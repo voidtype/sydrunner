@@ -66,11 +66,18 @@ From the repo root on the Mac, after `npm run build` **and the precompress step*
 scripts/precompress-dist.sh   # writes .zst/.br sidecars beside every asset
 ```
 
-The full runbook is **build → precompress → rsync → restart**, plus
-`scripts/publish-world-release.sh` whenever the pipeline has rebuilt the world.
-That last step is currently independent of the deploy — the client does not read
-from the releases yet, for the reason in [The world as a GitHub
-release](#the-world-as-a-github-release).
+The full runbook is **build → precompress → rsync → restart**. When the pipeline
+has rebuilt the world, `scripts/publish-world.sh` goes **first** — it stamps the
+new CDN ref into `client/public/world/index.json`, and that stamp has to be in
+the tree before `vite build` copies `public/` into `dist/`:
+
+```
+publish-world.sh  →  npm run build  →  precompress-dist.sh  →  rsync  →  restart
+```
+
+Publishing an unchanged world is a no-op worth skipping, but never harmful: the
+ref only moves when the bytes do. See [The world is a jsDelivr
+CDN](#the-world-is-a-jsdelivr-cdn).
 
 Caddy's `file_server { precompressed zstd br }` (in the site block since
 2026-08-04) serves those sidecars to any client that accepts them — tile GLBs
@@ -189,80 +196,106 @@ unstamped world under `immutable` is the seam this whole scheme exists to
 prevent. Since the world and the header are shipped by two different commands,
 the safe order is: rsync `dist/`, then reload Caddy.
 
-## The world as a GitHub release
+## The world is a jsDelivr CDN
 
-**Status: published, and not yet used by the client.** Read the blocker below
-before wiring anything to it.
+**Status: live in the client, off in production until the next deploy.**
 
-The box has a **20 GB/month transfer cap** and a first visit streams ~200 MB of
-precompressed city, so the site is roughly a hundred first visits from being
-shaped or billed — it breaks by being played. The world is 3,928 immutable
-files that are identical for every player and already versioned by `?v=<built>`,
-which makes it a static-asset problem, so it was published to GitHub releases:
+The box has a **20 GB/month transfer cap** and a first visit streams ~175 MB of
+city, so the site is roughly a hundred first visits from being shaped or billed —
+it breaks by being played. The world is 3,928 immutable files, identical for
+every player, so it is a static-asset problem and it now lives somewhere else:
 
 ```bash
-scripts/publish-world-release.sh            # --dry-run to compress and stop
+scripts/publish-world.sh            # --dry-run to see what it would do
 ```
 
-That gzips every file under `client/public/world` (originals kept), flattens the
-path — `tiles/-5_9.glb` becomes `tiles__-5_9.glb.gz`, since release assets have
-no folders — and uploads to `world-<built>-s0` .. `world-<built>-s7`. Two limits
-shaped that:
+That pushes `client/public/world` to the data repo
+**[voidtype/sydrunner-world](https://github.com/voidtype/sydrunner-world)** and
+prints a commit SHA. Players fetch from
+`https://cdn.jsdelivr.net/gh/voidtype/sydrunner-world@<sha>/<path>`.
 
-- **1000 assets per release.** GitHub refuses the 1001st (`file_count limited to
-  1000 assets per release`), so the world is sharded eight ways by
-  `FNV-1a(name) mod 8` — 485–496 files each. The client computes the same hash
-  in `client/src/world/cdn.ts` and needs no manifest.
-- **API rate limits.** ~3,900 uploads in a row trips the secondary limit and the
-  run stops partway. Re-runs are safe and resume (`--clobber`), but a full
-  publish needs to be spread out or retried.
+Four things about that are deliberate.
 
-`index.json` is uploaded for completeness but the client **always** reads it from
-the origin: it is the mutable pivot that names the version everything else is
-cached under (`client/src/world/version.ts`).
+**It is a separate repo, holding exactly one commit.** The branch is rebuilt from
+scratch each publish (a fresh `git init`, so "one commit" is true by construction
+rather than by discipline) and force-pushed. A world rebuild would otherwise add
+~600 MB to a repo's history *forever*. Old builds survive as tags and the script
+prunes all but the newest two — a client holding an older index lives for one
+session, and two builds is ~400 MB of repo.
 
-### The blocker: no CORS on release assets
+**The ref is a commit SHA, not a tag.** jsDelivr treats `@<sha>` as immutable and
+caches it forever; a tag is a moving target it has to revalidate.
 
-**A browser cannot fetch a GitHub release asset cross-origin.** A download
-redirects from `github.com` to `release-assets.githubusercontent.com`, an Azure
-Blob backend whose 200 carries `content-disposition: attachment` and **no
-`access-control-allow-origin` header at all**. Measured 2026-08-04:
+**The files are NOT gzipped**, which is the one counter-intuitive part. jsDelivr
+brotli-compresses on the fly and beats a pre-gzipped copy, because a `.gz` can
+only be served as opaque bytes where a raw file gets content negotiation.
+Measured on a real tile:
+
+```
+tiles/-10_-1.glb    raw 1,921,940    br 540,716    .gz 597,683
+```
+
+GLB is 97% of the world by bytes, so storing raw saves ~17 MB of a ~192 MB first
+visit (9%). It also deletes a whole layer of client code — no
+`DecompressionStream`, no feature detection, no engine that cannot inflate —
+because `Content-Encoding` is the browser's job and is transparent to `fetch`.
+
+**The client is told the ref by the origin's `index.json`**, which the publish
+script stamps after pushing:
+
+```json
+"cdn": { "ref": "<sha>", "repo": "voidtype/sydrunner-world" }
+```
+
+No pipeline change and no client rebuild: `index.json` is the one world file that
+is deliberately never cached (see `client/src/world/version.ts`), which makes it
+exactly the right place to put a pointer at immutable data. It cannot be stamped
+into the *published* copy, because the ref is the hash of the commit that would
+contain it. `vite build` copies `public/` into `dist/`, so stamping `public/` is
+enough for any future build; `dist/` is stamped too when it exists, so an
+already-built tree does not need rebuilding before the next rsync.
+
+### Why not GitHub releases
+
+The first version of this shipped to releases and had to be abandoned:
+**release assets carry no CORS header.** A download redirects to
+`release-assets.githubusercontent.com`, whose 200 has no
+`access-control-allow-origin` at all, so a browser `fetch` throws and
+`{mode:'no-cors'}` returns an unreadable opaque response. Releases are also
+capped at **1000 assets** (this world is 3,928) and rate-limit hard on bulk
+upload. jsDelivr answers all three: CORS `*`, no asset cap, and `git push` is not
+subject to the REST API rate limit.
+
+### Verifying a publish
 
 ```bash
-curl -sL -o /dev/null -D - -H 'Origin: https://oxford-tractor.bnr.la' \
-  'https://github.com/voidtype/sydrunner/releases/download/world-1785761486-s0/collision__-11_-4.bin.gz' \
-  | grep -i access-control    # -> nothing
+SHA=$(jq -r .cdn.ref client/public/world/index.json)
+curl -sIL -H 'Origin: https://oxford-tractor.bnr.la' \
+  "https://cdn.jsdelivr.net/gh/voidtype/sydrunner-world@$SHA/tiles/-10_-1.glb" |
+  grep -iE 'HTTP/|access-control-allow-origin|cache-control|content-encoding'
 ```
 
-In a browser: `fetch(asset)` throws `TypeError: Failed to fetch`; the same fetch
-with `{mode:'no-cors'}` returns an **opaque** response (so the request reaches
-the server — this is CORS, not the network); and a control fetch of
-`raw.githubusercontent.com` from the same page returns 200. An opaque response
-cannot be read, so no client code recovers it. This is GitHub infrastructure and
-is not configurable from a repo.
+Expect `200`, `access-control-allow-origin: *`, `cache-control: public,
+max-age=31536000, s-maxage=31536000, immutable`, and `content-encoding: br`.
+Measured 2026-08-04, a fresh SHA resolved within seconds of the push with no
+warm-up wait; a cold edge can still make the *first* hit slow, which is what the
+client's probe timeout is sized for.
 
-So `client/src/world/cdn.ts` ships with `CDN_ENABLED` false and every asset takes
-the origin path. The layer itself is complete and verified — sharding, a one-time
-boot probe, gzip inflate via `DecompressionStream`, per-file fallback, and a
-five-strike session cutout — and `?cdn` turns it on to watch it degrade:
+In the browser, `__cdn()` in the console is the truth at any moment. A healthy
+boot reads:
 
 ```
-http://localhost:5173/?offline&cdn
-> __cdn()
-{ hits: 0, fallbacks: 0, origin: 17, enabled: false, reason: 'probe failed' }
+{ hits: 17, fallbacks: 0, origin: 0, enabled: true, reason: '' }
 ```
 
-One request to GitHub (the probe), which fails, disables the CDN for the session,
-and every asset then goes straight to the origin with no per-file retry. The
-world loads normally and the player sees nothing.
-
-**If you want this to actually cut egress**, the options are: a host that sends
-CORS (Cloudflare R2, Backblaze B2 + Cloudflare, jsDelivr); or
-`raw.githubusercontent.com`, which *does* send `access-control-allow-origin: *`
-but serves out of the git tree — that means ~195 MB of world binaries in git
-history, permanently and for every rebuild, which is exactly what `.gitignore`
-and this scheme were built to avoid. Flipping `CDN_ENABLED` and changing
-`RELEASE_BASE` is the whole client-side change either way.
+`origin: 0` is the whole point — the only world request left on the box is
+`index.json`. Fallback semantics, all of which land back on the origin's
+untouched `?v=<built>` path: no `cdn` block, or a failed one-time boot probe,
+disables the CDN for the session; a single asset failing falls back alone; five
+consecutive failures disable it. `?nocdn` pins to the origin and `?cdnbogus`
+points the ref at a SHA that cannot exist — that costs exactly one probe request
+and then serves the entire world from the origin, which is what a jsDelivr
+outage would look like.
 
 ## Rollback
 

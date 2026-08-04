@@ -94,7 +94,7 @@ import {
   type NamedSegment,
   type TileStreetNames,
 } from './streetnames.ts';
-import { fetchWorldAsset, fetchWorldBuffer } from './cdn.ts';
+import { armCdn, fetchWorldAsset, fetchWorldBuffer, type CdnContract } from './cdn.ts';
 import { TerrainField, buildTerrainMesh, sampleTileGrid } from './terrain.ts';
 import { worldVersionSuffix } from './version.ts';
 import {
@@ -247,6 +247,14 @@ export interface WorldIndex {
    * client's reader has to.
    */
   built?: number;
+  /**
+   * Where the immutable copy of *this* build lives, when one has been published:
+   * a data-repo commit SHA that `scripts/publish-world.sh` stamps in after
+   * pushing. Absent on any world that has not been published, which simply means
+   * no CDN. See `world/cdn.ts` for why this pointer lives in the one world file
+   * that is deliberately never cached.
+   */
+  cdn?: CdnContract;
   stage: string;
   radius_m: number;
   tile_size: number;
@@ -1085,6 +1093,11 @@ export class TileStreamer {
     // *with* it. The index itself deliberately carries no suffix -- it is what
     // names the version, so it cannot be cached behind one.
     this.version = worldVersionSuffix(this.index);
+    // And where those assets come from, decided in the same breath and for the
+    // same reason: the index names both the version and, via its `cdn` block,
+    // the immutable tree that holds that version. Arming here means every world
+    // fetch after this line sees a decided CDN -- see `world/cdn.ts`.
+    armCdn(this.index);
     this.terrainField = new TerrainField(
       this.terrain.grid,
       this.index.tile_size,

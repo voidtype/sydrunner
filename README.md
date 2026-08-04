@@ -12,10 +12,10 @@ Built to [`sydney-fps-build-spec.md`](sydney-fps-build-spec.md). This file recor
 how to run it, and — importantly — what does not exist yet.
 
 The world itself is not in this repository. It is ~620 MB of generated geometry, published
-as gzipped [release assets](https://github.com/voidtype/sydrunner/releases) instead — see
-[Data and attribution](#data-and-attribution) below, and [`DEPLOY.md`](DEPLOY.md) for how a
-build gets there and why the client does not yet stream from those releases (GitHub serves
-release assets without CORS, so a browser cannot read one cross-origin).
+to a separate data repo — [voidtype/sydrunner-world](https://github.com/voidtype/sydrunner-world)
+— and streamed by players from jsDelivr's CDN, which is what keeps a 20 GB/month box serving
+a city. See [Data and attribution](#data-and-attribution) below, and [`DEPLOY.md`](DEPLOY.md)
+for how a build gets there.
 
 ---
 
@@ -1616,10 +1616,10 @@ stopped rather than starting over.
 ## Data and attribution
 
 The city is a derivative of open geodata, and the licences below travel with it. This
-applies to everything under `client/public/world/` and to every asset published in this
-repository's [world releases](https://github.com/voidtype/sydrunner/releases) — those
-release assets are a **processed derivative** of the sources named here (reprojected,
-merged, simplified, tiled and gzipped), redistributed under **ODbL**.
+applies to everything under `client/public/world/` and to everything published in the data
+repo [voidtype/sydrunner-world](https://github.com/voidtype/sydrunner-world) — that world
+data is a **processed derivative** of the sources named here (reprojected to EPSG:7856,
+merged, simplified and tiled), redistributed under **ODbL**.
 
 - **Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors**,
   available under the [Open Database License (ODbL)](https://opendatacommons.org/licenses/odbl/).
