@@ -369,10 +369,16 @@ async function main(): Promise<void> {
   // is really two files disagreeing. See `game/bikes.ts` and `world/bike.ts`.
   const bikeFailures = timed('bikes', verifyBikes);
   const bikeMeshFailures = timed('bike model', verifyBikeMesh);
-  // And the marker under a parked one, which fails in a third silent way: a
-  // flat horizontal surface wound the intuitive way faces the ground, so the
-  // glow would be drawn perfectly for anybody standing under the road and be
-  // invisible to every player. See `world/bike.verifyBikeGlow`.
+  // And the light a parked one gives off -- the marker under it and the beam
+  // over it -- which fails in a third silent way: a flat horizontal surface
+  // wound the intuitive way faces the ground, so the glow would be drawn
+  // perfectly for anybody standing under the road and be invisible to every
+  // player. The beam adds its own: a gradient that does not reach zero is a
+  // green line ruled across the sky with a visible end, a beam and a bike
+  // filled from different gates is a 72 m column left standing over an empty
+  // parking spot, and `depthTest` turned off trades the whole over-the-rooftops
+  // effect for a green haze drawn through the terrain. See
+  // `world/bike.verifyBikeGlow`.
   const bikeGlowFailures = timed('bike glow', verifyBikeGlow);
   // And the pedestrians, in the same two halves and failing in the same two
   // silent ways.
@@ -907,6 +913,12 @@ async function main(): Promise<void> {
         // The bike. Instanced, casting, and the same material for the parked set
         // and the ridden one -- so this one entry covers every bike in the game.
         { geometry: bikes.geometry, material: bikes.material, casts: true },
+        // The bike's glow disc and sky beam. Additive, never casting, both
+        // instanced -- without these the first bike a player walks toward
+        // compiles two pipelines in the frame the beacon exists to make them
+        // look at.
+        { geometry: bikes.glowGeometry, material: bikes.glowMaterial, casts: false, instanced: true },
+        { geometry: bikes.beamGeometry, material: bikes.beamMaterial, casts: false, instanced: true },
         // The far tier of the crowd, which is instanced, per-instance coloured
         // and casting. One entry covers all six of its sets: they share the one
         // material, and `warmup.ts`'s cache key reads attribute *layouts* rather
@@ -1795,6 +1807,13 @@ async function main(): Promise<void> {
   // it is filled from the same pass that fills the bikes so a ridden bike and
   // its marker can never disagree about who is on it.
   scene.add(bikeMeshes.glow);
+  // And the beacon over it: a 72 m lime column, drawn to the bike's own 400 m
+  // rather than the marker's 120, which is the long-range half of the same
+  // signal. See `world/bike.buildBikeBeam` -- it depth *tests*, so a terrace
+  // clips the bottom and the top stands clear over the roofline, which is the
+  // whole "spottable from blocks away" read. Filled on the same row of the same
+  // loop as the bike itself, so it goes out the frame somebody mounts.
+  scene.add(bikeMeshes.beam);
   /** The one under the local rider, drawn at the predicted position. */
   const selfBike = new RiddenBike(bikes);
   scene.add(selfBike.mesh);
@@ -2275,6 +2294,27 @@ async function main(): Promise<void> {
     for (const c of combatants) {
       if (c === playerCombat) continue;
       sink.mark(c.body.position.x, c.body.position.z, 'combatant', c.body.yaw);
+    }
+  });
+
+  // The unclaimed e-bikes, which is the map half of the beacon.
+  //
+  // **Unclaimed**, on exactly the test `BikeMeshes.update` uses: the wire's
+  // `rider` plus the local prediction, so the dot goes out on the frame `E` is
+  // pressed rather than 30 ms later when the server agrees, and comes back where
+  // the bike is dropped. Sharing the predicate with the renderer is what keeps
+  // the beam in the street and the dot on the map from ever disagreeing -- the
+  // failure would be a lime dot standing over a spot where the bike left ten
+  // seconds ago.
+  //
+  // No range test of its own. `mark` culls to the compass's 160 m and the big
+  // map culls to its view box, which is the sink's job by design; at 115 bikes
+  // this loop is a few microseconds at the minimap's 15 Hz and there is nothing
+  // to cache. A bike that has not been placed yet is simply not in the field.
+  minimap.addMarkerSource((sink) => {
+    for (const b of bikeWorld().all()) {
+      if (b.rider !== 0 || isRiddenLocally(b.id)) continue;
+      sink.mark(b.x, b.z, 'bike');
     }
   });
 
@@ -4614,6 +4654,10 @@ async function main(): Promise<void> {
         // How many are wearing a marker, which is the shorter range and the
         // answer to "is the glow on" without going to look at one.
         glowing: bikeMeshes.glowDrawn,
+        // And how many are lit up. Always equal to `drawn` -- they are filled
+        // on the same row -- so this is the one number that says "the beacons
+        // are on and they are on the right bikes" from the console.
+        beaming: bikeMeshes.beamDrawn,
         riding: playerCombat.ridingBike,
         tuned: playerCombat.bikeTuned,
         multiplier: playerCombat.ridingBike !== 0 ? bikeSpeedScale(playerCombat.bikeTuned) : 1,
@@ -4627,6 +4671,7 @@ async function main(): Promise<void> {
         lean: rideLean,
         triangles: bikes.triangles,
         glowTriangles: bikes.glowTriangles,
+        beamTriangles: bikes.beamTriangles,
       }),
       nearest: () => {
         let best: { id: number; range: number; x: number; z: number } | null = null;

@@ -101,6 +101,7 @@
  */
 
 import type { CollisionWorld, Prism } from './player/collision.ts';
+import { markerInk } from './minimap.ts';
 import type { MarkerKind, MarkerSink } from './minimap.ts';
 import {
   MapAtlas,
@@ -239,9 +240,10 @@ const SCALE_INK = 'rgba(147,168,188,0.75)';
 const PLAYER_FILL = 'rgba(255,255,255,0.95)';
 /** The view cone. Barely there on purpose: it is orientation, not a claim about sight lines. */
 const CONE_FILL = 'rgba(255,255,255,0.10)';
-const COMBATANT_DOT = '#f0a9a0';
-const TRAINING_DOT = 'rgb(255,184,41)';
-const FLAT_WHITE_DOT = 'rgb(247,237,209)';
+// The marker inks are not here. They live beside the marker kinds in
+// `minimap.ts` and this file imports `markerInk`, because the two maps draw one
+// marker list through one `collect` and a second copy of that switch is how the
+// big map ends up with a colour the compass does not use.
 
 /**
  * The dark ring every piece of text on this map is drawn over.
@@ -298,6 +300,19 @@ const LABEL_PAD = 2;
 const PLAYER_R = 5.5;
 const CONE_PX = 34;
 const DOT_R = 3;
+/**
+ * The bikes, per zoom, indexed by `ZOOMS`.
+ *
+ * The only marker whose size moves with the zoom, and it moves because it is
+ * the only one there are a hundred of. At the neighbourhood zoom a couple of
+ * dozen bikes over 1 km is a sparse scatter and they take the minimap's own
+ * 2.6 px; at the city zoom all 115 are on screen across 9 km, and 2.6 px dots
+ * at that density stop being a hundred places you could pick up a bike and
+ * become one lime cloud over the inner suburbs. 1.7 px keeps the constellation
+ * -- which is genuinely useful, it is a map of where the bikes are -- while
+ * leaving the powerups and the combatants unambiguously the larger marks.
+ */
+const BIKE_DOT_R = [2.6, 2.2, 1.7];
 /** How far a marker's heading tick reaches past its dot, in pixels. */
 const HEADING_TICK = 4.5;
 
@@ -1112,24 +1127,24 @@ export class BigMap implements MarkerSink {
 
     let kind: MarkerKind | '' = '';
     ctx.lineWidth = 1.5;
+    // Read once rather than per dot: at the city zoom this loop runs over 115
+    // bikes and the radius is the same number for all of them.
+    const bikeR = BIKE_DOT_R[this.zoomIndex] ?? BIKE_DOT_R[BIKE_DOT_R.length - 1];
     for (let i = 0; i < this.dotCount; i++) {
       const d = this.pool[i];
       const sx = projectX(view, d.x);
       const sy = projectY(view, d.z);
-      // One style write per run of like markers, as `minimap.ts` does it.
+      // One style write per run of like markers, as `minimap.ts` does it, and
+      // through the same shared switch so the two maps cannot drift apart.
       if (d.kind !== kind) {
         kind = d.kind;
-        const ink =
-          d.kind === 'training'
-            ? TRAINING_DOT
-            : d.kind === 'flat-white'
-              ? FLAT_WHITE_DOT
-              : COMBATANT_DOT;
+        const ink = markerInk(d.kind);
         ctx.fillStyle = ink;
         ctx.strokeStyle = ink;
       }
+      const r = d.kind === 'bike' ? bikeR : DOT_R;
       ctx.beginPath();
-      ctx.arc(sx, sy, DOT_R, 0, TAU);
+      ctx.arc(sx, sy, r, 0, TAU);
       ctx.fill();
 
       // Which way they are facing, where that is known -- the same tick the
@@ -1141,8 +1156,8 @@ export class BigMap implements MarkerSink {
         const fx = -Math.sin(d.yaw);
         const fy = -Math.cos(d.yaw);
         ctx.beginPath();
-        ctx.moveTo(sx + fx * DOT_R, sy + fy * DOT_R);
-        ctx.lineTo(sx + fx * (DOT_R + HEADING_TICK), sy + fy * (DOT_R + HEADING_TICK));
+        ctx.moveTo(sx + fx * r, sy + fy * r);
+        ctx.lineTo(sx + fx * (r + HEADING_TICK), sy + fy * (r + HEADING_TICK));
         ctx.stroke();
       }
     }
@@ -1300,6 +1315,52 @@ export class BigMap implements MarkerSink {
 export function verifyBigMap(): string[] {
   const failures: string[] = [];
   const view: MapView = { cx: 0, cz: 0, scale: 0.1, size: 800 };
+
+  // --- The shared palette. Both maps draw one marker list through `markerInk`,
+  // so a kind with no branch of its own does not fail to draw -- it draws in
+  // whatever the fallthrough is, which is the combatant red. A lime e-bike
+  // rendered as "somebody who can hit you" is the exact failure that is
+  // invisible in a screenshot and wrong in a fight.
+  {
+    const kinds: MarkerKind[] = ['training', 'flat-white', 'combatant', 'bike'];
+    const seen = new Map<string, MarkerKind>();
+    for (const kind of kinds) {
+      const ink = markerInk(kind);
+      const clash = seen.get(ink);
+      if (clash !== undefined) {
+        failures.push(`Markers '${kind}' and '${clash}' are both drawn in ${ink}; one of them has no branch of its own.`);
+      }
+      seen.set(ink, kind);
+    }
+    // And the bike's is a green, which is what ties the dot to the lime frame
+    // and the lime beam it stands for. Parsed rather than string-compared, so
+    // the check survives the colour being retuned and catches it being retuned
+    // to something that is not a lime.
+    const rgb = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(markerInk('bike'));
+    if (rgb === null) {
+      failures.push(`The bike marker is '${markerInk('bike')}', which this check cannot read as an rgb triple.`);
+    } else {
+      const [r, g, b] = [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+      if (!(g > r && g > b * 1.4)) {
+        failures.push(
+          `The bike marker is rgb(${r}, ${g}, ${b}), which is not a lime. The dot's whole legibility is ` +
+            `that it is the colour of the object it points at.`,
+        );
+      }
+    }
+    // The bikes shrink as the map widens, and there is a size for every zoom.
+    if (BIKE_DOT_R.length !== ZOOMS.length) {
+      failures.push(`${BIKE_DOT_R.length} bike dot sizes against ${ZOOMS.length} zooms; the widest would fall back.`);
+    }
+    for (let i = 1; i < BIKE_DOT_R.length; i++) {
+      if (!(BIKE_DOT_R[i] < BIKE_DOT_R[i - 1])) {
+        failures.push(
+          `The bike dot is ${BIKE_DOT_R[i]} px at the ${ZOOMS[i].name} zoom against ${BIKE_DOT_R[i - 1]} at ` +
+            `the one below. All 115 of them at full size across 9 km is one lime cloud, not a map.`,
+        );
+      }
+    }
+  }
 
   // --- North is up, east is right.
   {

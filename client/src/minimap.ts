@@ -188,13 +188,19 @@ import type { CollisionWorld, Prism } from './player/collision.ts';
  * What a marker can be.
  *
  * A closed union rather than a free string, so a typo in a provider is a
- * compile error rather than an invisible dot -- and it is closed at three
- * because three is what exists. A remote player, when the net layer arrives,
+ * compile error rather than an invisible dot -- and it is closed at four
+ * because four is what exists. A remote player, when the net layer arrives,
  * is a `combatant`: it is drawn from the same path, in the same red, with the
  * same heading tick, because from the map's point of view a remote and the
  * aggressor dummy are the same object -- someone else who can hit you.
+ *
+ * `bike` is an **unclaimed** lime e-bike, and the qualifier is the whole of it:
+ * a bike somebody is riding is a moving object that belongs to them and a dot
+ * for it would be a dot you cannot act on. The world half of the same signal is
+ * `world/bike.ts`'s beam, gated on exactly the same test, so the column in the
+ * street and the dot on the map go out together the instant somebody gets on.
  */
-export type MarkerKind = 'training' | 'flat-white' | 'combatant';
+export type MarkerKind = 'training' | 'flat-white' | 'combatant' | 'bike';
 
 /**
  * One thing on the map, in world metres.
@@ -328,6 +334,26 @@ const FLAT_WHITE_DOT = 'rgb(247,237,209)';
  */
 const COMBATANT_DOT = '#f0a9a0';
 
+/**
+ * The unclaimed e-bikes, in the bike's own lime.
+ *
+ * `#9BC53D` is `world/bike.LIME` written in sRGB -- the frame's paint, not the
+ * glow's emission -- brought up a little for a 2.6 px dot, which is small enough
+ * that a colour reads several steps darker than the same colour in a field.
+ * Using the object's own colour is the entire reason this is legible without a
+ * legend: the thing you are looking for in the street is bright yellow-green,
+ * and so is the dot that says where it is.
+ *
+ * It clears the map's own palette on hue rather than on brightness, which is
+ * what makes it safe against both grounds it is drawn over: the buildings are
+ * the interface's one pale blue-white and the harbour is a desaturated blue, and
+ * a yellow-green is the far side of the wheel from both. The powerups' gold is
+ * the nearest neighbour and is separated the same way the world separates them
+ * -- gold is orange-yellow, this is green-yellow, and at 3 px that is the
+ * difference between a coffee and a bike.
+ */
+const BIKE_DOT = 'rgb(174,214,79)';
+
 /** The player. The only pure white on the map, because it is the only thing that is always there. */
 const PLAYER_FILL = 'rgba(255,255,255,0.92)';
 /** North, at the rim. Dimmer than the figure -- it is orientation, not content. */
@@ -336,8 +362,41 @@ const NORTH_INK = 'rgba(207,226,242,0.62)';
 /** Marker radii in *pixels*, which is why they are not inside the map transform. */
 const POWERUP_DOT_R = 3;
 const COMBATANT_DOT_R = 3.5;
+/**
+ * The bikes, a shade smaller than a powerup.
+ *
+ * A ranking rather than a taste: somebody who can hit you is the biggest dot, a
+ * spec 8.3 objective is the middle one, and a bike is a convenience you take if
+ * it is on your way. There are also up to a couple of dozen of them inside 160 m
+ * in the inner suburbs against two or three powerups, and dots at the same size
+ * would make the map read as being mostly about bikes.
+ */
+const BIKE_DOT_R = 2.6;
 /** How far a combatant's heading tick reaches past their dot, in pixels. */
 const HEADING_TICK = 5;
+
+/**
+ * What colour a marker is drawn in, for **both** maps.
+ *
+ * Exported and shared rather than written out twice, on `collect`'s own
+ * argument: the two maps already draw one marker list, and the failure mode of
+ * a second copy of this switch is the big map inventing a colour the compass
+ * does not use -- which is a legend that changes when you press `M`. A pure
+ * function of the kind, so `verifyBigMap` can assert the whole palette without a
+ * canvas.
+ */
+export function markerInk(kind: MarkerKind): string {
+  switch (kind) {
+    case 'training':
+      return TRAINING_DOT;
+    case 'flat-white':
+      return FLAT_WHITE_DOT;
+    case 'bike':
+      return BIKE_DOT;
+    default:
+      return COMBATANT_DOT;
+  }
+}
 
 const TAU = Math.PI * 2;
 
@@ -628,12 +687,7 @@ export class Minimap implements MarkerSink {
       // run -- and it costs a string compare either way.
       if (m.kind !== kind) {
         kind = m.kind;
-        ink =
-          m.kind === 'training'
-            ? TRAINING_DOT
-            : m.kind === 'flat-white'
-              ? FLAT_WHITE_DOT
-              : COMBATANT_DOT;
+        ink = markerInk(m.kind);
         ctx.fillStyle = ink;
         // The tick takes the marker's own colour rather than the combatant red
         // it is only ever drawn in today, so a future kind with a heading is not
@@ -641,7 +695,7 @@ export class Minimap implements MarkerSink {
         ctx.strokeStyle = ink;
       }
 
-      const r = m.kind === 'combatant' ? COMBATANT_DOT_R : POWERUP_DOT_R;
+      const r = m.kind === 'combatant' ? COMBATANT_DOT_R : m.kind === 'bike' ? BIKE_DOT_R : POWERUP_DOT_R;
       ctx.beginPath();
       ctx.arc(sx, sy, r, 0, TAU);
       ctx.fill();

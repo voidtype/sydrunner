@@ -683,6 +683,335 @@ function buildBikeGlow(): BikeParts {
   return p;
 }
 
+// --- The beacon over a parked one ---------------------------------------------
+
+/**
+ * The beam: a lime shaft of light standing 72 m out of every idle bike.
+ *
+ * *"Make the e bikes put a green beam in the air to make them super
+ * spottable."*
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS IS A SIBLING OF THE GLOW AND NOT A SECOND SYSTEM.
+ *
+ * The glow above solves findability *in the street you are standing in*: it is
+ * a puddle of light on the road, it is occluded exactly as the bike is, and it
+ * is gated at `BIKE_GLOW_RANGE` because 64 discs strewn across 400 m of city
+ * would be a field of green blobs on the horizon. That gate is also its
+ * limitation, and it is the one the order is about: a bike two blocks away is
+ * behind a terrace, its disc is on the wrong side of the wall, and there is
+ * nothing to see. A share bike you cannot find is a share bike that does not
+ * exist.
+ *
+ * So the beam is the **long-range** half of the same signal, drawn to the
+ * bike's own `BIKE_DRAW_RANGE`, and it is built from the same parts: the same
+ * `BikeParts` builder, the same additive-under-a-tone-curve argument, the same
+ * `FrontSide`-with-both-windings trick, one geometry, one material, one
+ * `InstancedMesh` filled **from the same loop** as the bikes themselves. A bike
+ * and its beam cannot disagree about who is riding, because there is no second
+ * pass over the bikes in which they could.
+ *
+ * ---------------------------------------------------------------------------
+ * THREE PLANES AT 60 DEGREES, WHICH IS WHAT MAKES IT A COLUMN.
+ *
+ * A billboard would be the cheap answer and it is the wrong one: a quad turned
+ * to face the camera is a HUD element that happens to be in the world, it
+ * shears visibly when you strafe past it, and 64 of them all turning together
+ * reads as one animation. Crossed planes are a *fixed object* -- they occlude
+ * and are occluded like anything else standing in the street.
+ *
+ * Three rather than two, because two cross at 90 degrees and go nearly edge-on
+ * twice per half-turn; three at 60 degrees never leave a gap. The additive sum
+ * of the projected widths runs 1.73 to 2.73 of one plane's across a full turn,
+ * a 58% swing that reads as a soft flicker only if every beam in the city is at
+ * the same angle -- so the instance matrix carries a per-id yaw (`BEAM_PHASE`)
+ * and a street's worth of beams are all at different points of that swing. It
+ * is a *fixed* offset and not a spin: the rays under the bike turn, and a
+ * 72 m column that turned would be the only thing in Sydney doing it.
+ *
+ * The three planes all pass through the axis, so they overlap in screen space
+ * along the centre line and separate toward the edges: a bright core with
+ * dimmer flanks, which is what a shaft of light through air looks like and
+ * which costs nothing to get because additive blending does it on its own.
+ *
+ * ---------------------------------------------------------------------------
+ * THE GRADIENT IS FRONT-LOADED, FOR THE DISC'S REASON.
+ *
+ * `GLOW_FALLOFF` records what happened the first time this project ramped a
+ * brightness gently under `NeutralToneMapping`: the curve compresses its top
+ * hard, so 0.78 and 1.0 land within a few sRGB steps of each other and the
+ * entire visible gradient crams into the last quarter -- which is a hard edge,
+ * not a fade. The same trick applies here and the same way: the brightness is
+ * spent early, where the curve is still steep, so two thirds of it is gone by
+ * a fifth of the way up and the top half is a long dim tail. The last stop is
+ * **exactly zero**, because under an additive blend that is what an end is; a
+ * beam that stopped at 0.05 would be a green line ruled across the sky with a
+ * visible top.
+ *
+ * The foot is the other half of that lesson. `RAY_STOPS` dims the rays where
+ * they leave the road because the disc is already bright there and a second
+ * full-brightness surface on top of it glared. The beam's foot sits at
+ * `BEAM_BASE` -- inside the frame, so the light reads as coming *out of the
+ * bike* -- at a third of full, and comes to its own peak about five metres up,
+ * above head height. That is also what stops the column washing out the bike
+ * you walked over to mount, which is the one place a player is guaranteed to
+ * be standing inside it.
+ *
+ * ---------------------------------------------------------------------------
+ * NOON AND MIDNIGHT, ON THE GLOW'S OWN ARGUMENT.
+ *
+ * Additive, and that is the whole day/night term. The frame is tone-mapped at
+ * `calibration.EXPOSURE` = 0.62 through `NeutralToneMapping`, so a sunlit
+ * sandstone wall arrives at the blend at 4-5 in scene-linear and the same wall
+ * at night at a few hundredths. Adding ~2 of green at the core is a strong
+ * green *shift* on the first and an order-of-magnitude *glow* on the second.
+ * There is no uniform to keep in sync with the sky and no hour nobody tested.
+ *
+ * The two places the beam departs from the disc are both consequences of the
+ * one thing additive cannot do on its own, which is beat a *bright* background.
+ * Against a night street the beam is an order of magnitude over what it is
+ * drawn on and any reasonable number works. Against a 3 pm sky it is a small
+ * addition to something already bright, and the first cut of this -- the disc's
+ * own emission over a 1.4 m column -- was a faint scratch on the sky at 60 m,
+ * a beacon that worked at exactly the hours nobody needs one.
+ *
+ * So: it runs **hotter**, which it can afford because it is thin -- a disc
+ * pushed that far is a saturated ellipse with a rim, where a 2 m column at
+ * 400 m is four or five pixels and a four-pixel line going near-white-green at
+ * midday is not a blown surface, it is a beacon working. And it runs
+ * **narrower in hue**, at a fifth the red of the disc rather than a third,
+ * because what a player picks out of a skyline is a hue shift and every unit
+ * spent on red and blue pushes the result toward white -- which is what the sky
+ * already is. Both were arrived at by looking, at 3 pm and at 21:30, from six
+ * metres and from three hundred.
+ *
+ * ---------------------------------------------------------------------------
+ * DEPTH: IT TESTS. THE OCCLUSION *IS* THE EFFECT.
+ *
+ * `depthWrite` off, `depthTest` **on**, which was the one real decision here
+ * and it went the way it did after looking at both.
+ *
+ * Off is tempting -- it is the only way to guarantee a beam is never hidden --
+ * and it is wrong three times over. It draws every beam within 400 m through
+ * the terrain, so a bike behind a hill in Surry Hills paints a green column up
+ * the face of the hill; it draws them through the road, so a beam below you on
+ * a hill comes up through the footpath you are standing on; and 64 of them
+ * composited over everything is a green haze on the whole frame rather than 64
+ * findable objects. It also makes the thing a HUD element, which is precisely
+ * what this file's header spends four paragraphs arguing a bike must not be.
+ *
+ * On, the terrace in front of the bike clips the bottom of its beam and the
+ * top half stands clear over the roofline -- which is the *entire* read the
+ * order asked for. A Sydney terrace is 10-20 m at the ridge and the beam is 72,
+ * so better than two thirds of it is above every roofline in the inner suburbs
+ * and the gradient is tuned so that the part above the roof is still around
+ * half of peak. The canyon case -- a beam five metres behind a wall you are
+ * standing against -- loses the column and keeps the glow, which is the right
+ * division of labour between the two: at that range the disc is already on.
+ * The CBD towers are the only place a beam is genuinely swallowed, and a bike
+ * on the far side of the AMP tower is not one a player was going to reach.
+ */
+
+/**
+ * How tall it stands, metres, measured from the road.
+ *
+ * 72 rather than 30 or 200. The floor is the roofline it has to clear plus the
+ * distance it has to clear it *by*: a terrace ridge is 10-20 m, and a column
+ * that ended at 25 would be a stub peeking over a roof at close range and
+ * hidden behind the next street's roof at 300 m, because the sight line drops
+ * as you back away. At 72 m the beam is above every inner-suburb roofline from
+ * anywhere inside its own draw range. The ceiling is that this is a city with a
+ * skyline in it -- past about 100 m the columns start reading as buildings, and
+ * Sydney Tower is 305.
+ */
+const BEAM_HEIGHT = 72;
+/**
+ * Where the foot sits, metres. On the downtube, not on the road.
+ *
+ * The light comes out of the bike rather than out of the pavement beside it,
+ * which is the difference between a beacon attached to an object and a marker
+ * dropped near one. It also keeps the beam's own base clear of the glow disc
+ * lying at 3 cm, so the two do not stack into a glare at the one place a player
+ * stands closest.
+ */
+const BEAM_BASE = 0.55;
+/**
+ * Half-widths at the foot and the tip, metres. A slight taper, not a cone.
+ *
+ * 2.2 m across at the base, and the width is a *daylight* number rather than a
+ * look. Against a night street the beam is an order of magnitude over its
+ * background and a hand's width of it would do; against a 3 pm sky it is a hue
+ * shift on something already bright, and a hue shift is only as findable as it
+ * is large. The first cut of this was 1.4 m and it read as a faint scratch on
+ * the sky at 60 m, which is a beacon that works at exactly the hours you do not
+ * need one.
+ *
+ * The upper bound is that it must still read as a beam standing in a parking
+ * spot rather than a searchlight: at 2.2 m over 72 m the column is a 33:1
+ * spike, which is unmistakably a line and not a wall. The taper takes it to
+ * 1.1 m at the tip -- at 400 m the 1.9 m it leaves at a roofline is about five
+ * pixels of a 1080-line frame, and five pixels is a line you can pick out of a
+ * skyline.
+ */
+const BEAM_HALF_BASE = 1.1;
+const BEAM_HALF_TIP = 0.5;
+/** How many planes cross through the axis. Three, at 60 degrees. See the header. */
+const BEAM_PLANES = 3;
+/**
+ * The gradient, as `[height fraction, brightness]`. See the header for both
+ * ends of it: the dim foot is `RAY_STOPS`' lesson and the front-loading is
+ * `GLOW_FALLOFF`'s.
+ *
+ * **Both ends reach exactly zero**, and the bottom one is not symmetry for its
+ * own sake. A plane's foot is a straight cut across the geometry, and at a
+ * brightness above zero that cut is a visible hard edge -- standing six metres
+ * off a bike you could read the three rectangles the column is made of, sliced
+ * flat where they meet the road, which is the one distance at which a beacon
+ * has to look least like three rectangles. Ramping from nothing over the first
+ * metre puts the edge where an additive blend cannot show it, and what a player
+ * sees instead is light welling up out of the frame. It costs one stop.
+ *
+ * The stop at 0.2 is the load-bearing one. 0.2 of the span is 15 m, which is a
+ * terrace ridge, and 0.78 is what the beam is still worth where it clears one.
+ * Everything above that is the part seen from three blocks away.
+ *
+ * The middle of the curve is deliberately fuller than the disc's equivalent,
+ * and it is the one place this departs from `GLOW_FALLOFF`. The disc's job is
+ * to have a soft edge, so it spends everything early and tails off. The beam's
+ * gradient runs the *wrong way against its own backgrounds* -- the bottom is
+ * seen against brick and road, where anything reads, and the top against the
+ * sky, which is the brightest thing in the frame and where a fade to nothing
+ * costs the most. It still has to be brightest at the base or it is a floating
+ * bar rather than a beam, so the answer is not to move the peak but to make the
+ * descent from it gentle through the 15-40 m band, which is precisely the band
+ * that is over the rooftops and against sky from three streets away.
+ */
+const BEAM_STOPS: ReadonlyArray<readonly [number, number]> = [
+  [0, 0],
+  [0.014, 0.34],
+  [0.06, 1],
+  [0.2, 0.78],
+  [0.44, 0.5],
+  [0.74, 0.22],
+  [1, 0],
+];
+/**
+ * The beam's lime, **linear**, and half again over the disc's emission.
+ *
+ * A separate constant from `GLOW_LIME` and a hotter one, because the two are
+ * capped by different things. The disc is a square metre of road: pushed past
+ * about 1.3 it stops being light on a surface and becomes a saturated ellipse
+ * with a rim. The beam is a 2 m column seen at up to 400 m, and what caps it is
+ * `NeutralToneMapping`'s **desaturation shoulder** -- the curve rolls high
+ * values toward white, so past roughly 3 in scene-linear the core of the column
+ * stops being lime and starts being a white stripe with green edges, which is
+ * less findable than the dimmer version because white is what the sky already
+ * is. 1.13 of green per plane against three overlapping planes and a 0.78 mean
+ * opacity puts the core at 2.6, which is under that shoulder with room to
+ * spare and about twice what the first cut drew.
+ *
+ * The **ratio** is where this last differs from the disc, and it is the other
+ * half of the daylight problem. Against a night street any additive colour
+ * reads, because the background is nearly zero and the beam simply *is* the
+ * colour. Against a 3 pm sky the beam is a small addition to something already
+ * bright in every channel, and what a player picks out of a skyline is a hue
+ * shift rather than a brightness one -- so every unit spent on red and blue is
+ * a unit spent pushing the result toward white, which is what the sky already
+ * is. Red at 0.21 of green rather than the disc's 0.35: still visibly a
+ * yellow-green rather than a laser at night, and a materially stronger shift
+ * per unit of luminance in the one condition that was hard.
+ *
+ * Converted, never pasted, for the reason `LIME`'s own comment gives at length.
+ */
+const BEAM_LIME: Rgb = [0.24, 1.13, 0.09];
+/**
+ * The pulse: a mean and a depth, breathing on the **glow's own rate**.
+ *
+ * One clock, and that is the point of reusing `GLOW_PULSE_RATE` rather than
+ * picking a second number. Both nodes are built from the shared `time` uniform
+ * at the same rate, so the disc under a bike and the column over it swell and
+ * fade together; two rates a few percent apart would beat against each other on
+ * a period of a minute and read as a fault in the renderer.
+ *
+ * Shallower than the disc's, because the swing is multiplied by however many
+ * planes overlap at a given pixel and a 0.18 depth at the core is a 0.5 swing.
+ */
+const BEAM_MEAN = 0.78;
+const BEAM_PULSE = 0.11;
+/**
+ * How far each bike's beam is turned from the last, radians per id.
+ *
+ * Fixed, not animated. The three planes give an azimuthal brightness swing with
+ * a 60-degree period; 0.61 rad is a little over a third of that, so
+ * consecutive ids sit at different points of the swing and a street of beams
+ * never dims in unison. A shared angle would make a row of them one object.
+ */
+const BEAM_PHASE = 0.61;
+
+/**
+ * Build the beam as one geometry, in bike-local metres.
+ *
+ * Each plane is emitted **twice with opposite winding** rather than drawn with
+ * `DoubleSide`, exactly as the rays and the mudguard are: `world/contact.ts`
+ * records what a two-pass transparent material costs in this renderer, and
+ * `FrontSide` over a mirrored pair draws exactly one of the two from any
+ * viewpoint, so a plane is never added to the frame twice.
+ */
+function buildBikeBeam(): BikeParts {
+  const p = new BikeParts();
+  const span = BEAM_HEIGHT - BEAM_BASE;
+
+  for (let i = 0; i < BEAM_PLANES; i++) {
+    // Over a half-turn, not a full one: a plane at 180 degrees is the same
+    // plane as one at 0. Three of them is one every 60.
+    const a = (i / BEAM_PLANES) * Math.PI;
+    const ca = Math.cos(a);
+    const sa = Math.sin(a);
+    // The plane's own normal: horizontal, perpendicular to the vertical sheet
+    // it lies in. Carried for `verifyBikeGlow` and read by nothing else -- an
+    // unlit material never looks at a normal, and the check has to be able to
+    // ask whether a face agrees with the side it was built to be.
+    const nx = -sa;
+    const nz = ca;
+    /** One rung of the ladder at height fraction `t`: two points and a colour. */
+    const rung = (t: number, brightness: number) => {
+      const half = BEAM_HALF_BASE + (BEAM_HALF_TIP - BEAM_HALF_BASE) * t;
+      const y = BEAM_BASE + span * t;
+      const c: Rgb = [BEAM_LIME[0] * brightness, BEAM_LIME[1] * brightness, BEAM_LIME[2] * brightness];
+      return { left: [-ca * half, y, -sa * half] as Point, right: [ca * half, y, sa * half] as Point, c };
+    };
+    for (let s = 0; s < BEAM_STOPS.length - 1; s++) {
+      const lower = rung(BEAM_STOPS[s][0], BEAM_STOPS[s][1]);
+      const upper = rung(BEAM_STOPS[s + 1][0], BEAM_STOPS[s + 1][1]);
+      const corners: Array<[Point, Rgb]> = [
+        [lower.left, lower.c],
+        [lower.right, lower.c],
+        [upper.right, upper.c],
+        [upper.left, upper.c],
+      ];
+      for (const flip of [false, true]) {
+        const base = p.position.length / 3;
+        const order = flip ? [3, 2, 1, 0] : [0, 1, 2, 3];
+        // The cross product of the unflipped order works out to exactly
+        // `(-sin a, 0, cos a)` -- the sheet's own perpendicular -- and the
+        // reversed order to its negative. Flipping the normal *with* the
+        // winding is what makes the second copy a back face rather than a
+        // duplicate of the first.
+        const sign = flip ? -1 : 1;
+        for (const k of order) {
+          const [pt, c] = corners[k];
+          p.position.push(pt[0], pt[1], pt[2]);
+          p.normal.push(nx * sign, 0, nz * sign);
+          p.colour.push(c[0], c[1], c[2]);
+        }
+        p.index.push(base, base + 1, base + 2, base, base + 2, base + 3);
+      }
+    }
+  }
+
+  return p;
+}
+
 // --- Assets -------------------------------------------------------------------
 
 /**
@@ -713,6 +1042,10 @@ export class BikeAssets {
    */
   readonly glowMaterial: MeshBasicNodeMaterial;
   readonly glowTriangles: number;
+  /** The beacon over a parked one: one geometry and **one** material, as above. */
+  readonly beamGeometry: BufferGeometry;
+  readonly beamMaterial: MeshBasicNodeMaterial;
+  readonly beamTriangles: number;
 
   constructor() {
     const parts = buildBike();
@@ -794,6 +1127,51 @@ export class BikeAssets {
     glow.polygonOffsetUnits = -8;
     glow.polygonOffsetFactor = 0;
     this.glowMaterial = glow;
+
+    // --- The beam. See `buildBikeBeam`'s header for every decision below.
+    const beamParts = buildBikeBeam();
+    const beamGeometry = new BufferGeometry();
+    beamGeometry.name = 'lime-bike:beam';
+    beamGeometry.setAttribute('position', new BufferAttribute(new Float32Array(beamParts.position), 3));
+    beamGeometry.setAttribute('color', new BufferAttribute(new Float32Array(beamParts.colour), 3));
+    // Carried for `verifyBikeGlow` and for nothing else, exactly as the glow's
+    // are: an unlit material never reads a normal.
+    beamGeometry.setAttribute('normal', new BufferAttribute(new Float32Array(beamParts.normal), 3));
+    beamGeometry.setIndex(beamParts.index);
+    beamGeometry.computeBoundingSphere();
+    this.beamGeometry = beamGeometry;
+    this.beamTriangles = beamParts.index.length / 3;
+
+    const beam = new MeshBasicNodeMaterial();
+    beam.name = 'lime-bike:beam';
+    beam.vertexColors = true;
+    beam.color = new Color(1, 1, 1);
+    beam.transparent = true;
+    beam.blending = AdditiveBlending;
+    // Never writes: a column of light must not punch a hole through the bike it
+    // stands in, through the next beam behind it, or through the rider walking
+    // up to mount.
+    beam.depthWrite = false;
+    // **And it does test.** This is the decision the header argues at length --
+    // the terrace clipping the bottom of the beam is what leaves the top half
+    // standing over the roofline, which is the effect the order asked for, and
+    // it is also the only thing keeping 64 columns from being drawn through the
+    // terrain as a green haze over the whole frame. Stated rather than left at
+    // the default, because `verifyBikeGlow` asserts it and a future hand
+    // reaching for `depthTest = false` to "fix" a beam behind a wall should
+    // find a sentence here first.
+    beam.depthTest = true;
+    // One winding drawn from any side, because the geometry carries both.
+    beam.side = FrontSide;
+    // The pulse, on the glow's own rate and off the same shared `time` uniform:
+    // one clock, so the disc under the bike and the column over it breathe
+    // together. See `BEAM_MEAN`.
+    beam.opacityNode = float(BEAM_MEAN).add(sin(time.mul(GLOW_PULSE_RATE)).mul(BEAM_PULSE));
+    // No polygon offset, unlike the disc's. That exists because a surface lying
+    // *on* the road loses the depth fight and vanishes; a vertical sheet is
+    // coplanar with nothing and biasing it toward the camera would only let it
+    // creep through the wall in front of it.
+    this.beamMaterial = beam;
   }
 }
 
@@ -853,10 +1231,23 @@ export class BikeMeshes {
    * `main.ts` adds it to the scene; this class never touches the graph.
    */
   readonly glow: InstancedMesh;
+  /**
+   * The beacons, in a third draw over the same instance loop.
+   *
+   * Its own mesh for the glow's reason -- a different material, and three binds
+   * one per draw -- and filled on the **same row** as the bike itself rather
+   * than on a counter of its own. That is not a saving, it is the invariant:
+   * every bike this class draws has a beam and nothing else does, so "the beam
+   * over a bike somebody is riding away" is not a bug that can be introduced
+   * here without deleting a line that says `row`.
+   */
+  readonly beam: InstancedMesh;
   /** How many were drawn last update. Reported on the debug overlay. */
   drawn = 0;
   /** And how many markers, which is the shorter range. */
   glowDrawn = 0;
+  /** And how many beams, which is always exactly `drawn`. See `beam`. */
+  beamDrawn = 0;
 
   constructor(assets: BikeAssets) {
     const mesh = new InstancedMesh(assets.geometry, assets.material, CAPACITY);
@@ -889,6 +1280,25 @@ export class BikeMeshes {
     // last is order-independent against everything.
     glow.renderOrder = 2;
     this.glow = glow;
+
+    const beam = new InstancedMesh(assets.beamGeometry, assets.beamMaterial, CAPACITY);
+    beam.name = 'lime-bikes:beam';
+    // Neither, on the glow's argument doubled: a 72 m column casting into the
+    // sun's depth pass would lay a green-black stripe across half a suburb, and
+    // one receiving shadow would go out every time a cloud shadow crossed it.
+    beam.castShadow = false;
+    beam.receiveShadow = false;
+    // The set spans the city, so its bounding sphere is always on screen and
+    // culling it as a whole is meaningless. The range test in `update` is the
+    // culling. See `mesh` above.
+    beam.frustumCulled = false;
+    beam.count = 0;
+    // With the glow, after every other transparent. Additive is
+    // order-independent, so the two need no order between themselves -- what
+    // this buys is being drawn after the contact skirt, which is alpha-blended
+    // and would otherwise darken whichever of them sorted behind it.
+    beam.renderOrder = 2;
+    this.beam = beam;
   }
 
   /**
@@ -931,6 +1341,14 @@ export class BikeMeshes {
       _quaternion.setFromAxisAngle(_axis, bike.yaw);
       _matrix.compose(_position, _quaternion, _one);
       this.mesh.setMatrixAt(row, _matrix);
+      // The beacon, on the bike's own row and inside the bike's own gate, so
+      // the two counts are the same number by construction rather than by two
+      // tests that agree today. Turned by a fixed per-id angle -- see
+      // `BEAM_PHASE`: the three planes have an azimuthal brightness swing and a
+      // street of beams all at the same angle would dim in unison.
+      _quaternion.setFromAxisAngle(_axis, bike.id * BEAM_PHASE);
+      _matrix.compose(_position, _quaternion, _one);
+      this.beam.setMatrixAt(row, _matrix);
       row++;
 
       if (d2 > glowRange2) continue;
@@ -949,6 +1367,9 @@ export class BikeMeshes {
     this.glow.count = glowRow;
     this.glowDrawn = glowRow;
     this.glow.instanceMatrix.needsUpdate = true;
+    this.beam.count = row;
+    this.beamDrawn = row;
+    this.beam.instanceMatrix.needsUpdate = true;
   }
 
   dispose(): void {
@@ -956,6 +1377,8 @@ export class BikeMeshes {
     this.mesh.dispose();
     this.glow.removeFromParent();
     this.glow.dispose();
+    this.beam.removeFromParent();
+    this.beam.dispose();
   }
 }
 
@@ -1302,7 +1725,13 @@ export function verifyBikeMesh(): string[] {
 }
 
 /**
- * The marker under a parked bike, asserted.
+ * The light a parked bike gives off -- the marker under it and the beam over
+ * it -- asserted.
+ *
+ * Both, in one function, because they are one feature with one fill loop: the
+ * invariant that matters most here is that a bike, its disc and its column
+ * agree about who is riding, and that is a claim about the three of them
+ * together which neither could make alone.
  *
  * Separate from `verifyBikeMesh` because it is a separate object with a separate
  * failure mode, and every one of them is silent in this project's sense -- the
@@ -1325,6 +1754,26 @@ export function verifyBikeMesh(): string[] {
  *   - **A colour that is not a lime**, which is the sRGB-into-a-linear-pipeline
  *     mistake `LIME`'s comment documents, arriving a second time in a second
  *     constant.
+ *
+ * And the beam over it, which adds four of its own:
+ *
+ *   - **A gradient that does not reach zero at the top.** Under an additive
+ *     blend that is not a fade, it is a green line ruled across the sky with a
+ *     visible end, and it is the failure `GLOW_FALLOFF` already documents on
+ *     the other axis.
+ *   - **A beam that stopped being a beacon.** The whole order is "spottable
+ *     from blocks away over the rooftops", and every number that delivers it --
+ *     the 72 m height, the brightness still left at a terrace ridge, the width
+ *     that survives 400 m -- is a constant somebody could tune to something
+ *     that looks fine from ten metres and is gone from three streets away.
+ *   - **`depthTest` turned off.** The tempting one-line "fix" for a beam behind
+ *     a wall, which trades the whole effect for a green haze drawn through the
+ *     terrain. Asserted on, so the fix has to argue with a check.
+ *   - **A beam and a bike that disagree.** They are filled on the same row of
+ *     the same loop; the check is that the counts come out identical through a
+ *     mount, a knock-off and a drop, because a 72 m column left standing over
+ *     an empty parking spot -- or worse, following a rider at 26 m/s -- is the
+ *     most visible artefact this feature can produce.
  */
 export function verifyBikeGlow(): string[] {
   const failures: string[] = [];
@@ -1518,27 +1967,70 @@ export function verifyBikeGlow(): string[] {
       // Beyond the marker's range but inside the bike's, so the two counts are
       // asserted to be different things rather than the same test twice.
       { id: 4, x: BIKE_GLOW_RANGE + 30, y: 0, z: 0, yaw: 0, rider: 0 },
+      // And beyond the bike's own range, which is the beam's: a column of light
+      // over a bike too far away to draw would be the one thing on screen
+      // pointing at nothing.
+      { id: 5, x: BIKE_DRAW_RANGE + 50, y: 0, z: 0, yaw: 0, rider: 0 },
     ];
     meshes.update(bikes, 0, 0, (id) => id === 3, 0);
     if (meshes.drawn !== 2) {
       failures.push(
-        `${meshes.drawn} bikes were drawn. Only 1 and 4 qualify: 2 has a rider on the wire and 3 is ` +
-          `predicted ridden locally, and a ridden bike is drawn at its rider instead.`,
+        `${meshes.drawn} bikes were drawn. Only 1 and 4 qualify: 2 has a rider on the wire, 3 is ` +
+          `predicted ridden locally -- and a ridden bike is drawn at its rider instead -- and 5 is ` +
+          `past ${BIKE_DRAW_RANGE} m.`,
       );
     }
     if (meshes.glowDrawn !== 1) {
       failures.push(
         `${meshes.glowDrawn} markers were drawn. Only bike 1 qualifies: 2 has a rider, 3 is predicted ` +
-          `ridden locally, and 4 is past ${BIKE_GLOW_RANGE} m -- which is what makes the two ranges a ` +
-          `different test rather than the same one twice.`,
+          `ridden locally, and 4 and 5 are past ${BIKE_GLOW_RANGE} m -- which is what makes the two ` +
+          `ranges a different test rather than the same one twice.`,
       );
     }
-    // Dropped again: the marker comes back with no state to reset.
+    // --- And the beam is exactly the bikes, every fill. Not "roughly", and not
+    // the marker's count either: the disc is gated at 120 m and the column at
+    // the bike's own 400, so the two are deliberately different numbers and the
+    // relation between them is one-way. What must never drift is the beam
+    // against the *bike*, because they are filled on the same row.
+    if (meshes.beamDrawn !== meshes.drawn) {
+      failures.push(
+        `${meshes.beamDrawn} beams against ${meshes.drawn} bikes. They are filled on the same row of ` +
+          `the same loop, so a difference means somebody gave the beam a gate of its own -- and a ` +
+          `beam without a bike under it is a column of light over an empty parking spot.`,
+      );
+    }
+    if (meshes.beamDrawn < meshes.glowDrawn) {
+      failures.push(
+        `${meshes.beamDrawn} beams against ${meshes.glowDrawn} markers. The beam is drawn to ` +
+          `${BIKE_DRAW_RANGE} m and the marker to ${BIKE_GLOW_RANGE}, so every marker must have a beam ` +
+          `standing in it; fewer means the ranges have been swapped.`,
+      );
+    }
+    // Dropped again: the marker and the beam come back with no state to reset.
     bikes[1].rider = 0;
     meshes.update(bikes, 0, 0, () => false, 0);
-    if (meshes.drawn !== 4) failures.push(`${meshes.drawn} bikes after the riders got off; all four are parked and in range.`);
+    if (meshes.drawn !== 4) {
+      failures.push(`${meshes.drawn} bikes after the riders got off; four are parked and inside ${BIKE_DRAW_RANGE} m.`);
+    }
     if (meshes.glowDrawn !== 3) {
       failures.push(`${meshes.glowDrawn} markers after the riders got off; three bikes are in range and parked.`);
+    }
+    if (meshes.beamDrawn !== 4) {
+      failures.push(
+        `${meshes.beamDrawn} beams after the riders got off. A beam is meant to return where the bike ` +
+          `is dropped, with no state and no fade -- the same test asked once per frame.`,
+      );
+    }
+    // Two beams are turned differently, which is what stops a street of them
+    // dimming in unison. See `BEAM_PHASE`.
+    {
+      const one = new Matrix4();
+      const two = new Matrix4();
+      meshes.beam.getMatrixAt(0, one);
+      meshes.beam.getMatrixAt(1, two);
+      if (one.elements[0] === two.elements[0] && one.elements[2] === two.elements[2]) {
+        failures.push('Two bikes’ beams are at the same angle; a row of them would be one object.');
+      }
     }
     // The rays turn, and out of phase between two bikes.
     const first = new Matrix4();
@@ -1553,6 +2045,290 @@ export function verifyBikeGlow(): string[] {
       failures.push('Two bikes’ markers are at the same angle; the whole street would rotate in lockstep.');
     }
     meshes.dispose();
+  }
+
+  // --- The beam ---------------------------------------------------------------
+  //
+  // Everything below is about the one claim the order made: that a parked bike
+  // is spottable over the rooftops from blocks away. Each check is a number
+  // that delivers it and that would look perfectly reasonable set to something
+  // that does not.
+  {
+    const beamGeometry = assets.beamGeometry;
+    const bp = beamGeometry.getAttribute('position');
+    const bn = beamGeometry.getAttribute('normal');
+    const bc = beamGeometry.getAttribute('color');
+    const bi = beamGeometry.getIndex();
+    if (bi === null) {
+      failures.push('The bike beam geometry is not indexed.');
+      return failures;
+    }
+    if (bc.count !== bp.count) {
+      failures.push(`The beam has ${bc.count} colours against ${bp.count} positions.`);
+    }
+
+    // --- Budget. Thin, tall and cheap: the fragment cost is a few pixels wide
+    // and the vertex cost has to stay near nothing at 64 instances.
+    const expectedTriangles = BEAM_PLANES * (BEAM_STOPS.length - 1) * 4;
+    if (assets.beamTriangles !== expectedTriangles) {
+      failures.push(
+        `The beam is ${assets.beamTriangles} triangles against ${BEAM_PLANES} planes x ` +
+          `${BEAM_STOPS.length - 1} segments x 2 windings x 2 triangles = ${expectedTriangles}. ` +
+          `A plane with one winding vanishes when you walk round the bike.`,
+      );
+    }
+    if (assets.beamTriangles > 120) {
+      failures.push(
+        `The beam is ${assets.beamTriangles} triangles; at ${CAPACITY} instances that is ` +
+          `${assets.beamTriangles * CAPACITY} for a column of light.`,
+      );
+    }
+
+    // --- Winding, on `verifyBikeMesh`'s test: a face's cross product must
+    // agree with the mean of its three vertex normals. And every face is
+    // *vertical*: a horizontal triangle in here is a plane built lying down,
+    // which draws a lime saucer 72 m over the street.
+    {
+      const a = new Vector3();
+      const b = new Vector3();
+      const c = new Vector3();
+      const n = new Vector3();
+      const face = new Vector3();
+      let disagreeing = 0;
+      let leaning = 0;
+      for (let t = 0; t < bi.count; t += 3) {
+        const i0 = bi.getX(t);
+        const i1 = bi.getX(t + 1);
+        const i2 = bi.getX(t + 2);
+        a.fromBufferAttribute(bp, i0);
+        b.fromBufferAttribute(bp, i1);
+        c.fromBufferAttribute(bp, i2);
+        face.copy(b).sub(a).cross(n.copy(c).sub(a));
+        if (face.lengthSq() < 1e-16) continue;
+        face.normalize();
+        if (Math.abs(face.y) > 1e-4) leaning++;
+        n.set(0, 0, 0);
+        for (const i of [i0, i1, i2]) {
+          n.x += bn.getX(i);
+          n.y += bn.getY(i);
+          n.z += bn.getZ(i);
+        }
+        if (n.lengthSq() < 1e-12) continue;
+        if (face.dot(n.normalize()) < 0) disagreeing++;
+      }
+      if (disagreeing > 0) {
+        failures.push(
+          `${disagreeing} of ${bi.count / 3} beam triangles are wound against their own normals. ` +
+            `Half the column would be back-face culled and the beam would thin out as you walked past it.`,
+        );
+      }
+      if (leaning > 0) {
+        failures.push(`${leaning} beam triangles are not vertical; the planes are meant to stand, not lie.`);
+      }
+    }
+
+    // --- Extents: it comes out of the bike, it clears a roofline by a long way,
+    // and it tapers.
+    {
+      let minY = Infinity;
+      let maxY = -Infinity;
+      let footReach = 0;
+      let tipReach = 0;
+      for (let i = 0; i < bp.count; i++) {
+        const y = bp.getY(i);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+        const r = Math.hypot(bp.getX(i), bp.getZ(i));
+        if (y < BEAM_BASE + 1e-6) footReach = Math.max(footReach, r);
+        if (y > BEAM_HEIGHT - 1e-6) tipReach = Math.max(tipReach, r);
+      }
+      if (minY <= 0 || minY > 1.2) {
+        failures.push(
+          `The beam's foot is at ${minY.toFixed(2)} m. It is meant to sit on the frame -- a beam ` +
+            `starting at the road stacks onto the glow disc, and one starting above the bars floats ` +
+            `free of the object it is marking.`,
+        );
+      }
+      if (maxY < 60 || maxY > 90) {
+        failures.push(
+          `The beam is ${maxY.toFixed(0)} m tall. Under 60 it drops behind the next street's roofline ` +
+            `as you back away, which is exactly the range it exists to cover; over 90 the columns start ` +
+            `reading as buildings in a city with a skyline in it.`,
+        );
+      }
+      if (!(tipReach < footReach)) {
+        failures.push(`The beam is ${(tipReach * 2).toFixed(2)} m across at the tip and ${(footReach * 2).toFixed(2)} at the foot; it is meant to taper.`);
+      }
+      // Wide enough to survive its own draw range. At 400 m, a metre subtends
+      // about 2.6 px of a 1080-line frame at this camera -- so a column under a
+      // metre across is a line that disappears at exactly the distance it is
+      // for.
+      if (footReach * 2 < 1) {
+        failures.push(
+          `The beam is ${(footReach * 2).toFixed(2)} m across. At ${BIKE_DRAW_RANGE} m that is under ` +
+            `three pixels, and the whole point of it is being seen from there.`,
+        );
+      }
+    }
+
+    // --- The gradient, read off the geometry rather than off the table -- a
+    // builder that dropped the interpolation would pass a check on `BEAM_STOPS`
+    // and draw a flat green slab. Brightest near the foot, descending from
+    // there, and exactly zero at the top.
+    {
+      const levels = new Map<number, number>();
+      for (let i = 0; i < bc.count; i++) {
+        const y = Math.round(bp.getY(i) * 1000) / 1000;
+        const sum = bc.getX(i) + bc.getY(i) + bc.getZ(i);
+        levels.set(y, Math.max(levels.get(y) ?? 0, sum));
+      }
+      const ys = [...levels.keys()].sort((a, b) => a - b);
+      let peakY = ys[0];
+      let peak = 0;
+      for (const y of ys) {
+        const v = levels.get(y) as number;
+        if (v > peak) {
+          peak = v;
+          peakY = y;
+        }
+      }
+      // The peak is low: "brightest at the base, fading to nothing at the top".
+      if (peakY > BEAM_HEIGHT * 0.2) {
+        failures.push(
+          `The beam is brightest ${peakY.toFixed(1)} m up. It is meant to be brightest near its foot ` +
+            `and fade to nothing at the top, not to be a glowing band in the sky.`,
+        );
+      }
+      // And from the peak it only ever falls. A bump anywhere above it reads as
+      // a bright ring around the column at one height, which is a defect and
+      // not a beam.
+      let previous = Infinity;
+      let rising = 0;
+      for (const y of ys) {
+        if (y < peakY) continue;
+        const v = levels.get(y) as number;
+        if (v > previous + 1e-9) rising++;
+        previous = v;
+      }
+      if (rising > 0) {
+        failures.push(
+          `The beam brightens again ${rising} time(s) above its peak. Above the brightest point the ` +
+            `gradient has to fall monotonically, or the column has a bright band across it.`,
+        );
+      }
+      const top = levels.get(ys[ys.length - 1]) as number;
+      if (top > 1e-6) {
+        failures.push(
+          `The beam's top vertex still sums to ${top.toFixed(3)}. Under an additive blend the fade has ` +
+            `to reach exactly zero, or the beam is a green line ruled across the sky with a visible end.`,
+        );
+      }
+      // Still worth something where it clears a terrace. This is the check that
+      // says the *order* was met rather than that the code runs: a gradient
+      // front-loaded a little harder would be beautiful at ten metres and gone
+      // above every roofline in the inner west.
+      let atRoofline = 0;
+      for (const y of ys) {
+        if (y < 14 || y > 16) continue;
+        atRoofline = Math.max(atRoofline, levels.get(y) as number);
+      }
+      if (atRoofline === 0) {
+        // No vertex lands in the band, so interpolate from the table instead.
+        const t = (15 - BEAM_BASE) / (BEAM_HEIGHT - BEAM_BASE);
+        for (let s = 0; s < BEAM_STOPS.length - 1; s++) {
+          const [t0, b0] = BEAM_STOPS[s];
+          const [t1, b1] = BEAM_STOPS[s + 1];
+          if (t < t0 || t > t1) continue;
+          atRoofline = (b0 + ((b1 - b0) * (t - t0)) / (t1 - t0)) * peak;
+          break;
+        }
+      }
+      if (atRoofline < peak * 0.35) {
+        failures.push(
+          `At a 15 m terrace ridge the beam is down to ${(atRoofline / peak).toFixed(2)} of its peak. ` +
+            `The part above the roofline is the only part a player three blocks away can see.`,
+        );
+      }
+      // Bright enough to punch through noon and not so bright it is a white
+      // stripe. Per *plane*: the core stacks up to three of them, so the ceiling
+      // is `NeutralToneMapping`'s desaturation shoulder divided by three, and
+      // over it the column goes white -- which is less findable than the dimmer
+      // version, because white is what the sky already is.
+      if (peak > 2.4) failures.push(`The beam peaks at ${peak.toFixed(2)} in linear; three planes of that is a white stripe at noon.`);
+      if (peak < 0.9) failures.push(`The beam peaks at ${peak.toFixed(2)} in linear; it will wash out against a daylight sky.`);
+    }
+
+    // --- And it is a lime, which is the sRGB-in-a-linear-pipeline mistake
+    // arriving in a third constant.
+    {
+      let lime = 0;
+      let lit = 0;
+      for (let i = 0; i < bc.count; i++) {
+        const r = bc.getX(i);
+        const g = bc.getY(i);
+        const bl = bc.getZ(i);
+        if (r + g + bl < 1e-6) continue;
+        lit++;
+        if (g > 0.05 && g > r * 1.4 && g > bl * 4) lime++;
+      }
+      if (lime < lit) {
+        failures.push(
+          `${lit - lime} of ${lit} lit beam vertices are not a lime green. Check BEAM_LIME has not been ` +
+            `given an sRGB triple -- the frame's own LIME documents the same mistake.`,
+        );
+      }
+    }
+
+    // --- The material: additive, unlit, no depth write, depth test **on**, and
+    // exactly one of it for the whole city.
+    {
+      const m = assets.beamMaterial;
+      if (m.blending !== AdditiveBlending) failures.push('The beam is not additively blended, so it is paint rather than light.');
+      if (!m.transparent) failures.push('The beam is not transparent, so it is drawn in the opaque pass and never blended.');
+      if (m.depthWrite) failures.push('The beam writes depth; it will punch a 72 m hole through everything behind it.');
+      if (!m.depthTest) {
+        failures.push(
+          'The beam does not depth test. That is the tempting one-line fix for a beam behind a wall ' +
+            'and it costs the whole effect: every column within 400 m gets drawn through the terrain ' +
+            'and through the road, and the result is a green haze rather than 64 findable bikes. The ' +
+            'terrace clipping the bottom of a beam is what leaves the top standing over the roofline.',
+        );
+      }
+      if (m.side !== FrontSide) {
+        failures.push('The beam is not FrontSide; a transparent DoubleSide material is two passes in this renderer.');
+      }
+      if (m.opacityNode === null) failures.push('The beam has no pulse.');
+      if (m === assets.glowMaterial) {
+        failures.push('The beam and the marker share a material; the marker carries a polygon offset the beam must not.');
+      }
+      // The pulse stays inside the range an alpha means. Over one is a silent
+      // clamp and a pulse with a flat top; under zero inverts the blend.
+      if (BEAM_MEAN + BEAM_PULSE > 1 || BEAM_MEAN - BEAM_PULSE <= 0) {
+        failures.push(
+          `The beam's pulse runs ${(BEAM_MEAN - BEAM_PULSE).toFixed(2)} to ${(BEAM_MEAN + BEAM_PULSE).toFixed(2)}; ` +
+            `an opacity outside (0, 1] clamps flat at the top or inverts at the bottom.`,
+        );
+      }
+
+      // One material and one geometry, the invariant this project has been
+      // burned by -- 115 bikes would be 115 pipeline compilations at whatever
+      // moment a player first rounds a corner onto a street with bikes in it.
+      const second = new BikeAssets();
+      if (second.beamTriangles !== assets.beamTriangles) {
+        failures.push('Two BikeAssets built different beam geometry; the beacon is not deterministic.');
+      }
+      const meshes = new BikeMeshes(assets);
+      if (meshes.beam.material !== assets.beamMaterial) {
+        failures.push('BikeMeshes built its own beam material instead of sharing the one in BikeAssets.');
+      }
+      if (meshes.beam.geometry !== assets.beamGeometry) {
+        failures.push('BikeMeshes built its own beam geometry instead of sharing the one in BikeAssets.');
+      }
+      if (meshes.beam.castShadow) failures.push('The beam casts a shadow: a 72 m stripe laid across a suburb by a thing that emits light.');
+      if (meshes.beam.receiveShadow) failures.push('The beam receives shadow, so a cloud passing over would put it out.');
+      if (meshes.beam.count !== 0) failures.push('The beam starts with instances drawn before any bike exists.');
+      meshes.dispose();
+    }
   }
 
   // --- The lean is a roll about the contact patch, not a tip that lifts the
