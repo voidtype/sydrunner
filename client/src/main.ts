@@ -122,7 +122,7 @@ import {
   footyWarmupParts,
   verifyFootyBall,
 } from './world/footyball.ts';
-import { NameplateField, verifyNameplates } from './world/nameplates.ts';
+import { NameplateField, verifyNameplates, type PlateInput } from './world/nameplates.ts';
 import {
   FLAT_WHITE,
   KIND_NAME as POWERUP_NAME,
@@ -1672,6 +1672,16 @@ async function main(): Promise<void> {
   scene.add(nameplates.mesh);
   /** Where a plate's owner's head is. Reused every frame; never escapes the loop. */
   const plateHead = new Vector3();
+  /**
+   * One record, refilled per player per frame.
+   *
+   * `NameplateField.add` copies every field and keeps no reference, which is
+   * stated in `PlateInput` precisely so this can be a single object rather than
+   * fifteen literals a frame.
+   */
+  const plate: PlateInput = {
+    id: 0, name: '', health: 0, headX: 0, headY: 0, headZ: 0, down: false,
+  };
   /**
    * What to write over a training dummy.
    *
@@ -4339,21 +4349,17 @@ async function main(): Promise<void> {
         if (!entry) continue;
         entry.actor.mesh.updateMatrixWorld(true);
         entry.actor.headPosition(plateHead);
-        nameplates.add(
-          {
-            id: r.id,
-            // The roster's name, which is also where the bots' Aussie names come
-            // from -- `server/bots.ts` names them and the roster carries them,
-            // so a bot's plate needs nothing special here.
-            name: net.nameOf(r.id),
-            health: r.health,
-            headX: plateHead.x,
-            headY: plateHead.y,
-            headZ: plateHead.z,
-            down: r.anim === ANIM.KO,
-          },
-          net.id,
-        );
+        plate.id = r.id;
+        // The roster's name, which is also where the bots' Aussie names come
+        // from -- `server/bots.ts` names them and the roster carries them, so a
+        // bot's plate needs nothing special here.
+        plate.name = net.nameOf(r.id);
+        plate.health = r.health;
+        plate.headX = plateHead.x;
+        plate.headY = plateHead.y;
+        plate.headZ = plateHead.z;
+        plate.down = r.anim === ANIM.KO;
+        nameplates.add(plate, net.id);
       }
     } else {
       // Offline: the dummies, which are spec 9's stand-in players and are given
@@ -4365,18 +4371,14 @@ async function main(): Promise<void> {
         if (!f.dummy) continue;
         f.driver.actor.mesh.updateMatrixWorld(true);
         f.driver.actor.headPosition(plateHead);
-        nameplates.add(
-          {
-            id: f.combat.id,
-            name: dummyLabel(f.dummy.kind),
-            health: f.combat.health,
-            headX: plateHead.x,
-            headY: plateHead.y,
-            headZ: plateHead.z,
-            down: f.combat.phase === 'ko',
-          },
-          playerCombat.id,
-        );
+        plate.id = f.combat.id;
+        plate.name = dummyLabel(f.dummy.kind);
+        plate.health = f.combat.health;
+        plate.headX = plateHead.x;
+        plate.headY = plateHead.y;
+        plate.headZ = plateHead.z;
+        plate.down = f.combat.phase === 'ko';
+        nameplates.add(plate, playerCombat.id);
       }
     }
     nameplates.end();

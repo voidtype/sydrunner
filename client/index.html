@@ -583,6 +583,12 @@
         <div><kbd>space</kbd>jump</div>
         <div><kbd>shift</kbd>sprint</div>
         <div><kbd>mouse</kbd>look</div>
+        <!-- Here rather than under `lime bikes`, where it started: the camera is
+             a thing you have all the time and the bike only forces it. A player
+             who wants to watch themselves run looks under `movement`. Both
+             bindings on one line because they set one preference — see
+             `main.ts`'s `setCameraPreference`. -->
+        <div><kbd>wheel</kbd>camera — down third person, up first · <kbd>v</kbd>toggle</div>
       </section>
       <!-- Its own section rather than two more lines in `movement`, because the
            bike is a thing you find rather than a thing you always have, and a
@@ -596,7 +602,7 @@
              standing on: `a`/`d` strafe on foot and steer on a bike. See
              `game/bikes.shapeRideSteering`. -->
         <div><kbd>a d</kbd>steer · <kbd>w</kbd>throttle · <kbd>s</kbd>brake</div>
-        <div><kbd>v</kbd>camera view</div>
+        <div>a ride is always third person — the wheel and <kbd>v</kbd> set what you get back</div>
         <div>look for the green glow — find one parked, or the tuning stall in Redfern</div>
       </section>
       <section>
@@ -610,7 +616,10 @@
         <div><kbd>esc</kbd>close panels</div>
         <div><kbd>tab</kbd>scores, held</div>
         <div><kbd>m</kbd>city map</div>
-        <div><kbd>wheel</kbd>map zoom</div>
+        <!-- The map takes the wheel off the camera while it is open, which is
+             why this line says "with the map open" and the one under `movement`
+             does not. See `bigmap.onWheel`. -->
+        <div><kbd>wheel</kbd>zoom, with the map open</div>
         <div><kbd>`</kbd>diagnostics</div>
         <div><kbd>- =</kbd>render scale</div>
       </section>

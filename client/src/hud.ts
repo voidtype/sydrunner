@@ -262,6 +262,119 @@ const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', '
 /** How long the first-visit note stays on the front of the hint line. See `Hud.ready`. */
 const FIRST_VISIT_NOTE_MS = 45_000;
 
+/**
+ * The inline `width` of one block of the footy supply bar: full, filling, or
+ * empty. `index` counts from the left, `charges` is how many balls are in hand,
+ * `recharge` is 0..1 through the next one.
+ *
+ * Only the **next** ball's block fills, unlike the stamina bar beside it where
+ * every spent block fills together. That is the HUD saying what the rule is: the
+ * stamina comes back as one bar and the footy supply comes back one ball at a
+ * time, so a bar where all three filled in step would be drawing the wrong
+ * mechanic. See `game/combat.ts`'s ball constants.
+ *
+ * **A block that is already full returns a width rather than deferring to
+ * `#balls div.full i`'s 100%**, and that clause is the whole of the fix for "my
+ * 3rd footy never loads". An inline style outranks any class rule, so the moment
+ * the caller writes a partial width onto a block, `full` can never take it back
+ * -- only another write can. The loop this replaced started at `charges` and so
+ * had no write to give: with a full bar it ran zero times, and whatever partial
+ * width the last block was painted at was frozen there for the rest of the
+ * session.
+ *
+ * Offline that was invisible, because the last width before a block filled was
+ * 99.6% and rounded to 100. **Online it was the whole bug.** The client predicts
+ * its own recharge and `net/client.reconcile` takes the count from the server,
+ * which is a snapshot behind -- so for the 50-150 ms between the two, the client
+ * holds a count rolled back by one while `ballT` has already been *consumed* by
+ * the regen it predicted. The bar is painted in that window at about 1%, the
+ * next snapshot confirms the charge, and the block stuck at 1% for good:
+ * present, classed `full`, and drawn a quarter of a pixel wide. The first two
+ * blocks escaped it only because a fresh player spawns with a full bar, so no
+ * inline width has ever been written to them.
+ *
+ * Pulled out of `Hud.vitals` and made pure so `verifyHud` below can assert it at
+ * boot. The count side of the same bug is `checkBallBar` in
+ * `server/integration-check.ts`; it cannot assert this half, because
+ * `server/tsconfig.json` has no DOM and importing this file there would trade a
+ * real architectural invariant for one check.
+ */
+export function ballBlockWidth(index: number, charges: number, recharge: number): string {
+  if (index < charges) return '100%';
+  if (index > charges) return '0';
+  return `${Math.round(Math.min(1, Math.max(0, recharge)) * 100)}%`;
+}
+
+/**
+ * The footy supply bar, painted the way the DOM remembers it.
+ *
+ * A boot check rather than a comment because the bug this is about shipped, was
+ * played for a session, and was reported in the words *"for some reason my 3rd
+ * afl ball never loads"* -- and because every other check in the project passed
+ * while it was live. The supply was right in `game/combat.ts`, right on the
+ * wire, right in the reconciler and right in `Hud.vitals`'s `full` class. Only
+ * the width was wrong, and only after a sequence.
+ *
+ * So `widths` here **persists across frames and is only written where the loop
+ * writes**, which is the one property of the DOM that made the failure possible:
+ * a block nobody paints keeps what it had. A loop that goes back to starting at
+ * `s.ballCharges` cannot paint the block that just filled, and this fails at boot
+ * rather than in somebody's game.
+ *
+ * The sequence is the online one. The client predicts its own recharge; the
+ * server's count is a snapshot behind; for 50-150 ms the client holds a count
+ * rolled back by one over a `ballT` its predicted regen has already spent, so the
+ * bar is painted at 1% -- and then the server confirms and nothing paints it
+ * again.
+ */
+export function verifyHud(maxBallCharges: number): string[] {
+  const failures: string[] = [];
+
+  // `Hud.vitals`'s loop, and it has to be this loop: from zero, every block.
+  const widths = new Array<string>(maxBallCharges).fill('');
+  const paint = (charges: number, recharge: number): void => {
+    for (let i = 0; i < widths.length; i++) widths[i] = ballBlockWidth(i, charges, recharge);
+  };
+
+  paint(maxBallCharges - 1, 0.99); // the last block, all but full
+  paint(maxBallCharges - 1, 0.01); // the reconcile rollback, over a spent clock
+  paint(maxBallCharges, 0.01); // the server confirms -- the frame that used to freeze
+  if (!widths.every((w) => w === '100%')) {
+    failures.push(
+      `A full footy bar draws [${widths.join(', ')}] after a reconciliation rollback; every ` +
+        `block of a full bar is 100% wide. This is "my 3rd footy never loads": an inline width ` +
+        `outranks #balls div.full i, so a block the paint loop skips keeps whatever partial ` +
+        `width it was last given.`,
+    );
+  }
+
+  // The trickle is unchanged by that: one block moves, the ones behind it are
+  // full, the ones in front are empty. The other reading -- every spent block
+  // filling together, which is what the stamina bar beside it does -- would draw
+  // a whole-bar refill over a supply that comes back one ball at a time.
+  paint(1, 0.5);
+  const filling = widths.filter((w) => w !== '100%' && w !== '0');
+  if (widths[0] !== '100%' || filling.length !== 1 || filling[0] !== '50%') {
+    failures.push(
+      `With one ball in hand and the next half way back, the bar draws ` +
+        `[${widths.join(', ')}]; it should be one full block, one at 50%, and the rest empty -- ` +
+        `the supply trickles a ball at a time where the stamina bar refills all at once.`,
+    );
+  }
+
+  // And no block is ever left without a width of its own, at any count -- which
+  // is the rule that stops the class from having to win an argument it cannot.
+  for (let charges = 0; charges <= maxBallCharges; charges++) {
+    for (let i = 0; i < maxBallCharges; i++) {
+      if (ballBlockWidth(i, charges, 0.5) === '') {
+        failures.push(`Block ${i} of a ${charges}-ball bar was given no width, so its CSS class decides it.`);
+      }
+    }
+  }
+
+  return failures;
+}
+
 export class Hud {
   private readonly loading = document.getElementById('loading')!;
   private readonly loadingText = document.getElementById('loading-text')!;
@@ -725,15 +838,12 @@ export class Hud {
       const fill = this.staminaEls[i].firstElementChild as HTMLElement | null;
       if (fill) fill.style.width = width;
     }
-    // Only the **next** ball's block fills, unlike the stamina bar where every
-    // spent block fills together. That is the HUD saying what the rule is: the
-    // stamina comes back as one bar and the footy supply comes back one ball at
-    // a time, so a bar where all three filled in step would be drawing the wrong
-    // mechanic. See `game/combat.ts`'s ball constants.
-    const ballWidth = `${Math.round(Math.min(1, Math.max(0, s.ballRecharge)) * 100)}%`;
-    for (let i = s.ballCharges; i < this.ballEls.length; i++) {
+    // The footy supply, from **block zero** every frame. See `ballBlockWidth`
+    // for the rule and for why the loop cannot start at `s.ballCharges` the way
+    // the stamina loop above starts at `s.stamina`.
+    for (let i = 0; i < this.ballEls.length; i++) {
       const fill = this.ballEls[i].firstElementChild as HTMLElement | null;
-      if (fill) fill.style.width = i === s.ballCharges ? ballWidth : '0';
+      if (fill) fill.style.width = ballBlockWidth(i, s.ballCharges, s.ballRecharge);
     }
 
     // Spec 8.3's active effects, beside the pips.

@@ -1161,6 +1161,12 @@ async function main(): Promise<void> {
   say('');
   await checkWildlife();
 
+  // --- 16. The footy supply bar the player is actually looking at, from an
+  // empty bar to three full blocks. See `checkBallBar`, appended last and
+  // self-contained.
+  say('');
+  await checkBallBar();
+
   say('');
   if (failures.length === 0) {
     say(`ALL CHECKS PASSED (${log.filter((l) => l.includes('PASS')).length})`);
@@ -5586,4 +5592,92 @@ async function checkWildlife(): Promise<void> {
     }
     check(doubled === 0, `no anchor woke twice (${doubled} duplicates) -- the promotion is idempotent per bird`);
   }
+}
+
+/**
+ * The footy supply, from an empty bar back to three, **off the real wire**.
+ *
+ * This exists because of a reported bug that every check in this file already
+ * passed through: *"for some reason my 3rd afl ball never loads"*. Every number
+ * in the game was right. `verifyCombat` proved the trickle, the block in
+ * `checkFooty` proved one ball back per 4 s and a cap of three, and the snapshot
+ * round-trips `ballCharges` exactly -- while the third block of the bar the
+ * player is actually looking at stayed dark for the rest of the session.
+ *
+ * It turned out to be the HUD's paint and nothing on this side, which is why the
+ * *width* half of the regression is `hud.verifyHud` and runs in the browser at
+ * boot: `server/tsconfig.json` has no DOM on purpose, and importing `hud.ts`
+ * here to assert it would trade a real architectural invariant for one check.
+ *
+ * What belongs here is the half this file can actually own -- that the count a
+ * client is *told* comes back one ball at a time and reaches three. It was true
+ * before the fix and it is true after it, and that is the point: with both
+ * checks in place, the next report of this shape is answered by which one fails.
+ */
+async function checkBallBar(): Promise<void> {
+  say('footy supply: the bar the player looks at, from empty to three, off the wire');
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const world = await loadWorld(root);
+  const sim = new Simulation(world);
+  const out: TickOutput = { tick: 0, events: [], snapshot: null };
+  const me = sim.join(0, null, 'Baller');
+  const into: SnapshotPlayer[] = [];
+  const wire = createSnapshot();
+
+  /** What the wire says this player is holding, this tick. */
+  const onTheWire = (): number => {
+    const frame = encodeSnapshot(sim.tick, 0, sim.snapshot(into), [], []);
+    const back = decodeSnapshot(frame, wire);
+    return back?.players.find((p) => p.id === me.id)?.ballCharges ?? -1;
+  };
+
+  // --- 1. Empty it, through the real 0.55 s floor. The clock starts at the tick
+  // the third ball leaves the hand, which is where `advance` zeroes `ballT`.
+  let ticks = 0;
+  while (me.combat.ballCharges > 0 && ticks < 600) {
+    applyButtons(me.input, BTN.THROW);
+    sim.step(out);
+    ticks++;
+  }
+  check(me.combat.ballCharges === 0, `a full bar empties in ${(ticks / 60).toFixed(2)} s of holding the throw`);
+  check(onTheWire() === 0, `and the wire says 0 (${onTheWire()})`);
+
+  // --- 2. The refill, sampled 200 ms past each boundary so a check does not
+  // straddle the tick it is about. Only the wire is read: the point of the
+  // sample is what a client is *told*, not what the server privately knows.
+  const seen = new Map<number, number>();
+  const marks = [4.2, 8.2, 12.2];
+  let t = 0;
+  let next = 0;
+  for (let i = 0; i < 60 * 13; i++) {
+    applyButtons(me.input, 0);
+    sim.step(out);
+    t += 1 / 60;
+    if (next < marks.length && t >= marks[next]) {
+      seen.set(marks[next], onTheWire());
+      next++;
+    }
+  }
+  for (let i = 0; i < marks.length; i++) {
+    const want = i + 1;
+    const got = seen.get(marks[i]);
+    check(
+      got === want,
+      `${marks[i]} s after the bar emptied the wire carries ${got} ball(s), and the ` +
+        `${BALL_RECHARGE} s trickle says ${want}`,
+    );
+  }
+  check(me.combat.ballCharges === BALL_CHARGES, `the bar is back to ${BALL_CHARGES}/${BALL_CHARGES}`);
+
+  // --- 3. And it stays there. The cap is the other half of the trickle, and a
+  // regen that ran on past it would be a bar that emptied four balls once.
+  for (let i = 0; i < 60 * 8; i++) {
+    applyButtons(me.input, 0);
+    sim.step(out);
+  }
+  check(
+    onTheWire() === BALL_CHARGES,
+    `eight more seconds of not throwing leaves it at ${onTheWire()} -- the cap holds on the wire too`,
+  );
 }
