@@ -168,9 +168,18 @@ export function cdnStats(): CdnStats {
  *
  * One `origin` is expected and correct: it is the first asset, fetched while
  * the boot probe was still deciding.
+ *
+ * Reached through `globalThis` rather than by naming `window`, because this
+ * module is imported by `world/terrain.ts` and therefore compiled a second time
+ * by `server/tsconfig.json` **without the DOM lib** -- which is that file's
+ * whole purpose, and it caught this line the first time it was written.
  */
-if (typeof window === 'object') {
-  (window as unknown as { __cdn: () => CdnStats }).__cdn = cdnStats;
+const globalScope = globalThis as unknown as {
+  window?: unknown;
+  __cdn?: () => CdnStats;
+};
+if (typeof globalScope.window === 'object') {
+  globalScope.__cdn = cdnStats;
 }
 
 function disable(reason: string): void {
