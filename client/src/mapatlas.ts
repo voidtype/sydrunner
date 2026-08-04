@@ -74,6 +74,7 @@
  */
 
 import { decodeStreetNames, translateStreetNames } from './world/streetnames.ts';
+import { fetchWorldAsset } from './world/cdn.ts';
 import { decodeWater } from './world/water.ts';
 import { abbreviateStreet } from './game/locator.ts';
 
@@ -649,7 +650,7 @@ export class MapAtlas {
   private async loadSuburbs(): Promise<void> {
     try {
       this.fetches++;
-      const resp = await fetch(`${this.baseUrl}/suburbs.json${this.version}`);
+      const resp = await fetchWorldAsset(this.baseUrl, 'suburbs.json', this.version);
       if (!resp.ok) {
         this.failures++;
         return;
@@ -693,7 +694,7 @@ export class MapAtlas {
     if (!this.index.water?.far) return;
     try {
       this.fetches++;
-      const resp = await fetch(`${this.baseUrl}/far-water.bin${this.version}`);
+      const resp = await fetchWorldAsset(this.baseUrl, 'far-water.bin', this.version);
       if (!resp.ok) {
         this.failures++;
         return;
@@ -777,7 +778,7 @@ export class MapAtlas {
   private async loadTileNames(tile: MapIndexTile): Promise<void> {
     try {
       this.fetches++;
-      const resp = await fetch(`${this.baseUrl}/tiles/${tile.key}.names.bin${this.version}`);
+      const resp = await fetchWorldAsset(this.baseUrl, `tiles/${tile.key}.names.bin`, this.version);
       if (!resp.ok) {
         this.failures++;
         return;

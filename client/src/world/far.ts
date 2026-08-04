@@ -86,6 +86,7 @@ import {
   type MeshStandardNodeMaterial,
 } from 'three/webgpu';
 
+import { fetchWorldAsset } from './cdn.ts';
 import { MATERIALS } from './facade.ts';
 
 /**
@@ -872,8 +873,10 @@ export async function loadFarLayer(
   if (!far) return EMPTY;
   try {
     const [slabBuf, terrBuf] = await Promise.all([
-      fetch(`${baseUrl}/far.bin${version}`).then((r) => (r.ok ? r.arrayBuffer() : null)),
-      fetch(`${baseUrl}/far-terrain.bin${version}`).then((r) => (r.ok ? r.arrayBuffer() : null)),
+      fetchWorldAsset(baseUrl, 'far.bin', version).then((r) => (r.ok ? r.arrayBuffer() : null)),
+      fetchWorldAsset(baseUrl, 'far-terrain.bin', version).then((r) =>
+        r.ok ? r.arrayBuffer() : null,
+      ),
     ]);
 
     let slabs: FarCity | null = null;

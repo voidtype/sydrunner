@@ -94,6 +94,7 @@ import {
   type NamedSegment,
   type TileStreetNames,
 } from './streetnames.ts';
+import { fetchWorldAsset, fetchWorldBuffer } from './cdn.ts';
 import { TerrainField, buildTerrainMesh, sampleTileGrid } from './terrain.ts';
 import { worldVersionSuffix } from './version.ts';
 import {
@@ -1497,8 +1498,13 @@ export class TileStreamer {
       // corrected later.
       const [gltf, paramsBuffer, terrain, veg, parked, lines, props, picks, named, water, lanes] =
         await Promise.all([
-          this.loader.loadAsync(`${this.baseUrl}/tiles/${entry.key}.glb${this.version}`),
-          fetch(`${this.baseUrl}/tiles/${entry.key}.params.bin${this.version}`).then((r) => {
+          // Bytes first, then parse, because the bytes may arrive gzipped from
+          // the release CDN and `loadAsync` would fetch them itself. The tiles
+          // are self-contained GLB, so the parser needs no resource path.
+          fetchWorldBuffer(this.baseUrl, `tiles/${entry.key}.glb`, this.version).then((buf) =>
+            this.loader.parseAsync(buf, ''),
+          ),
+          fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.params.bin`, this.version).then((r) => {
             if (!r.ok) throw new Error(`params ${r.status}`);
             return r.arrayBuffer();
           }),
@@ -1923,7 +1929,7 @@ export class TileStreamer {
   private async loadVegetation(entry: TileEntry): Promise<TileVegetation | null> {
     if (!entry.v) return null;
     try {
-      const resp = await fetch(`${this.baseUrl}/tiles/${entry.key}.veg.bin${this.version}`);
+      const resp = await fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.veg.bin`, this.version);
       if (!resp.ok) return null;
       return decodeVegetation(await resp.arrayBuffer());
     } catch {
@@ -1939,7 +1945,7 @@ export class TileStreamer {
   private async loadCars(entry: TileEntry): Promise<TileCars | null> {
     if (!entry.c) return null;
     try {
-      const resp = await fetch(`${this.baseUrl}/tiles/${entry.key}.cars.bin${this.version}`);
+      const resp = await fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.cars.bin`, this.version);
       if (!resp.ok) return null;
       return decodeCars(await resp.arrayBuffer());
     } catch {
@@ -1958,7 +1964,7 @@ export class TileStreamer {
   private async loadPower(entry: TileEntry): Promise<TilePower | null> {
     if (!entry.p && !entry.w) return null;
     try {
-      const resp = await fetch(`${this.baseUrl}/tiles/${entry.key}.power.bin${this.version}`);
+      const resp = await fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.power.bin`, this.version);
       if (!resp.ok) return null;
       return decodePower(await resp.arrayBuffer());
     } catch {
@@ -1980,7 +1986,7 @@ export class TileStreamer {
   private async loadFurniture(entry: TileEntry): Promise<TileFurniture | null> {
     if (!entry.fb && !entry.fp && !entry.fs) return null;
     try {
-      const resp = await fetch(`${this.baseUrl}/tiles/${entry.key}.furn.bin${this.version}`);
+      const resp = await fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.furn.bin`, this.version);
       if (!resp.ok) return null;
       return decodeFurniture(await resp.arrayBuffer());
     } catch {
@@ -1996,7 +2002,7 @@ export class TileStreamer {
   private async loadPowerups(entry: TileEntry): Promise<ReturnType<typeof decodePowerups>> {
     if (!entry.pw) return null;
     try {
-      const resp = await fetch(`${this.baseUrl}/tiles/${entry.key}.pow.bin${this.version}`);
+      const resp = await fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.pow.bin`, this.version);
       if (!resp.ok) return null;
       return decodePowerups(await resp.arrayBuffer());
     } catch {
@@ -2020,7 +2026,7 @@ export class TileStreamer {
   private async loadStreetNames(entry: TileEntry): Promise<TileStreetNames | null> {
     if (!entry.sn) return null;
     try {
-      const resp = await fetch(`${this.baseUrl}/tiles/${entry.key}.names.bin${this.version}`);
+      const resp = await fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.names.bin`, this.version);
       if (!resp.ok) return null;
       return decodeStreetNames(await resp.arrayBuffer());
     } catch {
@@ -2048,7 +2054,7 @@ export class TileStreamer {
     if (this.traffic === null && this.pedestrians === null) return null;
     if (!entry.lw && !entry.lr) return null;
     try {
-      const resp = await fetch(`${this.baseUrl}/tiles/${entry.key}.lanes.bin${this.version}`);
+      const resp = await fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.lanes.bin`, this.version);
       if (!resp.ok) return null;
       const tileSize = this.index?.tile_size ?? 500;
       return decodeLanes(
@@ -2074,7 +2080,7 @@ export class TileStreamer {
   private async loadWater(entry: TileEntry): Promise<TileWater | null> {
     if (!entry.wv) return null;
     try {
-      const resp = await fetch(`${this.baseUrl}/tiles/${entry.key}.water.bin${this.version}`);
+      const resp = await fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.water.bin`, this.version);
       if (!resp.ok) return null;
       return decodeWater(await resp.arrayBuffer());
     } catch {

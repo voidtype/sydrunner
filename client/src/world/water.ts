@@ -90,6 +90,7 @@ import {
   type Material,
 } from 'three/webgpu';
 
+import { fetchWorldAsset } from './cdn.ts';
 import type { FacadeGlobals } from './facade.ts';
 import { TerrainField } from './terrain.ts';
 import { WaterLevels } from './wading.ts';
@@ -562,7 +563,7 @@ export async function loadFarWater(
 ): Promise<Mesh[]> {
   if (!contract?.far) return [];
   try {
-    const resp = await fetch(`${baseUrl}/far-water.bin${version}`);
+    const resp = await fetchWorldAsset(baseUrl, 'far-water.bin', version);
     if (!resp.ok) return [];
     const data = decodeWater(await resp.arrayBuffer());
     if (!data) return [];

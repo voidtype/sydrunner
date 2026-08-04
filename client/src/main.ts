@@ -21,6 +21,7 @@ import {
 import { EXPOSURE } from './sky/calibration.ts';
 import { SydneySky } from './sky/sky.ts';
 import { sydneyTime, verifySouthernHemisphere } from './sky/solar.ts';
+import { fetchWorldAsset, verifyCdn } from './world/cdn.ts';
 import { createFacadeGlobals } from './world/facade.ts';
 import { loadFarLayer } from './world/far.ts';
 import { loadLandmarks, verifyLandmarks } from './world/landmarks.ts';
@@ -121,6 +122,7 @@ import {
   footyWarmupParts,
   verifyFootyBall,
 } from './world/footyball.ts';
+import { NameplateField, verifyNameplates } from './world/nameplates.ts';
 import {
   FLAT_WHITE,
   KIND_NAME as POWERUP_NAME,
@@ -218,7 +220,7 @@ import {
   verifyWildlife,
 } from './game/wildlife.ts';
 import { WildlifeAssets, WildlifeFlock, verifyWildlifeKit } from './world/wildlife.ts';
-import { Hud } from './hud.ts';
+import { Hud, verifyHud } from './hud.ts';
 import { Minimap } from './minimap.ts';
 import { MapAtlas } from './mapatlas.ts';
 import { BigMap, verifyBigMap } from './bigmap.ts';
@@ -345,6 +347,12 @@ async function main(): Promise<void> {
   const trafficFailures = timed('traffic', () => verifyTraffic(carBodySizes()));
   const wadingFailures = timed('wading', verifyWading);
   const waterFailures = timed('water', verifyWater);
+  // The release CDN's half of a two-repo contract. If this file and
+  // `scripts/publish-world-release.sh` disagree about how a world path becomes
+  // an asset name, every CDN fetch 404s, every one silently falls back to the
+  // origin, and the *only* symptom is the bandwidth bill the CDN exists to
+  // prevent. Nothing on screen looks wrong. See `world/cdn.ts`.
+  const cdnFailures = timed('cdn', verifyCdn);
   // And where the session starts, which fails in the same shape: a sign error on
   // the spawn's z is a world that boots in Chatswood, and a dither that never
   // rejects is a boot inside a warehouse or under a pond in Sydney Park. Both
@@ -453,6 +461,22 @@ async function main(): Promise<void> {
   // The **model** half runs later beside the assets -- see `verifyWildlifeKit`
   // by `WildlifeAssets`.
   const wildlifeFailures = timed('wildlife', () => verifyWildlife());
+  // And the nameplates, on the same criterion once more. Every way this breaks
+  // renders: a text cache that misses re-uploads two megabytes of atlas twenty
+  // times a second and reads as a streaming stall; a fade that is not monotonic
+  // makes the far plates the bright ones; a plate for your own id is your own
+  // name floating in front of your face for the whole session. See
+  // `world/nameplates.ts`. `MAX_HEALTH` is handed in so the bar's pip ticks
+  // cannot drift from the number of pips there actually are.
+  const nameplateFailures = timed('nameplates', () => verifyNameplates(MAX_HEALTH));
+  // And the HUD's supply bar, which is here for a reason the rest of this list is
+  // not: it is the only one of them that shipped broken. Every number about the
+  // footy was right -- the trickle, the wire, the reconciler -- and the third
+  // block of the bar stayed dark anyway, because an inline width the paint loop
+  // could no longer reach outranked the CSS class that says "full". `BALL_CHARGES`
+  // is handed in so the check cannot drift from the bar's actual length. See
+  // `hud.verifyHud`.
+  const hudFailures = timed('hud', () => verifyHud(BALL_CHARGES));
   // Once, at `debug` so it is out of the way, and slowest-first because the only
   // question anyone asks of this line is which one it was.
   checkMs.sort((a, b) => b[1] - a[1]);
@@ -477,6 +501,7 @@ async function main(): Promise<void> {
     trafficFailures.length ||
     wadingFailures.length ||
     waterFailures.length ||
+    cdnFailures.length ||
     spawnFailures.length ||
     bikeFailures.length ||
     bikeMeshFailures.length ||
@@ -485,7 +510,9 @@ async function main(): Promise<void> {
     pedModelFailures.length ||
     policeFailures.length ||
     streetFailures.length ||
-    wildlifeFailures.length
+    wildlifeFailures.length ||
+    nameplateFailures.length ||
+    hudFailures.length
   ) {
     hud.fatal(
       'Self-checks failed:\n' +
@@ -506,6 +533,7 @@ async function main(): Promise<void> {
           ...trafficFailures,
           ...wadingFailures,
           ...waterFailures,
+          ...cdnFailures,
           ...spawnFailures,
           ...bikeFailures,
           ...bikeMeshFailures,
@@ -515,6 +543,8 @@ async function main(): Promise<void> {
           ...policeFailures,
           ...streetFailures,
           ...wildlifeFailures,
+          ...nameplateFailures,
+          ...hudFailures,
         ]
           .map((f) => '  - ' + f)
           .join('\n'),
@@ -1429,9 +1459,12 @@ async function main(): Promise<void> {
         // Versioned like every other world asset -- see `world/version.ts`. The
         // suffix is the streamer's, because the index it came from is the
         // streamer's, and two sources for one build stamp is one too many.
-        const resp = await fetch(`/world/collision/${entry.key}.bin${streamer.assetVersion}`, {
-          signal: AbortSignal.timeout(COLLISION_FETCH_TIMEOUT_MS),
-        });
+        const resp = await fetchWorldAsset(
+          '/world',
+          `collision/${entry.key}.bin`,
+          streamer.assetVersion,
+          { signal: AbortSignal.timeout(COLLISION_FETCH_TIMEOUT_MS) },
+        );
         if (resp.ok) {
           collision.addTile(
             entry.key,
@@ -1622,6 +1655,36 @@ async function main(): Promise<void> {
   const kills: string[] = [];
   const remotes = new Map<number, RemoteActor>();
   let net: NetClient | null = null;
+
+  // --- The nameplates: a name and a large health bar over every other player.
+  //
+  // A user-ordered feature that overrules spec 8.2's "no world-space health
+  // bars" line, and the one file that decides *who is a player* is this one --
+  // which is why the field is filled from here rather than from inside
+  // `net/client.ts`. Online it is fed the remotes; offline it is fed the three
+  // dummies, which stand in for players. The pedestrians, the faction NPCs, the
+  // police and the ibises are never offered one: they are scenery, and a
+  // labelled city is a diagram.
+  //
+  // One object for the whole feature -- one geometry, one material, one draw
+  // call, and no per-player anything. See `world/nameplates.ts`.
+  const nameplates = new NameplateField();
+  scene.add(nameplates.mesh);
+  /** Where a plate's owner's head is. Reused every frame; never escapes the loop. */
+  const plateHead = new Vector3();
+  /**
+   * What to write over a training dummy.
+   *
+   * They have no roster name -- there is no server offline and therefore no
+   * roster -- so they carry their behaviour, which is the only thing that tells
+   * the three of them apart and is exactly what somebody testing the plates
+   * wants to read. The alternative, borrowing `server/bots.ts`'s Aussie names,
+   * would put a name over a figure that is not a player and cannot be one, and
+   * `game/dummies.ts` deliberately restates rather than imports across that
+   * boundary.
+   */
+  const dummyLabel = (kind: DummyKind): string =>
+    kind === 'aggressor' ? 'Aggro' : kind === 'pacer' ? 'Pacer' : 'Post';
   // `footies` and `footyPool` are built near the top of `main`, with the
   // character assets and for the same reason: their shaders are warmed before
   // the first frame rather than compiled during the first fight.
@@ -2401,6 +2464,84 @@ async function main(): Promise<void> {
     if (locked || dragging) e.preventDefault();
   });
 
+  /**
+   * Ask for a camera, from `V` or from the wheel.
+   *
+   * One function because there is one preference, and the two bindings differ
+   * only in how they arrive at a boolean. The nudge is the interesting half: a
+   * rider is *forced* into third person, so a request made in the saddle changes
+   * nothing anybody can see, and a control that silently does nothing is a
+   * control a player decides is broken. It goes through the ride pill rather
+   * than `hud.notice` for `simulate`'s reason -- the line says "when you get
+   * off", so it is only true while you are on, and the pill is derived every
+   * tick and comes down by itself the moment you are not.
+   */
+  const setCameraPreference = (third: boolean): void => {
+    thirdPersonPreferred = third;
+    if (playerCombat.ridingBike !== 0) {
+      rideNudgeText = `camera: ${third ? 'third' : 'first'} person when you get off`;
+      rideNudgeT = RIDE_NUDGE_SECONDS;
+    }
+  };
+
+  /**
+   * The wheel: down for third person, up for first.
+   *
+   * A player found third person by accident, liked it, and asked for the wheel
+   * -- which is the right instinct, because it is the gesture every game with a
+   * chase camera already uses and `V` is a key nobody finds without reading the
+   * list. Both bindings stay, and both write the same `thirdPersonPreferred`.
+   * There is no second flag: two toggles over one preference is how a camera ends
+   * up in a state neither control can explain.
+   *
+   * **Accumulated to a threshold rather than acted on per event**, because the
+   * two devices that produce this event are nothing alike. A mouse notch is one
+   * event of about 100 px and should flip the camera on the spot. A trackpad
+   * produces a stream of 2-10 px events for the same physical gesture, and a
+   * handler that flipped on each of them would toggle the camera thirty times
+   * during one two-finger swipe. `WHEEL_CAMERA_STEP` is a shade under a notch so
+   * the mouse keeps its one-gesture-one-flip feel and the trackpad has to mean
+   * it. Reversing direction clears the tally rather than unwinding it, so a
+   * player who overshoots and comes back gets the flip on the gesture they make
+   * next rather than one gesture later.
+   *
+   * `deltaMode` is normalised because Firefox reports lines and not pixels; an
+   * unnormalised threshold is a control that needs a different flick per browser.
+   *
+   * Passive, and it is the guards below that make that safe. The **map owns the
+   * wheel while it is open** -- `bigmap.ts` binds its own non-passive listener on
+   * this same window and calls `preventDefault` there -- so this one returns
+   * before it counts anything rather than zooming the map and flipping the camera
+   * on one flick. The two listeners never fight, in either bind order, because
+   * only one of them is ever interested in the event.
+   */
+  const WHEEL_CAMERA_STEP = 80;
+  let wheelCamera = 0;
+  window.addEventListener(
+    'wheel',
+    (e) => {
+      // The name prompt is modal, and the three panels each own the screen while
+      // they are up: the map is scrolling itself, and the help and the board are
+      // being read. A camera that flipped underneath any of them would be a
+      // change the player could not see happening.
+      if (hud.typing || bigmap.visible || hud.helpVisible || hud.leaderboardVisible) {
+        wheelCamera = 0;
+        return;
+      }
+      const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1;
+      const delta = e.deltaY * scale;
+      if (delta === 0) return;
+      if (delta > 0 !== wheelCamera > 0) wheelCamera = 0;
+      wheelCamera += delta;
+      if (Math.abs(wheelCamera) < WHEEL_CAMERA_STEP) return;
+      // Down -- the direction that pushes the view away from you, which is the
+      // one every chase camera in every game zooms out on.
+      setCameraPreference(wheelCamera > 0);
+      wheelCamera = 0;
+    },
+    { passive: true },
+  );
+
   document.addEventListener('mousemove', (e) => {
     // Under pointer lock the cursor is captured and only movement deltas exist.
     // Dragging is the fallback, and uses the same deltas.
@@ -2438,27 +2579,15 @@ async function main(): Promise<void> {
       throwBuffer = PUNCH_BUFFER;
       enableAudio();
     }
-    // `V`: the camera preference. Edge-triggered like every other toggle here,
-    // or key repeat flips it thirty times a second.
+    // `V`: the camera preference, toggled. Edge-triggered like every other toggle
+    // here, or key repeat flips it thirty times a second.
     //
-    // Refused while riding, and that refusal is the design rather than a
-    // limitation: a bike is drawn under you and a rider in first person is a
-    // floating camera over a moving bike with no rider on it. So `V` is a
-    // preference the ride overrides, and pressing it mid-ride sets what you will
-    // get back when you get off. The HUD nudge says so, because a key that
-    // silently does nothing is a key a player decides is broken.
-    if (e.code === 'KeyV' && !held) {
-      thirdPersonPreferred = !thirdPersonPreferred;
-      if (playerCombat.ridingBike !== 0) {
-        // Through the ride pill rather than through `hud.notice`, and for the
-        // nudge's reason exactly: this line says "when you get off", so it is
-        // only true while you are on. Getting off -- by pressing `E`, by being
-        // batted, or by dying -- makes it false, and the derivation takes it
-        // down without anybody having to remember that it was up.
-        rideNudgeText = `camera: ${thirdPersonPreferred ? 'third' : 'first'} person when you get off`;
-        rideNudgeT = RIDE_NUDGE_SECONDS;
-      }
-    }
+    // Through `setCameraPreference`, which the wheel goes through too -- see
+    // there for the ride nudge and for why there is one preference and not two.
+    // A toggle here and an absolute up/down on the wheel is the difference
+    // between the two bindings and the whole of it: a key has no direction and a
+    // wheel has nothing but one.
+    if (e.code === 'KeyV' && !held) setCameraPreference(!thirdPersonPreferred);
     // `E`: get on the bike beside you, or off the one you are on.
     //
     // Edge-triggered here for the *prediction* and sent as a level bit for the
@@ -4182,6 +4311,76 @@ async function main(): Promise<void> {
       void ensureGround(player.position.x, player.position.z);
     }
 
+    // --- The nameplates, last, because they are the only thing in the frame
+    // that reads *other* objects' final world transforms.
+    //
+    // A plate hangs over the head **bone**, not over a fixed height above the
+    // feet, and that is the whole reason this sits here and pays for two forced
+    // matrix updates. A knocked-out body is face down in the street; a rider is
+    // seated 20 cm lower than they stand; both are poses the bone knows about
+    // and an offset from `RemotePlayer.position` does not. `CharacterActor.update`
+    // sets bone rotations and the mesh transform but does not compose world
+    // matrices -- the renderer does that, after this point -- so reading
+    // `headPosition` without forcing the update would put every plate one frame
+    // behind its owner, which at a sprint is 16 cm of visible lag.
+    //
+    // The cost is about twenty matrix composes per player, on at most fifteen
+    // players, once a frame. The camera gets the same treatment for the same
+    // reason: `begin` reads its world matrix for the billboard basis, and a
+    // frame-old basis is a plate that lags a fast mouse turn.
+    camera.updateMatrixWorld();
+    nameplates.begin(camera);
+    if (net) {
+      // Online: the remotes, and only the remotes. `add` drops the local id
+      // itself, so there is no condition here to get wrong.
+      for (const r of net.remotes.values()) {
+        if (r.fresh) continue;
+        const entry = remotes.get(r.id);
+        if (!entry) continue;
+        entry.actor.mesh.updateMatrixWorld(true);
+        entry.actor.headPosition(plateHead);
+        nameplates.add(
+          {
+            id: r.id,
+            // The roster's name, which is also where the bots' Aussie names come
+            // from -- `server/bots.ts` names them and the roster carries them,
+            // so a bot's plate needs nothing special here.
+            name: net.nameOf(r.id),
+            health: r.health,
+            headX: plateHead.x,
+            headY: plateHead.y,
+            headZ: plateHead.z,
+            down: r.anim === ANIM.KO,
+          },
+          net.id,
+        );
+      }
+    } else {
+      // Offline: the dummies, which are spec 9's stand-in players and are given
+      // plates for exactly that reason -- the feature has to be reachable
+      // without a server and a second browser, or it rots. They have no roster
+      // name, so they carry their kind, which is also the only thing that
+      // distinguishes them.
+      for (const f of fighters) {
+        if (!f.dummy) continue;
+        f.driver.actor.mesh.updateMatrixWorld(true);
+        f.driver.actor.headPosition(plateHead);
+        nameplates.add(
+          {
+            id: f.combat.id,
+            name: dummyLabel(f.dummy.kind),
+            health: f.combat.health,
+            headX: plateHead.x,
+            headY: plateHead.y,
+            headZ: plateHead.z,
+            down: f.combat.phase === 'ko',
+          },
+          playerCombat.id,
+        );
+      }
+    }
+    nameplates.end();
+
     renderer.render(scene, camera);
 
     // Cost of this frame, measured after the render call returns. Deltas above
@@ -4331,6 +4530,62 @@ async function main(): Promise<void> {
     player,
     globals,
     frameMs: () => medianFrameMs(),
+
+    /**
+     * The nameplates, for the console.
+     *
+     * `sydney.nameplates.report()` answers the only three questions this feature
+     * raises from outside: how many plates are being drawn, whether the name
+     * cache is doing its job, and whether anything is being dropped on the
+     * floor. `redraws` is the one to watch -- it should settle at one per
+     * distinct name that has ever been in the game and then stop moving
+     * forever. A `redraws` that climbs with the frame counter means the cache is
+     * missing and two megabytes of atlas are being re-uploaded every frame,
+     * which presents as a frame-rate problem a long way from this file.
+     *
+     * `dropped` should be zero for the life of the process; it counts players
+     * refused a plate because the buffers were full.
+     */
+    nameplates: {
+      field: nameplates,
+      report: () => ({
+        drawn: nameplates.live,
+        redraws: nameplates.redraws,
+        dropped: nameplates.dropped,
+        /** Who currently has one, and what their bar says. */
+        plates: net
+          ? [...net.remotes.values()]
+              .filter((r) => !r.fresh)
+              .map((r) => ({
+                id: r.id,
+                name: net?.nameOf(r.id) ?? '',
+                health: r.health,
+                down: r.anim === ANIM.KO,
+                metres: Math.round(
+                  Math.hypot(
+                    r.position.x - player.position.x,
+                    r.position.y - player.position.y,
+                    r.position.z - player.position.z,
+                  ),
+                ),
+              }))
+          : fighters
+              .filter((f) => f.dummy)
+              .map((f) => ({
+                id: f.combat.id,
+                name: dummyLabel(f.dummy!.kind),
+                health: f.combat.health,
+                down: f.combat.phase === 'ko',
+                metres: Math.round(
+                  Math.hypot(
+                    f.combat.body.position.x - player.position.x,
+                    f.combat.body.position.y - player.position.y,
+                    f.combat.body.position.z - player.position.z,
+                  ),
+                ),
+              })),
+      }),
+    },
 
     /**
      * The lime e-bikes, for the console.

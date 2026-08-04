@@ -12,9 +12,10 @@ Built to [`sydney-fps-build-spec.md`](sydney-fps-build-spec.md). This file recor
 how to run it, and — importantly — what does not exist yet.
 
 The world itself is not in this repository. It is ~620 MB of generated geometry, published
-as gzipped [release assets](https://github.com/voidtype/sydrunner/releases) and served to
-players from GitHub's CDN — see [Data and attribution](#data-and-attribution) below, and
-[`DEPLOY.md`](DEPLOY.md) for how a build gets there.
+as gzipped [release assets](https://github.com/voidtype/sydrunner/releases) instead — see
+[Data and attribution](#data-and-attribution) below, and [`DEPLOY.md`](DEPLOY.md) for how a
+build gets there and why the client does not yet stream from those releases (GitHub serves
+release assets without CORS, so a browser cannot read one cross-origin).
 
 ---
 

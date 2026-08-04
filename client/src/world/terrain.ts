@@ -41,6 +41,7 @@
  */
 
 import { BufferAttribute, BufferGeometry, Mesh, type Material } from 'three/webgpu';
+import { fetchWorldAsset } from './cdn.ts';
 
 /**
  * How far the skirt around each tile hangs below its edge, metres.
@@ -261,7 +262,9 @@ export class TerrainField {
       // the socket held and make the *next* attempt slower than this one.
       const signal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
       try {
-        const resp = await fetch(`${this.baseUrl}/tiles/${key}.terr.bin${this.version}`, { signal });
+        const resp = await fetchWorldAsset(this.baseUrl, `tiles/${key}.terr.bin`, this.version, {
+          signal,
+        });
         if (!resp.ok) {
           this.missing.add(key);
           finish(null);

@@ -50,6 +50,7 @@ import {
 } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Group, Mesh, MeshStandardNodeMaterial } from 'three/webgpu';
+import { fetchWorldBuffer } from './cdn.ts';
 
 /**
  * The six slots, in the pipeline's order. Order is not load-bearing -- the GLB
@@ -327,7 +328,12 @@ export async function loadLandmarks(
   if (!contract) return EMPTY;
   try {
     const loader = new GLTFLoader();
-    const gltf = await loader.loadAsync(`${baseUrl}/${contract.file}${version}`);
+    // Bytes first, then parse: the release CDN serves this gzipped and
+    // `loadAsync` would fetch it itself. Self-contained GLB, so no base path.
+    const gltf = await loader.parseAsync(
+      await fetchWorldBuffer(baseUrl, contract.file, version),
+      '',
+    );
     const materials = createLandmarkMaterials();
 
     const group = new Group();

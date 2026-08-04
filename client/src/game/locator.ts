@@ -68,6 +68,7 @@
 
 import type { NamedSegment } from '../world/streetnames.ts';
 import { distanceToPolylineSquared } from '../world/streetnames.ts';
+import { fetchWorldAsset } from '../world/cdn.ts';
 
 /**
  * Where a locator gets its streets. Structural, so `game/` states what it needs
@@ -287,7 +288,7 @@ export class Locator {
     if (this.suburbsRequested) return this.suburbs.length;
     this.suburbsRequested = true;
     try {
-      const resp = await fetch(`${this.baseUrl}/suburbs.json${this.version}`);
+      const resp = await fetchWorldAsset(this.baseUrl, 'suburbs.json', this.version);
       if (!resp.ok) return 0;
       const raw = (await resp.json()) as SuburbNode[];
       // Filtered rather than trusted: one malformed record with a NaN
