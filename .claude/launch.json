@@ -1,17 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    {
-      "name": "sydney",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 5173
-    },
-    {
-      "name": "sydney-dist",
-      "runtimeExecutable": "bun",
-      "runtimeArgs": ["run", "/private/tmp/claude-501/-Volumes-underbelly-Code-sydrunner/d60ddbbf-383f-4c71-9a21-99237cd22fa2/scratchpad/serve-dist.ts"],
-      "port": 4517
-    }
+    { "name": "sydney-client", "runtimeExecutable": "npm", "runtimeArgs": ["--workspace", "client", "run", "dev"], "port": 5173 }
   ]
 }

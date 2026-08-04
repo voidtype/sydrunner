@@ -586,21 +586,169 @@ const IBIS_DOWN_SECONDS = 10;
 
 // --- Magpie tuning ------------------------------------------------------------------
 
-/** Metres from the nest at which a magpie starts taking an interest. The brief's 20. */
+/**
+ * Metres from the nest at which a magpie starts taking an interest. The brief's 20.
+ *
+ * **Entering is on you; staying is what costs.** Twenty metres buys the first
+ * pass and nothing else -- every pass after it is gated on `DISENGAGE_RANGE`
+ * and on not already leaving. See `breakingOff`.
+ */
 const SWOOP_RANGE = 20;
+/**
+ * Metres. Inside this the campaign continues; outside it, the magpie is done.
+ *
+ * The asymmetry against `SWOOP_RANGE` is the entire fix for *"de aggro based on
+ * distance too slow"*. The old rule ended an engagement at the aggro radius, so
+ * a player who turned and ran from eight metres still had to cover twelve
+ * before the bird stopped -- and at a walk that is nearly three seconds, which
+ * is two more swoops in the back of the head while already retreating. Twelve
+ * is about a second and a half of walking or three quarters of a sprint, and
+ * `breakingOff`'s velocity half usually fires before the distance does.
+ */
+const DISENGAGE_RANGE = 12;
+/**
+ * The alarm, ticks, before the dive it announces.
+ *
+ * **The warble leads the dive rather than accompanying it**, which is the other
+ * half of the complaint (*"too hard to avoid"*). The old bird went from perched
+ * to past your ear in 40 ticks with the call layered over the top of it, so the
+ * first information you had about a swoop arrived at the same instant as the
+ * swoop. Fifty ticks is 0.83 s of a magpie screaming at you from the branch
+ * before it leaves it -- long enough to hear it, find it and move, and short
+ * enough that standing there listening is still the wrong answer.
+ *
+ * `NPC_STATE.AIM` carries it, which is a byte the wire already has and no
+ * faction of this one uses. `main.ts` plays the alarm off its rising edge and
+ * the dive sound off `CHASE`'s, so the two cues are 0.83 s apart online and
+ * offline alike, with no protocol change and no new event.
+ */
+const TELEGRAPH_TICKS = 50;
 /**
  * How long one dive takes, ticks, and how long the climb-out and circle between
  * two of them takes.
  *
  * 40 ticks is two thirds of a second from the branch to past your ear, which is
- * about right and is deliberately too fast to react to -- the counterplay is
- * leaving the radius, not dodging. 110 ticks of circling is what makes three
- * swoops read as a sustained campaign rather than a stutter.
+ * about right and is deliberately too fast to react to -- by the time the bird
+ * is off the branch the read has already happened, up in `TELEGRAPH_TICKS`.
+ *
+ * The circle was 110 ticks when the dive was the whole encounter. It is 55 now
+ * because the telegraph has been added in front of every pass: a swoop cycle is
+ * 50 + 40 + 55 = 145 ticks either way, so the *rhythm* is unchanged and what
+ * moved is where inside it the player gets to act.
  */
 const SWOOP_TICKS = 40;
-const CIRCLE_TICKS = 110;
-/** Swoops per engagement before it perches and settles for a stare. The brief's 2-3. */
-const MAX_SWOOPS = 3;
+const CIRCLE_TICKS = 55;
+/**
+ * And the climb-out after a **break-off**, which is a different thing.
+ *
+ * `CIRCLE_TICKS` is a rhythm: it is the pause that makes two swoops read as a
+ * campaign rather than a stutter, and it is only ever spent on a player the
+ * bird is still working on. A break-off has no rhythm to keep -- the player has
+ * answered and the bird is going back to the branch -- so making it wait the
+ * full circle just extends an engagement that has already ended by nearly a
+ * second. Measured through the real controller, the acceleration ramp from a
+ * standstill to `BREAK_OFF_SPEED` already costs about 0.7 s; with the full
+ * circle behind it, "turn and run" took 1.65 s to be over, which is the thing
+ * being fixed rather than a budget to spend.
+ */
+const BREAK_OFF_CIRCLE_TICKS = 24;
+/**
+ * Swoops per engagement before it perches and settles for a stare. The brief's 2-3.
+ *
+ * Two rather than three. Three was a seven-and-a-half second campaign, and with
+ * the telegraph in front of each pass a third one is a bird still working on
+ * you long after the joke has landed.
+ */
+const MAX_SWOOPS = 2;
+/**
+ * How far ahead of you the magpie aims, ticks of your own velocity, and the
+ * furthest that lead may reach, metres.
+ *
+ * **This pair is the dodge.** The arc is committed once, at the top of the
+ * telegraph, at `position + velocity * COMMIT_LEAD_TICKS` -- and then it is
+ * *fixed*, so what lands is a bird arriving where you were going to be rather
+ * than where you turned out to be. The two numbers decide who that catches:
+ *
+ *   - The bird leads by 46 ticks and the strike lands 70 ticks after the commit
+ *     (`TELEGRAPH_TICKS` plus half of `SWOOP_TICKS`), so it is always **24 ticks
+ *     short**. At a walk that is a 1.76 m error against a 1.15 m
+ *     `SWOOP_HIT_RADIUS`, which sounds like a clean miss and is not: the arc's
+ *     plan track runs straight down the ray it committed to, so a player walking
+ *     *along* that ray is swept anyway and only one walking across it is missed.
+ *     That is where the coin flip comes from, and it is the better coin flip --
+ *     what decides it is the direction you chose, not the speed you chose.
+ *   - The lead is **capped at 4 m**, which is a player moving at 5.2 m/s. A
+ *     4.4 m/s walk wants 3.37 m and is read in full; an 8.2 m/s sprint wants
+ *     6.3 m, gets 4, and is five and a half metres clear by the time the bird
+ *     arrives. Sprinting past a nest is a dodge, which it should be.
+ *
+ * A direction change beats it at any speed, because the commit is a straight
+ * line and you are no longer on it. Standing still beats nothing at all, which
+ * is the joke working as intended.
+ *
+ * **Measured over twenty scripted passes a style**, on flat ground with the
+ * player driven at a fixed velocity: standing 100% of dives land, dawdling at
+ * 1.5 m/s 100%, walking 50%, walking with a 90-degree turn on the alarm 0%,
+ * sprinting 0%. Those five numbers are the entire feature.
+ *
+ * Velocity rather than a remembered previous position, deliberately: it is
+ * already on `CombatantState.body`, it costs no per-actor storage on a wire
+ * record three factions share, and it is exactly as authoritative as the
+ * position beside it.
+ */
+const COMMIT_LEAD_TICKS = 46;
+const COMMIT_LEAD_MAX = 4;
+/**
+ * The shortest run the arc is ever built over, metres.
+ *
+ * A player standing directly under the nest gives a commit point on top of it,
+ * and an arc with no plan run is a division by nothing followed by a bird
+ * falling vertically through its own branch. Two metres is the floor.
+ */
+const COMMIT_MIN_RUN = 2;
+/**
+ * Ticks either side of the strike point in which a pass may connect.
+ *
+ * The hit test used to run over the whole dive, so the climb-out could clip
+ * somebody the bottom of the arc had already missed -- a graze counted as a
+ * strike, forty ticks wide. Six ticks either side of the bottom is a tenth of a
+ * second of contact window, which is the part of the curve that is actually at
+ * head height. Outside it the bird is either still coming down or already gone.
+ *
+ * **Measured, because it did not look like it would matter and it does.** The
+ * arc carries `SWOOP_OVERSHOOT` -- seven metres -- past the commit point and
+ * dips back through head height on the way up. Against a probe standing a
+ * spread of distances beyond the commit, the whole-arc window landed 18 passes
+ * in 20 and clipped players as much as **five metres** past where the bird was
+ * aiming; six ticks lands 11 and almost nothing past two. Every one of the
+ * seven it drops is the tail of a dive that had already gone by.
+ */
+const STRIKE_WINDOW_TICKS = 6;
+/**
+ * Metres per second of *outward* travel that calls the engagement off.
+ *
+ * Radial, against the nest: strafing past a tree is not leaving and does not
+ * count, and neither does backing away at a shuffle. 3.2 m/s is comfortably
+ * under a 4.4 m/s walk, so turning your back and walking is enough -- which is
+ * what the user meant by wanting the de-aggro to be quicker. It is checked
+ * every tick of the telegraph and over the back half of the dive, so the
+ * answer to a magpie is available at all times and takes effect inside the
+ * pass you are already in.
+ */
+const BREAK_OFF_SPEED = 3.2;
+/**
+ * Ticks a magpie stays bored after an engagement ends. Twenty seconds.
+ *
+ * Leaving and coming straight back used to buy a whole fresh campaign, so the
+ * counterplay to a magpie was also a way of farming one. Inside the cooldown a
+ * returning player gets **one** warning pass and then the stare; past it, the
+ * full two. Held in `barkedAt` while the bird is perched with nobody in range
+ * -- see the note on that field's double duty -- which means it lasts exactly
+ * as long as the bird stays promoted. A player who walks 40 m away has resolved
+ * the actor and is entitled to a fresh bird, which is also true of the one in
+ * the tree.
+ */
+const REAGGRO_COOLDOWN_TICKS = 20 * 60;
 /** Metres. How close the arc has to pass to a player's head to connect. */
 const SWOOP_HIT_RADIUS = 1.15;
 const SWOOP_DAMAGE = 0.25;
@@ -624,6 +772,51 @@ const MAGPIE_RADIUS = 0.22;
 const MAGPIE_HEIGHT = 0.42;
 /** A downed magpie stays down. Batting one out of the air is hard; it should count. */
 const MAGPIE_DOWN_SECONDS = 12;
+
+/**
+ * The magpie's tuning, exported so a check can assert *against the simulation*
+ * rather than against a copy of it.
+ *
+ * `server/integration-check.checkWildlife` reads these rather than restating
+ * them, which is the difference between a check that fails when the tuning
+ * moves and one that fails when the tuning is *wrong*. The first kind gets
+ * edited until it passes; the second kind is worth having.
+ */
+export const MAGPIE_TUNING = {
+  /** Metres. Entering this starts an engagement. */
+  swoopRange: SWOOP_RANGE,
+  /** Metres. Leaving this ends one. */
+  disengageRange: DISENGAGE_RANGE,
+  /** Ticks of alarm before the dive. */
+  telegraphTicks: TELEGRAPH_TICKS,
+  /** Ticks the dive itself takes. */
+  swoopTicks: SWOOP_TICKS,
+  /** Ticks of circling between passes. */
+  circleTicks: CIRCLE_TICKS,
+  /** And the shorter one after a break-off, which is just going home. */
+  breakOffCircleTicks: BREAK_OFF_CIRCLE_TICKS,
+  /** Passes in a full engagement. */
+  maxSwoops: MAX_SWOOPS,
+  /** Ticks of your velocity the commit point is thrown forward by. */
+  commitLeadTicks: COMMIT_LEAD_TICKS,
+  /** Metres that lead is capped at. */
+  commitLeadMax: COMMIT_LEAD_MAX,
+  /** Ticks either side of the bottom of the arc in which a pass may land. */
+  strikeWindowTicks: STRIKE_WINDOW_TICKS,
+  /** Metres. The sphere around the strike point. */
+  hitRadius: SWOOP_HIT_RADIUS,
+  /** m/s of outward travel that calls it off. */
+  breakOffSpeed: BREAK_OFF_SPEED,
+  /** Ticks before a returning player is worth a full campaign again. */
+  cooldownTicks: REAGGRO_COOLDOWN_TICKS,
+  /** Pips a pass takes. */
+  swoopDamage: SWOOP_DAMAGE,
+  /**
+   * Ticks from the commit to the strike: the whole flight the lead has to cover
+   * and deliberately does not. Derived here so nobody has to add it up again.
+   */
+  flightTicks: TELEGRAPH_TICKS + SWOOP_TICKS * 0.5,
+} as const;
 
 // --- Where an ambient bird is --------------------------------------------------------
 
@@ -1303,10 +1496,20 @@ export const IBIS = registerNpcKind({
  * through `C1` and pulled in -- so the bird does not turn a corner mid-dive; it
  * merely decelerates as it climbs out, which is what one does.
  *
- * `s` runs 0..1 over `SWOOP_TICKS`. The curve is re-derived every tick against
- * where the player *is* rather than frozen at launch, which is what makes a
- * magpie track you a little as it comes. It is not dodgeable by a sidestep, and
- * that is correct: you do not dodge these, you leave.
+ * `s` runs 0..1 over `SWOOP_TICKS`. **`(tx, ty, tz)` is the commit point, not
+ * the player**, and that is the change that made this feature playable. It used
+ * to be re-derived every tick against wherever the player *was now*, so the
+ * curve homed: a magpie could not be dodged by moving, only outrun, and the
+ * reported symptom was exactly that -- *"too hard to avoid"*. It is now frozen
+ * at the top of the telegraph by `commitSwoop`, 70 ticks before the strike, and
+ * everything downstream of that -- who gets clipped, who gets missed -- falls
+ * out of the difference between where you were going and where you went.
+ *
+ * The arc's plan projection lies **entirely on the ray from the nest through
+ * the commit point**: `C1` is on the segment, `S` and `E` are on it, so every
+ * control point is. That is why `MAGPIE.think` can store the whole aim as
+ * `(dx, dz, barkedAt)` -- a unit heading and a run -- and why the bird's drawn
+ * yaw is correct for the whole dive without anybody differencing a position.
  */
 function swoopPoint(
   s: number,
@@ -1355,20 +1558,140 @@ function swoopPoint(
 const _swoop = { x: 0, y: 0, z: 0 };
 
 /**
+ * Freeze the aim for one pass. Called once, at the top of the telegraph.
+ *
+ * Stores the whole commit as a **unit heading and a run** -- `(dx, dz)` and
+ * `barkedAt` -- which is possible because `swoopPoint`'s plan projection lies on
+ * the ray from the nest through the commit point and nowhere else. Two of those
+ * three numbers are the bird's own drawn heading, which is what it should be
+ * pointing at anyway; the third is a field this faction has to itself.
+ *
+ * The lead is `velocity * COMMIT_LEAD_TICKS`, clamped to `COMMIT_LEAD_MAX`, and
+ * both halves of that matter -- see the constants. No trig: a dot, a sqrt and a
+ * divide, all of which `planDistance` and `stepToward` already do.
+ */
+function commitSwoop(actor: NpcActor, target: CombatantState): void {
+  const v = target.body.velocity;
+  let lx = v.x * (COMMIT_LEAD_TICKS / 60);
+  let lz = v.z * (COMMIT_LEAD_TICKS / 60);
+  const l2 = lx * lx + lz * lz;
+  if (l2 > COMMIT_LEAD_MAX * COMMIT_LEAD_MAX) {
+    const k = COMMIT_LEAD_MAX / Math.sqrt(l2);
+    lx *= k;
+    lz *= k;
+  }
+  const hx = target.body.position.x + lx - actor.homeX;
+  const hz = target.body.position.z + lz - actor.homeZ;
+  const h2 = hx * hx + hz * hz;
+  // Straight down the tree is not a run. See `COMMIT_MIN_RUN`.
+  if (h2 < COMMIT_MIN_RUN * COMMIT_MIN_RUN) {
+    const inv = h2 > 1e-6 ? 1 / Math.sqrt(h2) : 0;
+    actor.dx = inv === 0 ? 0 : hx * inv;
+    actor.dz = inv === 0 ? 1 : hz * inv;
+    actor.barkedAt = COMMIT_MIN_RUN;
+    return;
+  }
+  const inv = 1 / Math.sqrt(h2);
+  actor.dx = hx * inv;
+  actor.dz = hz * inv;
+  actor.barkedAt = 1 / inv;
+}
+
+/**
+ * Whether this player has already answered the magpie, and the campaign should
+ * therefore stop.
+ *
+ * Two ways, whichever comes first, and both are measured against the **nest**
+ * rather than against the bird -- a magpie halfway down its arc is 6 m nearer
+ * you than its branch is, and a disengage test that used the bird's own
+ * position would decide you were closer every time it dived at you.
+ *
+ *   - Past `range`. You have left.
+ *   - Moving outward faster than `BREAK_OFF_SPEED`. You are leaving, and the
+ *     bird does not make you finish the walk first. This is the half that
+ *     actually fires: a player who turns and goes trips it on the tick they
+ *     turn, roughly a second and a half before the distance test would.
+ *
+ * **`range` is the caller's, and the two callers pass different ones**, which
+ * is not a subtlety so much as the whole disengage rule:
+ *
+ *   - Between passes, `DISENGAGE_RANGE`. Twelve metres. Continuing to swoop is
+ *     a stricter test than starting to.
+ *   - Inside a pass already under way -- the telegraph, or the back half of the
+ *     dive -- `SWOOP_RANGE`. Twenty. A player who walked in at eighteen was
+ *     *allowed* to be at eighteen, and aborting on the tick after the alarm
+ *     started because they were outside a radius they never entered would mean
+ *     no magpie in the city could ever swoop at anybody standing past twelve
+ *     metres. Which is what it meant, for exactly as long as it took the
+ *     hit-rate harness to report zero dives at every speed.
+ *
+ * Stateless on purpose. There is nowhere on `NpcActor` to accumulate "has been
+ * going away for a while" that this faction is entitled to, and it turns out
+ * not to need one: the radial dot product is already the question, and the
+ * cost of the occasional early break-off is a magpie that gave up slightly
+ * sooner, which is the direction the whole retune is going in.
+ */
+function breakingOff(actor: NpcActor, target: CombatantState, range: number): boolean {
+  const rx = target.body.position.x - actor.homeX;
+  const rz = target.body.position.z - actor.homeZ;
+  const r2 = rx * rx + rz * rz;
+  if (r2 > range * range) return true;
+  if (r2 < 1e-6) return false;
+  const inv = 1 / Math.sqrt(r2);
+  const outward = (target.body.velocity.x * rx + target.body.velocity.z * rz) * inv;
+  return outward >= BREAK_OFF_SPEED;
+}
+
+/**
+ * Abandon the rest of the engagement: climb out, circle once, perch and glare.
+ *
+ * `shotsFired` is driven to `MAX_SWOOPS` rather than to some separate flag,
+ * because "this campaign is over" is precisely what that value already means
+ * everywhere else in this function -- the perched branch reads it as the cue to
+ * stare, and the reset when the player finally leaves clears it.
+ */
+function breakOffSwoop(actor: NpcActor): void {
+  actor.shotsFired = MAX_SWOOPS;
+  actor.state = NPC_STATE.WALK;
+  actor.stateTicks = 0;
+  actor.fireCooldown = BREAK_OFF_CIRCLE_TICKS;
+}
+
+/**
  * The magpie. Kind 6. *Gymnorhina tibicen*, and the reason Australians wear
  * cable ties on their helmets for six weeks a year.
  *
- * Perches on its nest until somebody enters `SWOOP_RANGE`, then dives three
- * times with a circle between each, then perches and glares until you leave.
+ * Perches on its nest until somebody enters `SWOOP_RANGE`, then runs a
+ * telegraph-and-dive cycle at them until they leave or it runs out of passes:
+ *
+ *     IDLE  --(inside 20 m)-->  AIM  --(50 ticks)-->  CHASE/FIRE  -->  WALK
+ *      ^                         |                     |               |
+ *      |                         `--- break off -------'               |
+ *      `--------------------- circle 55 ticks ---------------------- --'
+ *
  * The damage is a quarter pip a pass, which is small -- the swoop is not
  * supposed to kill you, it is supposed to make you go a different way.
  *
- * **`downTicks` does double duty**, and it is worth writing down because it
- * looks like a bug. Outside `NPC_STATE.DOWN` the field is meaningless to the
- * framework -- nothing reads it and only `strikeNpc` writes it -- so a dive
- * borrows it as the "this pass has already connected" guard, which is the one
- * piece of per-dive state there is nowhere else to put. `strikeNpc` overwrites
- * it on a knockdown, which is exactly the moment the dive stops mattering.
+ * ---------------------------------------------------------------------------
+ * **Three fields do double duty here**, and all three look like bugs until you
+ * know which phase you are in. `NpcActor` is a wire record three factions share
+ * and this one is not entitled to grow it, so the per-engagement state lives in
+ * fields the framework does not read while a magpie is using them:
+ *
+ *   - **`downTicks`** -- outside `NPC_STATE.DOWN` nothing reads it and only
+ *     `strikeNpc` writes it, so a dive borrows it as the "this pass has already
+ *     connected" guard. `strikeNpc` overwrites it on a knockdown, which is
+ *     exactly the moment the dive stops mattering.
+ *   - **`barkedAt`** -- the framework's aggro-bark clock, which a magpie can
+ *     never set: `FactionField.bark` returns on the first line for a kind with
+ *     no `aggroClips`, and this one has none. From the top of a telegraph until
+ *     the end of the dive it holds the **committed run in metres**; while
+ *     perched with nobody in range it holds the **re-aggro cooldown in ticks**.
+ *     Those two phases cannot overlap, and the transition between them is
+ *     always through the perched branch, which sets it.
+ *   - **`dx, dz`** -- the drawn heading, which for a committed dive *is* the
+ *     unit direction of the whole arc. Storing the aim there costs nothing and
+ *     removes the per-tick position differencing that used to compute it.
  */
 export const MAGPIE = registerNpcKind({
   kind: NPC_KIND.MAGPIE,
@@ -1394,6 +1717,10 @@ export const MAGPIE = registerNpcKind({
         actor.state = NPC_STATE.RETURN;
         actor.stateTicks = 0;
         actor.shotsFired = 0;
+        // And with a clean `barkedAt`, which was a committed run when it was
+        // knocked out of the air. Left alone it would be read as a few ticks of
+        // re-aggro cooldown, which is not wrong so much as meaningless.
+        actor.barkedAt = 0;
       }
       return;
     }
@@ -1415,6 +1742,31 @@ export const MAGPIE = registerNpcKind({
     // is what a street tree is rooted in.
     const perchY = ctx.groundHeight(actor.homeX, actor.homeZ, -Infinity) + NEST_HEIGHT;
 
+    // --- The telegraph. On the branch, screaming, aim already frozen.
+    //
+    // The aim is committed on the tick this state is *entered* rather than on
+    // the tick it ends, which is the whole point: the player has the entire
+    // `TELEGRAPH_TICKS` to invalidate a decision the bird has already made. A
+    // magpie that recommitted at launch would merely be a magpie with a longer
+    // wind-up, and would have exactly the old hit rate.
+    if (actor.state === NPC_STATE.AIM) {
+      actor.x = actor.homeX;
+      actor.z = actor.homeZ;
+      actor.y = perchY;
+      // Answered before it ever left the branch. This is the cheapest possible
+      // escape and it is meant to be: hear it, turn, go.
+      if (!target || breakingOff(actor, target, SWOOP_RANGE)) {
+        breakOffSwoop(actor);
+        return;
+      }
+      if (actor.stateTicks >= TELEGRAPH_TICKS) {
+        actor.downTicks = 0;
+        actor.state = NPC_STATE.CHASE;
+        actor.stateTicks = 0;
+      }
+      return;
+    }
+
     // --- Mid-dive. The arc owns the position outright; nothing else moves it.
     // FIRE is entered inside the dive when the pass connects and is held for the
     // rest of it, so a client can play the impact off the rising edge of a state
@@ -1429,51 +1781,59 @@ export const MAGPIE = registerNpcKind({
         actor.fireCooldown = CIRCLE_TICKS;
         return;
       }
-      const tx = target.body.position.x;
-      // **`body.position.y` is the eye, not the feet**, and this line had
-      // `+ EYE_HEIGHT` on it until `checkWildlife` was written. A combatant's
-      // position is `controller.EYE_HEIGHT` above the ground by construction
-      // (`createCombatant` sets it, `combat.advance` clamps to
-      // `ground + EYE_HEIGHT`), which is why `factions.POLICE.think` aims a
-      // sight line at `suspect.body.position.y` directly and adds the eye
-      // height only to the *officer*, whose `y` is feet. Adding it again here
-      // put the strike point 1.68 m over the player's head: a magpie that
-      // dived on everybody, looked completely correct doing it, and could not
-      // connect with anything.
-      const ty = target.body.position.y;
-      const tz = target.body.position.z;
-      let hx = tx - actor.homeX;
-      let hz = tz - actor.homeZ;
-      const h2 = hx * hx + hz * hz;
-      const hinv = h2 > 1e-6 ? 1 / Math.sqrt(h2) : 0;
-      hx = hinv === 0 ? 0 : hx * hinv;
-      hz = hinv === 0 ? 1 : hz * hinv;
-      swoopPoint(s, actor.homeX, perchY, actor.homeZ, tx, ty, tz, hx, hz, _swoop);
+      // The commit, unpacked. A heading and a run, frozen by `commitSwoop`
+      // `TELEGRAPH_TICKS` ago and not touched since -- so this curve is the same
+      // curve on every tick of the dive, and a player who moved after the commit
+      // is a player the bird is going to miss.
+      //
+      // **The commit's height is asked of the ground rather than of the
+      // player**, and for `perchY`'s reason one field up: the strike point has
+      // to be at the head height of somebody standing *there*, which is
+      // `groundHeight` plus an eye. Reading `target.body.position.y` here would
+      // re-introduce exactly the tracking the commit exists to remove -- a
+      // player who jumped would drag the arc up with them.
+      const run = actor.barkedAt;
+      const cx = actor.homeX + actor.dx * run;
+      const cz = actor.homeZ + actor.dz * run;
+      const cy = ctx.groundHeight(cx, cz, -Infinity) + EYE_HEIGHT;
+      swoopPoint(s, actor.homeX, perchY, actor.homeZ, cx, cy, cz, actor.dx, actor.dz, _swoop);
       const nx = _swoop.x;
       const ny = _swoop.y;
       const nz = _swoop.z;
-      const mx = nx - actor.x;
-      const mz = nz - actor.z;
-      const m2 = mx * mx + mz * mz;
-      if (m2 > 1e-6) {
-        const minv = 1 / Math.sqrt(m2);
-        actor.dx = mx * minv;
-        actor.dz = mz * minv;
-      }
+      // No heading update: `(dx, dz)` already *is* the plan direction of this
+      // arc for every tick of it -- see `swoopPoint` -- and overwriting it would
+      // throw away the aim it is holding.
       actor.x = nx;
       actor.y = ny;
       actor.z = nz;
 
-      // The pass. One connection a dive -- see the note on `downTicks`.
-      if (actor.downTicks === 0) {
-        const ddx = nx - tx;
-        const ddy = ny - ty;
-        const ddz = nz - tz;
+      // The pass. One connection a dive -- see the note on `downTicks` -- and
+      // only in the `STRIKE_WINDOW_TICKS` around the bottom of the arc, so the
+      // climb-out cannot collect somebody the dive itself went past.
+      //
+      // Measured against where the player **is**, not against the commit: the
+      // commit decides where the bird goes and the player's real position
+      // decides whether that was the right guess. Those being different numbers
+      // is the feature.
+      const fromStrike = actor.stateTicks - SWOOP_TICKS * 0.5;
+      if (actor.downTicks === 0 && fromStrike >= -STRIKE_WINDOW_TICKS && fromStrike <= STRIKE_WINDOW_TICKS) {
+        const ddx = nx - target.body.position.x;
+        const ddy = ny - target.body.position.y;
+        const ddz = nz - target.body.position.z;
         if (ddx * ddx + ddy * ddy + ddz * ddz <= SWOOP_HIT_RADIUS * SWOOP_HIT_RADIUS) {
           actor.downTicks = 1;
           actor.state = NPC_STATE.FIRE;
           ctx.damagePlayer(target.id, SWOOP_DAMAGE, actor);
         }
+      }
+
+      // And the break-off, from the bottom of the arc onward. The dive itself is
+      // committed -- a bird halfway through a stoop does not stop -- but the
+      // *next* one is not, and cancelling it here rather than at the top of the
+      // circle is what makes "turn and run" end the engagement inside the pass
+      // you are already in rather than one after it.
+      if (fromStrike >= 0 && actor.shotsFired < MAX_SWOOPS && breakingOff(actor, target, SWOOP_RANGE)) {
+        actor.shotsFired = MAX_SWOOPS;
       }
       return;
     }
@@ -1502,25 +1862,51 @@ export const MAGPIE = registerNpcKind({
     const near = nearestTarget(actor, ctx, SWOOP_RANGE);
     if (!near) {
       actor.target = -1;
-      // Out of the radius: the campaign is over and the count resets, which is
-      // what makes walking away and coming back a fresh set of swoops rather
-      // than a bird that has permanently given up on this street.
-      actor.shotsFired = 0;
       actor.state = NPC_STATE.IDLE;
+      // Out of the radius. The campaign is over and the count resets -- and the
+      // **cooldown is armed on the same edge**, which is what stops walking out
+      // and straight back in being a way to farm a fresh pair of swoops. See
+      // `REAGGRO_COOLDOWN_TICKS`.
+      //
+      // `shotsFired > 0` is the edge: it is non-zero for exactly as long as an
+      // engagement has been running, so this arms once rather than every tick,
+      // and the `else` is then free to run the cooldown down. That is also the
+      // invariant that keeps `barkedAt`'s double duty honest -- every path to
+      // `shotsFired === 0` outside a dive passes through here or through the
+      // knockdown, and both of them write the field.
+      if (actor.shotsFired > 0) {
+        actor.shotsFired = 0;
+        actor.barkedAt = REAGGRO_COOLDOWN_TICKS;
+      } else if (actor.barkedAt > 0) {
+        actor.barkedAt--;
+      }
       if (abandoned(actor, ctx, WAKE_MAGPIE * SLEEP_FACTOR)) resolveActor(actor);
       return;
     }
+    actor.target = near.id;
     if (actor.shotsFired >= MAX_SWOOPS) {
       // Perched, watching, and it will not go again until you have left. The
       // stare is the point: the bird has won and both of you know it.
-      actor.target = near.id;
       actor.state = NPC_STATE.IDLE;
       return;
     }
-    actor.target = near.id;
+    // Mid-campaign, between passes: continuing is a stricter test than starting.
+    // `SWOOP_RANGE` got you the first swoop; the rest are gated on
+    // `DISENGAGE_RANGE` and on not already leaving, so a player who ran during
+    // the circle does not get dived on when it ends.
+    if (actor.shotsFired > 0 && breakingOff(actor, near, DISENGAGE_RANGE)) {
+      breakOffSwoop(actor);
+      return;
+    }
+    // A returning player, inside the cooldown: one warning pass, not a campaign.
+    // The `++` below takes this to `MAX_SWOOPS`, so the pass happens and the
+    // stare follows it immediately.
+    if (actor.shotsFired === 0 && actor.barkedAt > 0) actor.shotsFired = MAX_SWOOPS - 1;
     actor.shotsFired++;
-    actor.downTicks = 0;
-    actor.state = NPC_STATE.CHASE;
+    // The aim, frozen here and read for the next `TELEGRAPH_TICKS + SWOOP_TICKS`
+    // ticks. Everything about whether this pass lands was decided on this line.
+    commitSwoop(actor, near);
+    actor.state = NPC_STATE.AIM;
     actor.stateTicks = 0;
   },
 });
@@ -1642,6 +2028,13 @@ export function reportWildlifeCrime(kind: number, attackerId: number): boolean {
  *   - A **swoop arc that does not pass through head height** is a magpie that
  *     dives at your feet, which reads as the bird being badly animated rather
  *     than as the hit test never firing.
+ *   - A **swoop arc that still tracks** is the one the user reported. It is the
+ *     quietest failure in this list because there is nothing to see: the bird
+ *     dives beautifully, connects every time, and the only evidence is a player
+ *     who has worked out that moving does not help. `verifySwoop` pins it from
+ *     both ends -- a player who stayed on the commit point is hit, one who
+ *     sprinted clear of it is not -- and the tuning block below pins the
+ *     numbers that make the second of those true.
  *   - An **unregistered kind** draws nothing at all: the snapshot carries the
  *     byte, `npcKind` returns undefined, and `npcHitTest` skips it. A bird you
  *     can neither see nor hit, on a wire that says it is there.
@@ -1728,6 +2121,59 @@ export function verifyWildlife(kit?: { turkey: number; ibis: number; magpie: num
   }
   if (SWOOP_RANGE !== 20) failures.push(`Magpies engage at ${SWOOP_RANGE} m, not the specified 20.`);
   if (MAX_SWOOPS < 2 || MAX_SWOOPS > 3) failures.push(`Magpies swoop ${MAX_SWOOPS} times; the brief says 2-3.`);
+  // --- The mercy, which is the half of the magpie that was reported broken.
+  //
+  // Every one of these fails as *a magpie that is not dodgeable*, which is a
+  // thing the player experiences and no other check in this file can see: the
+  // arc would still be continuous, still pass through head height, still be
+  // bit-identical on both authorities, and still be the thing the user asked to
+  // have fixed.
+  if (DISENGAGE_RANGE >= SWOOP_RANGE) {
+    failures.push(
+      `Magpies engage at ${SWOOP_RANGE} m and disengage at ${DISENGAGE_RANGE} m. A disengage radius at or ` +
+        'outside the aggro radius is the old behaviour: the engagement only ends where it would have ' +
+        'started, so a fleeing player eats the rest of the campaign on the way out.',
+    );
+  }
+  if (TELEGRAPH_TICKS < 42 || TELEGRAPH_TICKS > 60) {
+    failures.push(
+      `The alarm leads the dive by ${(TELEGRAPH_TICKS / 60).toFixed(2)} s. Under 0.7 there is no time to ` +
+        'read it and over 1.0 the bird is announcing something that has stopped being a surprise.',
+    );
+  }
+  if (COMMIT_LEAD_TICKS >= TELEGRAPH_TICKS + SWOOP_TICKS * 0.5) {
+    failures.push(
+      `The commit leads by ${COMMIT_LEAD_TICKS} ticks and the strike lands ` +
+        `${TELEGRAPH_TICKS + SWOOP_TICKS * 0.5} ticks after it. A lead that covers the whole flight is a ` +
+        'magpie that hits a player moving at constant velocity every single time -- which is the ' +
+        'tracking swoop this was rebuilt to remove, wearing a telegraph.',
+    );
+  }
+  if (COMMIT_LEAD_MAX * 60 / COMMIT_LEAD_TICKS >= 8.2) {
+    failures.push(
+      `The lead cap is ${COMMIT_LEAD_MAX} m over ${COMMIT_LEAD_TICKS} ticks, which reads a player moving at ` +
+        `${(COMMIT_LEAD_MAX * 60 / COMMIT_LEAD_TICKS).toFixed(1)} m/s. A sprint is 8.2, so the cap has to ` +
+        'bite below it or sprinting past a nest is not a dodge.',
+    );
+  }
+  if (BREAK_OFF_SPEED >= 4.4) {
+    failures.push(
+      `A magpie breaks off at ${BREAK_OFF_SPEED} m/s of outward travel and a walk is 4.4. Turning your back ` +
+        'and walking has to be enough, or the only answer to a magpie is a sprint.',
+    );
+  }
+  if (STRIKE_WINDOW_TICKS * 2 >= SWOOP_TICKS) {
+    failures.push(
+      `The hit window is ${STRIKE_WINDOW_TICKS * 2} of the dive's ${SWOOP_TICKS} ticks, which is the whole ` +
+        'arc. The climb-out would collect players the dive itself went past.',
+    );
+  }
+  if (REAGGRO_COOLDOWN_TICKS < 10 * 60) {
+    failures.push(
+      `The re-aggro cooldown is ${(REAGGRO_COOLDOWN_TICKS / 60).toFixed(0)} s. Under ten, stepping out of ` +
+        'the radius and back is a way of ordering more swoops.',
+    );
+  }
   if (PECK_DAMAGE !== 0.25 || SWOOP_DAMAGE !== 0.25) {
     failures.push('A peck or a swoop is not the specified quarter pip.');
   }
@@ -1791,19 +2237,34 @@ export function verifyWildlife(kit?: { turkey: number; ibis: number; magpie: num
 }
 
 /**
- * The arc, sampled. Four assertions and each one is a different way it goes
- * wrong: a curve that does not start on the branch, one that does not finish
- * past you, one that never reaches head height, and one with a discontinuity in
- * it -- which draws as a magpie teleporting mid-dive.
+ * The arc, sampled, against the **commit point** it is now built around.
+ *
+ * Six assertions and each one is a different way it goes wrong: a curve that
+ * does not start on the branch, one that does not finish past you, one that
+ * never reaches head height, one with a discontinuity in it -- which draws as a
+ * magpie teleporting mid-dive -- and, since the arc stopped tracking, the two
+ * that describe what the commit is *for*: a player who is still on the commit
+ * point gets clipped, and a player who has left it does not.
+ *
+ * **The last pair is the arc contract now.** Before the retune the curve was
+ * re-derived every tick against the live player, so "does it connect" was a
+ * property of the hit radius alone and the only interesting question was
+ * whether the closest approach was inside it. Now the closest approach is to a
+ * point the player has had `MAGPIE_TUNING.flightTicks` to leave, and the number
+ * that decides an encounter is how far they got. Pinning only the old property
+ * would pass on a magpie whose commit was recomputed at launch -- which is a
+ * magpie with a longer wind-up and the identical hit rate.
  */
 function verifySwoop(): string[] {
   const failures: string[] = [];
   const px = 0;
   const py = NEST_HEIGHT;
   const pz = 0;
-  const tx = 0;
-  const ty = EYE_HEIGHT;
-  const tz = 14;
+  // The commit point: 14 m down the street, at the head height of somebody
+  // standing there. `swoopPoint` is handed this rather than a live player.
+  const cx = 0;
+  const cy = EYE_HEIGHT;
+  const cz = 14;
   const hx = 0;
   const hz = 1;
   const out = { x: 0, y: 0, z: 0 };
@@ -1813,9 +2274,18 @@ function verifySwoop(): string[] {
   let prevZ = 0;
   let maxStep = 0;
   let minHeadGap = Infinity;
+  // And the same arc against a player who kept moving. Two of them: one who
+  // carried straight on down the ray the bird committed to (the hardest case to
+  // miss, because the overshoot follows them) and one who went across it.
+  let minAlongGap = Infinity;
+  let minAcrossGap = Infinity;
+  // How far a sprint gets between the commit and the strike, less the lead the
+  // magpie is allowed to apply. Derived rather than chosen, so the pin moves
+  // when the tuning does and fails when the tuning stops working.
+  const dodge = 8.2 * (MAGPIE_TUNING.flightTicks / 60) - COMMIT_LEAD_MAX;
   for (let i = 0; i <= N; i++) {
     const s = i / N;
-    swoopPoint(s, px, py, pz, tx, ty, tz, hx, hz, out);
+    swoopPoint(s, px, py, pz, cx, cy, cz, hx, hz, out);
     if (i === 0) {
       if (Math.abs(out.x - px) > 1e-9 || Math.abs(out.y - py) > 1e-9 || Math.abs(out.z - pz) > 1e-9) {
         failures.push('The swoop does not start on the perch. The bird would appear beside the tree.');
@@ -1827,19 +2297,29 @@ function verifySwoop(): string[] {
       const step = Math.sqrt(dx * dx + dy * dy + dz * dz);
       if (step > maxStep) maxStep = step;
     }
-    const gx = out.x - tx;
-    const gy = out.y - ty;
-    const gz = out.z - tz;
-    const gap = Math.sqrt(gx * gx + gy * gy + gz * gz);
-    if (gap < minHeadGap) minHeadGap = gap;
+    // Only the part of the arc a pass may actually land in; outside the window
+    // the hit test does not run, so a near approach there is not a hit.
+    const fromStrike = Math.abs(s * SWOOP_TICKS - SWOOP_TICKS * 0.5);
+    if (fromStrike <= STRIKE_WINDOW_TICKS) {
+      minHeadGap = Math.min(minHeadGap, gapTo(out, cx, cy, cz));
+      minAlongGap = Math.min(minAlongGap, gapTo(out, cx, cy, cz + dodge));
+      minAcrossGap = Math.min(minAcrossGap, gapTo(out, cx + dodge, cy, cz));
+    }
     prevX = out.x;
     prevY = out.y;
     prevZ = out.z;
   }
   if (minHeadGap > SWOOP_HIT_RADIUS) {
     failures.push(
-      `The closest the arc comes to a stationary player's head is ${minHeadGap.toFixed(2)} m, and the hit ` +
-        `radius is ${SWOOP_HIT_RADIUS}. The magpie would dive past everybody forever.`,
+      `The closest the arc comes to a player still standing on the commit point is ${minHeadGap.toFixed(2)} m, ` +
+        `and the hit radius is ${SWOOP_HIT_RADIUS}. The magpie would dive past everybody forever.`,
+    );
+  }
+  if (minAlongGap <= SWOOP_HIT_RADIUS || minAcrossGap <= SWOOP_HIT_RADIUS) {
+    failures.push(
+      `A player who sprinted ${dodge.toFixed(1)} m clear of the commit point between the alarm and the strike ` +
+        `is still inside the hit radius (${Math.min(minAlongGap, minAcrossGap).toFixed(2)} m). The commit is ` +
+        'not actually committed -- the arc is tracking, and nothing a player does with their feet matters.',
     );
   }
   // The curve is sampled 64 times over a run of about 20 m, so a step much over
@@ -1847,12 +2327,20 @@ function verifySwoop(): string[] {
   if (maxStep > 1.5) {
     failures.push(`The swoop jumps ${maxStep.toFixed(2)} m between adjacent samples; the arc is discontinuous.`);
   }
-  // And it has to finish beyond the player, or the bird lands on them.
-  swoopPoint(1, px, py, pz, tx, ty, tz, hx, hz, out);
-  if (out.z <= tz + 1 || out.y <= ty) {
+  // And it has to finish beyond the commit point, or the bird lands on it.
+  swoopPoint(1, px, py, pz, cx, cy, cz, hx, hz, out);
+  if (out.z <= cz + 1 || out.y <= cy) {
     failures.push('The swoop does not climb out past the player; the magpie would end the dive on their head.');
   }
   return failures;
+}
+
+/** Distance from a sampled arc point to a head. Local to `verifySwoop`. */
+function gapTo(p: { x: number; y: number; z: number }, x: number, y: number, z: number): number {
+  const dx = p.x - x;
+  const dy = p.y - y;
+  const dz = p.z - z;
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
 /**

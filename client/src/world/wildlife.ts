@@ -753,8 +753,17 @@ export class WildlifeFlock {
     d.yaw = Math.atan2(-a.dx, -a.dz);
     const jitter = (carHash(a.id, 0x31) & 1023) / 1024;
     const diving = a.state === NPC_STATE.CHASE || a.state === NPC_STATE.FIRE;
+    // `NPC_STATE.AIM` on a magpie is the alarm: it is still on the branch, and
+    // the whole point of the state is that a player gets nearly a second to see
+    // and hear it before the dive. So it is drawn *agitated rather than
+    // arriving* -- wings beating at the dive rate on a body that has not moved,
+    // which reads as a bird working itself up to something. A magpie that
+    // telegraphed silently and invisibly would be the old magpie with a delay.
+    const alarmed = a.kind === NPC_KIND.MAGPIE && a.state === NPC_STATE.AIM;
     const flying = a.kind === NPC_KIND.MAGPIE && a.state !== NPC_STATE.IDLE && a.state !== NPC_STATE.DOWN;
-    const hz = a.kind === NPC_KIND.MAGPIE ? (diving ? DIVE_FLAP_HZ : FLAP_HZ) : a.state === NPC_STATE.CHASE ? 3.4 : 1.5;
+    const hz = a.kind === NPC_KIND.MAGPIE
+      ? (diving || alarmed ? DIVE_FLAP_HZ : FLAP_HZ)
+      : a.state === NPC_STATE.CHASE ? 3.4 : 1.5;
     d.phase = (now * hz + jitter) % 1;
     d.act = a.state === NPC_STATE.DOWN ? ACT.PAUSE : flying ? ACT.WALK : a.state === NPC_STATE.IDLE ? ACT.PAUSE : ACT.WALK;
     d.feed = 0;

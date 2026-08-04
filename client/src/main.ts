@@ -123,6 +123,7 @@ import {
   verifyFootyBall,
 } from './world/footyball.ts';
 import { NameplateField, verifyNameplates, type PlateInput } from './world/nameplates.ts';
+import { RenderGuard, auditSceneTextures, verifyTextureAudit } from './world/texture-audit.ts';
 import {
   FLAT_WHITE,
   KIND_NAME as POWERUP_NAME,
@@ -475,6 +476,13 @@ async function main(): Promise<void> {
   // `world/nameplates.ts`. `MAX_HEALTH` is handed in so the bar's pip ticks
   // cannot drift from the number of pips there actually are.
   const nameplateFailures = timed('nameplates', () => verifyNameplates(MAX_HEALTH));
+  // And the render guard, which is the only check here about the *loop* rather
+  // than about the world. It earns its place the way the HUD's does: it covers
+  // something that already shipped broken. A render exception used to abort the
+  // frame and every frame after it in silence -- the 3D world stopped dead while
+  // the big map, which is 2D and on its own rAF, went on animating, so it read
+  // as a stutter rather than as the crash it was. See `world/texture-audit.ts`.
+  const guardFailures = timed('render-guard', () => verifyTextureAudit());
   // And the HUD's supply bar, which is here for a reason the rest of this list is
   // not: it is the only one of them that shipped broken. Every number about the
   // footy was right -- the trickle, the wire, the reconciler -- and the third
@@ -518,6 +526,7 @@ async function main(): Promise<void> {
     streetFailures.length ||
     wildlifeFailures.length ||
     nameplateFailures.length ||
+    guardFailures.length ||
     hudFailures.length
   ) {
     hud.fatal(
@@ -550,6 +559,7 @@ async function main(): Promise<void> {
           ...streetFailures,
           ...wildlifeFailures,
           ...nameplateFailures,
+          ...guardFailures,
           ...hudFailures,
         ]
           .map((f) => '  - ' + f)
@@ -3611,6 +3621,12 @@ async function main(): Promise<void> {
   let hudClock = last;
   /** Reused: the HUD's chip list is rebuilt every frame and allocates nothing. */
   const powerupChips: Array<{ name: string; seconds: number }> = [];
+  /**
+   * Catches a throw out of the frame's render call so it cannot stop the world
+   * in silence. Built here rather than at module scope so its failure count is
+   * per-session, which is what `sydney.render.report()` is answering.
+   */
+  const renderGuard = new RenderGuard();
 
   renderer.setAnimationLoop(() => {
     const now = performance.now();
@@ -4100,12 +4116,17 @@ async function main(): Promise<void> {
       const range = Math.hypot(actor.x - player.position.x, actor.z - player.position.z);
       if (actor.state === NPC_STATE.FIRE) {
         audio.birdStrike(range);
+      } else if (actor.state === NPC_STATE.AIM && actor.kind === NPC_KIND.MAGPIE) {
+        // **The alarm leads the dive.** `NPC_STATE.AIM` on a magpie is
+        // `wildlife.TELEGRAPH_TICKS` of it screaming from the branch *before*
+        // it leaves -- so this warble arrives 0.83 s ahead of the swoop below,
+        // which is the entire read-and-react window the feature has. The two
+        // cues used to fire on the same edge, which is a warning that arrives
+        // with the thing it is warning about.
+        audio.magpieWarble(range, true);
       } else if (actor.state === NPC_STATE.CHASE) {
         if (actor.kind === NPC_KIND.TURKEY) audio.turkeyCall(range, true);
-        else if (actor.kind === NPC_KIND.MAGPIE) {
-          audio.magpieSwoop(range);
-          audio.magpieWarble(range, true);
-        }
+        else if (actor.kind === NPC_KIND.MAGPIE) audio.magpieSwoop(range);
       } else if (actor.state === NPC_STATE.RETURN && actor.kind === NPC_KIND.IBIS) {
         audio.ibisHonk(range);
       }
@@ -4423,7 +4444,22 @@ async function main(): Promise<void> {
     }
     nameplates.end();
 
-    renderer.render(scene, camera);
+    // **Guarded, and this is the one call in the client that has to be.**
+    //
+    // An exception out of `renderer.render` aborts this frame and, because
+    // whatever caused it is still there next frame, every frame after it. The
+    // reported symptom was "the map still animates but the 3D stops": the big
+    // map is a 2D canvas on its own rAF, so it kept painting in front of a world
+    // that had silently stopped being drawn, and the whole interface went on
+    // responding. Nothing in the client noticed and nothing told the player.
+    //
+    // So the throw is caught, logged once with its stack, audited for the
+    // null-image texture that caused the reported one, and put on the HUD. The
+    // loop **keeps attempting** rather than halting -- the argument for that,
+    // and for the frame count before the player is shown the error screen, is in
+    // `world/texture-audit.ts` beside `TRANSIENT_FRAMES`. Everything below this
+    // line -- the frame timing, the HUD, the network -- runs either way.
+    renderGuard.run(() => renderer.render(scene, camera), scene, hud);
 
     // Cost of this frame, measured after the render call returns. Deltas above
     // 200 ms are dropped rather than recorded: they mean the browser stopped
@@ -4588,6 +4624,28 @@ async function main(): Promise<void> {
      * `dropped` should be zero for the life of the process; it counts players
      * refused a plate because the buffers were full.
      */
+    /**
+     * The render guard, and the texture audit behind it.
+     *
+     * `sydney.render.report()` answers the question the reported crash left
+     * nobody able to answer from the console: is the scene actually being
+     * drawn? `failures` should be zero for the life of the process. Anything
+     * else means a frame threw, and `messages` carries what it threw.
+     *
+     * `sydney.render.audit()` is the diagnostic itself -- every texture bound
+     * anywhere in the scene whose image is null while its version has been
+     * bumped, which is the exact condition three's `Textures.updateTexture`
+     * dereferences null on. An empty array is the healthy answer and the normal
+     * one; a non-empty one names the mesh, the material and the texture. Safe to
+     * call at any time, but it walks every material's whole node graph, so it is
+     * a console tool and never a per-frame one.
+     */
+    render: {
+      guard: renderGuard,
+      report: () => ({ failures: renderGuard.failures, messages: [...renderGuard.messages] }),
+      audit: () => auditSceneTextures(scene),
+    },
+
     nameplates: {
       field: nameplates,
       report: () => ({

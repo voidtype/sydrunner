@@ -1102,6 +1102,62 @@ export function verifyNameplates(maxHealth: number): string[] {
       failures.push(`A full bar is ${widths[0]} m wide, not ${BAR_WIDTH}.`);
     }
     if (widths[3] > 1e-6) failures.push(`An empty bar is still ${widths[3]} m wide.`);
+
+    // --- The atlas image, across churn. This is the invariant behind a reported
+    // crash and it is checked here because this file owns the only canvas-backed
+    // texture in the client.
+    //
+    // What went wrong once: a texture reached three's WebGPU binder with
+    // `image === null` and the renderer died on `null.complete` inside
+    // `Textures.updateTexture` -- every frame, silently, behind a 2D map that
+    // went on animating. `world/texture-audit.ts` has the full reading of that
+    // path. The reason this file is a suspect at all is that it is the only one
+    // here that *rewrites* a live texture: rows are evicted and redrawn while
+    // the atlas is bound to a mesh in the draw list, and an eviction that
+    // replaced or released the canvas rather than drawing into it would be
+    // exactly the shape that produces a null image.
+    //
+    // It does not, and this is what pins that: the canvas is created once in the
+    // constructor and `draw` only ever `clearRect`s a row of it. So a thousand
+    // add/evict/re-add cycles -- sixty-six times the eviction pressure the
+    // sixteen-player cap can generate -- must leave `texture.image` the same
+    // object it started as, and must leave it uploadable.
+    const atlasBefore = field.texture.image as HTMLCanvasElement | null;
+    if (!atlasBefore) {
+      failures.push('The name atlas has no image before any churn; it would crash the renderer on the first bind.');
+    }
+    let churnFailure = '';
+    for (let cycle = 0; cycle < 1000 && churnFailure === ''; cycle++) {
+      // A fresh name every time, so every cycle past the first `NAME_SLOTS`
+      // evicts. Re-asking for an old one exercises the re-add half.
+      field.begin(camera);
+      field.add({ id: 20 + (cycle % 5), name: `Churn ${cycle}`, health: 2, headX: 0, headY: 0, headZ: -10, down: false }, 7);
+      field.add({ id: 30, name: `Churn ${Math.max(0, cycle - 3)}`, health: 1, headX: 1, headY: 0, headZ: -12, down: cycle % 7 === 0 }, 7);
+      field.end();
+      const image = field.texture.image as HTMLCanvasElement | null;
+      if (image === null || image === undefined) {
+        churnFailure = `The name atlas image became ${image === null ? 'null' : 'undefined'} after ${cycle + 1} churn cycles; three's binder throws on that.`;
+      } else if (image !== atlasBefore) {
+        churnFailure = `The name atlas canvas was replaced after ${cycle + 1} churn cycles; the old one may still be bound.`;
+      } else if (image.width !== ATLAS_WIDTH || image.height !== ATLAS_HEIGHT) {
+        churnFailure = `The name atlas was resized to ${image.width}x${image.height} after ${cycle + 1} churn cycles.`;
+      }
+    }
+    if (churnFailure) failures.push(churnFailure);
+    // Eviction has to have actually happened, or the loop above proved nothing.
+    if (field.redraws <= NAME_SLOTS) {
+      failures.push(`The churn check rasterised only ${field.redraws} names; it never filled the ${NAME_SLOTS} rows, so it never evicted.`);
+    }
+    // And the material must still sample *this* texture. `material.colorNode` is
+    // the `texture(tex)` node built in the constructor; if its value were ever
+    // swapped -- or were three's shared `EmptyTexture`, whose image is null by
+    // construction -- the atlas above could be perfect and the renderer would
+    // still bind a texture with no image. That is the actual reported crash, so
+    // the check follows the node rather than trusting the field.
+    const bound = (field.material.colorNode as unknown as { value?: unknown } | null)?.value;
+    if (bound !== field.texture) {
+      failures.push("The plate material does not sample the field's own atlas texture; it would bind something else.");
+    }
   } finally {
     field.dispose();
   }

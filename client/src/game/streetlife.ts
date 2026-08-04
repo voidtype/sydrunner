@@ -703,6 +703,121 @@ const PACE_SECONDS = 4;
 const TWITCH_AMPLITUDE = 0.04;
 const TWITCH_SECONDS = 0.5;
 
+/**
+ * The arc length of the point on `band` closest to `(x, z)`, and how far that is.
+ *
+ * **The whole of the drunk-placement fix, in one function**, and what it
+ * replaces is worth writing down because the bug was invisible in the code and
+ * enormous in the world.
+ *
+ * `poseDrunk` used to pick a band near the venue and then call `pointOnBand`
+ * with a *uniform* fraction -- a spot anywhere along the whole thing. That reads
+ * as harmless until you remember what a band is: not "the bit of footpath
+ * outside the pub" but an entire OSM way's kerb, which on King Street is most of
+ * a kilometre. `anchorBands` selects on the band's **bounding box**, so a pub
+ * whose corner clips the end of a long way got the whole way to stand on, and
+ * the drunk was dropped uniformly along it.
+ *
+ * Measured against the built city, before this existed: the median drunk stood
+ * **58 m** from the pub they were supposedly drinking outside, the 90th
+ * percentile 123 m and the furthest **291 m** -- around a corner, down a
+ * residential street, nowhere near a licenced premises. The 502 drunks were not
+ * missing, they were *smeared* off the pub strips into the back streets, one
+ * every hundred metres of nothing, which is exactly the report: you walk a road
+ * lined with pubs and meet nobody.
+ *
+ * The fix is to project the venue onto the band and stand there, so the answer
+ * to "which spot on this footpath" is "the one out the front". The search is a
+ * point-to-segment over `count - 1` segments, run once per drunk per query, and
+ * the bands are already the small cached pool `anchorBands` returns.
+ */
+function nearestOnBand(band: PedBand, x: number, z: number): { s: number; d2: number } {
+  let bestS = 0;
+  let best2 = Infinity;
+  for (let i = 0; i < band.count - 1; i++) {
+    const ax = band.x[i];
+    const az = band.z[i];
+    const ex = band.x[i + 1] - ax;
+    const ez = band.z[i + 1] - az;
+    const len2 = ex * ex + ez * ez;
+    let t = len2 > 1e-9 ? ((x - ax) * ex + (z - az) * ez) / len2 : 0;
+    if (t < 0) t = 0;
+    else if (t > 1) t = 1;
+    const px = ax + ex * t;
+    const pz = az + ez * t;
+    const dx = px - x;
+    const dz = pz - z;
+    const d2 = dx * dx + dz * dz;
+    if (d2 < best2) {
+      best2 = d2;
+      bestS = band.s[i] + (band.s[i + 1] - band.s[i]) * t;
+    }
+  }
+  return { s: bestS, d2: best2 };
+}
+
+/**
+ * How far from a venue a footpath still counts as that venue's frontage, metres.
+ *
+ * Was a literal 45 inside `poseDrunk`. It is a named constant now because
+ * `DRUNK_REACH` is derived from it and the derivation has to be visible: change
+ * this and the query gate moves with it instead of silently going wrong.
+ */
+const VENUE_BAND_RADIUS = 45;
+
+/**
+ * How far along the frontage a drunk drifts from the projected point, metres.
+ *
+ * Twelve metres either way is the width of a pub's footpath frontage plus a bit
+ * -- enough that a venue's two or three do not stand in a stack, small enough
+ * that all of them are recognisably *at that pub*. It is drift along the kerb,
+ * not a radius: the lateral offset is `lean`, and it is half a metre.
+ */
+const DRUNK_SPREAD = 12;
+
+/**
+ * How many of the frontage candidates a drunk picks between.
+ *
+ * A corner hotel has a footpath on two streets and both are correct, so the
+ * choice is real rather than decorative; past the nearest three it stops being
+ * a frontage and starts being the next street over.
+ */
+const FRONTAGE_CHOICES = 3;
+
+/**
+ * The furthest a drunk can possibly stand from their venue, metres -- **derived,
+ * not measured**, and `forEachDrunkNear`'s broadphase gate is exactly this.
+ *
+ * The other half of the bug above, and it is the half that dropped people from
+ * the world outright. The gate used to be a literal `60 + radius` against the
+ * *venue's* position while the placement had no bound at all, so a drunk who was
+ * genuinely thirty metres in front of you but whose pub was two hundred metres
+ * behind you was **never returned by the query** -- not drawn, not promoted, not
+ * there. Measured across 2,700 footpath points before the fix: 116 of 1,490
+ * drunk sightings at the 150 m draw radius and 34 of 219 at 60 m were silently
+ * dropped, 8% and 16%.
+ *
+ * With the projection, a placement is at most `VENUE_BAND_RADIUS` from the
+ * venue plus `DRUNK_SPREAD` of drift along the kerb (arc length, so never less
+ * than the straight line it covers), plus the lean and the sway. The margin
+ * covers those last two with room to spare, and `checkStreetlife` asserts the
+ * bound holds over every drunk in the built city rather than trusting it.
+ */
+const DRUNK_STAND_MARGIN = 2;
+export const DRUNK_REACH = VENUE_BAND_RADIUS + DRUNK_SPREAD + DRUNK_STAND_MARGIN;
+
+/**
+ * `poseDrunk`'s frontage shortlist. Module-level and reused, on `scanBands`'
+ * own argument: `poseDrunk` is called for every drunk in the draw radius on
+ * every frame and on every authority tick, and it must allocate nothing.
+ *
+ * Not re-entrant, and does not need to be: nothing in this file calls
+ * `poseDrunk` from inside a `poseDrunk` visit.
+ */
+const frontD2 = new Float64Array(FRONTAGE_CHOICES);
+const frontS = new Float64Array(FRONTAGE_CHOICES);
+const frontBand: Array<PedBand | null> = new Array(FRONTAGE_CHOICES).fill(null);
+
 /** A drunk's sway: slower and smaller than a pace, and lateral rather than along. */
 const SWAY_AMPLITUDE = 0.16;
 const SWAY_SECONDS = 3.4;
@@ -812,11 +927,67 @@ export function poseDrunk(
   // Tight: a drunk outside a pub is outside *that* pub. 45 m is far enough to
   // find the footpath a corner hotel actually fronts and near enough that
   // nobody is standing outside the wrong one.
-  const bands = anchorBands(peds, seed, vx, vz, 45, false, scratch);
+  const bands = anchorBands(peds, seed, vx, vz, VENUE_BAND_RADIUS, false, scratch);
   if (bands.length === 0) return false;
   const h = carHash(seed, index ^ 0x63d7);
-  const band = bands[h % bands.length];
-  pointOnBand(band, (carHash(h, 0x9e17) % 4096) / 4096, out);
+
+  // --- The frontage: the nearest `FRONTAGE_CHOICES` bands **by their closest
+  // point** rather than by their bounding box, which is the distinction the old
+  // placement missed entirely. See `nearestOnBand`.
+  //
+  // A band whose closest point is further than `VENUE_BAND_RADIUS` is not this
+  // pub's frontage however near its box came -- it is a long way that happens to
+  // pass by -- and it is dropped rather than stood on. That is what makes
+  // `DRUNK_REACH` a bound and not a hope. A venue whose every candidate fails
+  // contributes nobody, exactly as one with no band at all does: ten of the 263
+  // pubs that carry a drunk, which is the bar inside the shopping centre again.
+  //
+  // No allocation: the candidates are two parallel scratch arrays, module-level,
+  // because this runs for every drunk in the draw radius sixty times a second.
+  let picked = 0;
+  for (const band of bands) {
+    const near = nearestOnBand(band, vx, vz);
+    if (near.d2 > VENUE_BAND_RADIUS * VENUE_BAND_RADIUS) continue;
+    // Insertion sort into the top `FRONTAGE_CHOICES` by distance. The band index
+    // is the tie-break, and the pool `anchorBands` returns is already in a total
+    // order, so two processes rank identically.
+    let at = picked;
+    while (at > 0 && frontD2[at - 1] > near.d2) {
+      if (at < FRONTAGE_CHOICES) {
+        frontD2[at] = frontD2[at - 1];
+        frontS[at] = frontS[at - 1];
+        frontBand[at] = frontBand[at - 1];
+      }
+      at--;
+    }
+    if (at < FRONTAGE_CHOICES) {
+      frontD2[at] = near.d2;
+      frontS[at] = near.s;
+      frontBand[at] = band;
+    }
+    if (picked < FRONTAGE_CHOICES) picked++;
+  }
+  if (picked === 0) return false;
+
+  const chosen = h % picked;
+  const band = frontBand[chosen]!;
+  // --- Drift along the kerb from the projected point, **by slot**.
+  //
+  // A venue's drunks share a frontage, so a free hash on both would sometimes
+  // put two of them in the same half metre -- measured at 11 of the 160 venues
+  // that carry more than one, which is two blokes standing inside each other.
+  // Each index gets its own share of the spread and jitters inside the middle
+  // half of it, which leaves a guaranteed gap between neighbours and still looks
+  // unplanned. Clamped to the band afterwards, and the clamp only ever brings
+  // them *closer* to the projection -- so `DRUNK_REACH` still bounds it.
+  const count = venueDrunks(venue) || 1;
+  const slot = (2 * DRUNK_SPREAD) / count;
+  const jitter = ((carHash(h, 0x9e17) % 4096) / 4096) * slot * 0.5;
+  const drift = -DRUNK_SPREAD + index * slot + slot * 0.25 + jitter;
+  let s = frontS[chosen] + drift;
+  if (s < 0) s = 0;
+  else if (s > band.length) s = band.length;
+  pointOnBand(band, band.length > 1e-6 ? s / band.length : 0, out);
 
   out.key = streetKey(NPC_KIND.DRUNK, venue, index);
   out.kind = NPC_KIND.DRUNK;
@@ -916,11 +1087,13 @@ export function forEachDrunkNear(
 ): void {
   const now = trafficSeconds(tick);
   const r2 = radius * radius;
-  // A venue's drunks stand within a few dozen metres of it, so the gate is the
-  // query radius plus the band search. Four hundred and twenty-two squared
-  // distances is one pass over a flat array of numbers -- cheaper than the grid
-  // walk a spatial index would need for a set this size.
-  const gate = 60 + radius;
+  // A venue's drunks stand within `DRUNK_REACH` of it -- **derived from the
+  // placement rather than guessed at**, which is the whole point of the
+  // constant: this was a literal 60 against an unbounded placement, and it
+  // dropped one drunk in six at pub-front range. Four hundred and twenty-two
+  // squared distances is one pass over a flat array of numbers -- cheaper than
+  // the grid walk a spatial index would need for a set this size.
+  const gate = DRUNK_REACH + radius;
   const gate2 = gate * gate;
   for (let v = 0; v < VENUE_COUNT; v++) {
     const vdx = VENUE_XZ[v * 2] - x;

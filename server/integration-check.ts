@@ -4773,6 +4773,241 @@ async function checkStreetlife(): Promise<void> {
       );
     }
   }
+
+  // --- 12. **The drunks exist where a player actually walks.**
+  //
+  // The meth heads' section 11 written again for the other faction, and for the
+  // same reason: the report was *"I see no drunks at all in my travel"*, from a
+  // player who spawned at Sydney Park and walked the King Street corridor --
+  // which is lined with pubs -- while the tables said 502 drunks stood at 264 of
+  // the city's 422 licenced premises.
+  //
+  // Both halves of the cause were placement, and neither was visible in the
+  // code:
+  //
+  //   1. `poseDrunk` picked a band near the venue and then took a **uniform**
+  //      point along the whole of it. A band is an entire OSM way's kerb, and
+  //      `anchorBands` selects on its bounding box, so a pub that clipped the
+  //      end of a long way got the whole way to stand on. Measured before the
+  //      fix: the median drunk stood **58 m** from their own pub, the 90th
+  //      percentile 123 m, the furthest **291 m**. The drunks were never
+  //      missing; they were smeared off the pub strips into the back streets at
+  //      one per hundred metres of nothing.
+  //   2. `forEachDrunkNear`'s broadphase gate was a literal `60 + radius`
+  //      against the **venue**, while the placement had no bound at all -- so
+  //      230 of 489 placed drunks stood outside their own venue's gate and the
+  //      query never returned them. Not drawn, not promoted, not there.
+  //      Measured over 2,700 footpath points: 116 of 1,490 sightings at the
+  //      150 m draw radius and 34 of 219 at 60 m were dropped outright.
+  //
+  // What was *not* the cause, measured rather than assumed, because it was the
+  // loud suspect: the police. `policeHostileTo(DRUNK)` plus the new patrol
+  // lattice looked like a citywide cleansing -- every pub rousted by a passing
+  // pair before the player arrived. It cannot happen and does not: a drunk is
+  // only ever an actor while a player is inside `DRUNK_NOTICE`, and
+  // `respondToBrawls` only fetches an officer for a drunk who already has a
+  // target. Ten minutes of sim with no player in the world produced **zero**
+  // drunk-actor-ticks, so the ambient tier is untouchable and the cop-rousts-a-
+  // drunk vignette stays exactly as characterful as it was.
+  {
+    const bands: PedBand[] = [];
+    const pose = st.createStreetPose();
+
+    // --- The bound `forEachDrunkNear` now gates on is a real bound.
+    //
+    // The assertion that keeps the fix honest: `DRUNK_REACH` is derived from
+    // `VENUE_BAND_RADIUS + DRUNK_SPREAD` in the sim rather than measured off the
+    // city, so what has to be checked here is that the city agrees. If a
+    // placement ever exceeds it the gate starts dropping people again, silently,
+    // exactly as it did before.
+    let claimed = 0;
+    let placed = 0;
+    let orphans = 0;
+    let carrying = 0;
+    let atPub = 0;
+    let worstReach = 0;
+    for (let v = 0; v < st.VENUE_COUNT; v++) {
+      const want = st.venueDrunks(v);
+      if (want === 0) continue;
+      carrying++;
+      claimed += want;
+      let got = 0;
+      for (let i = 0; i < want; i++) {
+        if (!st.poseDrunk(world.peds, v, i, 12345, bands, pose)) continue;
+        got++;
+        const d = Math.hypot(pose.x - st.VENUE_XZ[v * 2], pose.z - st.VENUE_XZ[v * 2 + 1]);
+        if (d > worstReach) worstReach = d;
+        if (d <= 25) atPub++;
+      }
+      placed += got;
+      if (got === 0) orphans++;
+    }
+    check(
+      worstReach <= st.DRUNK_REACH,
+      `no drunk in the city stands further than DRUNK_REACH = ${st.DRUNK_REACH} m from their own pub ` +
+        `(worst is ${worstReach.toFixed(1)} m over ${placed} of them); before the frontage fix the worst was 291 m`,
+    );
+    check(
+      orphans <= 15,
+      `${orphans} of ${carrying} pubs that carry a drunk place nobody -- the frontage filter drops a band ` +
+        'whose closest point is past 45 m, and a bar inside a shopping centre has no frontage at all',
+    );
+    check(
+      placed >= claimed - 30,
+      `${placed} of the ${claimed} drunks the table claims stand on a real footpath`,
+    );
+
+    // --- And they stand **outside the pub**, which is the whole read.
+    check(
+      atPub >= placed * 0.75,
+      `${atPub} of ${placed} drunks (${((atPub / placed) * 100).toFixed(0)}%) stand within 25 m of their own ` +
+        'pub; with the uniform-along-the-band placement the median alone was 58 m',
+    );
+
+    // --- The query returns everybody who is really in range.
+    //
+    // The regression test for the half of the bug that was a *render* bug, and
+    // it is written as an equality against a brute force rather than as a floor,
+    // because the failure it guards is silent by construction: a gate that is
+    // fractionally too tight drops somebody who is standing in front of you and
+    // there is no frame anywhere that says so.
+    {
+      const truth: Array<{ x: number; z: number }> = [];
+      for (let v = 0; v < st.VENUE_COUNT; v++) {
+        const n = st.venueDrunks(v);
+        for (let i = 0; i < n; i++) {
+          if (st.poseDrunk(world.peds, v, i, 12345, bands, pose)) truth.push({ x: pose.x, z: pose.z });
+        }
+      }
+      const R = 150;
+      let sampled = 0;
+      let expected = 0;
+      let returned = 0;
+      let short = 0;
+      for (const at of [world.spawn, ...st.SUBURBS.slice(0, 24)]) {
+        sampled++;
+        let want = 0;
+        for (const p of truth) {
+          const dx = p.x - at.x;
+          const dz = p.z - at.z;
+          if (dx * dx + dz * dz <= R * R) want++;
+        }
+        let got = 0;
+        st.forEachDrunkNear(world.peds, at.x, at.z, R, 12345 * 60, bands, pose, () => {
+          got++;
+        });
+        expected += want;
+        returned += got;
+        if (got < want) short++;
+      }
+      check(
+        short === 0 && returned >= expected,
+        `forEachDrunkNear returned all ${expected} drunks genuinely inside ${R} m at every one of ${sampled} ` +
+          `places (${returned} returned, ${short} came up short); the 60 m gate used to drop 8% of them`,
+      );
+    }
+
+    // --- The route. Spawn to King Street, off the suburb table rather than off
+    // a pair of coordinates, so a retune of the city moves the check with it.
+    //
+    // This is the police round's presence assertion for the other faction, and
+    // it is deliberately a *route* rather than the spawn disc: the spawn is
+    // Sydney Park, there is no pub within 700 m of it, and there should not be
+    // one. What the player is owed is that the walk into Newtown puts drunks in
+    // front of them, and 300 m is the honest radius for that -- inside the
+    // 150 m draw radius they are drawn, and past it they are the reason to keep
+    // walking.
+    {
+      const legs = [
+        world.spawn,
+        st.SUBURBS.find((s) => s.name === 'Newtown South')!,
+        st.SUBURBS.find((s) => s.name === 'Newtown')!,
+      ];
+      const route: Array<{ x: number; z: number }> = [];
+      for (let i = 0; i < legs.length - 1; i++) {
+        const a = legs[i];
+        const b = legs[i + 1];
+        const n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 100);
+        for (let k = 0; k < n; k++) {
+          route.push({ x: a.x + (b.x - a.x) * (k / n), z: a.z + (b.z - a.z) * (k / n) });
+        }
+      }
+      route.push({ x: legs[legs.length - 1].x, z: legs[legs.length - 1].z });
+
+      const WANT_NEAR = 3;
+      const WANT_POINTS = 12;
+      let worst = Infinity;
+      let worstTick = 0;
+      for (let t = 0; t < 60; t++) {
+        const tick = 1_000_000 + t * 30;
+        let covered = 0;
+        for (const p of route) {
+          let n = 0;
+          st.forEachDrunkNear(world.peds, p.x, p.z, 300, tick, bands, pose, () => {
+            n++;
+          });
+          if (n >= WANT_NEAR) covered++;
+        }
+        if (covered < worst) {
+          worst = covered;
+          worstTick = t * 30;
+        }
+      }
+      check(
+        worst >= WANT_POINTS,
+        `at least ${WANT_POINTS} of the ${route.length} points on the spawn -> King Street walk have ` +
+          `${WANT_NEAR}+ drunks within 300 m at every one of 60 ticks (worst was ${worst}, at +${worstTick})`,
+      );
+    }
+
+    // --- And the corridor's pubs are actually occupied, which is the claim the
+    // player's complaint was really about: King Street is lined with them.
+    {
+      const newtown = st.SUBURBS.find((s) => s.name === 'Newtown')!;
+      const nsouth = st.SUBURBS.find((s) => s.name === 'Newtown South')!;
+      let pubs = 0;
+      let occupied = 0;
+      for (let v = 0; v < st.VENUE_COUNT; v++) {
+        const x = st.VENUE_XZ[v * 2];
+        const z = st.VENUE_XZ[v * 2 + 1];
+        const d = Math.min(Math.hypot(x - newtown.x, z - newtown.z), Math.hypot(x - nsouth.x, z - nsouth.z));
+        if (d > 700) continue;
+        pubs++;
+        const n = st.venueDrunks(v);
+        for (let i = 0; i < n; i++) {
+          if (st.poseDrunk(world.peds, v, i, 12345, bands, pose)) {
+            occupied++;
+            break;
+          }
+        }
+      }
+      check(
+        occupied >= 20,
+        `${occupied} of the ${pubs} pubs in the King Street corridor have somebody standing out the front`,
+      );
+    }
+
+    // --- The weighting the user asked for is untouched by all of it. Kings
+    // Cross is the loudest suburb in the table and Mosman is the quietest, and a
+    // placement fix that flattened that would have fixed the wrong thing.
+    {
+      const kx = st.SUBURBS.find((s) => s.name === 'Kings Cross')!;
+      const mosman = st.SUBURBS.find((s) => s.name === 'Mosman')!;
+      let cross = 0;
+      let quiet = 0;
+      st.forEachDrunkNear(world.peds, kx.x, kx.z, 400, 1_000_000, bands, pose, () => {
+        cross++;
+      });
+      st.forEachDrunkNear(world.peds, mosman.x, mosman.z, 400, 1_000_000, bands, pose, () => {
+        quiet++;
+      });
+      check(
+        cross > 10 && quiet === 0,
+        `Kings Cross carries ${cross} drunks within 400 m and Mosman ${quiet} -- the booze weighting survived ` +
+          'the placement fix',
+      );
+    }
+  }
 }
 
 /**
@@ -5352,6 +5587,18 @@ async function checkWildlife(): Promise<void> {
   // `swoopPoint` -- and the reason it is built that way rather than as the one
   // cubic it started as is exactly what is asserted here: a curve that merely
   // *aims* at your head misses it by three metres and looks perfect doing so.
+  //
+  // **This block is the half that has to keep hurting.** Sections 9b to 9d
+  // below are the mercy the swoop was retuned to have -- a sprint through the
+  // radius, a break-off, a cooldown -- and every one of them would also pass on
+  // a magpie that had simply been turned off. This one is what stops that being
+  // the fix: a player who stands under the nest and does nothing still gets hit,
+  // still gets hit exactly twice, and is still warned before each of them.
+  //
+  // Every number below is read out of `one.MAGPIE_TUNING` rather than restated,
+  // so a tuning change moves the check with it and only a *wrong* tuning breaks
+  // it.
+  const MT = one.MAGPIE_TUNING;
   {
     const nestAt = findBird(F.NPC_KIND.MAGPIE, -2784.7, 3133.7, 300)
       ?? findBird(F.NPC_KIND.MAGPIE, -2236.4, 4543.3, 400)
@@ -5395,6 +5642,13 @@ async function checkWildlife(): Promise<void> {
       // two birds' dives as one bird's five.
       const diving = new Set<number>();
       const passesBy = new Map<number, number>();
+      // And the state each bird was in on the previous tick, so the *order* of
+      // the two cues can be asserted rather than merely their existence. The
+      // alarm is `NPC_STATE.AIM`; a dive that was not preceded by one is a
+      // magpie that arrives without warning, which is the reported bug.
+      const prevState = new Map<number, number>();
+      let telegraphed = 0;
+      let ambushed = 0;
       let worstDrift = 0;
       for (let i = 0; i < 60 * 14; i++) {
         sim.step(out);
@@ -5426,10 +5680,13 @@ async function checkWildlife(): Promise<void> {
           if (isDiving && !diving.has(a.id)) {
             diving.add(a.id);
             passesBy.set(a.id, (passesBy.get(a.id) ?? 0) + 1);
+            if (prevState.get(a.id) === F.NPC_STATE.AIM) telegraphed++;
+            else ambushed++;
           } else if (!isDiving) {
             diving.delete(a.id);
           }
           if (isDiving) dived = true;
+          prevState.set(a.id, a.state);
         }
       }
       const passes = [...passesBy.values()];
@@ -5447,8 +5704,16 @@ async function checkWildlife(): Promise<void> {
         `${taken} of a pip came off in ${(taken / 0.25).toFixed(0)} hits, every one of them exactly a quarter`,
       );
       check(
-        most > 0 && most <= 3,
-        `the busiest magpie swooped ${most} time(s) before perching -- the brief's two to three, then a stare`,
+        most > 0 && most <= MT.maxSwoops,
+        `the busiest magpie swooped ${most} time(s) before perching -- the tuned ${MT.maxSwoops}, then a stare`,
+      );
+      // The telegraph, from the wire's own bytes. Every dive in this window was
+      // announced, and the announcement is a state a client can decode: that is
+      // what makes the alarm audible online as well as in `?offline`.
+      check(
+        ambushed === 0 && telegraphed > 0,
+        `all ${telegraphed} dives came out of the alarm state and none out of nowhere -- ` +
+          `${(MT.telegraphTicks / 60).toFixed(2)} s of warning, on a byte the wire already carries`,
       );
     }
 
@@ -5511,6 +5776,318 @@ async function checkWildlife(): Promise<void> {
         lowest < EYE_HEIGHT + 0.5,
         `the arc came down to ${lowest.toFixed(2)} m, through a player's ${EYE_HEIGHT} m head height`,
       );
+    }
+  }
+
+  // --- 9b..9d. The mercy: what a player who *does* something gets out of it.
+  //
+  // The reported bug was two sentences -- *"the magpies are too hard to avoid
+  // and de aggro based on distance too slow"* -- and both halves are things
+  // section 9 above cannot see, because a probe that stands still experiences
+  // neither. So these three run the same simulation with the probe **moving**,
+  // which is the only way to test a swoop that is aimed at a prediction:
+  //
+  //   9b  a sprint straight through the radius takes at most one hit
+  //   9c  turning and running ends the engagement inside a second and a half
+  //   9d  leaving and coming straight back buys one pass, not another campaign
+  //
+  // All three assert against `MAGPIE_TUNING`, and all three are run on nests in
+  // *other suburbs* from section 9's -- a magpie resolves once the player is
+  // past `WAKE_MAGPIE * 1.35`, so moving kilometres away is what guarantees each
+  // block starts against a bird with no history.
+  {
+    /** Every magpie nest near a point, nearest anchor first. */
+    const findNests = (qx: number, qz: number, radius: number): Array<{ x: number; z: number }> => {
+      const scratch = one.createWildScratch();
+      const pose = one.createWildPose();
+      const found: Array<{ x: number; z: number; d: number }> = [];
+      one.forEachWildlifeNear(world.peds, qx, qz, radius, trafficTick(Date.now()), ground, scratch, pose, (p) => {
+        if (p.kind !== F.NPC_KIND.MAGPIE) return;
+        found.push({ x: p.ax, z: p.az, d: (p.ax - qx) ** 2 + (p.az - qz) ** 2 });
+      });
+      found.sort((l, r) => l.d - r.d);
+      return found.map((f) => ({ x: f.x, z: f.z }));
+    };
+
+    /**
+     * Whether a player can actually run this line without the city stopping them.
+     *
+     * `standNear`'s lesson applied to a *path* rather than to a point: a check
+     * that scripts a sprint down a footpath and never verifies the footpath is
+     * clear is a check that measures a wall. Walked in half-metre steps through
+     * the same `CollisionWorld.resolve` the controller uses, at a bird's-eye
+     * 42 cm step height, because the probe has to cover the whole corridor for
+     * the claim ("a sprint through the radius") to mean anything.
+     */
+    const clearRun = (sx: number, sz: number, ux: number, uz: number, len: number): boolean => {
+      let x = sx;
+      let z = sz;
+      for (let i = 0; i < len * 2; i++) {
+        const nx = x + ux * 0.5;
+        const nz = z + uz * 0.5;
+        const g = ground(nx, nz);
+        if (!Number.isFinite(g)) return false;
+        const m = world.collision.resolve(x, z, nx, nz, PLAYER_RADIUS, g + 0.42);
+        if (Math.hypot(m.x - nx, m.z - nz) > 0.01) return false;
+        x = m.x;
+        z = m.z;
+      }
+      return true;
+    };
+
+    /** Sixteen bearings, no trig in the caller. Unit vectors on the compass rose. */
+    const bearings: Array<[number, number]> = [];
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      bearings.push([Math.cos(a), Math.sin(a)]);
+    }
+
+    /** Sum of the drops in the probe's health, topping it back up every tick. */
+    const topUp = (): number => {
+      const drop = MAX_HEALTH - probe.combat.health;
+      probe.combat.health = MAX_HEALTH;
+      return drop > 0 ? drop : 0;
+    };
+
+    const candidates = [
+      ...findNests(416.6, 1204.6, 350),
+      ...findNests(2452.5, 3279.5, 350),
+      ...findNests(-1751.2, 3411.8, 350),
+      ...findNests(527.1, -94.7, 350),
+    ];
+
+    /**
+     * Claim a nest for one of these blocks, and never hand out one near it again.
+     *
+     * **This is not tidiness, it is the fixture.** A magpie remembers: after an
+     * engagement it holds `MAGPIE_TUNING.cooldownTicks` of boredom and a spent
+     * campaign, and it only forgets by resolving, which needs the player past
+     * 40 m. The first cut of these blocks let 9c and 9d pick the same nest and
+     * 9d then measured a bird 9c had already exhausted -- it reported "the first
+     * visit was a full campaign: 0 passes", which is a correct measurement of
+     * the wrong bird. Two hundred metres is comfortably outside the wake radius
+     * either way, so each block gets an animal with no history.
+     */
+    const taken: Array<{ x: number; z: number }> = [];
+    const takeNest = (ok: (c: { x: number; z: number }) => boolean): { x: number; z: number } | null => {
+      for (const c of candidates) {
+        if (taken.some((t) => Math.hypot(t.x - c.x, t.z - c.z) < 200)) continue;
+        if (!ok(c)) continue;
+        taken.push(c);
+        return c;
+      }
+      return null;
+    };
+
+    // --- 9b. A sprint straight through the radius.
+    //
+    // The run starts `SWOOP_RANGE` outside the nest and finishes the same
+    // distance the other side, so the probe crosses the whole engagement radius
+    // and passes directly under the tree -- the worst line there is. It is
+    // driven by **real input through the real controller**, not teleported:
+    // the magpie aims at `position + velocity`, and a probe moved by hand with
+    // `place` has a velocity of zero and would be read as standing still. That
+    // is the difference between testing the dodge and testing nothing.
+    {
+      let ran: { nest: { x: number; z: number }; ux: number; uz: number } | null = null;
+      const reach = MT.swoopRange;
+      const nest = takeNest((c) => bearings.some(([ux, uz]) => {
+        const sx = c.x - ux * reach;
+        const sz = c.z - uz * reach;
+        return Number.isFinite(ground(sx, sz)) && clearRun(sx, sz, ux, uz, reach * 2);
+      }));
+      if (nest) {
+        for (const [ux, uz] of bearings) {
+          const sx = nest.x - ux * reach;
+          const sz = nest.z - uz * reach;
+          if (!Number.isFinite(ground(sx, sz))) continue;
+          if (!clearRun(sx, sz, ux, uz, reach * 2)) continue;
+          ran = { nest, ux, uz };
+          break;
+        }
+      }
+      if (!ran) {
+        check(false, `a ${MT.swoopRange * 2} m clear run through a magpie nest could be found somewhere in the city`);
+      } else {
+        const { nest, ux, uz } = ran;
+        const sx = nest.x - ux * reach;
+        const sz = nest.z - uz * reach;
+        const yaw = Math.atan2(-ux, -uz);
+        place(sx, sz, yaw);
+        sim.factions.clearInvestigation(probe.id);
+        probe.combat.health = MAX_HEALTH;
+        let taken = 0;
+        let dives = 0;
+        let awake = 0;
+        const diving = new Set<number>();
+        let travelled = 0;
+        for (let i = 0; i < 60 * 10; i++) {
+          probe.input.forward = 1;
+          probe.input.sprint = true;
+          probe.input.yaw = yaw;
+          probe.combat.body.yaw = yaw;
+          sim.step(out);
+          taken += topUp();
+          travelled = Math.hypot(probe.combat.body.position.x - sx, probe.combat.body.position.z - sz);
+          const live = birds(F.NPC_KIND.MAGPIE);
+          awake = Math.max(awake, live.length);
+          for (const a of live) {
+            const isDiving = a.state === F.NPC_STATE.CHASE || a.state === F.NPC_STATE.FIRE;
+            if (isDiving && !diving.has(a.id)) {
+              diving.add(a.id);
+              dives++;
+            } else if (!isDiving) {
+              diving.delete(a.id);
+            }
+          }
+          if (travelled >= reach * 2) break;
+        }
+        probe.input.forward = 0;
+        probe.input.sprint = false;
+        // The corridor, asserted rather than assumed. A probe that stopped after
+        // four metres never went through the radius, and every number after this
+        // would be a measurement of a wall.
+        check(
+          travelled > reach * 1.6,
+          `the probe sprinted ${travelled.toFixed(0)} m of a ${(reach * 2).toFixed(0)} m corridor straight ` +
+            'through the nest -- driven by the controller, so the magpie saw a real velocity',
+        );
+        check(awake > 0, `the nest was live for the run (${awake} magpie(s) promoted)`);
+        check(
+          taken <= MT.swoopDamage,
+          `sprinting through cost ${taken} of a pip over ${dives} dive(s) -- at most one clip, usually none. ` +
+            `The commit leads by ${MT.commitLeadTicks} ticks and lands ${MT.flightTicks}, so a sprint is ` +
+            `${(8.2 * (MT.flightTicks / 60) - MT.commitLeadMax).toFixed(1)} m clear of where the bird went`,
+        );
+      }
+    }
+
+    // --- 9c. Turn and run: the engagement is over inside a second and a half.
+    //
+    // The direct answer to *"de aggro based on distance too slow"*. The probe
+    // stands under the nest until the alarm starts -- which is the moment a
+    // player would actually react -- and then sprints out. What is timed is the
+    // gap between that and the bird being perched with its campaign spent.
+    {
+      const nest = takeNest((c) => standNear(c.x, c.z, 7) !== null);
+      const stand = nest ? standNear(nest.x, nest.z, 7) : null;
+      let escape: [number, number] | null = null;
+      if (nest && stand) {
+        for (const [ux, uz] of bearings) {
+          if (clearRun(stand.x, stand.z, ux, uz, MT.disengageRange + 6)) {
+            escape = [ux, uz];
+            break;
+          }
+        }
+      }
+      if (!nest || !stand || !escape) {
+        check(false, 'a magpie nest with somewhere to stand under it and somewhere to run to could be found');
+      } else {
+        const [ux, uz] = escape;
+        const yaw = Math.atan2(-ux, -uz);
+        place(stand.x, stand.z, yaw);
+        probe.combat.health = MAX_HEALTH;
+        let alarmedAt = -1;
+        let doneAt = -1;
+        for (let i = 0; i < 60 * 20 && doneAt < 0; i++) {
+          const live = birds(F.NPC_KIND.MAGPIE);
+          if (alarmedAt < 0 && live.some((a) => a.state === F.NPC_STATE.AIM)) alarmedAt = i;
+          if (alarmedAt < 0) {
+            // Standing still, waiting to be noticed. `place` holds the probe and
+            // zeroes its velocity, which is exactly a player who has stopped.
+            place(stand.x, stand.z, yaw);
+          } else {
+            probe.input.forward = 1;
+            probe.input.sprint = true;
+            probe.input.yaw = yaw;
+            probe.combat.body.yaw = yaw;
+          }
+          sim.step(out);
+          probe.combat.health = MAX_HEALTH;
+          if (alarmedAt >= 0) {
+            const after = birds(F.NPC_KIND.MAGPIE);
+            // Done: nothing is diving, nothing is winding up, and the campaign
+            // is spent -- which is the state `breakOffSwoop` leaves it in.
+            const busy = after.some((a) => a.state !== F.NPC_STATE.IDLE);
+            if (!busy && after.length > 0) doneAt = i;
+            if (after.length === 0) doneAt = i;
+          }
+        }
+        probe.input.forward = 0;
+        probe.input.sprint = false;
+        check(alarmedAt >= 0, 'standing under a nest got the probe an alarm to react to');
+        check(
+          doneAt >= 0 && doneAt - alarmedAt <= 90,
+          `turning and running ended the engagement in ${((doneAt - alarmedAt) / 60).toFixed(2)} s ` +
+            `(the rule is 1.5). Outward travel over ${MT.breakOffSpeed} m/s breaks a magpie off inside the ` +
+            'pass it is already in, rather than at the aggro radius twelve metres later',
+        );
+      }
+    }
+
+    // --- 9d. Leaving and coming straight back is worth one pass, not two.
+    //
+    // The cooldown exists because the counterplay must not also be a way of
+    // ordering more swoops: stepping outside `SWOOP_RANGE` and back used to
+    // reset the campaign outright, so the correct play and the exploit were the
+    // same play. The probe is teleported here rather than run, deliberately --
+    // what is being tested is the *bookkeeping* across a disengage, and a
+    // stationary arrival is the case that gets hit, so this is the harshest
+    // version of the question.
+    {
+      const nest = takeNest((c) => standNear(c.x, c.z, 7) !== null && standNear(c.x, c.z, 25) !== null);
+      const near = nest ? standNear(nest.x, nest.z, 7) : null;
+      const far = nest ? standNear(nest.x, nest.z, 25) : null;
+      const farD = nest && far ? Math.hypot(far.x - nest.x, far.z - nest.z) : 0;
+      if (!nest || !near || !far || farD <= MT.swoopRange || farD >= 38) {
+        check(false, 'a magpie nest with standable ground at 7 m and outside 20 m could be found');
+      } else {
+        /** Dives per actor id over `ticks`, with the probe parked at a spot. */
+        const watch = (x: number, z: number, ticks: number): Map<number, number> => {
+          const seen = new Map<number, number>();
+          const diving = new Set<number>();
+          for (let i = 0; i < ticks; i++) {
+            place(x, z, 0);
+            sim.step(out);
+            probe.combat.health = MAX_HEALTH;
+            for (const a of birds(F.NPC_KIND.MAGPIE)) {
+              const isDiving = a.state === F.NPC_STATE.CHASE || a.state === F.NPC_STATE.FIRE;
+              if (isDiving && !diving.has(a.id)) {
+                diving.add(a.id);
+                seen.set(a.id, (seen.get(a.id) ?? 0) + 1);
+              } else if (!isDiving) {
+                diving.delete(a.id);
+              }
+            }
+          }
+          return seen;
+        };
+        probe.combat.health = MAX_HEALTH;
+        const first = watch(near.x, near.z, 60 * 12);
+        const busiestFirst = first.size ? Math.max(...first.values()) : 0;
+        // Out past the aggro radius -- but nowhere near far enough to resolve
+        // the actor, which would hand the returning player a brand new bird and
+        // make the cooldown untestable. Three seconds is enough for the perched
+        // branch to arm it.
+        watch(far.x, far.z, 60 * 3);
+        const held = birds(F.NPC_KIND.MAGPIE).length;
+        const again = watch(near.x, near.z, 60 * 12);
+        const busiestAgain = again.size ? Math.max(...again.values()) : 0;
+        check(
+          busiestFirst === MT.maxSwoops,
+          `the first visit was a full campaign: ${busiestFirst} passes, which is the tuned ${MT.maxSwoops}`,
+        );
+        check(
+          held > 0 && farD < 40,
+          `standing ${farD.toFixed(0)} m off ended the engagement without resolving the bird (${held} still awake) ` +
+            '-- so what is measured next is the same magpie remembering, not a fresh one',
+        );
+        check(
+          busiestAgain <= 1,
+          `walking back inside the ${(MT.cooldownTicks / 60).toFixed(0)} s cooldown bought ${busiestAgain} ` +
+            'pass, not another campaign -- leaving is the counterplay, not a way of ordering more swoops',
+        );
+      }
     }
   }
 
