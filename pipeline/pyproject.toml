@@ -1,0 +1,36 @@
+[project]
+name = "sydney-pipeline"
+version = "0.1.0"
+description = "Offline asset pipeline: footprints + LiDAR + OSM -> glTF world tiles"
+requires-python = ">=3.12"
+
+# Deliberately wheel-only on Apple Silicon. The spec rules out CUDA, and brew's
+# PDAL pulls a ~4 GB LLVM/GCC/Boost build chain, so LAZ reading goes through
+# laspy+lazrs and vector I/O through shapely/pyogrio instead.
+dependencies = [
+    "numpy>=2.1",
+    "scipy>=1.14",       # cKDTree for the point-in-polygon and roof fitting passes
+    "shapely>=2.0",
+    "pyproj>=3.6",
+    "pygltflib>=1.16",   # glTF/GLB writing with custom vertex attributes
+    "laspy[lazrs]>=2.5", # LAZ point clouds, pure-wheel Rust backend
+    "pyogrio>=0.10",     # bundles GDAL; reads the Geofabrik OSM extract
+    "requests>=2.32",
+    "tqdm>=4.66",
+    "mapbox-earcut>=2.0.0",
+    "pillow>=12.3.0",     # decodes the terrarium DEM PNGs -- see terrain.py
+]
+
+[dependency-groups]
+dev = [
+    "pexpect>=4.9.0",
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.uv]
+package = false

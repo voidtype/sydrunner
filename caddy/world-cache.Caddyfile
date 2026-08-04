@@ -1,0 +1,62 @@
+# Cache headers for SYDNEY's static payloads.
+#
+# Copy to /etc/caddy/world-cache.Caddyfile on the box and add one line inside
+# the site block in /etc/caddy/Caddyfile:
+#
+#     import /etc/caddy/world-cache.Caddyfile
+#
+# then `caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy`.
+# Nothing else in the site block changes; see DEPLOY.md for the whole file.
+#
+# ---------------------------------------------------------------------------
+# WHY THIS IS SAFE, which is the only interesting thing about it.
+#
+# A first visit downloads about 350 MB of city, tile by tile, as the player
+# walks. Every byte of it is immutable in practice and mutable in name:
+# `world/tiles/5_-1.glb` is a grid coordinate, not a content hash, so the day
+# the pipeline is re-run it is different bytes under the same name. A one-year
+# `immutable` on the path alone would therefore leave anyone who visited before
+# a retile with a mixture of two builds for a year -- a seam through the middle
+# of the map that no reload can clear, because `immutable` tells the browser not
+# even to revalidate.
+#
+# So the version is in the URL instead. `pipeline/sydney/tiles.py` stamps
+# `built` -- epoch seconds -- into index.json on every run, and the client
+# appends it to every asset it fetches as `?v=<built>`
+# (`client/src/world/version.ts`). A rebuild moves the stamp, every URL changes,
+# and every cache in the chain misses exactly once. Nothing needs purging.
+#
+# index.json is the pivot and is the one file that must NOT be cached hard: it
+# is what tells the client which version to ask for. It is ~1 MB, it is one
+# request per session, and it is excluded explicitly below rather than by
+# omission, because "the index was excluded by accident" and "the index was
+# excluded on purpose" are the same file and very different bugs.
+#
+# Query strings do not affect matching or file lookup: Caddy's `path` matcher
+# reads the path only, and `file_server` ignores the query, so
+# `/world/tiles/5_-1.glb?v=1754130000` serves the same file it always did. A
+# client running an older build with no `?v=` at all still gets served, and
+# still gets the long cache -- which is correct, because that build is asking
+# for the world it was shipped against.
+
+@world_versioned {
+	path /world/*
+	not path /world/index.json
+}
+header @world_versioned Cache-Control "public, max-age=31536000, immutable"
+
+# The pivot. `no-cache` is "revalidate before use", not "do not store" -- the
+# browser keeps it and gets a 304 on the common path, so this costs one
+# conditional request per session and is what makes every rule above safe.
+@world_index path /world/index.json
+header @world_index Cache-Control "no-cache"
+
+# The client bundle, on the same argument with none of the caveats: vite content-
+# hashes everything under assets/ (`index-CsBenFzi.js`), so those names genuinely
+# do change when the bytes do.
+@client_assets path /assets/*
+header @client_assets Cache-Control "public, max-age=31536000, immutable"
+
+# And index.html, which names them. Same pivot, same reasoning as index.json.
+@client_index path / /index.html
+header @client_index Cache-Control "no-cache"

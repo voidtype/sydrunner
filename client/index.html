@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SYDNEY</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { height: 100%; overflow: hidden; background: #0b0d10; }
+      #viewport { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
+
+      #debug {
+        position: fixed; top: 12px; left: 14px;
+        font-size: 11px; line-height: 1.55; white-space: pre;
+        color: #cfe2f2; text-shadow: 0 1px 2px rgba(0,0,0,.85);
+        pointer-events: none; letter-spacing: .02em;
+      }
+
+      /* The notice pill. Transient messages only, as of this pass -- a refused
+         pointer lock, the first-visit note, a connection that dropped. The
+         controls it used to carry are in `#help`, in the opposite corner, and
+         permanently. */
+      #hint {
+        position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+        font-size: 11px; color: #e6eef6; text-shadow: 0 1px 3px rgba(0,0,0,.9);
+        background: rgba(10,14,20,.55); padding: 7px 13px; border-radius: 999px;
+        pointer-events: none; transition: opacity .25s ease; max-width: 92vw;
+        text-align: center;
+      }
+      /* An empty pill is *nothing*, not a small dark lozenge with no text in
+         it. On `#effects:empty`'s own argument below, and the reason the pill
+         can now be emptied at all: before this pass it always had the controls
+         line under whatever notice was showing, so it was never empty and
+         `Hud.notice('')` had something to restore. It has not, and does not. */
+      #hint:empty { display: none; }
+
+      /* The controls, bottom right, permanently.
+
+         The one part of this interface that answers "what do I press", so it is
+         on the screen rather than behind a key -- and it is *text over the
+         world* like `#debug` and `#locator` rather than a pill, for the same
+         reason those two are: a persistent element with a background is a
+         persistent hole in the picture, and the pill's background exists to
+         make a transient message readable wherever it lands.
+
+         Right-aligned against the same 14 px right edge as the map and its
+         strip, and the same 16 px bottom edge as the vitals, so the four
+         corners of the HUD share two margins between them.
+
+         Width-capped rather than wrapped, and the cap is the interesting half:
+         `#vitals` is bottom-*left* and its effect chips grow rightwards, so a
+         controls block that wrapped instead of clipping would meet them in the
+         middle of a narrow window. 44vw can never reach the centre line, and
+         each line clips with an ellipsis inside it. The lines are ordered so
+         what an ellipsis eats is what matters least. */
+      #help {
+        position: fixed; right: 14px; bottom: 16px;
+        max-width: min(340px, 44vw);
+        font-size: 11px; line-height: 1.55; letter-spacing: .02em;
+        color: #cfe2f2; text-shadow: 0 1px 2px rgba(0,0,0,.85);
+        text-align: right; pointer-events: none;
+        transition: opacity .25s ease;
+      }
+      #help div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      /* The key that opens the rest, in the dim tone the leaderboard's own
+         column headings use. It is a label for the block above it, not another
+         line of it. */
+      #help .more { color: #7f95ab; }
+      /* Hidden while the full list is up: they are the same information in the
+         same corner, and the compact block is the one with less of it. */
+      #help.hidden { opacity: 0; }
+      /* A window shorter than this is a laptop with the dev tools open across
+         the bottom half. This is the lowest-priority element on the screen, so
+         it gives up the two control lines and keeps the key that brings all of
+         them back. */
+      @media (max-height: 460px) { #help .keys { display: none; } }
+
+      /* The full list, toggled by `H`.
+
+         Toggled rather than held, unlike the leaderboard, and for the mirror of
+         that panel's reason: a scoreboard is glanced at mid-fight with a hand
+         still on the movement keys, and a control list is read by somebody who
+         has stopped playing to find out what a key does. Reading it one-handed
+         while holding the key it is about is not a thing that can be done.
+
+         Grown out of the same corner as the compact block it replaces, which is
+         where the player's eye already is -- the block says `h — all controls`
+         and this appears over the top of it. The panel is the leaderboard's
+         panel to the pixel: same background, same border, same blur, same
+         padding, no corner radius. Two panels that appeared in the same session
+         and did not match would read as two different programs.
+
+         Sections wrap, so a window too narrow for three columns gets two and
+         one too narrow for two gets one, without a media query having to guess
+         where the breaks are. */
+      #helpfull {
+        position: fixed; right: 14px; bottom: 16px;
+        display: none; flex-wrap: wrap; align-content: flex-start;
+        gap: 12px 28px; max-width: min(560px, 92vw);
+        pointer-events: none; z-index: 4;
+        background: rgba(10,14,20,.72);
+        -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+        border: 1px solid rgba(207,226,242,.34);
+        box-shadow: 0 2px 12px rgba(0,0,0,.7);
+        padding: 14px 18px;
+        color: #cfe2f2; font-size: 11px; letter-spacing: .02em;
+      }
+      #helpfull.shown { display: flex; }
+      /* A short window gets a wider panel, which is the opposite of what it
+         sounds like: the sections wrap, so more width is fewer rows and fewer
+         rows is a shorter panel. Three columns of five sections is 367 px tall,
+         which is more than a 400 px window has room for once the margins are
+         paid; four columns is 270 and fits down to about 310. The same trade
+         the compact block makes one block up, in the same direction -- the
+         screen has run out of height, so spend width. */
+      @media (max-height: 520px) { #helpfull { max-width: min(960px, 92vw); } }
+      #helpfull h1 {
+        flex: 0 0 100%;
+        font-size: 9px; letter-spacing: .38em; text-transform: uppercase;
+        color: #7f95ab; font-weight: normal;
+      }
+      #helpfull section { min-width: 168px; }
+      #helpfull h2 {
+        font-size: 9px; letter-spacing: .16em; text-transform: uppercase;
+        color: #7f95ab; font-weight: normal; margin-bottom: 5px;
+      }
+      /* The description is a tone down from the key, because the key is what is
+         being looked up and the sentence beside it is the answer. Both tones are
+         already in this stylesheet. */
+      #helpfull section div { line-height: 1.6; white-space: nowrap; color: #93a8bc; }
+      /* `kbd` for the semantics and `font: inherit` to undo what the browser
+         does with it -- every engine gives it a monospace stack and a smaller
+         size of its own, and this HUD is already monospace at one size. The
+         min-width is the column: it is wider than the longest key in the list
+         ("right click", eleven characters at this size), so every description
+         in a section starts on the same pixel. */
+      #helpfull kbd {
+        display: inline-block; min-width: 7em; font: inherit; color: #cfe2f2;
+      }
+
+      /* The rotating minimap. Top-right, opposite the debug overlay and
+         deliberately not part of it -- the backquote hides diagnostics, and a
+         map is the one thing on screen a player navigates by. Permanent as of
+         the pass that gave `M` to `#bigmap`: this is the compass and the strip
+         under it is where you are, and neither should be one keystroke from
+         gone. See `minimap.ts`.
+
+         Sized in `border-box`, so the 210 is the rim and the drawing surface is
+         206; `minimap.ts` measures the content box rather than trusting either
+         number. The background is the hint pill's, at the same 55%, so the map
+         sits in the same family as everything else here -- and it is a CSS
+         background rather than a canvas fill because the browser composites it
+         under the bitmap for free, where a fill would be a full-disc rewrite on
+         every one of the fifteen redraws a second.
+
+         THE RIM IS THREE RINGS, and each does something the other two cannot.
+
+         The 2 px `border` is the ring proper, in the interface's one blue-grey
+         at .55 -- up from the 1 px at .34 it was, which disappeared entirely
+         against a bright sky. It is inside the element's box, so widening it
+         costs the drawing surface two pixels and nothing else moves.
+
+         The first `box-shadow` layer is a 1 px dark ring immediately *outside*
+         it -- a zero-offset, zero-blur spread, which is the only way to draw a
+         second concentric ring on a `border-radius: 50%` element without a
+         pseudo-element. It is what makes the light ring read as an edge rather
+         than as a bright line floating on whatever is behind it. The case it
+         exists for is the sky: over the harbour at midday the background behind
+         the top of the disc is within a few percent of the blue-grey itself, and
+         a light ring on a light ground has no contrast on its outer side at all.
+         Dark on the outside gives it one at every viewpoint.
+
+         The second is the drop shadow that was already there, which separates
+         the whole disc from the scene -- pushed out a pixel so it still reads
+         from under the heavier rim. Listed inner-first because the first layer
+         in a `box-shadow` list is the one painted on top, so the ring stays
+         crisp against the soft shadow rather than the other way round. */
+      #minimap {
+        position: fixed; top: 12px; right: 14px;
+        width: 210px; height: 210px;
+        border: 2px solid rgba(207,226,242,.55); border-radius: 50%;
+        background: rgba(10,14,20,.55);
+        /* Prefixed as well as not, because Safari only dropped the prefix at 18
+           and an unprefixed-only rule fails by silently doing nothing. */
+        -webkit-backdrop-filter: blur(2px);
+        backdrop-filter: blur(2px);
+        box-shadow:
+          0 0 0 1px rgba(6,9,13,.72),
+          0 1px 4px rgba(0,0,0,.85);
+        pointer-events: none;
+      }
+
+      /* The locator strip: "King Street, Newtown", under the map.
+
+         Beside the drawing rather than on it, which is the whole placement
+         argument -- `minimap.ts` reads as a figure-ground plan where the streets
+         are the *void* between the buildings, and lettering that void would fill
+         the one part of the picture carrying the shape.
+
+         Right-aligned and width-capped to the map's own 210 so the block reads
+         as one object with a straight right edge. `#minimap` is `position:
+         fixed` and out of flow, so this cannot follow it and is placed against
+         the same two edges instead: 12 top + 210 map + 1 outer ring + 5 gap
+         = 228. The ring is in that sum because it is a `box-shadow` spread and
+         therefore paints outside the border box without occupying any.
+
+         TWO LINES, NOT ONE, and that is a measurement rather than a preference.
+         At 11px `ui-monospace` the advance is 6.6 px plus this rule's own .02em
+         of tracking, so 210 px holds about 30 characters. Swept over the whole
+         inner ring on a 25 m grid, a single-street line is 26 characters at the
+         median and fits inside that 86% of the time -- but a corner line is 40,
+         because it carries two names and a suburb, and fits 1% of the time. One
+         line would therefore ellipsis the suburb off very nearly every corner
+         reading, which is the half of the line a player cannot get any other
+         way. Two lines cover 100% of single-street readings and 98.9% of
+         corners; the remainder are corners of two motorway ramps, which is not
+         a place anybody stands.
+
+         `line-clamp` needs the old flexbox display and the box orientation to
+         work, and gives the ellipsis on the second line; the unprefixed property
+         is written beside the prefixed one so this stops being legacy the day
+         the engines finish. `overflow: hidden` is the floor under both and
+         clips rather than ellipsises if neither applies.
+
+         11px in `#cfe2f2` with the debug overlay's own shadow, because this is
+         the same family of thing: text the interface states over the world. */
+      #locator {
+        position: fixed; top: 228px; right: 14px;
+        width: 210px; text-align: right;
+        font-size: 11px; line-height: 1.4; letter-spacing: .02em;
+        color: #cfe2f2; text-shadow: 0 1px 2px rgba(0,0,0,.85);
+        display: -webkit-box; -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2; line-clamp: 2;
+        overflow: hidden; overflow-wrap: break-word;
+        pointer-events: none;
+      }
+
+      /* The big map, toggled by `M`. See `bigmap.ts` for what is on it and why
+         it is a second map rather than this one made larger.
+
+         A SQUARE, and that is the one dimension decision here that everything
+         else follows from. The build is a square 9 km on a side and the map has
+         a scale bar on it, so the drawing surface cannot be a rectangle whose
+         aspect depends on the window -- `min(85vw, 85vh)` is the largest square
+         that fits either way round, and it leaves a margin of real game visible
+         on all four sides. That margin is deliberate: this covers the world
+         while it is up, and a panel that reached the edges would read as a menu
+         the game had stopped behind.
+
+         The canvas fills it and every piece of text on the map -- the title, the
+         scale bar, the labels -- is drawn *into* the canvas rather than sitting
+         in DOM beside it. A DOM header inside this box would make the canvas
+         non-square, which is the one thing a map with a scale bar cannot be.
+
+         The panel is `#leaderboard`'s panel to the pixel: same background, same
+         border, same blur, no corner radius. Three panels have appeared in this
+         interface now and they are one object at three sizes.
+
+         `pointer-events: none` like every overlay here, and for the reason
+         `#leaderboard` states: a panel that swallowed a click would swallow the
+         one that recaptures the pointer lock. Which is also why the map has no
+         drag-to-pan -- the wheel zooms and the view re-centres itself on the
+         player, and neither needs the cursor.
+
+         `z-index: 6` puts it over the control list and the board. It never
+         shares the screen with either -- opening one closes the others in
+         `main.ts` -- so the ordering only decides what a frame in the middle of
+         that exchange looks like.
+
+         THE BACKGROUND IS DARKER THAN THE OTHER TWO PANELS -- .88 against their
+         .72 -- and that is the one place this deliberately breaks the family
+         resemblance. The reason is area and content: the leaderboard is a small
+         block of 11 px text that lands wherever it lands, and this is 85% of the
+         screen carrying 9 px labels and 1 px lines. At .72 over a midday sky the
+         whole northern half of the map washes out, because the thing behind it
+         is the brightest thing this renderer draws. The blur cannot fix it --
+         blurring a bright sky gives a bright sky. Everything *on* the map is
+         still the interface's own palette; only the ground under it is deeper. */
+      #bigmap {
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+        width: min(85vw, 85vh); height: min(85vw, 85vh);
+        display: none; pointer-events: none; z-index: 6;
+        background: rgba(9,12,17,.88);
+        -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+        border: 1px solid rgba(207,226,242,.34);
+        box-shadow: 0 2px 12px rgba(0,0,0,.7);
+      }
+      #bigmap.shown { display: block; }
+      /* `block` rather than the default inline, which would leave the canvas
+         sitting on a text baseline and the panel four pixels taller than the
+         drawing surface -- and the map is measured from `clientWidth`, so that
+         gap would be a permanently soft bitmap rather than a visible seam. */
+      #bigmap canvas { display: block; width: 100%; height: 100%; }
+
+      /* Centre dot rather than a full crosshair -- a heavy crosshair reads as a
+         shooter, and spec 2 is explicit that this is a melee game. It pulses on
+         a landed hit (see game/feedback.ts), which is the whole of the melee
+         reticle spec 8.2 needs: confirmation, not aiming assistance. */
+      #reticle {
+        position: fixed; top: 50%; left: 50%; width: 4px; height: 4px;
+        margin: -2px 0 0 -2px; border-radius: 50%;
+        background: rgba(255,255,255,.72);
+        box-shadow: 0 0 2px rgba(0,0,0,.9);
+        pointer-events: none;
+      }
+
+      /* Taking a hit. A DOM overlay rather than a post-process pass: it is one
+         composited div against a full-screen read-modify-write of a 3.7 Mpixel
+         target, for a red flash nobody looks at directly. Spec 8.2 says sell it
+         through audio and camera, so this is deliberately the cheap half. */
+      #vignette {
+        position: fixed; inset: 0; opacity: 0; pointer-events: none;
+        background: radial-gradient(ellipse at center,
+          rgba(150,10,10,0) 32%, rgba(168,14,10,.55) 74%, rgba(120,6,4,.92) 100%);
+      }
+
+      /* Spec 8.2: "No world-space health bars. Health pips in the corner." */
+      #vitals {
+        position: fixed; left: 16px; bottom: 16px;
+        pointer-events: none; display: flex; flex-direction: column; gap: 6px;
+      }
+      #pips { display: flex; gap: 6px; }
+      #pips div {
+        width: 26px; height: 12px; border: 1px solid rgba(207,226,242,.34);
+        box-shadow: 0 1px 2px rgba(0,0,0,.85);
+      }
+      #pips div.full { background: #dfe9f2; border-color: #dfe9f2; }
+      /* The last pip goes the colour the loading screen uses for a failure. It is
+         the only red in the interface and it should mean exactly one thing. */
+      #pips div.last { background: #f0a9a0; border-color: #f0a9a0; }
+      #stamina { display: flex; gap: 6px; }
+      #stamina div {
+        width: 18px; height: 3px; background: rgba(207,226,242,.18);
+        box-shadow: 0 1px 2px rgba(0,0,0,.85); overflow: hidden;
+      }
+      #stamina div i { display: block; height: 100%; width: 0; background: #9fc4e2; }
+      #stamina div.full i { width: 100%; background: #cfe2f2; }
+
+      /* The footy supply, under the stamina bar. Thinner than it and in the
+         ball's own leather red-brown rather than the interface's blue, which is
+         the whole of the distinction being drawn: everything else in this HUD is
+         one colour because it is all the same system, and the balls are a
+         separate resource that must never be read as stamina at a glance
+         mid-fight. See game/footy.ts for why it is a separate bar at all, and
+         game/combat.ts for why it refills one block at a time where the stamina
+         above it refills all at once. */
+      #balls { display: flex; gap: 5px; }
+      #balls div {
+        width: 24px; height: 2px; background: rgba(196,84,52,.16);
+        box-shadow: 0 1px 2px rgba(0,0,0,.85); overflow: hidden;
+      }
+      #balls div i { display: block; height: 100%; width: 0; background: rgba(196,84,52,.55); }
+      #balls div.full i { width: 100%; background: #c8563a; }
+
+      /* Spec 8.3's active effects, beside the pips. Terminal-plain on purpose:
+         a bordered label and a whole number of seconds, in the interface's one
+         colour. Anything with an icon or a progress ring would be the only
+         graphical element in a HUD that is otherwise four rectangles and a
+         dot. */
+      #effects { display: flex; gap: 6px; }
+      /* Otherwise an empty chip row still contributes the column's 6px gap and
+         the pips sit 6px higher for the whole game than they did before 8.3. */
+      #effects:empty { display: none; }
+      #effects div {
+        font-size: 9px; letter-spacing: .16em; padding: 3px 6px;
+        color: #cfe2f2; border: 1px solid rgba(207,226,242,.34);
+        text-shadow: 0 1px 2px rgba(0,0,0,.85); white-space: nowrap;
+      }
+
+      #ko {
+        position: fixed; top: 44%; left: 50%; transform: translate(-50%,-50%);
+        font-size: 12px; letter-spacing: .38em; text-transform: uppercase;
+        color: #f0a9a0; text-shadow: 0 1px 3px rgba(0,0,0,.9);
+        pointer-events: none; text-align: center; line-height: 2.1; display: none;
+      }
+
+      /* "Under Investigation!" -- the police banner.
+
+         Top-centre rather than in the corner with the pips, and that is the one
+         layout decision here. Everything in the bottom-left is a *resource*: how
+         much health, how much stamina, how many balls, all of it read by
+         glancing down between actions. This is not a resource, it is a **state
+         you are in**, and it has to be visible while the player is looking at
+         the thing shooting at them -- which is straight ahead. It sits above the
+         reticle rather than under it so it never covers what is being aimed at.
+
+         In #f0a9a0, which #pips already establishes as the only red in the
+         interface and which the comment there says should mean exactly one
+         thing. It does: this is that thing.
+
+         The countdown is a separate element on its own line, and it is dimmer
+         and larger-tracked than the reason above it. A player reads the reason
+         once and the number continuously, so the number gets the position the
+         eye returns to and the reason gets the emphasis.
+
+         The pulse is two seconds and very shallow -- .78 to 1 -- because a
+         banner that flashes hard is a banner that is hard to read, and this one
+         has to stay readable for forty-five seconds. It stops entirely under
+         prefers-reduced-motion. */
+      #investigation {
+        position: fixed; top: 13%; left: 50%; transform: translateX(-50%);
+        pointer-events: none; text-align: center; display: none;
+        color: #f0a9a0; text-shadow: 0 1px 3px rgba(0,0,0,.9);
+        animation: investigating 2s ease-in-out infinite;
+      }
+      #investigation.shown { display: block; }
+      #investigation-title {
+        font-size: 13px; letter-spacing: .34em; text-transform: uppercase;
+        white-space: nowrap;
+      }
+      #investigation-reason {
+        font-size: 10px; letter-spacing: .12em; margin-top: 7px;
+        color: rgba(240,169,160,.82); white-space: nowrap;
+      }
+      #investigation-count {
+        font-size: 11px; letter-spacing: .3em; margin-top: 9px;
+        color: rgba(240,169,160,.6);
+      }
+      @keyframes investigating {
+        0%, 100% { opacity: 1; }
+        50% { opacity: .78; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #investigation { animation: none; }
+      }
+
+      /* The leaderboard, held on Tab.
+
+         Held rather than toggled, which is the one interaction decision here:
+         a scoreboard is a thing you glance at between fights, and a toggle
+         leaves it over the game the next time somebody swings at you. Every
+         shooter that has ever had one has held it, and the reason is that the
+         hand is already off the movement keys while it is up.
+
+         The panel is the hint pill's own background at the same 55% and the
+         debug overlay's own text colour, because it is the same family of
+         thing: text the interface states over the world. No new colour, no new
+         font, no rounded corners -- the pill is round because it is a pill.
+
+         `pointer-events: none` throughout: it appears while a key is held and
+         there is nothing on it to click, and a panel that swallowed a click
+         would swallow the one that recaptures the pointer lock. */
+      #leaderboard {
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+        display: none; pointer-events: none; z-index: 5;
+        background: rgba(10,14,20,.72);
+        -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+        border: 1px solid rgba(207,226,242,.34);
+        box-shadow: 0 2px 12px rgba(0,0,0,.7);
+        padding: 14px 18px; min-width: 340px; max-width: 92vw;
+        color: #cfe2f2; font-size: 11px; letter-spacing: .02em;
+      }
+      #leaderboard.shown { display: block; }
+      #leaderboard h1 {
+        font-size: 9px; letter-spacing: .38em; text-transform: uppercase;
+        color: #7f95ab; font-weight: normal; margin-bottom: 10px;
+      }
+      #leaderboard table { border-collapse: collapse; width: 100%; }
+      #leaderboard th {
+        font-size: 9px; letter-spacing: .16em; text-transform: uppercase;
+        color: #7f95ab; font-weight: normal; text-align: right;
+        padding: 0 0 5px 14px; border-bottom: 1px solid rgba(207,226,242,.18);
+      }
+      #leaderboard th:first-child, #leaderboard td:first-child {
+        text-align: left; padding-left: 0;
+      }
+      #leaderboard td {
+        padding: 3px 0 3px 14px; text-align: right; line-height: 1.5;
+        white-space: nowrap; font-variant-numeric: tabular-nums;
+      }
+      /* The name column takes the slack so the numbers stay hard right, and a
+         name that somehow got past the sanitiser still cannot push the KO
+         column off the panel. */
+      #leaderboard td:first-child {
+        max-width: 22ch; overflow: hidden; text-overflow: ellipsis;
+      }
+      /* Your own row, in the interface's one bright tone. Brightness rather than
+         a colour, because the palette has exactly one accent and it is the red
+         that means "one pip left". */
+      #leaderboard tr.self td { color: #ffffff; }
+      #leaderboard tr.bot td { color: #93a8bc; }
+      /* The dash a bot's ping is drawn as: a bot has no socket, and "0 ms" would
+         be a lie about the best connection in the game. */
+      #leaderboard td.none { color: #5f7285; }
+
+      /* The name prompt, over everything including the loading screen.
+
+         The only element in this interface that takes a click, and the only one
+         with an input in it. Styled to disappear into the rest: the field is a
+         bottom rule rather than a box, the button is the effects chip's border
+         at the effects chip's size, and neither has a corner radius. */
+      #nameprompt {
+        position: fixed; inset: 0; display: none; place-items: center;
+        background: rgba(11,13,16,.82);
+        -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+        z-index: 11;
+      }
+      #nameprompt.shown { display: grid; }
+      #nameprompt-inner { text-align: center; padding: 24px; max-width: 420px; }
+      #nameprompt-title {
+        font-size: 13px; letter-spacing: .55em; color: #7f95ab;
+        margin-bottom: 6px; text-transform: uppercase;
+      }
+      #nameprompt-sub {
+        font-size: 11px; line-height: 1.7; color: #b9cbdb; margin-bottom: 22px;
+      }
+      #nameprompt-row { display: flex; gap: 10px; align-items: stretch; justify-content: center; }
+      #nameprompt input {
+        font: inherit; font-size: 13px; letter-spacing: .08em;
+        color: #e6eef6; background: transparent; text-align: center;
+        border: 0; border-bottom: 1px solid rgba(207,226,242,.34);
+        padding: 6px 8px; width: 220px; outline: none;
+      }
+      #nameprompt input:focus { border-bottom-color: #cfe2f2; }
+      #nameprompt input::placeholder { color: #5f7285; }
+      #nameprompt button {
+        font: inherit; font-size: 9px; letter-spacing: .16em; text-transform: uppercase;
+        color: #cfe2f2; background: transparent; cursor: pointer;
+        border: 1px solid rgba(207,226,242,.34); padding: 3px 14px;
+      }
+      #nameprompt button:hover { border-color: #cfe2f2; }
+      #nameprompt-note { font-size: 10px; color: #5f7285; margin-top: 16px; line-height: 1.6; }
+
+      #loading {
+        position: fixed; inset: 0; display: grid; place-items: center;
+        background: #0b0d10; z-index: 10; transition: opacity .4s ease;
+      }
+      #loading.hidden { opacity: 0; pointer-events: none; }
+      #loading-inner { text-align: center; max-width: 720px; padding: 24px; }
+      #loading-title {
+        font-size: 13px; letter-spacing: .55em; color: #7f95ab;
+        margin-bottom: 18px; text-transform: uppercase;
+      }
+      #loading-text {
+        font-size: 12px; line-height: 1.7; color: #b9cbdb; white-space: pre-wrap;
+        text-align: left;
+      }
+      #loading-text.error { color: #f0a9a0; }
+    </style>
+  </head>
+  <body>
+    <canvas id="viewport"></canvas>
+    <div id="reticle"></div>
+    <div id="vignette"></div>
+    <div id="debug"></div>
+    <canvas id="minimap"></canvas>
+    <div id="locator"></div>
+    <div id="bigmap"><canvas id="bigmap-canvas"></canvas></div>
+    <div id="ko"></div>
+    <div id="investigation">
+      <div id="investigation-title">Under Investigation!</div>
+      <div id="investigation-reason"></div>
+      <div id="investigation-count"></div>
+    </div>
+    <div id="vitals">
+      <div id="effects"></div>
+      <div id="pips"></div>
+      <div id="stamina"></div>
+      <div id="balls"></div>
+    </div>
+    <div id="hint">loading</div>
+
+    <!-- Static markup, unlike every other panel here, because this is the one
+         thing on the screen that never changes: the bindings are compiled into
+         `main.ts`'s keydown listener and a list built at runtime would be the
+         same eighteen strings with a loop around them. `hud.ts` only toggles a
+         class on these two. -->
+    <div id="help">
+      <div class="keys">wasd move · space jump · shift sprint</div>
+      <div class="keys">mouse look · left click bat · right click footy</div>
+      <div class="more">h — all controls</div>
+    </div>
+
+    <div id="helpfull">
+      <h1>controls</h1>
+      <section>
+        <h2>movement</h2>
+        <div><kbd>wasd</kbd>move</div>
+        <div><kbd>space</kbd>jump</div>
+        <div><kbd>shift</kbd>sprint</div>
+        <div><kbd>mouse</kbd>look</div>
+      </section>
+      <!-- Its own section rather than two more lines in `movement`, because the
+           bike is a thing you find rather than a thing you always have, and a
+           player reading this list is looking for "what was that green bike" as
+           a topic. -->
+      <section>
+        <h2>lime bikes</h2>
+        <div><kbd>e</kbd>get on / off</div>
+        <!-- Spelled out here and nowhere else, because it is the one binding in
+             the game that means a different thing depending on what you are
+             standing on: `a`/`d` strafe on foot and steer on a bike. See
+             `game/bikes.shapeRideSteering`. -->
+        <div><kbd>a d</kbd>steer · <kbd>w</kbd>throttle · <kbd>s</kbd>brake</div>
+        <div><kbd>v</kbd>camera view</div>
+        <div>look for the green glow — find one parked, or the tuning stall in Redfern</div>
+      </section>
+      <section>
+        <h2>fighting</h2>
+        <div><kbd>left click</kbd>swing the bat</div>
+        <div><kbd>right click</kbd>throw a footy</div>
+      </section>
+      <section>
+        <h2>interface</h2>
+        <div><kbd>h</kbd>all controls</div>
+        <div><kbd>esc</kbd>close panels</div>
+        <div><kbd>tab</kbd>scores, held</div>
+        <div><kbd>m</kbd>city map</div>
+        <div><kbd>wheel</kbd>map zoom</div>
+        <div><kbd>`</kbd>diagnostics</div>
+        <div><kbd>- =</kbd>render scale</div>
+      </section>
+      <section>
+        <h2>time</h2>
+        <div><kbd>[ ]</kbd>±30 minutes</div>
+        <div><kbd>n</kbd>night</div>
+        <div><kbd>t</kbd>3 pm</div>
+      </section>
+      <!-- The fallbacks, grouped rather than scattered through the two above,
+           because they are one situation rather than four bindings: a browser
+           that refuses pointer lock leaves the mouse busy turning the camera,
+           and everything in this section is what you use instead. -->
+      <section>
+        <h2>no pointer lock</h2>
+        <div><kbd>drag</kbd>look</div>
+        <div><kbd>arrows</kbd>look</div>
+        <div><kbd>f</kbd>swing the bat</div>
+        <div><kbd>l</kbd>throw a footy</div>
+      </section>
+    </div>
+
+    <div id="leaderboard">
+      <h1>Sydney</h1>
+      <table>
+        <thead>
+          <tr><th>name</th><th>kos</th><th>downs</th><th>ping</th></tr>
+        </thead>
+        <tbody id="leaderboard-rows"></tbody>
+      </table>
+    </div>
+
+    <div id="nameprompt">
+      <div id="nameprompt-inner">
+        <div id="nameprompt-title">Sydney</div>
+        <div id="nameprompt-sub">what should everyone call you?</div>
+        <div id="nameprompt-row">
+          <input id="nameprompt-input" maxlength="16" autocomplete="off" autocapitalize="off"
+                 autocorrect="off" spellcheck="false" />
+          <button id="nameprompt-join" type="button">join</button>
+        </div>
+        <div id="nameprompt-note">2–16 characters · enter to join</div>
+      </div>
+    </div>
+
+    <div id="loading">
+      <div id="loading-inner">
+        <div id="loading-title">Sydney</div>
+        <div id="loading-text">Starting renderer&hellip;</div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

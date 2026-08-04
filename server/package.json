@@ -1,0 +1,15 @@
+{
+  "name": "sydney-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Authoritative game server. Imports the client's own simulation modules; see index.ts.",
+  "scripts": {
+    "start": "bun run index.ts",
+    "check": "bun run integration-check.ts",
+    "typecheck": "../client/node_modules/.bin/tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14"
+  }
+}

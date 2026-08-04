@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    // No `DOM`, and that is the point of this file existing at all.
+    //
+    // The server imports six modules out of `client/src/` and the whole
+    // architecture rests on those being DOM-free. The client's own tsconfig
+    // includes `DOM` and `DOM.Iterable`, so a `document.` or a `window.` that
+    // crept into `game/combat.ts` would typecheck there and blow up here at
+    // runtime, in a process with no console anybody is watching. Compiling the
+    // same files a second time without the DOM turns that into a compile error.
+    //
+    // `WebWorker` is here for exactly one symbol: `WebSocket`, which Bun
+    // implements globally and which TypeScript otherwise only declares in the
+    // DOM lib. It brings no `document` and no `window` with it.
+    "lib": ["ES2022", "WebWorker"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "types": ["bun"]
+  },
+  // The server's own files plus the shared modules they pull in. `include` names
+  // only this directory because the imports drag the rest in, which is what
+  // makes the check meaningful: whatever `server/` actually depends on is what
+  // gets compiled without a DOM, and nothing else does.
+  "include": ["*.ts"]
+}

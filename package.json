@@ -1,0 +1,19 @@
+{
+  "name": "sydney",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Browser-based multiplayer melee FPS set in a geometrically accurate Greater Sydney",
+  "workspaces": [
+    "client"
+  ],
+  "scripts": {
+    "dev": "npm --workspace client run dev",
+    "build": "npm --workspace client run build",
+    "typecheck": "npm --workspace client run typecheck && cd server && ../client/node_modules/.bin/tsc --noEmit -p tsconfig.json",
+    "server": "bun run server/index.ts",
+    "server:check": "bun run server/integration-check.ts",
+    "world": "cd pipeline && uv run python -m sydney build --stage inner",
+    "world:middle": "cd pipeline && uv run python -m sydney build --stage middle",
+    "world:status": "cd pipeline && uv run python -m sydney status"
+  }
+}

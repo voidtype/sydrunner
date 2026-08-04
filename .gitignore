@@ -1,0 +1,28 @@
+# The world is not in git. It is 620 MB of generated geometry, and it ships as
+# gzipped GitHub release assets instead -- see scripts/publish-world-release.sh
+# and "The world is a GitHub release" in DEPLOY.md. Git would carry every byte
+# of every rebuild forever; a release carries one build and can be deleted.
+client/public/world/
+client/dist/
+
+# Pipeline cache and ledger. Gigabytes of downloaded OSM / Microsoft / terrain
+# source plus data/ledger.sqlite, all reproducible with `npm run world`.
+data/
+
+# Dependencies and virtualenvs.
+node_modules/
+.venv/
+pipeline/.venv/
+__pycache__/
+
+# Tooling scratch.
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+client/.shots/
+scratch/
+.scratch/
+*.log
+
+# macOS.
+.DS_Store
