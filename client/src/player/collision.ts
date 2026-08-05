@@ -40,6 +40,27 @@ export interface Prism {
   maxX: number;
   maxZ: number;
   /**
+   * Is this a **structure** rather than a building -- a deck, a viaduct, a
+   * bridge span, a landmark podium?
+   *
+   * `tiles.write_collision` writes the `extra` records (`landmarks.Prism`: every
+   * `decks.py` segment and parapet, the Harbour Bridge's deck, the Opera House
+   * podium, the tower's stalk) **before** the buildings, in one array under one
+   * count word. So the split is positional and exact, and it is recoverable here
+   * for nothing: the index already carries the tile's building count, and
+   * anything ahead of the last `b` records is a structure. See `addTile`.
+   *
+   * Nothing in this file's collision answers reads it, deliberately -- a prism is
+   * a prism to `resolve`, `blocked` and `roofHeight`, exactly as it was. What
+   * reads it is `world/invisible-walls.ts`, because the two kinds fail
+   * differently: a building's walls are drawn from its pad down to the terrain
+   * with a skirt, so it is never invisible, and a deck's are drawn at its own
+   * elevation with open air underneath. `false` on a tile whose caller did not
+   * say, which is every caller that has not been taught to -- the conservative
+   * answer, since it claims nothing.
+   */
+  structural: boolean;
+  /**
    * `prismsWithin`'s visit stamp, and nothing else's -- see it for the argument.
    *
    * On the record rather than in a `Set` beside it because a building 15 m
@@ -73,8 +94,28 @@ export class CollisionWorld {
     return this.tiles.has(key);
   }
 
-  /** Decode one tile's collision payload and index it. */
-  addTile(key: string, buffer: ArrayBuffer, offsetX: number, offsetZ: number): number {
+  /**
+   * Decode one tile's collision payload and index it.
+   *
+   * `buildingCount` is the index's own `b` for this tile, and it is optional
+   * because it buys nothing any collision answer needs -- it only separates the
+   * structures from the buildings, for `Prism.structural`. Passing it is what
+   * lets `world/invisible-walls.ts` name a deck without re-fetching or
+   * re-parsing anything; leaving it out marks every prism a building, which is
+   * what every caller got before this existed.
+   *
+   * Undercounting is the safe direction and is the reason this is a subtraction
+   * rather than a flag per record: an index written before decks existed carries
+   * a `b` equal to the whole payload, so `total - b` is zero and nothing is
+   * claimed to be a structure.
+   */
+  addTile(
+    key: string,
+    buffer: ArrayBuffer,
+    offsetX: number,
+    offsetZ: number,
+    buildingCount?: number,
+  ): number {
     if (this.tiles.has(key)) return 0;
     this.tiles.add(key);
 
@@ -82,6 +123,11 @@ export class CollisionWorld {
     let p = 0;
     const total = view.getUint32(p, true);
     p += 4;
+    // Clamped at zero: a `b` larger than the payload is a stale index against a
+    // fresh tile, and the honest reading of that is "nothing here is a
+    // structure" rather than a negative prefix that marks the whole tile.
+    const structuralCount =
+      buildingCount === undefined ? 0 : Math.max(0, Math.min(total, total - buildingCount));
 
     let added = 0;
     for (let i = 0; i < total; i++) {
@@ -112,7 +158,18 @@ export class CollisionWorld {
         if (z > maxZ) maxZ = z;
       }
 
-      const prism: Prism = { points, height, base, top: base + height, minX, minZ, maxX, maxZ, seen: 0 };
+      const prism: Prism = {
+        points,
+        height,
+        base,
+        top: base + height,
+        minX,
+        minZ,
+        maxX,
+        maxZ,
+        structural: i < structuralCount,
+        seen: 0,
+      };
       this.insert(prism);
       added++;
       this.count++;

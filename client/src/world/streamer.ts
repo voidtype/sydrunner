@@ -1292,6 +1292,34 @@ export class TileStreamer {
     return this.terrainField;
   }
 
+  /**
+   * Which phase of the pipeline this tile's **geometry** is in.
+   *
+   * The one question `stats` cannot answer, because `stats` is aggregate and
+   * this is per tile. It exists for `world/invisible-walls.ts`, whose whole
+   * subject is the window between a tile's collision arriving and its geometry
+   * being built: collision is fetched by `main.ts` on a 420 m radius as an 9 kB
+   * `.bin`, and the geometry is a 1.6 MB GLB through the fetch, the worker
+   * decode and the budgeted build queue. Inside that window every prism in the
+   * tile stops the player and draws nothing, and there is no other way to see
+   * it -- a hole in the city looks exactly like a park.
+   *
+   * `'failed'` is the one worth naming separately rather than folding into
+   * `'absent'`, because `update` never retries it: a tile that threw once is not
+   * drawn again for the rest of the session, so its collision is an invisible
+   * wall permanently rather than for a second and a half.
+   *
+   * A pure read of four containers, allocating nothing -- it is called per map
+   * redraw for a few dozen tiles.
+   */
+  tilePhase(key: string): 'built' | 'building' | 'loading' | 'failed' | 'absent' {
+    if (this.loaded.has(key)) return 'built';
+    if (this.building.has(key)) return 'building';
+    if (this.loading.has(key)) return 'loading';
+    if (this.failed.has(key)) return 'failed';
+    return 'absent';
+  }
+
   get stats() {
     let triangles = 0;
     let buildings = 0;

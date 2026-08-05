@@ -776,6 +776,30 @@ const VENUE_BAND_RADIUS = 45;
 const DRUNK_SPREAD = 12;
 
 /**
+ * The guaranteed gap between two drunks of the same venue, metres along the
+ * kerb -- and the number the **renderer's** `CLAIM_SNAP` is derived from.
+ *
+ * It exists because of what pairs an ambient to its promoted actor. The
+ * renderer has no identity to match on -- `protocol.NPC_BYTES` does not carry an
+ * actor's home -- so it claims the ambient the actor is standing *on* and then
+ * holds that claim by key. The claim is only unambiguous while no second
+ * ambient is inside the snap, so the sim owes the renderer a floor on how close
+ * two of one pub's drinkers can ever be, and this is it.
+ *
+ * The dependency runs one way, sim to renderer, which is why the constant lives
+ * here and `CLAIM_SNAP` is half of it rather than the two being tuned apart.
+ * Getting this wrong is what "the drunks teleport when I get close to them"
+ * was: two ambients inside the snap, the wrong one hidden, and the pairing
+ * changing its mind between frames.
+ *
+ * The slot layout in `poseDrunk` yields a gap of at least half a slot, so a
+ * venue needs `2 * count * DRUNK_MIN_GAP` of frontage to hold its people --
+ * 15 m for a pub with three, which is a normal shopfront and is why the filter
+ * costs so few venues.
+ */
+export const DRUNK_MIN_GAP = 2.5;
+
+/**
  * How many of the frontage candidates a drunk picks between.
  *
  * A corner hotel has a footpath on two streets and both are correct, so the
@@ -819,7 +843,7 @@ const frontS = new Float64Array(FRONTAGE_CHOICES);
 const frontBand: Array<PedBand | null> = new Array(FRONTAGE_CHOICES).fill(null);
 
 /** A drunk's sway: slower and smaller than a pace, and lateral rather than along. */
-const SWAY_AMPLITUDE = 0.16;
+export const SWAY_AMPLITUDE = 0.16;
 const SWAY_SECONDS = 3.4;
 /** How long one swig cycle takes. Long: a longneck is not a shot. */
 export const SWIG_SECONDS = 11;
@@ -944,10 +968,24 @@ export function poseDrunk(
   //
   // No allocation: the candidates are two parallel scratch arrays, module-level,
   // because this runs for every drunk in the draw radius sixty times a second.
+  const count = venueDrunks(venue) || 1;
   let picked = 0;
   for (const band of bands) {
     const near = nearestOnBand(band, vx, vz);
     if (near.d2 > VENUE_BAND_RADIUS * VENUE_BAND_RADIUS) continue;
+    // A frontage without room to stand this venue's drinkers along is not a
+    // frontage for them. The test is the room **either side of the projection**
+    // rather than the band's total length, because the window below is centred
+    // on the pub: a long way whose far end is 300 m up the road is no use if the
+    // pub sits five metres from where it starts. See `DRUNK_MIN_GAP` -- without
+    // this the slots collapse onto the end of a stub of footpath and two men
+    // stand in each other, measured at 14 of 297 pairs, the closest 1 cm apart.
+    if (
+      Math.min(DRUNK_SPREAD, near.s) + Math.min(DRUNK_SPREAD, band.length - near.s) <
+      2 * count * DRUNK_MIN_GAP
+    ) {
+      continue;
+    }
     // Insertion sort into the top `FRONTAGE_CHOICES` by distance. The band index
     // is the tie-break, and the pool `anchorBands` returns is already in a total
     // order, so two processes rank identically.
@@ -969,7 +1007,16 @@ export function poseDrunk(
   }
   if (picked === 0) return false;
 
-  const chosen = h % picked;
+  // The frontage is the **venue's**, not the drunk's, and that is load-bearing
+  // rather than tidy. A corner hotel has a footpath on two streets and picking
+  // per-drunk put one of them round the corner from the other -- which reads
+  // fine and breaks the slot layout below, because two drunks on two different
+  // bands have no shared arc length to be spaced along and can land on the same
+  // half metre where the bands cross. Measured: 8 pairs standing inside a metre
+  // of each other, every one of them a corner. One frontage per venue makes the
+  // spacing a guarantee instead of a hope, and the variety survives across
+  // venues rather than inside one.
+  const chosen = carHash(seed, 0x5c1f) % picked;
   const band = frontBand[chosen]!;
   // --- Drift along the kerb from the projected point, **by slot**.
   //
@@ -980,13 +1027,31 @@ export function poseDrunk(
   // half of it, which leaves a guaranteed gap between neighbours and still looks
   // unplanned. Clamped to the band afterwards, and the clamp only ever brings
   // them *closer* to the projection -- so `DRUNK_REACH` still bounds it.
-  const count = venueDrunks(venue) || 1;
-  const slot = (2 * DRUNK_SPREAD) / count;
+  //
+  // The gap is what the renderer's `CLAIM_SNAP` is sized against: an actor is
+  // promoted standing exactly on its own ambient, so the claim is unambiguous
+  // only while no *other* ambient is within the snap.
+  //
+  // The window stays **centred on the pub** and shrinks to fit, which is the
+  // difference between a guarantee and a near miss -- and the two wrong answers
+  // either side of it are both worth naming. Clamping each drunk independently,
+  // which this did first, collapses every slot that overran the end onto the
+  // same endpoint and stands two men in the same half metre. Sliding the whole
+  // window inward instead keeps them apart but walks them up to twelve metres
+  // off the pub they are drinking outside, which cost eight points of "standing
+  // at their own pub" and is the thing the frontage fix existed to buy.
+  //
+  // So the window takes whatever room the band gives it on each side, up to
+  // `DRUNK_SPREAD`, and is **not** required to be symmetric: insisting on that
+  // orphaned every corner pub whose frontage begins at the corner, 25 venues
+  // against 10. The candidate filter above has already guaranteed the two sides
+  // add up to room for the whole party.
+  const centre = frontS[chosen];
+  const before = Math.min(DRUNK_SPREAD, centre);
+  const after = Math.min(DRUNK_SPREAD, band.length - centre);
+  const slot = (before + after) / count;
   const jitter = ((carHash(h, 0x9e17) % 4096) / 4096) * slot * 0.5;
-  const drift = -DRUNK_SPREAD + index * slot + slot * 0.25 + jitter;
-  let s = frontS[chosen] + drift;
-  if (s < 0) s = 0;
-  else if (s > band.length) s = band.length;
+  const s = centre - before + index * slot + slot * 0.25 + jitter;
   pointOnBand(band, band.length > 1e-6 ? s / band.length : 0, out);
 
   out.key = streetKey(NPC_KIND.DRUNK, venue, index);

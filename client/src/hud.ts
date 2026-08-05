@@ -133,6 +133,21 @@ export interface HudState {
   wildlife?: { ambient: number; actors: number; costMs: number };
   collisionBuildings: number;
   /**
+   * Invisible walls around the player: collision you are stopped by with nothing
+   * drawn where it is. See `world/invisible-walls.ts`.
+   *
+   * On the overlay because this is the one class of world defect a screenshot
+   * cannot contain. A player reports "there's a wall here" and the picture they
+   * send is a picture of an empty street -- correct, and useless. `tiles` is how
+   * many tiles are currently solid-and-undrawn, which is the streaming gap's own
+   * size and should be a small number that keeps returning to zero; a number
+   * that sits still while the player stands still is a tile that will never
+   * build. `structures` is the permanent class -- deck and viaduct volumes whose
+   * soffit is over your head and which `CollisionWorld.resolve` nonetheless
+   * treats as solid to the ground -- and that one does not go away.
+   */
+  phantom?: { tiles: number; walls: number; structures: number; worst: string };
+  /**
    * Where the ground is, and what that is in real elevation.
    *
    * World y is metres above the ground at the ENU origin, so most of the city
@@ -1020,7 +1035,16 @@ export class Hud {
         `${s.shadow.casting} casting, ${s.shadow.receiving} receiving`,
       `phys  ${s.collisionBuildings.toLocaleString()} prisms, ${s.ground.tiles} ground grids` +
         (s.ground.missing ? `, ${s.ground.missing} absent` : '') +
-        (s.ground.retrying ? `, ${s.ground.retrying} retrying` : ''),
+        (s.ground.retrying ? `, ${s.ground.retrying} retrying` : '') +
+        (s.phantom
+          ? `\n      invisible walls: ${s.phantom.tiles} tiles solid+undrawn ` +
+            // "seen" rather than a bare count, because it is cumulative: a
+            // structure is judged against the terrain once, the first time a map
+            // asks about it, and remembered. The live number on that line is the
+            // tile count beside it.
+            `(${s.phantom.walls.toLocaleString()} walls), ${s.phantom.structures} overhead structures seen` +
+            (s.phantom.tiles ? `, worst ${s.phantom.worst}` : '')
+          : ''),
       `fight ${s.combat.phase}  ${s.combat.health.toFixed(2)} pips, ${s.combat.stamina} stamina`,
       `      ${s.combat.dummies}`,
       `pwr   ${s.powerups.active}/${s.powerups.resident} up nearby, ${s.powerups.known} known` +

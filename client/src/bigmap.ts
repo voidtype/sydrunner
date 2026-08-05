@@ -102,7 +102,26 @@
 
 import type { CollisionWorld, Prism } from './player/collision.ts';
 import { markerInk } from './minimap.ts';
-import type { MarkerKind, MarkerSink } from './minimap.ts';
+import type { HazardSource, MarkerKind, MarkerSink } from './minimap.ts';
+import {
+  HAZARD_FILL,
+  HAZARD_INK,
+  hatchPattern,
+  type HazardKind,
+  type HazardTile,
+} from './world/invisible-walls.ts';
+
+/**
+ * Whoever knows which tiles are solid and undrawn, for the region hatch.
+ *
+ * Structural, like `MarkerCollector` above it and for the same reason -- this
+ * file imports no class it draws from. `HazardSource` is the per-prism half and
+ * comes from `minimap.ts` so the two maps ask the identical question.
+ */
+export interface HazardCollector {
+  readonly tileCount: number;
+  tileAt(i: number): HazardTile;
+}
 import {
   MapAtlas,
   longestStraight,
@@ -488,6 +507,22 @@ export class BigMap implements MarkerSink {
   private cullMaxX = 0;
   private cullMaxZ = 0;
 
+  /**
+   * The invisible-wall overlay's two halves, or null before `main.ts` says.
+   *
+   * `hazards` is per tile and is what the district and city zooms draw -- at
+   * 3 km and 9 km a footprint is under a pixel and the honest mark is the region.
+   * `hazardSource` is per prism and is what the neighbourhood zoom draws, where
+   * the footprints are on the map anyway and the useful statement is *which* of
+   * them is a lie.
+   */
+  private hazards: HazardCollector | null = null;
+  private hazardSource: HazardSource | null = null;
+  private readonly hatches = new Map<HazardKind, CanvasPattern | null>();
+  private readonly prismKinds: Array<HazardKind | null> = [];
+  private hazardCounts: Record<HazardKind, number> = { unbuilt: 0, structure: 0 };
+  private lastHazardTiles = 0;
+
   private rebuilds = 0;
   private lastRebuildMs = 0;
   private lastRoads = 0;
@@ -718,11 +753,155 @@ export class BigMap implements MarkerSink {
     // `dpr` times that, which is what the transform above is for.
     ctx.drawImage(this.layer, 0, 0, this.size, this.size);
 
+    // The invisible walls, in the live frame and deliberately not in the city
+    // layer above it.
+    //
+    // Everything in `renderCity` is a property of the *view* -- it is rebuilt on
+    // an open, a zoom, a re-anchor and an atlas delivery, and on nothing else,
+    // which at the closest zoom is about once every twenty-five seconds of
+    // running. A hazard is a property of the *moment*: a tile finishes its build
+    // and the mark has to go out, and if it went out on the layer's schedule a
+    // player would be looking at a warning about a street that has been standing
+    // there for twenty seconds. So it costs a couple of hundred path points a
+    // frame instead of nothing, and it is correct. See `world/invisible-walls.ts`.
+    this.drawHazards(ctx, view);
     this.drawMarkers(ctx, view);
     this.drawPlayer(ctx, view, px, pz, yaw);
     if (!this.atlas.complete) this.drawLoading(ctx);
 
     this.lastFrameMs = performance.now() - t0;
+  }
+
+  /**
+   * Where the invisible walls are. See `world/invisible-walls.ts`.
+   *
+   * The two setters are separate because the two halves come from different
+   * questions and either is useful alone -- a caller with only the tile
+   * residency still gets the region hatch at every zoom.
+   */
+  setHazards(hazards: HazardCollector, source: HazardSource): void {
+    this.hazards = hazards;
+    this.hazardSource = source;
+  }
+
+  private hatch(kind: HazardKind): CanvasPattern | null {
+    let pattern = this.hatches.get(kind);
+    if (pattern === undefined) {
+      pattern = hatchPattern(this.ctx, kind, this.dpr);
+      this.hatches.set(kind, pattern);
+    }
+    return pattern;
+  }
+
+  /**
+   * The hazard overlay: regions at every zoom, footprints at the closest one.
+   *
+   * The **region** is the tile, hatched and outlined, and it is drawn at every
+   * rung including the one that also draws footprints. That overlap is on
+   * purpose: at 1 km a 500 m tile is a quarter of the panel, so the region says
+   * "this whole block of the city is not there yet" while the footprints inside
+   * it say which walls that means. At 3 km and 9 km the region is the only thing
+   * that can be said at all.
+   *
+   * The **footprints** are the prisms, and they are only drawn where the zoom
+   * already draws footprints -- below that the collision ring covers a fifth of
+   * the view and a map with hazards marked in the middle and none at the edges
+   * would read as a city whose defects stop at 420 m. That is `drawBuildings`'
+   * own argument for why the footprints themselves stop there.
+   */
+  private drawHazards(ctx: CanvasRenderingContext2D, view: MapView): void {
+    this.hazardCounts.unbuilt = 0;
+    this.hazardCounts.structure = 0;
+    this.lastHazardTiles = 0;
+
+    const count = this.hazards?.tileCount ?? 0;
+    if (this.hazards !== null && count > 0) {
+      const half = ZOOMS[this.zoomIndex].halfM;
+      ctx.beginPath();
+      for (let t = 0; t < count; t++) {
+        const [minX, minZ, maxX, maxZ] = this.hazards.tileAt(t).bounds;
+        // The view box, with no margin: a rectangle wholly outside it cannot
+        // contribute a pixel, and unlike the road runs there is no long thin
+        // shape here whose ends are both out while its middle is in.
+        if (
+          maxX < this.centreX - half ||
+          minX > this.centreX + half ||
+          maxZ < this.centreZ - half ||
+          minZ > this.centreZ + half
+        ) {
+          continue;
+        }
+        const x0 = projectX(view, minX);
+        const y0 = projectY(view, minZ);
+        ctx.rect(x0, y0, projectX(view, maxX) - x0, projectY(view, maxZ) - y0);
+        this.lastHazardTiles++;
+      }
+      if (this.lastHazardTiles > 0) {
+        // The region always reads as the streaming gap, whatever is standing in
+        // it. A tile is unbuilt or it is not; the permanent class is a property
+        // of individual prisms and is drawn as those below.
+        ctx.fillStyle = HAZARD_FILL.unbuilt;
+        ctx.fill();
+        const hatch = this.hatch('unbuilt');
+        if (hatch !== null) {
+          ctx.fillStyle = hatch;
+          ctx.fill();
+        }
+        ctx.strokeStyle = HAZARD_INK.unbuilt;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+
+    if (!ZOOMS[this.zoomIndex].buildings || this.hazardSource === null) return;
+    // `drawBuildings` filled `this.prisms` on the last city rebuild, and reusing
+    // it here would mark whatever was resident then. The query is 0.01 ms and
+    // the answer has to be this frame's.
+    const half = ZOOMS[this.zoomIndex].halfM;
+    const prisms = this.collision.prismsWithin(
+      this.centreX,
+      this.centreZ,
+      half * Math.SQRT2,
+      this.prisms,
+    );
+    let marked = 0;
+    for (let i = 0; i < prisms.length; i++) {
+      const kind = this.hazardSource(prisms[i]);
+      this.prismKinds[i] = kind;
+      if (kind !== null) {
+        this.hazardCounts[kind]++;
+        marked++;
+      }
+    }
+    if (marked === 0) return;
+    for (const kind of ['unbuilt', 'structure'] as const) {
+      if (this.hazardCounts[kind] === 0) continue;
+      ctx.beginPath();
+      for (let i = 0; i < prisms.length; i++) {
+        if (this.prismKinds[i] !== kind) continue;
+        const pts = prisms[i].points;
+        if (pts.length < 6) continue;
+        ctx.moveTo(projectX(view, pts[0]), projectY(view, pts[1]));
+        for (let v = 2; v < pts.length; v += 2) {
+          ctx.lineTo(projectX(view, pts[v]), projectY(view, pts[v + 1]));
+        }
+        ctx.closePath();
+      }
+      ctx.fillStyle = HAZARD_FILL[kind];
+      ctx.fill();
+      const hatch = this.hatch(kind);
+      if (hatch !== null) {
+        ctx.fillStyle = hatch;
+        ctx.fill();
+      }
+      // Outlined as well as filled, unlike the minimap's. At 0.8 px/m a terrace
+      // is six pixels across and a 34% wash over it is nearly nothing; the
+      // outline is what makes a single marked footprint findable on an 800 px
+      // panel.
+      ctx.strokeStyle = HAZARD_INK[kind];
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
   }
 
   // --- The city layer -----------------------------------------------------------
@@ -1258,6 +1437,12 @@ export class BigMap implements MarkerSink {
     streetLabels: number;
     suburbLabels: number;
     markers: number;
+    /**
+     * The invisible-wall overlay's last frame: hazard tile regions drawn, and
+     * footprints marked by kind. See `minimap.stats().hazards` for why a
+     * feature whose absence looks exactly like it working needs a counter.
+     */
+    hazards: { tiles: number; unbuilt: number; structure: number };
     atlas: ReturnType<MapAtlas['stats']>;
   } {
     const round = (v: number): number => Math.round(v * 1000) / 1000;
@@ -1278,6 +1463,11 @@ export class BigMap implements MarkerSink {
       streetLabels: this.lastLabels,
       suburbLabels: this.lastSuburbLabels,
       markers: this.dotCount,
+      hazards: {
+        tiles: this.lastHazardTiles,
+        unbuilt: this.hazardCounts.unbuilt,
+        structure: this.hazardCounts.structure,
+      },
       atlas: this.atlas.stats(),
     };
   }

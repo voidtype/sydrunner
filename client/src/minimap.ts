@@ -183,6 +183,21 @@
  */
 
 import type { CollisionWorld, Prism } from './player/collision.ts';
+import {
+  HAZARD_FILL,
+  hatchPattern,
+  type HazardKind,
+} from './world/invisible-walls.ts';
+
+/**
+ * Whoever knows which prisms are solid-but-undrawn.
+ *
+ * Structural, like every other seam in this file, so the map does not import the
+ * detector's class and a test can hand it a function. Null until `main.ts`
+ * supplies one, and null is a working configuration -- it is the map this file
+ * drew before the overlay existed.
+ */
+export type HazardSource = (prism: Prism) => HazardKind | null;
 
 /**
  * What a marker can be.
@@ -432,6 +447,27 @@ export class Minimap implements MarkerSink {
   private waterSource: WaterSource | null = null;
   /** Reused across redraws, like `prisms`; grows to its high-water mark and stays. */
   private readonly waterPlans: Float32Array[] = [];
+  /** Which prisms are invisible walls, or null before `main.ts` says. */
+  private hazardSource: HazardSource | null = null;
+  /**
+   * One hatch per kind, built on first use and kept.
+   *
+   * Lazily rather than in the constructor because building one needs a second
+   * canvas and a `createPattern`, and the overwhelmingly common case is a map
+   * with no hazard on it at all -- a player standing in a built part of the city
+   * with no viaduct nearby, which is most of a session.
+   */
+  private readonly hatches = new Map<HazardKind, CanvasPattern | null>();
+  /** Footprints marked by the last redraw, by kind. See `stats`. */
+  private hazardCounts: Record<HazardKind, number> = { unbuilt: 0, structure: 0 };
+  /**
+   * The hazard verdict per prism of the current redraw, parallel to `prisms`.
+   *
+   * Held so the source is asked once per prism rather than once per kind: the
+   * fill is one path per kind and a naive version would run the query twice.
+   * Reused and grown to the high-water mark, like everything else on this class.
+   */
+  private readonly prismKinds: Array<HazardKind | null> = [];
 
   /** Where `mark` culls against, set at the top of each redraw. */
   private centreX = 0;
@@ -510,6 +546,41 @@ export class Minimap implements MarkerSink {
    */
   setWaterSource(source: WaterSource): void {
     this.waterSource = source;
+  }
+
+  /**
+   * Which footprints on this map are solid and undrawn. See
+   * `world/invisible-walls.ts`.
+   *
+   * A setter on `setWaterSource`'s terms and for the same reason: there is
+   * exactly one thing in this client that knows, and it is built after the map.
+   *
+   * The overlay is *over* the figure rather than instead of it, and that is the
+   * whole reading of it. The footprints are drawn from the collision prisms, so
+   * a building whose geometry has not arrived is already on this map -- the map
+   * knows about it, because the map is drawn from the thing that stops you. What
+   * the wash says is "and this one is not in the world yet", which is a
+   * statement about the *difference* between the map and the window, and it only
+   * means that if the shape is visibly still there underneath.
+   */
+  setHazardSource(source: HazardSource): void {
+    this.hazardSource = source;
+  }
+
+  /**
+   * The hatch for a kind, built once.
+   *
+   * `null` is cached as readily as a pattern: a context that would not make one
+   * will not make one on the next redraw either, and retrying at 15 Hz forever
+   * is the wrong answer to a headless canvas.
+   */
+  private hatch(kind: HazardKind): CanvasPattern | null {
+    let pattern = this.hatches.get(kind);
+    if (pattern === undefined) {
+      pattern = hatchPattern(this.ctx, kind, this.dpr);
+      this.hatches.set(kind, pattern);
+    }
+    return pattern;
   }
 
   /** `MarkerSink`. Culls to the map's radius so no provider has to. */
@@ -660,6 +731,62 @@ export class Minimap implements MarkerSink {
     ctx.fillStyle = BUILDING_FILL;
     ctx.fill();
 
+    // --- The invisible walls, washed over the figure that is already there.
+    //
+    // One path per kind and one fill each, which is the footprints' own argument
+    // taken as far as it goes: a per-footprint fill double-darkens every party
+    // wall, and a hazard region in a terrace row is exactly where that would show
+    // up worst. Two kinds means at most two fills, and the common case -- nothing
+    // marked -- costs one pass over an array of nulls and no fill at all.
+    this.hazardCounts.unbuilt = 0;
+    this.hazardCounts.structure = 0;
+    if (this.hazardSource !== null) {
+      let marked = 0;
+      for (let i = 0; i < prisms.length; i++) {
+        const kind = this.hazardSource(prisms[i]);
+        this.prismKinds[i] = kind;
+        if (kind !== null) {
+          this.hazardCounts[kind]++;
+          marked++;
+        }
+      }
+      if (marked > 0) {
+        // The permanent one on top, because where a viaduct stands in a tile
+        // that has not built yet both are true and the one that will still be
+        // true in a second is the one to show.
+        for (const kind of ['unbuilt', 'structure'] as const) {
+          if (this.hazardCounts[kind] === 0) continue;
+          ctx.save();
+          ctx.translate(half, half);
+          ctx.rotate(yaw);
+          ctx.scale(this.scale, this.scale);
+          ctx.beginPath();
+          for (let i = 0; i < prisms.length; i++) {
+            if (this.prismKinds[i] !== kind) continue;
+            const pts = prisms[i].points;
+            const n = pts.length;
+            if (n < 6) continue;
+            ctx.moveTo(pts[0] - px, pts[1] - pz);
+            for (let v = 2; v < n; v += 2) ctx.lineTo(pts[v] - px, pts[v + 1] - pz);
+            ctx.closePath();
+          }
+          // Out of the transform before filling, exactly as the figure above
+          // does it -- and here it is load-bearing twice over, because the hatch
+          // is a *pattern* and a pattern is transformed at fill time rather than
+          // per point. Filling inside the map transform would rotate the hatch
+          // with the world and scale it to metres.
+          ctx.restore();
+          ctx.fillStyle = HAZARD_FILL[kind];
+          ctx.fill();
+          const hatch = this.hatch(kind);
+          if (hatch !== null) {
+            ctx.fillStyle = hatch;
+            ctx.fill();
+          }
+        }
+      }
+    }
+
     // --- The markers. Pulled fresh every redraw: a powerup that respawned or a
     // dummy that moved is a provider's business and never this file's cache.
     this.centreX = px;
@@ -787,6 +914,16 @@ export class Minimap implements MarkerSink {
     vertices: number;
     markers: number;
     waterTriangles: number;
+    /**
+     * Footprints on the disc that are solid and undrawn, by kind.
+     *
+     * On the readout because this overlay is the one thing on either map whose
+     * *absence* is indistinguishable from it working: a map with no hazard on it
+     * looks exactly like a map whose hazard source was never wired up. A
+     * non-zero here after riding into cold city is what says the feature is
+     * live. See `world/invisible-walls.ts`.
+     */
+    hazards: { unbuilt: number; structure: number };
     lastMs: number;
     medianMs: number;
     p95Ms: number;
@@ -822,6 +959,7 @@ export class Minimap implements MarkerSink {
       // triangles than the whole rest of the map and it should be visible which
       // half a slow redraw came from.
       waterTriangles: this.waterTriangles,
+      hazards: { unbuilt: this.hazardCounts.unbuilt, structure: this.hazardCounts.structure },
       lastMs: round(this.lastMs),
       medianMs: n ? round(sorted[n >> 1]) : 0,
       p95Ms: n ? round(sorted[Math.min(n - 1, Math.floor(n * 0.95))]) : 0,

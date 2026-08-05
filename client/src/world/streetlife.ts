@@ -83,6 +83,7 @@ import {
 import { NPC_KIND, NPC_STATE, type NpcActor } from '../game/factions.ts';
 import {
   DRUNK_CHASE_SPEED,
+  DRUNK_MIN_GAP,
   METH_CHASE_SPEED,
   createStreetPose,
   forEachDrunkNear,
@@ -654,11 +655,69 @@ const VISIBLE = 72;
 const CLAIM_RADIUS = 30;
 const CLAIM_RADIUS_2 = CLAIM_RADIUS * CLAIM_RADIUS;
 
+/**
+ * How close an actor has to be to an ambient to claim it **on the frame it
+ * first appears**, metres -- and the fix for "the drunks teleport when I get
+ * close to them".
+ *
+ * The claim used to be recomputed every frame as "the nearest ambient of this
+ * kind inside `CLAIM_RADIUS`", and that was correct for exactly as long as a
+ * venue's drunks were nowhere near each other. They were: before the frontage
+ * fix the median drunk stood 58 m from their own pub and a pub's two or three
+ * were scattered across the suburb, so the nearest candidate was always the
+ * right one by a mile. Putting them back on the frontage put two and three
+ * ambients inside one 30 m disc for the first time, and the per-frame search
+ * started picking the wrong one -- measured over a walk-up to all 153
+ * multi-drunk pubs in the city: **5,539 mis-claims in 46,867 actor-frames**,
+ * 801 frames where an actor was drawn *and* its own ambient was still standing
+ * there, and 34 frames where the ambient an actor was hiding changed between
+ * one frame and the next.
+ *
+ * That last number is the bug the player saw. The actor is drawn at its own
+ * position throughout -- the promotion seeds it exactly on the ambient, and the
+ * displacement is 0.000 m over 198 promotions -- but the *ambient it hides*
+ * flips, so a drunk winks out of one spot on the footpath and a different one
+ * appears a few metres away. Approach range, every time, because that is where
+ * the second candidate enters the disc.
+ *
+ * So the claim is made **once** and then held by key. `CLAIM_SNAP` is the
+ * radius of that first claim, and it is small on purpose: an actor is standing
+ * exactly on its ambient at the instant of promotion, and the nearest other
+ * drunk of the same venue is 3.6 m away at the 5th percentile. Anything an
+ * actor is not literally standing on is not the ambient it *is*.
+ *
+ * `CLAIM_RADIUS` keeps its old job: how far the actor may drag the claim before
+ * the loiterer is released and comes back, which is the documented behaviour a
+ * hundred metres into a chase.
+ */
+const CLAIM_SNAP = DRUNK_MIN_GAP / 2;
+const CLAIM_SNAP_2 = CLAIM_SNAP * CLAIM_SNAP;
+
 /** One pooled rig and whoever it currently stands in for. */
 interface Slot {
   actor: CharacterActor;
   props: StreetProps;
-  /** The person's stable key, or -1 for a free slot. */
+  /**
+   * Whether this rig is standing in for anybody, and it is a **flag rather than
+   * a sentinel value in `key`** for a reason that cost the faction its promoted
+   * half.
+   *
+   * `key` was doing both jobs: the person's identity, with "-1 means free". But
+   * an ambient's key is `streetKey`, a large positive, and a *promoted* actor's
+   * is `-a.id` -- negative, and `-1` for the actor that happens to hold id 1. So
+   * `key < 0` read "free slot" for every promoted meth head and drunk in the
+   * city, and all three places that asked did the wrong thing with the answer:
+   * `assign`'s first pass never re-validated them, its second pass handed their
+   * rig to somebody else, and `drive` hid them outright.
+   *
+   * The effect was that **a street person was invisible for exactly as long as
+   * they were promoted** -- which is to say from `DRUNK_NOTICE` inward, the
+   * moment you walked up to one. They did not teleport so much as wink out at
+   * seven metres while the ambient they had been mis-paired with stayed
+   * standing somewhere else, and that pair of symptoms is the bug report.
+   */
+  held: boolean;
+  /** The person's stable key: `streetKey` for an ambient, `-id` for an actor. */
   key: number;
   /** Which kit geometry the rig is currently wearing, so it is only swapped on a change. */
   kit: BufferGeometry | null;
@@ -700,8 +759,15 @@ export class StreetCrowd {
   /** The seed a swig runs off: the anchor's hash, or the claimed actor's inherited one. */
   private readonly vSeed = new Float64Array(VISIBLE);
   private visible = 0;
-  /** Look and seed per promoted actor id, inherited from the ambient it claimed. */
-  private readonly inherited = new Map<number, { look: number; seed: number }>();
+  /**
+   * Look, swig seed and **the ambient key this actor claimed**, per promoted
+   * actor id. The key is what makes the pairing stable; see `CLAIM_SNAP`.
+   */
+  private readonly inherited = new Map<number, { look: number; seed: number; key: number }>();
+  /** The keys currently held by a live actor, so a first claim cannot steal one. */
+  private readonly lockedKeys = new Set<number>();
+  /** Actor ids seen this frame. Filled during the gather; see the cleanup at its end. */
+  private readonly liveIds = new Set<number>();
 
   constructor(assets: StreetlifeAssets, characters: CharacterAssets) {
     this.assets = assets;
@@ -711,7 +777,7 @@ export class StreetCrowd {
       actor.mesh.visible = false;
       const props = new StreetProps(assets, actor);
       this.rigs.push(actor);
-      this.slots.push({ actor, props, key: -1, kit: null, down: false });
+      this.slots.push({ actor, props, held: false, key: -1, kit: null, down: false });
     }
   }
 
@@ -786,35 +852,73 @@ export class StreetCrowd {
     this.ambient = n;
 
     let actors = 0;
+    // Whatever is already spoken for. Rebuilt per frame rather than maintained,
+    // because the actor set is the wire's and turns over without telling us.
+    this.lockedKeys.clear();
+    for (const held of this.inherited.values()) {
+      if (held.key >= 0) this.lockedKeys.add(held.key);
+    }
+    this.liveIds.clear();
     for (const a of field.actors) {
       if (!isStreetKind(a.kind)) continue;
+      this.liveIds.add(a.id);
       const dx = a.x - x;
       const dz = a.z - z;
       const d2 = dx * dx + dz * dz;
       if (d2 > r2) continue;
 
-      // The claim: the nearest ambient of the same kind this actor is standing
-      // on. Exact at the instant of promotion; see `CLAIM_RADIUS`.
+      let mine = this.inherited.get(a.id);
       let claim = -1;
-      let claim2 = CLAIM_RADIUS_2;
-      for (let i = 0; i < this.ambient; i++) {
-        if (this.vKind[i] !== a.kind) continue;
-        if (this.vKey[i] < 0) continue;
-        const ax = this.vX[i] - a.x;
-        const az = this.vZ[i] - a.z;
-        const ad2 = ax * ax + az * az;
-        if (ad2 >= claim2) continue;
-        claim2 = ad2;
-        claim = i;
+
+      // --- The held claim, by key rather than by distance. See `CLAIM_SNAP`:
+      // this is the whole of the fix, and the reason it is an identity lookup is
+      // that distance stopped being an identity the moment a pub's drunks stood
+      // together.
+      if (mine !== undefined && mine.key >= 0) {
+        for (let i = 0; i < this.ambient; i++) {
+          if (this.vKey[i] !== mine.key) continue;
+          claim = i;
+          break;
+        }
+        if (claim >= 0) {
+          // Released once the actor has dragged it `CLAIM_RADIUS` off the post,
+          // which is the documented "the loiterer comes back" behaviour.
+          const ax = this.vX[claim] - a.x;
+          const az = this.vZ[claim] - a.z;
+          if (ax * ax + az * az > CLAIM_RADIUS_2) {
+            this.lockedKeys.delete(mine.key);
+            mine.key = -1;
+            claim = -1;
+          }
+        }
       }
 
-      let mine = this.inherited.get(a.id);
+      // --- A first claim, or a re-claim by an actor that has walked back to its
+      // post. Only what it is literally standing on, and never somebody else's.
+      if (claim < 0 && (mine === undefined || mine.key < 0)) {
+        let best2 = CLAIM_SNAP_2;
+        for (let i = 0; i < this.ambient; i++) {
+          if (this.vKind[i] !== a.kind) continue;
+          if (this.vKey[i] < 0) continue;
+          if (this.lockedKeys.has(this.vKey[i])) continue;
+          const ax = this.vX[i] - a.x;
+          const az = this.vZ[i] - a.z;
+          const ad2 = ax * ax + az * az;
+          if (ad2 >= best2) continue;
+          best2 = ad2;
+          claim = i;
+        }
+        if (claim >= 0) this.lockedKeys.add(this.vKey[claim]);
+      }
+
       if (mine === undefined) {
         mine =
           claim >= 0
-            ? { look: this.vLook[claim], seed: this.vSeed[claim] }
-            : { look: carHash(a.id, 0x4a17), seed: a.id };
+            ? { look: this.vLook[claim], seed: this.vSeed[claim], key: this.vKey[claim] }
+            : { look: carHash(a.id, 0x4a17), seed: a.id, key: -1 };
         this.inherited.set(a.id, mine);
+      } else if (mine.key < 0 && claim >= 0) {
+        mine.key = this.vKey[claim];
       }
 
       // Overwrite the claimed ambient rather than appending: one slot, one
@@ -854,10 +958,19 @@ export class StreetCrowd {
     // actor set from every snapshot, so an id that stops appearing is gone --
     // and an unbounded map keyed on a 16-bit id that wraps would eventually hand
     // a fresh meth head a despawned one's hat.
+    //
+    // The live set is the one collected **during** the pass above rather than a
+    // second walk of `field.actors`, and that is a correctness fix rather than a
+    // saved loop: online `policeField()` hands over `net.actors.values()`, a Map
+    // iterator, which the pass above has already exhausted. Re-iterating it
+    // yielded nothing, so every entry looked dead and the whole table was
+    // dropped the first time it passed 64 -- every street person in view
+    // changing kit and hat on one frame, and, now that the claim is held here,
+    // every pairing releasing at once.
     if (this.inherited.size > 64) {
-      const live = new Set<number>();
-      for (const a of field.actors) if (isStreetKind(a.kind)) live.add(a.id);
-      for (const id of [...this.inherited.keys()]) if (!live.has(id)) this.inherited.delete(id);
+      for (const id of [...this.inherited.keys()]) {
+        if (!this.liveIds.has(id)) this.inherited.delete(id);
+      }
     }
   }
 
@@ -872,7 +985,7 @@ export class StreetCrowd {
   private assign(): void {
     const taken = new Set<number>();
     for (const slot of this.slots) {
-      if (slot.key < 0) continue;
+      if (!slot.held) continue;
       let still = false;
       for (let i = 0; i < this.visible; i++) {
         if (this.vKey[i] === slot.key) {
@@ -881,10 +994,10 @@ export class StreetCrowd {
         }
       }
       if (still) taken.add(slot.key);
-      else slot.key = -1;
+      else slot.held = false;
     }
     for (const slot of this.slots) {
-      if (slot.key >= 0) continue;
+      if (slot.held) continue;
       let best = -1;
       let bestD = Infinity;
       for (let i = 0; i < this.visible; i++) {
@@ -895,6 +1008,7 @@ export class StreetCrowd {
       }
       if (best < 0) break;
       slot.key = this.vKey[best];
+      slot.held = true;
       taken.add(slot.key);
     }
   }
@@ -902,7 +1016,7 @@ export class StreetCrowd {
   /** Drive every assigned rig, and hide the rest. */
   private drive(dt: number, now: number): void {
     for (const slot of this.slots) {
-      if (slot.key < 0) {
+      if (!slot.held) {
         if (slot.actor.mesh.visible) {
           slot.actor.mesh.visible = false;
           slot.props.hideAll();

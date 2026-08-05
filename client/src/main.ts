@@ -234,6 +234,7 @@ import { Hud, verifyHud } from './hud.ts';
 import { Minimap } from './minimap.ts';
 import { MapAtlas } from './mapatlas.ts';
 import { BigMap, verifyBigMap } from './bigmap.ts';
+import { InvisibleWalls, verifyInvisibleWalls } from './world/invisible-walls.ts';
 
 const SIMULATION_HZ = 60;
 const FIXED_DT = 1 / SIMULATION_HZ;
@@ -500,6 +501,20 @@ async function main(): Promise<void> {
   // is handed in so the check cannot drift from the bar's actual length. See
   // `hud.verifyHud`.
   const hudFailures = timed('hud', () => verifyHud(BALL_CHARGES));
+  // And the invisible-wall overlay, which earns a check on the same criterion
+  // the HUD's does: every way it breaks draws something plausible. The cell
+  // arithmetic is floored off a tile's minimum corner and the whole build is
+  // south and west of the origin, so a scheme only ever tried at (0, 0) is off
+  // by one over the entire map and marks the tile next door. The structural
+  // split is *positional* -- the first `total - b` records of a collision
+  // payload -- so an off-by-one calls a terrace a viaduct and an inverted
+  // comparison marks every building in the city. The residency test has to
+  // require collision as well as missing geometry, or the overlay lights up
+  // every tile the streamer has not reached, which is most of the visible city
+  // at all times. And it has to *clear* when a build lands, because an overlay
+  // that never goes out trains the player to ignore it. See
+  // `world/invisible-walls.ts`.
+  const wallFailures = timed('invisible-walls', () => verifyInvisibleWalls());
   // Once, at `debug` so it is out of the way, and slowest-first because the only
   // question anyone asks of this line is which one it was.
   checkMs.sort((a, b) => b[1] - a[1]);
@@ -536,7 +551,8 @@ async function main(): Promise<void> {
     wildlifeFailures.length ||
     nameplateFailures.length ||
     guardFailures.length ||
-    hudFailures.length
+    hudFailures.length ||
+    wallFailures.length
   ) {
     hud.fatal(
       'Self-checks failed:\n' +
@@ -570,6 +586,7 @@ async function main(): Promise<void> {
           ...nameplateFailures,
           ...guardFailures,
           ...hudFailures,
+          ...wallFailures,
         ]
           .map((f) => '  - ' + f)
           .join('\n'),
@@ -1521,6 +1538,12 @@ async function main(): Promise<void> {
             await resp.arrayBuffer(),
             entry.bounds[0],
             entry.bounds[1] + index.tile_size,
+            // The index's own building count, which is what separates the
+            // buildings in this payload from the deck, viaduct and landmark
+            // volumes written ahead of them. Nothing in the collision answers
+            // reads the distinction; `world/invisible-walls.ts` does. See
+            // `CollisionWorld.addTile`.
+            entry.b,
           );
         }
       } catch {
@@ -2328,6 +2351,31 @@ async function main(): Promise<void> {
   // carrying either way -- see `minimap.setWaterSource`.
   minimap.setWaterSource((x, z, radius, out) => streamer.waterPlansNear(x, z, radius, out));
 
+  // --- The invisible walls, on both maps.
+  //
+  // The city arrives as two files per tile that are three orders of magnitude
+  // apart: a 9 kB collision payload this file fetches on `COLLISION_RADIUS`, and
+  // a 1.6 MB GLB that goes through the streamer's fetch, worker decode and
+  // budgeted build. Between the two the prisms of a tile are solid and there is
+  // nothing drawn where they are -- which at the tuned e-bike's 39 m/s is a
+  // wall you ride into in a street that is not there yet. And a second class
+  // never resolves at all: `tiles.write_collision` writes every deck, viaduct
+  // and landmark volume with its `base` at the *soffit*, and
+  // `CollisionWorld.resolve` tests only `top`, so the Cahill Expressway is solid
+  // from the ground up. See `world/invisible-walls.ts` for both and for the
+  // measurements.
+  //
+  // The ground sampler is `rawGroundAt` and deliberately **not**
+  // `groundHeightAt`, for both of the reasons that function is written down
+  // beside `bikeGround`. It folds in `collision.roofHeight`, so asking it under
+  // a viaduct returns the viaduct's own deck and every structure in the city
+  // would report a soffit clearance of zero -- and it *writes* `lastGround`, so
+  // a query about a prism 400 m away would move the player's own fallback
+  // height. `rawGroundAt` answers `NO_GROUND` for a tile whose terrain has not
+  // arrived, which the detector treats as "do not decide yet".
+  const invisibleWalls = new InvisibleWalls(index, collision, streamer, rawGroundAt);
+  minimap.setHazardSource((prism) => invisibleWalls.prismHazard(prism));
+
   // Spec 8.3's live points. `active` only, which is the whole information the
   // map carries about them -- a cafe you have just taken should leave the map
   // the instant it leaves the world, or the player runs back to a dot that is
@@ -2418,6 +2466,11 @@ async function main(): Promise<void> {
     collision,
     minimap,
   );
+  // And the same two halves of the invisible-wall overlay the compass got, so
+  // the two maps cannot disagree about which walls are real. The big map takes
+  // the tile regions as well: at 3 km and 9 km a footprint is under a pixel and
+  // the region is the only thing that can be drawn at all.
+  bigmap.setHazards(invisibleWalls, (prism) => invisibleWalls.prismHazard(prism));
 
   const keys = new Set<string>();
   let locked = false;
@@ -3978,6 +4031,12 @@ async function main(): Promise<void> {
     // the body on the fixed step, which is also what `applyToCamera` above
     // reads -- so taking the body's is what keeps the map turning in lockstep
     // with the view instead of a fraction of a step ahead of it.
+    // Which tiles are solid and undrawn, before either map is redrawn on this
+    // frame -- so the wash a player is looking at is this frame's residency
+    // rather than the previous one's. It runs on its own 10 Hz clock inside; the
+    // frame delta is what drives it, like the maps below.
+    invisibleWalls.update(frameDt, player.position.x, player.position.z);
+
     minimap.update(frameDt, player.position.x, player.position.z, player.yaw);
 
     // And the big map, which costs one comparison on every frame it is closed --
@@ -4594,6 +4653,16 @@ async function main(): Promise<void> {
           costMs: flock.costMs,
         },
         collisionBuildings: collision.buildingCount,
+        // The invisible walls. `tiles` returning to zero as the player stands
+        // still is the streaming gap closing; a `tiles` that does not move is a
+        // tile that will never build, and `worst` names it. See
+        // `world/invisible-walls.ts`.
+        phantom: {
+          tiles: invisibleWalls.tileCount,
+          walls: invisibleWalls.wallCount,
+          structures: invisibleWalls.structureCount,
+          worst: invisibleWalls.stats().worst,
+        },
         ground: {
           height: lastGround,
           datumAhd: streamer.terrain.datum_ahd,
@@ -4877,6 +4946,18 @@ async function main(): Promise<void> {
     bigmap,
     mapAtlas,
     bigmapSelfChecks: () => verifyBigMap(),
+
+    /**
+     * The invisible-wall overlay, on both maps.
+     *
+     * `stats()` is the one readout that says whether the streaming gap is open
+     * right now and how wide; `selfChecks` re-runs the arithmetic a console
+     * session can call after riding somewhere cold. See
+     * `world/invisible-walls.ts`.
+     */
+    invisibleWalls,
+    invisibleWallStats: () => invisibleWalls.stats(),
+    invisibleWallSelfChecks: () => verifyInvisibleWalls(),
 
     /**
      * The street/suburb readout under the map.

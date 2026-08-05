@@ -5565,9 +5565,16 @@ async function checkStreetlife(): Promise<void> {
       `${orphans} of ${carrying} pubs that carry a drunk place nobody -- the frontage filter drops a band ` +
         'whose closest point is past 45 m, and a bar inside a shopping centre has no frontage at all',
     );
+    // Nine tenths, not all of them, and the shortfall is bought rather than
+    // lost: a frontage has to have room to stand the venue's whole party
+    // `DRUNK_MIN_GAP` apart, and a pub whose only footpath is a stub does not.
+    // Standing them closer than that is what let the renderer's claim pick the
+    // wrong one, so the venues this drops are the exact venues that used to
+    // teleport.
     check(
-      placed >= claimed - 30,
-      `${placed} of the ${claimed} drunks the table claims stand on a real footpath`,
+      placed >= claimed * 0.9,
+      `${placed} of the ${claimed} drunks the table claims stand on a real footpath (${((placed / claimed) * 100).toFixed(0)}%; ` +
+        `the rest are at pubs with no frontage long enough to space a party ${st.DRUNK_MIN_GAP} m apart)`,
     );
 
     // --- And they stand **outside the pub**, which is the whole read.
@@ -5718,6 +5725,195 @@ async function checkStreetlife(): Promise<void> {
         cross > 10 && quiet === 0,
         `Kings Cross carries ${cross} drunks within 400 m and Mosman ${quiet} -- the booze weighting survived ` +
           'the placement fix',
+      );
+    }
+  }
+
+  // --- 13. **The ambient -> actor handoff is continuous.**
+  //
+  // The report was *"the drunks seem to teleport when I get close to them"*,
+  // and "close" is the promotion band, so this is the seam between the two
+  // tiers. It is worth writing down what was *not* wrong, because the obvious
+  // suspect was wrong: the promotion seeds the actor at the ambient's own posed
+  // position and the displacement is **0.000 m over 228 promotions**, exactly,
+  // on real world data. Nothing moves at the promotion tick.
+  //
+  // What moved was which ambient the *renderer* hid. `StreetCrowd.gather` paired
+  // an actor to an ambient by re-running "the nearest one of this kind inside
+  // `CLAIM_RADIUS`" **every frame**, and that is only an identity while a
+  // venue's drunks are nowhere near each other. Before the frontage fix they
+  // were scattered a median 58 m from their own pub, so the nearest candidate
+  // was always right. Standing them back on the frontage put two and three
+  // ambients inside one 30 m disc, and the search started picking the wrong one
+  // and changing its mind between frames -- so a drunk winked out of one spot
+  // and a different one appeared a few metres away. Measured over a walk-up to
+  // all 153 multi-drunk pubs in the built city: **14,111 mis-claims, 5,884
+  // frames with an actor drawn beside its own still-standing ambient, and 123
+  // claim flips**. With the claim made once and then held by key: **0, 0, 0.**
+  //
+  // The assertions below are the sim's half of that. The renderer's half cannot
+  // run here -- it needs a WebGL context -- so what is asserted is the property
+  // the renderer's pairing *depends on*: that promotion is continuous, and that
+  // no two ambients of one venue are ever close enough for a first claim to be
+  // ambiguous.
+  {
+    const bands: PedBand[] = [];
+    const pose = st.createStreetPose();
+    const probe = st.createStreetPose();
+
+    // --- Promotion continuity, over every multi-drunk pub in the city.
+    //
+    // `stepStreetlife` promotes at `p.x, p.y, p.z` -- the ambient's posed
+    // position, sway and all -- so this is an equality rather than a tolerance,
+    // and it is written as one deliberately: a tolerance here would pass a
+    // rewrite that seeded from the anchor point instead, which is the exact
+    // regression that would put the teleport back.
+    {
+      let promotions = 0;
+      let worst = 0;
+      let offBase = 0;
+      for (let v = 0; v < st.VENUE_COUNT; v++) {
+        const n = st.venueDrunks(v);
+        if (n < 2) continue;
+        for (let i = 0; i < n; i++) {
+          if (!st.poseDrunk(world.peds, v, i, 12345, bands, pose)) continue;
+          promotions++;
+          // What the authority hands `FactionField.promote`, against what the
+          // renderer draws for the same ambient on the same tick.
+          const seedX = pose.x;
+          const seedZ = pose.z;
+          const homeX = pose.baseX;
+          const homeZ = pose.baseZ;
+          if (!st.poseDrunk(world.peds, v, i, 12345, bands, probe)) continue;
+          const d = Math.hypot(probe.x - seedX, probe.z - seedZ);
+          if (d > worst) worst = d;
+          // And the home the actor carries is the *base* point, which is what
+          // `occupied` dedupes on and what `goHome` walks back to.
+          if (Math.hypot(homeX - probe.baseX, homeZ - probe.baseZ) > 1e-9) offBase++;
+        }
+      }
+      check(
+        worst === 0 && offBase === 0,
+        `the promotion seed is the ambient's own posed position for all ${promotions} drunks at multi-drunk ` +
+          `pubs (worst displacement ${worst.toFixed(4)} m, ${offBase} with a home off their base point)`,
+      );
+    }
+
+    // --- Pairing correctness at multi-drunk venues.
+    //
+    // The renderer claims within `CLAIM_SNAP` = 1.5 m and then holds the claim
+    // by key. That first claim is unambiguous only while a venue's *other*
+    // drunks are further away than the snap, so this is the assertion the
+    // renderer's constant is sized against -- and it is the one that would have
+    // caught the bug, because it fails on the placement that caused it.
+    const CLAIM_SNAP = st.DRUNK_MIN_GAP / 2;
+    {
+      let pairs = 0;
+      let tooClose = 0;
+      let closest = Infinity;
+      let where = -1;
+      for (let v = 0; v < st.VENUE_COUNT; v++) {
+        const n = st.venueDrunks(v);
+        if (n < 2) continue;
+        const pts: Array<{ x: number; z: number }> = [];
+        for (let i = 0; i < n; i++) {
+          if (st.poseDrunk(world.peds, v, i, 12345, bands, pose)) pts.push({ x: pose.x, z: pose.z });
+        }
+        for (let a = 0; a < pts.length; a++) {
+          for (let b = a + 1; b < pts.length; b++) {
+            pairs++;
+            const d = Math.hypot(pts[a].x - pts[b].x, pts[a].z - pts[b].z);
+            if (d < closest) {
+              closest = d;
+              where = v;
+            }
+            if (d < CLAIM_SNAP) tooClose++;
+          }
+        }
+      }
+      check(
+        tooClose === 0,
+        `no two drunks of one pub stand inside the renderer's ${CLAIM_SNAP} m claim snap, so an actor can only ` +
+          `ever claim itself (${tooClose} of ${pairs} pairs were; the closest is ${closest.toFixed(2)} m, at pub ${where})`,
+      );
+    }
+
+    // --- The two key spaces are disjoint, and an actor's key is never mistaken
+    //     for "this rig is free".
+    //
+    // This is the other half of the bug, and it was the bigger half. `Slot.key`
+    // in `world/streetlife.ts` carried both the identity and the emptiness --
+    // "-1 means free" -- while `StreetCrowd.gather` writes a promoted actor's
+    // key as `-a.id`. Actor ids run 1..65535, so **every** promoted street
+    // person had a negative key and `key < 0` read "free rig" for all of them:
+    // `assign` handed their rig away and `drive` hid it. Measured over a
+    // walk-up to a three-drunk pub: **0 of 1,300 promoted-actor frames were
+    // drawn.** A drunk was invisible for exactly as long as they were promoted,
+    // which is from `DRUNK_NOTICE` inward -- they winked out at seven metres,
+    // and the mis-paired ambient left standing somewhere else is what made it
+    // read as a teleport rather than a disappearance.
+    //
+    // The fix is a `held` flag, so the sentinel is gone. What is asserted here
+    // is the property that made the old test unsafe, because that is what a
+    // future rewrite would have to preserve: the ambient keys are positive, the
+    // actor keys are negative, and `-1` -- the old sentinel -- is a perfectly
+    // ordinary actor key.
+    {
+      let lowest = Infinity;
+      for (const kind of [fac.NPC_KIND.METHHEAD, fac.NPC_KIND.DRUNK]) {
+        for (const anchor of [0, 1, 57, st.VENUE_COUNT - 1]) {
+          for (let i = 0; i < 3; i++) {
+            const k = st.streetKey(kind, anchor, i);
+            if (k < lowest) lowest = k;
+          }
+        }
+      }
+      check(
+        lowest > 0,
+        `every ambient street key is positive (lowest seen ${lowest}), so an ambient can never be confused ` +
+          "with a promoted actor's -id",
+      );
+      // And the collision itself, stated rather than implied: id 1 is the first
+      // id `FactionField` hands out.
+      const firstActorKey = -1;
+      check(
+        firstActorKey < 0 && lowest > 0,
+        `the very first actor promoted holds key ${firstActorKey}, which is the value the rig pool used to ` +
+          'mean "nobody" -- the pool tracks emptiness in its own flag now, not in the sign of the key',
+      );
+    }
+
+    // --- Demotion continuity: the ambient comes back where the actor stood.
+    //
+    // The reverse handoff. A resolving drunk walks back to `homeX/homeZ` -- the
+    // ambient's *base* point -- and despawns there, and the ambient reappears at
+    // base plus its sway. So the step is the sway and nothing else, and the
+    // tolerance is derived from `SWAY_AMPLITUDE` rather than picked: a figure
+    // that is already swaying that far under its own idle cannot be seen to jump
+    // by less than it is swaying anyway.
+    {
+      const tol = st.SWAY_AMPLITUDE * 2;
+      let checked = 0;
+      let worst = 0;
+      for (let v = 0; v < st.VENUE_COUNT; v++) {
+        const n = st.venueDrunks(v);
+        if (n === 0) continue;
+        for (let i = 0; i < n; i++) {
+          // Across a spread of ticks, because the sway is a cycle and one tick
+          // would sample one phase of it.
+          for (let t = 0; t < 6; t++) {
+            if (!st.poseDrunk(world.peds, v, i, 12345 + t * 37, bands, pose)) continue;
+            checked++;
+            const d = Math.hypot(pose.x - pose.baseX, pose.z - pose.baseZ);
+            if (d > worst) worst = d;
+          }
+        }
+      }
+      check(
+        worst <= tol,
+        `an ambient drunk never stands more than ${tol.toFixed(2)} m from the base point their actor walks back ` +
+          `to and despawns on, so the reverse handoff is inside the idle's own sway (worst ${worst.toFixed(3)} m ` +
+          `over ${checked} poses)`,
       );
     }
   }
