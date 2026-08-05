@@ -1,0 +1,234 @@
+/**
+ * The chat hub: who may say what, and everybody who hears it.
+ *
+ * The wire is `client/src/net/chat.ts` and the rules of admission are there too,
+ * as pure functions on a synthetic clock, so this file is only the two things
+ * that need a server: the **fan-out**, and the **attribution**.
+ *
+ * ---------------------------------------------------------------------------
+ * ## THE FAN-OUT: every room, which is the whole feature
+ *
+ * `server/room.ts` is built on a rule this deliberately breaks. A `Room` is one
+ * `Simulation` and the sockets watching it, and every send in that file walks
+ * `this.conns` -- the roster, the bikes, the events, the snapshots. Nothing
+ * crosses, and `checkRooms` asserts it over real sockets because "one simulation
+ * per room" is only half of isolation.
+ *
+ * Chat crosses. The user asked for chat "global to the server", and a chat that
+ * stopped at the room boundary would be indistinguishable from one that worked
+ * right up until the gateway put two friends in different rooms -- which is the
+ * *normal* case under the least-full rule, and the exact failure that rule's own
+ * `?room=` invite link exists to work around. So this walks the `RoomHost`:
+ * every room, every socket with a participant behind it, one encode and N sends.
+ *
+ * What that costs, against the arithmetic in `net/chat.ts`'s header: a line is
+ * about 60 bytes and a sender is capped below one message per 1.5 s. Ten chatty
+ * players on a 1,000-player host is 3.2 kbit/s per client -- a tenth of one
+ * client's own snapshot stream, and a fifth of what the roster refresh already
+ * costs a full room. It is bounded by *talkers* rather than by population, which
+ * is why it can be global at all when nothing else here is.
+ *
+ * The frame is encoded **once per line** and the same `ArrayBuffer` is handed to
+ * every socket, on `Room.sendRoster`'s own pattern. Bun copies into the socket's
+ * buffer synchronously, so there is no aliasing hazard and no reason to slice.
+ *
+ * ---------------------------------------------------------------------------
+ * ## THE LIMITATION, stated where the seam is
+ *
+ * **Chat crosses rooms. It does not cross processes.**
+ *
+ * `SYDNEY_ROOM_BASE` in `server/index.ts` is the multi-process seam: four hosts
+ * on four ports with bases 0, 8, 16 and 24 present 32 globally-unique rooms, and
+ * "nothing in this process knows the other hosts exist" is that design's stated
+ * property. It is also exactly what bounds this: `broadcast` reaches every room
+ * on *this* `RoomHost`, so a 32-room deployment has four chat worlds of eight
+ * rooms each, and a player in room 3 cannot hear one in room 19.
+ *
+ * That is a real limitation and it is not papered over. Closing it needs a
+ * message bus between the hosts -- Redis pub/sub, or one host nominated as the
+ * relay -- which is a piece of deployment infrastructure this build does not
+ * have and which would be the first thing in the repo that could not be run by
+ * typing `bun run server/index.ts`. The seam it would attach to is
+ * `ChatHub.broadcast` below, and the change is one call: publish the encoded
+ * frame, and deliver locally on receipt. Single-process global chat is the
+ * honest scope, and the one deployment that exists today (one host, N rooms) is
+ * entirely covered by it.
+ *
+ * ---------------------------------------------------------------------------
+ * ## THE ATTRIBUTION: never the client's word
+ *
+ * `CHAT_SAY` carries a string and nothing else -- no sender field, no name, no
+ * room. The sender is the socket the frame arrived on, the name is read off that
+ * socket's `Participant` (which is what the *roster* is built from, so the name
+ * over a message is the name on the leaderboard by construction), and the room
+ * is `Conn.room`. A client cannot claim to be anybody, because there is no field
+ * in which to claim it.
+ *
+ * Bots never reach this file at all: a bot is a `Participant` with no socket, so
+ * there is nothing to receive a `CHAT_SAY` from. Stated because it is a design
+ * property rather than a check -- `server/bots.ts` has no chat in it and cannot
+ * grow one without a socket.
+ *
+ * **No profanity filter**, deliberately and out of scope. Word lists are a
+ * cross-cultural taste problem with a false-positive rate that hits place names
+ * ("Scunthorpe" is the canonical one and this is a game set in a real city), and
+ * a filter nobody can tune is worse than none. The floor here is *volume* --
+ * length, rate, repetition -- which is what stops a chat being unusable. What is
+ * said in it is a moderation problem and moderation needs identity, which spec 12
+ * explicitly does not have.
+ */
+
+import {
+  CHAT_FLAG,
+  CHAT_ROOM_NONE,
+  chatAdmit,
+  chatShouldNotify,
+  decodeChatSay,
+  encodeChatLine,
+  newChatGate,
+  sanitiseChat,
+  type ChatGate,
+  type ChatLine,
+} from '../client/src/net/chat.ts';
+import type { RoomHost, Socket } from './room.ts';
+
+/** What the sender is told when the bucket is empty. */
+const RATE_NOTICE = 'you are talking too fast — wait a moment';
+/** And when they have said the same thing three times running. */
+const REPEAT_NOTICE = 'you have said that three times — say something else';
+
+/**
+ * Every sender's budget, keyed by the socket it arrived on.
+ *
+ * A `WeakMap` rather than a field on `Conn`, and that is the one storage
+ * decision here. `Conn` lives in `server/room.ts`, which every check in the
+ * repo constructs by hand; adding a chat field to it would put this feature's
+ * state in the room's constructor, in `newConn`, and in every fake socket in
+ * `server/integration-check.ts`. A weak map keyed by the socket costs one hash
+ * per message, is emptied by the garbage collector when the socket is dropped --
+ * so a disconnect needs no cleanup path that could be forgotten -- and keeps the
+ * whole feature to two files plus the wire.
+ */
+export class ChatHub {
+  private readonly gates = new WeakMap<Socket, ChatGate>();
+
+  /** How many lines this hub has fanned out, and to how many sockets. Read by `/stats`. */
+  lines = 0;
+  sends = 0;
+  bytes = 0;
+  /** How many arrivals were refused, by reason. */
+  refusedRate = 0;
+  refusedRepeat = 0;
+  refusedEmpty = 0;
+
+  /**
+   * A `CHAT_SAY` arrived on `ws`. Sanitise it, admit it or refuse it, and if it
+   * lives, put it in front of everybody on the host.
+   *
+   * Returns what happened, for the caller's log and for the checks. `now` is
+   * injected rather than read here so the integration check can drive a rate
+   * limit's window without sleeping through it.
+   */
+  say(host: RoomHost, ws: Socket, frame: ArrayBuffer, now = Date.now()): 'sent' | 'empty' | 'rate' | 'repeat' | 'bad' {
+    const conn = ws.data;
+    const p = conn.participant;
+    // No participant means a socket that has not said hello. Silently ignored
+    // rather than refused, on `server/index.ts`'s rule for every other message
+    // type: a frame before the handshake is a client bug or a probe, and
+    // answering either is telling a stranger the server is listening.
+    if (!p) return 'bad';
+
+    const raw = decodeChatSay(frame);
+    if (raw === null) return 'bad';
+
+    // The second pass. The client ran this before it sent, so in the ordinary
+    // case it changes nothing -- which is precisely why `verifyChat` asserts the
+    // function is idempotent, and precisely why this run happens anyway: the
+    // first one happened inside something the player controls.
+    const text = sanitiseChat(raw);
+    if (text.length === 0) {
+      // An empty message is dropped with no notice at all. Somebody who pressed
+      // Enter on an empty box does not need to be told, and a probe sending
+      // three thousand of them should not be answered three thousand times.
+      this.refusedEmpty++;
+      return 'empty';
+    }
+
+    let gate = this.gates.get(ws);
+    if (!gate) {
+      gate = newChatGate(now);
+      this.gates.set(ws, gate);
+    }
+
+    const refusal = chatAdmit(gate, text, now);
+    if (refusal !== '') {
+      if (refusal === 'rate') this.refusedRate++;
+      else this.refusedRepeat++;
+      // Told **once per window**, not once per attempt -- see `CHAT_NOTICE_MS`.
+      // Without the throttle the server's own explanation is the flood.
+      if (chatShouldNotify(gate, now)) {
+        this.notify(ws, refusal === 'rate' ? RATE_NOTICE : REPEAT_NOTICE);
+      }
+      return refusal;
+    }
+
+    this.broadcast(host, {
+      sender: p.id,
+      room: conn.room,
+      flags: 0,
+      // The server's name for this player, which is the roster's name for them.
+      // `Simulation.join` sanitised and deduped it at the handshake -- see
+      // `Simulation.pickName` -- so what goes out here is what the leaderboard
+      // says and what a nameplate says, and there is no path by which a client
+      // can make it be anything else.
+      name: p.name,
+      text,
+    });
+    return 'sent';
+  }
+
+  /**
+   * One line to every socket on this host, in every room.
+   *
+   * Encoded once. The iteration is rooms-then-sockets rather than a flat socket
+   * set because the host has no flat socket set -- `server/index.ts` keeps one
+   * for the idle sweep, but it includes sockets that never said hello, and a
+   * chat line must only reach a client that has been welcomed and therefore has
+   * a roster to draw a name against.
+   */
+  broadcast(host: RoomHost, line: ChatLine): void {
+    const frame = encodeChatLine(line);
+    this.lines++;
+    for (const room of host.rooms) {
+      for (const ws of room.conns) {
+        if (!ws.data.participant) continue;
+        ws.send(frame);
+        this.sends++;
+        this.bytes += frame.byteLength;
+      }
+    }
+  }
+
+  /**
+   * A private system line to one socket: a throttle explanation, and nothing
+   * else so far.
+   *
+   * `PRIVATE` and `SYSTEM` are two flags rather than one because they are two
+   * different facts and a later line may want either alone -- a server-wide
+   * announcement is `SYSTEM` and not private, and a whisper would be private and
+   * not system. The client draws them differently: see `client/src/chat.ts`.
+   */
+  notify(ws: Socket, text: string): void {
+    if (!ws.data.participant) return;
+    const frame = encodeChatLine({
+      sender: 0,
+      room: CHAT_ROOM_NONE,
+      flags: CHAT_FLAG.PRIVATE | CHAT_FLAG.SYSTEM,
+      name: '',
+      text,
+    });
+    ws.send(frame);
+    this.sends++;
+    this.bytes += frame.byteLength;
+  }
+}

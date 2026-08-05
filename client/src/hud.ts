@@ -803,18 +803,50 @@ export class Hud {
   private helpOpen = false;
 
   /**
+   * True while the chat composer holds the keyboard. Set by `client/src/chat.ts`.
+   *
+   * A **field written from outside** rather than another element this class
+   * reads, and that is deliberate: the chat box owns its own DOM and its own
+   * focus (it is not a HUD readout -- see that file's header), so `Hud` should
+   * not know which element it is or what class it wears. What `Hud` owns is the
+   * one question everything else asks, which is `typing` below.
+   */
+  chatTyping = false;
+
+  /**
    * Is a text field holding the keyboard?
    *
-   * Currently the name prompt and nothing else. `main.ts` binds bare letters --
-   * `H`, `F`, `L`, `N`, `T`, `M` -- on `window`, and every one of them is a
-   * character somebody may want in a name. The prompt's own field stops its
-   * keys reaching that listener already (see `askName`), but that guard is the
-   * *focus* being in the input, and a player who has clicked the join button
-   * has moved it out. This is the guard that does not depend on where the focus
-   * went.
+   * The name prompt and the chat composer. `main.ts` binds bare letters --
+   * `H`, `F`, `L`, `N`, `T`, `M`, `I` -- on `window`, and every one of them is a
+   * character somebody may want in a name or a sentence. Both fields stop their
+   * own keys reaching that listener already (see `askName` and `ChatBox.onKey`),
+   * but that guard is the *focus* being in the input, and a player who has
+   * clicked the join button has moved it out. This is the guard that does not
+   * depend on where the focus went.
+   *
+   * It is also what settles **Escape** between the text fields and the panels.
+   * `main.ts` returns on this at the top of its keydown listener, above the
+   * branch that closes the control list and the map, so whichever text UI has
+   * the keyboard handles its own Escape and nothing else in that listener sees
+   * the key at all.
    */
+  /**
+   * The suggestions box's compose fields have the keyboard.
+   *
+   * A second flag beside `chatTyping` rather than a shared one, and the reason
+   * is that they go false at different moments: the chat composer closes when
+   * you send, and this stays open with the focus moving between a title, a
+   * textarea and a row of vote buttons. One flag written by two owners is one
+   * owner clearing it while the other is still typing -- which is every game key
+   * live under a half-written sentence.
+   *
+   * Written by `SuggestionsPanel` through `main.ts`, every frame's worth of
+   * focus change. See `client/src/suggestions.ts`.
+   */
+  suggestTyping = false;
+
   get typing(): boolean {
-    return this.prompt.classList.contains('shown');
+    return this.chatTyping || this.suggestTyping || this.prompt.classList.contains('shown');
   }
 
   setLocked(locked: boolean): void {

@@ -84,6 +84,23 @@ import {
 } from '../client/src/game/spawn.ts';
 import { WADE_MAX_DEPTH, WaterLevels, waterDepth } from '../client/src/world/wading.ts';
 import { groundFor, loadWorld } from './world.ts';
+import {
+  IP_VOTES_PER_WEEK,
+  SUBMITS_PER_WEEK,
+  SUGGEST_RESULT,
+  TALLY_CLOSE,
+  TALLY_OPEN,
+  VOTES_PER_WEEK,
+  decodeSuggestAck,
+  decodeSuggestionList,
+  encodeSuggestList,
+  encodeSuggestSubmit,
+  encodeSuggestVote,
+  isoWeekOf,
+  weekKey,
+  type SuggestionList,
+} from '../client/src/net/suggestions.ts';
+import { FloodGuard, SUGGEST_BURST, SuggestionStore } from './suggestions.ts';
 // The lime e-bikes. See `checkBikes` at the foot of this file, which is entirely
 // self-contained and appended after every check that was here before it.
 import {
@@ -162,6 +179,21 @@ import {
   type RoomInfo,
 } from '../client/src/net/protocol.ts';
 import { verifyAoi } from './aoi.ts';
+// Global chat. See `checkChat` at the foot of this file: cross-room delivery over
+// real sockets, which is the one claim in this server that contradicts
+// `checkRooms`' isolation on purpose.
+import {
+  CHAT_BURST,
+  CHAT_FLAG,
+  CHAT_INTERVAL_MS,
+  CHAT_REPEAT_LIMIT,
+  CHAT_SAY_HEADER_BYTES,
+  MAX_CHAT_BYTES,
+  decodeChatLine,
+  encodeChatSay,
+  verifyChat,
+  type ChatLine,
+} from '../client/src/net/chat.ts';
 import { Room, newConn, type Conn, type Socket } from './room.ts';
 import { roomWorld } from './world.ts';
 // The streaming lifecycle. See `checkStreamingLifecycle` at the foot of this
@@ -1298,6 +1330,22 @@ async function main(): Promise<void> {
   say('');
   await checkSoffits();
 
+  // --- 22. Global chat, over real sockets against a **two-room** host. The one
+  // channel in this server that crosses a room boundary, which makes it the one
+  // channel `checkRooms`' isolation assertions would happily let rot: a fan-out
+  // folded back into `Room` passes every check in this file except this one. See
+  // `checkChat`, appended last and self-contained.
+  say('');
+  await checkChat();
+
+  // --- 23. The suggestions box, over real sockets against a server of its own.
+  // The one feature here whose state **outlives the process** -- a ledger on
+  // disk and issues on GitHub -- so it is the one whose failures survive a
+  // restart rather than being cleared by one. See `checkSuggestions` for the six
+  // silent failures it exists to catch.
+  say('');
+  await checkSuggestions();
+
   say('');
   if (failures.length === 0) {
     say(`ALL CHECKS PASSED (${log.filter((l) => l.includes('PASS')).length})`);
@@ -2246,8 +2294,11 @@ async function checkBikes(): Promise<void> {
     }
   }
 
-  // --- 9. Protocol 8, and the refusal behaviour a version bump exists for.
-  check(PROTOCOL_VERSION === 8, `the protocol is at version ${PROTOCOL_VERSION}`);
+  // --- 9. Protocol 9, and the refusal behaviour a version bump exists for.
+  // v9 is a shared bump: global chat and the suggestions box both added message
+  // types in the same pass without changing an existing layout. See
+  // `protocol.PROTOCOL_VERSION`.
+  check(PROTOCOL_VERSION === 9, `the protocol is at version ${PROTOCOL_VERSION}`);
   {
     // A protocol-5 hello -- which is what a browser tab left open across this
     // deploy sends -- must still decode far enough to be refused *by version*,
@@ -9449,4 +9500,1149 @@ async function checkSoffits(): Promise<void> {
         `the same bits (${a.path.length === b.path.length ? `first divergence: none` : 'different lengths'})`,
     );
   }
+}
+
+// --- Global chat -----------------------------------------------------------------
+
+/**
+ * In-game chat, over real sockets, against a host running **two rooms**.
+ *
+ * The headline claim is the second one and it is the reason this check exists at
+ * all: **a line typed in room 0 reaches a client in room 1.** Every other
+ * channel in this server is a room's -- `checkRooms` asserts that a swing, a
+ * knockout and a roster all stop at the boundary, over sockets, because "one
+ * simulation per room" is only half of isolation. Chat is the single deliberate
+ * exception, and an exception that is only claimed in a comment is an exception
+ * that quietly stops being true the first time somebody folds the fan-out back
+ * into `Room`.
+ *
+ * The rest, in order:
+ *
+ *   1. The pure arithmetic, via `verifyChat` -- the sanitiser's idempotence, the
+ *      byte cap on multi-byte input, the two frame layouts and the rate window.
+ *      Run here as well as at boot so a failure is one line of this report
+ *      rather than a server that refused to start with a message nobody read.
+ *   2. **Cross-room delivery.** The headline.
+ *   3. **Attribution is the server's, never the client's.** Two players ask for
+ *      the same name; the second is deduped by `Simulation.pickName`, and what
+ *      appears in front of their message is what the *roster* calls them. There
+ *      is no field in `CHAT_SAY` in which to claim otherwise, and the frame's own
+ *      width is asserted to prove it.
+ *   4. **The abuse floor**: the burst, the sustained rate, the repeat guard, and
+ *      the private notice each of the last two produces.
+ *   5. **Hostile payloads**: a length prefix that overruns its frame, a message
+ *      far over the cap, control characters and a bidi override, an empty
+ *      message, and a runt frame -- none of which may crash the server, and all
+ *      of which must leave it answering afterwards.
+ *   6. **Bots are silent**, which is structural rather than enforced: a bot is a
+ *      `Participant` with no socket, so there is nothing for a `CHAT_SAY` to
+ *      arrive on. Asserted by running rooms with bots in them and hearing
+ *      nothing from any of them.
+ */
+async function checkChat(): Promise<void> {
+  say('global chat, across rooms');
+
+  // --- 1. The arithmetic, which the server also refuses to boot without.
+  {
+    const chatFailures = verifyChat();
+    check(
+      chatFailures.length === 0,
+      `verifyChat: sanitisation, byte caps, both layouts and the rate window ` +
+        `(${chatFailures.join('; ') || 'clean'})`,
+    );
+  }
+
+  // --- The rest is over sockets, against a host running two rooms with a bot in
+  // each. Two rooms is the whole point; the bots are section 6.
+  const port = PORT + 3;
+  const proc = Bun.spawn(['bun', 'run', new URL('./index.ts', import.meta.url).pathname], {
+    env: {
+      ...process.env,
+      SYDNEY_PORT: String(port),
+      SYDNEY_ROOMS: '2',
+      SYDNEY_ROOM_CAP: '4',
+      SYDNEY_BOTS: '1',
+    },
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  try {
+    let up = false;
+    for (let i = 0; i < 120 && !up; i++) {
+      await sleep(100);
+      try {
+        up = (await fetch(`http://127.0.0.1:${port}/health`)).ok;
+      } catch {
+        // not yet
+      }
+    }
+    if (!up) {
+      check(false, 'a two-room host answered /health');
+      return;
+    }
+
+    // --- 2. THE HEADLINE. One client in room 0, one in room 1, and a sentence
+    // that has to cross.
+    // Names deliberately **not** in `bots.BOT_NAMES`. Every room gets a Bazza
+    // and a Shazza by design (see `Room`'s constructor), so a probe called Bazza
+    // is deduped to "Bazza (2)" the moment it joins -- which is correct
+    // behaviour and would silently invalidate section 3 below, whose whole point
+    // is to control *when* the dedupe happens.
+    const inRoom0 = new ChatProbe('Cobber');
+    const inRoom1 = new ChatProbe('Drongo');
+    await inRoom0.connect(`ws://127.0.0.1:${port}?room=0`);
+    await inRoom1.connect(`ws://127.0.0.1:${port}?room=1`);
+    check(
+      inRoom0.room === 0 && inRoom1.room === 1,
+      `two clients landed in different rooms (${inRoom0.room} and ${inRoom1.room})`,
+    );
+    // Neither appears in the other's roster at all: different simulations,
+    // different scoreboards. This is the isolation chat is about to cross.
+    check(
+      !inRoom1.roster.some((r) => r.name === inRoom0.assignedName && inRoom0.assignedName !== ''),
+      "and room 1's roster does not contain room 0's player -- the rooms are isolated",
+    );
+
+    inRoom0.lines.length = 0;
+    inRoom1.lines.length = 0;
+    inRoom0.say('oi is anyone over there');
+    await sleep(500);
+
+    const crossed = inRoom1.lines.find((l) => l.text === 'oi is anyone over there');
+    check(
+      crossed !== undefined,
+      `a line typed in room 0 reached a client in room 1 (${inRoom1.lines.length} line(s) received)`,
+    );
+    check(
+      inRoom0.lines.some((l) => l.text === 'oi is anyone over there'),
+      'and came back to the sender off the wire rather than being echoed locally',
+    );
+    check(
+      crossed !== undefined && crossed.room === 0,
+      `the line carries the room it was said in (${crossed?.room}), so the receiver can mark it as from elsewhere`,
+    );
+    check(
+      crossed !== undefined && crossed.sender === inRoom0.id && crossed.flags === 0,
+      `attributed to sender ${crossed?.sender} (room 0's id ${inRoom0.id}), with no private or system flag`,
+    );
+    check(
+      crossed !== undefined && crossed.name === inRoom0.assignedName && crossed.name !== '',
+      `and carries the speaker's name (${JSON.stringify(crossed?.name)}) rather than an id room 1 has ` +
+        `never heard of`,
+    );
+
+    // --- 3. The name is the server's, not the client's. A second player asks to
+    // be "Cobber" **in the room the first one is in**, so `Simulation.pickName`
+    // has to dedupe them; what then precedes their message is the deduped name,
+    // read by everybody including a client in the other room.
+    const twin = new ChatProbe('Cobber');
+    await twin.connect(`ws://127.0.0.1:${port}?room=0`);
+    check(
+      twin.assignedName !== '' && twin.assignedName !== inRoom0.assignedName,
+      `a second "Cobber" in the same room was renamed by the server to ${JSON.stringify(twin.assignedName)} ` +
+        `(the first is still ${JSON.stringify(inRoom0.assignedName)})`,
+    );
+    inRoom1.lines.length = 0;
+    twin.say('it is me the real cobber');
+    await sleep(500);
+    const twinLine = inRoom1.lines.find((l) => l.text === 'it is me the real cobber');
+    check(
+      twinLine !== undefined && twinLine.name === twin.assignedName,
+      `the line is attributed ${JSON.stringify(twinLine?.name)}, which is the roster's name and not the one ` +
+        `the client asked for`,
+    );
+    check(
+      twinLine !== undefined && twinLine.name !== inRoom0.assignedName,
+      "so the impostor's words do not appear under the original's name, even one room away",
+    );
+    // And structurally: there is nowhere in a CHAT_SAY to put a name at all.
+    // Two bytes of header and the text, and nothing else on the wire.
+    check(
+      encodeChatSay('abc').byteLength === CHAT_SAY_HEADER_BYTES + 3,
+      `a CHAT_SAY is ${CHAT_SAY_HEADER_BYTES} bytes and the text -- there is no sender field to forge`,
+    );
+    twin.close();
+
+    // --- 4. The abuse floor. A fresh socket for each half, because the budget is
+    // per socket and a test that inherited the last one's would be testing the
+    // order these sections happen to be written in.
+    {
+      const flooder = new ChatProbe('Flooder');
+      await flooder.connect(`ws://127.0.0.1:${port}?room=0`);
+      inRoom1.lines.length = 0;
+      flooder.lines.length = 0;
+      // Six distinct messages in one breath. The bucket holds CHAT_BURST.
+      for (let i = 0; i < 6; i++) flooder.say(`flood ${i}`);
+      await sleep(600);
+      const got = inRoom1.lines.filter((l) => l.text.startsWith('flood ')).length;
+      check(
+        got === CHAT_BURST,
+        `six messages sent at once put ${got} through; the burst is ${CHAT_BURST} and the rest were dropped`,
+      );
+      const notices = flooder.lines.filter((l) => (l.flags & CHAT_FLAG.PRIVATE) !== 0);
+      check(
+        notices.length === 1 && (notices[0].flags & CHAT_FLAG.SYSTEM) !== 0,
+        `the sender was told privately why, once rather than once per refusal ` +
+          `(${notices.length}: ${JSON.stringify(notices[0]?.text ?? '')})`,
+      );
+      check(
+        !inRoom1.lines.some((l) => (l.flags & CHAT_FLAG.PRIVATE) !== 0),
+        'and nobody else was sent the throttle notice',
+      );
+      // The sustained rate: one interval of real time buys exactly one more.
+      inRoom1.lines.length = 0;
+      await sleep(CHAT_INTERVAL_MS + 250);
+      flooder.say('after the wait a');
+      flooder.say('after the wait b');
+      await sleep(600);
+      const after = inRoom1.lines.filter((l) => l.text.startsWith('after the wait')).length;
+      check(
+        after === 1,
+        `after one ${CHAT_INTERVAL_MS} ms interval exactly ${after} of two further messages got through`,
+      );
+      flooder.close();
+    }
+
+    {
+      const parrot = new ChatProbe('Parrot');
+      await parrot.connect(`ws://127.0.0.1:${port}?room=1`);
+      inRoom0.lines.length = 0;
+      parrot.lines.length = 0;
+      // The same word three times running. The repeat guard fires on the third,
+      // before the rate limiter has a chance to -- CHAT_BURST is 3, so all three
+      // would otherwise have been affordable. The third is spelled differently
+      // on purpose: case and trailing space must not make it a new message.
+      parrot.say('oi');
+      parrot.say('oi');
+      parrot.say('OI   ');
+      await sleep(600);
+      const heard = inRoom0.lines.filter((l) => l.text.toLowerCase() === 'oi').length;
+      check(
+        heard === CHAT_REPEAT_LIMIT - 1,
+        `the same word three times in a row put ${heard} through; the third was dropped as a repeat, ` +
+          `and neither case nor a trailing space made it a different message`,
+      );
+      const notice = parrot.lines.find((l) => (l.flags & CHAT_FLAG.SYSTEM) !== 0);
+      check(notice !== undefined, `and the sender was told (${JSON.stringify(notice?.text ?? '')})`);
+      // A refusal must not have cost a token: saying something else works
+      // immediately, which is what stops a stutter costing a normal player the
+      // next four seconds of conversation.
+      inRoom0.lines.length = 0;
+      parrot.say('something else entirely');
+      await sleep(600);
+      check(
+        inRoom0.lines.some((l) => l.text === 'something else entirely'),
+        'and a different message straight after a repeat refusal still went out -- a refusal costs no budget',
+      );
+      parrot.close();
+    }
+
+    // --- 5. Hostile and malformed payloads. Nothing here may throw inside the
+    // server's message handler: a throw there takes the socket with it, and the
+    // symptom is one player silently disconnected by another player's paste.
+    {
+      const hostile = new ChatProbe('Hostile');
+      await hostile.connect(`ws://127.0.0.1:${port}?room=0`);
+      inRoom1.lines.length = 0;
+
+      // A length prefix claiming far more than arrived. The decoder must clamp
+      // to the frame rather than build a view past its end, which throws.
+      const lying = new ArrayBuffer(CHAT_SAY_HEADER_BYTES + 5);
+      const lv = new DataView(lying);
+      lv.setUint8(0, MSG.CHAT_SAY);
+      lv.setUint8(1, 255);
+      new Uint8Array(lying, CHAT_SAY_HEADER_BYTES).set(new TextEncoder().encode('short'));
+      hostile.raw(lying);
+
+      // A runt: the type byte and nothing else.
+      const runt = new ArrayBuffer(1);
+      new DataView(runt).setUint8(0, MSG.CHAT_SAY);
+      hostile.raw(runt);
+
+      // An empty message and one of pure whitespace, both of which must be
+      // dropped silently -- and must not cost the sender any of their budget,
+      // which the message after them proves.
+      hostile.raw(encodeChatSay(''));
+      hostile.raw(encodeChatSay('     '));
+      await sleep(600);
+
+      check(
+        inRoom1.lines.some((l) => l.text === 'short'),
+        'a CHAT_SAY whose length prefix overran its frame was clamped to what arrived -- not dropped, not fatal',
+      );
+      check(
+        !inRoom1.lines.some((l) => l.text === ''),
+        'an empty message and one of pure whitespace were both dropped without a line',
+      );
+
+      // Far over the cap, and multi-byte so the *byte* limit is what bites
+      // rather than the character one.
+      inRoom1.lines.length = 0;
+      await sleep(CHAT_INTERVAL_MS + 250);
+      hostile.raw(encodeChatSay('水'.repeat(400)));
+      await sleep(600);
+      const clipped = inRoom1.lines.find((l) => l.text.startsWith('水'));
+      const clippedBytes = clipped ? new TextEncoder().encode(clipped.text).length : -1;
+      check(
+        clipped !== undefined && clippedBytes > 0 && clippedBytes <= MAX_CHAT_BYTES,
+        `a 400-character CJK message was clipped to ${clippedBytes} bytes, inside the ${MAX_CHAT_BYTES} cap`,
+      );
+      check(
+        clipped !== undefined && !clipped.text.includes('�'),
+        'and was clipped on a code-point boundary -- no half characters survived',
+      );
+
+      // Control characters and a bidirectional override, which is the one that
+      // could otherwise turn a whole scrollback backwards.
+      inRoom1.lines.length = 0;
+      await sleep(CHAT_INTERVAL_MS + 250);
+      hostile.raw(encodeChatSay('run‮away\nnow'));
+      await sleep(600);
+      const cleaned = inRoom1.lines.find((l) => l.text.includes('run'));
+      check(
+        cleaned !== undefined && cleaned.text === 'runaway now',
+        `a message carrying a bidi override, a newline and a bell arrived as ${JSON.stringify(cleaned?.text)}`,
+      );
+
+      // And the server is still there, which is the assertion everything above
+      // is really making.
+      const alive = await fetch(`http://127.0.0.1:${port}/health`);
+      check(alive.ok, 'the server is still answering after every malformed frame above');
+      hostile.close();
+    }
+
+    // --- 6. Bots are silent. Both rooms have had a bot in them for the whole of
+    // this check and neither has said anything, which is structural rather than
+    // enforced: a bot has no socket for a CHAT_SAY to arrive on.
+    {
+      const botIds = new Set(inRoom1.roster.filter((r) => r.bot).map((r) => r.id));
+      check(botIds.size > 0, `room 1 holds ${botIds.size} bot(s) to be silent`);
+      check(
+        !inRoom1.lines.some((l) => botIds.has(l.sender)) && !inRoom0.lines.some((l) => botIds.has(l.sender)),
+        'and not one line of chat in this whole check came from a bot',
+      );
+    }
+
+    inRoom0.close();
+    inRoom1.close();
+    await sleep(150);
+  } finally {
+    proc.kill();
+    await proc.exited;
+  }
+}
+
+/**
+ * A synthetic client that keeps what it was told, for chat. `RoomProbe`'s
+ * sibling, and its own class for that class's own stated reason: what it watches
+ * is different. It needs the name the server actually assigned it -- which is
+ * not always the one it asked for, and is the whole of section 3 -- and it needs
+ * to be able to put an arbitrary buffer on the wire, which no other probe here
+ * has any use for.
+ */
+class ChatProbe {
+  private socket!: WebSocket;
+  id = 0;
+  room = -1;
+  roster: RosterEntry[] = [];
+  readonly lines: ChatLine[] = [];
+
+  constructor(readonly wanted: string) {}
+
+  /** What the roster says this probe is called, which is the server's last word. */
+  get assignedName(): string {
+    return this.roster.find((r) => r.id === this.id)?.name ?? '';
+  }
+
+  connect(url: string): Promise<void> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const done = (): void => {
+        if (settled) return;
+        settled = true;
+        // A beat of slack after the WELCOME, for two reasons: the ROSTER that
+        // follows it has to land (`assignedName` is read off that and nothing
+        // else), and the chat gate is created on this socket's first message, so
+        // a probe that started talking in the same millisecond it connected
+        // would be testing the handshake rather than the rate limiter.
+        setTimeout(resolve, 200);
+      };
+      const socket = new WebSocket(url);
+      socket.binaryType = 'arraybuffer';
+      this.socket = socket;
+      socket.onopen = () => socket.send(encodeHello(255, this.wanted));
+      socket.onerror = () => done();
+      socket.onclose = () => done();
+      socket.onmessage = (e) => {
+        const frame = e.data as ArrayBuffer;
+        switch (frameType(frame)) {
+          case MSG.WELCOME: {
+            const w = decodeWelcome(frame);
+            if (!w) return;
+            this.id = w.id;
+            this.room = w.room;
+            done();
+            return;
+          }
+          case MSG.ROSTER: {
+            this.roster = decodeRoster(frame) ?? this.roster;
+            return;
+          }
+          case MSG.CHAT_LINE: {
+            const line = decodeChatLine(frame);
+            if (line) this.lines.push(line);
+            return;
+          }
+          default:
+            return;
+        }
+      };
+      setTimeout(done, 5000);
+    });
+  }
+
+  say(text: string): void {
+    this.raw(encodeChatSay(text));
+  }
+
+  /** Whatever bytes you like. Section 5 is entirely this. */
+  raw(frame: ArrayBuffer): void {
+    if (this.socket.readyState !== WebSocket.OPEN) return;
+    this.socket.send(frame);
+  }
+
+  close(): void {
+    this.socket?.close();
+  }
+}
+
+/**
+ * The suggestions box: the ledger's arithmetic, then the whole thing over a real
+ * socket.
+ *
+ * Every failure this catches is silent in this file's usual sense -- the panel
+ * opens, the votes are accepted, the issue appears -- and the count is simply
+ * wrong. Specifically, and each of these is a section below:
+ *
+ *   - **A week boundary computed with epoch arithmetic** is an hour out for half
+ *     the year, so twice a year somebody's four votes refill early. Nobody
+ *     reports this, because nobody is counting their votes against a clock.
+ *   - **A quota counted from what the client sent** rather than from the ledger
+ *     is no quota. The panel is the thing being defended against, and it is the
+ *     thing that reported the number.
+ *   - **One vote per suggestion per week enforced across all weeks** silently
+ *     deletes the feature the user actually asked for: *"votes can stack up over
+ *     time if someone consistently votes on something"*. It reads as working --
+ *     you voted, it counted -- until somebody notices they can never vote for
+ *     their favourite again.
+ *   - **A tally block a player can close early** lets a suggestion overwrite a
+ *     score on the next flush. That is the one injection this feature has, and
+ *     it lands in a public repo.
+ *   - **A pending-sync queue that loses its votes when it drains** throws away
+ *     exactly the week that mattered: the one before the token existed.
+ *   - **An order that is not total** reshuffles the panel between refreshes.
+ *
+ * The first half runs against a real `SuggestionStore` with a temporary ledger
+ * and an injected `fetch`, which is what lets the GitHub path be exercised --
+ * queued, drained, backfilled, tallied -- with no network and no token. The
+ * second half is a real server on its own port and a real socket, because the
+ * quota is only worth anything if it survives the wire.
+ */
+async function checkSuggestions(): Promise<void> {
+  say('SUGGESTIONS — the weekly vote, the ledger, and the GitHub mirror');
+
+  const dir = `${Bun.env.TMPDIR ?? '/tmp'}/sydney-suggest-${process.pid}`;
+  await Bun.$`mkdir -p ${dir}`.quiet();
+
+  /** A store with no network at all: every GitHub call fails as if offline. */
+  const offlineStore = (name: string): SuggestionStore =>
+    new SuggestionStore({
+      path: `${dir}/${name}.json`,
+      repo: 'voidtype/sydrunner',
+      token: '',
+      timers: false,
+      fetch: (async () => {
+        throw new Error('no network in this check');
+      }) as unknown as typeof fetch,
+    });
+
+  const ID_A = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
+  const ID_B = '9f8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
+  const ID_C = '11112222-3333-4444-5555-666677778888';
+
+  // --- 1. The week, in Sydney, across both daylight-saving changeovers.
+  //
+  // Asserted here as well as in `verifySuggestions` because this is the one that
+  // decides when four votes come back, and a check that only ran in the browser
+  // would be a check that never ran on the machine keeping the ledger.
+  {
+    // Monday 00:00 Sydney in August is AEST (UTC+10) -- 14:00 UTC Sunday.
+    const sundayNight = Date.parse('2026-08-02T13:59:00Z');
+    const mondayMorning = Date.parse('2026-08-02T14:01:00Z');
+    check(
+      weekKey(sundayNight) === '2026-W31' && weekKey(mondayMorning) === '2026-W32',
+      `the AEST week turns over at Monday 00:00 Sydney (${weekKey(sundayNight)} -> ${weekKey(mondayMorning)})`,
+    );
+    // In January it is AEDT (UTC+11) -- 13:00 UTC Sunday. A fixed +10 offset
+    // gets this one wrong by an hour and looks perfect in August.
+    const janBefore = Date.parse('2026-01-11T12:59:00Z');
+    const janAfter = Date.parse('2026-01-11T13:01:00Z');
+    check(
+      weekKey(janBefore) !== weekKey(janAfter),
+      `the AEDT week turns over an hour earlier in UTC, as it must (${weekKey(janBefore)} -> ${weekKey(janAfter)})`,
+    );
+    // The changeover Sundays themselves are not Mondays, so neither may split a
+    // week -- which is precisely what epoch arithmetic does to them.
+    const aprA = weekKey(Date.parse('2026-04-04T20:00:00Z'));
+    const aprB = weekKey(Date.parse('2026-04-05T02:00:00Z'));
+    const octA = weekKey(Date.parse('2026-10-03T14:00:00Z'));
+    const octB = weekKey(Date.parse('2026-10-03T18:00:00Z'));
+    check(
+      aprA === aprB && octA === octB,
+      `neither daylight-saving Sunday splits a week (April ${aprA}, October ${octA})`,
+    );
+    // And the ISO year, which is wrong on exactly one day a year in the naive
+    // implementation: 1 January 2027 is a Friday and belongs to 2026's week 53.
+    check(
+      isoWeekOf(2027, 1, 1) === '2026-W53',
+      `1 January 2027 is ${isoWeekOf(2027, 1, 1)}, the last week of the previous ISO year`,
+    );
+  }
+
+  // --- 2. The quotas, against a real ledger.
+  {
+    const store = offlineStore('quota');
+    const week1 = Date.parse('2026-08-05T04:00:00Z'); // Wednesday, 2026-W32
+    const week2 = Date.parse('2026-08-12T04:00:00Z'); // the following Wednesday
+    check(weekKey(week1) === '2026-W32' && weekKey(week2) === '2026-W33', 'the two test instants are in adjacent weeks');
+
+    // Five suggestions from one client; the third and beyond are refused.
+    const filed: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      const out = await store.submit(ID_A, '10.0.0.1', 'Bazza', `suggestion number ${i}`, 'because', week1);
+      if (out.result === SUGGEST_RESULT.QUEUED || out.result === SUGGEST_RESULT.OK) filed.push(i);
+    }
+    check(
+      filed.length === SUBMITS_PER_WEEK,
+      `one client filed ${filed.length} of 5 attempted suggestions in a week (the cap is ${SUBMITS_PER_WEEK})`,
+    );
+    // And the cap is per week, not for ever.
+    const nextWeek = await store.submit(ID_A, '10.0.0.1', 'Bazza', 'a thought I had on Monday', '', week2);
+    check(
+      nextWeek.result === SUGGEST_RESULT.QUEUED,
+      `the same client may file again the following week (${nextWeek.message})`,
+    );
+
+    // Somebody else supplies things to vote on, from a different address so the
+    // per-IP submit cap is not what is being measured.
+    const targets: number[] = [];
+    for (let i = 0; i < 2; i++) {
+      await store.submit(ID_B, '10.0.0.2', 'Shazza', `another idea ${i}`, '', week1);
+    }
+    for (const s of store.records.suggestions) targets.push(s.localId);
+    check(targets.length >= 5, `${targets.length} suggestions exist to vote on`);
+
+    // --- The vote quota: four a week, and the fifth is refused.
+    let counted = 0;
+    let refused = 0;
+    for (let i = 0; i < 6; i++) {
+      const out = store.vote(ID_C, '10.0.0.3', targets[i % targets.length], 1, week1);
+      if (out.result === SUGGEST_RESULT.OK) counted++;
+      else refused++;
+    }
+    check(
+      counted === VOTES_PER_WEEK,
+      `a client cast ${counted} votes and was refused ${refused} in one week (the quota is ${VOTES_PER_WEEK})`,
+    );
+
+    // --- One vote per suggestion per week, and **the same one again next
+    // week**. This pair is the mechanic the user asked for, and the second half
+    // is the half that is easy to break while looking correct.
+    const store2 = offlineStore('stack');
+    await store2.submit(ID_B, '10.0.0.2', 'Shazza', 'let us climb the pylons', '', week1);
+    const only = store2.records.suggestions[0].localId;
+    const first = store2.vote(ID_A, '10.0.0.1', only, 1, week1);
+    const second = store2.vote(ID_A, '10.0.0.1', only, 1, week1);
+    check(first.result === SUGGEST_RESULT.OK, 'the first vote on a suggestion counts');
+    check(
+      second.result === SUGGEST_RESULT.QUOTA && /this week/.test(second.message),
+      `voting twice on one suggestion in one week is refused, and says why: "${second.message}"`,
+    );
+    // It must not have spent a second vote from the budget.
+    check(
+      store2.list(ID_A, week1).votesLeft === VOTES_PER_WEEK - 1,
+      `a refused repeat vote does not spend the quota (${store2.list(ID_A, week1).votesLeft} left)`,
+    );
+    const nextMonday = store2.vote(ID_A, '10.0.0.1', only, 1, week2);
+    check(
+      nextMonday.result === SUGGEST_RESULT.OK,
+      'the same client may vote for the same suggestion again the following week — this is the stacking mechanic',
+    );
+    // And the score is **all-time**, so the two weeks add up rather than the
+    // second replacing the first. This is the other half of "votes stack up".
+    const stacked = store2.list(ID_A, week2).items.find((s) => s.localId === only);
+    check(
+      stacked?.score === 2 && stacked.ups === 2,
+      `two votes a week apart give an all-time score of ${stacked?.score} from ${stacked?.ups} ups`,
+    );
+    // The quota resets: a fresh four in the new week.
+    check(
+      store2.list(ID_A, week2).votesLeft === VOTES_PER_WEEK - 1,
+      `the weekly budget refilled and one is spent (${store2.list(ID_A, week2).votesLeft} left)`,
+    );
+
+    // --- The per-address cap, which is the sock-puppet speed bump. Twelve
+    // clean client ids from one address get through the per-client quota
+    // trivially and are stopped by this.
+    const store3 = offlineStore('ip');
+    await store3.submit(ID_B, '10.0.0.9', 'Shazza', 'a thing worth voting on', '', week1);
+    const target = store3.records.suggestions[0].localId;
+    let through = 0;
+    for (let i = 0; i < 20; i++) {
+      // A fresh, perfectly well-formed identity each time -- which is exactly
+      // what clearing site data gives you, and the reason this cap exists.
+      const puppet = crypto.randomUUID();
+      if (store3.vote(puppet, '10.0.0.7', target, 1, week1).result === SUGGEST_RESULT.OK) through++;
+    }
+    check(
+      through === IP_VOTES_PER_WEEK,
+      `20 fresh client ids from one address landed ${through} votes (the per-address cap is ${IP_VOTES_PER_WEEK})`,
+    );
+    // And a different address is unaffected, or a share house is unplayable.
+    check(
+      store3.vote(crypto.randomUUID(), '10.0.0.8', target, 1, week1).result === SUGGEST_RESULT.OK,
+      'a different address is not caught by another address had its fill',
+    );
+  }
+
+  // --- 3. Sanitisation, and the one injection this feature actually has.
+  {
+    const store = offlineStore('clean');
+    const at = Date.parse('2026-08-05T04:00:00Z');
+    const hostile =
+      `nice game ${TALLY_CLOSE}\n\n### Score 9999\n\n${TALLY_OPEN} and the rest`;
+    await store.submit(ID_A, '10.0.0.1', 'Bazza', 'a reasonable sounding title', hostile, at);
+    const stored = store.records.suggestions[0];
+    check(
+      !stored.body.includes(TALLY_CLOSE) && !stored.body.includes('<!--') && !stored.body.includes('-->'),
+      'a body carrying the tally markers is neutralised before it is stored',
+    );
+    // The rendered issue body has exactly one block, and the player's text is
+    // outside it -- which is the property that actually matters, because it is
+    // what the next flush parses.
+    const rendered = store.renderIssueBody(stored.localId);
+    const opens = rendered.split(TALLY_OPEN).length - 1;
+    const closes = rendered.split(TALLY_CLOSE).length - 1;
+    check(
+      opens === 1 && closes === 1,
+      `the rendered issue body has exactly one tally block (${opens} open, ${closes} close)`,
+    );
+    check(
+      rendered.indexOf('nice game') < rendered.indexOf(TALLY_OPEN),
+      "the player's text stays outside the machine-managed block",
+    );
+    check(
+      /machine|written by the game server|overwritten/i.test(rendered),
+      'the block says in its own text that hand edits are overwritten',
+    );
+    // A title of nothing is refused rather than becoming a blank row.
+    const empty = await store.submit(ID_B, '10.0.0.2', 'Shazza', '​​​  ', 'body', at);
+    check(empty.result === SUGGEST_RESULT.BAD, `a title of invisibles is refused (${empty.message})`);
+    // And a client id that is not one is refused before anything is written.
+    const before = store.records.suggestions.length;
+    const bogus = store.vote('not-a-uuid', '10.0.0.1', stored.localId, 1, at);
+    check(
+      bogus.result === SUGGEST_RESULT.BAD && store.records.suggestions.length === before,
+      'a malformed client id is refused and writes nothing',
+    );
+  }
+
+  // --- 4. The order, which is what "the top issue shows up first" means.
+  {
+    const store = offlineStore('order');
+    const at = Date.parse('2026-08-05T04:00:00Z');
+    for (const t of ['first idea here', 'second idea here', 'third idea here']) {
+      await store.submit(crypto.randomUUID(), `10.1.0.${t.length}`, 'someone', t, '', at);
+    }
+    const ids = store.records.suggestions.map((s) => s.localId);
+    // Give the middle one a clear lead and the last one a net negative.
+    for (let i = 0; i < 3; i++) store.vote(crypto.randomUUID(), `10.2.0.${i}`, ids[1], 1, at);
+    store.vote(crypto.randomUUID(), '10.2.1.0', ids[0], 1, at);
+    store.vote(crypto.randomUUID(), '10.2.2.0', ids[2], -1, at);
+    const ranked = store.list(ID_A, at).items;
+    check(
+      ranked[0].localId === ids[1] && ranked[0].score === 3,
+      `the highest score is first (#${ranked[0].localId} on ${ranked[0].score})`,
+    );
+    check(
+      ranked[ranked.length - 1].localId === ids[2] && ranked[ranked.length - 1].score === -1,
+      'a net-negative suggestion sorts last rather than being hidden',
+    );
+    check(
+      ranked.map((r) => r.score).every((s, i, a) => i === 0 || a[i - 1] >= s),
+      `the whole list is score-descending (${ranked.map((r) => r.score).join(', ')})`,
+    );
+    // The order is total: an all-square list must not reshuffle between calls,
+    // which reads as a rendering bug to anybody watching the panel.
+    const flat = offlineStore('flat');
+    for (const t of ['alpha idea here', 'bravo idea here', 'charlie idea here']) {
+      await flat.submit(crypto.randomUUID(), '10.3.0.1', 'someone', t, '', at);
+    }
+    const once = flat.list(ID_A, at).items.map((s) => s.localId).join(',');
+    const twice = flat.list(ID_B, at).items.map((s) => s.localId).join(',');
+    check(once === twice, `an all-zero list draws in the same order twice (${once})`);
+  }
+
+  // --- 5. The pending-sync queue: it works with no token, and it drains
+  // **without losing the votes it collected in the meantime**.
+  //
+  // This is the section that stands in for the deploy history: the feature
+  // shipped before the credential existed, so the queue is not a fallback that
+  // was never exercised, it is the path the first week ran on.
+  {
+    const at = Date.parse('2026-08-05T04:00:00Z');
+    const path = `${dir}/drain.json`;
+    const noToken = new SuggestionStore({
+      path,
+      repo: 'voidtype/sydrunner',
+      token: '',
+      timers: false,
+      fetch: (async () => {
+        throw new Error('should not be called without a token');
+      }) as unknown as typeof fetch,
+    });
+    const queued = await noToken.submit(ID_A, '10.4.0.1', 'Bazza', 'ladders on the harbour bridge', 'let us climb', at);
+    check(
+      queued.result === SUGGEST_RESULT.QUEUED && queued.issue === 0,
+      `with no token a suggestion is accepted and queued rather than refused ("${queued.message}")`,
+    );
+    const localId = noToken.records.suggestions[0].localId;
+    // Votes accumulate against it normally. They are ours and never needed
+    // GitHub, which is the whole storage argument in one assertion.
+    for (let i = 0; i < 3; i++) noToken.vote(crypto.randomUUID(), `10.4.1.${i}`, localId, 1, at);
+    const queuedView = noToken.list(ID_A, at).items[0];
+    check(
+      queuedView.pending && queuedView.score === 3 && queuedView.issue === 0,
+      `a queued suggestion is votable and on ${queuedView.score} with no issue number yet`,
+    );
+    check(
+      noToken.list(ID_A, at).linked === false,
+      'the panel is told the server is not linked to GitHub, so "queued" means something to the player',
+    );
+    check(noToken.records.votes.length === 3, 'the votes are in the ledger, not on GitHub');
+    // Nothing was synced, because there was nothing to sync with.
+    check((await noToken.sync()).posted === 0, 'sync with no token posts nothing rather than throwing');
+    await noToken.save();
+
+    // Now a token appears. Same ledger file, new store -- which is what a
+    // restart with the credential in place actually is.
+    let posted: { title?: string; body?: string; labels?: string[] } | null = null;
+    let patches = 0;
+    const withToken = new SuggestionStore({
+      path,
+      repo: 'voidtype/sydrunner',
+      token: 'not-a-real-token',
+      timers: false,
+      fetch: (async (_url: string, init?: RequestInit) => {
+        const method = init?.method ?? 'GET';
+        if (method === 'POST') {
+          posted = JSON.parse(String(init?.body));
+          return new Response(JSON.stringify({ number: 41 }), { status: 201 });
+        }
+        if (method === 'PATCH') {
+          patches++;
+          return new Response('{}', { status: 200 });
+        }
+        return new Response('[]', { status: 200 });
+      }) as unknown as typeof fetch,
+    });
+    await withToken.load();
+    check(
+      withToken.records.suggestions.length === 1 && withToken.records.votes.length === 3,
+      'the ledger survived the restart with its suggestion and its three votes',
+    );
+    const drained = await withToken.sync();
+    check(drained.posted === 1, `the queue drained: ${drained.posted} issue posted on the first sync`);
+    const after = withToken.list(ID_A, at).items[0];
+    check(
+      after.issue === 41 && !after.pending,
+      `the issue number was backfilled onto the existing suggestion (#${after.issue})`,
+    );
+    check(
+      after.score === 3,
+      `and it kept every vote it collected while queued (score ${after.score})`,
+    );
+    const body = String((posted as { body?: string } | null)?.body ?? '');
+    check(
+      body.includes(TALLY_OPEN) && /Score 3/.test(body),
+      'the issue was created with the accumulated tally already in it, not with a zero',
+    );
+    check(
+      ((posted as { labels?: string[] } | null)?.labels ?? []).includes('suggestion'),
+      'the issue is labelled `suggestion`, which is what the panel and the curator both filter on',
+    );
+    // A vote after the drain is a PATCH on the next flush and **not** an API
+    // call of its own -- the anti-thrash rule the whole 60 s debounce exists for.
+    const patchesBefore = patches;
+    withToken.vote(crypto.randomUUID(), '10.4.9.9', localId, 1, at);
+    check(patches === patchesBefore, 'a vote costs zero GitHub calls at the moment it is cast');
+    await withToken.sync();
+    check(patches === patchesBefore + 1, 'and exactly one PATCH on the next flush');
+    // A flush with nothing new is free, which is what makes a quiet week cost
+    // nothing at all against the rate limit.
+    const quiet = await withToken.sync();
+    check(quiet.patched === 0 && quiet.posted === 0, 'a flush with no change makes no GitHub calls');
+  }
+
+  // --- 6. GitHub being down, and GitHub being ahead of us.
+  {
+    const at = Date.parse('2026-08-05T04:00:00Z');
+    const store = new SuggestionStore({
+      path: `${dir}/refresh.json`,
+      repo: 'voidtype/sydrunner',
+      token: '',
+      timers: false,
+      fetch: (async () => {
+        throw new Error('api.github.com is unreachable');
+      }) as unknown as typeof fetch,
+    });
+    await store.submit(ID_A, '10.5.0.1', 'Bazza', 'a suggestion that predates the outage', '', at);
+    const before = store.list(ID_A, at).items.length;
+    await store.refresh();
+    check(
+      store.list(ID_A, at).items.length === before,
+      'GitHub being unreachable serves the last good list from the ledger rather than emptying the panel',
+    );
+
+    // And the other direction: an issue written on GitHub directly, and one the
+    // curator closed after building it. This is how a week *ends*.
+    const merging = new SuggestionStore({
+      path: `${dir}/merge.json`,
+      repo: 'voidtype/sydrunner',
+      token: 'not-a-real-token',
+      timers: false,
+      fetch: (async (_url: string, init?: RequestInit) => {
+        if ((init?.method ?? 'GET') !== 'GET') return new Response(JSON.stringify({ number: 99 }), { status: 201 });
+        return new Response(
+          JSON.stringify([
+            { number: 7, title: 'written straight onto github', body: 'by the curator', state: 'open', user: { login: 'voidtype' } },
+            { number: 8, title: 'a pull request wearing the label', body: '', state: 'open', pull_request: {} },
+          ]),
+          { status: 200 },
+        );
+      }) as unknown as typeof fetch,
+    });
+    const adopted = await merging.refresh();
+    check(adopted.adopted === 1, `an issue filed on GitHub directly is adopted into the panel (${adopted.adopted})`);
+    check(
+      merging.list(ID_A, at).items.some((s) => s.issue === 7),
+      'and it is votable in game like any other',
+    );
+    check(
+      !merging.list(ID_A, at).items.some((s) => s.issue === 8),
+      'a pull request wearing the `suggestion` label is not adopted as a suggestion',
+    );
+  }
+
+  // --- 7. The flood guard, which is a different failure from the weekly quota:
+  // a client that sends ten thousand legal requests a second.
+  {
+    const guard = new FloodGuard(0);
+    let allowed = 0;
+    for (let i = 0; i < 200; i++) if (guard.allow(0)) allowed++;
+    check(
+      allowed === SUGGEST_BURST,
+      `200 instantaneous requests were cut to ${allowed} (the burst is ${SUGGEST_BURST})`,
+    );
+    // The burst has to clear what a brisk *player* does -- open the panel, file
+    // one, spend four votes, watch it reorder -- or the limiter is a bug that
+    // only bites the people using the feature. The socket section above is that
+    // sequence, and it is about a dozen requests.
+    check(
+      SUGGEST_BURST >= 20,
+      `and the burst leaves room for a whole session's worth of clicking (${SUGGEST_BURST})`,
+    );
+    // And it refills, so a client that behaves is not punished for its burst.
+    check(guard.allow(10_000), 'the bucket refills over time rather than latching shut');
+  }
+
+  // --- 8. The whole thing over a real socket, against a real server.
+  //
+  // Everything above is the ledger's arithmetic; this is the part that proves
+  // the wire carries it. Two clients with different identities, a real
+  // `MSG.SUGGEST` frame, and the ranked list coming back down `MSG.SUGGEST_LIST`.
+  const port = PORT + 4;
+  const ledger = `${dir}/socket.json`;
+  const proc = Bun.spawn(['bun', 'run', new URL('./index.ts', import.meta.url).pathname], {
+    env: {
+      ...process.env,
+      SYDNEY_PORT: String(port),
+      SYDNEY_BOTS: '0',
+      SYDNEY_SUGGESTIONS: ledger,
+      // Explicitly cleared, so this section can never post to a real repo even
+      // if the environment running the check happens to have a token in it.
+      SYDNEY_GITHUB_TOKEN: '',
+      // And pointed at a repo that does not exist, which is what makes this
+      // section **hermetic**.
+      //
+      // Clearing the token is not enough on its own and that is worth stating,
+      // because the first cut of this check assumed it was: reading the issue
+      // list needs no credential at all (the real repo is public, see
+      // `SuggestionStore.refresh`), so a check pointed at `voidtype/sydrunner`
+      // adopts whatever is actually on GitHub the moment its five-minute
+      // refresh lands -- and then asserts "no suggestions yet" against a board
+      // with real ones on it. It failed exactly that way once. A 404 repo makes
+      // the refresh a no-op, which also quietly asserts that a wrong
+      // `SYDNEY_GITHUB_REPO` degrades to an empty panel rather than a crash.
+      SYDNEY_GITHUB_REPO: 'voidtype/sydney-integration-check-no-such-repo',
+    },
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  try {
+    let up = false;
+    for (let i = 0; i < 120 && !up; i++) {
+      await sleep(100);
+      try {
+        up = (await fetch(`http://127.0.0.1:${port}/health`)).ok;
+      } catch {
+        // not yet
+      }
+    }
+    if (!up) {
+      check(false, 'the suggestions server never answered /health');
+      return;
+    }
+
+    const client = await suggestProbe(`ws://127.0.0.1:${port}`, ID_A, 'Bazza');
+    const other = await suggestProbe(`ws://127.0.0.1:${port}`, ID_B, 'Shazza');
+
+    const opened = await client.list();
+    check(opened !== null, 'a client asking for the list over the socket is sent one');
+    check(
+      opened!.votesLeft === VOTES_PER_WEEK && opened!.items.length === 0,
+      `an untouched box offers ${opened?.votesLeft} votes and no suggestions yet`,
+    );
+    check(opened!.week === weekKey(), `and names the current Sydney week (${opened?.week})`);
+    check(
+      opened!.linked === false,
+      'and reports honestly that this server has no GitHub link, so everything will queue',
+    );
+
+    const ack = await client.submit('bring back the monorail', 'it would be good for getting to Darling Harbour');
+    check(
+      ack !== null && (ack.result === SUGGEST_RESULT.QUEUED || ack.result === SUGGEST_RESULT.OK),
+      `submitting over the socket is acknowledged: "${ack?.message}"`,
+    );
+
+    // The other client sees it, which is the whole point of the box being the
+    // server's rather than the browser's.
+    const seen = await other.list();
+    check(
+      seen !== null && seen.items.length === 1 && seen.items[0].title === 'bring back the monorail',
+      `a second client sees the first one's suggestion (${seen?.items.length} row)`,
+    );
+    check(
+      seen!.items[0].author === 'Bazza',
+      `attributed to the submitter's in-game name as the server assigned it (${seen?.items[0].author})`,
+    );
+    check(
+      seen!.items[0].myVote === 0 && seen!.votesLeft === VOTES_PER_WEEK,
+      'and the second client has its own untouched quota — the list is per viewer',
+    );
+
+    // A second suggestion, so there is something to reorder.
+    await other.submit('more ferries on the parramatta run', '');
+    const two = await client.list();
+    check(two!.items.length === 2, `two suggestions on the board (${two?.items.length})`);
+
+    // Vote the second one up and watch it overtake.
+    const before = (await client.list())!.items[0].title;
+    const ferry = two!.items.find((s) => s.title.startsWith('more ferries'))!;
+    const voteAck = await client.vote(ferry.localId, 1);
+    check(voteAck?.result === SUGGEST_RESULT.OK, `a vote over the socket is counted: "${voteAck?.message}"`);
+    const reordered = await client.list();
+    check(
+      reordered!.items[0].localId === ferry.localId && reordered!.items[0].score === 1,
+      `the voted-up suggestion moved to the top (was "${before}", now "${reordered?.items[0].title}")`,
+    );
+    check(
+      reordered!.votesLeft === VOTES_PER_WEEK - 1,
+      `and the voter's remaining quota came down to ${reordered?.votesLeft}`,
+    );
+    check(
+      reordered!.items[0].myVote === 1,
+      'and the row is marked as one this client has already voted on this week',
+    );
+
+    // The repeat, over the wire, with the message the player actually sees.
+    const repeat = await client.vote(ferry.localId, 1);
+    check(
+      repeat?.result === SUGGEST_RESULT.QUOTA && /Monday/.test(repeat.message),
+      `voting twice on one suggestion is refused over the wire and explains the weekly reset: "${repeat?.message}"`,
+    );
+
+    // Exhaust the quota. Three more suggestions to spend on, then the fifth vote.
+    for (let i = 0; i < 3; i++) {
+      const p = await suggestProbe(`ws://127.0.0.1:${port}`, crypto.randomUUID(), `Filler ${i}`);
+      await p.submit(`a filler suggestion number ${i}`, '');
+      p.close();
+    }
+    const board = (await client.list())!.items;
+    let spent = 1;
+    for (const row of board) {
+      if (row.myVote !== 0) continue;
+      const out = await client.vote(row.localId, 1);
+      if (out?.result === SUGGEST_RESULT.OK) spent++;
+      else {
+        check(
+          out?.result === SUGGEST_RESULT.QUOTA && /votes left|a week/.test(out.message),
+          `the ${spent + 1}th vote of the week is refused with the quota message: "${out?.message}"`,
+        );
+        break;
+      }
+    }
+    check(spent === VOTES_PER_WEEK, `the client landed exactly ${spent} votes this week over the socket`);
+    const spentList = await client.list();
+    check(spentList!.votesLeft === 0, `and its panel now shows ${spentList?.votesLeft} votes left`);
+
+    // The ledger is on disk, which is what "persist forever" rests on.
+    await sleep(500);
+    const onDisk = (await Bun.file(ledger).json()) as { suggestions: unknown[]; votes: unknown[] };
+    check(
+      Array.isArray(onDisk.suggestions) && onDisk.suggestions.length >= 5,
+      `the ledger is on disk with ${onDisk.suggestions.length} suggestion(s) and ${onDisk.votes.length} vote(s)`,
+    );
+
+    // A malformed frame is ignored rather than taken personally: the socket
+    // stays up and the next legitimate request is answered.
+    //
+    // The pause first, and it is not padding: this probe has just spent a
+    // fortnight's worth of a human's clicking in about a second, so its flood
+    // budget is genuinely low -- and a `null` here from the rate limiter rather
+    // than from a dropped socket would make this check assert the opposite of
+    // what it says. One second refills two, which is all the next request needs.
+    await sleep(1200);
+    client.raw(new Uint8Array([MSG.SUGGEST, 99, 3, 1, 2, 3]).buffer);
+    await sleep(100);
+    const stillThere = await client.list();
+    check(stillThere !== null, 'a malformed suggest frame is ignored and the socket keeps working');
+
+    client.close();
+    other.close();
+  } finally {
+    proc.kill();
+    await Bun.$`rm -rf ${dir}`.quiet().nothrow();
+  }
+}
+
+/**
+ * A synthetic client for the suggestions box: a socket, an identity, and a
+ * promise per request.
+ *
+ * Separate from `Probe` rather than folded into it, because it wants a different
+ * shape: `Probe` accumulates state from a stream of snapshots, and this is
+ * strictly request/response -- ask, await the one frame that answers. Folding
+ * them together would have put a suggestions inbox on the class that models a
+ * player.
+ */
+async function suggestProbe(
+  url: string,
+  id: string,
+  name: string,
+): Promise<{
+  list(): Promise<SuggestionList | null>;
+  submit(title: string, body: string): Promise<{ result: number; issue: number; message: string } | null>;
+  vote(localId: number, dir: number): Promise<{ result: number; issue: number; message: string } | null>;
+  raw(frame: ArrayBuffer): void;
+  close(): void;
+}> {
+  const socket = new WebSocket(url);
+  socket.binaryType = 'arraybuffer';
+  let waitingList: ((l: SuggestionList | null) => void) | null = null;
+  let waitingAck: ((a: { result: number; issue: number; message: string } | null) => void) | null = null;
+
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('no welcome within 5 s')), 5000);
+    socket.onopen = () => socket.send(encodeHello(255, name));
+    socket.onerror = () => {
+      clearTimeout(timer);
+      reject(new Error('socket error'));
+    };
+    socket.onmessage = (e) => {
+      const frame = e.data as ArrayBuffer;
+      const type = frameType(frame);
+      if (type === MSG.WELCOME) {
+        clearTimeout(timer);
+        resolve();
+        return;
+      }
+      if (type === MSG.SUGGEST_LIST) {
+        const l = decodeSuggestionList(frame, MSG.SUGGEST_LIST);
+        // A list can arrive unasked -- it is broadcast to every open panel when
+        // a score moves -- so an arrival with nobody waiting is dropped rather
+        // than resolving somebody else's request with it.
+        if (waitingList) {
+          const w = waitingList;
+          waitingList = null;
+          w(l);
+        }
+        return;
+      }
+      if (type === MSG.SUGGEST_ACK) {
+        const a = decodeSuggestAck(frame, MSG.SUGGEST_ACK);
+        if (waitingAck) {
+          const w = waitingAck;
+          waitingAck = null;
+          w(a);
+        }
+        return;
+      }
+    };
+  });
+
+  const awaitList = (): Promise<SuggestionList | null> =>
+    new Promise((resolve) => {
+      waitingList = resolve;
+      setTimeout(() => {
+        if (waitingList === resolve) {
+          waitingList = null;
+          resolve(null);
+        }
+      }, 3000);
+    });
+  const awaitAck = (): Promise<{ result: number; issue: number; message: string } | null> =>
+    new Promise((resolve) => {
+      waitingAck = resolve;
+      setTimeout(() => {
+        if (waitingAck === resolve) {
+          waitingAck = null;
+          resolve(null);
+        }
+      }, 3000);
+    });
+
+  return {
+    list() {
+      const p = awaitList();
+      socket.send(encodeSuggestList(MSG.SUGGEST, id));
+      return p;
+    },
+    submit(title, body) {
+      const p = awaitAck();
+      socket.send(encodeSuggestSubmit(MSG.SUGGEST, id, title, body));
+      return p;
+    },
+    vote(localId, dir) {
+      const p = awaitAck();
+      socket.send(encodeSuggestVote(MSG.SUGGEST, id, localId, dir));
+      return p;
+    },
+    raw(frame) {
+      socket.send(frame);
+    },
+    close() {
+      socket.close();
+    },
+  };
 }

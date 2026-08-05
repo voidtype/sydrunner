@@ -115,6 +115,10 @@ import {
 } from './game/combat.ts';
 import { BALL_RADIUS, FootyField, applyFootyHit, verifyFooty, type FootyEvent } from './game/footy.ts';
 import { NetClient, chooseRoom, fetchRooms, verifyNetClient, type RemotePlayer } from './net/client.ts';
+import { verifyChat } from './net/chat.ts';
+import { ChatBox, verifyChatBox } from './chat.ts';
+import { verifySuggestions } from './net/suggestions.ts';
+import { SuggestionsPanel, clientId } from './suggestions.ts';
 import { ANIM, SNAPSHOT_INTERVAL, sanitiseName, suggestName, verifyNames, verifyNet } from './net/protocol.ts';
 import {
   FootyAssets,
@@ -333,6 +337,27 @@ async function main(): Promise<void> {
   // half that makes it worth having -- the two ends have to agree about what a
   // name is or the one the player typed is not the one anybody sees.
   const nameFailures = timed('names', verifyNames);
+  // And the chat, on the names' criterion exactly: every way it breaks produces
+  // *text*, which renders perfectly. A sanitiser that is not idempotent posts a
+  // different sentence from the one in the box; a byte cap enforced in
+  // characters encodes a length a `u8` cannot hold and turns one player's
+  // messages into garbage; a truncation on a byte boundary puts half a code
+  // point on the end and reads as the sender's keyboard; a rate window wrong by
+  // a factor either lets a flood through or throttles a conversation. None of
+  // them throws. The server runs this same function before it opens its socket,
+  // which is the half that makes it worth having. See `net/chat.ts`.
+  const chatFailures = timed('chat', verifyChat);
+  const chatBoxFailures = timed('chat box', verifyChatBox);
+  // And the suggestions box, on the same criterion a third time, with one class
+  // of failure the other two do not have: a **week boundary computed by epoch
+  // arithmetic** is an hour out for half the year, and the symptom is a quota
+  // that resets at the wrong moment twice a year -- which is invisible, because
+  // nobody is counting their votes against a clock. The rest is the familiar
+  // shape: a sanitiser that misses the tally marker lets a suggestion overwrite
+  // a score, and a length prefix out of step draws a list nobody wrote. The
+  // server runs this same function before it opens its socket, which is what
+  // makes it worth having: it keeps the ledger. See `net/suggestions.ts`.
+  const suggestionFailures = timed('suggestions', verifySuggestions);
   // And the map readout, on the same criterion again. Every way this breaks
   // leaves a plausible street name under the map: the street behind you, the
   // street a hundred metres past the end of a way, a corner claimed halfway
@@ -564,7 +589,10 @@ async function main(): Promise<void> {
     guardFailures.length ||
     hudFailures.length ||
     wallFailures.length ||
-    lifecycleFailures.length
+    lifecycleFailures.length ||
+    chatFailures.length ||
+    chatBoxFailures.length ||
+    suggestionFailures.length
   ) {
     hud.fatal(
       'Self-checks failed:\n' +
@@ -600,6 +628,9 @@ async function main(): Promise<void> {
           ...hudFailures,
           ...wallFailures,
           ...lifecycleFailures,
+          ...chatFailures,
+          ...chatBoxFailures,
+          ...suggestionFailures,
         ]
           .map((f) => '  - ' + f)
           .join('\n'),
@@ -1774,6 +1805,51 @@ async function main(): Promise<void> {
   const remotes = new Map<number, RemoteActor>();
   let net: NetClient | null = null;
 
+  /**
+   * Global chat, opened with `I`. See `client/src/chat.ts`.
+   *
+   * Built **here**, before `net` exists and whether or not it ever will, and the
+   * hooks read `net` through closures rather than holding it: the client is
+   * constructed a second or two later on the online path and never at all on the
+   * offline one, and a box that had to be rebuilt on connect would be a box whose
+   * scrollback was thrown away by connecting.
+   *
+   * `onTypingChange` is the whole of the interlock with the rest of the input
+   * layer: it sets `hud.chatTyping`, which makes `hud.typing` true, which makes
+   * the keydown listener at the bottom of this file return at its first line --
+   * so `wasd` does not walk, `f` and `l` do not swing, and Escape belongs to the
+   * box rather than to the panels. The same guard the name prompt has used since
+   * it existed, reused rather than reinvented.
+   */
+  const chat = new ChatBox({
+    send: (text) => net?.sendChat(text) ?? '',
+    onTypingChange: (typing) => {
+      hud.chatTyping = typing;
+    },
+    selfId: () => net?.id ?? 0,
+    selfRoom: () => net?.room ?? -1,
+  });
+
+  /**
+   * The suggestions box, opened with Escape. See `client/src/suggestions.ts`.
+   *
+   * Built **here, before `net` exists and whether or not it ever will**, on the
+   * chat box's argument exactly: the client is constructed a second or two later
+   * on the online path and never at all offline, and the panel has to be
+   * openable in both cases -- offline it says so, which is the whole of what
+   * `?offline` needs from this feature.
+   *
+   * The handlers read `net` through closures rather than holding it, so a
+   * connection that settles after this line is picked up without rebuilding
+   * anything. `?? false` on each is what makes the offline path a returned
+   * boolean rather than a thrown error: the panel asks, gets no, and says no.
+   */
+  const suggestions = new SuggestionsPanel({
+    onRefresh: () => net?.requestSuggestions() ?? false,
+    onSubmit: (title, body) => net?.submitSuggestion(title, body) ?? false,
+    onVote: (localId, dir) => net?.voteSuggestion(localId, dir) ?? false,
+  });
+
   // --- The nameplates: a name and a large health bar over every other player.
   //
   // A user-ordered feature that overrules spec 8.2's "no world-space health
@@ -2267,7 +2343,12 @@ async function main(): Promise<void> {
     const room = chooseRoom(rooms, asked);
     const joinUrl = room === null ? netUrl : `${netUrl}${netUrl.includes('?') ? '&' : '?'}room=${room}`;
     hud.notice(`connecting to ${netUrl}${room === null ? '' : ` (room ${room})`}…`);
-    const client = new NetClient(joinUrl, netHandlers(), { name: playerName });
+    // `clientId` is this browser's vote identity, minted once in
+    // `localStorage` beside `sydney.name` and read here rather than inside the
+    // net layer -- so it survives a reconnect, which rebuilds this object. See
+    // `client/src/suggestions.ts`, which is honest about it being a claim rather
+    // than proof of anything.
+    const client = new NetClient(joinUrl, netHandlers(), { name: playerName, clientId: clientId() });
     // Awaited, and this is the one place the boot blocks on the network.
     //
     // The alternative -- connect in the background and spawn the dummies now,
@@ -2318,6 +2399,12 @@ async function main(): Promise<void> {
     }
   }
   const online = net !== null;
+  // The suggestions box is server-backed: offline it opens and says so rather
+  // than not opening, on the argument that a control which silently does nothing
+  // is a control a player decides is broken. `?offline` is one of the two ways
+  // to get here; a connection that never settled is the other, and they present
+  // identically because they are the same thing to this panel.
+  suggestions.setConnected(online);
 
   /**
    * The football in each dummy's off hand, so it can be hidden while in flight.
@@ -2734,7 +2821,10 @@ async function main(): Promise<void> {
       // they are up: the map is scrolling itself, and the help and the board are
       // being read. A camera that flipped underneath any of them would be a
       // change the player could not see happening.
-      if (hud.typing || bigmap.visible || hud.helpVisible || hud.leaderboardVisible) {
+      // The suggestions box joins the list for a reason of its own: it is the
+      // one panel here that **scrolls**, so a wheel over it is a player reading
+      // the list rather than asking for a camera.
+      if (hud.typing || bigmap.visible || hud.helpVisible || hud.leaderboardVisible || suggestions.visible) {
         wheelCamera = 0;
         return;
       }
@@ -2829,6 +2919,7 @@ async function main(): Promise<void> {
       if (bigmap.visible) {
         hud.setHelp(false);
         hud.setLeaderboard(false);
+        suggestions.close();
       }
     }
     // The diagnostics, moved off `Tab` this pass to make room for the board.
@@ -2849,25 +2940,75 @@ async function main(): Promise<void> {
     // open having stopped playing to look something up.
     if (e.code === 'KeyH' && !held) {
       hud.toggleHelp();
-      if (hud.helpVisible) bigmap.close();
+      if (hud.helpVisible) {
+        bigmap.close();
+        // The control list grows out of the same bottom-right corner the
+        // suggestions box occupies, so of the two panels this is the one pair
+        // that would genuinely overlap rather than merely coexist.
+        suggestions.close();
+      }
     }
-    // Escape closes it, and only ever closes -- it is the browser's key for
-    // "get me out of this" and it should never put something *up*.
+    // `I` opens the chat box. See `client/src/chat.ts`.
+    //
+    // This branch only ever *opens*: closing is the box's own keydown listener,
+    // because the moment it is open `hud.typing` is true and this listener has
+    // already returned at its first line. That is not an accident of ordering,
+    // it is the interlock -- the same one the name prompt has -- and it is what
+    // gives the composer Escape ahead of the control list, the map and any other
+    // panel bound in here. Nothing below can see a key while text is being
+    // typed.
+    //
+    // Edge-triggered on `held` like every other toggle here, or key repeat would
+    // fight the guard at the repeat rate. `preventDefault` because an `i` that
+    // reached the field would open the box with an "i" already in it.
+    if (e.code === 'KeyI' && !held) {
+      e.preventDefault();
+      chat.openBox();
+      // The panels go, on the rule the map applies to the other two: the thing
+      // being asked for now wins, and a text box under a full-screen map is a
+      // text box nobody can see themselves typing into.
+      bigmap.close();
+      hud.setHelp(false);
+      // And the suggestions box, which has text fields of its own -- two text
+      // UIs open at once is two things with a claim on the next keystroke.
+      suggestions.close();
+    }
+    // Escape: **close whatever is open, or -- if nothing is -- open the
+    // suggestions box.** The user asked for that key; this is how it shares.
+    //
+    // The rule the old comment stated is preserved exactly: *this key never puts
+    // something up while something is up*. The new behaviour lives entirely in
+    // the branch where the key previously did nothing at all, so every existing
+    // reflex -- Escape to get rid of the map, Escape to get rid of the control
+    // list -- is unchanged, and no press that used to close something now opens
+    // something instead.
+    //
+    // `anyOpen` is sampled **before** anything is closed, which is the whole of
+    // the correctness here. Reading it afterwards would find nothing open (this
+    // branch just closed it) and open the box on the same press that dismissed
+    // the map -- a panel appearing in the corner as a direct result of asking for
+    // one to go away.
     //
     // Under pointer lock the browser eats this keydown to release the pointer
     // and the page never sees it, so in practice the first Escape gives the
-    // cursor back and the second closes the panel. That is the right shape
-    // rather than a compromise: a player reading the control list has already
-    // stopped playing, so the panel is nearly always open with the pointer
-    // free, and this is reached on the first press in that case.
+    // cursor back and the second reaches here. That is the same two-press shape
+    // the control list has always had, it cannot be changed from script, and for
+    // this panel it is the right sequence anyway: the box has buttons in it and
+    // needs the cursor, so the press that frees the pointer is not a wasted one.
+    // `index.html`'s `#help` block says "esc — suggestions" so the first press is
+    // not a mystery.
     //
-    // Both panels, and the map is the one this matters most for: it covers the
-    // game, and Escape is the key every player already presses when something is
-    // in the way. `close` is a no-op when it is already shut, so this stays
-    // "only ever closes" however many things it closes.
+    // The chat composer and the name prompt never reach this line: while either
+    // has the keyboard `hud.typing` is true and this listener returned at its
+    // first statement. The suggestions panel's own compose fields do the same,
+    // through `hud.suggestTyping`, which is why closing it *from the textarea* is
+    // handled in `suggestions.ts` rather than here.
     if (e.code === 'Escape') {
+      const anyOpen = hud.helpVisible || bigmap.visible || hud.leaderboardVisible || suggestions.visible;
       hud.setHelp(false);
       bigmap.close();
+      if (suggestions.visible) suggestions.close();
+      else if (!anyOpen) suggestions.open();
     }
     // The scoreboard, **held** rather than toggled. See `index.html`.
     //
@@ -2886,6 +3027,11 @@ async function main(): Promise<void> {
       // are centred and the map is the larger of the two. Same no-op contract as
       // above, so a held key costs a boolean compare either way.
       bigmap.close();
+      // And the suggestions box, on the same rule -- and with one extra reason
+      // the others do not have: Tab is the key that moves focus *into* its
+      // fields, so a board held on Tab over an open compose box would be a board
+      // that types into it.
+      suggestions.close();
     }
   });
   window.addEventListener('keyup', (e) => {
@@ -3186,6 +3332,33 @@ async function main(): Promise<void> {
         if (status === 'online') hud.notice('');
         else if (status === 'refused') hud.notice(`server refused the connection: ${detail}`);
         else if (status === 'offline') hud.notice(`disconnected: ${detail}`);
+      },
+      /**
+       * Somebody said something, anywhere on the server.
+       *
+       * Straight into the chat log and deliberately **not** into `kills`. The
+       * two are adjacent and distinct: the feed is four lines of things that
+       * happened to bodies, held by this file and drawn in the diagnostics
+       * overlay; the chat is eight lines of things people said, held by
+       * `ChatBox` with its own expiry. Sharing one list would mean a busy
+       * conversation pushing out the line that says who knocked you down.
+       */
+      onChat(line) {
+        chat.push(line);
+      },
+      /*
+       * The suggestion list, straight into the panel and held nowhere else.
+       *
+       * It arrives on an open (the panel asked) and unasked whenever somebody
+       * anywhere on the host votes -- which is what makes two people voting
+       * beside each other one list rather than two. `show` is a no-op when the
+       * panel is shut, so an arrival for a closed panel costs a field write.
+       */
+      onSuggestions(list) {
+        suggestions.show(list);
+      },
+      onSuggestAck(result, issue, message) {
+        suggestions.ack(result, issue, message);
       },
     };
   }
@@ -4036,6 +4209,19 @@ async function main(): Promise<void> {
       hud.notice(`bike tuning unlocked -- rides are now ${BIKE_TUNED_COFFEES}x a coffee run`);
       audio.pickupTraining();
     }
+
+    // The suggestions panel's claim on the keyboard, pushed every frame rather
+    // than on a focus event.
+    //
+    // A focus listener would be cheaper and is wrong in one case that actually
+    // happens: the focus can leave a field without a `blur` this file hears
+    // about -- the panel being closed by another panel's key, the window losing
+    // focus mid-sentence -- and a stale `true` here is *every game key dead for
+    // the rest of the session*, which is the worst failure this feature could
+    // have. Asking a getter that reads `document.activeElement` once a frame
+    // cannot go stale, and costs a comparison. The chat box can afford the
+    // event-driven version because its box has exactly one way to close.
+    hud.suggestTyping = suggestions.typing;
 
     hud.vitals({
       health: playerCombat.health,

@@ -88,7 +88,17 @@ import {
   snapshotBytes,
 } from '../client/src/net/protocol.ts';
 import { verifyNames, verifyNet } from '../client/src/net/protocol.ts';
+import { verifyChat } from '../client/src/net/chat.ts';
+import { verifySuggestions } from '../client/src/net/suggestions.ts';
 import { verifyAoi } from './aoi.ts';
+import { ChatHub } from './chat.ts';
+import {
+  SuggestionHub,
+  SuggestionStore,
+  defaultLedgerPath,
+  githubRepo,
+  githubToken,
+} from './suggestions.ts';
 import { verifyRewind } from './rewind.ts';
 import { verifySim } from './sim.ts';
 import { RoomHost, newConn, type Conn, type Socket } from './room.ts';
@@ -114,7 +124,9 @@ const BOT_COUNT = Number(process.env.SYDNEY_BOTS ?? 2);
  * invalidated a documented command for no reader's benefit.
  */
 const ROOM_COUNT = Math.max(1, Number(process.env.SYDNEY_ROOMS ?? 1));
-const ROOM_CAP = Number(process.env.SYDNEY_ROOM_CAP ?? process.env.SYDNEY_MAX_PLAYERS ?? 128);
+const ROOM_CAP = Number(
+  process.env.SYDNEY_ROOM_CAP ?? process.env.SYDNEY_MAX_PLAYERS ?? MAX_PLAYERS,
+);
 /**
  * The id of this host's first room. Rooms are `BASE .. BASE + COUNT - 1`.
  *
@@ -151,6 +163,21 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // arrangement only works if the two runs agree, which is what an idempotent
     // sanitiser compiled from one file means.
     ['verifyNames', verifyNames()],
+    // And the chat, in the process that has the last word on *that* too, and for
+    // the same reason one line up: the browser sanitises so the box shows what
+    // will be sent, this sanitises again because the first run happened inside
+    // something the player controls, and the arrangement only works if the two
+    // runs agree. The rate limiter's arithmetic goes with it -- a window wrong
+    // by a factor either lets a flood through or throttles a conversation, and
+    // neither has a frame that says so. See `client/src/net/chat.ts`.
+    ['verifyChat', verifyChat()],
+    // The suggestions box's week arithmetic, sanitiser, order and codecs.
+    // Run **here** rather than only in the browser because the server is the
+    // side that keeps the ledger, and every failure in that file is silent in
+    // this repo's sense: the panel opens, the votes are accepted, and the count
+    // is quietly against the wrong week -- which nobody reports, because nobody
+    // was counting. See `client/src/net/suggestions.ts`.
+    ['verifySuggestions', verifySuggestions()],
     ['verifyRewind', verifyRewind()],
     // PERFORMANCE.md phase 1's grid, which every hit test in the game now
     // takes its candidates from. A grid that is not a superset is a punch that
@@ -198,6 +225,46 @@ console.log(
     `(${ROOM_COUNT * ROOM_CAP} players this process), ${BOT_COUNT} bot(s) per room — ` +
     `${(performance.now() - tRooms).toFixed(0)} ms`,
 );
+
+/**
+ * Global chat, which is the one channel that belongs to the **host** rather than
+ * to a room.
+ *
+ * Constructed here beside the rooms rather than inside `RoomHost` for exactly
+ * that reason: a `Room` owns a simulation and its sockets, and a hub that lived
+ * on one would be a hub with an opinion about which room chat came from. See
+ * `server/chat.ts`, including the multi-process limitation it states.
+ */
+const chat = new ChatHub();
+
+/**
+ * The suggestions box: a durable ledger and a one-way mirror into GitHub issues.
+ *
+ * Host-wide rather than per-room, on `chat`'s argument and one stronger: a
+ * suggestion is about **the game**, not about the twelve people who happened to
+ * be in room 3 when somebody thought of it. Two rooms with two lists would be
+ * two lists to curate and a vote that meant a different amount depending on
+ * where you spawned.
+ *
+ * Constructed before the socket opens and `load`ed before it accepts anybody,
+ * so the first player to open the panel sees the real list rather than an empty
+ * one that fills in a moment later.
+ */
+const suggestions = new SuggestionStore({
+  path: defaultLedgerPath(WORLD_ROOT),
+  repo: githubRepo(),
+  // Read once, here, from the environment. Never from a client, never logged.
+  // See `server/suggestions.ts`'s header for what is enforced structurally about
+  // the credential rather than by care.
+  token: githubToken(),
+});
+await suggestions.load();
+const suggestionHub = new SuggestionHub(suggestions);
+console.log(`[sydney] suggestions: ${suggestions.describe()}`);
+// The first read, not awaited: it picks up anything filed on GitHub directly and
+// anything the curator closed since the last run, and a boot that blocked on
+// api.github.com would be a boot that fails when GitHub does.
+void suggestions.refresh();
 
 // --- Connections --------------------------------------------------------------
 
@@ -453,6 +520,37 @@ const server = Bun.serve<Conn>({
           return;
         }
 
+        /*
+         * Global chat, and the one message here that leaves the room it arrived
+         * in. See `server/chat.ts` for the fan-out, the abuse floor and the
+         * multi-process limitation.
+         *
+         * `host` is handed in rather than the room, which is the whole point:
+         * every other case in this switch resolves `conn.room` and stops there.
+         */
+        case MSG.CHAT_SAY: {
+          chat.say(host, ws, frame);
+          return;
+        }
+
+        /*
+         * The suggestions box, and the second message here that is the host's
+         * rather than a room's. See `server/suggestions.ts`.
+         *
+         * The only `await`-shaped case in this switch, and it is deliberately
+         * **not awaited**: filing a suggestion posts to GitHub, and a message
+         * handler that waited on api.github.com would stall this socket's reads
+         * behind somebody else's network. `void` is the honest spelling of "this
+         * finishes on its own and answers the client when it does" -- the
+         * acknowledgement is a frame, not a return value, so nothing here needs
+         * the result. Rejections cannot escape: every path inside `handle`
+         * catches its own.
+         */
+        case MSG.SUGGEST: {
+          void suggestionHub.handle(ws, frame);
+          return;
+        }
+
         default:
           return;
       }
@@ -460,6 +558,10 @@ const server = Bun.serve<Conn>({
 
     close(ws: Socket) {
       conns.delete(ws);
+      // The suggestions hub holds a set of sockets with a panel open, so it can
+      // push the list when a score moves. Forgetting on close is what stops that
+      // set being an unbounded leak of dead sockets on a long-running host.
+      suggestionHub.forget(ws);
       const conn = ws.data;
       const room = conn.room >= 0 ? host.get(conn.room) : undefined;
       const p = conn.participant;
@@ -627,3 +729,43 @@ console.log(
     `spec 2's cap is ${MAX_PLAYERS} and a room here holds ${ROOM_CAP})`,
 );
 console.log(`[sydney] health: http://localhost:${server.port}/health   rooms: http://localhost:${server.port}/rooms`);
+
+/**
+ * Get the suggestions ledger on disk and its tallies onto GitHub before dying.
+ *
+ * The **only** thing in this process with state worth flushing, which is why
+ * this is the first shutdown hook the server has ever had: the game itself is
+ * deliberately unpersisted (spec 12 -- no accounts, no storage, the scoreboard
+ * dies with the process) and a room has nothing to save. The votes are the
+ * exception, because they are the one thing here a player accumulates across
+ * sessions.
+ *
+ * Both signals, because they arrive from different places and mean the same
+ * thing: SIGINT is Ctrl-C in a terminal and SIGTERM is systemd stopping the
+ * unit on a deploy, which is the case that would otherwise lose up to a minute
+ * of tallies on every restart.
+ *
+ * The ledger writes are already debounced to 250 ms and would mostly have
+ * landed; what this really buys is the **GitHub flush**, which is on a 60 s
+ * timer by design (see `SuggestionStore`) and would otherwise leave the last
+ * minute of voting out of the issue bodies until somebody voted again.
+ *
+ * `process.exit` at the end rather than falling through: the 60 Hz pump is a
+ * `setTimeout` chain that will happily keep this process alive forever, and a
+ * deploy that waited on it would wait for systemd's kill timer instead.
+ */
+let stopping = false;
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    // Guarded, because a second Ctrl-C while the first flush is in flight would
+    // otherwise start a concurrent one -- and `sync` posting the same queued
+    // suggestion twice is a duplicate issue that cannot be un-filed.
+    if (stopping) return;
+    stopping = true;
+    console.log(`[sydney] ${signal}: flushing suggestions…`);
+    void suggestions
+      .close()
+      .catch((err) => console.error(`[sydney] suggestions: flush failed: ${String(err)}`))
+      .finally(() => process.exit(0));
+  });
+}

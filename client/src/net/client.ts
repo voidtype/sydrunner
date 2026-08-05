@@ -130,6 +130,15 @@ import {
   type SnapshotNpc,
   type SnapshotPlayer,
 } from './protocol.ts';
+import { decodeChatLine, encodeChatSay, sanitiseChat, type ChatLine } from './chat.ts';
+import {
+  decodeSuggestAck,
+  decodeSuggestionList,
+  encodeSuggestList,
+  encodeSuggestSubmit,
+  encodeSuggestVote,
+  type SuggestionList,
+} from './suggestions.ts';
 import { NPC_STATE, type NpcActor } from '../game/factions.ts';
 
 const FIXED_DT = 1 / TICK_HZ;
@@ -261,6 +270,31 @@ export interface NetHandlers {
    */
   onDrop(id: number): void;
   onStatus(status: NetStatus, detail: string): void;
+  /**
+   * Somebody said something, anywhere on the host. See `net/chat.ts`.
+   *
+   * **Optional**, unlike every other member here, and that is deliberate rather
+   * than lazy: the six above are all things a renderer must react to or leak --
+   * a rig, a feed line, a status. A chat line is *text*, and a caller that has
+   * no chat log (a headless probe, a check) should not have to supply an empty
+   * function to prove it. The dispatch below is `?.`-guarded accordingly.
+   *
+   * The line arrives with the sender's name already on it rather than an id to
+   * look up, because chat crosses rooms and this client's roster is its own
+   * room's -- see `chat.encodeChatLine`.
+   */
+  onChat?(line: ChatLine): void;
+  /**
+   * The ranked suggestion list arrived, with this client's own standing in it.
+   *
+   * Optional like `onChat` and for the same reason: a headless probe and the
+   * integration check have no panel, and a handler set that forced them to
+   * supply an empty function for every feature would grow a line per feature
+   * forever.
+   */
+  onSuggestions?(list: SuggestionList): void;
+  /** Yes / no / not this week, with the server's own sentence. */
+  onSuggestAck?(result: number, issue: number, message: string): void;
 }
 
 interface PendingInput {
@@ -492,13 +526,28 @@ export class NetClient {
    */
   private readonly wantedName: string;
 
+  /**
+   * This browser's vote identity, or the empty string if it has none.
+   *
+   * Handed in rather than minted here. It lives in `localStorage` beside
+   * `sydney.name` (see `suggestions.clientId`) and the net layer only carries
+   * it, which is what keeps one identity per browser rather than one per
+   * `NetClient` -- a distinction that matters because this object is
+   * reconstructed on a reconnect and a vote identity must not be.
+   *
+   * It is **a claim and not proof**, and `net/suggestions.ts`'s header is honest
+   * about how far that goes. Nothing else in this client reads it.
+   */
+  private readonly clientId: string;
+
   constructor(
     url: string,
     handlers: NetHandlers,
-    options: { name?: string; transport?: NetTransport } = {},
+    options: { name?: string; transport?: NetTransport; clientId?: string } = {},
   ) {
     this.handlers = handlers;
     this.wantedName = options.name ?? '';
+    this.clientId = options.clientId ?? '';
     // Injectable so the integration harness and any future WebTransport class
     // can be dropped in without this file knowing. See `protocol.NetTransport`.
     this.transport = options.transport ?? new WebSocketTransport(url);
@@ -594,6 +643,67 @@ export class NetClient {
     // acknowledging -- because it died, or because the socket is half-open --
     // would otherwise grow this forever at 60 records a second.
     if (this.pending.length > INPUT_HISTORY) this.pending.shift();
+  }
+
+  /**
+   * Say something to everybody on the server. Returns what was actually sent, or
+   * the empty string if nothing was.
+   *
+   * Sanitised **here** as well as on the server, on `sendInput`'s neighbouring
+   * principle and `protocol.sanitiseName`'s explicit one: the client runs the
+   * shared function so what the player sees accepted is what the server accepts,
+   * and the server runs it again because the first run happened inside something
+   * the player controls. An empty result is dropped rather than sent, which
+   * spends none of the sender's rate budget on a stray Enter.
+   *
+   * Refused while offline for the obvious reason and one less obvious: `status`
+   * is `'offline'` on the `?offline` path *and* on a connection that dropped, and
+   * a message typed into a dead socket that silently vanished would be worse than
+   * one that was never accepted. `client/src/chat.ts` says so in the box.
+   */
+  sendChat(text: string): string {
+    if (this.status !== 'online') return '';
+    const clean = sanitiseChat(text);
+    if (clean.length === 0) return '';
+    this.transport.send(encodeChatSay(clean));
+    return clean;
+  }
+
+  /**
+   * The suggestions box's three requests. See `net/suggestions.ts`.
+   *
+   * Three thin methods rather than one with a discriminated argument, because
+   * the caller is a panel with three buttons and a union type at this seam would
+   * only be unpacked again on the next line. They share one message id and one
+   * flood budget on the wire; that is the protocol's business and not the
+   * panel's.
+   *
+   * All three carry the client id, which this object holds because it was handed
+   * one at construction and **never mints one** -- an identity minted in the net
+   * layer would be a second one beside `localStorage`'s, and a player would have
+   * a different vote identity per reconnect. See `suggestions.clientId`.
+   *
+   * Refused while offline on `sendChat`'s argument: `status` is `'offline'` on
+   * the `?offline` path and on a dropped socket alike, and a vote that silently
+   * vanished into a dead connection is worse than one visibly refused. The panel
+   * says so rather than failing quietly.
+   */
+  requestSuggestions(): boolean {
+    if (this.status !== 'online' || this.clientId === '') return false;
+    this.transport.send(encodeSuggestList(MSG.SUGGEST, this.clientId));
+    return true;
+  }
+
+  submitSuggestion(title: string, body: string): boolean {
+    if (this.status !== 'online' || this.clientId === '') return false;
+    this.transport.send(encodeSuggestSubmit(MSG.SUGGEST, this.clientId, title, body));
+    return true;
+  }
+
+  voteSuggestion(localId: number, dir: number): boolean {
+    if (this.status !== 'online' || this.clientId === '') return false;
+    this.transport.send(encodeSuggestVote(MSG.SUGGEST, this.clientId, localId, dir));
+    return true;
   }
 
   /** Called every frame. Advances the interpolation clock and places the remotes. */
@@ -700,6 +810,43 @@ export class NetClient {
             r.bot = e.bot;
           }
         }
+        return;
+      }
+      /*
+       * A line of chat, from anywhere on the host -- this room or another one.
+       *
+       * Passed straight out rather than filed on this object, which is the one
+       * decision in this case. Every other message here updates state the client
+       * reads back (the roster, the remotes, the bikes), because those are facts
+       * about the world that a late frame must be able to ask about. A chat line
+       * is an *event with a lifetime*: it is drawn, it fades, it scrolls off.
+       * Holding a copy here would be a second scrollback with its own expiry
+       * rules beside the one in `client/src/chat.ts` that already has them.
+       */
+      case MSG.CHAT_LINE: {
+        const line = decodeChatLine(frame);
+        if (line) this.handlers.onChat?.(line);
+        return;
+      }
+      /*
+       * The suggestion list and its acknowledgements. See `net/suggestions.ts`.
+       *
+       * Passed straight out and **not filed here**, on `CHAT_LINE`'s argument
+       * with one addition of its own. Every message this object keeps a copy of
+       * is a fact about the world that a late frame may need to ask about; a
+       * suggestion list is a fact about a *panel that is currently open*, and it
+       * carries this client's own remaining votes -- so a stale copy held here
+       * would be the one thing a reopened panel must not draw. The panel asks
+       * again on every open, which costs one frame a session.
+       */
+      case MSG.SUGGEST_LIST: {
+        const list = decodeSuggestionList(frame, MSG.SUGGEST_LIST);
+        if (list) this.handlers.onSuggestions?.(list);
+        return;
+      }
+      case MSG.SUGGEST_ACK: {
+        const ack = decodeSuggestAck(frame, MSG.SUGGEST_ACK);
+        if (ack) this.handlers.onSuggestAck?.(ack.result, ack.issue, ack.message);
         return;
       }
       case MSG.POWERUPS: {

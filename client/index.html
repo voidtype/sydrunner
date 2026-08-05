@@ -371,6 +371,113 @@
         text-shadow: 0 1px 2px rgba(0,0,0,.85); white-space: nowrap;
       }
 
+      /* Global chat, bottom-left, above the vitals. See `client/src/chat.ts`
+         for the interaction and `client/src/net/chat.ts` for the wire.
+
+         THE POSITION IS THE ONE CONSTRAINT THIS ELEMENT HAS. Four corners are
+         already spoken for -- vitals bottom-left, controls bottom-right, map and
+         locator top-right, diagnostics top-left -- and the notice pill runs
+         along the bottom centre. This takes the only space left: directly above
+         the vitals, in the same 16 px gutter, growing *upwards* so the pips
+         never move. A player reads health by glancing down mid-fight and the
+         one thing that block must never do is shift because somebody said hello.
+
+         96 px is the vitals stack at its tallest: an effect chip row (19), the
+         pips (12), the stamina bar (3), the ball bar (2) and three 6 px gaps,
+         plus the 16 px bottom margin and a 22 px breather. The chips are the
+         only part that comes and goes, and reserving their height unconditionally
+         is what stops the chat sliding down when a coffee wears off.
+
+         Width mirrors `#help`'s cap on the opposite side -- 42vw against its
+         44vw -- so the two blocks can never meet in the middle of a narrow
+         window, which is the same trade that comment describes making. */
+      #chat {
+        position: fixed; left: 16px; bottom: 96px;
+        width: min(460px, 42vw);
+        display: flex; flex-direction: column; gap: 6px;
+        pointer-events: none; z-index: 3;
+        font-size: 11px; line-height: 1.5; letter-spacing: .02em;
+      }
+      /* Text over the world like `#debug` and `#help`, not a panel: a persistent
+         background in the corner of a game is a persistent hole in the picture,
+         and this element is on screen for as long as anybody is talking. The
+         shadow is what makes it readable over a sunlit sandstone wall. */
+      #chatlog {
+        display: flex; flex-direction: column; gap: 3px;
+        color: #cfe2f2; text-shadow: 0 1px 2px rgba(0,0,0,.85);
+        transition: opacity .6s ease;
+      }
+      /* Fifteen seconds of silence. Slow rather than abrupt, because a line that
+         snapped out would read as a rendering fault; and to zero rather than to a
+         dim tone, because half-visible text over a moving city is worse than
+         none. `client/src/chat.ts` holds this off while the composer is open. */
+      #chatlog.faded { opacity: 0; }
+      /* Long words wrap instead of running under the map. `anywhere` rather than
+         `break-word` so it also applies inside the flex measurement, which is
+         what stops a 120-character URL widening the block past its own cap. */
+      #chatline, .chatline {
+        overflow-wrap: anywhere; word-break: break-word;
+      }
+      /* The speaker, a step brighter than what they said: a scrollback is read
+         by finding the name first and the sentence second, which is the opposite
+         of the leaderboard's emphasis and is why the tones are the other way
+         round from `#helpfull`'s. */
+      .chatline .name { color: #e6eef6; margin-right: .45em; }
+      .chatline .body { color: #cfe2f2; }
+      /* Your own line, in the bike bar's own colour. The only other non-blue in
+         this HUD is `#pips`' red, which means exactly one thing (see there), so
+         "this one is mine" borrows the footy's rather than inventing a third
+         hue. */
+      .chatline.mine .name { color: #e8b9a8; }
+      /* The room marker, for a line from somewhere else on the host. Cross-room
+         lines are the norm under the least-full gateway rule, so only the ones
+         from elsewhere are marked and the reader's own room is silent. The dim
+         tone is `#help .more`'s, which is this stylesheet's established "label,
+         not content". */
+      .chatline .room {
+        color: #7f95ab; margin-right: .45em; font-size: 9px; letter-spacing: .08em;
+      }
+      /* A server notice -- the throttle, the offline explanation. Italic and dim
+         so it never reads as somebody talking. */
+      .chatline.system .body { color: #93a8bc; font-style: italic; }
+
+      /* The composer, hidden until `I`. A background here where the log has
+         none, and it is the one place in this HUD that gets one: it is a text
+         field, it is on screen only while it is being used, and a caret over a
+         city is invisible without something behind it. The pill's own 55% and
+         the panels' own border, so it reads as the same program. */
+      #chatcompose {
+        display: none; align-items: center;
+        background: rgba(10,14,20,.66);
+        -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+        border: 1px solid rgba(207,226,242,.34);
+        padding: 5px 9px;
+      }
+      #chat.open #chatcompose { display: flex; pointer-events: auto; }
+      #chatprefix {
+        color: #7f95ab; letter-spacing: .16em; text-transform: uppercase;
+        font-size: 9px; margin-right: 9px; flex: 0 0 auto;
+      }
+      /* `font: inherit` and a stripped chrome, because a browser's default text
+         field is the one element on this screen that would look like a form. */
+      #chatinput {
+        flex: 1 1 auto; min-width: 0;
+        font: inherit; letter-spacing: .02em;
+        background: transparent; border: none; outline: none;
+        color: #e6eef6; caret-color: #9fc4e2;
+      }
+      #chatinput::placeholder { color: #6d8298; }
+      /* On a short window the log gives up half its lines rather than the whole
+         block: the composer is what is being used and the last few lines are
+         what is being answered. `#help` makes the same trade one corner over. */
+      @media (max-height: 520px) {
+        #chat { bottom: 88px; }
+        #chatlog .chatline:nth-last-child(n+5) { display: none; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #chatlog { transition: none; }
+      }
+
       #ko {
         position: fixed; top: 44%; left: 50%; transform: translate(-50%,-50%);
         font-size: 12px; letter-spacing: .38em; text-transform: uppercase;
@@ -487,6 +594,125 @@
          be a lie about the best connection in the game. */
       #leaderboard td.none { color: #5f7285; }
 
+      /* The suggestions box, bottom-right, opened with Escape.
+
+         Same family as the leaderboard and the control list -- 11px, #cfe2f2 on
+         a dark translucent panel, one hairline border, no rounded corners, no
+         second font. It is a bigger panel than either because it is the only one
+         you *do* something in rather than read, but nothing about its palette is
+         new.
+
+         `pointer-events: auto` and it is the only overlay in this file that has
+         it. The leaderboard's comment states the rule this is the exception to:
+         *a panel that swallowed a click would swallow the one that recaptures
+         the pointer lock*. This one is allowed to because it is `display: none`
+         when shut -- so it is not in the hit test at all unless it is open, and
+         the click that re-locks the pointer behaves exactly as it did before it
+         existed. */
+      #suggestions {
+        position: fixed; right: 14px; bottom: 16px;
+        display: none; pointer-events: auto; z-index: 7;
+        width: min(400px, 92vw); max-height: min(560px, 78vh);
+        flex-direction: column;
+        background: rgba(10,14,20,.55);
+        -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+        border: 1px solid rgba(207,226,242,.34);
+        box-shadow: 0 2px 12px rgba(0,0,0,.7);
+        padding: 12px 14px; color: #cfe2f2;
+        font-size: 11px; letter-spacing: .02em; line-height: 1.5;
+      }
+      #suggestions.shown { display: flex; }
+      /* The compact control block lives in this exact corner. While the box is
+         open it is behind it, so it goes -- through the body class rather than
+         through `#help.hidden`, which `hud.setHelp` owns and would fight over. */
+      body.suggesting #help { opacity: 0; }
+      #suggestions h1 {
+        font-size: 9px; letter-spacing: .38em; text-transform: uppercase;
+        color: #7f95ab; font-weight: normal; margin: 0 0 2px;
+      }
+      #suggestions-note { color: #93a8bc; margin-bottom: 8px; }
+      #suggestions-note.spent { color: #d98b8b; }
+      /* The list scrolls and the compose box does not: the thing you are adding
+         to must stay put while you read what is already there. */
+      #suggestions-list {
+        overflow-y: auto; flex: 1 1 auto; min-height: 0;
+        border-top: 1px solid rgba(207,226,242,.18);
+      }
+      #suggestions-list .empty { color: #7f95ab; padding: 10px 0; }
+      #suggestions .row {
+        display: flex; gap: 10px; align-items: flex-start;
+        padding: 7px 0; border-bottom: 1px solid rgba(207,226,242,.10);
+      }
+      #suggestions .votes {
+        display: flex; flex-direction: column; align-items: center; gap: 1px;
+        flex: 0 0 auto; width: 30px;
+      }
+      #suggestions .votes button {
+        background: none; border: none; padding: 0; cursor: pointer;
+        color: #7f95ab; font: inherit; font-size: 12px; line-height: 1;
+      }
+      #suggestions .votes button:hover:not(:disabled) { color: #ffffff; }
+      /* A spent vote stays visible rather than vanishing: "you already voted for
+         this" is information, and a control that disappeared would read as the
+         suggestion having changed. */
+      #suggestions .votes button.cast.up { color: #8fd9a0; }
+      #suggestions .votes button.cast.down { color: #d98b8b; }
+      #suggestions .votes button:disabled { opacity: .35; cursor: default; }
+      #suggestions .score {
+        font-variant-numeric: tabular-nums; color: #cfe2f2; padding: 1px 0;
+      }
+      #suggestions .score.pos { color: #8fd9a0; }
+      #suggestions .score.neg { color: #d98b8b; }
+      #suggestions .main { flex: 1 1 auto; min-width: 0; }
+      #suggestions .title { cursor: pointer; }
+      #suggestions .title:hover { color: #ffffff; }
+      /* The player's own text, and the one place in this interface a newline
+         survives -- `pre-wrap`, because a suggestion written as three lines was
+         written as three lines. */
+      #suggestions .body {
+        white-space: pre-wrap; color: #93a8bc; margin: 3px 0 1px;
+        padding-left: 8px; border-left: 1px solid rgba(207,226,242,.18);
+      }
+      #suggestions .meta { color: #7f95ab; font-size: 10px; }
+      #suggestions .issue { color: #5f7285; }
+      #suggestions-compose {
+        display: flex; flex-direction: column; gap: 5px;
+        padding-top: 9px; margin-top: 2px;
+        border-top: 1px solid rgba(207,226,242,.18);
+      }
+      #suggestions input, #suggestions textarea {
+        background: rgba(0,0,0,.35); border: 1px solid rgba(207,226,242,.22);
+        color: #cfe2f2; font: inherit; font-size: 11px; padding: 5px 7px;
+        outline: none; width: 100%; box-sizing: border-box;
+      }
+      #suggestions input:focus, #suggestions textarea:focus {
+        border-color: rgba(207,226,242,.55);
+      }
+      #suggestions input:disabled, #suggestions textarea:disabled { opacity: .4; }
+      #suggestions textarea { resize: none; height: 46px; line-height: 1.45; }
+      #suggestions-row {
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      }
+      #suggestions-count { color: #7f95ab; font-size: 10px; }
+      #suggestions-count.bad { color: #d98b8b; }
+      #suggestions-send {
+        background: rgba(207,226,242,.10); border: 1px solid rgba(207,226,242,.34);
+        color: #cfe2f2; font: inherit; font-size: 11px; padding: 4px 12px; cursor: pointer;
+      }
+      #suggestions-send:hover:not(:disabled) { background: rgba(207,226,242,.20); }
+      #suggestions-send:disabled { opacity: .4; cursor: default; }
+      #suggestions-status { min-height: 1.5em; margin-top: 5px; color: #93a8bc; }
+      #suggestions-status.ok { color: #8fd9a0; }
+      #suggestions-status.bad { color: #d98b8b; }
+      #suggestions-foot {
+        color: #5f7285; font-size: 10px; margin-top: 4px;
+        border-top: 1px solid rgba(207,226,242,.10); padding-top: 5px;
+      }
+      /* A short window is a laptop with the dev tools open. The list gives up
+         its height first, because the compose box is the part you cannot use
+         without. */
+      @media (max-height: 620px) { #suggestions { max-height: 86vh; } }
+
       /* The name prompt, over everything including the loading screen.
 
          The only element in this interface that takes a click, and the only one
@@ -564,6 +790,19 @@
     </div>
     <div id="hint">loading</div>
 
+    <!-- Global chat. The log is above the vitals and the composer is under it,
+         so the line you are typing is the closest thing to the corner your eye
+         is already in. Both are one block so the log rises as the composer
+         appears rather than being written over by it. See `client/src/chat.ts`. -->
+    <div id="chat">
+      <div id="chatlog"></div>
+      <div id="chatcompose">
+        <span id="chatprefix">say</span
+        ><input id="chatinput" maxlength="120" autocomplete="off" autocapitalize="off"
+                autocorrect="off" spellcheck="false" placeholder="enter to send · esc to cancel" />
+      </div>
+    </div>
+
     <!-- Static markup, unlike every other panel here, because this is the one
          thing on the screen that never changes: the bindings are compiled into
          `main.ts`'s keydown listener and a list built at runtime would be the
@@ -572,7 +811,7 @@
     <div id="help">
       <div class="keys">wasd move · space jump · shift sprint</div>
       <div class="keys">mouse look · left click bat · right click footy</div>
-      <div class="more">h — all controls</div>
+      <div class="more">h — all controls · esc — suggestions</div>
     </div>
 
     <div id="helpfull">
@@ -610,10 +849,35 @@
         <div><kbd>left click</kbd>swing the bat</div>
         <div><kbd>right click</kbd>throw a footy</div>
       </section>
+      <!-- Its own section rather than a line under `interface`, on `lime bikes`'
+           argument: chat is a topic somebody looks up ("how do I talk to
+           people"), not another panel key. The second line is the part that is
+           not obvious from the binding and is the whole point of the feature —
+           it reaches every room on the server, not the one you are standing
+           in. See `client/src/chat.ts`. -->
+      <section>
+        <h2>chat</h2>
+        <div><kbd>i</kbd>say something</div>
+        <div><kbd>enter</kbd>send · <kbd>esc</kbd>cancel</div>
+        <div>everyone on the server hears it, in every room</div>
+      </section>
+      <!-- Its own section for the same reason chat has one: it is a thing you
+           do rather than a key you press, and the weekly rule is the part
+           nobody would guess. See `client/src/net/suggestions.ts`. -->
+      <section>
+        <h2>suggestions</h2>
+        <div><kbd>esc</kbd>open the box</div>
+        <div>4 votes a week, one per suggestion</div>
+        <div>the top one each week gets built</div>
+      </section>
       <section>
         <h2>interface</h2>
         <div><kbd>h</kbd>all controls</div>
-        <div><kbd>esc</kbd>close panels</div>
+        <!-- One key, two jobs, and which one you get depends on whether
+             anything is open. See `client/src/suggestions.ts`: the old
+             behaviour is a strict prefix of the new one, so this key still
+             never puts something up while something is up. -->
+        <div><kbd>esc</kbd>close panels, or open suggestions</div>
         <div><kbd>tab</kbd>scores, held</div>
         <div><kbd>m</kbd>city map</div>
         <!-- The map takes the wheel off the camera while it is open, which is
@@ -650,6 +914,28 @@
         </thead>
         <tbody id="leaderboard-rows"></tbody>
       </table>
+    </div>
+
+    <!-- The suggestions box. Escape with nothing else open; see
+         `client/src/suggestions.ts` for why that key and what the pointer-lock
+         double press is. The rows are built there, not here: how many there are
+         is the server's answer and not a fact about this document. -->
+    <div id="suggestions">
+      <h1>suggestions</h1>
+      <div id="suggestions-note"></div>
+      <div id="suggestions-list"></div>
+      <div id="suggestions-compose">
+        <input id="suggestions-title" maxlength="90" autocomplete="off" autocapitalize="off"
+               autocorrect="off" spellcheck="false" placeholder="a change you want, in one line" />
+        <textarea id="suggestions-body" maxlength="400" autocomplete="off"
+                  placeholder="why (optional)"></textarea>
+        <div id="suggestions-row">
+          <span id="suggestions-count"></span>
+          <button id="suggestions-send" type="button">suggest</button>
+        </div>
+      </div>
+      <div id="suggestions-status"></div>
+      <div id="suggestions-foot"></div>
     </div>
 
     <div id="nameprompt">

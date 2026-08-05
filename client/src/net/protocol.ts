@@ -195,6 +195,32 @@ export const MSG = {
   HELLO: 0x01,
   INPUT: 0x02,
   PING: 0x03,
+  /**
+   * Say something to everybody on the host. See `net/chat.ts`.
+   *
+   * **0x0b rather than 0x04**, which is the next free number, and the reason is
+   * this file's own halves rule one paragraph up: `0x0b` is `0x8b & 0x7f`, so the
+   * request and the reply it produces are one number in two halves and reading
+   * either off a hex dump gives you the other. It also keeps the low end of the
+   * client range free for whatever the next feature wants, which matters when
+   * two features are being built at once against the same table.
+   */
+  CHAT_SAY: 0x0b,
+  /**
+   * The suggestions box, in one client message. See `net/suggestions.ts`.
+   *
+   * **0x0c on `CHAT_SAY`'s convention** -- `0x8c & 0x7f`, so the request and the
+   * list it asks for are one number in two halves.
+   *
+   * *One* id for three operations (ask for the list, file a suggestion, vote),
+   * discriminated by a sub-op byte, which is the only place in this table a
+   * message is not one shape. The argument is that they are one conversation
+   * held a handful of times a session: three ids would be three cases in
+   * `server/index.ts` for one feature, and its flood guard -- which is
+   * per-socket and counts this feature's traffic -- would have had to be summed
+   * across all three. See `suggestions.SUGGEST_OP`.
+   */
+  SUGGEST: 0x0c,
 
   WELCOME: 0x81,
   SNAPSHOT: 0x82,
@@ -258,6 +284,50 @@ export const MSG = {
    * standing still in an empty street is sent nothing at all.
    */
   INTEREST: 0x8a,
+  /**
+   * One line of chat, from anybody on the host. See `net/chat.ts`.
+   *
+   * The **only message in this table that is not a room's.** Everything else
+   * here is scoped to one `Simulation` and its sockets -- the roster is
+   * room-global and says so, the snapshot is narrower still -- and this crosses
+   * every room in the process, because "global chat" that stopped at the room
+   * boundary would be a lobby chat that called itself global. The fan-out is
+   * `server/chat.ts`, which also states the one boundary it does *not* cross.
+   *
+   * A message of its own rather than an `EVENT`, on `BIKES`' argument and one
+   * more: an event carries fixed-width ids and this carries two strings, so
+   * folding it into `encodeEvents` would put a variable-length record in the one
+   * message whose reader walks a fixed stride.
+   */
+  CHAT_LINE: 0x8b,
+  /**
+   * The ranked suggestion list, plus what this client has left to spend on it.
+   * See `net/suggestions.encodeSuggestionList`.
+   *
+   * **Not on the snapshot path and never sent unasked**, with one exception: it
+   * is pushed to every client whose panel is open when a score changes, so two
+   * people voting beside each other are looking at one list rather than two. On
+   * `BIKES`' argument -- that is a message a few times a minute across a whole
+   * host, against a snapshot twenty times a second per player.
+   *
+   * The list is **per client**, which is the one way it differs from every other
+   * server message here: it carries `myVote` and `votesLeft`, which are facts
+   * about the *recipient*. So it is deliberately never deduplicated across
+   * sockets the way a snapshot body is -- see `server/room.ts`'s `FrameGroups`
+   * for the machinery this is staying out of.
+   */
+  SUGGEST_LIST: 0x8c,
+  /**
+   * Yes / no / not this week, and a sentence saying which. See
+   * `net/suggestions.encodeSuggestAck`.
+   *
+   * The sentence is composed by the **server** rather than looked up from the
+   * result code on the client, because the rules it describes live on the server
+   * and a client-side table is two builds disagreeing about what "quota" means
+   * the day the quota moves. The code is still carried so the panel can colour
+   * the line and know whether to empty the compose box.
+   */
+  SUGGEST_ACK: 0x8d,
 } as const;
 
 /**
@@ -271,7 +341,16 @@ export const MSG = {
  * that produces a silently misparsed snapshot, and the failure there is a
  * player who moves in the wrong direction rather than a load that fails.
  */
-export const PROTOCOL_VERSION = 8;
+/*
+ * v9 is a **shared** bump: two features landed in the same pass -- global chat
+ * (`MSG.CHAT_SAY`/`MSG.CHAT_LINE`, `net/chat.ts`) and the suggestions box -- and
+ * both add message types to the table above without changing any existing
+ * layout. One version covers both, because the version's job is "these two ends
+ * do not agree about what a frame is" and a client missing either message type
+ * is a client that would silently ignore frames it should be showing a player.
+ * Whichever feature is edited next: check this number before bumping it.
+ */
+export const PROTOCOL_VERSION = 9;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
@@ -279,8 +358,16 @@ export const SNAPSHOT_HZ = 20;
 /** Every this many ticks, one snapshot. 60 / 20 = 3. */
 export const SNAPSHOT_INTERVAL = TICK_HZ / SNAPSHOT_HZ;
 
-/** Spec 2's cap. **No longer the width of anything** -- see `MAX_ROOM_PLAYERS`. */
-export const MAX_PLAYERS = 16;
+/**
+ * The advertised cap: how many players this game says it is for.
+ *
+ * Spec 2 said 16 and the user raised it to **100** on 2026-08-05. It is
+ * **not the width of anything** -- see `MAX_ROOM_PLAYERS`, which is 128 and is
+ * what every v8 field is sized against, so this number can move between 2 and
+ * 128 without touching a byte on the wire. It is the default a room fills to
+ * (`SYDNEY_ROOM_CAP` overrides) and the number the boot line quotes.
+ */
+export const MAX_PLAYERS = 100;
 
 /**
  * How big a room is allowed to get, and the number every width in v8 is sized
@@ -2949,6 +3036,47 @@ export function verifyNet(): string[] {
       failures.push(
         `Six players with two balls and eight officers on them is ${(six / 1000).toFixed(1)} kbit/s.`,
       );
+    }
+  }
+
+  // --- The message table itself: unique, and on the right side of 0x80.
+  //
+  // Added at v9, which is the version two features were built into at once
+  // (global chat and the suggestions box) against this one table. That is
+  // exactly the circumstance the rule at the top of `MSG` exists for and exactly
+  // the circumstance nobody re-reads it in: a duplicate id is not a parse error,
+  // it is one feature's frame being handed to the other's decoder, which reads a
+  // plausible wrong record out of it and returns. There is no throw and no log.
+  //
+  // The halves are asserted rather than assumed for the same reason. A
+  // client-to-server message numbered over 0x80 is one that a client can send to
+  // *itself* through a compromised server and that `client.ts`'s switch will
+  // dispatch, and the range test in both directions is what makes that a
+  // non-event.
+  {
+    const seen = new Map<number, string>();
+    for (const [name, id] of Object.entries(MSG)) {
+      const prior = seen.get(id);
+      if (prior !== undefined) {
+        failures.push(
+          `MSG.${name} and MSG.${prior} are both 0x${id.toString(16)}. One feature's frames will be ` +
+            "decoded as the other's, silently.",
+        );
+      }
+      seen.set(id, name);
+      if (id < 0 || id > 0xff) failures.push(`MSG.${name} is 0x${id.toString(16)}, which is not a byte.`);
+    }
+    // Which half each one belongs in, named here rather than inferred from a
+    // prefix: a list is checkable and a naming convention is not.
+    const clientToServer = ['HELLO', 'INPUT', 'PING', 'CHAT_SAY', 'SUGGEST'];
+    for (const [name, id] of Object.entries(MSG)) {
+      const wantsLow = clientToServer.includes(name);
+      if (wantsLow && id >= 0x80) {
+        failures.push(`MSG.${name} is a client message at 0x${id.toString(16)}; the client half is under 0x80.`);
+      }
+      if (!wantsLow && id < 0x80) {
+        failures.push(`MSG.${name} is a server message at 0x${id.toString(16)}; the server half is 0x80 and over.`);
+      }
     }
   }
 
