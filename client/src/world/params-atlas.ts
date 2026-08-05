@@ -28,6 +28,7 @@
  */
 
 import { DataTexture, FloatType, NearestFilter, RGBAFormat } from 'three/webgpu';
+import { registerTexture, unregisterTexture } from './texture-audit.ts';
 
 /** Texels per building. Must match `mesh.PARAMS_STRIDE / 4` in the pipeline. */
 export const TEXELS_PER_BUILDING = 4;
@@ -74,7 +75,15 @@ export class FacadeParamsAtlas {
     this.texture.magFilter = NearestFilter;
     this.texture.minFilter = NearestFilter;
     this.texture.generateMipmaps = false;
+    this.texture.name = 'facade_params_atlas';
     this.texture.needsUpdate = true;
+    // Declared to the render guard's audit, and this one is the reason the
+    // registry exists at all. Every facade material reaches this texture through
+    // a `textureLoad` inside an `Fn` body -- see `createFacadeMaterial` -- and an
+    // `Fn` body is a closure, so no amount of walking the node graph can find
+    // it. Without this line the most widely bound texture in the game is the one
+    // texture a crash report could not name. See `world/texture-audit.ts`.
+    registerTexture(this.texture);
   }
 
   get usedRows(): number {
@@ -173,6 +182,7 @@ export class FacadeParamsAtlas {
   }
 
   dispose(): void {
+    unregisterTexture(this.texture);
     this.texture.dispose();
   }
 }

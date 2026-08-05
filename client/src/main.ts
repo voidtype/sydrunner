@@ -126,7 +126,13 @@ import {
   verifyFootyBall,
 } from './world/footyball.ts';
 import { NameplateField, verifyNameplates, type PlateInput } from './world/nameplates.ts';
-import { RenderGuard, auditSceneTextures, verifyTextureAudit } from './world/texture-audit.ts';
+import {
+  RenderGuard,
+  auditSceneTextures,
+  quarantine,
+  registeredCount,
+  verifyTextureAudit,
+} from './world/texture-audit.ts';
 import {
   FLAT_WHITE,
   KIND_NAME as POWERUP_NAME,
@@ -4699,8 +4705,22 @@ async function main(): Promise<void> {
      */
     render: {
       guard: renderGuard,
-      report: () => ({ failures: renderGuard.failures, messages: [...renderGuard.messages] }),
+      report: () => ({
+        failures: renderGuard.failures,
+        messages: [...renderGuard.messages],
+        /** What the guard has repaired or benched. Empty is the healthy answer. */
+        quarantined: [...renderGuard.quarantined],
+        /**
+         * Textures declared to the audit. Two once the world is up -- the plate
+         * atlas and the facade parameter atlas. Anything else means a module
+         * made a texture without calling `registerTexture`, and a texture the
+         * audit cannot see is a crash it cannot name.
+         */
+        registered: registeredCount(),
+      }),
       audit: () => auditSceneTextures(scene),
+      /** Repair anything the audit finds, by hand. Returns what it did. */
+      heal: () => quarantine(scene),
     },
 
     nameplates: {

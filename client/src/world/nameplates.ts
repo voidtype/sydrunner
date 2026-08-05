@@ -83,6 +83,7 @@ import {
 } from 'three/webgpu';
 import { texture } from 'three/tsl';
 import { FIGURE_HEIGHT } from '../player/animation.ts';
+import { registerTexture, unregisterTexture } from './texture-audit.ts';
 
 // --- Sizes, in world metres ---------------------------------------------------
 
@@ -467,6 +468,11 @@ export class NameplateField {
     // Text at a distance is the one thing in this project that genuinely
     // shimmers without it, and a plate is on screen for as long as its owner is.
     tex.anisotropy = 4;
+    // Declared to the render guard's audit. Not optional bookkeeping: this
+    // texture is bound through `texture(tex)` on a node material, and the audit
+    // that has to name it during a crash cannot reach every graph shape by
+    // walking. See `world/texture-audit.ts` on the `Fn` blind spot.
+    registerTexture(tex);
     this.texture = tex;
 
     const verts = MAX_PLATES * QUADS_PER_PLATE * VERTS_PER_QUAD;
@@ -643,6 +649,7 @@ export class NameplateField {
 
   /** Give the atlas back. Nothing else here allocates GPU memory. */
   dispose(): void {
+    unregisterTexture(this.texture);
     this.texture.dispose();
     this.material.dispose();
     this.mesh.geometry.dispose();
