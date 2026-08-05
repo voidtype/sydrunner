@@ -65,6 +65,7 @@ import {
   type PedPose,
 } from './game/pedestrians.ts';
 import { warmUpPipelines } from './world/warmup.ts';
+import { NIGHT_VISIBLE_LEVEL, NightLights, verifyNightLights } from './world/nightlights.ts';
 import { CollisionWorld } from './player/collision.ts';
 import {
   EYE_HEIGHT,
@@ -254,12 +255,27 @@ const COLLISION_FETCH_TIMEOUT_MS = 8000;
  *
  * Generous, because unlike every other deadline on this path it is not waiting
  * on a network and the thing it is protecting against is a driver, not a link:
- * eight seconds is far longer than the measured pass and short enough that a GPU
- * which has decided to compile one shader forever cannot hold the game hostage.
- * Losing the race costs the first walk its hitches and nothing else -- the
- * compiles simply happen where they used to.
+ * it is far longer than the measured pass and short enough that a GPU which has
+ * decided to compile one shader forever cannot hold the game hostage. Losing the
+ * race costs the first walk its hitches and nothing else -- the compiles simply
+ * happen where they used to.
+ *
+ * **Raised from 8,000 with the night lighting, and the ratio is the point rather
+ * than the number.** Every light in the scene appears in every material's
+ * generated WGSL, so the three the night rig adds make all 83 pipelines bigger:
+ * the pass measured 4,765 ms with no night lights, 6,708 ms with them, and about
+ * 0.6 s per light in between (see `calibration.LAMP_REAL_COUNT`, which was sized
+ * on that curve). 8,000 over the old 4,765 was 68% of headroom; 11,000 over the
+ * new 6,708 is 64% of the same, which is what this restores. Leaving it at 8,000
+ * would have meant a machine 20% slower than this one silently losing the
+ * warm-up and getting the compile hitches back -- which is the failure the whole
+ * pass exists to prevent, arrived at by not moving a number.
+ *
+ * It is shared with the landmark and far-layer compiles below, and that is
+ * correct rather than incidental: those are the same kind of work paying the
+ * same tax for the same reason, so one number is what keeps them consistent.
  */
-const WARMUP_DEADLINE_MS = 8000;
+const WARMUP_DEADLINE_MS = 11000;
 
 async function main(): Promise<void> {
   const hud = new Hud();
@@ -551,6 +567,23 @@ async function main(): Promise<void> {
   // fetches on is prisms vanishing from under a player's feet, with no error and
   // no frame that shows it. See `world/tile-lifecycle.ts`.
   const lifecycleFailures = timed('tile-lifecycle', () => verifyTileLifecycle());
+  // And the night rig, which earns its place on this list twice over.
+  //
+  // Every other check here guards something that *renders wrongly*. This one
+  // also guards something that renders correctly and **stutters**: the set of
+  // lights in the scene is part of every WebGPU material's cache key, so a light
+  // that gets hidden rather than dimmed, or added rather than pre-created,
+  // recompiles every pipeline in the scene in the middle of play -- which
+  // presents as "the game hitches sometimes" and would never be traced to a
+  // lighting file. `verifyNightLights` builds a throwaway rig and asserts the
+  // count, the never-hidden flag and the no-shadow flag on the real objects.
+  //
+  // The rest of it is the usual criterion. A dusk ramp that snaps, a torch that
+  // shakes like a fault rather than like a hand, a ground pool wound face-down
+  // and therefore invisible, a lamp hash that clumps every luminaire in the city
+  // onto one street -- all of them draw something plausible and none of them
+  // throws. See `world/nightlights.ts`.
+  const nightFailures = timed('night-lights', () => verifyNightLights());
   // Once, at `debug` so it is out of the way, and slowest-first because the only
   // question anyone asks of this line is which one it was.
   checkMs.sort((a, b) => b[1] - a[1]);
@@ -590,6 +623,7 @@ async function main(): Promise<void> {
     hudFailures.length ||
     wallFailures.length ||
     lifecycleFailures.length ||
+    nightFailures.length ||
     chatFailures.length ||
     chatBoxFailures.length ||
     suggestionFailures.length
@@ -628,6 +662,7 @@ async function main(): Promise<void> {
           ...hudFailures,
           ...wallFailures,
           ...lifecycleFailures,
+          ...nightFailures,
           ...chatFailures,
           ...chatBoxFailures,
           ...suggestionFailures,
@@ -811,6 +846,25 @@ async function main(): Promise<void> {
       return;
     }
   }
+
+  /**
+   * The night: the player's torch, the four real street-lamp lights, and the
+   * traffic's headlights.
+   *
+   * Constructed **here**, immediately after the sky and a long way above
+   * anything that uses it, and that position is load-bearing rather than
+   * tidiness. Three's WebGPU backend folds the set of lights on the render list
+   * into every material's cache key, so a light that appears after
+   * `warmUpPipelines` has run recompiles every pipeline in the scene on the
+   * frame it appears. All five of these are in the scene before the streamer
+   * builds a single material, which is what makes the warm-up's compile count
+   * the *whole* compile count for the session -- day and night.
+   *
+   * `world/nightlights.ts` carries the full argument, including why the lamps
+   * are moved and faded rather than added and removed, and why nothing here
+   * casts a shadow.
+   */
+  const nightLights = new NightLights(scene);
 
   const globals = createFacadeGlobals();
   // The streamer needs the shadow volume's size to decide which tiles cast into
@@ -1045,6 +1099,25 @@ async function main(): Promise<void> {
         // pipeline mid-frame -- and unlike the football's, that frame is not one
         // the player chose, it is whichever one they happen to walk into.
         { geometry: pedAssets.torso, material: pedAssets.material, casts: true, instanced: true },
+        // The traffic's headlights and tail lights: two geometries over one
+        // additive material, instanced, never in the depth pass in either
+        // direction, and **never per-instance coloured** -- both sets have to
+        // agree about that or they would be two pipelines rather than two draws
+        // of one, because the presence of `instanceColor` is in the shader.
+        //
+        // Both are warmed for the reason the street lamps are warmed in
+        // `streamer.warmupParts`: they are hidden every daylight hour, and a
+        // hidden mesh is never drawn, so without these the pipeline would be
+        // compiled on the single frame the sun goes down with a hundred and
+        // eighty cars' worth of it arriving at once.
+        ...nightLights.carLights.meshes.map((mesh) => ({
+          geometry: mesh.geometry,
+          material: nightLights.carLights.material,
+          instanced: true,
+          instanceColor: false,
+          casts: false,
+          receives: [false],
+        })),
       ],
       // The characters, handed over whole because a skinned mesh cannot be
       // reduced to a geometry and a material: `RenderObject.getCacheKey` folds
@@ -1318,6 +1391,12 @@ async function main(): Promise<void> {
   streamer.setTrafficField(traffic);
   const trafficMovers = new TrafficMovers(streamer.cars);
   for (const mesh of trafficMovers.meshes) scene.add(mesh);
+  // Where the headlights go. The traffic already computes a pose for every car
+  // in view every frame and the night rig has to draw its lights at exactly
+  // those poses, so the sink is fed from inside that one loop rather than from a
+  // second pass that would have to agree with it. By day `begin()` returns false
+  // and the whole thing is one comparison per frame. See `world/cars.ts`.
+  trafficMovers.lights = nightLights.carLights;
   /** Scratch for the per-tick hit query, so a fixed step allocates nothing. */
   const carRoutes: LaneRoute[] = [];
   const carPose: CarPose = createCarPose();
@@ -4319,6 +4398,34 @@ async function main(): Promise<void> {
     // rather than by however long the browser was not drawing.
     streamer.updateLife(frameDt, camera);
 
+    // The night rig, after the streamer -- so a tile that arrived this frame
+    // already has its luminaires in the set the four real lights are picked from
+    // -- and before the traffic, so `carLights.begin()` answers for this frame
+    // rather than the last one.
+    //
+    // `frameDt` unclamped by anything of its own: the only thing it integrates
+    // is the torch's lag toward the view and its sway clock, and a backgrounded
+    // tab coming back should find the beam where the view is rather than
+    // sweeping a second of catch-up across the street. The exponential chase in
+    // `NightLights.update` is written so a long delta simply lands on the
+    // target.
+    //
+    // The streamer is handed over as the `LampSource` it implements, so the
+    // lights follow the lamps of tiles that are actually resident and nothing
+    // here has to keep a second copy of where they are.
+    nightLights.update(
+      frameDt,
+      camera,
+      alt,
+      Math.hypot(player.velocity.x, player.velocity.z),
+      streamer,
+    );
+    // And the sprites, which are hidden all day for the fill they would
+    // otherwise cost. One comparison on every frame but the two a day where the
+    // answer changes; see `TileStreamer.setNightLightsVisible` for why this is
+    // a mesh flag and must never become a light one.
+    streamer.setNightLightsVisible(nightLights.level > NIGHT_VISIBLE_LEVEL);
+
     // The traffic, after the streamer so a tile that arrived this frame already
     // has its routes in the field, and before the render so the matrices are
     // current.
@@ -4978,6 +5085,45 @@ async function main(): Promise<void> {
     player,
     globals,
     frameMs: () => medianFrameMs(),
+
+    /**
+     * The night rig, for the console.
+     *
+     * `sydney.night.report()` answers the three questions this feature raises
+     * from outside, and the first of them is the expensive one:
+     *
+     *   - `pipelines` is the renderer's live pipeline-cache size. It should be
+     *     **identical at 3 pm and at 21:30**, because that is the whole
+     *     architecture: five real lights created before the warm-up and never
+     *     added, removed or hidden, and every additive sprite pre-compiled by
+     *     `warmupParts`. Press `N`, read this, press `T`, read it again; if the
+     *     two differ, something in this feature is compiling in the middle of
+     *     play and `world/nightlights.ts`'s header says why that matters.
+     *   - `lights` is what the scene is actually carrying, which is the same
+     *     invariant from the other end.
+     *   - `level`, `lampsLit` and `carsLit` are the "is it on" questions: a dark
+     *     street with `level` at 1 and `lampsLit` at 0 is a client that has
+     *     streamed no tiles with poles in them, which is a completely different
+     *     problem from a lighting bug and looks identical from inside the game.
+     */
+    night: {
+      rig: nightLights,
+      report: () => ({
+        level: nightLights.level,
+        lampsLit: nightLights.lampsLit,
+        carsLit: nightLights.carLights.drawn,
+        torch: nightLights.torch.intensity,
+        lights: nightLights.realLights.map((l) => ({
+          name: l.name || l.type,
+          visible: l.visible,
+          intensity: (l as unknown as { intensity: number }).intensity,
+        })),
+        pipelines:
+          (renderer as unknown as { _pipelines?: { caches?: Map<unknown, unknown> } })._pipelines
+            ?.caches?.size ?? -1,
+        shaders: renderer.info.memory.programs,
+      }),
+    },
 
     /**
      * The nameplates, for the console.

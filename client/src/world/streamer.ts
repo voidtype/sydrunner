@@ -178,7 +178,14 @@ import {
   PowerAssets,
   buildTilePoles,
   buildTileWires,
+  poleYaws,
 } from './power.ts';
+import {
+  LAMP_RECORD_STRIDE,
+  StreetLampAssets,
+  buildTileStreetLamps,
+  type LampSource,
+} from './nightlights.ts';
 import { createStreetMaterial } from './street.ts';
 import type { NamedSegment, TileStreetNames } from './streetnames.ts';
 import { armCdn, fetchWorldAsset, fetchWorldBuffer, type CdnContract } from './cdn.ts';
@@ -587,6 +594,17 @@ interface LoadedTile {
   /** Power poles resident in this tile, and wire spans owned by it. Likewise. */
   poles: number;
   spans: number;
+  /**
+   * Where this tile's luminaires hang, in **world** metres, four floats each --
+   * x, y, z, and 1 for sodium.
+   *
+   * World rather than tile-local, unlike everything else a tile owns, and for
+   * `bladeLabels`' reason: the thing that reads this is the night rig's four
+   * real `PointLight`s, which are not in a tile and cannot be. Converted once at
+   * load rather than per frame. Empty for the majority of tiles, which have no
+   * poles at all.
+   */
+  lamps: Float32Array;
   /** Wheelie bins, street-name posts and signal heads resident here. Likewise. */
   bins: number;
   posts: number;
@@ -671,6 +689,17 @@ export interface CollisionSink {
  */
 const HAZARD_EXTRA_SLOTS = 2;
 
+/**
+ * Scratch for `nearestLamps`, which runs six times a second and must allocate
+ * nothing. `_lampDistances` is squared distances parallel to the caller's output
+ * array; sixteen slots is four times what the night rig asks for and the method
+ * clamps against it.
+ */
+const _lampProbe = /*#__PURE__*/ new Vector3();
+const _lampDistances = /*#__PURE__*/ new Float32Array(16);
+/** Shared by every tile with no luminaires in it, which is most of them. */
+const EMPTY_LAMPS = /*#__PURE__*/ new Float32Array(0);
+
 export interface StreamerOptions {
   /** Tiles beyond this are not loaded at all. */
   loadRadius?: number;
@@ -691,7 +720,7 @@ export interface StreamerOptions {
   buildBudgetMs?: number;
 }
 
-export class TileStreamer {
+export class TileStreamer implements LampSource {
   readonly root = new Group();
 
   private index: WorldIndex | null = null;
@@ -821,6 +850,27 @@ export class TileStreamer {
   }
   /** Two pole geometries, the timber material and the unlit wire material. */
   private readonly powerAssets = new PowerAssets();
+  /**
+   * One geometry and one material for every street lamp in the city.
+   *
+   * Owned here rather than by `world/nightlights.ts`'s `NightLights`, because a
+   * luminaire's lifecycle is a *tile's* -- it is built off the same `power.bin`
+   * sidecar as the pole it hangs on, it is hidden and shadowed with the tile,
+   * and its instance buffers go when the tile does. Exactly the arrangement
+   * `powerAssets` above has, for exactly the same reasons, and it is what puts
+   * the lamp material in `warmupParts` where it belongs.
+   */
+  private readonly streetLamps = new StreetLampAssets();
+  /**
+   * Whether the night geometry in the resident tiles is being drawn.
+   *
+   * Only ever moved by `setNightLightsVisible`, which is called once a frame
+   * with the dusk level and returns immediately on all but the two frames a day
+   * where it changes. It is remembered here rather than read from the sky
+   * because a tile that lands *after* dusk has to arrive already switched on --
+   * a tile built dark at midnight would stay dark until the next dawn.
+   */
+  private nightLightsVisible = false;
   /** Bin, blade, post and signal geometry, and the materials they wear. */
   private readonly furnitureAssets = new FurnitureAssets();
   /**
@@ -1378,6 +1428,23 @@ export class TileStreamer {
       casts: false,
       receives: [false],
     });
+    // The street lamps, in the **one** configuration they are ever drawn in.
+    // Instanced, per-instance coloured (LED or sodium), additive, and outside
+    // the shadow pass in both directions -- so a single entry covers every lamp
+    // in the city and the first dusk of a session compiles nothing.
+    //
+    // This is the entry that has to exist. The lamps are hidden all day and a
+    // hidden mesh is never drawn, so without a warm-up part their pipeline would
+    // be compiled on the **one frame the sun goes down** -- which is the frame
+    // several hundred of them appear at once, in the middle of play, with every
+    // tile in the ring holding one.
+    parts.push({
+      geometry: this.streetLamps.geometry,
+      material: this.streetLamps.material,
+      instanced: true,
+      casts: false,
+      receives: [false],
+    });
 
     const furniture = this.furnitureAssets;
     for (const geometry of [furniture.binBody, furniture.binLid, furniture.namePost, furniture.signal]) {
@@ -1704,6 +1771,107 @@ export class TileStreamer {
    * frame the tab comes *back* advances the world by one step rather than by
    * however long it was away.
    */
+  /**
+   * Draw or hide every street lamp's glow in every resident tile.
+   *
+   * Called once a frame with `nightLevel > NIGHT_VISIBLE_LEVEL` and returning on
+   * the first line on all but the two frames a day where the answer changes.
+   * When it does change it walks the resident tiles once, which is a few dozen
+   * groups of a few dozen children.
+   *
+   * **`visible` on a mesh, which is free, and never on a light, which is not.**
+   * `world/nightlights.ts` spends a paragraph on the difference: three's
+   * `_projectObject` skips an invisible object, so hiding a *light* takes it off
+   * the render list, which changes `LightsNode`'s cache key, which rebuilds and
+   * recompiles every pipeline in the scene. Hiding a mesh does nothing but skip
+   * a draw.
+   *
+   * The alternative -- leaving the sprites drawn at zero opacity all day -- was
+   * rejected on fill: a lamp's ground pool is 130 square metres of road and
+   * there are several hundred resident, and an additive blend at alpha zero
+   * still rasterises every one of those fragments.
+   */
+  setNightLightsVisible(visible: boolean): void {
+    if (visible === this.nightLightsVisible) return;
+    this.nightLightsVisible = visible;
+    // `this.root`, not `this.loaded`, and the difference is a tile in flight. A
+    // build adds its group to the root at the start and enters it in `loaded`
+    // only when it commits, and the commit is several `yield`s later -- so a
+    // tile that was mid-build when the sun went down would have had its lamps
+    // created with the old flag and never seen this walk. It would then stay
+    // dark until the next dawn *turned it on*, which is the funniest possible
+    // version of this bug and was observed as exactly one unlit tile in thirty.
+    for (const group of this.root.children) {
+      for (const child of group.children) {
+        if (child.userData.nightlights === true) child.visible = visible;
+      }
+    }
+  }
+
+  /**
+   * The nearest luminaires to a point, for the night rig's four real lights.
+   *
+   * A linear pass over the lamp arrays of the resident tiles within `radius`,
+   * with an insertion sort into a fixed `max`-long result -- which for a
+   * `max` of four is faster than any structure that could be kept in sync, and
+   * is called six times a second rather than sixty (see `LAMP_REPICK_INTERVAL`).
+   * The tile-level test is the same `distanceToBounds` everything else in this
+   * class trusts, so a search radius of 44 m touches the two or three tiles
+   * under the player and skips the rest without reading a single lamp.
+   *
+   * Distances are measured in **3D**, not in plan, because the thing being
+   * answered is "which lamps can light what I am standing next to" and Sydney is
+   * not flat: a lamp on the road 8 m below a player on the Cahill Expressway is
+   * not the nearest lamp in any sense that matters.
+   */
+  nearestLamps(
+    x: number,
+    y: number,
+    z: number,
+    radius: number,
+    out: Float32Array,
+    max: number,
+  ): number {
+    _lampProbe.set(x, y, z);
+    let found = 0;
+    // Parallel to `out`, so a candidate can be compared without recomputing.
+    const best = _lampDistances;
+    max = Math.min(max, best.length);
+    for (const tile of this.loaded.values()) {
+      if (tile.lamps.length === 0) continue;
+      if (distanceToBounds(_lampProbe, tile.entry.bounds) > radius) continue;
+      const lamps = tile.lamps;
+      for (let i = 0; i < lamps.length; i += LAMP_RECORD_STRIDE) {
+        const dx = lamps[i] - x;
+        const dy = lamps[i + 1] - y;
+        const dz = lamps[i + 2] - z;
+        const d = dx * dx + dy * dy + dz * dz;
+        if (d > radius * radius) continue;
+        if (found === max && d >= best[max - 1]) continue;
+        // Insertion into a sorted list of at most `max`. The sort order is what
+        // makes the six-hertz re-pick invisible: the light that gets dropped is
+        // always the furthest, which is the one already at the edge of
+        // `LAMP_DISTANCE` and contributing nothing.
+        let slot = Math.min(found, max - 1);
+        while (slot > 0 && best[slot - 1] > d) {
+          best[slot] = best[slot - 1];
+          const from = (slot - 1) * LAMP_RECORD_STRIDE;
+          const to = slot * LAMP_RECORD_STRIDE;
+          for (let k = 0; k < LAMP_RECORD_STRIDE; k++) out[to + k] = out[from + k];
+          slot--;
+        }
+        best[slot] = d;
+        const o = slot * LAMP_RECORD_STRIDE;
+        out[o] = lamps[i];
+        out[o + 1] = lamps[i + 1];
+        out[o + 2] = lamps[i + 2];
+        out[o + 3] = lamps[i + 3];
+        if (found < max) found++;
+      }
+    }
+    return found;
+  }
+
   updateLife(dt: number, camera: Camera): void {
     const cam = camera.position;
 
@@ -2412,8 +2580,14 @@ export class TileStreamer {
       const lines = decoded.power;
       let poles = 0;
       let spans = 0;
+      let lamps: Float32Array = EMPTY_LAMPS;
       if (lines !== null) {
-        for (const mesh of buildTilePoles(lines, this.powerAssets)) {
+        // Derived once and handed to both, because a luminaire reaches out along
+        // the crossarm's own axis and a second derivation would disagree with
+        // the pole on the eleven per cent that fall through `deriveYaw`'s
+        // fallback. See `power.poleYaws`.
+        const yaws = poleYaws(lines);
+        for (const mesh of buildTilePoles(lines, this.powerAssets, yaws)) {
           mesh.castShadow = true;
           mesh.receiveShadow = false;
           group.add(mesh);
@@ -2424,6 +2598,24 @@ export class TileStreamer {
           wires.receiveShadow = false;
           group.add(wires);
         }
+        // The street lamps on a hashed subset of those same poles. Built with
+        // the tile and dropped with it; **visible only after dusk**, which is
+        // read from the streamer's own remembered state rather than from the sky
+        // so that a tile arriving at midnight is lit on the frame it lands.
+        const lit = buildTileStreetLamps(
+          lines,
+          this.streetLamps,
+          (i) => yaws[i],
+          group.position.x,
+          group.position.z,
+        );
+        if (lit.mesh !== null) {
+          lit.mesh.visible = this.nightLightsVisible;
+          lit.mesh.castShadow = false;
+          lit.mesh.receiveShadow = false;
+          group.add(lit.mesh);
+        }
+        lamps = lit.lamps;
         poles = lines.poleCount;
         spans = lines.wireCount;
         yield;
@@ -2661,6 +2853,7 @@ export class TileStreamer {
         cars,
         poles,
         spans,
+        lamps,
         bins,
         posts,
         signals,
@@ -3181,7 +3374,13 @@ function releaseGroupGeometry(group: Group): void {
       // by the whole world, with the per-tile part being the instance
       // buffers. Disposing the geometry here would delete every station
       // marker in the city the first time a tile was evicted.
-      mesh.userData.powerups === true
+      mesh.userData.powerups === true ||
+      // And the street lamps, on the poles' own terms: one glow geometry for
+      // every luminaire in the city, with the per-tile part being the instance
+      // matrix and the LED-or-sodium instance colour. Disposing it with a tile
+      // would put out every street light in Sydney the first time the player
+      // walked far enough to evict one.
+      mesh.userData.nightlights === true
     ) {
       (mesh as InstancedMesh).dispose();
     } else {

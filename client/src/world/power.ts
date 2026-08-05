@@ -125,8 +125,16 @@ const TRANSFORMER = 1;
 // makes a wire end exactly on an insulator instead of near one -- see
 // `power.wire_attachment_y`, which is the other half of this arithmetic.
 
-/** The height the geometry below is built at. Each instance scales Y by `height / this`. */
-const NOMINAL_HEIGHT = 10.5;
+/**
+ * The height the geometry below is built at. Each instance scales Y by
+ * `height / this`.
+ *
+ * Exported because `world/nightlights.ts` hangs its luminaires off this same
+ * pole set and has to scale its own geometry by the identical factor, or a lamp
+ * head would float beside a tall pole and be buried in a short one. One constant
+ * for both, rather than a second 10.5 that can drift.
+ */
+export const NOMINAL_HEIGHT = 10.5;
 /** Crossarm centre, below the top of the shaft. */
 const CROSSARM_BELOW_TOP = 0.55;
 /** Conductor tie-off, below the crossarm: the length of the insulator stub. */
@@ -552,6 +560,26 @@ function deriveYaw(data: TilePower, index: number, dirX: Float32Array, dirZ: Flo
   return hash(data.tiltSeed[index], index, 7) * Math.PI * 2;
 }
 
+/**
+ * Every pole's crossarm heading in a tile, in one array.
+ *
+ * Exported because `world/nightlights.ts` hangs its luminaires off the same
+ * poles and has to reach out along the **same** axis this file rotates the
+ * crossarm to -- a lamp bracket that used its own derivation would agree with
+ * the pole on most poles and be at right angles to it on the eleven per cent
+ * that fall through to source 2 below, which is exactly the kind of difference
+ * nobody notices until they are standing under one.
+ *
+ * Handed to `buildTilePoles` as well, so a tile derives this once rather than
+ * twice.
+ */
+export function poleYaws(data: TilePower): Float32Array {
+  const { dirX, dirZ } = poleDirections(data);
+  const out = new Float32Array(data.poleCount);
+  for (let i = 0; i < data.poleCount; i++) out[i] = deriveYaw(data, i, dirX, dirZ);
+  return out;
+}
+
 /** Accumulate a street direction per pole from the spans and, failing that, the neighbours. */
 function poleDirections(data: TilePower): { dirX: Float32Array; dirZ: Float32Array } {
   const n = data.poleCount;
@@ -640,9 +668,13 @@ function poleDirections(data: TilePower): { dirX: Float32Array; dirZ: Float32Arr
  * of that wire have to have been measured against the same ground by the same
  * code -- which is the pipeline's, once, at build time.
  */
-export function buildTilePoles(data: TilePower, assets: PowerAssets): InstancedMesh[] {
+export function buildTilePoles(
+  data: TilePower,
+  assets: PowerAssets,
+  /** The headings, if the caller has already derived them. See `poleYaws`. */
+  yaws: Float32Array = poleYaws(data),
+): InstancedMesh[] {
   if (data.poleCount === 0) return [];
-  const { dirX, dirZ } = poleDirections(data);
 
   const perKind: number[][] = Array.from({ length: KIND_COUNT }, () => []);
   for (let i = 0; i < data.poleCount; i++) perKind[data.kind[i]].push(i);
@@ -676,7 +708,7 @@ export function buildTilePoles(data: TilePower, assets: PowerAssets): InstancedM
       _pivotDown.makeTranslation(0, -pivot, 0);
       _tilt.makeRotationFromQuaternion(_quaternion);
       _pivotUp.makeTranslation(0, pivot, 0);
-      _yaw.makeRotationY(deriveYaw(data, i, dirX, dirZ));
+      _yaw.makeRotationY(yaws[i]);
 
       _matrix.makeTranslation(data.x[i], data.groundY[i], data.z[i]);
       _matrix.multiply(_yaw);

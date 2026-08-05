@@ -322,7 +322,286 @@ export const WALL_RATIO_MAX = 4.6;
  */
 export const SHADE_WARMTH_MIN = 0.95;
 
+/* ---------------------------------------------------------------------------
+ * THE NIGHT HALF OF THE RIG.
+ *
+ * Everything above this line is the sun and what it bounced off, and every one
+ * of those terms reaches exactly zero when the sun sets -- which was correct
+ * right up until the point somebody pressed `N` and found a city that goes dark
+ * and stays dark. What is left after dark is `HEMISPHERE_NIGHT` (0.30) against
+ * `SKY_FILL_NIGHT`, which puts **0.064 of luminance** on a vertical wall and
+ * 0.076 on a horizontal one. Through Lambert at a 0.25 albedo and `EXPOSURE`
+ * that is a display value of about 12: a silhouette, correctly, and nothing you
+ * can walk through.
+ *
+ * So the city needs its own light after dark, and the numbers below are all
+ * expressed against that 0.064 rather than against taste. It is the *only*
+ * reference a night term has -- there is no photograph to calibrate to, because
+ * a photograph of a Sydney street at night is an exposure decision -- so what is
+ * pinned here is a set of **ratios to the ambient floor** at named distances,
+ * which is what decides whether the city is navigable.
+ *
+ * The three sources, and why they are these three:
+ *
+ *   - The **torch**, one real spot light, which is the player's own and is the
+ *     thing that makes a dark street playable rather than a guess.
+ *   - **Street lamps**, of which a small fixed number nearest the player are
+ *     real point lights and the rest are additive geometry. The split is a
+ *     recompile constraint rather than an aesthetic one -- see `LAMP_REAL_COUNT`.
+ *   - **Car lights**, which are additive geometry only and light nothing.
+ *
+ * Everything here is a function of `nightLevel` and nothing else, so there is
+ * exactly one clock in the night rig and `verifyLightRig` can assert that all of
+ * it is off at the reference instant the daytime calibration was measured at.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Solar altitude, degrees, at which the night rig starts to come up.
+ *
+ * +2 rather than 0, and it is a claim about switching gear rather than about
+ * light: a street light is turned on by a photocell at somewhere around 55 lux
+ * of horizontal illuminance, which on 15 February is a few minutes *before* the
+ * sun touches the horizon (19:35 against a 19:46 sunset). Starting the ramp
+ * above zero is what stops the lamps looking like they are waiting for
+ * permission, and it costs nothing: at +2 degrees the sky is still 40 times
+ * brighter than any of these terms, so the first third of the ramp is invisible
+ * whatever it does.
+ */
+export const NIGHT_ON_ALTITUDE = 2;
+
+/**
+ * And where it is complete: the end of civil twilight, which is the standard
+ * definition of "dark" and is 20:12 on the reference day.
+ *
+ * The span between the two is 8 degrees of altitude, which at Sydney's February
+ * declination is **37 minutes of wall clock**. That matters more here than it
+ * would in a game with a running clock, because this one has none: time moves
+ * only when somebody presses a key, so the ramp is seen almost entirely by
+ * scrubbing with `[` and `]`. At their half-hour step it reads 0.00 at 19:30,
+ * 0.83 at 20:00 and 1.00 at 20:30 -- an intermediate state on the way, which is
+ * the practical difference between a fade and a threshold. `N` and `T` are jumps
+ * by construction and always were; what this rules out is a *value* with a cliff
+ * in it, which is what `verifyNightLights` bounds by sweeping the ramp at a
+ * twentieth of a degree.
+ */
+export const NIGHT_FULL_ALTITUDE = -6;
+
+/**
+ * Torch intensity, in the same units three's `PointLightNode` reads -- so
+ * irradiance on a surface square-on to it is `intensity / distance^2`.
+ *
+ * Set by where a torch has to be *usable*, not by where it looks brightest.
+ * Against the 0.064 ambient floor above, 110 puts:
+ *
+ *     2 m    27.5    430x ambient   blown, as a torch on a wall at arm's length is
+ *     5 m     4.4     69x ambient   display ~115 on a 0.25 albedo: reading light
+ *    10 m     1.1     17x ambient   display ~66: you can see what you are walking into
+ *    20 m     0.275    4.3x         display ~34: shapes, no detail
+ *    35 m     0.09     1.4x         the edge of useful
+ *    60 m     0        -            `TORCH_DISTANCE` cuts it off entirely
+ *
+ * The 35 m line is the one that was actually chosen. A torch that ran out at
+ * 15 m makes an intersection unreadable and a player walk into the middle of the
+ * road to find the far kerb; one that reached 100 m is a searchlight and takes
+ * the night away, which is the whole thing being built.
+ */
+export const TORCH_INTENSITY = 110;
+
+/**
+ * Cut-off distance, metres, and the decay exponent.
+ *
+ * `getDistanceAttenuation` multiplies `1/d^decay` by a window that reaches zero
+ * at the cut-off, so this is not a hard edge -- it is already down to 1.4% of
+ * the inverse-square value at 40 m and to nothing at 60. Decay 2 because it is
+ * the physical one and because every other light in this rig is calibrated
+ * against physical falloff.
+ */
+export const TORCH_DISTANCE = 60;
+export const TORCH_DECAY = 2;
+
+/**
+ * Cone half-angle, radians, and the penumbra fraction.
+ *
+ * 0.42 rad is 24 degrees, so a 48-degree cone: wider than a real hand torch's
+ * hotspot (a Maglite is about 10) and deliberately so. This one is attached to
+ * the view and has to cover enough of the frame that a player is not aiming it
+ * -- the order was "convenient" before it was "shaky", and a narrow cone in a
+ * first-person view is a chore. At 10 m it lays a 9 m circle on the wall ahead,
+ * which is a terrace and a half.
+ *
+ * The penumbra is high for the same reason: 0.55 puts the soft edge over more
+ * than half the cone radius, so there is no ring anywhere in the frame. A hard
+ * edge is what makes a spot light read as a projector.
+ */
+export const TORCH_ANGLE = 0.42;
+export const TORCH_PENUMBRA = 0.55;
+
+/**
+ * Torch colour, linear, largest channel 1.
+ *
+ * A cheap white LED, which is what anybody in this city is actually carrying:
+ * slightly cool, with the green-blue lift a phosphor-converted LED has, but not
+ * the 6500 K blue-white of a phone torch -- that reads as a screen rather than
+ * as a light. Warm enough at R/B 1.19 to sit beside the sodium lamps without
+ * either of them looking broken.
+ */
+export const TORCH_COLOUR: Readonly<Rgb> = [1.0, 0.96, 0.84];
+
+/**
+ * How many street lamps are real lights at once.
+ *
+ * **This number is a shader constant, not a budget.** Three's WebGPU node
+ * materials fold the *set of lights in the scene* into every material's cache
+ * key -- `LightsNode.customCacheKey` hashes `light.id` and `castShadow` for each
+ * -- so adding or removing one light, or hiding one (an invisible light is not
+ * pushed onto the render list at all), rebuilds and recompiles **every pipeline
+ * in the scene**. `world/warmup.ts` exists because this project has already been
+ * burned by mid-play compiles; a lighting feature that added lights as you
+ * walked toward lamps would be the worst possible version of that bug.
+ *
+ * So: four `PointLight`s are created at boot, added to the scene before the
+ * warm-up runs, and never added, removed or hidden again for the life of the
+ * process. What moves is their *position* and what fades is their *intensity*,
+ * neither of which is in any cache key. `verifyNightLights` asserts the count
+ * and the never-hidden invariant, and the boot log prints the pipeline count so
+ * that day and night can be compared directly.
+ *
+ * **Two rather than the four or eight this was first sized at, and the number
+ * came out of a measurement rather than a preference.** Every real light in the
+ * scene is in every material's generated WGSL, so it makes every shader in the
+ * build bigger -- and the warm-up, which compiles all 83 pipelines behind the
+ * loading screen, scales with that. Measured on the same machine, same tiles,
+ * same 86 warm-up draws, varying only the number of lights added before it:
+ *
+ *     0 extra lights   4,765 ms
+ *     3 extra lights   6,708 ms      (+648 ms each)
+ *     5 extra lights   7,776 ms      (+602 ms each)
+ *
+ * So a real light costs about **0.6 s of boot** before it has lit a single
+ * pixel, on top of an unconditional per-fragment cost on every lit material in
+ * the frame, day and night, whether or not it is contributing anything.
+ *
+ * Two is where the value stops being obvious. Sydney hangs street lights at
+ * about 40 m, so two covers the lamp ahead of the player and the lamp behind --
+ * which are the only two whose falloff (`LAMP_DISTANCE`, 32 m) puts anything on
+ * the geometry the player is standing among. The third and fourth nearest are
+ * routinely 45 m away and past their own cut-off, so they were paying 1.2 s of
+ * boot to contribute nothing. Everything past the two is carried by the additive
+ * pools, which are free and which is why the architecture is built round them.
+ */
+export const LAMP_REAL_COUNT = 2;
+
+/**
+ * Street-lamp intensity, in the torch's units.
+ *
+ * A luminaire hangs 8.6 m up (see `LAMP_HEIGHT_FRACTION` in
+ * `world/nightlights.ts`), so 70 puts 0.95 of irradiance straight down on the
+ * road under it -- 15x the ambient floor, which on asphalt at 0.08 albedo is a
+ * display value of about 35 against the 12 the ambient alone gives. That is a
+ * pool you can see the kerb line in and not a puddle of daylight.
+ *
+ * On the *facade* beside it the same lamp is much more visible, because a wall
+ * 6 m away takes 1.94 and renders painted render at about 100 -- which is the
+ * point. What says "street light" in a photograph is not the road, it is the
+ * top-lit fence and the underside of the tree.
+ */
+export const LAMP_INTENSITY = 70;
+
+/** Cut-off, metres. Past 30 m a lamp is worth under 2% of the ambient floor. */
+export const LAMP_DISTANCE = 32;
+
+/**
+ * The two lamp colours, linear, largest channel 1 -- and the decision behind
+ * having two of them.
+ *
+ * Sydney is **mid-conversion and has been for a decade**. Ausgrid has been
+ * swapping the residential stock to 3000 K LED since 2017 and the arterials went
+ * first, so the main roads and most of the inner west are warm white, while
+ * plenty of back streets, laneways and the older industrial pockets are still on
+ * high-pressure sodium. Picking one would be picking a year.
+ *
+ * So both exist, and which one a lamp wears is hashed on a **150 m cell** rather
+ * than per pole -- because that is how the conversion actually happened, street
+ * by street with a crew, rather than lamp by lamp. A run of poles down one road
+ * is one colour and the next suburb over is the other, which is what it looks
+ * like from a car. Two thirds LED, one third sodium; see `LAMP_SODIUM_SHARE`.
+ *
+ * 3000 K through the linear-sRGB primaries is (1.0, 0.70, 0.44) and high-pressure
+ * sodium is far narrower than any blackbody -- a 589 nm doublet with a weak
+ * continuum -- which lands near (1.0, 0.48, 0.11). Neither is fudged toward the
+ * other: the whole reason for having two is that they are visibly different, and
+ * a street of each is the single strongest tell that this is Sydney and not a
+ * generic orange night.
+ */
+export const LAMP_LED_COLOUR: Readonly<Rgb> = [1.0, 0.7, 0.44];
+export const LAMP_SODIUM_COLOUR: Readonly<Rgb> = [1.0, 0.48, 0.11];
+
+/** What fraction of the city is still on sodium. See the colours above. */
+export const LAMP_SODIUM_SHARE = 0.34;
+
 export type Rgb = [number, number, number];
+
+/**
+ * How far into the night the rig is: 0 in daylight, 1 once it is dark.
+ *
+ * **The single clock for everything after sunset.** The torch's intensity, the
+ * real lamps' intensity and the opacity of every additive sprite in
+ * `world/nightlights.ts` are all this number times a constant, which is what
+ * makes the whole night rig fade together instead of six things each crossing
+ * their own threshold at their own hour.
+ *
+ * Smoothstep rather than linear, and it matters at the top end rather than the
+ * bottom: the last few per cent of a linear ramp arrive as a visible "and now
+ * the lights are fully on" step against a sky that is by then barely changing,
+ * whereas the cubic's flat tail lands on nothing. The derivative is zero at both
+ * ends, so nothing in this rig has a corner in it.
+ *
+ * Deliberately **not** `facade.ts`'s `nightFactor`, which ramps over
+ * -5 to +6 degrees. That one decides when the *windows* light, and windows come
+ * on while it is still light out because people turn lights on when the room
+ * gets dim, not when the sun sets. This one is a photocell. They are two
+ * different physical facts and giving them one number would mean getting one of
+ * them wrong; that they overlap for most of the ramp is why the join reads.
+ */
+export function nightLevel(altitudeDeg: number): number {
+  const t = Math.min(
+    Math.max((NIGHT_ON_ALTITUDE - altitudeDeg) / (NIGHT_ON_ALTITUDE - NIGHT_FULL_ALTITUDE), 0),
+    1,
+  );
+  return t * t * (3 - 2 * t);
+}
+
+/** What the night rig is doing at one instant. Everything is `nightLevel` times a constant. */
+export interface NightRig {
+  /** 0 in daylight, 1 once dark. */
+  level: number;
+  /** `SpotLight.intensity` for the torch. */
+  torchIntensity: number;
+  /** `PointLight.intensity` for each of the `LAMP_REAL_COUNT` real lamps. */
+  lampIntensity: number;
+}
+
+/** The night rig for a given solar altitude. Pure, for the same reason `solarRig` is. */
+export function nightRig(altitudeDeg: number): NightRig {
+  const level = nightLevel(altitudeDeg);
+  return {
+    level,
+    torchIntensity: TORCH_INTENSITY * level,
+    lampIntensity: LAMP_INTENSITY * level,
+  };
+}
+
+/**
+ * Irradiance on a vertical wall with nothing but the night sky on it.
+ *
+ * The floor every night term above is quoted against. It is `shadedWallIrradiance`
+ * with the bounce already zero -- stated as its own function because the night
+ * numbers are ratios to it and a reader checking them should not have to work
+ * out which terms survive sunset.
+ */
+export function nightAmbientOnWall(altitudeDeg = -20): Rgb {
+  return shadedWallIrradiance(solarRig(altitudeDeg));
+}
 
 /** What the rig is doing at one instant. Everything below is derived from this. */
 export interface LightRig {
@@ -633,6 +912,44 @@ export function verifyLightRig(rig = solarRig(REFERENCE_SOLAR.altitude)): string
         `horizon; it must be exactly zero. It is meant to be a fraction of the beam landing on ` +
         `the pavement, so it should switch itself off with the sun that feeds it rather than ` +
         `needing a separate night path.`,
+    );
+  }
+
+  // --- The night rig, in two parts, and both of them are about *this file's own
+  // arithmetic staying true* rather than about how the night looks.
+  //
+  // Every predicted display value above -- the sunlit footpath, the shaded
+  // brick, the two sun:shade ratios -- was measured with three lights in the
+  // scene. There are now nine, and the only reason those measurements are still
+  // the whole story at 3 pm is that the six new ones are multiplied by
+  // `nightLevel`, which is exactly zero above `NIGHT_ON_ALTITUDE`. That is a
+  // one-line invariant holding up a page of calibration, so it is asserted
+  // rather than trusted.
+  const dayNight = nightRig(solar.altitude);
+  if (dayNight.level !== 0 || dayNight.torchIntensity !== 0 || dayNight.lampIntensity !== 0) {
+    failures.push(
+      `The night rig is contributing at 3 pm on 15 February (level ${dayNight.level.toFixed(4)}, ` +
+        `torch ${dayNight.torchIntensity.toFixed(2)}, lamps ${dayNight.lampIntensity.toFixed(2)}). ` +
+        `It must be exactly zero above ${NIGHT_ON_ALTITUDE} degrees of solar altitude: every ` +
+        `display value predicted in this file and in facade.ts was measured with the sun, the ` +
+        `hemisphere and the bounce and nothing else, so a torch that is on at noon invalidates ` +
+        `all of them at once -- silently, because a slightly brighter wall looks like nothing.`,
+    );
+  }
+
+  // And the other end: something has to be on after dark, or this whole rig is
+  // the one it replaced. Quoted as a ratio to the ambient floor at 10 m because
+  // that is the number that decides whether a street is walkable -- see
+  // `TORCH_INTENSITY`'s table.
+  const dark = nightRig(-20);
+  const floor = luminance(nightAmbientOnWall(-20));
+  const torchAt10 = (dark.torchIntensity / 100) * luminance(TORCH_COLOUR as Rgb);
+  if (!(torchAt10 > floor * 4)) {
+    failures.push(
+      `The torch puts ${torchAt10.toFixed(3)} of irradiance on a wall 10 m away with the sun ` +
+        `20 degrees down, against an ambient floor of ${floor.toFixed(3)} -- under the 4x that ` +
+        `makes a dark street navigable rather than merely lighter. Check TORCH_INTENSITY ` +
+        `(${TORCH_INTENSITY}) and that nightLevel still reaches 1.`,
     );
   }
 

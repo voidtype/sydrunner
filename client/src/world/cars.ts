@@ -101,6 +101,7 @@ import {
   type TrafficField,
 } from '../game/traffic.ts';
 import { policeLiveried } from '../game/factions.ts';
+import type { CarLightSink } from './nightlights.ts';
 
 /** Must match `parking.SEDAN` .. `parking.VAN` in the pipeline. */
 export const BODY_COUNT = 5;
@@ -956,6 +957,22 @@ export class TrafficMovers {
   private readonly band: InstancedMesh;
   private bandCount = 0;
 
+  /**
+   * Where the headlights go, or null.
+   *
+   * The whole of the coupling between the traffic and `world/nightlights.ts`,
+   * and it is one property on purpose: this class already computes a pose for
+   * every car in view every frame, and a night rig that recomputed them would be
+   * doing the expensive half of this file twice for a picture that has to agree
+   * with it exactly -- the car you see lit has to be the car that is there.
+   *
+   * `begin()` returning false is what makes the day path free: one comparison
+   * per frame rather than a branch per car. Typed as the sink interface rather
+   * than as `CarLights` so this file never learns what a headlight is, which is
+   * the same split `CollisionSink` makes in `streamer.ts`.
+   */
+  lights: CarLightSink | null = null;
+
   constructor(assets: CarAssets) {
     this.band = new InstancedMesh(chequerBand(), assets.material, MOVER_CAPACITY);
     this.band.name = 'traffic_livery';
@@ -1006,6 +1023,8 @@ export class TrafficMovers {
     for (let b = 0; b < BODY_COUNT; b++) this.counts[b] = 0;
     this.bandCount = 0;
     let parked = 0;
+    const lights = this.lights;
+    const lighting = lights !== null && lights.begin();
 
     forEachCarNear(field, x, z, TRAFFIC_DRAW_RADIUS, tick, this.scratch, this.pose, (p) => {
       const n = this.counts[p.body];
@@ -1016,6 +1035,12 @@ export class TrafficMovers {
       // is the whole of why it reads as one of the 23,020 already at that kerb.
       // The only thing this file knows about the stages is this counter.
       if (p.stage === CAR_STAGE_PARKED_IN || p.stage === CAR_STAGE_PARKED_OUT) parked++;
+      // **After** the capacity return above, which is the point: a car this file
+      // has run out of instances for is not drawn at all, and a pair of
+      // headlights hanging in the air where an undrawn car would have been is a
+      // worse failure than the missing car. The night rig makes its own decision
+      // about whether a *parked* one is lit; that is not this file's business.
+      if (lighting) lights!.add(p);
       const mesh = this.meshes[p.body];
       _position.set(p.x, p.y, p.z);
       // The heading, straight off the pose's unit direction and with no
@@ -1087,6 +1112,7 @@ export class TrafficMovers {
       mesh.count = n;
       drawn += n;
     }
+    if (lights !== null) lights.end();
     if (this.bandCount > 0 || this.band.count > 0) this.band.instanceMatrix.needsUpdate = true;
     this.band.count = this.bandCount;
     this.liveried = this.bandCount;

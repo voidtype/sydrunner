@@ -59,8 +59,13 @@
          what an ellipsis eats is what matters least. */
       #help {
         position: fixed; right: 14px; bottom: 16px;
-        max-width: min(340px, 44vw);
-        font-size: 11px; line-height: 1.55; letter-spacing: .02em;
+        /* 13px, up from the interface's usual 11: the controls are the one
+           block a new player reads at arm's length while everything else is
+           glanced at. The width cap grows with it (340 -> 390) so the same
+           lines still fit on one row before the ellipsis takes over, and 44vw
+           still keeps it clear of `#vitals` in the bottom-left corner. */
+        max-width: min(390px, 44vw);
+        font-size: 13px; line-height: 1.5; letter-spacing: .02em;
         color: #cfe2f2; text-shadow: 0 1px 2px rgba(0,0,0,.85);
         text-align: right; pointer-events: none;
         transition: opacity .25s ease;
@@ -107,7 +112,11 @@
         border: 1px solid rgba(207,226,242,.34);
         box-shadow: 0 2px 12px rgba(0,0,0,.7);
         padding: 14px 18px;
-        color: #cfe2f2; font-size: 11px; letter-spacing: .02em;
+        /* Tracks `#help`'s 13px: the compact block is a preview of this panel
+           and a reader who opens it should not have the type change size under
+           them. The 560px cap holds -- the sections wrap, so a wider glyph
+           costs rows rather than overflow. */
+        color: #cfe2f2; font-size: 13px; letter-spacing: .02em;
       }
       #helpfull.shown { display: flex; }
       /* A short window gets a wider panel, which is the opposite of what it
