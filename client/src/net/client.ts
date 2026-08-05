@@ -89,6 +89,7 @@ import { EYE_HEIGHT, step, type InputSnapshot, type PlayerState } from '../playe
 import {
   ANIM,
   BTN,
+  ENTER_FLAG,
   EVENT,
   EVENT_FLAG,
   FLAG,
@@ -102,6 +103,7 @@ import {
   decodeBikes,
   decodeBye,
   decodeEvents,
+  decodeInterest,
   decodeInvestigations,
   decodePowerups,
   decodeRoster,
@@ -109,6 +111,8 @@ import {
   decodeWelcome,
   encodeHello,
   encodeInput,
+  encodeEvents,
+  encodeInterest,
   encodeInvestigations,
   encodePing,
   encodeRoster,
@@ -119,6 +123,8 @@ import {
   type InvestigationRecord,
   type NetTransport,
   type RosterEntry,
+  chooseRoom,
+  type RoomInfo as RoomInfoShape,
   type Snapshot,
   type SnapshotBall,
   type SnapshotNpc,
@@ -234,7 +240,26 @@ export interface NetHandlers {
   onBounce(x: number, y: number, z: number, bounces: number): void;
   onPickup(combatant: number, kind: PowerupKind, tileKey: string, index: number): void;
   onJoin(id: number, colourway: number, bot: boolean): void;
+  /**
+   * Somebody **left the game**. A kill feed line, and a rig to release.
+   *
+   * Distinct from `onDrop` below, and protocol v8 is what made the distinction
+   * necessary. Before interest management the only way to stop being drawn was
+   * to disconnect, so one callback did both jobs. Now a remote stops being drawn
+   * every time somebody walks two hundred metres away, and a feed that said
+   * "Bazza left" each time would be a feed of nothing but departures.
+   */
   onLeave(id: number): void;
+  /**
+   * Somebody **went out of view**. Release the rig; say nothing.
+   *
+   * PERFORMANCE.md phase 2. The caller must dispose exactly what `onLeave`
+   * disposes -- the actor, its props, its bike, its nameplate -- because the
+   * memory question is identical and only the *narration* differs. A client
+   * walking across the CBD will fire this hundreds of times a session, so a
+   * handler that leaked would leak at walking pace.
+   */
+  onDrop(id: number): void;
   onStatus(status: NetStatus, detail: string): void;
 }
 
@@ -263,6 +288,15 @@ export class NetClient {
   /** Assigned by the server's WELCOME. 0 until then. */
   id = 0;
   colourway = 0;
+  /**
+   * Which room this client landed in, from the WELCOME. -1 until then.
+   *
+   * Read rather than assumed from the URL, because a client that names no room
+   * is put in the least-full open one by the gateway -- see `server/index.ts` --
+   * so this is the only place the answer is known. What it is for is the invite
+   * link: `?room=<this>` is how a friend joins the same game.
+   */
+  room = -1;
 
   /** Smoothed round trip, ms, and the count behind it. */
   rtt = 0;
@@ -586,10 +620,40 @@ export class NetClient {
         }
         this.id = w.id;
         this.colourway = w.colourway;
+        this.room = w.room;
         this.serverTick = w.tick;
         this.tickSynced = true;
         this.welcome = w;
-        this.setStatus('online', `id ${w.id}`);
+        this.setStatus('online', `id ${w.id} in room ${w.room}`);
+        return;
+      }
+      /*
+       * v8's working-set delta. PERFORMANCE.md phase 2.
+       *
+       * This is where remotes are **created and destroyed** now, and the
+       * ordering the server guarantees is what makes that safe: the INTEREST
+       * frame is sent immediately before the snapshot whose bodies it explains,
+       * so every id in a snapshot has had an identity delivered first. The
+       * snapshot path below still builds a record for an id it has never heard
+       * of, on the same argument it always did -- a missing entrance must leave
+       * somebody *visible and wrongly dressed* rather than invisible -- but
+       * under v8 that branch should never fire, and `checkAoi` asserts it does
+       * not.
+       */
+      case MSG.INTEREST: {
+        const delta = decodeInterest(frame);
+        if (!delta) return;
+        for (const e of delta.enters) {
+          if (e.id === this.id) continue;
+          const r = this.ensureRemote(e.id, e.colourway, (e.flags & ENTER_FLAG.BOT) !== 0);
+          // Taken from the entrance rather than waited for, so the first pose is
+          // the right pose: a player who walks into view on a bike is drawn
+          // seated on the frame they appear rather than running along the
+          // footpath for one snapshot. The snapshot 0-50 ms later carries the
+          // same bit and takes over.
+          r.riding = (e.flags & ENTER_FLAG.RIDING) !== 0;
+        }
+        for (const id of delta.leaves) this.dropRemote(id);
         return;
       }
       case MSG.SNAPSHOT: {
@@ -771,9 +835,23 @@ export class NetClient {
       } else if (e.kind === EVENT.PICKUP) {
         this.handlers.onPickup(e.combatant, e.powerup as PowerupKind, `${e.tileX}_${e.tileZ}`, e.index);
       } else if (e.kind === EVENT.JOIN) {
-        if (e.id !== this.id) this.ensureRemote(e.id, e.colourway, e.bot !== 0);
+        // **A feed line and an identity, not a body.** Through v7 this built the
+        // remote, because a join meant "somebody you can now see"; under v8 a
+        // join is a room-wide fact about somebody who is probably three
+        // kilometres away, and building a rig for them would put a hundred and
+        // twenty-seven invisible actors in the scene. The body arrives when
+        // `MSG.INTEREST` says they are near enough to draw.
+        //
+        // The identity is still filed, on the roster's own argument: the two can
+        // arrive in either order, and a table that knew who somebody was before
+        // they walked round the corner is what stops them being drawn in kit 0
+        // for a snapshot.
+        if (e.id !== this.id) this.identity.set(e.id, { colourway: e.colourway, bot: e.bot !== 0 });
         this.handlers.onJoin(e.id, e.colourway, e.bot !== 0);
       } else {
+        // Left the game. Room-global, so this fires whether or not they were in
+        // view -- which is right: the kill feed is the only place a room-wide
+        // game is visible to somebody standing in a quiet street.
         this.remotes.delete(e.id);
         this.handlers.onLeave(e.id);
       }
@@ -821,6 +899,27 @@ export class NetClient {
     return r;
   }
 
+  /**
+   * Stop drawing somebody who went out of view, and release what they held.
+   *
+   * PERFORMANCE.md phase 2's other half. `onDrop` rather than `onLeave` -- see
+   * `NetHandlers` -- because the two say the same thing to the renderer and
+   * different things to the kill feed.
+   *
+   * The **interpolation history is deliberately not pruned** here, and that is
+   * the one subtle line in this method. `this.snapshots` still holds up to 1.5 s
+   * of frames with this id in them, and `interpolate` reads them by id off the
+   * `remotes` map -- which no longer has an entry, so nothing is drawn. When the
+   * same player walks back into view a fresh record is built and starts `fresh`,
+   * which hides it until its first authoritative position. That is the same path
+   * a joiner takes and it is what stops a returning neighbour being drawn for
+   * one frame at wherever they were when they left.
+   */
+  private dropRemote(id: number): void {
+    if (!this.remotes.delete(id)) return;
+    this.handlers.onDrop(id);
+  }
+
   private onSnapshot(s: Snapshot): void {
     // Out of order is possible on any transport and is cheap to reject: a
     // snapshot older than one already held would rewind the interpolation.
@@ -865,13 +964,21 @@ export class NetClient {
     for (const p of s.players) {
       if (p.id !== this.id && !this.remotes.has(p.id)) this.ensureRemote(p.id, 0, false);
     }
-    // And drop anybody the server has stopped reporting: a lost LEAVE would
-    // otherwise leave a statue in the street.
+    // And drop anybody this snapshot has stopped carrying.
+    //
+    // **Under v8 this is a backstop rather than the mechanism.** A snapshot is
+    // now exactly the working set, so "not in the snapshot" and "left my
+    // interest" are the same statement -- and `MSG.INTEREST`, which arrives
+    // immediately before, has already said so and already released the rig. What
+    // this covers is the case where the two ever disagree, and it fails safe in
+    // the right direction: a body the server is no longer describing stops being
+    // drawn rather than standing in the street forever.
+    //
+    // `dropRemote` rather than the old `handlers.onLeave`, which is the whole of
+    // phase 2's client-side change: somebody walking behind a building is not a
+    // line in the kill feed.
     for (const id of [...this.remotes.keys()]) {
-      if (!s.players.some((p) => p.id === id)) {
-        this.remotes.delete(id);
-        this.handlers.onLeave(id);
-      }
+      if (!s.players.some((p) => p.id === id)) this.dropRemote(id);
     }
 
     this.pendingAck = s.ackSeq;
@@ -1338,6 +1445,59 @@ export class NetClient {
 
 const PHASE_NAMES = ['idle', 'windup', 'active', 'recovery', 'flinch', 'ko'];
 
+// --- The gateway ---------------------------------------------------------------
+
+/**
+ * `chooseRoom` and `RoomInfo` live in `protocol.ts` -- the file both ends import
+ * -- and are re-exported here because this is where a caller looks for them.
+ *
+ * They are there rather than here for the reason that file exists at all: the
+ * *server's* integration check has to assert the client's own choosing rule, and
+ * this module imports `three` and cannot be loaded outside a browser. The same
+ * argument `protocol.rankRoster` already makes about the leaderboard's order.
+ */
+export { chooseRoom, type RoomInfo } from './protocol.ts';
+
+/**
+ * Ask a host what rooms it has. Returns an empty list for anything that is not a
+ * v8 host, which is what makes the join flow degrade rather than fail.
+ *
+ * PERFORMANCE.md phase 3. Three properties, all of them about failing softly:
+ *
+ *   - **A host with no `/rooms` route is not an error.** A pre-phase-3 server,
+ *     or a proxy that only forwards `/ws`, answers 404 or nothing; the caller
+ *     then connects with no room and the server's own gateway puts it in the
+ *     least-full open one. The boot must not stall on a route that is an
+ *     optimisation.
+ *   - **It is time-boxed.** A gateway fetch that hangs would hold up the join,
+ *     and the join is already the one place `main.ts` blocks on the network. Two
+ *     seconds, against a route that answers in a millisecond.
+ *   - **It never throws.** A CORS failure, a captive portal, a DNS answer that
+ *     is a parked domain -- all of them land here as an empty list.
+ *
+ * It stays in *this* file rather than beside `chooseRoom` because it is the one
+ * half that is not pure: it opens a socket, and `protocol.ts` deliberately holds
+ * nothing that does.
+ */
+export async function fetchRooms(httpBase: string, timeoutMs = 2000): Promise<RoomInfoShape[]> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const res = await fetch(`${httpBase.replace(/\/$/, '')}/rooms`, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok) return [];
+    const body = (await res.json()) as unknown;
+    if (!Array.isArray(body)) return [];
+    return body.filter(
+      (r): r is RoomInfoShape =>
+        typeof r === 'object' && r !== null &&
+        typeof (r as RoomInfoShape).id === 'number' && typeof (r as RoomInfoShape).players === 'number',
+    );
+  } catch {
+    return [];
+  }
+}
+
 /**
  * `a <= b` in wrapping 16-bit sequence space.
  *
@@ -1731,6 +1891,126 @@ export function verifyNetClient(): string[] {
     if (second?.reason !== 4) failures.push('A second predicted crime did not re-label the banner.');
   }
 
+  // --- v8: the working-set lifecycle, and the one thing it must not do to the
+  // kill feed.
+  //
+  // Three failures, all of them silent and all of them things a player would
+  // report as something else:
+  //
+  //   - An entrance that does not build a remote is a **player who is invisible
+  //     while punching you**. Nothing throws; the snapshot backstop eventually
+  //     draws them in kit 0, so the report is "sometimes people are the wrong
+  //     colour" and the cause is four bytes that never arrived.
+  //   - A departure that does not release the rig is a statue in the street and
+  //     a nameplate held out of the pool, at walking pace, forever.
+  //   - A departure that goes through `onLeave` writes "Bazza left" into the
+  //     kill feed every time somebody walks behind a building, which turns the
+  //     one room-wide surface a player has into noise.
+  {
+    const transport = nullTransport();
+    const left: number[] = [];
+    const dropped: number[] = [];
+    const joined: number[] = [];
+    const handlers = silentHandlers();
+    handlers.onLeave = (id) => left.push(id);
+    handlers.onDrop = (id) => dropped.push(id);
+    handlers.onJoin = (id) => joined.push(id);
+    const net = new NetClient('', handlers, { transport });
+    net.id = 1;
+
+    // The roster first, exactly as a room sends it: room-global, everybody in
+    // it, whether or not they can be seen.
+    transport.onframe?.(
+      encodeRoster([
+        { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 20 },
+        { id: 2, colourway: 4, bot: false, name: 'Shazza', kos: 0, downs: 0, ping: 30 },
+        { id: 3, colourway: 5, bot: true, name: 'Davo', kos: 0, downs: 0, ping: 0 },
+      ]),
+    );
+    // A JOIN for somebody across town. A feed line, and **no body**.
+    transport.onframe?.(encodeEvents([{ kind: EVENT.JOIN, id: 3, colourway: 5, bot: 1 }]));
+    if (joined.length !== 1) failures.push('A room-wide JOIN did not reach the kill feed.');
+    if (net.remotes.has(3)) {
+      failures.push(
+        'A JOIN built a remote for somebody out of interest. At a full room that is 127 invisible ' +
+          'actors in the scene, every one of them holding a rig.',
+      );
+    }
+
+    // Now they walk into view.
+    transport.onframe?.(
+      encodeInterest([{ id: 3, colourway: 5, flags: ENTER_FLAG.BOT | ENTER_FLAG.RIDING }], []),
+    );
+    const r = net.remotes.get(3);
+    if (!r) failures.push('An INTEREST entrance did not build a remote; the player is invisible.');
+    if (r && (r.colourway !== 5 || !r.bot)) {
+      failures.push(`An entrant arrived as kit ${r.colourway} bot ${r.bot}, not kit 5 bot true.`);
+    }
+    if (r && !r.riding) {
+      failures.push('An entrant on a bike was not drawn riding; the first pose is a runner with no bike under them.');
+    }
+
+    // ...and out again. The rig is released and the feed says nothing.
+    transport.onframe?.(encodeInterest([], [3]));
+    if (net.remotes.has(3)) failures.push('An INTEREST departure left the remote in place; that is a statue in the street.');
+    if (dropped.join(',') !== '3') failures.push(`Going out of view fired onDrop ${dropped.length} times, not once.`);
+    if (left.length !== 0) {
+      failures.push(
+        'Walking out of view wrote a "left" line into the kill feed. Under AOI that fires every time ' +
+          'anybody walks behind a building.',
+      );
+    }
+
+    // A real departure still says so, and still releases.
+    transport.onframe?.(encodeInterest([{ id: 2, colourway: 4, flags: 0 }], []));
+    transport.onframe?.(encodeEvents([{ kind: EVENT.LEAVE, id: 2, colourway: 4, bot: 0 }]));
+    if (net.remotes.has(2)) failures.push('A LEAVE event did not remove the remote.');
+    if (left.join(',') !== '2') failures.push(`A real departure fired onLeave ${left.length} times, not once.`);
+
+    // And an entrance for yourself is ignored -- the server never sends one, and
+    // a client that built a remote for itself would draw its own body in front
+    // of its own camera.
+    transport.onframe?.(encodeInterest([{ id: 1, colourway: 0, flags: 0 }], []));
+    if (net.remotes.has(1)) failures.push('An INTEREST entrance for the local player built a remote of itself.');
+  }
+
+  // --- v8: the gateway's room choice.
+  //
+  // Pure arithmetic over four numbers, and it is checked here rather than left
+  // to the server because the *client* is what picks: a rule that preferred the
+  // fullest room would pile everybody into one and produce the CBD-pileup
+  // bandwidth for a room that had seven empty neighbours.
+  {
+    const rooms: RoomInfoShape[] = [
+      { id: 0, players: 40, cap: 128, open: true },
+      { id: 1, players: 128, cap: 128, open: false },
+      { id: 2, players: 12, cap: 128, open: true },
+      { id: 3, players: 12, cap: 128, open: true },
+    ];
+    if (chooseRoom(rooms, null) !== 2) {
+      failures.push(`The gateway chose room ${chooseRoom(rooms, null)}; the emptiest open one is 2.`);
+    }
+    if (chooseRoom(rooms, 0) !== 0) failures.push('The gateway ignored an explicitly requested room; a friend\'s link does nothing.');
+    // A full room that was **asked for by name** is still returned, so the
+    // server can refuse it with a reason the player can read. Silently rehoming
+    // somebody who followed a link is worse than telling them.
+    if (chooseRoom(rooms, 1) !== 1) failures.push('The gateway silently rehomed a request for a full room instead of letting it be refused by name.');
+    if (chooseRoom(rooms, 99) !== 2) failures.push('A request for a room that does not exist was not replaced by the emptiest.');
+    // No listing at all -- a pre-phase-3 host, or a proxy that only forwards the
+    // socket. The answer is "let the server decide", which is what a bare
+    // connection has always meant.
+    if (chooseRoom([], null) !== null) failures.push('An empty room listing did not fall back to the server\'s own choice.');
+    if (chooseRoom([], 4) !== 4) failures.push('An explicit room against an unreachable listing was dropped; the link should still be tried.');
+    // Ties break on the id, so two clients starting together land together
+    // rather than being split by whichever list they happened to read.
+    if (chooseRoom([{ id: 7, players: 3, cap: 128, open: true }, { id: 2, players: 3, cap: 128, open: true }], null) !== 2) {
+      failures.push('Two equally-empty rooms did not break the tie on the id; friends joining at once would be split.');
+    }
+    if (chooseRoom([{ id: 0, players: 128, cap: 128, open: false }], null) !== null) {
+      failures.push('A full host did not fall back to the server\'s own refusal path.');
+    }
+  }
+
   return failures;
 }
 
@@ -1741,6 +2021,7 @@ function silentHandlers(): NetHandlers {
     onPickup: () => {},
     onJoin: () => {},
     onLeave: () => {},
+    onDrop: () => {},
     onStatus: () => {},
   };
 }

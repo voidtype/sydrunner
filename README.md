@@ -60,10 +60,14 @@ move the sun by half an hour, `N` for night, `T` back to 3 pm, `M` to toggle the
 | `?server=host:8787` | join a server somewhere else — a whole `ws://` URL also works |
 | `?offline` or `?server=none` | force the local stub, with no connection attempted |
 | `localStorage['sydney.server']` | the same as `?server=`, sticky across reloads |
+| `?room=3` | join a particular room — what an invite link is. Without it the gateway picks the emptiest |
 | `SYDNEY_PORT=9000 npm run server` | listen somewhere else |
-| `SYDNEY_BOTS=0 npm run server` | no bots |
+| `SYDNEY_BOTS=0 npm run server` | no bots (they are **per room**) |
+| `SYDNEY_ROOMS=8 npm run server` | run eight rooms in this process; the default is one |
+| `SYDNEY_ROOM_CAP=128 npm run server` | players per room. `SYDNEY_MAX_PLAYERS` is an accepted alias |
 | `npm run server:check` | two synthetic clients against a real server, no browser |
-| <http://localhost:8787/health> | tick, player count, protocol version |
+| <http://localhost:8787/health> | player count, per-room occupancy, protocol version |
+| <http://localhost:8787/rooms> | the gateway: `[{ id, players, cap, open }, …]` |
 
 To extend coverage from the 4 km inner ring to the 15 km middle ring:
 
@@ -170,18 +174,20 @@ exists is that nothing above the socket knows what carries it. `NetTransport` in
 message is already a self-contained frame with its type in the first byte — which is the
 shape a datagram wants and a stream does not care about.
 
-**Bandwidth is 55 kbit/s at sixteen players, against spec 10's 30, and the arithmetic is
-stated rather than rounded away.** A snapshot is 21 bytes a player plus an 8-byte header at
-20 Hz, which measures 8 kbit/s at two players, 21 at six and 55 at sixteen. The budget is
-met at the player counts this build is actually played at and missed by 1.8× at spec 2's
-cap, which is not reachable from a laptop on a desk. The gap is 12 bytes of position per
-player and there are two known ways to close it, neither of which belongs in a first
-server: packing the position to 21/17/21 bits (8 bytes, and 45 kbit/s — an improvement and
-still not the budget), or delta-encoding against the last acknowledged snapshot, which is
-the one that actually gets there and needs per-client baselines, snapshot acknowledgement
-and a resend path, all three of which fail as teleporting players. `verifyNet` asserts the
-number so the note above cannot go stale. Upstream is not close to a constraint: 10 bytes
-at 60 Hz is 4.8 kbit/s.
+**Bandwidth stopped being a function of how many people are in the game, in protocol v8.**
+Through v7 a snapshot carried every player to every client at 21 bytes each, which was
+55 kbit/s at spec 2's sixteen (against spec 10's 30) and 432 kbit/s at a room of 128 —
+measured at 1.92 Mbit/s per client with 500 players, and the wall the whole scaling pass
+existed to remove. v8 sends each client only what it can see: everybody within 180 m (held
+to 220 m so a boundary cannot flap), capped at the 40 nearest, at 22 bytes a player plus a
+12-byte header. So the arithmetic is now about local density rather than population —
+5 kbit/s alone in a street, 23 in a six-player fight, and a hard ceiling of 143 kbit/s
+because nobody can stand next to more than forty people. Measured across a thousand
+synthetic players: 133–199 kbit/s per client. Upstream is unchanged and was never close to
+a constraint: 10 bytes at 60 Hz is 4.8 kbit/s. `verifyNet` asserts the ceiling so the note
+above cannot go stale, and PERFORMANCE.md has the full measurement — including the part
+where this page's own pre-measurement estimate of "~30 kbit/s typical" turned out to be
+optimistic by four to six times.
 
 **There is a laser, and spec 12 excludes guns by name.** *"Guns, gore, progression,
 matchmaking, anti-cheat. Out of scope. It's a punching game for friends."* The raygun is
@@ -1330,7 +1336,7 @@ Five things about the netcode are decisions rather than mechanics.
   given latency, and a player at a particular ping would find their punches consistently
   landing early or late. Lerping between the two bracketing samples costs four multiplies.
 - **Reconciliation is a three-way split, not a copy of the server's state.** The snapshot
-  carries 21 bytes a player and deliberately no velocity, phase timers or powerup clocks, so
+  carries 22 bytes a player and deliberately no velocity, phase timers or powerup clocks, so
   "adopt the server's answer" is not available. *Predicted and reconciled*: position,
   velocity, look, ground contact, the punch phase machine — all functions of the player's own
   input. *Told outright*: health, stamina, laser charges, which powerups are running — all

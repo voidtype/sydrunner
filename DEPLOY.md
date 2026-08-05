@@ -297,6 +297,154 @@ points the ref at a SHA that cannot exist — that costs exactly one probe reque
 and then serves the entire world from the origin, which is what a jsDelivr
 outage would look like.
 
+## Rooms, and scaling past one process
+
+PERFORMANCE.md phase 3. The server is now a **host of R rooms** rather than one
+game. Nothing about the current box changes — the default is one room and
+`systemctl restart sydney` after a redeploy is still the whole operation — but
+the knobs are here and the multi-process shape is config, not code.
+
+### The environment variables
+
+| Variable | Default | What it does |
+|---|---|---|
+| `SYDNEY_ROOMS` | `1` | How many rooms this process runs |
+| `SYDNEY_ROOM_CAP` | `128` | Players per room. `SYDNEY_MAX_PLAYERS` is an accepted alias |
+| `SYDNEY_ROOM_BASE` | `0` | The id of this host's first room; rooms are `BASE .. BASE+ROOMS-1` |
+| `SYDNEY_BOTS` | `2` | Bots **per room**, so 8 rooms at the default is 16 |
+
+**One room is the default on purpose.** A default of eight would mean two
+browsers opened on one desk landing in different cities, which is the exact
+failure the gateway's least-full rule exists to prevent, caused by the gateway
+itself. Turn rooms on when there are enough players to fill more than one.
+
+The current 1 GB box should stay at `SYDNEY_ROOMS=1`: a room's fixed floor is
+about 0.35 ms of tick regardless of occupancy (the powerup sweep, the faction
+scan and the bike sweep all run whether or not anybody is in there), so eight
+empty rooms cost 2.8 ms a tick to serve nobody. Rooms are worth their floor
+once they hold players.
+
+### Adding rooms to the existing unit
+
+```bash
+ssh -i ~/.ssh/sydney_deploy root@oxford-tractor.bnr.la \
+  'systemctl edit sydney'      # drop-in, so the packaged unit stays clean
+```
+
+```ini
+[Service]
+Environment=SYDNEY_ROOMS=4
+Environment=SYDNEY_ROOM_CAP=128
+```
+
+`systemctl daemon-reload && systemctl restart sydney`, then
+`curl -s localhost:8787/rooms` — four objects, all `open`.
+
+### Several host processes on one box
+
+Rooms share a Bun thread, so one host process uses **one core** however many
+rooms it has. On an 8-core box the way to the other seven is more processes, and
+the whole of the configuration is a port and a room base:
+
+| Host | Port | Environment | Rooms |
+|---|---|---|---|
+| 0 | 8787 | `SYDNEY_ROOMS=8 SYDNEY_ROOM_BASE=0` | 0–7 |
+| 1 | 8788 | `SYDNEY_ROOMS=8 SYDNEY_ROOM_BASE=8` | 8–15 |
+| 2 | 8789 | `SYDNEY_ROOMS=8 SYDNEY_ROOM_BASE=16` | 16–23 |
+| 3 | 8790 | `SYDNEY_ROOMS=8 SYDNEY_ROOM_BASE=24` | 24–31 |
+
+A templated unit is the tidy way to run them. `sydney@.service`:
+
+```ini
+[Unit]
+Description=SYDNEY room host %i
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/sydney/server
+Environment=SYDNEY_WORLD=/opt/sydney/dist/world
+Environment=SYDNEY_ROOMS=8
+Environment=SYDNEY_ROOM_CAP=128
+# The port and the room base are the only per-host values, and they are derived
+# from the instance name so a fifth host is one `systemctl enable sydney@4`.
+ExecStart=/bin/sh -c 'SYDNEY_PORT=$((8787 + %i)) SYDNEY_ROOM_BASE=$((8 * %i)) /root/.bun/bin/bun run index.ts'
+Restart=on-failure
+RestartSec=2
+MemoryMax=1500M
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+systemctl enable --now sydney@0 sydney@1 sydney@2 sydney@3
+```
+
+Each host loads its own copy of the city (about 190 MB resident at load, and
+250 MB under a full 1,000-player swarm — see PERFORMANCE.md phase 4), so budget
+memory per host rather than per box.
+
+**Caddy.** `caddy/rooms.Caddyfile` in this repo is the snippet; it fans `/ws/<n>`
+out to `127.0.0.1:878n` and keeps the existing bare `/ws` pointed at host 0 so
+every current bookmark still works. Install it the way `world-cache.Caddyfile`
+is installed and **remove the inline `handle /ws` block it replaces**:
+
+```bash
+scp -i ~/.ssh/sydney_deploy caddy/rooms.Caddyfile \
+  root@oxford-tractor.bnr.la:/etc/caddy/rooms.Caddyfile
+ssh -i ~/.ssh/sydney_deploy root@oxford-tractor.bnr.la \
+  'caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy'
+```
+
+The site block then reads:
+
+```caddyfile
+oxford-tractor.bnr.la {
+	root * /opt/sydney/dist
+	encode zstd gzip
+
+	import /etc/caddy/world-cache.Caddyfile
+	import /etc/caddy/rooms.Caddyfile          # <- replaces `handle /ws { ... }`
+
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}
+```
+
+**The client's host list.** With one host, the client's gateway step fetches
+`/rooms` from the page's own origin and needs no configuration at all. With
+several, drop a `rooms.json` beside `index.json` in `dist/` naming them:
+
+```json
+{
+  "hosts": [
+    { "path": "/ws/0", "rooms": "/rooms/0" },
+    { "path": "/ws/1", "rooms": "/rooms/1" },
+    { "path": "/ws/2", "rooms": "/rooms/2" },
+    { "path": "/ws/3", "rooms": "/rooms/3" }
+  ]
+}
+```
+
+A client with no `rooms.json` falls back to the origin's `/rooms` and lands on
+host 0, which is why the bare `/ws` rule is kept first in the snippet: **every
+step of this degrades to the single-host behaviour** rather than failing.
+
+### Verifying a fanned-out box
+
+```bash
+for n in 0 1 2 3; do curl -s localhost:$((8787+n))/rooms | head -c 80; echo; done
+curl -s https://oxford-tractor.bnr.la/rooms/2 | head -c 80   # through Caddy
+```
+
+Then two browsers with `?room=` naming rooms on *different* hosts: each should
+see only itself plus its room's bots, and the two leaderboards should be
+disjoint. That is the same claim `checkRooms` asserts over loopback, made
+against the public edge.
+
 ## Rollback
 
 ```bash
@@ -314,7 +462,8 @@ site down but leaves the game server reachable on `localhost:8787`.
 
 ```bash
 curl -sI https://oxford-tractor.bnr.la/                  # 200, HTTP/2
-curl -s  https://oxford-tractor.bnr.la/health            # {"ok":true,...}
+curl -s  https://oxford-tractor.bnr.la/health            # {"ok":true,"rooms":[...],...}
+curl -s  https://oxford-tractor.bnr.la/rooms             # [{"id":0,"players":0,...}]
 curl -sI https://oxford-tractor.bnr.la/world/index.json  # 200
 ssh -i ~/.ssh/sydney_deploy root@oxford-tractor.bnr.la 'journalctl -u sydney -n 20 --no-pager'
 ```
@@ -345,6 +494,12 @@ welcome, ≥20 snapshots, a rising `ackSeq`, and a close code of 1000.
 - **Memory.** `MemoryMax=600M` on a 1 GB box, leaving room for Caddy and the
   OS. Measured steady state is 81 MB with a 134 MB peak, so the cap is ~4.5x
   headroom and exists to make a leak restart the service rather than the box.
+  **A room host needs more**: PERFORMANCE.md phase 4 measured 202 MB mean and
+  252 MB peak for eight rooms holding 1,000 players, so anything running rooms
+  wants `MemoryMax=1500M` and a box with the RAM to back it. The floor is the
+  city itself (about 190 MB), which is loaded once per *process* — so four host
+  processes on one box is 760 MB before a single player joins, and that is the
+  number to size against rather than the per-room one.
 - **Restart policy** is `on-failure` with `RestartSec=2`. A clean exit is
   treated as intentional.
 - **Ports.** 80 and 443 only, plus the pre-existing 22. `ufw` is inactive on

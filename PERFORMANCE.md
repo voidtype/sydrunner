@@ -7,11 +7,14 @@ from this page.
 
 ## Where the ceilings are today
 
-1. **Bandwidth is O(players²).** Every client receives every player at 20 Hz.
-   At 21 B/player, 1,000 players costs each client 420 KB/s down and the
-   server 3.4 Gbit/s up. Dead on arrival — this is the first wall. *Measured at
-   750: 369 KB/s per client and 2.2 Gbit/s up, which extrapolates to 490 KB/s
-   and 3.9 Gbit/s at 1,000. The arithmetic on this line was right.*
+1. ~~**Bandwidth is O(players²).**~~ **Done, phase 2.** Every client received
+   every player at 20 Hz. At 21 B/player, 1,000 players cost each client 420 KB/s
+   down and the server 3.4 Gbit/s up. Dead on arrival — this was the first wall.
+   *Measured at 750: 369 KB/s per client and 2.2 Gbit/s up, which extrapolates
+   to 490 KB/s and 3.9 Gbit/s at 1,000. The arithmetic on this line was right.*
+   Protocol v8's interest management replaced the O(N) term with a constant:
+   **a client is sent at most 40 players regardless of the room**, measured at
+   199 kbit/s down and 199 Mbit/s up for 1,000 concurrent.
 2. **One thread simulates everyone.** 60 Hz × N players × (controller step +
    melee sweeps + projectiles + NPC think). Single-threaded Bun tops out
    somewhere in the low hundreds of players per core — **measured: 450–500, and
@@ -24,7 +27,14 @@ from this page.
    candidate set, the football sweep and the pickup sweep. Equivalence-checked
    against the linear scans it replaced rather than approximated; see
    `checkSpatialHash`.
-4. **The roster/leaderboard/killfeed assume one small room.**
+4. ~~**The roster/leaderboard/killfeed assume one small room.**~~ **Done, phases
+   2 and 3.** All three are now per room and room-*global* within it, which is
+   the deliberate exception to interest management: a name and a score are
+   social rather than spatial, so a leaderboard that only listed the people
+   within 180 m would reorder itself as you walked. The kill feed is what that
+   buys — a knockout on the other side of the city still prints, with a name on
+   it, because the roster it is named from was never filtered. Asserted in
+   `checkAoi`.
 
 ## The architecture
 
@@ -35,22 +45,32 @@ single-point mega-process, linear horizontal scaling, and a full room still
 feels like a riot because interest management means you only ever *see* the
 nearby subset anyway.
 
-- **Interest management (AOI), protocol v8.** Per-client snapshots carry only
-  players within ~180 m (hysteresis band 180/220 m to stop flapping), capped
-  at the ~40 nearest. Entities enter/leave the client's working set with
-  explicit add/remove; ids stay stable within a room session. Client-side
-  nothing above the net layer should notice except that `remotes` is now a
-  changing subset. Per-client downlink becomes O(local density), ~30 kbit/s
-  typical, ~120 kbit/s worst-case CBD pileup.
-- **Room host process.** One Bun process hosts R rooms (R sized from the
-  measured per-room tick cost; target ≤ 40% of one core per full room so p99
-  tick < 8 ms). Rooms share the loaded world data (read-only) — collision,
-  lanes, water tables load once per process, not per room.
-- **Gateway.** The join flow asks `/rooms` (tiny JSON: room occupancy) and
-  connects to the least-full open room; a room id in the URL/hello lets
-  friends join together. Multiple host processes bind distinct ports behind
-  Caddy (`/ws/<n>`); multiple boxes are just more hostnames in the gateway
-  list. No shared state between rooms except the world files.
+- **Interest management (AOI), protocol v8.** ***Done, phase 2.*** Per-client
+  snapshots carry only players within 180 m (hysteresis band 180/220 m to stop
+  flapping), capped at the 40 nearest. Entities enter/leave the client's working
+  set with an explicit `INTEREST` message; ids are per room, monotonic, and never
+  reused while live. Client-side nothing above the net layer notices except that
+  `remotes` is now a changing subset. Per-client downlink is O(local density) —
+  and the two numbers on this line were both optimistic: **measured 133–199
+  kbit/s typical and 372 kbit/s in a CBD pileup**, against the 30 and 120
+  guessed here. See phase 4 below for why (the estimate assumed a working set of
+  eight; a 128-player room in one park gives forty) and for what it changes
+  about the hardware table.
+- **Room host process.** ***Done, phase 3.*** One Bun process hosts R rooms on
+  one thread. Measured at eight rooms × 125 players: **0.43–0.58 ms p50 per
+  room**, 81% of one core for the host, so the "≤ 40% of one core per full room"
+  target was met with room to spare — a full room is about 3% of a core of
+  simulation and the rest is the send path. Rooms share the loaded world data
+  read-only; the audit found exactly one mutable thing in it (the powerup
+  points), which is per room. **The floor is per room too** — about 0.35 ms a
+  tick whether or not anybody is in there — so run one room until there are
+  enough players to fill more than one.
+- **Gateway.** ***Done, phase 3.*** The join flow asks `/rooms` (tiny JSON: room
+  occupancy) and connects to the least-full open room; `?room=<id>` lets friends
+  join together and a full room refuses by name. Multiple host processes bind
+  distinct ports behind Caddy (`/ws/<n>`) — `caddy/rooms.Caddyfile` and
+  DEPLOY.md; multiple boxes are just more hostnames in the gateway list. No
+  shared state between rooms except the world files.
 - **Hot paths.** Spatial hash (cell ≈ 8 m) over players per room, rebuilt per
   tick, serving melee sweeps, footy hits, police witness checks and AOI
   candidate sets. Snapshot encode into pooled buffers (zero per-tick
@@ -61,17 +81,40 @@ nearby subset anyway.
 
 ```sh
 ulimit -n 16384                                    # one fd per client, plus Bun's own
+
+# phase 1's shape: one room, no interest management to speak of
 SYDNEY_MAX_PLAYERS=800 SYDNEY_BOTS=0 bun run server/index.ts
 bun run server/loadtest.ts --players 500 --minutes 3 --url ws://127.0.0.1:8787 --shards 4
+
+# phase 4's: eight rooms, a thousand clients spread across them
+SYDNEY_ROOMS=8 SYDNEY_ROOM_CAP=128 SYDNEY_BOTS=2 bun run server/index.ts
+bun run server/loadtest.ts --players 1000 --minutes 3 --shards 8
+
+# ...and the same, after the swarm has walked out of the spawn park
+bun run server/loadtest.ts --players 1000 --minutes 3 --shards 8 --disperse
+
+# the CBD pileup: one room, everybody converging on one intersection
+SYDNEY_ROOMS=1 SYDNEY_ROOM_CAP=128 SYDNEY_BOTS=0 bun run server/index.ts
+bun run server/loadtest.ts --players 100 --minutes 3 --shards 2 --converge
 ```
 
-`SYDNEY_MAX_PLAYERS` is the join gate and defaults to `protocol.MAX_PLAYERS`
-(16); the protocol constant is untouched. Use `--shards K` at 250 and above —
-the harness costs about 0.02 ms of its own thread per client per tick, so a
-single-process swarm of 500 saturates a core and under-sends, which reads as a
-server that is suspiciously cheap. Each shard is a separate process with its
-own event loop and heap. `curl localhost:8787/stats` gives the same numbers as
-JSON and **resets its window on read**, so poll it on a schedule or not at all.
+`SYDNEY_ROOM_CAP` is the per-room join gate and defaults to 128;
+`SYDNEY_MAX_PLAYERS` is still accepted as an alias, because that is the name the
+phase 1 line above uses and a rename would have invalidated a documented
+command. `SYDNEY_ROOMS` defaults to **1**, so a bare `bun run server/index.ts`
+is still "start it, open two tabs, fight". Bots are **per room**.
+
+Use `--shards K` at 250 and above — the harness costs about 0.02 ms of its own
+thread per client per tick, so a single-process swarm of 500 saturates a core
+and under-sends, which reads as a server that is suspiciously cheap. Each shard
+is a separate process with its own event loop and heap. The parent resolves
+`/rooms` once and hands every shard the list, so clients are spread exactly
+round-robin rather than by the server's own least-full rule — an even spread is
+what a capacity table wants, and least-full lags a 20-second ramp.
+
+`curl localhost:8787/stats` gives the same numbers as JSON, now with a per-room
+breakdown, and **resets its window on read** — so poll it on a schedule or not
+at all.
 
 ## Measured: the phase 1 capacity curve
 
@@ -182,20 +225,44 @@ participant — which fires on every knockout, so at 500 players it was a
 
 ## Target hardware (with the egress arithmetic)
 
-Per-player costs after AOI (*verify against harness*): ~30 kbit/s down +
-6 kbit/s up sustained, and — measured pre-AOI, so this is now an upper bound
-rather than an estimate — **≤ 0.03% of a modern core** at 60 Hz sim inclusive
-of encode.
+**Rewritten against phase 4's measurements.** The original version of this table
+is preserved in the strikethrough row below because the gap between what it
+assumed and what was measured is the single most expensive mistake on this page
+to have carried into a hardware purchase.
 
-| Tier | Players | Shape | Egress sustained |
-|---|---|---|---|
-| Today | ≤ ~100 (a few rooms) | current 1 vCPU / 1 GB VPS, **20 GB/mo cap is the real limit** (~30 kbit/s × players × hours) | ~3 Mbit/s at 100 |
-| 1,000 | ~8 rooms × 128 | one dedicated 8-core / 32 GB in Sydney (OVH Local Zone, Vultr Sydney bare metal, or Binary Lane's largest), **unmetered or ≥ 10 TB/mo** | ~30 Mbit/s |
-| 6,000–10,000 | 50–80 rooms | 3–5 such boxes (or one 32–48-core EPYC), gateway list in the client, world stays on jsDelivr | 180–350 Mbit/s — this is why "unmetered 1 Gbit" is a hard requirement, not a nicety |
+Per-player, measured: **133–199 kbit/s down** (local density decides; see phase
+4's bracket), 4.8 kbit/s up, and **~0.08% of a core** at 60 Hz inclusive of
+encode and send — 81% of one core for 1,000 players across eight rooms.
+
+| Tier | Players | Shape | Egress sustained | Per hour |
+|---|---|---|---|---|
+| Today | ≤ ~100 (one room) | current 1 vCPU / 1 GB VPS. **The 20 GB/mo cap is still the real limit** | 13–20 Mbit/s at 100 | 6–9 GB |
+| 1,000 | 8 rooms × 128, one host process | one dedicated 8-core / 32 GB in Sydney (OVH Local Zone, Vultr Sydney bare metal, or Binary Lane's largest), **unmetered — not "≥ 10 TB/mo"** | **133–199 Mbit/s** | 60–90 GB |
+| 6,000–10,000 | 50–80 rooms, 6–10 host processes over 2–3 boxes | gateway list in the client, world stays on jsDelivr | **0.8–2.0 Gbit/s** | 360–900 GB |
+| ~~1,000 (as estimated pre-phase-4)~~ | ~~8 rooms × 128~~ | ~~one 8-core, ≥ 10 TB/mo~~ | ~~30 Mbit/s~~ | ~~13 GB~~ |
+
+Three things moved and all of them in the same direction:
+
+- **Per-client downlink is 4.4–6.6× the estimate** (133–199 against 30), because
+  the estimate assumed eight players in view and a room of 128 in one park gives
+  forty. The *ceiling* is what AOI actually bought — it is now a constant rather
+  than a function of the room — but the typical case is much closer to that
+  ceiling than this page expected.
+- **10,000 players is a 1–2 Gbit/s problem, not a 350 Mbit/s one.** "Unmetered
+  1 Gbit" is no longer sufficient at the top tier; it is 2 Gbit or a second box.
+- **CPU is no longer the interesting axis at all.** 1,000 players is 81% of one
+  core of a ten-core machine. A box's limit is its NIC and its transit bill.
 
 The 20 GB/month VPS cannot host any of the scaled tiers: 1,000 concurrent
-players burn ~13 GB/hour of game traffic alone. Game egress — unlike the
-world, which jsDelivr now serves — cannot be CDN'd.
+players burn **60–90 GB/hour** of game traffic — five to seven times the earlier
+figure on this line, and three days' worth of the whole monthly cap in an hour.
+Game egress — unlike the world, which jsDelivr now serves — cannot be CDN'd.
+
+The cheapest lever if that bill matters is not more hardware: it is the **ball
+section** (60% of the pileup stream, unbounded by interest because balls pile up
+where people do) and the **snapshot rate** (20 Hz is spec 10's floor of the
+20–30 range already, but 15 Hz with the same 100 ms interpolation buffer would
+be a 25% cut for a change nobody would see at these speeds). Both are phase 5.
 
 ## Client-side riders (same round)
 
@@ -209,7 +276,15 @@ world, which jsDelivr now serves — cannot be CDN'd.
   pull-out and every despawn is a kerb pull-in — transitions happen in the
   visually-invisible "parked like the other 41,000 parked cars" state.
 - Nameplate/roster surfaces get AOI-aware caps (plates already cap at 15;
-  leaderboard pages beyond one screen).
+  leaderboard pages beyond one screen). *Partly answered by phase 2 rather than
+  by the client: the plate field is fed from `net.remotes`, which is now the
+  working set, so it can never be handed more than 40 candidates. The
+  leaderboard still needs paging — it is room-global and a room is 128.*
+- **The remote actor pool is the client-side hole phase 4 found.** `main.ts`
+  builds a fresh `CharacterActor` on every entrance and disposes it on every
+  departure, which was free when the only entrance was a join and is not now: a
+  CBD pileup asks a client to build and tear down **fifteen rigs a second**. See
+  phase 4's caveats.
 
 ## Phases
 
@@ -223,16 +298,371 @@ world, which jsDelivr now serves — cannot be CDN'd.
    nothing: the grid agrees with the linear scan on every one of 2,722
    randomised swings, the pooled encoder is byte-identical to the allocating
    one, and two interleaved simulations produce identical snapshot streams.
-2. **AOI protocol v8** — per-client filtered snapshots, enter/leave semantics,
-   client working-set handling, CBD pileup cap. **Widen the player id and the
-   player count past `u8` while the protocol is open** — see the caveat above.
-   The candidate structure is already there and already paid for:
-   `SpatialHash.forEachWithin(x, z, 220, cb)` for the hysteresis sweep and
-   `nearestK(x, z, 180, 40, out)` for the cap, against `Simulation.liveIndex`.
-   Note that AOI makes the broadcast per-client again, which is what the pooled
-   encoder gave up — budget for one buffer per *distinct working set*, not one
-   per client, and keep the byte-identity assertion.
-3. **Rooms + gateway** — multi-room host, `/rooms`, least-full join, room
-   codes, Caddy port fan-out; leaderboard per room.
-4. **Load-prove** — 1,000 synthetic players against one host box; publish the
-   numbers here; buy hardware accordingly.
+2. ~~**AOI protocol v8**~~ — **done.** Per-client filtered snapshots, explicit
+   enter/leave, the 180/220 m band, the 40-nearest cap, and the id and count
+   fields widened past `u8`. `server/aoi.ts` is the selection rule and the
+   frame-set clustering; `net/protocol.ts` is the wire. See below.
+3. ~~**Rooms + gateway**~~ — **done.** `server/room.ts` is a room and a host of
+   R of them, `/rooms` is the gateway, the client picks least-full or honours
+   `?room=`, and a full room refuses by name. `caddy/rooms.Caddyfile` and
+   DEPLOY.md carry the multi-process fan-out.
+4. ~~**Load-prove**~~ — **done.** 1,000 synthetic players across 8 rooms on one
+   M2 Pro, plus a 100-client CBD pileup. Numbers below.
+
+---
+
+# Phases 2–4: interest management, rooms, and the 1,000-player proof
+
+Written 2026-08-05, the same day as everything above it. Phase 1 left the
+process bandwidth-bound at 450–500 players in one room; this is what happened
+when the broadcast stopped being O(N²) and the room stopped being the process.
+
+## What phase 2 changed: protocol v8
+
+**The wire is per client now, and every id field is a `u16`.**
+
+| field | v7 | v8 | why |
+|---|---|---|---|
+| snapshot player `id` | `u8` | `u16` | the measurement at the top of this page: 500 players put two people on id 244 |
+| snapshot player count | `u8` | `u16` | same frame, same aliasing |
+| snapshot ball count | `u8` | `u16` | a pileup really does put >255 balls in one place |
+| ball `id`, ball `thrower` | `u8` | `u16` | `thrower` is a player id — aliasing it makes your own ball invisible to you |
+| bike `rider` | `u8` | `u16` | the client derives "which bike am I on" by scanning for its own id |
+| roster `id`, roster count | `u8` | `u16` | a room is 128, not 16 |
+| investigation `playerId`, count | `u8` | `u16` | ditto |
+| event `attacker`/`victim`/`combatant`/`id` | `u8` | `u16` | ditto |
+| event count | `u8` | `u16` | a wrapped count truncates a batch silently |
+| WELCOME `id` | `u8` | `u16` | + a new `u16 room`, so the client can build an invite link |
+| snapshot actor `id` | `u16` | `u16` | already right; v8 made the player match it |
+
+Record sizes: **player 21 → 22 B**, **ball 18 → 20 B**, actor 18 B unchanged,
+snapshot header 10 → 12 B, roster entry 10 → 11 B, investigation entry 4 → 5 B,
+bike record 17 → 18 B, HIT event 5 → 7 B.
+
+**The id lifecycle**, which the widening exists to make safe, is stated in
+`protocol.AOI_ID_LIFECYCLE` and enforced in `Simulation.allocateId`: per room,
+from 1, monotonic, **wrapping at 65535 and skipping anything live**; 0 is never
+allocated because three fields use it as "nobody". Before v8 `nextId` was an
+unbounded JavaScript number written as a `u8`, so a long session with churn
+eventually handed out an id that aliased onto somebody still standing there.
+The hazard it closes is an AOI hazard rather than a roster one: a client keys
+100 ms of interpolation history by id, and an id recycled onto a different body
+inside that window draws one person sliding into another.
+
+### The new message: `INTEREST` (0x8A)
+
+```
+u8   type
+u8   enter count          bounded by the 40-player cap
+u8   leave count
+per entrant: u16 id, u8 colourway, u8 flags   (BOT | RIDING)
+per leaver:  u16 id
+```
+
+4 bytes to introduce somebody, 2 to say they have gone. Sent **immediately
+before** the snapshot whose bodies it explains, and not sent at all on a tick
+where nothing changed — a client standing alone in a quiet street receives none.
+
+It is a message of its own rather than a section of the snapshot for one
+reason, and it is the reason the dedup below works: the snapshot body is a
+function of the *set*, and enter/leave is a function of the set **and of that
+client's previous set**. Folding the deltas in would have made every frame
+per-client again, which is exactly what phase 1 spent its budget removing.
+
+### The selection rule
+
+> A client's working set is the **40 nearest eligible** players, where eligible
+> means within **180 m**, or within **220 m** and already a member.
+
+One sentence rather than two, because "keep old members, then add new ones until
+full" is wrong in a way that is visible: with a full set of forty retainees at
+200 m, somebody walking up and punching you cannot get in, and the nearest
+player in the game is invisible. Hysteresis decides *eligibility*; distance
+decides *priority*. Ties go to the lower id, which makes the set a total order —
+and the set is the dedup key, so a merely-usually-the-same selection would split
+groups at random.
+
+`checkAoi` asserts this against a brute-force scan of the same snapshot records
+the room encoded from, over a 90-player room stepped for real: **360 client
+snapshots, 0 disagreements, the cap binding for 184 of them.**
+
+The query is **one 220 m sweep at cell 64 m**, not the two the phase 1 note
+predicted. `nearestK(180, 40)` cannot express "and these three at 200 m who were
+already members", and unioning two answers puts the cap back on the outside
+where it has to be re-applied anyway. Cell 64 rather than the melee's 8: a 220 m
+query at cell 8 walks 3,025 cells, at cell 64 it walks 64.
+
+### The dedup, and the honest size of it
+
+Clients are clustered by **frame set** — the ids of the players, balls and
+actors they are being sent — and one buffer is encoded per distinct set with the
+ack patched per client, exactly as phase 1 did per room. `checkAoi` asserts the
+byte-identity that makes that legal: every pooled frame equals a fresh
+allocating encode of that client's own filtered records at that client's own
+ack.
+
+**The measured ratio is modest and the intuition about it is wrong.** "A pileup
+dedups perfectly" is what it looks like and it is backwards:
+
+| scenario | dedup |
+|---|---:|
+| 24 players inside 30 m, nobody within 400 m | **24.0x** |
+| 90 players, half piled and half scattered | 1.25x |
+| 1,000 across 8 rooms, crowded | 1.19x |
+| 100 converging on one intersection | 1.17x |
+
+A cluster **under** the cap dedups perfectly, because everybody in it has the
+identical set. A cluster **over** the cap dedups barely at all, because
+forty-five people on a ring do not agree about who their forty nearest are. That
+is stated plainly rather than rounded up, because the wrong version would have
+been repeated — and what makes it acceptable is that in exactly that case the
+*cap* is doing the bigger job. The dedup is a second-order saving on encode CPU,
+and encode CPU was never the wall.
+
+## What phase 3 changed: rooms
+
+A room is one `Simulation` with its own participants, rewind rings, factions,
+bikes, roster, kill feed, investigations and bots. A host process runs R of
+them on **one Bun thread**.
+
+**Why one thread.** A full 128-player room is 0.52 ms of simulation (phase 1's
+2.9 µs/player plus a 0.15 ms floor), so eight are 4.2 ms against a 16.67 ms
+budget — there is no threading problem to solve at this scale, because what
+stopped phase 1 at 500 players was the broadcast and phase 2 removed the term
+that made it quadratic. Bun Workers were considered and rejected for a specific
+reason rather than a general one: **a worker cannot be handed a live
+`WebSocket`**, so a worker-per-room design needs either one listener per worker
+(a process seam wearing a thread's clothes, with none of a process's isolation)
+or a message hop per frame, which puts a structured clone on the path of every
+snapshot the pooled encoder exists to avoid copying. The scale-out seam is
+therefore **processes** — `SYDNEY_ROOM_BASE` and a Caddy `/ws/<n>` fan-out —
+which buys real cores, a memory boundary and a crash boundary, and needs no code.
+
+**The city is loaded once per process** and shared read-only. The audit that
+made that safe found exactly one mutable thing in a loaded world:
+`PowerupPoint.active` and `respawnT`, mutated by `tickPowerups` sixty times a
+second — so `world.roomWorld()` shares the collision prisms, terrain, water,
+lane graphs and footpaths by reference and gives every room its own
+`PowerupField` built from the same cached sidecar arrays. The integration check
+already knew this and said so about its own two simulations; phase 3 turned the
+observation into the seam it implied. `checkRooms` asserts it by taking a coffee
+in room A and finding it still on the pavement in room B.
+
+**The gateway** is three lines of protocol:
+
+```
+GET /rooms            -> [{ id, players, cap, open }, ...]
+ws://host/ws?room=3   -> that room, or a BYE naming it if it is full
+ws://host/ws          -> the least-full open room
+```
+
+The last line is what keeps every existing bookmark working, and it is why the
+room a client ends up in is reported back in the `WELCOME` rather than assumed
+from the URL. `chooseRoom` lives in `net/protocol.ts` so the server's own checks
+can assert the client's rule; it picks **emptiest**, not fullest, because a room
+holds 128 and you only ever see 40 of them — packing one to its cap buys nobody
+a better game and costs everybody in it the pileup bandwidth.
+
+Every step degrades to the pre-phase-3 behaviour: a host with no `/rooms`, a
+proxy that only forwards `/ws`, a fetch that times out, all end with the client
+connecting bare and the server choosing.
+
+## Measured: the phase 4 load proof
+
+Apple M2 Pro (10 cores, 16 GB), Bun 1.3.14, one host process against the real
+inner-ring world (372 tiles, 67,882 collision prisms, 1,103 powerup points).
+`server/loadtest.ts`, N genuine WebSocket clients over loopback at the real
+60 Hz input cadence, **three minutes per run**, 20 s ramp, 8 shards, server-side
+numbers off `/stats` with the ramp poll discarded and client-side numbers
+measured on the sockets themselves.
+
+| run | rooms × players | host tick p50 | host tick p99 | CPU¹ | RSS | working set | down/client | egress | dedup | joins failed |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **1,000, crowded** | 8 × 125 | **10.24 ms** | **13.33 ms** | 81% | 202/252 MB | 39.9 (cap) | 199 kbit/s | 199 Mbit/s | 1.19x | **0** |
+| **1,000, dispersed**² | 8 × 125 | 8.67 ms | 11.52 ms | 69% | 193/238 MB | 27.2 | 133 kbit/s | 133 Mbit/s | 1.19x | **0** |
+| **CBD pileup**³ | 1 × 100 | 1.79 ms | 8.38 ms | 31% | 164/202 MB | 40.0 (cap) | 372 kbit/s | 37 Mbit/s | 1.17x | **0** |
+
+¹ Percent of **one** core, `ps` sampled every 5 s over the steady window; mean
+and peak RSS from the same samples.
+² `--disperse`: 45 s of sprinting outward on a golden-angle fan before the
+ordinary behaviour mix, which spreads a room over about a 700 m disc.
+³ `--converge`: every client walks at one intersection and brawls on arrival.
+
+Every run held **60.00 Hz**, delivered 21.1 snapshots and 60.0 inputs per client
+per second, and had **zero join failures**. Client-observed snapshot interval
+stayed at a 50.00 ms p50 with a 52.7–54.6 ms p99. Zero stalls (a tick over four
+budgets) across nine minutes of load.
+
+Per-room, at 1,000 crowded: tick p50 **0.43–0.58 ms**, p99 **3.07–3.96 ms**, all
+eight rooms within 25% of each other, and the gateway placed exactly 128/128/128/
+128/128/120/120/120.
+
+### Against phase 1, which is the whole point
+
+| | phase 1, one room | phase 4, eight rooms |
+|---|---:|---:|
+| players | 500 | **1,000** |
+| per-client downlink | 1.92 Mbit/s | **133–199 kbit/s** |
+| server egress | 958 Mbit/s | **133–199 Mbit/s** |
+| tick p99 | 7.77 ms | **13.33 ms** |
+| what bounds a client's downlink | the room | **the 40-player cap** |
+
+Twice the players at a fifth of the egress, and — the part that matters more
+than the ratio — **the per-client cost stopped being a function of how many
+people are in the game.** A 128-player room and a 10,000-player deployment cost
+a client the same ceiling, because nobody can stand next to more than forty
+people.
+
+### Two things the run found that were not in the plan
+
+**All eight rooms broadcast on the same tick.** Every room ticked on the host's
+one pump and every room used `tick % SNAPSHOT_INTERVAL`, so two ticks did
+nothing and the third carried the entire host's egress. Measured as a host p99
+of **24.4 ms against a p50 of 3.8** — not a slow simulation, one tick in three
+doing all of the sending. Offsetting each room by `id % 3` (`Room.snapshotPhase`)
+spread it: **p99 24.4 → 13.3 ms**, p50 3.8 → 10.2 ms. The p50 rising is the
+point, not a regression — the work is now the same on every tick, so p50 is the
+honest cost and p99 is inside budget. It is free: no client's snapshot rate
+changes and nothing can tell which of the three ticks its room landed on. Using
+the room *id* rather than its index means two host processes on one box do not
+line up either.
+
+**The ten-second console line was stealing the `/stats` window.** Both readers
+reset the counters they read, so a log line landing between two polls took that
+window's bytes with it, and the harness reported a per-client downlink
+alternating between 47 and 186 kbit/s on successive polls. The measurement
+instrument and the log line now have separate counters (`Room.logBytes`), for
+the same reason `/stats` and `/health` are different routes. This bug predates
+phase 3 — it was present in phase 1 and invisible there because the phase 1
+table's bandwidth column came off the *clients*, not off `/stats`.
+
+### The honest caveats
+
+- **1,000 players is not a full box of players; it is a full box of *this
+  harness*.** The swarm and the server share ten cores. The host used ~81% of
+  one, so the headroom is real, but a run that put the harness on another
+  machine would measure a different (better) server.
+- **Loopback is still not a network.** 199 Mbit/s moved without a NIC, a queue
+  discipline or a millisecond of RTT. What that hides is the send-buffer
+  behaviour of 1,000 real sockets with real RTTs, which is the next thing to
+  measure and cannot be measured here.
+- **The pre-AOI estimate of "~30 kbit/s per player" on this page was
+  optimistic**, and the reason is worth keeping: it assumed a working set of
+  about eight. What sets a client's downlink is **local density**, and the three
+  runs bracket it —
+
+  | 128 players spread over | in view | measured |
+  |---|---:|---:|
+  | a 100 m spawn park (the first minutes of every match) | 40 (cap) | 199 kbit/s |
+  | a 700 m disc | 27 | 133 kbit/s |
+  | the whole 4 km inner ring (arithmetic, not measured) | ~1 | ~10 kbit/s |
+
+  Real play is somewhere in the middle and closer to the top, because players
+  cluster around interesting places on purpose. **Size the egress budget on 130–
+  200 kbit/s per player, not 30.** At 1,000 concurrent that is 130–200 Mbit/s
+  and 60–90 GB/hour, which changes the hardware table above from "unmetered or
+  ≥ 10 TB/mo" to "unmetered, and mean it".
+- **The CBD pileup's 372 kbit/s is mostly footballs, not people.** Forty players
+  at 22 B is 143 kbit/s; the rest is the ball section, which interest management
+  does **not** bound in a pileup because all the balls are in the same place as
+  all the people. A hundred clients spamming throw sustained roughly 67 balls in
+  the air — 1.3 kB a snapshot, about 60% of the stream. The protocol's own
+  invariant (a ball must never cost more than a person) still holds at 20 B
+  against 22, but the *count* is unbounded where the roster is capped, which is
+  exactly what `verifyNet` has always said about that section. A ball cap, or
+  interest by ball *velocity* rather than position, is the cheap fix if this
+  ever matters.
+- **The pileup thrashes the cap.** With 100 people inside 180 m and a cap of 40,
+  the "nearest forty" changes constantly: **15.7 entrances and 15.5 departures
+  per client per second**, against 2.0/1.8 in an ordinary crowded room and
+  0.7/0.6 dispersed. On the wire that is nothing (1 kbit/s of `INTEREST`
+  frames). On a *browser* it is not: `main.ts` builds a fresh `CharacterActor`
+  on every entrance and disposes it on every departure, so a pileup would ask a
+  client to build and tear down fifteen rigs a second. The band fixes the
+  *radius* boundary and does nothing for the *cap* boundary, and the fix is the
+  same trick applied twice — rank an existing member as if it were ~0.85× its
+  real distance, so a member is only displaced by somebody meaningfully nearer.
+  It is deliberately not in this pass: the selection rule is currently proven
+  equal to a brute-force scan, and a ranking bias is a change to the rule.
+  **This is the top phase 5 candidate**, with pooling the client's remote actors
+  beside it.
+
+### The fixed floor is now multiplied by R
+
+The one cost rooms add that a single big room does not have. A room's per-tick
+work is not all proportional to its occupancy — the faction scan, the powerup
+sweep and the bike sweep have a floor that runs whether or not anybody is in
+there. At 1,000 players across 8 rooms:
+
+| phase | ms/tick (host, all 8 rooms) | % |
+|---|---:|---:|
+| npc | 1.35 | 13.2% |
+| broadcast | 1.56 | 15.2% |
+| encode | 0.98 | 9.5% |
+| advance | 0.75 | 7.4% |
+| powerups | 0.48 | 4.7% |
+| bikes | 0.33 | 3.3% |
+| index | 0.25 | 2.5% |
+| traffic | 0.24 | 2.3% |
+| history, melee, balls | 0.11 | 1.0% |
+
+`npc` is the largest single phase and is the one most nearly independent of
+occupancy — it is the ambient promotion scan over police, streetlife and
+wildlife, run once per room per tick. Measured empty-room floor is about
+**0.35 ms**, so eight empty rooms cost 2.8 ms a tick to serve nobody. The
+operational rule that falls out of it, and it is in DEPLOY.md: **run one room
+until there are enough players to fill more than one.** The 1 GB production box
+should stay at `SYDNEY_ROOMS=1`.
+
+## What the checks say
+
+`bun run server/integration-check.ts` — **483 checks**, all green, up from the
+435 that phase 1's suite reports on a run where the two-probe fight does not
+happen to produce a knockout (the KO branch adds two, which is why that number
+is sometimes 437). The new ones, and what each is protecting:
+
+- **`checkAoi`** — the working set against a brute-force statement of the rule
+  over a 90-player room stepped for real (360 snapshots, 0 disagreements, the
+  cap binding for 184); that no snapshot ever carries a body no `INTEREST` frame
+  introduced; that every deduplicated frame is byte-identical to its own
+  client's fresh encode (360 compared); that a there-and-back walk across the
+  boundary costs exactly **one** entrance and **one** departure; that a tight
+  24-player cluster gives all 24 the same set and one encode; that a knockout
+  2.8 km away still reaches the kill feed while its fighters were never in view;
+  and that a ball 1.5 km away is not sent.
+- **`checkRooms`** — `/rooms`, the least-full spread (two bare joins land in
+  *different* rooms), a named room honoured, a full room refused **by name**, a
+  stale link to a room that does not exist refused by name, disjoint
+  leaderboards, an outsider sent exactly one body across four seconds of another
+  room fighting, `/health` and `/stats` per-room breakdowns, a coffee taken in
+  room A still standing in room B, and — the one that puts the architecture
+  beyond doubt — **an attacker and a bystander on the identical square metre of
+  Sydney in different rooms**, where the punch lands on the victim and the
+  bystander is untouched, unthrown, and told nothing.
+- **`verifyAoi`** at boot, beside `verifySpatialHash`: the selection against a
+  brute-force scan over randomised crowds, the band, the cap keeping the
+  *nearest* rather than the *earliest*, the delta merge, and the frame-group
+  interning.
+
+Sixteen-player behaviour is unchanged: the milestone-9 two-probe run, the bots,
+the footy, the bikes, the police, the streetlife and the wildlife checks all
+pass untouched, and a solo room's working set always contains its own player
+plus whatever is nearby — which for two browsers on one desk is each other.
+
+**One honest note about the suite's stability**, found while running it a dozen
+times over this pass rather than introduced by it: three or four of the existing
+police and wildlife checks are **wall-clock sensitive** and fail on roughly one
+run in five. The world's traffic and its pedestrian beats are pure functions of
+`Date.now()` by design (see `game/traffic.ts` — that is what makes six thousand
+cars cost zero protocol), so whether a car is on a particular street while a
+probe sprints a corridor, or whether an officer is on the right beat at the
+moment a crime is committed, depends on the wall clock the run happens to start
+at. The observed failures — *"the nearest officer went from 15.0 m to Infinity"*,
+*"a player who sent no input at all was shot within 25.0 s"*, *"sprinting through
+cost 1 of a pip"* (one pip is a car, not a magpie's 0.25) — are all that shape,
+all in checks that run **before** any phase 2 or 3 code, and all present in the
+same form on the unmodified suite. Twelve runs over this pass: nine clean at
+483, three with one to three of those checks failing. Worth fixing by seeding
+the wall clock those checks run against; not fixed here, because doing it
+properly means giving `trafficTick` an injectable clock and that is a change to
+a shared determinism path rather than to a test.

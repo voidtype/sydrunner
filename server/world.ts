@@ -131,6 +131,21 @@ export interface ServerWorld {
   peds: PedestrianField;
   bytes: { collision: number; terrain: number; powerups: number; lanes: number };
   /**
+   * The decoded powerup sidecars, kept so a second room can have its own field
+   * without a second read of the disk. See `roomWorld`.
+   *
+   * 14 kB for the inner ring, held for the life of the process. The alternative
+   * -- re-reading and re-decoding 372 files per room -- would be 2.9 MB of I/O
+   * and about 300 ms of boot **per room**, to produce arrays identical to these.
+   */
+  powerupSource: ReadonlyArray<{
+    tileKey: string;
+    kind: Uint8Array;
+    worldX: Float32Array;
+    worldY: Float32Array;
+    worldZ: Float32Array;
+  }>;
+  /**
    * The **centre** of the join disc: Sydney Park, or the nearest point to it the
    * built extent can hold. See `game/spawn.ts`, which both ends compute from
    * this same index -- nobody is placed *on* it. `Sim.joinSpot` draws a
@@ -159,6 +174,13 @@ export async function loadWorld(root: string): Promise<ServerWorld> {
   const traffic = new TrafficField();
   const peds = new PedestrianField();
   const bytes = { collision: 0, terrain: 0, powerups: 0, lanes: 0 };
+  const powerupSource: Array<{
+    tileKey: string;
+    kind: Uint8Array;
+    worldX: Float32Array;
+    worldY: Float32Array;
+    worldZ: Float32Array;
+  }> = [];
 
   // In parallel, because 663 small reads serialised behind each other is two
   // seconds of boot on a spinning disk and about 300 ms on this one -- and
@@ -201,6 +223,11 @@ export async function loadWorld(root: string): Promise<ServerWorld> {
             worldZ[i] = data.z[i] + originZ;
           }
           powerups.adopt(entry.key, data.kind, worldX, data.groundY, worldZ);
+          // Kept for `roomWorld`. `PowerupField.adopt` builds fresh
+          // `PowerupPoint` objects from these arrays, so a second field built
+          // from the same four typed arrays shares no mutable state with the
+          // first -- which is the whole property a room needs.
+          powerupSource.push({ tileKey: entry.key, kind: data.kind, worldX, worldY: data.groundY, worldZ });
         }
       }
 
@@ -250,7 +277,62 @@ export async function loadWorld(root: string): Promise<ServerWorld> {
     points,
     tileOf,
     bytes,
+    powerupSource,
     spawn: spawnCentre(index),
+  };
+}
+
+/**
+ * A world for one room: the same city, its own coffees.
+ *
+ * PERFORMANCE.md phase 3. A host process runs R rooms and **loads the city
+ * once** -- 2.4 MB of collision prisms, 249 kB of terrain and 1.4 MB of lane
+ * graphs, which at eight rooms would otherwise be 33 MB and eight times the boot
+ * -- so everything in a `ServerWorld` that is read-only is shared by reference
+ * and nothing else is.
+ *
+ * **Exactly one field is not read-only, and finding it is the whole of this
+ * function.** `PowerupPoint.active` and `PowerupPoint.respawnT` are mutated by
+ * `tickPowerups` sixty times a second, so two rooms sharing a `PowerupField`
+ * would be taking each other's coffees: a flat white collected in room 3 would
+ * vanish from the pavement in room 5 and come back on room 3's clock. The
+ * integration check already knew this -- `checkSpatialHash` builds its two
+ * `Simulation`s against two separately-loaded worlds and says so in as many
+ * words -- and this is that observation turned into the seam it implied.
+ *
+ * Everything else was audited and is genuinely immutable after load:
+ *
+ *   - `CollisionWorld` holds a per-query `seen` stamp on each prism, which is
+ *     scratch *within* one synchronous query. Rooms tick one after another and
+ *     never interleave inside a query, so the stamp is never observed across
+ *     rooms. (This is the same property `game/powerups.ts`'s module scratch
+ *     already relies on, asserted by `checkSpatialHash` section 7.)
+ *   - `TerrainField`, `WaterLevels` and `TrafficField` are lookup tables. A car
+ *     is a pure function of `trafficTick(Date.now())` -- see `game/traffic.ts`
+ *     -- so every room sees the same fleet on the same timetable, which is
+ *     correct: the traffic is the city, not the match.
+ *   - `PedestrianField` is bands derived from the lane graph; the crowd's poses
+ *     are computed into caller-owned scratch (`Simulation` holds its own).
+ *   - `index`, `tileOf` and `spawn` are data.
+ *
+ * The bikes are **not** here and are per room by construction: `BikeField` lives
+ * on the `Simulation`, so each room lays out and claims its own 74 bikes from
+ * the same deterministic plan. Two rooms therefore have a bike 12 in the same
+ * place with different riders, which is exactly right.
+ */
+export function roomWorld(shared: ServerWorld): ServerWorld {
+  const powerups = new PowerupField();
+  for (const src of shared.powerupSource) {
+    powerups.adopt(src.tileKey, src.kind, src.worldX, src.worldY, src.worldZ);
+  }
+  return {
+    ...shared,
+    powerups,
+    // Snapshotted once, exactly as `loadWorld` does it and for its reason: every
+    // tile is resident on a server, so the resident set never changes after
+    // this and the flat array can be taken as a guarantee rather than as an
+    // implementation detail relied on from another package.
+    points: [...powerups.resident()],
   };
 }
 

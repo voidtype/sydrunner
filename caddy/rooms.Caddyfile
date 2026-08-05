@@ -1,0 +1,124 @@
+# Multi-process room hosts behind one hostname. PERFORMANCE.md phase 3.
+#
+# Copy to /etc/caddy/rooms.Caddyfile on the box and add one line inside the site
+# block in /etc/caddy/Caddyfile:
+#
+#     import /etc/caddy/rooms.Caddyfile
+#
+# then `caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy`.
+# It **replaces** the existing `handle /ws { reverse_proxy 127.0.0.1:8787 }`
+# block -- the first rule below is that same rule, kept verbatim, and removing
+# the old one is the only edit. See DEPLOY.md for the whole file and for the
+# systemd units that start the hosts.
+#
+# ---------------------------------------------------------------------------
+# WHY THERE ARE SEVERAL PROCESSES AT ALL, which is the only interesting thing
+# about this file.
+#
+# A host process runs R rooms on one Bun thread and that is measurably enough
+# for a box's worth of players -- 1,000 across 8 rooms held 60.00 Hz at 81% of
+# one core (PERFORMANCE.md phase 4). "One core" is the operative phrase: the
+# rooms share a thread, so a single host cannot use the other seven cores of an
+# 8-core box no matter how many rooms you give it.
+#
+# Processes are the seam that buys them, and they buy three things a thread
+# would not: real cores, a memory boundary, and a crash boundary -- one host
+# falling over takes its own rooms down and leaves the rest of the box playing.
+# `server/room.ts`'s header has the argument against Bun Workers in full; the
+# short version is that a worker cannot be handed a live WebSocket, so a
+# worker-per-room design is this design with a message hop added.
+#
+# ---------------------------------------------------------------------------
+# THE ROOM NUMBERING, which is the whole of the configuration.
+#
+# Each host is started with `SYDNEY_ROOM_BASE` set so that no two hosts hand out
+# the same room id:
+#
+#     host 0 -> port 8787, SYDNEY_ROOMS=8 SYDNEY_ROOM_BASE=0    rooms  0..7
+#     host 1 -> port 8788, SYDNEY_ROOMS=8 SYDNEY_ROOM_BASE=8    rooms  8..15
+#     host 2 -> port 8789, SYDNEY_ROOMS=8 SYDNEY_ROOM_BASE=16   rooms 16..23
+#     host 3 -> port 8790, SYDNEY_ROOMS=8 SYDNEY_ROOM_BASE=24   rooms 24..31
+#
+# A client reaches host *n* at `/ws/<n>` and the room rides the query, exactly
+# as it does on a single host: `wss://host/ws/1?room=11`. The client's gateway
+# step reads a static host list beside `index.json` (see DEPLOY.md's
+# `rooms.json`) and merges each host's `/rooms` into one listing, so "the
+# emptiest open room" is a decision made across the whole box.
+#
+# The **room id is globally unique and the path is not derivable from it** --
+# room 11 is on host 1 because the list says so, not because 11/8 = 1. That is
+# deliberate: hosts are allowed to have different `SYDNEY_ROOMS`, and a client
+# that computed the path would be a client that broke the day one host was given
+# four rooms instead of eight.
+
+# The single-host path, unchanged. Every existing bookmark, every client built
+# before phase 3, and any client whose gateway fetch failed, all arrive here --
+# and host 0's own least-full rule puts them in one of its rooms. This rule
+# staying first and staying exactly as it was is what makes the fan-out additive
+# rather than a migration.
+handle /ws {
+	reverse_proxy 127.0.0.1:8787
+}
+
+# The fan-out. One block per host process; add or remove blocks as the box
+# grows, and keep them in step with the systemd units and with rooms.json.
+#
+# `handle` rather than `handle_path`: the upgrade in `server/index.ts` accepts
+# any path (see DEPLOY.md), so there is nothing to strip and stripping would
+# only make the proxied request harder to read in a log.
+handle /ws/0 {
+	reverse_proxy 127.0.0.1:8787
+}
+handle /ws/1 {
+	reverse_proxy 127.0.0.1:8788
+}
+handle /ws/2 {
+	reverse_proxy 127.0.0.1:8789
+}
+handle /ws/3 {
+	reverse_proxy 127.0.0.1:8790
+}
+
+# The gateway routes, on the **primary** host only.
+#
+# `/rooms` and `/health` answer for the process they reach, so pointing them at
+# 8787 means a client that asks the origin gets host 0's eight rooms and nothing
+# else. That is correct for a single-host box and is *not* the whole picture on
+# a fanned-out one -- which is what `rooms.json` is for: it names every host, the
+# client fetches `/rooms` from each, and merges. These two rules exist so that a
+# client with no `rooms.json` (an old build, a cached index) still gets a working
+# listing rather than a 404, and lands somewhere.
+handle /rooms {
+	reverse_proxy 127.0.0.1:8787
+}
+handle /health {
+	reverse_proxy 127.0.0.1:8787
+}
+
+# Per-host gateway routes, so a client holding rooms.json can ask each host for
+# its own occupancy. `handle_path` here **is** wanted: the upstream route is
+# `/rooms`, not `/rooms/1`.
+handle_path /rooms/0 {
+	rewrite * /rooms
+	reverse_proxy 127.0.0.1:8787
+}
+handle_path /rooms/1 {
+	rewrite * /rooms
+	reverse_proxy 127.0.0.1:8788
+}
+handle_path /rooms/2 {
+	rewrite * /rooms
+	reverse_proxy 127.0.0.1:8789
+}
+handle_path /rooms/3 {
+	rewrite * /rooms
+	reverse_proxy 127.0.0.1:8790
+}
+
+# `/stats` is deliberately **not** proxied.
+#
+# It resets its own counters on read (see `server/index.ts`), so a public route
+# would let anybody make the operator's numbers wrong by curling it -- and would
+# publish a per-room occupancy map to whoever asked. It is reachable on the box
+# at `127.0.0.1:878n/stats`, which is where the load harness and anybody
+# debugging a busy evening are anyway.

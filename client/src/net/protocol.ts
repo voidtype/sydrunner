@@ -35,20 +35,37 @@
  * not care about.
  *
  * ---------------------------------------------------------------------------
- * BANDWIDTH: measured, and short of spec 10's budget at sixteen players.
+ * BANDWIDTH: v8 is the version where this stopped being O(players).
  *
- * Spec 10 asks for *"< 30 kbit/s per player downstream at 16 players"*. What is
- * here is 21 bytes per player per snapshot plus a 10-byte header, at 20 Hz:
+ * Spec 10 asks for *"< 30 kbit/s per player downstream at 16 players"*. Through
+ * v7 the stream carried **every player to every client**, at 21 bytes each, so
+ * the answer was a function of how many people were in the game:
  *
- *     16 players -> 9 + 16 x 21 = 345 B/snapshot -> 6,900 B/s -> **55 kbit/s**
- *      6 players -> 9 +  6 x 21 = 135 B/snapshot -> 2,700 B/s -> **22 kbit/s**
- *      2 players ->              51 B/snapshot -> 1,020 B/s ->  **8 kbit/s**
+ *     16 players -> 10 + 16 x 21 = 346 B/snapshot -> **55 kbit/s**   (1.8x over)
+ *    128 players -> 10 + 128 x 21 = 2,698 B      -> **432 kbit/s**  (14x over)
+ *    500 players -> measured at 1.92 Mbit/s per client, 958 Mbit/s out of one
+ *                   process. See PERFORMANCE.md's phase 1 curve, which is what
+ *                   this section is a response to.
  *
- * So the budget is met at six players and missed by 1.8x at sixteen, and it is
- * stated here rather than rounded away because the arithmetic is not close and
- * nothing about the game says so. The deliverable this pass exists for is two
- * browsers on one machine; sixteen is spec 2's cap and is not reachable from a
- * laptop on a desk.
+ * **v8 carries the players a client can see**, which is a function of local
+ * density and not of the room. A working set is everybody within
+ * `AOI_ENTER_RADIUS` (180 m), held until `AOI_LEAVE_RADIUS` (220 m), capped at
+ * the `AOI_MAX_PLAYERS` (40) nearest, and the record grew a byte to 22:
+ *
+ *     alone in a street ->  12 +  1 x 22 =   34 B/snapshot ->  **5 kbit/s**
+ *     a fight (6 in view) ->  12 +  6 x 22 =  144 B         -> **23 kbit/s**
+ *     a busy block (18)   ->  12 + 18 x 22 =  408 B         -> **65 kbit/s**
+ *     the cap (40)        ->  12 + 40 x 22 =  892 B         -> **143 kbit/s**
+ *
+ * So spec 10's budget is now met at the counts the game is *played* at rather
+ * than at the count it happens to hold, and -- the part that matters more --
+ * **the worst case is bounded by a constant instead of by the room**. A 128
+ * player room and a 1,000 player deployment cost a client the same 143 kbit/s
+ * ceiling, because you cannot stand next to more than forty people.
+ *
+ * The measured typical is in PERFORMANCE.md phase 4, and the honest headline is
+ * that the mean is far under the cap: people spread out, and the mean working
+ * set in a 128-player room is single digits.
  *
  * **Footballs are on top of that**, at 18 B each, and they are the one part of
  * this record not paid per player. A ball lives about 1.5 s in practice -- three
@@ -209,6 +226,38 @@ export const MSG = {
    * bytes.
    */
   INVESTIGATION: 0x89,
+  /**
+   * Who just entered this client's working set, and who just left it. See
+   * `encodeInterest`, and PERFORMANCE.md phase 2.
+   *
+   * v8's one new message, and the whole of what interest management costs on the
+   * wire. A snapshot used to be the world; now it is *your* world -- the players
+   * within 180 m, capped at the 40 nearest -- so the client needs to be told when
+   * that membership changes rather than inferring it from a list that shrank.
+   *
+   * Inferring it was the alternative and it is wrong for one reason: a snapshot
+   * carries a position and says nothing about *who* somebody is. A player who
+   * walked into view would arrive as an id with no colourway and no bot flag, and
+   * the client would draw them in kit 0 until the next roster refresh two seconds
+   * later -- which is `net/client.ts`'s `identity` table's whole argument, made
+   * again at twenty times the rate. So an entrance carries the identity with it
+   * and an exit carries nothing but the id.
+   *
+   * A **message of its own rather than a section of the snapshot**, and that is
+   * the decision this record exists to state. The snapshot body is deduplicated
+   * across every client whose working set is the same set -- see
+   * `server/room.ts` -- and that only works because the body is a function of the
+   * *set* and of nothing else. Enter/leave are a function of the set **and of
+   * that client's previous set**, so two clients standing beside each other, one
+   * of whom arrived this tick, would have identical bodies and different deltas.
+   * Folding the deltas in would have made every frame per-client again, which is
+   * exactly the cost phase 1 removed and phase 2 is trying not to put back.
+   *
+   * Sent immediately **before** the snapshot on the tick it changes, so a body in
+   * the snapshot always has an identity behind it, and never otherwise: a client
+   * standing still in an empty street is sent nothing at all.
+   */
+  INTEREST: 0x8a,
 } as const;
 
 /**
@@ -222,7 +271,7 @@ export const MSG = {
  * that produces a silently misparsed snapshot, and the failure there is a
  * player who moves in the wrong direction rather than a load that fails.
  */
-export const PROTOCOL_VERSION = 7;
+export const PROTOCOL_VERSION = 8;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
@@ -230,8 +279,83 @@ export const SNAPSHOT_HZ = 20;
 /** Every this many ticks, one snapshot. 60 / 20 = 3. */
 export const SNAPSHOT_INTERVAL = TICK_HZ / SNAPSHOT_HZ;
 
-/** Spec 2's cap, and the width of the `id` field's useful range. */
+/** Spec 2's cap. **No longer the width of anything** -- see `MAX_ROOM_PLAYERS`. */
 export const MAX_PLAYERS = 16;
+
+/**
+ * How big a room is allowed to get, and the number every width in v8 is sized
+ * against.
+ *
+ * PERFORMANCE.md's architecture is "rooms of ~128, many rooms". 128 is the
+ * measured shape (0.52 ms of tick, 3.1% of a core) and this is the ceiling the
+ * *protocol* will carry rather than the default a host runs at -- see
+ * `server/room.ts`, which takes its cap from config and defaults to 128.
+ *
+ * Nothing on the wire is 150 wide. What this number does is make the widths
+ * below obviously sufficient rather than merely untested: an id is a `u16`
+ * because ids must survive churn without reuse (see `AOI_ID_LIFECYCLE` below),
+ * and a count is a `u16` because 150 does not fit in a byte with the AOI cap
+ * beside it.
+ */
+export const MAX_ROOM_PLAYERS = 150;
+
+/**
+ * ## The id lifecycle, stated once, because two ends have to agree about it
+ *
+ * A player id is **allocated per room, from 1, monotonically, and is never
+ * reused while its previous owner is still on anybody's screen.** Specifically:
+ *
+ *   - **0 is nobody.** `SnapshotBall.thrower` uses it for "the thrower has left",
+ *     `BikeRecord.rider` uses it for "on its kickstand", and `NpcActor.id` uses
+ *     it for "no actor". A live player is never 0.
+ *   - **Ids ascend and wrap at 65535 back to 1**, skipping anything currently
+ *     live. At the 20 joins a minute a busy room sees, the counter takes
+ *     **two days** to wrap; a room that has been up that long has nobody left in
+ *     it who remembers id 4,001.
+ *   - **An id is a room's, not a host's.** Two rooms in one process both have a
+ *     player 7 and they never meet, because a room is a separate `Simulation`
+ *     with a separate socket set. The room a client is in arrives in its
+ *     `WELCOME` and is fixed for the session.
+ *   - **Nothing is persisted.** A reconnecting player is a new id, which is spec
+ *     12's call (no accounts, no storage) and is unchanged by any of this.
+ *
+ * The reuse hazard this is written to close is specific and is an AOI hazard
+ * rather than a roster one: a client holds an interpolation history keyed by id,
+ * so an id recycled onto a *different body* inside the 100 ms buffer draws one
+ * person sliding into another. Monotonic allocation makes that unreachable
+ * rather than unlikely, which is the same argument `protocol.NPC_BYTES` already
+ * makes about why an actor's id is a `u16` where a player's used to be a byte.
+ */
+export const AOI_ID_LIFECYCLE = 'per-room, from 1, monotonic, wraps at 65535 skipping live ids';
+
+/**
+ * Interest management, PERFORMANCE.md phase 2. The three numbers the whole of
+ * v8's bandwidth story rests on.
+ *
+ * A player **enters** another client's working set at `AOI_ENTER_RADIUS` and
+ * **leaves** it at `AOI_LEAVE_RADIUS`, and the gap between the two is the whole
+ * point: a single radius means two players standing 180.0 m apart enter and
+ * leave on alternate snapshots forever, which is 40 bytes a snapshot of
+ * enter/leave churn and a remote actor being built and disposed twenty times a
+ * second. The band is 40 m, which at a sprint (8.2 m/s) is five seconds of
+ * walking -- so a flap needs somebody to run back and forth across the same
+ * 40 m, and even then it costs one transition per crossing.
+ *
+ * `AOI_MAX_PLAYERS` is the hard cap, and it is what makes the *worst* case
+ * bounded rather than a function of how many people decided to stand in Martin
+ * Place. 40 players is 880 B of player section, 141 kbit/s at 20 Hz -- which is
+ * the number the CBD-pileup measurement in PERFORMANCE.md is against.
+ *
+ * These live here, in the file both ends import, on this file's founding
+ * argument: the client does not compute interest (the server does, and a client
+ * that computed its own would be a client that could ask for the whole world),
+ * but `verifyNet` asserts the arithmetic they imply and `server/aoi.ts` asserts
+ * the selection against a brute-force scan. Two copies of 180 would be two
+ * copies that drifted.
+ */
+export const AOI_ENTER_RADIUS = 180;
+export const AOI_LEAVE_RADIUS = 220;
+export const AOI_MAX_PLAYERS = 40;
 
 /** Spec 10: "Server rewind for punch validation, capped at 250 ms." */
 export const MAX_REWIND_MS = 250;
@@ -680,13 +804,14 @@ export function quantisePing(ms: number): number {
 // --- Server -> client ---------------------------------------------------------
 
 /**
- * The join reply, 24 bytes.
+ * The join reply, 27 bytes.
  *
  *     u8   type = MSG.WELCOME
  *     u16  protocol version
- *     u8   your id
+ *     u16  your id                 v8: was a u8
  *     u8   your colourway
  *     u8   snapshot Hz
+ *     u16  the room you are in     v8: new
  *     u32  server tick
  *     i32  spawn x mm, y mm, z mm  (the eye, as `PlayerState.position` is)
  *     u16  spawn yaw
@@ -695,14 +820,25 @@ export function quantisePing(ms: number): number {
  * has to place its own predicted body *before* it can predict anything, and a
  * player who spends the first 50 ms at the ENU origin is a player who spends it
  * falling through Alexandria.
+ *
+ * **The room is here rather than left to the join URL**, and that is v8's one
+ * addition to this record. A client may arrive with no `?room=` at all -- which
+ * is what a bare `wss://host/ws` is, and what every existing bookmark is -- and
+ * the gateway then picks the least-full open room on its behalf. So the room a
+ * client is *in* is not always the room it asked for, exactly as the name and the
+ * colourway are not always what it asked for, and it is told here for the same
+ * reason: so the "invite a friend" link it builds names the room it is actually
+ * standing in. See `server/index.ts`'s `/rooms`.
  */
-export const WELCOME_BYTES = 24;
+export const WELCOME_BYTES = 27;
 
 export interface Welcome {
   version: number;
   id: number;
   colourway: number;
   snapshotHz: number;
+  /** Which room of this host. See `server/room.ts`. */
+  room: number;
   tick: number;
   x: number;
   y: number;
@@ -715,14 +851,15 @@ export function encodeWelcome(w: Welcome): ArrayBuffer {
   const v = new DataView(buffer);
   v.setUint8(0, MSG.WELCOME);
   v.setUint16(1, PROTOCOL_VERSION, true);
-  v.setUint8(3, w.id);
-  v.setUint8(4, w.colourway);
-  v.setUint8(5, w.snapshotHz);
-  v.setUint32(6, w.tick >>> 0, true);
-  v.setInt32(10, quantisePos(w.x), true);
-  v.setInt32(14, quantisePos(w.y), true);
-  v.setInt32(18, quantisePos(w.z), true);
-  v.setUint16(22, quantiseYaw(w.yaw), true);
+  v.setUint16(3, w.id & 0xffff, true);
+  v.setUint8(5, w.colourway);
+  v.setUint8(6, w.snapshotHz);
+  v.setUint16(7, w.room & 0xffff, true);
+  v.setUint32(9, w.tick >>> 0, true);
+  v.setInt32(13, quantisePos(w.x), true);
+  v.setInt32(17, quantisePos(w.y), true);
+  v.setInt32(21, quantisePos(w.z), true);
+  v.setUint16(25, quantiseYaw(w.yaw), true);
   return buffer;
 }
 
@@ -732,14 +869,15 @@ export function decodeWelcome(buffer: ArrayBuffer): Welcome | null {
   if (v.getUint8(0) !== MSG.WELCOME) return null;
   return {
     version: v.getUint16(1, true),
-    id: v.getUint8(3),
-    colourway: v.getUint8(4),
-    snapshotHz: v.getUint8(5),
-    tick: v.getUint32(6, true),
-    x: dequantisePos(v.getInt32(10, true)),
-    y: dequantisePos(v.getInt32(14, true)),
-    z: dequantisePos(v.getInt32(18, true)),
-    yaw: dequantiseYaw(v.getUint16(22, true)),
+    id: v.getUint16(3, true),
+    colourway: v.getUint8(5),
+    snapshotHz: v.getUint8(6),
+    room: v.getUint16(7, true),
+    tick: v.getUint32(9, true),
+    x: dequantisePos(v.getInt32(13, true)),
+    y: dequantisePos(v.getInt32(17, true)),
+    z: dequantisePos(v.getInt32(21, true)),
+    yaw: dequantiseYaw(v.getUint16(25, true)),
   };
 }
 
@@ -828,13 +966,38 @@ export const FLAG = {
   MASK: 0xcf,
 } as const;
 
-/** 21 bytes. See the header's bandwidth arithmetic. */
-export const PLAYER_BYTES = 21;
 /**
- * 18 bytes, against a player's 21.
+ * 22 bytes. See the header's bandwidth arithmetic.
  *
- *     u8   id                  wraps at 256; 0 is "no ball"
- *     u8   thrower             the combatant id, for "is this mine" and the audio
+ *     u16  id            v8: was a u8, which aliased above 255 players
+ *     i32  x, y, z
+ *     u16  yaw
+ *     i16  pitch
+ *     u8   anim
+ *     u8   health
+ *     u8   stamina | phase << 4
+ *     u8   flags | ballCharges << 4
+ *
+ * **The id is the one field v8 widened here, and PERFORMANCE.md phase 1 is the
+ * measurement that says why.** A 500-player load run put two players on id 244
+ * and told every client the roster was 244 long; the simulation was honest
+ * throughout (its ids are 32-bit and every body was stepped) and the *wire* was
+ * not. The byte cost is one per player per snapshot -- 20 B/s per player in view
+ * -- against a field that could silently put two people on one interpolation
+ * history, which draws one player sliding into another.
+ *
+ * Interest management (v8's other half) means this record is now paid **per
+ * player in view** rather than per player in the room, so the extra byte is
+ * charged against 40 records at the very worst and against a handful in an
+ * ordinary street. That is the trade the widening was cheap under: 21 B x 128
+ * was never going to be sent, and 22 B x 40 is.
+ */
+export const PLAYER_BYTES = 22;
+/**
+ * 20 bytes, against a player's 22.
+ *
+ *     u16  id                  v8: was a u8; 0 is "no ball"
+ *     u16  thrower             the combatant id, for "is this mine" and the audio
  *     i32  x, y, z             millimetres, as every position on this wire is
  *     i8   vx, vy, vz          half-metres a second
  *     u8   bounces             0..3
@@ -866,8 +1029,19 @@ export const PLAYER_BYTES = 21;
  * watching for a sign change in the vertical velocity between two snapshots,
  * which at 20 Hz misses any bounce that starts and ends inside 50 ms -- which is
  * most of them. One byte buys the thud.
+ *
+ * **v8 widened both ids and it had to widen `thrower` for a reason the `id`
+ * alone would not have forced.** `thrower` is a *player* id, and it is what
+ * `net/client.ownBall` compares against to decide not to draw your own throws;
+ * at 256 players it aliased onto somebody else, and the symptom is your own ball
+ * invisible to you while a stranger's is drawn twice. Widening `id` beside it is
+ * the cheaper half of the same argument: ball ids are handed out continuously
+ * for the life of a room -- far faster than player ids -- so a byte rolls over
+ * every few minutes of a busy game and puts a fresh ball on the interpolation
+ * history of one that just died, which draws a football teleporting across the
+ * street.
  */
-export const BALL_BYTES = 18;
+export const BALL_BYTES = 20;
 /**
  * One faction actor, 18 bytes -- the same as a football and three under a player.
  *
@@ -893,20 +1067,46 @@ export const BALL_BYTES = 18;
  *   - **Speed** is the client's own frame-to-frame difference of two
  *     interpolated positions, which is what `RemotePlayer.speed` already is.
  *
- * The `id` is a `u16` where a player's is a `u8`, and that is not symmetry for
- * its own sake: the roster is capped at sixteen and cannot wrap, where actors
- * are promoted and resolved continuously for the whole session -- a byte would
- * roll over every few minutes of a busy pursuit and put a fresh officer on the
+ * The `id` was a `u16` here while a player's was a `u8`, and v8 has made the two
+ * agree by widening the player rather than narrowing this: actors are promoted
+ * and resolved continuously for the whole session, so a byte would roll over
+ * every few minutes of a busy pursuit and put a fresh officer on the
  * interpolation history of one who despawned, which draws a body sliding across
- * the city.
+ * the city. That argument turned out to be the *player* id's argument too, once
+ * a room was 128 people with churn -- see `AOI_ID_LIFECYCLE`.
  *
- * At `factions.MAX_ACTORS` the section is 432 B, which is 24 B over what the
- * sixteen players it sits beside cost. `verifyNet` asserts it against the 500 B
- * cap this feature was scoped with.
+ * At `factions.MAX_ACTORS` the section is 432 B, which is 8 B under what the
+ * twenty-odd players a full working set holds beside it cost. `verifyNet`
+ * asserts it against the 500 B cap this feature was scoped with.
+ *
+ * **v8 filters this section by interest**, on exactly the terms the players are
+ * filtered: an officer is in your snapshot when they are inside your working
+ * set's radius. The counter-argument in the old text -- *"the actor a player
+ * most needs to see is the one that has not arrived yet"* -- survives at the
+ * radius that is actually used: 180 m is four city blocks, and an officer four
+ * blocks away is not "rounding the corner", they are out of earshot. What that
+ * argument was really protecting against is culling at *engagement* range, and
+ * `factions.ENGAGE_RANGE` is 45 m.
  */
 export const NPC_BYTES = 18;
-/** type + tick + ackSeq + player count + ball count + actor count. */
-export const SNAPSHOT_HEADER_BYTES = 10;
+/**
+ * type + tick + ackSeq + player count + ball count + actor count.
+ *
+ *     u8   type      (0)
+ *     u32  tick      (1)
+ *     u16  ackSeq    (5)  -- the one per-client field; see `patchSnapshotAck`
+ *     u16  players   (7)  -- v8: was a u8, which aliased above 255
+ *     u16  balls     (9)  -- v8: was a u8
+ *     u8   actors    (11) -- still a byte; `factions.MAX_ACTORS` is 24 per room
+ *
+ * The actor count stayed a byte deliberately rather than by omission. It is the
+ * one count in this header that is bounded by a *constant* rather than by a
+ * population: `MAX_ACTORS` is 24 and `Simulation.npcSnapshot` clamps to it, so
+ * the field cannot alias without that constant moving past 255 first -- at which
+ * point the section would be 4.6 kB a snapshot and the count byte would be the
+ * least of it.
+ */
+export const SNAPSHOT_HEADER_BYTES = 12;
 
 /** i8 half-metres a second. See `BALL_BYTES` for why this is so coarse. */
 const VELOCITY_SCALE = 2;
@@ -1038,24 +1238,24 @@ export function encodeSnapshotInto(
   v.setUint8(0, MSG.SNAPSHOT);
   v.setUint32(1, tick >>> 0, true);
   v.setUint16(5, ackSeq & 0xffff, true);
-  v.setUint8(7, players.length);
-  v.setUint8(8, balls.length);
-  v.setUint8(9, npcs.length);
+  v.setUint16(7, players.length & 0xffff, true);
+  v.setUint16(9, balls.length & 0xffff, true);
+  v.setUint8(11, npcs.length);
   let p = SNAPSHOT_HEADER_BYTES;
   for (const s of players) {
-    v.setUint8(p, s.id);
-    v.setInt32(p + 1, quantisePos(s.x), true);
-    v.setInt32(p + 5, quantisePos(s.y), true);
-    v.setInt32(p + 9, quantisePos(s.z), true);
-    v.setUint16(p + 13, quantiseYaw(s.yaw), true);
-    v.setInt16(p + 15, quantisePitch(s.pitch), true);
-    v.setUint8(p + 17, s.anim);
-    v.setUint8(p + 18, quantiseHealth(s.health));
+    v.setUint16(p, s.id & 0xffff, true);
+    v.setInt32(p + 2, quantisePos(s.x), true);
+    v.setInt32(p + 6, quantisePos(s.y), true);
+    v.setInt32(p + 10, quantisePos(s.z), true);
+    v.setUint16(p + 14, quantiseYaw(s.yaw), true);
+    v.setInt16(p + 16, quantisePitch(s.pitch), true);
+    v.setUint8(p + 18, s.anim);
+    v.setUint8(p + 19, quantiseHealth(s.health));
     // Stamina is 0..4 and the phase is 0..5, so both fit in one byte with two
-    // bits spare. Packed rather than given a byte each because at sixteen
-    // players a byte is 160 bit/s of nothing.
-    v.setUint8(p + 19, (s.stamina & 0x0f) | ((s.phase & 0x0f) << 4));
-    v.setUint8(p + 20, (s.flags & FLAG.MASK) | ((s.ballCharges & 0x03) << FLAG.BALL_SHIFT));
+    // bits spare. Packed rather than given a byte each because at the counts a
+    // working set holds a byte is 6.4 kbit/s of nothing.
+    v.setUint8(p + 20, (s.stamina & 0x0f) | ((s.phase & 0x0f) << 4));
+    v.setUint8(p + 21, (s.flags & FLAG.MASK) | ((s.ballCharges & 0x03) << FLAG.BALL_SHIFT));
     p += PLAYER_BYTES;
   }
   // The projectile section, after every player. Its own loop and its own record
@@ -1063,15 +1263,15 @@ export function encodeSnapshotInto(
   // the tick its thrower left the game on -- a thrown ball is an object in the
   // world and not a property of a person.
   for (const b of balls) {
-    v.setUint8(p, b.id);
-    v.setUint8(p + 1, b.thrower);
-    v.setInt32(p + 2, quantisePos(b.x), true);
-    v.setInt32(p + 6, quantisePos(b.y), true);
-    v.setInt32(p + 10, quantisePos(b.z), true);
-    v.setInt8(p + 14, quantiseVelocity(b.vx));
-    v.setInt8(p + 15, quantiseVelocity(b.vy));
-    v.setInt8(p + 16, quantiseVelocity(b.vz));
-    v.setUint8(p + 17, b.bounces & 0xff);
+    v.setUint16(p, b.id & 0xffff, true);
+    v.setUint16(p + 2, b.thrower & 0xffff, true);
+    v.setInt32(p + 4, quantisePos(b.x), true);
+    v.setInt32(p + 8, quantisePos(b.y), true);
+    v.setInt32(p + 12, quantisePos(b.z), true);
+    v.setInt8(p + 16, quantiseVelocity(b.vx));
+    v.setInt8(p + 17, quantiseVelocity(b.vy));
+    v.setInt8(p + 18, quantiseVelocity(b.vz));
+    v.setUint8(p + 19, b.bounces & 0xff);
     p += BALL_BYTES;
   }
   // The faction section, after the projectiles, on the same argument the balls
@@ -1110,9 +1310,9 @@ export function decodeSnapshot(buffer: ArrayBuffer, out: Snapshot): Snapshot | n
   if (v.getUint8(0) !== MSG.SNAPSHOT) return null;
   out.tick = v.getUint32(1, true);
   out.ackSeq = v.getUint16(5, true);
-  const count = v.getUint8(7);
-  const ballCount = v.getUint8(8);
-  const npcCount = v.getUint8(9);
+  const count = v.getUint16(7, true);
+  const ballCount = v.getUint16(9, true);
+  const npcCount = v.getUint8(11);
   if (buffer.byteLength < snapshotBytes(count, ballCount, npcCount)) return null;
   // The arrays are reused across snapshots and grown to their high-water mark,
   // on the terms `minimap.ts`'s marker pool is: a snapshot arrives twenty times
@@ -1126,18 +1326,18 @@ export function decodeSnapshot(buffer: ArrayBuffer, out: Snapshot): Snapshot | n
       s = { id: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, anim: 0, health: 0, stamina: 0, phase: 0, flags: 0, ballCharges: 0 };
       out.players[i] = s;
     }
-    s.id = v.getUint8(p);
-    s.x = dequantisePos(v.getInt32(p + 1, true));
-    s.y = dequantisePos(v.getInt32(p + 5, true));
-    s.z = dequantisePos(v.getInt32(p + 9, true));
-    s.yaw = dequantiseYaw(v.getUint16(p + 13, true));
-    s.pitch = dequantisePitch(v.getInt16(p + 15, true));
-    s.anim = v.getUint8(p + 17);
-    s.health = dequantiseHealth(v.getUint8(p + 18));
-    const sp = v.getUint8(p + 19);
+    s.id = v.getUint16(p, true);
+    s.x = dequantisePos(v.getInt32(p + 2, true));
+    s.y = dequantisePos(v.getInt32(p + 6, true));
+    s.z = dequantisePos(v.getInt32(p + 10, true));
+    s.yaw = dequantiseYaw(v.getUint16(p + 14, true));
+    s.pitch = dequantisePitch(v.getInt16(p + 16, true));
+    s.anim = v.getUint8(p + 18);
+    s.health = dequantiseHealth(v.getUint8(p + 19));
+    const sp = v.getUint8(p + 20);
     s.stamina = sp & 0x0f;
     s.phase = (sp >> 4) & 0x0f;
-    const fl = v.getUint8(p + 20);
+    const fl = v.getUint8(p + 21);
     s.flags = fl & FLAG.MASK;
     s.ballCharges = (fl >> FLAG.BALL_SHIFT) & 0x03;
     p += PLAYER_BYTES;
@@ -1149,15 +1349,15 @@ export function decodeSnapshot(buffer: ArrayBuffer, out: Snapshot): Snapshot | n
       b = { id: 0, thrower: 0, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, bounces: 0 };
       out.balls[i] = b;
     }
-    b.id = v.getUint8(p);
-    b.thrower = v.getUint8(p + 1);
-    b.x = dequantisePos(v.getInt32(p + 2, true));
-    b.y = dequantisePos(v.getInt32(p + 6, true));
-    b.z = dequantisePos(v.getInt32(p + 10, true));
-    b.vx = dequantiseVelocity(v.getInt8(p + 14));
-    b.vy = dequantiseVelocity(v.getInt8(p + 15));
-    b.vz = dequantiseVelocity(v.getInt8(p + 16));
-    b.bounces = v.getUint8(p + 17);
+    b.id = v.getUint16(p, true);
+    b.thrower = v.getUint16(p + 2, true);
+    b.x = dequantisePos(v.getInt32(p + 4, true));
+    b.y = dequantisePos(v.getInt32(p + 8, true));
+    b.z = dequantisePos(v.getInt32(p + 12, true));
+    b.vx = dequantiseVelocity(v.getInt8(p + 16));
+    b.vy = dequantiseVelocity(v.getInt8(p + 17));
+    b.vz = dequantiseVelocity(v.getInt8(p + 18));
+    b.bounces = v.getUint8(p + 19);
     p += BALL_BYTES;
   }
   out.npcs.length = npcCount;
@@ -1181,6 +1381,146 @@ export function decodeSnapshot(buffer: ArrayBuffer, out: Snapshot): Snapshot | n
 
 export function createSnapshot(): Snapshot {
   return { tick: 0, ackSeq: 0, players: [], balls: [], npcs: [] };
+}
+
+// --- Interest: who came into view, and who went out of it -----------------------
+
+/**
+ * `InterestEnter.flags`.
+ *
+ * Two bits, and the second one is the interesting one. `BOT` is what the roster
+ * would have said anyway and is here so an entrant is complete without waiting
+ * for a refresh. `RIDING` is here because a player who walks into view **on a
+ * bike** needs the bike built on the frame they appear: the flag is also in the
+ * very next snapshot 0-50 ms later, so this bit is not carrying information the
+ * client would never otherwise get -- it is carrying it early enough that the
+ * first pose is the right pose rather than a figure running along the footpath
+ * in a seated animation for one frame.
+ */
+export const ENTER_FLAG = {
+  BOT: 1 << 0,
+  RIDING: 1 << 1,
+} as const;
+
+/** Somebody who just came into a client's working set, with everything to draw them. */
+export interface InterestEnter {
+  id: number;
+  colourway: number;
+  flags: number;
+}
+
+/**
+ * What changed about a client's working set this snapshot.
+ *
+ *     u8   type = MSG.INTEREST
+ *     u8   enter count      -- bounded by AOI_MAX_PLAYERS
+ *     u8   leave count      -- likewise
+ *     per entrant: u16 id, u8 colourway, u8 flags
+ *     per leaver:  u16 id
+ *
+ * Both counts are bytes because both are bounded by `AOI_MAX_PLAYERS`: a working
+ * set holds at most 40 members, so at most 40 can join it and at most 40 can
+ * leave it in one snapshot. The worst frame this message can be is 3 + 160 + 80 =
+ * 243 B, which is one player teleporting into a full pileup and out of another,
+ * and is unreachable in practice because a respawn moves you at most a few
+ * hundred metres.
+ *
+ * **Enters are listed before leaves**, and the order is load-bearing when an id
+ * appears in both -- which it can, on the tick a player leaves the game and a new
+ * joiner is handed... no, it cannot, because `AOI_ID_LIFECYCLE` forbids reuse.
+ * The order is fixed anyway so that a decoder never has to think about it.
+ */
+export const INTEREST_HEADER_BYTES = 3;
+export const INTEREST_ENTER_BYTES = 4;
+export const INTEREST_LEAVE_BYTES = 2;
+
+export function interestBytes(enters: number, leaves: number): number {
+  return INTEREST_HEADER_BYTES + enters * INTEREST_ENTER_BYTES + leaves * INTEREST_LEAVE_BYTES;
+}
+
+export function encodeInterest(
+  enters: readonly InterestEnter[],
+  leaves: readonly number[],
+  buffer = new ArrayBuffer(interestBytes(enters.length, leaves.length)),
+): ArrayBuffer {
+  const v = new DataView(buffer);
+  encodeInterestInto(v, enters, leaves);
+  return buffer;
+}
+
+/**
+ * The same bytes into a caller-owned buffer, returning the length written.
+ *
+ * `encodeSnapshotInto`'s shape and for its reason one message over: this fires
+ * per client per snapshot tick on which anything moved in or out of view, which
+ * in a busy room is most clients most ticks. A fresh `ArrayBuffer` and a fresh
+ * `DataView` for each of them is the allocation site phase 1 spent its whole
+ * budget removing from the snapshot, put back on a smaller message.
+ *
+ * Unlike the snapshot, this is **not** deduplicated across clients -- see
+ * `MSG.INTEREST` for why it cannot be -- so the pooling is the whole of the
+ * saving here, and the buffer is one per room rather than one per set.
+ */
+export function encodeInterestInto(
+  v: DataView,
+  enters: readonly InterestEnter[],
+  leaves: readonly number[],
+): number {
+  v.setUint8(0, MSG.INTEREST);
+  v.setUint8(1, Math.min(enters.length, 255));
+  v.setUint8(2, Math.min(leaves.length, 255));
+  let p = INTEREST_HEADER_BYTES;
+  for (const e of enters) {
+    v.setUint16(p, e.id & 0xffff, true);
+    v.setUint8(p + 2, e.colourway & 0xff);
+    v.setUint8(p + 3, e.flags & 0xff);
+    p += INTEREST_ENTER_BYTES;
+  }
+  for (const id of leaves) {
+    v.setUint16(p, id & 0xffff, true);
+    p += INTEREST_LEAVE_BYTES;
+  }
+  return p;
+}
+
+export function decodeInterest(
+  buffer: ArrayBuffer,
+): { enters: InterestEnter[]; leaves: number[] } | null {
+  if (buffer.byteLength < INTEREST_HEADER_BYTES) return null;
+  const v = new DataView(buffer);
+  if (v.getUint8(0) !== MSG.INTEREST) return null;
+  const enterCount = v.getUint8(1);
+  const leaveCount = v.getUint8(2);
+  const enters: InterestEnter[] = [];
+  const leaves: number[] = [];
+  let p = INTEREST_HEADER_BYTES;
+  // Bounded by what arrived rather than by what the counts claim, which is
+  // `decodeBikes`' rule and the reason it exists: a `DataView` read past the end
+  // throws, and a throw inside a socket callback takes the client's whole
+  // message pump with it.
+  for (let i = 0; i < enterCount && p + INTEREST_ENTER_BYTES <= buffer.byteLength; i++) {
+    enters.push({
+      id: v.getUint16(p, true),
+      colourway: v.getUint8(p + 2),
+      flags: v.getUint8(p + 3),
+    });
+    p += INTEREST_ENTER_BYTES;
+  }
+  // The leaves start where the **declared** enter section ends, not where the
+  // readable one did, and that difference is the whole of this message's
+  // truncation rule. Continuing from `p` after a short read would parse the
+  // second half of an entrant's record as a leaver's id -- which is a two-byte
+  // slice of a colourway and a flags byte, a plausible id, and a remote actor
+  // disposed for a player standing right in front of you.
+  const leavesAt = INTEREST_HEADER_BYTES + enterCount * INTEREST_ENTER_BYTES;
+  if (enters.length === enterCount) {
+    p = leavesAt;
+    for (let i = 0; i < leaveCount && p + INTEREST_LEAVE_BYTES <= buffer.byteLength; i++) {
+      leaves.push(v.getUint16(p, true));
+      p += INTEREST_LEAVE_BYTES;
+    }
+  }
+  return { enters, leaves };
 }
 
 // --- Events -------------------------------------------------------------------
@@ -1273,37 +1613,50 @@ export type NetEvent = HitEvent | PickupEventFrame | JoinEvent;
  * constant here rather than implied by the parse.
  */
 const EVENT_BYTES: Record<number, number> = {
-  [EVENT.HIT]: 5,
-  [EVENT.PICKUP]: 9,
-  [EVENT.JOIN]: 4,
-  [EVENT.LEAVE]: 4,
+  [EVENT.HIT]: 7,
+  [EVENT.PICKUP]: 10,
+  [EVENT.JOIN]: 5,
+  [EVENT.LEAVE]: 5,
 };
 
+/**
+ * type + count. v8 made the count a `u16`.
+ *
+ * A byte was right at sixteen players and is not at a hundred and twenty-eight:
+ * events fire on transitions, but a tick in which the traffic runs over a dozen
+ * people while a pileup lands twenty punches is a real tick, and a count that
+ * wrapped would not truncate the batch -- it would tell the decoder to read
+ * *fewer* records than were written and leave the rest as a well-formed frame
+ * nobody parses. That is the quietest possible failure: a kill feed that
+ * occasionally misses lines, under load only.
+ */
+export const EVENTS_HEADER_BYTES = 3;
+
 export function encodeEvents(events: readonly NetEvent[]): ArrayBuffer {
-  let total = 2;
+  let total = EVENTS_HEADER_BYTES;
   for (const e of events) total += EVENT_BYTES[e.kind] ?? 0;
   const buffer = new ArrayBuffer(total);
   const v = new DataView(buffer);
   v.setUint8(0, MSG.EVENTS);
-  v.setUint8(1, events.length);
-  let p = 2;
+  v.setUint16(1, Math.min(events.length, 65535), true);
+  let p = EVENTS_HEADER_BYTES;
   for (const e of events) {
     v.setUint8(p, e.kind);
     if (e.kind === EVENT.HIT) {
-      v.setUint8(p + 1, e.attacker);
-      v.setUint8(p + 2, e.victim);
-      v.setUint8(p + 3, e.flags);
-      v.setUint8(p + 4, quantiseHealth(e.health));
+      v.setUint16(p + 1, e.attacker & 0xffff, true);
+      v.setUint16(p + 3, e.victim & 0xffff, true);
+      v.setUint8(p + 5, e.flags);
+      v.setUint8(p + 6, quantiseHealth(e.health));
     } else if (e.kind === EVENT.PICKUP) {
-      v.setUint8(p + 1, e.combatant);
-      v.setUint8(p + 2, e.powerup);
-      v.setInt16(p + 3, e.tileX, true);
-      v.setInt16(p + 5, e.tileZ, true);
-      v.setUint16(p + 7, e.index, true);
+      v.setUint16(p + 1, e.combatant & 0xffff, true);
+      v.setUint8(p + 3, e.powerup);
+      v.setInt16(p + 4, e.tileX, true);
+      v.setInt16(p + 6, e.tileZ, true);
+      v.setUint16(p + 8, e.index, true);
     } else {
-      v.setUint8(p + 1, e.id);
-      v.setUint8(p + 2, e.colourway);
-      v.setUint8(p + 3, e.bot);
+      v.setUint16(p + 1, e.id & 0xffff, true);
+      v.setUint8(p + 3, e.colourway);
+      v.setUint8(p + 4, e.bot);
     }
     p += EVENT_BYTES[e.kind];
   }
@@ -1311,12 +1664,12 @@ export function encodeEvents(events: readonly NetEvent[]): ArrayBuffer {
 }
 
 export function decodeEvents(buffer: ArrayBuffer): NetEvent[] | null {
-  if (buffer.byteLength < 2) return null;
+  if (buffer.byteLength < EVENTS_HEADER_BYTES) return null;
   const v = new DataView(buffer);
   if (v.getUint8(0) !== MSG.EVENTS) return null;
-  const count = v.getUint8(1);
+  const count = v.getUint16(1, true);
   const out: NetEvent[] = [];
-  let p = 2;
+  let p = EVENTS_HEADER_BYTES;
   for (let i = 0; i < count; i++) {
     if (p >= buffer.byteLength) break;
     const kind = v.getUint8(p);
@@ -1328,26 +1681,26 @@ export function decodeEvents(buffer: ArrayBuffer): NetEvent[] | null {
     if (kind === EVENT.HIT) {
       out.push({
         kind: EVENT.HIT,
-        attacker: v.getUint8(p + 1),
-        victim: v.getUint8(p + 2),
-        flags: v.getUint8(p + 3),
-        health: dequantiseHealth(v.getUint8(p + 4)),
+        attacker: v.getUint16(p + 1, true),
+        victim: v.getUint16(p + 3, true),
+        flags: v.getUint8(p + 5),
+        health: dequantiseHealth(v.getUint8(p + 6)),
       });
     } else if (kind === EVENT.PICKUP) {
       out.push({
         kind: EVENT.PICKUP,
-        combatant: v.getUint8(p + 1),
-        powerup: v.getUint8(p + 2),
-        tileX: v.getInt16(p + 3, true),
-        tileZ: v.getInt16(p + 5, true),
-        index: v.getUint16(p + 7, true),
+        combatant: v.getUint16(p + 1, true),
+        powerup: v.getUint8(p + 3),
+        tileX: v.getInt16(p + 4, true),
+        tileZ: v.getInt16(p + 6, true),
+        index: v.getUint16(p + 8, true),
       });
     } else {
       out.push({
         kind: kind as 4 | 5,
-        id: v.getUint8(p + 1),
-        colourway: v.getUint8(p + 2),
-        bot: v.getUint8(p + 3),
+        id: v.getUint16(p + 1, true),
+        colourway: v.getUint8(p + 3),
+        bot: v.getUint8(p + 4),
       });
     }
     p += size;
@@ -1466,8 +1819,16 @@ export interface BikeRecord {
 }
 
 export const BIKE_HEADER_BYTES = 3;
-/** 2 + 1 + 4 + 4 + 4 + 2. Asserted in `verifyNet`, which is how it got right. */
-export const BIKE_RECORD_BYTES = 17;
+/**
+ * 2 + 2 + 4 + 4 + 4 + 2. Asserted in `verifyNet`, which is how it got right.
+ *
+ * v8 widened `rider` from a byte to a `u16` because it is a *player* id, and an
+ * aliased rider is the worst-behaved of all the widenings in this pass: the
+ * client derives "which bike am I on" by scanning this list for its own id (see
+ * `net/client.ts`'s BIKES case), so at 256 players two people would each be
+ * told they are riding the same bike, and both would get the chase camera.
+ */
+export const BIKE_RECORD_BYTES = 18;
 
 export function bikesBytes(count: number): number {
   return BIKE_HEADER_BYTES + count * BIKE_RECORD_BYTES;
@@ -1481,11 +1842,11 @@ export function encodeBikes(bikes: readonly BikeRecord[]): ArrayBuffer {
   let p = BIKE_HEADER_BYTES;
   for (const b of bikes) {
     v.setUint16(p, b.id & 0xffff, true);
-    v.setUint8(p + 2, b.rider & 0xff);
-    v.setInt32(p + 3, quantisePos(b.x), true);
-    v.setInt32(p + 7, quantisePos(b.y), true);
-    v.setInt32(p + 11, quantisePos(b.z), true);
-    v.setUint16(p + 15, quantiseYaw(b.yaw), true);
+    v.setUint16(p + 2, b.rider & 0xffff, true);
+    v.setInt32(p + 4, quantisePos(b.x), true);
+    v.setInt32(p + 8, quantisePos(b.y), true);
+    v.setInt32(p + 12, quantisePos(b.z), true);
+    v.setUint16(p + 16, quantiseYaw(b.yaw), true);
     p += BIKE_RECORD_BYTES;
   }
   return buffer;
@@ -1504,11 +1865,11 @@ export function decodeBikes(buffer: ArrayBuffer): BikeRecord[] | null {
   for (let i = 0; i < count && p + BIKE_RECORD_BYTES <= buffer.byteLength; i++) {
     out.push({
       id: v.getUint16(p, true),
-      rider: v.getUint8(p + 2),
-      x: dequantisePos(v.getInt32(p + 3, true)),
-      y: dequantisePos(v.getInt32(p + 7, true)),
-      z: dequantisePos(v.getInt32(p + 11, true)),
-      yaw: dequantiseYaw(v.getUint16(p + 15, true)),
+      rider: v.getUint16(p + 2, true),
+      x: dequantisePos(v.getInt32(p + 4, true)),
+      y: dequantisePos(v.getInt32(p + 8, true)),
+      z: dequantisePos(v.getInt32(p + 12, true)),
+      yaw: dequantiseYaw(v.getUint16(p + 16, true)),
     });
     p += BIKE_RECORD_BYTES;
   }
@@ -1557,36 +1918,56 @@ export interface InvestigationRecord {
   ticks: number;
 }
 
-export const INVESTIGATION_HEADER_BYTES = 2;
-export const INVESTIGATION_ENTRY_BYTES = 4;
+export const INVESTIGATION_HEADER_BYTES = 3;
+export const INVESTIGATION_ENTRY_BYTES = 5;
 
 export function investigationBytes(count: number): number {
   return INVESTIGATION_HEADER_BYTES + count * INVESTIGATION_ENTRY_BYTES;
 }
 
-export function encodeInvestigations(records: readonly InvestigationRecord[]): ArrayBuffer {
-  const buffer = new ArrayBuffer(investigationBytes(records.length));
+export function encodeInvestigations(
+  records: readonly InvestigationRecord[],
+  buffer = new ArrayBuffer(investigationBytes(records.length)),
+): ArrayBuffer {
   const v = new DataView(buffer);
+  encodeInvestigationsInto(v, records);
+  return buffer;
+}
+
+/**
+ * The same bytes into a caller-owned buffer, returning the length written.
+ *
+ * v8 needs this because the message became **per client**: an investigation is
+ * carried for a player you can see, plus always your own -- see
+ * `server/room.ts`. At the two-second refresh a room of 128 would otherwise
+ * allocate 128 small buffers every two seconds forever, to say "nobody is
+ * wanted" a hundred and twenty-eight times.
+ *
+ * The room dedupes on top of this (most clients are sent the identical empty
+ * frame), so in the ordinary case the pool is written once and sent many times,
+ * which is `encodeSnapshotInto`'s arrangement at a hundredth of the rate.
+ */
+export function encodeInvestigationsInto(v: DataView, records: readonly InvestigationRecord[]): number {
   v.setUint8(0, MSG.INVESTIGATION);
-  v.setUint8(1, Math.min(records.length, 255));
+  v.setUint16(1, Math.min(records.length, 65535), true);
   let p = INVESTIGATION_HEADER_BYTES;
   for (const r of records) {
-    v.setUint8(p, r.playerId & 0xff);
-    v.setUint8(p + 1, r.reason & 0xff);
+    v.setUint16(p, r.playerId & 0xffff, true);
+    v.setUint8(p + 2, r.reason & 0xff);
     // Clamped rather than wrapped, on `quantisePing`'s argument: a wrapped
     // countdown would draw eighteen minutes of pursuit as one second left, which
     // is the one number in this message a player is actually reading.
-    v.setUint16(p + 2, Math.max(0, Math.min(65535, Math.round(r.ticks))), true);
+    v.setUint16(p + 3, Math.max(0, Math.min(65535, Math.round(r.ticks))), true);
     p += INVESTIGATION_ENTRY_BYTES;
   }
-  return buffer;
+  return p;
 }
 
 export function decodeInvestigations(buffer: ArrayBuffer): InvestigationRecord[] | null {
   if (buffer.byteLength < INVESTIGATION_HEADER_BYTES) return null;
   const v = new DataView(buffer);
   if (v.getUint8(0) !== MSG.INVESTIGATION) return null;
-  const count = v.getUint8(1);
+  const count = v.getUint16(1, true);
   const out: InvestigationRecord[] = [];
   let p = INVESTIGATION_HEADER_BYTES;
   // Bounded by what arrived rather than by what the count claims, which is
@@ -1595,9 +1976,9 @@ export function decodeInvestigations(buffer: ArrayBuffer): InvestigationRecord[]
   // message pump with it.
   for (let i = 0; i < count && p + INVESTIGATION_ENTRY_BYTES <= buffer.byteLength; i++) {
     out.push({
-      playerId: v.getUint8(p),
-      reason: v.getUint8(p + 1),
-      ticks: v.getUint16(p + 2, true),
+      playerId: v.getUint16(p, true),
+      reason: v.getUint8(p + 2),
+      ticks: v.getUint16(p + 3, true),
     });
     p += INVESTIGATION_ENTRY_BYTES;
   }
@@ -1652,9 +2033,28 @@ export interface RosterEntry {
   ping: number;
 }
 
-export const ROSTER_HEADER_BYTES = 2;
+/**
+ * type + count. v8 made the count a `u16` and the id inside an entry a `u16`.
+ *
+ * **The roster stays room-global under interest management**, and that is the
+ * decision worth stating beside the widening. Everything else in v8 is filtered
+ * by what a client can see; this is not, because a name and a score are *social*
+ * rather than spatial -- a leaderboard that only listed the people within 180 m
+ * would be a leaderboard that reordered itself as you walked, and the player at
+ * the top of it would be invisible to whoever is second. It is also the channel
+ * that makes an out-of-interest knockout printable: the kill feed names an id
+ * off this table (see `net/client.nameOf`), so a cross-town KO still reads as
+ * "Bazza batted Shazza" rather than as two numbers.
+ *
+ * What that costs at a full room, measured against the message's own arithmetic:
+ * 128 entries at 11 + name is about 2.4 kB, on change plus a two-second refresh
+ * -- 9.6 kbit/s, against the ~30 kbit/s a client's snapshots now cost. That is a
+ * third of the stream to carry the thing AOI cannot filter, and it is why the
+ * refresh is two seconds rather than one.
+ */
+export const ROSTER_HEADER_BYTES = 3;
 /** Everything in an entry except the name itself. */
-export const ROSTER_ENTRY_BYTES = 10;
+export const ROSTER_ENTRY_BYTES = 11;
 
 export function rosterBytes(entries: readonly RosterEntry[]): number {
   let total = ROSTER_HEADER_BYTES;
@@ -1669,17 +2069,17 @@ export function encodeRoster(entries: readonly RosterEntry[]): ArrayBuffer {
   const v = new DataView(buffer);
   const bytes = new Uint8Array(buffer);
   v.setUint8(0, MSG.ROSTER);
-  v.setUint8(1, Math.min(entries.length, 255));
+  v.setUint16(1, Math.min(entries.length, 65535), true);
   let p = ROSTER_HEADER_BYTES;
   for (const e of entries) {
     const name = NAME_ENCODER.encode(e.name).subarray(0, MAX_NAME_BYTES);
-    v.setUint8(p, e.id);
-    v.setUint8(p + 1, e.colourway);
-    v.setUint8(p + 2, e.bot ? 1 : 0);
-    v.setUint16(p + 3, Math.max(0, Math.min(65535, e.kos)), true);
-    v.setUint16(p + 5, Math.max(0, Math.min(65535, e.downs)), true);
-    v.setUint16(p + 7, quantisePing(e.ping), true);
-    v.setUint8(p + 9, name.length);
+    v.setUint16(p, e.id & 0xffff, true);
+    v.setUint8(p + 2, e.colourway);
+    v.setUint8(p + 3, e.bot ? 1 : 0);
+    v.setUint16(p + 4, Math.max(0, Math.min(65535, e.kos)), true);
+    v.setUint16(p + 6, Math.max(0, Math.min(65535, e.downs)), true);
+    v.setUint16(p + 8, quantisePing(e.ping), true);
+    v.setUint8(p + 10, name.length);
     bytes.set(name, p + ROSTER_ENTRY_BYTES);
     p += ROSTER_ENTRY_BYTES + name.length;
   }
@@ -1690,7 +2090,7 @@ export function decodeRoster(buffer: ArrayBuffer): RosterEntry[] | null {
   if (buffer.byteLength < ROSTER_HEADER_BYTES) return null;
   const v = new DataView(buffer);
   if (v.getUint8(0) !== MSG.ROSTER) return null;
-  const count = v.getUint8(1);
+  const count = v.getUint16(1, true);
   const out: RosterEntry[] = [];
   let p = ROSTER_HEADER_BYTES;
   for (let i = 0; i < count; i++) {
@@ -1698,15 +2098,15 @@ export function decodeRoster(buffer: ArrayBuffer): RosterEntry[] | null {
     // `DataView` throws on -- and a throw inside a socket callback takes the
     // whole client's message pump with it. `decodeEvents` refuses the same way.
     if (p + ROSTER_ENTRY_BYTES > buffer.byteLength) break;
-    const nameLen = v.getUint8(p + 9);
+    const nameLen = v.getUint8(p + 10);
     if (p + ROSTER_ENTRY_BYTES + nameLen > buffer.byteLength) break;
     out.push({
-      id: v.getUint8(p),
-      colourway: v.getUint8(p + 1),
-      bot: (v.getUint8(p + 2) & 1) !== 0,
-      kos: v.getUint16(p + 3, true),
-      downs: v.getUint16(p + 5, true),
-      ping: v.getUint16(p + 7, true),
+      id: v.getUint16(p, true),
+      colourway: v.getUint8(p + 2),
+      bot: (v.getUint8(p + 3) & 1) !== 0,
+      kos: v.getUint16(p + 4, true),
+      downs: v.getUint16(p + 6, true),
+      ping: v.getUint16(p + 8, true),
       name: nameLen > 0 ? NAME_DECODER.decode(new Uint8Array(buffer, p + ROSTER_ENTRY_BYTES, nameLen)) : '',
     });
     p += ROSTER_ENTRY_BYTES + nameLen;
@@ -1733,6 +2133,68 @@ export function rankRoster(entries: readonly RosterEntry[]): RosterEntry[] {
   return [...entries].sort(
     (a, b) => b.kos - a.kos || a.downs - b.downs || a.name.localeCompare(b.name) || a.id - b.id,
   );
+}
+
+// --- The gateway --------------------------------------------------------------
+
+/**
+ * One room, as `GET /rooms` describes it.
+ *
+ * The only thing in this file that is **not binary**, and it is here anyway. The
+ * join flow is a protocol -- the client asks a host what rooms it has and then
+ * connects to one -- and a protocol that lived only in the client would be a
+ * protocol the server's own checks could not assert. It is JSON rather than a
+ * frame because it is fetched over HTTP before any socket exists, and because it
+ * is 45 bytes a room fetched once per session: a binary encoding of four numbers
+ * would save nothing and would need a decoder in a place that has none.
+ *
+ *     [{ "id": 0, "players": 41, "cap": 128, "open": true }, ...]
+ *
+ * `open` is a field rather than `players < cap` derived, because "open" is the
+ * server's answer and may one day mean more than occupancy -- a room draining
+ * for a restart, a private room. A client that derived it would be a client that
+ * ignored the difference.
+ */
+export interface RoomInfo {
+  id: number;
+  players: number;
+  cap: number;
+  open: boolean;
+}
+
+/**
+ * Which room to join: the one asked for if it exists, else the emptiest open one.
+ *
+ * Returns **null for "let the server decide"**, which is what an empty listing,
+ * an unreachable gateway or a full house all produce -- and which the server
+ * handles identically to a bare connection with no `?room=` at all. That is the
+ * property which keeps every pre-phase-3 bookmark working.
+ *
+ * **Emptiest rather than fullest**, which is the opposite of a matchmaker that
+ * wants full games and is right here for a reason specific to this architecture:
+ * a room holds 128 and interest management means you only ever see forty of
+ * them, so packing a room to its cap buys nobody a better game and costs
+ * everybody in it the CBD-pileup bandwidth. Ties break on the id so two friends
+ * who click at the same moment land together rather than being split by
+ * whichever listing each of them happened to read.
+ *
+ * A named room that is **full** is still returned, rather than silently swapped
+ * for an open one. The server refuses it with a `BYE` naming the room and its
+ * cap, and the player reads that -- which is a better answer than being dropped
+ * into a different city with no explanation and no friend in it.
+ *
+ * Here rather than in `net/client.ts` for `rankRoster`'s reason one section up:
+ * the integration check has to assert it, and that file imports `three`.
+ */
+export function chooseRoom(rooms: readonly RoomInfo[], asked: number | null): number | null {
+  if (asked !== null && rooms.some((r) => r.id === asked)) return asked;
+  if (asked !== null && rooms.length === 0) return asked;
+  let best: RoomInfo | null = null;
+  for (const r of rooms) {
+    if (!r.open) continue;
+    if (best === null || r.players < best.players || (r.players === best.players && r.id < best.id)) best = r;
+  }
+  return best === null ? null : best.id;
 }
 
 // --- Pong and bye -------------------------------------------------------------
@@ -1970,7 +2432,14 @@ export function verifyNet(): string[] {
       // packed byte's sake: `RIDING` and `TUNED` are bits 6 and 7 of the same
       // byte the ball charges sit in the middle of, so a mask that is still
       // `0x0f` drops both of them here and nowhere else in this array.
-      { id: 200, x: 12.3, y: 4.5, z: -67.8, yaw: 1, pitch: -1, anim: ANIM.WINDUP, health: 1.6, stamina: 3, phase: 1, flags: FLAG.ON_GROUND | FLAG.RIDING | FLAG.TUNED, ballCharges: 1 },
+      //
+      // **And its id is 40,000**, which is v8's whole point in one field. A `u8`
+      // -- which this was through v7 -- writes 40000 & 0xff = 64, so this player
+      // silently becomes player 64 and shares an interpolation history with
+      // whoever that is. PERFORMANCE.md phase 1 measured exactly this above 255
+      // players and said the protocol had to widen; this is the assertion that
+      // it did.
+      { id: 40000, x: 12.3, y: 4.5, z: -67.8, yaw: 1, pitch: -1, anim: ANIM.WINDUP, health: 1.6, stamina: 3, phase: 1, flags: FLAG.ON_GROUND | FLAG.RIDING | FLAG.TUNED, ballCharges: 1 },
     ];
     // Three balls with the section's own extremes in them: a fast one climbing,
     // one that has bounced its whole budget, and one at the origin with a zero
@@ -1978,7 +2447,11 @@ export function verifyNet(): string[] {
     // sign error in the velocity field shows up on.
     const balls: SnapshotBall[] = [
       { id: 1, thrower: 7, x: -1234.56, y: 43.25, z: 987.65, vx: 18.5, vy: 9, vz: -12.5, bounces: 0 },
-      { id: 255, thrower: 200, x: 3999.99, y: -70.125, z: -3999.99, vx: -4.5, vy: -0.5, vz: 3, bounces: 3 },
+      // A ball id and a thrower id that both need the v8 width. The thrower is
+      // the player four rows up, which is what `net/client.ownBall` compares
+      // against to decide not to draw your own throws -- so an aliased thrower
+      // is your own ball invisible to you and a stranger's drawn twice.
+      { id: 60000, thrower: 40000, x: 3999.99, y: -70.125, z: -3999.99, vx: -4.5, vy: -0.5, vz: 3, bounces: 3 },
       { id: 42, thrower: 0, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, bounces: 1 },
     ];
     // Two faction actors with the section's own extremes: a `u16` id at the top
@@ -2231,12 +2704,87 @@ export function verifyNet(): string[] {
     }
   }
 
+  // --- v8's interest message: who came into view and who went out of it.
+  //
+  // What this catches is the shape of failure the whole of AOI has: an entrant
+  // whose identity does not survive is a player drawn in kit 0 -- the same
+  // "everybody in the same singlet" that `net/client.ts`'s identity table exists
+  // to prevent, now happening every time somebody walks round a corner. And a
+  // leaver whose id does not survive is a remote actor never disposed, which is
+  // a statue in the street and a rig held out of the pool forever.
+  {
+    const enters: InterestEnter[] = [
+      { id: 1, colourway: 0, flags: 0 },
+      // The id a byte would have aliased, with both flag bits set.
+      { id: 40000, colourway: 6, flags: ENTER_FLAG.BOT | ENTER_FLAG.RIDING },
+      { id: 65535, colourway: 3, flags: ENTER_FLAG.RIDING },
+    ];
+    const leaves = [2, 300, 65534];
+    const frame = encodeInterest(enters, leaves);
+    if (frame.byteLength !== interestBytes(3, 3)) {
+      failures.push(`A 3-in 3-out INTEREST is ${frame.byteLength} bytes; the layout says ${interestBytes(3, 3)}.`);
+    }
+    const got = decodeInterest(frame);
+    if (!got || got.enters.length !== 3 || got.leaves.length !== 3) {
+      failures.push(`A 3-in 3-out INTEREST decoded to ${got?.enters.length ?? 'null'} in and ${got?.leaves.length ?? 'null'} out.`);
+    } else {
+      for (let i = 0; i < 3; i++) {
+        const a = enters[i];
+        const b = got.enters[i];
+        if (b.id !== a.id || b.colourway !== a.colourway || b.flags !== a.flags) {
+          failures.push(`Entrant ${a.id}: ${a.colourway}/${a.flags} came back as ${b.id}: ${b.colourway}/${b.flags}.`);
+        }
+        if (got.leaves[i] !== leaves[i]) failures.push(`Leaver ${leaves[i]} came back as ${got.leaves[i]}.`);
+      }
+    }
+    // The empty message is the one that must never be *sent*, and must still
+    // decode: a client standing alone in an empty street has nothing entering
+    // and nothing leaving, and `server/room.ts` skips the frame entirely. A
+    // decoder that returned null for one would log an error if that ever changed.
+    const none = decodeInterest(encodeInterest([], []));
+    if (!none || none.enters.length !== 0 || none.leaves.length !== 0) {
+      failures.push('An empty INTEREST message did not decode to two empty lists.');
+    }
+    // Leaves-only, which is what walking away from everybody looks like.
+    const out = decodeInterest(encodeInterest([], [9]));
+    if (!out || out.enters.length !== 0 || out.leaves.length !== 1 || out.leaves[0] !== 9) {
+      failures.push('A leave-only INTEREST did not round-trip.');
+    }
+    // And a truncated tail drops the rest rather than throwing inside the socket
+    // callback, which is `decodeRoster`'s rule and the reason it exists. **The
+    // leaves must be empty**, not resynchronised out of the middle of an
+    // entrant's record: half of a colourway and a flags byte is a plausible id,
+    // and disposing a remote for a player standing in front of you is the one
+    // way this message can be worse than not arriving.
+    const short = decodeInterest(frame.slice(0, INTEREST_HEADER_BYTES + INTEREST_ENTER_BYTES + 2));
+    if (short === null || short.enters.length !== 1 || short.leaves.length !== 0) {
+      failures.push(
+        `An INTEREST truncated mid-record decoded ${short?.enters.length ?? 'null'} entrants and ` +
+          `${short?.leaves.length ?? 'null'} leavers; it must be 1 and 0.`,
+      );
+    }
+    // The worst frame the caps allow, against what the message claims to cost.
+    const worst = interestBytes(AOI_MAX_PLAYERS, AOI_MAX_PLAYERS);
+    if (worst > 250) {
+      failures.push(`A full-turnover INTEREST is ${worst} B; the record documents 243 at the ${AOI_MAX_PLAYERS} cap.`);
+    }
+  }
+
   // --- Welcome, pong and bye.
   {
-    const w: Welcome = { version: PROTOCOL_VERSION, id: 3, colourway: 5, snapshotHz: SNAPSHOT_HZ, tick: 4000000000, x: -812.34, y: 15.5, z: 1420.99, yaw: 4.2 };
+    const w: Welcome = { version: PROTOCOL_VERSION, id: 3, colourway: 5, snapshotHz: SNAPSHOT_HZ, room: 7, tick: 4000000000, x: -812.34, y: 15.5, z: 1420.99, yaw: 4.2 };
     const got = decodeWelcome(encodeWelcome(w));
     if (!got || got.id !== 3 || got.tick !== 4000000000 || Math.abs(got.x - w.x) > 0.01 || Math.abs(got.z - w.z) > 0.01) {
       failures.push('A WELCOME did not round-trip. A tick over 2^31 is the usual cause -- it is a u32.');
+    }
+    if (got && got.room !== 7) {
+      failures.push(`A WELCOME's room came back as ${got.room}, not 7. A client would build the wrong invite link.`);
+    }
+    // v8's widened id, at a value a byte could not hold. This is the field the
+    // phase 1 capacity curve found aliasing above 255 players.
+    const wide = decodeWelcome(encodeWelcome({ ...w, id: 41234, room: 65535 }));
+    if (!wide || wide.id !== 41234 || wide.room !== 65535) {
+      failures.push(`A WELCOME with id 41234 came back as ${wide?.id}. The id field must be a u16.`);
     }
     const pong = decodePong(encodePong(9, 1234.5, 6789.25));
     if (!pong || pong.seq !== 9 || pong.clientTime !== 1234.5 || pong.serverTime !== 6789.25) {
@@ -2302,18 +2850,42 @@ export function verifyNet(): string[] {
 
   // --- The bandwidth claim in the header, asserted rather than asserted-in-prose.
   {
-    const at16 = snapshotBytes(16) * SNAPSHOT_HZ * 8;
-    if (at16 > 60000) {
+    // v8's headline, and the one assertion in this file that is about the
+    // *architecture* rather than about a layout: a client's downstream is
+    // bounded by the interest cap and not by the room. If this ever fails,
+    // somebody has widened a record without re-reading what it is now multiplied
+    // by -- 40 rather than 16 -- and the ceiling has moved with it.
+    const atCap = snapshotBytes(AOI_MAX_PLAYERS) * SNAPSHOT_HZ * 8;
+    if (atCap > 150000) {
       failures.push(
-        `A 16-player snapshot stream is ${(at16 / 1000).toFixed(1)} kbit/s. The header ` +
-          `documents 55; anything above 60 means the record grew and the note is stale.`,
+        `A full working set of ${AOI_MAX_PLAYERS} is ${(atCap / 1000).toFixed(1)} kbit/s. The header ` +
+          `documents 143; anything above 150 means the player record grew and the CBD-pileup ` +
+          `budget in PERFORMANCE.md is stale.`,
       );
     }
+    // And the same arithmetic at the counts the game is actually played at,
+    // which is where spec 10's budget has to be met rather than merely bounded.
     const at6 = snapshotBytes(6) * SNAPSHOT_HZ * 8;
     if (at6 > 30000) {
       failures.push(
-        `A 6-player snapshot stream is ${(at6 / 1000).toFixed(1)} kbit/s, which breaks spec 10's ` +
+        `A 6-player working set is ${(at6 / 1000).toFixed(1)} kbit/s, which breaks spec 10's ` +
           `30 kbit/s budget at the player count this build is actually played at.`,
+      );
+    }
+    // The property that makes the cap a cap. A room of 128 and a deployment of
+    // 1,000 must cost a client the same, because you cannot stand next to more
+    // than `AOI_MAX_PLAYERS` people -- so the snapshot size must not be a
+    // function of `MAX_ROOM_PLAYERS` anywhere.
+    if (snapshotBytes(Math.min(MAX_ROOM_PLAYERS, AOI_MAX_PLAYERS)) !== snapshotBytes(AOI_MAX_PLAYERS)) {
+      failures.push('The interest cap is not the binding one; a full room would be sent whole.');
+    }
+    // The hysteresis band, which is the other half of the cost story: a single
+    // radius is an enter/leave pair every snapshot for anybody standing on the
+    // line, and 40 m at a sprint is five seconds of walking.
+    if (AOI_LEAVE_RADIUS <= AOI_ENTER_RADIUS) {
+      failures.push(
+        `The AOI band is ${AOI_ENTER_RADIUS}/${AOI_LEAVE_RADIUS} m, which is not a band. ` +
+          `Entering and leaving at one radius flaps forever.`,
       );
     }
     // And the projectile section, at the count six players can actually sustain.
@@ -2358,18 +2930,17 @@ export function verifyNet(): string[] {
           `An actor is ${NPC_BYTES} B.`,
       );
     }
-    // The whole stream at the worst case anything can reach: spec 2's player
-    // cap, the balls six players can sustain, and a pursuit at the actor cap.
-    // 131 kbit/s, which is documented in the header and is over spec 10's
-    // budget in the same direction and for the same reason the player section
-    // already is -- what this asserts is that it has not *moved*, because the
-    // faction section is the one part of this record that is not bounded by the
-    // roster and is therefore the one that will grow without anybody noticing.
-    const fullHouse = snapshotBytes(16, 2, 24) * SNAPSHOT_HZ * 8;
-    if (fullHouse > 140000) {
+    // The whole stream at the worst case anything can reach under v8: a working
+    // set at the interest cap, the balls that many players can sustain, and a
+    // pursuit at the actor cap. This is the CBD-pileup number PERFORMANCE.md
+    // phase 4 measures against, and what this asserts is that it has not
+    // *moved* -- the faction section is the one part of this record not bounded
+    // by the interest cap, so it is the one that will grow unnoticed.
+    const fullHouse = snapshotBytes(AOI_MAX_PLAYERS, 10, 24) * SNAPSHOT_HZ * 8;
+    if (fullHouse > 250000) {
       failures.push(
-        `Sixteen players, two balls and a full pursuit is ${(fullHouse / 1000).toFixed(1)} kbit/s. ` +
-          'The header documents 131; anything above 140 means a record grew and the note is stale.',
+        `A full working set with ten balls and a full pursuit is ${(fullHouse / 1000).toFixed(1)} kbit/s. ` +
+          'The CBD-pileup budget in PERFORMANCE.md is 244; anything above 250 means a record grew.',
       );
     }
     // And the one that actually matters at the count this build is played at.

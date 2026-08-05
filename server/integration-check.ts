@@ -142,6 +142,21 @@ import { hitTest, type CombatantState } from '../client/src/game/combat.ts';
 import { createFooty, createFootyStep, stepFooty } from '../client/src/game/footy.ts';
 import { createPoint, tickPowerups, type PickupEvent, type PowerupKind } from '../client/src/game/powerups.ts';
 import { encodeSnapshotInto, patchSnapshotAck } from '../client/src/net/protocol.ts';
+// PERFORMANCE.md phase 2 and 3. See `checkAoi` and `checkRooms` at the foot of
+// this file: the working-set rule against a brute-force scan, the frame-group
+// dedup against a fresh allocating encode, and rooms over real sockets.
+import {
+  AOI_ENTER_RADIUS,
+  AOI_LEAVE_RADIUS,
+  AOI_MAX_PLAYERS,
+  chooseRoom,
+  decodeBye,
+  decodeInterest,
+  type RoomInfo,
+} from '../client/src/net/protocol.ts';
+import { verifyAoi } from './aoi.ts';
+import { Room, newConn, type Conn, type Socket } from './room.ts';
+import { roomWorld } from './world.ts';
 
 const PORT = Number(process.env.SYDNEY_CHECK_PORT ?? 8799);
 const SERVER_URL = `ws://127.0.0.1:${PORT}`;
@@ -1182,6 +1197,19 @@ async function main(): Promise<void> {
   say('');
   await checkSpatialHash();
 
+  // --- 18. PERFORMANCE.md phase 2: interest management. The working set against
+  // the rule it claims to be, the band, the cap, the dedup's byte-identity, and
+  // the one thing AOI must not break -- a kill feed that still names a knockout
+  // on the other side of the city. See `checkAoi`.
+  say('');
+  await checkAoi();
+
+  // --- 19. PERFORMANCE.md phase 3: rooms and the gateway. Isolation over real
+  // sockets, the least-full join, a full room refused by name, and the one
+  // mutable thing two rooms must not share. See `checkRooms`.
+  say('');
+  await checkRooms();
+
   say('');
   if (failures.length === 0) {
     say(`ALL CHECKS PASSED (${log.filter((l) => l.includes('PASS')).length})`);
@@ -2130,8 +2158,8 @@ async function checkBikes(): Promise<void> {
     }
   }
 
-  // --- 9. Protocol 7, and the refusal behaviour a version bump exists for.
-  check(PROTOCOL_VERSION === 7, `the protocol is at version ${PROTOCOL_VERSION}`);
+  // --- 9. Protocol 8, and the refusal behaviour a version bump exists for.
+  check(PROTOCOL_VERSION === 8, `the protocol is at version ${PROTOCOL_VERSION}`);
   {
     // A protocol-5 hello -- which is what a browser tab left open across this
     // deploy sends -- must still decode far enough to be refused *by version*,
@@ -2146,6 +2174,29 @@ async function checkBikes(): Promise<void> {
     check(
       old !== null && old.version === 5,
       'a protocol-5 HELLO still decodes to version 5, so a stale tab gets a BYE it can print rather than silence',
+    );
+    // And a **protocol-7** one, which is the version this deploy replaces and
+    // therefore the one every open tab in the world is speaking right now. v8
+    // widened four id fields, so a v7 client that was tolerated rather than
+    // refused would read every player's position out of the wrong offset -- a
+    // city of people at plausible wrong coordinates, with nothing thrown on
+    // either end. This is the case `PROTOCOL_VERSION`'s own comment is about.
+    const v7 = new ArrayBuffer(5);
+    const v7v = new DataView(v7);
+    v7v.setUint8(0, MSG.HELLO);
+    v7v.setUint16(1, 7, true);
+    v7v.setUint8(3, 255);
+    v7v.setUint8(4, 0);
+    const prev = decodeHello(v7);
+    // `prev.version` is compared against a number the compiler knows is 8, so
+    // the inequality is written against the constant rather than against
+    // `PROTOCOL_VERSION` -- which TypeScript narrows to a literal and then
+    // rejects as an impossible comparison. The claim is the same one: the
+    // version this deploy replaces is not the version it speaks.
+    const previousVersion = 7;
+    check(
+      prev !== null && prev.version === previousVersion && PROTOCOL_VERSION > previousVersion,
+      'a protocol-7 HELLO decodes to version 7 and is therefore refusable -- the tab open across this deploy',
     );
   }
 }
@@ -6237,19 +6288,72 @@ async function checkWildlife(): Promise<void> {
         place(sx, sz, yaw);
         sim.factions.clearInvestigation(probe.id);
         probe.combat.health = MAX_HEALTH;
-        let taken = 0;
+        // --- What is counted, and the flake that decided it.
+        //
+        // **`NPC_STATE.FIRE` rather than the health bar.** This check used to
+        // sum every pip the probe lost during the run and call the total the
+        // magpie's doing. It failed about one run in three at the deploy gate
+        // with *"cost 1 of a pip"* and *"cost 2 of a pip"* -- and a swoop is
+        // `SWOOP_DAMAGE`, a quarter. One pip is `traffic.CAR_DAMAGE`. The
+        // corridor is forty metres of a real Sydney street and the cars on it
+        // are a pure function of `Date.now()` by design, so whether the probe
+        // gets run over on its way past the tree depends on the wall clock the
+        // suite happened to start at. The bird was never involved.
+        //
+        // Swept over 150 wall-clock phases spanning two minutes, with the
+        // corridor and the nest held fixed: **zero** swoop connections, at
+        // every phase, and 31 car-sized hits scattered across them. The same
+        // corridor with the probe *standing still* connects. So the failure was
+        // in the instrument and not in the bird, and the fix is to measure the
+        // bird.
+        //
+        // `FIRE` is the exact answer to "did this pass connect": `MAGPIE.think`
+        // enters it on the tick the sphere test succeeds and holds it for the
+        // rest of the dive, which is why `main.ts` can play `birdStrike` off its
+        // rising edge. It is on the wire, it is per-actor, and no car, fall or
+        // footy can forge one.
+        //
+        // **The phase is deliberately not pinned.** It could be -- but it would
+        // buy nothing here and cost something. The magpie half of this scenario
+        // is already phase-independent (that is what the 150-phase sweep says),
+        // so pinning would only hide a future regression that happened to bite
+        // at an unpinned phase, and the machinery to do it means either patching
+        // `Date.now` under a `Simulation` that other checks in this function
+        // share, or giving `trafficTick` an injectable clock -- a change to a
+        // shared determinism path, which PERFORMANCE.md's closing note already
+        // argues is the wrong trade for a test. The car damage is still
+        // *reported* below, because a reader looking at a probe that lost two
+        // pips deserves to be told it was the traffic.
+        let magpieHits = 0;
+        let swoopSizedDrops = 0;
+        let trafficDamage = 0;
         let dives = 0;
         let awake = 0;
         const diving = new Set<number>();
+        const connected = new Set<number>();
         let travelled = 0;
+        let path = 0;
+        let ticks = 0;
+        let prevX = probe.combat.body.position.x;
+        let prevZ = probe.combat.body.position.z;
         for (let i = 0; i < 60 * 10; i++) {
           probe.input.forward = 1;
           probe.input.sprint = true;
           probe.input.yaw = yaw;
           probe.combat.body.yaw = yaw;
           sim.step(out);
-          taken += topUp();
-          travelled = Math.hypot(probe.combat.body.position.x - sx, probe.combat.body.position.z - sz);
+          ticks++;
+          const drop = topUp();
+          if (drop > 1e-9) {
+            if (Math.abs(drop - MT.swoopDamage) < 1e-6) swoopSizedDrops++;
+            else trafficDamage += drop;
+          }
+          const px = probe.combat.body.position.x;
+          const pz = probe.combat.body.position.z;
+          path += Math.hypot(px - prevX, pz - prevZ);
+          prevX = px;
+          prevZ = pz;
+          travelled = Math.hypot(px - sx, pz - sz);
           const live = birds(F.NPC_KIND.MAGPIE);
           awake = Math.max(awake, live.length);
           for (const a of live) {
@@ -6260,11 +6364,21 @@ async function checkWildlife(): Promise<void> {
             } else if (!isDiving) {
               diving.delete(a.id);
             }
+            // The connection, on the rising edge of the state that means it.
+            if (a.state === F.NPC_STATE.FIRE) {
+              if (!connected.has(a.id)) {
+                connected.add(a.id);
+                magpieHits++;
+              }
+            } else {
+              connected.delete(a.id);
+            }
           }
           if (travelled >= reach * 2) break;
         }
         probe.input.forward = 0;
         probe.input.sprint = false;
+        const meanSpeed = ticks > 0 ? path / (ticks / 60) : 0;
         // The corridor, asserted rather than assumed. A probe that stopped after
         // four metres never went through the radius, and every number after this
         // would be a measurement of a wall.
@@ -6273,12 +6387,39 @@ async function checkWildlife(): Promise<void> {
           `the probe sprinted ${travelled.toFixed(0)} m of a ${(reach * 2).toFixed(0)} m corridor straight ` +
             'through the nest -- driven by the controller, so the magpie saw a real velocity',
         );
-        check(awake > 0, `the nest was live for the run (${awake} magpie(s) promoted)`);
+        // **And that it sprinted, not merely that it arrived.** The whole dodge
+        // is arithmetic on speed: the commit leads by `commitLeadTicks` and the
+        // strike lands `flightTicks` later, which only puts a sprinter clear if
+        // the sprinter is actually doing 8.2 m/s. A corridor that grew a kerb
+        // hop, a wade or a parked car would slow the probe and quietly turn this
+        // into a test of a jog -- which the magpie *can* read. Measured range
+        // over the sweep was 7.90 to 8.07 m/s, so 7.5 is a floor with headroom
+        // rather than a number chosen to pass.
         check(
-          taken <= MT.swoopDamage,
-          `sprinting through cost ${taken} of a pip over ${dives} dive(s) -- at most one clip, usually none. ` +
-            `The commit leads by ${MT.commitLeadTicks} ticks and lands ${MT.flightTicks}, so a sprint is ` +
-            `${(8.2 * (MT.flightTicks / 60) - MT.commitLeadMax).toFixed(1)} m clear of where the bird went`,
+          meanSpeed >= 7.5,
+          `and held ${meanSpeed.toFixed(2)} m/s of the 8.2 m/s sprint the whole way (floor 7.5) -- ` +
+            'below that the commit-lead arithmetic stops guaranteeing a miss and this would be ' +
+            'measuring the terrain',
+        );
+        check(awake > 0, `the nest was live for the run (${awake} magpie(s) promoted)`);
+        // The bird has to have *tried*. Without this a magpie that never left
+        // the branch -- switched off, mis-tuned, never promoted -- would sail
+        // through the assertion below, which is the one way "it missed" and "it
+        // was not there" look identical from the outside.
+        check(
+          dives > 0,
+          `the magpie committed ${dives} pass(es) at the sprinter rather than staying put -- ` +
+            'a bird that never dived would pass a miss test for the wrong reason',
+        );
+        check(
+          magpieHits === 0 && swoopSizedDrops === magpieHits,
+          `and connected ${magpieHits} time(s) of them. The commit leads by ${MT.commitLeadTicks} ticks and ` +
+            `lands ${MT.flightTicks}, so a sprint is ` +
+            `${(8.2 * (MT.flightTicks / 60) - MT.commitLeadMax).toFixed(1)} m clear of where the bird went` +
+            (trafficDamage > 0
+              ? `. (${trafficDamage} pip(s) of traffic hit the probe on the way through -- that is the street, ` +
+                'not the bird, and it is why this counts FIRE edges rather than health.)'
+              : ''),
         );
       }
     }
@@ -7145,5 +7286,861 @@ async function checkSpatialHash(): Promise<void> {
     }
     check(frames > 60, `${frames} snapshots compared across two interleaved simulations`);
     check(diverged === 0, `every one of them byte-identical (${diverged} diverged)`);
+  }
+}
+
+// --- PERFORMANCE.md phase 2: interest management ---------------------------------
+
+/**
+ * A `Socket` that keeps every frame instead of sending it.
+ *
+ * The whole reason `checkAoi` below can be exact rather than statistical. A
+ * socket-driven check can only ever say "A saw B"; this says "A was sent
+ * precisely these ids, in this order, in these bytes" -- which is what a
+ * selection rule and a byte-identity claim need. `Room` speaks to two methods
+ * and reads one field, so a fake is nine lines and runs the **real** send path:
+ * the real AOI selection, the real frame grouping, the real pooled encoder and
+ * the real ack patch.
+ *
+ * The frames are **copied** out of the room's pooled buffers rather than
+ * referenced, which is not fastidiousness -- it is the property under test. The
+ * room hands every client in a group a view onto one buffer and patches two
+ * bytes between sends, exactly as phase 1's broadcast did, and a fake that kept
+ * the view would see the *last* client's ack on every frame and the byte
+ * comparison below would pass for the wrong reason.
+ */
+class FakeSocket {
+  readonly frames: ArrayBuffer[] = [];
+  closed = '';
+  constructor(readonly data: Conn) {}
+  send(data: ArrayBuffer | Uint8Array): number {
+    const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+    this.frames.push(bytes.slice().buffer as ArrayBuffer);
+    return bytes.byteLength;
+  }
+  close(_code?: number, reason?: string): void {
+    this.closed = reason ?? 'closed';
+  }
+  /** The frames of one type received since `mark`, newest run first. */
+  since(mark: number, type: number): ArrayBuffer[] {
+    return this.frames.slice(mark).filter((f) => frameType(f) === type);
+  }
+}
+
+/**
+ * Interest management, asserted against the rule rather than against itself.
+ *
+ * PERFORMANCE.md phase 2. Five claims, and every one of them fails silently:
+ *
+ *   1. **The working set is the rule.** A player who should be in it and is not
+ *      is somebody invisible while punching you -- and there is no frame in
+ *      which that reads as a networking bug rather than as broken hit detection.
+ *      Checked against a brute-force scan of the same snapshot records the room
+ *      encoded from, so the two cannot drift into agreeing about the wrong
+ *      thing.
+ *   2. **The band is a band.** Entering and leaving at one radius is an
+ *      enter/leave pair every snapshot for anybody standing on the line, which
+ *      builds and disposes a remote actor twenty times a second and spends more
+ *      bandwidth than AOI saves.
+ *   3. **Every body is announced before it is drawn.** A snapshot carrying an id
+ *      no `INTEREST` frame introduced is a player rendered in kit 0 -- the
+ *      "everybody in the same singlet" failure `net/client.ts`'s identity table
+ *      exists to prevent, now happening at every corner.
+ *   4. **The dedup is byte-identical.** This is phase 1's assertion carried
+ *      forward: the pooled group buffer a client is actually sent must equal a
+ *      fresh allocating encode of that client's own filtered records at that
+ *      client's own ack. If it does not, two clients standing together are being
+ *      sent each other's world, and the picture is players at plausible wrong
+ *      positions.
+ *   5. **A knockout across town still prints.** The kill feed is the only
+ *      surface a room-wide game has, and an events channel that had been
+ *      filtered along with everything else would have removed it without
+ *      anybody noticing until a player asked why the feed had gone quiet.
+ */
+async function checkAoi(): Promise<void> {
+  say('interest management (protocol v8): working sets, the band, the cap, the dedup');
+
+  {
+    const f = verifyAoi();
+    check(f.length === 0, `verifyAoi passes${f.length ? ` -- ${f[0]}` : ''}`);
+  }
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const world = await loadWorld(root);
+
+  /** The rule, written out as a scan over the records the room actually sent. */
+  const brute = (
+    players: readonly SnapshotPlayer[],
+    x: number,
+    z: number,
+    held: (id: number) => boolean,
+  ): number[] => {
+    const eligible: Array<{ id: number; d2: number }> = [];
+    for (const p of players) {
+      const dx = p.x - x;
+      const dz = p.z - z;
+      const d2 = dx * dx + dz * dz;
+      const inner = AOI_ENTER_RADIUS * AOI_ENTER_RADIUS;
+      const outer = AOI_LEAVE_RADIUS * AOI_LEAVE_RADIUS;
+      if (d2 <= inner || (d2 <= outer && held(p.id))) eligible.push({ id: p.id, d2 });
+    }
+    eligible.sort((a, b) => a.d2 - b.d2 || a.id - b.id);
+    return eligible.slice(0, AOI_MAX_PLAYERS).map((e) => e.id).sort((a, b) => a - b);
+  };
+
+  // --- 1. A room of 90, half of them piled onto one intersection and half
+  // scattered over three kilometres, stepped for real.
+  //
+  // The mix is the point. A scattered room is where a working set is small and
+  // the dedup has nothing to work with; a pileup is where the cap binds and the
+  // dedup does everything. A check with only one of them would report a number
+  // that is true of neither.
+  {
+    const room = new Room(0, world, 200, 0);
+    const sockets: FakeSocket[] = [];
+    const N = 90;
+    for (let i = 0; i < N; i++) {
+      const conn = newConn(0);
+      const ws = new FakeSocket(conn);
+      const p = room.join(conn, i % 7, `aoi-${i}`);
+      if (!p) break;
+      room.conns.add(ws as unknown as Socket);
+      sockets.push(ws);
+      // Half onto one intersection inside a 25 m circle -- the CBD pileup -- and
+      // half spread over 3 km, which is the whole inner ring.
+      const centre = world.spawn;
+      if (i < N / 2) {
+        const a = (i / (N / 2)) * Math.PI * 2;
+        p.combat.body.position.x = centre.x + Math.cos(a) * (5 + (i % 5) * 4);
+        p.combat.body.position.z = centre.z + Math.sin(a) * (5 + (i % 5) * 4);
+      } else {
+        const k = i - N / 2;
+        p.combat.body.position.x = centre.x + ((k % 7) - 3) * 420;
+        p.combat.body.position.z = centre.z + (Math.floor(k / 7) - 3) * 420;
+      }
+      p.history.seed(room.sim.tick, p.combat.body.position.x, p.combat.body.position.y, p.combat.body.position.z, 0);
+    }
+
+    // Three ticks: one to land on a snapshot boundary, and two more so a set has
+    // a *previous* state for the band to be evaluated against.
+    let mismatched = 0;
+    let unannounced = 0;
+    let byteMismatch = 0;
+    let compared = 0;
+    let cappedClients = 0;
+    let sumSet = 0;
+    let samples = 0;
+    const known = new Map<FakeSocket, Set<number>>();
+    for (const ws of sockets) known.set(ws, new Set());
+    const scratch = createSnapshot();
+    const announced = new Map<FakeSocket, Set<number>>();
+    for (const ws of sockets) announced.set(ws, new Set());
+
+    for (let t = 0; t < 12; t++) {
+      const marks = new Map<FakeSocket, number>();
+      for (const ws of sockets) marks.set(ws, ws.frames.length);
+      room.step();
+      if (room.sim.tick % SNAPSHOT_INTERVAL !== 0) continue;
+
+      // What the room simulated, read back through the same pooled arrays it
+      // encoded from. Nothing here re-derives a position.
+      const records = room.sim.snapshot([]);
+      const byId = new Map(records.map((r) => [r.id, r]));
+
+      for (const ws of sockets) {
+        const conn = ws.data;
+        const p = conn.participant;
+        if (!p) continue;
+        const from = marks.get(ws) ?? 0;
+
+        // The interest delta, applied to this check's own idea of what the
+        // client knows -- built from the wire rather than from the server's
+        // state, which is the only way this can catch the two disagreeing.
+        const seen = announced.get(ws)!;
+        for (const frame of ws.since(from, MSG.INTEREST)) {
+          const d = decodeInterest(frame)!;
+          for (const e of d.enters) seen.add(e.id);
+          for (const id of d.leaves) seen.delete(id);
+        }
+
+        const frames = ws.since(from, MSG.SNAPSHOT);
+        if (frames.length !== 1) {
+          mismatched++;
+          continue;
+        }
+        const got = decodeSnapshot(frames[0], scratch)!;
+        const ids = got.players.map((s) => s.id);
+        sumSet += ids.length;
+        samples++;
+        if (ids.length === AOI_MAX_PLAYERS) cappedClients++;
+
+        // --- Claim 1: the ids are the rule's ids.
+        const held = known.get(ws)!;
+        const want = brute(records, p.combat.body.position.x, p.combat.body.position.z, (id) => held.has(id));
+        if (ids.length !== want.length || ids.some((id, i) => id !== want[i])) mismatched++;
+        known.set(ws, new Set(want));
+
+        // --- Claim 3: nothing is drawn that was never announced. `seen` is
+        // built from the INTEREST frames alone, so an id in the snapshot that
+        // is not in it is a body with no identity behind it.
+        for (const id of ids) if (id !== p.id && !seen.has(id)) unannounced++;
+        // ...and yourself is always in your own set, or prediction has nothing
+        // to reconcile against.
+        if (!ids.includes(p.id)) mismatched++;
+
+        // --- Claim 4: the pooled group bytes equal a fresh allocating encode of
+        // exactly these records at exactly this client's ack. This is phase 1's
+        // byte-identity assertion, carried forward to per-set encoding.
+        const sub: SnapshotPlayer[] = [];
+        for (const id of want) {
+          const rec = byId.get(id);
+          if (rec) sub.push(rec);
+        }
+        // The ball and actor sections rebuilt the same way -- from the room's
+        // own live records, selected by the ids the client was actually sent.
+        // Passing empty arrays here would have made this check pass for the
+        // wrong reason in the one scenario that has no balls in it, and fail
+        // spuriously in every other.
+        const liveBalls = room.sim.ballSnapshot();
+        const liveNpcs = room.sim.npcSnapshot();
+        const subBalls = got.balls.map((b) => liveBalls.find((l) => l.id === b.id)).filter((b): b is NonNullable<typeof b> => b !== undefined);
+        const subNpcs = got.npcs.map((n) => liveNpcs.find((l) => l.id === n.id)).filter((n): n is NonNullable<typeof n> => n !== undefined);
+        const direct = new Uint8Array(encodeSnapshot(room.sim.tick, p.ackSeq, sub, subBalls, subNpcs));
+        const sent = new Uint8Array(frames[0]);
+        compared++;
+        if (direct.byteLength !== sent.byteLength) byteMismatch++;
+        else for (let i = 0; i < direct.byteLength; i++) if (direct[i] !== sent[i]) { byteMismatch++; break; }
+      }
+    }
+
+    check(samples > 200, `${samples} client-snapshots inspected across a ${sockets.length}-player room`);
+    check(mismatched === 0, `every working set was exactly the brute-force rule's (${mismatched} were not)`);
+    check(cappedClients > 0, `the ${AOI_MAX_PLAYERS} cap actually bound for ${cappedClients} of them -- a pileup, not a paddock`);
+    check(unannounced === 0, `no snapshot carried a body that no INTEREST frame had introduced (${unannounced} did)`);
+    check(compared > 200, `${compared} pooled frames compared against a fresh allocating encode`);
+    check(byteMismatch === 0, `every deduplicated frame is byte-identical to its own client's encode (${byteMismatch} were not)`);
+
+    const stats = room.stats(1);
+    check(
+      stats.dedup > 1,
+      `the mixed room deduplicated at all: ${stats.dedup.toFixed(2)} frames sent per frame encoded ` +
+        `(mean working set ${(sumSet / Math.max(1, samples)).toFixed(1)})`,
+    );
+    say(
+      `  note: ${sockets.length} clients, mean working set ${(sumSet / Math.max(1, samples)).toFixed(1)}, ` +
+        `peak ${stats.interest.max}, dedup ${stats.dedup.toFixed(2)}x, ` +
+        `${snapshotBytes(Math.round(sumSet / Math.max(1, samples)))} B/snapshot typical.`,
+    );
+  }
+
+  // --- 1b. The dedup's *mechanism*, in the case it exists for.
+  //
+  // The mixed room above measures the realistic ratio and it is modest (1.25),
+  // for a reason worth pinning down with its own check rather than leaving as a
+  // number: **the cap is what limits the dedup**. Forty-five people on a ring do
+  // not agree about who their forty nearest are, so each is sent a slightly
+  // different set and each set is encoded once.
+  //
+  // Under the cap, they agree exactly. Twenty-four players inside 30 m with
+  // nobody within 400 m have the *identical* twenty-four-member working set, so
+  // one encode serves all of them -- which is phase 1's broadcast again, scoped
+  // to a neighbourhood. If this check ever drops toward 1 while the one above
+  // holds, the frame key has started distinguishing frames that are the same.
+  {
+    const room = new Room(0, world, 64, 0);
+    const socks: FakeSocket[] = [];
+    const N = 24;
+    for (let i = 0; i < N; i++) {
+      const conn = newConn(0);
+      const ws = new FakeSocket(conn);
+      const p = room.join(conn, i % 7, `tight-${i}`)!;
+      room.conns.add(ws as unknown as Socket);
+      socks.push(ws);
+      const a = (i / N) * Math.PI * 2;
+      p.combat.body.position.x = world.spawn.x + Math.cos(a) * 12;
+      p.combat.body.position.z = world.spawn.z + Math.sin(a) * 12;
+    }
+    for (let t = 0; t < 6; t++) room.step();
+    const stats = room.stats(1);
+    check(
+      stats.interest.max === N && Math.abs(stats.interest.mean - N) < 0.01,
+      `a tight cluster of ${N} gives every client the same ${stats.interest.max}-member set`,
+    );
+    check(
+      stats.dedup > N - 0.01,
+      `and one encode serves all of them: ${stats.dedup.toFixed(2)} frames sent per frame encoded`,
+    );
+  }
+
+  // --- 2. The band, at the boundary it exists for.
+  //
+  // One player walks out from 100 m to 240 m and back in one metre a tick, and
+  // the whole claim is a count: **one** entrance and **one** departure. Under a
+  // single radius this is a transition every time they cross 180 m, and the
+  // picture is a remote actor built and disposed twenty times a second on
+  // everybody's screen.
+  {
+    const room = new Room(0, world, 8, 0);
+    const socks: FakeSocket[] = [];
+    const parts: Participant[] = [];
+    for (let i = 0; i < 2; i++) {
+      const conn = newConn(0);
+      const ws = new FakeSocket(conn);
+      const p = room.join(conn, i, `band-${i}`)!;
+      room.conns.add(ws as unknown as Socket);
+      socks.push(ws);
+      parts.push(p);
+    }
+    const [watcher, walker] = parts;
+    watcher.combat.body.position.x = world.spawn.x;
+    watcher.combat.body.position.z = world.spawn.z;
+    let enters = 0;
+    let leaves = 0;
+    let heldAt200 = false;
+    let heldAt230 = true;
+    const walk = (d: number): void => {
+      walker.combat.body.position.x = world.spawn.x;
+      walker.combat.body.position.z = world.spawn.z + d;
+      // Pinned every tick, because `advance` would otherwise walk them: what is
+      // under test is the boundary, not the controller.
+      watcher.combat.body.position.x = world.spawn.x;
+      watcher.combat.body.position.z = world.spawn.z;
+      const from = socks[0].frames.length;
+      room.step();
+      for (const f of socks[0].since(from, MSG.INTEREST)) {
+        const d2 = decodeInterest(f)!;
+        for (const e of d2.enters) if (e.id === walker.id) enters++;
+        for (const id of d2.leaves) if (id === walker.id) leaves++;
+      }
+    };
+    for (let d = 240; d >= 100; d--) walk(d);
+    for (let d = 100; d <= 200; d++) walk(d);
+    heldAt200 = socks[0].data.interest.has(walker.id);
+    for (let d = 200; d <= 240; d++) walk(d);
+    heldAt230 = socks[0].data.interest.has(walker.id);
+
+    check(heldAt200, `a member at 200 m is still held -- the band is ${AOI_ENTER_RADIUS}/${AOI_LEAVE_RADIUS} m, not one radius`);
+    check(!heldAt230, 'and is dropped past 220 m');
+    check(
+      enters === 1 && leaves === 1,
+      `a there-and-back walk across the boundary cost ${enters} entrance(s) and ${leaves} departure(s); ` +
+        `it must be one of each, or the boundary flaps`,
+    );
+  }
+
+  // --- 3. A knockout across town still prints in the kill feed.
+  //
+  // Two players fight at the spawn and a third stands 2 km away. The third must
+  // never have had either of them in its working set -- and must still be told
+  // about the knockout, because the feed is the only room-wide surface a player
+  // standing in a quiet street has. An events channel filtered along with
+  // everything else would have removed that with nothing to show for it: a HIT
+  // is 7 bytes against a snapshot's 900.
+  {
+    const room = new Room(0, world, 8, 0);
+    const socks: FakeSocket[] = [];
+    const parts: Participant[] = [];
+    for (let i = 0; i < 3; i++) {
+      const conn = newConn(0);
+      const ws = new FakeSocket(conn);
+      const p = room.join(conn, i, `feed-${i}`)!;
+      room.conns.add(ws as unknown as Socket);
+      socks.push(ws);
+      parts.push(p);
+    }
+    const [attacker, victim, distant] = parts;
+    // The geometry `verifySim` uses for a punch that lands, plus a victim on one
+    // pip so the punch is a knockout rather than a hit.
+    attacker.combat.body.position.set(world.spawn.x, EYE_HEIGHT, world.spawn.z + 1);
+    victim.combat.body.position.set(world.spawn.x, EYE_HEIGHT, world.spawn.z);
+    attacker.combat.body.yaw = 0;
+    attacker.input.yaw = 0;
+    victim.input.yaw = 0;
+    victim.combat.health = 1;
+    distant.combat.body.position.set(world.spawn.x + 2000, EYE_HEIGHT, world.spawn.z + 2000);
+    attacker.history.seed(room.sim.tick, attacker.combat.body.position.x, EYE_HEIGHT, attacker.combat.body.position.z, 0);
+    victim.history.seed(room.sim.tick, victim.combat.body.position.x, EYE_HEIGHT, victim.combat.body.position.z, 0);
+
+    attacker.input.punch = true;
+    let sawKo = false;
+    let distantSetHadFighters = false;
+    const scratch = createSnapshot();
+    for (let t = 0; t < 60; t++) {
+      const from = socks[2].frames.length;
+      // The distant client is pinned, because a knocked-about world would
+      // otherwise be free to walk it back into range and prove nothing.
+      distant.combat.body.position.x = world.spawn.x + 2000;
+      distant.combat.body.position.z = world.spawn.z + 2000;
+      room.step();
+      attacker.input.punch = false;
+      for (const f of socks[2].since(from, MSG.EVENTS)) {
+        for (const e of decodeEvents(f) ?? []) {
+          if (e.kind === EVENT.HIT && (e.flags & EVENT_FLAG.KO) !== 0) sawKo = true;
+        }
+      }
+      for (const f of socks[2].since(from, MSG.SNAPSHOT)) {
+        const s = decodeSnapshot(f, scratch)!;
+        if (s.players.some((pl) => pl.id === attacker.id || pl.id === victim.id)) distantSetHadFighters = true;
+      }
+    }
+    check(!distantSetHadFighters, 'a client 2.8 km away never had the fighters in its working set');
+    check(
+      sawKo,
+      'and was still told about the knockout, so a cross-town KO prints in the kill feed -- the events ' +
+        'channel is room-global on purpose',
+    );
+    check(victim.combat.phase === 'ko', `the victim really was knocked out (phase "${victim.combat.phase}")`);
+  }
+
+  // --- 4. Balls and officers are filtered by their own position, not by whose
+  // they are. A ball is most interesting to the player it is about to reach,
+  // who by definition is nowhere near whoever threw it.
+  {
+    const room = new Room(0, world, 8, 0);
+    const socks: FakeSocket[] = [];
+    const parts: Participant[] = [];
+    for (let i = 0; i < 2; i++) {
+      const conn = newConn(0);
+      const ws = new FakeSocket(conn);
+      const p = room.join(conn, i, `ball-${i}`)!;
+      room.conns.add(ws as unknown as Socket);
+      socks.push(ws);
+      parts.push(p);
+    }
+    const [thrower, far] = parts;
+    thrower.combat.body.position.set(world.spawn.x, EYE_HEIGHT, world.spawn.z);
+    far.combat.body.position.set(world.spawn.x + 1500, EYE_HEIGHT, world.spawn.z);
+    thrower.input.throwBall = true;
+    thrower.input.pitch = 0.2;
+    let throwerSaw = 0;
+    let farSaw = 0;
+    const scratch = createSnapshot();
+    for (let t = 0; t < 40; t++) {
+      far.combat.body.position.x = world.spawn.x + 1500;
+      far.combat.body.position.z = world.spawn.z;
+      const m0 = socks[0].frames.length;
+      const m1 = socks[1].frames.length;
+      room.step();
+      thrower.input.throwBall = false;
+      for (const f of socks[0].since(m0, MSG.SNAPSHOT)) throwerSaw += decodeSnapshot(f, scratch)!.balls.length;
+      for (const f of socks[1].since(m1, MSG.SNAPSHOT)) farSaw += decodeSnapshot(f, scratch)!.balls.length;
+    }
+    check(throwerSaw > 0, `the thrower saw its own ball in the stream (${throwerSaw} ball-records)`);
+    check(farSaw === 0, `a client 1.5 km away was sent none of it (${farSaw} ball-records)`);
+  }
+}
+
+// --- PERFORMANCE.md phase 3: rooms and the gateway --------------------------------
+
+/**
+ * Rooms, over the real socket and the real gateway.
+ *
+ * Four claims, and the first is the one the architecture rests on:
+ *
+ *   1. **Rooms are isolated.** A swing in room 0 cannot land in room 1, a
+ *      knockout in one never reaches the other's kill feed, and each room's
+ *      leaderboard is its own. This is asserted over sockets rather than in
+ *      process because "one `Simulation` per room" is only half of it -- the
+ *      other half is that the transport never sends a room's frame to somebody
+ *      else's socket, which is a thing only a socket can see.
+ *   2. **The gateway spreads.** Two bare connections must land in *different*
+ *      rooms, because the rule is least-full: a rule that returned the first
+ *      open room would put everybody in room 0 and leave seven idling.
+ *   3. **A named room is honoured**, which is what an invite link is.
+ *   4. **A full room refuses cleanly, by name.** The failure this replaces is a
+ *      socket that closes with nothing a browser will surface -- see
+ *      `protocol.encodeBye`, whose whole purpose is a refusal a player can read.
+ *
+ * And one in-process claim that no socket could make: that two rooms sharing a
+ * loaded city do not share the one mutable thing in it.
+ */
+async function checkRooms(): Promise<void> {
+  say('rooms and the gateway (PERFORMANCE.md phase 3)');
+
+  // --- 0. The world split, in process. `roomWorld` shares 3.7 MB of prisms by
+  // reference and must not share a single coffee.
+  {
+    const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+    const shared = await loadWorld(root);
+    const a = roomWorld(shared);
+    const b = roomWorld(shared);
+    check(a.collision === b.collision && a.terrain === b.terrain && a.traffic === b.traffic,
+      'two rooms share the collision, terrain and lane graphs by reference -- the city is loaded once');
+    check(a.powerups !== b.powerups && a.points !== b.points,
+      'and hold their own powerup fields, which is the one mutable thing in a loaded world');
+    check(a.points.length === b.points.length && a.points.length > 100,
+      `both fields carry the same ${a.points.length} points`);
+    // The real test: take a coffee in one room and check it is still on the
+    // pavement in the other. A shared field makes this fail and the symptom in a
+    // game is a powerup that vanishes for reasons in another city.
+    const takenA = a.points.find((p) => p.active);
+    if (takenA) {
+      takenA.active = false;
+      takenA.respawnT = 45;
+      const same = b.points.find((p) => p.id === takenA.id);
+      check(same !== undefined && same.active,
+        `a pickup taken in room A left room B's copy of the same point standing`);
+      takenA.active = true;
+      takenA.respawnT = 0;
+    } else {
+      check(false, 'no active powerup to test room isolation with');
+    }
+  }
+
+  // --- The rest is over sockets, against a host running three small rooms.
+  const port = PORT + 2;
+  const proc = Bun.spawn(['bun', 'run', new URL('./index.ts', import.meta.url).pathname], {
+    env: {
+      ...process.env,
+      SYDNEY_PORT: String(port),
+      SYDNEY_ROOMS: '3',
+      SYDNEY_ROOM_CAP: '3',
+      SYDNEY_BOTS: '0',
+    },
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  try {
+    let up = false;
+    for (let i = 0; i < 120 && !up; i++) {
+      await sleep(100);
+      try {
+        up = (await fetch(`http://127.0.0.1:${port}/health`)).ok;
+      } catch {
+        // not yet
+      }
+    }
+    if (!up) {
+      check(false, 'a three-room host answered /health');
+      return;
+    }
+
+    // --- 1. `GET /rooms`, the whole of the gateway protocol.
+    const listing = (await (await fetch(`http://127.0.0.1:${port}/rooms`)).json()) as RoomInfo[];
+    check(Array.isArray(listing) && listing.length === 3, `/rooms lists ${listing.length} rooms`);
+    check(
+      listing.every((r) => typeof r.id === 'number' && r.cap === 3 && r.open === true && r.players === 0),
+      `every room reports an id, a cap and an occupancy (${JSON.stringify(listing[0])})`,
+    );
+    check(
+      chooseRoom(listing, null) === listing[0].id,
+      `the client's own rule picks room ${chooseRoom(listing, null)} from an empty host`,
+    );
+
+    // --- 2. Two bare connections land in different rooms. This is the least-full
+    // rule doing its job; a "first open room" rule passes every other check here
+    // and fails this one.
+    const bare1 = new RoomProbe('bare1');
+    await bare1.connect(`ws://127.0.0.1:${port}`);
+    const bare2 = new RoomProbe('bare2');
+    await bare2.connect(`ws://127.0.0.1:${port}`);
+    check(
+      bare1.room !== bare2.room,
+      `two bare joins spread across rooms (${bare1.room} and ${bare2.room}); the gateway picks least-full`,
+    );
+    check(bare1.room >= 0 && bare2.room >= 0, 'and the WELCOME told each of them which room it landed in');
+    bare1.close();
+    bare2.close();
+    await sleep(200);
+
+    // --- 3. A named room is honoured -- an invite link -- and two friends who
+    // name the same one meet.
+    const friendA = new RoomProbe('friendA');
+    const friendB = new RoomProbe('friendB');
+    await friendA.connect(`ws://127.0.0.1:${port}?room=2`);
+    await friendB.connect(`ws://127.0.0.1:${port}?room=2`);
+    check(friendA.room === 2 && friendB.room === 2, `both friends landed in the room they named (${friendA.room}, ${friendB.room})`);
+
+    // A third client, in a different room, for the isolation tests below.
+    const outsider = new RoomProbe('outsider');
+    await outsider.connect(`ws://127.0.0.1:${port}?room=0`);
+    check(outsider.room === 0, `an outsider joined room ${outsider.room}`);
+
+    // --- 4. A full room refuses by name. Room 2 has two of its three.
+    const filler = new RoomProbe('filler');
+    await filler.connect(`ws://127.0.0.1:${port}?room=2`);
+    const refused = new RoomProbe('refused');
+    await refused.connect(`ws://127.0.0.1:${port}?room=2`);
+    check(
+      refused.bye.includes('full') && refused.bye.includes('2'),
+      `a full room refused by name with a message the client can print: ${JSON.stringify(refused.bye)}`,
+    );
+    check(refused.id === 0, 'and never welcomed them');
+    const nowhere = new RoomProbe('nowhere');
+    await nowhere.connect(`ws://127.0.0.1:${port}?room=99`);
+    check(
+      nowhere.bye.includes('99'),
+      `a stale link to a room that does not exist is refused by name: ${JSON.stringify(nowhere.bye)}`,
+    );
+
+    // --- 5. Isolation over the socket. Four seconds of the two friends walking
+    // together while the outsider stands still, then what each of them was told.
+    //
+    // The **bodies** are the non-vacuous half here rather than a knockout. A
+    // socket brawl has to cross whatever the spawn dither put between the two
+    // probes -- up to 200 m -- so requiring a landed punch inside a fixed budget
+    // would be requiring a random walk to finish on time, which is a check that
+    // fails on a slow machine rather than on a bug. What "a swing cannot cross a
+    // room" means is asserted deterministically in section 7 below, in process,
+    // where two bodies can be put on the same square metre of Sydney in
+    // different rooms.
+    friendA.forward = 1;
+    friendB.forward = 1;
+    for (let i = 0; i < 240; i++) {
+      const pa = friendA.selfAt();
+      const pb = friendA.at(friendB.id);
+      if (pa && pb) {
+        const gap = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]);
+        friendA.yaw = Math.atan2(-(pb[0] - pa[0]), -(pb[1] - pa[1]));
+        friendB.yaw = friendA.yaw + Math.PI;
+        friendA.forward = gap > 1.0 ? 1 : 0;
+        friendA.buttons |= BTN.SPRINT;
+        friendB.forward = gap > 3 ? 1 : 0;
+        if (gap < 2.0 && i % 40 === 0) friendA.buttons |= BTN.PUNCH;
+      }
+      friendA.tick();
+      friendB.tick();
+      outsider.tick();
+      await sleep(1000 / 60);
+    }
+
+    check(outsider.hits.length === 0, `the outsider saw ${outsider.hits.length} hit events from another room`);
+    const outsiderNames = new Set(outsider.roster.map((r) => r.name));
+    const friendNames = new Set(friendA.roster.map((r) => r.name));
+    check(
+      ![...friendNames].some((n) => outsiderNames.has(n)),
+      `the two rooms' leaderboards are disjoint (room 2: ${[...friendNames].join(', ')} | room 0: ${[...outsiderNames].join(', ')})`,
+    );
+    check(
+      outsider.roster.length === 1 && friendA.roster.length === 3,
+      `each roster is its own room's (${outsider.roster.length} and ${friendA.roster.length} rows)`,
+    );
+    check(
+      friendA.seenIds.has(friendB.id) && friendB.seenIds.has(friendA.id),
+      `the two friends really were in one room together -- each was sent the other's body -- so the ` +
+        `outsider's silence means something`,
+    );
+    check(
+      outsider.seenIds.size === 1 && outsider.seenIds.has(outsider.id),
+      `and the outsider was sent exactly one body, its own (${outsider.seenIds.size} ids seen across ` +
+        `four seconds of another room fighting)`,
+    );
+    // The other half of "a swing in A cannot hit B": the outsider is untouched.
+    check(
+      Math.abs((outsider.selfHealth ?? 3) - 3) < 1e-6,
+      `the outsider is still on ${outsider.selfHealth} pips; nothing in room 2 reached them`,
+    );
+
+    // --- 6. `/health` and `/stats` carry the per-room breakdown, which is what
+    // makes a busy host diagnosable: one room of 128 and seven idle is a
+    // completely different machine from eight even ones, and an aggregate
+    // cannot tell them apart.
+    const health = (await (await fetch(`http://127.0.0.1:${port}/health`)).json()) as { rooms: RoomInfo[]; players: number };
+    check(health.rooms.length === 3 && health.players === 4, `/health reports ${health.players} players across ${health.rooms.length} rooms`);
+    const occupied = health.rooms.filter((r) => r.players > 0);
+    check(occupied.length === 2, `and says which rooms they are in (${occupied.map((r) => `${r.id}:${r.players}`).join(' ')})`);
+    const stats = (await (await fetch(`http://127.0.0.1:${port}/stats`)).json()) as {
+      room: Array<{ id: number; players: number; dedup: number; interest: { mean: number } }>;
+      dedup: number;
+      interest: { mean: number };
+    };
+    check(Array.isArray(stats.room) && stats.room.length === 3, `/stats breaks down by room (${stats.room?.length} entries)`);
+    check(
+      stats.room.some((r) => r.interest.mean > 0),
+      `and reports each room's mean working set (${stats.room.map((r) => r.interest.mean.toFixed(1)).join(', ')})`,
+    );
+
+    friendA.close();
+    friendB.close();
+    filler.close();
+    outsider.close();
+    await sleep(200);
+  } finally {
+    proc.kill();
+    await sleep(100);
+  }
+
+  // --- 7. **A swing in room A cannot hit room B**, put beyond doubt.
+  //
+  // Two rooms, and three bodies standing on **the same square metre of Sydney**:
+  // an attacker and a victim in room A, and a bystander in room B at the
+  // victim's exact coordinates. Room A's punch is the geometry `verifySim` uses
+  // for one that lands, so it certainly lands -- on the victim. If a room were
+  // anything less than a separate world, the bystander is standing in the same
+  // place and would be hit by the same swing.
+  //
+  // In process rather than over a socket because the claim is about *the
+  // simulation*, and because putting two bodies on one coordinate is the whole
+  // experiment -- something no socket-driven probe can arrange. The socket
+  // section above proves the complementary half: that the transport never sends
+  // one room's frame to another room's client.
+  {
+    const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+    const shared = await loadWorld(root);
+    const A = new Room(0, shared, 8, 0);
+    const B = new Room(1, shared, 8, 0);
+    const wsA = new FakeSocket(newConn(0));
+    const wsV = new FakeSocket(newConn(0));
+    const wsB = new FakeSocket(newConn(1));
+    const attacker = A.join(wsA.data, 0, 'swing-attacker')!;
+    const victim = A.join(wsV.data, 1, 'swing-victim')!;
+    const bystander = B.join(wsB.data, 0, 'swing-bystander')!;
+    A.conns.add(wsA as unknown as Socket);
+    A.conns.add(wsV as unknown as Socket);
+    B.conns.add(wsB as unknown as Socket);
+
+    const x = shared.spawn.x;
+    const z = shared.spawn.z;
+    attacker.combat.body.position.set(x, EYE_HEIGHT, z + 1);
+    victim.combat.body.position.set(x, EYE_HEIGHT, z);
+    // The same coordinates as the victim, in the other room.
+    bystander.combat.body.position.set(x, EYE_HEIGHT, z);
+    attacker.combat.body.yaw = 0;
+    attacker.input.yaw = 0;
+    victim.input.yaw = 0;
+    bystander.input.yaw = 0;
+    attacker.history.seed(A.sim.tick, x, EYE_HEIGHT, z + 1, 0);
+    victim.history.seed(A.sim.tick, x, EYE_HEIGHT, z, 0);
+    bystander.history.seed(B.sim.tick, x, EYE_HEIGHT, z, 0);
+
+    attacker.input.punch = true;
+    let eventsInB = 0;
+    for (let t = 0; t < 40; t++) {
+      const markB = wsB.frames.length;
+      // The bystander is pinned so a knockback in the *other* room cannot be
+      // confused with them simply having walked off.
+      bystander.combat.body.position.set(x, EYE_HEIGHT, z);
+      A.step();
+      B.step();
+      attacker.input.punch = false;
+      for (const f of wsB.since(markB, MSG.EVENTS)) eventsInB += (decodeEvents(f) ?? []).length;
+    }
+
+    check(
+      Math.abs(victim.combat.health - (MAX_HEALTH - 1)) < 1e-9,
+      `the swing landed in its own room: the victim is on ${victim.combat.health} pips`,
+    );
+    check(
+      Math.abs(bystander.combat.health - MAX_HEALTH) < 1e-9,
+      `and a body standing on the identical coordinates in room 1 is untouched ` +
+        `(${bystander.combat.health} pips)`,
+    );
+    check(
+      Math.hypot(bystander.combat.body.position.x - x, bystander.combat.body.position.z - z) < 1e-6,
+      'the bystander was not thrown by the other room\'s knockback either',
+    );
+    check(eventsInB === 0, `room 1's client received ${eventsInB} events from room 0's fight`);
+    check(
+      A.sim.participants.size === 2 && B.sim.participants.size === 1,
+      `and the two rooms hold their own participants (${A.sim.participants.size} and ${B.sim.participants.size})`,
+    );
+  }
+}
+
+/**
+ * A synthetic client that keeps what a room told it. `Probe`'s little sibling.
+ *
+ * Its own class rather than a flag on `Probe`, because what it watches is
+ * different: a room's identity, a `BYE` it was refused with, and which bodies it
+ * was ever sent -- none of which the milestone-9 probe has any use for.
+ */
+class RoomProbe {
+  private socket!: WebSocket;
+  id = 0;
+  room = -1;
+  bye = '';
+  seq = 0;
+  yaw = 0;
+  forward = 0;
+  buttons = 0;
+  roster: RosterEntry[] = [];
+  hits: Array<{ attacker: number; victim: number; ko: boolean }> = [];
+  readonly seenIds = new Set<number>();
+  selfHealth: number | null = null;
+  private readonly positions = new Map<number, [number, number]>();
+  private readonly scratch = createSnapshot();
+
+  constructor(readonly name: string) {}
+
+  connect(url: string): Promise<void> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const done = (): void => {
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
+      };
+      const socket = new WebSocket(url);
+      socket.binaryType = 'arraybuffer';
+      this.socket = socket;
+      socket.onopen = () => socket.send(encodeHello(255, this.name));
+      socket.onerror = () => done();
+      socket.onclose = () => done();
+      socket.onmessage = (e) => {
+        const frame = e.data as ArrayBuffer;
+        switch (frameType(frame)) {
+          case MSG.WELCOME: {
+            const w = decodeWelcome(frame);
+            if (!w) return;
+            this.id = w.id;
+            this.room = w.room;
+            done();
+            return;
+          }
+          case MSG.BYE: {
+            this.bye = decodeBye(frame) ?? 'bye';
+            done();
+            return;
+          }
+          case MSG.ROSTER: {
+            this.roster = decodeRoster(frame) ?? this.roster;
+            return;
+          }
+          case MSG.SNAPSHOT: {
+            const s = decodeSnapshot(frame, this.scratch);
+            if (!s) return;
+            for (const p of s.players) {
+              this.seenIds.add(p.id);
+              this.positions.set(p.id, [p.x, p.z]);
+              if (p.id === this.id) this.selfHealth = p.health;
+            }
+            return;
+          }
+          case MSG.EVENTS: {
+            for (const ev of decodeEvents(frame) ?? []) {
+              if (ev.kind === EVENT.HIT) {
+                this.hits.push({ attacker: ev.attacker, victim: ev.victim, ko: (ev.flags & EVENT_FLAG.KO) !== 0 });
+              }
+            }
+            return;
+          }
+          default:
+            return;
+        }
+      };
+      setTimeout(done, 5000);
+    });
+  }
+
+  at(id: number): [number, number] | null {
+    return this.positions.get(id) ?? null;
+  }
+
+  selfAt(): [number, number] | null {
+    return this.positions.get(this.id) ?? null;
+  }
+
+  tick(): void {
+    if (this.socket.readyState !== WebSocket.OPEN) return;
+    this.seq = (this.seq + 1) & 0xffff;
+    this.socket.send(
+      encodeInput({ seq: this.seq, buttons: this.buttons, forward: this.forward, right: 0, yaw: this.yaw, pitch: 0 }),
+    );
+    this.buttons = 0;
+  }
+
+  close(): void {
+    this.socket?.close();
   }
 }

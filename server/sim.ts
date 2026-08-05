@@ -595,7 +595,7 @@ export class Simulation {
    * and deduped against everybody already in the world.
    */
   join(preferredColourway: number, bot: BotKind | null, requestedName = ''): Participant {
-    const id = this.nextId++;
+    const id = this.allocateId();
     const spot = this.joinSpot();
     const combat = createCombatant(id, spot.x, spot.z);
     const world = groundFor(this.world);
@@ -650,6 +650,40 @@ export class Simulation {
     const p = this.participants.get(id);
     if (!p) return;
     p.gone = true;
+  }
+
+  /**
+   * The next player id, per `protocol.AOI_ID_LIFECYCLE`.
+   *
+   * Ascending from 1, **wrapping at 65535 and skipping anybody currently live**,
+   * which is protocol v8's requirement and was a latent bug before it: `nextId`
+   * was an unbounded JavaScript number written to the wire as a `u8`, so a long
+   * session with churn eventually handed out an id that aliased onto somebody
+   * already standing there. v8's `u16` moves that from "a busy evening" to
+   * "two days of continuous joins", and the skip makes it unreachable rather
+   * than merely unlikely.
+   *
+   * **0 is never allocated.** Three fields on the wire use it as a sentinel --
+   * `SnapshotBall.thrower` for a thrower who has left, `BikeRecord.rider` for a
+   * bike on its kickstand, `NpcActor.id` for no actor -- so a player 0 would be
+   * a player whose thrown balls belonged to nobody and whose bike nobody was on.
+   *
+   * The skip loop is bounded by the room cap rather than by 65535: it can only
+   * run as many times as there are live participants, because that is how many
+   * ids are taken. At a 128-player room the worst case is 128 map lookups, once,
+   * on the two-days-later tick where the counter wraps into an occupied range.
+   */
+  private allocateId(): number {
+    for (let attempt = 0; attempt <= 65535; attempt++) {
+      const id = this.nextId;
+      this.nextId = this.nextId >= 65535 ? 1 : this.nextId + 1;
+      if (!this.participants.has(id)) return id;
+    }
+    // Unreachable: 65,535 ids against a room cap in the hundreds. Throwing
+    // rather than returning a duplicate, because a duplicate id is two players
+    // sharing a body and there is no frame in which that reads as a join
+    // failure.
+    throw new Error('no free player id: the room holds 65,535 participants');
   }
 
   /**
@@ -1887,6 +1921,9 @@ export function verifySim(): string[] {
     points: [],
     tileOf: new Map(),
     bytes: { collision: 0, terrain: 0, powerups: 0, lanes: 0 },
+    // No sidecars to re-adopt, because nothing here builds a second room. See
+    // `world.roomWorld`, which is the only reader of this field.
+    powerupSource: [],
     spawn: { x: 0, z: 0 },
   };
 

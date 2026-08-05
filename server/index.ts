@@ -24,6 +24,25 @@
  * the browser runs them from.
  *
  * ---------------------------------------------------------------------------
+ * **This process is now a host of R rooms rather than one game.**
+ * PERFORMANCE.md phase 3.
+ *
+ * What used to be module-level state here -- a `Simulation`, a socket set, a
+ * roster cadence, a snapshot pool -- is a `Room` (see `server/room.ts`), and
+ * this file is what is left when you take the game out of it: boot checks, one
+ * loaded city, three HTTP routes and a 60 Hz pump that steps every room.
+ *
+ * The join flow is the only new protocol above the socket:
+ *
+ *     GET /rooms            -> [{ id, players, cap, open }, ...]
+ *     ws://host/ws?room=3   -> that room, or a BYE if it is full
+ *     ws://host/ws          -> the least-full open room
+ *
+ * The last line is what keeps every existing bookmark working, and it is why the
+ * room a client ends up in is reported back in the `WELCOME` rather than assumed
+ * from the URL.
+ *
+ * ---------------------------------------------------------------------------
  * WebSocket, not WebTransport. See `net/protocol.ts`'s header for the full
  * argument; the short version is that spec 10's transport requires HTTP/3 and a
  * real TLS certificate, which is the deployment step this pass is explicitly
@@ -38,10 +57,13 @@
  * the disk at boot because it needs to simulate against them; it has no route
  * that would hand one to a browser.
  *
- *     bun run server/index.ts            # from the repo root
- *     npm run server                     # the same thing
- *     SYDNEY_PORT=9000 npm run server    # a different port
- *     SYDNEY_BOTS=0 npm run server       # no bots
+ *     bun run server/index.ts               # from the repo root
+ *     npm run server                        # the same thing
+ *     SYDNEY_PORT=9000 npm run server       # a different port
+ *     SYDNEY_BOTS=0 npm run server          # no bots
+ *     SYDNEY_ROOMS=8 npm run server         # eight rooms in this process
+ *     SYDNEY_ROOM_CAP=128 npm run server    # each of them 128 players
+ *     SYDNEY_ROOM_BASE=8 npm run server     # rooms numbered 8..15 (second host)
  */
 
 import { verifyCombat } from '../client/src/game/combat.ts';
@@ -50,38 +72,26 @@ import { verifyPowerups } from '../client/src/game/powerups.ts';
 import { verifySpatialHash } from '../client/src/game/spatialhash.ts';
 import { verifyMovementBasis } from '../client/src/player/controller.ts';
 import {
-  INTERP_DELAY_MS,
   MAX_PLAYERS,
   MAX_REWIND_MS,
   MSG,
   PROTOCOL_VERSION,
   SNAPSHOT_HZ,
-  SNAPSHOT_INTERVAL,
   TICK_HZ,
   decodeHello,
   decodeInput,
   decodePing,
-  encodeBikes,
   encodeBye,
-  encodeEvents,
   encodePong,
-  encodePowerups,
-  encodeInvestigations,
-  encodeRoster,
-  encodeSnapshotInto,
-  encodeWelcome,
   frameType,
-  patchSnapshotAck,
   rankRoster,
-  rosterBytes,
   snapshotBytes,
-  type InputFrame,
-  type SnapshotPlayer,
 } from '../client/src/net/protocol.ts';
 import { verifyNames, verifyNet } from '../client/src/net/protocol.ts';
-import { botName } from './bots.ts';
+import { verifyAoi } from './aoi.ts';
 import { verifyRewind } from './rewind.ts';
-import { Simulation, applyButtons, verifySim, type Participant, type TickOutput } from './sim.ts';
+import { verifySim } from './sim.ts';
+import { RoomHost, newConn, type Conn, type Socket } from './room.ts';
 import { loadWorld } from './world.ts';
 
 const PORT = Number(process.env.SYDNEY_PORT ?? 8787);
@@ -89,29 +99,39 @@ const WORLD_ROOT = process.env.SYDNEY_WORLD ?? new URL('../client/public/world',
 const BOT_COUNT = Number(process.env.SYDNEY_BOTS ?? 2);
 
 /**
- * The join gate, and **the one thing `server/loadtest.ts` turns up**.
+ * How many rooms this process runs, and how big each is allowed to get.
  *
- * `protocol.MAX_PLAYERS` is spec 2's sixteen and stays sixteen: it is a
- * *protocol* constant, the client reads it, and PERFORMANCE.md phase 1 changes
- * no protocol. What this is, is the number of humans this process will admit,
- * which is a deployment question and is exactly what a capacity curve varies.
+ * **One room by default**, which keeps `bun run server/index.ts` the thing it
+ * has always been: start it, open two tabs, fight. Rooms are a deployment
+ * decision and a default of eight would mean two browsers on one desk landing in
+ * different cities -- the exact failure the gateway's least-full rule exists to
+ * prevent, caused by the gateway itself.
  *
- * **Above 255 the wire aliases.** `encodeSnapshot` writes the player id and the
- * player count as `u8`, so a 500-player run puts two players on id 244 and tells
- * every client the roster is 244 long. The *simulation* is honest at any count
- * -- the ids inside this process are 32-bit, every body is stepped, every byte
- * is written -- so the CPU and bandwidth numbers a load run produces are real,
- * and that is what the curve measures. What is not real above 255 is any client
- * that tries to *interpret* the result. Phase 2's protocol v8 has to widen both
- * fields; this is the measurement that says by how much.
+ * The cap is 128 because that is what PERFORMANCE.md measured a room at: 0.52 ms
+ * of tick, 3.1% of a core. `SYDNEY_MAX_PLAYERS` is kept as an alias for it
+ * because that is the name phase 1's harness invocation uses and is written into
+ * PERFORMANCE.md's "running the harness" section -- a rename would have
+ * invalidated a documented command for no reader's benefit.
  */
-const MAX_HUMANS = Number(process.env.SYDNEY_MAX_PLAYERS ?? MAX_PLAYERS);
+const ROOM_COUNT = Math.max(1, Number(process.env.SYDNEY_ROOMS ?? 1));
+const ROOM_CAP = Number(process.env.SYDNEY_ROOM_CAP ?? process.env.SYDNEY_MAX_PLAYERS ?? 128);
+/**
+ * The id of this host's first room. Rooms are `BASE .. BASE + COUNT - 1`.
+ *
+ * The whole of the multi-process seam, and it is one number. Four hosts on ports
+ * 8787-8790 with `SYDNEY_ROOM_BASE` 0, 8, 16 and 24 present 32 globally-unique
+ * rooms; Caddy fans `/ws/<n>` out to the right port and the client's gateway
+ * step reads a static host list. See DEPLOY.md and `caddy/rooms.Caddyfile`.
+ * Nothing in this process knows the other hosts exist, which is the property
+ * that makes another box just another line of config.
+ */
+const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
 
 // --- Self-checks, before anything expensive -----------------------------------
 
 /*
  * `main.ts` runs six of these before it constructs a renderer and refuses to
- * boot on any failure. This runs eight before it opens a socket, for the same
+ * boot on any failure. This runs ten before it opens a socket, for the same
  * reason and with one addition: the four shared ones are being run **in a second
  * runtime**, and the whole premise of this architecture is that they behave
  * identically there. A shared module that silently depended on a browser global
@@ -137,6 +157,10 @@ const MAX_HUMANS = Number(process.env.SYDNEY_MAX_PLAYERS ?? MAX_PLAYERS);
     // passes through somebody, and there is no frame in which that looks like
     // an index bug rather than a hit test one.
     ['verifySpatialHash', verifySpatialHash()],
+    // And phase 2's selection on top of it. A working set that is missing
+    // somebody nearby is a player invisible while punching you; see
+    // `server/aoi.ts`, which asserts the rule against a brute-force scan.
+    ['verifyAoi', verifyAoi()],
     ['verifySim', verifySim()],
   ];
   const failed = checks.filter(([, f]) => f.length > 0);
@@ -159,85 +183,46 @@ console.log(
     `${world.points.length} powerups — ${(performance.now() - t0).toFixed(0)} ms`,
 );
 
-const sim = new Simulation(world);
-
-// Spec 9's stub, promoted. Two bots so a single human online still has something
-// to hit -- see `server/bots.ts` for why these two personalities and not the
-// third. They are ordinary combatants: nothing downstream of `join` knows.
-for (let i = 0; i < BOT_COUNT; i++) {
-  // Named from `bots.BOT_NAMES` by index, so the first two are always Bazza and
-  // Shazza. A bot is an ordinary combatant on the scoreboard and gets an
-  // ordinary row -- which is the point of giving them names at all: a human
-  // beaten by a bot should be able to see who beat them.
-  const bot = sim.join(255, i % 2 === 0 ? 'aggressor' : 'pacer', botName(i));
-  console.log(`[sydney] bot ${bot.id} "${bot.name}" (${bot.bot!.kind}, kit ${bot.colourway})`);
-}
+/**
+ * The rooms, sharing that one city read-only.
+ *
+ * `roomWorld` is what makes "read-only" true rather than hoped: it hands every
+ * room the same collision, terrain, water, lanes and footpaths, and gives each
+ * its own `PowerupField` -- the one thing in a loaded world that a tick mutates.
+ * See its header for the audit of everything else.
+ */
+const tRooms = performance.now();
+const host = new RoomHost(world, ROOM_COUNT, ROOM_CAP, BOT_COUNT, ROOM_BASE);
+console.log(
+  `[sydney] ${ROOM_COUNT} room(s) ${ROOM_BASE}..${ROOM_BASE + ROOM_COUNT - 1}, cap ${ROOM_CAP} each ` +
+    `(${ROOM_COUNT * ROOM_CAP} players this process), ${BOT_COUNT} bot(s) per room — ` +
+    `${(performance.now() - tRooms).toFixed(0)} ms`,
+);
 
 // --- Connections --------------------------------------------------------------
 
-/**
- * What each socket carries.
- *
- * `pendingInput` is the *latest* input received since the last tick rather than
- * a queue, and that is a real decision. A client sends at 60 Hz and the server
- * ticks at 60 Hz, so in the steady state exactly one arrives per tick -- but TCP
- * bunches, so two or three land together after a hiccup. Replaying all of them
- * on one tick would give that client two or three ticks of movement in one,
- * which is a speed hack handed out for free to whoever has the worst connection.
- * Taking the newest and discarding the rest costs that client a few ticks of
- * their own input and costs everybody else nothing, which is the right way round.
- *
- * The dropped inputs are *not* lost from the client's point of view: they were
- * predicted locally and the ack tells it which one the server actually applied,
- * so reconciliation replays from there. See `net/client.ts`.
- */
-interface Conn {
-  participant: Participant | null;
-  /**
-   * The latest input, **decoded straight into a record owned by this socket**.
-   *
-   * PERFORMANCE.md phase 1. This used to be `InputFrame | null` holding a
-   * `{ ...scratch }` spread of the shared decode buffer, which is one object per
-   * input message per client -- 60 Hz x N, or **thirty thousand objects a
-   * second at five hundred players**, the second-largest allocation site in the
-   * process. The copy is still a copy (the decode scratch is shared across
-   * sockets and aliasing it would give every player the last input anybody
-   * sent), it is just a copy into a field instead of into a new object.
-   */
-  readonly input: InputFrame;
-  /** Whether `input` holds something the next tick has not consumed. */
-  hasInput: boolean;
-  /** Smoothed round trip, ms. Seeded pessimistically so an early punch is not over-rewound. */
-  rtt: number;
-  lastSeen: number;
-}
-
-function newConn(): Conn {
-  return {
-    participant: null,
-    input: { seq: 0, buttons: 0, forward: 0, right: 0, yaw: 0, pitch: 0 },
-    hasInput: false,
-    rtt: 60,
-    lastSeen: Date.now(),
-  };
-}
-
-const conns = new Set<{ data: Conn; send(data: ArrayBuffer): void; close(): void }>();
-type Socket = { data: Conn; send(data: ArrayBuffer | Uint8Array): number; close(code?: number, reason?: string): void };
+const conns = new Set<Socket>();
 
 /**
- * How many of the participants are people. Counted rather than spread.
+ * The room a request is asking for, from `?room=<id>`, or -1 for "you choose".
  *
- * The three places that used to ask this each built `[...sim.participants
- * .values()].filter(...)` -- a fresh array of every participant, on the join
- * path, on `/health`, and on the ten-second log. At five hundred players and a
- * churning load test that is the kind of quiet allocation that only shows up as
- * a GC pause with nothing obvious in the profile.
+ * Parsed at the **upgrade** rather than out of the hello, and the choice is
+ * worth a line. A query parameter is visible in a link -- which is what "join my
+ * room" is -- survives a reconnect without the client having to remember
+ * anything, and shows up in a proxy log when somebody asks why they landed in
+ * room 3. A first-hello byte would have been two bytes cheaper and invisible in
+ * every one of those places.
+ *
+ * An unparseable or unknown room is **not** refused here. It becomes -1 and the
+ * gateway picks, because the alternative -- a 400 on the upgrade -- is a
+ * WebSocket that closes with no reason a browser will surface, and the failure a
+ * player actually hits is a stale link to a room that has since been renumbered.
  */
-function humanCount(): number {
-  let n = 0;
-  for (const p of sim.participants.values()) if (!p.bot) n++;
-  return n;
+function askedRoom(url: URL): number {
+  const raw = url.searchParams.get('room');
+  if (raw === null) return -1;
+  const n = Number(raw);
+  return Number.isFinite(n) ? Math.trunc(n) : -1;
 }
 
 const server = Bun.serve<Conn>({
@@ -247,86 +232,127 @@ const server = Bun.serve<Conn>({
   fetch(req, srv) {
     const url = new URL(req.url);
     if (url.pathname === '/health') {
-      const humans = humanCount();
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          tick: sim.tick,
-          players: humans,
-          bots: sim.participants.size - humans,
-          stage: world.index.stage,
-          protocol: PROTOCOL_VERSION,
-        }),
-        // The one route that is not the game, and the one that needs a CORS
-        // header: a browser fetching it from the vite origin is a cross-origin
-        // request, where the WebSocket upgrade below is not subject to the
-        // same-origin policy at all.
-        { headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } },
-      );
+      let bots = 0;
+      for (const r of host.rooms) bots += r.sim.participants.size - r.humans();
+      return json({
+        ok: true,
+        players: host.players(),
+        // Every room's bots, summed. Kept as a top-level field across the phase 3
+        // rewrite because `server/integration-check.ts` prints it in its
+        // transcript header and a deployment probe should not have to sum an
+        // array to answer "is anything alive in there".
+        bots,
+        rooms: host.listing(),
+        stage: world.index.stage,
+        protocol: PROTOCOL_VERSION,
+        // The join disc's centre, which both ends already compute from the same
+        // `index.json` (`game/spawn.spawnCentre`). Published because
+        // `server/loadtest.ts`'s pileup scenario needs a world coordinate every
+        // synthetic client can converge on, and the alternative -- baking one
+        // into the harness -- would be a constant that silently stopped being a
+        // street the day the extent moved.
+        spawn: world.spawn,
+      });
     }
+    /*
+     * `/rooms` -- the gateway, and the whole of the join protocol above the
+     * socket.
+     *
+     * Its own route rather than a field on `/health`, on `/stats`' own argument:
+     * `/health` is a liveness probe a deployment hits and this is a thing every
+     * client fetches before every join. Kept deliberately tiny (a room is about
+     * 45 bytes of JSON, so eight rooms is 360 B) and deliberately dumb -- the
+     * client picks, because a server that picked would need a way to say "and
+     * connect here", and that is a redirect protocol for a decision the client
+     * can make from four numbers.
+     */
+    if (url.pathname === '/rooms') return json(host.listing());
     /*
      * `/stats` -- what `server/loadtest.ts` reads, and the only thing in this
      * process that knows where a tick went.
-     *
-     * A second route rather than more fields on `/health`, because the two
-     * answer different questions to different callers: `/health` is a liveness
-     * probe a deployment hits and has to stay cheap and stable, and this is a
-     * measurement instrument that resets its own counters when it is read. A
-     * probe with side effects would be a probe that made the numbers wrong for
-     * whoever asked next.
      *
      * **Reading it resets the window**, so successive polls report disjoint
      * intervals and a harness can integrate them. The tick-cost percentiles are
      * the exception: they come off a 20 s ring that is not cleared, because a
      * p99 that only ever saw one poll's worth of ticks is not a p99.
+     *
+     * Phase 3 added the per-room breakdown, and it is the point of the route
+     * now: a host whose p99 is 9 ms because one room of 128 is doing all the
+     * work is a completely different machine from one whose eight rooms are
+     * evenly loaded, and the aggregate cannot tell them apart.
      */
     if (url.pathname === '/stats') {
       const now = performance.now();
       const window = Math.max(1e-6, now - statsReadAt);
-      const sorted = Float64Array.prototype.slice.call(tickCost, 0, Math.min(ticksMeasured, tickCost.length)).sort();
-      const at = (q: number): number => (sorted.length === 0 ? 0 : sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))]);
-      // Per-tick milliseconds, which is what a budget is stated in. The
-      // simulation accumulates totals since the last read; dividing by the
-      // ticks in that window is the only conversion that survives a poll
-      // interval that is not exactly one second.
       const ticksInWindow = Math.max(1, ticksRun - statsTicksAt);
+      const rooms = host.rooms.map((r) => r.stats(ticksInWindow));
+      const players = host.players();
+      let bytesOut = 0;
+      let snapshots = 0;
+      let stalls = 0;
+      let framesSent = 0;
+      let framesEncoded = 0;
+      let interestTotal = 0;
+      let interestSamples = 0;
+      let interestMax = 0;
       const phases: Record<string, number> = {};
-      for (const [k, v] of Object.entries(sim.phaseMs)) phases[k] = v / ticksInWindow;
-      phases.encode = encodeMs / ticksInWindow;
-      phases.broadcast = broadcastMs / ticksInWindow;
+      for (const r of host.rooms) {
+        bytesOut += r.bytesSent;
+        snapshots += r.snapshotsSent;
+        stalls += r.stalls;
+        framesSent += r.framesSent;
+        framesEncoded += r.framesEncoded;
+        interestTotal += r.interestTotal;
+        interestSamples += r.interestSamples;
+        if (r.interestMax > interestMax) interestMax = r.interestMax;
+      }
+      // The host's phase breakdown is the **sum** across rooms, because that is
+      // what a tick of this process costs. A per-room average would answer a
+      // question nobody is asking: the budget is one 16.67 ms tick for all of
+      // them together.
+      for (const s of rooms) {
+        for (const [k, v] of Object.entries(s.phaseMs)) phases[k] = (phases[k] ?? 0) + v;
+      }
+      const sorted = Float64Array.prototype.slice.call(hostTickCost, 0, Math.min(ticksMeasured, hostTickCost.length)).sort();
+      const at = (q: number): number => (sorted.length === 0 ? 0 : sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))]);
       const body = JSON.stringify({
-        tick: sim.tick,
-        players: humanCount(),
-        participants: sim.participants.size,
+        tick: host.rooms[0]?.sim.tick ?? 0,
+        players,
+        rooms: rooms.length,
         /** Ticks per second actually achieved. Below 60 means the loop is losing. */
         tickHz: (ticksInWindow / window) * 1000,
-        tickMs: { p50: at(0.5), p90: at(0.9), p99: at(0.99), max: worstTick },
-        /** Ticks over four budgets. Bun exposes no GC hook; this is the observable proxy. */
+        /** The **host's** tick: every room, plus the pump. This is the budget. */
+        tickMs: { p50: at(0.5), p90: at(0.9), p99: at(0.99), max: worstHostTick },
         stalls,
         phaseMs: phases,
-        bytesOut: bytesSent,
-        snapshots: snapshotsSent,
-        /** Bytes per client per second, the number AOI has to bring down. */
-        bytesPerClientPerSec: humanCount() > 0 ? (bytesSent / humanCount() / window) * 1000 : 0,
+        bytesOut,
+        snapshots,
+        /** Bytes per client per second, the number AOI exists to bring down. */
+        bytesPerClientPerSec: players > 0 ? (bytesOut / players / window) * 1000 : 0,
+        /** Frames sent per frame encoded. See `server/aoi.ts`'s `FrameGroups`. */
+        dedup: framesEncoded === 0 ? 1 : framesSent / framesEncoded,
+        interest: {
+          mean: interestSamples === 0 ? 0 : interestTotal / interestSamples,
+          max: interestMax,
+        },
         rss: process.memoryUsage.rss(),
         heap: process.memoryUsage().heapUsed,
         windowMs: window,
         ticksInWindow,
+        room: rooms,
       });
       statsReadAt = now;
       statsTicksAt = ticksRun;
-      for (const k of Object.keys(sim.phaseMs)) (sim.phaseMs as Record<string, number>)[k] = 0;
-      encodeMs = 0;
-      broadcastMs = 0;
-      bytesSent = 0;
-      snapshotsSent = 0;
-      stalls = 0;
-      worstTick = 0;
+      for (const r of host.rooms) r.resetWindow();
+      worstHostTick = 0;
       return new Response(body, {
         headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
       });
     }
-    const ok = srv.upgrade(req, { data: newConn() });
+    // The upgrade accepts any path -- see DEPLOY.md, where Caddy proxies `/ws`
+    // to this and phase 3 adds `/ws/<n>` for a fan-out across host processes.
+    // The room, if one was asked for, rides the query.
+    const ok = srv.upgrade(req, { data: newConn(askedRoom(url)) });
     if (ok) return undefined;
     return new Response('SYDNEY game server. Connect a WebSocket; tiles are served elsewhere.\n', {
       status: 426,
@@ -342,7 +368,7 @@ const server = Bun.serve<Conn>({
     maxPayloadLength: 1024,
 
     open(ws: Socket) {
-      conns.add(ws as never);
+      conns.add(ws);
     },
 
     message(ws: Socket, raw: string | Buffer) {
@@ -359,78 +385,48 @@ const server = Bun.serve<Conn>({
             // Refused rather than tolerated. See `PROTOCOL_VERSION`: the two
             // ends do not ship together, so a tab left open across a restart is
             // the normal case and a misparsed snapshot is the normal symptom.
+            // v8 widened four id fields, so a v7 client reading a v8 snapshot
+            // would put every player at a plausible wrong position -- which is
+            // exactly the silent failure this refusal exists for.
             ws.send(encodeBye(`protocol ${hello.version}; this server speaks ${PROTOCOL_VERSION}. Reload the page.`));
             ws.close(1002, 'protocol');
             return;
           }
-          if (humanCount() >= MAX_HUMANS) {
-            ws.send(encodeBye(`full (${MAX_HUMANS} players)`));
+          if (conn.participant) return; // a second hello on one socket is ignored
+
+          // --- The gateway, in four lines.
+          //
+          // A named room is honoured if it exists and has space; a named room
+          // that is full is refused **by name** rather than silently rehomed,
+          // because somebody who followed a friend's link would rather be told
+          // than dropped into a different city. No room named means the
+          // least-full open one, which is what a bare `wss://host/ws` gets and
+          // is what keeps every existing bookmark working.
+          const wanted = conn.room >= 0 ? host.get(conn.room) : host.leastFull();
+          if (!wanted) {
+            const detail = conn.room >= 0
+              ? `no room ${conn.room} on this host`
+              : `every room on this host is full (${host.rooms.length} x ${ROOM_CAP})`;
+            ws.send(encodeBye(detail));
             ws.close(1013, 'full');
             return;
           }
-          if (conn.participant) return; // a second hello on one socket is ignored
-
           // The name is a request, exactly as the colourway is. `sim.join`
-          // sanitises it again and dedupes it against the world -- see
+          // sanitises it again and dedupes it against the room -- see
           // `Simulation.pickName` -- so what comes back on `p.name` is what this
           // player is actually called, which is not always what they asked for.
-          const p = sim.join(hello.colourway, null, hello.name);
-          conn.participant = p;
-          ws.send(
-            encodeWelcome({
-              version: PROTOCOL_VERSION,
-              id: p.id,
-              colourway: p.colourway,
-              snapshotHz: SNAPSHOT_HZ,
-              tick: sim.tick,
-              x: p.combat.body.position.x,
-              y: p.combat.body.position.y,
-              z: p.combat.body.position.z,
-              yaw: p.combat.body.yaw,
-            }),
-          );
-          // Spec 8.3's currently-taken points, so a joiner's icons match
-          // everybody else's from the first frame rather than showing a full
-          // city that empties as the first pickups happen.
-          ws.send(encodePowerups(sim.powerupsDown()));
-          // Every lime e-bike, once, with whoever is currently on one.
-          //
-          // The whole set rather than a nearby subset, on `Simulation.snapshot`'s
-          // own argument about relevance culling: it is 1.3 kB paid once, and a
-          // client that only knew about bikes near its spawn would show an empty
-          // city to anybody who walked anywhere. From here it is deltas -- see
-          // `runTick`.
-          ws.send(encodeBikes(sim.bikeRecords()));
-          // And who the police are currently after, so a joiner arriving into a
-          // pursuit already in progress can render the marker over the suspect
-          // rather than seeing four officers shooting at somebody for no visible
-          // reason. Almost always a two-byte frame.
-          ws.send(encodeInvestigations(sim.investigations()));
-          // The scoreboard, **before** the join events below it, and the order
-          // is the one rule about this message: a client turns a JOIN into a
-          // line in its kill feed, and a name it has not been told yet is a line
-          // that says "player 4 joined" for somebody it will be calling Shazza a
-          // frame later. Same rule in `runTick`, for the same reason.
-          ws.send(encodeRoster(sim.roster()));
-          // And who is already here, so the client can build its remote actors
-          // before the first snapshot rather than one snapshot late.
-          ws.send(
-            encodeEvents(
-              [...sim.participants.values()].map((other) => ({
-                kind: 4 as const,
-                id: other.id,
-                colourway: other.colourway,
-                bot: other.bot ? 1 : 0,
-              })),
-            ),
-          );
-          // `rosterSent` is deliberately **not** updated here. The join bumped
-          // `sim.rosterVersion`, and everybody who was already in the world
-          // still has to be told there is a new row; the broadcast on the next
-          // tick does that, and re-sending it to this socket costs 400 bytes
-          // once.
+          const p = wanted.join(conn, hello.colourway, hello.name);
+          if (!p) {
+            ws.send(encodeBye(`room ${wanted.id} is full (${wanted.cap} players)`));
+            ws.close(1013, 'full');
+            return;
+          }
+          conn.room = wanted.id;
+          wanted.conns.add(ws);
+          wanted.welcome(ws, p);
           console.log(
-            `[sydney] player ${p.id} "${p.name}" joined (kit ${p.colourway}); ${sim.participants.size} in the world`,
+            `[sydney] room ${wanted.id}: player ${p.id} "${p.name}" joined (kit ${p.colourway}); ` +
+              `${wanted.sim.participants.size} in the room`,
           );
           return;
         }
@@ -463,11 +459,15 @@ const server = Bun.serve<Conn>({
     },
 
     close(ws: Socket) {
-      conns.delete(ws as never);
-      const p = ws.data.participant;
+      conns.delete(ws);
+      const conn = ws.data;
+      const room = conn.room >= 0 ? host.get(conn.room) : undefined;
+      const p = conn.participant;
+      if (room) room.leave(ws);
       if (p) {
-        sim.leave(p.id);
-        console.log(`[sydney] player ${p.id} "${p.name}" left (${p.kos} KOs, ${p.downs} downs)`);
+        console.log(
+          `[sydney] room ${conn.room}: player ${p.id} "${p.name}" left (${p.kos} KOs, ${p.downs} downs)`,
+        );
       }
     },
   },
@@ -476,7 +476,7 @@ const server = Bun.serve<Conn>({
 // --- The loop -----------------------------------------------------------------
 
 /**
- * Spec 10's 60 Hz, drift-corrected.
+ * Spec 10's 60 Hz, drift-corrected, stepping every room.
  *
  * `setInterval(fn, 16.67)` is the obvious implementation and it is wrong in a
  * way that takes an hour to see: the interval is a *minimum*, so every tick that
@@ -489,283 +489,29 @@ const server = Bun.serve<Conn>({
  * -- and catches up when it falls behind, with a cap for the same reason
  * `main.ts` clamps its frame delta: a process suspended by a laptop lid must not
  * run four thousand ticks on resume.
+ *
+ * **Every room advances on the same schedule**, which is the one thing phase 3
+ * did not change and could have: a room-per-timer would drift independently and
+ * make "the host's tick" meaningless. One pump, R rooms, one number to budget.
  */
 const MAX_CATCHUP_TICKS = 8;
 const startedAt = performance.now();
 let ticksRun = 0;
 
-const out: TickOutput = { tick: 0, events: [], snapshot: null };
-const snapshotScratch: SnapshotPlayer[] = [];
-
-/**
- * Rolling cost of a tick, for the console line below and for `/stats`.
- *
- * Twenty seconds of ticks rather than two, because PERFORMANCE.md phase 1's
- * exit criterion is a **p99** and a 120-sample window has 1.2 samples above the
- * 99th percentile. 1,200 is 9.6 kB of Float64 and gives the tail 12 samples to
- * be made of.
- */
-const tickCost = new Float64Array(TICK_HZ * 20);
+/** Rolling cost of a whole host tick -- every room plus the pump. See `/stats`. */
+const hostTickCost = new Float64Array(TICK_HZ * 20);
 let costCursor = 0;
 let ticksMeasured = 0;
-let snapshotsSent = 0;
-let bytesSent = 0;
-let encodeMs = 0;
-let broadcastMs = 0;
-let worstTick = 0;
-/** A tick this far over budget waited on something; see `runTick`. */
-const STALL_MS = (1000 / TICK_HZ) * 4;
-let stalls = 0;
-
-/**
- * The one snapshot buffer, and the two views onto it. See the send loop.
- *
- * Sized for the sixteen-player world at boot and grown on demand, because a
- * server that starts at five hundred players' worth of buffer to serve two is
- * carrying 10 kB nobody asked for and a server that reallocates every tick is
- * the thing this exists to stop.
- */
-let snapshotPool = new ArrayBuffer(snapshotBytes(MAX_PLAYERS, 8, 24));
-let snapshotView = new DataView(snapshotPool);
-let snapshotBytesOut = new Uint8Array(snapshotPool);
-
-/**
- * The scoreboard's cadence: on change, plus a slow refresh for the ping column.
- *
- * `rosterSent` is the `sim.rosterVersion` this loop last put on the wire, so a
- * join, a departure or a knockout is broadcast on the tick it happens and
- * nothing else is. `ROSTER_REFRESH_TICKS` covers the one field that changes
- * continuously and that nothing bumps the version for -- see
- * `Simulation.rosterVersion`.
- *
- * Two seconds, and the number is chosen against what the message costs rather
- * than against how fresh a ping needs to be. `protocol.encodeRoster` has the
- * arithmetic: 402 B at sixteen players is 1.6 kbit/s at this cadence, about 3%
- * of what the snapshots cost at the same count. A ping column two seconds stale
- * is a ping column; one at 20 Hz would be a second snapshot stream carrying
- * names that have not changed since anybody joined.
- */
-const ROSTER_REFRESH_TICKS = TICK_HZ * 2;
-let rosterSent = -1;
-let rosterTick = 0;
-let rostersSent = 0;
-
-/**
- * The police channel's cadence, and it is the roster's exactly.
- *
- * On change -- an investigation opening, ending, or changing its reason -- plus
- * a slow refresh for the one field that moves continuously and that nothing
- * bumps the version for, which here is the countdown. That is the same
- * arrangement the scoreboard has and it is the same argument
- * (`Simulation.investigationVersion` states it): a client runs the countdown
- * down itself between messages, so what the refresh is actually correcting is
- * accumulated clock drift, and two seconds of that at 60 Hz is nothing anybody
- * can read off a banner rounded to whole seconds.
- *
- * The message is four bytes an entry. At the sixteen-player cap with everybody
- * somehow wanted at once it is 66 B every two seconds, or 0.26 kbit/s -- a sixth
- * of what the roster costs at the same count, and in the ordinary case (nobody
- * wanted) it is a two-byte frame that is not sent at all, because the version
- * has not moved and the refresh below skips an empty set.
- */
-const INVESTIGATION_REFRESH_TICKS = TICK_HZ * 2;
-let investigationSent = -1;
-let investigationTick = 0;
+let worstHostTick = 0;
 
 function runTick(): void {
   const began = performance.now();
-
-  // Apply the newest input from each socket. Before `sim.step`, so the tick sees
-  // it -- and the ack is recorded here rather than inside the simulation,
-  // because "which packet did I last hear from you" is a property of the
-  // connection and not of the combatant.
-  for (const ws of conns) {
-    const conn = (ws as unknown as Socket).data;
-    const p = conn.participant;
-    if (!p || !conn.hasInput) continue;
-    const frame = conn.input;
-    conn.hasInput = false;
-    p.input.forward = frame.forward;
-    p.input.right = frame.right;
-    p.input.yaw = frame.yaw;
-    p.input.pitch = frame.pitch;
-    applyButtons(p.input, frame.buttons);
-    p.ackSeq = frame.seq;
-    // Spec 8.2's lag compensation, in ticks. Half a round trip is how long the
-    // input took to arrive; the interpolation delay is how far in the past this
-    // client was *drawing* everybody else when they pressed the button. Both
-    // have to be undone to evaluate the punch against what the attacker saw --
-    // and the sum is clamped to spec 10's 250 ms cap, so a client claiming a
-    // four-second trip gets 250 ms and not a licence.
-    const viewMs = Math.min(MAX_REWIND_MS, conn.rtt * 0.5 + INTERP_DELAY_MS);
-    p.viewTicks = (viewMs / 1000) * TICK_HZ;
-  }
-
-  sim.step(out);
-
-  // The scoreboard, **before** the events below it and after the step that may
-  // have changed it. The order is the whole of the contract with the client: a
-  // JOIN event becomes a line in a kill feed, and a client that has not been
-  // told the new player's name yet writes that line with an id in it. Sending
-  // the roster first means every event in the batch below can be named.
-  if (sim.rosterVersion !== rosterSent || sim.tick - rosterTick >= ROSTER_REFRESH_TICKS) {
-    rosterSent = sim.rosterVersion;
-    rosterTick = sim.tick;
-    const entries = sim.roster();
-    const frame = encodeRoster(entries);
-    for (const ws of conns) {
-      const s = ws as unknown as Socket;
-      if (!s.data.participant) continue;
-      s.send(frame);
-      bytesSent += frame.byteLength;
-      rostersSent++;
-    }
-  }
-
-  // The police channel, beside the roster and above the events for the same
-  // ordering reason: a client turns a shot's `HIT` event into a flinch and a
-  // sound, and it should already know *why* it is being shot at when that
-  // arrives rather than a frame later.
-  //
-  // **The refresh fires even when nobody is wanted**, which looks like waste and
-  // is the one thing that makes the client's prediction safe.
-  //
-  // A client opens its own banner the instant it commits a crime it can see a
-  // witness for -- see `net/client.predictInvestigation`, which exists so the
-  // banner appears when the bat connects rather than a third of a second later.
-  // When that prediction is *right*, the server's own message arrives within a
-  // snapshot and agrees. When it is **wrong** -- the officer the client thought
-  // could see it had walked behind a van on the server's copy of the world --
-  // there is by definition no version change here to contradict it, and an
-  // earlier cut of this skipped the empty message on the grounds that it carried
-  // nothing. The result was a player under investigation for forty-five seconds
-  // on their own screen with nothing chasing them.
-  //
-  // So a quiet server sends a two-byte frame every two seconds, per client:
-  // 8 bit/s, against the 22 kbit/s the snapshots already cost. That is the price
-  // of "a wrong prediction clears itself", and it is not a price.
-  {
-    const changed = sim.investigationVersion !== investigationSent;
-    const refresh = sim.tick - investigationTick >= INVESTIGATION_REFRESH_TICKS;
-    if (changed || refresh) {
-      investigationSent = sim.investigationVersion;
-      investigationTick = sim.tick;
-      // Read inside the branch rather than above it. On a quiet server this
-      // fires once every two seconds instead of sixty times a second, and
-      // `sim.investigations()` walks a map either way.
-      const frame = encodeInvestigations(sim.investigations());
-      for (const ws of conns) {
-        const s = ws as unknown as Socket;
-        if (!s.data.participant) continue;
-        s.send(frame);
-        bytesSent += frame.byteLength;
-      }
-    }
-  }
-
-  // The bikes, on the tick a claim or a drop happens, and only the records that
-  // changed. Beside the events and above them for the same ordering reason the
-  // roster is above both: a client turns `FLAG.RIDING` in the next snapshot into
-  // a seated pose and a bike mesh, and it needs to have been told which bike
-  // before that arrives. On a normal tick this array is empty and nothing is
-  // sent at all.
-  {
-    const changed = sim.bikeDelta();
-    if (changed.length > 0) {
-      const frame = encodeBikes(
-        changed.map((b) => ({ id: b.id, rider: b.rider, x: b.x, y: b.y, z: b.z, yaw: b.yaw })),
-      );
-      for (const ws of conns) {
-        const s = ws as unknown as Socket;
-        if (!s.data.participant) continue;
-        s.send(frame);
-        bytesSent += frame.byteLength;
-      }
-    }
-  }
-
-  // Events on the tick they happen, at up to 60 Hz. See `net/protocol.ts`: a
-  // snapshot is idempotent state and an event is a transition, so delaying an
-  // event to the snapshot rate would put a punch's sound up to 50 ms after the
-  // punch for no saving worth having -- events are rare.
-  if (out.events.length > 0) {
-    const frame = encodeEvents(out.events);
-    for (const ws of conns) {
-      const s = ws as unknown as Socket;
-      if (!s.data.participant) continue;
-      s.send(frame);
-      bytesSent += frame.byteLength;
-    }
-  }
-
-  // Snapshots at spec 10's 20 Hz. One encode for the roster, but a *separate*
-  // frame per client, because the `ackSeq` in the header is that client's own
-  // and is the whole basis of its reconciliation. The 21 bytes per player are
-  // identical across clients; only the two-byte ack differs, which would be a
-  // real saving to exploit and is not worth the shared-buffer aliasing bug it
-  // would invite at this player count.
-  if (sim.tick % SNAPSHOT_INTERVAL === 0) {
-    const players = sim.snapshot(snapshotScratch);
-    // The projectile section, built once for the roster exactly as the players
-    // are: a ball is the same object to everybody looking at it.
-    const balls = sim.ballSnapshot();
-    // And the faction section, likewise once for the roster: an officer is the
-    // same object to everybody looking at them. See `protocol.NPC_BYTES` for
-    // what is in the record and, more usefully, what is deliberately not.
-    const npcs = sim.npcSnapshot();
-
-    // **One encode, one buffer, one ack patched per client.**
-    //
-    // PERFORMANCE.md phase 1, and it is the change that comment above used to
-    // argue against: *"only the two-byte ack differs, which would be a real
-    // saving to exploit and is not worth the shared-buffer aliasing bug it
-    // would invite at this player count"*. At this player count, correct. At the
-    // counts the capacity curve runs at it was the largest allocation site in
-    // the process by an order of magnitude -- 10.5 kB x 500 clients x 20 Hz is
-    // 105 MB a second of garbage to say the same thing five hundred times.
-    //
-    // The aliasing bug it invites is real and is closed by one property of the
-    // transport: `ws.send` **copies** into the socket's write buffer
-    // synchronously, so by the time the ack is patched for the next client the
-    // previous one's bytes are already gone. Nothing here holds a reference to
-    // the buffer across a line.
-    const bytes = snapshotBytes(players.length, balls.length, npcs.length);
-    if (snapshotPool.byteLength < bytes) {
-      // Grown to the high-water mark and never shrunk, which for a process
-      // whose player count only goes up during a session is one allocation.
-      snapshotPool = new ArrayBuffer(bytes);
-      snapshotView = new DataView(snapshotPool);
-      snapshotBytesOut = new Uint8Array(snapshotPool);
-    }
-    let t = performance.now();
-    encodeSnapshotInto(snapshotView, sim.tick, 0, players, balls, npcs);
-    encodeMs += performance.now() - t;
-
-    t = performance.now();
-    const wire = snapshotBytesOut.subarray(0, bytes);
-    for (const ws of conns) {
-      const s = ws as unknown as Socket;
-      const p = s.data.participant;
-      if (!p) continue;
-      patchSnapshotAck(snapshotView, p.ackSeq);
-      s.send(wire);
-      bytesSent += bytes;
-      snapshotsSent++;
-    }
-    broadcastMs += performance.now() - t;
-  }
-
+  host.step();
   const cost = performance.now() - began;
-  tickCost[costCursor] = cost;
-  costCursor = (costCursor + 1) % tickCost.length;
+  hostTickCost[costCursor] = cost;
+  costCursor = (costCursor + 1) % hostTickCost.length;
   ticksMeasured++;
-  // The stall detector, and it is the closest thing to a GC probe this runtime
-  // gives. Bun exposes no allocation counters and no GC hook, so what is
-  // measured instead is the observable symptom: a tick that took more than four
-  // times the 16.67 ms budget did not do four times the work, it waited. See
-  // `/stats`.
-  if (cost > STALL_MS) stalls++;
-  if (cost > worstTick) worstTick = cost;
+  if (cost > worstHostTick) worstHostTick = cost;
 }
 
 function pump(): void {
@@ -792,6 +538,17 @@ pump();
 
 // --- Housekeeping -------------------------------------------------------------
 
+function json(body: unknown): Response {
+  // The one class of route that is not the game, and the one that needs a CORS
+  // header: a browser fetching it from the vite origin is a cross-origin
+  // request, where the WebSocket upgrade is not subject to the same-origin
+  // policy at all. `/rooms` needs it most -- it is fetched by every client
+  // before every join.
+  return new Response(JSON.stringify(body), {
+    headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+  });
+}
+
 /**
  * A stale socket is one that has sent nothing for half a minute.
  *
@@ -802,17 +559,13 @@ pump();
  * focused. A browser stops issuing animation frames to a window it considers
  * hidden, which stops that client's input entirely -- so the only thing holding
  * its socket open is `net/client.ts`'s ping, which is on a timer for this reason
- * and which a browser throttles to about 1 Hz rather than stopping. Thirty
- * seconds covers a throttled tab with two orders of magnitude to spare and still
- * reaps a genuinely dead socket well before anyone wonders why a statue is
- * standing in the street.
+ * and which a browser throttles to about 1 Hz rather than stopping.
  */
 const STALE_MS = 30000;
 setInterval(() => {
   const now = Date.now();
   for (const ws of conns) {
-    const s = ws as unknown as Socket;
-    if (now - s.data.lastSeen > STALE_MS) s.close(1001, 'silent');
+    if (now - ws.data.lastSeen > STALE_MS) ws.close(1001, 'silent');
   }
 }, 5000);
 
@@ -822,33 +575,55 @@ let statsTicksAt = 0;
 
 /** One line every ten seconds, and only when somebody is connected. */
 setInterval(() => {
-  const humans = humanCount();
-  if (humans === 0) return;
-  const sorted = Array.from(tickCost).filter((v) => v > 0).sort((a, b) => a - b);
+  const players = host.players();
+  if (players === 0) return;
+  const sorted = Array.from(hostTickCost).filter((v) => v > 0).sort((a, b) => a - b);
   const median = sorted.length ? sorted[sorted.length >> 1] : 0;
-  const rate = (bytesSent * 8) / 10 / 1000;
-  console.log(
-    `[sydney] tick ${sim.tick}  ${humans} player(s) + ${sim.participants.size - humans} bot(s)  ` +
-      `${median.toFixed(2)} ms/tick median  ${snapshotsSent} snapshots  ${rate.toFixed(1)} kbit/s out ` +
-      `(${snapshotBytes(sim.participants.size)} B/snapshot, ${rostersSent} rosters at ` +
-      `${rosterBytes(sim.roster())} B)`,
-  );
-  // The board itself, so a session leaves a record in the log it has nowhere
-  // else to leave one -- there is no persistence and the scoreboard dies with
-  // the process, which is spec 12's call and not this line's to change.
-  const board = rankRoster(sim.roster());
-  if (board.some((r) => r.kos > 0 || r.downs > 0)) {
-    console.log(
-      `[sydney]   ${board.map((r) => `${r.name} ${r.kos}/${r.downs}`).join('   ')}`,
-    );
+  let bytes = 0;
+  let snapshots = 0;
+  let framesSent = 0;
+  let framesEncoded = 0;
+  let interestTotal = 0;
+  let interestSamples = 0;
+  for (const r of host.rooms) {
+    // The log's own counters, not `/stats`'. Both readers reset what they read,
+    // and a console line landing between two polls used to steal that window's
+    // bytes -- which the harness reported as a downlink alternating between 47
+    // and 186 kbit/s. See `Room.logBytes`.
+    bytes += r.logBytes;
+    snapshots += r.logSnapshots;
+    framesSent += r.framesSent;
+    framesEncoded += r.framesEncoded;
+    interestTotal += r.interestTotal;
+    interestSamples += r.interestSamples;
   }
-  snapshotsSent = 0;
-  bytesSent = 0;
-  rostersSent = 0;
+  const rate = (bytes * 8) / 10 / 1000;
+  const set = interestSamples === 0 ? 0 : interestTotal / interestSamples;
+  console.log(
+    `[sydney] ${players} player(s) across ${host.rooms.length} room(s)  ` +
+      `${median.toFixed(2)} ms/host-tick median  ${snapshots} snapshots  ${rate.toFixed(1)} kbit/s out  ` +
+      `working set ${set.toFixed(1)} avg (${snapshotBytes(Math.round(set))} B/snapshot)  ` +
+      `dedup ${(framesEncoded === 0 ? 1 : framesSent / framesEncoded).toFixed(2)}x`,
+  );
+  // The board itself, per room, so a session leaves a record in the log it has
+  // nowhere else to leave one -- there is no persistence and the scoreboard dies
+  // with the process, which is spec 12's call and not this line's to change.
+  for (const r of host.rooms) {
+    const board = rankRoster(r.sim.roster());
+    if (board.some((row) => row.kos > 0 || row.downs > 0)) {
+      console.log(`[sydney]   room ${r.id}: ${board.slice(0, 8).map((row) => `${row.name} ${row.kos}/${row.downs}`).join('   ')}`);
+    }
+  }
+  for (const r of host.rooms) {
+    r.logBytes = 0;
+    r.logSnapshots = 0;
+    r.rostersSent = 0;
+  }
 }, 10000);
 
 console.log(
   `[sydney] listening on ws://localhost:${server.port}  ` +
-    `(${TICK_HZ} Hz tick, ${SNAPSHOT_HZ} Hz snapshots, ${MAX_REWIND_MS} ms rewind, protocol ${PROTOCOL_VERSION})`,
+    `(${TICK_HZ} Hz tick, ${SNAPSHOT_HZ} Hz snapshots, ${MAX_REWIND_MS} ms rewind, protocol ${PROTOCOL_VERSION}, ` +
+    `spec 2's cap is ${MAX_PLAYERS} and a room here holds ${ROOM_CAP})`,
 );
-console.log(`[sydney] health: http://localhost:${server.port}/health`);
+console.log(`[sydney] health: http://localhost:${server.port}/health   rooms: http://localhost:${server.port}/rooms`);

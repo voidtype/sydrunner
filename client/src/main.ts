@@ -114,7 +114,7 @@ import {
   createHitReport,
 } from './game/combat.ts';
 import { BALL_RADIUS, FootyField, applyFootyHit, verifyFooty, type FootyEvent } from './game/footy.ts';
-import { NetClient, verifyNetClient, type RemotePlayer } from './net/client.ts';
+import { NetClient, chooseRoom, fetchRooms, verifyNetClient, type RemotePlayer } from './net/client.ts';
 import { ANIM, SNAPSHOT_INTERVAL, sanitiseName, suggestName, verifyNames, verifyNet } from './net/protocol.ts';
 import {
   FootyAssets,
@@ -2172,8 +2172,28 @@ async function main(): Promise<void> {
 
   if (netUrl !== null) {
     dev.boot = 'connecting';
-    hud.notice(`connecting to ${netUrl}…`);
-    const client = new NetClient(netUrl, netHandlers(), { name: playerName });
+    /*
+     * The gateway step. PERFORMANCE.md phase 3.
+     *
+     * One HTTP round trip before the socket: ask the host what rooms it has,
+     * pick the emptiest open one (or the one a friend's link named), and put it
+     * in the query. Every part of this degrades to the pre-phase-3 behaviour --
+     * a host with no `/rooms`, a proxy that only forwards `/ws`, a fetch that
+     * times out -- because `fetchRooms` answers with an empty list and
+     * `chooseRoom` then says "you decide", which is a bare connection and is
+     * exactly what a v7 client sent.
+     *
+     * It is awaited rather than raced with the socket because it is bounded at
+     * two seconds against a route that answers in one millisecond, and because
+     * connecting first would mean joining a room and then discovering there was
+     * a better one -- which is a reconnect, and a reconnect is a new id.
+     */
+    const asked = requestedRoom();
+    const rooms = await fetchRooms(httpBaseOf(netUrl));
+    const room = chooseRoom(rooms, asked);
+    const joinUrl = room === null ? netUrl : `${netUrl}${netUrl.includes('?') ? '&' : '?'}room=${room}`;
+    hud.notice(`connecting to ${netUrl}${room === null ? '' : ` (room ${room})`}…`);
+    const client = new NetClient(joinUrl, netHandlers(), { name: playerName });
     // Awaited, and this is the one place the boot blocks on the network.
     //
     // The alternative -- connect in the background and spawn the dummies now,
@@ -3039,6 +3059,20 @@ async function main(): Promise<void> {
       onLeave(id) {
         dropRemoteActor(id);
         pushKill(`${who(id)} left`);
+      },
+      /**
+       * Somebody walked out of interest. PERFORMANCE.md phase 2.
+       *
+       * The **same disposal** as `onLeave` and deliberately not a line in the
+       * feed: under interest management this fires every time anybody crosses
+       * 220 m, which in a 128-player room is constantly. Releasing the rig is
+       * the whole job, and it is the same call because the memory question is
+       * identical -- the actor, its footy and bat props, and its bike all go
+       * back, and `nameplates` drops the plate on its next `begin` because the
+       * remote is no longer in `net.remotes`.
+       */
+      onDrop(id) {
+        dropRemoteActor(id);
       },
       onStatus(status, detail) {
         if (status === 'online') hud.notice('');
@@ -5506,6 +5540,42 @@ function resolveServerUrl(): string | null {
   // on vite's 5173 and the server is on 8787 -- carrying the port over would
   // send every client to a WebSocket on the dev server.
   return `${scheme}//${location.hostname || 'localhost'}:8787`;
+}
+
+/**
+ * The HTTP origin behind a `ws://` or `wss://` URL, for `/rooms` and `/health`.
+ *
+ * A textual swap rather than a `new URL(...)` round trip, and the reason is the
+ * one case that matters: production is `wss://host/ws`, proxied by Caddy, and
+ * the gateway route is `https://host/rooms` -- **not** `https://host/ws/rooms`.
+ * So the path is dropped along with the scheme, which is what `URL.origin`
+ * would have given anyway, without the parse that throws on a malformed
+ * `?server=` a player typed.
+ *
+ * See DEPLOY.md: when a deployment fans out to several host processes, `/rooms`
+ * stays on the primary and the per-host sockets are `/ws/<n>`, so this
+ * deliberately points at the origin rather than at the socket's own path.
+ */
+function httpBaseOf(wsUrl: string): string {
+  const noScheme = wsUrl.replace(/^wss:\/\//, 'https://').replace(/^ws:\/\//, 'http://');
+  const slash = noScheme.indexOf('/', noScheme.indexOf('://') + 3);
+  return slash < 0 ? noScheme : noScheme.slice(0, slash);
+}
+
+/**
+ * The room this page was asked to join, or null.
+ *
+ *     ?room=3     join room 3 -- what an invite link is
+ *
+ * Null means "the gateway picks", which is what every ordinary visit is. A room
+ * that is full is still *asked for* rather than swapped out; see
+ * `net/client.chooseRoom` for why being told is better than being rehomed.
+ */
+function requestedRoom(): number | null {
+  const raw = new URLSearchParams(location.search).get('room');
+  if (raw === null) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
 void main();
