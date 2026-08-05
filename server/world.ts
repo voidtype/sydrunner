@@ -58,7 +58,13 @@ export interface TileEntry {
   key: string;
   /** `[minX, minZ, maxX, maxZ]`, north-positive. */
   bounds: [number, number, number, number];
-  /** Buildings in the tile. Used only to pick a spawn, as `main.ts` does. */
+  /**
+   * Buildings in the tile.
+   *
+   * Picks a spawn, as `main.ts` does -- and, since the walk-under rule, splits
+   * this tile's payload into structures and buildings for `CollisionWorld`. See
+   * the `addTile` call in `loadWorld`.
+   */
   b: number;
   /**
    * The water surface over this tile, world y, absent where there is none.
@@ -194,7 +200,23 @@ export async function loadWorld(root: string): Promise<ServerWorld> {
       if (prisms) {
         bytes.collision += prisms.byteLength;
         // The offset `main.ts` uses, verbatim. See the header.
-        collision.addTile(entry.key, prisms, entry.bounds[0], entry.bounds[1] + index.tile_size);
+        //
+        // **And the building count with it, which is now physics rather than a
+        // map feature.** It marks the deck, viaduct and bridge volumes written
+        // ahead of the buildings as `Prism.structural`, and `resolve` reads that
+        // flag to decide whether a prism's `base` is a soffit to walk under or a
+        // pad with a skirt drawn to the ground. A server that left it out would
+        // hold the Cahill solid at street level while every client walked under
+        // it -- the two authorities running different worlds, which is the one
+        // thing this file exists to prevent. Client side it is `main.ts`'s
+        // `entry.b` on the same index.
+        collision.addTile(
+          entry.key,
+          prisms,
+          entry.bounds[0],
+          entry.bounds[1] + index.tile_size,
+          entry.b,
+        );
       }
 
       const grid = await readOptional(join(root, 'tiles', `${entry.key}.terr.bin`));

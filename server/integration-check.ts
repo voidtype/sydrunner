@@ -164,6 +164,27 @@ import {
 import { verifyAoi } from './aoi.ts';
 import { Room, newConn, type Conn, type Socket } from './room.ts';
 import { roomWorld } from './world.ts';
+// The streaming lifecycle. See `checkStreamingLifecycle` at the foot of this
+// file, which is entirely self-contained and appended after every check that
+// was here before it: the client's failure taxonomy and the collision/geometry
+// parity rule, both of them pure arithmetic over the same `CollisionWorld` and
+// the same `index.json` this process already reads.
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { CollisionWorld } from '../client/src/player/collision.ts';
+import {
+  COLLISION_LOAD_RADIUS_M,
+  TileFetchError,
+  TileRetryLedger,
+  classifyTileFailure,
+  mayEvictCollision,
+  verifyTileLifecycle,
+} from '../client/src/world/tile-lifecycle.ts';
+// The walk-under rule. See `checkSoffits` at the foot of this file: the band
+// `CollisionWorld.resolve` now tests a body against, driven over the real
+// viaducts by the real controller.
+import { BODY_HEIGHT_M, verifyCollision, type Prism } from '../client/src/player/collision.ts';
+import { createPlayerState, step } from '../client/src/player/controller.ts';
 
 const PORT = Number(process.env.SYDNEY_CHECK_PORT ?? 8799);
 const SERVER_URL = `ws://127.0.0.1:${PORT}`;
@@ -1140,9 +1161,20 @@ async function main(): Promise<void> {
   // one of them is being written from the wrong side of the punch.
   const scored = board.reduce((sum, r) => sum + r.kos, 0);
   const downs = board.reduce((sum, r) => sum + r.downs, 0);
+  // **The two columns are not the same total, and the line above already said
+  // why.** `creditKo(id, id)` -- a police round, a car, a magpie -- records a
+  // down against the victim and a kill for nobody, so the board's downs are the
+  // player knockouts *plus* the environmental ones while its kills are the
+  // player knockouts alone. Asserting both against `koEvents.length` was an
+  // assertion that the city never knocks anybody over in the eight seconds the
+  // probes are brawling, which is not a property of the code and was observed
+  // failing as "the board's 1 KOs and 2 downs match the 1 KO events A saw" on a
+  // run where the note directly above it reported one environmental knockout.
+  // The identity that is actually claimed is this one.
   check(
-    scored === koEvents.length && downs === koEvents.length,
-    `the board's ${scored} KOs and ${downs} downs match the ${koEvents.length} KO events A saw`,
+    scored === koEvents.length && downs === koEvents.length + environmentKos,
+    `the board's ${scored} KOs and ${downs} downs match the ${koEvents.length} KO events A saw` +
+      (environmentKos > 0 ? ` plus ${environmentKos} from the city` : ''),
   );
   if (koEvents.length > 0) {
     const victor = koEvents[0].attacker;
@@ -1248,6 +1280,23 @@ async function main(): Promise<void> {
   // mutable thing two rooms must not share. See `checkRooms`.
   say('');
   await checkRooms();
+
+  // --- 20. The streaming lifecycle, which is a *client* defect asserted here
+  // because the arithmetic is shared: the failure taxonomy that decides whether
+  // a tile is ever asked for again, and the collision/geometry parity rule that
+  // decides whether a return trip is a guaranteed block of solid invisible
+  // city. Driven over the real extent, with the real payloads, twice -- once
+  // under the rule that shipped and once under the new one. See
+  // `checkStreamingLifecycle`.
+  say('');
+  await checkStreamingLifecycle();
+
+  // --- 21. The walk-under rule: `CollisionWorld.resolve` reading a prism's
+  // `base` as the soffit the pipeline wrote, driven by the real controller under
+  // the real Western Distributor, Harbour Bridge, Broadway viaduct and Cahill,
+  // against the same world in its old semantics. See `checkSoffits`.
+  say('');
+  await checkSoffits();
 
   say('');
   if (failures.length === 0) {
@@ -8734,5 +8783,670 @@ class RoomProbe {
 
   close(): void {
     this.socket?.close();
+  }
+}
+
+/**
+ * The streaming lifecycle: what happens to a tile that fails, and what happens
+ * to a tile the player walks away from and comes back to.
+ *
+ * Off the socket deliberately, on `checkWading`'s argument -- there is no wire
+ * in this and the server has no lifecycle problem at all: `loadWorld` reads all
+ * 372 collision payloads at boot and holds them for the process. This is a
+ * *client* defect, and it is here because the two rules it turns on are pure
+ * arithmetic over the same `CollisionWorld` and the same `index.json` both ends
+ * share, so the one place they can be held still without a browser is this one.
+ *
+ * Two defects, and both of them manufacture the same symptom -- collision the
+ * player is stopped by with nothing drawn there:
+ *
+ *   1. `TileStreamer.update` gated on a `failed` set that nothing ever emptied.
+ *      One aborted fetch and that tile's geometry was never requested again for
+ *      the session, while `main.ts` kept fetching its 9 kB collision payload on
+ *      a different radius, successfully, because a small request and a 1.6 MB
+ *      one do not fail together.
+ *   2. `CollisionWorld` never evicted anything and the streamer evicts geometry
+ *      past 1,800 m. So collision accumulated for the session and geometry did
+ *      not, and every return trip was *guaranteed* to find tiles with prisms and
+ *      no buildings. The tour below measures how many, on the real build, with
+ *      the old rule and the new one.
+ *
+ * The third case is the one that makes the fix safe rather than merely
+ * effective: over the whole tour, at every step, every tile inside the ring
+ * `ensureGround` fetches on must have its prisms resident. A fix that cleared
+ * the amber by dropping collision near the player would pass the first two
+ * cases and drop players through the world.
+ */
+async function checkStreamingLifecycle(): Promise<void> {
+  say('streaming lifecycle: the retry taxonomy, and collision/geometry parity over a tour');
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const index = JSON.parse(
+    await readFile(join(root, 'index.json'), 'utf8'),
+  ) as { tile_size: number; tiles: Array<{ key: string; b: number; bounds: [number, number, number, number] }> };
+
+  // --- 1. The arithmetic, exactly as the client runs it at boot.
+  {
+    const failures = verifyTileLifecycle();
+    check(
+      failures.length === 0,
+      `the tile lifecycle rules check out (${failures.length ? failures[0] : 'taxonomy, backoff, safety radius'})`,
+    );
+  }
+
+  // --- 2. A transient failure retries and then succeeds; a 404 does not.
+  //
+  // The distinction is the whole of defect 1 and it is invisible from either
+  // side: a tile quietly never asked for again looks exactly like a slow
+  // network, and a 404 asked for forever looks exactly like a healthy client.
+  {
+    const ledger = new TileRetryLedger();
+    const t0 = 1_700_000_000_000;
+    const flaky = index.tiles[0].key;
+
+    check(
+      classifyTileFailure(new TileFetchError(`tiles/${flaky}.glb`, 503)) === 'transient' &&
+        classifyTileFailure(new TileFetchError(`tiles/${flaky}.glb`, 404)) === 'permanent',
+      'a 503 is a fact about the moment and a 404 is a fact about the build',
+    );
+
+    ledger.noteTransient(flaky, t0, '503');
+    check(!ledger.ready(flaky, t0 + 1_000), `${flaky} is not re-fetched one second after a 503`);
+    check(ledger.ready(flaky, t0 + 5_000), `${flaky} is re-fetched five seconds after a 503`);
+    // ...and the retry lands, which is what the streamer's commit step does.
+    ledger.clear(flaky);
+    check(
+      ledger.retryingCount === 0 && ledger.ready(flaky, t0 + 5_001),
+      'a tile that loaded on the retry is forgotten entirely, attempt count and all',
+    );
+    // The reset is not cosmetic: without it the next hiccup, hours later, would
+    // wait 45 s rather than 5 s and the tile would be an invisible wall for
+    // nine times as long as it should be.
+    ledger.noteTransient(flaky, t0 + 3_600_000, '503');
+    check(
+      ledger.ready(flaky, t0 + 3_600_000 + 5_000),
+      'a later hiccup waits 5 s again rather than inheriting the old attempt count',
+    );
+
+    const absent = index.tiles[1].key;
+    const first = ledger.notePermanent(absent, '404');
+    const second = ledger.notePermanent(absent, '404');
+    check(first && !second, `${absent} is logged once as absent from the build, not once a frame`);
+    check(
+      !ledger.ready(absent, t0 + 86_400_000) && ledger.permanentCount === 1,
+      'a 404 tile stays suppressed for the session and is counted where somebody can see it',
+    );
+  }
+
+  // --- 3. The teleport tour: A -> B -> A across the real extent, with the real
+  //        payloads, under both rules.
+  //
+  // What is being compared is an *ordering*, so the network is abstracted to
+  // the one thing about it that decides the ordering: how many tiles can be in
+  // flight at once. A tick retires up to `SLOTS` geometry payloads, nearest
+  // first, which is `TileStreamer.update`'s own ranking; collision is a 9 kB
+  // file against a 1.6 MB one, so it lands a tick after it is asked for, ahead
+  // of any geometry requested at the same moment. Nothing here predicts a
+  // wall-clock. It predicts which of two rules leaves the player standing in
+  // solid air, and for how many ticks.
+  //
+  // A teleport rather than a walk, and that is the case that matters: walking
+  // back into a suburb requests its geometry at 1,800 m and its collision at
+  // 420 m, so the geometry has a kilometre of warning. A teleport asks for both
+  // at once -- and under the rule that shipped, the collision was never asked
+  // for at all, because it had been sitting in the grid since the last visit.
+  const RENDER_RADIUS_M = 1800;
+  const SLOTS = 4;
+  const HAZARD_EXTRA_SLOTS = 2;
+  /** `InvisibleWalls.SCAN_RADIUS_M`: the collision ring plus a tile. */
+  const SCAN_RADIUS_M = COLLISION_LOAD_RADIUS_M + 500;
+  const near = (b: readonly [number, number, number, number], x: number, z: number): number => {
+    const dx = Math.max(b[0] - x, 0, x - b[2]);
+    const dz = Math.max(b[1] - z, 0, z - b[3]);
+    return Math.hypot(dx, dz);
+  };
+
+  // A real route: the busiest tile in the build out to the furthest one and
+  // back. Busiest because the wall count is what the defect is measured in, and
+  // furthest because the return has to cross the render radius to evict
+  // anything at all.
+  const busiest = index.tiles.reduce((a, t) => (t.b > a.b ? t : a), index.tiles[0]);
+  const home = {
+    x: (busiest.bounds[0] + busiest.bounds[2]) / 2,
+    z: (busiest.bounds[1] + busiest.bounds[3]) / 2,
+  };
+  const away = index.tiles.reduce(
+    (best, t) => {
+      const c = { x: (t.bounds[0] + t.bounds[2]) / 2, z: (t.bounds[1] + t.bounds[3]) / 2 };
+      const d = Math.hypot(c.x - home.x, c.z - home.z);
+      return d > best.d ? { ...c, d } : best;
+    },
+    { x: home.x, z: home.z, d: 0 },
+  );
+  check(
+    away.d > 2 * RENDER_RADIUS_M,
+    `the tour teleports ${(away.d / 1000).toFixed(1)} km out and back, which is past the ${RENDER_RADIUS_M} m ` +
+      'render radius and therefore past every geometry eviction there is',
+  );
+
+  const payloads = new Map<string, ArrayBuffer>();
+  for (const entry of index.tiles) {
+    const bytes = await readFile(join(root, 'collision', `${entry.key}.bin`)).catch(() => null);
+    if (bytes) {
+      payloads.set(
+        entry.key,
+        bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+      );
+    }
+  }
+  check(payloads.size > 0, `${payloads.size} collision payloads read off the disk for the tour`);
+
+  interface TourResult {
+    /** Walls standing in solid air on the tick the player arrives home. */
+    wallsOnArrival: number;
+    /** And how many tiles that is. */
+    tilesOnArrival: number;
+    /** Ticks from the arrival until the hazard overlay is clear again. */
+    ticksToClear: number;
+    /** Steps at which a tile inside the collision ring had no prisms. */
+    safetyBreaches: number;
+    /** Tiles whose prisms were dropped over the whole tour. */
+    evicted: number;
+  }
+
+  /**
+   * @param parity the fix: collision evicted with geometry outside the keep
+   *   radius, and a tile whose prisms are resident fetched and built ahead of
+   *   the queue because it is a wall right now rather than a hole.
+   */
+  const runTour = (parity: boolean): TourResult => {
+    const collision = new CollisionWorld();
+    /** Tiles whose collision request lands at the end of this tick. */
+    let collisionInFlight: string[] = [];
+    const built = new Set<string>();
+    const queue: string[] = [];
+    let evicted = 0;
+    let safetyBreaches = 0;
+
+    const hazard = (key: string): boolean => parity && collision.hasTile(key) && !built.has(key);
+
+    /** Walls the overlay would draw right now. `InvisibleWalls.scan`, verbatim. */
+    const amber = (x: number, z: number): { tiles: number; walls: number } => {
+      let tiles = 0;
+      let walls = 0;
+      for (const entry of index.tiles) {
+        if (entry.b <= 0) continue;
+        if (near(entry.bounds, x, z) > SCAN_RADIUS_M) continue;
+        if (!collision.hasTile(entry.key)) continue;
+        if (built.has(entry.key)) continue;
+        tiles++;
+        walls += entry.b;
+      }
+      return { tiles, walls };
+    };
+
+    const tick = (x: number, z: number): void => {
+      // 1. Collision requested last tick lands. 9 kB against 1.6 MB.
+      for (const key of collisionInFlight) {
+        const entry = index.tiles.find((t) => t.key === key)!;
+        const payload = payloads.get(key);
+        if (payload && !collision.hasTile(key)) {
+          collision.addTile(key, payload.slice(0), entry.bounds[0], entry.bounds[1] + index.tile_size, entry.b);
+        }
+      }
+      collisionInFlight = [];
+
+      // 2. Geometry eviction, and -- the fix -- the prisms with it.
+      for (const entry of index.tiles) {
+        const d = near(entry.bounds, x, z);
+        if (d <= RENDER_RADIUS_M) continue;
+        const at = queue.indexOf(entry.key);
+        if (at >= 0) queue.splice(at, 1);
+        if (!built.delete(entry.key) && at < 0) continue;
+        if (parity && mayEvictCollision(d) && collision.hasTile(entry.key)) {
+          collision.removeTile(entry.key);
+          evicted++;
+        }
+      }
+
+      // 3. `main.ts`'s `ensureGround`: collision for the 420 m ring.
+      for (const entry of index.tiles) {
+        if (near(entry.bounds, x, z) > COLLISION_LOAD_RADIUS_M) continue;
+        if (!collision.hasTile(entry.key) && payloads.has(entry.key)) collisionInFlight.push(entry.key);
+      }
+
+      // 4. `TileStreamer.update`: queue everything in the render radius,
+      //    nearest first -- and a tile that is a wall right now at the head of
+      //    it rather than behind whatever arrived earlier.
+      const wanted = index.tiles
+        .map((entry) => ({ entry, d: near(entry.bounds, x, z) }))
+        .filter((w) => w.d <= RENDER_RADIUS_M && !built.has(w.entry.key) && !queue.includes(w.entry.key))
+        .sort((a, b) => a.d - b.d);
+      for (const { entry } of wanted) {
+        if (hazard(entry.key)) queue.unshift(entry.key);
+        else queue.push(entry.key);
+      }
+
+      // 5. The tick's fetches retire. The hazard set gets slots nobody else
+      //    can have -- bounded, because it is only ever the 420 m ring.
+      let ordinary = SLOTS;
+      let extra = parity ? HAZARD_EXTRA_SLOTS : 0;
+      while (queue.length > 0) {
+        const key = queue[0];
+        if (hazard(key) && extra > 0) extra--;
+        else if (ordinary > 0) ordinary--;
+        else break;
+        queue.shift();
+        built.add(key);
+      }
+
+      // 6. The safety invariant. Every tile inside the ring the player's own
+      //    collision is fetched on has its prisms, or it is in flight this
+      //    tick -- which is the state a first visit is in and is not a
+      //    regression, so it is only counted once the request has had a tick.
+      for (const entry of index.tiles) {
+        if (near(entry.bounds, x, z) > COLLISION_LOAD_RADIUS_M) continue;
+        if (!payloads.has(entry.key)) continue;
+        if (!collision.hasTile(entry.key) && !collisionInFlight.includes(entry.key)) safetyBreaches++;
+      }
+    };
+
+    // Settle at home, teleport away, settle, teleport back. Sixty ticks is
+    // long enough for either rule to retire a 1,800 m radius at four a tick.
+    const SETTLE = 60;
+    for (let i = 0; i < SETTLE; i++) tick(home.x, home.z);
+    for (let i = 0; i < SETTLE; i++) tick(away.x, away.z);
+
+    // The arrival. Measured *after* the tick, which is the first frame the
+    // player can see anything: collision that was already resident is already
+    // stopping them, and geometry that was evicted is four tiles into a queue.
+    tick(home.x, home.z);
+    const arrival = amber(home.x, home.z);
+    let ticksToClear = 0;
+    while (ticksToClear < SETTLE && amber(home.x, home.z).tiles > 0) {
+      tick(home.x, home.z);
+      ticksToClear++;
+    }
+
+    return {
+      wallsOnArrival: arrival.walls,
+      tilesOnArrival: arrival.tiles,
+      ticksToClear,
+      safetyBreaches,
+      evicted,
+    };
+  };
+
+  const before = runTour(false);
+  const after = runTour(true);
+
+  check(
+    before.evicted === 0 && after.evicted > 0,
+    `the old rule evicted 0 tiles' prisms over the tour and the new one evicted ${after.evicted}`,
+  );
+  check(
+    before.safetyBreaches === 0 && after.safetyBreaches === 0,
+    `neither rule ever left a tile inside the ${COLLISION_LOAD_RADIUS_M} m collision ring without its prisms ` +
+      `(${before.safetyBreaches} / ${after.safetyBreaches} breaches over the whole tour)`,
+  );
+  check(
+    before.wallsOnArrival > 0,
+    `the rule that shipped puts ${before.wallsOnArrival} walls across ${before.tilesOnArrival} tiles ` +
+      'into solid air on the tick the player arrives home -- the defect, reproduced',
+  );
+  check(
+    after.wallsOnArrival < before.wallsOnArrival,
+    `the parity rule arrives with ${after.wallsOnArrival} walls across ${after.tilesOnArrival} tiles ` +
+      `instead of ${before.wallsOnArrival} across ${before.tilesOnArrival}`,
+  );
+  check(
+    after.ticksToClear <= before.ticksToClear,
+    `and clears in ${after.ticksToClear} ticks against ${before.ticksToClear}`,
+  );
+
+
+  // --- 4. And the eviction really is an eviction: the prisms are gone from the
+  // grid, not merely unlisted. A `hasTile` that answered false over a grid that
+  // still held the polygons would pass every test above and stop the player
+  // exactly as before.
+  {
+    const entry = index.tiles.find((t) => t.b > 0 && payloads.has(t.key));
+    check(entry !== undefined, 'the grid-emptying case has a real tile with buildings in it to use');
+    if (entry) {
+      const world = new CollisionWorld();
+      const payload = payloads.get(entry.key)!;
+      const added = world.addTile(entry.key, payload.slice(0), entry.bounds[0], entry.bounds[1] + index.tile_size, entry.b);
+      const cx = (entry.bounds[0] + entry.bounds[2]) / 2;
+      const cz = (entry.bounds[1] + entry.bounds[3]) / 2;
+      const held = world.prismsWithin(cx, cz, 400).length;
+      const removed = world.removeTile(entry.key);
+      check(
+        removed === added && world.buildingCount === 0 && !world.hasTile(entry.key),
+        `${entry.key}: all ${added} prisms went out with the tile`,
+      );
+      check(
+        held > 0 && world.prismsWithin(cx, cz, 400).length === 0,
+        `and the grid is empty where ${held} prisms stood, so nothing is left to stop the player`,
+      );
+      // Re-adding is a fresh decode rather than a resurrection, which is what a
+      // revisit actually does.
+      const again = world.addTile(entry.key, payload.slice(0), entry.bounds[0], entry.bounds[1] + index.tile_size, entry.b);
+      check(
+        again === added && world.prismsWithin(cx, cz, 400).length === held,
+        'a tile that comes back is the same tile, decoded again from its own payload',
+      );
+      check(world.removeTile('never_loaded') === 0, 'removing a tile that was never added does nothing');
+    }
+  }
+}
+
+/**
+ * The walk-under rule, over the four viaducts the player actually meets.
+ *
+ * Appended last and self-contained. What it asserts is one sentence --
+ * `CollisionWorld.resolve` reads a prism's `base` as a soffit where the pipeline
+ * wrote one -- and the reason it needs a world file to assert it is that the
+ * sentence is only interesting where the soffits are real: the Western
+ * Distributor over Pyrmont, the Bradfield approach under the Harbour Bridge, the
+ * Cahill over Alfred Street, and the Broadway viaduct a player reported as an
+ * invisible wall heading into the city.
+ *
+ * Every course here was found by measurement rather than by guess -- the longest
+ * straight line whose every 2 m sample is over dry land, under a structural
+ * prism with at least `cli.WALKABLE_UNDER_M` of clearance, and clear of any
+ * prism a body overlaps -- and each is walked by `player/controller.ts` itself
+ * at the fixed step, not by a bespoke integrator. The comparison is against the
+ * *old* rule rather than against a number: the same collision payloads, added
+ * without their building count, mark every prism a building, and a building is
+ * `feetY >= top - 0.05` and nothing else, which is the test this file shipped
+ * with. So "before" is not a memory, it is a second world in the same process.
+ */
+async function checkSoffits(): Promise<void> {
+  say('soffits: walking under the city, against the world files');
+
+  // --- 1. The rule itself, on two module instances.
+  //
+  // Two, because `collision.ts` is run by the client, by the server and by
+  // rewind, and a rule that lived in module state would pass on the instance
+  // that happened to be warm. Same argument as `checkPolice`.
+  const here = new URL('../client/src/player/collision.ts', import.meta.url).pathname;
+  const one = (await import(here)) as typeof import('../client/src/player/collision.ts');
+  const two = (await import(`${here}?instance=2`)) as typeof import('../client/src/player/collision.ts');
+  check(one.CollisionWorld !== two.CollisionWorld, 'the two collision module instances really are separate');
+  for (const [label, mod] of [['instance 1', one], ['instance 2', two]] as const) {
+    const f = mod.verifyCollision();
+    check(f.length === 0, `verifyCollision passes on ${label}` + (f.length ? ` -- ${f[0]}` : ''));
+  }
+  check(verifyCollision().length === 0, 'and on the instance this file imported directly');
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const world = await loadWorld(root);
+
+  /**
+   * The same collision payloads in a fresh world, with or without the building
+   * count that marks a tile's structures. Without it every prism is a building
+   * and the answers are the ones this file gave before the walk-under rule.
+   */
+  const collisionFrom = async (
+    Ctor: typeof CollisionWorld,
+    counts: boolean,
+  ): Promise<CollisionWorld> => {
+    const w = new Ctor();
+    for (const entry of world.index.tiles) {
+      let payload: ArrayBuffer;
+      try {
+        const buf = await readFile(join(root, 'collision', `${entry.key}.bin`));
+        payload = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+      } catch {
+        continue;
+      }
+      w.addTile(
+        entry.key,
+        payload,
+        entry.bounds[0],
+        entry.bounds[1] + world.index.tile_size,
+        counts ? entry.b : undefined,
+      );
+    }
+    return w;
+  };
+
+  const before = await collisionFrom(one.CollisionWorld, false);
+  const after = world.collision;
+
+  /**
+   * Walk a body from A to B with the real controller and the server's own
+   * ground, and report how far along the line it ever got.
+   *
+   * `groundHeightAt` is `world.groundFor`'s, rebuilt here only because that one
+   * closes over a `lastGround` per combatant and this wants a fresh one per
+   * walk. The trajectory is recorded whole, because the byte-identity check
+   * below compares paths rather than endpoints -- two runs can arrive at the
+   * same doorway by different routes.
+   */
+  const walkUnder = (
+    collision: CollisionWorld,
+    ax: number,
+    az: number,
+    bx: number,
+    bz: number,
+  ): { travelled: number; want: number; x: number; z: number; feet: number; path: number[] } => {
+    const want = Math.hypot(bx - ax, bz - az);
+    const ux = (bx - ax) / want;
+    const uz = (bz - az) / want;
+    // `controller.step`'s basis: forward is (-sin yaw, -cos yaw).
+    const yaw = Math.atan2(-ux, -uz);
+    let lastGround = 0;
+    const groundAt = (x: number, z: number, feetY: number): number => {
+      const sampled = world.terrain.height(x, z);
+      if (Number.isFinite(sampled)) lastGround = sampled;
+      return Math.max(lastGround, collision.roofHeight(x, z, feetY));
+    };
+    const state = createPlayerState(ax, az);
+    state.position.y = groundAt(ax, az, -Infinity) + EYE_HEIGHT;
+    const input = { forward: 1, right: 0, jump: false, sprint: false, yaw, pitch: 0 };
+    const path: number[] = [];
+    let travelled = 0;
+    for (let tick = 0; tick < 60 * 60; tick++) {
+      step(state, input, 1 / 60, collision, groundAt);
+      path.push(state.position.x, state.position.y, state.position.z);
+      const along = (state.position.x - ax) * ux + (state.position.z - az) * uz;
+      if (along > travelled) travelled = along;
+      if (travelled >= want) break;
+    }
+    return {
+      travelled,
+      want,
+      x: state.position.x,
+      z: state.position.z,
+      feet: state.position.y - EYE_HEIGHT,
+      path,
+    };
+  };
+
+  /** [name, from x, from z, to x, to z]. Measured; see the header. */
+  const COURSES: ReadonlyArray<readonly [string, number, number, number, number]> = [
+    ['the Western Distributor at Pyrmont', -1560, 275, -1440, 385],
+    ['the Harbour Bridge south approach', -38, -1642, 16, -1600],
+    ['the Broadway viaduct at Haymarket', -790, 607, -670, 551],
+    ['the Cahill at Circular Quay', 0, -841, 26, -837],
+  ];
+
+  say('');
+  for (const [name, ax, az, bx, bz] of COURSES) {
+    const was = walkUnder(before, ax, az, bx, bz);
+    const now = walkUnder(after, ax, az, bx, bz);
+    check(
+      now.travelled >= now.want - 0.5,
+      `a player walks the full ${now.want.toFixed(0)} m under ${name} ` +
+        `(${now.travelled.toFixed(1)} m, ending at ${now.x.toFixed(1)}, ${now.z.toFixed(1)}, ` +
+        `feet ${now.feet.toFixed(1)})`,
+    );
+    // The other half of the same assertion: this course was genuinely impassable
+    // before, so the check above cannot pass by accident on an open street.
+    check(
+      was.travelled < now.want * 0.5,
+      `  and could not before -- the old rule stopped them after ${was.travelled.toFixed(1)} m ` +
+        `at (${was.x.toFixed(1)}, ${was.z.toFixed(1)})`,
+    );
+  }
+
+  // --- 2. What still stops you. A deck is not a hole in the world: its piers
+  //        stand in the street, and the touchdown ramps `decks.py` runs from the
+  //        ground up are solid embankments by construction.
+  say('');
+  {
+    let solid = 0;
+    let air = 0;
+    for (const prism of after.prismsWithin(-1500, 325, 200)) {
+      if (!prism.structural) continue;
+      const x = (prism.minX + prism.maxX) * 0.5;
+      const z = (prism.minZ + prism.maxZ) * 0.5;
+      const g = world.terrain.height(x, z);
+      if (!Number.isFinite(g)) continue;
+      if (after.resolve(x, z, x, z, PLAYER_RADIUS, g + 0.42, g + BODY_HEIGHT_M).hit) solid++;
+      else air++;
+    }
+    check(
+      solid > 0 && air > 0,
+      `of the structural prisms over Pyrmont, ${solid} are still solid at street level ` +
+        `(piers, parapets, touchdown ramps) and ${air} are now air`,
+    );
+  }
+
+  // --- 3. Standing on the deck, which is the failure a walk-under rule invites:
+  //        a soffit that stops being a floor for the people on top of it.
+  {
+    // A deck with *walkable street under it*, which is a stricter thing than a
+    // high base: the Pyrmont stack puts parapets on decks on embankments, so the
+    // first prism whose base is 4 m up can easily be a parapet standing over a
+    // touchdown ramp that is solid to the ground. The extra clause is the same
+    // null-move probe the courses use -- if a body can stand at street level
+    // there, the volume over it is genuinely a soffit and not a lid.
+    let deck: Prism | null = null;
+    for (const prism of after.prismsWithin(-1500, 325, 150)) {
+      const x = (prism.minX + prism.maxX) * 0.5;
+      const z = (prism.minZ + prism.maxZ) * 0.5;
+      const g = world.terrain.height(x, z);
+      if (!prism.structural || !Number.isFinite(g) || prism.base - g <= 4) continue;
+      if (after.resolve(x, z, x, z, PLAYER_RADIUS, g + 0.42, g + BODY_HEIGHT_M).hit) continue;
+      deck = prism;
+      break;
+    }
+    if (deck === null) {
+      check(false, 'no elevated deck prism over Pyrmont to stand on -- the world files changed');
+    } else {
+      const x = (deck.minX + deck.maxX) * 0.5;
+      const z = (deck.minZ + deck.maxZ) * 0.5;
+      check(
+        after.roofHeight(x, z, deck.top) === deck.top,
+        `a player on the deck at (${x.toFixed(0)}, ${z.toFixed(0)}) stands on it ` +
+          `(roofHeight ${after.roofHeight(x, z, deck.top).toFixed(2)} at its top ${deck.top.toFixed(2)})`,
+      );
+      // Against the *soffit* rather than against `-Infinity`: what must never
+      // happen is a body at street level being handed the deck, or anything
+      // else above the soffit, as its floor. Being handed something below the
+      // soffit is not that -- a kerb, a plinth, the top of a solid touchdown
+      // ramp beside it -- and `resolve` holds every one of those solid, which
+      // is the pairing `roofHeight`'s own header describes.
+      const underfoot = after.roofHeight(x, z, world.terrain.height(x, z));
+      check(
+        underfoot < deck.base,
+        `and a player on the street under it is not teleported up onto it ` +
+          `(ground under them ${underfoot === -Infinity ? 'the terrain' : underfoot.toFixed(2)}, ` +
+          `soffit ${deck.base.toFixed(2)})`,
+      );
+      check(
+        !after.resolve(x, z, x + 0.5, z, PLAYER_RADIUS, deck.top + 0.42, deck.top + BODY_HEIGHT_M).hit,
+        'and can walk along it -- the deck top is not solid to whoever is on it',
+      );
+    }
+  }
+
+  // --- 4. Jumping under a soffit does not throw you sideways.
+  //
+  // A body already under a deck whose head enters the girder is left where it
+  // is; pushing it out in plan would send it to the nearest edge of the
+  // footprint, which under a 12 m viaduct is a six-metre teleport mid-jump. Run
+  // over a jump's whole arc, apex included.
+  {
+    const [ax, az] = [-1500, 325];
+    const g = world.terrain.height(ax, az);
+    let worst = 0;
+    for (let rise = 0; rise <= 1.2; rise += 0.05) {
+      const feet = g + rise;
+      const r = after.resolve(ax, az, ax, az + 0.07, PLAYER_RADIUS, feet + 0.42, feet + BODY_HEIGHT_M);
+      worst = Math.max(worst, Math.hypot(r.x - ax, r.z - (az + 0.07)));
+    }
+    check(
+      worst < 0.05,
+      `a jump under the Western Distributor displaces the body by ${worst.toFixed(3)} m at most`,
+    );
+  }
+
+  // --- 5. The widening property, over the real city rather than a synthetic one.
+  //
+  // `verifyCollision` runs this over randomised configurations; this runs it
+  // over the actual prisms, which is the population that matters -- 61,068
+  // buildings whose pads are not soffits among 6,814 structures whose bases are.
+  // Nothing that was reachable may stop being reachable.
+  {
+    let seed = 0x51d;
+    const rnd = (): number => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    let newlyBlocked = 0;
+    let newlyFree = 0;
+    let moves = 0;
+    for (const [, cx, cz] of COURSES) {
+      for (let i = 0; i < 4000; i++) {
+        const x = cx + (rnd() - 0.5) * 400;
+        const z = cz + (rnd() - 0.5) * 400;
+        const g = world.terrain.height(x, z);
+        if (!Number.isFinite(g)) continue;
+        const tx = x + (rnd() - 0.5) * 3;
+        const tz = z + (rnd() - 0.5) * 3;
+        const feet = g + rnd() * 6;
+        const a = before.resolve(x, z, tx, tz, PLAYER_RADIUS, feet + 0.42, feet + BODY_HEIGHT_M);
+        const b = after.resolve(x, z, tx, tz, PLAYER_RADIUS, feet + 0.42, feet + BODY_HEIGHT_M);
+        moves++;
+        const reachedBefore = Math.hypot(a.x - tx, a.z - tz) < 1e-9;
+        const reachedAfter = Math.hypot(b.x - tx, b.z - tz) < 1e-9;
+        if (reachedBefore && !reachedAfter) newlyBlocked++;
+        if (!reachedBefore && reachedAfter) newlyFree++;
+      }
+    }
+    check(
+      newlyBlocked === 0 && newlyFree > 0,
+      `over ${moves.toLocaleString()} moves through the real city the rule is a strict widening: ` +
+        `${newlyBlocked} newly blocked, ${newlyFree} newly passable`,
+    );
+  }
+
+  // --- 6. Both authorities, byte for byte.
+  //
+  // The client predicts with this file, the server simulates with it and rewind
+  // replays with it, so the trajectories have to be identical rather than close:
+  // a metre of drift under a bridge is a player rubber-banded into a pier. Two
+  // module instances, two worlds decoded from the same bytes, one course.
+  {
+    const second = await collisionFrom(two.CollisionWorld as unknown as typeof CollisionWorld, true);
+    const [, ax, az, bx, bz] = COURSES[0];
+    const a = walkUnder(after, ax, az, bx, bz);
+    const b = walkUnder(second, ax, az, bx, bz);
+    let drift = -1;
+    if (a.path.length === b.path.length) {
+      drift = 0;
+      for (let i = 0; i < a.path.length; i++) {
+        if (!Object.is(a.path[i], b.path[i])) drift = i + 1;
+        if (drift > 0) break;
+      }
+    }
+    check(
+      a.path.length === b.path.length && drift === 0,
+      `two module instances walked the ${(a.path.length / 3).toFixed(0)}-tick Pyrmont course to ` +
+        `the same bits (${a.path.length === b.path.length ? `first divergence: none` : 'different lengths'})`,
+    );
   }
 }

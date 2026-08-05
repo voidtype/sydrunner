@@ -29,7 +29,37 @@ export interface HudState {
      * machine -- see `BUILD_BUDGET_MS` in `world/streamer.ts`.
      */
     building: number;
+    /**
+     * Tiles whose last load failed transiently and which are waiting on a
+     * backoff. **Not a death sentence** -- see `TileStreamer.tilePhase`. This
+     * used to be a set nothing ever emptied, and a non-zero here meant that
+     * much of the city was solid and invisible for the rest of the session.
+     */
     failed: number;
+    /** Seconds to the soonest of those retries; `Infinity` when none is due. */
+    nextRetryS: number;
+    /**
+     * Tiles the build does not contain: a 404 or 410, suppressed for the
+     * session. A **build defect** rather than a streaming state, which is why
+     * it is a number of its own -- one of these with collision resident is an
+     * invisible wall that will never draw itself.
+     */
+    missing: number;
+    /**
+     * Tiles whose prisms went out with their geometry, this session.
+     *
+     * The counter for the second half of the invisible-wall fix. It should
+     * climb steadily as the player crosses the city and leaves tiles behind;
+     * one that stays at zero over a long walk means collision is accumulating
+     * for the session again and every return trip is a guaranteed block of
+     * solid, invisible city. See `TileStreamer.setCollisionSink`.
+     */
+    collisionEvicted: number;
+    /**
+     * Evictions that had to keep the prisms because the tile was inside the
+     * safety radius. Should read zero forever; see `parityHolds`.
+     */
+    collisionHeld: number;
     triangles: number;
     buildings: number;
     trees: number;
@@ -142,9 +172,14 @@ export interface HudState {
    * many tiles are currently solid-and-undrawn, which is the streaming gap's own
    * size and should be a small number that keeps returning to zero; a number
    * that sits still while the player stands still is a tile that will never
-   * build. `structures` is the permanent class -- deck and viaduct volumes whose
-   * soffit is over your head and which `CollisionWorld.resolve` nonetheless
-   * treats as solid to the ground -- and that one does not go away.
+   * build. `structures` used to be a second, permanent class -- deck and viaduct
+   * volumes whose soffit is over your head and which `CollisionWorld.resolve`
+   * treated as solid to the ground -- and it is not a defect any more:
+   * `resolve` tests a body's band against `[base, top)`, so those volumes are
+   * walked under. The field stays as the *count of them the maps have measured*,
+   * which is the tripwire for the way that regresses: a zero here while the
+   * player stands under a viaduct means nothing is being marked
+   * `Prism.structural`, and every deck in the city is solid to the ground again.
    */
   phantom?: { tiles: number; walls: number; structures: number; worst: string };
   /**
@@ -987,7 +1022,23 @@ export class Hud {
         // the construction budget retires tiles faster than they can be
         // fetched, so a persistent number here is the symptom to report.
         (s.streamer.building ? `, ${s.streamer.building} building` : '') +
-        (s.streamer.failed ? `, ${s.streamer.failed} failed` : ''),
+        // "failed" with a countdown, because that is now what it means: a
+        // transient failure on a backoff, not a tile written off for the
+        // session. The seconds are the whole point of printing it -- a reader
+        // who can see the next attempt coming knows to wait rather than reload.
+        (s.streamer.failed
+          ? `, ${s.streamer.failed} retrying` +
+            (Number.isFinite(s.streamer.nextRetryS) ? ` (next in ${Math.ceil(s.streamer.nextRetryS)}s)` : '')
+          : '') +
+        // And the ones that will never arrive, which is a different sentence
+        // and a different audience: the player can do nothing about a tile the
+        // pipeline did not emit, and whoever runs the pipeline can.
+        (s.streamer.missing ? `, ${s.streamer.missing} not in build` : '') +
+        // The collision lifetime, reported beside the geometry's because the
+        // entire class of invisible wall this fixes is the two disagreeing.
+        // `held` should never appear at all -- see `HudStats.collisionHeld`.
+        (s.streamer.collisionEvicted ? `, ${s.streamer.collisionEvicted} collision evicted` : '') +
+        (s.streamer.collisionHeld ? `, ${s.streamer.collisionHeld} HELD` : ''),
       `      LOD ${s.streamer.bands.join('/')}  (0-80m / 400m / 2km / far)`,
       `drawn ${(s.streamer.triangles / 1000).toFixed(0)}k tris, ${s.streamer.buildings.toLocaleString()} buildings` +
         `, ${s.farSlabs.toLocaleString()} far slabs` +

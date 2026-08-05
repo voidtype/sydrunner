@@ -20,18 +20,25 @@
  * exactly that way and excludes them from "solid standing in the road" on
  * precisely that ground.
  *
- * `CollisionWorld.resolve` does not. Its only height test is
- * `feetY >= prism.top - 0.05`; it never looks at `base`. So every one of those
- * volumes is solid from the ground up, and a player walking under the Cahill
- * Expressway or the Western Distributor is stopped by a deck twenty metres over
+ * `CollisionWorld.resolve` did not. Its only height test was
+ * `feetY >= prism.top - 0.05`; it never looked at `base`. So every one of those
+ * volumes was solid from the ground up, and a player walking under the Cahill
+ * Expressway or the Western Distributor was stopped by a deck twenty metres over
  * their head. Measured over the shipped build: **4,522 structural prisms, 178,279
  * m2 of plan**, concentrated on the Circular Quay viaduct, the Pyrmont deck
  * stack, the Bradfield approach and the Anzac Bridge.
  *
- * This module does not fix that -- `resolve` is shared with the authoritative
- * server and its semantics are not a map feature's to change. It *shows* it, in
- * an ink of its own, so a player can tell a wall that will appear in a moment
- * from a wall that never will.
+ * **That is fixed, in the file it was always going to have to be fixed in.**
+ * `resolve` now tests a body's own vertical extent against the prism's
+ * `[base, top)` and a player walks under every soffit that clears their head, on
+ * both authorities. This module marked that class in a magenta of its own for as
+ * long as it was true, and stopped: a wash over the Western Distributor telling
+ * a player to go round a street they can walk down is the same kind of lie the
+ * overlay exists to catch, pointed the other way. What survives here is the
+ * *classification* -- the positional split below, and the count of structures
+ * the maps have measured, which is the tripwire for `Prism.structural` silently
+ * going dark and taking the walk-under rule with it. The permanent-hazard ink is
+ * retired; the streaming one below is the whole of the overlay now.
  *
  * ---------------------------------------------------------------------------
  * Why the two classes are told apart positionally rather than geometrically.
@@ -81,25 +88,51 @@ import { CollisionWorld, type Prism } from '../player/collision.ts';
  *
  *   - `unbuilt`: the tile's collision is resident and its geometry is not. It is
  *     solid, it is invisible, and it will draw itself in a moment. *Wait.*
- *   - `structure`: a deck, viaduct or landmark volume whose underside is over
- *     your head. It is solid, it is invisible, and it will never draw itself,
- *     because what is drawn is twenty metres up. *Go round.*
+ *   - `structure`: **retired, and nothing produces it.** It was a deck, viaduct
+ *     or landmark volume whose underside is over your head and which `resolve`
+ *     held solid to the ground anyway -- *go round*. `resolve` tests the band
+ *     now and the answer is *walk under*, so the class has no members. See
+ *     `prismHazard`.
+ *
+ * The retired member is left in the union rather than deleted with its ink and
+ * its hatch, because that deletion reaches into both maps' legends and counters
+ * and is a tidy-up rather than a physics change. Nothing reads it; the two maps
+ * count zero of it.
  */
 export type HazardKind = 'unbuilt' | 'structure';
 
 /**
  * A tile whose collision is resident and whose geometry is not.
  *
- * `phase` is carried because the three that are not `built` are three different
- * stories: `loading` and `building` clear on their own, and `failed` does not --
- * `TileStreamer.update` never retries a tile that threw, so its collision is an
- * invisible wall for the rest of the session.
+ * `phase` is carried because the ones that are not `built` are different
+ * stories with different endings:
+ *
+ *   - `loading`, `building`: clears on its own, in a second or two.
+ *   - `failed`: the last attempt threw, and the next one is scheduled. **This
+ *     used to mean "gone for the session"** -- `TileStreamer.update` gated on a
+ *     set nothing ever emptied -- and it now means "retrying, next attempt in
+ *     `retryInS`". The word is unchanged on purpose: the state got better
+ *     rather than different, and every reader of it was already saying "wait".
+ *   - `missing`: the build does not contain this tile (404/410). Nothing will
+ *     fix it in this session. A tile in this state whose collision is resident
+ *     is a **permanent** invisible wall and a defect in the build, which is why
+ *     it is worth a word of its own rather than being folded into `failed`.
+ *   - `absent`: not requested yet -- out of the render radius, or waiting on a
+ *     concurrency slot.
  */
 export interface HazardTile {
   key: string;
   /** `[minX, minZ, maxX, maxZ]`, world metres -- the index's own frame. */
   bounds: readonly [number, number, number, number];
-  phase: 'building' | 'loading' | 'failed' | 'absent';
+  phase: 'building' | 'loading' | 'failed' | 'missing' | 'absent';
+  /**
+   * Seconds until the next attempt, for a `failed` tile; 0 for everything else.
+   *
+   * What turns the amber from a verdict into a wait. A hazard that says
+   * "failed" and nothing more is the old, hopeless message; one that says
+   * "retrying in 12 s" tells the player to stand still for twelve seconds.
+   */
+  retryInS: number;
   /** Buildings the index says are in it, which is how many walls this is. */
   buildings: number;
 }
@@ -114,9 +147,17 @@ export interface TileIndexView {
   }>;
 }
 
-/** The slice of `TileStreamer` this needs. See `TileStreamer.tilePhase`. */
+/**
+ * The slice of `TileStreamer` this needs. See `TileStreamer.tilePhase`.
+ *
+ * `retryInSeconds` is optional so a caller that is only a residency table -- a
+ * check's synthetic streamer, say -- does not have to grow a clock to answer
+ * it. Absent reads as zero, which is the honest answer for every phase but
+ * `failed`.
+ */
 export interface GeometryResidency {
-  tilePhase(key: string): 'built' | 'building' | 'loading' | 'failed' | 'absent';
+  tilePhase(key: string): 'built' | 'building' | 'loading' | 'failed' | 'missing' | 'absent';
+  retryInSeconds?(key: string): number;
 }
 
 /** The slice of `CollisionWorld` this needs. */
@@ -233,6 +274,15 @@ export class InvisibleWalls {
   private clock = REFRESH_DT;
   private buildingsAtRisk = 0;
   private structuresSeen = 0;
+  /**
+   * Hazard tiles the build does not contain, from the last scan.
+   *
+   * The only number on this overlay that is a **build** defect rather than a
+   * streaming state: a tile in range, with prisms resident, that the pipeline
+   * never emitted geometry for. It will not clear itself however long anybody
+   * stands there, so it is worth separating from the amber that will.
+   */
+  private permanentTiles = 0;
 
   constructor(
     index: TileIndexView,
@@ -265,6 +315,7 @@ export class InvisibleWalls {
     this.hazardCount = 0;
     this.cells.clear();
     this.buildingsAtRisk = 0;
+    this.permanentTiles = 0;
     const size = this.index.tile_size;
 
     for (const entry of this.index.tiles) {
@@ -287,15 +338,19 @@ export class InvisibleWalls {
 
       let tile = this.hazards[this.hazardCount];
       if (tile === undefined) {
-        tile = { key: '', bounds: [0, 0, 0, 0], phase: 'absent', buildings: 0 };
+        tile = { key: '', bounds: [0, 0, 0, 0], phase: 'absent', retryInS: 0, buildings: 0 };
         this.hazards.push(tile);
       }
       tile.key = entry.key;
       tile.bounds = entry.bounds;
       tile.phase = phase;
+      // Only asked for the phase that has a countdown, so a scan over a ring of
+      // healthy tiles never reaches for a clock.
+      tile.retryInS = phase === 'failed' ? (this.geometry.retryInSeconds?.(entry.key) ?? 0) : 0;
       tile.buildings = entry.b;
       this.hazardCount++;
       this.buildingsAtRisk += entry.b;
+      if (phase === 'missing') this.permanentTiles++;
       this.cells.set(cellKey(entry.bounds[0], entry.bounds[1], size), tile);
     }
   }
@@ -352,12 +407,32 @@ export class InvisibleWalls {
   /**
    * What kind of invisible wall this prism is, or null if it is an honest one.
    *
-   * `structure` outranks `unbuilt` where a deck stands in a tile that has not
-   * built yet, and that is the right way round: the tile will finish and the
-   * amber will clear, and the magenta underneath it is still true.
+   * **The `structure` class no longer fires, and that is this feature's whole
+   * second half being retired rather than a rule being relaxed.** It marked the
+   * deck and viaduct volumes `CollisionWorld.resolve` held solid from the ground
+   * up despite a soffit over the player's head -- 4,522 prisms, and the module
+   * header still carries the measurement. `resolve` now tests a body's band
+   * against `[base, top)`, so a prism whose underside clears a head is not
+   * something the player is stopped by at all, and a magenta wash over the
+   * Western Distributor telling them to *go round* would be the map lying about
+   * a street they can walk down.
+   *
+   * Nothing takes its place, because there is nothing left in that class. What
+   * still stops a player -- a pier, a parapet, a touchdown ramp `decks.py` runs
+   * from the ground up -- is solid *and drawn*, at head height, right in front
+   * of them: an ordinary wall, and this overlay is for the ones you cannot see.
+   * A structure in a tile whose geometry has not built yet is still marked, by
+   * the `unbuilt` line below, which is the class that covers it correctly.
+   *
+   * `clearsAHead` is kept and still runs, for `structureCount`: the count of
+   * deck volumes the maps have looked at is the diagnostic that says the
+   * walk-under rule has something to act on, and a zero there while the player
+   * stands under the Cahill means `Prism.structural` is not being set -- which
+   * is exactly how this would regress, since a prism nobody marks structural is
+   * a prism `resolve` holds solid to the ground again.
    */
   prismHazard(prism: Prism): HazardKind | null {
-    if (prism.structural && this.clearsAHead(prism)) return 'structure';
+    if (prism.structural) this.clearsAHead(prism);
     // The centre rather than a corner: a footprint straddling a tile seam is
     // filed under one tile by the pipeline and its prism belongs to whichever
     // that was, so testing an arbitrary vertex would answer for the neighbour.
@@ -369,8 +444,9 @@ export class InvisibleWalls {
    *
    * A deck that has come down to grade -- the last few stations before a
    * touchdown, which `decks.py` emits down to a 0.35 m rise -- is a kerb you
-   * step over and not a wall you cannot see, so it is not marked. Everything
-   * above `HEAD_ROOM_M` is.
+   * step over and not a wall you cannot see. Everything above `HEAD_ROOM_M` is a
+   * volume the player walks under, and counting those is all this does now: see
+   * `prismHazard` for why it stopped deciding anything.
    */
   private clearsAHead(prism: Prism): boolean {
     const cached = this.soffitClear.get(prism);
@@ -388,26 +464,45 @@ export class InvisibleWalls {
     return clear;
   }
 
+  /** Hazard tiles from the last scan that the build does not contain. */
+  get permanentCount(): number {
+    return this.permanentTiles;
+  }
+
   /** For `window.sydney.invisibleWalls`. */
   stats(): {
     tiles: number;
     walls: number;
+    /** Of those tiles, how many will never draw themselves. See `permanentCount`. */
+    permanent: number;
     structures: number;
     headRoomM: number;
     scanRadiusM: number;
     hz: number;
     worst: string;
   } {
+    // Named worst-first by *how it ends*, which is now three answers rather
+    // than two. `missing` never clears -- the build has no geometry for it --
+    // so it outranks everything. `failed` clears on a backoff, so it is named
+    // with the countdown that says when. Anything else clears on its own in a
+    // second or two and is only named when there is nothing worse to say.
     let worst = 'none';
+    let rank = 0;
     for (let i = 0; i < this.hazardCount; i++) {
       const t = this.hazards[i];
-      // `failed` is the one that never clears itself, so it is the one to name.
-      if (t.phase === 'failed' || worst === 'none') worst = `${t.key} ${t.phase} (${t.buildings})`;
-      if (t.phase === 'failed') break;
+      const mine = t.phase === 'missing' ? 3 : t.phase === 'failed' ? 2 : 1;
+      if (mine <= rank) continue;
+      rank = mine;
+      worst =
+        t.phase === 'failed'
+          ? `${t.key} retrying in ${t.retryInS.toFixed(0)}s (${t.buildings})`
+          : `${t.key} ${t.phase} (${t.buildings})`;
+      if (rank === 3) break;
     }
     return {
       tiles: this.hazardCount,
       walls: this.buildingsAtRisk,
+      permanent: this.permanentTiles,
       structures: this.structuresSeen,
       headRoomM: HEAD_ROOM_M,
       scanRadiusM: SCAN_RADIUS_M,
@@ -615,12 +710,23 @@ export function verifyInvisibleWalls(): string[] {
 
   // --- 5. The soffit rule, against the terrain.
   //
-  // Both directions, because the interesting failure is not "it never fires" --
-  // it is that it fires on the deck's own touchdown, where the structure is at
-  // grade and there is nothing to walk under. And a building is never marked
-  // whatever its pad is doing, because `mesh.py` skirts its walls down to the
-  // ground; that is the assumption the positional split rests on and it is
-  // asserted here rather than left implicit.
+  // **This check used to assert the opposite of what it asserts now, and the
+  // reason is that the defect it was written to mark has been fixed.** It read
+  // "a deck with its soffit 8 m over the ground was not marked -- `resolve`
+  // stops the player under it and nothing is drawn there", and the second half
+  // of that sentence stopped being true when `CollisionWorld.resolve` started
+  // testing a body's band against `[base, top)`. Nothing stops the player under
+  // an 8 m soffit any more, so nothing about it belongs on a map of walls that
+  // are not there. See `prismHazard`.
+  //
+  // What is still asserted, and is the whole of what this case ever really
+  // protected, is the *classification*: the soffit question is answered for a
+  // structure and never for a building, the deck at grade is not a structure
+  // hazard, and terrain that has not arrived decides nothing. The counter is
+  // the observable now -- a structure the maps have looked at and measured --
+  // and it is the tripwire for the way this regresses: if `Prism.structural`
+  // stops being set, this count goes to zero and `resolve` quietly holds every
+  // viaduct in the city solid to the ground again.
   {
     const world = new SyntheticWorld();
     // One deck 8 m up, one deck at grade, one building on a 3 m pad.
@@ -644,10 +750,17 @@ export function verifyInvisibleWalls(): string[] {
       failures.push(`The soffit case decoded ${byX.length} prisms, not 3.`);
     } else {
       const [high, grade, building] = byX;
-      if (walls.prismHazard(high) !== 'structure') {
+      if (walls.prismHazard(high) !== null) {
         failures.push(
-          `A deck with its soffit ${high.base} m over the ground was not marked. ` +
-            `\`resolve\` stops the player under it and nothing is drawn there.`,
+          `A deck with its soffit ${high.base} m over the ground was marked as an invisible ` +
+            `wall in a tile that is built. \`resolve\` lets the player walk under it now.`,
+        );
+      }
+      if (walls.structureCount !== 1) {
+        failures.push(
+          `A deck with its soffit ${high.base} m over the ground was not counted as a ` +
+            `structure (${walls.structureCount}). That count is what says the walk-under ` +
+            `rule has volumes to act on.`,
         );
       }
       if (walls.prismHazard(grade) !== null) {
@@ -655,6 +768,9 @@ export function verifyInvisibleWalls(): string[] {
           `A deck at grade (soffit ${grade.base} m) was marked as an invisible wall. ` +
             `There is nothing to walk under; it is a kerb.`,
         );
+      }
+      if (walls.structureCount !== 1) {
+        failures.push('A deck at grade was counted as a walk-under structure.');
       }
       if (walls.prismHazard(building) !== null) {
         failures.push(
@@ -675,6 +791,59 @@ export function verifyInvisibleWalls(): string[] {
     }
   }
 
+  // --- 5b. The three endings, told apart.
+  //
+  // The overlay's whole job is to say which kind of wall this is, and after the
+  // streaming lifecycle pass there are three answers rather than two: a tile
+  // that is loading clears itself, a tile that `failed` clears itself on a
+  // backoff and can say when, and a tile the build does not contain
+  // (`missing`) never clears at all. Collapsing the last two -- which is what
+  // the old single `failed` phase did -- means either promising a wait that
+  // never ends or hiding a build defect behind one that does.
+  {
+    const world = new SyntheticWorld();
+    const index: TileIndexView = {
+      tile_size: 500,
+      tiles: [
+        { key: 'slow', bounds: [0, 0, 500, 500], b: 10 },
+        { key: 'flaky', bounds: [500, 0, 1000, 500], b: 20 },
+        { key: 'absent', bounds: [1000, 0, 1500, 500], b: 30 },
+      ],
+    };
+    for (const t of index.tiles) world.resident.add(t.key);
+    world.phases.set('slow', 'loading');
+    world.phases.set('flaky', 'failed');
+    world.phases.set('absent', 'missing');
+    world.retries.set('flaky', 12);
+
+    const walls = new InvisibleWalls(index, world, world, () => 0);
+    walls.scan(750, 250);
+    if (walls.tileCount !== 3) {
+      failures.push(`${walls.tileCount} hazard tiles where all three are solid-and-undrawn.`);
+    }
+    if (walls.permanentCount !== 1) {
+      failures.push(
+        `${walls.permanentCount} tiles reported as permanently absent, not 1. A tile the build ` +
+          'does not contain is a defect, and one counted with the retries is one nobody fixes.',
+      );
+    }
+    const worst = walls.stats().worst;
+    if (!worst.startsWith('absent ')) {
+      failures.push(
+        `The worst hazard is reported as "${worst}"; the tile that never clears outranks the two that do.`,
+      );
+    }
+    // And with the permanent one gone, the retry is named *with its countdown*,
+    // which is the whole difference between "failed" and "wait twelve seconds".
+    world.phases.set('absent', 'built');
+    walls.scan(750, 250);
+    const next = walls.stats().worst;
+    if (!next.includes('flaky') || !next.includes('12')) {
+      failures.push(`A retrying tile is reported as "${next}" rather than naming its countdown.`);
+    }
+    if (walls.permanentCount !== 0) failures.push('A build defect was still counted after it was built.');
+  }
+
   // --- 6. The two inks are two inks. A hazard palette that collapsed to one
   // colour would draw both classes identically, and the entire point of the
   // split is that one of them means "wait" and the other means "go round".
@@ -689,14 +858,20 @@ export function verifyInvisibleWalls(): string[] {
 class SyntheticWorld implements GeometryResidency, CollisionResidency {
   readonly collision = new CollisionWorld();
   readonly resident = new Set<string>();
-  readonly phases = new Map<string, 'built' | 'building' | 'loading' | 'failed' | 'absent'>();
+  readonly phases = new Map<string, 'built' | 'building' | 'loading' | 'failed' | 'missing' | 'absent'>();
+  /** Seconds to the next attempt, by key. Read only for a `failed` tile. */
+  readonly retries = new Map<string, number>();
 
   hasTile(key: string): boolean {
     return this.resident.has(key);
   }
 
-  tilePhase(key: string): 'built' | 'building' | 'loading' | 'failed' | 'absent' {
+  tilePhase(key: string): 'built' | 'building' | 'loading' | 'failed' | 'missing' | 'absent' {
     return this.phases.get(key) ?? 'absent';
+  }
+
+  retryInSeconds(key: string): number {
+    return this.retries.get(key) ?? 0;
   }
 }
 

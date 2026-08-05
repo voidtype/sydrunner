@@ -627,7 +627,12 @@ export function stepFooty(
   // Queried at the ball's own centre height, so a ball sailing over a roof is
   // not stopped by the building under it and one at chest height is.
   if (world?.collision) {
-    const r = world.collision.resolve(fromX, fromZ, toX, toZ, BALL_RADIUS, toY);
+    // Head and feet both at the ball's own centre, which is what makes it a
+    // point rather than a body: a ball is not 1.8 m tall, and the default head
+    // would stop one thrown *under* the Western Distributor against a soffit
+    // ten metres over it. The band the ball has to miss is its centre height,
+    // the same number the roof test above it has always used.
+    const r = world.collision.resolve(fromX, fromZ, toX, toZ, BALL_RADIUS, toY, toY);
     if (r.hit) {
       let nx = r.x - toX;
       let nz = r.z - toZ;

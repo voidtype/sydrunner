@@ -14,7 +14,7 @@
 
 import { Euler, Vector3 } from 'three/webgpu';
 
-import type { CollisionWorld } from './collision.ts';
+import { BODY_HEIGHT_M, type CollisionWorld } from './collision.ts';
 
 export interface InputSnapshot {
   forward: number; // -1..1
@@ -195,7 +195,26 @@ export function step(
   let resolvedX = toX;
   let resolvedZ = toZ;
   if (world) {
-    const r = world.resolve(fromX, fromZ, toX, toZ, PLAYER_RADIUS, feetY + STEP_HEIGHT);
+    // The two ends of the capsule, and only the bottom one carries the step.
+    //
+    // `feetY + STEP_HEIGHT` is the probe that has always been passed here: a
+    // kerb whose top is inside the step is climbed rather than walked into.
+    // The head is measured from the **unlifted** feet, because the step is a
+    // thing the feet may do and not a thing that makes the player taller --
+    // lifting both ends would demand 2.22 m of headroom to walk under a span,
+    // which is over the 2.2 m `cli.WALKABLE_UNDER_M` the pipeline audits
+    // against, and this controller is the body that audit is written about.
+    // At 1.8 m the player clears every soffit the build calls walk-under with
+    // 0.4 m to spare, and `decks.WALK_UNDER_M`'s 2.6 m with 0.8 m.
+    const r = world.resolve(
+      fromX,
+      fromZ,
+      toX,
+      toZ,
+      PLAYER_RADIUS,
+      feetY + STEP_HEIGHT,
+      feetY + BODY_HEIGHT_M,
+    );
     resolvedX = r.x;
     resolvedZ = r.z;
     if (r.hit) {

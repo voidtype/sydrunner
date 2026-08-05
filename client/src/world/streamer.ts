@@ -79,6 +79,37 @@
  * all told in the final step, in the same task as `root.add`. A build abandoned
  * half way -- the player walked away, the atlas filled -- therefore has nothing
  * to undo but its own geometry and its atlas row. See `cancelBuild`.
+ *
+ * ---------------------------------------------------------------------------
+ * AND THE OTHER END OF THE LIFETIME, which is where the invisible walls were.
+ *
+ * The paragraph above is about a tile arriving. Two things about a tile
+ * *failing* and a tile *leaving* were wrong, and both of them manufacture the
+ * one defect a player cannot diagnose: collision they are stopped by with
+ * nothing drawn there.
+ *
+ *   1. **A tile that failed once was never asked for again.** `update` gated on
+ *      a `failed` set that nothing emptied, so a single aborted fetch cost that
+ *      tile's geometry for the whole session -- while `main.ts` went on
+ *      fetching its 9 kB collision payload on a different radius, successfully,
+ *      because a small request and a 1.6 MB one do not fail together. The set
+ *      is now a `TileRetryLedger`: a 404 or 410 is a fact about the build and is
+ *      suppressed and counted, and everything else is retried at 5 s, 15 s,
+ *      45 s and then every two minutes, reset by a successful load.
+ *   2. **Collision had no upper end to its lifetime at all.** `CollisionWorld`
+ *      only ever grew; geometry is evicted the moment a tile leaves the 1,800 m
+ *      radius. So a return trip was *guaranteed* to find tiles with prisms and
+ *      no buildings -- 676 walls across 6 tiles on the shipped build, every lap,
+ *      with no network fault in it. `dispose` now takes the prisms with the
+ *      geometry, but only outside `COLLISION_KEEP_RADIUS_M`, because collision
+ *      is safety and geometry is not; and a tile whose prisms *are* resident
+ *      gets extra fetch concurrency and the head of the build queue, because it
+ *      is a solid invisible block of city rather than a hole in the picture.
+ *
+ * The taxonomy, the backoff and the keep radius live in `world/tile-lifecycle.ts`
+ * -- arithmetic with no scene graph in it, so it can be held still by a check on
+ * either side of the wire. `world/invisible-walls.ts` is what draws the window
+ * this closes.
  */
 
 import {
@@ -160,6 +191,12 @@ import {
   type TileDecodeResult,
 } from './tile-decode.ts';
 import { TerrainField, buildTerrainMesh, sampleTileGrid } from './terrain.ts';
+import {
+  TileFetchError,
+  TileRetryLedger,
+  classifyTileFailure,
+  mayEvictCollision,
+} from './tile-lifecycle.ts';
 import { worldVersionSuffix } from './version.ts';
 import {
   buildWaterMeshes,
@@ -599,6 +636,41 @@ interface LoadedTile {
   powerupStates: readonly PowerupDrawState[];
 }
 
+/**
+ * The slice of `CollisionWorld` the streamer touches, and the whole of it.
+ *
+ * An interface rather than the class, for the reason every other handle in this
+ * file is one: the streamer must not be able to *ask a collision question*. It
+ * has no business knowing where a wall is; what it needs is the two facts that
+ * pair a tile's prisms to its geometry -- whether they are resident, and the
+ * ability to take them away when the geometry goes. Handing it the class would
+ * put `resolve` within reach of a module whose job is drawing, and the parallel
+ * question of what `resolve` means is somebody else's.
+ */
+export interface CollisionSink {
+  hasTile(key: string): boolean;
+  removeTile(key: string): number;
+}
+
+/**
+ * Extra concurrent fetches a tile may have when its collision is already
+ * resident.
+ *
+ * A tile with prisms and no geometry is, right now, a block of solid invisible
+ * city. Everything else in the load radius is a hole in the picture. So the
+ * hazard set jumps the queue, and two extra slots is what it takes to matter:
+ * a revisit puts six or so tiles into that state at once, and four slots
+ * retires them in two round trips of a 1.6 MB payload where six retires them in
+ * one.
+ *
+ * Bounded, which is the reason it is safe. The hazard set is exactly the tiles
+ * `main.ts` has collision for, which is its own 420 m ring -- nine tiles at the
+ * absolute most -- so this cannot become an unbounded fan-out however far the
+ * player teleports. Six concurrent fetches is also still inside the browser's
+ * six-per-origin limit, so it costs no queueing anywhere else.
+ */
+const HAZARD_EXTRA_SLOTS = 2;
+
 export interface StreamerOptions {
   /** Tiles beyond this are not loaded at all. */
   loadRadius?: number;
@@ -625,7 +697,33 @@ export class TileStreamer {
   private index: WorldIndex | null = null;
   private readonly loaded = new Map<string, LoadedTile>();
   private readonly loading = new Set<string>();
-  private readonly failed = new Map<string, number>();
+  /**
+   * Which tiles failed, how, and when to ask again.
+   *
+   * This was a `Map<string, number>` called `failed` that nothing ever emptied,
+   * and it is the first of the two defects this pass exists to close: one
+   * aborted fetch and that tile's geometry was never requested again for the
+   * session, while `main.ts` went on fetching its collision successfully every
+   * half second on a different radius. A permanent invisible wall from a 200 ms
+   * network blip. See `world/tile-lifecycle.ts` for the taxonomy and the
+   * backoff.
+   */
+  private readonly ledger = new TileRetryLedger();
+  /**
+   * Fetches to fail on purpose, for `debugFailTile`. Empty in every session
+   * nobody has typed into a console.
+   */
+  private readonly injectedFaults = new Map<string, { status: number; times: number }>();
+  /**
+   * Whether a failure should say so on the console.
+   *
+   * Off only while `verifyLifecycle` is deliberately breaking things. A boot
+   * check that warned about the faults it injected on purpose would put two
+   * lines in every dev session's console that look exactly like the real
+   * failure they exist to detect, which is the one way a diagnostic can make a
+   * diagnosis harder.
+   */
+  private logFailures = true;
   /**
    * The reference GLB parser, kept for exactly one caller.
    *
@@ -657,6 +755,23 @@ export class TileStreamer {
   private readonly building = new Map<string, PendingBuild>();
   /** Steps drained and frames pumped, for the debug overlay. */
   private builtTiles = 0;
+  /** Tiles whose collision went out with their geometry. See `dispose`. */
+  private collisionEvictions = 0;
+  /**
+   * Geometry evictions that had to leave collision behind because the tile was
+   * inside `COLLISION_KEEP_RADIUS_M`.
+   *
+   * The counter that says the parity rule is being *asked* to do something it
+   * refuses to do. It should be zero for the life of a session: geometry is
+   * only ever evicted out past the 1,800 m render radius or, in the budget
+   * path, from the furthest tiles of a set that reaches no further than that,
+   * and both are a long way outside 1,000 m. A number that climbs means the
+   * radii have been changed into overlapping and the amber-on-revisit case is
+   * back -- see `world/tile-lifecycle.ts`, part 2.
+   */
+  private parityHolds = 0;
+  /** Rebuilds put at the head of the queue because collision was resident. */
+  private priorityBuilds = 0;
 
   private readonly loadRadius: number;
   private readonly concurrency: number;
@@ -737,6 +852,14 @@ export class TileStreamer {
    * enough to be simulated, by which time the prisms have long since landed.
    */
   private spawnGuard: SpawnGuard | null = null;
+  /**
+   * The prisms, as a residency handle, or null before `main.ts` supplies one --
+   * and null is a working configuration: it is what a headless tile-loading
+   * test is, and it means collision is never evicted and no rebuild is
+   * prioritised, which is exactly what this class did before. See
+   * `setCollisionSink`.
+   */
+  private collisionSink: CollisionSink | null = null;
   /** Two geometries and three materials for every powerup in the world. */
   private readonly powerupAssets = new PowerupAssets();
   /**
@@ -1049,6 +1172,76 @@ export class TileStreamer {
   }
 
   /**
+   * Hand the streamer the collision world, so the two halves of a tile can have
+   * one lifetime.
+   *
+   * **The second half of the invisible-wall fix**, and the one that is not
+   * about failure at all. Before this the two were loaded on different radii by
+   * different modules and unloaded by only one of them: `main.ts` fetched
+   * prisms inside 420 m and never let them go, this class dropped geometry past
+   * 1,800 m, and every return trip landed on tiles that had kept one and lost
+   * the other. The invariant this establishes, in as many words:
+   *
+   *     a tile has resident collision only while its geometry is built,
+   *     building, or the tile is inside the collision working set.
+   *
+   * Two things fall out of it and both are here rather than in `main.ts`,
+   * because this class is the one that knows the moment a tile's geometry goes
+   * and comes back:
+   *
+   *   - `dispose` drops the prisms with the geometry, but **only** outside
+   *     `COLLISION_KEEP_RADIUS_M`. Collision is safety and geometry is not, so
+   *     the rule is one-directional and its distance has a 580 m hysteresis
+   *     band under it. See `world/tile-lifecycle.ts`, part 2.
+   *   - a tile whose prisms *are* resident and whose geometry is not is an
+   *     invisible wall this instant, so it is fetched with an extra
+   *     concurrency slot and built at the head of the queue rather than behind
+   *     whatever arrived first.
+   *
+   * A setter on `setSpawnGuard`'s terms -- `main.ts` builds the two in the
+   * other order -- and null is a working configuration: without one, collision
+   * is never evicted and no rebuild is prioritised, which is what this class
+   * did before and what a headless tile-loading test wants.
+   */
+  setCollisionSink(sink: CollisionSink): void {
+    this.collisionSink = sink;
+  }
+
+  /**
+   * Fail this tile's next `n` fetches on purpose, with this status.
+   *
+   * The dev handle for the half of the lifecycle nobody can reproduce on
+   * demand: `sydney.streamer.debugFailTile('5_-1', 503)` makes the next attempt
+   * throw a transient error, so the retry, the backoff countdown on the HUD and
+   * the tile arriving late can all be watched happening. A 404 demonstrates the
+   * other branch -- suppressed for the session, counted, logged once.
+   *
+   * Only the *fetch* is faulted, before a byte is requested, so nothing is left
+   * half-done and no atlas row is held. Cleared when it has fired `times`.
+   */
+  debugFailTile(key: string, status = 503, times = 1): void {
+    this.injectedFaults.set(key, { status, times });
+  }
+
+  /**
+   * Forget a tile's failures so the next frame asks for it again -- one key, or
+   * every key when none is named.
+   *
+   * The console's counterpart to the suppression: a 404 that nothing can undo
+   * is right for a session and wrong for a developer who has just re-run the
+   * pipeline into a tab that is still open. It clears the permanent verdict as
+   * well as the backoff, which is why it is here and not on the load path.
+   */
+  retryNow(key?: string): void {
+    if (key === undefined) {
+      for (const [absent] of this.ledger.permanentEntries()) this.ledger.forget(absent);
+      for (const entry of this.index?.tiles ?? []) this.ledger.forget(entry.key);
+      return;
+    }
+    this.ledger.forget(key);
+  }
+
+  /**
    * Hand the streamer whoever owns spec 8.3's powerup state.
    *
    * A setter, and for a stronger reason than `setSpawnGuard`'s: the sink
@@ -1304,20 +1497,71 @@ export class TileStreamer {
    * tile stops the player and draws nothing, and there is no other way to see
    * it -- a hole in the city looks exactly like a park.
    *
-   * `'failed'` is the one worth naming separately rather than folding into
-   * `'absent'`, because `update` never retries it: a tile that threw once is not
-   * drawn again for the rest of the session, so its collision is an invisible
-   * wall permanently rather than for a second and a half.
+   * **`'failed'` no longer means what it did, and the change is the point of
+   * this pass.** It used to mean "threw once, and is therefore gone for the
+   * session" -- `update` never retried it, so its collision was an invisible
+   * wall permanently rather than for a second and a half. It now means
+   * *retrying, next attempt in `retryInMs`* : a transient failure on a widening
+   * backoff, which clears itself. The vocabulary is deliberately unchanged for
+   * that case so no reader of this method has to be taught a new word for a
+   * state that got better rather than different.
    *
-   * A pure read of four containers, allocating nothing -- it is called per map
+   * `'missing'` is the new one, and it is the state that really is permanent: a
+   * 404 or 410, meaning the pipeline did not emit this tile. Nothing will fix
+   * it in this session and a reader should say so rather than promise a wait.
+   * A tile in this state with collision resident is a **build defect** and is
+   * worth showing as one -- see `world/invisible-walls.ts`.
+   *
+   * A pure read of five containers, allocating nothing -- it is called per map
    * redraw for a few dozen tiles.
    */
-  tilePhase(key: string): 'built' | 'building' | 'loading' | 'failed' | 'absent' {
+  tilePhase(key: string): 'built' | 'building' | 'loading' | 'failed' | 'missing' | 'absent' {
     if (this.loaded.has(key)) return 'built';
     if (this.building.has(key)) return 'building';
     if (this.loading.has(key)) return 'loading';
-    if (this.failed.has(key)) return 'failed';
+    if (this.ledger.isPermanent(key)) return 'missing';
+    if (this.ledger.isRetrying(key)) return 'failed';
     return 'absent';
+  }
+
+  /**
+   * How long until this tile is asked for again, seconds, or 0 if it may be now.
+   *
+   * The other half of what `'failed'` now means. A hazard readout that says
+   * "failed" and nothing else is the old, hopeless message; one that says
+   * "retrying in 12 s" is a wait with an end on it.
+   */
+  retryInSeconds(key: string): number {
+    return this.ledger.nextRetryInMs(key, Date.now()) / 1000;
+  }
+
+  /**
+   * What has failed, how, and what the parity rule has done about it -- for the
+   * console and the HUD.
+   *
+   * `holds` is the one to watch and the one that should never move: see
+   * `parityHolds`.
+   */
+  get lifecycleReport(): {
+    retrying: number;
+    missing: number;
+    nextRetryS: number;
+    collisionEvicted: number;
+    holds: number;
+    priorityBuilds: number;
+    absent: Array<[string, string]>;
+  } {
+    const soonest = this.ledger.soonestRetryInMs(Date.now());
+    return {
+      retrying: this.ledger.retryingCount,
+      missing: this.ledger.permanentCount,
+      /** Seconds to the soonest retry, or `Infinity` when nothing is waiting. */
+      nextRetryS: soonest === Infinity ? Infinity : soonest / 1000,
+      collisionEvicted: this.collisionEvictions,
+      holds: this.parityHolds,
+      priorityBuilds: this.priorityBuilds,
+      absent: this.ledger.permanentEntries(),
+    };
   }
 
   get stats() {
@@ -1393,7 +1637,30 @@ export class TileStreamer {
       /** Tiles this session has finished building. Monotonic; for the overlay. */
       built: this.builtTiles,
       decoder: this.decoder.stats,
-      failed: this.failed.size,
+      /**
+       * Tiles whose last attempt failed transiently and which are waiting on a
+       * backoff. **Not** a death sentence any more -- see `tilePhase`. Kept
+       * under the old name because it is the same line on the same overlay and
+       * the meaning got better rather than different.
+       */
+      failed: this.ledger.retryingCount,
+      /** Seconds to the soonest of those, or `Infinity` when none is waiting. */
+      nextRetryS: (() => {
+        const ms = this.ledger.soonestRetryInMs(Date.now());
+        return ms === Infinity ? Infinity : ms / 1000;
+      })(),
+      /**
+       * Tiles the build does not contain: a 404 or 410. Permanent for the
+       * session, and worth a number of its own rather than being folded into
+       * the retries -- a tile in range that the pipeline never emitted is a
+       * defect in the build, and one whose collision is resident is an
+       * invisible wall that will never draw itself.
+       */
+      missing: this.ledger.permanentCount,
+      /** Tiles whose prisms went out with their geometry. See `dispose`. */
+      collisionEvicted: this.collisionEvictions,
+      /** Evictions that had to keep collision for safety. Should stay zero. */
+      collisionHeld: this.parityHolds,
       triangles,
       buildings,
       trees,
@@ -1547,6 +1814,15 @@ export class TileStreamer {
     // linear pass over a few thousand tile entries below it.
     this.receiveRange = sunReceiveRange(this.shadowRadius, sunAltitudeDeg);
 
+    // Wall clock rather than `performance.now`, because the retry schedule is
+    // written in seconds a player waits and is read back by a HUD countdown --
+    // and because `TileRetryLedger` is handed a `now` by its checks too, which
+    // is easier to read against `Date.now` than against a page-load offset.
+    // Read once a frame rather than per tile: sixty `Date.now` calls a frame
+    // over a few thousand index entries is a measurable thing to do for an
+    // answer that cannot change inside one pass.
+    const now = Date.now();
+
     const cam = camera.position;
     this.projScreen.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     // The coordinate system matters: WebGPU clips depth to [0, w] and WebGL to
@@ -1590,15 +1866,24 @@ export class TileStreamer {
           (tile.casts && shadowVolume !== null && shadowVolume.intersectsBox(tile.box));
         continue;
       }
+      // A tile whose prisms are already resident is not a hole in the picture,
+      // it is a solid invisible block of city -- so it gets two concurrency
+      // slots nobody else can have. See `HAZARD_EXTRA_SLOTS` for why that set
+      // is bounded and why the extra slots are the ones that matter.
+      const hazard = this.collisionSink?.hasTile(entry.key) === true;
+      const slots = hazard ? this.concurrency + HAZARD_EXTRA_SLOTS : this.concurrency;
       if (
-        this.loading.size < this.concurrency &&
+        this.loading.size < slots &&
         !this.loading.has(entry.key) &&
         // Decoded and queued counts as "on its way": without this the tile
         // would be fetched again on every frame between the decode landing and
         // the budget getting round to building it, which at four concurrent
         // slots is the whole streamer wedged behind one tile.
         !this.building.has(entry.key) &&
-        !this.failed.has(entry.key)
+        // Permanently absent from the build, or inside a retry backoff. This
+        // used to be a set that nothing ever emptied, which is the whole of the
+        // first defect -- see `TileRetryLedger`.
+        this.ledger.ready(entry.key, now)
       ) {
         void this.loadTile(entry);
       }
@@ -1632,8 +1917,18 @@ export class TileStreamer {
         // The generator's own `finally` has already released the geometry and
         // the atlas row on its way out, so there is nothing to undo here.
         done = true;
-        this.failed.set(job.entry.key, Date.now());
-        if (this.failed.size < 6) console.warn(`tile ${job.entry.key} build failed:`, err);
+        // Transient, always: a build that threw is a fact about these bytes and
+        // this moment -- a truncated payload, a decode that produced something
+        // the builder could not use, an atlas that filled -- and every one of
+        // those is fixed by fetching the tile again. The backoff is what keeps
+        // a genuinely unbuildable tile from re-fetching 1.6 MB every frame.
+        const state = this.ledger.noteTransient(job.entry.key, Date.now(), `build: ${String(err)}`);
+        if (state.attempts === 1) {
+          console.warn(
+            `tile ${job.entry.key} build failed (retrying in ${(this.ledger.nextRetryInMs(job.entry.key, Date.now()) / 1000).toFixed(0)} s):`,
+            err,
+          );
+        }
       }
       if (done) {
         this.buildQueue.shift();
@@ -1800,14 +2095,36 @@ export class TileStreamer {
   private async loadTile(entry: TileEntry): Promise<void> {
     this.loading.add(entry.key);
     try {
+      // The console's fault injection, before a byte is asked for, so a faulted
+      // attempt leaves nothing half-done and holds no atlas row. See
+      // `debugFailTile`.
+      const fault = this.injectedFaults.get(entry.key);
+      if (fault !== undefined && fault.times > 0) {
+        fault.times -= 1;
+        if (fault.times <= 0) this.injectedFaults.delete(entry.key);
+        throw new TileFetchError(`tiles/${entry.key}.glb (injected)`, fault.status);
+      }
+
       const [glb, paramsBuffer, terrain, parked, lanes, veg, power, furn, pow, names, water] =
         await Promise.all([
           // Bytes rather than a `Response`, because they are about to be
           // transferred to another thread. The tiles are self-contained GLB, so
           // the parser needs no resource path.
-          fetchWorldBuffer(this.baseUrl, `tiles/${entry.key}.glb`, this.version),
+          //
+          // `fetchWorldAsset` rather than `fetchWorldBuffer`, and the two lines
+          // that follow are what it buys: the *status* survives, as a number,
+          // into `classifyTileFailure`. `fetchWorldBuffer` throws a message
+          // with the code embedded in prose, which is a fine thing to read and
+          // a poor thing to branch a session-long suppression on. Nothing about
+          // the CDN changes -- this is the same one entry point, with the same
+          // per-file fallback and the same strike counter behind it, and the
+          // fallback has already happened by the time a status is seen here.
+          fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.glb`, this.version).then((r) => {
+            if (!r.ok) throw new TileFetchError(`tiles/${entry.key}.glb`, r.status);
+            return r.arrayBuffer();
+          }),
           fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.params.bin`, this.version).then((r) => {
-            if (!r.ok) throw new Error(`params ${r.status}`);
+            if (!r.ok) throw new TileFetchError(`tiles/${entry.key}.params.bin`, r.status);
             return r.arrayBuffer();
           }),
           this.terrainField ? this.terrainField.ensure(entry.key) : Promise.resolve(null),
@@ -1883,13 +2200,53 @@ export class TileStreamer {
         entry,
         steps: this.buildTile(entry, decoded, terrain, parked, lanes),
       };
-      this.buildQueue.push(job);
+      // Arrival order, except for the tiles that are stopping the player right
+      // now. A tile whose prisms are resident and whose geometry is not is an
+      // invisible wall for exactly as long as this queue takes to reach it, so
+      // it goes to the head of it -- which is what turns a revisit from "amber
+      // until the queue drains" into "amber for one build".
+      //
+      // This cannot starve the ordinary queue, and the bound is not a
+      // convention: the priority set is the tiles `main.ts` has collision for,
+      // which is its own 420 m ring, so at most a handful can ever be ahead --
+      // and each of them is finite work that leaves the queue when it is done.
+      // The header's argument against re-sorting by distance every frame is
+      // untouched; this is a one-off placement at insertion, not an ordering.
+      if (this.collisionSink?.hasTile(entry.key) === true) {
+        this.buildQueue.unshift(job);
+        this.priorityBuilds++;
+      } else {
+        this.buildQueue.push(job);
+      }
       this.building.set(entry.key, job);
     } catch (err) {
-      // A missing or corrupt tile must not stall the stream; record it and move
-      // on, and let a later run of the pipeline fix it.
-      this.failed.set(entry.key, Date.now());
-      if (this.failed.size < 6) console.warn(`tile ${entry.key} failed:`, err);
+      // A tile that would not load must not stall the stream -- but *how* it
+      // failed decides whether it is ever asked for again, and getting that
+      // wrong in the safe-looking direction is the bug this pass exists to fix.
+      // A 404 is a fact about the build and is remembered; everything else is a
+      // fact about one moment and comes back on a widening backoff. See
+      // `world/tile-lifecycle.ts`.
+      const now = Date.now();
+      if (classifyTileFailure(err) === 'permanent') {
+        // Logged once, at `warn`, because a tile in range that the pipeline
+        // never emitted is a defect in the build rather than a hiccup -- and
+        // counted on the HUD for the same reason. The player cannot act on it;
+        // whoever runs the pipeline can.
+        if (this.ledger.notePermanent(entry.key, String(err)) && this.logFailures) {
+          console.warn(`tile ${entry.key} is not in this build (suppressed for the session):`, err);
+        }
+      } else {
+        const state = this.ledger.noteTransient(entry.key, now, String(err));
+        // Once per tile, on the first failure only: the retry is the story and
+        // it is already on the overlay, so a console line per attempt would be
+        // noise proportional to how bad the network is.
+        if (state.attempts === 1 && this.logFailures) {
+          console.warn(
+            `tile ${entry.key} failed (retrying in ${(retryWaitSeconds(state.nextAt, now)).toFixed(0)} s):`,
+            err,
+          );
+        }
+      }
     } finally {
       this.loading.delete(entry.key);
     }
@@ -2209,7 +2566,12 @@ export class TileStreamer {
       // scene has not got or the far layer has taken its slabs away from a tile
       // that is not there yet.
       if (group.children.length === 0) {
-        this.failed.set(entry.key, Date.now());
+        // Permanent, not transient, and the distinction is the point of the
+        // taxonomy: the payload arrived, decoded and produced nothing, which is
+        // a fact about what the pipeline emitted for this tile. Re-fetching
+        // 1.6 MB every two minutes to build nothing again would be the retry
+        // machinery doing damage. Counted with the 404s, where it belongs.
+        this.ledger.notePermanent(entry.key, 'built nothing');
         return;
       }
 
@@ -2309,6 +2671,13 @@ export class TileStreamer {
         powerupStates,
       });
       this.builtTiles++;
+      // The tile is here. Forget every failure it ever had, **including the
+      // attempt count** -- a tile that hiccupped twice an hour ago and has
+      // loaded a hundred times since must not wait 45 s on its next one. This
+      // is the "reset on success" half of the backoff and it is the half that
+      // is easy to leave out, because leaving it out is invisible until the
+      // network is bad twice.
+      this.ledger.clear(entry.key);
       committed = true;
     } finally {
       // The single cleanup path for every way a build can end without
@@ -2435,10 +2804,114 @@ export class TileStreamer {
         water,
       });
       for (const f of roundTrip) failures.push(`worker round trip: ${f}`);
-      return failures.map((f) => `${entry.key}: ${f}`);
+      const keyed = failures.map((f) => `${entry.key}: ${f}`);
+      for (const f of await this.verifyLifecycle()) keyed.push(f);
+      return keyed;
     } catch (err) {
       return [`verifyStreaming could not read tile ${entry.key}: ${String(err)}`];
     }
+  }
+
+  /**
+   * The other thing streaming can get wrong, and the one that used to be
+   * permanent: what happens to a tile that *does not* load.
+   *
+   * `verifyTileLifecycle` holds the arithmetic still on its own -- the
+   * taxonomy, the backoff, the safety radius -- and is run at boot with the
+   * rest of the pure checks. What can only be asserted here is the **wiring**:
+   * that this class's gate actually consults the ledger, that a transient
+   * failure leaves the tile in a phase that says "wait, with an end on it", and
+   * that a 404 leaves it in a phase that says "never, and here is a build to
+   * fix". Every one of those is a two-line connection that would fail silently:
+   * a tile that is quietly never retried looks exactly like a slow network.
+   *
+   * Driven through a **synthetic key**, so no tile in the real build is faulted
+   * or suppressed by running this, and forgotten afterwards so the overlay's
+   * counts are untouched. The fault is injected ahead of the fetch, so nothing
+   * is requested, no atlas row is taken and the scene is not touched.
+   *
+   * The live half is the 404 probe, and it earns its request: a dev server that
+   * answers 200 with an HTML shell for an unknown path -- which is what a
+   * single-page fallback does -- would make every genuinely missing tile look
+   * like a corrupt one and retry it forever. That is invisible from the source
+   * of this file and is exactly what a boot check is for.
+   */
+  private async verifyLifecycle(): Promise<string[]> {
+    const failures: string[] = [];
+    const key = '__lifecycle_check__';
+    const synthetic: TileEntry = { key, b: 0, t: 0, bounds: [0, 0, 0, 0], hmax: 0, size: 500 };
+
+    // Quiet, because everything below is broken on purpose and the console
+    // lines it would print are indistinguishable from the real failure they
+    // exist to report.
+    this.logFailures = false;
+    try {
+      // --- A transient failure: retried, with a countdown, and not suppressed.
+      this.debugFailTile(key, 503, 1);
+      await this.loadTile(synthetic);
+      if (this.tilePhase(key) !== 'failed') {
+        failures.push(
+          `A 503 left the tile in phase '${this.tilePhase(key)}' rather than 'failed' (retrying). ` +
+            'A transient failure that is not remembered as retryable is a permanent invisible wall.',
+        );
+      }
+      const wait = this.retryInSeconds(key);
+      if (!(wait > 4 && wait <= 5)) {
+        failures.push(`The first retry is due in ${wait.toFixed(1)} s; the schedule says 5 s.`);
+      }
+      if (this.ledger.ready(key, Date.now())) {
+        failures.push('A tile that failed a moment ago was ready to be fetched again immediately.');
+      }
+      if (!this.ledger.ready(key, Date.now() + 5_001)) {
+        failures.push('A tile was still suppressed after its backoff elapsed -- the retry never happens.');
+      }
+      // And a success forgets it, which is what `buildTile`'s commit does.
+      this.ledger.clear(key);
+      if (this.tilePhase(key) !== 'absent') {
+        failures.push('A tile that loaded is still reported as failed.');
+      }
+
+      // --- A 404: suppressed for the session, counted, and never retried.
+      this.debugFailTile(key, 404, 1);
+      await this.loadTile(synthetic);
+      if (this.tilePhase(key) !== 'missing') {
+        failures.push(
+          `A 404 left the tile in phase '${this.tilePhase(key)}' rather than 'missing'. ` +
+            'A tile the build does not contain would be re-fetched forever.',
+        );
+      }
+      if (this.ledger.ready(key, Date.now() + 86_400_000)) {
+        failures.push('A 404 tile was ready to be fetched again a day later.');
+      }
+    } finally {
+      // Whatever happened above, this key leaves no trace: no injected fault,
+      // no retry, no phantom absent tile on the overlay's count.
+      this.injectedFaults.delete(key);
+      this.ledger.forget(key);
+      this.logFailures = true;
+    }
+
+    // --- The live half: does this origin really 404 a tile that is not there?
+    try {
+      const resp = await fetchWorldAsset(this.baseUrl, 'tiles/__no_such_tile__.glb', this.version);
+      if (resp.ok) {
+        failures.push(
+          'A tile that does not exist was answered 200 by the origin. Every missing tile will be ' +
+            'classified transient and re-fetched for the life of the session -- check the dev ' +
+            "server's single-page fallback.",
+        );
+      } else if (classifyTileFailure(new TileFetchError('tiles/__no_such_tile__.glb', resp.status)) !== 'permanent') {
+        failures.push(
+          `A missing tile answers ${resp.status}, which this client retries rather than suppresses. ` +
+            'See `PERMANENT_STATUS` in `world/tile-lifecycle.ts`.',
+        );
+      }
+    } catch {
+      // Offline, or the origin is down. Not a failure of this rule: what the
+      // check is about is what a *reachable* origin says about a missing file.
+    }
+
+    return failures;
   }
 
   /**
@@ -2557,10 +3030,16 @@ export class TileStreamer {
     return verifyDecoderRoundTrip(this.decoder, clone(), clone());
   }
 
-  /** Drop tiles that are out of range, or the furthest ones if over budget. */
+  /**
+   * Drop tiles that are out of range, or the furthest ones if over budget.
+   *
+   * Both paths hand `dispose` the camera, which is not tidiness: dropping a
+   * tile's geometry is now also the moment its **collision** may go, and that
+   * decision is a distance. See `dispose` and `setCollisionSink`.
+   */
   private evict(cam: Vector3, keep: Set<string>): void {
     for (const [key, tile] of this.loaded) {
-      if (!keep.has(key)) this.dispose(key, tile);
+      if (!keep.has(key)) this.dispose(key, tile, cam);
     }
     // Queued builds go the same way, and this is not merely tidiness: a teleport
     // moves the whole wanted set at once, and without this the queue would spend
@@ -2572,17 +3051,44 @@ export class TileStreamer {
     }
     if (this.loaded.size <= this.budget) return;
 
+    // Furthest first -- `b - a` is descending, which is what makes the budget
+    // path safe for the collision rule below: the tiles it takes are by
+    // construction the ones the player is least near, so the distance test in
+    // `dispose` is being asked about the far end of the set rather than a
+    // random member of it.
     const byDistance = [...this.loaded.entries()].sort(
       (a, b) =>
         distanceToBounds(cam, b[1].entry.bounds) - distanceToBounds(cam, a[1].entry.bounds),
     );
     for (const [key, tile] of byDistance) {
       if (this.loaded.size <= this.budget) break;
-      this.dispose(key, tile);
+      this.dispose(key, tile, cam);
     }
   }
 
-  private dispose(key: string, tile: LoadedTile): void {
+  /**
+   * Take one tile out of the scene -- and, if it is far enough away, take its
+   * collision with it.
+   *
+   * The second clause is the fix for the amber-on-revisit case and it is the
+   * one place in this client where prisms are removed. The rule, stated as the
+   * invariant rather than as the code: *a tile has resident collision only
+   * while its geometry is built, building, or the tile is inside the collision
+   * working set.* Before this, collision had no upper end to its lifetime at
+   * all and geometry did, so a return trip was guaranteed to find them
+   * disagreeing.
+   *
+   * **The distance test is the safety argument, and it is deliberately not the
+   * eviction's own radius.** `mayEvictCollision` is 1,000 m against the 420 m
+   * ring `main.ts` re-fetches on, so the player would have to cross 580 m back
+   * toward an evicted tile before a 9 kB request even starts, and another
+   * 420 m before they could touch it. Geometry eviction only happens past
+   * 1,800 m or to the furthest of a set bounded by it, so the test never
+   * actually binds -- which is exactly why it is asserted rather than assumed.
+   * A refusal is counted (`parityHolds`) precisely so that a future radius
+   * change that makes it bind shows up as a number rather than as a bug report.
+   */
+  private dispose(key: string, tile: LoadedTile, cam: Vector3 | null = null): void {
     this.root.remove(tile.group);
     // And the far layer takes the tile back. Paired with the line in `loadTile`;
     // between them a building is drawn by exactly one of the two systems at
@@ -2607,6 +3113,24 @@ export class TileStreamer {
     this.pedestrians?.drop(key);
     this.atlas.release(key);
     this.loaded.delete(key);
+
+    // And the prisms, last, once the tile is out of the scene in every other
+    // sense -- so there is no window in which the collision is gone and the
+    // geometry is still drawn, which would be the one direction of this that a
+    // player could exploit.
+    const sink = this.collisionSink;
+    if (sink === null || !sink.hasTile(key)) return;
+    // No camera means no distance and therefore no answer, so the safe reading
+    // is "keep it". Only a caller outside `evict` can be in that position and
+    // there is none today; the default exists so that a future one cannot drop
+    // collision by omitting an argument.
+    const far = cam !== null && mayEvictCollision(distanceToBounds(cam, tile.entry.bounds));
+    if (far) {
+      sink.removeTile(key);
+      this.collisionEvictions++;
+    } else {
+      this.parityHolds++;
+    }
   }
 }
 
@@ -2770,6 +3294,11 @@ function slotAttributes(slot: MaterialName): Parameters<typeof warmupGeometry>[0
  */
 function resolveMaterialName(name: string): MaterialName {
   return (MATERIALS as readonly string[]).includes(name) ? (name as MaterialName) : 'brick_red';
+}
+
+/** Seconds between now and a scheduled retry, never negative. For the log line. */
+function retryWaitSeconds(nextAt: number, now: number): number {
+  return Math.max(0, nextAt - now) / 1000;
 }
 
 /** Distance from a point to an axis-aligned XZ box, zero if inside. */

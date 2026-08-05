@@ -19,6 +19,46 @@
  * Hills ridge has a base 40 m above one in Alexandria, and every height question
  * in this file has to say which of the two it means.
  *
+ * ---------------------------------------------------------------------------
+ * **A body is a band too, and that is what `base` finally bought.**
+ *
+ * `resolve` used to ask one question of a prism -- "are my feet at or above its
+ * top?" -- and so every volume in the payload was solid from the ground up. For
+ * a building that is correct and stays correct (see `structural` below). For the
+ * 4,522 deck, viaduct and bridge volumes the pipeline writes with their `base`
+ * at the **soffit** it was a wall twenty metres over the player's head: the
+ * Western Distributor at Pyrmont, the Cahill at Circular Quay, the Bradfield
+ * approaches, Anzac Bridge and the Harbour Bridge itself, all of them written by
+ * `decks.py` to be walked under ("`base` at the soffit puts the volume over a
+ * player's head so they walk under it") and all of them stopping a player at
+ * street level. It is the "invisible wall at Broadway heading towards the city".
+ *
+ * So the rule is now an overlap of two intervals rather than one comparison. A
+ * prism blocks a body when the body's own vertical extent `[feetY, headY]`
+ * overlaps the prism's `[base, top)`:
+ *
+ *     blocked  <=>  feetY < top - 0.05  &&  headY > base
+ *
+ * The first clause is exactly the test that was here before, epsilon included,
+ * so a kerb whose top is inside the caller's step tolerance is still climbed
+ * rather than walked into. The second is new and is the whole change. Half-open
+ * at the top: a head exactly at the soffit clears it.
+ *
+ * See `resolve` for what `headY` defaults to and why the two ends of a body are
+ * the caller's to state.
+ *
+ * **Nothing on the wire changed and nothing needed to.** The payload is byte for
+ * byte the format it was, the protocol version is untouched, and the flag that
+ * decides a soffit from a pad is recovered from the index's building count on
+ * both ends. What a deploy does have is a window: a server restarted with this
+ * rule while a browser tab is still predicting with the old one will mispredict
+ * under every bridge, because the client thinks it is stopped where the server
+ * walks on. It resolves itself -- reconciliation snaps the player to the
+ * authoritative position, so the symptom is a rubber-band under a viaduct and
+ * not a desync, and it ends when the tab is reloaded. Deliberately not given a
+ * `BYE`-and-version path: that one is for a protocol the client cannot speak,
+ * and this is a client that speaks it correctly and disagrees about a wall.
+ *
  * There is no version word in the payload, deliberately -- see
  * `tiles.write_collision` for the argument. The short version is that the two
  * ends of this format ship together and a v1 file read as v2 misparses on the
@@ -50,14 +90,30 @@ export interface Prism {
    * for nothing: the index already carries the tile's building count, and
    * anything ahead of the last `b` records is a structure. See `addTile`.
    *
-   * Nothing in this file's collision answers reads it, deliberately -- a prism is
-   * a prism to `resolve`, `blocked` and `roofHeight`, exactly as it was. What
-   * reads it is `world/invisible-walls.ts`, because the two kinds fail
-   * differently: a building's walls are drawn from its pad down to the terrain
-   * with a skirt, so it is never invisible, and a deck's are drawn at its own
-   * elevation with open air underneath. `false` on a tile whose caller did not
-   * say, which is every caller that has not been taught to -- the conservative
-   * answer, since it claims nothing.
+   * **`resolve` reads this, and it is the one flag that decides whether `base`
+   * is a soffit or a bookkeeping number.** It did not, once, and the comment
+   * here said so; what changed is that the walk-under rule is only true for one
+   * of the two kinds, and for exactly the reason `world/invisible-walls.ts`
+   * already had to tell them apart:
+   *
+   *   - A **structure** is drawn at its own elevation with open air underneath.
+   *     Its `base` is the soffit, `decks.py` only lifts it off the ground where
+   *     there is `WALK_UNDER_M` (2.6 m) of room, and the volume between the
+   *     terrain and that soffit is meant to be walked through.
+   *   - A **building** is drawn from its pad *down* to the terrain: `mesh.py`
+   *     runs every wall from `base_y - skirt` with the skirt sized per building
+   *     to meet the ground. Its `base` is a pad, not a soffit, and there is no
+   *     air under it -- **39% of the 61,068 buildings in this build clear the
+   *     sampled terrain over their own footprint by more than 1.8 m**, so a
+   *     walk-under rule applied to them would open a player-high hole along the
+   *     downhill wall of two buildings in five. That is the same measurement
+   *     `invisible-walls.ts` uses to argue the classes cannot be told apart
+   *     geometrically, read the other way round.
+   *
+   * So a building is still solid from its top to the ground, exactly as it was,
+   * and only a structure gets the band. `false` on a tile whose caller did not
+   * pass a building count -- the conservative answer in both directions now,
+   * since it claims no air under anything.
    */
   structural: boolean;
   /**
@@ -73,11 +129,45 @@ export interface Prism {
   seen: number;
 }
 
+/**
+ * How far the top of a standing body is over its own feet, metres.
+ *
+ * 1.8, and it is not a fresh guess: it is the number the *pipeline* already
+ * models the player with. `cli.WALKABLE_UNDER_M` is derived from it in as many
+ * words -- "the controller's capsule is 1.8 m and it steps 0.42 m without help,
+ * so anything whose base is over 2.2 m is out of reach from the road below it
+ * even standing on the kerb" -- and `decks.WALK_UNDER_M` is the 2.6 m a deck is
+ * *built* to, chosen to clear the same 1.8 m player with room to jump. Three
+ * numbers in a line, each with slack over the next, and this is the bottom of
+ * it: the geometric height of the thing that has to fit.
+ *
+ * Deliberately a shade over `controller.EYE_HEIGHT` (1.68) rather than equal to
+ * it -- the eye is not the top of the head -- and deliberately declared here
+ * rather than imported from the controller, because this file is the shared
+ * authority and must not depend on the one caller that happens to be a person.
+ */
+export const BODY_HEIGHT_M = 1.8;
+
 /** Uniform grid over prisms, so a move query touches only nearby buildings. */
 export class CollisionWorld {
   private readonly cells = new Map<string, Prism[]>();
   private readonly cellSize: number;
-  private readonly tiles = new Set<string>();
+  /**
+   * Every resident tile, and the prisms it put in the grid.
+   *
+   * A `Map` rather than the `Set` this was, and the list is the whole reason:
+   * `removeTile` has to find a tile's own records among a grid that mixes every
+   * tile's together, and the only alternatives are a tile tag on each `Prism`
+   * (a field on a record this class hands out by reference, read by four
+   * modules) or a scan of every cell in the world. The list costs one array of
+   * a few hundred references per tile and makes the eviction a walk over
+   * exactly what that tile added.
+   *
+   * The server never removes anything -- `server/world.ts` loads all 372 tiles
+   * at boot and holds them for the process -- so on that side this is the old
+   * `Set` with a payload nobody reads.
+   */
+  private readonly tiles = new Map<string, Prism[]>();
   private count = 0;
   /** `prismsWithin`'s query counter. See `Prism.seen`. */
   private visit = 0;
@@ -117,7 +207,8 @@ export class CollisionWorld {
     buildingCount?: number,
   ): number {
     if (this.tiles.has(key)) return 0;
-    this.tiles.add(key);
+    const mine: Prism[] = [];
+    this.tiles.set(key, mine);
 
     const view = new DataView(buffer);
     let p = 0;
@@ -171,10 +262,75 @@ export class CollisionWorld {
         seen: 0,
       };
       this.insert(prism);
+      mine.push(prism);
       added++;
       this.count++;
     }
     return added;
+  }
+
+  /**
+   * Drop one tile's prisms out of the grid. Returns how many went.
+   *
+   * **The client half of a lifetime that used to have only one end.** Nothing
+   * ever removed a tile from this world: `main.ts` fetches collision on a 420 m
+   * ring and the map only grew, while `TileStreamer` drops a tile's *geometry*
+   * the moment it leaves the 1,800 m render radius. So every tile the player
+   * had ever been near kept its prisms for the session, and any of them they
+   * walked far enough from lost its geometry -- which makes a return trip a
+   * guaranteed block of solid, invisible city. Measured on the shipped build:
+   * 676 walls across 6 tiles, every lap, with no network fault in it at all.
+   *
+   * **This is not a decision this class makes.** It is safety-critical to drop
+   * the ground out from under somebody, so the *when* lives in
+   * `world/tile-lifecycle.ts` beside the radius it is compared against, and the
+   * only caller is the streamer's own eviction path, which asks
+   * `mayEvictCollision` first. Calling this for a tile the player is standing
+   * in is a player falling through the world, and nothing in here can tell.
+   *
+   * Idempotent, and safe against a re-add: `addTile` re-decodes the payload
+   * from scratch, so a tile that leaves and comes back is fresh records in
+   * fresh cells rather than anything resurrected.
+   *
+   * The cell arithmetic is `insert`'s, run backwards. Recomputed rather than
+   * remembered because it is a floor of a bound this record already carries and
+   * a cached cell list would be a second copy of the same fact that could
+   * disagree with the first. A prism 15 m across lands in one to four of the
+   * 32 m cells, so this is a handful of short splices per building.
+   */
+  removeTile(key: string): number {
+    const mine = this.tiles.get(key);
+    if (mine === undefined) return 0;
+    this.tiles.delete(key);
+    const c = this.cellSize;
+    for (const prism of mine) {
+      for (let cx = Math.floor(prism.minX / c); cx <= Math.floor(prism.maxX / c); cx++) {
+        for (let cz = Math.floor(prism.minZ / c); cz <= Math.floor(prism.maxZ / c); cz++) {
+          const k = `${cx},${cz}`;
+          const list = this.cells.get(k);
+          if (list === undefined) continue;
+          const at = list.indexOf(prism);
+          if (at >= 0) list.splice(at, 1);
+          // Emptied cells go, rather than being left as empty arrays: the grid
+          // is keyed by string and a player who has crossed the city leaves
+          // tens of thousands of them behind, every one of them a `Map` entry
+          // `near` has to miss on.
+          if (list.length === 0) this.cells.delete(k);
+        }
+      }
+    }
+    this.count -= mine.length;
+    return mine.length;
+  }
+
+  /** How many tiles' prisms are resident. For the overlay and the checks. */
+  get tileCount(): number {
+    return this.tiles.size;
+  }
+
+  /** Which ones, as a fresh array. A console and check tool, not a per-frame one. */
+  residentTiles(): string[] {
+    return [...this.tiles.keys()];
   }
 
   private insert(prism: Prism): void {
@@ -262,8 +418,40 @@ export class CollisionWorld {
    * sliding along a facade rather than sticking. Two passes handles the inside of
    * a corner, where the first push can move the player into the other wall.
    *
-   * Returns the resolved position. `feetY` decides whether a prism is even in the
-   * way -- you can stand on top of a low building and walk over it.
+   * Returns the resolved position. `feetY` and `headY` are the two ends of the
+   * body and they decide whether a prism is in the way at all: you can stand on
+   * top of a low building and walk over it, and you can walk *under* a deck
+   * whose soffit is over your head.
+   *
+   * **The two ends are the caller's to state, and they are not the same
+   * question.** `feetY` is a *probe* height and every caller here already lifts
+   * it by the step it is allowed to climb -- `controller.step` passes
+   * `feet + STEP_HEIGHT` so a kerb is climbed rather than walked into, and the
+   * placement probes pass `ground + 0.42` for the same reason. Lifting the head
+   * by that step as well would make the clearance a body needs 2.22 m rather
+   * than its own 1.8 m, which is over `cli.WALKABLE_UNDER_M` -- the pipeline's
+   * audit would be calling a volume walk-under while this file called it a wall.
+   * So `headY` defaults to `feetY + BODY_HEIGHT_M`, which is right for a probe
+   * asking "is a body free to stand here, kerb and all", and the two callers
+   * whose body is not a standing person say so:
+   *
+   *   - `player/controller.ts` passes `feet + BODY_HEIGHT_M` from the *unlifted*
+   *     feet. It is the one caller the pipeline's audit is written against, and
+   *     it is the one that has to clear every soffit the audit excuses.
+   *   - `game/footy.ts` and `main.ts`'s chase camera pass `headY === feetY`: a
+   *     ball and a camera boom are points, and asking either to carry a 1.8 m
+   *     head would stop the ball under a span and snap the camera in under the
+   *     Cahill.
+   *
+   * Everything else takes the default from its own already-lifted probe and so
+   * asks for 2.22 m (2.1 m for `game/wildlife.ts`, which lifts by 0.3): the
+   * police, the street factions, the animals, a knocked-out body, and the four
+   * placement probes that ask whether a spawn, a bike or a respawn ring is
+   * clear. That is deliberately the strictest reading in the file and it costs
+   * nothing real -- `decks.WALK_UNDER_M` builds every soffit in the city to
+   * 2.6 m, so an officer still follows a player under the Cahill, and a spawn
+   * point under a viaduct is refused only where the viaduct is within 40 cm of
+   * being a wall anyway.
    */
   resolve(
     fromX: number,
@@ -272,6 +460,7 @@ export class CollisionWorld {
     toZ: number,
     radius: number,
     feetY: number,
+    headY: number = feetY + BODY_HEIGHT_M,
   ): { x: number; z: number; hit: boolean } {
     let x = toX;
     let z = toZ;
@@ -280,10 +469,7 @@ export class CollisionWorld {
     for (let pass = 0; pass < 2; pass++) {
       let moved = false;
       for (const prism of this.near(x, z, radius)) {
-        // Standing above the roofline: not an obstacle. Against `top` rather
-        // than `height`, and that is the whole of what terrain changed here --
-        // a 9 m warehouse on a pad 30 m up is 39 m of obstacle, not 9.
-        if (feetY >= prism.top - 0.05) continue;
+        if (!this.solidFor(prism, feetY, headY, fromX, fromZ)) continue;
         if (
           x + radius < prism.minX ||
           x - radius > prism.maxX ||
@@ -304,19 +490,74 @@ export class CollisionWorld {
     }
 
     // If resolution failed to find a free spot, refuse the move rather than
-    // letting the player through a wall.
-    if (hit && this.overlaps(x, z, radius, feetY)) {
+    // letting the player through a wall. It has to ask the *same* question the
+    // push loop asked, `from` included -- a guard that read a prism as solid
+    // when the loop had exempted it would return the player to `from` on every
+    // tick they spent under a bridge, which is a freeze rather than a wall.
+    if (hit && this.overlaps(x, z, radius, feetY, headY, fromX, fromZ)) {
       return { x: fromX, z: fromZ, hit: true };
     }
     return { x, z, hit };
   }
 
-  private overlaps(x: number, z: number, radius: number, feetY: number): boolean {
+  private overlaps(
+    x: number,
+    z: number,
+    radius: number,
+    feetY: number,
+    headY: number,
+    fromX: number,
+    fromZ: number,
+  ): boolean {
     for (const prism of this.near(x, z, radius)) {
-      if (feetY >= prism.top - 0.05) continue;
+      if (!this.solidFor(prism, feetY, headY, fromX, fromZ)) continue;
       if (pointInPolygon(prism.points, x, z)) return true;
     }
     return false;
+  }
+
+  /**
+   * Is this prism in the way of a body spanning `[feetY, headY]` that started
+   * the move at `(fromX, fromZ)`? The whole of the band rule, in one place
+   * because `resolve` and its own overlap guard must not be able to disagree.
+   *
+   * Four clauses, in the order they are cheapest to fail:
+   *
+   *   1. **Above the roofline.** The test that was here before terrain and
+   *      before this, epsilon and all: against `top` rather than `height`,
+   *      because a 9 m warehouse on a pad 30 m up is 39 m of obstacle. The
+   *      0.05 m is what lets a caller's step tolerance land *on* a kerb instead
+   *      of inside it, and every kerb-climbing behaviour in the game is that
+   *      number.
+   *   2. **Not a structure.** A building is solid from its top to the terrain
+   *      whatever its pad says, because its walls are drawn down to the terrain.
+   *      See `Prism.structural` for the measurement that settles it.
+   *   3. **Wholly under the soffit.** Half-open `[base, top)`: a head exactly at
+   *      the soffit clears it. This is the line the Cahill, the Western
+   *      Distributor and the Harbour Bridge all fall on.
+   *   4. **Already under it.** A body whose *feet* are below the soffit is under
+   *      the deck, not in it; only its head is in the band, and it got there by
+   *      jumping or by the ground rising. Pushing it out in plan would send it
+   *      to the nearest edge of the footprint in one tick, which under a 12 m
+   *      viaduct is a six-metre sideways teleport mid-jump. So a body that was
+   *      already inside the footprint before the move is left where it is and
+   *      clips the girder; one arriving from outside is stopped at the edge,
+   *      which is what makes a street rising into a soffit a wall. Tested at
+   *      `from` rather than at the running `(x, z)` so that both resolve passes
+   *      and the overlap guard get the same answer.
+   */
+  private solidFor(
+    prism: Prism,
+    feetY: number,
+    headY: number,
+    fromX: number,
+    fromZ: number,
+  ): boolean {
+    if (feetY >= prism.top - 0.05) return false;
+    if (!prism.structural) return true;
+    if (headY <= prism.base) return false;
+    if (feetY < prism.base && pointInPolygon(prism.points, fromX, fromZ)) return false;
+    return true;
   }
 
   /**
@@ -342,6 +583,14 @@ export class CollisionWorld {
    *      crosses a footprint's outline 30 m up has not been blocked by a 9 m
    *      warehouse, and a purely planar test would say it had -- which reads as
    *      police who cannot see you across a car park.
+   *
+   * It needed nothing from the walk-under rule and got nothing: this test has
+   * honoured `base` since the day it was written, in both the cheap reject and
+   * the crossing-height clause, so an officer on Alfred Street could always see
+   * a player standing under the Cahill even while `resolve` insisted neither of
+   * them could walk there. The two answers now agree, which is the state they
+   * were always supposed to be in -- police who can see under a bridge they
+   * cannot follow you under is the pair of bugs this half was already free of.
    *
    * A segment that *starts or ends inside* a footprint counts as blocked, which
    * is the honest answer for the two ways it happens: somebody standing in a
@@ -396,10 +645,22 @@ export class CollisionWorld {
    *
    * It cannot let a falling player through a roof, which is the failure the old
    * rule was carefully avoiding. Landing on a roof means feet at `top`, which is
-   * above `base`; falling from higher still is further above it. The only way to
-   * be under the base *and* inside the footprint is to be inside the building's
-   * volume, and `resolve` above is what keeps that from happening -- it treats
-   * exactly the same prism as solid.
+   * above `base`; falling from higher still is further above it.
+   *
+   * **And that same `base` test is the whole of what the walk-under rule needed
+   * from this function, which is why it is unchanged by it.** The sentence that
+   * used to finish the paragraph above -- "the only way to be under the base and
+   * inside the footprint is to be inside the building's volume, and `resolve`
+   * keeps that from happening" -- is no longer true, and it does not have to be:
+   * being under the base and inside the footprint is now the ordinary state of a
+   * player under the Cahill, and `feetY < prism.base - 0.05` is exactly the
+   * clause that refuses to hand them the deck twenty metres up as their floor.
+   * Standing *on* the deck is the other side of the same test -- feet at `top`
+   * are above `base`, so the deck is still the floor for whoever is on it, and
+   * the deck-run continuity `checkTraffic` asserts still holds. A query that
+   * looked only for "the highest top under the point" would teleport a player
+   * walking under a viaduct onto it, which is the bug this shape was already
+   * written to avoid one storey lower down.
    *
    * `-Infinity` rather than 0 for "nothing here", because zero is a real height
    * now: it is the ground at the ENU origin, some tens of metres above most of
@@ -545,4 +806,319 @@ function pointInPolygon(points: Float32Array, x: number, z: number): boolean {
     }
   }
   return inside;
+}
+
+// --- The self-check -------------------------------------------------------------
+
+/**
+ * A collision payload, encoded exactly as `tiles.write_collision` writes one.
+ *
+ * Local to the check rather than shared with `world/invisible-walls.ts`'s copy,
+ * and on purpose: this is the module that *decodes* the format, so a helper it
+ * borrowed from a reader could agree with that reader about a layout the
+ * pipeline never wrote.
+ */
+function encodeCheckPayload(
+  prisms: ReadonlyArray<{ height: number; base: number; points: readonly number[] }>,
+): ArrayBuffer {
+  let bytes = 4;
+  for (const p of prisms) bytes += 10 + p.points.length * 4;
+  const buffer = new ArrayBuffer(bytes);
+  const view = new DataView(buffer);
+  let o = 0;
+  view.setUint32(o, prisms.length, true);
+  o += 4;
+  for (const p of prisms) {
+    view.setFloat32(o, p.height, true);
+    o += 4;
+    view.setFloat32(o, p.base, true);
+    o += 4;
+    view.setUint16(o, p.points.length / 2, true);
+    o += 2;
+    for (const v of p.points) {
+      view.setFloat32(o, v, true);
+      o += 4;
+    }
+  }
+  return buffer;
+}
+
+/** An axis-aligned slab, as a plan ring. */
+function slab(x0: number, z0: number, x1: number, z1: number): number[] {
+  return [x0, z0, x1, z0, x1, z1, x0, z1];
+}
+
+/**
+ * The band rule, asserted.
+ *
+ * Every case here is one the shipped city actually contains -- a viaduct over a
+ * street, a pier standing in it, a terrace on a pad above the footpath, a ramp
+ * touching down -- reduced to the smallest arrangement that can tell the right
+ * answer from the wrong one. Arithmetic only: no world files, no clock, no DOM.
+ *
+ * The **old** rule is not reimplemented anywhere in here, which is the point of
+ * how the oracle is built: a tile added without a building count marks every
+ * prism a building, and `solidFor` on a building is `feetY >= top - 0.05` and
+ * nothing else -- the exact test this file shipped with. So "the world before
+ * this change" is the same payload added the old way, and the two can be run
+ * against each other without a second copy of the rule to drift.
+ */
+export function verifyCollision(): string[] {
+  const failures: string[] = [];
+  const say = (s: string): void => void failures.push(s);
+
+  // A viaduct 12 m wide and 60 m long with its soffit 5 m up, one pier holding
+  // it up, and a terrace beside it on a pad 3 m above the footpath. The deck and
+  // the pier are structures; the terrace is a building.
+  const DECK = { height: 1.2, base: 5, points: slab(-6, -30, 6, 30) };
+  const PIER = { height: 5, base: 0, points: slab(-1.3, -1, 1.3, 1) };
+  const TERRACE = { height: 9, base: 3, points: slab(20, -10, 34, 10) };
+  const city = (): CollisionWorld => {
+    const w = new CollisionWorld();
+    w.addTile('t', encodeCheckPayload([DECK, PIER, TERRACE]), 0, 0, 1);
+    return w;
+  };
+  const world = city();
+  const R = 0.34;
+  /** A standing body, the way `controller.step` asks: feet lifted, head not. */
+  const walk = (w: CollisionWorld, fx: number, fz: number, tx: number, tz: number, feet: number) =>
+    w.resolve(fx, fz, tx, tz, R, feet + 0.42, feet + BODY_HEIGHT_M);
+
+  // --- 1. Under the span, the length of it. The headline.
+  //
+  // Down the deck at x = 4, which is inside the 12 m footprint and clear of the
+  // pier standing at the origin -- the walk-under lane, not the pier's lane.
+  {
+    let x = 4;
+    let z = -40;
+    let stopped = 0;
+    for (let i = 0; i < 160; i++) {
+      const r = walk(world, x, z, x, z + 0.5, 0);
+      if (r.hit) stopped++;
+      x = r.x;
+      z = r.z;
+    }
+    if (stopped > 0 || z < 39) {
+      say(
+        `A body walked ${(z + 40).toFixed(1)} m of an 80 m course under a soffit 5 m over its ` +
+          `head and was stopped ${stopped} time(s). A prism whose base is above a head is one ` +
+          `the pipeline wrote to be walked under.`,
+      );
+    }
+  }
+
+  // --- 2. And is stopped by the pier holding it up.
+  {
+    const r = walk(world, 6, 0, 0, 0, 0);
+    // Measured against where it was *going*, not along one axis: `pushOut` frees
+    // the circle by the nearest edge, and for a body that walked into the middle
+    // of a 2.6 x 2 m pier that edge is a side one.
+    if (!r.hit || Math.hypot(r.x, r.z) < 0.9) {
+      say(
+        `Walking into a pier at the origin was not blocked (ended ` +
+          `${Math.hypot(r.x, r.z).toFixed(2)} m from its centre).`,
+      );
+    }
+  }
+
+  // --- 3. Standing on the deck still stands on the deck.
+  {
+    if (walk(world, 4, -20, 4, -19, 6.2).hit) {
+      say('A body standing on the deck top was pushed off it -- the roofline test regressed.');
+    }
+    // Against a tolerance because `base` and `height` are f32 in the payload and
+    // 5 + 1.2 comes back as 6.200000047683716. The wire format is the authority
+    // on that, not the literal in this file.
+    const onDeck = world.roofHeight(4, -20, 6.2);
+    if (Math.abs(onDeck - 6.2) > 1e-4) {
+      say(`roofHeight for a body on the deck answered ${onDeck} rather than the deck top, 6.2.`);
+    }
+    // And under it the deck is not a floor. This is the "standing under the
+    // bridge teleports you onto it" failure, and the `base` clause is what
+    // refuses it.
+    if (world.roofHeight(4, -20, 0) !== -Infinity) {
+      say(
+        `roofHeight under the deck answered ${world.roofHeight(4, -20, 0)}; a body at street ` +
+          `level must not be handed a soffit 5 m over it as ground.`,
+      );
+    }
+  }
+
+  // --- 4. A building on a pad is solid to the ground, pad or no pad.
+  //
+  // The one case the band rule must *not* widen: `mesh.py` draws a building's
+  // walls from its pad down to the terrain with a skirt, so the air under a
+  // terrace's floor is a wall you can see. 39% of this build's buildings clear
+  // the sampled terrain over their footprint by more than a body's height.
+  {
+    const r = walk(world, 18, 0, 24, 0, 0);
+    if (!r.hit || r.x > 20) {
+      say(
+        `A body walked into a building on a 3 m pad and was not stopped (ended at ` +
+          `x=${r.x.toFixed(2)}). Only structures get the band.`,
+      );
+    }
+  }
+
+  // --- 5. A street rising into a soffit closes the gap.
+  //
+  // Approached from outside, which is how it happens: the ground comes up under
+  // the player as they walk toward the deck, and the tick their head reaches the
+  // soffit is the tick they stop.
+  {
+    // Deep under the deck, 2 m of clearance left: still walking.
+    const clear = walk(world, 4, -25, 4, -24, 3.0);
+    if (clear.hit || Math.abs(clear.z + 24) > 1e-9) {
+      say('A body with 2 m of clearance under the soffit was stopped early.');
+    }
+    const risen = walk(world, 0, -31, 0, -29.5, 3.3);
+    if (!risen.hit || risen.z < -30.5) {
+      say(
+        `A body whose head had risen into the soffit band walked under it anyway (z=` +
+          `${risen.z.toFixed(2)}). Ground rising into a deck has to become a wall.`,
+      );
+    }
+  }
+
+  // --- 6. Nobody is teleported out from under a bridge.
+  //
+  // A body already under the deck whose head enters the band -- a jump, or a
+  // metre of rising ground -- is left where it is. Pushing it out in plan would
+  // send it to the nearest edge of a 12 m footprint in one tick.
+  {
+    const jump = world.resolve(4, 0, 4, 0.1, R, 1.5 + 0.42, 1.5 + BODY_HEIGHT_M);
+    const moved = Math.hypot(jump.x - 4, jump.z - 0);
+    if (moved > 0.2) {
+      say(
+        `A body under the deck was displaced ${moved.toFixed(2)} m when its head entered the ` +
+          `girder. Under a real viaduct that is a six-metre sideways teleport mid-jump.`,
+      );
+    }
+  }
+
+  // --- 7. Half-open at the soffit, and the step tolerance at the top untouched.
+  {
+    const w = new CollisionWorld();
+    w.addTile(
+      'k',
+      encodeCheckPayload([
+        { height: 4, base: 2.0, points: slab(-3, 40, 3, 46) },
+        { height: 0.3, base: 0, points: slab(-3, 60, 3, 66) },
+        { height: 0.6, base: 0, points: slab(-3, 80, 3, 86) },
+      ]),
+      0,
+      0,
+      0,
+    );
+    if (w.resolve(0, 38, 0, 43, R, 0.42, 2.0).hit) {
+      say('A head exactly at the soffit was blocked; the band is half-open at `base`.');
+    }
+    if (!w.resolve(0, 38, 0, 43, R, 0.42, 2.0001).hit) {
+      say('A head a tenth of a millimetre into the band was not blocked.');
+    }
+    if (w.resolve(0, 58, 0, 63, R, 0.42, 0.42 + BODY_HEIGHT_M).hit) {
+      say('A 0.3 m kerb inside the step height stopped a body. STEP_HEIGHT regressed.');
+    }
+    if (!w.resolve(0, 78, 0, 83, R, 0.42, 0.42 + BODY_HEIGHT_M).hit) {
+      say('A 0.6 m wall over the step height did not stop a body.');
+    }
+  }
+
+  // --- 8. Sight lines agree with feet.
+  //
+  // `blocked` has honoured `base` since it was written; what this asserts is
+  // that the two answers now say the same thing about the same volume, because
+  // an officer who can see under a bridge they cannot walk under is the half of
+  // this bug that never showed.
+  {
+    if (world.blocked(-20, 1.6, 0, 20, 1.6, 0) !== true) {
+      say('The pier does not block a sight line through it.');
+    }
+    if (world.blocked(-5, 1.6, -20, 5, 1.6, -20)) {
+      say('A sight line under the deck, clear of the pier, was blocked by the deck.');
+    }
+  }
+
+  // --- 9. The widening property, over randomised configurations.
+  //
+  // The contract for this change is that it is *only* a widening: no position
+  // any body could reach before may be refused now. Run against the same payload
+  // added without a building count, which is the old rule exactly -- see the
+  // header on this function.
+  {
+    let seed = 0x5eed1;
+    const rnd = (): number => {
+      // A 32-bit LCG. No `Math.random`: a property test that cannot be replayed
+      // is a rumour, and this file's whole discipline is reproducible answers.
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    let newlyBlocked = 0;
+    let diverged = 0;
+    let flatDiverged = 0;
+    let cases = 0;
+    let widened = 0;
+    for (let trial = 0; trial < 400; trial++) {
+      // A quarter of the configurations have nothing off the ground at all,
+      // which is the population the two rules must agree on to the bit.
+      const flat = trial % 4 === 0;
+      const prisms: Array<{ height: number; base: number; points: number[] }> = [];
+      const n = 1 + Math.floor(rnd() * 4);
+      for (let i = 0; i < n; i++) {
+        const cx = (rnd() - 0.5) * 40;
+        const cz = (rnd() - 0.5) * 40;
+        const w = 2 + rnd() * 10;
+        const d = 2 + rnd() * 10;
+        prisms.push({
+          height: 0.2 + rnd() * 12,
+          base: flat ? 0 : rnd() < 0.5 ? 0 : rnd() * 8,
+          points: slab(cx - w * 0.5, cz - d * 0.5, cx + w * 0.5, cz + d * 0.5),
+        });
+      }
+      const payload = encodeCheckPayload(prisms);
+      const after = new CollisionWorld();
+      after.addTile('t', payload, 0, 0, 0);
+      const before = new CollisionWorld();
+      before.addTile('t', payload, 0, 0);
+      for (let q = 0; q < 25; q++) {
+        const fx = (rnd() - 0.5) * 50;
+        const fz = (rnd() - 0.5) * 50;
+        const tx = fx + (rnd() - 0.5) * 4;
+        const tz = fz + (rnd() - 0.5) * 4;
+        const feet = rnd() * 12;
+        const a = before.resolve(fx, fz, tx, tz, R, feet + 0.42, feet + BODY_HEIGHT_M);
+        const b = after.resolve(fx, fz, tx, tz, R, feet + 0.42, feet + BODY_HEIGHT_M);
+        cases++;
+        // "Newly blocked" is about the *destination*, not the flag: a body that
+        // reaches where it was going has not been blocked however many prisms it
+        // brushed on the way.
+        const reachedBefore = Math.hypot(a.x - tx, a.z - tz) < 1e-9;
+        const reachedAfter = Math.hypot(b.x - tx, b.z - tz) < 1e-9;
+        if (reachedBefore && !reachedAfter) newlyBlocked++;
+        if (!reachedBefore && reachedAfter) widened++;
+        if (b.hit && !a.hit) newlyBlocked++;
+        if (a.x !== b.x || a.z !== b.z || a.hit !== b.hit) {
+          diverged++;
+          if (flat) flatDiverged++;
+        }
+      }
+    }
+    if (newlyBlocked > 0) {
+      say(
+        `${newlyBlocked} of ${cases} randomised moves became blocked that were not before. This ` +
+          `change is a strict widening or it is a regression.`,
+      );
+    }
+    if (flatDiverged > 0) {
+      say(
+        `${flatDiverged} moves in a city with nothing off the ground answered differently under ` +
+          `the new rule. With every base at zero the two rules are the same comparison.`,
+      );
+    }
+    if (widened === 0 || diverged === 0) {
+      say('The randomised sweep never met an elevated prism; the property proves nothing.');
+    }
+  }
+
+  return failures;
 }

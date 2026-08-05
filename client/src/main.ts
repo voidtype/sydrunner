@@ -235,6 +235,7 @@ import { Minimap } from './minimap.ts';
 import { MapAtlas } from './mapatlas.ts';
 import { BigMap, verifyBigMap } from './bigmap.ts';
 import { InvisibleWalls, verifyInvisibleWalls } from './world/invisible-walls.ts';
+import { verifyTileLifecycle } from './world/tile-lifecycle.ts';
 
 const SIMULATION_HZ = 60;
 const FIXED_DT = 1 / SIMULATION_HZ;
@@ -515,6 +516,14 @@ async function main(): Promise<void> {
   // that never goes out trains the player to ignore it. See
   // `world/invisible-walls.ts`.
   const wallFailures = timed('invisible-walls', () => verifyInvisibleWalls());
+  // And the two rules that decide when a tile is *allowed* to be one of those
+  // walls, which is the same criterion again: both of them fail by looking
+  // healthy. A transient failure misfiled as permanent is a tile that is never
+  // requested again and nothing anywhere says so -- it reads as a slow network
+  // forever. A collision keep radius that slipped under the ring `ensureGround`
+  // fetches on is prisms vanishing from under a player's feet, with no error and
+  // no frame that shows it. See `world/tile-lifecycle.ts`.
+  const lifecycleFailures = timed('tile-lifecycle', () => verifyTileLifecycle());
   // Once, at `debug` so it is out of the way, and slowest-first because the only
   // question anyone asks of this line is which one it was.
   checkMs.sort((a, b) => b[1] - a[1]);
@@ -552,7 +561,8 @@ async function main(): Promise<void> {
     nameplateFailures.length ||
     guardFailures.length ||
     hudFailures.length ||
-    wallFailures.length
+    wallFailures.length ||
+    lifecycleFailures.length
   ) {
     hud.fatal(
       'Self-checks failed:\n' +
@@ -587,6 +597,7 @@ async function main(): Promise<void> {
           ...guardFailures,
           ...hudFailures,
           ...wallFailures,
+          ...lifecycleFailures,
         ]
           .map((f) => '  - ' + f)
           .join('\n'),
@@ -1215,6 +1226,19 @@ async function main(): Promise<void> {
     ready: (key) => collision.hasTile(key),
     solid: (x, y, z) => collision.roofHeight(x, z, y) > y + 0.4,
   });
+
+  // And the same world again, as the streamer's collision *lifetime* handle.
+  //
+  // Two facts and no questions -- whether a tile's prisms are resident, and the
+  // ability to take them away -- which is exactly what pairs the two halves of
+  // a tile that this file and the streamer load on two different radii. Without
+  // it collision accumulated for the session while geometry was evicted past
+  // 1,800 m, so every return trip found tiles that stop the player and draw
+  // nothing: 676 walls across 6 tiles, measured, every lap, with no network
+  // fault in it. See `TileStreamer.setCollisionSink`, which also explains why
+  // the streamer refuses to drop prisms anywhere near the player whatever the
+  // renderer is doing.
+  streamer.setCollisionSink(collision);
 
   // Spec 8.3's powerups. The field owns every point the client has ever seen and
   // outlives the tiles they arrived on, which is what makes a 90 s station
@@ -2358,12 +2382,16 @@ async function main(): Promise<void> {
   // a 1.6 MB GLB that goes through the streamer's fetch, worker decode and
   // budgeted build. Between the two the prisms of a tile are solid and there is
   // nothing drawn where they are -- which at the tuned e-bike's 39 m/s is a
-  // wall you ride into in a street that is not there yet. And a second class
-  // never resolves at all: `tiles.write_collision` writes every deck, viaduct
-  // and landmark volume with its `base` at the *soffit*, and
-  // `CollisionWorld.resolve` tests only `top`, so the Cahill Expressway is solid
-  // from the ground up. See `world/invisible-walls.ts` for both and for the
-  // measurements.
+  // wall you ride into in a street that is not there yet. That gap is what this
+  // overlay marks, and it is now all of what it marks.
+  //
+  // There was a second class, permanent: `tiles.write_collision` writes every
+  // deck, viaduct and landmark volume with its `base` at the *soffit*, and
+  // `CollisionWorld.resolve` tested only `top`, so the Cahill Expressway was
+  // solid from the ground up. It is not any more -- `resolve` tests a body's
+  // band against `[base, top)` -- so those 4,522 prisms are no longer walls at
+  // all and no longer wear an ink. See `world/invisible-walls.ts`, which still
+  // measures them for the counter that says the rule has something to act on.
   //
   // The ground sampler is `rawGroundAt` and deliberately **not**
   // `groundHeightAt`, for both of the reasons that function is written down
@@ -3915,9 +3943,12 @@ async function main(): Promise<void> {
         const pz = headZ - dirZ * d;
         const py = headY - dirY * d + CHASE_LIFT;
         // Against the roofs as well as the walls: a camera that swung up over a
-        // warehouse would otherwise end up inside it.
+        // warehouse would otherwise end up inside it. Head and feet both at the
+        // boom's own height -- a camera is a point, and a 1.8 m head on it would
+        // snap the chase in against a soffit the player is walking happily
+        // under. See `CollisionWorld.resolve`.
         if (
-          collision.resolve(px, pz, px, pz, CHASE_RADIUS, py).hit ||
+          collision.resolve(px, pz, px, pz, CHASE_RADIUS, py, py).hit ||
           py < groundHeightAt(px, pz, py) + CHASE_FLOOR
         ) {
           reach = Math.max(CHASE_NEAR, ((want * (s - 1)) / CHASE_STEPS) - 0.05);
@@ -4958,6 +4989,37 @@ async function main(): Promise<void> {
     invisibleWalls,
     invisibleWallStats: () => invisibleWalls.stats(),
     invisibleWallSelfChecks: () => verifyInvisibleWalls(),
+
+    /**
+     * The streaming lifecycle, from the other end: what has failed, what is
+     * being retried and when, what the build does not contain, and how many
+     * tiles have had their prisms dropped with their geometry.
+     *
+     * The two console tools beside it are the only way to reproduce either half
+     * of this on demand.
+     *
+     *   * `sydney.streaming.fail('5_-1')` faults that tile's next fetch with a
+     *     503: watch it go amber on the map, count down on the HUD's tiles
+     *     line, and draw itself five seconds later. `fail('5_-1', 404)` is the
+     *     other branch -- suppressed for the session, counted as "not in
+     *     build", logged once.
+     *   * `sydney.streaming.retryNow()` forgets every verdict, which is what a
+     *     developer wants after re-running the pipeline into a tab that is
+     *     still open.
+     *
+     * `report().collisionEvicted` is the number that says the parity rule is
+     * alive: it should climb as the player crosses the city. `report().holds`
+     * is the one that should never move -- see `TileStreamer.dispose`.
+     */
+    streaming: {
+      report: () => streamer.lifecycleReport,
+      phase: (key: string) => streamer.tilePhase(key),
+      fail: (key: string, status = 503, times = 1) => streamer.debugFailTile(key, status, times),
+      retryNow: (key?: string) => streamer.retryNow(key),
+      selfChecks: () => verifyTileLifecycle(),
+      /** Which tiles' prisms are resident, for the parity probe. */
+      collisionTiles: () => collision.residentTiles(),
+    },
 
     /**
      * The street/suburb readout under the map.
