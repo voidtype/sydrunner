@@ -146,6 +146,18 @@ interface MaybeTexture {
   isTexture?: boolean;
   isDataTexture?: boolean;
   isCubeTexture?: boolean;
+  isCanvasTexture?: boolean;
+  /**
+   * The five flags that make three take `backend.createTexture` instead of the
+   * branch that reads `image`. A texture with any of them set never has its
+   * image dereferenced, so a null one is not a fault -- see
+   * `wouldDereferenceNull`, which mirrors three's own condition.
+   */
+  isRenderTargetTexture?: boolean;
+  isDepthTexture?: boolean;
+  isFramebufferTexture?: boolean;
+  isStorageTexture?: boolean;
+  isExternalTexture?: boolean;
   name?: string;
   image?: unknown;
   version?: number;
@@ -400,6 +412,16 @@ function placeholderImage(texture: MaybeTexture): unknown {
   if (texture.isDataTexture === true) {
     return { data: new Float32Array(4), width: 1, height: 1 };
   }
+  if (texture.isCubeTexture === true) {
+    // Six faces, because `getSize` reads `texture.images[0]` and the upload
+    // walks all six. One canvas reused is fine: they are all the same texel.
+    const face = onePixelCanvas();
+    return [face, face, face, face, face, face];
+  }
+  return onePixelCanvas();
+}
+
+function onePixelCanvas(): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = 1;
   canvas.height = 1;
@@ -460,13 +482,268 @@ export function quarantine(scene: Object3D): string[] {
   return done;
 }
 
-// --- Surviving a frame that throws --------------------------------------------
+// --- The shim: intercepting at the throwing call site --------------------------
 
-/** What `RenderGuard` needs of the HUD. Structural, so the checks can drive it. */
+/** What `RenderGuard` and the shim need of the HUD. Structural, so the checks can drive it. */
 export interface GuardReport {
   fatal(message: string): void;
   notice(message: string): void;
 }
+
+/**
+ * Why there is a shim as well as an audit, and why searching was the wrong
+ * strategy.
+ *
+ * The audit above is comprehensive over everything this client can *enumerate*:
+ * the registry, three's shared `EmptyTexture`, every material in the scene
+ * through both classic slots and walkable node graphs, and the scene's own
+ * background, environment and override material. On the third occurrence it
+ * found **nothing**, while the renderer went on throwing `null.complete` every
+ * frame. That is a decisive negative result rather than a disappointment: the
+ * offending texture is somewhere no traversal from `scene` reaches.
+ *
+ * There is a lot of somewhere. Three binds textures this client never sees --
+ * shadow-map depth textures, PMREM and environment products, background
+ * textures, internal render-target attachments, textures reached through the
+ * *shadow pass's* material rather than the scene material, and anything hung on
+ * an object parented to the camera rather than to the scene. Widening the
+ * search to cover each of those is a losing game: every round adds a place to
+ * look, and the failure mode of missing one is exactly the silent dead world
+ * this whole module exists to prevent.
+ *
+ * So this stops searching and **intercepts the call that throws**.
+ * `Textures.updateTexture` is the single function that dereferences the null,
+ * and every texture three uploads goes through it, whatever its origin and
+ * however it was reached. Wrapping it catches the fault one instruction before
+ * three commits it, for *any* origin, and gets the identity for free -- which
+ * is the thing three rounds of searching could not produce.
+ *
+ * --- How it fails safe
+ *
+ * The hook is on `renderer._textures`, a private field, so a three upgrade can
+ * rename it out from under this. Every step is therefore checked and the
+ * failure is a **logged no-op**: `install` returns a reason string, warns once,
+ * and leaves `RenderGuard` as the net it already was. It never throws, so a
+ * renamed internal cannot turn into a boot fatal. Inside the wrapper the
+ * inspection is wrapped again and the original is called through a `finally`,
+ * so a bug in this file cannot stop a frame that three would have drawn.
+ *
+ * --- The second hook, and why it is worth one more private field
+ *
+ * `updateTexture` receives only the texture, which names the object but not
+ * where it was bound from. `Bindings.getForRender( renderObject )` is called
+ * immediately above it in the same stack and *does* have the render object --
+ * its mesh and its material. Recording that for the duration of the call turns
+ * "some texture with no image" into "this texture, bound by this material, on
+ * this mesh", which is the difference between a report we can act on and
+ * another round of guessing. It is optional: if `_bindings` cannot be found the
+ * shim installs anyway and simply reports less.
+ */
+
+/** One thing the shim caught, and how many times. Keyed by identity. */
+const CATCH_KEY = Symbol.for('sydney.textureAudit.shimCatches');
+const catchGlobals = globalThis as unknown as Record<symbol, Map<string, number> | undefined>;
+const shimCatches: Map<string, number> = catchGlobals[CATCH_KEY] ?? new Map<string, number>();
+catchGlobals[CATCH_KEY] = shimCatches;
+
+/** Everything the shim has intercepted, most frequent first. One line each. */
+export function shimCatchLines(): string[] {
+  return [...shimCatches.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([identity, count]) => `${identity} [caught x${count}]`);
+}
+
+/** For the checks. */
+export function resetShimCatches(): void {
+  shimCatches.clear();
+}
+
+/**
+ * Would three dereference null on this texture?
+ *
+ * Mirrors `Textures.updateTexture`'s own branch exactly, and the exclusions
+ * matter as much as the test. A render-target, depth, framebuffer, storage or
+ * external texture takes the `backend.createTexture` path and never reads
+ * `image` at all, so one of those with a null image is **not** a fault and
+ * installing an image on it would be damage rather than repair.
+ */
+function wouldDereferenceNull(texture: MaybeTexture): boolean {
+  if (texture.isRenderTargetTexture === true) return false;
+  if (texture.isDepthTexture === true) return false;
+  if (texture.isFramebufferTexture === true) return false;
+  if (texture.isStorageTexture === true) return false;
+  if (texture.isExternalTexture === true) return false;
+  return texture.image === null && (texture.version ?? 0) > 0;
+}
+
+/** The render object currently having its bindings built, if the probe is in. */
+let currentRenderObject: Record<string, unknown> | null = null;
+
+/**
+ * Everything worth knowing about the texture that was about to throw.
+ *
+ * Deliberately verbose. This string is the entire product of the exercise: it
+ * is what turns "a texture somewhere had no image" into a specific object with a
+ * constructor, a uuid and a binding site, and it is what the next round will fix
+ * at the origin. It is built defensively -- every field is read through a
+ * `try` -- because an object that is already in a bad state is exactly the kind
+ * that throws on a getter.
+ */
+function identify(texture: MaybeTexture): string {
+  const parts: string[] = [];
+  const push = (label: string, read: () => unknown): void => {
+    try {
+      const value = read();
+      if (value !== undefined && value !== null && value !== '' && value !== false) {
+        parts.push(`${label}=${String(value)}`);
+      }
+    } catch {
+      parts.push(`${label}=<threw>`);
+    }
+  };
+  const t = texture as unknown as Record<string, unknown>;
+  push('class', () => (t.constructor as { name?: string } | undefined)?.name);
+  push('name', () => t.name);
+  push('uuid', () => t.uuid);
+  push('version', () => t.version);
+  push('source.uuid', () => (t.source as { uuid?: string } | undefined)?.uuid);
+  push('source.dataReady', () => (t.source as { dataReady?: boolean } | undefined)?.dataReady);
+  for (const flag of [
+    'isCanvasTexture', 'isDataTexture', 'isCubeTexture', 'isArrayTexture', 'isData3DTexture',
+    'isCompressedTexture', 'isVideoTexture', 'isDepthTexture', 'isRenderTargetTexture',
+    'isFramebufferTexture', 'isStorageTexture', 'isExternalTexture', 'isHTMLTexture',
+  ]) {
+    push(flag, () => (t[flag] === true ? true : undefined));
+  }
+  push('mapping', () => t.mapping);
+  push('format', () => t.format);
+  push('type', () => t.type);
+  push('colorSpace', () => t.colorSpace);
+  push('mipmaps', () => (Array.isArray(t.mipmaps) ? t.mipmaps.length : undefined));
+
+  // Where it was being bound from, if the bindings probe is installed.
+  const ro = currentRenderObject;
+  if (ro) {
+    const object = ro.object as Record<string, unknown> | undefined;
+    const material = ro.material as Record<string, unknown> | undefined;
+    push('boundOn', () => object && (object.name || object.type));
+    push('boundVia', () => material && (material.name || material.type));
+    push('materialClass', () => (material?.constructor as { name?: string } | undefined)?.name);
+    // A viewmodel or a nameplate field parented to the camera is not reachable
+    // by walking `scene`, and is one of the places the audit could not look.
+    push('underCamera', () => {
+      let node = object as { parent?: Record<string, unknown>; isCamera?: boolean } | undefined;
+      while (node) {
+        if (node.isCamera === true) return true;
+        node = node.parent as typeof node;
+      }
+      return undefined;
+    });
+  } else {
+    parts.push('boundOn=<no bindings probe>');
+  }
+  return parts.join(' ');
+}
+
+/**
+ * Install the interception. Returns a one-line account of what happened, which
+ * the boot log prints and the debug object keeps.
+ *
+ * Never throws. Every failure degrades to a logged no-op.
+ */
+export function installTextureShim(renderer: unknown, report: GuardReport): string {
+  try {
+    const r = renderer as Record<string, unknown> | null;
+    const textures = r?._textures as Record<string, unknown> | undefined;
+    if (!textures || typeof textures.updateTexture !== 'function') {
+      const why =
+        'renderer._textures.updateTexture was not found -- three has probably renamed it. ' +
+        'The render guard is still in place, but a null-image texture will crash the frame before it can be named.';
+      console.warn('[render] texture shim NOT installed: ' + why);
+      return 'not installed: ' + why;
+    }
+    if (textures.__sydneyShimmed === true) return 'already installed';
+
+    const original = textures.updateTexture as (texture: unknown, options?: unknown) => unknown;
+    textures.updateTexture = function (this: unknown, texture: unknown, options?: unknown): unknown {
+      try {
+        if (texture && typeof texture === 'object' && wouldDereferenceNull(texture as MaybeTexture)) {
+          intercept(texture as MaybeTexture, report);
+        }
+      } catch {
+        // A bug in the inspection must never cost a frame that three would
+        // have drawn. The original call happens either way, below.
+      }
+      return original.call(this, texture, options);
+    };
+    textures.__sydneyShimmed = true;
+
+    // Optional enrichment. See the header on the second hook.
+    let probe = 'no bindings probe';
+    try {
+      const bindings = r?._bindings as Record<string, unknown> | undefined;
+      if (bindings && typeof bindings.getForRender === 'function' && bindings.__sydneyProbed !== true) {
+        const originalGet = bindings.getForRender as (renderObject: unknown) => unknown;
+        bindings.getForRender = function (this: unknown, renderObject: unknown): unknown {
+          currentRenderObject = renderObject as Record<string, unknown>;
+          try {
+            return originalGet.call(this, renderObject);
+          } finally {
+            currentRenderObject = null;
+          }
+        };
+        bindings.__sydneyProbed = true;
+        probe = 'bindings probe in';
+      }
+    } catch {
+      /* enrichment only */
+    }
+    return `installed (${probe})`;
+  } catch (err) {
+    const why = err instanceof Error ? err.message : String(err);
+    console.warn('[render] texture shim NOT installed: ' + why);
+    return 'not installed: ' + why;
+  }
+}
+
+/**
+ * A texture reached the uploader with no image. Name it, repair it, let it
+ * through.
+ *
+ * Repair is the same 1x1 placeholder `quarantine` installs, for the same
+ * reason: it is precisely what three would have bound at version 0, so the
+ * texture becomes uploadable and every binding of it is valid. The frame then
+ * draws. The surface it lands on loses its detail; nothing else changes.
+ *
+ * Reported once per distinct identity. A texture that is wrong once is wrong on
+ * every frame until something fixes its origin, and the point of the message is
+ * the identity, not the repetition.
+ */
+function intercept(texture: MaybeTexture, report: GuardReport): void {
+  const identity = identify(texture);
+  const seen = shimCatches.get(identity) ?? 0;
+  shimCatches.set(identity, seen + 1);
+
+  try {
+    texture.image = placeholderImage(texture);
+    texture.needsUpdate = true;
+  } catch {
+    // Could not repair. Three is about to throw on it; `RenderGuard` catches
+    // that, and the identity is recorded either way -- which is still strictly
+    // more than the three previous occurrences produced.
+  }
+
+  if (seen === 0) {
+    console.error(
+      '[render] a texture reached the uploader with image === null and was repaired in place.\n' +
+        '  ' + identity + '\n' +
+        '  The frame was saved; this texture now draws a 1x1 placeholder. Its origin still needs fixing.',
+    );
+    report.notice(`texture repaired at the uploader: ${identity.slice(0, 120)}`);
+  }
+}
+
+// --- Surviving a frame that throws --------------------------------------------
 
 /**
  * Frames a render exception is allowed to be transient for before the player is
@@ -555,20 +832,38 @@ export class RenderGuard {
     const repaired = quarantine(scene);
     for (const line of repaired) this.quarantined.push(line);
 
+    // What the shim caught at the uploader. This is the coherence the messaging
+    // needs: when the shim has named a texture the audit could not reach, the
+    // guard must report *that* rather than announcing it found nothing -- which
+    // is exactly the misleading pair of lines the third occurrence produced.
+    const caught = shimCatchLines();
+
     if (fresh) {
       console.error('[render] the frame threw; the 3D scene is not being drawn.', err);
       if (repaired.length > 0) {
         console.error('[render] quarantined:\n' + repaired.map((l) => '  - ' + l).join('\n'));
+      } else if (caught.length > 0) {
+        console.error(
+          '[render] the scene audit found nothing, but the uploader shim caught and repaired:\n' +
+            caught.map((l) => '  - ' + l).join('\n') +
+            '\n  If the frame is still throwing, the fault is beyond a null image.',
+        );
       } else {
         console.error(
-          '[render] no null-image texture was found, so this is not the known texture fault. ' +
-            'The scene will keep being attempted; `sydney.render.audit()` re-runs the search.',
+          '[render] no null-image texture was found by the scene audit or the uploader shim, ' +
+            'so this is not the known texture fault. The scene will keep being attempted; ' +
+            '`sydney.render.audit()` re-runs the search and `sydney.render.shim()` lists what the uploader saw.',
         );
       }
     }
 
     // The offender's name leads. This is what the player pastes.
-    const lead = repaired.length > 0 ? repaired.join('\n') : 'no null-image texture found';
+    const lead =
+      repaired.length > 0
+        ? repaired.join('\n')
+        : caught.length > 0
+          ? `repaired at the uploader:\n${caught.join('\n')}`
+          : 'no null-image texture found (scene audit and uploader shim both clean)';
 
     if (this.consecutive >= TRANSIENT_FRAMES) {
       if (this.fatalShown) return;
@@ -580,7 +875,11 @@ export class RenderGuard {
     } else if (!this.noticeShown) {
       this.noticeShown = true;
       report.notice(
-        repaired.length > 0 ? `benched: ${repaired[0]}` : 'a frame failed to draw',
+        repaired.length > 0
+          ? `benched: ${repaired[0]}`
+          : caught.length > 0
+            ? `repaired at the uploader: ${caught[0]}`
+            : 'a frame failed to draw',
       );
     }
   }
@@ -720,6 +1019,134 @@ function checks(failures: string[]): string[] {
   const dataImage = dataProbe.image as { data?: unknown } | null;
   if (!dataImage || !(dataImage.data instanceof Float32Array)) {
     failures.push('A repaired DataTexture did not get a typed-array image; the backend reads `image.data`.');
+  }
+
+  // --- The shim. A fake `Textures` stands in for three's, because the real one
+  // does not exist until `renderer.init()` has resolved and these checks run
+  // long before that. What is being checked is the wrapping contract, which is
+  // the part that can rot: the branch conditions, the repair, the identity, and
+  // -- above all -- that every failure is a no-op rather than a boot fatal.
+  {
+    resetShimCatches();
+    const uploaded: unknown[] = [];
+    const fakeTextures = {
+      updateTexture(texture: unknown) {
+        // Stands in for three: reads `.complete` off the image, which is the
+        // exact dereference that has crashed this client three times.
+        const image = (texture as MaybeTexture).image as { complete?: boolean } | null;
+        if ((texture as MaybeTexture).version! > 0 && image !== undefined) {
+          void (image as { complete: boolean }).complete;
+        }
+        uploaded.push(texture);
+      },
+    };
+    const probed: unknown[] = [];
+    const fakeBindings = {
+      getForRender(renderObject: unknown) {
+        probed.push(renderObject);
+        return [];
+      },
+    };
+    const fakeRenderer = { _textures: fakeTextures, _bindings: fakeBindings };
+    const quiet: GuardReport = { fatal: () => {}, notice: () => {} };
+    const result = installTextureShim(fakeRenderer, quiet);
+    if (!result.startsWith('installed')) {
+      failures.push(`The shim did not install against a well-formed renderer: "${result}".`);
+    }
+    if (!result.includes('bindings probe in')) {
+      failures.push('The shim installed without the bindings probe, so a catch could not name the mesh it was bound on.');
+    }
+    // Installing twice must not double-wrap; a stack of wrappers would report
+    // one fault several times and slow every upload in the game.
+    if (installTextureShim(fakeRenderer, quiet) !== 'already installed') {
+      failures.push('Installing the shim twice wrapped the uploader twice.');
+    }
+
+    // The interception itself, driven the way three drives it: `getForRender`
+    // builds the bindings and the upload happens *inside* that call, which is
+    // what lets the probe attribute the texture to a mesh and a material.
+    //
+    // Built as a second, fresh pair rather than by re-installing over the first:
+    // `install` returns early on an already-shimmed uploader, so re-installing
+    // would silently skip the probe -- which is exactly the bug the first cut of
+    // this check had, and it reported a false failure against a shim that works.
+    const offender: MaybeTexture = {
+      isTexture: true, name: 'shim_probe', image: null, version: 5, isCanvasTexture: true,
+    };
+    const mesh = { name: 'probe_mesh', type: 'Mesh', isCamera: false, parent: null };
+    const material = { name: 'probe_material', type: 'MeshBasicNodeMaterial' };
+    const liveTextures = {
+      updateTexture(texture: unknown) {
+        const image = (texture as MaybeTexture).image as { complete?: boolean } | null;
+        if (((texture as MaybeTexture).version ?? 0) > 0 && image !== undefined) {
+          void (image as { complete: boolean }).complete;
+        }
+      },
+    };
+    const liveRenderer = {
+      _textures: liveTextures,
+      _bindings: {
+        getForRender(renderObject: unknown) {
+          liveRenderer._textures.updateTexture(offender);
+          return [renderObject];
+        },
+      },
+    };
+    const liveStatus = installTextureShim(liveRenderer, quiet);
+    if (!liveStatus.includes('bindings probe in')) {
+      failures.push(`The second install did not take the bindings probe: "${liveStatus}".`);
+    }
+    let threw = false;
+    try {
+      liveRenderer._bindings.getForRender({ object: mesh, material });
+    } catch {
+      threw = true;
+    }
+    if (threw) failures.push('The shim let the uploader throw on a null-image texture; the frame would still die.');
+    if (offender.image === null) failures.push('The shim did not repair the texture it intercepted.');
+    const caught = shimCatchLines();
+    if (caught.length !== 1) {
+      failures.push(`The shim recorded ${caught.length} catches for one intercepted texture.`);
+    } else {
+      for (const want of ['shim_probe', 'isCanvasTexture', 'version=5']) {
+        if (!caught[0].includes(want)) failures.push(`The shim's identity line omits ${want}; the report would not identify the texture.`);
+      }
+      if (!caught[0].includes('probe_mesh') || !caught[0].includes('probe_material')) {
+        failures.push('The shim did not record the binding site, which is the whole reason for the bindings probe.');
+      }
+    }
+
+    // A render-target/depth/storage texture with a null image is NOT a fault --
+    // three never reads `image` for those -- and installing one would be damage.
+    for (const flag of ['isRenderTargetTexture', 'isDepthTexture', 'isStorageTexture', 'isExternalTexture', 'isFramebufferTexture']) {
+      const rt: MaybeTexture = { isTexture: true, name: flag, image: null, version: 3, [flag]: true } as MaybeTexture;
+      if (wouldDereferenceNull(rt)) {
+        failures.push(`A texture with ${flag} was treated as a fault; three never reads its image.`);
+      }
+    }
+    // And a healthy or version-0 texture must pass through untouched.
+    const healthyTex: MaybeTexture = { isTexture: true, image: { width: 2 }, version: 3 };
+    const quietTex: MaybeTexture = { isTexture: true, image: null, version: 0 };
+    if (wouldDereferenceNull(healthyTex) || wouldDereferenceNull(quietTex)) {
+      failures.push('The shim would repair a texture that three handles perfectly well.');
+    }
+    resetShimCatches();
+  }
+
+  // --- Failing safe. A three that renamed the internals must degrade to a
+  // logged no-op, never to a boot fatal -- an instrumentation module that can
+  // stop the game is worse than no instrumentation.
+  for (const shape of [null, undefined, {}, { _textures: null }, { _textures: {} }, { _textures: { updateTexture: 3 } }]) {
+    let result = '';
+    try {
+      result = installTextureShim(shape, { fatal: () => {}, notice: () => {} });
+    } catch (err) {
+      failures.push(`Installing the shim against ${JSON.stringify(shape)} threw: ${String(err)}. It must degrade quietly.`);
+      continue;
+    }
+    if (!result.startsWith('not installed')) {
+      failures.push(`The shim claimed "${result}" against a renderer with no usable uploader.`);
+    }
   }
 
   // --- The guard, against the real exception.

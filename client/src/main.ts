@@ -129,8 +129,10 @@ import { NameplateField, verifyNameplates, type PlateInput } from './world/namep
 import {
   RenderGuard,
   auditSceneTextures,
+  installTextureShim,
   quarantine,
   registeredCount,
+  shimCatchLines,
   verifyTextureAudit,
 } from './world/texture-audit.ts';
 import {
@@ -709,6 +711,25 @@ async function main(): Promise<void> {
   // reasoning where it is defined.
   renderer.toneMappingExposure = EXPOSURE;
   await renderer.init();
+
+  /**
+   * Intercept the one call in three that has crashed this client three times.
+   *
+   * Installed here and not earlier because `renderer._textures` does not exist
+   * until `init()` has resolved -- it is built inside that promise. See
+   * `world/texture-audit.ts` for why this is an interception rather than a
+   * fourth widening of the search: the scene audit is comprehensive over
+   * everything reachable from `scene` and came back empty while the renderer
+   * went on throwing, which puts the offender somewhere no traversal reaches.
+   * Every texture three uploads goes through `Textures.updateTexture`, whatever
+   * its origin, so wrapping it catches the fault for all of them and -- the
+   * part three rounds of searching could not deliver -- names the object.
+   *
+   * It cannot stop the game: a three that renamed the internals makes this a
+   * logged no-op and leaves `renderGuard` as the net it already was.
+   */
+  const shimStatus = installTextureShim(renderer, hud);
+  console.debug(`[boot] texture uploader shim: ${shimStatus}`);
 
   const scene = new Scene();
   // The field of view is `game/feedback.ts`'s to move, not this file's: spec
@@ -4817,10 +4838,20 @@ async function main(): Promise<void> {
          * audit cannot see is a crash it cannot name.
          */
         registered: registeredCount(),
+        /** Whether the uploader interception is in. See `installTextureShim`. */
+        shim: shimStatus,
+        /**
+         * What the uploader shim caught, which is the answer to the question
+         * three occurrences of this crash could not answer: *which texture*.
+         * Empty is the healthy answer. A non-empty one is the thing to paste.
+         */
+        shimCaught: shimCatchLines(),
       }),
       audit: () => auditSceneTextures(scene),
       /** Repair anything the audit finds, by hand. Returns what it did. */
       heal: () => quarantine(scene),
+      /** Everything the uploader shim has intercepted and repaired. */
+      shim: () => shimCatchLines(),
     },
 
     nameplates: {
