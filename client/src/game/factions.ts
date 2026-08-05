@@ -733,9 +733,16 @@ const WITNESS_RANGE_2 = WITNESS_RANGE * WITNESS_RANGE;
  * is the same figure the player is. The *crime* end is chest height rather than
  * ground, because the thing being seen is a person doing something and a ray to
  * somebody's shoes is blocked by every parked car in the street.
+ *
+ * Exported because a check that stages a crime has to aim its own sight lines
+ * at the same two heights this does. `checkPolice.findScene` tests whether the
+ * officers it is about to hand a pursuit can actually see the spot, and a test
+ * that used its own idea of chest height would be answering a slightly
+ * different question from the one the sim asks -- which is the way a staged
+ * scenario ends up asserting something the feature never promised.
  */
-const WITNESS_EYE = EYE_HEIGHT;
-const CRIME_HEIGHT = 1.1;
+export const WITNESS_EYE = EYE_HEIGHT;
+export const CRIME_HEIGHT = 1.1;
 
 /** How fast a pursuing officer runs, m/s. Between a player's walk and their sprint. */
 export const CHASE_SPEED = 6.4;

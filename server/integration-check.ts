@@ -133,6 +133,13 @@ import { trafficTick } from '../client/src/game/traffic.ts';
 // assert it. See there.
 import { createCarPose, forEachCarNear, type LaneRoute } from '../client/src/game/traffic.ts';
 import { Simulation, applyButtons, type TickOutput } from './sim.ts';
+// The swing clock and the stamina budget, for `checkPolice`'s staged crime: it
+// swings again when a bat misses a moving walker, and it has to space the
+// presses a whole swing apart or the second one is refused mid-recovery.
+import { PUNCH_TOTAL } from '../client/src/player/animation.ts';
+/** `PUNCH_TOTAL` in ticks: wind-up, active window and recovery, at 60 Hz. */
+const PUNCH_TICKS = Math.round(PUNCH_TOTAL * 60);
+
 // PERFORMANCE.md phase 1. See `checkSpatialHash` at the foot of this file: the
 // grid, the two rewind entry points it feeds, and the pooled encoder -- each
 // asserted against the linear path it replaced.
@@ -211,7 +218,7 @@ class Probe {
   hits: Array<{ attacker: number; victim: number; ko: boolean; footy: boolean }> = [];
   joins: number[] = [];
   /** Every ball seen in a snapshot, by id: where it was first and last, and how far it flew. */
-  readonly balls = new Map<number, { thrower: number; first: [number, number, number]; last: [number, number, number]; path: number; bounces: number; samples: number }>();
+  readonly balls = new Map<number, { thrower: number; first: [number, number, number]; last: [number, number, number]; path: number; bounces: number; samples: number; maxY: number }>();
 
   private readonly scratch = createSnapshot();
 
@@ -255,11 +262,14 @@ class Probe {
                   path: 0,
                   bounces: b.bounces,
                   samples: 1,
+                  // The apex, for the gravity test. See where it is read.
+                  maxY: b.y,
                 });
               } else {
                 seen.path += Math.hypot(b.x - seen.last[0], b.y - seen.last[1], b.z - seen.last[2]);
                 seen.last = [b.x, b.y, b.z];
                 seen.bounces = Math.max(seen.bounces, b.bounces);
+                seen.maxY = Math.max(seen.maxY, b.y);
                 seen.samples++;
               }
             }
@@ -1061,11 +1071,24 @@ async function main(): Promise<void> {
     const idsAtB = new Set([...b.balls.keys()]);
     const shared = [...idsAtA].filter((id) => idsAtB.has(id)).length;
     check(shared > 0, `A and B saw the same balls (${shared} ids in common)`);
-    const fell = ballsAtA.filter((x) => x.last[1] < x.first[1]);
+    // **Down from its apex**, not down from where it was thrown.
+    //
+    // Comparing the last sample to the first asks whether the ground at the far
+    // end is lower, which is a question about Sydney rather than about gravity:
+    // a ball thrown up a rising street obeys the integrator perfectly and still
+    // lands above the hand that threw it, and a spawn dither that happens to put
+    // the two probes on a slope then fails a physics check. Observed once in
+    // nine runs as *"0 of 2"*.
+    //
+    // The apex is the honest instrument. Every ball that flies has one, it does
+    // not care what the terrain does, and a ball that never came down from it is
+    // a ball the integrator is not pulling on.
+    const fell = ballsAtA.filter((x) => x.last[1] < x.maxY - 0.05);
     check(
       fell.length > 0,
-      `at least one ball ended lower than it started, so gravity is on the wire ` +
-        `(${fell.length} of ${ballsAtA.length})`,
+      `at least one ball came back down from its apex, so gravity is on the wire ` +
+        `(${fell.length} of ${ballsAtA.length}; falls of ` +
+        `${ballsAtA.map((x) => (x.maxY - x.last[1]).toFixed(2)).join(', ')} m)`,
     );
     const bounced = ballsAtA.filter((x) => x.bounces > 0).length;
     const hitByFooty = a.hits.filter((h) => h.footy);
@@ -1080,7 +1103,23 @@ async function main(): Promise<void> {
   // knockouts perfectly and never broadcast the roster is a leaderboard frozen
   // at 0/0 all game, and nothing about it throws.
   say('');
-  const koEvents = a.hits.filter((h) => h.ko);
+  // **Player knockouts only.** `attacker === victim` is the environment's
+  // sentinel, which `Simulation.shoot` sets deliberately -- a police round, a
+  // car and a magpie all raise their HIT with the victim as their own attacker,
+  // and `creditKo(id, id)` then records a *down* against them and a *kill* for
+  // nobody. That is the correct scoreboard: a leaderboard is a record of what
+  // players did to each other.
+  //
+  // Counting those as KO events made the board disagree with itself -- observed
+  // once as *"the board's 0 KOs and 1 downs match the 1 KO events A saw"*, which
+  // is exactly the arithmetic of one probe being shot by the police mid-fight
+  // rather than punched. The two probes brawl on a real Sydney street, and the
+  // street is now well policed enough for that to happen.
+  const environmentKos = a.hits.filter((h) => h.ko && h.attacker === h.victim).length;
+  const koEvents = a.hits.filter((h) => h.ko && h.attacker !== h.victim);
+  if (environmentKos > 0) {
+    say(`  note: ${environmentKos} knockout(s) came from the city itself (police, traffic or wildlife), not from a player.`);
+  }
   const board = rankRoster(a.roster);
   say(`scoreboard at A: ${board.map((r) => `${r.name} ${r.kos}/${r.downs} ${r.bot ? '—' : r.ping + 'ms'}`).join('   ')}`);
   check(
@@ -3376,6 +3415,13 @@ async function checkPolice(): Promise<void> {
       beat: one.createBeatPose(),
     };
     const witness = one.createWitness();
+    // Scratch for the prosecutability test below. Its own, rather than the beat
+    // scan's: that one is mid-iteration when this runs, and handing a callback
+    // the array its caller is walking is how a scan quietly loses half its
+    // officers.
+    const pursuitBands: PedBand[] = [];
+    const pursuitPed = createPedPose();
+    const pursuitBeat = one.createBeatPose();
     let found: { standX: number; standZ: number; yaw: number; ox: number; oz: number; key: number } | null = null;
 
     for (const station of one.POLICE_STATIONS) {
@@ -3409,6 +3455,67 @@ async function checkPolice(): Promise<void> {
           }
           // And the witness, through the real query at the real tick.
           if (!one.policeWitness(p.x, p.z, tick, witnessCtx, witness).seen) return;
+
+          // --- And **a pursuit that can prosecute**, which is the half this
+          //     used to leave to luck and is the whole of the flake below it.
+          //
+          // A witness is all sections 5 needs: somebody saw it, the
+          // investigation opens. Sections 6 and 7 need something the witness
+          // test does not imply -- officers who can *reach and see* the suspect
+          // once they are promoted. `POLICE.think` walks straight at its target
+          // and slides off buildings, and `factions.walkToward` says in as many
+          // words that there is no pathfinding and deliberately never will be:
+          // *"what a wall-sliding pursuer does when it loses you is stand at the
+          // wall, which is exactly what the countdown is for."*
+          //
+          // So a scene whose promoted officers all start on the far side of a
+          // block is a scene where the correct behaviour is that nobody ever
+          // fires -- and section 7, which waits 25 s for a shot, reads that as
+          // the shot model being broken. Measured over 45 pinned wall-clock
+          // phases, that is exactly what the two failures were: `before` at 79
+          // and 96 m with **all four** officers' sight lines blocked, pursuing
+          // correctly and stalled against a terrace.
+          //
+          // The set tested here is the set `FactionField.recruit` will actually
+          // promote -- the first `PURSUIT_TARGET` officers inside
+          // `PROMOTE_RADIUS`, in `forEachPoliceNear`'s own iteration order --
+          // and the requirement is that at least two of them can see the crime
+          // spot **and are close enough to reach it inside section 7's clock**.
+          //
+          // Two rather than one because a single clear officer is one unlucky
+          // corner away from being none, and rather than four because demanding
+          // a scene with no obstruction at all would reject most of the real
+          // CBD, which is a city made of buildings.
+          //
+          // The distance half is the second cut and it is arithmetic rather than
+          // taste: section 7 waits 25 s for a round. An officer closes at
+          // `CHASE_SPEED` and then spends `AIM_TICKS` with the weapon up, so
+          // from the far edge of `PROMOTE_RADIUS` that is 120 m of running --
+          // nineteen seconds before the first shot, against a budget of
+          // twenty-five, with a crowd and a kerb in the way. Scenes like that
+          // are not wrong, they are simply too tight to measure a shot model
+          // through, and they are where the residual failures sat. Half the
+          // promote radius leaves the pursuit about five seconds of running and
+          // twenty seconds of margin.
+          const reach = one.PROMOTE_RADIUS / 2;
+          let considered = 0;
+          let withSight = 0;
+          one.forEachPoliceNear(
+            world.peds, standX, standZ, one.PROMOTE_RADIUS, tick,
+            pursuitBands, pursuitPed, pursuitBeat,
+            (o) => {
+              if (considered >= one.PURSUIT_TARGET) return true;
+              considered++;
+              const dx = o.x - standX;
+              const dz = o.z - standZ;
+              if (dx * dx + dz * dz > reach * reach) return;
+              if (!world.collision.blocked(o.x, o.y + EYE_HEIGHT, o.z, standX, ground + one.CRIME_HEIGHT, standZ)) {
+                withSight++;
+              }
+            },
+          );
+          if (withSight < 2) return;
+
           found = { standX, standZ, yaw: rehearsalActor.body.yaw, ox, oz, key: p.key };
           return true;
         });
@@ -3444,11 +3551,13 @@ async function checkPolice(): Promise<void> {
   // It sends `BTN.PUNCH` -- one bit -- and `Simulation.resolveStrike` re-runs the
   // identical `strikePedestrian` the browser runs against its own bands at its
   // own tick, then asks its own `policeWitness`. That is the claim.
-  const scene = findScene(trafficTick(Date.now()));
-  if (!scene) {
+  const firstScene = findScene(trafficTick(Date.now()));
+  if (!firstScene) {
     check(false, 'a bystander in view of an officer on a beat could be found somewhere in the city');
     return;
   }
+  // Non-null from here, and reassignable: the swing retry below re-finds it.
+  let scene = firstScene;
   {
     place(scene.standX, scene.standZ, scene.yaw);
     say(
@@ -3484,18 +3593,168 @@ async function checkPolice(): Promise<void> {
       return moved;
     };
 
-    suspect.input.punch = true;
-    // The button is released after the first tick, because a held punch would
-    // empty the stamina bar -- which is spec 8.2's behaviour and not what this
-    // is measuring.
+    /**
+     * Swing, and swing again if the bat missed. **Three attempts, not one.**
+     *
+     * The old shape staked the entire cluster on a single swing connecting: one
+     * `BTN.PUNCH`, twenty-four ticks, and if the bystander stepped off the kerb
+     * or turned a corner inside the wind-up there was no crime, no
+     * investigation, no pursuit and no shot -- so sections 5, 6 and 7 all failed
+     * together and read as the police being broken. It is a real miss: the
+     * bystander is a `posePedestrian` schedule denominated in wall time and the
+     * probe is chasing it through a `Simulation.step` that is not free.
+     *
+     * A player who missed would swing again, so this does. Nothing about the
+     * claim changes -- the assertion is still that batting a bystander in front
+     * of police is a crime, decided on the server off one bit of client input.
+     * What changes is that the check no longer needs the first bat of the run to
+     * land, which was never part of the claim.
+     *
+     * The scene is re-found between attempts because by then it is a second
+     * older, and `findScene` returns a scene that is true rather than one that
+     * was -- which is the whole reason it exists.
+     */
+    /**
+     * Is somebody watching **this spot, right now**, with room to spare?
+     *
+     * The race this closes, and it is the root of the whole cluster. `findScene`
+     * verifies a witness at the tick it stages, and the bat is adjudicated some
+     * ticks later -- eight of wind-up at the very least, and more while the
+     * probe chases a walker through a `Simulation.step` that costs real
+     * milliseconds. Officers are `posePedestrian` slots denominated in **wall
+     * time**, so in that gap they keep walking: around a corner, behind a
+     * delivery van, or simply past the 40 m their sight is good for. The crime
+     * then lands with nobody watching, `resolveStrike` opens no investigation,
+     * and every assertion after it fails trivially -- which is exactly the shape
+     * the gate reported: *"opened an investigation for "suspicious behaviour"
+     * (0 entries)"*, then no countdown, no promotion, no officers, no shot.
+     *
+     * It is neither a wrong instrument nor a hole in the sim: an officer who
+     * walked away really did not see it. It is a stage-then-drift race, so the
+     * answer is to stop staging and then hoping -- swing on a tick when the
+     * witness query says yes, through the same `policeWitness` the server will
+     * ask, at the same wall tick.
+     *
+     * The margin is what makes it hold rather than merely usually hold. A
+     * witness at 39.5 m satisfies the query and is one step from not; requiring
+     * the nearest watcher to be inside four fifths of `WITNESS_RANGE` leaves 8 m
+     * of walking -- about five seconds at a beat's pace -- for a swing that
+     * needs a fraction of one.
+     *
+     * `field: null` because this is a question about the **beat**: at this point
+     * nobody has been promoted, and an ambient officer is what the crime has to
+     * be seen by. It is the same context `findScene` builds for the same reason.
+     */
+    const swingWitnessCtx = {
+      peds: world.peds,
+      collision: world.collision,
+      field: null,
+      bands: [] as PedBand[],
+      ped: createPedPose(),
+      beat: one.createBeatPose(),
+    };
+    const swingWitness = one.createWitness();
+    const liveBands: PedBand[] = [];
+    const livePed = createPedPose();
+    const liveBeat = one.createBeatPose();
+
+    /**
+     * Is the whole scene true **right now** -- a watcher with margin, and a
+     * pursuit that can prosecute?
+     *
+     * Both halves are re-asked here rather than trusted from `findScene`, and
+     * the second half is why: officers walk. `findScene` vets the four officers
+     * `recruit` would promote *at staging time*, and the swing lands a second or
+     * two of wall clock later, by which point the set has moved and can have
+     * moved behind a building. Measured under an emulated slow box, that is
+     * exactly the residue -- a crime that landed, was witnessed, and was
+     * answered by two officers 77 m away with both sight lines blocked, which
+     * section 7 then read as the shot model failing.
+     *
+     * So the two questions the later sections depend on are asked on the tick
+     * the bat comes up, which is the only tick at which their answers matter.
+     */
+    const sceneIsLive = (): boolean => {
+      const p = suspect.combat.body.position;
+      const tick = trafficTick(Date.now());
+      const w = one.policeWitness(p.x, p.z, tick, swingWitnessCtx, swingWitness);
+      if (!w.seen || w.range > one.WITNESS_RANGE * 0.8) return false;
+      // `body.position` is the **eye**, so the chest the sight line aims at is
+      // that much lower plus `CRIME_HEIGHT` -- the same two heights the sim's
+      // own witness ray uses.
+      const chest = p.y - EYE_HEIGHT + one.CRIME_HEIGHT;
+      const reach = one.PROMOTE_RADIUS / 2;
+      let considered = 0;
+      let withSight = 0;
+      one.forEachPoliceNear(world.peds, p.x, p.z, one.PROMOTE_RADIUS, tick, liveBands, livePed, liveBeat, (o) => {
+        if (considered >= one.PURSUIT_TARGET) return true;
+        considered++;
+        const dx = o.x - p.x;
+        const dz = o.z - p.z;
+        if (dx * dx + dz * dz > reach * reach) return;
+        if (!world.collision.blocked(o.x, o.y + one.WITNESS_EYE, o.z, p.x, chest, p.z)) withSight++;
+      });
+      return withSight >= 2;
+    };
+
     let tracked = 0;
-    for (let i = 0; i < 24; i++) {
-      if (follow()) tracked++;
-      sim.step(out);
-      suspect.input.punch = false;
+    let swings = 0;
+    let waited = 0;
+    let wanted = sim.investigations();
+    while (swings < 3 && wanted.length === 0) {
+      if (swings > 0) {
+        const again = findScene(trafficTick(Date.now()));
+        if (again) scene = again;
+        place(scene.standX, scene.standZ, scene.yaw);
+        // Long enough for the stamina bar to come back and the swing clock to
+        // clear, so the second attempt is a swing rather than a refused one.
+        for (let i = 0; i < 30; i++) sim.step(out);
+      }
+      // --- Wait for the moment before lifting the bat. See `sceneIsLive`.
+      //
+      // Following the bystander throughout, so the probe is still behind them
+      // when it comes. Two seconds of beat schedule; if the city has not
+      // obliged by then the swing goes ahead anyway and the retry covers it,
+      // because a check that could hang waiting for Sydney to cooperate would be
+      // worse than one that occasionally misses.
+      for (let i = 0; i < 120 && !sceneIsLive(); i++) {
+        if (follow()) tracked++;
+        sim.step(out);
+        waited++;
+      }
+      // --- And then swing, and keep swinging.
+      //
+      // A bat is 1.55 m of reach against a walker who is still walking, and it
+      // misses sometimes -- observed under load as three staged crimes in a row
+      // where the bystander was never knocked down at all while an officer stood
+      // watching the whole time. That is not the police failing and it is not
+      // the witness race; it is a melee miss, and a player who missed would
+      // simply swing again.
+      //
+      // Four swings, which is `MAX_STAMINA`, spaced a whole `PUNCH_TOTAL` apart
+      // so each is a swing rather than a press refused mid-recovery. The loop
+      // stops the moment an investigation exists, so a scene that works costs
+      // one swing.
+      for (let s = 0; s < MAX_STAMINA && sim.investigations().length === 0; s++) {
+        swings++;
+        suspect.input.punch = true;
+        // The button is released after the first tick, because a held punch
+        // would empty the stamina bar -- which is spec 8.2's behaviour and not
+        // what this is measuring.
+        for (let i = 0; i < PUNCH_TICKS; i++) {
+          if (follow()) tracked++;
+          sim.step(out);
+          suspect.input.punch = false;
+        }
+      }
+      wanted = sim.investigations();
     }
-    check(tracked > 0, `the bystander stayed findable for ${tracked} of 24 ticks while the swing came round`);
-    const wanted = sim.investigations();
+    check(
+      tracked > 0,
+      `the bystander stayed findable for ${tracked} of ${swings * PUNCH_TICKS + waited} ticks while the ` +
+        `swing came round (${swings} swing(s)` +
+        (waited > 0 ? `, ${waited} tick(s) waiting for an officer to be watching` : '') + ')',
+    );
     check(
       wanted.length === 1 && wanted[0].playerId === suspect.id && wanted[0].reason === one.REASON.ASSAULT,
       'batting a bystander in front of police opened an investigation for ' +
@@ -3507,9 +3766,46 @@ async function checkPolice(): Promise<void> {
     );
   }
 
+  /**
+   * Step, holding the scenario open. **Sections 6 and 7 are measured through
+   * this rather than through `sim.step` directly, and it is the fix to a flake
+   * that fired because the police work.**
+   *
+   * `Simulation.shoot` ends an investigation the moment its subject goes down:
+   * *"Being shot by the police is the countdown's other terminal state, and a
+   * banner that survived a respawn would have the player wanted for something
+   * they were already punished for."* That is correct, and it is a state
+   * section 6 cannot survive -- with the investigation gone, every pursuing
+   * officer takes `POLICE.think`'s stand-down branch on its next tick, walks
+   * back toward where it was promoted, and despawns on arrival. A promoted
+   * officer that has not moved far is already inside the 2 m despawn radius,
+   * so the whole squad can be gone inside twenty ticks.
+   *
+   * The symptom is precisely the two failures on the gate: `after` is empty, so
+   * section 6 reports *"the nearest officer went from 21.8 m to Infinity"*, and
+   * section 7 then waits its full 25 s for a shot at somebody who is not wanted
+   * and not there. Observed on a pinned-clock sweep as `inv=GONE` with **2,623
+   * ticks still on the countdown** -- which no expiry could produce.
+   *
+   * Neither section is about the suspect's health. Section 6 is about officers
+   * converging and section 7 is about the size and authority of a round, so the
+   * probe is held on its feet and wanted for exactly as long as it takes to
+   * measure those. Section 7 lets go the instant it starts counting damage --
+   * see there.
+   */
+  const holdScenario = (): void => {
+    if (suspect.combat.health < MAX_HEALTH) suspect.combat.health = MAX_HEALTH;
+    if (!sim.factions.investigationOf(suspect.id)) {
+      sim.factions.accuse(suspect.id, one.REASON.ASSAULT, trafficTick(Date.now()));
+    }
+  };
+
   // --- 6. Officers are promoted onto the suspect, and they come from the beat.
   {
-    for (let i = 0; i < 60; i++) sim.step(out);
+    for (let i = 0; i < 60; i++) {
+      holdScenario();
+      sim.step(out);
+    }
     // **Filtered to the police**, which this did not have to do when it was
     // written and does now.
     //
@@ -3538,7 +3834,10 @@ async function checkPolice(): Promise<void> {
     // suspect, which is the only thing that distinguishes a pursuit from a
     // spawn.
     const before = actors.map((a) => Math.hypot(a.x - suspect.combat.body.position.x, a.z - suspect.combat.body.position.z));
-    for (let i = 0; i < 60; i++) sim.step(out);
+    for (let i = 0; i < 60; i++) {
+      holdScenario();
+      sim.step(out);
+    }
     const after = sim
       .npcSnapshot()
       .filter((a) => a.kind === one.NPC_KIND.POLICE)
@@ -3583,8 +3882,32 @@ async function checkPolice(): Promise<void> {
     // shot would have this measuring somebody else's damage against the police
     // shot model -- which reads as the shot being the wrong size. Ticks where
     // nothing left a barrel are skipped; the assertion below is about a round.
+    //
+    // **Started from a scenario that is known to still exist**, and then left
+    // alone. Section 6 may have run the probe's health down to the point where
+    // `Simulation.shoot` would knock them out and close the investigation with
+    // them -- see `holdScenario`, which is why it did not -- so this begins by
+    // restating the two facts it depends on and nothing else: on their feet,
+    // and wanted. From the first `sim.step` below, nothing touches the probe
+    // again. That is the claim: a client that sends no input, and whose health
+    // this check is no longer propping up, is still shot by the server.
+    holdScenario();
     let health = suspect.combat.health;
-    while (lost === 0 && ticks < 60 * 25) {
+    // **The countdown, not a round number.** How long a pursuit is allowed to
+    // take before it has failed is a question this feature already answers:
+    // `COUNTDOWN_TICKS` is how long the police are interested, and inside that
+    // window they are entitled to spend as long as the city makes them.
+    //
+    // Twenty-five seconds was the old bound and it was an arbitrary one. The
+    // sim promises that an officer with a clear line inside `ENGAGE_RANGE`
+    // fires after `AIM_TICKS`; it explicitly does **not** promise a bounded
+    // time to acquire that line, because `factions.walkToward` has no
+    // pathfinding and says so -- a pursuer that has to come round a block takes
+    // as long as the block is. Measured under an emulated slow box, honest
+    // pursuits were landing their first round at 21.9 s, which passed by three
+    // seconds and would not have on a slower one. Deriving the budget from the
+    // countdown makes it move with the feature instead of against it.
+    while (lost === 0 && ticks < one.COUNTDOWN_TICKS) {
       const before = rounds();
       sim.step(out);
       firedThatTick = rounds() - before;
@@ -3736,16 +4059,34 @@ async function checkPolice(): Promise<void> {
     check(sim.investigations().length === 0, `the investigation ended when its countdown reached 0 (${ticks} ticks)`);
 
     // And the officers resolve rather than standing in the street forever.
-    let left = 0;
+    //
+    // **Counted over the police, not over the field**, which is section 6's own
+    // correction applied to the section that was missed by it. `FactionField`
+    // is shared, and the probe is standing on a footpath in a city that also
+    // contains meth heads, drunks and magpies: `stepStreetlife` promotes a
+    // loiterer within `METH_SIGHT` of a player and a drunk within
+    // `DRUNK_NOTICE`, and both of them have every right to still be standing
+    // there a minute after the police went home. Asking `npcSnapshot().length`
+    // and calling the answer "officers" made a correct city fail a police
+    // check -- observed once in eight runs as *"1 still promoted"* -- and it is
+    // the same wrong-instrument shape this whole cluster was flaky for.
+    let leftPolice = 0;
+    let leftOther = 0;
     for (let i = 0; i < 60 * 20; i++) {
       sim.step(out);
-      left = sim.npcSnapshot().length;
-      if (left === 0) break;
+      const all = sim.npcSnapshot();
+      leftPolice = all.filter((a) => a.kind === one.NPC_KIND.POLICE).length;
+      leftOther = all.length - leftPolice;
+      if (leftPolice === 0) break;
     }
-    check(left === 0, `every pursuing officer stood down and despawned (${left} still promoted)`);
     check(
-      sim.factions.actors.length === 0,
-      'and the field is empty, so the wire cost of a finished pursuit is zero',
+      leftPolice === 0,
+      `every pursuing officer stood down and despawned (${leftPolice} still promoted` +
+        (leftOther ? `, beside ${leftOther} other faction actor(s) who are not this check's subject` : '') + ')',
+    );
+    check(
+      sim.factions.actors.every((a) => a.kind !== one.NPC_KIND.POLICE),
+      'and no officer is left in the field, so the wire cost of a finished pursuit is zero',
     );
   }
 
@@ -6689,8 +7030,29 @@ async function checkBallBar(): Promise<void> {
   const marks = [4.2, 8.2, 12.2];
   let t = 0;
   let next = 0;
+  let harassed = 0;
   for (let i = 0; i < 60 * 13; i++) {
     applyButtons(me.input, 0);
+    // --- Kept on their feet, because the subject is the **bar** and not the
+    // probe's life expectancy.
+    //
+    // `sim.join` puts this player on the real join disc in Sydney Park and then
+    // asks them to stand still for thirteen seconds in a city that contains
+    // bush turkeys, traffic and a police force. Measured over thirty pinned
+    // clock phases, one of them ends with `health = 0` and the phase set
+    // `[idle, ko]` -- and a knocked-out player's recharge stops, so the third
+    // ball never arrives and the check reports *"12.2 s after the bar emptied
+    // the wire carries 2 ball(s)"*. Nothing about the supply was wrong; the
+    // tester was pecked to death.
+    //
+    // Topping the bar's owner up is the narrowest possible way to say "this
+    // check is about the trickle". It cannot mask a supply regression, because
+    // health and `ballCharges` are different fields on different clocks, and the
+    // interference is reported below rather than swallowed.
+    if (me.combat.health < MAX_HEALTH) {
+      me.combat.health = MAX_HEALTH;
+      harassed++;
+    }
     sim.step(out);
     t += 1 / 60;
     if (next < marks.length && t >= marks[next]) {
@@ -6706,6 +7068,9 @@ async function checkBallBar(): Promise<void> {
       `${marks[i]} s after the bar emptied the wire carries ${got} ball(s), and the ` +
         `${BALL_RECHARGE} s trickle says ${want}`,
     );
+  }
+  if (harassed > 0) {
+    say(`  note: the city had a go at the probe on ${harassed} tick(s) -- traffic or wildlife on the join disc -- and it was held on its feet so the trickle could be read.`);
   }
   check(me.combat.ballCharges === BALL_CHARGES, `the bar is back to ${BALL_CHARGES}/${BALL_CHARGES}`);
 
@@ -7904,7 +8269,29 @@ async function checkRooms(): Promise<void> {
       await sleep(1000 / 60);
     }
 
-    check(outsider.hits.length === 0, `the outsider saw ${outsider.hits.length} hit events from another room`);
+    // --- Hits **from another player**, which is the only kind that could have
+    // crossed a room.
+    //
+    // `attacker === victim` is the environment's sentinel and it is deliberate:
+    // `Simulation.shoot` raises its HIT with the victim as their own attacker so
+    // that a police round, a car and a magpie all read as "nobody did this",
+    // and `traffic`'s car hit says the same thing the same way. Counting those
+    // as evidence of a room leak is the same wrong-instrument mistake the magpie
+    // check already made once -- the outsider is standing in a real Sydney
+    // street *in its own room*, and the wildlife there is entitled to peck it.
+    //
+    // Observed once in eight runs before this: "3 hit events from another room"
+    // and a health bar reading 2.25, which is three quarter-pip pecks. A quarter
+    // pip is `wildlife.SWOOP_DAMAGE`; no player melee in this game does 0.25.
+    const crossRoom = outsider.hits.filter((h) => h.attacker !== h.victim);
+    const ownRoomEnvironment = outsider.hits.length - crossRoom.length;
+    check(
+      crossRoom.length === 0,
+      `the outsider saw ${crossRoom.length} player hit events from another room` +
+        (ownRoomEnvironment
+          ? ` (and ${ownRoomEnvironment} environment hit(s) in its own room -- wildlife or traffic, which is not room 2)`
+          : ''),
+    );
     const outsiderNames = new Set(outsider.roster.map((r) => r.name));
     const friendNames = new Set(friendA.roster.map((r) => r.name));
     check(
@@ -7925,10 +8312,19 @@ async function checkRooms(): Promise<void> {
       `and the outsider was sent exactly one body, its own (${outsider.seenIds.size} ids seen across ` +
         `four seconds of another room fighting)`,
     );
-    // The other half of "a swing in A cannot hit B": the outsider is untouched.
+    // The other half of "a swing in A cannot hit B": the outsider is untouched
+    // **by room 2**.
+    //
+    // Asserted on the attribution of what hit them rather than on the number on
+    // their health bar, for the reason above: the bar is a sum over everything
+    // in their own street, and demanding it read exactly 3 is demanding that no
+    // turkey in Sydney Park took an interest -- which is a claim about the
+    // wildlife, not about rooms. What has to be true is that nothing *from room
+    // 2* arrived, and that is `crossRoom`.
     check(
-      Math.abs((outsider.selfHealth ?? 3) - 3) < 1e-6,
-      `the outsider is still on ${outsider.selfHealth} pips; nothing in room 2 reached them`,
+      crossRoom.length === 0 && (outsider.selfHealth ?? 0) > 0,
+      `nothing in room 2 reached the outsider; they are on ${outsider.selfHealth} pips` +
+        (ownRoomEnvironment ? ' after their own room\'s wildlife had a go at them' : ' and untouched'),
     );
 
     // --- 6. `/health` and `/stats` carry the per-room breakdown, which is what

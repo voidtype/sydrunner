@@ -759,10 +759,13 @@ export function advance(
   // at once -- see the constants for why this is the one resource in the game
   // that trickles.
   //
-  // The clock is *consumed* rather than reset to zero, so a player who was
-  // knocked out for three seconds gets the ball those three seconds earned
-  // rather than starting the count again. `while` rather than `if` for the same
-  // reason: eight seconds away from the bar is two balls, and a rule that
+  // The clock is *consumed* rather than reset to zero, so a flinch or a
+  // hitstop does not restart the count -- partial progress toward the next
+  // ball survives an interruption. (It does NOT run while knocked out: the ko
+  // branch above never reaches this line, which is fine because `respawn`
+  // refills the bag anyway -- measured during the checkPolice flake hunt,
+  // 2026-08-05.) `while` rather than `if` for the same reason as the
+  // consumption: eight seconds of accrued clock is two balls, and a rule that
   // returned one would silently make the refill depend on how often `advance`
   // was called.
   c.ballT += dt;
