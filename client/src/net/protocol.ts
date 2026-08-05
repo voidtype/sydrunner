@@ -1002,7 +1002,39 @@ export function encodeSnapshot(
   npcs: readonly SnapshotNpc[] = EMPTY_NPCS,
 ): ArrayBuffer {
   const buffer = new ArrayBuffer(snapshotBytes(players.length, balls.length, npcs.length));
-  const v = new DataView(buffer);
+  encodeSnapshotInto(new DataView(buffer), tick, ackSeq, players, balls, npcs);
+  return buffer;
+}
+
+/**
+ * The same bytes, into a buffer the caller owns. Returns the length written.
+ *
+ * PERFORMANCE.md phase 1. `encodeSnapshot` above allocates its buffer, which is
+ * the right shape for the client (which never encodes one) and for a check
+ * (which wants a value it can hold) -- and is the **largest allocation site in
+ * the server process** by an order of magnitude, because the transport encoded
+ * one *per client*. At five hundred players that is 10.5 kB x 500 x 20 Hz, or
+ * 105 MB a second of garbage, for a payload whose every byte except a two-byte
+ * ack is identical across all five hundred of them.
+ *
+ * So the server encodes once into a pooled buffer, patches the ack per client
+ * with `patchSnapshotAck`, and sends a view. Byte-for-byte the same frame:
+ * `encodeSnapshot` is now literally this function with an allocation in front
+ * of it, which is what makes "the pooled path and the allocating path produce
+ * identical bytes" a fact about the code rather than a check that could drift.
+ *
+ * The caller must have sized the buffer with `snapshotBytes`. Nothing here
+ * grows it, because a snapshot encoder that could reallocate is a snapshot
+ * encoder that allocates.
+ */
+export function encodeSnapshotInto(
+  v: DataView,
+  tick: number,
+  ackSeq: number,
+  players: readonly SnapshotPlayer[],
+  balls: readonly SnapshotBall[] = EMPTY_BALLS,
+  npcs: readonly SnapshotNpc[] = EMPTY_NPCS,
+): number {
   v.setUint8(0, MSG.SNAPSHOT);
   v.setUint32(1, tick >>> 0, true);
   v.setUint16(5, ackSeq & 0xffff, true);
@@ -1056,7 +1088,17 @@ export function encodeSnapshot(
     v.setUint8(p + 17, n.state & 0xff);
     p += NPC_BYTES;
   }
-  return buffer;
+  return p;
+}
+
+/**
+ * Rewrite the two ack bytes of an already-encoded snapshot, in place.
+ *
+ * The one field that differs between clients. See `encodeSnapshotInto`, and
+ * `server/index.ts` for the send loop that uses it.
+ */
+export function patchSnapshotAck(v: DataView, ackSeq: number): void {
+  v.setUint16(5, ackSeq & 0xffff, true);
 }
 
 const EMPTY_BALLS: readonly SnapshotBall[] = [];

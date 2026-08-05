@@ -20,6 +20,15 @@ export interface HudState {
   streamer: {
     resident: number;
     loading: number;
+    /**
+     * Tiles decoded and queued, waiting on the per-frame construction budget.
+     *
+     * The number that says whether streaming is keeping up. It should read zero
+     * or one: construction retires far faster than 1.6 MB tiles can be fetched.
+     * A queue that sits deep for seconds means the budget is too small for this
+     * machine -- see `BUILD_BUDGET_MS` in `world/streamer.ts`.
+     */
+    building: number;
     failed: number;
     triangles: number;
     buildings: number;
@@ -70,7 +79,7 @@ export interface HudState {
    * a quaternion and a matrix compose, every frame. `costMs` is the budget this
    * feature was scoped against and the only place anyone can see it.
    */
-  traffic: { drawn: number; costMs: number; tiles: number; liveried: number };
+  traffic: { drawn: number; parked: number; costMs: number; tiles: number; liveried: number };
   /**
    * The crowd: people posed this frame, how many of them got a real skinned rig,
    * how long the whole thing took, and how many are lying on the footpath.
@@ -959,6 +968,10 @@ export class Hud {
       // counts because it is what they are counted out of.
       `world ${this.world}`,
       `tiles ${s.streamer.resident} resident, ${s.streamer.loading} loading` +
+        // Only when there is one, because in a healthy session there never is:
+        // the construction budget retires tiles faster than they can be
+        // fetched, so a persistent number here is the symptom to report.
+        (s.streamer.building ? `, ${s.streamer.building} building` : '') +
         (s.streamer.failed ? `, ${s.streamer.failed} failed` : ''),
       `      LOD ${s.streamer.bands.join('/')}  (0-80m / 400m / 2km / far)`,
       `drawn ${(s.streamer.triangles / 1000).toFixed(0)}k tris, ${s.streamer.buildings.toLocaleString()} buildings` +
@@ -977,8 +990,12 @@ export class Hud {
       // per frame rather than a draw cost. Ibises are counted resident; only the
       // ones inside 150 m are stepped.
       `life  ${s.streamer.birds} ibises resident, ${s.streamer.gulls} gulls aloft`,
-      `traf  ${s.traffic.drawn} cars driving, ${s.traffic.costMs.toFixed(2)} ms to place` +
-        `, ${s.traffic.tiles} lane tiles` +
+      // `parked` is the schedule cars sitting in a kerb bay between runs, which
+      // is where every appearance and disappearance in the fleet now happens --
+      // see `game/traffic.ts`. It is on the HUD because it is the one number
+      // that says the fix for the pop is still working.
+      `traf  ${s.traffic.drawn - s.traffic.parked} cars driving, ${s.traffic.parked} parked, ` +
+        `${s.traffic.costMs.toFixed(2)} ms to place, ${s.traffic.tiles} lane tiles` +
         (s.traffic.liveried ? `, ${s.traffic.liveried} marked` : ''),
       `peds  ${s.pedestrians.drawn} walking (${s.pedestrians.rigged} rigged), ` +
         `${s.pedestrians.costMs.toFixed(2)} ms to place, ${s.pedestrians.tiles} footpath tiles` +

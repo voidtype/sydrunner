@@ -95,17 +95,25 @@ import {
   vec3,
 } from 'three/tsl';
 
-/** Must match `vegetation.SPECIES_*` in the pipeline. */
-export const SPECIES_COUNT = 6;
+import { SPECIES_COUNT, decodeVegetation, type TileVegetation } from './tile-decode.ts';
+
+/**
+ * The sidecar half of this module lives in `world/tile-decode.ts`.
+ *
+ * Not a refactor for tidiness: that file has no `three` import in it, which is
+ * what lets `world/decode.worker.ts` read a `.veg.bin` on a thread that is not
+ * the render thread. Re-exported from here so every existing caller keeps
+ * naming the module that owns what a tree *is*, which is this one.
+ */
+export { SPECIES_COUNT, decodeVegetation };
+export type { TileVegetation };
+
 const FIG = 0;
 const PLANE = 1;
 const JACARANDA = 2;
 const PAPERBARK = 3;
 const BRUSH_BOX = 4;
 const EUCALYPT = 5;
-
-/** Bytes per instance in a `.veg.bin` sidecar. Set by `tiles.write_vegetation`. */
-const VEG_STRIDE = 20;
 
 // --- The palette --------------------------------------------------------------
 
@@ -698,54 +706,6 @@ export class VegetationAssets {
   geometry(species: number): BufferGeometry {
     return this.geometries[species] ?? this.geometries[BRUSH_BOX];
   }
-}
-
-// --- The sidecar --------------------------------------------------------------
-
-/** One tile's instances, decoded from `<key>.veg.bin` as a structure of arrays. */
-export interface TileVegetation {
-  count: number;
-  /** Tile-local metres, renderer axes. */
-  x: Float32Array;
-  z: Float32Array;
-  height: Float32Array;
-  radius: Float32Array;
-  species: Uint8Array;
-  seed: Uint8Array;
-}
-
-/**
- * Decode a `.veg.bin`. Returns `null` for anything that is not one, because a
- * tile with no trees must be indistinguishable from a tile whose sidecar is
- * missing -- see `streamer.ts`.
- */
-export function decodeVegetation(buffer: ArrayBuffer): TileVegetation | null {
-  if (buffer.byteLength < 4) return null;
-  const view = new DataView(buffer);
-  const count = view.getUint32(0, true);
-  if (count === 0 || buffer.byteLength < 4 + count * VEG_STRIDE) return null;
-
-  const out: TileVegetation = {
-    count,
-    x: new Float32Array(count),
-    z: new Float32Array(count),
-    height: new Float32Array(count),
-    radius: new Float32Array(count),
-    species: new Uint8Array(count),
-    seed: new Uint8Array(count),
-  };
-  for (let i = 0; i < count; i++) {
-    const o = 4 + i * VEG_STRIDE;
-    out.x[i] = view.getFloat32(o, true);
-    out.z[i] = view.getFloat32(o + 4, true);
-    out.height[i] = view.getFloat32(o + 8, true);
-    out.radius[i] = view.getFloat32(o + 12, true);
-    // Clamped rather than trusted: an out-of-range species index would read past
-    // the geometry table and take the whole tile out with it.
-    out.species[i] = Math.min(view.getUint8(o + 16), SPECIES_COUNT - 1);
-    out.seed[i] = view.getUint8(o + 17);
-  }
-  return out;
 }
 
 // --- Instancing ---------------------------------------------------------------

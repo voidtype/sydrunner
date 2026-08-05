@@ -165,6 +165,68 @@ export class PositionHistory {
     out.z = this.z[i];
     out.yaw = this.yaw[i];
   }
+
+  /**
+   * The axis-aligned box on the ground plane containing **every position this
+   * ring can be rewound to**, live one included.
+   *
+   * PERFORMANCE.md phase 1's spatial hash needs this and nothing else does. The
+   * melee's candidate set has to be a superset of whoever a punch could reach
+   * *after* the rewind, and a hash built from live positions is not one: a
+   * player who sprinted 2 m in the last 250 ms is up to 2 m from where the
+   * lookup will put them. Filing them under this box instead makes the
+   * candidate set exact in the only sense that counts -- see
+   * `game/spatialhash.ts`'s header for why a lerp between two ring samples is
+   * always inside the box of all of them, which is what makes the superset
+   * claim a proof rather than a margin.
+   *
+   * A scan of the whole window rather than bounds maintained in `record`,
+   * because a ring evicts and a running minimum cannot be un-shrunk without
+   * exactly this scan anyway. Fifteen slots, once per player per tick: 450,000
+   * float compares a second at five hundred players, against the 26 million
+   * distance tests the hash removes.
+   */
+  bounds(out: Bounds): Bounds {
+    const n = this.samples;
+    if (n === 0) {
+      out.minX = out.maxX = out.minZ = out.maxZ = 0;
+      out.valid = false;
+      return out;
+    }
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (let k = 0; k < n; k++) {
+      const i = (this.cursor - k + HISTORY_TICKS * 2) % HISTORY_TICKS;
+      const x = this.x[i];
+      const z = this.z[i];
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (z < minZ) minZ = z;
+      if (z > maxZ) maxZ = z;
+    }
+    out.minX = minX;
+    out.maxX = maxX;
+    out.minZ = minZ;
+    out.maxZ = maxZ;
+    out.valid = true;
+    return out;
+  }
+}
+
+/** `PositionHistory.bounds`' out-parameter. Allocated once per caller, never per tick. */
+export interface Bounds {
+  minX: number;
+  minZ: number;
+  maxX: number;
+  maxZ: number;
+  /** False when the ring has never been written, which is a player who has not been seeded. */
+  valid: boolean;
+}
+
+export function createBounds(): Bounds {
+  return { minX: 0, minZ: 0, maxX: 0, maxZ: 0, valid: false };
 }
 
 /**
@@ -218,8 +280,45 @@ export function rewind(
   pool: CombatantState[],
 ): CombatantState[] {
   pool.length = 0;
-  const at = { x: 0, y: 0, z: 0, yaw: 0 };
-  for (const c of live) {
+  return rewindInto(attacker, live, histories, viewTick, pool, sharedProxies);
+}
+
+/**
+ * The same rewind, over a candidate list, into a caller-owned proxy pool.
+ *
+ * PERFORMANCE.md phase 1 split this out of `rewind` for the two costs that were
+ * both linear in the player count on a path that runs on every swing:
+ *
+ *   1. **The list.** `rewind` walked every combatant in the world. A punch
+ *      reaches 1.55 m, so all but a handful of them were rewound to be measured
+ *      and discarded. `server/sim.ts` now hands in the spatial hash's candidate
+ *      set and this walks that instead. The set is a *superset* of everyone the
+ *      old scan could have hit -- see `PositionHistory.bounds` -- so the answer
+ *      is identical rather than approximate.
+ *   2. **The proxies.** Each rewound target used to be four fresh objects: an
+ *      `Object.create`, a spread of the body, a position record and the property
+ *      descriptor that held them. At sixteen players trading punches that is a
+ *      few hundred objects a second and nobody would notice; at five hundred it
+ *      is the second-largest allocation site in the process. `proxies` is a pool
+ *      grown to its high-water mark and reused forever.
+ *
+ * The pooled proxy keeps the property the `Object.create` version was written
+ * for -- **position is historical, everything else is current** -- by holding a
+ * reference to the live combatant and reading `id`, `phase` and `health` through
+ * getters rather than copying them. So a health that changes between building
+ * this list and reading it is still seen.
+ */
+export function rewindInto(
+  attacker: CombatantState,
+  candidates: readonly CombatantState[],
+  histories: Map<number, PositionHistory>,
+  viewTick: number,
+  pool: CombatantState[],
+  proxies: RewoundProxy[],
+): CombatantState[] {
+  const at = sampleScratch;
+  let used = 0;
+  for (const c of candidates) {
     if (c.id === attacker.id) {
       pool.push(c);
       continue;
@@ -229,19 +328,54 @@ export function rewind(
       pool.push(c);
       continue;
     }
-    // A shallow clone with a substituted body. `Object.create` keeps the
-    // prototype-free plain-object shape the rest of the simulation expects while
-    // making every field except the two below read straight through to the live
-    // state -- so a health that changes between building this list and reading
-    // it is seen, and a position that changes is not.
-    const view = Object.create(c) as CombatantState;
-    Object.defineProperty(view, 'body', {
-      value: { ...c.body, position: { x: at.x, y: at.y, z: at.z }, yaw: at.yaw },
-      enumerable: true,
-    });
-    pool.push(view);
+    let view = proxies[used];
+    if (view === undefined) {
+      view = new RewoundProxy();
+      proxies[used] = view;
+    }
+    used++;
+    view.live = c;
+    view.body.position.x = at.x;
+    view.body.position.y = at.y;
+    view.body.position.z = at.z;
+    view.body.yaw = at.yaw;
+    pool.push(view as unknown as CombatantState);
   }
   return pool;
+}
+
+const sampleScratch = { x: 0, y: 0, z: 0, yaw: 0 };
+/** The pool behind the legacy `rewind` entry point, which the checks still use. */
+const sharedProxies: RewoundProxy[] = [];
+
+/**
+ * One pooled stand-in. `RewoundView`'s four fields, and not one more.
+ *
+ * `game/combat.hitTest` and `game/footy.stepFooty` between them read exactly
+ * `id`, `phase`, `health` and `body.position` -- through `isTargetable` and
+ * `feetY`, which are two lines each. Nothing else about a combatant is ever
+ * asked of a rewound target, which is what makes a four-field proxy safe where
+ * a fifteen-field clone would not be: there is nothing here to go stale,
+ * because the three scalar fields are getters onto the live object and the
+ * fourth is the one thing that is *supposed* to be historical.
+ *
+ * A class rather than an object literal so the getters live on a prototype and
+ * every proxy in the pool has one shape. A pool of literals with own accessors
+ * would be a new hidden class per proxy, which is the megamorphic access this
+ * whole change exists to avoid.
+ */
+export class RewoundProxy {
+  live: CombatantState = null as unknown as CombatantState;
+  readonly body = { position: { x: 0, y: 0, z: 0 }, yaw: 0 };
+  get id(): number {
+    return this.live.id;
+  }
+  get phase(): string {
+    return this.live.phase;
+  }
+  get health(): number {
+    return this.live.health;
+  }
 }
 
 /**
@@ -260,6 +394,26 @@ export function resolveLive(
   if (view === null) return null;
   for (const c of live) if (c.id === view.id) return c;
   return null;
+}
+
+/**
+ * The same lookup against an index rather than a scan.
+ *
+ * PERFORMANCE.md phase 1. `resolveLive` above is a linear walk of the whole
+ * roster on every landed punch, which is invisible at sixteen players and is
+ * one of four places the tick was O(N) for no reason at all. The map is
+ * `Simulation`'s own, rebuilt beside the combatant list.
+ *
+ * Returns null for an id that is not live, which is the same answer the scan
+ * gives and means the same thing: the target left the world between the hit
+ * test and this line.
+ */
+export function resolveLiveById(
+  view: CombatantState | null,
+  byId: ReadonlyMap<number, CombatantState>,
+): CombatantState | null {
+  if (view === null) return null;
+  return byId.get(view.id) ?? null;
 }
 
 // --- The self-check -----------------------------------------------------------

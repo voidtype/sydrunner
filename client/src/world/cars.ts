@@ -92,6 +92,8 @@ import {
 
 import { CAR_BODY_SIZE } from '../game/traffic.ts';
 import {
+  CAR_STAGE_PARKED_IN,
+  CAR_STAGE_PARKED_OUT,
   createCarPose,
   forEachCarNear,
   type CarPose,
@@ -767,10 +769,19 @@ export function carBodySizes(): ReadonlyArray<{ length: number; width: number; h
  * the bar of shade a car throws across a lane is the thing that makes it read as
  * moving through the world rather than over it.
  *
- * Pushing it further is cheap in triangles and expensive in *pops*: a car exists
- * for one traversal of its route, so the further out they are drawn the more
- * often one is seen appearing. 420 m puts the appearances beyond the distance a
- * player is reading individual cars at.
+ * This used to be a *pop* budget as well as a triangle one -- a car existed for
+ * one traversal of its route, so the further out they were drawn the more often
+ * one was seen appearing, and 420 m was chosen to put the appearances beyond the
+ * distance a player reads individual cars at. That argument is retired.
+ * `game/traffic.ts`'s park stages mean a car now appears and disappears while
+ * *stationary in a kerb bay*, indistinguishable from the parked fleet around it,
+ * so distance no longer buys anything the stages do not. What is left is the
+ * triangle trade, and 420 m is where that landed.
+ *
+ * The measured consequence of the stages, at the densest 420 m in the extent:
+ * 177 cars in frame where the driving half alone is 91 -- 63 parked and 23 on a
+ * ramp. A little over double the fleet, at 110 triangles each, against the 398 k
+ * the static parked cars already put in the same frame.
  */
 export const TRAFFIC_DRAW_RADIUS = 420;
 
@@ -874,11 +885,21 @@ const liveried = policeLiveried;
  * Instances per body type. Five times this is the ceiling on cars in frame.
  *
  * Sedans are 30% of the mix, so the busiest body type sees about a third of the
- * ~210 the radius above admits. 256 is an order of magnitude of headroom on the
- * measured worst case, and an `InstancedMesh` costs its capacity in buffer bytes
- * and its *count* in draw work -- so the headroom is 100 kB and no frame time.
+ * cars the radius above admits -- which since `game/traffic.ts` gained its park
+ * stages is a measured 177 at the densest point in the extent rather than the
+ * ~210 estimated for the driving half alone, so about 60 sedans. 384 is six
+ * times the measured worst case, and an `InstancedMesh` costs its capacity in
+ * buffer bytes and its *count* in draw work -- so the headroom is 150 kB across
+ * the six sets and no frame time at all.
+ *
+ * Raised from 256 with the park stages rather than left alone, because the thing
+ * that overflows this is not the draw radius but a *headway* change in the
+ * pipeline: a car's life is now `duration + two dwells` and the dwells are
+ * bounded by the headway, so halving the headways citywide would roughly double
+ * this population. `checkTraffic` measures the peak against this ceiling so that
+ * change fails a check rather than silently dropping cars out of the world.
  */
-const MOVER_CAPACITY = 256;
+const MOVER_CAPACITY = 384;
 
 /**
  * Every moving car in view, as five instanced sets.
@@ -903,6 +924,17 @@ export class TrafficMovers {
   readonly meshes: InstancedMesh[] = [];
   /** Cars drawn last update. Read by the HUD's diagnostics line. */
   drawn = 0;
+  /**
+   * Of those, how many are sitting in a kerb bay between runs.
+   *
+   * On the HUD beside `drawn` because it is the number that says whether the
+   * fix for the pop is working. A schedule car appears and disappears only while
+   * it is one of these, so "38 driving, 41 parked" is the shape of a street
+   * where nothing winks in front of you; a zero here would mean the park stages
+   * had stopped being derived and every one of those transitions was back in the
+   * middle of a lane.
+   */
+  parked = 0;
   /** How long the last update took, milliseconds. Likewise. */
   costMs = 0;
   /** Of those, how many wore a police livery. Diagnostics only. */
@@ -973,10 +1005,17 @@ export class TrafficMovers {
     const at = performance.now();
     for (let b = 0; b < BODY_COUNT; b++) this.counts[b] = 0;
     this.bandCount = 0;
+    let parked = 0;
 
     forEachCarNear(field, x, z, TRAFFIC_DRAW_RADIUS, tick, this.scratch, this.pose, (p) => {
       const n = this.counts[p.body];
       if (n >= MOVER_CAPACITY) return;
+      // Counted before the capacity test would have a chance to skew it, and
+      // *not* branched on: a car in one of its parked stages is drawn by exactly
+      // the same code as a driving one, at the pose `poseCar` hands over, which
+      // is the whole of why it reads as one of the 23,020 already at that kerb.
+      // The only thing this file knows about the stages is this counter.
+      if (p.stage === CAR_STAGE_PARKED_IN || p.stage === CAR_STAGE_PARKED_OUT) parked++;
       const mesh = this.meshes[p.body];
       _position.set(p.x, p.y, p.z);
       // The heading, straight off the pose's unit direction and with no
@@ -1052,6 +1091,7 @@ export class TrafficMovers {
     this.band.count = this.bandCount;
     this.liveried = this.bandCount;
     this.drawn = drawn;
+    this.parked = parked;
     this.costMs = performance.now() - at;
   }
 

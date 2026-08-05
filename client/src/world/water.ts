@@ -105,14 +105,26 @@ import { WaterLevels } from './wading.ts';
  * would decode as a sheet count and everything after it as geometry at random
  * heights.
  */
-const WATER_MAGIC = 0x52544157; // "WATR", little-endian
-const WATER_VERSION = 1;
+import {
+  SHEET_HEADER,
+  WATER_HEADER,
+  WATER_MAGIC,
+  WATER_VERSION,
+  WATER_VERTEX_STRIDE,
+  decodeWater,
+  type TileWater,
+  type WaterSheet,
+} from './tile-decode.ts';
 
-/** Header and per-sheet header sizes, in bytes. See `tiles.write_water`. */
-const WATER_HEADER = 12;
-const SHEET_HEADER = 12;
-/** x, z, depth. */
-const VERTEX_STRIDE = 12;
+/**
+ * The decode, the record types and the format constants live in
+ * `world/tile-decode.ts`, which carries no `three` import and can therefore be
+ * read on a worker thread -- and a harbour tile's `.water.bin` is 29 kB, the
+ * largest sidecar in the build. Re-exported from here because this module is
+ * what owns how water *looks*, and every caller should keep naming it.
+ */
+export { decodeWater };
+export type { TileWater, WaterSheet };
 
 /**
  * The water contract, from `index.json`.
@@ -143,63 +155,6 @@ export interface WaterContract {
     sink_m: number;
     cell_m?: number;
   };
-}
-
-/** One flat run of water at a single surface height. */
-export interface WaterSheet {
-  /** World y of the surface. Absolute -- a tile's group sits at y = 0. */
-  surface: number;
-  /** Interleaved x, z, depth, three floats a vertex. */
-  vertices: Float32Array;
-  indices: Uint32Array;
-  count: number;
-}
-
-export interface TileWater {
-  sheets: WaterSheet[];
-  /** Triangles across every sheet. Reported by the streamer, used by nothing. */
-  triangles: number;
-}
-
-/**
- * Decode a `.water.bin` or `far-water.bin`. `null` for anything that is not one.
- *
- * Every length is checked against the buffer before it is read. A truncated
- * sidecar is what a rebuild interrupted mid-write leaves behind, and the failure
- * mode of trusting it is a `RangeError` thrown inside the streamer's
- * `Promise.all`, which takes the whole tile down.
- */
-export function decodeWater(buffer: ArrayBuffer): TileWater | null {
-  if (buffer.byteLength < WATER_HEADER) return null;
-  const view = new DataView(buffer);
-  if (view.getUint32(0, true) !== WATER_MAGIC) return null;
-  if (view.getUint32(4, true) !== WATER_VERSION) return null;
-  const sheetCount = view.getUint32(8, true);
-  if (sheetCount === 0) return null;
-
-  const sheets: WaterSheet[] = [];
-  let triangles = 0;
-  let at = WATER_HEADER;
-  for (let s = 0; s < sheetCount; s++) {
-    if (at + SHEET_HEADER > buffer.byteLength) return null;
-    const surface = view.getFloat32(at, true);
-    const vertexCount = view.getUint32(at + 4, true);
-    const indexCount = view.getUint32(at + 8, true);
-    at += SHEET_HEADER;
-    const need = vertexCount * VERTEX_STRIDE + indexCount * 4;
-    if (vertexCount === 0 || indexCount === 0 || at + need > buffer.byteLength) return null;
-    // Copies rather than views. The offsets are 4-byte aligned by construction
-    // -- every field in this format is a 4-byte word -- but a `Float32Array`
-    // view would keep the whole payload alive for as long as the tile is
-    // resident, which for the far sheet is the session.
-    const vertices = new Float32Array(buffer.slice(at, at + vertexCount * VERTEX_STRIDE));
-    at += vertexCount * VERTEX_STRIDE;
-    const indices = new Uint32Array(buffer.slice(at, at + indexCount * 4));
-    at += indexCount * 4;
-    sheets.push({ surface, vertices, indices, count: vertexCount });
-    triangles += indexCount / 3;
-  }
-  return { sheets, triangles };
 }
 
 /**
@@ -604,7 +559,7 @@ export function verifyWater(): string[] {
   const vertexCount = 3;
   const indexCount = 3;
   const bytes = new ArrayBuffer(
-    WATER_HEADER + SHEET_HEADER + vertexCount * VERTEX_STRIDE + indexCount * 4,
+    WATER_HEADER + SHEET_HEADER + vertexCount * WATER_VERTEX_STRIDE + indexCount * 4,
   );
   const view = new DataView(bytes);
   view.setUint32(0, WATER_MAGIC, true);
@@ -623,7 +578,7 @@ export function verifyWater(): string[] {
     view.setFloat32(at, x, true);
     view.setFloat32(at + 4, z, true);
     view.setFloat32(at + 8, d, true);
-    at += VERTEX_STRIDE;
+    at += WATER_VERTEX_STRIDE;
   }
   for (let i = 0; i < indexCount; i++) {
     view.setUint32(at + i * 4, i, true);

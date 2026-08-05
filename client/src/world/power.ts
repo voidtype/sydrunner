@@ -99,14 +99,24 @@ import {
   Vector3,
 } from 'three/webgpu';
 
+import { POLE_KIND_COUNT, decodePower, type TilePower } from './tile-decode.ts';
+
+/**
+ * The sidecar half of this module lives in `world/tile-decode.ts`, which carries
+ * no `three` import and can therefore be read on a worker thread. Re-exported
+ * from here so callers keep naming the module that owns what a pole *is*.
+ *
+ * `KIND_COUNT` keeps its old name on this side; over there it is
+ * `POLE_KIND_COUNT`, because three sidecars in this build have a kind count and
+ * they are not the same number of kinds.
+ */
+export { decodePower };
+export type { TilePower };
+
 /** Must match `power.STANDARD` / `power.TRANSFORMER` in the pipeline. */
-export const KIND_COUNT = 2;
+export const KIND_COUNT = POLE_KIND_COUNT;
 const STANDARD = 0;
 const TRANSFORMER = 1;
-
-/** Bytes per record in a `.power.bin` sidecar. Set by `tiles.write_power`. */
-const POLE_STRIDE = 20;
-const WIRE_STRIDE = 24;
 
 // --- The shared frame with the pipeline ---------------------------------------
 //
@@ -474,73 +484,6 @@ export class PowerAssets {
   geometry(kind: number): BufferGeometry {
     return this.geometries[kind] ?? this.geometries[STANDARD];
   }
-}
-
-// --- The sidecar --------------------------------------------------------------
-
-/** One tile's poles and spans, decoded from `<key>.power.bin`. */
-export interface TilePower {
-  poleCount: number;
-  /** Tile-local metres, renderer axes. */
-  x: Float32Array;
-  z: Float32Array;
-  /** Absolute metres above the datum -- the terrain under the pole's foot. */
-  groundY: Float32Array;
-  /** Metres, ground to the top of the shaft. */
-  height: Float32Array;
-  kind: Uint8Array;
-  tiltSeed: Uint8Array;
-  wireCount: number;
-  /**
-   * Span endpoints, six floats each: ax, ay, az, bx, by, bz. X and Z are local
-   * to *this* tile and Y is absolute, and one endpoint is routinely outside the
-   * tile -- a span belongs to whichever tile holds its midpoint, so it reaches
-   * up to half a span over the seam. Nothing here may clamp them.
-   */
-  wire: Float32Array;
-}
-
-/**
- * Decode a `.power.bin`. Returns `null` for anything that is not one, because a
- * tile with no poles must be indistinguishable from a tile whose sidecar is
- * missing -- see `streamer.ts`.
- */
-export function decodePower(buffer: ArrayBuffer): TilePower | null {
-  if (buffer.byteLength < 8) return null;
-  const view = new DataView(buffer);
-  const poleCount = view.getUint32(0, true);
-  const wireBase = 4 + poleCount * POLE_STRIDE;
-  if (buffer.byteLength < wireBase + 4) return null;
-  const wireCount = view.getUint32(wireBase, true);
-  if (buffer.byteLength < wireBase + 4 + wireCount * WIRE_STRIDE) return null;
-  if (poleCount === 0 && wireCount === 0) return null;
-
-  const out: TilePower = {
-    poleCount,
-    x: new Float32Array(poleCount),
-    z: new Float32Array(poleCount),
-    groundY: new Float32Array(poleCount),
-    height: new Float32Array(poleCount),
-    kind: new Uint8Array(poleCount),
-    tiltSeed: new Uint8Array(poleCount),
-    wireCount,
-    wire: new Float32Array(wireCount * 6),
-  };
-  for (let i = 0; i < poleCount; i++) {
-    const o = 4 + i * POLE_STRIDE;
-    out.x[i] = view.getFloat32(o, true);
-    out.z[i] = view.getFloat32(o + 4, true);
-    out.groundY[i] = view.getFloat32(o + 8, true);
-    out.height[i] = view.getFloat32(o + 12, true);
-    // Clamped rather than trusted: an out-of-range kind would read past the
-    // geometry table and take the whole tile out with it.
-    out.kind[i] = Math.min(view.getUint8(o + 16), KIND_COUNT - 1);
-    out.tiltSeed[i] = view.getUint8(o + 17);
-  }
-  for (let i = 0; i < wireCount * 6; i++) {
-    out.wire[i] = view.getFloat32(wireBase + 4 + i * 4, true);
-  }
-  return out;
 }
 
 // --- Instancing ---------------------------------------------------------------

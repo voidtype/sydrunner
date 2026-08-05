@@ -47,6 +47,7 @@
 import { verifyCombat } from '../client/src/game/combat.ts';
 import { verifyFooty } from '../client/src/game/footy.ts';
 import { verifyPowerups } from '../client/src/game/powerups.ts';
+import { verifySpatialHash } from '../client/src/game/spatialhash.ts';
 import { verifyMovementBasis } from '../client/src/player/controller.ts';
 import {
   INTERP_DELAY_MS,
@@ -67,9 +68,10 @@ import {
   encodePowerups,
   encodeInvestigations,
   encodeRoster,
-  encodeSnapshot,
+  encodeSnapshotInto,
   encodeWelcome,
   frameType,
+  patchSnapshotAck,
   rankRoster,
   rosterBytes,
   snapshotBytes,
@@ -85,6 +87,25 @@ import { loadWorld } from './world.ts';
 const PORT = Number(process.env.SYDNEY_PORT ?? 8787);
 const WORLD_ROOT = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
 const BOT_COUNT = Number(process.env.SYDNEY_BOTS ?? 2);
+
+/**
+ * The join gate, and **the one thing `server/loadtest.ts` turns up**.
+ *
+ * `protocol.MAX_PLAYERS` is spec 2's sixteen and stays sixteen: it is a
+ * *protocol* constant, the client reads it, and PERFORMANCE.md phase 1 changes
+ * no protocol. What this is, is the number of humans this process will admit,
+ * which is a deployment question and is exactly what a capacity curve varies.
+ *
+ * **Above 255 the wire aliases.** `encodeSnapshot` writes the player id and the
+ * player count as `u8`, so a 500-player run puts two players on id 244 and tells
+ * every client the roster is 244 long. The *simulation* is honest at any count
+ * -- the ids inside this process are 32-bit, every body is stepped, every byte
+ * is written -- so the CPU and bandwidth numbers a load run produces are real,
+ * and that is what the curve measures. What is not real above 255 is any client
+ * that tries to *interpret* the result. Phase 2's protocol v8 has to widen both
+ * fields; this is the measurement that says by how much.
+ */
+const MAX_HUMANS = Number(process.env.SYDNEY_MAX_PLAYERS ?? MAX_PLAYERS);
 
 // --- Self-checks, before anything expensive -----------------------------------
 
@@ -111,6 +132,11 @@ const BOT_COUNT = Number(process.env.SYDNEY_BOTS ?? 2);
     // sanitiser compiled from one file means.
     ['verifyNames', verifyNames()],
     ['verifyRewind', verifyRewind()],
+    // PERFORMANCE.md phase 1's grid, which every hit test in the game now
+    // takes its candidates from. A grid that is not a superset is a punch that
+    // passes through somebody, and there is no frame in which that looks like
+    // an index bug rather than a hit test one.
+    ['verifySpatialHash', verifySpatialHash()],
     ['verifySim', verifySim()],
   ];
   const failed = checks.filter(([, f]) => f.length > 0);
@@ -167,16 +193,52 @@ for (let i = 0; i < BOT_COUNT; i++) {
  */
 interface Conn {
   participant: Participant | null;
-  pendingInput: InputFrame | null;
+  /**
+   * The latest input, **decoded straight into a record owned by this socket**.
+   *
+   * PERFORMANCE.md phase 1. This used to be `InputFrame | null` holding a
+   * `{ ...scratch }` spread of the shared decode buffer, which is one object per
+   * input message per client -- 60 Hz x N, or **thirty thousand objects a
+   * second at five hundred players**, the second-largest allocation site in the
+   * process. The copy is still a copy (the decode scratch is shared across
+   * sockets and aliasing it would give every player the last input anybody
+   * sent), it is just a copy into a field instead of into a new object.
+   */
+  readonly input: InputFrame;
+  /** Whether `input` holds something the next tick has not consumed. */
+  hasInput: boolean;
   /** Smoothed round trip, ms. Seeded pessimistically so an early punch is not over-rewound. */
   rtt: number;
   lastSeen: number;
 }
 
+function newConn(): Conn {
+  return {
+    participant: null,
+    input: { seq: 0, buttons: 0, forward: 0, right: 0, yaw: 0, pitch: 0 },
+    hasInput: false,
+    rtt: 60,
+    lastSeen: Date.now(),
+  };
+}
+
 const conns = new Set<{ data: Conn; send(data: ArrayBuffer): void; close(): void }>();
 type Socket = { data: Conn; send(data: ArrayBuffer | Uint8Array): number; close(code?: number, reason?: string): void };
 
-const inputScratch: InputFrame = { seq: 0, buttons: 0, forward: 0, right: 0, yaw: 0, pitch: 0 };
+/**
+ * How many of the participants are people. Counted rather than spread.
+ *
+ * The three places that used to ask this each built `[...sim.participants
+ * .values()].filter(...)` -- a fresh array of every participant, on the join
+ * path, on `/health`, and on the ten-second log. At five hundred players and a
+ * churning load test that is the kind of quiet allocation that only shows up as
+ * a GC pause with nothing obvious in the profile.
+ */
+function humanCount(): number {
+  let n = 0;
+  for (const p of sim.participants.values()) if (!p.bot) n++;
+  return n;
+}
 
 const server = Bun.serve<Conn>({
   port: PORT,
@@ -185,12 +247,13 @@ const server = Bun.serve<Conn>({
   fetch(req, srv) {
     const url = new URL(req.url);
     if (url.pathname === '/health') {
+      const humans = humanCount();
       return new Response(
         JSON.stringify({
           ok: true,
           tick: sim.tick,
-          players: [...sim.participants.values()].filter((p) => !p.bot).length,
-          bots: [...sim.participants.values()].filter((p) => p.bot).length,
+          players: humans,
+          bots: sim.participants.size - humans,
           stage: world.index.stage,
           protocol: PROTOCOL_VERSION,
         }),
@@ -201,9 +264,69 @@ const server = Bun.serve<Conn>({
         { headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' } },
       );
     }
-    const ok = srv.upgrade(req, {
-      data: { participant: null, pendingInput: null, rtt: 60, lastSeen: Date.now() } satisfies Conn,
-    });
+    /*
+     * `/stats` -- what `server/loadtest.ts` reads, and the only thing in this
+     * process that knows where a tick went.
+     *
+     * A second route rather than more fields on `/health`, because the two
+     * answer different questions to different callers: `/health` is a liveness
+     * probe a deployment hits and has to stay cheap and stable, and this is a
+     * measurement instrument that resets its own counters when it is read. A
+     * probe with side effects would be a probe that made the numbers wrong for
+     * whoever asked next.
+     *
+     * **Reading it resets the window**, so successive polls report disjoint
+     * intervals and a harness can integrate them. The tick-cost percentiles are
+     * the exception: they come off a 20 s ring that is not cleared, because a
+     * p99 that only ever saw one poll's worth of ticks is not a p99.
+     */
+    if (url.pathname === '/stats') {
+      const now = performance.now();
+      const window = Math.max(1e-6, now - statsReadAt);
+      const sorted = Float64Array.prototype.slice.call(tickCost, 0, Math.min(ticksMeasured, tickCost.length)).sort();
+      const at = (q: number): number => (sorted.length === 0 ? 0 : sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))]);
+      // Per-tick milliseconds, which is what a budget is stated in. The
+      // simulation accumulates totals since the last read; dividing by the
+      // ticks in that window is the only conversion that survives a poll
+      // interval that is not exactly one second.
+      const ticksInWindow = Math.max(1, ticksRun - statsTicksAt);
+      const phases: Record<string, number> = {};
+      for (const [k, v] of Object.entries(sim.phaseMs)) phases[k] = v / ticksInWindow;
+      phases.encode = encodeMs / ticksInWindow;
+      phases.broadcast = broadcastMs / ticksInWindow;
+      const body = JSON.stringify({
+        tick: sim.tick,
+        players: humanCount(),
+        participants: sim.participants.size,
+        /** Ticks per second actually achieved. Below 60 means the loop is losing. */
+        tickHz: (ticksInWindow / window) * 1000,
+        tickMs: { p50: at(0.5), p90: at(0.9), p99: at(0.99), max: worstTick },
+        /** Ticks over four budgets. Bun exposes no GC hook; this is the observable proxy. */
+        stalls,
+        phaseMs: phases,
+        bytesOut: bytesSent,
+        snapshots: snapshotsSent,
+        /** Bytes per client per second, the number AOI has to bring down. */
+        bytesPerClientPerSec: humanCount() > 0 ? (bytesSent / humanCount() / window) * 1000 : 0,
+        rss: process.memoryUsage.rss(),
+        heap: process.memoryUsage().heapUsed,
+        windowMs: window,
+        ticksInWindow,
+      });
+      statsReadAt = now;
+      statsTicksAt = ticksRun;
+      for (const k of Object.keys(sim.phaseMs)) (sim.phaseMs as Record<string, number>)[k] = 0;
+      encodeMs = 0;
+      broadcastMs = 0;
+      bytesSent = 0;
+      snapshotsSent = 0;
+      stalls = 0;
+      worstTick = 0;
+      return new Response(body, {
+        headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
+      });
+    }
+    const ok = srv.upgrade(req, { data: newConn() });
     if (ok) return undefined;
     return new Response('SYDNEY game server. Connect a WebSocket; tiles are served elsewhere.\n', {
       status: 426,
@@ -240,9 +363,8 @@ const server = Bun.serve<Conn>({
             ws.close(1002, 'protocol');
             return;
           }
-          const humans = [...sim.participants.values()].filter((p) => !p.bot).length;
-          if (humans >= MAX_PLAYERS) {
-            ws.send(encodeBye(`full (${MAX_PLAYERS} players)`));
+          if (humanCount() >= MAX_HUMANS) {
+            ws.send(encodeBye(`full (${MAX_HUMANS} players)`));
             ws.close(1013, 'full');
             return;
           }
@@ -315,12 +437,11 @@ const server = Bun.serve<Conn>({
 
         case MSG.INPUT: {
           if (!conn.participant) return;
-          const got = decodeInput(frame, inputScratch);
-          if (!got) return;
-          // Copied rather than aliased: `inputScratch` is reused by the next
-          // message on any socket, and holding a reference to it would make
-          // every player's input the last one that arrived from anybody.
-          conn.pendingInput = { ...got };
+          // Decoded straight into this socket's own record. `decodeInput` takes
+          // its output, so there is no shared scratch to alias and no spread to
+          // allocate -- see `Conn.input`.
+          if (!decodeInput(frame, conn.input)) return;
+          conn.hasInput = true;
           return;
         }
 
@@ -376,11 +497,37 @@ let ticksRun = 0;
 const out: TickOutput = { tick: 0, events: [], snapshot: null };
 const snapshotScratch: SnapshotPlayer[] = [];
 
-/** Rolling cost of a tick, for the console line below. */
-const tickCost = new Float64Array(120);
+/**
+ * Rolling cost of a tick, for the console line below and for `/stats`.
+ *
+ * Twenty seconds of ticks rather than two, because PERFORMANCE.md phase 1's
+ * exit criterion is a **p99** and a 120-sample window has 1.2 samples above the
+ * 99th percentile. 1,200 is 9.6 kB of Float64 and gives the tail 12 samples to
+ * be made of.
+ */
+const tickCost = new Float64Array(TICK_HZ * 20);
 let costCursor = 0;
+let ticksMeasured = 0;
 let snapshotsSent = 0;
 let bytesSent = 0;
+let encodeMs = 0;
+let broadcastMs = 0;
+let worstTick = 0;
+/** A tick this far over budget waited on something; see `runTick`. */
+const STALL_MS = (1000 / TICK_HZ) * 4;
+let stalls = 0;
+
+/**
+ * The one snapshot buffer, and the two views onto it. See the send loop.
+ *
+ * Sized for the sixteen-player world at boot and grown on demand, because a
+ * server that starts at five hundred players' worth of buffer to serve two is
+ * carrying 10 kB nobody asked for and a server that reallocates every tick is
+ * the thing this exists to stop.
+ */
+let snapshotPool = new ArrayBuffer(snapshotBytes(MAX_PLAYERS, 8, 24));
+let snapshotView = new DataView(snapshotPool);
+let snapshotBytesOut = new Uint8Array(snapshotPool);
 
 /**
  * The scoreboard's cadence: on change, plus a slow refresh for the ping column.
@@ -435,9 +582,9 @@ function runTick(): void {
   for (const ws of conns) {
     const conn = (ws as unknown as Socket).data;
     const p = conn.participant;
-    if (!p || !conn.pendingInput) continue;
-    const frame = conn.pendingInput;
-    conn.pendingInput = null;
+    if (!p || !conn.hasInput) continue;
+    const frame = conn.input;
+    conn.hasInput = false;
     p.input.forward = frame.forward;
     p.input.right = frame.right;
     p.input.yaw = frame.yaw;
@@ -500,11 +647,13 @@ function runTick(): void {
   {
     const changed = sim.investigationVersion !== investigationSent;
     const refresh = sim.tick - investigationTick >= INVESTIGATION_REFRESH_TICKS;
-    const wanted = sim.investigations();
     if (changed || refresh) {
       investigationSent = sim.investigationVersion;
       investigationTick = sim.tick;
-      const frame = encodeInvestigations(wanted);
+      // Read inside the branch rather than above it. On a quiet server this
+      // fires once every two seconds instead of sixty times a second, and
+      // `sim.investigations()` walks a map either way.
+      const frame = encodeInvestigations(sim.investigations());
       for (const ws of conns) {
         const s = ws as unknown as Socket;
         if (!s.data.participant) continue;
@@ -564,19 +713,59 @@ function runTick(): void {
     // same object to everybody looking at them. See `protocol.NPC_BYTES` for
     // what is in the record and, more usefully, what is deliberately not.
     const npcs = sim.npcSnapshot();
+
+    // **One encode, one buffer, one ack patched per client.**
+    //
+    // PERFORMANCE.md phase 1, and it is the change that comment above used to
+    // argue against: *"only the two-byte ack differs, which would be a real
+    // saving to exploit and is not worth the shared-buffer aliasing bug it
+    // would invite at this player count"*. At this player count, correct. At the
+    // counts the capacity curve runs at it was the largest allocation site in
+    // the process by an order of magnitude -- 10.5 kB x 500 clients x 20 Hz is
+    // 105 MB a second of garbage to say the same thing five hundred times.
+    //
+    // The aliasing bug it invites is real and is closed by one property of the
+    // transport: `ws.send` **copies** into the socket's write buffer
+    // synchronously, so by the time the ack is patched for the next client the
+    // previous one's bytes are already gone. Nothing here holds a reference to
+    // the buffer across a line.
+    const bytes = snapshotBytes(players.length, balls.length, npcs.length);
+    if (snapshotPool.byteLength < bytes) {
+      // Grown to the high-water mark and never shrunk, which for a process
+      // whose player count only goes up during a session is one allocation.
+      snapshotPool = new ArrayBuffer(bytes);
+      snapshotView = new DataView(snapshotPool);
+      snapshotBytesOut = new Uint8Array(snapshotPool);
+    }
+    let t = performance.now();
+    encodeSnapshotInto(snapshotView, sim.tick, 0, players, balls, npcs);
+    encodeMs += performance.now() - t;
+
+    t = performance.now();
+    const wire = snapshotBytesOut.subarray(0, bytes);
     for (const ws of conns) {
       const s = ws as unknown as Socket;
       const p = s.data.participant;
       if (!p) continue;
-      const frame = encodeSnapshot(sim.tick, p.ackSeq, players, balls, npcs);
-      s.send(frame);
-      bytesSent += frame.byteLength;
+      patchSnapshotAck(snapshotView, p.ackSeq);
+      s.send(wire);
+      bytesSent += bytes;
       snapshotsSent++;
     }
+    broadcastMs += performance.now() - t;
   }
 
-  tickCost[costCursor] = performance.now() - began;
+  const cost = performance.now() - began;
+  tickCost[costCursor] = cost;
   costCursor = (costCursor + 1) % tickCost.length;
+  ticksMeasured++;
+  // The stall detector, and it is the closest thing to a GC probe this runtime
+  // gives. Bun exposes no allocation counters and no GC hook, so what is
+  // measured instead is the observable symptom: a tick that took more than four
+  // times the 16.67 ms budget did not do four times the work, it waited. See
+  // `/stats`.
+  if (cost > STALL_MS) stalls++;
+  if (cost > worstTick) worstTick = cost;
 }
 
 function pump(): void {
@@ -627,9 +816,13 @@ setInterval(() => {
   }
 }, 5000);
 
+/** When `/stats` last reported, so each poll covers a disjoint window. */
+let statsReadAt = performance.now();
+let statsTicksAt = 0;
+
 /** One line every ten seconds, and only when somebody is connected. */
 setInterval(() => {
-  const humans = [...sim.participants.values()].filter((p) => !p.bot).length;
+  const humans = humanCount();
   if (humans === 0) return;
   const sorted = Array.from(tickCost).filter((v) => v > 0).sort((a, b) => a - b);
   const median = sorted.length ? sorted[sorted.length >> 1] : 0;

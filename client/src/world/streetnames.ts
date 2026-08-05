@@ -53,139 +53,26 @@
  * runs rejects nearly all of them on four compares before any point is touched.
  */
 
-/** One continuous run of one named street, in world metres. */
-export interface NamedSegment {
-  /**
-   * The street's full display form -- 'King Street', never 'King St'.
-   *
-   * The pipeline abbreviates for the *blades* and deliberately does not here:
-   * a readout is prose, and 'St' cannot be expanded back because Sydney has
-   * both a Sussex Street and a St Johns Road. `game/locator.ts` shortens it for
-   * itself in the one case that has to fit two names on one line.
-   *
-   * Shared by reference across every segment of the same street in a tile, out
-   * of the file's own string table, so a name is one string however many runs
-   * quote it.
-   */
-  readonly name: string;
-  /** `[x0, z0, x1, z1, ...]`, at least two points. */
-  readonly points: Float32Array;
-  /** The run's own bounds, so the query rejects it without touching a point. */
-  minX: number;
-  minZ: number;
-  maxX: number;
-  maxZ: number;
-}
-
-/** One tile's worth, held on the `LoadedTile` and dropped with it. */
-export interface TileStreetNames {
-  /** Distinct street names in this tile, in the file's table order. */
-  readonly names: readonly string[];
-  readonly segments: readonly NamedSegment[];
-  /** Total points across every run. Reported; nothing reads it. */
-  readonly pointCount: number;
-}
-
-const decoder = new TextDecoder();
+import {
+  decodeStreetNames,
+  translateStreetNames,
+  type NamedSegment,
+  type TileStreetNames,
+} from './tile-decode.ts';
 
 /**
- * Decode one tile's `.names.bin`, or null if there is nothing usable in it.
+ * The decode itself lives in `world/tile-decode.ts`, along with the record types
+ * and the tile-local-to-world translation.
  *
- * Returns tile-local coordinates. `translateStreetNames` is what makes them
- * world coordinates and must be called before the segments are queried; the two
- * are separate because only the caller knows the tile's origin, and folding the
- * offset into the decoder would mean passing it through the fetch layer.
- *
- * Defensive against a truncated file at every step rather than at the top,
- * because the record is variable-stride -- the point count is per segment -- so
- * there is no single length test that proves the file is whole. A short read
- * returns what was decoded up to that point instead of throwing: a tile with
- * three of its forty streets is a worse readout, and a tile that fails to load
- * is a hole in the city.
+ * It moved there for one reason: that file carries no `three` import, so
+ * `world/decode.worker.ts` can read a `.names.bin` -- and lift it into world
+ * metres, since the tile origin travels with the bytes -- on a thread that is
+ * not the render thread. Re-exported from here because this module is still
+ * where the argument above lives, and because `streamer.ts` and
+ * `game/locator.ts` should keep naming it.
  */
-export function decodeStreetNames(buffer: ArrayBuffer): TileStreetNames | null {
-  if (buffer.byteLength < 3) return null;
-  const view = new DataView(buffer);
-  const bytes = new Uint8Array(buffer);
-  let p = 0;
-
-  const nameCount = view.getUint8(p);
-  p += 1;
-  const names: string[] = [];
-  for (let i = 0; i < nameCount; i++) {
-    if (p >= buffer.byteLength) return null;
-    const len = view.getUint8(p);
-    p += 1;
-    if (p + len > buffer.byteLength) return null;
-    names.push(decoder.decode(bytes.subarray(p, p + len)));
-    p += len;
-  }
-  if (names.length === 0 || p + 2 > buffer.byteLength) return null;
-
-  const segCount = view.getUint16(p, true);
-  p += 2;
-  const segments: NamedSegment[] = [];
-  let pointCount = 0;
-  for (let s = 0; s < segCount; s++) {
-    if (p + 2 > buffer.byteLength) break;
-    const nameIdx = view.getUint8(p);
-    const n = view.getUint8(p + 1);
-    p += 2;
-    const need = n * 8;
-    if (p + need > buffer.byteLength) break;
-    // A name index past the table is a file this decoder does not understand,
-    // and the run is dropped rather than clamped: clamping would put a piece of
-    // some *other* street on the map under the wrong name, which is the one
-    // failure a readout must not have. A short tile is visibly short; a
-    // confidently wrong street name is not.
-    if (nameIdx >= names.length || n < 2) {
-      p += need;
-      continue;
-    }
-    const points = new Float32Array(n * 2);
-    let minX = Infinity;
-    let minZ = Infinity;
-    let maxX = -Infinity;
-    let maxZ = -Infinity;
-    for (let i = 0; i < n; i++) {
-      const x = view.getFloat32(p + i * 8, true);
-      const z = view.getFloat32(p + i * 8 + 4, true);
-      points[i * 2] = x;
-      points[i * 2 + 1] = z;
-      if (x < minX) minX = x;
-      if (x > maxX) maxX = x;
-      if (z < minZ) minZ = z;
-      if (z > maxZ) maxZ = z;
-    }
-    p += need;
-    segments.push({ name: names[nameIdx], points, minX, minZ, maxX, maxZ });
-    pointCount += n;
-  }
-  if (segments.length === 0) return null;
-  return { names, segments, pointCount };
-}
-
-/**
- * Lift a decoded tile from tile-local metres into world metres, in place.
- *
- * Called once per tile at load with the tile group's own translation, which is
- * the same `(minX, minZ + tileSize)` every other per-tile payload is offset by.
- * Mutating rather than copying is deliberate -- the arrays were allocated by the
- * decode a moment ago and have no other owner.
- */
-export function translateStreetNames(tile: TileStreetNames, dx: number, dz: number): void {
-  for (const seg of tile.segments) {
-    const pts = seg.points;
-    for (let i = 0; i < pts.length; i += 2) {
-      pts[i] += dx;
-      pts[i + 1] += dz;
-    }
-    seg.minX += dx;
-    seg.maxX += dx;
-    seg.minZ += dz;
-    seg.maxZ += dz;
-  }
-}
+export { decodeStreetNames, translateStreetNames };
+export type { NamedSegment, TileStreetNames };
 
 /**
  * Squared distance from a point to a polyline, in world metres.

@@ -102,6 +102,18 @@
 import * as combat from './combat.ts';
 import { MAX_HEALTH, type CombatInput, type CombatantState } from './combat.ts';
 import { EYE_HEIGHT } from '../player/controller.ts';
+import type { SpatialHash } from './spatialhash.ts';
+
+/**
+ * Candidates for one point's pickup test. See `tickPowerups`.
+ *
+ * Module-level and shared, on `game/streetlife.ts`'s `scanBands` terms: it is
+ * refilled and fully consumed inside one synchronous inner loop and nothing
+ * downstream of that loop holds a reference to it, so two `Simulation`s in one
+ * process (which `server/integration-check.ts` builds, deliberately) cannot
+ * carry an answer from one into the other through it.
+ */
+const pickupScratch: CombatantState[] = [];
 
 // --- Kinds --------------------------------------------------------------------
 
@@ -318,6 +330,7 @@ export function tickPowerups(
   combatants: readonly CombatantState[],
   dt: number,
   out: PickupEvent[] = [],
+  index: SpatialHash<CombatantState> | null = null,
 ): PickupEvent[] {
   out.length = 0;
   const radius2 = PICKUP_RADIUS * PICKUP_RADIUS;
@@ -334,7 +347,23 @@ export function tickPowerups(
       p.active = true;
     }
 
-    for (const c of combatants) {
+    // Everybody, or -- when the caller has built one -- only the bodies whose
+    // cell touches this point's 1.6 m disc.
+    //
+    // PERFORMANCE.md phase 1, and this is the single largest thing the spatial
+    // hash removes from the tick: the inner loop below runs once per point per
+    // combatant, which over the inner ring's 884 points is 14,000 distance
+    // tests a tick at sixteen players and **442,000 at five hundred** -- 26
+    // million a second, more than everything else in the tick put together.
+    // Almost all of it is a cafe in Newtown measuring its distance to somebody
+    // in Bondi.
+    //
+    // `collectWithin` returns a superset in ascending combatant order, which is
+    // exactly the order `combatants` is in, so the `break` below picks the same
+    // body it always did. See `game/spatialhash.ts` on why that ordering
+    // guarantee is what makes this identical rather than merely equivalent.
+    const near = index === null ? combatants : index.collectWithin(p.x, p.z, PICKUP_RADIUS, pickupScratch);
+    for (const c of near) {
       // A knocked-out body slid 7 m into a cafe must not collect it, and a
       // combatant on 0 pips is a body. `combat.isTargetable` asks exactly this
       // question about a punch; it is the same question here and is deliberately

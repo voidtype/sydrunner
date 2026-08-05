@@ -1742,6 +1742,28 @@ export class FactionField {
   }
 
   /**
+   * How many players are wanted, and each of them, without building an array.
+   *
+   * PERFORMANCE.md phase 1's GC discipline. `liveInvestigations` above spreads
+   * a `Map` into a fresh array, which is the right shape for a caller that
+   * wants a list and the wrong one for the three callers that ask this question
+   * **every tick**: `server/sim.stepFactions` compares the count either side of
+   * a step, and `server/index.ts` re-reads the set on its refresh cadence. Three
+   * arrays a tick is 180 a second forever, for a number and a walk.
+   *
+   * Iteration order is the `Map`'s, which is insertion order, which is the
+   * order crimes were reported -- the same order `liveInvestigations` gives and
+   * the one `FactionField.step` already relies on.
+   */
+  get investigationCount(): number {
+    return this.investigations.size;
+  }
+
+  forEachInvestigation(cb: (inv: Investigation) => void): void {
+    for (const inv of this.investigations.values()) cb(inv);
+  }
+
+  /**
    * Open an investigation, or extend and re-label one already running.
    *
    * Re-labelling rather than keeping the first reason is deliberate and is the

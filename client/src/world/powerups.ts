@@ -117,13 +117,21 @@ import {
   Vector3,
 } from 'three/webgpu';
 
+import { POWERUP_KIND_COUNT, decodePowerups, type TilePowerupData } from './tile-decode.ts';
+
+/**
+ * The sidecar half of this module lives in `world/tile-decode.ts`, which has no
+ * `three` import and can therefore be read on a worker thread. Re-exported from
+ * here because that is the name `server/world.ts` reaches it by, and the server
+ * must keep reaching it without acquiring a renderer.
+ */
+export { decodePowerups };
+export type { TilePowerupData };
+
 /** Must match `pipeline/sydney/powerups.py` and `game/powerups.ts`. */
 export const TRAINING = 0;
 export const FLAT_WHITE = 1;
-export const KIND_COUNT = 2;
-
-/** Fixed record stride in a `.pow.bin`. Set by `tiles.write_powerups`. */
-const STRIDE = 16;
+export const KIND_COUNT = POWERUP_KIND_COUNT;
 
 // --- The look -----------------------------------------------------------------
 
@@ -476,49 +484,6 @@ export class PowerupAssets {
     shell.opacityNode = distanceFade(SHELL_OPACITY, true);
     this.shellMaterial = shell;
   }
-}
-
-// --- The sidecar --------------------------------------------------------------
-
-/** One tile's powerups, decoded from `<key>.pow.bin`. */
-export interface TilePowerupData {
-  count: number;
-  /** Tile-local metres, renderer axes: x in [0, tileSize), z in (-tileSize, 0]. */
-  x: Float32Array;
-  z: Float32Array;
-  /** Absolute metres -- the top of the footpath paving, as the pipeline sampled it. */
-  groundY: Float32Array;
-  kind: Uint8Array;
-}
-
-/**
- * Decode a `.pow.bin`. Returns `null` for anything that is not one, because a
- * tile with no powerups must be indistinguishable from a tile whose sidecar is
- * missing -- see `streamer.ts`.
- */
-export function decodePowerups(buffer: ArrayBuffer): TilePowerupData | null {
-  if (buffer.byteLength < 4) return null;
-  const view = new DataView(buffer);
-  const count = view.getUint32(0, true);
-  if (count === 0 || buffer.byteLength < 4 + count * STRIDE) return null;
-
-  const out: TilePowerupData = {
-    count,
-    x: new Float32Array(count),
-    z: new Float32Array(count),
-    groundY: new Float32Array(count),
-    kind: new Uint8Array(count),
-  };
-  for (let i = 0; i < count; i++) {
-    const p = 4 + i * STRIDE;
-    out.x[i] = view.getFloat32(p, true);
-    out.z[i] = view.getFloat32(p + 4, true);
-    out.groundY[i] = view.getFloat32(p + 8, true);
-    // Clamped rather than trusted: an out-of-range kind would read past the
-    // colour table and take the whole tile out with it.
-    out.kind[i] = Math.min(view.getUint8(p + 12), KIND_COUNT - 1);
-  }
-  return out;
 }
 
 // --- Instancing ---------------------------------------------------------------

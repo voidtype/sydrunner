@@ -125,6 +125,16 @@ import {
 } from './combat.ts';
 import { damageScale } from './powerups.ts';
 import { NO_WATER } from '../world/wading.ts';
+import type { SpatialHash } from './spatialhash.ts';
+
+/**
+ * Candidates for one ball's sweep. See `stepFooty`.
+ *
+ * Module-level and shared, on `game/powerups.ts`'s `pickupScratch` terms and
+ * for the same reason: refilled and fully consumed inside one synchronous
+ * block, never retained past it.
+ */
+const sweepScratch: CombatantState[] = [];
 
 // --- The ball ------------------------------------------------------------------
 
@@ -496,6 +506,7 @@ export function stepFooty(
   world: CombatWorld | null,
   targets: readonly CombatantState[],
   out: FootyStep,
+  index: SpatialHash<CombatantState> | null = null,
 ): FootyStep {
   clearStep(out);
   if (!ball.alive) return out;
@@ -535,7 +546,26 @@ export function stepFooty(
     const reach = BALL_RADIUS + CAPSULE_RADIUS;
     let best: CombatantState | null = null;
     let bestAlong = Infinity;
-    for (const t of targets) {
+    // Everybody, or -- when the caller has built one -- only the bodies whose
+    // cell touches this tick's flight segment.
+    //
+    // PERFORMANCE.md phase 1. A capsule is vertical, so `segmentDistance` can
+    // only come in under `reach` for a body whose *plan* position is within
+    // `reach` of the flight's plan projection: a disc centred on the segment's
+    // midpoint with radius `half the segment + reach` contains every one of
+    // them and the exact test below still decides. A superset in ascending
+    // combatant order, which is the order `targets` is in, so the strict `<`
+    // on `bestAlong` breaks its ties exactly as it did -- see
+    // `game/spatialhash.ts` on why that matters.
+    let sweep = targets;
+    if (index !== null) {
+      const mx = (fromX + toX) * 0.5;
+      const mz = (fromZ + toZ) * 0.5;
+      const hx = toX - mx;
+      const hz = toZ - mz;
+      sweep = index.collectWithin(mx, mz, Math.sqrt(hx * hx + hz * hz) + reach, sweepScratch);
+    }
+    for (const t of sweep) {
       if (t.id === ball.thrower) continue;
       if (!isTargetable(t)) continue;
       const foot = feetY(t);
@@ -824,11 +854,12 @@ export class FootyField {
     world: CombatWorld | null,
     targets: readonly CombatantState[],
     out: FootyEvent[],
+    index: SpatialHash<CombatantState> | null = null,
   ): FootyEvent[] {
     out.length = 0;
     const s = this.step_;
     for (const ball of this.balls) {
-      stepFooty(ball, dt, world, targets, s);
+      stepFooty(ball, dt, world, targets, s, index);
       if (s.victim) out.push({ ball, kind: 'hit', victim: s.victim });
       else if (s.splashed) out.push({ ball, kind: 'splash', victim: null });
       else if (s.expired) out.push({ ball, kind: 'expire', victim: null });

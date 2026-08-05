@@ -33,8 +33,11 @@ import { atlasTextureSize } from './world/params-atlas.ts';
 import { TileStreamer, type WorldIndex } from './world/streamer.ts';
 import { TrafficMovers, carBodySizes } from './world/cars.ts';
 import {
+  CAR_STAGE_PARKED_IN,
+  CAR_STAGE_PARKED_OUT,
   TrafficField,
   applyCarHit,
+  carHitStrength,
   carHitting,
   createCarPose,
   forEachCarNear,
@@ -809,6 +812,25 @@ async function main(): Promise<void> {
     boot: 'warming shaders',
   };
   (window as unknown as { sydney: unknown }).sydney = dev;
+
+  // The streaming decode check, in dev only and deliberately not awaited.
+  //
+  // It reads one real tile and proves two things that cannot be read off the
+  // source: that the purpose-built GLB reader on the decode thread agrees with
+  // `GLTFLoader` attribute for attribute, and that a tile survives the worker
+  // boundary unchanged. See `TileStreamer.verifyStreaming`.
+  //
+  // Not fatal, and not in the boot path. Every other check here guards something
+  // that would render wrongly; this one guards something that renders *fine* and
+  // costs a frame -- and holding up the loading screen for a tile fetch to find
+  // that out would be the wrong trade even in dev.
+  if (import.meta.env.DEV) {
+    void streamer.verifyStreaming().then((failures) => {
+      if (failures.length) {
+        console.warn('[streaming] decode self-check failed:\n  - ' + failures.join('\n  - '));
+      }
+    });
+  }
 
   // --- The three asset sets that are built here rather than where they are
   // used, and the reason is one line further down.
@@ -4497,6 +4519,7 @@ async function main(): Promise<void> {
         // world and the lane graph behind it outlives the tiles it arrived on.
         traffic: {
           drawn: trafficMovers.drawn,
+          parked: trafficMovers.parked,
           costMs: trafficMovers.costMs,
           liveried: trafficMovers.liveried,
           tiles: traffic.tileCount,
@@ -4991,7 +5014,10 @@ async function main(): Promise<void> {
      */
     trafficReport() {
       const tick = trafficTick(Date.now());
-      const found: Array<{ metres: number; x: number; y: number; z: number; body: number }> = [];
+      const found: Array<{
+        metres: number; x: number; y: number; z: number; body: number;
+        stage: number; speed: number; parked: boolean; knocksYouOver: boolean;
+      }> = [];
       const probe = createCarPose();
       forEachCarNear(traffic, player.position.x, player.position.z, 120, tick, carRoutes, probe, (c) => {
         found.push({
@@ -5000,13 +5026,30 @@ async function main(): Promise<void> {
           y: Math.round(c.y * 10) / 10,
           z: Math.round(c.z * 10) / 10,
           body: c.body,
+          stage: c.stage,
+          speed: Math.round(c.speed * 10) / 10,
+          // A car in a kerb bay between runs. It knocks nobody over, which is
+          // why `standHere` below cannot be allowed to pick one.
+          parked: c.stage === CAR_STAGE_PARKED_IN || c.stage === CAR_STAGE_PARKED_OUT,
+          knocksYouOver: carHitStrength(c) > 0,
         });
       });
       found.sort((a, b) => a.metres - b.metres);
       const nearest = found[0];
+      // The nearest car that will actually run you down. Since `game/traffic.ts`
+      // gained its park stages, "nearest car" and "nearest hazard" are different
+      // questions -- a parked one is furniture and a car easing out of a bay
+      // shoves rather than launches -- and `standHere` is documented as the
+      // coordinate that gets you hit, so it has to answer the second.
+      const hazard = found.find((c) => c.knocksYouOver) ?? null;
+      const parkedNear = found.find((c) => c.parked) ?? null;
       return {
         tick,
         drawn: trafficMovers.drawn,
+        // Of `drawn`, the ones sitting in a kerb bay between runs. A schedule
+        // car only ever appears or disappears while it is one of these, which is
+        // what `game/traffic.ts`'s park stages bought.
+        parked: trafficMovers.parked,
         costMs: Math.round(trafficMovers.costMs * 1000) / 1000,
         laneTiles: traffic.tileCount,
         routesResident: traffic.routes().length,
@@ -5014,7 +5057,12 @@ async function main(): Promise<void> {
         hits: carHits.count,
         lastHitTick: carHits.lastTick,
         nearest: nearest ?? null,
-        standHere: nearest ? { x: nearest.x, y: nearest.y + EYE_HEIGHT, z: nearest.z } : null,
+        standHere: hazard ? { x: hazard.x, y: hazard.y + EYE_HEIGHT, z: hazard.z } : null,
+        // The other half of the manual test: stand here and *nothing* should
+        // happen, because the car you are standing against is parked.
+        standBesideParked: parkedNear
+          ? { x: parkedNear.x, y: parkedNear.y + EYE_HEIGHT, z: parkedNear.z }
+          : null,
       };
     },
 

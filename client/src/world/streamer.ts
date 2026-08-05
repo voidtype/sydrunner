@@ -15,10 +15,76 @@
  *
  * Transitions use distance hysteresis so a tile sitting exactly on a boundary
  * cannot thrash between bands as the player steps back and forth.
+ *
+ * ---------------------------------------------------------------------------
+ * HOW A TILE ARRIVES, AND WHY IT IS THREE PHASES RATHER THAN ONE.
+ *
+ * It used to be one. `loadTile` fetched eleven payloads with a `Promise.all`,
+ * parsed all of them on the main thread, built every geometry and instanced set
+ * for the tile, and inserted the lot into the scene -- and because a settled
+ * `Promise.all` continuation runs as a microtask inside whatever task settled
+ * the last promise, *all of that was one uninterruptible task*. Measured over
+ * the thirty-two heaviest tiles in the inner ring, four at a time, which is what
+ * `concurrency` actually does:
+ *
+ *     tasks over 16 ms    17 across 32 tiles, worst 48.7 ms, 360 ms total
+ *     GLB parse           p50  2.4 ms   p95 14.1 ms
+ *     build + insertion   p50  2.3 ms   p95  3.8 ms
+ *
+ * On the M-series Mac it was developed on that hides inside a 16.7 ms frame most
+ * of the time. On a modest Windows laptop, four to six times slower per core, it
+ * is a quarter of a second of a game that does not draw, every few seconds, for
+ * as long as the player keeps walking into new city. That is the bug.
+ *
+ * So:
+ *
+ *   1. **Fetch, on the main thread.** `world/cdn.ts` decides where every byte
+ *      comes from and holds the CDN's health -- one probe, one strike counter,
+ *      one set of counters the HUD reads. A worker would get its own copy of all
+ *      of that, so the fetch stays here and the *bytes* travel, not the URL.
+ *   2. **Decode, on a worker.** `world/decode.worker.ts` turns the GLB and six
+ *      sidecars into plain typed arrays and transfers them back. Nothing about
+ *      this phase touches the main thread except the `postMessage` either side.
+ *   3. **Construct, here, under a per-frame budget.** Wrapping a transferred
+ *      `Float32Array` in a `BufferAttribute` is free; what is not free is the
+ *      per-instance matrix loops and the scene insertion. Those are broken into
+ *      steps and drained by `pumpBuilds` across however many frames it takes at
+ *      `BUILD_BUDGET_MS` a frame. A tile appears two or three frames later than
+ *      it used to, which nobody can see, instead of appearing at the far side of
+ *      a dropped frame, which everybody can.
+ *
+ * Two payloads are deliberately still decoded on the main thread, in a budgeted
+ * step of their own: `.cars.bin` and `.lanes.bin`. Their decoders live in
+ * `world/cars.ts` and `game/traffic.ts`, both of which import `three`, so a
+ * worker that called them would pull the entire WebGPU renderer onto a second
+ * thread to read a sidecar. Measured, they are the two cheapest things in the
+ * whole load -- 0.03 ms and 0.07 ms a tile against a 2.5 ms budget -- so they
+ * cost a fraction of one step and buy nothing by moving.
+ *
+ * ---------------------------------------------------------------------------
+ * THE ORDERING INVARIANT, which the budget must not break.
+ *
+ * **A tile's ground is answerable before the tile can be seen, and stays so
+ * after it is gone.** `TerrainField.ensure` is still awaited in phase 1, before
+ * a single geometry exists, and the field never evicts -- so the grid a player
+ * stands on is in memory strictly earlier than the buildings standing on it, by
+ * however many frames the build queue took. The queue can only ever make a tile
+ * appear *later*, never earlier, which is the safe direction for this and for
+ * collision alike (`main.ts` loads collision on its own 420 m radius, well
+ * inside the 1,800 m the renderer streams, so a visible tile out at a kilometre
+ * has always been an uncollidable one and still is).
+ *
+ * **Nothing outside the tile learns about it until it is whole.** The traffic
+ * field, the pedestrian field, the powerup sink, the far layer and `loaded` are
+ * all told in the final step, in the same task as `root.add`. A build abandoned
+ * half way -- the player walked away, the atlas filled -- therefore has nothing
+ * to undo but its own geometry and its atlas row. See `cancelBuild`.
  */
 
 import {
   Box3,
+  BufferAttribute,
+  BufferGeometry,
   Frustum,
   Group,
   InstancedMesh,
@@ -54,7 +120,7 @@ import {
   type SpawnGuard,
   type TileIbises,
 } from './birds.ts';
-import { CarAssets, buildTileCars, decodeCars, type TileCars } from './cars.ts';
+import { CarAssets, buildTileCars, decodeCars } from './cars.ts';
 import { decodeLanes, type TrafficField } from '../game/traffic.ts';
 import type { PedestrianField } from '../game/pedestrians.ts';
 import { createContactMaterial } from './contact.ts';
@@ -68,42 +134,38 @@ import {
   buildTilePosts,
   buildTileSignals,
   collectBladeLabels,
-  decodeFurniture,
-  type TileFurniture,
 } from './furniture.ts';
 import { createGroundMaterial } from './ground.ts';
 import {
   PowerupAssets,
   PowerupIcons,
-  decodePowerups,
   type PowerupDrawState,
   type PowerupSink,
 } from './powerups.ts';
-import { FacadeParamsAtlas, offsetBuildingIndices } from './params-atlas.ts';
+import { FacadeParamsAtlas } from './params-atlas.ts';
 import {
   PowerAssets,
   buildTilePoles,
   buildTileWires,
-  decodePower,
-  type TilePower,
 } from './power.ts';
 import { createStreetMaterial } from './street.ts';
-import {
-  decodeStreetNames,
-  translateStreetNames,
-  type NamedSegment,
-  type TileStreetNames,
-} from './streetnames.ts';
+import type { NamedSegment, TileStreetNames } from './streetnames.ts';
 import { armCdn, fetchWorldAsset, fetchWorldBuffer, type CdnContract } from './cdn.ts';
+import { TileDecoder, verifyDecoderRoundTrip } from './decode-pool.ts';
+import {
+  BLDIDX_LOWER,
+  parseTileGlb,
+  type GlbPrimitive,
+  type TileDecodeRequest,
+  type TileDecodeResult,
+} from './tile-decode.ts';
 import { TerrainField, buildTerrainMesh, sampleTileGrid } from './terrain.ts';
 import { worldVersionSuffix } from './version.ts';
 import {
   buildWaterMeshes,
   createWaterClock,
   createWaterMaterial,
-  decodeWater,
   waterPlanWorld,
-  type TileWater,
   type WaterContract,
 } from './water.ts';
 import { warmupGeometry, type WarmupPart } from './warmup.ts';
@@ -111,8 +173,6 @@ import {
   VegetationAssets,
   buildTileTrees,
   createParkGrassMaterial,
-  decodeVegetation,
-  type TileVegetation,
 } from './vegetation.ts';
 
 export interface TileEntry {
@@ -401,6 +461,65 @@ const POWERUP_ANIMATE_RADIUS = 600;
  */
 const BLADE_LABEL_RADIUS = 200;
 
+/**
+ * How long `pumpBuilds` may spend constructing GPU resources in one frame,
+ * milliseconds.
+ *
+ * The number is chosen against the frame, not against the work. At 60 Hz the
+ * budget is 16.7 ms and this client spends 6-9 ms of it rendering on the
+ * machines that struggle; 2.5 ms is a sixth of the frame and comfortably inside
+ * what is left, and it retires the queue far faster than the network can fill
+ * it -- measured, a whole tile costs 2.2 ms of construction at the median, so a
+ * 2.5 ms budget is roughly 68 tiles a second against four concurrent fetches of
+ * 1.6 MB each, which not even a warm CDN gets close to. The queue is therefore
+ * empty almost always and this constant almost never binds. It exists for the
+ * case where it does: a teleport, or a first walk into the CBD.
+ *
+ * **It is a check between steps, not a pre-emption.** A step that starts inside
+ * the budget runs to completion, so the real bound is `BUILD_BUDGET_MS` plus the
+ * longest single step -- which is one instanced population of one tile, under
+ * 1.5 ms on the worst tile in the build. Making the bound tighter would mean
+ * splitting the per-instance matrix loops in `vegetation.ts`, `cars.ts` and
+ * `furniture.ts`, which is a lot of API for a millisecond that is already inside
+ * the frame.
+ */
+const BUILD_BUDGET_MS = 2.5;
+
+/**
+ * Primitives lifted into `BufferGeometry` before the builder yields.
+ *
+ * Higher than it looks like it should be because this step is genuinely cheap:
+ * the arrays arrived from the worker already built, so a primitive costs a
+ * `BufferGeometry`, three or four `BufferAttribute` wrappers and a `Mesh` --
+ * tens of microseconds, no copying and no per-vertex work at all, since the
+ * atlas offset was folded into `_BLDIDX` on the decode thread. A tile has around
+ * twenty primitives, so this is two or three yields rather than twenty.
+ */
+const GLB_PRIMITIVES_PER_STEP = 8;
+
+/**
+ * A tile that has been fetched and decoded and is now being built, one budgeted
+ * step at a time.
+ *
+ * The generator holds the half-built state as its own locals, which is the whole
+ * reason it is a generator: the alternative is a hand-written state machine with
+ * a dozen fields on this interface, every one of them nullable, and a `switch`
+ * that has to be kept in step with them.
+ */
+interface PendingBuild {
+  entry: TileEntry;
+  /**
+   * The build, suspended between steps.
+   *
+   * Abandoning one is `steps.return()`, which is not a detail: the builder wraps
+   * its whole body in a `try/finally`, so the same clause releases the geometry
+   * and the atlas row whether the build was cancelled, threw, or simply never
+   * reached its commit. There is no second cleanup path to keep in step with the
+   * first.
+   */
+  steps: Generator<void, void, void>;
+}
+
 interface LoadedTile {
   entry: TileEntry;
   group: Group;
@@ -490,6 +609,14 @@ export interface StreamerOptions {
   baseUrl?: string;
   /** Half-extent of the sun's shadow volume, metres. From `SydneySky`. */
   shadowRadius?: number;
+  /**
+   * Decode threads. Zero forces every decode onto the main thread, which is
+   * what a headless tile-loading test wants and what a browser with no `Worker`
+   * gets anyway -- see `TileDecoder`.
+   */
+  decodeWorkers?: number;
+  /** Milliseconds a frame for GPU-resource construction. See `BUILD_BUDGET_MS`. */
+  buildBudgetMs?: number;
 }
 
 export class TileStreamer {
@@ -499,13 +626,42 @@ export class TileStreamer {
   private readonly loaded = new Map<string, LoadedTile>();
   private readonly loading = new Set<string>();
   private readonly failed = new Map<string, number>();
+  /**
+   * The reference GLB parser, kept for exactly one caller.
+   *
+   * Nothing in the streaming path uses it any more -- `parseTileGlb` on the
+   * decode thread does that job. It is here because `verifyTileGlbParse` runs
+   * both parsers over a real tile and compares them attribute by attribute,
+   * which is the only honest way to claim that a hand-written reader of a
+   * pipeline-specific GLB agrees with the general one. It costs nothing in the
+   * bundle: `world/landmarks.ts` imports `GLTFLoader` regardless.
+   */
   private readonly loader = new GLTFLoader();
   private readonly frustum = new Frustum();
   private readonly projScreen = new Matrix4();
 
+  /** Phase 2. Lazily useful: with no worker it decodes inline, and still works. */
+  private readonly decoder: TileDecoder;
+  /**
+   * Phase 3's queue, in arrival order.
+   *
+   * Arrival rather than distance, deliberately. `update` already fetches the
+   * nearest missing tile first, so the queue is very nearly in distance order by
+   * construction, and re-sorting it every frame would let a tile that is one
+   * step from being finished be overtaken forever by a stream of slightly nearer
+   * ones -- the classic starvation, and it would present as a hole in the city
+   * that never fills while the player walks.
+   */
+  private readonly buildQueue: PendingBuild[] = [];
+  /** The same jobs by key, so `update` does not re-request a tile mid-build. */
+  private readonly building = new Map<string, PendingBuild>();
+  /** Steps drained and frames pumped, for the debug overlay. */
+  private builtTiles = 0;
+
   private readonly loadRadius: number;
   private readonly concurrency: number;
   private readonly budget: number;
+  private readonly buildBudgetMs: number;
   private readonly baseUrl: string;
   /**
    * The build stamp every asset URL carries, as a query suffix, or `''` until
@@ -654,7 +810,9 @@ export class TileStreamer {
     this.loadRadius = opts.loadRadius ?? 1800;
     this.concurrency = opts.concurrency ?? 4;
     this.budget = opts.budget ?? 220;
+    this.buildBudgetMs = opts.buildBudgetMs ?? BUILD_BUDGET_MS;
     this.baseUrl = opts.baseUrl ?? '/world';
+    this.decoder = new TileDecoder(opts.decodeWorkers ?? 2);
     this.root.name = 'tiles';
 
     // Shadow roles are distances, not LOD bands, and conflating the two is what
@@ -1194,6 +1352,19 @@ export class TileStreamer {
     return {
       resident: this.loaded.size,
       loading: this.loading.size,
+      /**
+       * Tiles decoded and waiting on the frame budget to be built.
+       *
+       * The one number that says whether `BUILD_BUDGET_MS` is binding. It should
+       * be zero or one nearly always -- construction retires far faster than
+       * 1.6 MB tiles can be fetched -- and a queue that sits deep for seconds
+       * means either the budget is too small for the machine or something in a
+       * builder has grown a cost nobody measured.
+       */
+      building: this.building.size,
+      /** Tiles this session has finished building. Monotonic; for the overlay. */
+      built: this.builtTiles,
+      decoder: this.decoder.stats,
       failed: this.failed.size,
       triangles,
       buildings,
@@ -1333,6 +1504,17 @@ export class TileStreamer {
   ): void {
     if (!this.index) return;
 
+    // Phase 3, before anything else this frame.
+    //
+    // First rather than last, and the reason is one frame of correctness: a tile
+    // finished here is in `loaded` by the time the pass below runs, so it gets
+    // its band, its shadow role and a real frustum test on the same frame it
+    // enters the scene. Pumping afterwards would leave it drawn for one frame
+    // with `Group.visible` at its default and every primitive's
+    // `frustumCulled` off, which is the whole tile rasterised whether or not the
+    // camera is pointing at it.
+    this.pumpBuilds();
+
     // Cheap enough to redo unconditionally -- two trig calls a frame against a
     // linear pass over a few thousand tile entries below it.
     this.receiveRange = sunReceiveRange(this.shadowRadius, sunAltitudeDeg);
@@ -1383,6 +1565,11 @@ export class TileStreamer {
       if (
         this.loading.size < this.concurrency &&
         !this.loading.has(entry.key) &&
+        // Decoded and queued counts as "on its way": without this the tile
+        // would be fetched again on every frame between the decode landing and
+        // the budget getting round to building it, which at four concurrent
+        // slots is the whole streamer wedged behind one tile.
+        !this.building.has(entry.key) &&
         !this.failed.has(entry.key)
       ) {
         void this.loadTile(entry);
@@ -1390,6 +1577,65 @@ export class TileStreamer {
     }
 
     this.evict(cam, new Set(wanted.map((w) => w.entry.key)));
+  }
+
+  /**
+   * Phase 3: build queued tiles until the frame budget runs out.
+   *
+   * The loop checks the clock *between* steps, so a step that starts inside the
+   * budget finishes -- see `BUILD_BUDGET_MS` on why that is the right trade and
+   * what the real bound is.
+   *
+   * A step that throws takes its own tile down and nothing else. That matters
+   * more than it looks: the alternative is one malformed sidecar stopping the
+   * queue, so a single bad tile in the build would freeze the city at whatever
+   * had already loaded, which reads as "the world stopped streaming" and points
+   * nowhere near the cause.
+   */
+  private pumpBuilds(): void {
+    if (this.buildQueue.length === 0) return;
+    const deadline = performance.now() + this.buildBudgetMs;
+    do {
+      const job = this.buildQueue[0];
+      let done = false;
+      try {
+        done = job.steps.next().done === true;
+      } catch (err) {
+        // The generator's own `finally` has already released the geometry and
+        // the atlas row on its way out, so there is nothing to undo here.
+        done = true;
+        this.failed.set(job.entry.key, Date.now());
+        if (this.failed.size < 6) console.warn(`tile ${job.entry.key} build failed:`, err);
+      }
+      if (done) {
+        this.buildQueue.shift();
+        this.building.delete(job.entry.key);
+      }
+    } while (this.buildQueue.length > 0 && performance.now() < deadline);
+  }
+
+  /**
+   * Abandon a queued build -- the player walked away before it finished.
+   *
+   * `return()` resumes the generator at its `finally`, which is where the
+   * geometry and the atlas row are released. Everything else a finished tile
+   * owns is handed out in the commit step, so a build that never got there has
+   * told nobody anything and there is nothing else to take back.
+   */
+  private cancelBuild(job: PendingBuild): void {
+    job.steps.return();
+    // And the atlas row explicitly, because `return()` is **not** enough on its
+    // own: a generator that has never been resumed has not entered its `try`, so
+    // its `finally` does not run, and a tile queued and evicted inside one frame
+    // -- which is exactly what a teleport does to four of them -- would leak its
+    // block. `release` is idempotent, so the generator running its own `finally`
+    // a moment later is harmless; a leak here is not, because the atlas reports
+    // itself full long after the tiles that filled it are gone and the city
+    // simply stops loading.
+    this.atlas.release(job.entry.key);
+    this.building.delete(job.entry.key);
+    const at = this.buildQueue.indexOf(job);
+    if (at >= 0) this.buildQueue.splice(at, 1);
   }
 
   /** Choose a LOD band for a tile, with hysteresis against its current one. */
@@ -1500,36 +1746,71 @@ export class TileStreamer {
     }
   }
 
+  /**
+   * Phase 1: fetch a tile's payloads, allocate its atlas row, and hand the bytes
+   * to a decode thread. Nothing here builds anything.
+   *
+   * The eleven requests still go out together and the terrain grid is still one
+   * of them, and that ordering is the whole answer to a question that could have
+   * been a lifecycle: trees and parked cars need to know where the ground is
+   * before they can be placed on it, and nothing in this tile is built until
+   * every request has landed. No placement can run early, so none has to be
+   * corrected later. It is also half of the invariant in this file's header --
+   * the grid is in `TerrainField` before any geometry exists, and the field
+   * never evicts.
+   *
+   * **The atlas row is allocated here rather than at build time**, which is the
+   * one thing about this phase that is not obvious. The row number is what the
+   * `_BLDIDX` attribute has to be offset by, and folding that offset in is a
+   * pass over every vertex of every building primitive in the tile -- the only
+   * genuinely size-proportional piece of the old build block. Allocating before
+   * the decode is dispatched lets that pass happen on the decode thread. The
+   * cost is that a row is held for a few milliseconds longer than it used to be,
+   * and the risk is that a build abandoned before it commits has to give it
+   * back, which is exactly what the builder's `finally` does.
+   */
   private async loadTile(entry: TileEntry): Promise<void> {
     this.loading.add(entry.key);
     try {
-      // The terrain grid is fetched here, alongside everything else, and that
-      // ordering is the whole answer to a question that could have been a
-      // lifecycle: trees and parked cars need to know where the ground is before
-      // they can be placed on it, and nothing in this tile is built until all
-      // five requests have landed. No placement can run early, so none has to be
-      // corrected later.
-      const [gltf, paramsBuffer, terrain, veg, parked, lines, props, picks, named, water, lanes] =
+      const [glb, paramsBuffer, terrain, parked, lanes, veg, power, furn, pow, names, water] =
         await Promise.all([
-          // Bytes first, then parse, because the bytes may arrive gzipped from
-          // the release CDN and `loadAsync` would fetch them itself. The tiles
-          // are self-contained GLB, so the parser needs no resource path.
-          fetchWorldBuffer(this.baseUrl, `tiles/${entry.key}.glb`, this.version).then((buf) =>
-            this.loader.parseAsync(buf, ''),
-          ),
+          // Bytes rather than a `Response`, because they are about to be
+          // transferred to another thread. The tiles are self-contained GLB, so
+          // the parser needs no resource path.
+          fetchWorldBuffer(this.baseUrl, `tiles/${entry.key}.glb`, this.version),
           fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.params.bin`, this.version).then((r) => {
             if (!r.ok) throw new Error(`params ${r.status}`);
             return r.arrayBuffer();
           }),
           this.terrainField ? this.terrainField.ensure(entry.key) : Promise.resolve(null),
-          this.loadVegetation(entry),
-          this.loadCars(entry),
-          this.loadPower(entry),
-          this.loadFurniture(entry),
-          this.loadPowerups(entry),
-          this.loadStreetNames(entry),
-          this.loadWater(entry),
-          this.loadLanes(entry),
+          // Parked cars and the lane graph, kept on this side of the thread
+          // boundary -- see this file's header for why, and note that between
+          // them they are a tenth of a millisecond of the tile.
+          this.loadSidecar(entry, 'cars.bin', Boolean(entry.c)),
+          this.loadSidecar(
+            entry,
+            'lanes.bin',
+            // Two listeners, and the test is their union: a world with
+            // pedestrians and no traffic must still fetch this, which is what a
+            // build made before the traffic pass would be. Skipped outright when
+            // nothing is listening, so a world with no traffic in it costs no
+            // requests at all.
+            (this.traffic !== null || this.pedestrians !== null) && Boolean(entry.lw || entry.lr),
+          ),
+          this.loadSidecar(entry, 'veg.bin', Boolean(entry.v)),
+          // The **union** of the two counts, not the poles alone. A span is
+          // filed under the tile containing its midpoint, so a tile can own
+          // spans with both their poles next door -- testing `p` on its own
+          // drops a wire at a seam, silently, and only on the tiles where a
+          // street crosses a tile line.
+          this.loadSidecar(entry, 'power.bin', Boolean(entry.p || entry.w)),
+          // The union of all three counts, for a different reason: nothing here
+          // crosses a seam, this is simply one file holding three independent
+          // blocks, and a tile that has only signals must still fetch it.
+          this.loadSidecar(entry, 'furn.bin', Boolean(entry.fb || entry.fp || entry.fs)),
+          this.loadSidecar(entry, 'pow.bin', Boolean(entry.pw)),
+          this.loadSidecar(entry, 'names.bin', Boolean(entry.sn)),
+          this.loadSidecar(entry, 'water.bin', Boolean(entry.wv)),
         ]);
 
       const offset = this.atlas.allocate(entry.key, new Float32Array(paramsBuffer));
@@ -1539,20 +1820,94 @@ export class TileStreamer {
         return;
       }
 
-      const group = new Group();
-      group.name = entry.key;
+      const tileSize = this.index!.tile_size;
+      const request: TileDecodeRequest = {
+        key: entry.key,
+        bldOffset: offset,
+        // The tile group's own translation, so the street centrelines come back
+        // in world metres. Every other payload stays tile-local and inherits the
+        // group; the centrelines cannot, because the query that reads them spans
+        // several tiles at once.
+        originX: entry.bounds[0],
+        originZ: entry.bounds[1] + tileSize,
+        glb,
+        veg,
+        power,
+        furn,
+        pow,
+        names,
+        water,
+      };
 
+      let decoded: TileDecodeResult;
+      try {
+        decoded = await this.decoder.decode(request);
+      } catch (err) {
+        // The row was allocated a moment ago and this tile will never use it.
+        // Without this the atlas leaks a block per failed tile and eventually
+        // reports itself full, at which point the city stops loading for a
+        // reason with no connection to the tile that broke.
+        this.atlas.release(entry.key);
+        throw err;
+      }
+
+      const job: PendingBuild = {
+        entry,
+        steps: this.buildTile(entry, decoded, terrain, parked, lanes),
+      };
+      this.buildQueue.push(job);
+      this.building.set(entry.key, job);
+    } catch (err) {
+      // A missing or corrupt tile must not stall the stream; record it and move
+      // on, and let a later run of the pipeline fix it.
+      this.failed.set(entry.key, Date.now());
+      if (this.failed.size < 6) console.warn(`tile ${entry.key} failed:`, err);
+    } finally {
+      this.loading.delete(entry.key);
+    }
+  }
+
+  /**
+   * Phase 3: turn one decoded tile into scene objects, a step at a time.
+   *
+   * Every `yield` is a point at which `pumpBuilds` may stop for the frame. The
+   * steps are grouped by what they build rather than by cost, because that is
+   * what makes them readable, and the costs happen to be within a factor of
+   * three of each other anyway -- the expensive ones are the per-instance matrix
+   * loops, and there is one of those per population.
+   *
+   * The whole body is inside a `try/finally`. The `finally` is the *only*
+   * cleanup path in this class for an unfinished tile, and it covers all three
+   * ways a build can end early: `pumpBuilds` catching a throw, `evict` calling
+   * `steps.return()` because the player walked away, and the generator being
+   * dropped on the floor. It must therefore never release anything the commit
+   * step has already handed out -- which is why `committed` gates it and why
+   * every hand-out is in that one step.
+   */
+  private *buildTile(
+    entry: TileEntry,
+    decoded: TileDecodeResult,
+    terrain: Float32Array | null,
+    carsBuffer: ArrayBuffer | null,
+    lanesBuffer: ArrayBuffer | null,
+  ): Generator<void, void, void> {
+    const group = new Group();
+    group.name = entry.key;
+    let committed = false;
+
+    try {
       const tileSize = this.index!.tile_size;
       const [minX, minZ] = entry.bounds;
-      // Tile geometry is tile-local; its world offset is a node translation, which
-      // is what keeps float32 vertex precision constant across the whole extent.
+      // Tile geometry is tile-local; its world offset is a node translation,
+      // which is what keeps float32 vertex precision constant across the whole
+      // extent.
       group.position.set(minX, 0, minZ + tileSize);
 
-      // The ground first, so it is the first thing drawn and the thing every
-      // other primitive in the tile was placed against. Its heights are already
-      // baked into the pipeline's geometry -- walls, roads and grass all arrive
-      // draped -- so this is the only piece of the tile the client positions
-      // vertically at all.
+      // --- The ground, first, so it is the first thing drawn and the thing
+      // every other primitive in the tile was placed against. Its heights are
+      // already baked into the pipeline's geometry -- walls, roads and grass all
+      // arrive draped -- so this is the only piece of the tile the client
+      // positions vertically at all.
       const groundAt =
         terrain === null
           ? (): number => 0
@@ -1561,44 +1916,39 @@ export class TileStreamer {
       if (terrain !== null) {
         group.add(buildTerrainMesh(terrain, this.terrain.grid, tileSize, this.groundMaterial));
       }
+      yield;
 
-      // And the water over it, second, for the same reason the ground is first:
-      // it is the other half of the surface, it was cut against exactly this
-      // tile's terrain by the pipeline, and everything else in the tile stands
-      // on one or the other. Tile-local like the ground, so it inherits the
-      // group's translation; the surface height in it is absolute, so it does
-      // not.
+      // --- And the water over it, second, for the same reason the ground is
+      // first: it is the other half of the surface, it was cut against exactly
+      // this tile's terrain by the pipeline, and everything else in the tile
+      // stands on one or the other. Tile-local like the ground, so it inherits
+      // the group's translation; the surface height in it is absolute, so it
+      // does not.
       let waterTriangles = 0;
       let waterPlan: Float32Array | null = null;
+      const water = decoded.water;
       if (water !== null) {
         for (const mesh of buildWaterMeshes(water, this.waterMaterial)) group.add(mesh);
         waterTriangles = water.triangles;
         waterPlan = waterPlanWorld(water, minX, minZ + tileSize);
+        yield;
       }
 
-      // Collect first, reparent after. Reparenting inside `traverse` mutates the
-      // children array that traverse is indexing, which walks it off the end.
-      const meshes: Mesh[] = [];
-      gltf.scene.traverse((node) => {
-        const mesh = node as Mesh;
-        if (mesh.isMesh) meshes.push(mesh);
-      });
-
-      // The awning fascia, kept as it goes past. It is the only primitive in the
-      // build that marks a retail strip exactly, and its vertices are already
-      // standing over the footpath -- so it is what spec 7.7's "near bins" turns
-      // into without a bin existing anywhere. Read here rather than re-fetched:
-      // the buffer is in memory for this one loop and nothing else wants it.
+      // --- The buildings and the street surfaces, from the decoded GLB.
+      //
+      // The awning fascia is kept as it goes past. It is the only primitive in
+      // the build that marks a retail strip exactly, and its vertices are
+      // already standing over the footpath -- so it is what spec 7.7's "near
+      // bins" turns into without a bin existing anywhere.
       let awningPositions: Float32Array | null = null;
       let awningTriangles = 0;
-
-      for (const mesh of meshes) {
-        // A no-op on ground-surface primitives, which carry no `_BLDIDX` at all.
-        normaliseBuildingIndexAttribute(mesh, offset);
-        const slot = resolveMaterialName(mesh);
+      const primitives = decoded.glb.primitives;
+      for (let i = 0; i < primitives.length; i++) {
+        const prim = primitives[i];
+        const slot = resolveMaterialName(prim.material);
         const surface = isSurfaceMaterial(slot);
         if (slot === 'awning_fascia') {
-          const attr = mesh.geometry.getAttribute('position');
+          const attr = prim.attributes.find((a) => a.name === 'position');
           // Float32 and three-component, tested rather than assumed. The tiles
           // are uncompressed today, but the Draco-plus-quantisation pass the
           // README keeps naming would hand this int16 positions in a normalised
@@ -1612,9 +1962,10 @@ export class TileStreamer {
           if (!awningPositions && attr && attr.itemSize === 3 && attr.array instanceof Float32Array) {
             awningPositions = attr.array.slice();
           }
-          awningTriangles += (mesh.geometry.getIndex()?.count ?? 0) / 3;
+          awningTriangles += prim.index.length / 3;
         }
-        mesh.material = this.materials.get(slot)!;
+        const mesh = new Mesh(buildPrimitiveGeometry(prim), this.materials.get(slot)!);
+        mesh.name = slot;
         mesh.userData.surface = surface;
         // The load-time defaults, corrected by `applyShadowRole` on the first
         // frame this tile is seen. Casting starts on so a tile that streams in
@@ -1625,12 +1976,15 @@ export class TileStreamer {
         mesh.receiveShadow = false;
         mesh.frustumCulled = false; // culled per tile instead, far cheaper
         group.add(mesh);
+        if ((i + 1) % GLB_PRIMITIVES_PER_STEP === 0) yield;
       }
+      yield;
 
-      // Trees, from the sidecar. Added to the tile's own group so they inherit
-      // its world translation and are hidden, shadowed and disposed with it --
-      // there is no separate vegetation lifecycle to keep in step, which is the
-      // one way this could have leaked geometry across a stream-out.
+      // --- Trees, from the sidecar. Added to the tile's own group so they
+      // inherit its world translation and are hidden, shadowed and disposed with
+      // it -- there is no separate vegetation lifecycle to keep in step, which is
+      // the one way this could have leaked geometry across a stream-out.
+      const veg = decoded.veg;
       let trees = 0;
       if (veg !== null) {
         for (const mesh of buildTileTrees(veg, this.vegetation, groundAt)) {
@@ -1639,30 +1993,38 @@ export class TileStreamer {
           group.add(mesh);
         }
         trees = veg.count;
+        yield;
       }
 
-      // Parked cars, from their own sidecar, on exactly the same terms as the
-      // trees: added to the tile's group so they inherit its translation and are
-      // hidden, shadowed and disposed with it. A car casts and does not receive
-      // at load time -- it is 1.5 m tall and standing on the road the shadow
-      // lands on, so it is a caster of precisely the kind the rig was sized for,
-      // and the shadow it throws across the footpath is worth more than the one
-      // it catches.
+      // --- Parked cars, on exactly the same terms as the trees. A car casts and
+      // does not receive at load time -- it is 1.5 m tall and standing on the
+      // road the shadow lands on, so it is a caster of precisely the kind the rig
+      // was sized for, and the shadow it throws across the footpath is worth more
+      // than the one it catches.
+      //
+      // This is one of the two decodes still on the render thread, and it is here
+      // rather than in phase 2 because `decodeCars` lives in `world/cars.ts`,
+      // which imports `three`. It is 0.03 ms a tile.
       let cars = 0;
-      if (parked !== null) {
-        for (const mesh of buildTileCars(parked, this.carAssets, groundAt)) {
-          mesh.castShadow = true;
-          mesh.receiveShadow = false;
-          group.add(mesh);
+      if (carsBuffer !== null) {
+        const parked = safeDecode(() => decodeCars(carsBuffer));
+        if (parked !== null) {
+          for (const mesh of buildTileCars(parked, this.carAssets, groundAt)) {
+            mesh.castShadow = true;
+            mesh.receiveShadow = false;
+            group.add(mesh);
+          }
+          cars = parked.count;
         }
-        cars = parked.count;
+        yield;
       }
 
-      // Power poles and the wires between them, again on the tile's own group.
-      // Poles need no `groundAt`: unlike a tree or a car, a pole carries its own
-      // terrain height in the sidecar, because the wire leaving it may be
-      // anchored from a pole in the next tile and both ends have to have been
-      // measured by the same code against the same ground.
+      // --- Power poles and the wires between them. Poles need no `groundAt`:
+      // unlike a tree or a car, a pole carries its own terrain height in the
+      // sidecar, because the wire leaving it may be anchored from a pole in the
+      // next tile and both ends have to have been measured by the same code
+      // against the same ground.
+      const lines = decoded.power;
       let poles = 0;
       let spans = 0;
       if (lines !== null) {
@@ -1679,20 +2041,21 @@ export class TileStreamer {
         }
         poles = lines.poleCount;
         spans = lines.wireCount;
+        yield;
       }
 
-      // Street furniture, on the tile's own group again and needing no
-      // `groundAt` for the same reason the poles do not: the sidecar carries an
-      // absolute height per instance. Unlike a pole it is the height of the
-      // *paving* rather than of the terrain -- the pipeline has already added
-      // the footpath's 15 cm, because a bin stands on the concrete where a pole
-      // is set into a hole through it.
+      // --- Street furniture, needing no `groundAt` for the reason the poles do
+      // not: the sidecar carries an absolute height per instance. Unlike a pole
+      // it is the height of the *paving* rather than of the terrain -- the
+      // pipeline has already added the footpath's 15 cm, because a bin stands on
+      // the concrete where a pole is set into a hole through it.
       //
       // Bins, posts and signal heads all cast and none receives, which is the
       // same call `cars.ts` gets and for the same reason: a 1.07 m bin on an
       // unbroken concrete surface throws the only shadow that surface has, and
       // the one it would catch is worth much less. The lit lamps are the
       // exception in the other direction and carry `userData.noShadow`.
+      const props = decoded.furn;
       let bins = 0;
       let posts = 0;
       let signals = 0;
@@ -1719,79 +2082,51 @@ export class TileStreamer {
           site.x += group.position.x;
           site.z += group.position.z;
         }
+        yield;
       }
 
-      // The named centrelines, lifted into world metres by the same translation
-      // and for the same reason as the legends above them: the query that reads
-      // them spans several tiles at once. Nothing is built and nothing is added
-      // to the group -- this payload draws nothing at all, and its only lifecycle
-      // is that it is dropped when the tile is. See `world/streetnames.ts`.
-      if (named !== null) {
-        translateStreetNames(named, group.position.x, group.position.z);
-      }
-
-      // Spec 8.3's powerups. The one streamed thing in the build whose *state*
-      // does not belong to the tile: the icons go on the tile's group and are
-      // disposed with it, but the "taken, back in 74 s" lives in the sink and
+      // --- Spec 8.3's powerups. The one streamed thing in the build whose
+      // *state* does not belong to the tile: the icons go on the tile's group and
+      // are disposed with it, but the "taken, back in 74 s" lives in the sink and
       // survives an eviction, which is what stops walking a block and back
-      // resetting every respawn in the suburb.
-      //
-      // The sink is handed world metres rather than the tile-local ones in the
-      // sidecar, because a powerup is tested against a player position that is
-      // world-space and the conversion has to happen exactly once. It happens
-      // here, where the tile's origin is already in hand.
+      // resetting every respawn in the suburb. The sink is not told until the
+      // commit step -- see the invariant in this file's header.
+      const picks = decoded.pow;
       let powerupIcons: PowerupIcons | null = null;
-      let powerupStates: readonly PowerupDrawState[] = [];
       if (picks !== null) {
         powerupIcons = new PowerupIcons(picks, this.powerupAssets);
         for (const mesh of powerupIcons.meshes) group.add(mesh);
-        if (this.powerupSink !== null) {
-          const worldX = new Float32Array(picks.count);
-          const worldZ = new Float32Array(picks.count);
-          for (let i = 0; i < picks.count; i++) {
-            worldX[i] = picks.x[i] + group.position.x;
-            worldZ[i] = picks.z[i] + group.position.z;
-          }
-          powerupStates = this.powerupSink.adopt(
-            entry.key,
-            picks.kind,
-            worldX,
-            // Already absolute -- the pipeline samples the footpath height, the
-            // tile group sits at y = 0, and nothing here adds a bias. Passed as
-            // the sidecar's own array rather than a copy for that reason.
-            picks.groundY,
-            worldZ,
-          );
-          // Pose once against the real states before the tile is ever drawn.
-          // Without it a tile re-streaming next to a powerup somebody took
-          // twenty seconds ago shows it present for exactly one frame, which is
-          // a flicker with no cause a player could work out.
-          powerupIcons.update(powerupStates, 0);
-        }
+        yield;
       }
 
-      // The lane graph, and the cars driving it. Nothing is built and nothing is
-      // added to the group -- like `.names.bin` this payload draws no geometry
-      // of its own, and unlike `.names.bin` what it describes is not even in
-      // this tile. A route belongs to the tile holding its *first* point and
-      // runs up to 800 m out of it, and the fleet is drawn as one instanced set
-      // for the whole visible world rather than per tile, because a car crosses
-      // a seam every few seconds. So the field is simply told, and it is told in
-      // world metres -- `decodeLanes` folded the group's translation in at
-      // decode, which is the one place that conversion can happen exactly once.
-      // ...and the people walking beside them, off the *same* decoded payload.
+      // --- The lane graph, and the cars driving it. Nothing is built and nothing
+      // is added to the group -- like `.names.bin` this payload draws no geometry
+      // of its own, and unlike `.names.bin` what it describes is not even in this
+      // tile. A route belongs to the tile holding its *first* point and runs up
+      // to 800 m out of it, and the fleet is drawn as one instanced set for the
+      // whole visible world rather than per tile, because a car crosses a seam
+      // every few seconds.
+      //
+      // Decoded here and adopted in the commit step, which is the second of the
+      // two decodes still on the render thread: `decodeLanes` belongs to
+      // `game/traffic.ts`, which imports `three`. 0.07 ms a tile. `decodeLanes`
+      // folds the group's translation in itself, which is the one place that
+      // conversion can happen exactly once.
+      //
       // The routes block is the traffic and the ways block is the footpath
       // network; one fetch, one decode, two consumers, and no second sidecar --
       // which is what `tiles.write_lanes` designed the ways block for. See
-      // `game/pedestrians.buildBands`, which derives the bands here rather than
-      // holding the ways, because a band is what a walker is scheduled along.
-      if (lanes !== null) {
-        this.traffic?.adopt(entry.key, lanes);
-        this.pedestrians?.adopt(entry.key, lanes);
+      // `game/pedestrians.buildBands`.
+      let lanes: ReturnType<typeof decodeLanes> = null;
+      if (lanesBuffer !== null) {
+        lanes = safeDecode(() =>
+          decodeLanes(lanesBuffer, entry.bounds[0], entry.bounds[1] + tileSize),
+        );
+        yield;
       }
 
-      // Ibises, derived from two things that are already in hand: the tree
-      // sidecar decoded above, and the awning geometry collected on the way
+      // --- Ibises, derived from two things that are already in hand: the tree
+      // sidecar decoded in phase 2, and the awning geometry collected on the way
       // past. Nothing is fetched for them and nothing was built for them --
       // spec 7.7's "scatter near bins and parks" turns out to be answerable
       // entirely from data the tile was already carrying. See `birds.ts`.
@@ -1802,17 +2137,17 @@ export class TileStreamer {
       // texels of shadow. Five texels is a small dark blob, and a bird with no
       // dark blob under it does not stand on the ground, it floats over it.
       //
-      // They get a different ground function from the trees and the cars, and
-      // it is the one thing about them that is not a copy of how those work. A
-      // tree stands where the pipeline put it and never moves, so the tile's own
+      // They get a different ground function from the trees and the cars, and it
+      // is the one thing about them that is not a copy of how those work. A tree
+      // stands where the pipeline put it and never moves, so the tile's own
       // clamped grid answers it exactly. A bird spawns up to 12 m from its fig
       // and then runs 8-15 m from the player, so it routinely ends up over the
-      // *next* tile -- where `sampleTileGrid` clamps to the edge post and
-      // extends it flat, and the bird floats or sinks by the local gradient
-      // times however far it strayed. On Crown Street that is two and a half
-      // metres. The field query is the same one the player walks on and is
-      // correct across a seam; it falls back to the tile grid only where the
-      // neighbour has not loaded, which is a tile the bird cannot be seen from.
+      // *next* tile -- where `sampleTileGrid` clamps to the edge post and extends
+      // it flat, and the bird floats or sinks by the local gradient times however
+      // far it strayed. On Crown Street that is two and a half metres. The field
+      // query is the same one the player walks on and is correct across a seam;
+      // it falls back to the tile grid only where the neighbour has not loaded,
+      // which is a tile the bird cannot be seen from.
       const field = this.terrainField;
       const originZ = minZ + tileSize;
       const birdGround =
@@ -1838,30 +2173,20 @@ export class TileStreamer {
         birds.mesh.receiveShadow = false;
         group.add(birds.mesh);
       }
+      yield;
 
+      // --- The commit. One step, no `yield` inside it, and that is the point:
+      // everything that outlives the tile is told about it here, in one task, so
+      // there is no frame in which the traffic is driving through a tile the
+      // scene has not got or the far layer has taken its slabs away from a tile
+      // that is not there yet.
       if (group.children.length === 0) {
-        this.atlas.release(entry.key);
         this.failed.set(entry.key, Date.now());
         return;
       }
 
-      this.root.add(group);
-      // Vertical extent of the tile's ground, from the grid itself rather than
-      // from the index -- it is loaded either way, and the index rounds. Since
-      // terrain arrived this is no longer a band around zero: a tile on the
-      // Surry Hills ridge sits 40 m above one in Alexandria, and a box that
-      // still assumed y = 0 would cull half the city the moment the player
-      // walked downhill.
-      let groundLo = 0;
-      let groundHi = 0;
-      if (terrain !== null) {
-        groundLo = Infinity;
-        groundHi = -Infinity;
-        for (const h of terrain) {
-          if (h < groundLo) groundLo = h;
-          if (h > groundHi) groundHi = h;
-        }
-      }
+      const groundLo = terrain === null ? 0 : minOf(terrain);
+      const groundHi = terrain === null ? 0 : maxOf(terrain);
       const centre = new Vector3(
         (entry.bounds[0] + entry.bounds[2]) / 2,
         groundHi + entry.hmax / 2,
@@ -1890,12 +2215,48 @@ export class TileStreamer {
           entry.bounds[3] + reach,
         ),
       );
+
+      this.root.add(group);
       // The far layer's half of the same event. Here rather than a frame later
       // in `update`, and *after* `root.add(group)` rather than before it, so the
       // slabs go the moment the real buildings are in the scene and not one
       // frame either side of it -- a frame with neither is a hole in the city,
       // and a frame with both is a flat box in front of a facade.
       this.farCity?.setTileResident(entry.key, true);
+
+      let powerupStates: readonly PowerupDrawState[] = [];
+      if (picks !== null && powerupIcons !== null && this.powerupSink !== null) {
+        // The sink is handed world metres rather than the tile-local ones in the
+        // sidecar, because a powerup is tested against a player position that is
+        // world-space and the conversion has to happen exactly once.
+        const worldX = new Float32Array(picks.count);
+        const worldZ = new Float32Array(picks.count);
+        for (let i = 0; i < picks.count; i++) {
+          worldX[i] = picks.x[i] + group.position.x;
+          worldZ[i] = picks.z[i] + group.position.z;
+        }
+        powerupStates = this.powerupSink.adopt(
+          entry.key,
+          picks.kind,
+          worldX,
+          // Already absolute -- the pipeline samples the footpath height, the
+          // tile group sits at y = 0, and nothing here adds a bias. Passed as
+          // the sidecar's own array rather than a copy for that reason.
+          picks.groundY,
+          worldZ,
+        );
+        // Pose once against the real states before the tile is ever drawn.
+        // Without it a tile re-streaming next to a powerup somebody took twenty
+        // seconds ago shows it present for exactly one frame, which is a flicker
+        // with no cause a player could work out.
+        powerupIcons.update(powerupStates, 0);
+      }
+
+      if (lanes !== null) {
+        this.traffic?.adopt(entry.key, lanes);
+        this.pedestrians?.adopt(entry.key, lanes);
+      }
+
       this.loaded.set(entry.key, {
         entry,
         group,
@@ -1914,197 +2275,272 @@ export class TileStreamer {
         posts,
         signals,
         bladeLabels,
-        streets: named,
+        streets: decoded.names,
         birds,
         powerups: powerupIcons,
         powerupStates,
       });
-    } catch (err) {
-      // A missing or corrupt tile must not stall the stream; record it and move
-      // on, and let a later run of the pipeline fix it.
-      this.failed.set(entry.key, Date.now());
-      if (this.failed.size < 6) console.warn(`tile ${entry.key} failed:`, err);
+      this.builtTiles++;
+      committed = true;
     } finally {
-      this.loading.delete(entry.key);
+      // The single cleanup path for every way a build can end without
+      // committing: a throw, an eviction calling `steps.return()`, or the
+      // group-was-empty return above. A committed tile owns its group and its
+      // atlas row for as long as it is resident, so `dispose` -- not this -- is
+      // what releases those.
+      if (!committed) {
+        this.root.remove(group);
+        releaseGroupGeometry(group);
+        group.clear();
+        this.atlas.release(entry.key);
+      }
     }
   }
 
   /**
-   * Fetch and decode one tile's trees.
+   * Fetch one of a tile's sidecars as raw bytes, or null.
    *
-   * Never throws and never fails the tile. A missing, truncated or malformed
-   * sidecar means a tile with no trees in it, which is a tile -- the world is
-   * older than the vegetation pass and an index or a tile directory from before
-   * it must still load. That is also why the index's `v` is consulted first:
-   * the request is skipped entirely for a tile the pipeline said has none, so
-   * the common case costs nothing at all rather than a 404.
-   */
-  private async loadVegetation(entry: TileEntry): Promise<TileVegetation | null> {
-    if (!entry.v) return null;
-    try {
-      const resp = await fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.veg.bin`, this.version);
-      if (!resp.ok) return null;
-      return decodeVegetation(await resp.arrayBuffer());
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Fetch and decode one tile's parked cars. Same contract as
-   * `loadVegetation`, down to the reason: never throws, never fails the tile,
-   * and skipped entirely when the index says the tile has none.
-   */
-  private async loadCars(entry: TileEntry): Promise<TileCars | null> {
-    if (!entry.c) return null;
-    try {
-      const resp = await fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.cars.bin`, this.version);
-      if (!resp.ok) return null;
-      return decodeCars(await resp.arrayBuffer());
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Fetch and decode one tile's power poles and wire spans. Same contract as
-   * the two above, with one difference that matters: the fetch test is the
-   * *union* of the two counts, not the poles alone. A span is filed under the
-   * tile containing its midpoint, so a tile can own spans with both their poles
-   * next door -- testing `p` on its own drops a wire at a seam, silently, and
-   * only on the tiles where a street crosses a tile line.
-   */
-  private async loadPower(entry: TileEntry): Promise<TilePower | null> {
-    if (!entry.p && !entry.w) return null;
-    try {
-      const resp = await fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.power.bin`, this.version);
-      if (!resp.ok) return null;
-      return decodePower(await resp.arrayBuffer());
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Fetch and decode one tile's street furniture. Same contract as the three
-   * above: never throws, never fails the tile, skipped entirely when the index
-   * says the tile has none.
+   * **Never throws and never fails the tile.** A missing, truncated or malformed
+   * sidecar means a tile without that thing in it, which is a tile -- the world
+   * is older than most of these passes and an index or a tile directory from
+   * before one of them must still load. That is also why the caller consults the
+   * index count first: the request is skipped entirely for a tile the pipeline
+   * said has none, so the common case costs nothing at all rather than a 404.
+   * `.pow.bin` is absent from 100 of the inner ring's 221 tiles and `.water.bin`
+   * from 213 of them, so this is most of the tiles most of the time.
    *
-   * The test is the union of all three counts, like `loadPower`'s but with a
-   * different reason behind it. Nothing here crosses a tile seam -- every bin,
-   * post and head is filed under the tile it stands in -- so this is simply one
-   * file holding three independent blocks, and a tile that has only signals must
-   * still fetch it.
+   * One method rather than the seven near-identical ones this replaces, now that
+   * none of them decodes anything: what was different between them was which
+   * index field to test, and that is the caller's business and is documented at
+   * the call site where the union tests can be read against each other.
    */
-  private async loadFurniture(entry: TileEntry): Promise<TileFurniture | null> {
-    if (!entry.fb && !entry.fp && !entry.fs) return null;
+  private async loadSidecar(
+    entry: TileEntry,
+    extension: string,
+    present: boolean,
+  ): Promise<ArrayBuffer | null> {
+    if (!present) return null;
     try {
-      const resp = await fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.furn.bin`, this.version);
-      if (!resp.ok) return null;
-      return decodeFurniture(await resp.arrayBuffer());
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Fetch and decode one tile's powerups. Same contract as the four above --
-   * never throws, never fails the tile, skipped entirely when the index says
-   * the tile has none, which is 100 of the inner ring's 221.
-   */
-  private async loadPowerups(entry: TileEntry): Promise<ReturnType<typeof decodePowerups>> {
-    if (!entry.pw) return null;
-    try {
-      const resp = await fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.pow.bin`, this.version);
-      if (!resp.ok) return null;
-      return decodePowerups(await resp.arrayBuffer());
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Fetch and decode one tile's named street centrelines. Same contract as the
-   * five above -- never throws, never fails the tile, skipped entirely when the
-   * index says the tile has none.
-   *
-   * The one difference is which way the common case falls. Every other sidecar
-   * here is absent from most tiles and the index test is what saves the 404;
-   * this one is present on nearly all of them, because a tile with no named
-   * street on it is a park or the harbour. The test still earns its place on
-   * those, and on an index written before this sidecar existed -- where `sn` is
-   * absent everywhere and the whole feature quietly does not exist rather than
-   * 404ing 221 times.
-   */
-  private async loadStreetNames(entry: TileEntry): Promise<TileStreetNames | null> {
-    if (!entry.sn) return null;
-    try {
-      const resp = await fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.names.bin`, this.version);
-      if (!resp.ok) return null;
-      return decodeStreetNames(await resp.arrayBuffer());
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Fetch and decode one tile's lane graph. Same contract as the six above:
-   * never throws, never fails the tile, skipped entirely when the index says the
-   * tile has none -- and skipped outright when nothing is listening, so a world
-   * with no traffic in it costs no requests at all.
-   *
-   * The one thing done here that no other loader does is apply the tile's world
-   * translation, and it is done here on purpose. Every other sidecar's contents
-   * go on the tile's group and inherit it; a route does not belong to a group at
-   * all -- it runs out of its own tile and its cars are drawn in one set for the
-   * whole world -- so the conversion has to happen exactly once, and this is the
-   * only place that has both the bytes and the origin.
-   */
-  private async loadLanes(entry: TileEntry): Promise<ReturnType<typeof decodeLanes>> {
-    // Two listeners now, and the test is the union: a world with pedestrians and
-    // no traffic must still fetch this, which is what a build made before the
-    // traffic pass would be.
-    if (this.traffic === null && this.pedestrians === null) return null;
-    if (!entry.lw && !entry.lr) return null;
-    try {
-      const resp = await fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.lanes.bin`, this.version);
-      if (!resp.ok) return null;
-      const tileSize = this.index?.tile_size ?? 500;
-      return decodeLanes(
-        await resp.arrayBuffer(),
-        entry.bounds[0],
-        entry.bounds[1] + tileSize,
+      const resp = await fetchWorldAsset(
+        this.baseUrl,
+        `tiles/${entry.key}.${extension}`,
+        this.version,
       );
+      if (!resp.ok) return null;
+      return await resp.arrayBuffer();
     } catch {
       return null;
     }
   }
 
   /**
-   * Fetch and decode one tile's water surface. Same contract as the six above:
-   * never throws, never fails the tile, skipped entirely when the index says the
-   * tile has none -- which is 213 of the inner ring's 221, since only the tiles
-   * on the harbour and the two with a pond in them carry any.
+   * The streaming boot check: one real tile, decoded three ways, compared.
    *
-   * A tile that loses its water is a tile that draws none: the far sheet is
-   * still under it, so the failure mode is the harbour at 35 cm lower and one
-   * tile's worth of shoreline detail, not a hole.
+   * It is the only check in this client that needs the *world* rather than
+   * arithmetic, and it guards the two claims this whole pass rests on and
+   * neither of which can be read off the source:
+   *
+   *   1. `parseTileGlb` produces what `GLTFLoader` produced, attribute for
+   *      attribute and index for index, including the lowercased `_bldidx` the
+   *      pipeline cache key is warmed against and including the atlas-offset
+   *      fold that moved to the decode thread.
+   *   2. A tile survives the worker boundary unchanged -- the transfer list, the
+   *      structured clone and the reply shape.
+   *
+   * Every way either could be wrong is silent. A dropped `normalized` flag turns
+   * the contact skirt's colour ramp from a 0..1 gradient into 0..255; a buffer
+   * missing from the transfer list still arrives, just copied; a field forgotten
+   * in the reply reads as "this tile has no trees".
+   *
+   * Chosen tile: the one the index says carries the most of everything, so the
+   * check exercises all six worker-side sidecars rather than a park with nothing
+   * on it. It costs one tile's bytes, which the player is about to stream
+   * anyway, and it is meant to be called only in dev.
+   *
+   * Never throws, and returns a list of failures like every other check here.
    */
-  private async loadWater(entry: TileEntry): Promise<TileWater | null> {
-    if (!entry.wv) return null;
-    try {
-      const resp = await fetchWorldAsset(this.baseUrl, `tiles/${entry.key}.water.bin`, this.version);
-      if (!resp.ok) return null;
-      return decodeWater(await resp.arrayBuffer());
-    } catch {
-      return null;
+  async verifyStreaming(): Promise<string[]> {
+    const index = this.index;
+    if (!index) return ['verifyStreaming ran before loadIndex'];
+    // The richest tile in the build: every optional sidecar present, so nothing
+    // in the payload goes untested. Falls back to the first tile with a GLB.
+    let pick: TileEntry | null = null;
+    let best = -1;
+    for (const entry of index.tiles) {
+      const score =
+        (entry.v ? 1 : 0) +
+        (entry.p || entry.w ? 1 : 0) +
+        (entry.fb || entry.fp || entry.fs ? 1 : 0) +
+        (entry.pw ? 1 : 0) +
+        (entry.sn ? 1 : 0) +
+        (entry.wv ? 1 : 0);
+      if (score > best) {
+        best = score;
+        pick = entry;
+      }
     }
+    if (!pick) return ['verifyStreaming found no tiles in the index'];
+    const entry = pick;
+
+    try {
+      const [glb, veg, power, furn, pow, names, water] = await Promise.all([
+        fetchWorldBuffer(this.baseUrl, `tiles/${entry.key}.glb`, this.version),
+        this.loadSidecar(entry, 'veg.bin', Boolean(entry.v)),
+        this.loadSidecar(entry, 'power.bin', Boolean(entry.p || entry.w)),
+        this.loadSidecar(entry, 'furn.bin', Boolean(entry.fb || entry.fp || entry.fs)),
+        this.loadSidecar(entry, 'pow.bin', Boolean(entry.pw)),
+        this.loadSidecar(entry, 'names.bin', Boolean(entry.sn)),
+        this.loadSidecar(entry, 'water.bin', Boolean(entry.wv)),
+      ]);
+      const failures = await this.verifyTileGlbParse(glb.slice(0));
+      const roundTrip = await this.verifyDecodeRoundTrip({
+        key: entry.key,
+        bldOffset: 11,
+        originX: entry.bounds[0],
+        originZ: entry.bounds[1] + index.tile_size,
+        glb,
+        veg,
+        power,
+        furn,
+        pow,
+        names,
+        water,
+      });
+      for (const f of roundTrip) failures.push(`worker round trip: ${f}`);
+      return failures.map((f) => `${entry.key}: ${f}`);
+    } catch (err) {
+      return [`verifyStreaming could not read tile ${entry.key}: ${String(err)}`];
+    }
+  }
+
+  /**
+   * Prove that the purpose-built GLB reader agrees with `GLTFLoader`, on a real
+   * tile, including the atlas-offset fold.
+   *
+   * The check that makes `parseTileGlb` honest. It is a hand-written reader of
+   * one pipeline's output standing in for four thousand lines of the general
+   * case, and the ways it could be subtly wrong are all silent: an attribute
+   * under the wrong name draws with the wrong pipeline (a compile hitch, which
+   * is the bug this whole change exists to remove, reintroduced by the fix); a
+   * `normalized` flag dropped turns the contact skirt's colour ramp from a 0..1
+   * gradient into 0..255; an accessor read at the wrong offset is a building in
+   * the harbour.
+   *
+   * Compared against `GLTFLoader` rather than against a fixture, because
+   * `GLTFLoader` is the thing whose behaviour this has to match -- including its
+   * lowercasing of `_BLDIDX`, which is in the geometry cache key `warmup.ts`
+   * warms against.
+   *
+   * Dev only, on the first tile that loads, and never fatal: a failure is a
+   * console warning because the game is playing correctly or it is not, and this
+   * check cannot tell which. It is a signal to a developer.
+   */
+  async verifyTileGlbParse(buffer: ArrayBuffer, offset = 7): Promise<string[]> {
+    const failures: string[] = [];
+    // Two copies: `parseTileGlb` reads its input and `parseAsync` reads its own,
+    // and the offset fold is destructive on whichever it is given.
+    const gltf = await this.loader.parseAsync(buffer.slice(0), '');
+    const mine = parseTileGlb(buffer.slice(0), offset);
+
+    const reference: Mesh[] = [];
+    gltf.scene.traverse((node) => {
+      if ((node as Mesh).isMesh) reference.push(node as Mesh);
+    });
+    if (reference.length !== mine.primitives.length) {
+      failures.push(`primitive count: GLTFLoader ${reference.length}, parseTileGlb ${mine.primitives.length}`);
+      return failures;
+    }
+
+    for (let i = 0; i < reference.length && failures.length < 8; i++) {
+      const want = reference[i].geometry;
+      const got = mine.primitives[i];
+      const slot = reference[i].material;
+      const mat = Array.isArray(slot) ? slot[0] : slot;
+      if ((mat?.name ?? '') !== got.material) {
+        failures.push(`primitive ${i}: material ${mat?.name} vs ${got.material}`);
+      }
+      const wantNames = Object.keys(want.attributes).sort().join(',');
+      const gotNames = got.attributes.map((a) => a.name).sort().join(',');
+      if (wantNames !== gotNames) {
+        failures.push(`primitive ${i}: attributes ${wantNames} vs ${gotNames}`);
+        continue;
+      }
+      for (const attr of got.attributes) {
+        const ref = want.getAttribute(attr.name);
+        const expected = ref.array as ArrayLike<number>;
+        if (ref.itemSize !== attr.itemSize) {
+          failures.push(`primitive ${i} ${attr.name}: itemSize ${ref.itemSize} vs ${attr.itemSize}`);
+          break;
+        }
+        if (ref.normalized !== attr.normalized) {
+          failures.push(`primitive ${i} ${attr.name}: normalized ${ref.normalized} vs ${attr.normalized}`);
+          break;
+        }
+        if (expected.length !== attr.array.length) {
+          failures.push(`primitive ${i} ${attr.name}: length ${expected.length} vs ${attr.array.length}`);
+          break;
+        }
+        // The fold is applied to the reference here rather than in the parser,
+        // so this compares both halves of what the decode thread now does.
+        const bias = attr.name === BLDIDX_LOWER ? offset : 0;
+        for (let k = 0; k < expected.length; k++) {
+          if (expected[k] + bias !== attr.array[k]) {
+            failures.push(`primitive ${i} ${attr.name}[${k}]: ${expected[k] + bias} vs ${attr.array[k]}`);
+            break;
+          }
+        }
+      }
+      const wantIndex = want.getIndex();
+      if (!wantIndex || wantIndex.count !== got.index.length) {
+        failures.push(`primitive ${i}: index count ${wantIndex?.count} vs ${got.index.length}`);
+        continue;
+      }
+      for (let k = 0; k < got.index.length; k++) {
+        if ((wantIndex.array as ArrayLike<number>)[k] !== got.index[k]) {
+          failures.push(`primitive ${i} index[${k}]: ${(wantIndex.array as ArrayLike<number>)[k]} vs ${got.index[k]}`);
+          break;
+        }
+      }
+      want.dispose();
+    }
+    return failures;
+  }
+
+  /**
+   * Prove that a tile crossing the worker boundary comes back unchanged.
+   *
+   * The other half of the regression net, and the half that is about the
+   * *protocol* rather than the arithmetic: `decodeTilePayload` is one function
+   * and both threads run it, so what can differ is the transfer list, the
+   * structured clone and the shape of the reply. See `verifyDecoderRoundTrip`.
+   */
+  async verifyDecodeRoundTrip(request: TileDecodeRequest): Promise<string[]> {
+    const copy = (buf: ArrayBuffer | null): ArrayBuffer | null => (buf === null ? null : buf.slice(0));
+    const clone = (): TileDecodeRequest => ({
+      ...request,
+      glb: request.glb.slice(0),
+      veg: copy(request.veg),
+      power: copy(request.power),
+      furn: copy(request.furn),
+      pow: copy(request.pow),
+      names: copy(request.names),
+      water: copy(request.water),
+    });
+    return verifyDecoderRoundTrip(this.decoder, clone(), clone());
   }
 
   /** Drop tiles that are out of range, or the furthest ones if over budget. */
   private evict(cam: Vector3, keep: Set<string>): void {
     for (const [key, tile] of this.loaded) {
       if (!keep.has(key)) this.dispose(key, tile);
+    }
+    // Queued builds go the same way, and this is not merely tidiness: a teleport
+    // moves the whole wanted set at once, and without this the queue would spend
+    // the next several frames of its budget building tiles that are already four
+    // kilometres behind the player -- delaying the ones under their feet by
+    // exactly the time it took.
+    for (const [key, job] of [...this.building]) {
+      if (!keep.has(key)) this.cancelBuild(job);
     }
     if (this.loaded.size <= this.budget) return;
 
@@ -2124,48 +2560,7 @@ export class TileStreamer {
     // between them a building is drawn by exactly one of the two systems at
     // every instant, including the instant of the swap.
     this.farCity?.setTileResident(key, false);
-    // Geometry is per tile and must go; materials are shared world-wide and must
-    // not. Disposing a shared material here would blank every other tile.
-    //
-    // Trees, cars and poles invert that: their *geometry* is the shared thing --
-    // six tree meshes, five car bodies and two pole kinds for the whole world --
-    // and what is per tile is the instance matrix and colour buffers, which is
-    // exactly what `InstancedMesh.dispose` releases. Calling `geometry.dispose()`
-    // on one would delete the species out of every other tile at once, and the
-    // symptom would be trees, or every silver hatchback in the city, vanishing
-    // the first time the player walked far enough to evict a tile.
-    //
-    // The *wires* are not in that set and must not be: their geometry is merged
-    // per tile from that tile's own spans, so it falls to the default branch and
-    // is released here. Their material is shared and is not touched, same as
-    // every other material in this loop.
-    for (const child of tile.group.children) {
-      const mesh = child as Mesh;
-      if (!mesh.isMesh) continue;
-      if (
-        mesh.userData.vegetation === true ||
-        mesh.userData.cars === true ||
-        mesh.userData.poles === true ||
-        // Street furniture is in that set too: six geometries -- bin body, bin
-        // lid, name post, blade, signal head, lamp -- shared by the whole world,
-        // with the per-tile part being the instance buffers.
-        mesh.userData.furniture === true ||
-        // The ibises are in that set and not in the wires' one: their geometry
-        // is the single shared bird mesh, so what is per tile is the instance
-        // matrix and colour buffers -- exactly what `InstancedMesh.dispose`
-        // releases. The gulls are in neither, because they are not in a tile.
-        mesh.userData.birds === true ||
-        // And spec 8.3's icons: two geometries -- the bolt and the cup -- shared
-        // by the whole world, with the per-tile part being the instance
-        // buffers. Disposing the geometry here would delete every station
-        // marker in the city the first time a tile was evicted.
-        mesh.userData.powerups === true
-      ) {
-        (mesh as InstancedMesh).dispose();
-      } else {
-        mesh.geometry.dispose();
-      }
-    }
+    releaseGroupGeometry(tile.group);
     // The icons go with the tile; their *state* does not. The sink keeps the
     // points so a respawn clock started before the eviction is the same clock
     // still running when the tile comes back -- see `PowerupField`.
@@ -2188,20 +2583,117 @@ export class TileStreamer {
 }
 
 /**
- * GLTFLoader lowercases vertex attribute names it does not recognise, so the
- * pipeline's `_BLDIDX` arrives as `_bldidx`. TSL looks it up by the name the
- * shader asks for, so alias it back.
+ * Release every geometry a tile group owns, and nothing that is shared.
+ *
+ * One function for the two callers that must not disagree: `dispose`, for a
+ * tile that streamed out, and the builder's `finally`, for a tile that was
+ * abandoned half-built. A rule that lived in only one of them would leak the
+ * *other* one's buffers, and a leak in the abandoned path is the one nobody
+ * would find -- it happens on a teleport, which is a developer's key rather than
+ * a player's.
+ *
+ * Geometry is per tile and must go; materials are shared world-wide and must
+ * not. Disposing a shared material here would blank every other tile.
+ *
+ * Trees, cars and poles invert that: their *geometry* is the shared thing --
+ * six tree meshes, five car bodies and two pole kinds for the whole world --
+ * and what is per tile is the instance matrix and colour buffers, which is
+ * exactly what `InstancedMesh.dispose` releases. Calling `geometry.dispose()`
+ * on one would delete the species out of every other tile at once, and the
+ * symptom would be trees, or every silver hatchback in the city, vanishing the
+ * first time the player walked far enough to evict a tile.
+ *
+ * The *wires* are not in that set and must not be: their geometry is merged per
+ * tile from that tile's own spans, so it falls to the default branch and is
+ * released here. Their material is shared and is not touched, same as every
+ * other material in this loop.
  */
-function normaliseBuildingIndexAttribute(mesh: Mesh, atlasOffset: number): void {
-  const attrs = mesh.geometry.attributes as Record<string, unknown>;
-  let name = attrs._BLDIDX ? '_BLDIDX' : Object.keys(attrs).find((k) => k.toLowerCase() === '_bldidx');
-  if (!name) return;
-  const attr = mesh.geometry.getAttribute(name);
-  // Fold the tile's atlas row offset into the attribute, so the shader indexes
-  // the shared parameter texture directly with no per-tile uniform.
-  offsetBuildingIndices(attr.array as Float32Array, atlasOffset);
-  if (name !== '_BLDIDX') mesh.geometry.setAttribute('_BLDIDX', attr);
-  attr.needsUpdate = true;
+function releaseGroupGeometry(group: Group): void {
+  for (const child of group.children) {
+    const mesh = child as Mesh;
+    if (!mesh.isMesh) continue;
+    if (
+      mesh.userData.vegetation === true ||
+      mesh.userData.cars === true ||
+      mesh.userData.poles === true ||
+      // Street furniture is in that set too: six geometries -- bin body, bin
+      // lid, name post, blade, signal head, lamp -- shared by the whole world,
+      // with the per-tile part being the instance buffers.
+      mesh.userData.furniture === true ||
+      // The ibises are in that set and not in the wires' one: their geometry
+      // is the single shared bird mesh, so what is per tile is the instance
+      // matrix and colour buffers -- exactly what `InstancedMesh.dispose`
+      // releases. The gulls are in neither, because they are not in a tile.
+      mesh.userData.birds === true ||
+      // And spec 8.3's icons: two geometries -- the bolt and the cup -- shared
+      // by the whole world, with the per-tile part being the instance
+      // buffers. Disposing the geometry here would delete every station
+      // marker in the city the first time a tile was evicted.
+      mesh.userData.powerups === true
+    ) {
+      (mesh as InstancedMesh).dispose();
+    } else {
+      mesh.geometry.dispose();
+    }
+  }
+}
+
+/**
+ * One decoded primitive, wrapped in a `BufferGeometry`.
+ *
+ * The whole of what phase 3 has to do for the buildings, and it is deliberately
+ * this cheap: the arrays came off the decode thread already built, already
+ * offset, and already named the way TSL looks them up, so this allocates a few
+ * wrapper objects and copies nothing at all.
+ *
+ * `_BLDIDX` is set **twice, under both spellings, sharing one attribute
+ * object**, and that is not belt-and-braces. `GLTFLoader` lowercases custom
+ * semantics, so the path this replaced reached the renderer with both names on
+ * one buffer; three's `RenderObject.getGeometryCacheKey` walks
+ * `Object.keys(geometry.attributes)`, so dropping the duplicate would change the
+ * cache key and warm-up would have compiled a pipeline nothing draws -- putting
+ * a shader compile back in the middle of a walk, which is the exact class of
+ * hitch this change exists to remove. `warmup.warmupGeometry` sets both for the
+ * same reason, and the two have to agree.
+ */
+function buildPrimitiveGeometry(prim: GlbPrimitive): BufferGeometry {
+  const geometry = new BufferGeometry();
+  for (const attr of prim.attributes) {
+    const buffer = new BufferAttribute(attr.array, attr.itemSize, attr.normalized);
+    geometry.setAttribute(attr.name, buffer);
+    if (attr.name === BLDIDX_LOWER) geometry.setAttribute('_BLDIDX', buffer);
+  }
+  geometry.setIndex(new BufferAttribute(prim.index, 1));
+  return geometry;
+}
+
+/**
+ * A decoder's answer, or null if it threw.
+ *
+ * The two sidecars still decoded on the render thread go through this, so they
+ * keep the contract the other six have on the worker: a malformed sidecar is a
+ * tile without that thing in it, never a tile that failed.
+ */
+function safeDecode<T>(run: () => T | null): T | null {
+  try {
+    return run();
+  } catch {
+    return null;
+  }
+}
+
+/** Smallest value in a terrain grid. A loop, because `Math.min(...grid)` is a stack overflow at 289 posts and a real one at the far layer's size. */
+function minOf(values: Float32Array): number {
+  let lo = Infinity;
+  for (const v of values) if (v < lo) lo = v;
+  return lo === Infinity ? 0 : lo;
+}
+
+/** Largest value in a terrain grid. See `minOf`. */
+function maxOf(values: Float32Array): number {
+  let hi = -Infinity;
+  for (const v of values) if (v > hi) hi = v;
+  return hi === -Infinity ? 0 : hi;
 }
 
 /**
@@ -2239,11 +2731,17 @@ function slotAttributes(slot: MaterialName): Parameters<typeof warmupGeometry>[0
   return { normal: true, uv: true, buildingIndexed: !plain };
 }
 
-/** Which material slot a loaded primitive belongs to. */
-function resolveMaterialName(mesh: Mesh): MaterialName {
-  const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-  const name = (mat?.name ?? '') as MaterialName;
-  return (MATERIALS as readonly string[]).includes(name) ? name : 'brick_red';
+/**
+ * Which material slot a decoded primitive belongs to.
+ *
+ * The name comes straight out of the GLB's material table now rather than off a
+ * `MeshStandardMaterial` the loader built and this class immediately threw away.
+ * The fallback is unchanged and is the important half: a slot this client does
+ * not know draws as brick rather than not at all, because a world built by a
+ * newer pipeline should look wrong in one material, not have holes in it.
+ */
+function resolveMaterialName(name: string): MaterialName {
+  return (MATERIALS as readonly string[]).includes(name) ? (name as MaterialName) : 'brick_red';
 }
 
 /** Distance from a point to an axis-aligned XZ box, zero if inside. */

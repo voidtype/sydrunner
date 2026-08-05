@@ -145,46 +145,35 @@ import {
   SRGBColorSpace,
 } from 'three/webgpu';
 
-/** Must match `furniture.LID_*` in the pipeline. */
-export const LID_COUNT = 3;
+import {
+  LAMP_COUNT,
+  LID_COUNT,
+  STYLE_COUNT,
+  decodeFurniture,
+  type TileFurniture,
+} from './tile-decode.ts';
+
+/**
+ * The sidecar half of this module lives in `world/tile-decode.ts`.
+ *
+ * `.furn.bin` is the only variable-stride record in the build and its decode is
+ * the most expensive of the eight -- 0.15 ms a tile against 0.03 for the next
+ * one, because it builds a string per blade. That file carries no `three`
+ * import, so `world/decode.worker.ts` can run it off the render thread. The
+ * three kind counts come back with it: they are what the decode clamps against,
+ * and a second copy of one of them on this side is a table overrun waiting for
+ * a pipeline change.
+ */
+export { LAMP_COUNT, LID_COUNT, STYLE_COUNT, decodeFurniture };
+export type { TileFurniture };
+
 /** Must match `furniture.LAMP_*` in the pipeline. */
 export const LAMP_RED = 0;
 export const LAMP_AMBER = 1;
 export const LAMP_GREEN = 2;
-export const LAMP_COUNT = 3;
 /** Must match `furniture.STYLE_*` in the pipeline. */
 export const STYLE_COS_GREEN = 0;
 export const STYLE_RMS_WHITE = 1;
-export const STYLE_COUNT = 2;
-
-/**
- * `.furn.bin`'s header. Must match `tiles.FURN_MAGIC` and `tiles.FURN_VERSION`.
- *
- * ASCII 'FURN' little-endian, which reads as 1,313,096,518 -- so a *version 1*
- * sidecar, which had no header and opened straight on its bin count, can be
- * recognised by this u32 not being there. See `decodeFurniture`.
- */
-const FURN_MAGIC = 0x4e525546;
-const FURN_VERSION = 2;
-
-/** Fixed-size record strides in a `.furn.bin`. Set by `tiles.write_furniture`. */
-const BIN_STRIDE = 20;
-const POST_HEADER = 16;
-const SIGNAL_STRIDE = 20;
-/** Blades per post the pipeline will never exceed. `furniture.MAX_BLADES`. */
-const MAX_BLADES = 2;
-/**
- * Bytes of legend the pipeline will never write for one blade.
- *
- * `furniture.MAX_NAME_CHARS` is 24 *characters*, which is 96 bytes even if every
- * one of them were four-byte UTF-8; Sydney's are ASCII, so the real maximum is
- * 24. 128 is well clear of both and well under the 255 a u8 can hold, and that
- * gap is the point: the length byte cannot be out of range on its own, so
- * without a bound like this a walk that has come unaligned reads a garbage
- * length, skips a plausible number of bytes and carries on producing nonsense.
- * With it, the tile is refused.
- */
-const MAX_NAME_BYTES = 128;
 
 // --- Dimensions shared with the pipeline --------------------------------------
 //
@@ -1459,218 +1448,6 @@ export class FurnitureAssets {
     lamp.color = new Color(1, 1, 1);
     this.lampMaterial = lamp;
   }
-}
-
-// --- The sidecar --------------------------------------------------------------
-
-/** One tile's street furniture, decoded from `<key>.furn.bin`. */
-export interface TileFurniture {
-  binCount: number;
-  /** Tile-local metres, renderer axes: x in [0, tileSize), z in (-tileSize, 0]. */
-  binX: Float32Array;
-  binZ: Float32Array;
-  /** Absolute metres -- the **top of the footpath paving**, not the terrain. */
-  binGroundY: Float32Array;
-  binYaw: Float32Array;
-  binLid: Uint8Array;
-
-  postCount: number;
-  postX: Float32Array;
-  postZ: Float32Array;
-  postGroundY: Float32Array;
-  /** `STYLE_COS_GREEN` or `STYLE_RMS_WHITE`, per post. Both its blades share it. */
-  postStyle: Uint8Array;
-
-  /**
-   * Blades, flattened across all posts with a parallel index back to the post
-   * each belongs to.
-   *
-   * Flattened rather than nested because that is the shape the `InstancedMesh`
-   * wants -- one instance per blade, not per post -- and because the sidecar's
-   * post record is variable-stride, so the count is only known after the walk
-   * anyway.
-   */
-  bladeCount: number;
-  bladePost: Uint32Array;
-  /** Which blade this is on its own post: 0 is the upper one. Drives the stack. */
-  bladeRank: Uint8Array;
-  bladeYaw: Float32Array;
-  /**
-   * The legend on each blade, in blade order. Empty strings for a version 1
-   * sidecar, which carried none -- see `decodeFurniture`.
-   *
-   * A plain string array rather than a typed one, because it is read once a
-   * second by `BladeLabels` and never per frame, and because the alternative --
-   * an offset table into a shared `Uint8Array` -- would decode to the same
-   * strings on every use.
-   */
-  bladeName: string[];
-
-  signalCount: number;
-  signalX: Float32Array;
-  signalZ: Float32Array;
-  signalGroundY: Float32Array;
-  signalYaw: Float32Array;
-  signalLit: Uint8Array;
-}
-
-/**
- * Decode a `.furn.bin`. Returns `null` for anything that is not one, because a
- * tile with no furniture must be indistinguishable from a tile whose sidecar is
- * missing -- see `streamer.ts`.
- *
- * The post block is the only variable-stride record in the build and so this is
- * the only decoder here that walks rather than indexes: each post is a 16-byte
- * header plus, per blade, a float yaw and a length-prefixed UTF-8 legend. Every
- * length is checked against the buffer before it is read, because a truncated
- * sidecar that decoded to a plausible count would produce NaN transforms rather
- * than a missing tile.
- *
- * **Two versions are read.** Version 2 opens on `FURN_MAGIC` and carries the
- * legends and the style; version 1 had no header at all and opened straight on
- * its bin count, so it is recognised by that first u32 *not* being the magic --
- * which is safe, because the magic is 1.3 billion and a bin count is capped at
- * 300 by `furniture.MAX_BINS_PER_TILE`. A v1 tile decodes to blank legends and
- * style 0, which is exactly the world it was written for. That matters more than
- * it looks: a client deployed against a world directory built before this change
- * shows plain green blades rather than no street furniture at all.
- */
-export function decodeFurniture(buffer: ArrayBuffer): TileFurniture | null {
-  if (buffer.byteLength < 12) return null;
-  const view = new DataView(buffer);
-  let o = 0;
-
-  let version = 1;
-  if (view.getUint32(0, true) === FURN_MAGIC) {
-    version = view.getUint32(4, true);
-    // An unknown *future* version is refused rather than guessed at. A newer
-    // pipeline against an older client is a deployment mistake, and a tile with
-    // no furniture is a far better symptom of it than a tile of NaN transforms.
-    if (version !== FURN_VERSION) return null;
-    o = 8;
-  }
-
-  const binCount = view.getUint32(o, true);
-  o += 4;
-  if (buffer.byteLength < o + binCount * BIN_STRIDE + 4) return null;
-  const binBase = o;
-  o += binCount * BIN_STRIDE;
-
-  const postCount = view.getUint32(o, true);
-  o += 4;
-  // First walk: find where the post block ends and how many blades it holds.
-  // Nothing is written yet, so a malformed block costs a scan and no allocation.
-  const postBase = o;
-  let bladeCount = 0;
-  for (let i = 0; i < postCount; i++) {
-    if (buffer.byteLength < o + POST_HEADER) return null;
-    const blades = view.getUint8(o + 12);
-    if (blades === 0 || blades > MAX_BLADES) return null;
-    o += POST_HEADER;
-    for (let k = 0; k < blades; k++) {
-      // v1's blade record is the yaw and nothing else; v2 adds the length byte
-      // and the bytes it counts.
-      o += 4;
-      if (version >= 2) {
-        if (buffer.byteLength < o + 1) return null;
-        const len = view.getUint8(o);
-        if (len > MAX_NAME_BYTES) return null;
-        o += 1 + len;
-      }
-      if (buffer.byteLength < o) return null;
-    }
-    bladeCount += blades;
-  }
-
-  if (buffer.byteLength < o + 4) return null;
-  const signalCount = view.getUint32(o, true);
-  o += 4;
-  if (buffer.byteLength < o + signalCount * SIGNAL_STRIDE) return null;
-  const signalBase = o;
-
-  if (binCount === 0 && postCount === 0 && signalCount === 0) return null;
-
-  const out: TileFurniture = {
-    binCount,
-    binX: new Float32Array(binCount),
-    binZ: new Float32Array(binCount),
-    binGroundY: new Float32Array(binCount),
-    binYaw: new Float32Array(binCount),
-    binLid: new Uint8Array(binCount),
-    postCount,
-    postX: new Float32Array(postCount),
-    postZ: new Float32Array(postCount),
-    postGroundY: new Float32Array(postCount),
-    postStyle: new Uint8Array(postCount),
-    bladeCount,
-    bladePost: new Uint32Array(bladeCount),
-    bladeRank: new Uint8Array(bladeCount),
-    bladeYaw: new Float32Array(bladeCount),
-    bladeName: new Array<string>(bladeCount).fill(''),
-    signalCount,
-    signalX: new Float32Array(signalCount),
-    signalZ: new Float32Array(signalCount),
-    signalGroundY: new Float32Array(signalCount),
-    signalYaw: new Float32Array(signalCount),
-    signalLit: new Uint8Array(signalCount),
-  };
-
-  for (let i = 0; i < binCount; i++) {
-    const p = binBase + i * BIN_STRIDE;
-    out.binX[i] = view.getFloat32(p, true);
-    out.binZ[i] = view.getFloat32(p + 4, true);
-    out.binGroundY[i] = view.getFloat32(p + 8, true);
-    out.binYaw[i] = view.getFloat32(p + 12, true);
-    // Clamped rather than trusted: an out-of-range lid would read past the
-    // colour table and take the whole tile out with it.
-    out.binLid[i] = Math.min(view.getUint8(p + 16), LID_COUNT - 1);
-  }
-
-  // One decoder for the whole file. Constructed here rather than per legend,
-  // because a `TextDecoder` is not free to build and this walk creates one
-  // string per blade in the tile -- 26 at the median, 92 at the busiest corner
-  // in the city.
-  const utf8 = typeof TextDecoder === 'undefined' ? null : new TextDecoder();
-  const bytes = new Uint8Array(buffer);
-
-  let p = postBase;
-  let b = 0;
-  for (let i = 0; i < postCount; i++) {
-    out.postX[i] = view.getFloat32(p, true);
-    out.postZ[i] = view.getFloat32(p + 4, true);
-    out.postGroundY[i] = view.getFloat32(p + 8, true);
-    const blades = view.getUint8(p + 12);
-    // Clamped rather than trusted, for the reason the lid and the lamp are: an
-    // out-of-range style would read past the material table and take the tile
-    // out with it.
-    out.postStyle[i] = Math.min(view.getUint8(p + 13), STYLE_COUNT - 1);
-    p += POST_HEADER;
-    for (let k = 0; k < blades; k++) {
-      out.bladePost[b] = i;
-      out.bladeRank[b] = k;
-      out.bladeYaw[b] = view.getFloat32(p, true);
-      p += 4;
-      if (version >= 2) {
-        const len = view.getUint8(p);
-        p += 1;
-        if (len > 0 && utf8 !== null) {
-          out.bladeName[b] = utf8.decode(bytes.subarray(p, p + len));
-        }
-        p += len;
-      }
-      b++;
-    }
-  }
-
-  for (let i = 0; i < signalCount; i++) {
-    const q = signalBase + i * SIGNAL_STRIDE;
-    out.signalX[i] = view.getFloat32(q, true);
-    out.signalZ[i] = view.getFloat32(q + 4, true);
-    out.signalGroundY[i] = view.getFloat32(q + 8, true);
-    out.signalYaw[i] = view.getFloat32(q + 12, true);
-    out.signalLit[i] = Math.min(view.getUint8(q + 16), LAMP_COUNT - 1);
-  }
-  return out;
 }
 
 // --- Instancing ---------------------------------------------------------------

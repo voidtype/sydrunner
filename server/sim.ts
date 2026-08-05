@@ -143,7 +143,13 @@ import {
 import { REACH, CAST_RADIUS } from '../client/src/game/combat.ts';
 import { BALL_RADIUS } from '../client/src/game/footy.ts';
 import { Bot, type BotKind } from './bots.ts';
-import { PositionHistory, rewind, resolveLive } from './rewind.ts';
+import { PositionHistory, createBounds, rewindInto, resolveLiveById, type RewoundProxy } from './rewind.ts';
+// PERFORMANCE.md phase 1's spatial hash. Pure, three-free, shared with the
+// browser on every other module's terms -- and the structure phase 2's interest
+// management is going to query, which is why its `forEachWithin` / `nearestK`
+// are a stated API rather than whatever the melee happened to need. See its
+// header.
+import { SpatialHash } from '../client/src/game/spatialhash.ts';
 import { eyeAt, groundFor, type ServerWorld } from './world.ts';
 import { CollisionWorld } from '../client/src/player/collision.ts';
 import { TerrainField } from '../client/src/world/terrain.ts';
@@ -257,6 +263,67 @@ export class Simulation {
   private combatants: CombatantState[] = [];
   private ordered: Participant[] = [];
   private dirty = true;
+  /**
+   * The combatant list, by id. Rebuilt with it.
+   *
+   * PERFORMANCE.md phase 1: `rewind.resolveLive` walked the whole roster on
+   * every landed punch to turn a rewound proxy back into the body it stands
+   * for, which is one of the four places the tick was linear in the player
+   * count for no reason. Every id here is a participant id, because
+   * `createCombatant(id, ...)` is handed the participant's own.
+   */
+  private readonly byId = new Map<number, CombatantState>();
+
+  /**
+   * Where everybody **could be rewound to**, and where everybody **is**.
+   *
+   * Two builds a tick rather than one, and the split is not an optimisation --
+   * the two answer different questions and a single index would be wrong for
+   * one of them:
+   *
+   *   - `rewindIndex` is built at the top of the tick from each player's
+   *     `PositionHistory.bounds`, so it is a superset of every position spec
+   *     8.2's lag compensation can resolve a target to. The melee queries it,
+   *     because a punch is evaluated against the past.
+   *   - `liveIndex` is built **after every combatant has advanced** from the
+   *     positions they finished the tick at. The balls and the pickups query
+   *     it, because both of those are deliberately not rewound -- see
+   *     `game/footy.stepFooty` and the ordering note in `step`.
+   *
+   * Cell 8 m, PERFORMANCE.md's number. Phase 2's AOI will query `liveIndex`
+   * (or a coarser sibling; see `game/spatialhash.ts`) and needs nothing added
+   * here.
+   */
+  private readonly rewindIndex = new SpatialHash<CombatantState>();
+  private readonly liveIndex = new SpatialHash<CombatantState>();
+  private readonly boundsScratch = createBounds();
+  /** Candidates for one swing, and the pooled proxies they are rewound into. */
+  private readonly strikeCandidates: CombatantState[] = [];
+  private readonly strikeProxies: RewoundProxy[] = [];
+
+  /**
+   * Where the tick went, in milliseconds, accumulated since the last read.
+   *
+   * PERFORMANCE.md phase 1's deliverable is a capacity curve with a phase
+   * breakdown, and a breakdown that is not measured in the process being
+   * measured is a guess. Nine `performance.now` pairs a tick is about 2 us
+   * against a 16,667 us budget, so this is on permanently rather than behind a
+   * flag: a profile you have to remember to enable is a profile that is not
+   * running the day something regresses.
+   *
+   * Read and reset by `server/index.ts`'s `/stats`.
+   */
+  readonly phaseMs = {
+    index: 0,
+    advance: 0,
+    melee: 0,
+    balls: 0,
+    traffic: 0,
+    powerups: 0,
+    bikes: 0,
+    npc: 0,
+    history: 0,
+  };
 
   tick = 0;
   private nextId = 1;
@@ -439,10 +506,25 @@ export class Simulation {
   private readonly bikeSweep: Bike[] = [];
   private readonly riderViews: RiderView[] = [];
 
+  /** See `stepFactions`, which mutates the two members that change and nothing else. */
+  private factionCtx!: FactionCtx;
+
   constructor(world: ServerWorld) {
     this.world = world;
     this.ballWorld = groundFor(world);
     this.factionWorld = groundFor(world);
+    this.factionCtx = {
+      tick: 0,
+      dt: FIXED_DT,
+      collision: world.collision,
+      groundHeight: (x, z, feet) => this.factionWorld.groundHeight(x, z, feet),
+      peds: world.peds,
+      combatants: this.combatants,
+      field: this.factions,
+      investigationOf: (id) => this.factions.investigationOf(id),
+      damagePlayer: (id, pips, actor) => this.shoot(id, pips, actor),
+      emit: (e) => this.factions.events.push(e),
+    };
     this.witnessCtx = {
       peds: world.peds,
       collision: world.collision,
@@ -601,23 +683,43 @@ export class Simulation {
    * as well would be a second opinion about the same question.
    */
   roster(): RosterEntry[] {
-    const out: RosterEntry[] = [];
+    // Pooled and written in place, which is a change of *contract* rather than
+    // only of allocation: the returned array is now owned by this object and
+    // reused, exactly as `snapshot`, `investigations` and `bikeDelta` already
+    // were. Serialise before the next call.
+    //
+    // PERFORMANCE.md phase 1. The comment this replaces argued for building
+    // fresh "because it is produced at most a few times a second", and that was
+    // true at sixteen players -- `rosterVersion` bumps on every knockout, and at
+    // five hundred players there are several knockouts a *tick*, so this became
+    // a five-hundred-object allocation at 60 Hz. The staleness the old comment
+    // worried about is answered by the reuse being total: every field is
+    // rewritten on every call.
+    const out = this.rosterRecords;
+    let n = 0;
     for (const p of this.participants.values()) {
-      out.push({
-        id: p.id,
-        colourway: p.colourway,
-        bot: p.bot !== null,
-        name: p.name,
-        kos: p.kos,
-        downs: p.downs,
-        // A bot has no socket and therefore no round trip. Zero is drawn as a
-        // dash rather than as "0 ms", which would be a lie about the best
-        // connection in the game.
-        ping: p.bot ? 0 : p.ping,
-      });
+      let s = out[n];
+      if (s === undefined) {
+        s = { id: 0, colourway: 0, bot: false, name: '', kos: 0, downs: 0, ping: 0 };
+        out.push(s);
+      }
+      s.id = p.id;
+      s.colourway = p.colourway;
+      s.bot = p.bot !== null;
+      s.name = p.name;
+      s.kos = p.kos;
+      s.downs = p.downs;
+      // A bot has no socket and therefore no round trip. Zero is drawn as a
+      // dash rather than as "0 ms", which would be a lie about the best
+      // connection in the game.
+      s.ping = p.bot ? 0 : p.ping;
+      n++;
     }
+    out.length = n;
     return out;
   }
+
+  private readonly rosterRecords: RosterEntry[] = [];
 
   /**
    * Credit a knockout, and count the fall.
@@ -696,7 +798,52 @@ export class Simulation {
   private rebuild(): void {
     this.ordered = [...this.participants.values()].sort((a, b) => a.id - b.id);
     this.combatants = this.ordered.map((p) => p.combat);
+    this.byId.clear();
+    for (const c of this.combatants) this.byId.set(c.id, c);
     this.dirty = false;
+  }
+
+  /**
+   * Refile everybody under the box their rewind window covers.
+   *
+   * Called once, at the top of the tick, before anything has moved -- which is
+   * the only moment at which it is *correct* rather than merely current: every
+   * position `PositionHistory.sampleAt` can return is a sample written at the
+   * end of some earlier tick, and the box over the ring contains all of them
+   * and every lerp between them. See `game/spatialhash.ts` on why that makes
+   * the candidate set a proof rather than a margin.
+   */
+  private buildRewindIndex(): void {
+    const b = this.boundsScratch;
+    this.rewindIndex.clear();
+    for (const p of this.ordered) {
+      const c = p.combat;
+      const x = c.body.position.x;
+      const z = c.body.position.z;
+      p.history.bounds(b);
+      if (b.valid) {
+        // Unioned with the live position rather than taken bare. A seeded ring
+        // already contains it, and every participant's is seeded -- `join`
+        // does it and every respawn does it again -- so this is belt and
+        // braces over the one branch in `rewindInto` that falls back to the
+        // live body when a history is missing.
+        this.rewindIndex.insertBox(
+          c, x, z,
+          Math.min(b.minX, x), Math.min(b.minZ, z),
+          Math.max(b.maxX, x), Math.max(b.maxZ, z),
+        );
+      } else {
+        this.rewindIndex.insert(c, x, z);
+      }
+    }
+  }
+
+  /** Refile everybody where they actually are. Called after the advance loop. */
+  private buildLiveIndex(): void {
+    this.liveIndex.clear();
+    for (const c of this.combatants) {
+      this.liveIndex.insert(c, c.body.position.x, c.body.position.z);
+    }
   }
 
   // --- The tick ---------------------------------------------------------------
@@ -739,6 +886,12 @@ export class Simulation {
     }
     if (departed || this.dirty) this.rebuild();
 
+    // --- The melee's candidate grid, before anybody has moved. See
+    // `buildRewindIndex` for why the moment matters.
+    let t = performance.now();
+    this.buildRewindIndex();
+    this.phaseMs.index += performance.now() - t;
+
     // --- Every input first, from the state as it stands at the top of the tick.
     //
     // `main.ts` says why in as many words: a bot that thought *during* the loop
@@ -764,6 +917,7 @@ export class Simulation {
     // --- Advance, in ascending id. See `main.ts`: the order is the tick order
     // and it is fixed rather than incidental, because two combatants who strike
     // on the same tick have to resolve in an order both ends agree on.
+    t = performance.now();
     for (const p of this.ordered) {
       const events = advance(p.combat, p.input, FIXED_DT, p.world);
 
@@ -801,6 +955,16 @@ export class Simulation {
       }
     }
 
+    this.phaseMs.advance += performance.now() - t;
+
+    // --- Where everybody finished. Everything below this line is deliberately
+    // **not** rewound -- the balls, the pickups, the traffic and the factions
+    // all read the positions the tick just produced -- so they share one index
+    // built here rather than the melee's historical one.
+    t = performance.now();
+    this.buildLiveIndex();
+    this.phaseMs.index += performance.now() - t;
+
     // --- Every football in the air, after every combatant has moved.
     //
     // The order matters for the pickups' own reason: a ball tested against last
@@ -815,7 +979,8 @@ export class Simulation {
     // snapshot stream, and rewinding it would mean a ball that visibly passed
     // somebody 100 ms ago knocking them over now. So `server/rewind.ts` is not
     // consulted here at all, and the 250 ms ring stays a melee mechanism.
-    for (const e of this.balls.step(FIXED_DT, this.ballWorld, this.combatants, this.ballEvents)) {
+    t = performance.now();
+    for (const e of this.balls.step(FIXED_DT, this.ballWorld, this.combatants, this.ballEvents, this.liveIndex)) {
       if (e.kind !== 'hit' || !e.victim) continue;
       const thrower = this.participants.get(e.ball.thrower);
       // A ball whose thrower has since disconnected still counts. It is in the
@@ -864,6 +1029,7 @@ export class Simulation {
         if (actor !== null) this.hitNpc(actor, 1, thrower);
       }
     }
+    this.phaseMs.balls += performance.now() - t;
 
     // --- The traffic, after every combatant has moved and before the pickups.
     //
@@ -879,6 +1045,7 @@ export class Simulation {
     //
     // Bots are in `this.ordered` like anyone else and are run down like anyone
     // else, which is both correct and funny.
+    t = performance.now();
     {
       const tick = trafficTick(Date.now());
       for (const p of this.ordered) {
@@ -901,10 +1068,17 @@ export class Simulation {
       }
     }
 
+    this.phaseMs.traffic += performance.now() - t;
+
     // --- Spec 8.3, after every combatant has moved, and authoritative. The
     // client no longer decides this at all while connected; it mirrors the
     // event. See `main.ts` for why the order within the tick matters.
-    for (const e of tickPowerups(this.world.points, this.combatants, FIXED_DT, this.pickups)) {
+    //
+    // The live index goes in because this pass was the largest single cost in
+    // the tick before PERFORMANCE.md phase 1 -- 884 points times every player,
+    // every tick. See `tickPowerups`.
+    t = performance.now();
+    for (const e of tickPowerups(this.world.points, this.combatants, FIXED_DT, this.pickups, this.liveIndex)) {
       const at = this.world.tileOf.get(tileKeyOf(e.point.id));
       this.events.push({
         kind: EVENT.PICKUP,
@@ -930,6 +1104,9 @@ export class Simulation {
     // position the server just simulated -- never on a client's word. It is the
     // only line in this process that sets `bikeTuned`, which is what makes 3x
     // something you walk to rather than something you ask for.
+    this.phaseMs.powerups += performance.now() - t;
+
+    t = performance.now();
     this.riderViews.length = 0;
     for (const p of this.ordered) {
       const c = p.combat;
@@ -971,6 +1148,7 @@ export class Simulation {
     // the instruction was that it does. So the crime fires when they come into
     // view and again only after they have left it. See `seenRiding`.
     this.stepRideBy();
+    this.phaseMs.bikes += performance.now() - t;
 
     // --- The factions, after everything that could have started an
     // investigation and before the history is recorded.
@@ -980,12 +1158,15 @@ export class Simulation {
     // chasing where the suspect was rather than where they are, which at
     // 6.4 m/s is 11 cm a tick and is the same argument the balls and the traffic
     // already make about their own placement in this loop.
+    t = performance.now();
     this.stepFactions();
+    this.phaseMs.npc += performance.now() - t;
 
     // --- History, at the *end* of the tick, which is where the position a
     // snapshot reports is taken from. Recording at the top would file each
     // sample under the tick before the one it belongs to, and every rewind in
     // the game would be one tick -- 8.3 ms, 7 cm at a sprint -- stale.
+    t = performance.now();
     for (const p of this.ordered) {
       p.history.record(
         this.tick,
@@ -995,6 +1176,7 @@ export class Simulation {
         p.combat.body.yaw,
       );
     }
+    this.phaseMs.history += performance.now() - t;
 
     out.tick = this.tick;
     out.events = this.events;
@@ -1038,19 +1220,20 @@ export class Simulation {
    * which is not a cost worth a cached record and a staleness bug.
    */
   private stepFactions(): void {
-    const ctx: FactionCtx = {
-      tick: trafficTick(Date.now()),
-      dt: FIXED_DT,
-      collision: this.world.collision,
-      groundHeight: (x, z, feet) => this.factionWorld.groundHeight(x, z, feet),
-      peds: this.world.peds,
-      combatants: this.combatants,
-      field: this.factions,
-      investigationOf: (id) => this.factions.investigationOf(id),
-      damagePlayer: (id, pips, actor) => this.shoot(id, pips, actor),
-      emit: (e) => this.factions.events.push(e),
-    };
-    const before = this.factions.liveInvestigations().length;
+    // The context, **built once in the constructor** and mutated here.
+    //
+    // PERFORMANCE.md phase 1, and it reverses the call the comment that used to
+    // sit here made. That comment was right about the cost -- one object
+    // literal a tick is nothing against `MAX_ACTORS` `think`s inside it -- and
+    // wrong about the shape: the literal carried four *closures*, so it was
+    // five allocations a tick and, worse, a fresh callable identity that no
+    // engine can inline through. Two of its members genuinely change and both
+    // are assigned below; the other nine are stable references that were being
+    // re-copied sixty times a second.
+    const ctx = this.factionCtx;
+    ctx.tick = trafficTick(Date.now());
+    ctx.combatants = this.combatants;
+    const before = this.factions.investigationCount;
     this.factions.step(ctx);
     // The street factions' ambient promotion scan, **after** the step and before
     // the events are drained. `FactionField.step` clears its own event list at
@@ -1066,7 +1249,7 @@ export class Simulation {
     stepWildlife(ctx, this.wildScratch, this.wildPose);
     // An investigation that ran out changes what the wire has to say, and
     // nothing inside the field can bump a version it does not know about.
-    if (this.factions.liveInvestigations().length !== before) this.investigationVersion++;
+    if (this.factions.investigationCount !== before) this.investigationVersion++;
     this.factionEvents.length = 0;
     for (const e of this.factions.events) this.factionEvents.push(e);
   }
@@ -1169,14 +1352,35 @@ export class Simulation {
 
   /** Spec 8.2's punch, against the attacker's own view of the world. */
   private resolveStrike(p: Participant): void {
-    const targets = rewind(
+    const began = performance.now();
+    // PERFORMANCE.md phase 1. This used to rewind **every combatant in the
+    // world** and hand the lot to `hitTest`, which then measured them all and
+    // threw away everyone further than the bat's 1.55 m -- so a swing in a
+    // five-hundred-player world built five hundred proxies to find at most one
+    // target. The grid answers the same question directly.
+    //
+    // `rewindIndex` files each player under the box their rewind window covers,
+    // so a candidate set taken at `REACH` contains everybody the old full scan
+    // could have found: a rewound position is always inside that box, and
+    // `hitTest`'s own plan-distance gate is the same `REACH`. The remaining
+    // work -- the sweep, the nearest-wins rule, the order ties resolve in -- is
+    // untouched. See `game/spatialhash.ts`.
+    const candidates = this.rewindIndex.collectWithin(
+      p.combat.body.position.x,
+      p.combat.body.position.z,
+      REACH,
+      this.strikeCandidates,
+    );
+    this.rewindPool.length = 0;
+    const targets = rewindInto(
       p.combat,
-      this.combatants,
+      candidates,
       this.histories,
       this.tick - p.viewTicks,
       this.rewindPool,
+      this.strikeProxies,
     );
-    const victim = resolveLive(hitTest(p.combat, targets), this.combatants);
+    const victim = resolveLiveById(hitTest(p.combat, targets), this.byId);
     if (victim) {
       this.hitReport = applyHit(p.combat, victim);
       if (this.hitReport.ko) this.creditKo(p.id, victim.id);
@@ -1208,6 +1412,10 @@ export class Simulation {
     // actually saw it.
     this.strikeBystanders(p);
     this.strikeOfficers(p);
+    // The whole swing, players and bystanders and officers, in one number.
+    // Accumulated per strike rather than per tick because a swing is rare --
+    // `advance` above already carries the cost of everybody who did not swing.
+    this.phaseMs.melee += performance.now() - began;
   }
 
   /**
@@ -1385,21 +1593,39 @@ export class Simulation {
    * exactly the pop the 100 ms interpolation buffer exists to prevent.
    */
   snapshot(into: SnapshotPlayer[]): SnapshotPlayer[] {
-    into.length = 0;
-    for (const p of this.ordered) {
+    // **Grown to a high-water mark and written in place**, rather than refilled
+    // with fresh records.
+    //
+    // PERFORMANCE.md phase 1, and it is `protocol.decodeSnapshot`'s own trick
+    // pointed the other way -- that function has always reused its output array
+    // for exactly this reason and said so. A snapshot goes out twenty times a
+    // second forever, so a fresh record per player per snapshot is 320 objects a
+    // second at sixteen players and **ten thousand a second at five hundred**,
+    // which was the third-largest allocation site in the process.
+    //
+    // Safe on the same terms `TickOutput` already states: the array is owned by
+    // this object and the caller must serialise before the next `step`. It
+    // already had to.
+    const n = this.ordered.length;
+    for (let i = into.length; i < n; i++) {
+      into.push({ id: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, anim: 0, health: 0, stamina: 0, phase: 0, flags: 0, ballCharges: 0 });
+    }
+    into.length = n;
+    for (let i = 0; i < n; i++) {
+      const p = this.ordered[i];
       const c = p.combat;
-      into.push({
-        id: p.id,
-        x: c.body.position.x,
-        y: c.body.position.y,
-        z: c.body.position.z,
-        yaw: c.body.yaw,
-        pitch: c.body.pitch,
-        anim: animOf(c),
-        health: c.health,
-        stamina: c.stamina,
-        phase: phaseIndex(c.phase),
-        flags:
+      const s = into[i];
+      s.id = p.id;
+      s.x = c.body.position.x;
+      s.y = c.body.position.y;
+      s.z = c.body.position.z;
+      s.yaw = c.body.yaw;
+      s.pitch = c.body.pitch;
+      s.anim = animOf(c);
+      s.health = c.health;
+      s.stamina = c.stamina;
+      s.phase = phaseIndex(c.phase);
+      s.flags =
           (c.trainingT > 0 ? FLAG.TRAINING : 0) |
           (c.flatWhiteT > 0 ? FLAG.FLAT_WHITE : 0) |
           (c.body.onGround ? FLAG.ON_GROUND : 0) |
@@ -1415,9 +1641,8 @@ export class Simulation {
           // way a client ever learns it has been unlocked -- see
           // `net/client.reconcile`, which takes it and never sets it.
           (c.ridingBike !== 0 ? FLAG.RIDING : 0) |
-          (c.bikeTuned ? FLAG.TUNED : 0),
-        ballCharges: c.ballCharges,
-      });
+          (c.bikeTuned ? FLAG.TUNED : 0);
+      s.ballCharges = c.ballCharges;
     }
     return into;
   }
@@ -1433,20 +1658,25 @@ export class Simulation {
    * close to react to.
    */
   ballSnapshot(): SnapshotBall[] {
+    // Written in place into a pooled array, on `snapshot` above's terms.
     const out = this.snapshotBalls;
-    out.length = 0;
-    for (const b of this.balls.balls) {
-      out.push({
-        id: b.id,
-        thrower: b.thrower,
-        x: b.x,
-        y: b.y,
-        z: b.z,
-        vx: b.vx,
-        vy: b.vy,
-        vz: b.vz,
-        bounces: b.bounces,
-      });
+    const n = this.balls.balls.length;
+    for (let i = out.length; i < n; i++) {
+      out.push({ id: 0, thrower: 0, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, bounces: 0 });
+    }
+    out.length = n;
+    for (let i = 0; i < n; i++) {
+      const b = this.balls.balls[i];
+      const s = out[i];
+      s.id = b.id;
+      s.thrower = b.thrower;
+      s.x = b.x;
+      s.y = b.y;
+      s.z = b.z;
+      s.vx = b.vx;
+      s.vy = b.vy;
+      s.vz = b.vz;
+      s.bounces = b.bounces;
     }
     return out;
   }
@@ -1468,33 +1698,51 @@ export class Simulation {
    * though it runs twenty times a second per actor.
    */
   npcSnapshot(): SnapshotNpc[] {
+    // Written in place into a pooled array, on `snapshot` above's terms.
     const out = this.npcRecords;
-    out.length = 0;
-    for (const a of this.factions.actors) {
-      if (out.length >= MAX_ACTORS) break;
-      out.push({
-        id: a.id,
-        kind: a.kind,
-        x: a.x,
-        y: a.y,
-        z: a.z,
-        // Yaw 0 faces -Z, which is `CharacterActor`'s convention and the
-        // camera's: the yaw that sends the figure's forward to (dx, dz) is
-        // `atan2(-dx, -dz)`.
-        yaw: Math.atan2(-a.dx, -a.dz),
-        state: a.state,
-      });
+    const n = Math.min(this.factions.actors.length, MAX_ACTORS);
+    for (let i = out.length; i < n; i++) out.push({ id: 0, kind: 0, x: 0, y: 0, z: 0, yaw: 0, state: 0 });
+    out.length = n;
+    for (let i = 0; i < n; i++) {
+      const a = this.factions.actors[i];
+      const s = out[i];
+      s.id = a.id;
+      s.kind = a.kind;
+      s.x = a.x;
+      s.y = a.y;
+      s.z = a.z;
+      // Yaw 0 faces -Z, which is `CharacterActor`'s convention and the
+      // camera's: the yaw that sends the figure's forward to (dx, dz) is
+      // `atan2(-dx, -dz)`.
+      s.yaw = Math.atan2(-a.dx, -a.dz);
+      s.state = a.state;
     }
     return out;
   }
 
-  /** Who is wanted, as the wire wants them. Reused; serialise before the next step. */
+  /**
+   * Who is wanted, as the wire wants them. Reused; serialise before the next step.
+   *
+   * `forEachInvestigation` rather than `liveInvestigations` because that one
+   * spreads a `Map` into a fresh array, and this is called on the transport's
+   * two-second refresh **and on every tick that changes the set** -- see
+   * `server/index.ts`. Records are pooled on `snapshot` above's terms.
+   */
   investigations(): InvestigationRecord[] {
     const out = this.investigationRecords;
-    out.length = 0;
-    for (const inv of this.factions.liveInvestigations()) {
-      out.push({ playerId: inv.playerId, reason: inv.reason, ticks: Math.max(0, Math.round(inv.ticks)) });
-    }
+    let n = 0;
+    this.factions.forEachInvestigation((inv) => {
+      let s = out[n];
+      if (s === undefined) {
+        s = { playerId: 0, reason: 0, ticks: 0 };
+        out.push(s);
+      }
+      s.playerId = inv.playerId;
+      s.reason = inv.reason;
+      s.ticks = Math.max(0, Math.round(inv.ticks));
+      n++;
+    });
+    out.length = n;
     return out;
   }
 

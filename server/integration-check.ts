@@ -99,7 +99,7 @@ import {
 import { planSpeed, respawnAt } from '../client/src/game/combat.ts';
 // The three damage paths a rider can be knocked out by, and the flag bits their
 // consequences arrive on. See section 8b.
-import { applyCarHit } from '../client/src/game/traffic.ts';
+import { applyCarHit, CAR_STAGE_DRIVING } from '../client/src/game/traffic.ts';
 import { FLAG } from '../client/src/net/protocol.ts';
 import type { Participant } from './sim.ts';
 import {
@@ -133,6 +133,15 @@ import { trafficTick } from '../client/src/game/traffic.ts';
 // assert it. See there.
 import { createCarPose, forEachCarNear, type LaneRoute } from '../client/src/game/traffic.ts';
 import { Simulation, applyButtons, type TickOutput } from './sim.ts';
+// PERFORMANCE.md phase 1. See `checkSpatialHash` at the foot of this file: the
+// grid, the two rewind entry points it feeds, and the pooled encoder -- each
+// asserted against the linear path it replaced.
+import { SpatialHash, verifySpatialHash } from '../client/src/game/spatialhash.ts';
+import { HISTORY_TICKS, PositionHistory, createBounds, rewind, rewindInto, type RewoundProxy } from './rewind.ts';
+import { hitTest, type CombatantState } from '../client/src/game/combat.ts';
+import { createFooty, createFootyStep, stepFooty } from '../client/src/game/footy.ts';
+import { createPoint, tickPowerups, type PickupEvent, type PowerupKind } from '../client/src/game/powerups.ts';
+import { encodeSnapshotInto, patchSnapshotAck } from '../client/src/net/protocol.ts';
 
 const PORT = Number(process.env.SYDNEY_CHECK_PORT ?? 8799);
 const SERVER_URL = `ws://127.0.0.1:${PORT}`;
@@ -1167,6 +1176,12 @@ async function main(): Promise<void> {
   say('');
   await checkBallBar();
 
+  // --- 17. PERFORMANCE.md phase 1: the spatial hash's candidate sets, the
+  // pooled records and the one broadcast buffer, all asserted to have changed
+  // nothing. See `checkSpatialHash`, appended last and self-contained.
+  say('');
+  await checkSpatialHash();
+
   say('');
   if (failures.length === 0) {
     say(`ALL CHECKS PASSED (${log.filter((l) => l.includes('PASS')).length})`);
@@ -1803,6 +1818,10 @@ async function checkBikes(): Promise<void> {
             dx: 1, dz: 0,
             body: 0, colour: 0, scale: 1,
             halfLength: 2.2, halfWidth: 0.9, height: 1.5,
+            // At a road speed, because the knockback now scales with it: a car
+            // in one of its parked stages is stationary and shoves nobody, and
+            // this case is a *run-down*. See `traffic.carHitStrength`.
+            stage: CAR_STAGE_DRIVING, routeT: 0, speed: 12,
           });
         },
       },
@@ -2199,7 +2218,18 @@ async function checkTraffic(): Promise<void> {
     const sample = routes.filter((_, i) => i % Math.max(1, Math.floor(routes.length / 100)) === 0);
     let compared = 0;
     let live = 0;
+    let parked = 0;
+    let ramping = 0;
     let firstBad = -1;
+    // Wider than the two slots a driving car needs, because a slot's life now
+    // starts before its departure and ends after its arrival -- see the park
+    // stages in `game/traffic.ts`. Slots -2 and 3 are the ones sitting in a kerb
+    // bay at either end of the window, and they are the whole point of this
+    // pass: the stages are derived at *decode* time from the ways block, so a
+    // decoder that rounded a kerb offset differently, or ordered its way scan
+    // differently, would put one process's parked fleet somewhere the other's is
+    // not -- and it would do it in the one state a player is least likely to
+    // report, because a parked car looks like scenery.
     outer: for (let tick = 0; tick < 10000; tick += 7) {
       const now = one.trafficSeconds(tick);
       const alsoNow = two.trafficSeconds(tick);
@@ -2208,7 +2238,7 @@ async function checkTraffic(): Promise<void> {
         break;
       }
       for (const route of sample) {
-        for (let slot = -1; slot <= 2; slot++) {
+        for (let slot = -2; slot <= 3; slot++) {
           const liveA = one.poseCar(route, slot, now, a);
           const liveB = two.poseCar(route, slot, now, b);
           compared++;
@@ -2218,10 +2248,13 @@ async function checkTraffic(): Promise<void> {
           }
           if (!liveA) continue;
           live++;
+          if (a.stage === one.CAR_STAGE_PARKED_IN || a.stage === one.CAR_STAGE_PARKED_OUT) parked++;
+          else if (a.stage !== one.CAR_STAGE_DRIVING) ramping++;
           if (
             a.x !== b.x || a.y !== b.y || a.z !== b.z ||
             a.dx !== b.dx || a.dz !== b.dz ||
-            a.body !== b.body || a.colour !== b.colour || a.scale !== b.scale
+            a.body !== b.body || a.colour !== b.colour || a.scale !== b.scale ||
+            a.stage !== b.stage || a.speed !== b.speed
           ) {
             firstBad = tick;
             break outer;
@@ -2232,8 +2265,84 @@ async function checkTraffic(): Promise<void> {
     check(
       firstBad < 0,
       `${sample.length} routes are bit-identical across two module instances over 10,000 ticks ` +
-        `(${compared.toLocaleString()} lookups, ${live.toLocaleString()} live cars)` +
+        `(${compared.toLocaleString()} lookups, ${live.toLocaleString()} live cars, of which ` +
+        `${parked.toLocaleString()} parked at a kerb and ${ramping.toLocaleString()} on a ramp)` +
         (firstBad >= 0 ? ` -- first divergence at tick ${firstBad}` : ''),
+    );
+    check(
+      parked > 0 && ramping > 0,
+      'the sample actually exercised the park stages rather than only the driving one',
+    );
+  }
+
+  // --- The timetable is still monotone, and the ramps did not shift it.
+  //
+  // This is the lane audit's own property carried into the reparametrisation:
+  // `lanes.py` proves two cars on one route never meet from the fact that route
+  // time only ever increases, so a warp that dipped -- a car in reverse for two
+  // frames -- would quietly delete that proof and put two bodies in one place
+  // somewhere in the city at some hour of the day.
+  //
+  // Measured as *displacement*, at 60 Hz, across a whole car's life including
+  // both dwells: a car that never moves more in one tick than its own class
+  // could travel has no teleports in it, and one whose net motion never reverses
+  // has a monotone timetable. Both are the same sweep because both are the same
+  // claim -- that the five stages join up.
+  {
+    const p = one.createCarPose();
+    const sample = routes.filter((_, i) => i % Math.max(1, Math.floor(routes.length / 60)) === 0);
+    let worstStep = 0;
+    let worstRoute = -1;
+    let reversals = 0;
+    let swept = 0;
+    let lives = 0;
+    for (const route of sample) {
+      // One whole life of slot 0, dwells included, walked at the simulation rate.
+      const from = Math.floor((route.phase - 40) * 60);
+      const to = Math.ceil((route.phase + route.duration + 40) * 60);
+      let px = NaN;
+      let pz = NaN;
+      let lastT = -Infinity;
+      let ticks = 0;
+      for (let tick = from; tick <= to; tick++) {
+        if (!one.poseCar(route, 0, one.trafficSeconds(tick), p)) {
+          px = NaN;
+          lastT = -Infinity;
+          continue;
+        }
+        ticks++;
+        swept++;
+        if (!Number.isNaN(px)) {
+          const dx = p.x - px;
+          const dz = p.z - pz;
+          const step = Math.sqrt(dx * dx + dz * dz);
+          if (step > worstStep) {
+            worstStep = step;
+            worstRoute = route.rid;
+          }
+        }
+        // The property itself, off the pose rather than inferred from the
+        // polyline -- a route that turns a corner changes direction without ever
+        // going backwards in time, and only the second of those is a bug.
+        if (p.routeT < lastT) reversals++;
+        lastT = p.routeT;
+        px = p.x;
+        pz = p.z;
+      }
+      if (ticks > 0) lives++;
+    }
+    // The fastest class in the extent is the motorway at 100 km/h, which is
+    // 0.46 m in a tick. Half a metre is that plus the lateral a kerb ramp adds.
+    check(
+      worstStep < 0.5,
+      `no car moves more than ${worstStep.toFixed(3)} m in one tick anywhere in ${lives} sampled lives ` +
+        `(${swept.toLocaleString()} ticks) -- the five stages join up with no teleport` +
+        (worstStep >= 0.5 ? ` (worst on route ${worstRoute})` : ''),
+    );
+    check(
+      reversals === 0,
+      `and none of them ever reverses (${reversals} backward steps) -- the ramp warp is monotone, ` +
+        "so `lanes.py`'s two-cars-never-meet argument survives it",
     );
   }
 
@@ -2253,20 +2362,56 @@ async function checkTraffic(): Promise<void> {
   {
     const pose = one.createCarPose();
     let cars = 0;
+    let parked = 0;
     let lowest = Infinity;
     let highest = -Infinity;
     const tick = one.trafficTick(Date.now());
     const now = one.trafficSeconds(tick);
     for (const route of routes) {
-      for (let slot = Math.floor((now - route.phase - route.duration) / route.headway) + 1;
-           slot <= Math.floor((now - route.phase) / route.headway); slot++) {
+      // Widened by `dwellCap` at both ends, because a slot exists before it
+      // departs and after it arrives now -- it is sitting in a kerb bay. This
+      // arithmetic is `traffic.liveSlots`', restated here rather than exported
+      // for the reason the rest of this file restates things: what is under test
+      // is the module, and a check that called the module's own range helper
+      // could not tell a broken range from a broken check.
+      for (let slot = Math.floor((now - route.phase - route.duration - route.dwellCap) / route.headway) + 1;
+           slot <= Math.floor((now - route.phase + route.dwellCap) / route.headway); slot++) {
         if (!one.poseCar(route, slot, now, pose)) continue;
         cars++;
+        if (pose.stage === one.CAR_STAGE_PARKED_IN || pose.stage === one.CAR_STAGE_PARKED_OUT) parked++;
         if (pose.y < lowest) lowest = pose.y;
         if (pose.y > highest) highest = pose.y;
       }
     }
-    check(cars > 1000, `${cars.toLocaleString()} cars are on the road across the whole extent right now`);
+    check(
+      cars > 1000,
+      `${cars.toLocaleString()} cars exist across the whole extent right now, ` +
+        `${parked.toLocaleString()} of them parked at a kerb between runs`,
+    );
+    // How many route ends had no way close enough to derive a kerb bay from --
+    // a motorway deck, or an end whose own way is in the next tile's sidecar.
+    // Reported rather than checked, because the right number is a property of
+    // the shipped world rather than of this code: those cars dwell at the lane
+    // offset instead, which is a car stopped in a lane, which is what a car
+    // stopped on a motorway is. It is here so that a pipeline change to the ways
+    // block shows up as this number moving.
+    {
+      let kerbless = 0;
+      for (const route of routes) {
+        if (route.kerbShift0 === 0) kerbless++;
+        if (route.kerbShift1 === 0) kerbless++;
+      }
+      const ends = routes.length * 2;
+      say(
+        `  kerbs: ${(ends - kerbless).toLocaleString()} of ${ends.toLocaleString()} route ends park ` +
+          `against a derived kerb bay; ${kerbless.toLocaleString()} ` +
+          `(${((kerbless / ends) * 100).toFixed(1)}%) dwell at the lane offset instead`,
+      );
+      check(
+        kerbless < ends * 0.25,
+        `at least three route ends in four found a kerb (${(((ends - kerbless) / ends) * 100).toFixed(1)}%)`,
+      );
+    }
     // The datum puts sea level at y = -71.075, so this band is roughly -2 m to
     // +111 m AHD. Loose on purpose at the top -- Bellevue Hill's streets reach
     // 97 m and are inside this extent -- and tight where it matters: a lane
@@ -2300,10 +2445,18 @@ async function checkTraffic(): Promise<void> {
       if (placed) break;
       const slot = Math.floor((now - route.phase) / route.headway);
       if (!one.poseCar(route, slot, now, pose)) continue;
+      // A *driving* car, explicitly. The same slot arithmetic now also lands on
+      // cars sitting in a kerb bay and on cars easing out of one, and both of
+      // those hit softer by design -- see the matrix below, which is where they
+      // are checked. What this block is about is the full-speed run-down, and it
+      // has to stay the assertion it was.
+      if (pose.stage !== one.CAR_STAGE_DRIVING || one.carHitStrength(pose) !== 1) continue;
       const victim = createCombatant(9, 0, 0);
       victim.body.position.set(pose.x, pose.y + EYE_HEIGHT, pose.z);
       const car = one.carHitting(world.traffic, victim, tick, scratch, one.createCarPose());
       if (car === null) continue;
+      // The car that found them need not be the car they were placed on.
+      if (one.carHitStrength(car) !== 1) continue;
       placed = true;
       heading = Math.sqrt(car.dx * car.dx + car.dz * car.dz);
       ko = one.applyCarHit(victim, car);
@@ -2329,6 +2482,174 @@ async function checkTraffic(): Promise<void> {
       );
       check(!rehit, 'a victim still in the car flinch cannot be run down again on the same tick');
     }
+  }
+
+  // --- The knockdown matrix: parked, pulling out, at speed.
+  //
+  // The feature that removed the pop put a stationary two-tonne object at the
+  // kerb of every route end in Sydney, which is where players walk. Before it,
+  // "is there a car overlapping this capsule" and "does a car knock this capsule
+  // over" were the same question and the answer was always the full 10.5 m/s.
+  // Now they are three questions, and all three are here against the shipped
+  // world rather than a synthetic route:
+  //
+  //   parked     nothing at all. Standing against a parked car is standing
+  //              against a bollard, and this is also the fix for a bug that
+  //              predates the parking -- a car held at a red used to flatten you.
+  //   pulling out  a shove that scales with how fast it is actually going.
+  //   at speed   exactly what it always was, which is the assertion above.
+  {
+    const scratch: (typeof routes)[number][] = [];
+    const probe = one.createCarPose();
+    const tick = one.trafficTick(Date.now());
+    const now = one.trafficSeconds(tick);
+    let parkedTried = 0;
+    let parkedHit = 0;
+    let parkedArmed = 0;
+    let parkedOverlapped = 0;
+    let rampTried = 0;
+    let rampOutside = 0;
+    let worstRampSpeed = 0;
+    let gentlestRampSpeed = Infinity;
+    for (const route of routes) {
+      const lo = Math.floor((now - route.phase - route.duration - route.dwellCap) / route.headway) + 1;
+      const hi = Math.floor((now - route.phase + route.dwellCap) / route.headway);
+      for (let slot = lo; slot <= hi; slot++) {
+        if (!one.poseCar(route, slot, now, probe)) continue;
+        const parked = probe.stage === one.CAR_STAGE_PARKED_IN || probe.stage === one.CAR_STAGE_PARKED_OUT;
+        if (parked && parkedTried < 200) {
+          parkedTried++;
+          const bystander = createCombatant(9, 0, 0);
+          bystander.body.position.set(probe.x, probe.y + EYE_HEIGHT, probe.z);
+          // It still occupies the ground it is on -- that has to keep being true,
+          // or a future spawn rule would put a player inside a parked car.
+          if (one.carOverlaps(probe, bystander)) parkedOverlapped++;
+          // The claim is about *this* car. A kerb bay is a metre off the lane,
+          // so somebody standing in one is close enough to be clipped by traffic
+          // going past -- and should be. What must never happen is the parked
+          // car itself doing it, so the hit is compared by identity rather than
+          // by presence.
+          const hit = one.carHitting(world.traffic, bystander, tick, scratch, one.createCarPose());
+          if (hit !== null && hit.route === probe.route && hit.slot === probe.slot) parkedHit++;
+          if (one.carHitStrength(probe) !== 0) parkedArmed++;
+        }
+        if (probe.stage === one.CAR_STAGE_PULL_OUT || probe.stage === one.CAR_STAGE_PULL_IN) {
+          const k = one.carHitStrength(probe);
+          if (k > 0 && k < 1 && rampTried < 200) {
+            rampTried++;
+            const victim = createCombatant(9, 0, 0);
+            victim.body.position.set(probe.x, probe.y + EYE_HEIGHT, probe.z);
+            one.applyCarHit(victim, probe);
+            const thrown = Math.sqrt(
+              victim.body.velocity.x * victim.body.velocity.x +
+                victim.body.velocity.z * victim.body.velocity.z,
+            );
+            if (thrown > worstRampSpeed) worstRampSpeed = thrown;
+            if (thrown < gentlestRampSpeed) gentlestRampSpeed = thrown;
+            // Strictly gentler than a run-down and strictly more than nothing.
+            if (!(thrown > 0) || thrown >= one.CAR_KNOCKBACK_HORIZONTAL) rampOutside++;
+          }
+        }
+      }
+      if (parkedTried >= 200 && rampTried >= 200) break;
+    }
+    check(
+      parkedTried > 0 && parkedOverlapped === parkedTried,
+      `all ${parkedTried} parked cars sampled still overlap a body standing on them -- a parked car is ` +
+        'furniture, not a hole in the world',
+    );
+    check(
+      parkedHit === 0 && parkedArmed === 0,
+      `and not one of them knocked that body over (${parkedHit} did), because not one of them reports ` +
+        `any hit strength at all (${parkedArmed} did) -- a stationary car is furniture`,
+    );
+    check(
+      rampTried > 0 && rampOutside === 0,
+      `${rampTried} cars caught mid-ramp all threw a victim strictly between nothing and a run-down: ` +
+        `${gentlestRampSpeed.toFixed(2)} to ${worstRampSpeed.toFixed(2)} m/s against the full ` +
+        `${one.CAR_KNOCKBACK_HORIZONTAL} -- the scale is continuous, so a car easing out of a bay tips ` +
+        'you over and a car most of the way up to speed still throws you',
+    );
+  }
+
+  // --- What it costs to draw, now that the fleet includes the parked half.
+  //
+  // Reported and bounded rather than asserted to a figure: the client's budget is
+  // about a millisecond for `TrafficMovers.update`, and what this can measure
+  // headlessly is the *work* that budget is spent on -- how many cars land inside
+  // the 420 m draw radius and how long posing them takes. The park stages add
+  // roughly one car per route end to that count, which is the price of the pop
+  // going away and is the number to watch if it ever stops being worth paying.
+  {
+    const probe = one.createCarPose();
+    const scratchR: (typeof routes)[number][] = [];
+    // Two places, because the spawn is Sydney Park and the number that decides
+    // the budget is the CBD's. The busy one is found rather than named: the
+    // route start with the most routes inside a draw radius of it, which is the
+    // densest lane graph in the extent by construction and needs no coordinate
+    // in this file to go stale.
+    // `cars.TRAFFIC_DRAW_RADIUS`, restated. That module imports three and can
+    // never be loaded in this process; `verifyTraffic`'s body-table argument is
+    // the same shape and the same reason.
+    const DRAW_RADIUS = 420;
+    const spawn = world.spawn;
+    let busyX = spawn.x;
+    let busyZ = spawn.z;
+    let busyRoutes = -1;
+    for (let i = 0; i < routes.length; i += 5) {
+      const n = world.traffic.near(routes[i].x[0], routes[i].z[0], DRAW_RADIUS, scratchR).length;
+      if (n > busyRoutes) {
+        busyRoutes = n;
+        busyX = routes[i].x[0];
+        busyZ = routes[i].z[0];
+      }
+    }
+    let worstPeak = 0;
+    for (const [label, px, pz] of [['spawn', spawn.x, spawn.z], ['busiest', busyX, busyZ]] as const) {
+      let peak = 0;
+      let peakParked = 0;
+      let peakDriving = 0;
+      let total = 0;
+      let samples = 0;
+      const started = performance.now();
+      for (let t = 0; t < 60; t++) {
+        const tick = one.trafficTick(Date.now()) + t * 37;
+        let n = 0;
+        let parked = 0;
+        let driving = 0;
+        one.forEachCarNear(world.traffic, px, pz, DRAW_RADIUS, tick, scratchR, probe, (p) => {
+          n++;
+          if (p.stage === one.CAR_STAGE_PARKED_IN || p.stage === one.CAR_STAGE_PARKED_OUT) parked++;
+          else if (p.stage === one.CAR_STAGE_DRIVING) driving++;
+        });
+        total += n;
+        samples++;
+        if (n > peak) {
+          peak = n;
+          peakParked = parked;
+          peakDriving = driving;
+        }
+      }
+      const perPlace = (performance.now() - started) / samples;
+      if (peak > worstPeak) worstPeak = peak;
+      // `peakDriving` is what this radius held *before* the park stages existed:
+      // the driving stage is the whole of the old life. So the pair is the
+      // before and after of this change, measured rather than estimated.
+      say(
+        `  draw @${label}: ${peak} cars peak inside ${DRAW_RADIUS} m ` +
+          `(${peakDriving} driving -- what it was before the park stages -- ${peakParked} parked, ` +
+          `${peak - peakDriving - peakParked} on a ramp), ${(total / samples).toFixed(0)} mean, ` +
+          `${perPlace.toFixed(2)} ms to walk them`,
+      );
+    }
+    // `cars.MOVER_CAPACITY` is per body type and the mix puts at most a third of
+    // these in the busiest one, so the ceiling that matters is roughly three
+    // times it. This is the check that would fire if a future headway or dwell
+    // change quietly overflowed the instanced sets and started dropping cars.
+    check(
+      worstPeak < 3 * 256,
+      `which is inside the instanced sets' combined capacity (worst peak ${worstPeak})`,
+    );
   }
 
   // --- And the whole thing reproduces bit for bit in the other instance, which
@@ -6257,4 +6578,572 @@ async function checkBallBar(): Promise<void> {
     onTheWire() === BALL_CHARGES,
     `eight more seconds of not throwing leaves it at ${onTheWire()} -- the cap holds on the wire too`,
   );
+}
+
+/**
+ * PERFORMANCE.md phase 1, and the whole of its claim to have changed nothing.
+ *
+ * Three optimisations went into the 60 Hz tick -- a spatial hash feeding the
+ * candidate sets, pooled records where fresh ones were being allocated, and one
+ * broadcast buffer where there used to be one per client -- and every one of
+ * them is the kind of change that is *almost* invisible when it is wrong. A
+ * candidate set that is a superset except at negative x is a punch that lands
+ * on one side of the CBD and passes through people on the other. A pooled
+ * snapshot record that is not fully rewritten carries a dead player's health
+ * into a live player's row for one frame. A shared broadcast buffer that is
+ * mutated after the send gives four hundred clients somebody else's ack.
+ *
+ * So this asserts **identity, not similarity**: the same victim, the same
+ * pickup, the same bytes. Where a thing can be computed two ways it is computed
+ * two ways over randomised configurations and the two answers are compared.
+ *
+ * The randomisation is the project's own integer hash rather than
+ * `Math.random`, so a failure here is reproducible from the seed printed beside
+ * it.
+ */
+async function checkSpatialHash(): Promise<void> {
+  say('spatial hash + zero-alloc encode: identical answers, identical bytes');
+
+  // --- 0. The module's own boot check, in this process.
+  {
+    const f = verifySpatialHash();
+    check(f.length === 0, `verifySpatialHash passes${f.length ? ` -- ${f[0]}` : ''}`);
+  }
+
+  let seed = 987654321;
+  const rand = (): number => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) | 0;
+    return ((seed >>> 8) & 0xffffff) / 0x1000000;
+  };
+
+  // --- 1. The melee. `hitTest` over a rewound *candidate set* has to name the
+  // same victim as `hitTest` over a rewound *everybody*, at every latency and
+  // every geometry, or spec 8.2's punch has quietly changed.
+  //
+  // The scenario is the one that can actually break it: everybody moving, so
+  // the rewind window is a real box rather than a point, and a mix of view
+  // times so some targets are looked up 250 ms back and some not at all. The
+  // crowd is deliberately dense -- 1.2 m spacing against a 1.55 m reach -- so
+  // that the answer is usually *some* victim rather than usually null, which is
+  // what makes an agreeing pair of nulls worth nothing.
+  {
+    let trials = 0;
+    let landed = 0;
+    let disagreements = 0;
+    let missingCandidate = 0;
+
+    for (let trial = 0; trial < 200; trial++) {
+      const n = 4 + Math.floor(rand() * 24);
+      const combatants: CombatantState[] = [];
+      const histories = new Map<number, PositionHistory>();
+      // Half the trials are centred west and south of the origin, which is
+      // where a cell index that truncates instead of flooring goes wrong.
+      const ox = (rand() - 0.5) * 6000;
+      const oz = (rand() - 0.5) * 6000;
+
+      for (let i = 0; i < n; i++) {
+        const c = createCombatant(i + 1, ox + (rand() - 0.5) * 12, oz + (rand() - 0.5) * 12);
+        c.body.position.y = EYE_HEIGHT;
+        c.body.yaw = (rand() - 0.5) * Math.PI * 2;
+        c.body.pitch = (rand() - 0.5) * 0.8;
+        if (rand() < 0.15) c.health = 0;
+        combatants.push(c);
+
+        // A real 250 ms of movement behind each of them, at up to a sprint, so
+        // the bounding box has genuine extent and a lookup lands between two
+        // samples rather than on one.
+        const h = new PositionHistory();
+        const vx = (rand() - 0.5) * 16;
+        const vz = (rand() - 0.5) * 16;
+        for (let t = 0; t < HISTORY_TICKS; t++) {
+          h.record(
+            1000 + t,
+            c.body.position.x - vx * (HISTORY_TICKS - 1 - t) / 60,
+            EYE_HEIGHT,
+            c.body.position.z - vz * (HISTORY_TICKS - 1 - t) / 60,
+            c.body.yaw,
+          );
+        }
+        histories.set(c.id, h);
+      }
+
+      // The grid, exactly as `Simulation.buildRewindIndex` builds it.
+      const index = new SpatialHash<CombatantState>();
+      const bounds = createBounds();
+      for (const c of combatants) {
+        histories.get(c.id)!.bounds(bounds);
+        index.insertBox(
+          c, c.body.position.x, c.body.position.z,
+          Math.min(bounds.minX, c.body.position.x), Math.min(bounds.minZ, c.body.position.z),
+          Math.max(bounds.maxX, c.body.position.x), Math.max(bounds.maxZ, c.body.position.z),
+        );
+      }
+
+      for (const attacker of combatants) {
+        if (attacker.health <= 0) continue;
+        const viewTick = 1000 + HISTORY_TICKS - 1 - rand() * (HISTORY_TICKS - 1);
+        trials++;
+
+        // The reference: rewind the whole world, exactly as this file did
+        // before the grid existed.
+        const wholeWorld: CombatantState[] = [];
+        const reference = hitTest(
+          attacker,
+          rewind(attacker, combatants, histories, viewTick, wholeWorld),
+        );
+
+        // And the grid's answer.
+        const candidates: CombatantState[] = [];
+        index.collectWithin(attacker.body.position.x, attacker.body.position.z, REACH, candidates);
+        const pool: CombatantState[] = [];
+        const proxies: RewoundProxy[] = [];
+        const hashed = hitTest(
+          attacker,
+          rewindInto(attacker, candidates, histories, viewTick, pool, proxies),
+        );
+
+        if ((reference?.id ?? 0) !== (hashed?.id ?? 0)) disagreements++;
+        if (reference !== null) {
+          landed++;
+          // The stronger statement, and the one that says *why* when it fails:
+          // whoever the full scan found must have been in the candidate set at
+          // all. A disagreement with a present candidate is a bug in the
+          // rewind; a disagreement with an absent one is a bug in the grid.
+          if (!candidates.some((c) => c.id === reference.id)) missingCandidate++;
+        }
+      }
+    }
+
+    check(trials > 2000, `${trials} randomised swings adjudicated both ways`);
+    check(landed > 200, `${landed} of them landed on somebody -- a check where nothing connects proves nothing`);
+    check(
+      missingCandidate === 0,
+      `every victim the full scan found was in the grid's candidate set (${missingCandidate} were not)`,
+    );
+    check(
+      disagreements === 0,
+      `the grid and the full scan named the same victim every time (${disagreements} disagreements)`,
+    );
+  }
+
+  // --- 2. The pickups. The same 884-point-times-everybody sweep, hashed and
+  // not, over the same points -- and the *point state* is compared as well as
+  // the events, because a pickup that fired against the wrong body still leaves
+  // the cafe empty and would look right in the event list.
+  {
+    let disagreements = 0;
+    let pickups = 0;
+    for (let trial = 0; trial < 120; trial++) {
+      const ox = (rand() - 0.5) * 4000;
+      const oz = (rand() - 0.5) * 4000;
+      const n = 2 + Math.floor(rand() * 30);
+      const combatants: CombatantState[] = [];
+      for (let i = 0; i < n; i++) {
+        const c = createCombatant(i + 1, ox + (rand() - 0.5) * 40, oz + (rand() - 0.5) * 40);
+        c.body.position.y = EYE_HEIGHT + (rand() < 0.2 ? 3 : 0);
+        if (rand() < 0.1) c.phase = 'ko';
+        combatants.push(c);
+      }
+      // Two identical sets of points, one for each way of running the sweep.
+      const a: ReturnType<typeof createPoint>[] = [];
+      const b: ReturnType<typeof createPoint>[] = [];
+      const m = 20 + Math.floor(rand() * 60);
+      for (let i = 0; i < m; i++) {
+        const px = ox + (rand() - 0.5) * 44;
+        const pz = oz + (rand() - 0.5) * 44;
+        const kind: PowerupKind = rand() < 0.5 ? 0 : 1;
+        a.push(createPoint(`t:${i}`, kind, px, 0, pz));
+        b.push(createPoint(`t:${i}`, kind, px, 0, pz));
+      }
+
+      const index = new SpatialHash<CombatantState>();
+      for (const c of combatants) index.insert(c, c.body.position.x, c.body.position.z);
+
+      // Two fresh combatant sets, because `tickPowerups` *applies* the powerup
+      // and a shared body would carry the first run's effect into the second.
+      const copy = combatants.map((c) => {
+        const d = createCombatant(c.id, c.body.position.x, c.body.position.z);
+        d.body.position.y = c.body.position.y;
+        d.phase = c.phase;
+        return d;
+      });
+      const index2 = new SpatialHash<CombatantState>();
+      for (const c of copy) index2.insert(c, c.body.position.x, c.body.position.z);
+
+      const evA: PickupEvent[] = [];
+      const evB: PickupEvent[] = [];
+      tickPowerups(a, combatants, 1 / 60, evA);
+      tickPowerups(b, copy, 1 / 60, evB, index2);
+
+      if (evA.length !== evB.length) disagreements++;
+      else {
+        for (let i = 0; i < evA.length; i++) {
+          if (evA[i].point.id !== evB[i].point.id || evA[i].combatant.id !== evB[i].combatant.id) disagreements++;
+        }
+      }
+      for (let i = 0; i < a.length; i++) if (a[i].active !== b[i].active) disagreements++;
+      pickups += evA.length;
+    }
+    check(pickups > 40, `${pickups} pickups fired across the randomised fields`);
+    check(disagreements === 0, `hashed and linear pickup sweeps agreed on every event and every point (${disagreements} did not)`);
+  }
+
+  // --- 3. The football. A ball's tick-long sweep is the one query whose radius
+  // is derived rather than constant, so it is the one that can be too small.
+  {
+    let disagreements = 0;
+    let hits = 0;
+    for (let trial = 0; trial < 400; trial++) {
+      const ox = (rand() - 0.5) * 4000;
+      const oz = (rand() - 0.5) * 4000;
+      const n = 3 + Math.floor(rand() * 20);
+      const targets: CombatantState[] = [];
+      for (let i = 0; i < n; i++) {
+        const c = createCombatant(i + 2, ox + (rand() - 0.5) * 16, oz + (rand() - 0.5) * 16);
+        c.body.position.y = EYE_HEIGHT;
+        targets.push(c);
+      }
+      const index = new SpatialHash<CombatantState>();
+      for (const c of targets) index.insert(c, c.body.position.x, c.body.position.z);
+
+      // The direction first, then the ball is placed **just short of a body
+      // along it**, and that placement is the whole point of the case.
+      //
+      // A ball moves `speed / 60` metres in one step -- 7 cm at a lob and 50 cm
+      // at a hard throw -- so a ball aimed at somebody eight metres away simply
+      // does not reach them this tick, and four hundred trials of that measure
+      // nothing but two implementations agreeing about an empty sweep. Seeded
+      // inside the step's own reach, with a lateral offset spanning the
+      // 0.46 m the ball and the capsule are wide between them, this straddles
+      // the hit/miss boundary: about a third connect, and the rest are near
+      // misses, which is exactly where a sweep radius that is slightly too
+      // small would show up.
+      const speed = 4 + rand() * 26;
+      const travel = speed / 60;
+      let dirX = rand() - 0.5;
+      let dirY = (rand() - 0.5) * 0.2;
+      let dirZ = rand() - 0.5;
+      let len = Math.max(1e-6, Math.hypot(dirX, dirY, dirZ));
+      dirX /= len;
+      dirY /= len;
+      dirZ /= len;
+      let ballSeedX = ox + (rand() - 0.5) * 16;
+      let ballSeedY = EYE_HEIGHT + (rand() - 0.5) * 1.4;
+      let ballSeedZ = oz + (rand() - 0.5) * 16;
+      if (rand() < 0.8) {
+        const mark = targets[Math.floor(rand() * targets.length)];
+        // Perpendicular to the flight on the ground plane, for the offset.
+        const perpX = -dirZ;
+        const perpZ = dirX;
+        const off = (rand() - 0.5) * 1.4;
+        const back = travel * (0.1 + rand() * 0.95);
+        ballSeedX = mark.body.position.x - dirX * back + perpX * off;
+        ballSeedY = mark.body.position.y - EYE_HEIGHT + 0.2 + rand() * 1.3;
+        ballSeedZ = mark.body.position.z - dirZ * back + perpZ * off;
+      }
+      const make = (): ReturnType<typeof createFooty> => {
+        const ball = createFooty();
+        ball.id = 1;
+        ball.thrower = 1;
+        ball.x = ballSeedX;
+        ball.y = ballSeedY;
+        ball.z = ballSeedZ;
+        ball.alive = true;
+        return ball;
+      };
+      const ballA = make();
+      const ballB = { ...ballA };
+      for (const ball of [ballA, ballB]) {
+        ball.vx = dirX * speed;
+        ball.vy = dirY * speed;
+        ball.vz = dirZ * speed;
+      }
+
+      const stepA = createFootyStep();
+      const stepB = createFootyStep();
+      stepFooty(ballA, 1 / 60, null, targets, stepA);
+      stepFooty(ballB, 1 / 60, null, targets, stepB, index);
+
+      if ((stepA.victim?.id ?? 0) !== (stepB.victim?.id ?? 0)) disagreements++;
+      if (ballA.x !== ballB.x || ballA.y !== ballB.y || ballA.z !== ballB.z || ballA.alive !== ballB.alive) {
+        disagreements++;
+      }
+      if (stepA.victim) hits++;
+    }
+    check(hits > 60, `${hits} of 400 randomised ball steps found a body`);
+    check(disagreements === 0, `hashed and linear ball sweeps agreed on the victim and the resting place (${disagreements} did not)`);
+  }
+
+  // --- 4. The encode. The pooled path and the allocating path must produce the
+  // same bytes, and the per-client ack patch must be the *only* thing that
+  // differs between two clients' frames.
+  {
+    const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+    const world = await loadWorld(root);
+    const sim = new Simulation(world);
+    const out: TickOutput = { tick: 0, events: [], snapshot: null };
+    const players: Participant[] = [];
+    for (let i = 0; i < 12; i++) players.push(sim.join(i % 7, null, `enc-${i}`));
+
+    // Something happening, rather than twelve statues: balls in the air and
+    // bodies in every phase is what makes the flags byte and the projectile
+    // section non-trivial.
+    let mismatched = 0;
+    let compared = 0;
+    let sawBalls = false;
+    const into: SnapshotPlayer[] = [];
+    const pooled = new ArrayBuffer(snapshotBytes(64, 32, 32));
+    const view = new DataView(pooled);
+
+    for (let t = 0; t < 400; t++) {
+      for (const p of players) {
+        p.input.forward = 1;
+        p.input.yaw = (p.id * 0.7) % 6.28;
+        applyButtons(p.input, t % 30 === 0 ? BTN.THROW : t % 17 === 0 ? BTN.PUNCH : BTN.SPRINT);
+      }
+      sim.step(out);
+      if (sim.tick % SNAPSHOT_INTERVAL !== 0) continue;
+
+      const snap = sim.snapshot(into);
+      const balls = sim.ballSnapshot();
+      const npcs = sim.npcSnapshot();
+      if (balls.length > 0) sawBalls = true;
+
+      for (const ack of [0, 1, 65535, 4242]) {
+        const allocating = new Uint8Array(encodeSnapshot(sim.tick, ack, snap, balls, npcs));
+        const n = encodeSnapshotInto(view, sim.tick, ack, snap, balls, npcs);
+        const pooledBytes = new Uint8Array(pooled, 0, n);
+        compared++;
+        if (n !== allocating.byteLength) mismatched++;
+        else for (let i = 0; i < n; i++) if (allocating[i] !== pooledBytes[i]) { mismatched++; break; }
+      }
+
+      // And the patch: encode once with ack 0, patch to another ack, and the
+      // result must equal a fresh encode at that ack. This is the exact
+      // sequence `server/index.ts` runs per client per snapshot.
+      const n = encodeSnapshotInto(view, sim.tick, 0, snap, balls, npcs);
+      patchSnapshotAck(view, 31337);
+      const direct = new Uint8Array(encodeSnapshot(sim.tick, 31337, snap, balls, npcs));
+      const patched = new Uint8Array(pooled, 0, n);
+      compared++;
+      for (let i = 0; i < n; i++) if (direct[i] !== patched[i]) { mismatched++; break; }
+    }
+
+    check(compared > 600, `${compared} snapshot frames encoded both ways over a 400-tick fight`);
+    check(sawBalls, 'with footballs in the projectile section for some of them');
+    check(mismatched === 0, `every pooled frame is byte-identical to the allocating one (${mismatched} were not)`);
+
+    // --- 5. And the pooling itself: the records `snapshot()` reuses must be
+    // *fully* rewritten, or a departed player's row survives into a live one.
+    //
+    // The way this fails is precise: the array is truncated with `.length = n`
+    // and grown by pushing, so a field that stopped being assigned would keep
+    // whatever the player who used to occupy that slot left there. Comparing a
+    // pooled read against a freshly-built one after a departure is the case.
+    {
+      const before = sim.snapshot(into).map((s) => ({ ...s }));
+      sim.leave(players[3].id);
+      sim.leave(players[7].id);
+      sim.step(out);
+      sim.step(out);
+      const after = sim.snapshot(into);
+      const ids = new Set(after.map((s) => s.id));
+      check(!ids.has(players[3].id) && !ids.has(players[7].id), 'two departures leave the pooled snapshot array');
+      check(after.length === before.length - 2, `and it shrank from ${before.length} to ${after.length}`);
+      let stale = 0;
+      for (const s of after) {
+        const live = sim.participants.get(s.id);
+        if (!live) { stale++; continue; }
+        if (s.health !== live.combat.health || Math.abs(s.x - live.combat.body.position.x) > 1e-12) stale++;
+      }
+      check(stale === 0, `every surviving row was rewritten from its own live combatant (${stale} were stale)`);
+    }
+
+    // --- 6. The roster is pooled on the same terms and has the same failure.
+    {
+      const rows = sim.roster();
+      let wrong = 0;
+      for (const r of rows) {
+        const p = sim.participants.get(r.id);
+        if (!p || p.name !== r.name || p.kos !== r.kos || p.downs !== r.downs) wrong++;
+      }
+      check(rows.length === sim.participants.size && wrong === 0, `the pooled roster carries ${rows.length} correct rows`);
+    }
+  }
+
+  // --- 7. The module-level scratch arrays, which are the one thing the pooling
+  // could have broken that no assertion above would notice.
+  //
+  // `game/powerups.pickupScratch` and `game/footy.sweepScratch` are shared by
+  // every caller in the process, on `game/streetlife.ts`'s precedent -- and
+  // this file deliberately builds **two `Simulation`s in one process**, which
+  // is exactly the arrangement a leaked buffer would corrupt. The failure has
+  // no picture: two servers in one process would adjudicate differently from
+  // one, and only under load.
+  //
+  // Tested directly rather than through a whole simulation, because a
+  // simulation's ambient systems are a function of the **wall clock** --
+  // `trafficTick(Date.now())` -- so two sims stepped microseconds apart are not
+  // required to agree about where a car is, and a check that demanded they did
+  // would be a check that failed on a slow machine. What is required is that
+  // interleaving two callers of these two functions gives each of them the
+  // answer it would have got alone, and that is a closed question.
+  {
+    const mkWorld = (n: number, ox: number): { pts: ReturnType<typeof createPoint>[]; cs: CombatantState[]; hash: SpatialHash<CombatantState> } => {
+      const cs: CombatantState[] = [];
+      for (let i = 0; i < n; i++) {
+        const c = createCombatant(i + 1, ox + (rand() - 0.5) * 30, (rand() - 0.5) * 30);
+        c.body.position.y = EYE_HEIGHT;
+        cs.push(c);
+      }
+      const pts: ReturnType<typeof createPoint>[] = [];
+      for (let i = 0; i < 40; i++) {
+        pts.push(createPoint(`s:${i}`, (rand() < 0.5 ? 0 : 1) as PowerupKind, ox + (rand() - 0.5) * 30, 0, (rand() - 0.5) * 30));
+      }
+      const hash = new SpatialHash<CombatantState>();
+      for (const c of cs) hash.insert(c, c.body.position.x, c.body.position.z);
+      return { pts, cs, hash };
+    };
+
+    // Two independent little worlds, run alone, then run interleaved. The
+    // second `mkWorld` call uses the same seeded stream in the same order, so
+    // the "alone" and "interleaved" runs see identical inputs.
+    const seedAt = seed;
+    const soloA: string[] = [];
+    const soloB: string[] = [];
+    const digest = (ev: PickupEvent[], pts: ReturnType<typeof createPoint>[]): string =>
+      ev.map((e) => `${e.point.id}/${e.combatant.id}`).join(',') + '|' + pts.map((p) => (p.active ? '1' : '0')).join('');
+
+    {
+      seed = seedAt;
+      const A = mkWorld(9, -400);
+      const B = mkWorld(13, 900);
+      for (let t = 0; t < 30; t++) soloA.push(digest(tickPowerups(A.pts, A.cs, 1 / 60, [], A.hash), A.pts));
+      for (let t = 0; t < 30; t++) soloB.push(digest(tickPowerups(B.pts, B.cs, 1 / 60, [], B.hash), B.pts));
+    }
+
+    const interA: string[] = [];
+    const interB: string[] = [];
+    {
+      seed = seedAt;
+      const A = mkWorld(9, -400);
+      const B = mkWorld(13, 900);
+      for (let t = 0; t < 30; t++) {
+        interA.push(digest(tickPowerups(A.pts, A.cs, 1 / 60, [], A.hash), A.pts));
+        interB.push(digest(tickPowerups(B.pts, B.cs, 1 / 60, [], B.hash), B.pts));
+      }
+    }
+    check(
+      soloA.join(';') === interA.join(';') && soloB.join(';') === interB.join(';'),
+      'interleaving two pickup sweeps gives each the answer it got alone -- the shared scratch carries nothing',
+    );
+
+    // And the same question about the football's sweep, which shares its own.
+    {
+      const mkBall = (x: number): ReturnType<typeof createFooty> => {
+        const b = createFooty();
+        b.id = 1;
+        b.thrower = 999;
+        b.x = x;
+        b.y = EYE_HEIGHT;
+        b.z = 0;
+        b.vx = 6;
+        b.vz = 3;
+        b.alive = true;
+        return b;
+      };
+      seed = seedAt;
+      const A = mkWorld(9, -400);
+      const B = mkWorld(13, 900);
+      const stepOut = createFootyStep();
+      const trace = (ball: ReturnType<typeof createFooty>, w: typeof A, n: number): string => {
+        let out = '';
+        for (let t = 0; t < n; t++) {
+          stepFooty(ball, 1 / 60, null, w.cs, stepOut, w.hash);
+          out += `${ball.x.toFixed(9)},${ball.z.toFixed(9)},${stepOut.victim?.id ?? 0};`;
+        }
+        return out;
+      };
+      const aAlone = trace(mkBall(-405), A, 40);
+      const bAlone = trace(mkBall(895), B, 40);
+      const ballA = mkBall(-405);
+      const ballB = mkBall(895);
+      let aInter = '';
+      let bInter = '';
+      for (let t = 0; t < 40; t++) {
+        stepFooty(ballA, 1 / 60, null, A.cs, stepOut, A.hash);
+        aInter += `${ballA.x.toFixed(9)},${ballA.z.toFixed(9)},${stepOut.victim?.id ?? 0};`;
+        stepFooty(ballB, 1 / 60, null, B.cs, stepOut, B.hash);
+        bInter += `${ballB.x.toFixed(9)},${ballB.z.toFixed(9)},${stepOut.victim?.id ?? 0};`;
+      }
+      check(
+        aAlone === aInter && bAlone === bInter,
+        'and interleaving two ball sweeps does the same -- 80 alternating steps, identical flights',
+      );
+    }
+  }
+
+  // --- 8. Two `Simulation`s stepped alternately inside one tick, byte for
+  // byte, which is the end-to-end version of section 7.
+  //
+  // Kept as well as the focused test above because it covers the composition
+  // rather than the parts -- every pooled array in `Simulation`, the two hash
+  // rebuilds, the rewind proxy pool -- and it is the check that would catch a
+  // *future* shared buffer nobody thought to test. Its own worlds, because
+  // `PowerupPoint.active` is mutable state on the world object and two sims
+  // sharing one would be taking each other's coffees.
+  {
+    const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+    const a = new Simulation(await loadWorld(root));
+    const b = new Simulation(await loadWorld(root));
+    const outA: TickOutput = { tick: 0, events: [], snapshot: null };
+    const outB: TickOutput = { tick: 0, events: [], snapshot: null };
+    const pa: Participant[] = [];
+    const pb: Participant[] = [];
+    for (let i = 0; i < 16; i++) {
+      pa.push(a.join(i % 7, null, `det-${i}`));
+      pb.push(b.join(i % 7, null, `det-${i}`));
+    }
+    // `joinSpot` draws a random point per join and nothing replays it, so B is
+    // placed onto A before either of them moves.
+    for (let i = 0; i < 16; i++) {
+      const from = pa[i].combat.body.position;
+      pb[i].combat.body.position.set(from.x, from.y, from.z);
+      pb[i].combat.body.yaw = pa[i].combat.body.yaw;
+      pb[i].history.seed(b.tick, from.x, from.y, from.z, pa[i].combat.body.yaw);
+      pa[i].history.seed(a.tick, from.x, from.y, from.z, pa[i].combat.body.yaw);
+    }
+    const intoA: SnapshotPlayer[] = [];
+    const intoB: SnapshotPlayer[] = [];
+    let frames = 0;
+    let diverged = 0;
+    for (let t = 0; t < 240; t++) {
+      for (let i = 0; i < 16; i++) {
+        for (const ps of [pa, pb]) {
+          ps[i].input.forward = 1;
+          ps[i].input.yaw = ((i * 0.61 + t * 0.013) % 6.28) - 3.14;
+          applyButtons(ps[i].input, t % 23 === 0 ? BTN.PUNCH : t % 31 === 0 ? BTN.THROW : BTN.SPRINT);
+        }
+      }
+      // Alternating inside the tick. A shared module buffer would be written by
+      // A and read by B here; running them one after the other would hide it.
+      a.step(outA);
+      b.step(outB);
+      if (a.tick % SNAPSHOT_INTERVAL !== 0) continue;
+      // The **player section only**. The faction and projectile sections ride
+      // on `trafficTick(Date.now())`, which is the wall clock by design -- see
+      // `game/traffic.ts` -- so two sims stepped microseconds apart are not
+      // required to agree about where an officer on a beat is standing, and a
+      // check that demanded it would fail on a busy machine rather than on a
+      // bug. What the players do is a pure function of their inputs and the
+      // world, and that is what this asserts.
+      const fa = new Uint8Array(encodeSnapshot(a.tick, 0, a.snapshot(intoA)));
+      const fb = new Uint8Array(encodeSnapshot(b.tick, 0, b.snapshot(intoB)));
+      frames++;
+      if (fa.byteLength !== fb.byteLength) { diverged++; continue; }
+      for (let i = 0; i < fa.byteLength; i++) if (fa[i] !== fb[i]) { diverged++; break; }
+    }
+    check(frames > 60, `${frames} snapshots compared across two interleaved simulations`);
+    check(diverged === 0, `every one of them byte-identical (${diverged} diverged)`);
+  }
 }
