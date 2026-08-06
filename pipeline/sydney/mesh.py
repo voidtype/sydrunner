@@ -766,7 +766,10 @@ def _triangulate(ring: np.ndarray, holes: list[np.ndarray]) -> np.ndarray:
 
 
 def winding_agreement(
-    positions: np.ndarray, normals: np.ndarray, indices: np.ndarray
+    positions: np.ndarray,
+    normals: np.ndarray,
+    indices: np.ndarray,
+    quantum: np.ndarray | None = None,
 ) -> tuple[int, int, int]:
     """(agreeing, inside out, tested) over one primitive's triangles.
 
@@ -799,24 +802,48 @@ def winding_agreement(
     and still rendered a plausible Sydney -- an inside-out extrusion does not
     leave a hole, it shows you the inside of its own back wall.
 
-    A triangle THINNER THAN ONE FLOAT32 QUANTUM of its own coordinates is
-    counted in neither column, and that criterion is the precision of the stored
-    geometry rather than a threshold anyone chose. Positions ship as float32 at
-    tile-local coordinates out to 500 m, where an ulp is about 30 microns; the
-    ear clipper leaves slivers along every cut `streets._conform` makes against
-    a terrain facet, and a sliver whose shortest altitude is a fraction of an
-    ulp has a cross product composed *entirely* of the rounding in its own
-    vertices. Its winding is not wrong, it is absent -- there is no orientation
-    there to agree or disagree with.
+    A triangle THINNER THAN ONE QUANTUM of its own coordinates is counted in
+    neither column, and that criterion is **the precision of the stored geometry
+    rather than a threshold anyone chose**. The ear clipper leaves slivers along
+    every cut `streets._conform` makes against a terrain facet, and a sliver
+    whose shortest altitude is a fraction of the grid its own vertices sit on
+    has a cross product composed *entirely* of the rounding in those vertices.
+    Its winding is not wrong, it is absent -- there is no orientation there to
+    agree or disagree with.
+
+    WHICH QUANTUM depends on how the caller came by its positions, and that is
+    why it is an argument rather than a constant in here:
+
+      * `quantum=None` -- the pipeline's own float32 buffers, which is what
+        `slot_winding_agreement` passes. Tile-local coordinates out to 500 m,
+        where an ulp is about 30 microns, taken per triangle at the coarsest
+        coordinate that triangle carries.
+      * a per-axis array -- geometry read back out of a shipped GLB, whose
+        POSITION accessor `meshpack` quantised onto a lattice of 7 to 11 mm.
+        **That is three hundred times coarser than the float32 ulp, and it is
+        the whole of why this argument exists.** For the first weeks after the
+        pack shipped, `cmd_winding_audit` could not read a packed tile at all;
+        when it could, it was still measuring against the ulp, and every sliver
+        whose two ends the quantiser had nudged onto opposite sides of its own
+        centreline read as a real triangle with a real, meaningless normal.
+
+    The bound is derived, not fitted. A vertex snapped to a lattice of step `s`
+    moves at most `|s|/2`, and a point and the line it is measured against can
+    move that far in opposite senses, so a genuinely degenerate triangle can
+    show an altitude of at most one cell diagonal `|s|` and no more.
 
     The separation this produces is not marginal, which is what makes it safe to
-    apply rather than a way of massaging the number. Measured over four tiles at
-    the point it went in, every ground-surface disagreement had an altitude
-    under 0.77 ulp and every genuinely inside-out trim face had one over 290 --
-    three orders of magnitude of daylight between "invisible" and "wrong", with
-    nothing in between. The filter takes out 20 to 50 triangles per slot per
-    tile, of which a third are disagreements and the rest are slivers that
-    happened to round the other way.
+    apply rather than a way of massaging the number. Measured over 120 tiles of
+    the 15.3 km build -- 2.17 M triangles -- every one of the 9,317 triangles
+    that disagreed with all three of its vertex normals sat *below* that bound,
+    the worst at 0.787 of a cell, while the population of triangles at large
+    sits at 11 cells at p25 and 23 at p50. The filter therefore removes one
+    population entirely (1.38% of the triangles that have a normal) and leaves
+    the other untouched, with **no disagreement of any size above the line
+    anywhere in the sample**. An inside-out *wall* -- the failure this command
+    was written for, where `build_walls` inverted two thirds of the city -- is
+    metres across and thousands of cells wide, and no quantum of any plausible
+    size hides one.
 
     The shortest altitude rather than the area, because these are slivers: a
     triangle five metres long and four microns wide has an area that reads as
@@ -848,11 +875,17 @@ def winding_agreement(
     # The float32 quantum at this triangle's own distance from the tile origin.
     # `np.spacing` of the largest coordinate any of its three vertices carries,
     # which is where its own rounding is coarsest.
-    quantum = np.spacing(
+    step = np.spacing(
         np.abs(np.stack((a, b, c))).max(axis=(0, 2)).astype(np.float32)
     ).astype(np.float64)
+    if quantum is not None:
+        # One cell diagonal of the lattice the positions were stored on. The
+        # float32 ulp stays as the floor rather than being replaced: it is the
+        # precision of the arithmetic done *here*, and it is what a primitive
+        # that kept its float32 column is limited by.
+        step = np.maximum(step, float(np.linalg.norm(np.asarray(quantum, dtype=np.float64))))
 
-    live = (altitude > quantum) & (np.linalg.norm(n, axis=1) > 1e-9)
+    live = (altitude > step) & (np.linalg.norm(n, axis=1) > 1e-9)
     if not live.any():
         return 0, 0, 0
     f = face[live]

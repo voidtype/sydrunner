@@ -121,19 +121,37 @@ If you redistribute this data you must carry the same attribution and share
 alike under ODbL.
 EOF
 
-echo "committing $FILES files..."
-git add -A
-git commit -q -m "world $BUILT
+# Committed and pushed in SLICES, because GitHub refuses a single push over
+# 2 GB over HTTPS and the 15.3 km world is 2.9 GB. The slices are ordinary
+# commits on one branch rather than one orphan commit, so "the repo holds
+# exactly one commit" became "the repo holds one *lineage*, rebuilt from
+# scratch every publish" -- the property that actually mattered (no unbounded
+# history across builds) is unchanged, since `git init` above still starts an
+# empty repo every time.
+#
+# jsDelivr pins the FINAL commit, so a half-pushed world is never served: the
+# ref stamped into index.json does not exist until the last slice lands.
+git remote add origin "https://github.com/$DATA_REPO.git"
 
-Pipeline build $BUILT: $FILES files, $((BYTES / 1048576)) MB.
+slice() {  # slice <label> <path-spec>...
+  label=$1; shift
+  [ -z "$(git status --porcelain -- "$@" 2>/dev/null)" ] && return 0
+  git add -A -- "$@"
+  git commit -q -m "world $BUILT ($label)
+
+Pipeline build $BUILT, $label slice.
 A processed derivative of OpenStreetMap (ODbL), Microsoft Building
 Footprints (ODbL) and AWS Terrain Tiles. See README.md."
+  echo "  pushing $label..."
+  git push -q --force origin main
+}
+
+echo "committing and pushing $FILES files in slices (~$((BYTES / 1048576)) MB raw)..."
+slice tiles tiles
+slice regions regions
+slice rest .
 
 SHA=$(git rev-parse HEAD)
-
-echo "pushing (~$((BYTES / 1048576)) MB raw, git packs it)..."
-git remote add origin "https://github.com/$DATA_REPO.git"
-git push -q --force origin main
 git tag -f "$TAG" >/dev/null
 git push -q --force origin "refs/tags/$TAG"
 

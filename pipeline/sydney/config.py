@@ -74,7 +74,13 @@ STAGES: tuple[Stage, ...] = (
     # Park (5,064 m from origin at the pin) and the whole park plus a 100 m
     # dither disc and a working margin must be playable tiles, not far scenery.
     Stage(1, "inner", 5_300, "Sydney LGA + inner ring, out to Sydney Park"),
-    Stage(2, "middle", 15_000, "Marrickville, Bondi, Balmain, Randwick, North Sydney, Chatswood"),
+    # 15,300 rather than 15,000: the user asked for "another 10 km in each
+    # direction" from the 5,300 inner ring, and 300 m is not worth the
+    # difference between a number that answers the request and one that nearly
+    # does. Measured at this radius: 117,681 OSM buildings (3.34x the inner
+    # ring) over ~2,100 emitted tiles, roughly 30% of the disc being harbour
+    # and open ocean, which the pipeline skips.
+    Stage(2, "middle", 15_300, "Marrickville, Bondi, Balmain, Randwick, North Sydney, Chatswood"),
     Stage(3, "outer", 35_000, "Parramatta, Bankstown, Hornsby, Sutherland, Manly"),
     Stage(4, "horizon", 60_000, "terrain and coastline only, buildings optional"),
 )

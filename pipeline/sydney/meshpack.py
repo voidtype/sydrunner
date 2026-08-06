@@ -109,7 +109,10 @@ that check alive.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json as _json
+import struct as _struct
+from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 
@@ -310,34 +313,376 @@ def pack_indices(indices: np.ndarray) -> Packed:
     return Packed(delta_encode(arr, 1), COMPONENT_UINT, "SCALAR", 1, False, {"d": 1}, 0.0)
 
 
+# --- Reading a packed tile back ------------------------------------------------
+#
+# **Everything below this line is the inverse, and it exists because the audits
+# went blind.** When the pack landed, `write_glb` started emitting delta-coded
+# uint16 where it used to emit float32 and uint32, and the pipeline's own readers
+# -- `cli._glb_primitives` and `cli._landmark_nodes` -- kept doing
+# `np.frombuffer(blob, "<f4")` at the accessor's byte offset. That does not fail:
+# it produces an array of the right length full of the wrong numbers, and the
+# first thing downstream that indexes a vertex by a delta-coded index number
+# throws an `IndexError` from inside `mesh.winding_agreement`, three frames away
+# from the actual mistake, *after* the audit has already printed its header. Three
+# of the seven audits died that way and their verdicts simply never appeared.
+#
+# So the rule this section encodes is: there is exactly one way for Python to read
+# a tile GLB, it undoes the pack, and it refuses a file it was not written for.
+#
+# **The correctness standard is bit-identity with the client**, not "close
+# enough". `client/src/world/tile-decode.ts` is what the player actually sees, so
+# an audit that dequantises even one ulp differently is auditing a world that is
+# not shipped. Every arithmetic choice below is therefore a transcription of that
+# file rather than a re-derivation:
+#
+#   * the prefix sum is modular in the *stored* width, `& 0xffff` for uint16 and
+#     `>>> 0` for uint32, so a column that wraps reconstructs without a case;
+#   * the dequantisation is `code * scale + offset` in float64, in that order,
+#     rounded to float32 once at the end -- `(code + offset/scale) * scale` is
+#     algebraically the same and is not the same float;
+#   * int8 normals are renormalised from the *stored integers*, `1/sqrt(x*x +
+#     y*y + z*z)` then three multiplies, because the 1/127 the encoder divided by
+#     cancels out of a renormalisation and dividing by it first would round twice;
+#   * `COLOR_0` comes back as the stored bytes, which is what `parseTileGlb`
+#     hands three.
+#
+# That equivalence was checked, not asserted: a real tile decoded through this
+# module and through `tile-decode.ts` under Bun compares equal byte for byte on
+# every attribute and every index buffer of all nineteen primitives.
+
+
+class PackVersionError(RuntimeError):
+    """A packed artefact written by rules this reader does not have.
+
+    Raised rather than guessed at. The failure mode this replaces is the one that
+    made this module necessary: bytes read under the wrong rules are not missing,
+    they are *plausible*, and the audit that consumes them reports a number
+    instead of a problem.
+    """
+
+
+#: The extras vocabulary of `PACK_VERSION`. A key outside this set means the
+#: format grew a field while this reader was not looking, which is the same
+#: situation as an unknown version number and gets the same refusal.
+_EXTRAS_KEYS = frozenset({"q", "i", "d"})
+
+GLB_MAGIC = 0x46546C67
+CHUNK_JSON = 0x4E4F534A
+CHUNK_BIN = 0x004E4942
+
+#: `SYD_mesh_pack` in `extensionsUsed` is how a file says it carries the delta
+#: filter. It is deliberately not in `extensionsRequired` -- see this module's
+#: header -- so it is a statement about the bytes rather than a demand.
+PACK_EXTENSION = "SYD_mesh_pack"
+
+_COMPONENT_DTYPE = {
+    COMPONENT_BYTE: np.dtype("<i1"),
+    COMPONENT_UBYTE: np.dtype("<u1"),
+    COMPONENT_SHORT: np.dtype("<i2"),
+    COMPONENT_USHORT: np.dtype("<u2"),
+    COMPONENT_UINT: np.dtype("<u4"),
+    COMPONENT_FLOAT: np.dtype("<f4"),
+}
+
+_TYPE_COMPONENTS = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}
+
+
+def require_pack_version(declared, *, source: str, reader: str = "this audit") -> int:
+    """Refuse a pack version this reader was not written against.
+
+    `declared` is `index.json`'s `geometry.pack`, or None for a world built
+    before the pack existed -- which is a legitimate thing to read, because the
+    accessors in it carry no `extras` and every branch below leaves them alone.
+
+    The message names the version rather than the symptom on purpose. An unknown
+    future version used to arrive as `IndexError: index 65538 is out of bounds`
+    from inside a winding check, and the whole point of this function is that it
+    is impossible to read that and know what happened.
+    """
+    if declared is None:
+        return 0
+    try:
+        version = int(declared)
+    except (TypeError, ValueError):
+        raise PackVersionError(
+            f"{reader} does not understand pack version {declared!r} ({source})."
+        ) from None
+    if version != PACK_VERSION:
+        raise PackVersionError(
+            f"{reader} does not understand pack version {version}."
+            f" {source} declares it; this reader implements version {PACK_VERSION}."
+            " `sydney/meshpack.py` and `client/src/world/tile-decode.ts` are the two"
+            " halves of one format -- teach this reader the new rules before"
+            " auditing a build written under them."
+        )
+    return version
+
+
+def undo_delta(raw: np.ndarray, components: int) -> np.ndarray:
+    """Modular prefix sum along the vertex axis, per component.
+
+    The exact inverse of `delta_encode`, and modular in the stored width for the
+    same reason it was: the encoder subtracted wide and truncated, so a negative
+    step is stored as its two's complement and only the wrap brings it back.
+    Masking once at the end rather than every step is the same arithmetic --
+    addition modulo 2^n is associative -- and is one pass instead of n.
+    """
+    rows = raw.reshape(-1, components)
+    if len(rows) < 2:
+        return raw
+    bits = raw.dtype.itemsize * 8
+    acc = np.cumsum(rows.astype(np.int64), axis=0)
+    return (acc & ((1 << bits) - 1)).astype(raw.dtype).reshape(-1)
+
+
+def _unit_normals(raw: np.ndarray) -> np.ndarray:
+    """int8 normals back to unit float32, exactly as `unpackNormals` does it.
+
+    From the stored integers, not from `code / 127`: the scale cancels out of a
+    renormalisation, so applying it first would be a rounding step that the
+    client does not take. A zero normal stays zero -- 13,648 of the build's
+    13.8 M, from degenerate source triangles -- because inventing a direction for
+    a triangle that has none would be this reader deciding what the audit sees.
+    """
+    rows = raw.reshape(-1, 3).astype(np.float64)
+    sq = (rows * rows).sum(axis=1)
+    out = np.zeros_like(rows)
+    live = sq > 0.0
+    if live.any():
+        out[live] = rows[live] * (1.0 / np.sqrt(sq[live]))[:, None]
+    return out.astype(np.float32).reshape(-1)
+
+
+def unpack_column(
+    raw: np.ndarray, components: int, extras: dict | None = None, normalized: bool = False
+) -> np.ndarray:
+    """One stored accessor column back to what the pipeline put in.
+
+    Flat in, flat out; the caller reshapes. Returns float32 for everything that
+    was a float before it was packed, the stored integer dtype for an index
+    buffer, and the stored bytes for `COLOR_0` -- which is the same set of types
+    the pre-pack readers got out of `np.frombuffer`, so nothing downstream has to
+    know the pack happened.
+    """
+    extras = extras or {}
+    unknown = set(extras) - _EXTRAS_KEYS
+    if unknown:
+        raise PackVersionError(
+            f"accessor extras carry {sorted(unknown)}, which pack version"
+            f" {PACK_VERSION} has no meaning for. The format grew a field this"
+            " reader does not implement."
+        )
+    if extras.get("d") == 1:
+        raw = undo_delta(raw, components)
+
+    q = extras.get("q")
+    if q is not None:
+        if len(q) != 2 * components:
+            raise PackVersionError(
+                f"accessor extras 'q' has {len(q)} numbers for a {components}-component"
+                f" column; pack version {PACK_VERSION} writes offset then scale, per axis."
+            )
+        offset = np.asarray(q[:components], dtype=np.float64)
+        scale = np.asarray(q[components:], dtype=np.float64)
+        wide = raw.reshape(-1, components).astype(np.float64) * scale + offset
+        return wide.astype(np.float32).reshape(-1)
+
+    if extras.get("i") == 1:
+        # `_BLDIDX`: an atlas row number, widened back to the bit-identical
+        # float32 the pipeline wrote. Not approximate and never was.
+        return raw.astype(np.float32)
+
+    if normalized and raw.dtype == np.int8 and components == 3:
+        return _unit_normals(raw)
+
+    return raw
+
+
+@dataclass(frozen=True)
+class GlbPrimitive:
+    """One primitive, unpacked. `material` is the slot name the pipeline gave it.
+
+    `quanta` carries the per-axis step each attribute was quantised on, in the
+    attribute's own units, or None where the column shipped as float32 and there
+    is no step. **A reader that only hands back the values loses the one fact a
+    geometric check needs about them**: a triangle narrower than the lattice its
+    vertices were snapped to has an orientation composed entirely of that
+    snapping, and nothing in the values themselves says how wide the lattice is.
+    `mesh.winding_agreement` is where that matters -- see its `quantum`.
+    """
+
+    material: str
+    attributes: dict[str, np.ndarray]
+    indices: np.ndarray
+    quanta: dict[str, np.ndarray | None]
+
+    def attribute(self, semantic: str) -> np.ndarray | None:
+        return self.attributes.get(semantic)
+
+    def quantum(self, semantic: str) -> np.ndarray | None:
+        """Per-axis quantisation step for one attribute, or None if it is float32."""
+        return self.quanta.get(semantic)
+
+
+@dataclass(frozen=True)
+class GlbNode:
+    """One glTF node and the primitives under it.
+
+    `translation` matters for `landmarks.glb`, whose three nodes each carry their
+    landmark's anchor; tile GLBs have a single node with no transform.
+    """
+
+    name: str
+    translation: tuple[float, float, float]
+    primitives: list[GlbPrimitive] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class Glb:
+    """A parsed GLB with every accessor already unpacked."""
+
+    path: Path
+    nodes: list[GlbNode]
+    packed: bool
+
+    @property
+    def primitives(self) -> list[GlbPrimitive]:
+        return [p for node in self.nodes for p in node.primitives]
+
+
+def read_glb(path: Path | str) -> Glb:
+    """Read a GLB this pipeline wrote, undoing the pack.
+
+    The container parse is deliberately the same narrow one `parseTileGlb` does
+    -- header, two chunks, no sparse accessors, no interleaving, one buffer --
+    rather than a general glTF library, because the two files have to agree about
+    what a tile *is* and a library's tolerance for shapes this pipeline never
+    writes would hide a writer that started producing one.
+
+    Every unsupported shape raises. An audit that skips a primitive it cannot
+    read is an audit that reports a clean world because it looked at less of it.
+    """
+    path = Path(path)
+    raw = path.read_bytes()
+    if len(raw) < 12:
+        raise ValueError(f"{path.name}: {len(raw)} bytes is not a GLB")
+    magic, version, _length = _struct.unpack_from("<III", raw, 0)
+    if magic != GLB_MAGIC:
+        raise ValueError(f"{path.name}: magic {magic:#x}, not a GLB")
+    if version != 2:
+        raise ValueError(f"{path.name}: GLB version {version}, not 2")
+
+    doc: dict | None = None
+    blob: bytes | None = None
+    at = 12
+    while at + 8 <= len(raw):
+        length, kind = _struct.unpack_from("<II", raw, at)
+        body = at + 8
+        if body + length > len(raw):
+            raise ValueError(f"{path.name}: chunk runs past the file")
+        if kind == CHUNK_JSON and doc is None:
+            doc = _json.loads(raw[body : body + length])
+        elif kind == CHUNK_BIN and blob is None:
+            blob = raw[body : body + length]
+        at = body + length + ((4 - (length % 4)) % 4)
+    if doc is None:
+        raise ValueError(f"{path.name}: no JSON chunk")
+    if blob is None:
+        raise ValueError(f"{path.name}: no BIN chunk")
+
+    # Nothing this pipeline writes is in `extensionsRequired` -- see this
+    # module's header for why -- so anything there is a writer that has moved on
+    # without this reader, and reading the file anyway would be reading it under
+    # rules it has explicitly said are not enough.
+    required = [e for e in (doc.get("extensionsRequired") or []) if e != PACK_EXTENSION]
+    if required:
+        raise PackVersionError(
+            f"{path.name} requires {required}, which this reader does not implement."
+        )
+
+    accessors = doc.get("accessors") or []
+    views = doc.get("bufferViews") or []
+    materials = [m.get("name", "") for m in doc.get("materials") or []]
+    packed = PACK_EXTENSION in (doc.get("extensionsUsed") or [])
+
+    def column(index: int) -> tuple[np.ndarray, int, np.ndarray | None]:
+        acc = accessors[index]
+        if acc.get("bufferView") is None:
+            raise ValueError(f"{path.name}: accessor {index} has no bufferView")
+        view = views[acc["bufferView"]]
+        if view.get("byteStride"):
+            raise ValueError(
+                f"{path.name}: interleaved bufferView, which this pipeline never writes"
+            )
+        dtype = _COMPONENT_DTYPE.get(acc["componentType"])
+        components = _TYPE_COMPONENTS.get(acc["type"])
+        if dtype is None or components is None:
+            raise ValueError(
+                f"{path.name}: accessor {index} is {acc['type']}/{acc['componentType']}"
+            )
+        offset = (view.get("byteOffset") or 0) + (acc.get("byteOffset") or 0)
+        stored = np.frombuffer(blob, dtype=dtype, count=acc["count"] * components, offset=offset)
+        extras = acc.get("extras") or {}
+        q = extras.get("q")
+        return (
+            unpack_column(stored, components, extras, bool(acc.get("normalized"))),
+            components,
+            None if q is None else np.asarray(q[components:], dtype=np.float64),
+        )
+
+    nodes: list[GlbNode] = []
+    for node in doc.get("nodes") or []:
+        if node.get("mesh") is None:
+            continue
+        mesh_doc = (doc.get("meshes") or [])[node["mesh"]]
+        prims: list[GlbPrimitive] = []
+        for prim in mesh_doc.get("primitives") or []:
+            if prim.get("mode", 4) != 4:
+                raise ValueError(f"{path.name}: primitive mode {prim.get('mode')}, not TRIANGLES")
+            if prim.get("indices") is None:
+                raise ValueError(f"{path.name}: non-indexed primitive")
+            attributes: dict[str, np.ndarray] = {}
+            quanta: dict[str, np.ndarray | None] = {}
+            for semantic, acc_index in (prim.get("attributes") or {}).items():
+                values, components, step = column(acc_index)
+                attributes[semantic] = values.reshape(-1, components)
+                quanta[semantic] = step
+            indices, _, _ = column(prim["indices"])
+            slot = prim.get("material")
+            prims.append(
+                GlbPrimitive(
+                    material=materials[slot] if slot is not None and slot < len(materials) else "",
+                    attributes=attributes,
+                    indices=indices,
+                    quanta=quanta,
+                )
+            )
+        t = node.get("translation") or [0.0, 0.0, 0.0]
+        nodes.append(
+            GlbNode(
+                name=node.get("name") or mesh_doc.get("name") or "",
+                translation=(float(t[0]), float(t[1]), float(t[2])),
+                primitives=prims,
+            )
+        )
+    return Glb(path=path, nodes=nodes, packed=packed)
+
+
 # --- The other half, for the pipeline's own check ----------------------------
 
 
 def unpack(packed: Packed) -> np.ndarray:
-    """Reverse `pack_*`, exactly as `tile-decode.ts` does it.
+    """Reverse `pack_*` on a column that has not been through a file yet.
 
     Here so `write_glb` can assert what it just wrote before the file leaves the
     process. A round trip that is only ever checked in the browser is a round
     trip whose failures are found by players.
+
+    One implementation, not two: this is `unpack_column` with the column's
+    description taken off the `Packed` rather than off a glTF accessor, so a
+    change to the arithmetic cannot land in the in-process check and miss the
+    file reader, or the other way round.
     """
-    data = packed.data
-    extras = packed.extras or {}
-    if extras.get("d"):
-        rows = data.reshape(-1, packed.components).astype(np.int64)
-        acc = np.cumsum(rows, axis=0)
-        bits = data.dtype.itemsize * 8
-        data = (acc & ((1 << bits) - 1)).astype(data.dtype).reshape(-1)
-    if "q" in extras:
-        n = packed.components
-        offset = np.asarray(extras["q"][:n], dtype=np.float64)
-        scale = np.asarray(extras["q"][n:], dtype=np.float64)
-        return (data.reshape(-1, n).astype(np.float64) * scale + offset).astype(np.float32)
-    if extras.get("i"):
-        return data.astype(np.float32)
-    if packed.normalized and data.dtype == np.int8:
-        back = data.reshape(-1, packed.components).astype(np.float64) / 127.0
-        length = np.linalg.norm(back, axis=1, keepdims=True)
-        return np.divide(back, length, out=np.zeros_like(back), where=length > 1e-9).astype(
-            np.float32
-        )
-    return data
+    return unpack_column(
+        packed.data, packed.components, packed.extras, packed.normalized
+    ).reshape(-1, packed.components)

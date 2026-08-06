@@ -41,9 +41,22 @@
  * `data/cache/sydney.osm.pbf` the city was built from, projected through the
  * identical `geo.lonlat_to_enu` -> `geo.enu_to_world` path, curated down to the
  * ones inside the extent that a player will actually walk. `VENUE_XZ` is every
- * `amenity=pub|bar|biergarten` in the same extent -- 422 of them after a 30 m
+ * `amenity=pub|bar|biergarten` in the same extent -- 611 of them after a 30 m
  * dedupe that folds a pub mapped as both a node and its own building outline
  * into one venue.
+ *
+ * Both tables grew with the world: 59 suburbs and 422 venues at 5,300 m, 255 and
+ * 611 at 15,300 m. Both grew by **appending**, and the appended block is fenced
+ * off with a comment in each table saying so. Nothing above the fence moved, and
+ * `verifyStreetlife` will not let it: what a player meets in the inner city is
+ * decided by a row's own numbers and its index, and both of those are the same
+ * numbers and the same indices they were before the middle ring existed.
+ *
+ * 611 is well short of the ~900 the ring's area would suggest, and the reason is
+ * real rather than a missed layer: the whole extract holds 833 pub/bar features
+ * inside 40 km of Town Hall, of which 479 are inside the old 5,300 m ring. The
+ * CBD, the Cross and the inner west are simply where Sydney's bars are, and the
+ * middle ring is mostly houses.
  *
  * **The coordinates are data and the weights are taste**, and the whole of this
  * feature's honesty is in keeping those two apart. `POLICE_STATIONS` says the
@@ -159,10 +172,11 @@ export interface Suburb {
  * The curated set: every `place=suburb|neighbourhood` centroid inside the
  * extent that a player can reach, with the two weights.
  *
- * Fifty-two of the eighty-five the extract found. The ones dropped are water
- * features, industrial spans and the handful of neighbourhood labels that name
- * a single building -- "Quay Quarter", "The Hungry Mile" -- which would put a
- * loiterer in a lobby.
+ * Fifty-two of the eighty-five the inner-ring extract found, plus the additions
+ * below, plus the middle ring's 196. The ones dropped are water features,
+ * industrial spans and the handful of neighbourhood labels that name a single
+ * building -- "Quay Quarter", "The Hungry Mile" -- which would put a loiterer in
+ * a lobby.
  *
  * Kings Cross has no `place` node in OSM at all, which is a fact about the data
  * rather than about the Cross: it is mapped as a locality inside Potts Point.
@@ -268,19 +282,269 @@ export const SUBURBS: readonly Suburb[] = [
   { name: 'Rose Bay', x: 5206.2, z: 505.8, crime: 0.06, booze: 0.2 },
   { name: 'Point Piper', x: 3908.3, z: -197.3, crime: 0.05, booze: 0.1 },
   { name: 'Mosman', x: 3165.2, z: -4055.6, crime: 0.05, booze: 0.2 },
+
+  // ===========================================================================
+  // The 5,300 - 15,300 m middle ring. 196 rows, appended rather than merged.
+  //
+  // Everything above this line is the inner-ring bake and is FROZEN -- same
+  // rows, same order, same numbers. `methLoiterers`, `methSpread` and
+  // `suburbSeed` are functions of the row (and `streetKey` of its index), so a
+  // frozen block is a frozen set of loiterers, and `VENUE_DRUNKS` below reads
+  // `booze` through a nearest-centroid search that a *new* row could otherwise
+  // have quietly re-pointed. Measured: of the 422 inner-ring venues, exactly
+  // three change which centroid is nearest -- two Crows Nest pubs to St Leonards
+  // and one Greenwich pub to Longueville -- and both of those rows are weighted
+  // to their neighbour's `booze` on purpose, so every one of the 422 keeps the
+  // drunk count it has today. See `verifyStreetlife`.
+  //
+  // The extract finds 278 `place=suburb|neighbourhood|town` nodes inside
+  // 15,300 m. The 80 inside the old ring are dropped wholesale -- the inner ring's 59 rows
+  // are curated and adding the ones it deliberately left out (water features,
+  // industrial spans, labels that name one building) would move loiterers a
+  // player already knows. Two more are dropped by name: OSM's `Mosman` and
+  // `St Peters` nodes sit outside 5,300 m but the curated table already carries
+  // both under hand-picked coordinates, and a second row would double the
+  // suburb.
+  //
+  // The weights are the header's taste rule pushed outward and nothing more:
+  // the night-time strips (Bondi, Bondi Beach, Coogee, Marrickville, Dee Why,
+  // Chatswood, Burwood) carry the booze; the high streets along the western and
+  // southern rail lines carry the crime; the harbour, the upper north shore and
+  // the peninsula suburbs carry neither. Nothing out here reaches the Cross:
+  // the heaviest new row is Marrickville at 0.5 against Redfern's 1.0, which is
+  // the ordering `checkStreetlife` asserts and the one a player would expect.
+  // ===========================================================================
+  { name: 'Marrickville', x: -4840.7, z: 4700.4, crime: 0.5, booze: 0.7 },
+  { name: 'Campsie', x: -9720.5, z: 5231.9, crime: 0.5, booze: 0.35 },
+  { name: 'Lakemba', x: -12325.2, z: 5861.9, crime: 0.5, booze: 0.2 },
+  { name: 'Ashfield', x: -7533.4, z: 2428.2, crime: 0.45, booze: 0.4 },
+  { name: 'Greenacre', x: -13875.8, z: 3967.3, crime: 0.45, booze: 0.15 },
+  { name: 'Wiley Park', x: -12978.8, z: 6254.1, crime: 0.45, booze: 0.15 },
+  { name: 'Petersham', x: -4932.9, z: 2938.9, crime: 0.4, booze: 0.55 },
+  { name: 'Burwood', x: -9716.7, z: 1247.6, crime: 0.4, booze: 0.45 },
+  { name: 'Hurstville', x: -9889.1, z: 10373.4, crime: 0.4, booze: 0.4 },
+  { name: 'Maroubra', x: 3510.6, z: 8430.4, crime: 0.4, booze: 0.4 },
+  { name: 'Sydenham', x: -3721.6, z: 5576.9, crime: 0.4, booze: 0.4 },
+  { name: 'Rockdale', x: -6205.3, z: 9590.9, crime: 0.4, booze: 0.35 },
+  { name: 'Canterbury', x: -8447.2, z: 5056.9, crime: 0.4, booze: 0.3 },
+  { name: 'Belmore', x: -11126.6, z: 5814.6, crime: 0.4, booze: 0.2 },
+  { name: 'Bondi Beach', x: 5879.1, z: 2328.4, crime: 0.35, booze: 0.8 },
+  { name: 'Bondi', x: 5043.9, z: 2604.1, crime: 0.35, booze: 0.75 },
+  { name: 'Dulwich Hill', x: -6467.5, z: 4084.7, crime: 0.35, booze: 0.45 },
+  { name: 'Kogarah', x: -6631.3, z: 11147.7, crime: 0.35, booze: 0.35 },
+  { name: 'Arncliffe', x: -5762.2, z: 7805.0, crime: 0.35, booze: 0.2 },
+  { name: 'Eastlakes', x: 311.5, z: 6902.6, crime: 0.35, booze: 0.2 },
+  { name: 'Belfield', x: -11332.3, z: 4166.5, crime: 0.35, booze: 0.15 },
+  { name: 'Hillsdale', x: 1836.6, z: 9302.5, crime: 0.35, booze: 0.15 },
+  { name: 'Coogee', x: 4400.9, z: 5792.5, crime: 0.3, booze: 0.7 },
+  { name: 'Randwick', x: 3018.9, z: 4975.3, crime: 0.3, booze: 0.5 },
+  { name: 'Brighton-Le-Sands', x: -5066.5, z: 9995.5, crime: 0.3, booze: 0.45 },
+  { name: 'Dee Why', x: 7026.2, z: -13003.1, crime: 0.3, booze: 0.45 },
+  { name: 'Kingsford', x: 1759.8, z: 5825.7, crime: 0.3, booze: 0.45 },
+  { name: 'Lewisham', x: -5742.9, z: 3051.2, crime: 0.3, booze: 0.4 },
+  { name: 'Mascot', x: -1189.1, z: 6694.0, crime: 0.3, booze: 0.35 },
+  { name: 'Strathfield', x: -11831.1, z: 1359.3, crime: 0.3, booze: 0.35 },
+  { name: 'Tempe', x: -4010.0, z: 6278.0, crime: 0.3, booze: 0.35 },
+  { name: 'Botany', x: -793.1, z: 8780.6, crime: 0.3, booze: 0.3 },
+  { name: 'Rosebery', x: -329.8, z: 5528.6, crime: 0.3, booze: 0.3 },
+  { name: 'Beverly Hills', x: -11633.1, z: 9189.7, crime: 0.3, booze: 0.25 },
+  { name: 'Banksia', x: -6238.9, z: 8549.0, crime: 0.3, booze: 0.2 },
+  { name: 'Croydon Park', x: -9824.3, z: 3363.6, crime: 0.3, booze: 0.2 },
+  { name: 'Enfield', x: -10445.4, z: 2546.6, crime: 0.3, booze: 0.2 },
+  { name: 'Homebush West', x: -13224.2, z: -517.0, crime: 0.3, booze: 0.2 },
+  { name: 'Lidcombe', x: -15148.6, z: -360.2, crime: 0.3, booze: 0.2 },
+  { name: 'Matraville', x: 2412.8, z: 10511.3, crime: 0.3, booze: 0.2 },
+  { name: 'Roselands', x: -12148.5, z: 7452.0, crime: 0.3, booze: 0.2 },
+  { name: 'Clemton Park', x: -9725.3, z: 6501.4, crime: 0.3, booze: 0.15 },
+  { name: 'Chullora', x: -14892.2, z: 2900.4, crime: 0.3, booze: 0.1 },
+  { name: 'Summer Hill', x: -6650.6, z: 2846.7, crime: 0.25, booze: 0.45 },
+  { name: 'Waverley', x: 4371.5, z: 3600.6, crime: 0.25, booze: 0.4 },
+  { name: 'Brookvale', x: 5482.8, z: -11842.6, crime: 0.25, booze: 0.3 },
+  { name: 'Croydon', x: -8645.0, z: 1152.3, crime: 0.25, booze: 0.3 },
+  { name: 'Earlwood', x: -7094.5, z: 6330.0, crime: 0.25, booze: 0.3 },
+  { name: 'Monterey', x: -5460.5, z: 11546.7, crime: 0.25, booze: 0.3 },
+  { name: 'Homebush', x: -11922.0, z: -711.0, crime: 0.25, booze: 0.25 },
+  { name: 'Hurlstone Park', x: -7381.1, z: 4702.0, crime: 0.25, booze: 0.25 },
+  { name: 'Ramsgate Beach', x: -5614.5, z: 12701.8, crime: 0.25, booze: 0.25 },
+  { name: 'Wolli Creek', x: -4928.8, z: 6975.0, crime: 0.25, booze: 0.25 },
+  { name: 'Allawah', x: -8553.0, z: 11680.7, crime: 0.25, booze: 0.2 },
+  { name: 'Bexley', x: -8262.9, z: 9416.8, crime: 0.25, booze: 0.2 },
+  { name: 'Burwood Heights', x: -9709.1, z: 2464.3, crime: 0.25, booze: 0.2 },
+  { name: 'Carlton', x: -7927.1, z: 11455.9, crime: 0.25, booze: 0.2 },
+  { name: 'Eastgardens', x: 1606.5, z: 8399.0, crime: 0.25, booze: 0.2 },
+  { name: 'Kingsgrove', x: -10002.9, z: 7765.9, crime: 0.25, booze: 0.2 },
+  { name: 'Malabar', x: 3759.8, z: 10382.2, crime: 0.25, booze: 0.2 },
+  { name: 'Pagewood', x: 1119.0, z: 7775.2, crime: 0.25, booze: 0.2 },
+  { name: 'Ramsgate', x: -6188.1, z: 12746.8, crime: 0.25, booze: 0.2 },
+  { name: 'Bexley North', x: -8554.1, z: 8333.0, crime: 0.25, booze: 0.15 },
+  { name: 'Chifley', x: 2985.5, z: 11205.7, crime: 0.25, booze: 0.15 },
+  { name: 'Daceyville', x: 1584.6, z: 6643.0, crime: 0.25, booze: 0.15 },
+  { name: 'La Perouse', x: 2336.2, z: 13252.2, crime: 0.25, booze: 0.15 },
+  { name: 'Strathfield South', x: -12006.3, z: 3308.3, crime: 0.25, booze: 0.15 },
+  { name: 'Turrella', x: -6201.9, z: 6929.3, crime: 0.25, booze: 0.15 },
+  { name: 'Undercliffe', x: -6024.7, z: 6309.0, crime: 0.25, booze: 0.15 },
+  { name: 'Banksmeadow', x: 757.4, z: 9465.4, crime: 0.25, booze: 0.1 },
+  { name: 'North Bondi', x: 6275.0, z: 1395.9, crime: 0.2, booze: 0.5 },
+  { name: 'Charing Cross', x: 4156.4, z: 3418.2, crime: 0.2, booze: 0.45 },
+  { name: 'Dee Why Beach', x: 7784.9, z: -12945.4, crime: 0.2, booze: 0.4 },
+  { name: 'Six Ways', x: 5691.4, z: 2152.7, crime: 0.2, booze: 0.4 },
+  { name: 'Manly Vale', x: 5084.3, z: -9595.4, crime: 0.2, booze: 0.35 },
+  { name: 'Seven Ways', x: 5976.1, z: 1736.5, crime: 0.2, booze: 0.35 },
+  { name: 'Haberfield', x: -6467.1, z: 1294.4, crime: 0.2, booze: 0.3 },
+  { name: 'Ryde', x: -9155.2, z: -6077.3, crime: 0.2, booze: 0.3 },
+  { name: 'Eastwood', x: -11712.9, z: -8530.6, crime: 0.2, booze: 0.25 },
+  { name: 'North Strathfield', x: -11188.3, z: -905.9, crime: 0.2, booze: 0.25 },
+  { name: 'West Ryde', x: -11544.2, z: -6376.6, crime: 0.2, booze: 0.25 },
+  { name: 'Ashbury', x: -8375.6, z: 3623.1, crime: 0.2, booze: 0.15 },
+  { name: 'Bardwell Park', x: -7765.9, z: 7544.1, crime: 0.2, booze: 0.15 },
+  { name: 'Bardwell Valley', x: -7157.1, z: 7743.3, crime: 0.2, booze: 0.15 },
+  { name: 'Kyeemagh', x: -4332.6, z: 8997.7, crime: 0.2, booze: 0.1 },
+  { name: 'Phillip Bay', x: 2376.8, z: 12159.9, crime: 0.2, booze: 0.1 },
+  { name: 'Port Botany', x: 992.7, z: 11593.6, crime: 0.2, booze: 0.05 },
+  { name: 'St Leonards', x: -1659.0, z: -5099.7, crime: 0.15, booze: 0.45 },
+  { name: 'Bronte', x: 5105.9, z: 3840.6, crime: 0.15, booze: 0.4 },
+  { name: 'Clovelly', x: 4938.0, z: 4778.2, crime: 0.15, booze: 0.4 },
+  { name: 'Freshwater', x: 6781.5, z: -10509.5, crime: 0.15, booze: 0.4 },
+  { name: 'Five Dock', x: -7425.8, z: 154.7, crime: 0.15, booze: 0.3 },
+  { name: 'Gladesville', x: -7753.4, z: -4443.4, crime: 0.15, booze: 0.3 },
+  { name: 'Queenscliff', x: 6880.1, z: -9702.2, crime: 0.15, booze: 0.3 },
+  { name: 'Sydney Olympic Park', x: -12705.7, z: -2643.1, crime: 0.15, booze: 0.3 },
+  { name: 'Macquarie Park', x: -7912.3, z: -9543.9, crime: 0.15, booze: 0.25 },
+  { name: 'Rhodes', x: -11362.6, z: -4204.0, crime: 0.15, booze: 0.25 },
+  { name: 'South Coogee', x: 4250.6, z: 6960.3, crime: 0.15, booze: 0.25 },
+  { name: 'Concord West', x: -10898.7, z: -2647.4, crime: 0.15, booze: 0.2 },
+  { name: 'Dolls Point', x: -5723.7, z: 13947.4, crime: 0.15, booze: 0.2 },
+  { name: 'Meadowbank', x: -11287.7, z: -5487.8, crime: 0.15, booze: 0.2 },
+  { name: 'North Manly', x: 5503.2, z: -10731.7, crime: 0.15, booze: 0.2 },
+  { name: 'North Ryde', x: -7728.9, z: -7766.6, crime: 0.15, booze: 0.2 },
+  { name: 'Wentworth Point', x: -12285.5, z: -4426.8, crime: 0.15, booze: 0.2 },
+  { name: 'Beverley Park', x: -6963.1, z: 12326.7, crime: 0.15, booze: 0.15 },
+  { name: 'Ermington', x: -13929.1, z: -6257.5, crime: 0.15, booze: 0.15 },
+  { name: 'Kogarah Bay', x: -7664.8, z: 12659.0, crime: 0.15, booze: 0.15 },
+  { name: 'Little Bay', x: 3707.7, z: 12652.0, crime: 0.15, booze: 0.15 },
+  { name: 'Marsfield', x: -10001.0, z: -9916.1, crime: 0.15, booze: 0.15 },
+  { name: 'Balgowlah', x: 4963.4, z: -8342.3, crime: 0.12, booze: 0.3 },
+  { name: 'Drummoyne', x: -5177.8, z: -1764.5, crime: 0.12, booze: 0.3 },
+  { name: 'Lane Cove', x: -3749.5, z: -5939.4, crime: 0.12, booze: 0.3 },
+  { name: 'Tamarama', x: 5770.5, z: 3222.9, crime: 0.12, booze: 0.3 },
+  { name: 'Concord', x: -9511.9, z: -1285.9, crime: 0.12, booze: 0.25 },
+  { name: 'Curl Curl', x: 7266.0, z: -11101.5, crime: 0.12, booze: 0.25 },
+  { name: 'Willoughby', x: -1039.7, z: -6826.0, crime: 0.12, booze: 0.25 },
+  { name: 'Artarmon', x: -2411.4, z: -6657.3, crime: 0.12, booze: 0.2 },
+  { name: 'Chatswood North', x: -2863.4, z: -8816.6, crime: 0.12, booze: 0.15 },
+  { name: 'Chatswood West', x: -4732.0, z: -7991.9, crime: 0.12, booze: 0.15 },
+  { name: 'East Ryde', x: -6956.2, z: -6432.3, crime: 0.12, booze: 0.15 },
+  { name: 'Narraweena', x: 5779.1, z: -13253.9, crime: 0.12, booze: 0.15 },
+  { name: 'Melrose Park', x: -12689.4, z: -5700.8, crime: 0.12, booze: 0.1 },
+  { name: 'Ben Buckler', x: 6970.2, z: 2401.0, crime: 0.1, booze: 0.25 },
+  { name: 'Canada Bay', x: -8717.5, z: -302.4, crime: 0.1, booze: 0.2 },
+  { name: 'Fairlight', x: 6103.6, z: -8185.1, crime: 0.1, booze: 0.2 },
+  { name: 'Lane Cove North', x: -4389.2, z: -6948.1, crime: 0.1, booze: 0.2 },
+  { name: 'Naremburn', x: -847.4, z: -5701.0, crime: 0.1, booze: 0.2 },
+  { name: 'North Curl Curl', x: 7314.5, z: -11860.4, crime: 0.1, booze: 0.2 },
+  { name: 'Allambie', x: 4459.6, z: -10667.2, crime: 0.1, booze: 0.15 },
+  { name: 'Beacon Hill', x: 4478.4, z: -13056.8, crime: 0.1, booze: 0.15 },
+  { name: 'Frenchs Forest', x: 1617.1, z: -13428.6, crime: 0.1, booze: 0.15 },
+  { name: 'Gore Hill', x: -2404.6, z: -5925.9, crime: 0.1, booze: 0.15 },
+  { name: 'Lane Cove West', x: -5591.9, z: -6208.6, crime: 0.1, booze: 0.15 },
+  { name: 'Mortlake', x: -9602.5, z: -2907.3, crime: 0.1, booze: 0.15 },
+  { name: 'Newington', x: -14265.9, z: -3575.9, crime: 0.1, booze: 0.15 },
+  { name: 'North Willoughby', x: -1055.9, z: -8250.6, crime: 0.1, booze: 0.15 },
+  { name: 'Wareemba', x: -7178.1, z: -1125.8, crime: 0.1, booze: 0.15 },
+  { name: 'Willoughby East', x: -429.7, z: -7716.9, crime: 0.1, booze: 0.15 },
+  { name: 'Wingala', x: 7223.5, z: -12001.5, crime: 0.1, booze: 0.15 },
+  { name: 'Allambie Heights', x: 3619.4, z: -11531.6, crime: 0.1, booze: 0.12 },
+  { name: 'Denistone', x: -11300.5, z: -7550.2, crime: 0.1, booze: 0.1 },
+  { name: 'Denistone East', x: -10418.1, z: -7857.4, crime: 0.1, booze: 0.1 },
+  { name: 'Denistone West', x: -12402.1, z: -7344.7, crime: 0.1, booze: 0.1 },
+  { name: 'Liberty Grove', x: -11658.2, z: -2830.6, crime: 0.1, booze: 0.1 },
+  { name: 'Midway', x: -10052.6, z: -7940.5, crime: 0.1, booze: 0.1 },
+  { name: 'Spit Junction', x: 2840.4, z: -4961.3, crime: 0.08, booze: 0.2 },
+  { name: 'Abbotsford', x: -7395.0, z: -1892.5, crime: 0.08, booze: 0.15 },
+  { name: 'Cabarita', x: -8684.6, z: -2207.3, crime: 0.08, booze: 0.15 },
+  { name: 'Forestville', x: 330.3, z: -11843.1, crime: 0.08, booze: 0.15 },
+  { name: 'North Balgowlah', x: 3680.3, z: -9010.1, crime: 0.08, booze: 0.15 },
+  { name: 'Russell Lea', x: -6283.3, z: -1027.1, crime: 0.08, booze: 0.12 },
+  { name: 'Red Hill', x: 4276.4, z: -13725.7, crime: 0.08, booze: 0.1 },
+  { name: 'Chiswick', x: -6645.2, z: -1985.9, crime: 0.07, booze: 0.12 },
+  { name: 'Putney', x: -9604.3, z: -4568.4, crime: 0.07, booze: 0.12 },
+  { name: 'Rodd Point', x: -6085.3, z: -220.8, crime: 0.07, booze: 0.12 },
+  { name: 'Watsons Bay', x: 6731.0, z: -2946.4, crime: 0.06, booze: 0.25 },
+  { name: 'Hunters Hill', x: -6023.7, z: -3796.1, crime: 0.06, booze: 0.15 },
+  { name: 'Northbridge', x: 647.7, z: -6410.6, crime: 0.06, booze: 0.15 },
+  { name: 'Balgowlah Heights', x: 5037.2, z: -6886.8, crime: 0.06, booze: 0.12 },
+  { name: 'Gordon', x: -5544.1, z: -12482.7, crime: 0.06, booze: 0.12 },
+  { name: 'North Harbour', x: 6866.6, z: -6062.7, crime: 0.06, booze: 0.12 },
+  { name: 'Roseville', x: -3075.4, z: -9292.4, crime: 0.06, booze: 0.12 },
+  { name: 'Seaforth', x: 2972.9, z: -8672.7, crime: 0.06, booze: 0.12 },
+  { name: 'Breakfast Point', x: -9137.8, z: -2778.8, crime: 0.06, booze: 0.1 },
+  { name: 'Henley', x: -6830.6, z: -2809.3, crime: 0.06, booze: 0.1 },
+  { name: 'Jamieson Square', x: 494.3, z: -11960.4, crime: 0.06, booze: 0.1 },
+  { name: 'Riverview', x: -4649.8, z: -4975.6, crime: 0.06, booze: 0.1 },
+  { name: 'Tennyson Point', x: -8619.6, z: -3996.9, crime: 0.06, booze: 0.1 },
+  { name: 'Crimson Hill', x: -4595.6, z: -8915.9, crime: 0.06, booze: 0.08 },
+  { name: 'Fullers Bridge', x: -5523.4, z: -7719.2, crime: 0.06, booze: 0.08 },
+  { name: 'Balmoral', x: 3797.8, z: -4184.5, crime: 0.05, booze: 0.15 },
+  { name: 'Lindfield', x: -3924.2, z: -10258.8, crime: 0.05, booze: 0.12 },
+  { name: 'Castle Cove', x: 305.9, z: -9131.6, crime: 0.05, booze: 0.1 },
+  { name: 'Castlecrag', x: 838.1, z: -7608.1, crime: 0.05, booze: 0.1 },
+  { name: 'Clontarf', x: 4021.7, z: -7023.0, crime: 0.05, booze: 0.1 },
+  { name: 'Davidson', x: -1645.6, z: -14274.6, crime: 0.05, booze: 0.1 },
+  { name: 'Dover Heights', x: 6645.7, z: 461.5, crime: 0.05, booze: 0.1 },
+  { name: 'East Killara', x: -3287.0, z: -12673.4, crime: 0.05, booze: 0.1 },
+  { name: 'East Lindfield', x: -2217.7, z: -11207.5, crime: 0.05, booze: 0.1 },
+  { name: 'Huntleys Cove', x: -6703.2, z: -3260.6, crime: 0.05, booze: 0.1 },
+  { name: 'Huntleys Point', x: -6083.5, z: -3117.8, crime: 0.05, booze: 0.1 },
+  { name: 'Killara', x: -4753.9, z: -11313.1, crime: 0.05, booze: 0.1 },
+  { name: 'Killarney Heights', x: 635.4, z: -10402.5, crime: 0.05, booze: 0.1 },
+  { name: 'Linley Point', x: -5568.6, z: -4513.7, crime: 0.05, booze: 0.1 },
+  { name: 'Longueville', x: -3842.3, z: -4328.9, crime: 0.05, booze: 0.1 },
+  { name: 'Middle Cove', x: 33.6, z: -8431.3, crime: 0.05, booze: 0.1 },
+  { name: 'Northwood', x: -2950.8, z: -4478.1, crime: 0.05, booze: 0.1 },
+  { name: 'Pymble', x: -6429.9, z: -13617.3, crime: 0.05, booze: 0.1 },
+  { name: 'Roseville Chase', x: -1017.1, z: -10418.3, crime: 0.05, booze: 0.1 },
+  { name: 'Vaucluse', x: 6155.5, z: -1541.0, crime: 0.05, booze: 0.1 },
+  { name: 'West Pymble', x: -7369.7, z: -11418.7, crime: 0.05, booze: 0.1 },
+  { name: 'Bantry Bay', x: 1742.5, z: -12271.9, crime: 0.05, booze: 0.08 },
+  { name: 'Barra Brui', x: -4078.9, z: -13291.6, crime: 0.05, booze: 0.08 },
+  { name: 'Oxford Falls', x: 2944.1, z: -14659.8, crime: 0.05, booze: 0.08 },
+  // The two `place=town` centres in the ring, on the frozen block's own
+  // precedent: `Sydney` and `North Sydney` are a `city` and a `town` node and
+  // are in the table because a reader would not accept a Sydney with no
+  // Sydney in it. Chatswood and Manly are the same argument out here -- each
+  // has its own command in `POLICE_STATIONS`, and the `suburb` extract has
+  // neither, only their fringes (Chatswood North, Chatswood West, Fairlight).
+  { name: 'Manly', x: 7146.6, z: -8064.7, crime: 0.25, booze: 0.6 },
+  { name: 'Chatswood', x: -2719.4, z: -7946.2, crime: 0.25, booze: 0.45 },
 ];
 
-/** The extent both tables were extracted inside. `verifyStreetlife` asserts it. */
-export const STREET_EXTENT_M = 5300;
+/**
+ * The extent both tables were extracted inside. `verifyStreetlife` asserts it.
+ */
+export const STREET_EXTENT_M = 15300;
+
+/**
+ * The extent the frozen prefix of each table was baked inside, and how long that
+ * prefix is.
+ *
+ * The invariance contract in three numbers. Rows `[0, SUBURB_INNER_COUNT)` of
+ * `SUBURBS` and venues `[0, VENUE_INNER_COUNT)` of `VENUE_XZ` are the 5,300 m
+ * bake, unchanged and in their original order, so every seed, index, key and
+ * count derived from them is unchanged too. `verifyStreetlife` asserts the
+ * prefix is still inside the ring it came from.
+ */
+export const STREET_INNER_EXTENT_M = 5300;
+export const SUBURB_INNER_COUNT = 59;
+export const VENUE_INNER_COUNT = 422;
 
 /**
  * Every `amenity=pub|bar|biergarten` in the extent, as flat integer x, z pairs.
  *
  * **Packed rather than records**, and it is the one place this file departs
- * from `POLICE_STATIONS`' shape. Nineteen stations with names is a table a
- * reader can check by eye; four hundred and twenty-two named venues is five
- * pages nobody reads, and the names are not used for anything -- a drunk does
- * not know which pub they came out of. Metres, rounded: a pub's front door is
+ * from `POLICE_STATIONS`' shape. Forty-three stations with names is a table a
+ * reader can check by eye; six hundred and eleven named venues is seven pages
+ * nobody reads, and the names are not used for anything -- a drunk does not
+ * know which pub they came out of. Metres, rounded: a pub's front door is
  * not a surveyed point and the loiterer is placed on the nearest footpath in
  * any case.
  *
@@ -343,6 +607,37 @@ export const VENUE_XZ: readonly number[] = [
   -3340, 3392, -851, -4695, 1717, -4477, 1782, -4472, -3405, 3408, -3449, 3425, -2569, 4156, -4405, 2225,
   -3509, 3477, -4129, 2798, -850, -4948, -4821, 1497, 1500, 4846, -4584, 2180, -4840, 1548, -1141, -4961,
   -1813, 4843, 3199, -4107, -3285, 4048, -4727, 2209, -1388, -5052, -1352, -5089,
+  // --- The 5,300 - 15,300 m middle ring: 189 more, appended. Everything above
+  // is the inner-ring bake at its original indices; see `VENUE_INNER_COUNT`.
+  4142, 3428, -508, 5371, -5102, -1839, 4164, 3484, -3732, 3990, 3124, -4542, -1507, 5311,
+  1719, 5261, -3783, 4048, -4560, 3164, -3037, 4658, 5606, 32, 3599, 4352, -4905, 2816,
+  2722, -4995, -3990, 4077, -5437, 1823, 3160, 4810, -4983, 2946, 3130, 4886, -4049, 4223,
+  -4064, 4334, -1073, 5880, -3314, 4993, -4366, 4106, -158, 6015, 1736, 5772, -5924, -1215,
+  -4204, 4367, -5193, 3193, -3125, 5266, 5805, 1973, 5757, 2149, 5898, 1846, 5538, 2793,
+  -5740, 2474, 3107, 5443, -5391, 3228, 5871, 2257, -4235, 4672, -4040, 4855, 42, -6334,
+  1841, 6078, -4107, 4853, -1909, 6075, 5935, 2466, -2271, -6022, 5998, 2393, 6066, 2256,
+  6103, 2197, -3877, 5220, 3250, 5672, 6156, 2210, -4057, 5184, -4396, 4917, -4623, 4796,
+  -4679, 4773, -4599, 4852, -4636, 4830, -4924, 4629, -4822, 4748, -4898, 4776, -1065, -6813,
+  -6541, 2514, -1284, 6905, -4993, 4941, -6531, 2698, -3686, -6084, 5219, 4840, -6008, 3886,
+  -3745, -6146, 4458, 5705, -6128, 3967, 6708, -2981, -7351, 188, -7362, 256, -7399, 32,
+  6850, -2846, -2939, -7001, -7712, 568, -2798, 7323, -4531, 6512, -2649, 7548, -7657, 2466,
+  -7751, 2316, -6980, 4171, -1238, -8060, -7849, 2318, -3890, 7348, -2833, -7856, -3507, 7590,
+  -3572, 7596, -3714, 7536, -3681, 7563, -2716, -7973, -3625, 7608, -1357, -8355, -1070, 8405,
+  -2834, -7997, -3594, 7737, -2720, -8093, -4568, 7223, -3844, 7678, -1357, 8525, -7727, -3859,
+  -1195, 8585, -3887, 7794, -3872, 7918, -3921, 7931, -3954, 7940, -629, 9295, -5530, 7566,
+  -8194, 4965, 4514, 8500, -9639, 200, -9761, 1061, -9779, 1143, 3949, 9090, -9451, 3184,
+  -7646, 6519, 291, 10071, 581, 10157, -9940, 2241, 6530, -7841, 2178, 10080, 6868, -7702,
+  6863, -7747, 6896, -7730, 6884, -7806, -10551, 493, 6978, -7962, 6970, -8039, -10673, 731,
+  7073, -8044, 7045, -8074, 7187, -7967, -9693, 4644, 7114, -8089, -9665, 4826, 7120, -8126,
+  -9886, 4880, -10833, 2374, -11212, -474, -9768, -5560, 5792, -9632, -9631, -5875,
+  -6387, 9319, -4771, 10295, -4763, 10375, -7234, -8863, -11448, -184, -8567, 7847,
+  -11621, 2779, 7088, -9907, -11554, 3952, 6894, -10080, -11057, 5631, -12591, -789,
+  -6888, 10712, -12724, -743, -5170, -11668, -9751, 8251, -9813, 8183, -12156, -4621,
+  -12875, -2201, 5538, -11839, -11236, -6682, -9138, -9529, -11463, -6635, -13156, -2091,
+  -13253, -2182, 5784, -12145, -7645, 11223, -9053, -10451, -8595, 11391, -5901, 13093,
+  6701, -12735, -6552, 12933, -11836, -8430, -9597, 10973, -9476, 11117, -11947, -8454,
+  -9740, 10986, -9778, 10957, -11682, 9248, -14587, 3371, 684, -15064, 7845, -12913,
+  -15278, -378,
 ];
 
 export const VENUE_COUNT = VENUE_XZ.length / 2;
@@ -434,7 +729,7 @@ export function venueSeed(venue: number): number {
  * three pubs in Greenwich, so Greenwich has a drunk about as often as it should.
  *
  * Computed once at module load into `VENUE_DRUNKS` rather than per query,
- * because the nearest-suburb search behind it is 58 distance tests and the
+ * because the nearest-suburb search behind it is 255 distance tests and the
  * answer is a constant -- both tables are frozen at compile time. Deterministic
  * for the same reason: integer hashes and comparisons over literal numbers,
  * evaluated identically by JavaScriptCore and V8.
@@ -1864,8 +2159,46 @@ export function verifyStreetlife(): string[] {
   const failures: string[] = [];
 
   // --- The two tables, against the extent they were extracted inside.
-  if (SUBURBS.length < 20) {
-    failures.push(`Only ${SUBURBS.length} suburbs are baked; the crime table is meant to cover the extent.`);
+  if (SUBURBS.length <= SUBURB_INNER_COUNT) {
+    failures.push(
+      `Only ${SUBURBS.length} suburbs are baked and the frozen inner ring is ${SUBURB_INNER_COUNT} of them; ` +
+        'the crime table is meant to cover the extent, and the middle ring would carry nobody.',
+    );
+  }
+  if (VENUE_COUNT <= VENUE_INNER_COUNT) {
+    failures.push(
+      `Only ${VENUE_COUNT} venues are baked and the frozen inner ring is ${VENUE_INNER_COUNT} of them; ` +
+        'every pub outside the old ring would have nobody outside it.',
+    );
+  }
+  // --- The frozen prefixes, from the other end.
+  //
+  // The inner ring's invariance is not a comment, it is these two loops. A row
+  // inserted into or reordered inside either prefix changes `suburbSeed`'s
+  // neighbours, `streetKey`'s anchor index and `VENUE_DRUNKS`' whole array --
+  // none of which is visible from the table and all of which a player in
+  // Newtown would see. Every frozen row is still inside the ring it was baked
+  // in; anything past the prefix is the middle ring and is allowed out there.
+  for (let i = 0; i < SUBURB_INNER_COUNT && i < SUBURBS.length; i++) {
+    const s = SUBURBS[i];
+    const d = Math.sqrt(s.x * s.x + s.z * s.z);
+    if (d > STREET_INNER_EXTENT_M) {
+      failures.push(
+        `Row ${i} of the frozen suburb block is ${s.name} at ${d.toFixed(0)} m, outside the ` +
+          `${STREET_INNER_EXTENT_M} m bake it came from. The block has been reordered.`,
+      );
+    }
+  }
+  for (let v = 0; v < VENUE_INNER_COUNT && v < VENUE_COUNT; v++) {
+    const x = VENUE_XZ[v * 2];
+    const z = VENUE_XZ[v * 2 + 1];
+    if (x * x + z * z > STREET_INNER_EXTENT_M * STREET_INNER_EXTENT_M) {
+      failures.push(
+        `Venue ${v} is at (${x}, ${z}), outside the ${STREET_INNER_EXTENT_M} m ring the frozen block was ` +
+          'baked in. The packed table has been reordered and every drunk in the inner city has moved.',
+      );
+      break;
+    }
   }
   const names = new Set<string>();
   for (const s of SUBURBS) {

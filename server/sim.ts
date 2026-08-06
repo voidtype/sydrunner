@@ -1900,7 +1900,7 @@ export function verifySim(): string[] {
   // last-known-height fallback exists for -- so this check also covers the
   // branch that carries a player over the harbour.
   const world: ServerWorld = {
-    index: { stage: 'test', tile_size: 500, terrain: { grid: 16, datum_ahd: 0, sea_level_y: 0 }, tiles: [] },
+    index: { stage: 'test', radius_m: 0, tile_size: 500, terrain: { grid: 16, datum_ahd: 0, sea_level_y: 0 }, tiles: [] },
     collision: new CollisionWorld(),
     terrain: new TerrainField(16, 500, ''),
     // A dry city, on the same terms as the empty one around it: `WaterLevels`

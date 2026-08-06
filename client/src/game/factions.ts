@@ -173,14 +173,32 @@ import { EYE_HEIGHT } from '../player/controller.ts';
  * same file the world was built from, stamp 1785746290 -- by a read-only scratch
  * script that projected each feature's centroid through `sydney.geo.lonlat_to_enu`
  * and `enu_to_world`, which is the identical path every building in the city took
- * to reach its tile. Nineteen features inside 5,300 m, every one of them on a
+ * to reach its tile. Forty-three features inside 15,300 m, every one of them on a
  * built tile, verified by `verifyPolice`.
  *
  * It is a table here rather than a sidecar for the reason `game/bikes.TUNING_X`
- * is two numbers rather than a file: nineteen records is 800 bytes, the pipeline
- * is not to be rebuilt, and a sidecar would be a fetch, a decoder, a version
- * word and a failure mode -- all to avoid typing coordinates that cannot change
- * without the world changing.
+ * is two numbers rather than a file: forty-three records is under 2 kB, the
+ * pipeline is not to be rebuilt, and a sidecar would be a fetch, a decoder, a
+ * version word and a failure mode -- all to avoid typing coordinates that cannot
+ * change without the world changing.
+ *
+ * ---------------------------------------------------------------------------
+ * **Two blocks, and the split is load-bearing rather than cosmetic.**
+ *
+ * The first nineteen rows are the 5,300 m inner-ring bake, *frozen*: same rows,
+ * same order, same coordinates, same weights. Everything a station decides --
+ * `beatPairs`, `catchment`, `stationSeed`, and the order `forEachPoliceNear`
+ * walks -- is a function of the row and its index, so freezing the block freezes
+ * every officer a player already meets. The re-extract at 15,300 m returns those
+ * nineteen byte-for-byte and adds twenty-four more; the twenty-four are appended
+ * after them and nothing above them moves. `verifyPolice` asserts the frozen
+ * prefix from the other end so a careless re-sort cannot pass.
+ *
+ * The dedupe is 30 m, `streetlife.VENUE_XZ`'s, and it folds exactly two pairs:
+ * Marrickville and Kogarah are each mapped as two overlapping outlines 10-11 m
+ * apart. Nothing in the inner ring is within 30 m of anything else -- the
+ * closest pair is Surry Hills and the Sydney Police Centre at 55 m, which are
+ * genuinely two buildings -- so the dedupe cannot touch the frozen block.
  *
  * ---------------------------------------------------------------------------
  * `weight` is **stylised, not statistical**, and saying so is the point.
@@ -198,6 +216,28 @@ import { EYE_HEIGHT } from '../player/controller.ts';
  * The weight drives two things and nothing else: how many pairs walk a beat
  * (`beatPairs`) and how far the beat reaches (`catchment`). A station at 1.0 is
  * three pairs over 900 m; one at 0.15 is one pair over 645 m.
+ *
+ * The middle ring extends the same ladder outward rather than inventing a second
+ * one, and the ladder is worth writing down now that it has forty-three rungs
+ * instead of nineteen:
+ *
+ *   - **1.00 - 0.55** the CBD and the Cross. Nothing outside the inner ring gets
+ *     near this, and the check below asserts that from the other end: the
+ *     heaviest beat has to be within 2 km of Town Hall.
+ *   - **0.45 - 0.35** a district command on a real high street -- Bondi,
+ *     Randwick, Marrickville, Chatswood, Burwood, Ashfield, Campsie, Hurstville,
+ *     Kogarah, Manly. These are the outer ring's Newtowns.
+ *   - **0.30 - 0.20** suburban and specialist commands: Maroubra, Mascot,
+ *     Strathfield, Ryde, Dee Why, the airport's federal detachment, and the
+ *     quieter shopfronts at Five Dock, Gladesville, Earlwood, Eastwood and the
+ *     unsigned one in Petersham.
+ *   - **0.15 - 0.10** the leafy north and the campus post. Frenchs Forest and
+ *     Gordon sit where Mosman sits, which is the point of them.
+ *
+ * `Macquarie University` is `amenity=police` with `operator=NSW Police Force` --
+ * a campus shopfront rather than a command. It is in the table because the
+ * provenance line above says *every* `amenity=police` and an editorial exception
+ * would quietly make that false; it is at 0.1 because it is a desk.
  */
 export interface PoliceStation {
   readonly name: string;
@@ -208,7 +248,37 @@ export interface PoliceStation {
   readonly weight: number;
 }
 
-export const POLICE_STATIONS: readonly PoliceStation[] = [
+/**
+ * A row as it is *written*, with the weight optional.
+ *
+ * The optionality is the whole reason this type exists. A station is a real
+ * feature whether or not anybody has had an opinion about how busy it is, and
+ * the failure mode of a required field is that the next person to append a row
+ * -- a stage-3 outer-ring bake, most likely -- either leaves it out and gets
+ * `undefined` propagated into `beatPairs`, or types `0` and gets a command with
+ * no officers, no catchment and no error. `STATION_WEIGHT_DEFAULT` is the third
+ * answer: a quiet-but-real command. Every row below does carry a weight; this is
+ * here so the one that does not still works.
+ */
+interface PoliceStationSpec {
+  readonly name: string;
+  readonly x: number;
+  readonly z: number;
+  readonly weight?: number;
+}
+
+/**
+ * What an unweighted station gets. A quiet suburban command, not a silent one.
+ *
+ * 0.2 rather than the table's 0.1 floor because a default is a statement that
+ * nobody has looked yet, and the safe direction to be wrong in is "there are
+ * some police here".
+ */
+export const STATION_WEIGHT_DEFAULT = 0.2;
+
+const STATION_SPECS: readonly PoliceStationSpec[] = [
+  // --- The 5,300 m inner ring. FROZEN: see the header. Do not reorder, do not
+  // retune, do not insert. Anything new goes in the block below.
   { name: 'Day Street', x: -486.8, z: 740.3, weight: 1.0 },
   { name: 'Kings Cross', x: 1512.7, z: 452.6, weight: 0.95 },
   { name: 'Surry Hills', x: 416.6, z: 1204.6, weight: 0.85 },
@@ -228,10 +298,61 @@ export const POLICE_STATIONS: readonly PoliceStation[] = [
   { name: 'Water Police', x: -1647.8, z: -1054.5, weight: 0.25 },
   { name: 'Rose Bay', x: 4015.3, z: 44.4, weight: 0.2 },
   { name: 'Mosman', x: 3165.2, z: -4055.6, weight: 0.15 },
+  // --- The 5,300 - 15,300 m middle ring. Twenty-four more, sorted by weight so
+  // the block reads like the one above it.
+  { name: 'Bondi', x: 6012.6, z: 2261.9, weight: 0.45 },
+  { name: 'Randwick', x: 3021.9, z: 4835.1, weight: 0.4 },
+  { name: 'Marrickville', x: -4876.0, z: 4570.9, weight: 0.4 },
+  { name: 'Chatswood', x: -2264.7, z: -7948.7, weight: 0.35 },
+  { name: 'Burwood', x: -9627.9, z: 1290.6, weight: 0.35 },
+  { name: 'Ashfield', x: -7259.3, z: 2587.1, weight: 0.35 },
+  { name: 'Campsie', x: -10173.4, z: 4863.4, weight: 0.35 },
+  { name: 'Hurstville', x: -9767.1, z: 11132.0, weight: 0.35 },
+  { name: 'Kogarah', x: -6795.5, z: 10659.5, weight: 0.35 },
+  { name: 'Manly', x: 6881.3, z: -7998.3, weight: 0.35 },
+  { name: 'Maroubra', x: 2709.9, z: 7973.2, weight: 0.3 },
+  { name: 'Mascot', x: -1126.4, z: 6204.4, weight: 0.3 },
+  { name: 'Strathfield', x: -10673.1, z: 641.3, weight: 0.3 },
+  { name: 'Ryde', x: -10234.3, z: -5706.6, weight: 0.3 },
+  { name: 'Dee Why', x: 6821.3, z: -13025.8, weight: 0.25 },
+  { name: 'Airport Federal Police', x: -3939.1, z: 7455.3, weight: 0.25 },
+  { name: 'Five Dock', x: -7493.9, z: 32.8, weight: 0.2 },
+  { name: 'Gladesville', x: -7487.3, z: -3420.9, weight: 0.2 },
+  { name: 'Earlwood', x: -7631.9, z: 6421.8, weight: 0.2 },
+  { name: 'Eastwood', x: -11778.3, z: -8522.1, weight: 0.2 },
+  { name: 'Petersham', x: -4834.0, z: 3097.6, weight: 0.2 },
+  { name: 'Frenchs Forest', x: 1541.0, z: -13260.7, weight: 0.15 },
+  { name: 'Gordon', x: -5486.6, z: -12629.9, weight: 0.15 },
+  { name: 'Macquarie University', x: -9082.4, z: -10108.1, weight: 0.1 },
 ];
 
+/**
+ * The table, with every row's weight resolved.
+ *
+ * Normalised once at module load rather than at every read, so `patrolWeight`'s
+ * inner loop stays four flops and a compare and nothing on a hot path pays for
+ * the optionality above.
+ */
+export const POLICE_STATIONS: readonly PoliceStation[] = STATION_SPECS.map((s) => ({
+  name: s.name,
+  x: s.x,
+  z: s.z,
+  weight: s.weight ?? STATION_WEIGHT_DEFAULT,
+}));
+
 /** The extent the stations were extracted inside. `verifyPolice` asserts it. */
-export const STATION_EXTENT_M = 5300;
+export const STATION_EXTENT_M = 15300;
+
+/**
+ * The extent the frozen prefix was extracted inside, and how many rows it is.
+ *
+ * Exported because the invariance is the point: the first `STATION_INNER_COUNT`
+ * rows are the 5,300 m bake and every one of them is inside
+ * `STATION_INNER_EXTENT_M`, which is what lets a check assert "the inner ring
+ * did not move" without carrying a second copy of the table to diff against.
+ */
+export const STATION_INNER_EXTENT_M = 5300;
+export const STATION_INNER_COUNT = 19;
 
 /**
  * How far a station's beat reaches, metres, at weight 0 and at weight 1.
@@ -998,8 +1119,8 @@ function catchmentBands(field: PedestrianField, station: PoliceStation, out: Ped
   // is filled by a widening search above rather than by one fixed radius.
   //
   // What the rescue cannot do is invent coverage where there is no station, and
-  // nineteen discs of 300-520 m over a city of 5,300 m radius leaves most of it
-  // outside every one of them. That is `forEachPatrolNear`'s job, not this one's.
+  // forty-three discs of 300-520 m over a city of 15,300 m radius leaves most of
+  // it outside every one of them. That is `forEachPatrolNear`'s job, not this one's.
   const score = (b: PedBand): number => {
     // Closest approach of the band's own bounds to the station, so a long street
     // that runs past the front door is not judged by where its far end is.
@@ -1044,8 +1165,10 @@ const BEAT_BAND_POOL = 12;
  * other beat in the city is further.
  *
  * That is not a tuning failure, it is a *shape* failure. Nineteen stations with
- * catchments of 300-520 m cover about 11 km^2 of a city that is 88 km^2, so
- * seven eighths of the map has no police in it at all -- and the eighth that
+ * catchments of 300-520 m covered about 11 km^2 of a city that was 88 km^2, so
+ * seven eighths of the map had no police in it at all -- and the middle ring did
+ * not change the ratio, it scaled it: forty-three stations cover about 24 km^2
+ * of a city that is now 735 km^2, which is worse -- and the eighth that
  * does is the eighth a player who spawned in the CBD would have walked anyway.
  * Widening the catchments does not fix it either: a beat spread over a kilometre
  * is a beat you never meet, which is the argument `CATCHMENT_MIN` already lost
@@ -1071,7 +1194,7 @@ const BEAT_BAND_POOL = 12;
  * `catchmentBands` scores by expected distance and clips to the nearest dozen
  * streets. A patrol is the opposite claim: two officers walking a stretch of
  * arterial between commands, belonging to no door in particular. Modelling that
- * as a fake station would have meant inventing nineteen more `POLICE_STATIONS`
+ * as a fake station would have meant inventing a hundred more `POLICE_STATIONS`
  * rows that no OSM feature backs, and `POLICE_STATIONS`' own header is explicit
  * that its coordinates are data and only its weights are taste.
  *
@@ -1243,9 +1366,58 @@ export function patrolCentre(c: number): number {
  *
  * No `Math.hypot`; see the header's rule 5.
  */
+/**
+ * Which stations can possibly reach a point, without walking the whole table.
+ *
+ * **A broadphase, added when the table went from 19 rows to 43.** `patrolWeight`
+ * is read by `policeLiveried` for one car in twelve every frame, and the loop it
+ * used to be measured 0.08 us at 19 stations and 0.51 us at 43 -- six times
+ * worse for two and a bit times the rows, because the middle ring also put more
+ * of them *within* `PATROL_INFLUENCE` and therefore under a square root. A
+ * stage-3 bake would carry on in the same direction.
+ *
+ * A station is registered in every cell its influence disc's bounding box
+ * overlaps, and the cell is `PATROL_INFLUENCE` itself, so a point can only be
+ * reached by stations registered in the point's own cell -- one map lookup, no
+ * neighbourhood walk. Nine cells a station, forty-three stations, built once.
+ *
+ * **Bit-identical, not merely equivalent**, which is the reason the buckets are
+ * built in ascending table order and read in it. Floating-point addition is not
+ * associative: the same terms summed in a different order give a different last
+ * bit, and `patrolWeight` feeds a rounding in `patrolPairs` and a comparison in
+ * `policeLiveried`, so a last bit is a pair of officers appearing in one process
+ * and not the other. The stations this skips contributed exactly nothing -- the
+ * old loop's `continue` -- so the sum is the same sum, term for term.
+ */
+const PATROL_GRID = (() => {
+  const grid = new Map<number, number[]>();
+  for (let i = 0; i < POLICE_STATIONS.length; i++) {
+    const s = POLICE_STATIONS[i];
+    const x0 = Math.floor((s.x - PATROL_INFLUENCE) / PATROL_INFLUENCE);
+    const x1 = Math.floor((s.x + PATROL_INFLUENCE) / PATROL_INFLUENCE);
+    const z0 = Math.floor((s.z - PATROL_INFLUENCE) / PATROL_INFLUENCE);
+    const z1 = Math.floor((s.z + PATROL_INFLUENCE) / PATROL_INFLUENCE);
+    for (let cx = x0; cx <= x1; cx++) {
+      for (let cz = z0; cz <= z1; cz++) {
+        const key = ((cx | 0) << 16) ^ (cz & 0xffff);
+        const cell = grid.get(key);
+        if (cell === undefined) grid.set(key, [i]);
+        else cell.push(i);
+      }
+    }
+  }
+  return grid;
+})();
+
+const PATROL_GRID_EMPTY: readonly number[] = [];
+
 export function patrolWeight(x: number, z: number): number {
+  const cx = Math.floor(x / PATROL_INFLUENCE) | 0;
+  const cz = Math.floor(z / PATROL_INFLUENCE) | 0;
+  const near = PATROL_GRID.get(((cx | 0) << 16) ^ (cz & 0xffff)) ?? PATROL_GRID_EMPTY;
   let f = 0;
-  for (const s of POLICE_STATIONS) {
+  for (let i = 0; i < near.length; i++) {
+    const s = POLICE_STATIONS[near[i]];
     const dx = s.x - x;
     const dz = s.z - z;
     const d2 = dx * dx + dz * dz;
@@ -1267,15 +1439,17 @@ export function patrolWeight(x: number, z: number): number {
  *
  * **Memoised**, and it is not premature: this is a pure function of two integers
  * over a table frozen at module load, and `forEachPatrolNear` calls it for every
- * cell of every query -- twenty-five of them for a draw radius, nineteen square
- * roots each. Cached, a warm query does two integer hashes and a map lookup. The
- * map is bounded by the number of cells in the extent, which is 640.
+ * cell of every query -- twenty-five of them for a draw radius, forty-three
+ * square roots each. Cached, a warm query does two integer hashes and a map
+ * lookup. The map is bounded by the number of cells in the extent, which the
+ * middle ring takes from 640 to about 7,500 -- still a few hundred kilobytes at
+ * worst, and only the cells actually walked are ever inserted.
  */
 const patrolPairCache = new Map<number, number>();
 
 export function patrolPairs(cx: number, cz: number): number {
-  // The cells span about -14..+14 on each axis, so a 16-bit interleave is exact
-  // in a double with room to spare and cannot alias.
+  // The cells span about -48..+48 on each axis at the middle ring's extent, so a
+  // 16-bit interleave is exact in a double with room to spare and cannot alias.
   const memo = ((cx | 0) << 16) ^ (cz & 0xffff);
   const hit = patrolPairCache.get(memo);
   if (hit !== undefined) return hit;
@@ -1603,7 +1777,7 @@ const LIVERY_STEPS = LIVERY_SHARE_CITY / LIVERY_SHARE_NEAR;
  * a gradient. Two independent rolls would have produced exactly that.
  *
  * The field is only evaluated for the one car in twelve that could possibly
- * qualify, which keeps nineteen square roots off the other eleven.
+ * qualify, which keeps forty-three square roots off the other eleven.
  */
 export function policeLiveried(route: number, slot: number, x: number, z: number): boolean {
   const roll = carHash(route, slot ^ 0x9011ce) % LIVERY_SHARE_CITY;
@@ -2563,8 +2737,40 @@ export function verifyPolice(kitTriangles?: number, snapshotInterval?: number): 
   }
 
   // --- The stations, against the extent they were extracted inside.
-  if (POLICE_STATIONS.length < 10) {
-    failures.push(`Only ${POLICE_STATIONS.length} police stations are baked; the extract found 19.`);
+  if (POLICE_STATIONS.length <= STATION_INNER_COUNT) {
+    failures.push(
+      `Only ${POLICE_STATIONS.length} police stations are baked and the frozen inner ring is ` +
+        `${STATION_INNER_COUNT} of them; the middle-ring extract found 43. The new ring would have no commands at all.`,
+    );
+  }
+  // The frozen prefix, from the other end. Every one of the first
+  // `STATION_INNER_COUNT` rows has to still be inside the ring it was baked in
+  // and still be sorted by weight, which is what a careless re-sort or an
+  // insertion into the middle of the table would break. See the header.
+  for (let i = 0; i < STATION_INNER_COUNT && i < POLICE_STATIONS.length; i++) {
+    const s = POLICE_STATIONS[i];
+    const d = Math.sqrt(s.x * s.x + s.z * s.z);
+    if (d > STATION_INNER_EXTENT_M) {
+      failures.push(
+        `Row ${i} of the frozen inner-ring block is ${s.name} at ${d.toFixed(0)} m, outside the ` +
+          `${STATION_INNER_EXTENT_M} m bake it came from. The block has been reordered and every officer a ` +
+          'player already meets has moved.',
+      );
+    }
+    if (i > 0 && POLICE_STATIONS[i - 1].weight < s.weight) {
+      failures.push(`The frozen inner-ring block is no longer sorted by weight at row ${i} (${s.name}).`);
+    }
+  }
+  // The default an unweighted row falls to. It is not exercised by any row in
+  // the table today -- every one of the 43 carries a weight -- which is exactly
+  // why it is asserted here rather than left to be discovered by the stage-3
+  // bake that first leaves one out. Zero would be a command with no officers,
+  // no catchment and no error.
+  if (!(STATION_WEIGHT_DEFAULT > 0 && STATION_WEIGHT_DEFAULT <= 1)) {
+    failures.push(
+      `STATION_WEIGHT_DEFAULT is ${STATION_WEIGHT_DEFAULT}; a station that arrives without a weight would ` +
+        'be a building with a sign on it.',
+    );
   }
   const seenNames = new Set<string>();
   for (const s of POLICE_STATIONS) {

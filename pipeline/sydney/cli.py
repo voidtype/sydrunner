@@ -19,11 +19,13 @@ run picks up where it stopped rather than starting over.
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import math
 import struct
 import sys
 import time
+import traceback
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -44,6 +46,7 @@ from . import (
     ledger,
     merge,
     mesh,
+    meshpack,
     parking,
     power,
     powerups,
@@ -1706,6 +1709,108 @@ def _results_from_ledger(con, wanted: set[str]) -> list[tiles.TileResult]:
     return out
 
 
+# --- What an audit's exit status is allowed to mean -----------------------------
+#
+# **The failure this scaffolding exists for was not a wrong number, it was a
+# missing verdict.** When `write_glb` started packing its attributes, three of
+# the seven audits began throwing an `IndexError` partway through their tile
+# loop. Each of them had already printed its header and some of its table, so the
+# output looked like an audit running; Python exited 1, which is what a *failing*
+# audit exits; and nothing anywhere said "the verdict line never came". They
+# stayed that way for the whole of the packed build's life.
+#
+# So the exit status is three-valued from here on, and each value means exactly
+# one thing:
+#
+#   0  PASS         the audit looked at the world and it is within its limits
+#   1  FAIL         the audit looked at the world and it is not
+#   2  UNRESOLVED   the audit did not get to look. A crash, an artefact it
+#                   cannot parse, a pack version it does not implement, or a run
+#                   that read nothing at all.
+#
+# Two is not a worse one. A caller that treats "did not run" as "ran and failed"
+# will chase a defect that is not there; one that treats it as a pass ships a
+# world nothing checked. Both are worse than being told the audit is blind.
+EXIT_PASS = 0
+EXIT_FAIL = 1
+EXIT_UNRESOLVED = 2
+
+
+class AuditUnresolved(RuntimeError):
+    """The audit cannot answer. Raised where an audit would otherwise be silent.
+
+    Its whole purpose is to have a name that is neither pass nor fail, so that
+    "I read zero primitives" -- which every one of these commands used to report
+    as a clean world -- has somewhere to go that is not `return 0`.
+    """
+
+
+def _audit(fn):
+    """Wrap an audit command so that its exit status can only mean one thing.
+
+    Catches broadly, which is a thing to justify rather than apologise for: a
+    bare `except Exception` normally hides the bug it catches, and here it does
+    the opposite. The traceback is printed in full, the banner names the audit
+    and says the verdict never came, and the exit status stops claiming an
+    answer the command did not produce.
+
+    `SystemExit` is passed through when it carries 0 or 1 -- an audit that has
+    reached a verdict and said so -- and converted otherwise, because the
+    `raise SystemExit("far.bin is the wrong version")` cases scattered through
+    these commands are refusals to audit, not failures of the world.
+    """
+
+    @functools.wraps(fn)
+    def run(args: argparse.Namespace) -> int:
+        name = fn.__name__.removeprefix("cmd_").replace("_", "-")
+        try:
+            verdict = fn(args)
+        except AuditUnresolved as exc:
+            print(f"\n  UNRESOLVED: {name} could not reach a verdict -- {exc}")
+            return EXIT_UNRESOLVED
+        except meshpack.PackVersionError as exc:
+            print(f"\n  UNRESOLVED: {name} cannot read this build's geometry.\n    {exc}")
+            return EXIT_UNRESOLVED
+        except SystemExit as exc:
+            if exc.code in (EXIT_PASS, EXIT_FAIL):
+                raise
+            print(f"\n  UNRESOLVED: {name} stopped before reaching a verdict -- {exc.code}")
+            return EXIT_UNRESOLVED
+        except KeyboardInterrupt:
+            raise
+        except Exception:  # noqa: BLE001 -- deliberate: see this function's docstring
+            traceback.print_exc()
+            print(
+                f"\n  UNRESOLVED: {name} crashed before reaching a verdict."
+                " Whatever it printed above is a partial run and is not an answer;"
+                " the world has not been checked."
+            )
+            return EXIT_UNRESOLVED
+        if verdict not in (EXIT_PASS, EXIT_FAIL):
+            print(
+                f"\n  UNRESOLVED: {name} returned {verdict!r} rather than a verdict."
+            )
+            return EXIT_UNRESOLVED
+        return verdict
+
+    return run
+
+
+def _require_readable_geometry(index: dict) -> None:
+    """Refuse to audit tile geometry written under pack rules this build does not have.
+
+    Cheap, and at the top rather than on the first accessor: an audit that finds
+    out three hundred tiles in is an audit that has already printed most of a
+    table nobody can trust.
+    """
+    meshpack.require_pack_version(
+        (index.get("geometry") or {}).get("pack"),
+        source="`geometry.pack` in index.json",
+        reader="this audit's GLB reader",
+    )
+
+
+@_audit
 def cmd_terrain_audit(args: argparse.Namespace) -> int:
     """Read the emitted world back and check that everything agrees about y.
 
@@ -1722,9 +1827,8 @@ def cmd_terrain_audit(args: argparse.Namespace) -> int:
     which is what makes it a check rather than a second opinion from the same
     witness.
     """
-    import pygltflib as gl
-
     index = json.loads(config.INDEX_PATH.read_text())
+    _require_readable_geometry(index)
     contract = index.get("terrain")
     if contract is None:
         print("index.json has no terrain contract -- this world was built flat.")
@@ -1803,7 +1907,7 @@ def cmd_terrain_audit(args: argparse.Namespace) -> int:
     for key in sample:
         tx, tz = (int(v) for v in key.split("_"))
         oe, on = tx * config.TILE_SIZE, tz * config.TILE_SIZE
-        for slot, pos, tris, _nrm in _glb_primitives(gl, config.TILE_DIR / f"{key}.glb"):
+        for slot, pos, tris, _nrm, _q in _glb_primitives(config.TILE_DIR / f"{key}.glb"):
             if slot not in nominal:
                 continue
             east = pos[:, 0] + oe
@@ -1817,6 +1921,11 @@ def cmd_terrain_audit(args: argparse.Namespace) -> int:
             counted[slot] += len(pos)
             if slot == "road_asphalt":
                 slopes.append(np.column_stack(_triangle_slopes(pos, tris)))
+    if not any(counted.values()):
+        raise AuditUnresolved(
+            f"none of the {len(sample):,} tiles sampled carried a draped surface slot,"
+            " so there is nothing to compare against the terrain"
+        )
     print("  surfaces      worst |vertex y - (terrain + its offset)|, over the sample:")
     for slot in nominal:
         if counted[slot]:
@@ -1992,6 +2101,7 @@ def _sheet_area(sheet: dict) -> float:
     return float(np.abs(cross).sum() * 0.5)
 
 
+@_audit
 def cmd_water_audit(args: argparse.Namespace) -> int:
     """Read the emitted water back and check that it is water rather than paint.
 
@@ -2247,39 +2357,43 @@ def cmd_water_audit(args: argparse.Namespace) -> int:
     return 1 if bad else 0
 
 
-def _glb_primitives(gl, path):
-    """(material name, positions, triangles, normals) per primitive in a tile GLB.
+def _glb_primitives(path):
+    """(material, positions, triangles, normals, quantum) per primitive in a tile GLB.
 
     `normals` is None on a primitive that carries no NORMAL attribute, which in
     this build is `contact_ao` alone -- it is drawn unlit and would be paying 12
     bytes a vertex for a stream nothing samples.
+
+    `quantum` is the per-axis metre step the POSITION column was quantised onto,
+    or None if it shipped as float32. It travels with the positions because it is
+    a fact *about* them that they do not carry -- see `mesh.winding_agreement`,
+    which cannot tell a degenerate sliver from a real triangle without it.
+
+    **This is the only way an audit reads geometry back**, and it goes through
+    `meshpack.read_glb` rather than pulling accessor bytes itself. It used to do
+    the latter -- `np.frombuffer(blob, "<f4")` at the accessor's offset -- and
+    when `write_glb` started quantising and delta-coding, that kept returning
+    arrays of the right shape full of numbers that were not the world's. See
+    `meshpack`'s "Reading a packed tile back".
+
+    A missing file raises rather than yielding nothing. Every caller samples keys
+    out of `index.json`, so a tile that is named there and absent from disk is a
+    broken build, and returning silently would take it off the audit's books --
+    which is the exact shape of the failure this whole change is about.
     """
+    path = Path(path)
     if not path.exists():
-        return
-    doc = gl.GLTF2().load(str(path))
-    blob = doc.binary_blob()
-
-    def read(acc_index, dtype, shape):
-        """One accessor as an (N, shape) array.
-
-        `accessor.count` is elements of the accessor's own type -- vec3s for a
-        position stream, *scalars* for an index stream -- so the element width
-        comes from the accessor and the caller only says how to group them.
-        """
-        acc = doc.accessors[acc_index]
-        view = doc.bufferViews[acc.bufferView]
-        offset = (view.byteOffset or 0) + (acc.byteOffset or 0)
-        width = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}[acc.type]
-        flat = np.frombuffer(blob, dtype=dtype, count=acc.count * width, offset=offset)
-        return flat.reshape(-1, shape)
-
-    for prim in doc.meshes[0].primitives:
-        nrm = prim.attributes.NORMAL
+        raise FileNotFoundError(
+            f"{path} is named by index.json but is not on disk. The audit cannot"
+            " see this tile and will not pretend it did."
+        )
+    for prim in meshpack.read_glb(path).primitives:
         yield (
-            doc.materials[prim.material].name,
-            read(prim.attributes.POSITION, "<f4", 3),
-            read(prim.indices, "<u4", 3),
-            None if nrm is None else read(nrm, "<f4", 3),
+            prim.material,
+            prim.attribute("POSITION"),
+            prim.indices.reshape(-1, 3),
+            prim.attribute("NORMAL"),
+            prim.quantum("POSITION"),
         )
 
 
@@ -2319,6 +2433,7 @@ def _collision_prisms(payload: bytes):
         yield float(base), pts
 
 
+@_audit
 def cmd_winding_audit(args: argparse.Namespace) -> int:
     """Every triangle in the shipped tiles, winding against stored normal.
 
@@ -2339,9 +2454,8 @@ def cmd_winding_audit(args: argparse.Namespace) -> int:
     A slot with no NORMAL is reported as such rather than as a pass. Only
     `contact_ao` is in that position; its winding is guarded where it is made.
     """
-    import pygltflib as gl
-
     index = json.loads(config.INDEX_PATH.read_text())
+    _require_readable_geometry(index)
     keys = [t["key"] for t in index["tiles"]]
     limit = args.tiles if args.tiles > 0 else len(keys)
     # Spread across the extent rather than taking the first N. The first tiles
@@ -2356,11 +2470,11 @@ def cmd_winding_audit(args: argparse.Namespace) -> int:
     unlit: dict[str, int] = defaultdict(int)
     worst: list[tuple[float, str, str]] = []
     for key in sample:
-        for slot, pos, tris, nrm in _glb_primitives(gl, config.TILE_DIR / f"{key}.glb"):
+        for slot, pos, tris, nrm, quantum in _glb_primitives(config.TILE_DIR / f"{key}.glb"):
             if nrm is None:
                 unlit[slot] += len(tris)
                 continue
-            ok, bad, n = mesh.winding_agreement(pos, nrm, tris)
+            ok, bad, n = mesh.winding_agreement(pos, nrm, tris, quantum)
             agree[slot] += ok
             flipped[slot] += bad
             total[slot] += n
@@ -2378,6 +2492,13 @@ def cmd_winding_audit(args: argparse.Namespace) -> int:
         note = "" if ok == n else "   <-- crease" if bad == 0 else "   <-- INSIDE OUT"
         print(f"  {slot:<20}{n:>12,}{ok:>12,}{100.0 * ok / n:>7.2f}%{bad:>12,}{note}")
     grand, gok, gbad = sum(total.values()), sum(agree.values()), sum(flipped.values())
+    if not grand:
+        # No triangle with a normal anywhere in the sample. The table above is
+        # then a page of zeroes and "0 inside out" is true of nothing, which is
+        # the shape of pass this command must never give.
+        raise AuditUnresolved(
+            f"{len(sample):,} tiles carried no triangle with a NORMAL attribute"
+        )
     print(
         f"  {'ALL':<20}{grand:>12,}{gok:>12,}"
         f"{100.0 * gok / max(grand, 1):>7.2f}%{gbad:>12,}"
@@ -2414,6 +2535,7 @@ def _veg_instances(key: str):
         yield x, z, height, radius, sp
 
 
+@_audit
 def cmd_vegetation_audit(args: argparse.Namespace) -> int:
     """Every tree instance in the shipped world, against the scale the client
     will apply to it.
@@ -2524,6 +2646,7 @@ def _tile_ground(key: str):
     return np.frombuffer(path.read_bytes(), dtype="<f4").reshape(n + 1, n + 1)
 
 
+@_audit
 def cmd_carriageway_audit(args: argparse.Namespace) -> int:
     """How much solid geometry is standing in the road, measured from the files.
 
@@ -2569,11 +2692,11 @@ def cmd_carriageway_audit(args: argparse.Namespace) -> int:
     dropped on the floor -- and the number it produced was a mixture of a defect
     and a viaduct. See `WALKABLE_UNDER_M`.
     """
-    import pygltflib as gl
     from shapely.geometry import Polygon
     from shapely.ops import unary_union
 
     index = json.loads(config.INDEX_PATH.read_text())
+    _require_readable_geometry(index)
     keys = [t["key"] for t in index["tiles"]]
     limit = args.tiles if args.tiles > 0 else len(keys)
     sample = keys[:: max(len(keys) // limit, 1)][:limit]
@@ -2596,7 +2719,7 @@ def cmd_carriageway_audit(args: argparse.Namespace) -> int:
     prism_hits = slab_hits = overhead = 0
     worst: list[tuple] = []
     for key in sample:
-        road = _tile_carriageway(gl, key, Polygon, unary_union)
+        road = _tile_carriageway(key, Polygon, unary_union)
         if road.is_empty:
             continue
         road_total += road.area
@@ -2635,6 +2758,14 @@ def cmd_carriageway_audit(args: argparse.Namespace) -> int:
                 c = rect.centroid
                 worst.append((on_road, "far slab", key, oe + c.x, on - c.y))
 
+    if road_total <= 0.0:
+        # Every share below is `x / max(road_total, 1)`, so with no road at all
+        # they are all zero and the command reports a spotless carriageway it
+        # never found. That is the one answer it must not give.
+        raise AuditUnresolved(
+            f"no `road_asphalt` geometry in any of the {len(sample):,} tiles sampled,"
+            " so there is no carriageway to measure anything against"
+        )
     print(f"  carriageway {road_total:12,.0f} m2 of road in the sample")
     print(
         f"  buildings   {prism_area:12,.0f} m2 standing on it"
@@ -2676,7 +2807,7 @@ def cmd_carriageway_audit(args: argparse.Namespace) -> int:
     return 0
 
 
-def _tile_carriageway(gl, key: str, Polygon, unary_union):
+def _tile_carriageway(key: str, Polygon, unary_union):
     """One tile's road surface as a plan polygon, from its own GLB.
 
     Built from the emitted triangles rather than re-buffered from OSM, which is
@@ -2684,7 +2815,7 @@ def _tile_carriageway(gl, key: str, Polygon, unary_union):
     see a road the pipeline failed to emit.
     """
     tris = []
-    for slot, pos, idx, _n in _glb_primitives(gl, config.TILE_DIR / f"{key}.glb"):
+    for slot, pos, idx, _n, _q in _glb_primitives(config.TILE_DIR / f"{key}.glb"):
         if slot != "road_asphalt":
             continue
         plan = pos[:, [0, 2]]
@@ -2749,6 +2880,7 @@ def _far_slabs_by_tile(index) -> dict:
     return out
 
 
+@_audit
 def cmd_road_grade_audit(args: argparse.Namespace) -> int:
     """Measure how steep and how banked the streets actually came out.
 
@@ -2797,6 +2929,7 @@ def cmd_road_grade_audit(args: argparse.Namespace) -> int:
         one column.
     """
     index = json.loads(config.INDEX_PATH.read_text())
+    _require_readable_geometry(index)
     contract = index.get("terrain")
     if contract is None:
         print("index.json has no terrain contract -- this world was built flat.")
@@ -3185,8 +3318,6 @@ def _mesh_grade_report(keys, args, field=None) -> None:
     the lattice failing to hold a level street, and a steep facet on a deck is
     `decks.py`'s profile solve having been asked for something it could not give.
     """
-    import pygltflib as gl
-
     sample = sorted(keys)
     if args.tiles > 0:
         sample = sample[:: max(len(sample) // args.tiles, 1)][: args.tiles]
@@ -3194,7 +3325,7 @@ def _mesh_grade_report(keys, args, field=None) -> None:
     for key in sample:
         tx, tz = (int(v) for v in key.split("_"))
         oe, on = tx * config.TILE_SIZE, tz * config.TILE_SIZE
-        for slot, pos, tris, _n in _glb_primitives(gl, config.TILE_DIR / f"{key}.glb"):
+        for slot, pos, tris, _n, _q in _glb_primitives(config.TILE_DIR / f"{key}.glb"):
             if slot != "road_asphalt":
                 continue
             grad, area = _triangle_slopes(pos, tris)
@@ -3208,7 +3339,15 @@ def _mesh_grade_report(keys, args, field=None) -> None:
                 rise = np.nan_to_num(centre[:, 1] - ground, nan=0.0)
             rows_.append(np.column_stack((grad, area, rise)))
     if not rows_:
-        return
+        # This section printed nothing at all when it read nothing, so the
+        # command's remaining output looked like a complete run with the
+        # emitted-asphalt lines simply absent. It is the half of `road-grade`
+        # that reads the shipped geometry, and it going quiet is exactly what
+        # happened for the whole life of the packed build.
+        raise AuditUnresolved(
+            f"no `road_asphalt` geometry in any of the {len(sample):,} tiles sampled,"
+            " so the emitted-facet slope has nothing to measure"
+        )
     both = np.concatenate(rows_)
     live = np.isfinite(both[:, 0]) & (both[:, 1] > 0.1)
     both = both[live]
@@ -3272,40 +3411,35 @@ LANDMARK_HEIGHT_TOLERANCE = 0.02
 DECK_GAP_TOLERANCE_M = 0.5
 
 
-def _landmark_nodes(gl, path: Path) -> dict:
+def _landmark_nodes(path: Path) -> dict:
     """Every node in `landmarks.glb` as world-space positions, normals and tris.
 
     Positions come back **already offset by the node translation**, so what this
     returns is where the geometry actually is in the world -- which is the thing
     being audited. A reader that ignored the translation would pass a build that
     left every landmark sitting on Town Hall.
+
+    Through `meshpack.read_glb` like every other GLB this pipeline reads back.
+    `write_landmarks` does *not* pack -- three hero models are 300 kB and the
+    file is fetched once and never evicted, so there is nothing here worth the
+    quantisation error -- and this audit went on passing through the pack round
+    for exactly that reason. Sharing the reader anyway is what stops that being
+    luck: if `write_landmarks` ever starts packing, this reads it, and if it
+    starts packing under rules this reader does not have, this refuses it.
     """
-    doc = gl.GLTF2().load(str(path))
-    blob = doc.binary_blob()
-
-    def read(acc_index, dtype, width):
-        acc = doc.accessors[acc_index]
-        view = doc.bufferViews[acc.bufferView]
-        offset = (view.byteOffset or 0) + (acc.byteOffset or 0)
-        n = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}[acc.type]
-        flat = np.frombuffer(blob, dtype=dtype, count=acc.count * n, offset=offset)
-        return flat.reshape(-1, width)
-
     out: dict = {}
-    for node in doc.nodes:
-        if node.mesh is None:
-            continue
-        t = node.translation or [0.0, 0.0, 0.0]
-        parts = []
-        for prim in doc.meshes[node.mesh].primitives:
-            pos = read(prim.attributes.POSITION, "<f4", 3).astype(np.float64) + np.asarray(t)
-            nrm = read(prim.attributes.NORMAL, "<f4", 3).astype(np.float64)
-            tris = read(prim.indices, "<u4", 3)
-            parts.append((doc.materials[prim.material].name, pos, nrm, tris))
-        out[node.name or doc.meshes[node.mesh].name] = {
-            "translation": [float(v) for v in t],
-            "parts": parts,
-        }
+    for node in meshpack.read_glb(path).nodes:
+        t = np.asarray(node.translation, dtype=np.float64)
+        parts = [
+            (
+                prim.material,
+                prim.attribute("POSITION").astype(np.float64) + t,
+                prim.attribute("NORMAL").astype(np.float64),
+                prim.indices.reshape(-1, 3),
+            )
+            for prim in node.primitives
+        ]
+        out[node.name] = {"translation": [float(v) for v in t], "parts": parts}
     return out
 
 
@@ -3483,9 +3617,9 @@ def _deck_prisms(bridge_audit: dict, anchor: list[float]) -> list[tuple[float, f
     return sorted(deck), sorted(rails)
 
 
+@_audit
 def cmd_landmark_audit(args: argparse.Namespace) -> int:
     """Read the shipped landmark set back and check it against the real Sydney."""
-    import pygltflib as gl
     from shapely.geometry import Point, Polygon
 
     failures: list[str] = []
@@ -3503,7 +3637,7 @@ def cmd_landmark_audit(args: argparse.Namespace) -> int:
         raise SystemExit(f"index names {manifest['file']} but it is not on disk at {glb}.")
 
     sea = manifest["sea_level_y"]
-    nodes = _landmark_nodes(gl, glb)
+    nodes = _landmark_nodes(glb)
     items = {i["name"]: i for i in manifest["items"]}
 
     print(f"landmarks -> {glb.name}, {glb.stat().st_size / 1024:,.0f} kB,"
@@ -3801,6 +3935,7 @@ def _decode_lanes(key: str):
     return {"ways": ways, "routes": routes}
 
 
+@_audit
 def cmd_lane_audit(args: argparse.Namespace) -> int:
     """Read the traffic back off the disk and check it can be driven.
 

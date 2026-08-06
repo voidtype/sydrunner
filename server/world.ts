@@ -80,6 +80,13 @@ export interface TileEntry {
 
 export interface WorldIndex {
   stage: string;
+  /**
+   * The radius this build actually covers, metres -- the pipeline's own
+   * statement of what it wrote. Read by `integration-check`'s coverage gate so
+   * a table baked for a stage the world has not been rebuilt to yet is judged
+   * against the ground that exists rather than against the ground it will have.
+   */
+  radius_m: number;
   tile_size: number;
   terrain: { grid: number; datum_ahd: number; sea_level_y: number };
   tiles: TileEntry[];

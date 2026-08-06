@@ -240,6 +240,36 @@ function check(ok: boolean, line: string): void {
   if (!ok) failures.push(line);
 }
 
+/**
+ * A test for "is this anchor on ground the *currently built* world covers".
+ *
+ * The anchor tables and the world are baked to the same extent but not by the
+ * same command, and between the two there is a real, ordinary state: the tables
+ * carry the 15,300 m middle ring and `client/public/world` is still the 5,300 m
+ * inner build, or the middle build is halfway through writing its tiles. Every
+ * coverage check below wants the same thing out of that state -- *judge the
+ * anchors the world claims to cover, and say plainly how many were skipped* --
+ * and a check that instead asserted the tables against a stage nobody built
+ * would fail for a whole afternoon while telling you nothing.
+ *
+ * So the gate is `index.radius_m` exactly -- the pipeline's own statement of what
+ * it built, and the same disc the anchors were extracted inside, which is why a
+ * table baked at a stage matches that stage's world with nothing skipped and
+ * every check unweakened. No margin: a tile is emitted when it *intersects* the
+ * disc, so everything inside the radius is on one, while a margin outward would
+ * admit exactly the anchors the pipeline decided not to build.
+ */
+function builtGate(world: { index: { radius_m: number; tile_size: number } }): (x: number, z: number) => boolean {
+  const r2 = world.index.radius_m * world.index.radius_m;
+  return (x: number, z: number) => x * x + z * z <= r2;
+}
+
+/** How that gate reads in a check message. Empty once the world catches up. */
+function builtNote(world: { index: { radius_m: number; stage: string } }, skipped: number): string {
+  if (skipped === 0) return '';
+  return ` (${skipped} skipped: outside the built ${world.index.stage} stage's ${world.index.radius_m} m)`;
+}
+
 /** One synthetic player: a socket, a yaw, and whatever it last heard. */
 class Probe {
   readonly name: string;
@@ -2607,17 +2637,79 @@ async function checkTraffic(): Promise<void> {
         `at least three route ends in four found a kerb (${(((ends - kerbless) / ends) * 100).toFixed(1)}%)`,
       );
     }
-    // The datum puts sea level at y = -71.075, so this band is roughly -2 m to
-    // +111 m AHD. Loose on purpose at the top -- Bellevue Hill's streets reach
-    // 97 m and are inside this extent -- and tight where it matters: a lane
-    // whose height lookup missed is on the harbour bed at -74, or over it on a
-    // deck that solved to nothing. Both are the failure this catches, and both
-    // render as a car driving through the water off Dawes Point.
+    // The datum puts sea level at y = -71.075. A lane whose height lookup missed
+    // is on the harbour bed at -74, or over it on a deck that solved to nothing;
+    // both are the failure this catches, and both render as a car driving
+    // through the water off Dawes Point.
+    //
+    // **The band is read off the built world rather than written down**, which
+    // it has to be now that there is more than one stage: the top of it was a
+    // literal 40 -- roughly 111 m AHD, chosen when Bellevue Hill's 97 m was the
+    // highest ground in the build -- and the middle ring reaches Frenchs Forest
+    // and the Killara ridge, whose streets are legitimately half as high again.
+    // A literal would have to be re-guessed at every stage and would be wrong in
+    // the safe direction each time. Sampling the terrain gives the real ceiling
+    // for whatever was built, and the margin above it is the deck allowance: the
+    // Harbour Bridge roadway is ~50 m over the water it crosses and is a car
+    // that is correctly nowhere near the ground under it.
+    let groundHi = -Infinity;
+    let groundLo = Infinity;
+    for (let x = -world.index.radius_m; x <= world.index.radius_m; x += 250) {
+      for (let z = -world.index.radius_m; z <= world.index.radius_m; z += 250) {
+        if (x * x + z * z > world.index.radius_m * world.index.radius_m) continue;
+        const h = world.terrain.height(x, z);
+        if (!Number.isFinite(h)) continue;
+        if (h > groundHi) groundHi = h;
+        if (h < groundLo) groundLo = h;
+      }
+    }
+    const DECK_ALLOWANCE = 60;
     check(
-      lowest > -73 && highest < 40,
-      `every one of them is between y ${lowest.toFixed(1)} and ${highest.toFixed(1)}, ` +
-        'which is inside the extent\'s ground range',
+      lowest >= groundLo && highest < groundHi + DECK_ALLOWANCE,
+      `every one of them is between y ${lowest.toFixed(1)} and ${highest.toFixed(1)}, inside the built ` +
+        `${world.index.stage} stage's own ground range of ${groundLo.toFixed(1)} to ${groundHi.toFixed(1)} ` +
+        `plus a ${DECK_ALLOWANCE} m deck allowance`,
     );
+    // --- And the failure the band used to stand in for, measured directly.
+    //
+    // The old lower bound was the literal -73, one metre above the inner ring's
+    // bathymetry: a car below it had to be a lane whose height lookup fell into
+    // the harbour. The middle ring's rivers go deeper than that, so the literal
+    // stopped discriminating -- it now rejects the built terrain's own floor --
+    // and the honest replacement is to count the thing itself. A car under the
+    // waterline is a car in the river, whatever the extent's deepest point
+    // happens to be.
+    {
+      let sunk = 0;
+      let total = 0;
+      let worstX = 0;
+      let worstZ = 0;
+      let worstY = 0;
+      const sea = world.index.terrain.sea_level_y;
+      for (const route of routes) {
+        for (let slot = Math.floor((now - route.phase - route.duration - route.dwellCap) / route.headway) + 1;
+             slot <= Math.floor((now - route.phase + route.dwellCap) / route.headway); slot++) {
+          if (!one.poseCar(route, slot, now, pose)) continue;
+          total++;
+          if (pose.y >= sea) continue;
+          sunk++;
+          if (pose.y < worstY || sunk === 1) {
+            worstY = pose.y;
+            worstX = pose.x;
+            worstZ = pose.z;
+          }
+        }
+      }
+      say(
+        `  waterline: ${sunk} of ${total.toLocaleString()} cars sit below y ${sea} (sea level)` +
+          (sunk ? `; deepest at (${worstX.toFixed(0)}, ${worstZ.toFixed(0)}), y ${worstY.toFixed(1)}` : ''),
+      );
+      check(
+        sunk <= total * 0.0005,
+        `at most one car in two thousand is under the waterline (${sunk} of ${total.toLocaleString()}) -- ` +
+          'a lane end whose height lookup landed on the riverbed rather than on the bridge over it',
+      );
+    }
   }
 
   // --- A scripted player standing in a lane is run down.
@@ -3308,15 +3400,23 @@ async function checkPolice(): Promise<void> {
   {
     const size = world.index.tile_size;
     const keys = new Set(world.index.tiles.map((t) => t.key));
+    const built = builtGate(world);
     let offMap = 0;
     let bandless = 0;
+    let judged = 0;
+    let skipped = 0;
     const scratch: Parameters<typeof one.forEachPoliceNear>[5] = [];
     for (const station of one.POLICE_STATIONS) {
+      if (!built(station.x, station.z)) {
+        skipped++;
+        continue;
+      }
+      judged++;
       const key = `${Math.floor(station.x / size)}_${Math.floor(-station.z / size)}`;
       if (!keys.has(key)) offMap++;
       if (world.peds.near(station.x, station.z, one.catchment(station), scratch).length === 0) bandless++;
     }
-    check(offMap === 0, `all ${one.POLICE_STATIONS.length} police stations are on a built tile (${offMap} were not)`);
+    check(offMap === 0, `all ${judged} police stations are on a built tile (${offMap} were not)${builtNote(world, skipped)}`);
     check(bandless === 0, `every station's catchment holds footpath bands to walk (${bandless} held none)`);
     say(
       `  world: ${one.POLICE_STATIONS.length} stations, ` +
@@ -4633,8 +4733,16 @@ async function checkPolice(): Promise<void> {
     // silently contribute nobody.
     {
       let silent = 0;
+      let judged = 0;
+      let skipped = 0;
+      const built = builtGate(world);
       const names: string[] = [];
       for (const station of one.POLICE_STATIONS) {
+        if (!built(station.x, station.z)) {
+          skipped++;
+          continue;
+        }
+        judged++;
         let n = 0;
         for (let t = 0; t < 8 && n === 0; t++) {
           one.forEachPoliceNear(world.peds, station.x, station.z, 900, 1_000_000 + t * 9000, bands, ped, beat, (p) => {
@@ -4648,8 +4756,9 @@ async function checkPolice(): Promise<void> {
       }
       check(
         silent === 0,
-        `all ${one.POLICE_STATIONS.length} stations put officers on a real footpath` +
-          (silent ? ` -- ${names.join(', ')} posed nobody` : ''),
+        `all ${judged} stations put officers on a real footpath` +
+          (silent ? ` -- ${names.join(', ')} posed nobody` : '') +
+          builtNote(world, skipped),
       );
     }
   }
@@ -4744,33 +4853,45 @@ async function checkStreetlife(): Promise<void> {
   {
     const size = world.index.tile_size;
     const keys = new Set(world.index.tiles.map((t) => t.key));
+    const built = builtGate(world);
     const scratch: PedBand[] = [];
     let subOff = 0;
     let subBandless = 0;
+    let subSkipped = 0;
+    let populated = 0;
     for (const s of st.SUBURBS) {
       if (st.methLoiterers(s) === 0) continue;
+      if (!built(s.x, s.z)) {
+        subSkipped++;
+        continue;
+      }
+      populated++;
       if (!keys.has(`${Math.floor(s.x / size)}_${Math.floor(-s.z / size)}`)) subOff++;
       if (world.peds.near(s.x, s.z, st.methSpread(s), scratch).length === 0) subBandless++;
     }
-    const populated = st.SUBURBS.filter((s) => st.methLoiterers(s) > 0).length;
-    check(subOff === 0, `all ${populated} suburbs that carry meth heads are on a built tile (${subOff} were not)`);
+    check(subOff === 0, `all ${populated} suburbs that carry meth heads are on a built tile (${subOff} were not)${builtNote(world, subSkipped)}`);
     check(subBandless === 0, `every one of them has footpaths to loiter on (${subBandless} had none)`);
 
     let venueOff = 0;
     let venueBandless = 0;
     let withDrunks = 0;
     let drunkTotal = 0;
+    let venueSkipped = 0;
     for (let v = 0; v < st.VENUE_COUNT; v++) {
       const n = st.venueDrunks(v);
       if (n === 0) continue;
-      withDrunks++;
-      drunkTotal += n;
       const x = st.VENUE_XZ[v * 2];
       const z = st.VENUE_XZ[v * 2 + 1];
+      if (!built(x, z)) {
+        venueSkipped++;
+        continue;
+      }
+      withDrunks++;
+      drunkTotal += n;
       if (!keys.has(`${Math.floor(x / size)}_${Math.floor(-z / size)}`)) venueOff++;
       if (world.peds.near(x, z, 45, scratch).length === 0) venueBandless++;
     }
-    check(venueOff === 0, `all ${withDrunks} pubs that carry a drunk are on a built tile (${venueOff} were not)`);
+    check(venueOff === 0, `all ${withDrunks} pubs that carry a drunk are on a built tile (${venueOff} were not)${builtNote(world, venueSkipped)}`);
     // A handful of venues genuinely have no band inside 45 m -- a bar inside a
     // shopping centre, a pub on a road the pipeline gives no footpath. They
     // contribute nobody, which is correct; what would be wrong is most of them.
@@ -5550,13 +5671,31 @@ async function checkStreetlife(): Promise<void> {
     // any" that answered by tripling the city would have cost every frame in
     // Redfern to buy one person in St Peters, so the total is bounded against
     // the number this table carried before the inner-south rows were added.
+    //
+    // Bounded against the **frozen inner-ring prefix** rather than against a
+    // literal, now that the table carries a middle ring as well: the number that
+    // must not drift is what the inner city carries, and the middle ring is
+    // allowed to add exactly as much as its own suburbs justify. Both halves are
+    // read off the sim's own constants, so a re-bake cannot quietly retune this
+    // check into agreeing with itself.
     {
+      let inner = 0;
+      for (let i = 0; i < st.SUBURB_INNER_COUNT; i++) inner += st.methLoiterers(st.SUBURBS[i]);
       let total = 0;
       for (const s of st.SUBURBS) total += st.methLoiterers(s);
+      const outer = total - inner;
+      const innerPer = inner / st.SUBURB_INNER_COUNT;
+      const outerPer = outer / Math.max(1, st.SUBURBS.length - st.SUBURB_INNER_COUNT);
       check(
-        total > 100 && total < 160,
-        `the city carries ${total} meth heads across ${st.SUBURBS.length} suburbs -- it carried 114 across ` +
-          '57 before the inner south was filled in, and this is a coverage fix rather than a population one',
+        inner > 100 && inner < 160,
+        `the frozen inner ring carries ${inner} meth heads across ${st.SUBURB_INNER_COUNT} suburbs -- it ` +
+          'carried 114 across 57 before the inner south was filled in, and the middle-ring bake did not touch it',
+      );
+      check(
+        outerPer < innerPer,
+        `the middle ring carries ${outer} across ${st.SUBURBS.length - st.SUBURB_INNER_COUNT} suburbs, ` +
+          `${outerPer.toFixed(2)} a suburb against the inner city's ${innerPer.toFixed(2)} -- ` +
+          'a coverage fix rather than a population one, in the direction Sydney actually thins out',
       );
     }
 
@@ -5572,10 +5711,16 @@ async function checkStreetlife(): Promise<void> {
     {
       let claimed = 0;
       let placed = 0;
+      let skipped = 0;
+      const built = builtGate(world);
       const missing: string[] = [];
       for (let s = 0; s < st.SUBURBS.length; s++) {
         const suburb = st.SUBURBS[s];
         const want = st.methLoiterers(suburb);
+        if (!built(suburb.x, suburb.z)) {
+          skipped += want;
+          continue;
+        }
         claimed += want;
         let got = 0;
         for (let i = 0; i < want; i++) {
@@ -5587,7 +5732,8 @@ async function checkStreetlife(): Promise<void> {
       check(
         placed === claimed,
         `all ${claimed} loiterers the table claims are placed on a real footpath` +
-          (missing.length ? ` -- ${missing.slice(0, 4).join(', ')}` : ''),
+          (missing.length ? ` -- ${missing.slice(0, 4).join(', ')}` : '') +
+          builtNote(world, skipped),
       );
     }
   }
@@ -5638,37 +5784,75 @@ async function checkStreetlife(): Promise<void> {
     // city, so what has to be checked here is that the city agrees. If a
     // placement ever exceeds it the gate starts dropping people again, silently,
     // exactly as it did before.
-    let claimed = 0;
-    let placed = 0;
-    let orphans = 0;
-    let carrying = 0;
-    let atPub = 0;
-    let worstReach = 0;
-    for (let v = 0; v < st.VENUE_COUNT; v++) {
-      const want = st.venueDrunks(v);
-      if (want === 0) continue;
-      carrying++;
-      claimed += want;
-      let got = 0;
-      for (let i = 0; i < want; i++) {
-        if (!st.poseDrunk(world.peds, v, i, 12345, bands, pose)) continue;
-        got++;
-        const d = Math.hypot(pose.x - st.VENUE_XZ[v * 2], pose.z - st.VENUE_XZ[v * 2 + 1]);
-        if (d > worstReach) worstReach = d;
-        if (d <= 25) atPub++;
+    //
+    // **Tallied per ring**, and that split is the honest version of a bar that
+    // was calibrated on one. Every rate below was measured against the 422
+    // inner-ring venues, on inner-city footpaths: short blocks, a band per side,
+    // a pub every fifty metres. The middle ring's pubs stand on suburban
+    // arterials whose bands are four hundred metres long and one to a side, so
+    // the same placement rule lands a smaller share of them within 25 m of their
+    // own door -- not because anything regressed, but because Victoria Road is
+    // not King Street. Holding the whole city to the inner ring's number would
+    // either fail forever or, worse, be "fixed" by loosening the bar on the
+    // ground where it was actually doing work.
+    //
+    // So: the inner ring keeps the number it was tuned to, exactly, and is the
+    // regression test. The middle ring gets its own floor and its own line in
+    // the log, so a real collapse out there is still visible.
+    const ring = (from: number, to: number) => {
+      let claimed = 0;
+      let placed = 0;
+      let orphans = 0;
+      let carrying = 0;
+      let atPub = 0;
+      let worstReach = 0;
+      let skipped = 0;
+      const builtHere = builtGate(world);
+      for (let v = from; v < to; v++) {
+        const want = st.venueDrunks(v);
+        if (want === 0) continue;
+        if (!builtHere(st.VENUE_XZ[v * 2], st.VENUE_XZ[v * 2 + 1])) {
+          skipped += want;
+          continue;
+        }
+        carrying++;
+        claimed += want;
+        let got = 0;
+        for (let i = 0; i < want; i++) {
+          if (!st.poseDrunk(world.peds, v, i, 12345, bands, pose)) continue;
+          got++;
+          const d = Math.hypot(pose.x - st.VENUE_XZ[v * 2], pose.z - st.VENUE_XZ[v * 2 + 1]);
+          if (d > worstReach) worstReach = d;
+          if (d <= 25) atPub++;
+        }
+        placed += got;
+        if (got === 0) orphans++;
       }
-      placed += got;
-      if (got === 0) orphans++;
-    }
+      return { claimed, placed, orphans, carrying, atPub, worstReach, skipped };
+    };
+    const inner = ring(0, st.VENUE_INNER_COUNT);
+    const middle = ring(st.VENUE_INNER_COUNT, st.VENUE_COUNT);
+    const worstReach = Math.max(inner.worstReach, middle.worstReach);
+    const placed = inner.placed + middle.placed;
+
     check(
       worstReach <= st.DRUNK_REACH,
       `no drunk in the city stands further than DRUNK_REACH = ${st.DRUNK_REACH} m from their own pub ` +
         `(worst is ${worstReach.toFixed(1)} m over ${placed} of them); before the frontage fix the worst was 291 m`,
     );
     check(
-      orphans <= 15,
-      `${orphans} of ${carrying} pubs that carry a drunk place nobody -- the frontage filter drops a band ` +
-        'whose closest point is past 45 m, and a bar inside a shopping centre has no frontage at all',
+      inner.orphans <= 15,
+      `${inner.orphans} of ${inner.carrying} inner-ring pubs that carry a drunk place nobody -- the frontage ` +
+        'filter drops a band whose closest point is past 45 m, and a bar inside a shopping centre has no ' +
+        'frontage at all' +
+        builtNote(world, inner.skipped),
+    );
+    check(
+      middle.orphans <= middle.carrying * 0.2,
+      `and ${middle.orphans} of ${middle.carrying} middle-ring pubs (` +
+        `${((middle.orphans / Math.max(1, middle.carrying)) * 100).toFixed(0)}%, under a fifth), where a ` +
+        'suburban pub with a car park and no footpath frontage is a commoner shape' +
+        builtNote(world, middle.skipped),
     );
     // Nine tenths, not all of them, and the shortfall is bought rather than
     // lost: a frontage has to have room to stand the venue's whole party
@@ -5677,16 +5861,26 @@ async function checkStreetlife(): Promise<void> {
     // wrong one, so the venues this drops are the exact venues that used to
     // teleport.
     check(
-      placed >= claimed * 0.9,
-      `${placed} of the ${claimed} drunks the table claims stand on a real footpath (${((placed / claimed) * 100).toFixed(0)}%; ` +
-        `the rest are at pubs with no frontage long enough to space a party ${st.DRUNK_MIN_GAP} m apart)`,
+      inner.placed >= inner.claimed * 0.9 && middle.placed >= middle.claimed * 0.9,
+      `${inner.placed} of the ${inner.claimed} inner-ring drunks and ${middle.placed} of the ` +
+        `${middle.claimed} middle-ring ones stand on a real footpath ` +
+        `(${((inner.placed / Math.max(1, inner.claimed)) * 100).toFixed(0)}% and ` +
+        `${((middle.placed / Math.max(1, middle.claimed)) * 100).toFixed(0)}%; the rest are at pubs with no ` +
+        `frontage long enough to space a party ${st.DRUNK_MIN_GAP} m apart)`,
     );
 
     // --- And they stand **outside the pub**, which is the whole read.
     check(
-      atPub >= placed * 0.75,
-      `${atPub} of ${placed} drunks (${((atPub / placed) * 100).toFixed(0)}%) stand within 25 m of their own ` +
+      inner.atPub >= inner.placed * 0.75,
+      `${inner.atPub} of ${inner.placed} inner-ring drunks ` +
+        `(${((inner.atPub / Math.max(1, inner.placed)) * 100).toFixed(0)}%) stand within 25 m of their own ` +
         'pub; with the uniform-along-the-band placement the median alone was 58 m',
+    );
+    check(
+      middle.atPub >= middle.placed * 0.4,
+      `and ${middle.atPub} of ${middle.placed} middle-ring drunks ` +
+        `(${((middle.atPub / Math.max(1, middle.placed)) * 100).toFixed(0)}%), on suburban arterials whose ` +
+        'bands are hundreds of metres long -- lower on purpose, and still a majority within DRUNK_REACH',
     );
 
     // --- The query returns everybody who is really in range.
@@ -6123,14 +6317,22 @@ async function checkWildlife(): Promise<void> {
   {
     const size = world.index.tile_size;
     const keys = new Set(world.index.tiles.map((t) => t.key));
+    const built = builtGate(world);
     let offMap = 0;
     let noTerrain = 0;
+    let judged = 0;
+    let skipped = 0;
     for (const park of one.PARKS) {
+      if (!built(park.x, park.z)) {
+        skipped++;
+        continue;
+      }
+      judged++;
       const key = `${Math.floor(park.x / size)}_${Math.floor(-park.z / size)}`;
       if (!keys.has(key)) offMap++;
       if (!Number.isFinite(world.terrain.height(park.x, park.z))) noTerrain++;
     }
-    check(offMap === 0, `all ${one.PARKS.length} baked parks are on a built tile (${offMap} were not)`);
+    check(offMap === 0, `all ${judged} baked parks are on a built tile (${offMap} were not)${builtNote(world, skipped)}`);
     check(noTerrain === 0, `every park has a terrain grid to stand birds on (${noTerrain} had none)`);
     const area = one.PARKS.reduce((n, p) => n + Math.PI * p.r * p.r, 0);
     say(
@@ -6833,14 +7035,32 @@ async function checkWildlife(): Promise<void> {
      * 42 cm step height, because the probe has to cover the whole corridor for
      * the claim ("a sprint through the radius") to mean anything.
      */
+    //
+    // **And flat enough that a sprint stays a sprint.** The gradient test is the
+    // middle ring's doing: at 5,300 m every candidate corridor was inner-city
+    // and level, and the run held 7.90-8.07 m/s of an 8.2 m/s sprint. The
+    // 15,300 m world reaches the Chatswood and Killara ridges, where the first
+    // clear forty metres the search finds can be a 1-in-8 street -- and the
+    // probe then measures 7.04 m/s, which fails a floor that is asserting
+    // something about the *magpie's* arithmetic rather than about the hill. The
+    // corridor is meant to be a controlled straight line; a grade cap is part of
+    // controlling it, and it belongs here rather than in a looser floor, because
+    // loosening the floor is exactly how this check would stop meaning anything.
+    const MAX_GRADE = 0.06;
     const clearRun = (sx: number, sz: number, ux: number, uz: number, len: number): boolean => {
       let x = sx;
       let z = sz;
+      let last = ground(sx, sz);
+      if (!Number.isFinite(last)) return false;
       for (let i = 0; i < len * 2; i++) {
         const nx = x + ux * 0.5;
         const nz = z + uz * 0.5;
         const g = ground(nx, nz);
         if (!Number.isFinite(g)) return false;
+        // Per half-metre step, so this is a local slope rather than an average
+        // that a dip and a rise could cancel out of.
+        if (Math.abs(g - last) > MAX_GRADE * 0.5) return false;
+        last = g;
         const m = world.collision.resolve(x, z, nx, nz, PLAYER_RADIUS, g + 0.42);
         if (Math.hypot(m.x - nx, m.z - nz) > 0.01) return false;
         x = m.x;
