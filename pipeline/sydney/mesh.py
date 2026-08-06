@@ -833,17 +833,22 @@ def winding_agreement(
     show an altitude of at most one cell diagonal `|s|` and no more.
 
     The separation this produces is not marginal, which is what makes it safe to
-    apply rather than a way of massaging the number. Measured over 120 tiles of
-    the 15.3 km build -- 2.17 M triangles -- every one of the 9,317 triangles
-    that disagreed with all three of its vertex normals sat *below* that bound,
-    the worst at 0.787 of a cell, while the population of triangles at large
-    sits at 11 cells at p25 and 23 at p50. The filter therefore removes one
-    population entirely (1.38% of the triangles that have a normal) and leaves
-    the other untouched, with **no disagreement of any size above the line
-    anywhere in the sample**. An inside-out *wall* -- the failure this command
-    was written for, where `build_walls` inverted two thirds of the city -- is
-    metres across and thousands of cells wide, and no quantum of any plausible
-    size hides one.
+    apply rather than a way of massaging the number, and it was measured over
+    the whole 15.3 km build rather than a sample. Of 39,388,146 triangles in
+    2,194 tiles, four disagree with all three of their vertex normals above the
+    bound -- and they are at **42, 60, 276 and 288 cells**, on facets of 1.4 to
+    10.1 m2. Below the bound, over a 120-tile subsample, sit 9,317 more
+    disagreements whose worst is **0.787 of a cell**. So the two populations are
+    separated by a factor of fifty with nothing whatever in between: sub-cell
+    slivers on one side, real reversed facets metres across on the other. The
+    filter takes out 1.38% of the triangles that carry a normal, all of them
+    from the first population.
+
+    Those four are a genuine defect and this command reports them -- see the
+    note in `cli.cmd_winding_audit` about the sample size that finds them. An
+    inside-out *wall*, the failure this was written for, where `build_walls`
+    inverted two thirds of the city, is metres across and thousands of cells
+    wide; no quantum of any plausible size hides one.
 
     The shortest altitude rather than the area, because these are slivers: a
     triangle five metres long and four microns wide has an area that reads as

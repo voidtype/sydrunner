@@ -2453,6 +2453,16 @@ def cmd_winding_audit(args: argparse.Namespace) -> int:
 
     A slot with no NORMAL is reported as such rather than as a pass. Only
     `contact_ao` is in that position; its winding is guarded where it is made.
+
+    **THE DEFAULT SAMPLE OF 40 TILES DOES NOT FIND WHAT IS CURRENTLY WRONG.**
+    Measured on the 15.3 km build of 1786015035: `--tiles 0` opens all 2,194 and
+    reports four inside-out triangles out of 39,388,146, two on tile `-3_18` and
+    two on `3_-17`; the default forty-tile spread passes clean. That is not an
+    argument for changing the default -- forty tiles is one second and 2,194 is
+    a minute, and this command is run often -- but a reader who takes a pass
+    here as "the world has no reversed faces" is reading more than it says. It
+    says the sample has none. Run `--tiles 0` before believing the stronger
+    claim.
     """
     index = json.loads(config.INDEX_PATH.read_text())
     _require_readable_geometry(index)
