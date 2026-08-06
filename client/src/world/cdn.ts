@@ -143,13 +143,25 @@ export interface CdnStats {
   fallbacks: number;
   /** Assets fetched from the origin without trying the CDN. */
   origin: number;
+  /**
+   * Assets served out of a region bundle already in memory, costing no request
+   * at all. The number this whole pass exists to move -- see `world/regions.ts`.
+   */
+  bundled: number;
   /** Whether the CDN is currently believed usable. */
   enabled: boolean;
   /** Why not, when `enabled` is false and something decided that. */
   reason: string;
 }
 
-const stats: CdnStats = { hits: 0, fallbacks: 0, origin: 0, enabled: false, reason: 'not armed' };
+const stats: CdnStats = {
+  hits: 0,
+  fallbacks: 0,
+  origin: 0,
+  bundled: 0,
+  enabled: false,
+  reason: 'not armed',
+};
 let consecutiveFailures = 0;
 let probe: Promise<boolean> | null = null;
 let ref = '';
@@ -323,9 +335,37 @@ async function tryCdn(path: string, init?: RequestInit): Promise<ArrayBuffer | n
 }
 
 /**
- * **The one entry point.** A world asset, from the CDN when that is working and
- * from the origin when it is not, as a `Response` either way so that call sites
- * keep their existing `.ok` / `.arrayBuffer()` / `.json()` handling unchanged.
+ * A source of world assets that is already in memory, consulted before the
+ * network. `world/regions.ts` is the only thing that ever registers one.
+ *
+ * **A hook rather than an import**, and that is the whole reason this is three
+ * lines in this file instead of thirty in the streamer. Every world asset in
+ * the client -- tile GLBs, params, terrain grids, the six sidecars, collision --
+ * already funnels through `fetchWorldAsset`, so a region cache that hangs off
+ * this point serves all of them with no call site changed and no second place
+ * that knows what a tile's URL looks like. Registering rather than importing
+ * keeps the dependency pointing the right way: `regions.ts` needs *this* module
+ * to fetch the bundles, and this module is also compiled into the Bun server
+ * (see `__cdn` above), where regions do not exist and must not be dragged in.
+ *
+ * Returning `null` means "not in memory, go to the network", which is the
+ * ordinary case for a world with no regions and for any asset a region miss
+ * left behind.
+ */
+export type LocalAssetSource = (path: string) => Promise<ArrayBuffer | null>;
+
+let localSource: LocalAssetSource | null = null;
+
+/** Install the in-memory source. Pass `null` to remove it. */
+export function setLocalAssetSource(source: LocalAssetSource | null): void {
+  localSource = source;
+}
+
+/**
+ * **The one entry point.** A world asset, from memory when a region bundle
+ * already holds it, from the CDN when that is working and from the origin when
+ * it is not, as a `Response` in every case so that call sites keep their
+ * existing `.ok` / `.arrayBuffer()` / `.json()` handling unchanged.
  *
  * @param baseUrl the world root, `/world` everywhere in this client
  * @param path    world-relative, no leading slash: `tiles/5_-1.glb`
@@ -337,6 +377,23 @@ export async function fetchWorldAsset(
   version: string,
   init?: RequestInit,
 ): Promise<Response> {
+  if (localSource !== null) {
+    // Never allowed to fail the fetch. A region that 404s, a bundle with a
+    // member missing, a decode that threw -- all of them mean "the network
+    // still has it", which is the path the next line takes. Degrading to the
+    // world loading slowly is the entire point of keeping the per-tile files
+    // published beside the bundles.
+    let bytes: ArrayBuffer | null = null;
+    try {
+      bytes = await localSource(path);
+    } catch {
+      bytes = null;
+    }
+    if (bytes !== null) {
+      stats.bundled += 1;
+      return new Response(bytes, { status: 200 });
+    }
+  }
   if (stats.enabled && (await ensureProbe()) && stats.enabled) {
     const buf = await tryCdn(path, init);
     if (buf) return new Response(buf, { status: 200 });

@@ -124,6 +124,10 @@ export interface HazardCollector {
 }
 import {
   MapAtlas,
+  NAME_BUNDLE_HEADER,
+  NAME_BUNDLE_MAGIC,
+  NAME_BUNDLE_VERSION,
+  decodeStreetNameBundle,
   longestStraight,
   type LabelLine,
   type MapLandmark,
@@ -1388,7 +1392,7 @@ export class BigMap implements MarkerSink {
   }
 
   /**
-   * "loading street names", while the 213 sidecars come in.
+   * "loading street names", while `street-names.bin` comes in.
    *
    * On the live layer rather than the city one so it can pulse without a
    * rebuild, and worded as a fact rather than a spinner: the map is *usable*
@@ -1396,6 +1400,12 @@ export class BigMap implements MarkerSink {
    * there in the first round trip -- and this says only that more names are
    * still arriving. A modal spinner over a working map would be a lie about
    * which of those two things is true.
+   *
+   * It is kept now the streets are one request rather than 357, for two
+   * reasons: the fallback path is still 357 on an older world (`mapatlas.ts`'s
+   * `loadNameBundle`), and half a megabyte is still half a megabyte on a phone
+   * radio. What changed is that the percentage now goes 0 to 100 in one step
+   * instead of creeping, which is the honest picture of one request.
    */
   private drawLoading(ctx: CanvasRenderingContext2D): void {
     const pct = Math.round(this.atlas.progress * 100);
@@ -1829,6 +1839,351 @@ export function verifyBigMap(): string[] {
         `An importance floor of 250 m kept ${out.length} runs where it should keep Crown Street's` +
           ' three and drop the lane.',
       );
+    }
+  }
+
+  // --- The street-name bundle: the same map, in one request instead of 357.
+  //
+  // What is checked here is *equivalence*, because that is the entire claim.
+  // The bundle changed nothing about what the map draws and nothing about how it
+  // decides -- it changed where the bytes come from -- so the failure this
+  // guards against is not a crash but a map that is subtly different from the
+  // one that shipped: a name interned in a different order and therefore
+  // ranking differently on a tie, a run lifted into world metres by an
+  // arithmetic that rounds once where the old one rounded twice and therefore
+  // chaining across a join it used to miss. None of that shows in a screenshot.
+  {
+    /**
+     * A bundle laid out by hand, against the format `write_street_name_bundle`
+     * documents -- not through an encoder of this file's own, which would agree
+     * with the decoder about a layout the pipeline does not write.
+     */
+    interface BundleLayout {
+      /** Byte offset of each block, so a tweak names what it is corrupting. */
+      tileRuns: number;
+      origins: number;
+      nameIdx: number;
+      counts: number;
+      points: number;
+    }
+    const bundleBytes = (
+      names: string[],
+      tiles: Array<{ ox: number; oz: number; runs: Array<{ name: number; pts: number[] }> }>,
+      tweak: (view: DataView, at: BundleLayout) => void = () => {},
+    ): ArrayBuffer => {
+      const encoder = new TextEncoder();
+      const raw = names.map((n) => encoder.encode(n));
+      let tableBytes = 0;
+      for (const r of raw) tableBytes += 2 + r.length;
+      tableBytes = (tableBytes + 3) & ~3;
+      const runs = tiles.flatMap((t) => t.runs);
+      const points = runs.reduce((n, r) => n + r.pts.length / 2, 0);
+      const idxWidth = names.length <= 0xffff ? 2 : 4;
+      const idxBytes = (runs.length * idxWidth + 3) & ~3;
+      const countBytes = (runs.length + 3) & ~3;
+      const total =
+        NAME_BUNDLE_HEADER + tableBytes + tiles.length * 12 + idxBytes + countBytes + points * 8;
+      const buffer = new ArrayBuffer(total);
+      const view = new DataView(buffer);
+      const u32 = (at: number, v: number): void => view.setUint32(at, v, true);
+      u32(0, NAME_BUNDLE_MAGIC);
+      u32(4, NAME_BUNDLE_VERSION);
+      u32(8, names.length);
+      u32(12, tiles.length);
+      u32(16, runs.length);
+      u32(20, points);
+      u32(24, tableBytes);
+      u32(28, idxWidth);
+      let p = NAME_BUNDLE_HEADER;
+      for (const r of raw) {
+        view.setUint16(p, r.length, true);
+        p += 2;
+        new Uint8Array(buffer, p, r.length).set(r);
+        p += r.length;
+      }
+      const at: BundleLayout = {
+        tileRuns: NAME_BUNDLE_HEADER + tableBytes,
+        origins: NAME_BUNDLE_HEADER + tableBytes + tiles.length * 4,
+        nameIdx: NAME_BUNDLE_HEADER + tableBytes + tiles.length * 12,
+        counts: NAME_BUNDLE_HEADER + tableBytes + tiles.length * 12 + idxBytes,
+        points: NAME_BUNDLE_HEADER + tableBytes + tiles.length * 12 + idxBytes + countBytes,
+      };
+      p = at.tileRuns;
+      for (const t of tiles) {
+        u32(p, t.runs.length);
+        p += 4;
+      }
+      for (const t of tiles) {
+        view.setFloat32(p, t.ox, true);
+        view.setFloat32(p + 4, t.oz, true);
+        p += 8;
+      }
+      for (let i = 0; i < runs.length; i++) {
+        if (idxWidth === 2) view.setUint16(at.nameIdx + i * 2, runs[i].name, true);
+        else u32(at.nameIdx + i * 4, runs[i].name);
+      }
+      for (let i = 0; i < runs.length; i++) view.setUint8(at.counts + i, runs[i].pts.length / 2);
+      p = at.points;
+      for (const r of runs) {
+        for (const v of r.pts) {
+          view.setFloat32(p, v, true);
+          p += 4;
+        }
+      }
+      tweak(view, at);
+      return buffer;
+    };
+
+    // Two tiles of one street plus a laneway, with fractional coordinates that
+    // do not survive float32 exactly -- which is the point. The tile origins are
+    // the streamer's own, `(bounds.minX, bounds.minZ + tileSize)`.
+    //
+    // The string table is deliberately in a *different* order from the order
+    // the runs first quote it in -- Regent Street is first in the table and last
+    // on the ground. The atlas interns a name when a run first uses it, which is
+    // what the per-tile path did and what the last tie-break in
+    // `drawStreetLabels` sorts on; a fold that interned the table instead would
+    // produce the same map everywhere except where two streets rank exactly
+    // equal, which is exactly the kind of difference nobody would ever find.
+    const NAMES = ['Regent Street', 'Botany Road', 'Foley Lane'];
+    const TILES = [
+      {
+        ox: -2500,
+        oz: 1000,
+        runs: [
+          { name: 1, pts: [10.3, 20.7, 210.3, 20.7] },
+          { name: 2, pts: [50.1, 0.9, 50.1, 150.9] },
+        ],
+      },
+      {
+        ox: -2000,
+        oz: 1000,
+        runs: [
+          { name: 1, pts: [-289.7, 20.7, -89.7, 20.7] },
+          { name: 0, pts: [0.25, -0.5, 0.25, 400.5, 100.25, 400.5] },
+        ],
+      },
+    ];
+    const bytes = bundleBytes(NAMES, TILES);
+
+    // The same geometry as the per-tile path would hand the atlas: the points
+    // rounded to float32, then lifted by the origin **and rounded again**, and
+    // the bounds taken in tile-local float32 and lifted in double. Both halves
+    // are the arithmetic `decodeStreetNames` plus `translateStreetNames` do, and
+    // stating them here rather than deriving them from the decoder is what makes
+    // this a check rather than a tautology.
+    const asSegments = (): Array<{
+      name: string;
+      points: Float32Array;
+      minX: number;
+      minZ: number;
+      maxX: number;
+      maxZ: number;
+    }> =>
+      TILES.flatMap((tile) =>
+        tile.runs.map((run) => {
+          const local = run.pts.map(Math.fround);
+          const points = new Float32Array(local.length);
+          let minX = Infinity;
+          let minZ = Infinity;
+          let maxX = -Infinity;
+          let maxZ = -Infinity;
+          for (let i = 0; i < local.length; i += 2) {
+            minX = Math.min(minX, local[i]);
+            maxX = Math.max(maxX, local[i]);
+            minZ = Math.min(minZ, local[i + 1]);
+            maxZ = Math.max(maxZ, local[i + 1]);
+            points[i] = local[i] + tile.ox;
+            points[i + 1] = local[i + 1] + tile.oz;
+          }
+          return {
+            name: NAMES[run.name],
+            points,
+            minX: minX + tile.ox,
+            minZ: minZ + tile.oz,
+            maxX: maxX + tile.ox,
+            maxZ: maxZ + tile.oz,
+          };
+        }),
+      );
+
+    // --- The decode itself, against the arithmetic above.
+    const decoded = decodeStreetNameBundle(bytes);
+    if (decoded === null) {
+      failures.push('A well-formed street-name bundle decoded to nothing.');
+    } else {
+      const want = asSegments();
+      if (decoded.runs.length !== want.length) {
+        failures.push(`The bundle decoded to ${decoded.runs.length} runs rather than ${want.length}.`);
+      }
+      for (let i = 0; i < Math.min(decoded.runs.length, want.length); i++) {
+        const got = decoded.runs[i];
+        const exp = want[i];
+        if (decoded.names[got.nameIdx] !== exp.name) {
+          failures.push(
+            `Run ${i} came back as '${decoded.names[got.nameIdx]}' rather than '${exp.name}'.` +
+              ' The string table and the run indices are out of step, which puts one street on the' +
+              " map under another's name.",
+          );
+        }
+        const same =
+          got.points.length === exp.points.length &&
+          Array.from(got.points).every((v, k) => v === exp.points[k]);
+        if (!same) {
+          failures.push(
+            `Run ${i}'s world points are not the ones the per-tile path produces:` +
+              ` [${Array.from(got.points).join(', ')}] against [${Array.from(exp.points).join(', ')}].` +
+              ' The lift has to round exactly where `translateStreetNames` rounds, or every label' +
+              ' in the city moves by a few bits and the chains join differently.',
+          );
+        }
+        if (
+          got.minX !== exp.minX ||
+          got.minZ !== exp.minZ ||
+          got.maxX !== exp.maxX ||
+          got.maxZ !== exp.maxZ
+        ) {
+          failures.push(
+            `Run ${i}'s bounds are (${got.minX}, ${got.minZ}, ${got.maxX}, ${got.maxZ}) rather` +
+              ` than (${exp.minX}, ${exp.minZ}, ${exp.maxX}, ${exp.maxZ}). Bounds are lifted in` +
+              ' double and the points in float32; folding the origin in once cannot be both.',
+          );
+        }
+      }
+    }
+
+    // --- Equivalence: one atlas from the bundle, one from the same runs
+    // delivered per tile, and nothing between them may differ. This is the
+    // acceptance bar the whole change is held to.
+    {
+      const viaBundle = new MapAtlas({ tile_size: 500, tiles: [] });
+      if (!viaBundle.addBundleForTest(bytes)) {
+        failures.push('A well-formed bundle was refused by the atlas.');
+      }
+      const viaTiles = new MapAtlas({ tile_size: 500, tiles: [] });
+      viaTiles.addSegmentsForTest(asSegments());
+
+      const dump = (atlas: MapAtlas): string => {
+        const runs: RoadRun[] = [];
+        atlas.roadsWithin(-1e9, -1e9, 1e9, 1e9, 0, runs);
+        const lines: LabelLine[] = [];
+        atlas.labelLinesWithin(-1e9, -1e9, 1e9, 1e9, 0, lines);
+        return [
+          runs.map(
+            (r) =>
+              `${r.nameId}:${atlas.nameOf(r.nameId)}:${atlas.labelOf(r.nameId)}:` +
+              `${atlas.importanceOf(r.nameId)}:${r.length}:` +
+              `${r.minX},${r.minZ},${r.maxX},${r.maxZ}:${Array.from(r.points).join(',')}`,
+          ),
+          lines.map((l) => `${l.nameId}:${l.x}:${l.z}:${l.angle}:${l.straight}:${l.length}`),
+        ]
+          .flat()
+          .join('\n');
+      };
+      // Stated separately as well as being inside the dump, because the dump's
+      // message does not say *why* two identical-looking atlases differ.
+      if (viaBundle.nameOf(0) !== 'Botany Road') {
+        failures.push(
+          `The first name in the atlas is '${viaBundle.nameOf(0)}' rather than 'Botany Road'.` +
+            ' Names are interned when a run first quotes one, not in the order the bundle happens' +
+            ' to list them -- the id is the last tie-break when two streets rank equal for a label.',
+        );
+      }
+      const fromBundle = dump(viaBundle);
+      const fromTiles = dump(viaTiles);
+      if (fromBundle !== fromTiles) {
+        // The first differing line, because the whole dump is unreadable in a
+        // console and the first difference is always the cause of the rest.
+        const a = fromBundle.split('\n');
+        const b = fromTiles.split('\n');
+        const at = a.findIndex((line, i) => line !== b[i]);
+        failures.push(
+          'The bundle and the per-tile sidecars produce different atlases, which is the one thing' +
+            ` this change may not do. First difference at row ${at}:\n  bundle ${a[at]}\n  tiles  ${b[at]}`,
+        );
+      }
+      // And the chains really did form -- a check that compared two empty
+      // atlases would pass forever. Botany Road crosses the tile seam as two
+      // runs 200 m each and must come back as one 400 m stretch.
+      const lines: LabelLine[] = [];
+      viaBundle.labelLinesWithin(-1e9, -1e9, 1e9, 1e9, 0, lines);
+      const botany = lines.filter((l) => viaBundle.nameOf(l.nameId) === 'Botany Road');
+      if (botany.length !== 1 || Math.abs(botany[0].straight - 400) > 0.01) {
+        failures.push(
+          `Botany Road came out of the bundle as ${botany.length} chain(s) of` +
+            ` ${botany[0]?.straight.toFixed(1) ?? 'no'} m rather than one of 400. The runs either` +
+            ' did not chain across the tile seam or were lifted into the wrong frame.',
+        );
+      }
+    }
+
+    // --- What must be refused. Every one of these falls back to the 357
+    // sidecars and draws the same map; a bundle that was *accepted* wrongly
+    // draws a broken one.
+    {
+      const refusals: Array<[string, ArrayBuffer]> = [
+        ['an empty buffer', new ArrayBuffer(0)],
+        ['a header of zeroes', new ArrayBuffer(NAME_BUNDLE_HEADER)],
+        [
+          'a bundle from a newer pipeline',
+          bundleBytes(NAMES, TILES, (v) => v.setUint32(4, NAME_BUNDLE_VERSION + 1, true)),
+        ],
+        [
+          'a bundle whose magic is something else',
+          bundleBytes(NAMES, TILES, (v) => v.setUint32(0, 0x12345678, true)),
+        ],
+        [
+          'a bundle claiming more points than it carries',
+          bundleBytes(NAMES, TILES, (v) => v.setUint32(20, 4000, true)),
+        ],
+        [
+          'a bundle whose tile run counts do not sum to its run count',
+          bundleBytes(NAMES, TILES, (v, at) => v.setUint32(at.tileRuns, 1, true)),
+        ],
+        [
+          'a bundle with an impossible name-index width',
+          bundleBytes(NAMES, TILES, (v) => v.setUint32(28, 3, true)),
+        ],
+      ];
+      for (const [what, buffer] of refusals) {
+        if (decodeStreetNameBundle(buffer) !== null) {
+          failures.push(
+            `The bundle decoder accepted ${what}. Refusing is free -- the map falls back to the` +
+              ' per-tile sidecars and is complete -- and accepting it is a city of NaN.',
+          );
+        }
+      }
+      // A truncated string table must not be read past, and a name index past
+      // the table must drop its run rather than clamp into some other street.
+      const truncated = bundleBytes(NAMES, TILES, (v) => v.setUint16(NAME_BUNDLE_HEADER, 900, true));
+      if (decodeStreetNameBundle(truncated) !== null) {
+        failures.push('The bundle decoder read a name longer than its own string table.');
+      }
+      const stray = bundleBytes(NAMES, TILES, (v, at) => v.setUint16(at.nameIdx, 9, true));
+      const strayDecode = decodeStreetNameBundle(stray);
+      if (strayDecode !== null && strayDecode.runs.length !== 3) {
+        failures.push(
+          `A run naming a street past the end of the table produced ${strayDecode.runs.length} runs` +
+            ' rather than 3. It must be dropped, never clamped: clamping puts a piece of one street' +
+            " on the map under another's name, which is the one failure a map may not have.",
+        );
+      }
+    }
+
+    // --- The fallback. A world built before the bundle existed has no block,
+    // must not ask for the file, and must load its streets exactly as it always
+    // did -- which is what every optional block in `index.json` promises.
+    {
+      const older = new MapAtlas({ tile_size: 500, tiles: [] });
+      if (older.stats().bundle) {
+        failures.push('An atlas that has loaded nothing claims its streets came from a bundle.');
+      }
+      if (older.addBundleForTest(new ArrayBuffer(8))) {
+        failures.push('The atlas accepted eight bytes of nothing as a street-name bundle.');
+      }
+      if (older.stats().runs !== 0) {
+        failures.push('A refused bundle left runs behind in the atlas.');
+      }
     }
   }
 

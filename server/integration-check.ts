@@ -212,6 +212,11 @@ import {
   mayEvictCollision,
   verifyTileLifecycle,
 } from '../client/src/world/tile-lifecycle.ts';
+// The two wire formats a tile arrives in. Both are pure arithmetic with no DOM
+// and no `three` in them -- which is what lets the suite run the same functions
+// the browser runs at boot rather than a paraphrase of them.
+import { TILE_PACK_VERSION, verifyMeshPack } from '../client/src/world/tile-decode.ts';
+import { verifyRegions } from '../client/src/world/regions.ts';
 // The walk-under rule. See `checkSoffits` at the foot of this file: the band
 // `CollisionWorld.resolve` now tests a body against, driven over the real
 // viaducts by the real controller.
@@ -8882,6 +8887,43 @@ async function checkStreamingLifecycle(): Promise<void> {
     check(
       failures.length === 0,
       `the tile lifecycle rules check out (${failures.length ? failures[0] : 'taxonomy, backoff, safety radius'})`,
+    );
+  }
+
+  // --- 1b. The two formats a tile now arrives in, both of which are half
+  // written in Python and half in TypeScript and neither of which fails loudly.
+  //
+  // `verifyMeshPack` builds a packed GLB from known values, parses it back and
+  // asserts that `_BLDIDX` and the indices are *equal* rather than close --
+  // `_BLDIDX` is a row in the facade parameter atlas and a value one off draws a
+  // terrace house with a tower's window grammar. `verifyRegions` does the same
+  // for the bundle container, plus the floor-division that decides which bundle
+  // owns a tile, which agrees with truncation on the positive half of the grid
+  // and disagrees on the negative one -- and Town Hall is at the origin, so half
+  // the city is on the wrong side of that.
+  {
+    const failures = verifyMeshPack();
+    check(
+      failures.length === 0,
+      failures.length
+        ? `mesh packing round trip: ${failures[0]}`
+        : 'quantised geometry survives the round trip, and _BLDIDX and the indices come back exact',
+    );
+  }
+  {
+    const failures = verifyRegions();
+    check(
+      failures.length === 0,
+      failures.length
+        ? `region bundles: ${failures[0]}`
+        : 'a region bundle round-trips, refuses a truncated or future one, and owns the right tiles either side of the origin',
+    );
+  }
+  {
+    const geometry = (index as { geometry?: { pack?: number } }).geometry;
+    check(
+      geometry?.pack === undefined || geometry.pack === TILE_PACK_VERSION,
+      `this world's geometry is packed to a version this client reads (${geometry?.pack ?? 'unpacked'} vs ${TILE_PACK_VERSION})`,
     );
   }
 

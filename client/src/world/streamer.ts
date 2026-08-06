@@ -189,10 +189,18 @@ import {
 import { createStreetMaterial } from './street.ts';
 import type { NamedSegment, TileStreetNames } from './streetnames.ts';
 import { armCdn, fetchWorldAsset, fetchWorldBuffer, type CdnContract } from './cdn.ts';
+import {
+  armRegions,
+  updateRegions,
+  verifyRegions,
+  type RegionContract,
+} from './regions.ts';
 import { TileDecoder, verifyDecoderRoundTrip } from './decode-pool.ts';
 import {
   BLDIDX_LOWER,
+  TILE_PACK_VERSION,
   parseTileGlb,
+  verifyMeshPack,
   type GlbPrimitive,
   type TileDecodeRequest,
   type TileDecodeResult,
@@ -359,6 +367,26 @@ export interface WorldIndex {
    * that is deliberately never cached.
    */
   cdn?: CdnContract;
+  /**
+   * The streaming bundles, when the pipeline wrote any: 2x2-tile region files
+   * that hold every per-tile asset in a square kilometre behind one request.
+   * Absent on a world built before they existed, which simply means every asset
+   * is fetched on its own, exactly as it always was. See `world/regions.ts`.
+   */
+  regions?: RegionContract;
+  /**
+   * How this build's vertex attributes are packed, and the worst error that
+   * cost. `pack` is the format version, and a build naming one this client does
+   * not know is refused loudly by `verifyStreaming` rather than decoded into
+   * noise. Absent on a world built before `meshpack` existed, whose tiles are
+   * plain float32 and which `parseTileGlb` still reads.
+   */
+  geometry?: {
+    pack?: number;
+    max_position_error_mm?: number;
+    max_uv_error_mm?: number;
+    max_normal_error_deg?: number;
+  };
   stage: string;
   radius_m: number;
   tile_size: number;
@@ -1516,6 +1544,13 @@ export class TileStreamer implements LampSource {
     // the immutable tree that holds that version. Arming here means every world
     // fetch after this line sees a decided CDN -- see `world/cdn.ts`.
     armCdn(this.index);
+    // And *how* they are packaged, in the same breath and on the same terms: a
+    // region bundle is a world asset like any other, so it needs the version and
+    // the base URL, and arming it here means the first tile of the session
+    // already costs one request for its whole square kilometre rather than
+    // twelve for itself. An index with no `regions` block leaves this off and
+    // the world loads exactly as it did before -- see `world/regions.ts`.
+    armRegions(this.index, this.baseUrl, this.version);
     this.terrainField = new TerrainField(
       this.terrain.grid,
       this.index.tile_size,
@@ -1992,6 +2027,15 @@ export class TileStreamer implements LampSource {
     const now = Date.now();
 
     const cam = camera.position;
+
+    // Prefetch, before the tile pass below decides what to fetch. The order is
+    // load-bearing in one direction only: a bundle triggered this frame cannot
+    // possibly have landed by the time the pass runs, so this is not about
+    // serving *this* frame's tiles. It is about the region 2,200 m out being
+    // started 400 m before its tiles enter the 1,800 m load radius, which at
+    // 39.4 m/s is 10.2 seconds of lead. See `world/regions.ts`.
+    updateRegions(cam.x, cam.z);
+
     this.projScreen.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     // The coordinate system matters: WebGPU clips depth to [0, w] and WebGL to
     // [-w, w], and the near-plane extraction differs between them. Reading it
@@ -2999,10 +3043,97 @@ export class TileStreamer implements LampSource {
       for (const f of roundTrip) failures.push(`worker round trip: ${f}`);
       const keyed = failures.map((f) => `${entry.key}: ${f}`);
       for (const f of await this.verifyLifecycle()) keyed.push(f);
+
+      // --- The packing, three ways, because it is a two-repository format and
+      // every way it can be wrong is silent.
+      //
+      // 1. The arithmetic, against known values with no network in it. This is
+      //    the bit-exact round trip: `_BLDIDX` and the indices come back
+      //    *equal*, not close. See `verifyMeshPack`.
+      for (const f of verifyMeshPack()) keyed.push(`mesh pack: ${f}`);
+      // 2. The version, so a client reading a build packed by different rules
+      //    fails at boot rather than drawing a city of noise on the first tile
+      //    that happens to use whichever field moved.
+      const pack = index.geometry?.pack;
+      if (pack !== undefined && pack !== TILE_PACK_VERSION) {
+        keyed.push(
+          `this world's geometry is packed to version ${pack} and this client reads ` +
+            `${TILE_PACK_VERSION}. Rebuild the world, or check ` +
+            '`PACK_VERSION` in `pipeline/sydney/meshpack.py` against `TILE_PACK_VERSION`.',
+        );
+      }
+      // 3. The error the pipeline measured over the whole build, against the
+      //    claim this pass rests on -- that the drift is below anything the eye
+      //    can see. A centimetre is the line: the facade shader's window grid is
+      //    denominated in metric UVs and the road surfaces sit a centimetre or so
+      //    off the terrain, so a build that quietly moved past this is a build
+      //    that could z-fight.
+      const positionError = index.geometry?.max_position_error_mm ?? 0;
+      const uvError = index.geometry?.max_uv_error_mm ?? 0;
+      if (positionError > 10 || uvError > 10) {
+        keyed.push(
+          `the pipeline packed this world to ${positionError.toFixed(1)} mm of position error and ` +
+            `${uvError.toFixed(1)} mm of UV error. Over 10 mm is past what the quantisation ` +
+            'argument in `sydney/meshpack.py` covers.',
+        );
+      }
+
+      // --- The region bundles: the format, the ownership arithmetic, and that
+      // a miss falls back per-tile rather than leaving a hole.
+      for (const f of verifyRegions()) keyed.push(`regions: ${f}`);
+      for (const f of await this.verifyRegionFallback(entry)) keyed.push(`regions: ${f}`);
       return keyed;
     } catch (err) {
       return [`verifyStreaming could not read tile ${entry.key}: ${String(err)}`];
     }
+  }
+
+  /**
+   * A region that is not there must cost one failed request and nothing else.
+   *
+   * The live half of the bundle check, and it earns its request the way
+   * `verifyLifecycle`'s 404 probe does. Everything about regions is an
+   * optimisation over a path that already worked, and the promise is that every
+   * way it can go wrong lands back on that path -- so the thing worth proving
+   * on a real origin is that a *missing* bundle still yields a tile.
+   *
+   * Driven by asking for a real tile's assets after pointing the cache at a
+   * region key that cannot exist, which is what a publish that dropped a file,
+   * a CDN that has not warmed the tree, or a bundle truncated mid-upload all
+   * look like from here. The assertion is simply that the bytes still arrive.
+   */
+  private async verifyRegionFallback(entry: TileEntry): Promise<string[]> {
+    const failures: string[] = [];
+    try {
+      const resp = await fetchWorldAsset(
+        this.baseUrl,
+        `regions/__no_such_region__.bin`,
+        this.version,
+      );
+      if (resp.ok) {
+        failures.push(
+          'A region bundle that does not exist was answered 200. Every missing bundle would ' +
+            "be parsed as garbage -- check the dev server's single-page fallback.",
+        );
+      }
+    } catch {
+      // Offline, or the origin is down. Not a failure of this rule.
+    }
+    try {
+      // The tile's own GLB, which the bundle for this region either holds or
+      // does not. Either way the bytes must arrive, because either way there is
+      // a per-tile file behind them.
+      const glb = await fetchWorldBuffer(this.baseUrl, `tiles/${entry.key}.glb`, this.version);
+      if (glb.byteLength === 0) {
+        failures.push(`tiles/${entry.key}.glb came back empty through the bundle path.`);
+      }
+    } catch (err) {
+      failures.push(
+        `tiles/${entry.key}.glb did not load: ${String(err)}. A region miss must degrade to a ` +
+          'per-tile fetch, never to a hole in the city.',
+      );
+    }
+    return failures;
   }
 
   /**
@@ -3135,6 +3266,11 @@ export class TileStreamer implements LampSource {
     // and the offset fold is destructive on whichever it is given.
     const gltf = await this.loader.parseAsync(buffer.slice(0), '');
     const mine = parseTileGlb(buffer.slice(0), offset);
+    // And the file's own JSON, because `GLTFLoader` drops accessor `extras` and
+    // the packing lives there. Reading it a third time is cheap -- the chunk is
+    // a few tens of kilobytes -- and it is what lets the comparison below undo
+    // the packing *independently* of the code being checked.
+    const extras = readAccessorExtras(buffer);
 
     const reference: Mesh[] = [];
     gltf.scene.traverse((node) => {
@@ -3161,25 +3297,47 @@ export class TileStreamer implements LampSource {
       }
       for (const attr of got.attributes) {
         const ref = want.getAttribute(attr.name);
-        const expected = ref.array as ArrayLike<number>;
         if (ref.itemSize !== attr.itemSize) {
           failures.push(`primitive ${i} ${attr.name}: itemSize ${ref.itemSize} vs ${attr.itemSize}`);
           break;
         }
-        if (ref.normalized !== attr.normalized) {
-          failures.push(`primitive ${i} ${attr.name}: normalized ${ref.normalized} vs ${attr.normalized}`);
+        // Colour is the one attribute that reaches the GPU as an integer, so it
+        // is the one whose `normalized` flag still has to survive verbatim --
+        // it is in the geometry cache key, and `warmup.ts` compiled a pipeline
+        // against it. Everything else is dequantised to float32 here on purpose
+        // and comes back `normalized: false`; see `tile-decode.ts`'s header.
+        const wantNormalized = attr.name === 'color' ? ref.normalized : false;
+        if (wantNormalized !== attr.normalized) {
+          failures.push(`primitive ${i} ${attr.name}: normalized ${wantNormalized} vs ${attr.normalized}`);
           break;
         }
-        if (expected.length !== attr.array.length) {
-          failures.push(`primitive ${i} ${attr.name}: length ${expected.length} vs ${attr.array.length}`);
+        if (ref.array.length !== attr.array.length) {
+          failures.push(`primitive ${i} ${attr.name}: length ${ref.array.length} vs ${attr.array.length}`);
           break;
         }
-        // The fold is applied to the reference here rather than in the parser,
-        // so this compares both halves of what the decode thread now does.
+        // The reference is `GLTFLoader`'s **stored** column -- the file holds
+        // quantised integers now, and `GLTFLoader` hands those back as they are
+        // -- put through a second, deliberately separate implementation of the
+        // unpacking. The fold into `_BLDIDX` is applied here too, so this
+        // compares both halves of what the decode thread does.
+        //
+        // Bit-exact for everything except normals, and that is not slack: the
+        // reference renormalises through a different intermediate from
+        // `unpackNormals`, and two float64 routes to the same unit vector can
+        // land a last bit apart in float32. A tenth of a degree is 1e-3; the
+        // tolerance here is 1e-6.
         const bias = attr.name === BLDIDX_LOWER ? offset : 0;
+        const expected = unpackReference(
+          ref.array as ArrayLike<number>,
+          attr.itemSize,
+          extras.get(`${i}:${attr.name}`),
+          attr.name === 'normal' && ref.normalized === true,
+          bias,
+        );
+        const tolerance = attr.name === 'normal' ? 1e-6 : 0;
         for (let k = 0; k < expected.length; k++) {
-          if (expected[k] + bias !== attr.array[k]) {
-            failures.push(`primitive ${i} ${attr.name}[${k}]: ${expected[k] + bias} vs ${attr.array[k]}`);
+          if (Math.abs(expected[k] - attr.array[k]) > tolerance) {
+            failures.push(`primitive ${i} ${attr.name}[${k}]: ${expected[k]} vs ${attr.array[k]}`);
             break;
           }
         }
@@ -3189,9 +3347,16 @@ export class TileStreamer implements LampSource {
         failures.push(`primitive ${i}: index count ${wantIndex?.count} vs ${got.index.length}`);
         continue;
       }
+      const wantIndexValues = unpackReference(
+        wantIndex.array as ArrayLike<number>,
+        1,
+        extras.get(`${i}:index`),
+        false,
+        0,
+      );
       for (let k = 0; k < got.index.length; k++) {
-        if ((wantIndex.array as ArrayLike<number>)[k] !== got.index[k]) {
-          failures.push(`primitive ${i} index[${k}]: ${(wantIndex.array as ArrayLike<number>)[k]} vs ${got.index[k]}`);
+        if (wantIndexValues[k] !== got.index[k]) {
+          failures.push(`primitive ${i} index[${k}]: ${wantIndexValues[k]} vs ${got.index[k]}`);
           break;
         }
       }
@@ -3498,6 +3663,129 @@ function resolveMaterialName(name: string): MaterialName {
 /** Seconds between now and a scheduled retry, never negative. For the log line. */
 function retryWaitSeconds(nextAt: number, now: number): number {
   return Math.max(0, nextAt - now) / 1000;
+}
+
+/**
+ * One accessor's packing, keyed `<primitive>:<three attribute name>`, read
+ * straight out of a tile's JSON chunk.
+ *
+ * `GLTFLoader` throws accessor `extras` away -- it keeps them only on nodes,
+ * meshes and materials -- and the packing lives there, so `verifyTileGlbParse`
+ * cannot get at it through the loader it is comparing against. Twelve lines of
+ * chunk-walking gets it, and getting it is what turns that comparison from "the
+ * two parsers read the same integers" back into "the two parsers produce the
+ * same geometry", which is the claim that matters.
+ */
+function readAccessorExtras(buffer: ArrayBuffer): Map<string, PackReference | undefined> {
+  const out = new Map<string, PackReference | undefined>();
+  try {
+    const head = new DataView(buffer);
+    let at = 12;
+    let json: {
+      accessors?: Array<{ extras?: PackReference }>;
+      meshes?: Array<{ primitives?: Array<{ attributes?: Record<string, number>; indices?: number }> }>;
+    } | null = null;
+    while (at + 8 <= buffer.byteLength && json === null) {
+      const length = head.getUint32(at, true);
+      const type = head.getUint32(at + 4, true);
+      if (type === 0x4e4f534a) {
+        json = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, at + 8, length)));
+      }
+      at += 8 + length + ((4 - (length % 4)) % 4);
+    }
+    if (!json) return out;
+    let primitive = 0;
+    for (const mesh of json.meshes ?? []) {
+      for (const prim of mesh.primitives ?? []) {
+        for (const [semantic, index] of Object.entries(prim.attributes ?? {})) {
+          const name = TILE_SEMANTIC_NAMES[semantic] ?? semantic.toLowerCase();
+          out.set(`${primitive}:${name}`, json.accessors?.[index]?.extras);
+        }
+        if (prim.indices !== undefined) {
+          out.set(`${primitive}:index`, json.accessors?.[prim.indices]?.extras);
+        }
+        primitive++;
+      }
+    }
+  } catch {
+    // A tile whose JSON will not parse is a tile `parseTileGlb` has already
+    // thrown on, so the caller is not going to reach this comparison.
+  }
+  return out;
+}
+
+/** `GLTFLoader.ATTRIBUTES`, for the check's own reading of the JSON chunk. */
+const TILE_SEMANTIC_NAMES: Record<string, string> = {
+  POSITION: 'position',
+  NORMAL: 'normal',
+  TEXCOORD_0: 'uv',
+  COLOR_0: 'color',
+};
+
+/** What `pipeline/sydney/meshpack.py` writes into an accessor's `extras`. */
+interface PackReference {
+  q?: number[];
+  d?: number;
+  i?: number;
+}
+
+/**
+ * Undo the packing, written out longhand, for `verifyTileGlbParse` only.
+ *
+ * **A deliberate second implementation**, and the whole value of the check is
+ * that it is one: `tile-decode.ts`'s version is three specialised loops tuned
+ * for a pass over every vertex in the city, and a check that shared them would
+ * prove only that the code equals itself. This is the format as
+ * `meshpack.unpack` states it, one component at a time, with no fast path.
+ */
+function unpackReference(
+  raw: ArrayLike<number>,
+  components: number,
+  extras: PackReference | undefined,
+  isNormal: boolean,
+  bias: number,
+): Float64Array {
+  const out = new Float64Array(raw.length);
+  const values = new Float64Array(raw.length);
+  const delta = extras?.d === 1;
+  const wide = raw instanceof Uint32Array;
+  const acc = new Float64Array(components);
+  for (let i = 0; i < raw.length; i += components) {
+    for (let c = 0; c < components; c++) {
+      acc[c] = delta
+        ? wide
+          ? (acc[c] + raw[i + c]) >>> 0
+          : (acc[c] + raw[i + c]) & 0xffff
+        : raw[i + c];
+      values[i + c] = acc[c];
+    }
+  }
+  if (extras?.q) {
+    for (let i = 0; i < raw.length; i += components) {
+      for (let c = 0; c < components; c++) {
+        out[i + c] = Math.fround(
+          values[i + c] * extras.q[components + c] + extras.q[c] + bias,
+        );
+      }
+    }
+    return out;
+  }
+  if (isNormal) {
+    for (let i = 0; i < raw.length; i += 3) {
+      const x = values[i] / 127;
+      const y = values[i + 1] / 127;
+      const z = values[i + 2] / 127;
+      const len = Math.hypot(x, y, z);
+      if (len > 0) {
+        out[i] = Math.fround(x / len);
+        out[i + 1] = Math.fround(y / len);
+        out[i + 2] = Math.fround(z / len);
+      }
+    }
+    return out;
+  }
+  for (let i = 0; i < raw.length; i++) out[i] = Math.fround(values[i] + bias);
+  return out;
 }
 
 /** Distance from a point to an axis-aligned XZ box, zero if inside. */

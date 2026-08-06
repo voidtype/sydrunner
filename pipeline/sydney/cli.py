@@ -47,6 +47,7 @@ from . import (
     parking,
     power,
     powerups,
+    regions,
     roadgrade,
     rows,
     streets,
@@ -650,6 +651,19 @@ def cmd_build(args: argparse.Namespace) -> int:
     # earlier run, so it is rebuilt from the ledger rather than from this run.
     all_results = _results_from_ledger(con, wanted)
     all_results += _carry_index_tiles({r.key for r in all_results}, wanted)
+    # The big map's one-request bundle, from the `.names.bin` sidecars the tile
+    # loop has just written. Not ledgered, like the suburb table and the far
+    # water: it is a repack of files already on disk, it costs a fraction of a
+    # second, and doing it every run is what guarantees the bundle the index
+    # describes is the bundle beside it. See `_emit_name_bundle`.
+    names_contract = _emit_name_bundle(all_results)
+    # The streaming bundles, on exactly the same terms as the name bundle above:
+    # a repack of files already on disk, done every run so that the regions the
+    # index describes are the regions beside it. It must come last, after every
+    # sidecar this run could have written or deleted, because a region is
+    # whatever its tiles are made of at the moment it is packed. See
+    # `sydney.regions`.
+    regions_contract = _emit_regions(all_results)
     tiles.write_index(
         all_results,
         stage.name,
@@ -659,8 +673,12 @@ def cmd_build(args: argparse.Namespace) -> int:
         water_contract,
         landmark_contract,
         lanes.manifest(lane_network),
+        names_contract,
+        regions_contract,
     )
     _report_street_names(all_results)
+    _report_name_bundle(names_contract)
+    _report_regions(regions_contract)
     _report_water_tiles(all_results)
 
     total_mb = sum(r.glb_bytes for r in all_results) / 1024**2
@@ -932,6 +950,86 @@ def _report_street_names(results: list[tiles.TileResult]) -> None:
         f"    {total_bytes / 1024:,.0f} kB total,"
         f" {total_bytes / max(len(named), 1):,.0f} bytes a tile mean,"
         f" decimated at {streets.NAME_SIMPLIFY:.1f} m"
+    )
+
+
+def _emit_name_bundle(results: list[tiles.TileResult]) -> dict:
+    """Repack every `.names.bin` into `world/street-names.bin`.
+
+    The tile order is `index.json`'s, which is sorted by key -- `write_index`
+    sorts the same way -- because the client interns street names in the order
+    it first meets them and that order is the last tie-break when two streets
+    rank equal for a label. See `tiles.write_street_name_bundle`.
+
+    Reads the sidecars back off disk rather than taking the segments from the
+    tile loop, which is what makes it work on a resumed build where most tiles
+    were emitted on an earlier run and are not in memory at all.
+    """
+    entries = [
+        (r.key, float(r.bounds[0]), float(r.bounds[1]) + config.TILE_SIZE)
+        for r in sorted(results, key=lambda r: r.key)
+        if r.street_names
+    ]
+    return tiles.write_street_name_bundle(
+        config.OUT_ROOT / "street-names.bin", entries, config.TILE_DIR
+    )
+
+
+def _report_name_bundle(contract: dict) -> None:
+    """What the map's first press of `M` now costs, against what it cost.
+
+    The request count is the number worth printing rather than the bytes: the
+    bundle is within a few percent of the sidecars it replaces and always will
+    be -- it is the same points -- and the whole reason it exists is that it is
+    *one* of them instead of one per tile.
+    """
+    if not contract.get("runs"):
+        return
+    print(
+        f"    bundle -> street-names.bin: {contract['runs']:,} runs,"
+        f" {contract['points']:,} points, {contract['names']:,} names"
+        f" over {contract['tiles']:,} tiles, {contract['bytes'] / 1024:,.0f} kB"
+        f" -- the big map's first open is 1 request rather than {contract['tiles']:,}"
+    )
+
+
+def _emit_regions(results: list[tiles.TileResult]) -> dict:
+    """Repack every tile's files into `world/regions/<rx>_<rz>.bin`.
+
+    Reads what is on disk rather than what this run produced, for the reason
+    `_emit_name_bundle` does: on a resumed or narrowed build most tiles were
+    emitted by an earlier run and are not in memory, and a region that only
+    bundled *this* run's tiles would be a region with holes in it that the
+    client would then have to fall back per-tile for -- silently, and only on
+    the tiles that happened not to be rebuilt.
+    """
+    return regions.emit(
+        [r.key for r in sorted(results, key=lambda r: r.key)],
+        {r.key: list(r.bounds) for r in results},
+    )
+
+
+def _report_regions(contract: dict) -> None:
+    """What a walk now costs in requests, against what it cost.
+
+    Requests are the number to print, like the name bundle above: the bytes are
+    the same bytes. What changed is that the 1,800 m load radius is ~19 fetches
+    instead of the ~500 files those 41 tiles are made of.
+    """
+    if not contract.get("count"):
+        return
+    sizes = sorted(r["size"] for r in contract["list"])
+    p50 = sizes[len(sizes) // 2]
+    p95 = sizes[min(len(sizes) - 1, int(len(sizes) * 0.95))]
+    files = sum(r["n"] for r in contract["list"])
+    print(
+        f"    regions -> {contract['count']:,} bundles of"
+        f" {contract['tiles_per_side']}x{contract['tiles_per_side']} tiles"
+        f" ({contract['size_m'] / 1000:.1f} km), {contract['bytes'] / 1024**2:,.0f} MB,"
+        f" p50 {p50 / 1024**2:.2f} MB p95 {p95 / 1024**2:.2f} MB"
+        f" max {contract['max_bytes'] / 1024**2:.2f} MB"
+        f" -- {files:,} per-tile files behind {contract['count']:,} requests,"
+        f" triggered at {contract['trigger_m']:,.0f} m"
     )
 
 
@@ -3987,6 +4085,50 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_name_bundle(args: argparse.Namespace) -> int:
+    """Rebuild `street-names.bin` from the world already on disk.
+
+    The bundle is a pure repack of the `.names.bin` sidecars, so it can be made
+    from a finished build without re-tiling anything -- which is the whole point
+    of this command. `build` writes it on every run and this is not a substitute
+    for that; it is for the case where a world was emitted by a pipeline that
+    predates the bundle, or where the format changed and the geometry did not.
+    An eight-minute retile to repack half a megabyte would be absurd.
+
+    The index is **patched rather than rewritten**: it is read, the
+    `street_names` block is replaced, and it is written back with every other
+    key untouched -- including `cdn`, which `scripts/publish-world.sh` stamps in
+    afterwards and which a regenerated index would silently drop. `built` is
+    deliberately left alone: the bundle carries the same points as the sidecars
+    the stamp already covers, so moving it would expire the whole world's cache
+    to no purpose.
+    """
+    if not config.INDEX_PATH.exists():
+        print(f"no index at {config.INDEX_PATH} -- build the world first")
+        return 1
+    index = json.loads(config.INDEX_PATH.read_text())
+    size = float(index.get("tile_size", config.TILE_SIZE))
+    entries = [
+        (e["key"], float(e["bounds"][0]), float(e["bounds"][1]) + size)
+        for e in index.get("tiles", [])
+        if e.get("sn")
+    ]
+    print(f"{len(entries):,} tiles with named streets, from {config.INDEX_PATH}")
+    contract = tiles.write_street_name_bundle(
+        config.OUT_ROOT / "street-names.bin", entries, config.TILE_DIR
+    )
+    if not contract.get("runs"):
+        index.pop("street_names", None)
+        config.INDEX_PATH.write_text(json.dumps(index))
+        print("no named centreline anywhere in the build -- no bundle written")
+        return 0
+    index["street_names"] = contract
+    config.INDEX_PATH.write_text(json.dumps(index))
+    _report_name_bundle(contract)
+    print(f"index -> {config.INDEX_PATH}")
+    return 0
+
+
 def cmd_reset(args: argparse.Namespace) -> int:
     con = ledger.connect()
     print(f"reset {ledger.reset(con, args.kind):,} '{args.kind}' units to pending")
@@ -4013,6 +4155,12 @@ def main(argv: list[str] | None = None) -> int:
 
     s = sub.add_parser("status", help="ledger and dataset summary")
     s.set_defaults(func=cmd_status)
+
+    nb = sub.add_parser(
+        "name-bundle",
+        help="repack the .names.bin sidecars into world/street-names.bin and patch the index",
+    )
+    nb.set_defaults(func=cmd_name_bundle)
 
     t = sub.add_parser("terrain-audit", help="read the emitted world back and check its heights")
     t.add_argument(

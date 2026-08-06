@@ -59,6 +59,41 @@
  * reads attribute *names* and item sizes. `verifyTileGlbParse` in `streamer.ts`
  * runs both parsers over a real tile at boot in dev and compares, which is the
  * regression net for that claim.
+ *
+ * ---------------------------------------------------------------------------
+ * THE PACKED ATTRIBUTES, which is the other half of `pipeline/sydney/meshpack.py`
+ * and where most of the arithmetic in this file now lives.
+ *
+ * Tile geometry was 96% of a 613 MB world and every column of it was float32
+ * holding values that did not need a float32. The pipeline now quantises
+ * positions and metric UVs to uint16 per axis, narrows normals to int8 and
+ * `_BLDIDX` and the indices to uint16, and delta-codes everything that is not
+ * already one byte wide -- 2.25x off the raw bytes and 1.82x off the wire after
+ * brotli. `meshpack`'s header carries the measurements and the schemes that
+ * were tried and rejected.
+ *
+ * **What comes out of here is unchanged.** Positions, normals, UVs and
+ * `_BLDIDX` are handed back as `Float32Array`, normals renormalised, colour
+ * still normalised `Uint8Array`. That is not conservatism; it is the pipeline
+ * cache key. Three's `getGeometryCacheKey` reads each attribute's name, item
+ * size and `normalized` flag, and `world/warmup.ts` compiles a pipeline at boot
+ * against stand-in geometry built from exactly those types -- see the note there
+ * about the colour attribute. An int8 normal reaching the GPU would key
+ * differently from the stand-in, and the first tile of the session would pay a
+ * shader compile on the render thread, which is the precise hitch this whole
+ * decode-thread architecture exists to remove. The bytes are saved on the wire,
+ * where the problem was; the GPU sees what it always saw.
+ *
+ * The dequantisation is one multiply-add per component fused into the delta's
+ * prefix sum, so it is a single pass over an array that is now less than half
+ * the size it used to be -- the pass replaces a `slice` of twice the bytes.
+ *
+ * The atlas-offset fold into `_BLDIDX` happens in that same pass. `_BLDIDX` is
+ * **exact**: it is a row number in the facade parameter atlas, it is stored as
+ * an integer and widened to the float32 the pipeline wrote, and a value one off
+ * is a terrace house drawn with a tower's window grammar. `verifyMeshPack`
+ * below and `verifyStreaming` in `streamer.ts` both assert that separately from
+ * everything else.
  */
 
 // --- The GLB container --------------------------------------------------------
@@ -154,6 +189,23 @@ export interface TileGlb {
   primitives: GlbPrimitive[];
 }
 
+/**
+ * How one accessor was packed, out of its glTF `extras`.
+ *
+ * `extras` is legal glTF that every other loader ignores, which is what lets a
+ * packed tile still be read by `GLTFLoader` -- and therefore what keeps
+ * `verifyTileGlbParse`'s comparison against `GLTFLoader` alive. **Must match
+ * what `pipeline/sydney/meshpack.py` writes.**
+ */
+interface PackExtras {
+  /** `[ox, oy, oz, sx, sy, sz]`: per-axis offset then per-axis scale. */
+  q?: number[];
+  /** Delta-coded along the vertex axis, per component. */
+  d?: number;
+  /** An integer column widened to float32 exactly -- `_BLDIDX`. */
+  i?: number;
+}
+
 interface GltfAccessor {
   bufferView?: number;
   byteOffset?: number;
@@ -161,6 +213,7 @@ interface GltfAccessor {
   count: number;
   type: string;
   normalized?: boolean;
+  extras?: PackExtras;
 }
 
 interface GltfBufferView {
@@ -195,26 +248,6 @@ function componentBytes(componentType: number): number {
   }
 }
 
-function makeArray(
-  componentType: number,
-  bytes: ArrayBuffer,
-): GlbAttribute['array'] {
-  switch (componentType) {
-    case COMPONENT_BYTE:
-      return new Int8Array(bytes);
-    case COMPONENT_UBYTE:
-      return new Uint8Array(bytes);
-    case COMPONENT_SHORT:
-      return new Int16Array(bytes);
-    case COMPONENT_USHORT:
-      return new Uint16Array(bytes);
-    case COMPONENT_UINT:
-      return new Uint32Array(bytes);
-    default:
-      return new Float32Array(bytes);
-  }
-}
-
 /**
  * Read one accessor out of the BIN chunk, as its own `ArrayBuffer`.
  *
@@ -230,18 +263,29 @@ function makeArray(
  * offset zero, so a `Float32Array` over it is always legal however the view was
  * placed in the file.
  */
-function readAccessor(json: GltfJson, bin: ArrayBuffer, index: number): GlbAttribute['array'] {
+/**
+ * The stored column, as a *view* into the BIN chunk rather than a copy.
+ *
+ * A view where `readAccessor` slices, because every caller below is about to
+ * write a freshly allocated output array anyway -- the copy would be a second
+ * pass over the same bytes for nothing. `write_glb` pads the blob to four bytes
+ * before every buffer view and gives each accessor its own view at offset zero,
+ * so `start` is always a multiple of four and a typed-array view over it is
+ * always legal. That is checked here rather than assumed, because the failure
+ * of assuming it is a `RangeError` from a constructor, thrown inside the worker,
+ * with nothing in the message about which tile it came from.
+ */
+function accessorView(
+  json: GltfJson,
+  bin: ArrayBuffer,
+  index: number,
+): { view: GlbAttribute['array']; accessor: GltfAccessor; components: number } {
   const accessor = json.accessors?.[index];
   if (!accessor) throw new Error(`glb: no accessor ${index}`);
-  if (accessor.bufferView === undefined) {
-    // A view-less accessor is glTF's "all zeroes", which this pipeline never
-    // emits. Refused rather than synthesised: silently handing back zeroes
-    // would put a tile's worth of geometry at the origin.
-    throw new Error(`glb: accessor ${index} has no bufferView`);
-  }
-  const view = json.bufferViews?.[accessor.bufferView];
-  if (!view) throw new Error(`glb: no bufferView ${accessor.bufferView}`);
-  if (view.byteStride !== undefined && view.byteStride !== 0) {
+  if (accessor.bufferView === undefined) throw new Error(`glb: accessor ${index} has no bufferView`);
+  const bufferView = json.bufferViews?.[accessor.bufferView];
+  if (!bufferView) throw new Error(`glb: no bufferView ${accessor.bufferView}`);
+  if (bufferView.byteStride !== undefined && bufferView.byteStride !== 0) {
     throw new Error('glb: interleaved bufferView, which this pipeline never writes');
   }
   const components = TYPE_COMPONENTS[accessor.type];
@@ -249,10 +293,196 @@ function readAccessor(json: GltfJson, bin: ArrayBuffer, index: number): GlbAttri
   if (!components || !size) {
     throw new Error(`glb: accessor ${index} type ${accessor.type}/${accessor.componentType}`);
   }
-  const start = (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
+  const start = (bufferView.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
   const length = accessor.count * components * size;
-  if (start + length > bin.byteLength) throw new Error(`glb: accessor ${index} runs past the BIN chunk`);
-  return makeArray(accessor.componentType, bin.slice(start, start + length));
+  if (start + length > bin.byteLength) {
+    throw new Error(`glb: accessor ${index} runs past the BIN chunk`);
+  }
+  if (start % size !== 0) throw new Error(`glb: accessor ${index} is misaligned at ${start}`);
+  const count = accessor.count * components;
+  let view: GlbAttribute['array'];
+  switch (accessor.componentType) {
+    case COMPONENT_BYTE:
+      view = new Int8Array(bin, start, count);
+      break;
+    case COMPONENT_UBYTE:
+      view = new Uint8Array(bin, start, count);
+      break;
+    case COMPONENT_SHORT:
+      view = new Int16Array(bin, start, count);
+      break;
+    case COMPONENT_USHORT:
+      view = new Uint16Array(bin, start, count);
+      break;
+    case COMPONENT_UINT:
+      view = new Uint32Array(bin, start, count);
+      break;
+    default:
+      view = new Float32Array(bin, start, count);
+      break;
+  }
+  return { view, accessor, components };
+}
+
+/**
+ * Undo the delta filter and the quantisation in one pass, into float32.
+ *
+ * `bias` is added to every value on the way out, which is how the atlas-row
+ * fold into `_BLDIDX` rides along for free -- it used to be a separate pass
+ * over every vertex of every building primitive in the tile.
+ *
+ * The prefix sum is modular in the stored width, exactly as
+ * `meshpack.delta_encode` produced it, so a column that wraps reconstructs
+ * without a special case. `mask` is the whole of that: `& 0xffff` for uint16
+ * and `>>> 0` for uint32, and the accumulator never leaves the safe integer
+ * range in between because both operands are below 2^32.
+ */
+function unpackToFloat(
+  raw: GlbAttribute['array'],
+  components: number,
+  extras: PackExtras | undefined,
+  bias: number,
+): Float32Array {
+  const n = raw.length;
+  const out = new Float32Array(n);
+  const q = extras?.q;
+  const delta = extras?.d === 1;
+
+  if (!delta && !q) {
+    // A float column the pipeline left alone -- a UV span too long to quantise
+    // within a centimetre, which is a handful of long kerb runs in the build --
+    // or the whole of a tile written before this format existed.
+    for (let i = 0; i < n; i++) out[i] = raw[i] + bias;
+    return out;
+  }
+
+  // Offsets and scales in locals, not an array lookup per component. This is
+  // the loop that runs over every vertex in the city and the difference is
+  // measurable.
+  const o0 = q ? q[0] : 0;
+  const s0 = q ? q[components] : 1;
+
+  // Three specialised loops rather than one general one, and the specialisation
+  // is worth the repetition: `components` is a runtime value, so a general loop
+  // carries a branch per component that the engine cannot hoist, and VEC3
+  // position is 30% of every tile.
+  if (delta && raw instanceof Uint16Array) {
+    if (components === 3) {
+      const o1 = q ? q[1] : 0;
+      const o2 = q ? q[2] : 0;
+      const s1 = q ? q[4] : 1;
+      const s2 = q ? q[5] : 1;
+      let a0 = 0;
+      let a1 = 0;
+      let a2 = 0;
+      for (let i = 0; i < n; i += 3) {
+        a0 = (a0 + raw[i]) & 0xffff;
+        a1 = (a1 + raw[i + 1]) & 0xffff;
+        a2 = (a2 + raw[i + 2]) & 0xffff;
+        out[i] = a0 * s0 + o0 + bias;
+        out[i + 1] = a1 * s1 + o1 + bias;
+        out[i + 2] = a2 * s2 + o2 + bias;
+      }
+      return out;
+    }
+    if (components === 2) {
+      const o1 = q ? q[1] : 0;
+      const s1 = q ? q[3] : 1;
+      let a0 = 0;
+      let a1 = 0;
+      for (let i = 0; i < n; i += 2) {
+        a0 = (a0 + raw[i]) & 0xffff;
+        a1 = (a1 + raw[i + 1]) & 0xffff;
+        out[i] = a0 * s0 + o0 + bias;
+        out[i + 1] = a1 * s1 + o1 + bias;
+      }
+      return out;
+    }
+    if (components === 1) {
+      let a0 = 0;
+      for (let i = 0; i < n; i++) {
+        a0 = (a0 + raw[i]) & 0xffff;
+        out[i] = a0 * s0 + o0 + bias;
+      }
+      return out;
+    }
+  }
+
+  // The general case, for anything the fast paths above do not cover: a wider
+  // stored width, more than three components, or a quantised column with no
+  // delta filter. Correct rather than quick, because nothing in the build takes
+  // it -- and it is here so that a format that grows one does not silently
+  // decode to the wrong thing.
+  const wide = raw instanceof Uint32Array;
+  const acc = new Float64Array(components);
+  for (let i = 0; i < n; i += components) {
+    for (let c = 0; c < components; c++) {
+      if (delta) {
+        acc[c] = wide ? (acc[c] + raw[i + c]) >>> 0 : (acc[c] + raw[i + c]) & 0xffff;
+      } else {
+        acc[c] = raw[i + c];
+      }
+      const scale = q ? q[components + c] : 1;
+      const offset = q ? q[c] : 0;
+      out[i + c] = acc[c] * scale + offset + bias;
+    }
+  }
+  return out;
+}
+
+/**
+ * Undo the delta filter on an index buffer, keeping it an integer array.
+ *
+ * Separate from `unpackToFloat` because an index must never touch a float: at
+ * 33,441 vertices it would survive one, but the type it comes back as is what
+ * three binds the index buffer with, and `warmup.ts`'s stand-in geometry is
+ * indexed with a `Uint16Array` -- which is now what a tile hands over too.
+ */
+function unpackIndex(raw: Uint16Array | Uint32Array, delta: boolean): Uint16Array | Uint32Array {
+  if (!delta) return raw.slice();
+  const n = raw.length;
+  const wide = raw instanceof Uint32Array;
+  const out = wide ? new Uint32Array(n) : new Uint16Array(n);
+  let acc = 0;
+  for (let i = 0; i < n; i++) {
+    acc = wide ? (acc + raw[i]) >>> 0 : (acc + raw[i]) & 0xffff;
+    out[i] = acc;
+  }
+  return out;
+}
+
+/**
+ * int8 normals back to unit float32.
+ *
+ * Renormalised rather than just scaled: `q / 127` has a length within 0.6% of
+ * one, which no lighting in this client can see, but the shader path is TSL and
+ * whether every node on it normalises is not a thing this file should have to
+ * know. One reciprocal square root per vertex settles it.
+ *
+ * A zero normal stays zero. The build has 13,648 of them out of 13.8 M, from
+ * degenerate source triangles, and inventing a direction for one here would be
+ * the decoder deciding how the city is lit.
+ */
+function unpackNormals(raw: Int8Array): Float32Array {
+  const n = raw.length;
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i += 3) {
+    const x = raw[i];
+    const y = raw[i + 1];
+    const z = raw[i + 2];
+    const sq = x * x + y * y + z * z;
+    if (sq > 0) {
+      // One reciprocal square root and three multiplies. The 1/127 the encoder
+      // divided by cancels out of a renormalisation, so it is not applied at
+      // all -- the direction is what survives quantisation, and the length is
+      // reconstructed rather than carried.
+      const inv = 1 / Math.sqrt(sq);
+      out[i] = x * inv;
+      out[i + 1] = y * inv;
+      out[i + 2] = z * inv;
+    }
+  }
+  return out;
 }
 
 /**
@@ -316,24 +546,56 @@ export function parseTileGlb(buffer: ArrayBuffer, bldOffset: number): TileGlb {
 
       const attributes: GlbAttribute[] = [];
       for (const [semantic, accessorIndex] of Object.entries(prim.attributes ?? {})) {
-        const accessor = json.accessors![accessorIndex];
-        const array = readAccessor(json, bin, accessorIndex);
+        const { view, accessor, components } = accessorView(json, bin, accessorIndex);
         const name = ATTRIBUTE_NAMES[semantic] ?? semantic.toLowerCase();
-        if (name === BLDIDX_LOWER && bldOffset !== 0 && array instanceof Float32Array) {
-          for (let i = 0; i < array.length; i++) array[i] += bldOffset;
+
+        // Colour is the one attribute the pipeline leaves alone -- it is already
+        // one normalised byte a component -- and it is also the one the GPU
+        // takes as an integer, so it is copied out as it stands. A copy rather
+        // than the view, so the tile does not hold the whole BIN chunk alive
+        // for as long as it is resident.
+        if (semantic === 'COLOR_0') {
+          attributes.push({
+            name,
+            array: view.slice() as GlbAttribute['array'],
+            itemSize: components,
+            normalized: accessor.normalized === true,
+          });
+          continue;
         }
+
+        // Normals come off the wire as int8 and go to the GPU as float32. See
+        // this file's header for why they are not left as int8: the geometry
+        // cache key, and the pipeline `warmup.ts` compiled against it.
+        if (semantic === 'NORMAL' && view instanceof Int8Array) {
+          attributes.push({ name, array: unpackNormals(view), itemSize: 3, normalized: false });
+          continue;
+        }
+
+        // Everything else -- position, metric UV, `_BLDIDX` -- comes back as
+        // float32 with the delta and the quantisation undone in one pass, and
+        // the atlas row folded into `_BLDIDX` on the way past.
         attributes.push({
           name,
-          array,
-          itemSize: TYPE_COMPONENTS[accessor.type] ?? 1,
-          normalized: accessor.normalized === true,
+          array: unpackToFloat(
+            view,
+            components,
+            accessor.extras,
+            name === BLDIDX_LOWER ? bldOffset : 0,
+          ),
+          itemSize: components,
+          normalized: false,
         });
       }
 
-      const index = readAccessor(json, bin, prim.indices);
-      if (!(index instanceof Uint32Array) && !(index instanceof Uint16Array)) {
+      const packedIndex = accessorView(json, bin, prim.indices);
+      if (
+        !(packedIndex.view instanceof Uint32Array) &&
+        !(packedIndex.view instanceof Uint16Array)
+      ) {
         throw new Error('glb: index accessor is not an unsigned int');
       }
+      const index = unpackIndex(packedIndex.view, packedIndex.accessor.extras?.d === 1);
       primitives.push({
         material: materials[prim.material ?? -1]?.name ?? '',
         attributes,
@@ -342,6 +604,292 @@ export function parseTileGlb(buffer: ArrayBuffer, bldOffset: number): TileGlb {
     }
   }
   return { primitives };
+}
+
+// --- The pack format, checked against itself ----------------------------------
+
+/**
+ * The packing this decoder understands. **Must match `PACK_VERSION` in
+ * `pipeline/sydney/meshpack.py`.**
+ *
+ * It rides in `index.json` as `geometry.pack`, and `streamer.verifyStreaming`
+ * refuses a build that names a different one. A tile decoded by the wrong rules
+ * is not a subtly wrong tile -- it is a city of noise -- so the failure has to
+ * be loud and has to happen at boot rather than on the first tile that happens
+ * to use whichever field changed.
+ */
+export const TILE_PACK_VERSION = 1;
+
+/**
+ * A packed GLB built from known values, parsed back, compared.
+ *
+ * **The bit-exact round trip.** It is here and not in the streamer because it
+ * needs no network, no `three` and no DOM -- so `server/integration-check.ts`
+ * runs it in the suite alongside every other pure check, and `verifyStreaming`
+ * runs it in the browser against the same code. What it proves is the part of
+ * the format that a comparison against `GLTFLoader` on a real tile *cannot*:
+ * `GLTFLoader` hands back the stored integers, so comparing against it proves
+ * the container was read correctly and says nothing about whether the
+ * dequantisation is right. This proves the arithmetic.
+ *
+ * The three claims, one assertion each:
+ *
+ *   1. **`_BLDIDX` is exact.** Integers in, the same integers out, plus the
+ *      atlas offset. Not "within a tolerance" -- equal. A row number one off is
+ *      a building drawn with another building's facade grammar, and it is the
+ *      one column in the file where quantisation would be a bug rather than a
+ *      trade.
+ *   2. **Indices are exact**, through the delta filter, including a wrap.
+ *   3. **Positions and UVs come back inside the quantum.** The bound is the
+ *      per-axis step the writer chose, which is what the error claim in
+ *      `index.json`'s `geometry` block is denominated in.
+ *
+ * Returns a list of failures, like every other check in this client.
+ */
+export function verifyMeshPack(): string[] {
+  const failures: string[] = [];
+
+  // A primitive with a deliberately awkward shape: a 500 m x 40 m x 500 m
+  // extent like a real tile, a degenerate axis (every vertex at the same v),
+  // and an index buffer whose deltas go backwards.
+  const count = 64;
+  const position = new Float32Array(count * 3);
+  const uv = new Float32Array(count * 2);
+  const bld = new Float32Array(count);
+  for (let i = 0; i < count; i++) {
+    position[i * 3] = (i / (count - 1)) * 500;
+    position[i * 3 + 1] = (i % 7) * 6.5;
+    position[i * 3 + 2] = -((i / (count - 1)) * 500);
+    uv[i * 2] = i * 3.25;
+    uv[i * 2 + 1] = 12.5; // degenerate axis: span 0
+    bld[i] = (i * 13) % 770;
+  }
+  const index = new Uint16Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    index[i * 3] = (count - 1 - i) % count;
+    index[i * 3 + 1] = i;
+    index[i * 3 + 2] = (i * 31) % count;
+  }
+
+  const bias = 11;
+  const glb = packSyntheticGlb(position, uv, bld, index);
+  let parsed: TileGlb;
+  try {
+    parsed = parseTileGlb(glb, bias);
+  } catch (err) {
+    return [`verifyMeshPack could not parse its own GLB: ${String(err)}`];
+  }
+  if (parsed.primitives.length !== 1) {
+    return [`verifyMeshPack: ${parsed.primitives.length} primitives, expected 1`];
+  }
+  const prim = parsed.primitives[0];
+  const by = new Map(prim.attributes.map((a) => [a.name, a]));
+
+  const gotBld = by.get(BLDIDX_LOWER)?.array;
+  if (!(gotBld instanceof Float32Array)) {
+    failures.push('_BLDIDX did not come back as a Float32Array');
+  } else {
+    for (let i = 0; i < count; i++) {
+      if (gotBld[i] !== bld[i] + bias) {
+        failures.push(
+          `_BLDIDX[${i}] is ${gotBld[i]}, expected exactly ${bld[i] + bias}. ` +
+            'The facade parameter index must survive packing bit for bit.',
+        );
+        break;
+      }
+    }
+  }
+
+  if (prim.index.length !== index.length) {
+    failures.push(`index count ${prim.index.length}, expected ${index.length}`);
+  } else {
+    for (let i = 0; i < index.length; i++) {
+      if (prim.index[i] !== index[i]) {
+        failures.push(`index[${i}] is ${prim.index[i]}, expected ${index[i]} (delta filter)`);
+        break;
+      }
+    }
+  }
+
+  // 500 m over 65,535 steps is a 7.6 mm quantum, so half of it is the bound;
+  // a little slack for the float32 the value is stored back into.
+  const bound = (500 / 65535) * 0.5 + 1e-4;
+  const gotPos = by.get('position')?.array;
+  if (!(gotPos instanceof Float32Array)) {
+    failures.push('position did not come back as a Float32Array');
+  } else {
+    let worst = 0;
+    for (let i = 0; i < position.length; i++) worst = Math.max(worst, Math.abs(gotPos[i] - position[i]));
+    if (worst > bound) failures.push(`position error ${(worst * 1000).toFixed(3)} mm exceeds the quantum`);
+  }
+  const gotUv = by.get('uv')?.array;
+  if (!(gotUv instanceof Float32Array)) {
+    failures.push('uv did not come back as a Float32Array');
+  } else {
+    let worst = 0;
+    for (let i = 0; i < uv.length; i++) worst = Math.max(worst, Math.abs(gotUv[i] - uv[i]));
+    // The v column has zero span, so it must be reproduced exactly -- a
+    // degenerate axis is where a scale of zero would show up as NaN.
+    for (let i = 1; i < uv.length; i += 2) {
+      if (gotUv[i] !== uv[i]) {
+        failures.push(`uv v[${i}] is ${gotUv[i]}, expected exactly ${uv[i]} (degenerate axis)`);
+        break;
+      }
+    }
+    if (worst > (uv[uv.length - 2] / 65535) * 0.5 + 1e-3) {
+      failures.push(`uv error ${(worst * 1000).toFixed(3)} mm exceeds the quantum`);
+    }
+  }
+
+  return failures;
+}
+
+/**
+ * The pipeline's writer, in miniature, for `verifyMeshPack` only.
+ *
+ * A deliberate second implementation rather than a fixture: a fixture would go
+ * stale the moment `meshpack.py` changed and would fail as "the check is old"
+ * rather than as "the format moved". This is small enough to read against
+ * `meshpack.pack_*` line for line, and if the two ever disagree the round trip
+ * above is what says so.
+ */
+function packSyntheticGlb(
+  position: Float32Array,
+  uv: Float32Array,
+  bld: Float32Array,
+  index: Uint16Array,
+): ArrayBuffer {
+  const bin: number[] = [];
+  const views: Array<{ byteOffset: number; byteLength: number }> = [];
+  const accessors: GltfAccessor[] = [];
+
+  const push = (bytes: Uint8Array): number => {
+    while (bin.length % 4) bin.push(0);
+    const byteOffset = bin.length;
+    for (const b of bytes) bin.push(b);
+    views.push({ byteOffset, byteLength: bytes.length });
+    return views.length - 1;
+  };
+
+  const quantise = (values: Float32Array, components: number): number[] => {
+    const offset: number[] = [];
+    const scale: number[] = [];
+    for (let c = 0; c < components; c++) {
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (let i = c; i < values.length; i += components) {
+        lo = Math.min(lo, values[i]);
+        hi = Math.max(hi, values[i]);
+      }
+      offset.push(lo);
+      scale.push(hi > lo ? (hi - lo) / 65535 : 1);
+    }
+    const codes = new Uint16Array(values.length);
+    for (let i = 0; i < values.length; i++) {
+      const c = i % components;
+      codes[i] = Math.round((values[i] - offset[c]) / scale[c]);
+    }
+    deltaInPlace(codes, components);
+    push(new Uint8Array(codes.buffer, codes.byteOffset, codes.byteLength));
+    return [...offset, ...scale];
+  };
+
+  const addQuantised = (values: Float32Array, components: number, type: string): number => {
+    const q = quantise(values, components);
+    accessors.push({
+      bufferView: views.length - 1,
+      componentType: COMPONENT_USHORT,
+      count: values.length / components,
+      type,
+      extras: { q, d: 1 },
+    });
+    return accessors.length - 1;
+  };
+
+  const positionAccessor = addQuantised(position, 3, 'VEC3');
+  const uvAccessor = addQuantised(uv, 2, 'VEC2');
+
+  const bldCodes = new Uint16Array(bld.length);
+  for (let i = 0; i < bld.length; i++) bldCodes[i] = bld[i];
+  deltaInPlace(bldCodes, 1);
+  push(new Uint8Array(bldCodes.buffer, bldCodes.byteOffset, bldCodes.byteLength));
+  accessors.push({
+    bufferView: views.length - 1,
+    componentType: COMPONENT_USHORT,
+    count: bld.length,
+    type: 'SCALAR',
+    extras: { i: 1, d: 1 },
+  });
+  const bldAccessor = accessors.length - 1;
+
+  const indexCodes = index.slice();
+  deltaInPlace(indexCodes, 1);
+  push(new Uint8Array(indexCodes.buffer, indexCodes.byteOffset, indexCodes.byteLength));
+  accessors.push({
+    bufferView: views.length - 1,
+    componentType: COMPONENT_USHORT,
+    count: index.length,
+    type: 'SCALAR',
+    extras: { d: 1 },
+  });
+  const indexAccessor = accessors.length - 1;
+
+  const json = JSON.stringify({
+    asset: { version: '2.0' },
+    extensionsUsed: ['KHR_mesh_quantization', 'SYD_mesh_pack'],
+    scene: 0,
+    scenes: [{ nodes: [0] }],
+    nodes: [{ mesh: 0 }],
+    materials: [{ name: 'brick_red' }],
+    meshes: [
+      {
+        primitives: [
+          {
+            attributes: {
+              POSITION: positionAccessor,
+              TEXCOORD_0: uvAccessor,
+              _BLDIDX: bldAccessor,
+            },
+            indices: indexAccessor,
+            material: 0,
+            mode: 4,
+          },
+        ],
+      },
+    ],
+    accessors,
+    bufferViews: views.map((v) => ({ buffer: 0, ...v })),
+    buffers: [{ byteLength: bin.length }],
+  });
+
+  const jsonBytes = new TextEncoder().encode(json);
+  const jsonPad = (4 - (jsonBytes.length % 4)) % 4;
+  const binPad = (4 - (bin.length % 4)) % 4;
+  const total = 12 + 8 + jsonBytes.length + jsonPad + 8 + bin.length + binPad;
+  const out = new ArrayBuffer(total);
+  const view = new DataView(out);
+  const bytes = new Uint8Array(out);
+  view.setUint32(0, 0x46546c67, true);
+  view.setUint32(4, 2, true);
+  view.setUint32(8, total, true);
+  view.setUint32(12, jsonBytes.length + jsonPad, true);
+  view.setUint32(16, 0x4e4f534a, true);
+  bytes.set(jsonBytes, 20);
+  for (let i = 0; i < jsonPad; i++) bytes[20 + jsonBytes.length + i] = 0x20;
+  const binChunk = 20 + jsonBytes.length + jsonPad;
+  view.setUint32(binChunk, bin.length + binPad, true);
+  view.setUint32(binChunk + 4, 0x004e4942, true);
+  bytes.set(new Uint8Array(bin), binChunk + 8);
+  return out;
+}
+
+/** `meshpack.delta_encode`, in place, modular in the stored width. */
+function deltaInPlace(values: Uint16Array, components: number): void {
+  for (let i = values.length - components; i >= components; i -= components) {
+    for (let c = 0; c < components; c++) {
+      values[i + c] = (values[i + c] - values[i + c - components]) & 0xffff;
+    }
+  }
 }
 
 // --- The vegetation sidecar ---------------------------------------------------

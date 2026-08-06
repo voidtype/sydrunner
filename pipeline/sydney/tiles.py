@@ -14,11 +14,13 @@ One tile produces up to nine files:
   tiles/<tx>_<tz>.water.bin    the water surface over this tile, as a mesh
   collision/<tx>_<tz>.bin      simplified prisms, for the server
 
-Plus four files that belong to no tile at all and are written once for the whole
+Plus five files that belong to no tile at all and are written once for the whole
 build -- `far.bin` and `far-terrain.bin`, the always-resident far layer (see
 `emit_far` at the bottom of this module), `far-water.bin`, the harbour at the
-scale the horizon needs it (see `emit_water`), and `suburbs.json`, the suburb
-label nodes the readout names a place from (see `write_suburbs`).
+scale the horizon needs it (see `emit_water`), `suburbs.json`, the suburb
+label nodes the readout names a place from (see `write_suburbs`), and
+`street-names.bin`, every tile's named centrelines repacked into one file for
+the big map (see `write_street_name_bundle`).
 
 The five instance sidecars, the names sidecar and the water sidecar are written
 only when the tile has something in them, and deleted when it does not, so a
@@ -55,6 +57,7 @@ from . import (
     furniture,
     lanes,
     mesh,
+    meshpack,
     parking,
     power,
     powerups,
@@ -69,6 +72,20 @@ COMPONENT_UINT = 5125
 COMPONENT_UBYTE = 5121
 TARGET_ARRAY_BUFFER = 34962
 TARGET_ELEMENT_ARRAY = 34963
+
+# The worst reconstruction error `meshpack` produced anywhere in this process's
+# tiles, in metres and degrees. Module state rather than a return value because
+# `write_glb` is called from a worker loop whose signature is load-bearing in
+# four places, and because the question this answers -- "how far did the whole
+# *build* move?" -- is not a question about one tile. `cli.py` reads it into the
+# index's `geometry` block, which is where a rebuild can be audited against the
+# claim that the drift is invisible.
+PACK_ERROR = {"position_m": 0.0, "uv_m": 0.0, "normal_deg": 0.0}
+
+
+def _note_pack_error(worst: dict[str, float]) -> None:
+    for key, value in worst.items():
+        PACK_ERROR[key] = max(PACK_ERROR[key], value)
 
 # `.furn.bin`'s header. The only versioned sidecar in the build, and see
 # `write_furniture` for why this one earned a header when the other five did
@@ -232,12 +249,20 @@ def write_glb(
     produce a primitive whose accessors disagree about how many vertices there
     are, which glTF does not check and the client would read straight off the
     end of. `_attribute` raises instead.
+
+    **Every column here is packed by `sydney.meshpack`** -- quantised per axis
+    where it can be, narrowed where it must stay exact, and delta-coded before
+    it is written. That module carries the whole argument and the measurements;
+    what matters at this call site is that the *shape* of the file is unchanged
+    (one buffer, one node, one primitive per material slot, no interleaving) and
+    that `client/src/world/tile-decode.ts` is the other half of the format.
     """
     blob = bytearray()
     views: list[gl.BufferView] = []
     accessors: list[gl.Accessor] = []
     primitives: list[gl.Primitive] = []
     triangles = 0
+    worst = {"position_m": 0.0, "uv_m": 0.0, "normal_deg": 0.0}
 
     def push(data: bytes, target: int | None) -> int:
         # glTF requires accessor-aligned buffer views; 4 bytes covers float and
@@ -249,23 +274,32 @@ def write_glb(
         views.append(gl.BufferView(buffer=0, byteOffset=offset, byteLength=len(data), target=target))
         return len(views) - 1
 
-    def add_accessor(
-        arr: np.ndarray, comp_type: int, type_str: str, components: int, target: int,
-        normalized: bool = False,
-    ) -> int:
-        view = push(arr.tobytes(), target)
-        lo, hi = _accessor_min_max(arr, components)
-        accessors.append(
-            gl.Accessor(
-                bufferView=view,
-                componentType=comp_type,
-                count=len(arr) // components,
-                type=type_str,
-                normalized=normalized,
-                min=lo,
-                max=hi,
-            )
+    def add_packed(packed: meshpack.Packed, target: int, gauge: str | None = None) -> int:
+        """One packed column as a glTF accessor, plus its dequantisation.
+
+        `min`/`max` are written only for POSITION, which is the one accessor the
+        spec requires them on. Dropping them everywhere else is worth doing
+        rather than tidy: they are six full-precision floats per accessor
+        against a JSON chunk that is now a fifth of the file, and nothing --
+        neither `parseTileGlb` nor `GLTFLoader` on the path this client uses --
+        reads them.
+        """
+        if gauge is not None:
+            worst[gauge] = max(worst[gauge], packed.max_error)
+        view = push(packed.data.tobytes(), target)
+        accessor = gl.Accessor(
+            bufferView=view,
+            componentType=packed.component_type,
+            count=len(packed.data) // packed.components,
+            type=packed.type_str,
+            normalized=packed.normalized,
         )
+        if target == TARGET_ARRAY_BUFFER and packed.type_str == "VEC3" and gauge == "position_m":
+            lo, hi = _accessor_min_max(packed.data, packed.components)
+            accessor.min, accessor.max = lo, hi
+        if packed.extras is not None:
+            accessor.extras = packed.extras
+        accessors.append(accessor)
         return len(accessors) - 1
 
     for material_name, buf in slots.items():
@@ -280,23 +314,29 @@ def write_glb(
         col = _attribute(buf.colours, 4, vertices, material_name, "COLOR_0")
 
         attrs = gl.Attributes(
-            POSITION=add_accessor(pos, COMPONENT_FLOAT, "VEC3", 3, TARGET_ARRAY_BUFFER),
+            POSITION=add_packed(meshpack.pack_positions(pos), TARGET_ARRAY_BUFFER, "position_m"),
         )
         if nrm is not None:
-            attrs.NORMAL = add_accessor(nrm, COMPONENT_FLOAT, "VEC3", 3, TARGET_ARRAY_BUFFER)
+            attrs.NORMAL = add_packed(
+                meshpack.pack_normals(nrm), TARGET_ARRAY_BUFFER, "normal_deg"
+            )
         if uv is not None:
-            attrs.TEXCOORD_0 = add_accessor(uv, COMPONENT_FLOAT, "VEC2", 2, TARGET_ARRAY_BUFFER)
+            attrs.TEXCOORD_0 = add_packed(meshpack.pack_uvs(uv), TARGET_ARRAY_BUFFER, "uv_m")
         if col is not None:
             # Rounded rather than truncated, so 0.55 stores as 140/255 = 0.549
-            # and not as 139. glTF's min/max on a normalised accessor are in the
-            # stored units, which is what `_accessor_min_max` produces here.
-            attrs.COLOR_0 = add_accessor(
-                np.rint(np.clip(col, 0.0, 1.0) * 255.0).astype(np.uint8),
-                COMPONENT_UBYTE,
-                "VEC4",
-                4,
+            # and not as 139. Already one byte a component, so `meshpack` leaves
+            # it alone -- there is nothing left in it to take out.
+            attrs.COLOR_0 = add_packed(
+                meshpack.Packed(
+                    np.rint(np.clip(col, 0.0, 1.0) * 255.0).astype(np.uint8),
+                    meshpack.COMPONENT_UBYTE,
+                    "VEC4",
+                    4,
+                    True,
+                    None,
+                    0.0,
+                ),
                 TARGET_ARRAY_BUFFER,
-                normalized=True,
             )
         if buf.building_index:
             # pygltflib models custom attributes as plain extra fields on Attributes.
@@ -304,13 +344,13 @@ def write_glb(
             setattr(
                 attrs,
                 "_BLDIDX",
-                add_accessor(bidx, COMPONENT_FLOAT, "SCALAR", 1, TARGET_ARRAY_BUFFER),
+                add_packed(meshpack.pack_building_index(bidx), TARGET_ARRAY_BUFFER),
             )
 
         primitives.append(
             gl.Primitive(
                 attributes=attrs,
-                indices=add_accessor(idx, COMPONENT_UINT, "SCALAR", 1, TARGET_ELEMENT_ARRAY),
+                indices=add_packed(meshpack.pack_indices(idx), TARGET_ELEMENT_ARRAY),
                 material=mesh.MATERIAL_INDEX.get(material_name, 0),
                 mode=4,  # TRIANGLES
             )
@@ -319,6 +359,8 @@ def write_glb(
 
     if not primitives:
         return 0, 0
+
+    _note_pack_error(worst)
 
     # Materials are named placeholders; the client substitutes its own facade
     # node material per slot and only needs the name to know which is which.
@@ -334,6 +376,14 @@ def write_glb(
         accessors=accessors,
         bufferViews=views,
         buffers=[gl.Buffer(byteLength=len(blob))],
+        # Declared, not required. `KHR_mesh_quantization` is what makes an
+        # integer POSITION legitimate glTF; `SYD_mesh_pack` flags the delta
+        # filter, which is nobody's extension but ours. Neither goes in
+        # `extensionsRequired`, because a required extension it does not know
+        # makes `GLTFLoader` refuse the file -- and `verifyTileGlbParse` compares
+        # `parseTileGlb` against `GLTFLoader` on a real tile at boot. See
+        # `meshpack`'s header.
+        extensionsUsed=["KHR_mesh_quantization", "SYD_mesh_pack"],
     )
     doc.set_binary_blob(bytes(blob))
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1071,6 +1121,246 @@ def write_street_names(
     return len(kept), len(out)
 
 
+# --- The street-name bundle ---------------------------------------------------
+
+# `SNBD`, read as a little-endian u32. The header of `world/street-names.bin`.
+NAME_BUNDLE_MAGIC = 0x44424E53
+NAME_BUNDLE_VERSION = 1
+# Fixed header: magic, version, names, tiles, runs, points, table bytes, index
+# width. Eight u32s, so every block after it starts 4-byte aligned.
+NAME_BUNDLE_HEADER = 32
+
+
+def _read_street_names(path: Path) -> tuple[list[str], list[tuple[int, int, bytes]]] | None:
+    """Read one `.names.bin` back into its table and its runs.
+
+    The inverse of `write_street_names`, and deliberately the *only* way the
+    bundle below gets its geometry: the bundle is a repack of the sidecars
+    rather than a second emission from the street network. That is what makes
+    the two incapable of disagreeing -- the map and the in-world blades read
+    the same points, to the bit -- and it is also what lets the bundle be
+    rebuilt from a world already on disk without re-tiling anything.
+
+    Each run comes back as `(name index, point count, raw point bytes)`, the
+    point bytes untouched: they are already tile-local little-endian float32
+    pairs, which is exactly what the bundle stores, so the coordinates make the
+    trip from one file to the other without passing through a float at all.
+
+    Returns None for a file that is missing or does not parse, which the caller
+    treats as a tile with no names -- the same answer the client's decoder
+    gives, and a hole in the map's labels rather than a failed build.
+    """
+    try:
+        b = path.read_bytes()
+    except OSError:
+        return None
+    if len(b) < 3:
+        return None
+    o = 0
+    count = b[o]
+    o += 1
+    names: list[str] = []
+    for _ in range(count):
+        if o >= len(b):
+            return None
+        n = b[o]
+        o += 1
+        if o + n > len(b):
+            return None
+        names.append(b[o : o + n].decode("utf-8", "replace"))
+        o += n
+    if not names or o + 2 > len(b):
+        return None
+    (runs_n,) = struct.unpack_from("<H", b, o)
+    o += 2
+    runs: list[tuple[int, int, bytes]] = []
+    for _ in range(runs_n):
+        if o + 2 > len(b):
+            break
+        idx, pts = b[o], b[o + 1]
+        o += 2
+        need = pts * 8
+        if o + need > len(b):
+            break
+        # A name index past the table is dropped rather than clamped, exactly as
+        # `decodeStreetNames` drops it: clamping would put a piece of some other
+        # street on the map under the wrong name.
+        if idx < len(names) and pts >= 2:
+            runs.append((idx, pts, b[o : o + need]))
+        o += need
+    return names, runs
+
+
+def write_street_name_bundle(
+    path: Path,
+    entries: list[tuple[str, float, float]],
+    tile_dir: Path,
+) -> dict:
+    """Every tile's named centrelines, in one file, for the big map.
+
+        u32  magic          `NAME_BUNDLE_MAGIC`, ASCII 'SNBD' little-endian
+        u32  version        `NAME_BUNDLE_VERSION`
+        u32  name count
+        u32  tile count     tiles with at least one run; not the whole build
+        u32  run count      across every tile
+        u32  point count    across every run
+        u32  table bytes    the string table's length, padded to 4
+        u32  index width    2 or 4, the bytes a run's name index takes
+        -- string table, `name count` entries:
+          u16  byte length of the UTF-8 that follows
+          u8   name x length     the **full** display form, e.g. 'King Street'
+          ...padded with zeroes to a 4-byte boundary
+        -- u32 x tile count     runs in each tile, in index order
+        -- f32 x 2 x tile count each tile's world origin: (minX, minZ + size)
+        -- idx x run count      each run's name, tile order then run order
+                                ...padded with zeroes to a 4-byte boundary
+        -- u8  x run count      each run's point count
+                                ...padded with zeroes to a 4-byte boundary
+        -- f32 x 2 x point count tile-local metres, renderer axes, run order
+
+    ---------------------------------------------------------------------------
+    WHY THIS EXISTS. The per-tile `.names.bin` sidecars are right for what they
+    were written for -- `game/locator.ts` and the blade legends want the tile
+    they are standing on and nothing else, and they get it with the tile. The
+    big map wants *the whole city at once*, and it was getting it by fetching
+    every one of them: 357 requests on the first press of `M` at this stage, and
+    a projected ~2,000 at 15 km. That is a request count rather than a byte
+    count -- half a megabyte in total -- and a request count is the thing a CDN
+    edge, an HTTP/2 window and a phone radio all charge for separately.
+
+    So this is a **packaging change and nothing else**. The sidecars stay,
+    byte-for-byte, and this file is assembled by reading them back (see
+    `_read_street_names`). Nothing about what the map draws changes, which is
+    the acceptance bar the client's `verifyBigMap` holds it to.
+
+    ---------------------------------------------------------------------------
+    THE THREE DECISIONS IN THE LAYOUT.
+
+    **One string table for the build, where the sidecars have one per tile.**
+    An arterial crosses forty tiles and pays for its name in all forty; across
+    the build the 18,788 runs quote 2,870 distinct names, and the per-tile
+    tables spend 92 kB restating them. Deduplicated they are 46 kB. It is also
+    what lets the run's name reference shrink -- a u8 index into a 40-name tile
+    table becomes a u16 into a build-wide one, and the file still comes out
+    smaller than the sum of its parts.
+
+    **Structure of arrays, not an array of structures.** The counts, the name
+    indices and the points are three contiguous blocks rather than interleaved
+    per run, for two reasons: the client makes one typed-array view over each
+    instead of walking a `DataView` 18,788 times, and a block of little-endian
+    float32 pairs next to another block of little-endian float32 pairs is what
+    a compressor can find structure in. Raw, this is 486 kB against the
+    sidecars' 534; brotli'd -- which is what jsDelivr serves and what the
+    origin's own sidecars carry -- it is 266 kB against 296.
+
+    **Tile-local points and a per-tile origin, rather than world metres.** The
+    obvious packing writes the points already in world coordinates and drops the
+    origins. It is rejected because it would quietly move every label: the
+    client's existing path computes a world point as `float32(float32(local) +
+    origin)` and a run's bounds as `double(local) + origin`, and a pipeline that
+    folded the origin in at float64 and then rounded once would disagree with
+    both in the last few bits. Shipping the same tile-local float32 the sidecar
+    ships, plus the same origin the client already applies, makes the arrays the
+    client ends up holding **bit-identical** to the ones it holds today -- so
+    the chains, the importance ranking and the placement cannot drift, and the
+    equivalence is a fact about the format rather than a tolerance in a test.
+
+    ---------------------------------------------------------------------------
+    `entries` is `(key, originX, originZ)` per tile **in the order `index.json`
+    lists them**, which is sorted by key. The order is load-bearing in one small
+    way: the client interns names in the order it first meets them, and the name
+    index is the last tie-break when two streets rank equal for a label. Pinning
+    it here replaces an order that used to depend on which of ten concurrent
+    fetches landed first.
+
+    Returns the `index.json` contract, or a contract with `runs: 0` and no file
+    when the build has no named street in it at all -- the client reads that the
+    same way it reads a missing block, and falls back to the sidecars.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    names: list[str] = []
+    name_index: dict[str, int] = {}
+    tile_runs: list[int] = []
+    tile_origins: list[tuple[float, float]] = []
+    run_names: list[int] = []
+    run_points: list[int] = []
+    points = bytearray()
+
+    for key, origin_x, origin_z in entries:
+        parsed = _read_street_names(tile_dir / f"{key}.names.bin")
+        if parsed is None:
+            continue
+        table, runs = parsed
+        if not runs:
+            continue
+        ids = []
+        for name in table:
+            got = name_index.get(name)
+            if got is None:
+                got = len(names)
+                name_index[name] = got
+                names.append(name)
+            ids.append(got)
+        for idx, count, raw in runs:
+            run_names.append(ids[idx])
+            run_points.append(count)
+            points += raw
+        tile_runs.append(len(runs))
+        tile_origins.append((origin_x, origin_z))
+
+    if not run_names:
+        path.unlink(missing_ok=True)
+        return {"runs": 0, "names": 0, "tiles": 0, "points": 0, "bytes": 0}
+
+    table = bytearray()
+    for name in names:
+        raw = name.encode("utf-8")
+        table += struct.pack("<H", len(raw))
+        table += raw
+    table += b"\0" * (-len(table) % 4)
+
+    # Two bytes while the build's name table fits in one, four when it does not.
+    # At 5.3 km there are 2,870 names and at 35 km there will be a hundred
+    # thousand-odd, so this is a real switch rather than a hypothetical -- and it
+    # is in the header rather than implied by the version, so a client reads
+    # either without knowing which stage it is looking at.
+    idx_width = 2 if len(names) <= 0xFFFF else 4
+    total_points = sum(run_points)
+
+    out = bytearray(
+        struct.pack(
+            "<IIIIIIII",
+            NAME_BUNDLE_MAGIC,
+            NAME_BUNDLE_VERSION,
+            len(names),
+            len(tile_runs),
+            len(run_names),
+            total_points,
+            len(table),
+            idx_width,
+        )
+    )
+    out += table
+    out += np.asarray(tile_runs, dtype="<u4").tobytes()
+    out += np.asarray(tile_origins, dtype="<f4").tobytes()
+    out += np.asarray(run_names, dtype="<u2" if idx_width == 2 else "<u4").tobytes()
+    out += b"\0" * (-len(out) % 4)
+    out += np.asarray(run_points, dtype="<u1").tobytes()
+    out += b"\0" * (-len(out) % 4)
+    out += points
+    path.write_bytes(bytes(out))
+    return {
+        "path": path.name,
+        "format": NAME_BUNDLE_VERSION,
+        "runs": len(run_names),
+        "names": len(names),
+        "tiles": len(tile_runs),
+        "points": total_points,
+        "bytes": len(out),
+    }
+
+
 def _pack_water(sheets: list, origin: tuple[float, float] | None) -> bytes:
     """The bytes of a water payload, near or far. See `write_water`."""
     oe, on = origin if origin is not None else (0.0, 0.0)
@@ -1665,6 +1955,8 @@ def write_index(
     water_contract: dict | None = None,
     landmark_contract: dict | None = None,
     lanes_contract: dict | None = None,
+    street_names_contract: dict | None = None,
+    regions_contract: dict | None = None,
 ) -> Path:
     """The spatial index the client streams against.
 
@@ -1747,6 +2039,42 @@ def write_index(
         # timetable is denominated in, and `epoch_ms`, the instant tick zero
         # sits at) plus the totals a build report and the audit read.
         **({"lanes": lanes_contract} if lanes_contract is not None else {}),
+        # The big map's street-name bundle, on the same terms as every optional
+        # block above: absent means this world has no `street-names.bin`, and
+        # the client falls back to fetching the per-tile `.names.bin` sidecars
+        # one by one -- which is exactly what it did before this file existed
+        # and what a world built by an older pipeline still gets. The block is
+        # also omitted on a build whose bundle came out empty, so "present"
+        # always means "there is a file worth one request". See
+        # `write_street_name_bundle` and `client/src/mapatlas.ts`.
+        **(
+            {"street_names": street_names_contract}
+            if street_names_contract and street_names_contract.get("runs")
+            else {}
+        ),
+        # How this build's vertex attributes are packed, and how far that moved
+        # the city. `pack` is the format version and the client refuses one it
+        # does not know; the three errors are the *measured* worst case over
+        # every primitive in the build, and they are in the index rather than in
+        # a build log because the claim they support -- that the drift is
+        # cosmetic and below anything the eye or the collision can see -- is one
+        # a later build could quietly break. See `sydney.meshpack`.
+        "geometry": {
+            "pack": meshpack.PACK_VERSION,
+            "max_position_error_mm": round(PACK_ERROR["position_m"] * 1000.0, 3),
+            "max_uv_error_mm": round(PACK_ERROR["uv_m"] * 1000.0, 3),
+            "max_normal_error_deg": round(PACK_ERROR["normal_deg"], 4),
+        },
+        # The streaming bundles. Absent means this world has no `regions/` and
+        # the client fetches every tile file one by one -- which is exactly what
+        # it did before this pass and what a world built by an older pipeline
+        # still gets, on the same terms as every optional block above. See
+        # `sydney.regions` and `client/src/world/regions.ts`.
+        **(
+            {"regions": regions_contract}
+            if regions_contract and regions_contract.get("count")
+            else {}
+        ),
         "tiles": [
             {
                 "key": r.key,
