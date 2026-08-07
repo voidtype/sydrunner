@@ -253,6 +253,11 @@ import { verifyRegions } from '../client/src/world/regions.ts';
 // viaducts by the real controller.
 import { BODY_HEIGHT_M, verifyCollision, type Prism } from '../client/src/player/collision.ts';
 import { createPlayerState, step } from '../client/src/player/controller.ts';
+// The ramp. See `checkAccelerationRamp` at the foot of this file: the bound it
+// asserts is derived from this constant rather than from a literal, because the
+// error a mis-seeded replay makes *is* one step of this per unacknowledged
+// input. See `net/client.ts`'s `ackedVelocity`.
+import { ACCELERATION } from '../client/src/player/controller.ts';
 
 const PORT = Number(process.env.SYDNEY_CHECK_PORT ?? 8799);
 const SERVER_URL = `ws://127.0.0.1:${PORT}`;
@@ -1424,6 +1429,13 @@ async function main(): Promise<void> {
   // jitter. See `checkInputQueue`, appended last and self-contained.
   say('');
   await checkInputQueue();
+
+  // --- 25b. The third cause of the same jitter, and the last one: a replay that
+  // rewound the position and not the *speed*. Steady motion hid it; every start,
+  // stop and jump did not. See `checkAccelerationRamp`, appended last and
+  // self-contained.
+  say('');
+  await checkAccelerationRamp();
 
   // --- 26. The round trip the rewind is driven by. The other half of the
   // reported "my combat seems to miss": the input queue fixed what the *client*
@@ -11874,7 +11886,12 @@ async function checkInputQueue(): Promise<void> {
       if (t >= SETTLE && net.lastCorrection > worst) worst = net.lastCorrection;
       input.yaw += TURN * FIXED_DT;
       advance(playerCombat, input, FIXED_DT, combatWorld);
-      net.sendInput(input);
+      // `advance` first, `sendInput` second -- `main.ts`'s order, and the
+      // ordering contract `NetClient.sendInput`'s header states: the velocity
+      // handed over is the post-step one, because that is what the server's
+      // acknowledgement of this seq will be a picture of. Section 5 below
+      // asserts this harness holds to it.
+      net.sendInput(input, playerCombat.body.velocity);
       // The 30 fps schedule: the browser posts this tick's frame and the last
       // one together, every other tick.
       if (t % 2 === 1) pump();
@@ -12422,7 +12439,7 @@ async function checkMeleeAtLatency(MS_PER_TICK: number, FIXED_DT: number): Promi
         struck.push({ t, x: r.position.x, z: r.position.z, sees });
       }
 
-      net.sendInput(input);
+      net.sendInput(input, playerCombat.body.velocity);
       pump();
       pin();
 
@@ -12604,5 +12621,367 @@ async function checkMeleeAtLatency(MS_PER_TICK: number, FIXED_DT: number): Promi
       `than at \`estimated-server-now - 100 ms\`, which costs a whole round trip of rewind budget instead ` +
       `of half of one. Moving it would put the requirement back inside the cap for every ping the game ` +
       `has, and it is a change to client prediction rather than to this file.`,
+  );
+}
+
+// --- 25b. The acceleration ramp ---------------------------------------------------
+
+/**
+ * *Rewind the position, and rewind the speed with it* -- the third and last
+ * cause of the same reported camera jitter.
+ *
+ * ---------------------------------------------------------------------------
+ * ## What was wrong
+ *
+ * `net/client.ts`'s `reconcile` replays every unacknowledged input from the
+ * server's acknowledged position. The **position** it starts from is correct by
+ * construction: it is the one on the wire. The **velocity** it started from was
+ * `local.body.velocity` -- the velocity of *right now*, not the velocity the
+ * body had `pending.length` inputs ago -- because velocity is deliberately not
+ * in the snapshot (see `protocol.ts`'s bandwidth arithmetic) and that was the
+ * only number to hand.
+ *
+ * At a steady speed the two are the same number and it cost nothing. The
+ * residual over thirty seconds of flat-out sprinting was 0.4 mm, which is not a
+ * disagreement at all -- it is the wire's own millimetre position quantisation.
+ *
+ * On a **ramp** they are not the same number. `ACCELERATION` is 48 m/s^2, so a
+ * body's speed moves by `ACCELERATION / TICK_HZ` -- 0.8 m/s -- every single
+ * step, and the replay therefore ran the whole acknowledged-to-now window from a
+ * starting speed metres per second too fast. It landed long, the reconciler
+ * called that a correction, and the camera was told. Every start from rest,
+ * every stop, and *every jump*.
+ *
+ * The error grows with the round trip, because the number of unacknowledged
+ * inputs does. Measured by this section's own harness before the fix:
+ *
+ * | one-way lag | worst divergence on a ramp | eased corrections in 30 s |
+ * |---|---|---|
+ * | 0 ticks (loopback) | 0.062 m | 4 |
+ * | 1 tick (~33 ms rtt) | **0.962 m** | 205 |
+ * | 3 ticks (~100 ms rtt) | 0.880 m | 257 |
+ * | 6 ticks (~200 ms rtt) | **1.039 m** | 306 |
+ *
+ * A metre. On the camera, five times a second, on a connection that is merely
+ * ordinary. It never showed up in `checkInputQueue` because that section sprints
+ * in a circle at a constant speed for its whole run and skips its first second
+ * for exactly this reason -- it is a check about *counting* input frames, and it
+ * said so.
+ *
+ * ---------------------------------------------------------------------------
+ * ## The fix, and why it is not "trusting the client"
+ *
+ * The client stores the body's velocity beside every input it already keeps a
+ * copy of, and seeds the replay with the one recorded against the input the
+ * server just acknowledged. Nothing is added to the wire, nothing is asked of
+ * the server, and nothing new is believed from anybody: this is the client
+ * reconstructing *its own* past state for *its own* replay, out of a queue it
+ * already had. The server remains the sole authority on the position that
+ * replay starts from.
+ *
+ * ---------------------------------------------------------------------------
+ * ## What this section asserts, and why in this shape
+ *
+ *   0. **The ramp cannot hide in the deadzone.** Derived from `ACCELERATION`,
+ *      `TICK_HZ` and `SNAPSHOT_INTERVAL` rather than from a literal: even at the
+ *      shallowest replay this protocol can produce -- a loopback, where only the
+ *      snapshot cadence separates an input from its acknowledgement -- a seed
+ *      that is one ramp wrong costs more than `CORRECTION_DEADZONE`. So a
+ *      regression is guaranteed to be visible to the bound in 1-4 below, at
+ *      every latency, rather than being visible only at the ones that were
+ *      sampled.
+ *
+ *   1-4. **The measurement, at four latencies**, over the genuine `NetClient`
+ *      against a genuine `Room` on a deterministic delayed loopback -- the same
+ *      harness `checkServerRtt` uses, so a failure here is a real regression and
+ *      not a flaky afternoon. The probe starts from rest, sprints, stops, jumps
+ *      and does it again, and the divergence is judged **on the ramps as well
+ *      as off them**: the bound is `CORRECTION_DEADZONE`, which is the
+ *      reconciler's own statement of what is not worth telling the camera about.
+ *      Zero corrections and zero snaps are asserted beside it, because "inside
+ *      the deadzone" and "the camera was never told" are the same sentence and
+ *      the second one is the one the player experiences.
+ *
+ *   5. **The ordering contract, asserted rather than assumed.** This is the
+ *      hazard the fix carries and the reason it was not simply written: the
+ *      velocity stored against a seq is only the right seed if it is the
+ *      velocity *after* that input was integrated, and whether it is depends on
+ *      `main.ts` calling `advance` before `net.sendInput` -- which was an
+ *      undocumented convention shared by three call sites. `sendInput`'s header
+ *      now states it. This asserts it: for every acknowledged seq, the velocity
+ *      the client recorded is compared against the velocity the *server's* body
+ *      actually had after applying that same seq, and they must be **bit-
+ *      identical**. Off by one step and the recorded velocity would be the
+ *      pre-step one, which differs from the server's by up to a full
+ *      `ACCELERATION / TICK_HZ` on every ramp tick -- so the comparison is
+ *      counted separately over the ticks where the speed was actually moving,
+ *      and a run that never moved it would report as much rather than passing
+ *      vacuously.
+ *
+ *      That equality is also the strongest statement this suite makes about the
+ *      shared simulation: identical inputs, one module, two ends of a wire, and
+ *      not one bit of drift across a full thirty seconds.
+ */
+async function checkAccelerationRamp(): Promise<void> {
+  say('the acceleration ramp: the replay rewinds the speed as well as the position');
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const world = await loadWorld(root);
+  const FIXED_DT = 1 / TICK_HZ;
+
+  // --- 0. The ruler, out of the simulation's own constants.
+  //
+  // `rampStep` is how much a body's speed moves in one step under full
+  // acceleration. `inFlight` at a given one-way lag is the uplink trip, the
+  // downlink trip and the snapshot cadence -- every input sent in that window is
+  // unacknowledged and therefore replayed. A seed that is `inFlight` ramp steps
+  // too fast carries that error across the whole replay, and the metres it
+  // costs is at least the average of it over those steps.
+  const rampStep = ACCELERATION / TICK_HZ;
+  const inFlightAt = (lagTicks: number): number => 2 * lagTicks + SNAPSHOT_INTERVAL;
+  const rampCost = (lagTicks: number): number => {
+    const n = inFlightAt(lagTicks);
+    return (rampStep * n * n) / TICK_HZ / 2;
+  };
+  check(
+    rampCost(0) > CORRECTION_DEADZONE,
+    `one step of the ramp is ${rampStep.toFixed(2)} m/s (ACCELERATION ${ACCELERATION} over ${TICK_HZ} Hz), ` +
+      `so seeding a replay with the wrong speed costs ${rampCost(0).toFixed(3)} m even on a loopback -- ` +
+      `${(rampCost(0) / CORRECTION_DEADZONE).toFixed(1)}x the reconciler's ${CORRECTION_DEADZONE} m deadzone, ` +
+      `and ${rampCost(6).toFixed(2)} m at a 200 ms round trip. A ramp cannot hide inside the deadzone at ` +
+      `any latency this game runs at`,
+  );
+
+  /**
+   * The movement script: **rest, sprint, stop, jump, repeat**, on a four-second
+   * cycle so each leg is several snapshots long and the ramps are entered from a
+   * settled state rather than from the middle of the previous one.
+   *
+   * Straight-line and yaw-frozen, which is the opposite of `checkInputQueue`'s
+   * circle and is deliberate: that section needs a turning path because a
+   * dropped input frame and a repeated one produce the same trajectory in a
+   * straight line, and this one needs a straight path because a turn is a
+   * *continuous* change of velocity that would blur the thing under test. The
+   * two sections are asking different questions of the same reconciler.
+   */
+  const CYCLE = TICK_HZ * 4;
+  const legAt = (t: number): { forward: number; sprint: boolean; jump: boolean; phase: string } => {
+    const c = t % CYCLE;
+    if (c < 45) return { forward: 0, sprint: false, jump: false, phase: 'at rest' };
+    if (c < 150) return { forward: 1, sprint: true, jump: false, phase: c < 90 ? 'accelerating' : 'sprinting' };
+    if (c < 195) return { forward: 0, sprint: false, jump: false, phase: 'stopping' };
+    if (c === 195) return { forward: 1, sprint: true, jump: true, phase: 'jumping' };
+    return { forward: 1, sprint: true, jump: false, phase: 'airborne' };
+  };
+
+  /**
+   * One run. `lagTicks` is the one-way delay, expressed in ticks so the injected
+   * number is exactly representable on this loop's clock rather than quantised
+   * by it -- `checkServerRtt`'s arrangement, for its reason.
+   */
+  const run = (lagTicks: number): {
+    worst: number; worstPhase: string; steady: number; corrections: number; snaps: number;
+    compared: number; identical: number; moving: number; worstDv: number;
+  } => {
+    const room = new Room(0, world, 8, 0);
+    const combatWorld = groundFor(world);
+    const toServer: Array<{ f: ArrayBuffer; at: number }> = [];
+    const toClient: Array<{ f: ArrayBuffer; at: number }> = [];
+    // A holder rather than two locals, which is `checkMeleeAtLatency`'s
+    // arrangement and for its reason: both are assigned inside `pump`'s closure,
+    // and a plain `let` narrows to `null` everywhere the compiler cannot see the
+    // assignment happen.
+    const link: { ws: FakeSocket | null; p: Participant | null } = { ws: null, p: null };
+    let now = 0;
+
+    const transport: NetTransport = {
+      open: true, onframe: null, onopen: null, onclose: null,
+      send(f: ArrayBuffer): void { toServer.push({ f, at: now + lagTicks }); },
+      close(): void {},
+    };
+    const net = new NetClient('', {
+      onHit: () => {}, onBounce: () => {}, onPickup: () => {}, onJoin: () => {},
+      onLeave: () => {}, onDrop: () => {}, onStatus: () => {},
+    }, { name: 'ramp-probe', transport });
+
+    const pump = (): void => {
+      for (let i = toServer.length - 1; i >= 0; i--) {
+        if (toServer[i].at > now) continue;
+        const { f } = toServer.splice(i, 1)[0];
+        if (frameType(f) === MSG.HELLO && !link.p) {
+          const sock = new FakeSocket(newConn(0));
+          link.ws = sock;
+          link.p = room.join(sock.data, 0, 'ramp-probe');
+          if (link.p) {
+            room.conns.add(sock as unknown as Socket);
+            room.welcome(sock as unknown as Socket, link.p);
+          }
+        } else if (frameType(f) === MSG.INPUT && link.ws) {
+          receiveInput(link.ws.data, f);
+        }
+      }
+    };
+    const drain = (): void => {
+      if (link.ws) for (const f of link.ws.frames.splice(0)) toClient.push({ f, at: now + lagTicks });
+      for (let i = toClient.length - 1; i >= 0; i--) {
+        if (toClient[i].at > now) continue;
+        transport.onframe?.(toClient.splice(i, 1)[0].f);
+      }
+    };
+
+    // Both bodies pinned to the spawn on the tick the join lands, exactly as
+    // `checkInputQueue` and `checkMeleeAtLatency` pin theirs and for their
+    // reason: an unpinned probe runs a different 250 m of Sydney every time this
+    // file runs, and a ramp that was interrupted by a kerb would fail this
+    // section and mean nothing by it. Lazily, because at a non-zero lag the join
+    // does not land on the tick the hello was sent.
+    const spawnY = eyeAt(combatWorld, world.spawn.x, world.spawn.z);
+    const playerCombat = createCombatant(0, world.spawn.x, world.spawn.z);
+    playerCombat.body.position.set(world.spawn.x, spawnY, world.spawn.z);
+    const correction = playerCombat.body.velocity.clone();
+    let pinned = false;
+    const pin = (): void => {
+      const me = link.p;
+      if (pinned || !me) return;
+      pinned = true;
+      me.combat.body.position.set(world.spawn.x, spawnY, world.spawn.z);
+      me.combat.body.velocity.set(0, 0, 0);
+      me.history.seed(room.sim.tick, world.spawn.x, spawnY, world.spawn.z, 0);
+      playerCombat.body.position.set(world.spawn.x, spawnY, world.spawn.z);
+      playerCombat.body.velocity.set(0, 0, 0);
+    };
+
+    transport.onopen?.();
+
+    const input = {
+      forward: 0, right: 0, jump: false, sprint: false,
+      yaw: 0, pitch: 0, speedScale: 1, jumpScale: 1,
+      punch: false, throwBall: false, mount: false,
+    };
+
+    // What the client recorded against each seq, kept here rather than read out
+    // of the reconciler's private queue: what section 5 is asserting is the
+    // *call site's* contract, and reaching into the object under test to check
+    // it would assert only that the object is self-consistent.
+    const recorded = new Map<number, [number, number, number]>();
+    let mySeq = 0;
+    let lastAck = -1;
+    let prevAckedVel: [number, number, number] | null = null;
+    let compared = 0, identical = 0, moving = 0, worstDv = 0;
+
+    const TICKS = TICK_HZ * 32;
+    // Two seconds before anything is judged: the first cycle is spent with the
+    // client still converging on the room's tick and the pin still settling.
+    const SETTLE = TICK_HZ * 2;
+    let worst = 0, worstPhase = '', steady = 0;
+
+    for (let t = 0; t < TICKS; t++) {
+      now = t;
+      net.reconcile(playerCombat, combatWorld, correction);
+      // Judged against the leg the *previous* tick was in, because
+      // `lastCorrection` is what the snapshot that has just been folded in was
+      // a picture of.
+      if (t >= SETTLE) {
+        const was = legAt(t - 1).phase;
+        if (net.lastCorrection > worst) { worst = net.lastCorrection; worstPhase = was; }
+        if (was === 'sprinting') steady = Math.max(steady, net.lastCorrection);
+      }
+
+      const leg = legAt(t);
+      input.forward = leg.forward;
+      input.sprint = leg.sprint;
+      input.jump = leg.jump;
+
+      // `advance` first, `sendInput` second. This is the ordering contract under
+      // test and it is `main.ts`'s order exactly; see `NetClient.sendInput`.
+      advance(playerCombat, input, FIXED_DT, combatWorld);
+      const online = net.status === 'online';
+      net.sendInput(input, playerCombat.body.velocity);
+      if (online) {
+        mySeq = (mySeq + 1) & 0xffff;
+        recorded.set(mySeq, [
+          playerCombat.body.velocity.x, playerCombat.body.velocity.y, playerCombat.body.velocity.z,
+        ]);
+      }
+
+      pump();
+      pin();
+      room.step();
+
+      // The server's own body, on the tick it acknowledged a new seq. Read
+      // straight off the participant rather than off the wire, because velocity
+      // is not on the wire -- which is the whole reason this bug existed.
+      const me = link.p;
+      if (me && pinned && me.ackSeq !== lastAck) {
+        lastAck = me.ackSeq;
+        const mine = recorded.get(lastAck);
+        if (mine && t >= SETTLE) {
+          const sv = me.combat.body.velocity;
+          compared++;
+          if (sv.x === mine[0] && sv.y === mine[1] && sv.z === mine[2]) identical++;
+          worstDv = Math.max(worstDv, Math.hypot(sv.x - mine[0], sv.y - mine[1], sv.z - mine[2]));
+          // Was the speed actually moving here? If it never was, the equality
+          // above would hold for a client that stored the pre-step velocity too,
+          // and section 5 would be asserting nothing.
+          if (prevAckedVel && Math.hypot(sv.x - prevAckedVel[0], sv.y - prevAckedVel[1], sv.z - prevAckedVel[2]) > rampStep / 2) {
+            moving++;
+          }
+          prevAckedVel = [sv.x, sv.y, sv.z];
+        }
+      }
+
+      drain();
+      net.update(FIXED_DT);
+    }
+    // The heartbeat this object starts in its constructor is a real timer, and a
+    // probe that left four of them running would hold the process open past the
+    // last check.
+    net.close();
+    return {
+      worst, worstPhase, steady, corrections: net.corrections, snaps: net.snaps,
+      compared, identical, moving, worstDv,
+    };
+  };
+
+  // --- 1-4. The four latencies. Loopback, a LAN, an ordinary domestic
+  // connection to the host, and a bad one.
+  const before = new Map([[0, 0.062], [1, 0.962], [3, 0.880], [6, 1.039]]);
+  let totalCompared = 0, totalIdentical = 0, totalMoving = 0, worstDv = 0;
+  for (const lag of [0, 1, 3, 6]) {
+    const r = run(lag);
+    const rttMs = Math.round((lag * 2 * 1000) / TICK_HZ);
+    check(
+      r.worst <= CORRECTION_DEADZONE,
+      `at ${rttMs} ms round trip the probe started, sprinted, stopped and jumped for 30 s and its worst ` +
+        `divergence was ${r.worst.toFixed(4)} m -- during ${r.worstPhase || 'no leg at all'}, inside the ` +
+        `${CORRECTION_DEADZONE} m deadzone, against ${before.get(lag)!.toFixed(3)} m before the fix ` +
+        `(and ${rampCost(lag).toFixed(2)} m of ramp arithmetic to explain it)`,
+    );
+    check(
+      r.corrections === 0 && r.snaps === 0,
+      `  and the camera was told about ${r.corrections} of them, with ${r.snaps} snap(s). Both zero: ` +
+        `steady sprinting sat at ${r.steady.toFixed(5)} m, which is the wire's own millimetre position ` +
+        `quantisation and not a disagreement`,
+    );
+    totalCompared += r.compared;
+    totalIdentical += r.identical;
+    totalMoving += r.moving;
+    worstDv = Math.max(worstDv, r.worstDv);
+  }
+
+  // --- 5. The ordering contract, and the bit-identity underneath it.
+  check(
+    totalCompared > 0 && totalIdentical === totalCompared,
+    `the velocity the client recorded against an acknowledged seq was bit-identical to the velocity the ` +
+      `server's own body had after applying that same seq, on ${totalIdentical} of ${totalCompared} ` +
+      `acknowledgements across the four runs (worst difference ${worstDv.toExponential(1)} m/s). That is ` +
+      `the ordering contract -- \`advance\` then \`sendInput\`, so the stored velocity is the *post*-step ` +
+      `one -- and it is the shared simulation agreeing bit for bit over 128 s of play`,
+  );
+  check(
+    totalMoving > totalCompared / 20,
+    `  and ${totalMoving} of those ${totalCompared} landed on a tick where the speed had moved by more ` +
+      `than half a ramp step, so the equality is pinning the ordering rather than holding vacuously: a ` +
+      `client that stored the velocity from *before* the step would have failed every one of them`,
   );
 }

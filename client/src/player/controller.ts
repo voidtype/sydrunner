@@ -68,8 +68,17 @@ export const PLAYER_RADIUS = 0.34;
 
 const WALK_SPEED = 4.4;
 const SPRINT_SPEED = 8.2;
-/** Metres per second squared. Deliberately snappy -- this is a brawler, not a sim. */
-const ACCELERATION = 48;
+/**
+ * Metres per second squared. Deliberately snappy -- this is a brawler, not a sim.
+ *
+ * Exported, and only that -- the value is untouched, on `GRAVITY`'s terms below.
+ * It is how much a body's speed can move in one step, which makes it the size of
+ * the error a reconciler makes if it replays an acceleration ramp from the wrong
+ * starting speed: `net/client.ts`'s `ackedVelocity` is the fix for having done
+ * exactly that, and `integration-check.checkAccelerationRamp` derives its bound
+ * from this number rather than from a literal chosen to pass.
+ */
+export const ACCELERATION = 48;
 const AIR_ACCELERATION = 9;
 const FRICTION = 34;
 const AIR_FRICTION = 1.5;

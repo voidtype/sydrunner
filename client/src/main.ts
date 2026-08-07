@@ -4107,7 +4107,16 @@ async function main(): Promise<void> {
     // client has already taken. Sending before the step would ack an input whose
     // predicted result did not exist yet, and the replay in `reconcile` would be
     // one tick short every time.
-    if (net) net.sendInput(input);
+    //
+    // **The velocity goes with it, and it is the post-step one because of where
+    // this line is.** `net.sendInput`'s header states that contract in full; the
+    // short version is that the reconciler replays from the acknowledged
+    // position and needs the velocity the body had *there*, which is the one
+    // this tick has just finished producing. Read after everything above that
+    // can touch it -- the step, and the car shove, which both ends apply in the
+    // same place in their own loop -- so it is the body as this tick leaves it,
+    // which is the thing the server will acknowledge.
+    if (net) net.sendInput(input, playerCombat.body.velocity);
   }
 
   /** Handed to `tickPowerups` online. A constant, so the online path allocates nothing. */

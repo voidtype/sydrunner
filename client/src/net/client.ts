@@ -334,6 +334,22 @@ interface PendingInput {
   seq: number;
   /** A copy: `main.ts` owns and mutates its own input record every frame. */
   input: CombatInput;
+  /**
+   * The body's velocity **after** this input was integrated, m/s.
+   *
+   * Three numbers rather than a `Vector3` because this record is pushed sixty
+   * times a second and read a handful of times a second; the copy of the input
+   * beside it is already the allocation this queue pays for, and a second object
+   * per frame to hold three floats would be a second one for no gain.
+   *
+   * *After* is the whole of the contract -- see `sendInput`, which states it, and
+   * `reconcile`, which depends on it. Storing the *pre*-step velocity here would
+   * seed every replay one step early and reintroduce this bug with the sign
+   * flipped.
+   */
+  vx: number;
+  vy: number;
+  vz: number;
 }
 
 interface TimedSnapshot {
@@ -528,6 +544,45 @@ export class NetClient {
   /** The eased position correction still owed to the camera, metres. */
   private readonly correction = new Vector3();
 
+  /**
+   * The velocity the body had at the moment the server's latest position is a
+   * picture of, m/s -- the seed the replay in `reconcile` starts from.
+   *
+   * ---------------------------------------------------------------------------
+   * ## Why this is not simply `local.body.velocity`
+   *
+   * The replay rewinds to the acknowledged position, which is `pending.length`
+   * inputs in the past, and then runs forward. It used the *current* velocity to
+   * start from, because velocity is not on the wire and that was the only number
+   * to hand. At a steady speed the two are the same number and it cost nothing:
+   * the residual was 0.4 mm, which is the wire's own millimetre quantisation.
+   *
+   * On an **acceleration ramp** they are not the same number. Starting to run,
+   * stopping, and every jump moves the body's speed by up to `ACCELERATION`
+   * (48 m/s^2) per step, so the current velocity is metres per second faster
+   * than the velocity the body actually had at the acknowledged moment, and the
+   * replay accelerates from the wrong starting speed for its whole length. The
+   * error is `dv * n * dt` and grows with the round trip because `n` does:
+   * measured at 6 cm on a loopback and **a full metre at 200 ms**, every time
+   * the player starts moving or leaves the ground. That is the camera jitter on
+   * acceleration, and it is the last of the three causes.
+   *
+   * So the client reconstructs its own past instead of guessing at it. Nothing
+   * new is believed from anybody and nothing new is on the wire -- `sendInput`
+   * already keeps a copy of every unacknowledged input, and this is one more
+   * field on the record it already keeps. The seed is the velocity stored
+   * against the most recently acknowledged input, which by that method's
+   * ordering contract is the velocity *after* the server's own acknowledged
+   * step.
+   */
+  private readonly ackedVelocity = new Vector3();
+  /**
+   * False until an acknowledgement has supplied one, and after any path that
+   * throws the recorded history away. `local.body.velocity` is the fallback,
+   * which is what every replay used before this field existed.
+   */
+  private ackedVelocityKnown = false;
+
   /** The two most recent authoritative positions for the local player. See the header. */
   private readonly lastServerPos = new Vector3();
   private lastServerTick = -1;
@@ -652,8 +707,35 @@ export class NetClient {
    * The input is copied rather than referenced because `main.ts` mutates one
    * record every frame -- and the whole reconciliation depends on being able to
    * replay the inputs *as they were*, not as the newest one happens to be.
+   *
+   * ---------------------------------------------------------------------------
+   * ## The ordering contract, stated once and depended on twice
+   *
+   * **This is called at the end of the tick, after `combat.advance` has already
+   * integrated `input` into the body.** So `velocity` is the velocity the body
+   * has *after* the step that `this.seq` names -- the post-state of that input,
+   * not its pre-state.
+   *
+   * `main.ts` says the same thing from its side at the foot of its fixed step
+   * ("the local player's inputs go out last, after the tick they belong to has
+   * been predicted"), and `predictedBikeChange` above already leans on it to
+   * work out that a press rides on `seq + 1`. It was an undocumented convention
+   * shared by three call sites until the velocity below started depending on it,
+   * and an undocumented convention is exactly what a refactor moves one line.
+   *
+   * The consequence, which is why `velocity` is a parameter at all: the server
+   * acknowledges a seq, and the position it sends with that acknowledgement is
+   * the position *after* it applied that seq. `reconcile` replays from there,
+   * and the velocity it must start from is the velocity after that same seq --
+   * which is precisely what is recorded here. See `reconcile`'s seed.
+   *
+   * Handed in rather than read off a stored reference to the combatant, because
+   * this object deliberately does not own one: everything else it knows about
+   * the local player arrives as an argument to `reconcile`, and a field pointing
+   * back into `main.ts`'s state would be a second, quieter path by which the two
+   * could disagree.
    */
-  sendInput(input: CombatInput): void {
+  sendInput(input: CombatInput, velocity: Vector3): void {
     if (this.status !== 'online') return;
     this.seq = (this.seq + 1) & 0xffff;
     this.transport.send(
@@ -671,7 +753,13 @@ export class NetClient {
         pitch: input.pitch,
       }),
     );
-    this.pending.push({ seq: this.seq, input: { ...input } });
+    this.pending.push({
+      seq: this.seq,
+      input: { ...input },
+      vx: velocity.x,
+      vy: velocity.y,
+      vz: velocity.z,
+    });
     // A bounded ring rather than an unbounded queue: a server that stopped
     // acknowledging -- because it died, or because the socket is half-open --
     // would otherwise grow this forever at 60 records a second.
@@ -1279,6 +1367,11 @@ export class NetClient {
         // ends it on its own after `FLINCH_LOCKOUT`.
         respawnAt(local, self.x, self.y - EYE_HEIGHT, self.z, local.body.yaw);
         this.pending.length = 0;
+        // Nothing recorded survives a respawn: the queue those velocities were
+        // stamped on has just been emptied, so the next replay falls back to the
+        // current velocity until an acknowledgement refills it. See
+        // `ackedVelocity`.
+        this.ackedVelocityKnown = false;
         this.correction.set(0, 0, 0);
         this.lastServerTick = -1;
         return out.copy(this.correction);
@@ -1297,18 +1390,36 @@ export class NetClient {
       // signed 16-bit space rather than a plain `<=`. Getting this wrong drops
       // the whole history once every eighteen minutes and replays two thousand
       // inputs in one tick.
-      while (this.pending.length > 0 && seqLE(this.pending[0].seq, ack)) this.pending.shift();
+      //
+      // The last one dropped is the one the server's position is a picture of,
+      // so its recorded velocity is the seed the replay below starts from. Taken
+      // here rather than by searching for `ack` in the queue, because the two
+      // are the same entry and this loop has already found it -- and because an
+      // exact match is not guaranteed: a seq can leave the queue through
+      // `INPUT_HISTORY` instead, and the newest thing acknowledged is still the
+      // right answer.
+      while (this.pending.length > 0 && seqLE(this.pending[0].seq, ack)) {
+        const done = this.pending.shift()!;
+        this.ackedVelocity.set(done.vx, done.vy, done.vz);
+        this.ackedVelocityKnown = true;
+      }
     }
 
     // Replay: start from the authoritative position and run every input the
     // server has not yet seen, through the same pure `step` the server ran.
     const body = this.replayBody;
     body.position.set(self.x, self.y, self.z);
-    // The velocity is not on the wire (see the header). The local one is the
-    // best estimate, because both ends just ran the same inputs -- except after
-    // a knockback, which the snap branch below detects and corrects from the
-    // server's own positions.
-    body.velocity.copy(local.body.velocity);
+    // The velocity is not on the wire (see the header), so it is reconstructed
+    // rather than guessed: the client's own recorded velocity for the input the
+    // server just acknowledged, which is the velocity the body had at exactly
+    // the moment this position is a picture of. See `ackedVelocity` for what
+    // using the *current* one cost on every acceleration ramp.
+    //
+    // The current velocity remains the fallback for the two cases where there is
+    // no recorded history to read: before the first acknowledgement, and after
+    // a teleport or a respawn has thrown the queue away.
+    if (this.ackedVelocityKnown) body.velocity.copy(this.ackedVelocity);
+    else body.velocity.copy(local.body.velocity);
     body.onGround = (self.flags & FLAG.ON_GROUND) !== 0;
     body.yaw = self.yaw;
     body.pitch = self.pitch;
@@ -1364,6 +1475,29 @@ export class NetClient {
         }
         local.body.position.copy(body.position);
         this.correction.set(0, 0, 0);
+        // And restamp the recorded history, which this branch has just declared
+        // wrong.
+        //
+        // A snap is the client being told its prediction of the last few frames
+        // never happened -- it predicted a stationary body and the server threw
+        // it at 11 m/s -- so the velocities recorded against those frames are
+        // predictions of a world that did not occur. Left alone they would be
+        // fed back as the seed on each of the next two or three snapshots, which
+        // is a replay flying the arc from a standing start and another snap
+        // behind it: a knockback that rubber-bands for 150 ms instead of
+        // reading as a punch.
+        //
+        // The velocity taken from the server's own two positions is the only
+        // thing actually known about that window, so every unacknowledged frame
+        // is stamped with it -- which is exactly what the reconciler did for
+        // every frame before the seed existed.
+        for (const p of this.pending) {
+          p.vx = local.body.velocity.x;
+          p.vy = local.body.velocity.y;
+          p.vz = local.body.velocity.z;
+        }
+        this.ackedVelocity.copy(local.body.velocity);
+        this.ackedVelocityKnown = true;
       } else {
         // The ordinary case. The simulation takes the correction now; the camera
         // is told about it over the next 80 ms.
@@ -1472,6 +1606,9 @@ export class NetClient {
     // is a road surface and the player is standing on it, not falling onto it.
     local.body.onGround = true;
     this.pending.length = 0;
+    // As on the respawn path: the recorded velocities belong to a queue that no
+    // longer exists, and to a place two hundred metres away. See `ackedVelocity`.
+    this.ackedVelocityKnown = false;
     this.correction.set(0, 0, 0);
     this.lastServerPos.set(self.x, self.y, self.z);
     this.lastServerTick = -1;
@@ -1899,7 +2036,10 @@ export function verifyNetClient(): string[] {
     };
     for (let i = 0; i < 30; i++) {
       advance(local, input, FIXED_DT, world);
-      net.sendInput(input);
+      // `advance` first and `sendInput` second, which is `main.ts`'s order and
+      // the contract `sendInput`'s header states: the velocity recorded against
+      // a seq is the one the body has *after* that input.
+      net.sendInput(input, local.body.velocity);
     }
 
     // The server says the player is 0.5 m from where the client thinks, having

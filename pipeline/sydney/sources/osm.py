@@ -453,11 +453,20 @@ def read_station_areas(radius_m: float, path: Path = PBF_PATH) -> list[OsmPoi]:
 # is here so that the day someone adds one it is picked up rather than being a
 # code change.
 #
+# `town` joined them when the world reached 19.3 km, and Manly is why: OSM tags
+# it `place=town` rather than `place=suburb`, so the locator called it Manly Vale
+# and `/tp manly` drove you to Manly Vale -- the matcher answering correctly from
+# a table that did not contain the place. Sydney's metropolitan area absorbed a
+# ring of what were once separate towns (Manly, Parramatta, Liverpool) and OSM
+# still records that history in the tag; a game whose map is the real city has to
+# read it. There is exactly one `town` inside 19.3 km, which is the size of the
+# risk.
+#
 # Deliberately *not* here: `locality` (23 nodes in the inner bbox), which OSM
 # uses for unbuilt features -- headlands, bays, wharves and rail junctions -- and
 # `city`, which is the single node for Sydney itself and would win the nearest
 # test across half the CBD.
-PLACE_KINDS = ("suburb", "neighbourhood", "quarter")
+PLACE_KINDS = ("suburb", "neighbourhood", "quarter", "town")
 
 
 @dataclass
