@@ -80,7 +80,7 @@ STAGES: tuple[Stage, ...] = (
     # does. Measured at this radius: 117,681 OSM buildings (3.34x the inner
     # ring) over ~2,100 emitted tiles, roughly 30% of the disc being harbour
     # and open ocean, which the pipeline skips.
-    Stage(2, "middle", 15_300, "Marrickville, Bondi, Balmain, Randwick, North Sydney, Chatswood"),
+    Stage(2, "middle", 19_300, "Marrickville, Bondi, Balmain, Randwick, North Sydney, Chatswood"),
     Stage(3, "outer", 35_000, "Parramatta, Bankstown, Hornsby, Sutherland, Manly"),
     Stage(4, "horizon", 60_000, "terrain and coastline only, buildings optional"),
 )

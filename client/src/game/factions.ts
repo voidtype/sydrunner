@@ -173,17 +173,17 @@ import { EYE_HEIGHT } from '../player/controller.ts';
  * same file the world was built from, stamp 1785746290 -- by a read-only scratch
  * script that projected each feature's centroid through `sydney.geo.lonlat_to_enu`
  * and `enu_to_world`, which is the identical path every building in the city took
- * to reach its tile. Forty-three features inside 15,300 m, every one of them on a
+ * to reach its tile. Forty-nine features inside 19,300 m, every one of them on a
  * built tile, verified by `verifyPolice`.
  *
  * It is a table here rather than a sidecar for the reason `game/bikes.TUNING_X`
- * is two numbers rather than a file: forty-three records is under 2 kB, the
+ * is two numbers rather than a file: forty-nine records is under 3 kB, the
  * pipeline is not to be rebuilt, and a sidecar would be a fetch, a decoder, a
  * version word and a failure mode -- all to avoid typing coordinates that cannot
  * change without the world changing.
  *
  * ---------------------------------------------------------------------------
- * **Two blocks, and the split is load-bearing rather than cosmetic.**
+ * **Three blocks, and the split is load-bearing rather than cosmetic.**
  *
  * The first nineteen rows are the 5,300 m inner-ring bake, *frozen*: same rows,
  * same order, same coordinates, same weights. Everything a station decides --
@@ -193,6 +193,11 @@ import { EYE_HEIGHT } from '../player/controller.ts';
  * nineteen byte-for-byte and adds twenty-four more; the twenty-four are appended
  * after them and nothing above them moves. `verifyPolice` asserts the frozen
  * prefix from the other end so a careless re-sort cannot pass.
+ *
+ * The 19,300 m re-extract did the same thing again a ring further out: it
+ * returned all **forty-three** of the rows above byte-for-byte -- 43/43 matched
+ * to 0.1 m, and not one new station turned up inside the old 15,300 m line --
+ * and added six. The same append rule applies to them, for the same reason.
  *
  * The dedupe is 30 m, `streetlife.VENUE_XZ`'s, and it folds exactly two pairs:
  * Marrickville and Kogarah are each mapped as two overlapping outlines 10-11 m
@@ -217,20 +222,22 @@ import { EYE_HEIGHT } from '../player/controller.ts';
  * (`beatPairs`) and how far the beat reaches (`catchment`). A station at 1.0 is
  * three pairs over 900 m; one at 0.15 is one pair over 645 m.
  *
- * The middle ring extends the same ladder outward rather than inventing a second
- * one, and the ladder is worth writing down now that it has forty-three rungs
- * instead of nineteen:
+ * The middle and outer rings extend the same ladder outward rather than
+ * inventing a second one, and the ladder is worth writing down now that it has
+ * forty-nine rungs instead of nineteen:
  *
  *   - **1.00 - 0.55** the CBD and the Cross. Nothing outside the inner ring gets
  *     near this, and the check below asserts that from the other end: the
  *     heaviest beat has to be within 2 km of Town Hall.
  *   - **0.45 - 0.35** a district command on a real high street -- Bondi,
  *     Randwick, Marrickville, Chatswood, Burwood, Ashfield, Campsie, Hurstville,
- *     Kogarah, Manly. These are the outer ring's Newtowns.
+ *     Kogarah, Manly, and out past 15,300 m, Bankstown, Granville and Auburn.
+ *     These are the outer ring's Newtowns.
  *   - **0.30 - 0.20** suburban and specialist commands: Maroubra, Mascot,
- *     Strathfield, Ryde, Dee Why, the airport's federal detachment, and the
- *     quieter shopfronts at Five Dock, Gladesville, Earlwood, Eastwood and the
- *     unsigned one in Petersham.
+ *     Strathfield, Ryde, Dee Why, Riverwood, Ermington, the airport's federal
+ *     detachment and the Botany Bay marine one, and the quieter shopfronts at
+ *     Five Dock, Gladesville, Earlwood, Eastwood and the unsigned one in
+ *     Petersham.
  *   - **0.15 - 0.10** the leafy north and the campus post. Frenchs Forest and
  *     Gordon sit where Mosman sits, which is the point of them.
  *
@@ -324,6 +331,16 @@ const STATION_SPECS: readonly PoliceStationSpec[] = [
   { name: 'Frenchs Forest', x: 1541.0, z: -13260.7, weight: 0.15 },
   { name: 'Gordon', x: -5486.6, z: -12629.9, weight: 0.15 },
   { name: 'Macquarie University', x: -9082.4, z: -10108.1, weight: 0.1 },
+  // --- The 15,300 - 19,300 m outer ring. Six more, on the same ladder and in
+  // the same weight order. The 19,300 m re-extract returned the forty-three
+  // above byte-for-byte -- same dedupe, same projection, same rounding -- so
+  // nothing here is a retune of anything above it.
+  { name: 'Bankstown', x: -16383.5, z: 5633.6, weight: 0.4 },
+  { name: 'Granville', x: -18572.3, z: -3725.1, weight: 0.35 },
+  { name: 'Auburn', x: -16290.4, z: -1468.4, weight: 0.35 },
+  { name: 'Riverwood', x: -14447.9, z: 9843.9, weight: 0.25 },
+  { name: 'Ermington', x: -14572.7, z: -5673.8, weight: 0.2 },
+  { name: 'Botany Bay Water Police', x: -7550.2, z: 14909.6, weight: 0.2 },
 ];
 
 /**
@@ -341,7 +358,7 @@ export const POLICE_STATIONS: readonly PoliceStation[] = STATION_SPECS.map((s) =
 }));
 
 /** The extent the stations were extracted inside. `verifyPolice` asserts it. */
-export const STATION_EXTENT_M = 15300;
+export const STATION_EXTENT_M = 19300;
 
 /**
  * The extent the frozen prefix was extracted inside, and how many rows it is.
@@ -1119,7 +1136,7 @@ function catchmentBands(field: PedestrianField, station: PoliceStation, out: Ped
   // is filled by a widening search above rather than by one fixed radius.
   //
   // What the rescue cannot do is invent coverage where there is no station, and
-  // forty-three discs of 300-520 m over a city of 15,300 m radius leaves most of
+  // forty-nine discs of 300-520 m over a city of 19,300 m radius leaves most of
   // it outside every one of them. That is `forEachPatrolNear`'s job, not this one's.
   const score = (b: PedBand): number => {
     // Closest approach of the band's own bounds to the station, so a long street
@@ -1167,8 +1184,9 @@ const BEAT_BAND_POOL = 12;
  * That is not a tuning failure, it is a *shape* failure. Nineteen stations with
  * catchments of 300-520 m covered about 11 km^2 of a city that was 88 km^2, so
  * seven eighths of the map had no police in it at all -- and the middle ring did
- * not change the ratio, it scaled it: forty-three stations cover about 24 km^2
- * of a city that is now 735 km^2, which is worse -- and the eighth that
+ * not change the ratio, it scaled it, and the outer ring scaled it again:
+ * forty-nine stations cover about 20 km^2 of a city that is now 1,170 km^2,
+ * which is worse again -- and the eighth that
  * does is the eighth a player who spawned in the CBD would have walked anyway.
  * Widening the catchments does not fix it either: a beat spread over a kilometre
  * is a beat you never meet, which is the argument `CATCHMENT_MIN` already lost
@@ -1379,7 +1397,14 @@ export function patrolCentre(c: number): number {
  * A station is registered in every cell its influence disc's bounding box
  * overlaps, and the cell is `PATROL_INFLUENCE` itself, so a point can only be
  * reached by stations registered in the point's own cell -- one map lookup, no
- * neighbourhood walk. Nine cells a station, forty-three stations, built once.
+ * neighbourhood walk. Nine cells a station, forty-nine stations, built once.
+ *
+ * **Re-measured at the outer ring** rather than assumed: at 49 stations the
+ * grid is 0.035 us a query against the linear scan's 0.092 us on the same
+ * sample, and it is **bit-identical** to that scan at all 38,416 points of a
+ * 200 m lattice over the 19,300 m disc -- which is the property that matters
+ * here, not the speed. The cell is `PATROL_INFLUENCE`, so the six new rows add
+ * nine buckets each and change nothing about what any existing query reads.
  *
  * **Bit-identical, not merely equivalent**, which is the reason the buckets are
  * built in ascending table order and read in it. Floating-point addition is not
@@ -1439,11 +1464,12 @@ export function patrolWeight(x: number, z: number): number {
  *
  * **Memoised**, and it is not premature: this is a pure function of two integers
  * over a table frozen at module load, and `forEachPatrolNear` calls it for every
- * cell of every query -- twenty-five of them for a draw radius, forty-three
+ * cell of every query -- twenty-five of them for a draw radius, forty-nine
  * square roots each. Cached, a warm query does two integer hashes and a map
  * lookup. The map is bounded by the number of cells in the extent, which the
- * middle ring takes from 640 to about 7,500 -- still a few hundred kilobytes at
- * worst, and only the cells actually walked are ever inserted.
+ * middle ring took from 640 to about 7,500 and the outer ring takes to about
+ * 11,400 -- still a few hundred kilobytes at worst, and only the cells actually
+ * walked are ever inserted.
  */
 const patrolPairCache = new Map<number, number>();
 
@@ -1777,7 +1803,7 @@ const LIVERY_STEPS = LIVERY_SHARE_CITY / LIVERY_SHARE_NEAR;
  * a gradient. Two independent rolls would have produced exactly that.
  *
  * The field is only evaluated for the one car in twelve that could possibly
- * qualify, which keeps forty-three square roots off the other eleven.
+ * qualify, which keeps forty-nine square roots off the other eleven.
  */
 export function policeLiveried(route: number, slot: number, x: number, z: number): boolean {
   const roll = carHash(route, slot ^ 0x9011ce) % LIVERY_SHARE_CITY;
@@ -2740,7 +2766,7 @@ export function verifyPolice(kitTriangles?: number, snapshotInterval?: number): 
   if (POLICE_STATIONS.length <= STATION_INNER_COUNT) {
     failures.push(
       `Only ${POLICE_STATIONS.length} police stations are baked and the frozen inner ring is ` +
-        `${STATION_INNER_COUNT} of them; the middle-ring extract found 43. The new ring would have no commands at all.`,
+        `${STATION_INNER_COUNT} of them; the 19,300 m extract found 49. The new ring would have no commands at all.`,
     );
   }
   // The frozen prefix, from the other end. Every one of the first
@@ -2762,7 +2788,7 @@ export function verifyPolice(kitTriangles?: number, snapshotInterval?: number): 
     }
   }
   // The default an unweighted row falls to. It is not exercised by any row in
-  // the table today -- every one of the 43 carries a weight -- which is exactly
+  // the table today -- every one of the 49 carries a weight -- which is exactly
   // why it is asserted here rather than left to be discovered by the stage-3
   // bake that first leaves one out. Zero would be a command with no officers,
   // no catchment and no error.

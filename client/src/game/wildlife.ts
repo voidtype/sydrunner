@@ -916,6 +916,243 @@ const PARKS_MIDDLE_PACKED =
   '1782.7|12.1';
 
 /**
+ * The 15,300 - 19,300 m outer ring, 476 discs, in the same packing.
+ *
+ * A **separate constant rather than more records on the end of
+ * `PARKS_MIDDLE_PACKED`**, and the reason is the same reason the middle block
+ * exists at all: kept apart, the middle string is byte-identical to what it was
+ * before this ring was baked, and "byte-identical" is a thing a diff can show
+ * rather than a thing a reader has to take on trust. Concatenated, every park in
+ * the city would sit on one line that changed.
+ *
+ * The 19,300 m re-extract reproduced **all 1,345 rows above to 0.1 m** -- same
+ * recipe, same `MIN_AREA`, same `MIN_R`, same aquatic-reserve exclusion, same
+ * pole of inaccessibility at the same tolerance.
+ *
+ * Twenty-one discs inside the old 15,300 m line did *not* match a baked row and
+ * are **dropped rather than appended**, which is the same call the 15,300 m bake
+ * made about three of them. They are not new parks: they are polygons the
+ * smaller bbox had *clipped*, whose pole of inaccessibility therefore sat
+ * somewhere else -- Sydney Harbour National Park, Rawson Park, Gore Hill Park,
+ * Wolli Creek, the Parramatta River reserves, and a dozen ovals on the old rim.
+ * Read whole they land somewhere better, but "somewhere better" inside the
+ * frozen region is still a flock that moved, and the append-only rule says the
+ * inner rings do not move. They will be right the next time the frozen line
+ * itself is redrawn.
+ *
+ * Two further discs are dropped for a different reason: both halves of **Towra
+ * Point Nature Reserve**, whose poles of inaccessibility land on Botany Bay
+ * tidal mudflat that the pipeline emits no tile for. The 15,300 m ring met this
+ * as marine reserves and excluded them by `protection_title == 'Aquatic
+ * Reserve'`; Towra Point is tagged a plain land `Nature Reserve`, so the tag is
+ * not the discriminator and the built tile set is. The appended block is
+ * therefore filtered against `index.json`'s own tile keys -- which is exactly
+ * what `integration-check` asserts from the other end, so the two agree by
+ * construction rather than by coincidence.
+ */
+const PARKS_OUTER_PACKED =
+  'Garigal National Park|3151.4|-18620.0|1121.0;Garigal National Park|-2194.0|-15853.6|508.6;Kamay ' +
+  'Botany Bay National Park|1693.3|15283.4|432.9;Ku-ring-gai Wildflower Garden|-3555.3|-18091.7|406' +
+  '.2;Towra Point Nature Reserve|-4319.9|18090.6|327.0;Lane Cove National Park|-11195.0|-12982.7|32' +
+  '6.9;St Ives Showground|-2580.2|-18244.2|306.8;Endeavour Heights Reserve|-46.3|18546.5|288.7;Twin' +
+  's Creek Reserve|-9204.2|-14117.8|272.6;Cronulla State Park|-2245.4|18196.4|272.2;Terramerragal R' +
+  'eserve|-5339.9|-18102.0|244.8;Oatley Park|-13409.5|12617.0|240.8;Rofe Park|-8267.4|-13504.3|213.' +
+  '9;Bradley Reserve|-10100.4|-12734.3|205.3;Lane Cove National Park|-10583.6|-13393.5|201.1;Campbe' +
+  'll Hill Pioneer Reserve|-19167.6|484.3|169.5;Baden-Powell Activity Centre|-11944.1|-14387.5|167.' +
+  '1;Salt Pan Creek Reserve|-15172.4|8554.7|166.3;Lane Cove National Park|-10817.9|-14283.8|165.8;O' +
+  'lds Park|-12283.3|10267.7|148.0;Wyatt Park|-15742.5|-1217.1|143.1;Galaringi Reserve|-14487.2|-91' +
+  '60.4|138.7;Pennant Hills Park|-12082.2|-13708.6|135.8;The Collaroy Centre|7949.7|-14984.9|134.2;' +
+  'Cowells Lane Reserve|-13700.3|-6848.9|132.8;Brush Farm Park|-13251.7|-7978.5|130.5;park -14268,1' +
+  '1497|-14267.5|11496.9|129.9;Wategora Reserve|-18196.1|298.5|129.7;O\'Neill Park|-17110.5|3938.3|1' +
+  '29.1;Auburn Botanic Gardens|-17851.9|-854.0|127.1;Lucknow Park|-10703.5|-11048.3|123.1;Mona Park' +
+  '|-17565.9|-1854.3|120.2;Kyle Williams Recreational Reserve|-9359.5|13811.4|119.6;Cox Park|-14782' +
+  '.4|-9023.0|118.7;park -8003,13358|-8003.1|13358.1|118.5;Towra Point Nature Reserve|-220.4|16456.' +
+  '6|118.2;Norford Park|-18231.2|1165.4|117.9;Oriole Park|-17756.5|-1124.9|115.4;Everley Park|-1830' +
+  '6.2|806.8|114.3;North Rocks Park|-15990.0|-10575.8|110.5;Riverwood Park|-14942.4|9273.1|107.9;Er' +
+  'ic Primrose Reserve|-14816.7|-4911.9|107.2;Hunts Creek Reserve|-16543.5|-9686.0|106.5;Upjohn Par' +
+  'k|-14841.7|-6561.9|106.3;McLaughlin Oval|-15045.1|8204.2|104.8;Maluga Passive Park|-17848.1|2981' +
+  '.0|104.8;Gwawley Park|-7966.5|17258.6|102.3;Horlyck Reserve|-17883.8|-1755.6|100.9;Punchbowl Par' +
+  'k|-14818.4|7182.6|100.6;Jensen Park|-17648.6|1962.4|100.5;Epping Oval|-11405.2|-11473.3|99.9;Dun' +
+  'das Park|-14485.7|-7954.6|98.8;North Turramurra Recreation Area|-5936.9|-18218.7|98.3;Jim Ring R' +
+  'eserve|-17793.2|2597.7|98.2;Auluba Reserve|-9312.1|-12845.3|97.9;Coleman Park|-15643.9|726.9|96.' +
+  '6;Hassall Park|-3728.1|-16881.1|95.4;Griffith Park|8551.0|-14358.3|95.0;Saint Matthews Farm Rese' +
+  'rve|6097.4|-14957.7|93.1;West Epping Park|-13306.6|-10671.3|93.1;grass -1530,17048|-1530.3|17048' +
+  '.3|92.9;Ray Marshall Reserve|-18151.5|-407.4|92.2;park -4528,-17646|-4528.1|-17645.9|92.1;Moore ' +
+  'Reserve|-10984.9|12497.3|91.7;Peakhurst Park|-13838.0|10147.7|91.2;Apsley Place Baseball Fields|' +
+  '-8093.6|17105.2|90.5;Dalrymple-Hay Nature Reserve|-4999.9|-14485.4|90.2;Turramurra Memorial Park' +
+  '|-7473.0|-15733.8|90.1;Carss Bush Park|-8274.6|13711.6|89.8;Bonna Reserve|-1411.2|15481.8|89.7;P' +
+  'arramatta City Tennis Courts|-17373.3|-6945.0|89.6;Bennett Park|-13276.5|8196.2|89.3;Lane Cove N' +
+  'ational Park|-11823.5|-11761.0|88.8;Barton Park|-17599.9|-7178.8|88.5;Canoon Road Recreation Are' +
+  'a|-10181.6|-13114.1|88.2;Peter Hislop Park|-18093.2|617.6|87.0;park -18853,3695|-18852.9|3694.8|' +
+  '86.3;Cromer Park|6583.4|-14427.9|86.2;Mobbs Lane Reserve|-13447.4|-9271.8|85.7;St Ives Village G' +
+  'reen|-4848.0|-15474.3|84.9;Ruse Park|-15940.9|6715.3|84.5;Fred Spurway Park|-13374.7|-9014.0|83.' +
+  '9;Sheldon Forest|-7723.3|-13870.6|83.4;Boronia Park|-12358.6|-10314.6|82.7;Bankstown Memorial Pa' +
+  'rk|-16279.3|6199.2|82.5;Progress Park|-17852.8|-355.9|82.2;park -6191,-16093|-6191.0|-16093.1|81' +
+  '.1;Grover Avenue Reserve|5900.2|-14829.8|81.0;Princes Park|-18127.7|941.2|80.4;Bankstown City Sp' +
+  'orts Complex|-17125.7|6981.7|80.3;Kendall Reserve|-7069.7|14653.7|80.1;Thornleigh Park|-11628.8|' +
+  '-14500.9|80.0;Ron Payne Park|-10620.3|-12567.6|79.5;Todd Park|-8664.8|13378.6|78.5;Myles Dunphy ' +
+  'Bushland Reserve|-12022.6|12914.0|77.6;Rydalmere Park|-15789.4|-5749.6|76.9;Playford Park|-16623' +
+  '.1|8887.9|76.7;Padstow Park|-15740.4|9322.8|76.6;Gillespie Field|-8150.1|-16172.5|76.4;North Epp' +
+  'ing Park|-10214.9|-12046.6|76.2;park -9214,-16030|-9213.5|-16030.4|74.5;Beecroft Park|-13764.4|-' +
+  '12264.6|74.0;Tulich Reserve|7306.4|-13803.3|73.9;Graf Park|-16297.8|4326.5|73.9;Gosling Park|-14' +
+  '880.5|4026.3|73.6;grass -17180,-6204|-17180.3|-6204.4|73.3;Bannockburn Oval|-6655.5|-14753.1|72.' +
+  '5;Cheltenham Park|-13125.1|-11779.4|72.5;Sturt Park|-15341.2|-7581.9|72.4;Oatley Pleasure Ground' +
+  '|-11364.4|13234.6|71.8;Renown Reserve|-11173.9|11894.5|71.0;Wise Reserve|-13472.1|8427.3|69.6;Au' +
+  'burn Park|-16250.0|-2395.9|69.1;Rotary Park|-13753.2|8615.8|68.4;Wyatt Reserve|246.7|-16087.6|68' +
+  '.3;Maddison Reserve|-5928.0|-15053.4|67.8;Waldon Road Reserve|345.0|-17108.7|67.7;Thomas Wemys P' +
+  'ark|-14253.3|-6770.4|67.7;Lane Cove National Park|-11732.9|-12452.1|67.5;park -11422,15377|-1142' +
+  '1.5|15376.7|67.4;Marton Park|491.8|15810.2|66.9;Somerset Park|-10529.5|-11152.1|66.7;Sir Thomas ' +
+  'Mitchell Reserve|-14470.4|-8373.2|66.6;park -14112,-12059|-14111.5|-12058.6|66.5;Field 2|-5867.1' +
+  '|-18216.0|66.5;Acron Oval|-3142.4|-15636.2|65.9;F S Garside Park|-17960.5|-3806.3|65.7;Granville' +
+  ' Memorial Park|-18178.5|-3409.0|65.3;P H Jeffery Reserve|-17419.8|-7108.2|64.8;George Gollan Res' +
+  'erve|-17470.5|-7868.8|64.2;Bankstown Oval|-16342.0|6343.0|64.1;Marri Badoo Reserve|-15468.9|-722' +
+  '2.2|64.1;Woorarra Lookout Reserve|6247.7|-18143.7|63.9;Collaroy Plateau Park|7399.7|-15657.0|63.' +
+  '6;Wahroonga Park|-8814.5|-16747.9|63.5;John Wearn Reserve|-16162.1|-10379.7|63.5;Band Hall Reser' +
+  've|-17494.4|3426.2|63.5;Fred Robertson Park|-16537.7|-7031.4|62.9;Rotary Park|-13962.2|8384.6|62' +
+  '.6;Colquhoun Park|-18745.8|-1948.3|62.3;Shipwrights Bay Reserve|-8982.2|14411.6|62.2;Chilworth R' +
+  'eserve|-13903.1|-12220.1|62.2;Kingsdene Oval|-16433.9|-9094.8|62.0;Equestrian Park|-6385.1|14376' +
+  '.7|62.0;Robin Thomas Reserve|-18314.6|-5376.0|61.8;Harold West Reserve|-14998.6|-10099.4|61.5;Cl' +
+  'areville Park|-6410.1|14561.3|61.5;Stuart Street Reserve|-15742.0|8810.1|60.5;Washington Avenue ' +
+  'Reserve|5484.9|-15065.0|60.2;Little Duck Creek Reserve|-18911.4|-1365.4|60.2;Poulton Park|-10022' +
+  '.9|12417.6|59.9;Samuel King Park|-6086.0|-17431.6|58.5;park -13989,-10645|-13988.9|-10645.3|58.2' +
+  ';Kentucky Road Reserve|-14859.1|8824.2|58.2;Lyne Road Reserve|-12402.9|-11687.4|57.7;park -16033' +
+  ',-6487|-16032.6|-6486.9|57.6;Eccles Park|-14494.3|-6165.9|57.3;grass -17031,-6139|-17031.2|-6139' +
+  '.0|57.3;James Ruse Reserve|-18349.0|-5262.0|57.1;Middleton Park|-18440.3|4066.8|56.7;Ponds Creek' +
+  ' Reserve|-14689.4|-8108.2|56.4;Karuah Oval|-7538.7|-15575.0|56.0;Church Street Native Flora Rese' +
+  'rve|-8716.0|13729.5|55.9;Wattawa Reserve|-18065.0|5856.1|55.8;Rapanea Community Forest|-15057.3|' +
+  '-8478.1|55.7;Como Pleasure Grounds|-12585.8|14515.5|55.6;Harry Gapes Reserve|-18821.6|-1766.6|55' +
+  '.6;Stuart Park|-8994.3|13576.7|55.4;The Green|-9694.1|13301.6|55.0;Yanung Reserve|-14129.2|-1138' +
+  '7.9|54.3;Canberra Road Reserve|-9027.9|16022.4|54.2;Mount Lewis Park|-14668.3|5600.8|54.2;Silver' +
+  'water Park|-14820.9|-4563.2|54.1;Elizabeth Farm Reserve|-17772.0|-4988.2|53.9;grass -4089,-15317' +
+  '|-4088.8|-15316.7|53.9;Truman Reserve|4885.6|-15393.6|53.5;Homelands Reserve|-15551.2|-8546.9|53' +
+  '.4;recreation_ground -13312,-10711|-13311.7|-10710.7|52.9;recreation_ground -15561,-767|-15561.4' +
+  '|-767.0|52.3;Williams Reserve|-15777.8|-6814.9|52.2;Burnside Gollan Reserve|-17716.4|-7560.3|52.' +
+  '1;grass -7853,16759|-7852.9|16758.7|52.1;Duck River Reserve|-17934.8|-1268.8|52.0;recreation_gro' +
+  'und -12246,-12100|-12246.0|-12099.9|52.0;Howson Oval|-9667.8|-13987.9|51.4;Deakin Park|-15436.9|' +
+  '-2766.7|51.3;Guillfoyle Park|-16971.4|1813.2|51.0;Allder Park|-18521.9|2708.9|50.9;Forest Park|-' +
+  '11709.0|-10159.3|50.7;Bilarong Reserve|6986.3|-17664.7|50.7;Lane Cove National Park|-11665.7|-12' +
+  '275.3|50.0;park -6904,-14367|-6903.7|-14366.7|49.6;Bankstown City Gardens|-16102.6|6207.6|49.6;p' +
+  'ark -13787,-12508|-13786.6|-12507.7|49.6;Booth Park|-13256.7|-12621.6|49.5;Beatty Reserve|-12953' +
+  '.2|11504.5|49.4;Hurstville Quarry Reserve (South)|-10031.0|11966.2|49.3;WRCS Flying Field|2583.8' +
+  '|-17313.1|49.2;Japanese Gardens|-17711.3|-749.6|49.1;Jubilee Park|-11899.0|11957.5|49.0;recreati' +
+  'on_ground -17693,-604|-17692.7|-604.0|48.9;Marion Reserve|-18317.3|5540.2|48.1;Boundary Reserve|' +
+  '-12942.0|10501.1|48.0;Smail Reserve|-16817.7|3375.6|47.8;Morona Avenue Reserve|-10424.6|-13617.8' +
+  '|47.7;park -13134,-11587|-13134.3|-11586.7|47.7;park -14636,-11420|-14635.7|-11419.6|47.7;park -' +
+  '8409,-13473|-8408.7|-13472.6|47.7;Baraba Reserve|-18074.4|-1335.6|47.6;Middle Creek Reserve|5363' +
+  '.4|-16822.5|47.5;North Rocks Catholic Cemetery|-15818.4|-10813.6|47.4;Roselea Park|-15120.2|-113' +
+  '15.3|47.3;Kurnell Boarding Stables and Riding School|-1615.6|17192.8|47.0;Claude Cameron Grove|-' +
+  '7189.6|-17287.5|46.9;Acacia Park|-14938.8|-7990.0|46.6;Revesby Flood Reserve|-17208.4|7787.4|46.' +
+  '5;Steam Roller Park|-13557.3|12736.2|46.1;recreation_ground -18348,-5774|-18347.6|-5774.0|45.8;D' +
+  'onnelly Park|-10185.2|13617.3|45.6;park 8507,-13916|8507.3|-13916.2|45.6;Elizabeth Macarthur Par' +
+  'k|-15821.6|-8170.5|45.3;Cook Park|-7143.2|15171.0|45.2;garden -17263,1297|-17263.4|1297.4|45.2;T' +
+  'ucker Reserve|-13980.9|12410.7|44.9;Clarke Reserve|-15826.3|9915.2|44.4;Gillman Reserve|-18464.0' +
+  '|4744.7|43.9;Dunrossil Park|-14281.4|-10709.7|43.9;Bald Face Point Reserve|-9592.4|14789.5|43.8;' +
+  'James Morgan Reserve|6463.1|-14231.0|43.8;Hawkesbury Park|-8061.0|16481.3|43.6;park -15260,1720|' +
+  '-15260.2|1719.8|43.5;Gazzard Park|-17046.7|4349.5|43.5;Greenacre Heights Reserve|-15041.1|5044.8' +
+  '|43.5;Cutting Reserve|-15464.4|9938.5|43.4;North Epping Bowling Club|-11126.2|-12559.6|43.4;Rose' +
+  ' Park|-18088.9|3302.2|43.3;Scout Memorial Park|-18505.1|-3162.0|43.0;recreation_ground -4818,-15' +
+  '618|-4818.2|-15618.1|42.9;Maybrook Ave Bushland Reserve|5280.9|-14558.1|42.9;grass 945,15281|944' +
+  '.6|15280.7|42.8;Mahratta|-8719.5|-15557.2|42.7;Greenhills fields|-1987.8|17375.0|42.4;Rangihou R' +
+  'eserve|-18091.7|-5605.3|42.4;Bright Park|-19123.9|-1032.0|42.3;grass -18907,1097|-18907.4|1097.4' +
+  '|42.1;Scott Park|-6475.0|14697.8|42.1;Taren Point Shorebird Reserve|-7500.2|16528.0|41.9;Shirley' +
+  ' Street Reserve|-15072.7|-9451.8|41.8;park 378,-15876|378.0|-15875.6|41.8;McRaes Park|-11169.9|1' +
+  '1407.4|41.7;Ray Park|-13849.2|-11193.8|41.7;Rorie Reserve|-15646.1|10795.4|41.6;park -13164,-782' +
+  '5|-13164.1|-7824.9|41.5;Lane Cove National Park|-12327.6|-12776.7|41.3;Browns Field|-9613.4|-147' +
+  '23.2|40.8;Scott Park|-6493.8|14820.9|40.8;Hamilton Park|-8463.8|-14066.8|40.5;Bloxsome Park|-165' +
+  '06.0|2781.2|40.4;Toolang Playing Field|-5007.4|-16780.5|40.3;Kibo Park|-16346.1|1556.4|40.1;Arth' +
+  'ur Park|-15377.6|6818.1|39.9;Robert Green Forest|-16682.2|-7155.2|39.9;Connells Point Reserve|-1' +
+  '0652.3|13685.3|39.5;Duck River Reserve|-17948.5|-2315.7|39.5;Stay Upright Motorcycle Training|-1' +
+  '7434.8|-3755.9|39.4;Thella Reserve|-17789.5|5541.4|39.1;Schaefer Park|-16995.0|-5747.9|38.7;Stev' +
+  'ens Reserve|-15677.0|6151.3|38.5;Paul Keating Park|-16057.9|5489.1|38.4;Jim Crowgey Reserve|-164' +
+  '72.6|-6513.8|38.1;Lumeah Reserve|5926.8|-18165.0|38.1;Bedes Forest|-4003.9|-15159.5|38.0;Winsor ' +
+  'Park|-15170.1|3859.7|37.6;Woodstock Reserve|-15295.8|-10529.5|37.6;Experiment Farm Reserve|-1829' +
+  '0.6|-5161.0|37.5;Blackbutt Park|-5729.0|-14580.0|37.5;Freeman Avenue Reserve|-13064.5|13074.6|37' +
+  '.5;Lambert Reserve|-13920.3|11597.4|37.3;Hurstville Quarry Reserve (North)|-10237.2|11706.6|37.1' +
+  ';Field 1|-5970.2|-18250.8|37.1;Furlough Park|8094.4|-17190.4|36.8;Beale Reserve|-13679.0|11099.5' +
+  '|36.2;Wimbledon Reserve|7424.3|-17263.0|36.2;park -6738,-14068|-6737.5|-14067.6|36.1;Ruse Park|-' +
+  '16056.8|7127.7|36.0;Pine Tree Park|-15427.8|-11236.7|36.0;Collett Park|-17609.1|-6384.5|35.9;Ter' +
+  'esa Place Reserve|5393.8|-14460.7|35.9;park -19222,-945|-19222.2|-945.0|35.8;park -17933,-2111|-' +
+  '17933.0|-2110.9|35.8;Wabash Reserve|6018.6|-15131.2|35.6;Hambledon Cottage Reserve|-18100.5|-520' +
+  '9.8|35.5;New Settlers Park|-16964.5|-6892.9|35.5;Green Point Reserve|-12121.5|14568.1|35.4;park ' +
+  '-13494,-12637|-13494.5|-12637.0|35.0;park -12742,9326|-12742.0|9325.7|35.0;William Wade Park|-15' +
+  '942.4|-7439.9|34.7;Allan Cunningham Reserve|-14066.1|-8509.2|34.6;RAAF Stores Park|-17558.1|969.' +
+  '7|34.0;Cavan Green|-12837.3|-9096.1|34.0;Sir Robert Menzies Park|-9991.9|-14450.2|34.0;Urimbirra' +
+  ' Park|-18807.3|-533.9|33.9;Baralyly Park|-14469.6|-8729.7|33.8;park -12388,9196|-12387.9|9196.1|' +
+  '33.8;Maunder Avenue Reserve|-3936.2|-16391.3|33.8;Lorraine Taylor Reserve|-2895.0|-16187.2|33.3;' +
+  'Magney Reserve|-17147.4|2344.2|33.3;grass 5742,-17955|5742.1|-17954.8|33.2;Tyagarah Place Reserv' +
+  'e|5477.7|-14519.9|33.2;Lidcombe Remembrance Park|-15306.1|-60.0|33.1;Windarra Reserve|-12694.7|8' +
+  '606.7|33.1;Apex Reserve|-15607.3|4480.6|33.0;RM Campbell Reserve Park|-15706.5|5204.9|33.0;Bango' +
+  'r Park|-17804.6|-2079.1|33.0;Grannys Springs|-7959.2|-14779.3|32.9;garden -17804,-4970|-17803.8|' +
+  '-4970.0|32.9;nature_reserve -8671,-14535|-8671.4|-14534.6|32.6;Dog Park|-9314.9|-12691.1|32.4;Su' +
+  'ffolk Avenue Reserve|7757.0|-14535.2|32.3;park -7990,13173|-7989.6|13173.1|32.2;Lindisfarne Cres' +
+  'cent Reserve|-15866.9|-10149.7|32.1;park -13281,8622|-13281.3|8621.8|31.9;Salmon Reserve|-14817.' +
+  '4|6741.3|31.9;Spencer Park|-16538.4|1374.5|31.9;Cutliffe Reserve|-15893.6|2302.1|31.8;park 6502,' +
+  '-18018|6501.5|-18018.5|31.8;Dorothy Street Reserve|5587.9|-14663.5|31.7;park -12702,11871|-12701' +
+  '.8|11870.7|31.6;Foveaux Park|-17761.6|-6029.9|31.6;Scott Park|-13561.4|7256.3|31.3;Carlingford M' +
+  'emorial Park|-14694.7|-9549.1|31.2;park -16586,8987|-16586.3|8987.0|31.2;Dandarbong Reserve|-141' +
+  '39.2|-8822.9|31.2;grass -18634,-3022|-18633.5|-3021.6|31.2;Carlingford Anglican Cemetery|-14008.' +
+  '5|-9223.3|31.0;Kilpack Park|-14335.9|-10049.8|30.9;Fitzgerald Forest|-14880.2|-8723.9|30.9;Mortd' +
+  'ale Memorial Park|-12171.8|11637.4|30.8;Norman Park|-16790.8|-40.9|30.8;park -7656,-15108|-7656.' +
+  '1|-15107.7|30.6;Cherrywood Reserve|-6805.9|-17312.2|30.6;Prairie Vale Reserve|-15180.3|5494.7|30' +
+  '.5;Granville Waratah Scoccer Football Club|-18314.2|-5478.1|30.4;David Scott Reserve|-12904.5|-9' +
+  '906.3|30.3;Iona Creek Reserve|-14182.2|-7969.1|30.2;George Cayley Reserve|-14481.7|7616.8|30.1;M' +
+  'emorial Avenue Reserve|-4621.2|-16187.8|30.1;Illoura Reserve|-19036.7|-2960.5|30.0;James Hoskin ' +
+  'Reserve|-13570.1|-8768.8|29.9;park -12571,11780|-12571.1|11780.4|29.8;park -16752,-9256|-16752.5' +
+  '|-9255.5|29.7;Berry Reserve|7644.7|-16592.5|29.7;park -18584,-637|-18584.3|-637.0|29.6;Chattan P' +
+  'ark|7534.7|-17579.3|29.5;Civic Park|-16458.8|-720.5|29.4;grass -62,-18876|-61.6|-18875.8|29.2;gr' +
+  'ass -5979,-16910|-5979.2|-16909.6|29.1;Bell Park|-9894.0|11822.5|28.9;Dover Park|-8308.3|14087.4' +
+  '|28.9;park -17741,-5625|-17741.3|-5624.6|28.9;Silver Beach Reserve|-818.4|15468.7|28.8;James Whe' +
+  'el Place Reserve|5892.0|-15982.9|28.7;Broadoaks Park|-14767.0|-5309.1|28.7;Orange Green Park|-59' +
+  '18.9|-16856.9|28.5;grass -17699,2428|-17699.1|2428.5|28.5;Sans Souci Park|-7372.1|15074.5|28.3;p' +
+  'ark -16170,-6462|-16169.8|-6461.9|28.2;Johnstone Reserve|-14713.1|10235.2|28.2;Prairievale Reser' +
+  've|-9301.1|12767.5|28.0;Hume Park|-15338.4|-2948.5|28.0;New Glasgow Park|-17917.1|-2590.6|28.0;g' +
+  'rass -16945,-6168|-16945.2|-6167.9|28.0;McLeod Reserve|-16308.5|4646.0|27.9;Irish Town Grove|-62' +
+  '94.9|-15753.3|27.8;Basil Street Reserve|-15163.1|9683.1|27.8;Alice Park|-16541.3|4878.1|27.7;Pea' +
+  'rce Avenue Reserve|-13564.8|10205.8|27.6;Eric Mobbs Memorial Park|-14584.9|-9467.2|27.5;park -10' +
+  '404,-11741|-10403.6|-11741.3|27.5;Charles Reserve|-13480.8|9441.4|27.3;Harley Park|-12423.8|-933' +
+  '4.0|27.3;Queens Wharf Park|-18093.5|-5476.4|27.1;park -14960,5256|-14960.3|5255.9|27.1;park -164' +
+  '22,5961|-16422.0|5961.3|27.0;recreation_ground -18320,-5988|-18319.8|-5987.5|26.8;nature_reserve' +
+  ' -9704,-12956|-9704.3|-12955.7|26.8;Neverfail Bay Reserve|-12218.3|13888.3|26.6;Dorothy Park|-14' +
+  '909.3|6194.3|26.4;grass -6962,14964|-6962.1|14964.0|26.3;park -14612,-11872|-14612.3|-11872.0|26' +
+  '.2;Oatley Memorial Park|-11779.2|12958.6|26.2;park -14210,-7573|-14209.6|-7573.3|26.2;102 Roseda' +
+  'le Road (Gazettal in Progress)|-4928.6|-14647.4|26.0;Padstow Bowling and Recreation Club|-16203.' +
+  '5|9320.8|25.9;Barra Wood|-4040.3|-14859.3|25.8;Toronto Avenue Reserve|5984.1|-15199.2|25.8;grass' +
+  ' -5959,-14970|-5959.3|-14970.4|25.7;grass -17185,-5806|-17184.7|-5806.5|25.6;park -14854,7941|-1' +
+  '4853.8|7941.4|25.6;Eyles Reserve|-13770.4|-8336.2|25.5;park -6476,-15642|-6475.9|-15642.5|25.4;T' +
+  'erry Street Reserve|-9206.8|12755.8|25.3;Berry Reserve|7752.1|-17165.3|25.3;Simpson Reserve|-123' +
+  '39.4|13696.3|25.2;Kulgun Park|-16946.8|390.5|25.1;Duncan Park|-12563.6|-10154.5|25.0;Laura Osbor' +
+  'ne Houison Sanctuary|-8708.8|-15132.6|25.0;Grove Park|-10395.8|11731.6|24.9;Transmission Park|-4' +
+  '291.3|-18377.5|24.9;Oatley Memorial Gardens|-11734.9|12616.6|24.8;Basil Cook Reserve|-13708.7|-1' +
+  '0556.4|24.6;Richard Podmore Reserve|-13102.3|8478.7|24.5;grass 812,15664|811.6|15664.0|24.5;gras' +
+  's -10542,-14974|-10541.6|-14973.5|24.5;Maxwell Park|-17556.8|5283.3|24.5;park -414,-15324|-414.1' +
+  '|-15324.2|24.3;Auburn Memorial Park|-16247.1|-1784.2|24.0;Aqua Flora Park|-6276.6|14612.2|23.9;g' +
+  'rass 1024,15802|1024.5|15802.0|23.9;Lachlan Macquarie Park|-14074.9|-7646.3|23.6;Surfrider Garde' +
+  'ns|8055.5|-17007.7|23.3;park -7399,15811|-7398.8|15810.7|23.0;park -16021,8936|-16020.8|8936.4|2' +
+  '2.9;Gardenia Reserve|-15379.4|6022.9|22.8;Tallowwood Avenue Reserve|-14989.2|12033.8|22.8;Henry ' +
+  'Lawson Drive Reserve|-14108.0|10470.2|22.6;park 8364,-15110|8364.4|-15109.8|22.1;grass -18947,-3' +
+  '144|-18947.1|-3144.0|22.1;grass -7080,15092|-7079.6|15091.8|22.1;park -15638,-10319|-15638.1|-10' +
+  '319.2|21.4;grass -4495,-18481|-4495.2|-18480.8|21.3;park -17891,-5639|-17891.4|-5639.1|21.3;gras' +
+  's -13436,-9169|-13435.5|-9169.2|21.3;Silver Beach Reserve|561.2|15416.0|21.2;Georges River Natio' +
+  'nal Park|-15087.6|10693.3|20.7;York Street Park|-16737.2|746.0|20.7;Harvey Dixon Park|-14962.8|1' +
+  '0455.4|20.7;Jacob Park|-16752.8|2779.5|20.6;park 7348,-14735|7347.6|-14734.8|20.3;Henty Park|-18' +
+  '158.7|3875.4|20.3;Rosella Park|-18565.2|-4658.1|20.3;Charles Fraser Park|-14429.4|-8854.2|20.1;K' +
+  'eppel Avenue Reserve|-14612.6|9646.2|20.0;grass 263,15616|262.9|15616.3|19.9;grass -16866,8328|-' +
+  '16865.8|8327.6|19.8;park 8610,-15022|8610.4|-15022.4|19.8;Lane Cove National Park|-10355.4|-1150' +
+  '0.4|19.4;Jinna Road Reserve|-13697.3|12224.2|19.2;park -12411,11554|-12411.3|11553.6|19.0;Willia' +
+  'm Lamb Park|-18580.7|-1400.0|18.4;18th Brigade Remembrance Drive Reserve|-18458.1|4368.8|18.2;pa' +
+  'rk -16636,5190|-16635.9|5190.0|18.0;Reid Park|-16037.4|-5299.4|17.9;18th Brigade Remembrance Dri' +
+  've Reserve|-18185.5|4401.8|17.7;Braemar Park|-12721.1|-8611.4|17.7;park -12425,-10800|-12425.0|-' +
+  '10799.7|17.7;Herbert Rumsey Reserve|-15214.4|-8778.7|17.6;park -14649,-4768|-14648.8|-4768.0|17.' +
+  '3;Ambleside Reserve|6079.3|-15363.9|16.9;park 7395,-16503|7395.0|-16503.0|16.4;grass -16876,-613' +
+  '6|-16875.9|-6136.5|16.2;RAAF Site Park 1|-18122.5|1354.9|16.1;Progress Park|-12907.4|9227.0|15.8' +
+  ';park -16681,5427|-16680.7|5427.1|15.8;park -15733,-10939|-15733.4|-10939.4|15.3;Young Street Re' +
+  'serve|-10434.1|15583.5|15.3;park -13680,7506|-13680.1|7505.8|15.1;park -13852,-9564|-13852.5|-95' +
+  '63.7|14.9;grass -17404,-2235|-17404.5|-2235.4|14.9;park -11586,-14765|-11585.7|-14765.3|14.6;Ova' +
+  'l|-15620.9|-9484.7|14.2;park -11188,15168|-11188.5|15168.3|13.6;Saint Johns Reserve|-17129.1|829' +
+  '.2|13.0;park 7916,-17596|7916.5|-17596.4|13.0;Kennington Oval|-17297.0|803.3|12.9;Don Stewart Pa' +
+  'rk|-13714.9|-9528.9|12.6';
+
+/**
  * Every park, inner block then middle, in that order and no other.
  *
  * The order is the invariance. `parkCells` hashes on the park's **index**, so
@@ -926,15 +1163,17 @@ const PARKS_MIDDLE_PACKED =
  */
 export const PARKS: readonly Park[] = (() => {
   const out: Park[] = PARKS_INNER.slice();
-  for (const rec of PARKS_MIDDLE_PACKED.split(';')) {
-    const f = rec.split('|');
-    out.push({ name: f[0], x: +f[1], z: +f[2], r: +f[3] });
+  for (const packed of [PARKS_MIDDLE_PACKED, PARKS_OUTER_PACKED]) {
+    for (const rec of packed.split(';')) {
+      const f = rec.split('|');
+      out.push({ name: f[0], x: +f[1], z: +f[2], r: +f[3] });
+    }
   }
   return out;
 })();
 
 /** The extent the parks were extracted inside. `verifyWildlife` asserts it. */
-export const PARK_EXTENT_M = 15300;
+export const PARK_EXTENT_M = 19300;
 
 /**
  * The extent the frozen prefix was baked inside, and how long it is.
@@ -1380,6 +1619,13 @@ export function createWildScratch(): WildScratch {
  * the right shape at 248 and measured 1.7 us a query; at 1,345 the same loop
  * measured 10.5 us, and it runs per player per tick as well as per frame. A
  * stage-3 bake would make it 55.
+ *
+ * **Re-measured at 1,821**, which is what the 19,300 m ring takes it to: the
+ * linear reach test is 5.3 us a query and the grid is 0.36 us -- 15x, and the
+ * grid figure includes posing the birds it finds while the scan only rejects.
+ * The index costs 2,820 (cell, park) pairs, about 22 kB, and
+ * `PARK_GRID_COVERAGE` is 1,821 of 1,821, so no disc has fallen out of the
+ * grid.
  *
  * The grid is built once at module load and never touched again: a park is
  * registered in every cell its **disc bounding box** overlaps, so a query whose
