@@ -101,7 +101,16 @@ import {
 } from './suggestions.ts';
 import { verifyRewind } from './rewind.ts';
 import { verifySim } from './sim.ts';
-import { RoomHost, newConn, receiveInput, type Conn, type Socket } from './room.ts';
+import {
+  HEARTBEAT_MS,
+  RoomHost,
+  heartbeat,
+  newConn,
+  receiveInput,
+  receivePong,
+  type Conn,
+  type Socket,
+} from './room.ts';
 import { loadWorld } from './world.ts';
 
 const PORT = Number(process.env.SYDNEY_PORT ?? 8787);
@@ -444,6 +453,25 @@ const server = Bun.serve<Conn>({
 
     open(ws: Socket) {
       conns.add(ws);
+      // The first round-trip measurement, asked for immediately rather than on
+      // the next timer tick. `Conn.rtt` steers spec 8.2's rewind and starts on a
+      // seed; asking here means the seed is replaced one trip into the
+      // connection, which is long before this socket has said hello, banked its
+      // input reserve or swung anything. See `HEARTBEAT_MS`.
+      heartbeat(ws);
+    },
+
+    /**
+     * A WebSocket protocol pong -- the other half of the only round trip this
+     * server measures itself. See `HEARTBEAT_MS` in `server/room.ts` for the
+     * whole argument, including what a custom client can still do with it.
+     *
+     * Bun's own keep-alive pings produce pongs that land here too; they fail the
+     * nonce match inside `receivePong` and are dropped, which is the same path
+     * an unsolicited or replayed pong takes.
+     */
+    pong(ws: Socket, data: Buffer) {
+      receivePong(ws.data, new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
     },
 
     message(ws: Socket, raw: string | Buffer) {
@@ -524,6 +552,12 @@ const server = Bun.serve<Conn>({
           // nothing else. `conn.rtt` -- which decides how far a punch is rewound
           // -- is deliberately not written here: see `protocol.encodePing` for
           // why a client that could set its own rewind budget would.
+          //
+          // Unchanged by the pass that gave the server its own measurement, and
+          // deliberately so. The rewind now reads a median of protocol pongs
+          // (`HEARTBEAT_MS`), and this line still reads the client's own number:
+          // two values, two purposes, and the client's still steers nothing. The
+          // refusal here was never the bug -- the missing measurement was.
           if (conn.participant) conn.participant.ping = ping.rttMs;
           ws.send(encodePong(ping.seq, ping.clientTime, performance.now()));
           return;
@@ -679,6 +713,25 @@ setInterval(() => {
     if (now - ws.data.lastSeen > STALE_MS) ws.close(1001, 'silent');
   }
 }, 5000);
+
+/**
+ * The round-trip heartbeat: one protocol ping per socket, twice a second.
+ *
+ * Host-wide rather than per room, because a round trip is a property of a
+ * socket and `Room` is a thing that must be steppable with no network under it
+ * at all -- which is what the check harness relies on.
+ *
+ * The cost is four bytes of payload in a ten-byte frame, twice a second: at a
+ * full 128-player host that is 2.6 kB/s against a downlink already measured in
+ * hundreds of kbit. It does **not** replace the stale sweep above. A pong comes
+ * from the peer's network stack whether or not the page is alive, so a socket
+ * answering pings is not evidence anybody is still playing; `lastSeen` is only
+ * moved by a message the client's own code chose to send, and stays that way.
+ */
+setInterval(() => {
+  const now = performance.now();
+  for (const ws of conns) heartbeat(ws, now);
+}, HEARTBEAT_MS);
 
 /** When `/stats` last reported, so each poll covers a disjoint window. */
 let statsReadAt = performance.now();

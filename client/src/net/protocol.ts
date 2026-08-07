@@ -833,21 +833,28 @@ export function decodeHello(
  * in this protocol that the server takes a client's word for. That is a choice
  * and it is bounded on purpose.
  *
- * The round trip is measured where it can be: the client sends `clientTime`, the
+ * This exchange is measured where it can be: the client sends `clientTime`, the
  * server echoes it, and the client subtracts. The server never sees both ends of
- * that -- it holds no outstanding-ping table (deliberately, see above) and the
- * client's ping timer is independent of the reply, so the arrival cadence tells
- * the server nothing about the trip. Adding a server-initiated round trip to
- * measure a number the client already has, twice a second per player, is a
- * message type and a timer for a **scoreboard column**.
+ * *this* one -- it keeps no table of outstanding `MSG.PING`s (deliberately, see
+ * above) and the client's ping timer is independent of the reply, so the arrival
+ * cadence tells the server nothing about the trip. Adding a second application
+ * message type to re-measure a number the client already has, twice a second per
+ * player, would be a protocol change for a **scoreboard column**.
  *
  * So the column is what the reporter measured, which is what a ping column is in
  * every game that has one. What matters is what it is *not* wired to: it does
  * **not** feed `Participant.viewTicks`. Spec 8.2's lag compensation rewinds by
  * half a round trip, so a client that could inflate this number would be buying
- * rewind -- claiming half a second to be granted spec 10's full 250 ms cap. The
- * server keeps its own `Conn.rtt` for that and this only ever reaches a `u16` in
- * the roster. Lying about it makes your own ping look bad.
+ * rewind -- claiming half a second to be granted spec 10's full 250 ms cap.
+ * Lying about it makes your own ping look bad and does nothing else.
+ *
+ * The server keeps its own `Conn.rtt` for the rewind, and -- this is the part
+ * that went missing for a while -- it now actually *measures* it. Not with a
+ * message: with a WebSocket **protocol** ping, one layer below this file, where
+ * the peer's network stack answers and the page has no say. That costs no
+ * message type and no wire format, which is why the objection above still holds
+ * for `MSG.PING` and does not apply to the thing that replaced the constant it
+ * was standing in for. See `server/room.ts`'s `HEARTBEAT_MS`.
  */
 export const PING_BYTES = 15;
 

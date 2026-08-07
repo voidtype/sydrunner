@@ -220,8 +220,9 @@ export interface Participant {
    *
    * Display only, and `protocol.encodePing` says at length why it is the one
    * client-supplied number here and what it is deliberately not wired to: the
-   * rewind uses `Conn.rtt`, which lives on the connection and never comes from a
-   * packet.
+   * rewind uses `Conn.rtt`, which lives on the connection and is measured by the
+   * server at the WebSocket framing layer rather than taken from any packet the
+   * client composed. See `room.HEARTBEAT_MS`.
    */
   ping: number;
   combat: CombatantState;
@@ -235,10 +236,11 @@ export interface Participant {
   /**
    * How far back this client's view is, in ticks, for spec 8.2's rewind.
    *
-   * Half the round trip plus the client's own interpolation delay, which is
-   * what the attacker was actually looking at: a remote is drawn 100 ms in the
-   * past by design (spec 10), so a punch aimed at where a remote *appeared*
-   * is aimed at where they were 100 ms plus one trip ago.
+   * The round trip plus the client's own interpolation delay, which is what the
+   * attacker was actually looking at: a remote is drawn 100 ms in the past by
+   * design (spec 10) *on top of* a snapshot that is already a downlink trip old,
+   * and the swing itself took an uplink trip to arrive. `Room.step` derives it
+   * term by term and says why it is a whole trip rather than the textbook half.
    */
   viewTicks: number;
   /**
@@ -627,6 +629,17 @@ export class Simulation {
         yaw: spot.yaw, pitch: 0, punch: false, throwBall: false, mount: false,
       },
       ackSeq: 0,
+      // Zero, and for a bot it stays zero for life.
+      //
+      // `Room.step` recomputes this each tick for every socket in the room from
+      // that socket's measured `Conn.rtt`; a bot has no socket to iterate, so it
+      // is never revisited. That is the right number rather than a gap left by
+      // the loop: lag compensation exists to rewind the world to what an
+      // attacker *saw*, and a bot's eyes are `this.participants` at the instant
+      // it swings. There is no trip to compensate for and no interpolation
+      // delay to undo, so a bot punches the present. `?offline` is the same
+      // argument from the other end -- the client is the authority there, the
+      // server's rewind is not in the path at all, and `Conn` does not exist.
       viewTicks: 0,
       mountHeld: false,
       gone: false,

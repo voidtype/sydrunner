@@ -208,7 +208,23 @@ import {
   verifyChat,
   type ChatLine,
 } from '../client/src/net/chat.ts';
-import { INPUT_RESERVE, Room, RoomHost, newConn, receiveInput, type Conn, type Socket } from './room.ts';
+import {
+  DEFAULT_RTT_MS,
+  HEARTBEAT_MS,
+  INPUT_RESERVE,
+  MAX_RTT_MS,
+  RTT_WINDOW,
+  Room,
+  RoomHost,
+  heartbeat,
+  newConn,
+  receiveInput,
+  receivePong,
+  recordRtt,
+  type Conn,
+  type Socket,
+} from './room.ts';
+import { INTERP_DELAY_MS, MAX_REWIND_MS } from '../client/src/net/protocol.ts';
 import { ChatHub } from './chat.ts';
 import { roomWorld } from './world.ts';
 // The streaming lifecycle. See `checkStreamingLifecycle` at the foot of this
@@ -1408,6 +1424,13 @@ async function main(): Promise<void> {
   // jitter. See `checkInputQueue`, appended last and self-contained.
   say('');
   await checkInputQueue();
+
+  // --- 26. The round trip the rewind is driven by. The other half of the
+  // reported "my combat seems to miss": the input queue fixed what the *client*
+  // was told, and this fixes where the *server* looked. See `checkServerRtt`,
+  // appended last and self-contained.
+  say('');
+  await checkServerRtt();
 
   say('');
   if (failures.length === 0) {
@@ -8235,6 +8258,22 @@ class FakeSocket {
   close(_code?: number, reason?: string): void {
     this.closed = reason ?? 'closed';
   }
+  /**
+   * WebSocket protocol pings this socket was handed, oldest first. See
+   * `room.heartbeat`, which is what a real `ServerWebSocket` would frame.
+   *
+   * **Copied**, not referenced: `heartbeat` writes the nonce into one reused
+   * scratch buffer, so a harness that kept the reference would find every ping
+   * it had ever captured carrying the newest nonce. `checkServerRtt` asserts
+   * that the reuse is safe by holding two of them at once.
+   */
+  readonly pings: Uint8Array[] = [];
+  ping(data?: string | ArrayBuffer | Uint8Array): number {
+    if (data === undefined || typeof data === 'string') return 0;
+    const b = data instanceof Uint8Array ? data : new Uint8Array(data);
+    this.pings.push(b.slice());
+    return b.byteLength;
+  }
   /** The frames of one type received since `mark`, newest run first. */
   since(mark: number, type: number): ArrayBuffer[] {
     return this.frames.slice(mark).filter((f) => frameType(f) === type);
@@ -11880,4 +11919,690 @@ async function checkInputQueue(): Promise<void> {
         `every one of them a visible step of the camera`,
     );
   }
+}
+
+/**
+ * The round trip the rewind is driven by: measured, bounded, and worth what it
+ * claims to be worth.
+ *
+ * ---------------------------------------------------------------------------
+ * The two failures this exists for, which turned out to be one failure counted
+ * twice.
+ *
+ *   1. **`Conn.rtt` was never written.** It was seeded to 60 in `newConn` and
+ *      nothing on the server assigned it again, so `Room.step`'s view time was
+ *      the constant 130 ms for every player in every room -- a Marrickville
+ *      connection and a Perth one compensated identically. `server/index.ts`
+ *      routed the client's self-reported ping to the scoreboard and refused to
+ *      let it near the rewind, which was the right call, but no server-side
+ *      measurement was ever put in its place.
+ *   2. **The view time spent half a round trip where it needed the whole one.**
+ *      `Room.step` derives that term by term. The short version is that
+ *      `net/client.ts` renders remotes at `serverTick - INTERP_DELAY_MS` with a
+ *      `serverTick` that converges on the newest snapshot *received* rather
+ *      than on an estimate of the room's present, so the downlink trip is
+ *      already inside what the attacker was looking at and the uplink trip is
+ *      on top of it.
+ *
+ * They are one failure because they cancelled. Half of the 60 ms seed is 30 ms
+ * of over-rewind, which is almost exactly the shortfall a 33 ms round trip
+ * produces, so a player sitting next to the host was compensated correctly by
+ * accident and everybody further away was not. Fixing either alone moves one
+ * band of players the wrong way -- measured below, and the reason the two lines
+ * shipped together.
+ *
+ * ---------------------------------------------------------------------------
+ * What is asserted, in order:
+ *
+ *   1. The estimate converges on the injected latency, at three of them, to
+ *      inside one tick of history -- the ring's own resolution, which is the
+ *      finest distinction a rewind can act on.
+ *   2. It is clamped at both ends, and the view time it produces stays inside
+ *      spec 10's cap.
+ *   3. The median rejects an outlier that a low-pass would have carried for
+ *      seconds, with the low-pass computed alongside it for contrast.
+ *   4. A joiner is right on the first pong rather than after five.
+ *   5. A socket that never answers keeps the seed, and cannot grow anything.
+ *   6. The adversarial surface: unsolicited, replayed, malformed and
+ *      never-issued pongs are all dropped, and the one lie that *is* available
+ *      is bounded by the cap.
+ *   7. A bot, which has no socket, punches the present.
+ *   8. And the whole point: the melee hit rate on a moving target, over the
+ *      real `NetClient` against a real `Room` on a delayed loopback, before and
+ *      after, at three latencies.
+ */
+async function checkServerRtt(): Promise<void> {
+  say('the round trip the rewind is driven by (the melee that missed)');
+
+  const MS_PER_TICK = 1000 / TICK_HZ;
+  const FIXED_DT = 1 / TICK_HZ;
+
+  /**
+   * Drive one connection's heartbeat on an injected clock through a wire with a
+   * fixed one-way delay. Returns the estimate after `beats` exchanges.
+   *
+   * The clock is injected rather than real for `checkInputQueue`'s reason: a
+   * measurement of a network taken over a real one is a measurement of the
+   * afternoon.
+   */
+  const converge = (oneWayMs: number, beats: number): { conn: Conn; ws: FakeSocket } => {
+    const ws = new FakeSocket(newConn(0));
+    let clock = 0;
+    for (let i = 0; i < beats; i++) {
+      heartbeat(ws as unknown as Socket, clock);
+      const sent = ws.pings.splice(0);
+      clock += oneWayMs * 2;
+      for (const p of sent) receivePong(ws.data, p, clock);
+      clock += HEARTBEAT_MS - oneWayMs * 2;
+    }
+    return { conn: ws.data, ws };
+  };
+
+  // --- 1. Convergence, at the three latencies the melee run below uses.
+  //
+  // The tolerance is one tick of `PositionHistory`, derived rather than tuned:
+  // the ring holds one sample per tick, so an error smaller than its own
+  // spacing cannot be the thing that decides a hit. `sampleAt` interpolates
+  // between samples, which makes this a generous bound rather than a tight one
+  // -- and the measurement lands well inside it.
+  for (const oneWay of [20, 80, 150]) {
+    const { conn } = converge(oneWay, RTT_WINDOW * 2);
+    const err = Math.abs(conn.rtt - Math.min(MAX_RTT_MS, oneWay * 2));
+    check(
+      err < MS_PER_TICK,
+      `a ${oneWay} ms one-way wire is measured as a ${conn.rtt.toFixed(1)} ms round trip -- ` +
+        `${err.toFixed(2)} ms from the truth, against the ${MS_PER_TICK.toFixed(1)} ms one tick of ` +
+        `position history is worth`,
+    );
+  }
+
+  // --- 2. Clamped at both ends, by construction rather than at the reader.
+  {
+    const stalled = new FakeSocket(newConn(0));
+    recordRtt(stalled.data, 10000); // a suspended laptop, or a client sitting on a pong
+    check(
+      stalled.data.rtt === MAX_RTT_MS,
+      `a ten-second round trip is stored as ${stalled.data.rtt} ms -- clamped to ${MAX_RTT_MS}, which ` +
+        `is the trip past which spec 10's ${MAX_REWIND_MS} ms cap takes back every extra millisecond anyway`,
+    );
+    const viewMs = Math.min(MAX_REWIND_MS, stalled.data.rtt + INTERP_DELAY_MS);
+    check(
+      viewMs <= MAX_REWIND_MS,
+      `and the view time it produces is ${viewMs} ms, inside spec 10's ${MAX_REWIND_MS} ms -- the clamp ` +
+        `here does not replace the clamp in \`Room.step\`, it stops the ring holding nonsense`,
+    );
+    const backwards = new FakeSocket(newConn(0));
+    recordRtt(backwards.data, -5); // a clock that stepped backwards mid-flight
+    check(
+      backwards.data.rtt === 0,
+      `and a negative sample -- a clock that went backwards between the ping and the pong -- lands at ` +
+        `${backwards.data.rtt}, not below it`,
+    );
+  }
+
+  // --- 3. A median, and the thing a low-pass would have done instead.
+  {
+    const { conn } = converge(40, RTT_WINDOW * 2);
+    const before = conn.rtt;
+    recordRtt(conn, 4000); // one wifi retransmit, or one router's coffee break
+    const lowPass = before * 0.8 + 4000 * 0.2;
+    check(
+      conn.rtt === before,
+      `one 4-second excursion on a steady ${before.toFixed(0)} ms line moves the median estimate to ` +
+        `${conn.rtt.toFixed(0)} ms -- that is, not at all. The same sample through a 0.2 low-pass would ` +
+        `have read ${lowPass.toFixed(0)} ms and taken a dozen more to walk back down, and every ` +
+        `millisecond of that overhang is rewind nobody earned`,
+    );
+    // And the other side of the same property: rejecting an outlier must not
+    // mean refusing to move. Three of five is a majority, so a genuine route
+    // change carries the median in exactly three samples.
+    const moved = 120;
+    for (let i = 0; i < 3; i++) recordRtt(conn, moved);
+    check(
+      conn.rtt === moved,
+      `and it is not merely stubborn: three samples on a new ${moved} ms line -- ` +
+        `${((3 * HEARTBEAT_MS) / 1000).toFixed(1)} s at the heartbeat rate -- carry it there outright ` +
+        `(${conn.rtt.toFixed(0)} ms), with the excursion still sitting in the window. Three of five is a ` +
+        `majority, which is the whole of the tuning`,
+    );
+  }
+
+  // --- 4. A joiner is right on the first pong, not after five.
+  {
+    const { conn } = converge(45, 1);
+    check(
+      conn.rttMeasured === 1 && Math.abs(conn.rtt - 90) < 1e-9,
+      `one pong is enough: after a single exchange on a 45 ms wire the estimate is ${conn.rtt} ms. ` +
+        `The first sample fills the whole window rather than one slot of five -- without that a joiner's ` +
+        `median is four zeros and a reading, which is zero, and their first swing gets no rewind at all`,
+    );
+  }
+
+  // --- 5. Silence keeps the seed, and cannot grow anything.
+  {
+    const quiet = new FakeSocket(newConn(0));
+    for (let i = 0; i < 100; i++) heartbeat(quiet as unknown as Socket, i * HEARTBEAT_MS);
+    check(
+      quiet.data.rtt === DEFAULT_RTT_MS && quiet.data.rttMeasured === 0,
+      `a socket that answers none of a hundred pings still reads ${quiet.data.rtt} ms -- the seed, ` +
+        `which is what this field held before it was ever measured, so the worst a silent client gets ` +
+        `is the behaviour the whole server had`,
+    );
+    check(
+      quiet.data.pingNonce.length === quiet.data.pingSentAt.length && quiet.data.pingNonce.length <= 8,
+      `and the outstanding-ping table is still ${quiet.data.pingNonce.length} slots after those hundred ` +
+        `pings. It is indexed by nonce and overwritten, so refusing to answer is not a way to allocate`,
+    );
+  }
+
+  // --- 6. The adversarial surface.
+  //
+  // The honest claim is *bounded*, not *immune*: a browser cannot touch this at
+  // all -- the pong comes out of the network stack and the `WebSocket` API has
+  // no ping surface for a page to reach -- but a custom client speaking the
+  // protocol directly can answer late. What it cannot do is answer *early*, and
+  // that asymmetry is what the checks below are about.
+  {
+    const ws = new FakeSocket(newConn(0));
+    heartbeat(ws as unknown as Socket, 0);
+    heartbeat(ws as unknown as Socket, 100);
+    const [first, second] = ws.pings;
+    check(
+      first.byteLength === 4 && second.byteLength === 4 && !first.every((b, i) => b === second[i]),
+      `two pings a tenth of a second apart carry two different nonces (${new DataView(first.buffer).getUint32(0, true)}, ` +
+        `${new DataView(second.buffer).getUint32(0, true)}) -- the scratch buffer \`heartbeat\` reuses is ` +
+        `written before each send and copied by the frame, so one nonce cannot be answered for another`,
+    );
+
+    const good = receivePong(ws.data, second, 140);
+    check(
+      Math.abs(good - 40) < 1e-9,
+      `the second nonce comes back at t=140 and is measured as ${good} ms`,
+    );
+    const replay = receivePong(ws.data, second, 500);
+    check(
+      replay === -1 && Math.abs(ws.data.rtt - 40) < 1e-9,
+      `replaying that same nonce 360 ms later is refused (${replay}) and leaves the estimate at ` +
+        `${ws.data.rtt} ms -- a nonce is spent on first use, so a client cannot bank one and answer it ` +
+        `late to buy rewind, nor answer it twice to weight the window`,
+    );
+    const garbage = receivePong(ws.data, new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]), 600);
+    const unsolicited = receivePong(ws.data, new Uint8Array(4), 600);
+    const invented = (): number => {
+      const b = new Uint8Array(4);
+      new DataView(b.buffer).setUint32(0, 0xabcdef, true);
+      return receivePong(ws.data, b, 600);
+    };
+    check(
+      garbage === -1 && unsolicited === -1 && invented() === -1 && Math.abs(ws.data.rtt - 40) < 1e-9,
+      `and a pong of the wrong length, a zero nonce and a nonce this server never issued are all ` +
+        `dropped (RFC 6455 lets a peer send unsolicited pongs, and Bun's own keep-alive produces some), ` +
+        `leaving the estimate at ${ws.data.rtt} ms`,
+    );
+
+    // The lie that *is* available, and what it buys.
+    const liar = new FakeSocket(newConn(0));
+    let clock = 0;
+    for (let i = 0; i < RTT_WINDOW * 2; i++) {
+      heartbeat(liar as unknown as Socket, clock);
+      const sent = liar.pings.splice(0);
+      clock += 40 + 460; // a 40 ms line, answered 460 ms late on purpose
+      for (const p of sent) receivePong(liar.data, p, clock);
+      clock += HEARTBEAT_MS;
+    }
+    const honest = Math.min(MAX_REWIND_MS, 40 + INTERP_DELAY_MS);
+    const bought = Math.min(MAX_REWIND_MS, liar.data.rtt + INTERP_DELAY_MS);
+    check(
+      liar.data.rtt === MAX_RTT_MS && bought === MAX_REWIND_MS && bought - honest <= MAX_REWIND_MS - honest,
+      `a client on a 40 ms line that sits on every pong for half a second is measured at ` +
+        `${liar.data.rtt} ms and rewound ${bought} ms instead of ${honest} ms. That is the whole of the ` +
+        `exploit: ${(bought - honest).toFixed(0)} ms, ceilinged by spec 10's cap, and it is the same ` +
+        `${MAX_REWIND_MS} ms an honest player in Perth is already granted -- so the worst case it opens ` +
+        `is a case the game has to be correct for anyway`,
+    );
+    check(
+      bought > honest,
+      `and it is a lie that can only go one way. A pong cannot be sent before its ping arrives and a ` +
+        `nonce cannot be re-used, so the estimate has a hard floor at the true path: the server can be ` +
+        `made to rewind too far and never too little. Which is the direction that costs the liar -- ` +
+        `rewind adds no reach, it chooses the instant the ${REACH} m cast is measured at, so claiming ` +
+        `${MAX_REWIND_MS} ms while rendering at ${INTERP_DELAY_MS} ms means aiming at what is on screen ` +
+        `and adjudicating against something ${(MAX_REWIND_MS - INTERP_DELAY_MS) / 1000 * 8.2 > 1 ? 'over a metre' : 'well'} away`,
+    );
+  }
+
+  // --- 7. A bot has no socket, and punches the present.
+  {
+    const world = await loadWorld(process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname);
+    const room = new Room(0, world, 8, 2);
+    for (let i = 0; i < 30; i++) room.step();
+    const bots = [...room.sim.participants.values()].filter((p) => p.bot);
+    check(
+      bots.length === 2 && bots.every((p) => p.viewTicks === 0),
+      `both bots are still at viewTicks ${bots.map((p) => p.viewTicks).join(', ')} after thirty ticks. ` +
+        `\`Room.step\` recomputes the view time per socket and a bot has none, so this is the value it ` +
+        `was born with -- and it is the right one rather than a gap: a bot's eyes are the participant ` +
+        `list at the instant it swings, with no trip and no interpolation delay to undo`,
+    );
+  }
+
+  // --- 8. The melee, over the real client against a real room.
+  //
+  // A headless `NetClient` on a loopback with a **delay line** in both
+  // directions, standing still and swinging at a target that orbits through its
+  // reach. Two arms over identical scenarios: the shipped constant, and the
+  // measured trip. What is counted is the rate the reported bug is about --
+  // *of the swings that visibly connected on the attacker's screen, how many
+  // did the server register?*
+  //
+  // "Visibly connected" is not a re-derivation of the reach: it is
+  // `game/combat.hitTest`, the same function the server adjudicates with, run
+  // against a proxy standing exactly where `net/client.ts` placed the remote on
+  // the frame the client's own predicted strike fired. If that returns the
+  // target, the player saw the bat land.
+  await checkMeleeAtLatency(MS_PER_TICK, FIXED_DT);
+}
+
+/** Section 8 of `checkServerRtt`, split out for its length. */
+async function checkMeleeAtLatency(MS_PER_TICK: number, FIXED_DT: number): Promise<void> {
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const world = await loadWorld(root);
+  const rewound = { x: 0, y: 0, z: 0, yaw: 0 };
+
+  /**
+   * One arm. `lagTicks` is the one-way delay; latency is expressed in ticks so
+   * the injected number is exactly representable on this loop's clock rather
+   * than quantised by it.
+   *
+   * `measured` false pins `conn.rtt` at the value that reproduces the shipped
+   * server exactly: the old expression was `rtt * 0.5 + INTERP_DELAY_MS` with
+   * `rtt` stuck at `DEFAULT_RTT_MS`, which is 130 ms, and the corrected
+   * expression reaches the same 130 ms at `rtt = DEFAULT_RTT_MS * 0.5`.
+   */
+  const arm = (lagTicks: number, measured: boolean): {
+    swings: number; visual: number; landed: number; phantom: number;
+    crossings: number; speed: number; viewMs: number; rtt: number;
+    ideal: number; actual: number; gap: number;
+  } => {
+    const combatWorld = groundFor(world);
+    const room = new Room(0, world, 8, 0);
+    // Joined first, so the target's id is below the attacker's and `sim.ordered`
+    // advances it before the attacker's strike resolves. That is what makes the
+    // knockback undo below exact: the victim's position for the tick is already
+    // integrated when `applyHit` touches its velocity.
+    const target = room.sim.join(1, null, 'rtt-target');
+
+    const toServer: Array<{ f: ArrayBuffer; at: number }> = [];
+    const toClient: Array<{ f: ArrayBuffer; at: number }> = [];
+    const pongs: Array<{ payload: Uint8Array; at: number }> = [];
+    const link: { ws: FakeSocket | null; p: Participant | null } = { ws: null, p: null };
+    let now = 0;
+
+    const transport: NetTransport = {
+      open: true, onframe: null, onopen: null, onclose: null,
+      send(f: ArrayBuffer): void { toServer.push({ f, at: now + lagTicks }); },
+      close(): void {},
+    };
+    const net = new NetClient('', {
+      onHit: () => {}, onBounce: () => {}, onPickup: () => {}, onJoin: () => {},
+      onLeave: () => {}, onDrop: () => {}, onStatus: () => {},
+    }, { name: 'rtt-probe', transport });
+
+    const pump = (): void => {
+      for (let i = toServer.length - 1; i >= 0; i--) {
+        if (toServer[i].at > now) continue;
+        const { f } = toServer.splice(i, 1)[0];
+        if (frameType(f) === MSG.HELLO && !link.p) {
+          const sock = new FakeSocket(newConn(0));
+          link.ws = sock;
+          link.p = room.join(sock.data, 0, 'rtt-probe');
+          if (link.p) {
+            room.conns.add(sock as unknown as Socket);
+            room.welcome(sock as unknown as Socket, link.p);
+          }
+        } else if (frameType(f) === MSG.INPUT && link.ws) {
+          receiveInput(link.ws.data, f);
+        }
+      }
+    };
+    const drain = (): void => {
+      if (link.ws) for (const f of link.ws.frames.splice(0)) toClient.push({ f, at: now + lagTicks });
+      for (let i = toClient.length - 1; i >= 0; i--) {
+        if (toClient[i].at > now) continue;
+        transport.onframe?.(toClient.splice(i, 1)[0].f);
+      }
+    };
+
+    /**
+     * Did this room award the attacker a hit on the target this tick? Read off
+     * the **wire** rather than out of the simulation: `Simulation.events` is
+     * private, and the frame the client would have been sent is the more honest
+     * source anyway.
+     */
+    const awarded = (): boolean => {
+      const sock = link.ws;
+      const me = link.p;
+      if (!sock || !me) return false;
+      for (const f of sock.frames) {
+        if (frameType(f) !== MSG.EVENTS) continue;
+        const decoded = decodeEvents(f);
+        if (!decoded) continue;
+        for (const e of decoded) {
+          if (e.kind === EVENT.HIT && e.attacker === me.id && e.victim === target.id) return true;
+        }
+      }
+      return false;
+    };
+
+    transport.onopen?.();
+
+    // Both bodies pinned to the spawn on the tick the join lands, exactly as
+    // `checkInputQueue` pins its probe and for the same reason: an unpinned run
+    // wanders into a different 250 m of Sydney every time this file runs, and a
+    // punch that missed because a pedestrian walked through it would fail this
+    // section and mean nothing by it.
+    const spawnY = eyeAt(combatWorld, world.spawn.x, world.spawn.z);
+    let pinned = false;
+    const pin = (): void => {
+      const me = link.p;
+      if (pinned || !me) return;
+      pinned = true;
+      me.combat.body.position.set(world.spawn.x, spawnY, world.spawn.z);
+      me.combat.body.velocity.set(0, 0, 0);
+      me.history.seed(room.sim.tick, world.spawn.x, spawnY, world.spawn.z, 0);
+      target.combat.body.position.set(world.spawn.x, spawnY, world.spawn.z + 1.2);
+      target.combat.body.velocity.set(0, 0, 0);
+      target.history.seed(room.sim.tick, world.spawn.x, spawnY, world.spawn.z + 1.2, 0);
+    };
+
+    const playerCombat = createCombatant(0, world.spawn.x, world.spawn.z);
+    playerCombat.body.position.set(world.spawn.x, spawnY, world.spawn.z);
+    const correction = playerCombat.body.velocity.clone();
+    const input = {
+      forward: 0, right: 0, jump: false, sprint: false,
+      yaw: 0, pitch: 0, speedScale: 1, jumpScale: 1,
+      punch: false, throwBall: false, mount: false,
+    };
+    /** The proxy the client's own hit test runs against: the remote as drawn. */
+    const screen = createCombatant(target.id, 0, 0);
+
+    // The target's path: pure pursuit of a point orbiting a centre offset from
+    // the attacker, so the separation sweeps through the 1.55 m reach twice an
+    // orbit at a full sprint and **never reverses**. A reversal is the one
+    // motion a 20 Hz snapshot lerp cannot represent -- the chord cuts the corner
+    // and the client draws the target somewhere it never was -- and that error
+    // belongs to the interpolator rather than to the rewind under test.
+    const ORBIT_R = 1.6;
+    const OFFSET = 1.2;
+    const ORBIT_W = 4.6;
+    const TICKS = TICK_HZ * 120;
+    const SETTLE = TICK_HZ * 3;
+    // Swinging starts a second after the interpolation clock has settled, so
+    // every swing counted as "seen" has a server strike behind it to be paired
+    // with. Counting one and not the other is a percentage point of free error.
+    const ARMED = SETTLE + TICK_HZ;
+
+    // Swings are gated by a fixed LCG rather than fired as fast as the punch
+    // cycle allows. Free-running, the cadence phase-locks to the orbit and the
+    // run reports one point of the cycle sampled a hundred times; jittered, the
+    // reach boundary is sampled evenly, which is what makes the rate a rate.
+    let seed = 0x9e3779b9;
+    const rnd = (): number => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+
+    let swings = 0, visual = 0, landed = 0, phantom = 0, crossings = 0;
+    let speedSum = 0, speedN = 0, gapSum = 0, gapN = 0, idealSum = 0, idealN = 0;
+    let insideBefore = false;
+    let prevPhase = 'idle';
+    let actualView = 0;
+    const struck: Array<{ t: number; x: number; z: number; sees: boolean }> = [];
+    let awaiting: { at: number; sees: boolean } | null = null;
+
+    for (let t = 0; t < TICKS; t++) {
+      now = t;
+
+      const sock = link.ws;
+      if (sock) {
+        if (measured) {
+          if (t % Math.round(HEARTBEAT_MS / MS_PER_TICK) === 0) {
+            heartbeat(sock as unknown as Socket, t * MS_PER_TICK);
+            for (const p of sock.pings.splice(0)) pongs.push({ payload: p, at: t + lagTicks * 2 });
+          }
+          for (let i = pongs.length - 1; i >= 0; i--) {
+            if (pongs[i].at > t) continue;
+            receivePong(sock.data, pongs.splice(i, 1)[0].payload, t * MS_PER_TICK);
+          }
+        } else {
+          sock.data.rtt = DEFAULT_RTT_MS * 0.5;
+        }
+      }
+
+      // The target's leg for this tick.
+      {
+        const phi = t * ORBIT_W * FIXED_DT;
+        const px = world.spawn.x + OFFSET + ORBIT_R * Math.cos(phi);
+        const pz = world.spawn.z + ORBIT_R * Math.sin(phi);
+        const ux = px - target.combat.body.position.x;
+        const uz = pz - target.combat.body.position.z;
+        target.input.forward = 1;
+        target.input.sprint = true;
+        if (ux * ux + uz * uz > 1e-9) target.input.yaw = Math.atan2(-ux, -uz);
+        // Kept on its feet: a knocked-out target stops being targetable and the
+        // rest of the run would measure nothing.
+        target.combat.health = MAX_HEALTH;
+      }
+
+      net.reconcile(playerCombat, combatWorld, correction);
+      net.update(FIXED_DT);
+
+      const r = net.remotes.get(target.id);
+      if (r) {
+        const dx = r.position.x - playerCombat.body.position.x;
+        const dz = r.position.z - playerCombat.body.position.z;
+        // The attacker aims at what is on its screen, which is the whole
+        // premise. Yaw 0 looks down -Z; see `combat.viewDirection`.
+        if (dx * dx + dz * dz > 1e-9) input.yaw = Math.atan2(-dx, -dz);
+        const inside = Math.hypot(dx, dz) <= REACH;
+        if (t >= SETTLE && inside !== insideBefore) crossings++;
+        insideBefore = inside;
+      }
+      input.punch = t >= ARMED && r !== undefined && rnd() < 0.25;
+
+      const ev = advance(playerCombat, input, FIXED_DT, combatWorld);
+      if (ev.strike && r) {
+        swings++;
+        screen.body.position.copy(r.position);
+        screen.body.yaw = r.yaw;
+        screen.health = MAX_HEALTH;
+        screen.phase = 'idle';
+        const sees = hitTest(playerCombat, [screen]) !== null;
+        if (sees) visual++;
+        struck.push({ t, x: r.position.x, z: r.position.z, sees });
+      }
+
+      net.sendInput(input);
+      pump();
+      pin();
+
+      const preVel = target.combat.body.velocity.clone();
+      room.step();
+
+      const serverHit = awarded();
+      if (serverHit) {
+        // Undo what `applyHit` did to the pair, so the experiment is not
+        // deformed by its own measurement: a knockback would throw the target
+        // eight metres and end the run, and the attacker's hitstop would drift
+        // its punch clock out of step with the client's. The *position* is
+        // untouched -- this tick's integration ran before the strike resolved.
+        target.combat.health = MAX_HEALTH;
+        target.combat.phase = 'idle';
+        target.combat.phaseT = 0;
+        target.combat.hitstopT = 0;
+        target.combat.body.onGround = true;
+        target.combat.body.velocity.copy(preVel);
+        if (link.p) link.p.combat.hitstopT = 0;
+      }
+
+      // The server's own strike: the tick the attacker's combat enters
+      // `active`. Its rewind is compared against the frame the client struck on
+      // rather than against this tick, because those are two different instants
+      // and the distance between them is the whole subject.
+      const me = link.p;
+      if (me) {
+        if (prevPhase === 'windup' && me.combat.phase === 'active') {
+          actualView = me.viewTicks;
+          const client = struck.shift();
+          if (client) {
+            gapSum += t - client.t;
+            gapN++;
+            // The depth that *would* have put the history exactly where the
+            // attacker's screen was, found by scanning the ring rather than
+            // derived from the same formula under test.
+            let bestErr = Infinity;
+            let bestK = 0;
+            for (let k = 0; k <= HISTORY_TICKS; k++) {
+              if (!target.history.sampleAt(room.sim.tick - k, rewound)) continue;
+              const e = Math.hypot(rewound.x - client.x, rewound.z - client.z);
+              if (e < bestErr) { bestErr = e; bestK = k; }
+            }
+            idealSum += bestK;
+            idealN++;
+            awaiting = { at: t, sees: client.sees };
+          }
+        }
+        prevPhase = me.combat.phase;
+      }
+      if (awaiting) {
+        if (serverHit) {
+          if (awaiting.sees) landed++;
+          else phantom++;
+          awaiting = null;
+        } else if (t > awaiting.at) {
+          awaiting = null;
+        }
+      }
+
+      drain();
+      speedSum += planSpeed(target.combat);
+      speedN++;
+    }
+
+    return {
+      swings, visual, landed, phantom, crossings,
+      speed: speedSum / Math.max(1, speedN),
+      viewMs: (actualView / TICK_HZ) * 1000,
+      rtt: link.ws ? link.ws.data.rtt : 0,
+      ideal: idealSum / Math.max(1, idealN),
+      actual: actualView,
+      gap: gapSum / Math.max(1, gapN),
+    };
+  };
+
+  const rows: Array<{ oneWay: number; before: ReturnType<typeof arm>; after: ReturnType<typeof arm> }> = [];
+  for (const lagTicks of [1, 5, 9]) {
+    rows.push({
+      oneWay: lagTicks * MS_PER_TICK,
+      before: arm(lagTicks, false),
+      after: arm(lagTicks, true),
+    });
+  }
+
+  // The run has to be a run before its rate means anything.
+  const sane = rows.every((r) => r.after.crossings > 100 && r.after.visual > 20 && r.after.speed > 5);
+  check(
+    sane,
+    `each arm ran ${(TICK_HZ * 120) / TICK_HZ} s: the target crossed the ${REACH} m reach ` +
+      `${rows[0].after.crossings} times at a mean ${rows[0].after.speed.toFixed(1)} m/s, and of ` +
+      `${rows[0].after.swings} swings ${rows[0].after.visual} visibly connected. Without that there is ` +
+      `no rate to report`,
+  );
+
+  /**
+   * What this measurement can resolve, in points of rate, and why it is not a
+   * standard error.
+   *
+   * A binomial model of forty-odd swings puts three sigma at twenty-odd points,
+   * which is far too loose to be useful here -- and it is the wrong model. The
+   * swings are not independent draws: the scenario is the same 120 s of the
+   * same orbit every run, and the only thing that moves between runs is the
+   * crowd and traffic that `Simulation` seeds at random around a pinned pair.
+   * Measured over five runs the spread was two to three points, which is one
+   * swing.
+   *
+   * So the bar is the run's own quantum -- one swing -- times three. Anything
+   * inside that is the pedestrian who walked past; anything outside it is the
+   * rewind.
+   */
+  const resolution = (row: { before: { visual: number }; after: { visual: number } }): number =>
+    300 / Math.max(1, Math.min(row.before.visual, row.after.visual));
+
+  for (const row of rows) {
+    const b = (100 * row.before.landed) / Math.max(1, row.before.visual);
+    const a = (100 * row.after.landed) / Math.max(1, row.after.visual);
+    const noise = resolution(row);
+    check(
+      a >= b - noise,
+      `${row.oneWay.toFixed(0)} ms one way (${(row.oneWay * 2).toFixed(0)} ms round trip): of the swings ` +
+        `that connected on the attacker's screen, the shipped 130 ms constant landed ` +
+        `${row.before.landed}/${row.before.visual} (${b.toFixed(0)}%) and the measured trip lands ` +
+        `${row.after.landed}/${row.after.visual} (${a.toFixed(0)}%)`,
+    );
+    // The same error seen from the victim's side: a hit the server awarded that
+    // the attacker's screen said was out of reach. Held to the same three-swing
+    // quantum as the rate above rather than to a strict decrease, because at the
+    // top latency it does not decrease -- the cap is what is producing these,
+    // not the measurement, and pretending otherwise would be a check tuned to a
+    // conclusion.
+    check(
+      row.after.phantom <= row.before.phantom + 3,
+      `  and the other half of the same error: hits the server awarded that the attacker's screen said ` +
+        `were out of reach went ${row.before.phantom} -> ${row.after.phantom}`,
+    );
+
+    // Where the shortfall was big enough to have to show, it has to show.
+    //
+    // The condition is the run's own arithmetic rather than a list of latencies:
+    // how far the constant's rewind fell short, in ticks, times how fast the
+    // target was moving. Once that passes the target's own body radius the
+    // adjudication is looking at a different person's worth of ground, and a
+    // measurement that did not change the outcome would mean the rate is not
+    // reading what it claims to.
+    const shortM = (Math.abs(row.before.ideal - row.before.actual) / TICK_HZ) * row.before.speed;
+    if (shortM > PLAYER_RADIUS) {
+      check(
+        a > b + noise,
+        `  and it had to: the constant's rewind was ${Math.abs(row.before.ideal - row.before.actual).toFixed(1)} ` +
+          `ticks short, which at ${row.before.speed.toFixed(1)} m/s is ${(shortM * 100).toFixed(0)} cm of ` +
+          `target -- past the ${PLAYER_RADIUS} m the body is wide. ${(a - b).toFixed(0)} points of the rate ` +
+          `moved, against the ${noise.toFixed(1)} this run can resolve`,
+      );
+    }
+  }
+
+  // The measurement that says *why*, in ticks of position history rather than
+  // in a rate: the depth the formula chose against the depth that would have
+  // been exactly right, found by scanning the ring.
+  for (const row of rows) {
+    const capped = row.after.actual >= (MAX_REWIND_MS / 1000) * TICK_HZ - 1e-6;
+    check(
+      capped || Math.abs(row.after.actual - row.after.ideal) <= 1.5,
+      `  the rewind it chose was ${row.after.actual.toFixed(1)} ticks against an ideal of ` +
+        `${row.after.ideal.toFixed(1)}${capped ? ` -- at spec 10's ${MAX_REWIND_MS} ms ceiling, which is ` +
+        `what binds here rather than the measurement` : ''}, with the strike resolving ` +
+        `${row.after.gap.toFixed(0)} ticks after the client predicted it`,
+    );
+  }
+
+  say(
+    `  the residual, stated rather than hidden: at ${rows[2].oneWay.toFixed(0)} ms one way the depth that ` +
+      `would be exactly right is past spec 10's ${MAX_REWIND_MS} ms cap, so a genuinely distant player is ` +
+      `still under-compensated and the rate stops at ${((100 * rows[2].after.landed) / Math.max(1, rows[2].after.visual)).toFixed(0)}%. ` +
+      `That is not a measurement failure -- the trip is measured correctly and the clamp eats it. The fix ` +
+      `is on the client's clock: \`net/client.ts\` renders at \`newest-snapshot-received - 100 ms\` rather ` +
+      `than at \`estimated-server-now - 100 ms\`, which costs a whole round trip of rewind budget instead ` +
+      `of half of one. Moving it would put the requirement back inside the cap for every ping the game ` +
+      `has, and it is a change to client prediction rather than to this file.`,
+  );
 }

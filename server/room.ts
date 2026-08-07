@@ -153,8 +153,37 @@ export interface Conn {
    * and `checkInputQueue` is what says how far down.
    */
   inputStarved: number;
-  /** Smoothed round trip, ms. Seeded pessimistically so an early punch is not over-rewound. */
+  /**
+   * **Measured** round trip, ms: the median of the last `RTT_WINDOW` protocol
+   * pongs, clamped to `[0, MAX_RTT_MS]`. See `HEARTBEAT_MS` for how the samples
+   * are taken and why they are taken where they are.
+   *
+   * This is the number spec 8.2's rewind is driven by, and it is deliberately
+   * **not** `Participant.ping` -- see the `MSG.PING` case in `server/index.ts`.
+   */
   rtt: number;
+  /**
+   * The last `RTT_WINDOW` samples, and where the next one goes. Preallocated,
+   * because a per-connection ring of five doubles that never allocates is the
+   * same shape as everything else on this record.
+   */
+  readonly rttSamples: Float64Array;
+  rttCursor: number;
+  /** How many pongs have ever landed. Zero means `rtt` is still the seed. */
+  rttMeasured: number;
+  /**
+   * Pings sent and not yet answered: the nonce, and the `performance.now()` it
+   * went out at. Indexed by `nonce % OUTSTANDING_PINGS`, so an old ping expires
+   * by being overwritten rather than by a sweep, and the table cannot grow.
+   *
+   * A negative `sentAt` means the slot is spent. That is what makes a nonce
+   * single-use: a client cannot bank a nonce and re-answer it later to
+   * manufacture a low sample, because the second answer finds nothing.
+   */
+  readonly pingNonce: Uint32Array;
+  readonly pingSentAt: Float64Array;
+  /** Next nonce. Starts at 1; 0 is never issued, so a zeroed slot is never live. */
+  pingSeq: number;
   lastSeen: number;
   /**
    * What this client can currently see. PERFORMANCE.md phase 2.
@@ -170,7 +199,239 @@ export type Socket = {
   data: Conn;
   send(data: ArrayBuffer | Uint8Array): number;
   close(code?: number, reason?: string): void;
+  /**
+   * A WebSocket **protocol** ping -- RFC 6455 frame opcode 0x9, not a `MSG.PING`.
+   * Bun's `ServerWebSocket` has it; see `heartbeat`.
+   *
+   * Optional because not every socket in this file is a socket: the check
+   * harness drives a room through a loopback, and a room must not require a
+   * network to be steppable.
+   */
+  ping?(data?: string | ArrayBuffer | Uint8Array): number;
 };
+
+/**
+ * How the server measures a round trip, and why it is measured at all.
+ *
+ * ---------------------------------------------------------------------------
+ * The hole this fills.
+ *
+ * `Conn.rtt` decides how far spec 8.2's rewind reaches back for this socket.
+ * Until this was written **nothing assigned it**: it was seeded to 60 at
+ * `newConn` and stayed there for the life of the connection, so `Room.step`'s
+ * `rtt * 0.5 + INTERP_DELAY_MS` was the constant 130 ms for every player in
+ * every room regardless of where they were sitting. `protocol.encodePing`
+ * correctly refused to let the client's self-reported number steer the rewind
+ * -- that judgement was right and stands -- but the server-side measurement it
+ * promised in its place ("the server keeps its own `Conn.rtt` for that") was
+ * never actually taken.
+ *
+ * What that costs, in the units that matter: at a real 20 ms trip the server
+ * over-rewinds by 20 ms, and at 150 ms it under-rewinds by 45 ms. Two players
+ * closing at a sprint apiece is 16.4 m/s of relative motion, so those are 33 cm
+ * and 74 cm of target displacement -- against a 1.55 m reach-plus-cast. A swing
+ * that connected on the attacker's screen missed on the server, and the further
+ * you were from the host the worse it got.
+ *
+ * ---------------------------------------------------------------------------
+ * Measured at the framing layer, not in `MSG.PING`.
+ *
+ * The exchange is a WebSocket **protocol** ping: the server sends opcode 0x9
+ * with a four-byte nonce, and RFC 6455 s5.5.3 obliges the peer to send back
+ * opcode 0xA carrying that same payload "as soon as is practical". The server
+ * stamps the send, matches the nonce on return, and subtracts. Both ends of the
+ * measurement are therefore held by the server, which is the entire difference
+ * from the `MSG.PING` column: that number is a client's arithmetic, reported.
+ *
+ * The reason to prefer it over an application-level echo is that **a browser
+ * answers it below the page**. The pong is emitted by the network stack; there
+ * is no ping/pong surface on the `WebSocket` API at all, so page JavaScript
+ * cannot see the ping, cannot delay the pong, and cannot be blocked from
+ * answering by a stalled main thread. Verified rather than assumed, on Bun
+ * 1.3.14 and a real browser with a page whose only script opens the socket and
+ * then does nothing: five pings, five pongs, payload intact byte for byte.
+ *
+ * ---------------------------------------------------------------------------
+ * What a hostile client can still do, and why it is not worth doing.
+ *
+ * A *browser* cannot influence this. A **custom client** -- something speaking
+ * the WebSocket protocol directly -- can, in exactly one direction: it can sit
+ * on a pong and answer late. It cannot answer early, because it cannot answer a
+ * nonce it has not received yet, and it cannot re-use an old one, because a
+ * nonce is spent on first use. So the estimate has a hard floor at the true
+ * path and the only lie available is **upward**. That is the safe direction to
+ * be attackable in, and it is worth being explicit about why:
+ *
+ *   - The ceiling is `MAX_REWIND_MS`. `Room.step` clamps `rtt * 0.5 +
+ *     INTERP_DELAY_MS + queue` to 250 ms, so an honest 20 ms player already
+ *     gets 110 ms of rewind and the most a liar can buy is the 140 ms up to the
+ *     cap. Every millisecond of that is already granted, for free and honestly,
+ *     to anyone playing from far enough away -- so the worst case this opens is
+ *     a case the game has to be correct for anyway.
+ *   - It buys **no reach**. Rewind does not extend the 1.2 m cast; it chooses
+ *     which historical instant the cast is measured at. Claiming 300 ms makes
+ *     the server adjudicate against where victims were 250 ms ago while the
+ *     cheat's own renderer -- which interpolates at `INTERP_DELAY_MS`, 100 ms --
+ *     is still drawing them 100 ms ago. Aiming at what is on screen now misses.
+ *     To profit they would have to build a client that also renders 250 ms in
+ *     the past, at which point they have reproduced, at some effort, the
+ *     experience of having a bad connection.
+ *   - It is one-sided in the victim's favour on the other axis. A large rewind
+ *     is what produces the "hit from behind cover" complaint, and 250 ms is the
+ *     bound the spec already accepted for that.
+ *
+ * The honest summary is therefore: not immune, bounded, and self-defeating.
+ * Against the alternative -- letting `ping.rttMs` steer the rewind, where a
+ * client sets the number to whatever it likes instantly and at no cost to its
+ * own aim -- this is the difference between a lever and a number.
+ *
+ * One more thing the nonce table buys: a client that never answers, or answers
+ * garbage, cannot grow anything. The table is a fixed four slots and an
+ * unmatched pong is dropped. It keeps the seed, which is what it had before.
+ *
+ * ---------------------------------------------------------------------------
+ * A median of five, not a low-pass.
+ *
+ * Both are cheap; the choice is about the *shape* of the noise. Round trips are
+ * one-sidedly skewed -- the floor is the physical path and every excursion is
+ * upward (a wifi retransmit, a queue, a router's coffee break). An exponential
+ * average is dragged up by each of those and then takes a dozen samples to walk
+ * back down, and every millisecond of that overhang is rewind the player did
+ * not earn. A median of five discards up to two outliers in the window
+ * *outright*: one bad sample cannot move it at all, and it is back on the true
+ * value the sample after the excursion ends.
+ *
+ * At `HEARTBEAT_MS` the window is 2.5 s of history, and three samples -- 1.5 s
+ * -- is enough to carry the median onto a new route.
+ */
+export const HEARTBEAT_MS = 500;
+
+/** Samples in the window. Odd, so the median is a sample rather than a mean of two. */
+export const RTT_WINDOW = 5;
+
+/**
+ * Pings that may be outstanding at once. Four is two seconds' worth, which is
+ * far more than any trip this rewind would honour: a nonce still unanswered
+ * when its slot comes round again described a trip past `MAX_REWIND_MS` anyway.
+ */
+const OUTSTANDING_PINGS = 4;
+
+/**
+ * What `rtt` is worth before the first pong lands.
+ *
+ * A seed and not a policy: the first ping goes out when the socket opens, so it
+ * is replaced one round trip into the connection -- comfortably before the
+ * `INPUT_RESERVE` has finished banking, let alone before anybody has swung a
+ * bat. Nothing here has time to be felt.
+ *
+ * 60 ms is the value this field has held since it was written, kept because
+ * there is no better guess to make about a connection nothing is yet known
+ * about and it is a plausible metro round trip. Note that it no longer
+ * reproduces the old server's behaviour: paired with the corrected view-time
+ * expression it is 160 ms of rewind rather than the 130 ms the constant used to
+ * produce. That is the point -- 130 was the wrong number, and the seed's job is
+ * to be wrong for one trip rather than forever.
+ */
+export const DEFAULT_RTT_MS = 60;
+
+/**
+ * The ceiling on a stored round trip.
+ *
+ * Equal to `MAX_REWIND_MS` because `Room.step` spends the round trip **whole**
+ * -- see the derivation there -- so a trip past 250 ms cannot buy a millisecond
+ * of rewind that spec 10's cap would not immediately take back. Clamping here
+ * as well as there costs nothing and keeps anything absurd (a suspended laptop,
+ * a client sitting on a pong) out of the ring in the first place. Both bounds
+ * are asserted in `checkServerRtt`.
+ */
+export const MAX_RTT_MS = MAX_REWIND_MS;
+
+/** Four bytes of nonce, reused every ping. `ws.ping` copies into the frame. */
+const pingScratch = new Uint8Array(4);
+const pingScratchView = new DataView(pingScratch.buffer);
+/** The window, copied out to be sorted. `RTT_WINDOW` elements, sorted in place. */
+const medianScratch = new Float64Array(RTT_WINDOW);
+
+/**
+ * Send one protocol ping and remember when it went out.
+ *
+ * Called on open and then on a timer; see `server/index.ts`. A socket with no
+ * `ping` -- the check harness's loopback, anything that is not a real
+ * `ServerWebSocket` -- is a no-op, and keeps the seed.
+ */
+export function heartbeat(ws: Socket, now: number = performance.now()): void {
+  if (!ws.ping) return;
+  const conn = ws.data;
+  // Nonces start at 1 and wrap inside u32, so a zeroed slot is never a match.
+  const nonce = conn.pingSeq === 0xffffffff ? 1 : conn.pingSeq + 1;
+  conn.pingSeq = nonce;
+  const slot = nonce % OUTSTANDING_PINGS;
+  conn.pingNonce[slot] = nonce;
+  conn.pingSentAt[slot] = now;
+  pingScratchView.setUint32(0, nonce, true);
+  ws.ping(pingScratch);
+}
+
+/**
+ * A protocol pong came back. Returns the raw sample in ms, or -1 if this pong
+ * answered nothing this server asked.
+ *
+ * Unmatched pongs are not an error and are not rare: RFC 6455 lets a peer send
+ * unsolicited pongs, and Bun's own keep-alive pings produce pongs of their own
+ * that arrive here too. Every one of them fails the nonce match and is dropped,
+ * which is also the property that stops a client replaying one.
+ */
+export function receivePong(
+  conn: Conn,
+  data: ArrayBuffer | Uint8Array,
+  now: number = performance.now(),
+): number {
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+  if (bytes.byteLength !== 4) return -1;
+  const nonce = new DataView(bytes.buffer, bytes.byteOffset, 4).getUint32(0, true);
+  if (nonce === 0) return -1;
+  const slot = nonce % OUTSTANDING_PINGS;
+  if (conn.pingNonce[slot] !== nonce) return -1;
+  const sentAt = conn.pingSentAt[slot];
+  if (sentAt < 0) return -1; // already spent: a replayed nonce buys nothing
+  conn.pingSentAt[slot] = -1;
+  const sample = now - sentAt;
+  recordRtt(conn, sample);
+  return sample;
+}
+
+/**
+ * Fold one round-trip sample into the estimate.
+ *
+ * Clamped **on the way in**, so `Conn.rtt` is inside `[0, MAX_RTT_MS]` by
+ * construction rather than by a check at the point of use -- a clamp at the
+ * reader is a clamp somebody adds a second reader past.
+ *
+ * The first sample fills the whole window rather than one slot. Without that a
+ * joiner's estimate is the median of one real reading and four zeros, which is
+ * zero: they would spend their first two seconds with no rewind at all, which
+ * is precisely the "wild rewind on the first swing" this is here to avoid.
+ */
+export function recordRtt(conn: Conn, sample: number): void {
+  const s = sample < 0 ? 0 : sample > MAX_RTT_MS ? MAX_RTT_MS : sample;
+  if (conn.rttMeasured === 0) conn.rttSamples.fill(s);
+  else conn.rttSamples[conn.rttCursor] = s;
+  conn.rttCursor = (conn.rttCursor + 1) % RTT_WINDOW;
+  conn.rttMeasured++;
+  medianScratch.set(conn.rttSamples);
+  // Insertion sort over five elements: no allocation, and shorter than the
+  // comparator a `.sort()` would need.
+  for (let i = 1; i < RTT_WINDOW; i++) {
+    const v = medianScratch[i];
+    let j = i - 1;
+    while (j >= 0 && medianScratch[j] > v) {
+      medianScratch[j + 1] = medianScratch[j];
+      j--;
+    }
+    medianScratch[j + 1] = v;
+  }
+  conn.rtt = medianScratch[RTT_WINDOW >> 1];
+}
 
 /**
  * How many input frames a socket may have waiting, and why it is not one.
@@ -232,7 +493,15 @@ export function newConn(room: number): Conn {
     inboxBanking: INPUT_RESERVE,
     inputOverflow: 0,
     inputStarved: 0,
-    rtt: 60,
+    rtt: DEFAULT_RTT_MS,
+    rttSamples: new Float64Array(RTT_WINDOW),
+    rttCursor: 0,
+    rttMeasured: 0,
+    pingNonce: new Uint32Array(OUTSTANDING_PINGS),
+    // -1 is "spent". A fresh table is entirely spent, so a pong that arrives
+    // before this server has asked anything matches nothing.
+    pingSentAt: new Float64Array(OUTSTANDING_PINGS).fill(-1),
+    pingSeq: 0,
     lastSeen: Date.now(),
     interest: new InterestSet(),
   };
@@ -552,15 +821,63 @@ export class Room {
 
       // Spec 8.2's lag compensation, in ticks, clamped to spec 10's 250 ms.
       //
+      // `conn.rtt` is the server's **own** measurement -- the median of the last
+      // five protocol pongs, see `HEARTBEAT_MS`. It is not `p.ping`, and the two
+      // must stay separate: `p.ping` is the client's arithmetic, reported, and
+      // exists for the scoreboard column. A client that could set this term
+      // would be choosing its own rewind budget, so it does not get to. That
+      // refusal predates this line and was always right; what it was missing was
+      // a measurement to refuse *in favour of*, and until there was one this
+      // expression evaluated to the constant 130 ms for every player alive.
+      //
       // **Plus the frames still held**, which is the reserve paying for itself.
       // The frame just applied was produced by the client `inboxCount` steps
       // before the newest one it has sent, so it describes a moment that much
       // further in the past -- and a punch on it must be rewound that much
       // further or the buffer would be a hit-registration regression. The term
       // is inside the clamp, so the 250 ms ceiling still holds.
+      //
+      // ---------------------------------------------------------------------
+      // The **whole** round trip, not half of it, and this is the second half
+      // of the same bug.
+      //
+      // Walk the instant a strike is resolved on, backwards, and count what is
+      // between it and what the attacker was looking at when they swung:
+      //
+      //   1. The frame being resolved reached this room one **uplink** trip ago
+      //      (plus `inboxCount`, which is the term above).
+      //   2. When the client produced it, the newest snapshot it held was one
+      //      **downlink** trip old.
+      //   3. And it was not drawing that snapshot. `net/client.ts` renders
+      //      remotes at `serverTick - INTERP_DELAY_MS`, and its `serverTick`
+      //      converges on the tick of the newest snapshot **received** rather
+      //      than on an estimate of this room's present -- see `onSnapshot`,
+      //      where the nudge's fixed point is the arriving tick. So a further
+      //      100 ms.
+      //
+      // Uplink plus downlink is a round trip. The textbook formula is half a
+      // trip plus the interpolation delay, and it is correct for a client whose
+      // clock is run *ahead* of the server by the uplink so that its render time
+      // is already `server-now - interp`. This client does not do that, and the
+      // rewind has to compensate the client that exists rather than the one the
+      // formula was written for. `checkServerRtt` brute-forces the ideal depth
+      // out of the position history and gets `rtt + interp + queue` to the tick.
+      //
+      // It was invisible for as long as `conn.rtt` was the constant 60: half of
+      // 60 is 30, and 30 ms of over-rewind is almost exactly the shortfall a
+      // 33 ms round trip produces, so the two errors cancelled for anyone
+      // sitting close to the host and only the far players felt it. Correcting
+      // one without the other makes the near players worse -- measured, 98% to
+      // 90% -- which is why these two lines changed together.
+      //
+      // What this does **not** fix: above about 150 ms of round trip the ideal
+      // depth passes spec 10's 250 ms cap and the clamp starts eating it, so a
+      // genuinely distant player is still under-compensated. The fix for that is
+      // on the client's clock rather than here, and it is not attempted; see the
+      // report in `checkServerRtt`.
       const viewMs = Math.min(
         MAX_REWIND_MS,
-        conn.rtt * 0.5 + INTERP_DELAY_MS + (conn.inboxCount * 1000) / TICK_HZ,
+        conn.rtt + INTERP_DELAY_MS + (conn.inboxCount * 1000) / TICK_HZ,
       );
       p.viewTicks = (viewMs / 1000) * TICK_HZ;
     }
