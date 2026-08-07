@@ -595,6 +595,39 @@ interface PendingBuild {
 interface LoadedTile {
   entry: TileEntry;
   group: Group;
+  /**
+   * Whether this tile's pipelines have been compiled, and therefore whether it
+   * is allowed to be drawn at all.
+   *
+   * **The fix for the freeze on turning**, and the reason it is a per-tile flag
+   * rather than something in `world/warmup.ts`. Three keys an instanced draw's
+   * node-builder state on `object.uuid` -- `RenderObject.getMaterialCacheKey`
+   * does it unconditionally for `isInstancedMesh`, with a TODO pointing at
+   * three.js#29066 -- so **every `InstancedMesh` in the world gets its own
+   * shader module and its own render pipeline**, whatever its geometry, its
+   * material or its capacity. The generated WGSL is not even textually equal:
+   * the instance matrix arrives as a uniform struct named `NodeBuffer_<node id>`
+   * and the id is a fresh global counter per build.
+   *
+   * There are about thirteen instanced sets in a tile, so a resident ring is
+   * over a thousand pipelines that no boot-time warm-up can ever pre-compile.
+   * And `update` below flips `group.visible` from a **frustum test**, so the
+   * frame they compile on is the frame the tile enters the view -- which is why
+   * this presented as a freeze when the player turned on the spot, with nothing
+   * loading and nothing moving. Measured: one 360-degree turn at 180 deg/s with
+   * 56 tiles resident compiled 589 pipelines, p95 242 ms, worst frame 1,492 ms;
+   * the same turn repeated compiled nothing and peaked at 62 ms.
+   *
+   * So a tile is compiled **once, asynchronously, when it is built** -- see
+   * `setPrecompiler` -- and is not shown until that has landed. The compile is
+   * off the main thread (`device.createRenderPipelineAsync`), it happens while
+   * the tile is already streaming rather than at a moment the player chose, and
+   * by the time anybody turns around there is nothing left to compile.
+   *
+   * True with no precompiler set, so a caller that never installs one gets the
+   * old behaviour exactly.
+   */
+  warm: boolean;
   band: LodBand;
   /** Shadow flags, tracked separately from the band -- see `applyShadowRole`. */
   casts: boolean;
@@ -978,6 +1011,11 @@ export class TileStreamer implements LampSource {
    * `setFarCity`.
    */
   private farCity: FarCity | null = null;
+  /** What compiles a tile's shaders before it is drawn. See `setPrecompiler`. */
+  private precompile: ((group: Group) => Promise<void>) | null = null;
+  /** Tiles built and waiting to be compiled, nearest-first. See `warmTile`. */
+  private readonly warmQueue: LoadedTile[] = [];
+  private warming = false;
   /**
    * The unpaved-ground shading, worn by every tile's terrain mesh -- and, via
    * this handle, by the far plane as well, so the near ground and the far field
@@ -1374,7 +1412,73 @@ export class TileStreamer implements LampSource {
    */
   setFarCity(city: FarCity): void {
     this.farCity = city;
-    for (const key of this.loaded.keys()) city.setTileResident(key, true);
+    for (const tile of this.loaded.values()) {
+      if (tile.warm) city.setTileResident(tile.entry.key, true);
+    }
+  }
+
+  /**
+   * Install the thing that compiles a tile's shaders before it is drawn.
+   *
+   * A function rather than the renderer, for the split this file keeps
+   * everywhere else: `setCollisionSink` takes two facts about collision rather
+   * than a `CollisionWorld`, and this takes "make this group drawable" rather
+   * than a `WebGPURenderer`. The streamer never learns what a pipeline is.
+   *
+   * The contract is one line and the whole feature rests on it: **resolve when
+   * every shader the group needs has been compiled.** It may take as long as it
+   * likes -- the tile simply is not drawn until then, which is a tile that is
+   * still streaming, and the far layer's slab stays up in its place. What it
+   * must not do is compile on the main thread, because the entire point is to
+   * take that work off the frame the player's own turn would otherwise put it
+   * on. See `LoadedTile.warm`.
+   *
+   * Failure is not fatal and is not reported: a tile that could not be compiled
+   * is shown anyway, which is exactly the behaviour this replaced.
+   */
+  setPrecompiler(precompile: (group: Group) => Promise<void>): void {
+    this.precompile = precompile;
+  }
+
+  /**
+   * Compile one tile, then let it be drawn.
+   *
+   * Serialised through `warming` rather than fired in parallel, and that is not
+   * caution: `compileAsync` walks a scene, builds node graphs and awaits driver
+   * promises with a yield to the main thread between each, so eight of them
+   * interleaving would be eight scene walks competing for the same frames while
+   * the streamer is already spending its build budget. One at a time drains the
+   * queue in the order tiles were built, which is nearest-first.
+   */
+  private warmTile(tile: LoadedTile): void {
+    this.warmQueue.push(tile);
+    if (this.warming) return;
+    this.warming = true;
+    void (async () => {
+      try {
+        while (this.warmQueue.length > 0) {
+          const next = this.warmQueue.shift() as LoadedTile;
+          // Evicted while it was waiting. Its group has been emptied and its
+          // geometry released, so compiling it would be work for nothing at
+          // best and a walk over disposed buffers at worst.
+          if (this.loaded.get(next.entry.key) !== next) continue;
+          try {
+            await this.precompile?.(next.group);
+          } catch {
+            // A tile that would not compile is a tile that hitches once, which
+            // is what every tile did before this existed.
+          }
+          if (this.loaded.get(next.entry.key) !== next) continue;
+          next.warm = true;
+          // Paired with the moment the tile becomes drawable, for the reason
+          // `buildTile` gives: the slab and the facade must never both draw and
+          // must never both be missing.
+          this.farCity?.setTileResident(next.entry.key, true);
+        }
+      } finally {
+        this.warming = false;
+      }
+    })();
   }
 
   /**
@@ -1442,11 +1546,6 @@ export class TileStreamer implements LampSource {
       casts: false,
     });
 
-    // The instanced populations, with their real shared geometry -- so these
-    // cannot drift out of layout even if the builders change.
-    parts.push({ geometry: this.vegetation.geometry(0), material: this.vegetation.material, instanced: true });
-    parts.push({ geometry: this.carAssets.geometry(0), material: this.carAssets.material, instanced: true });
-    parts.push({ geometry: this.powerAssets.geometry(0), material: this.powerAssets.poleMaterial, instanced: true });
     // The wires are merged per tile rather than instanced, carry position and
     // nothing else, and are unlit and out of the depth pass entirely.
     parts.push({
@@ -1456,72 +1555,37 @@ export class TileStreamer implements LampSource {
       casts: false,
       receives: [false],
     });
-    // The street lamps, in the **one** configuration they are ever drawn in.
-    // Instanced, per-instance coloured (LED or sodium), additive, and outside
-    // the shadow pass in both directions -- so a single entry covers every lamp
-    // in the city and the first dusk of a session compiles nothing.
-    //
-    // This is the entry that has to exist. The lamps are hidden all day and a
-    // hidden mesh is never drawn, so without a warm-up part their pipeline would
-    // be compiled on the **one frame the sun goes down** -- which is the frame
-    // several hundred of them appear at once, in the middle of play, with every
-    // tile in the ring holding one.
-    parts.push({
-      geometry: this.streetLamps.geometry,
-      material: this.streetLamps.material,
-      instanced: true,
-      casts: false,
-      receives: [false],
-    });
-
-    const furniture = this.furnitureAssets;
-    for (const geometry of [furniture.binBody, furniture.binLid, furniture.namePost, furniture.signal]) {
-      parts.push({ geometry, material: furniture.propMaterial, instanced: true });
-    }
-    // Both blade styles, and neither carries per-instance colour: `furniture.ts`
-    // gives the two styles two materials precisely because `instanceColor` can
-    // only multiply and the styles invert each other.
-    for (const material of furniture.bladeMaterial) {
-      parts.push({ geometry: furniture.blade, material, instanced: true, instanceColor: false });
-    }
-    parts.push({
-      geometry: furniture.lamp,
-      material: furniture.lampMaterial,
-      instanced: true,
-      casts: false,
-      receives: [false],
-    });
     // One street-name legend, which is enough for all of them: every legend is
     // its own material and its own canvas texture, but they generate identical
     // WGSL, so the shader module and the pipeline are shared and only the
     // binding differs. The cache evicts this on its own clock like any other.
-    const legend = furniture.labels.acquire('Warm Up', 0);
+    const legend = this.furnitureAssets.labels.acquire('Warm Up', 0);
     if (legend) {
       parts.push({
-        geometry: furniture.bladeLabel,
+        geometry: this.furnitureAssets.bladeLabel,
         material: legend,
         casts: false,
         receives: [false],
       });
     }
 
-    parts.push({ geometry: this.birdAssets.ibis, material: this.birdAssets.material, instanced: true });
-
-    // Spec 8.3's icons: three passes over one geometry, none of them in the
-    // depth map -- see `powerups.ts`'s `instanced`.
-    for (const material of [
-      this.powerupAssets.solidMaterial,
-      this.powerupAssets.shellMaterial,
-      this.powerupAssets.ghostMaterial,
-    ]) {
-      parts.push({
-        geometry: this.powerupAssets.bolt,
-        material,
-        instanced: true,
-        casts: false,
-        receives: [false],
-      });
-    }
+    // And **nothing instanced**, which is the change this list most needs
+    // explaining.
+    //
+    // It used to carry a stand-in for every instanced population a tile holds --
+    // the trees, the parked cars, the poles, the street lamps, the bins, the
+    // blades, the signal lamps, the ibises, the powerup icons -- and not one of
+    // them ever warmed a pipeline the game drew. Three keys an instanced draw's
+    // node-builder state on `object.uuid` (`RenderObject.getMaterialCacheKey`,
+    // unconditionally, with a TODO pointing at three.js#29066), so a stand-in
+    // with a different uuid produces different WGSL and a different pipeline.
+    // Measured: with all of those entries present, a 360-degree turn on the spot
+    // over 56 resident tiles still compiled 589 pipelines and put a 1,492 ms
+    // frame in the middle of it.
+    //
+    // What covers them instead is `setPrecompiler`, which compiles each tile's
+    // **real** meshes when the tile is built and holds the tile out of the
+    // picture until that lands. See `LoadedTile.warm` and `world/warmup.ts`.
 
     return parts;
   }
@@ -2073,9 +2137,16 @@ export class TileStreamer implements LampSource {
         // near tiles it cannot see. That is a few tens of thousands of triangles
         // of vertex work that clips away immediately, against the entire point
         // of the feature.
+        //
+        // And `tile.warm` in front of both, which is the freeze this pass
+        // exists to remove: a tile whose pipelines have not been compiled is
+        // not drawn at all, because the frame that first draws it is the frame
+        // that compiles them -- thirteen of them, synchronously, on whichever
+        // frame the player happened to turn. See `LoadedTile.warm`.
         tile.group.visible =
-          this.frustum.intersectsBox(tile.box) ||
-          (tile.casts && shadowVolume !== null && shadowVolume.intersectsBox(tile.box));
+          tile.warm &&
+          (this.frustum.intersectsBox(tile.box) ||
+            (tile.casts && shadowVolume !== null && shadowVolume.intersectsBox(tile.box)));
         continue;
       }
       // A tile whose prisms are already resident is not a hole in the picture,
@@ -2843,12 +2914,11 @@ export class TileStreamer implements LampSource {
       );
 
       this.root.add(group);
-      // The far layer's half of the same event. Here rather than a frame later
-      // in `update`, and *after* `root.add(group)` rather than before it, so the
-      // slabs go the moment the real buildings are in the scene and not one
-      // frame either side of it -- a frame with neither is a hole in the city,
-      // and a frame with both is a flat box in front of a facade.
-      this.farCity?.setTileResident(entry.key, true);
+      // Not drawn until its pipelines exist. See `LoadedTile.warm`, which is the
+      // whole of why this line is here: a tile shown before it is compiled
+      // compiles thirteen pipelines inside whichever frame the player's own
+      // turn brings it into the frustum.
+      group.visible = false;
 
       let powerupStates: readonly PowerupDrawState[] = [];
       if (picks !== null && powerupIcons !== null && this.powerupSink !== null) {
@@ -2883,9 +2953,11 @@ export class TileStreamer implements LampSource {
         this.pedestrians?.adopt(entry.key, lanes);
       }
 
-      this.loaded.set(entry.key, {
+      const tile: LoadedTile = {
         entry,
         group,
+        // No precompiler installed means the old behaviour: drawable at once.
+        warm: this.precompile === null,
         band: 0,
         casts: true,
         receives: false,
@@ -2906,7 +2978,18 @@ export class TileStreamer implements LampSource {
         birds,
         powerups: powerupIcons,
         powerupStates,
-      });
+      };
+      this.loaded.set(entry.key, tile);
+      if (tile.warm) {
+        // The far layer's half of the same event, and it stays paired with the
+        // moment the real buildings become *drawable* rather than the moment
+        // they enter the graph -- a frame with neither is a hole in the city and
+        // a frame with both is a flat box in front of a facade. With a
+        // precompiler installed that moment is `markWarm` below instead.
+        this.farCity?.setTileResident(entry.key, true);
+      } else {
+        this.warmTile(tile);
+      }
       this.builtTiles++;
       // The tile is here. Forget every failure it ever had, **including the
       // attempt count** -- a tile that hiccupped twice an hour ago and has

@@ -81,6 +81,7 @@ import {
   MeshBasicNodeMaterial,
   SRGBColorSpace,
 } from 'three/webgpu';
+import type { WarmupPart } from './warmup.ts';
 import { texture } from 'three/tsl';
 import { FIGURE_HEIGHT } from '../player/animation.ts';
 import { registerTexture, unregisterTexture } from './texture-audit.ts';
@@ -1202,4 +1203,22 @@ function checkWinding(field: NameplateField, quads: number): string | null {
     if (cross < 0) return `Plate quad ${q} is wound away from the camera; a single-sided plate would be invisible.`;
   }
   return null;
+}
+
+/**
+ * The plate field's pipeline, as a warm-up part.
+ *
+ * One mesh for every plate in the game, so this is one pipeline -- and it is one
+ * the old boot could not reach at all, because the field is built eight hundred
+ * lines after the warm-up runs and its geometry is empty until somebody else is
+ * on screen. Without it the **first remote player to appear** compiles a shader
+ * inside that frame, which is the frame the player most needs.
+ *
+ * Neither casts nor receives, matching the mesh: the header argues the plates out
+ * of the shadow pass entirely.
+ */
+export function nameplateWarmupParts(field: NameplateField): WarmupPart[] {
+  return [
+    { geometry: field.mesh.geometry, material: field.material, casts: false, receives: [false] },
+  ];
 }

@@ -64,7 +64,7 @@ import {
   type PedBand,
   type PedPose,
 } from './game/pedestrians.ts';
-import { warmUpPipelines } from './world/warmup.ts';
+import { PipelineWatch, auditWarmup, warmUpPipelines, type WarmupPart } from './world/warmup.ts';
 import { NIGHT_VISIBLE_LEVEL, NightLights, verifyNightLights } from './world/nightlights.ts';
 import { CollisionWorld } from './player/collision.ts';
 import {
@@ -144,7 +144,7 @@ import {
   footyWarmupParts,
   verifyFootyBall,
 } from './world/footyball.ts';
-import { NameplateField, verifyNameplates, type PlateInput } from './world/nameplates.ts';
+import { NameplateField, nameplateWarmupParts, verifyNameplates, type PlateInput } from './world/nameplates.ts';
 import {
   RenderGuard,
   auditSceneTextures,
@@ -222,7 +222,7 @@ import {
   type FactionCtx,
   type NpcActor,
 } from './game/factions.ts';
-import { PoliceAssets, PoliceSquad, Tracers, verifyPoliceKit } from './world/police.ts';
+import { PoliceAssets, PoliceSquad, Tracers, policeWarmupParts, verifyPoliceKit } from './world/police.ts';
 // The street factions -- meth heads and drunks -- on the same split again:
 // `game/streetlife.ts` is the shared simulation the server runs and
 // `world/streetlife.ts` is the renderer. See either header.
@@ -239,7 +239,7 @@ import {
   strikeCrime,
   verifyStreetlife,
 } from './game/streetlife.ts';
-import { StreetCrowd, StreetlifeAssets, verifyStreetlifeKit } from './world/streetlife.ts';
+import { StreetCrowd, StreetlifeAssets, streetlifeWarmupParts, verifyStreetlifeKit } from './world/streetlife.ts';
 // The wildlife -- bush turkeys, ibises and magpies -- on the same split once
 // more: `game/wildlife.ts` is the shared simulation the server runs and
 // `world/wildlife.ts` is the renderer. See either header.
@@ -1055,6 +1055,50 @@ async function main(): Promise<void> {
    */
   const bikes = new BikeAssets();
 
+  // --- And the five asset sets that used to be built *below* the warm-up, which
+  // is the whole of why the police kit, the meth heads, the wildlife, the
+  // nameplates and the tracers each compiled a pipeline on the frame they were
+  // first looked at.
+  //
+  // Every one of them is pure geometry on the terms the four above are: no
+  // network, no index, nothing that has to happen after the far layer. They were
+  // constructed four hundred lines further down purely because that is where
+  // their *renderers* are wired up, and the cost of that was invisible -- the
+  // first officer, the first loiterer, the first bush turkey, the first remote
+  // player's plate and the first shot fired were each a synchronous compile in
+  // the middle of play. The squads, the crowd and the flock are still built
+  // where they were; only the shared geometry and materials moved.
+  //
+  // The kit self-checks come with them, because a fatal check belongs beside the
+  // thing it checks rather than beside the thing that happens to use it.
+  const policeAssets = new PoliceAssets(characters);
+  const policeKitFailures = verifyPoliceKit(policeAssets);
+  if (policeKitFailures.length) {
+    hud.fatal('Police kit self-checks failed:\n' + policeKitFailures.map((f) => '  - ' + f).join('\n'));
+    return;
+  }
+  const tracers = new Tracers();
+  const streetAssets = new StreetlifeAssets(characters);
+  const streetKitFailures = verifyStreetlifeKit(streetAssets);
+  if (streetKitFailures.length) {
+    hud.fatal('Street kit self-checks failed:\n' + streetKitFailures.map((f) => '  - ' + f).join('\n'));
+    return;
+  }
+  const wildlifeAssets = new WildlifeAssets();
+  const wildlifeKitFailures = verifyWildlifeKit(wildlifeAssets);
+  if (wildlifeKitFailures.length) {
+    hud.fatal('Wildlife kit self-checks failed:\n' + wildlifeKitFailures.map((f) => '  - ' + f).join('\n'));
+    return;
+  }
+  /**
+   * The plate field, built here and added to the scene where it always was.
+   *
+   * Its geometry is empty until somebody else is in the game, and an empty
+   * geometry still has the attribute *layout* the pipeline is keyed on -- which
+   * is the whole reason this can be warmed at all. See `world/nameplates.ts`.
+   */
+  const nameplates = new NameplateField();
+
   // --- Shader warm-up, and this is the one thing on the boot path that exists
   // purely because of how a real player described the game.
   //
@@ -1087,12 +1131,16 @@ async function main(): Promise<void> {
   const warmupActors = [new CharacterActor(characters, 0), new CharacterActor(characters, 0)];
   warmupActors[0].mesh.receiveShadow = true;
   warmupActors[1].mesh.receiveShadow = false;
-  const warmup = await withDeadline(
-    warmUpPipelines(
-      renderer,
-      scene,
-      camera,
-      [
+  /**
+   * Everything the warm-up compiles, kept rather than passed inline.
+   *
+   * `auditWarmup` takes the same list a few seconds into play and names anything
+   * in the scene that is not in it -- which is the only thing that can catch the
+   * recurring shape of this bug, a renderer shipped without an entry here. See
+   * `world/warmup.ts`.
+   */
+  const warmupExtras = warmupActors.map((a) => a.mesh);
+  const warmupParts: WarmupPart[] = [
         ...streamer.warmupParts(),
         // The football, in the one material every one of them is drawn with.
         // `FootyPool` keeps its balls `visible = false` until somebody throws,
@@ -1107,47 +1155,33 @@ async function main(): Promise<void> {
         // the viewmodel receives and the local player's own bat, which is on the
         // shadow layer, does not.
         { geometry: bats.geometry, material: bats.material, casts: true },
-        // The bike. Instanced, casting, and the same material for the parked set
-        // and the ridden one -- so this one entry covers every bike in the game.
-        { geometry: bikes.geometry, material: bikes.material, casts: true },
-        // The bike's glow disc and sky beam. Additive, never casting, both
-        // instanced -- without these the first bike a player walks toward
-        // compiles two pipelines in the frame the beacon exists to make them
-        // look at.
-        { geometry: bikes.glowGeometry, material: bikes.glowMaterial, casts: false, instanced: true },
-        { geometry: bikes.beamGeometry, material: bikes.beamMaterial, casts: false, instanced: true },
-        // The far tier of the crowd, which is instanced, per-instance coloured
-        // and casting. One entry covers all six of its sets: they share the one
-        // material, and `warmup.ts`'s cache key reads attribute *layouts* rather
-        // than contents, so the torso's box stands in for the shorts' and the
-        // shin's. Without it the first pedestrian to come into view compiles a
-        // pipeline mid-frame -- and unlike the football's, that frame is not one
-        // the player chose, it is whichever one they happen to walk into.
-        { geometry: pedAssets.torso, material: pedAssets.material, casts: true, instanced: true },
-        // The traffic's headlights and tail lights: two geometries over one
-        // additive material, instanced, never in the depth pass in either
-        // direction, and **never per-instance coloured** -- both sets have to
-        // agree about that or they would be two pipelines rather than two draws
-        // of one, because the presence of `instanceColor` is in the shader.
-        //
-        // Both are warmed for the reason the street lamps are warmed in
-        // `streamer.warmupParts`: they are hidden every daylight hour, and a
-        // hidden mesh is never drawn, so without these the pipeline would be
-        // compiled on the single frame the sun goes down with a hundred and
-        // eighty cars' worth of it arriving at once.
-        ...nightLights.carLights.meshes.map((mesh) => ({
-          geometry: mesh.geometry,
-          material: nightLights.carLights.material,
-          instanced: true,
-          instanceColor: false,
-          casts: false,
-          receives: [false],
-        })),
-      ],
+        // The police kit's two props and the tracers, the street factions' four
+        // props, the flock's five sets and the nameplate field. Every one of
+        // these used to be built *below* this call and so could not be reached
+        // by it at all; each was a compile on the frame it first appeared --
+        // the first officer, the first meth head, the first bush turkey, the
+        // first shot fired, the first other player's plate.
+        ...policeWarmupParts(policeAssets, tracers),
+        ...streetlifeWarmupParts(streetAssets),
+        ...nameplateWarmupParts(nameplates),
+        // And **nothing instanced**, which is the change this list most needs
+        // explaining. The bikes, the crowd, the traffic, the flock and the
+        // headlights were all warmed here and none of them was ever warmed at
+        // all: three keys an instanced draw on `object.uuid`, so a stand-in
+        // compiles a pipeline with a different uuid and the real mesh compiles
+        // its own on the frame it is first drawn. `world/warmup.ts` sets that
+        // out; the scene pass below is what covers them now.
+  ];
+  const warmup = await withDeadline(
+    warmUpPipelines(
+      renderer,
+      scene,
+      camera,
+      warmupParts,
       // The characters, handed over whole because a skinned mesh cannot be
       // reduced to a geometry and a material: `RenderObject.getCacheKey` folds
       // the skeleton's bone count in, and the vertex path is the skinning one.
-      warmupActors.map((a) => a.mesh),
+      warmupExtras,
     ),
     WARMUP_DEADLINE_MS,
     'the shader warm-up',
@@ -1161,6 +1195,94 @@ async function main(): Promise<void> {
   }
   dev.warmup = warmup;
   dev.boot = 'far layer';
+
+  /**
+   * The coverage check, and it is aimed at the *next* feature rather than at
+   * this one.
+   *
+   * Every omission this session closed -- the police kit, the meth heads, the
+   * flock, the plates, the tracers, and then every instanced set in the world --
+   * was the same mistake made independently: somebody added a renderer and
+   * nobody added the matching warm-up, and the defect is invisible until a
+   * player turns around fast. It cannot be caught by reading either file,
+   * because the fault is that the two files do not mention each other.
+   *
+   * So the check is not a list of things to remember. It is the symptom itself:
+   * `PipelineWatch` counts the frames in which the renderer's pipeline cache
+   * grew **across the render call**, which is exactly and only a frame that
+   * stalled on a shader compile -- see `world/warmup.ts`. Zero is the invariant;
+   * anything else names how many frames and how bad the worst one was, and
+   * `coldMaterials` is the place to start looking.
+   *
+   * Twenty seconds because that is comfortably past the streamer filling its
+   * ring at the spawn and past everything ambient having posed at least once.
+   * Reported rather than thrown, on the boot path's usual terms: a warm-up
+   * problem is a stutter, and a false positive that stopped the boot would be
+   * worse than the thing it is guarding. `sydney.warmupAudit()` runs it on
+   * demand, which is what to type after adding a renderer.
+   */
+  const pipelineWatch = new PipelineWatch();
+  const auditNow = (): ReturnType<typeof auditWarmup> =>
+    auditWarmup(renderer, scene, warmupParts, warmupExtras, warmup?.pipelinesAfter ?? -1, pipelineWatch);
+  setTimeout(() => {
+    const audit = auditNow();
+    if (audit.failures.length) {
+      console.warn(
+        '[warmup] frames stalled on shader compilation:\n  - ' +
+          audit.failures.join('\n  - ') +
+          '\n  materials with no boot-time stand-in: ' +
+          (audit.coldMaterials.join(', ') || 'none'),
+      );
+    }
+  }, 20000);
+
+  // --- And the half of the warm-up that a boot pass can never do.
+  //
+  // Everything above compiles a *shared* pipeline: one per material, geometry
+  // layout and shadow role, keyed on things that do not vary per object. That
+  // covers every non-instanced surface in the world and it is why the first
+  // terrace and the first roof no longer hitch.
+  //
+  // It cannot cover an `InstancedMesh`, and the reason is in three rather than
+  // in this project. `RenderObject.getMaterialCacheKey` appends `object.uuid`
+  // for anything instanced -- unconditionally, with a TODO pointing at
+  // three.js#29066 -- because the instance matrix is baked into the node graph
+  // as a uniform buffer over that mesh's own array. So the node-builder state,
+  // the generated WGSL and the render pipeline are all per object: two tiles'
+  // trees produce shaders that are not even textually equal, because the matrix
+  // arrives as a struct named `NodeBuffer_<node id>` off a global counter.
+  //
+  // A tile has about thirteen instanced sets in it, the streamer keeps dozens of
+  // tiles resident, and `TileStreamer.update` decides `group.visible` from a
+  // **frustum test** -- so those compiles land on the frame a tile enters the
+  // view. Turning on the spot moves nothing, loads nothing and streams nothing,
+  // and brings twenty tiles into the frustum at once. Measured on the shipped
+  // build at 180 deg/s with 56 tiles resident: one turn compiled 589 pipelines,
+  // p95 242 ms, worst frame 1,492 ms, 23 frames of 120 over 100 ms. The same
+  // turn repeated compiled nothing and peaked at 62 ms.
+  //
+  // So each tile is compiled once, off the main thread, when it is built, and is
+  // not drawn until that lands. `compileAsync` is the same tool the boot pass
+  // uses and for the same reason -- it passes a promise array to the backend,
+  // which is what selects `device.createRenderPipelineAsync` over the blocking
+  // call. See `TileStreamer.setPrecompiler` and `LoadedTile.warm`.
+  streamer.setPrecompiler(async (group) => {
+    // Visible for the walk and hidden again immediately, because the two
+    // visibilities are the same flag: `_projectObject` skips an invisible object
+    // in `compileAsync` exactly as it does in `render`. `compileAsync` does its
+    // whole projection synchronously before its first await -- the render list
+    // is built and the compilation work items are queued before it yields -- so
+    // by the time this returns the walk has happened and the tile is hidden for
+    // the entire asynchronous half.
+    //
+    // The three-argument form names the real scene as the target, which is what
+    // makes the cache keys the ones `render` will look up: the lights node, the
+    // clipping context and the render-target formats all come from there.
+    group.visible = true;
+    const compiled = renderer.compileAsync(group, camera, scene);
+    group.visible = false;
+    await compiled;
+  });
 
   // And the loading overlay goes now, on the same argument. It exists to cover
   // the gap before the renderer can draw, and the renderer can draw: the world
@@ -1468,12 +1590,8 @@ async function main(): Promise<void> {
   // of the tick evaluated identically on both ends, so they cost no bytes and
   // exist in both modes without anybody sending anything. See
   // `factions.POLICE_SLOT_BASE`, which is the trick that makes it free.
-  const policeAssets = new PoliceAssets(characters);
-  const policeKitFailures = verifyPoliceKit(policeAssets);
-  if (policeKitFailures.length) {
-    hud.fatal('Police kit self-checks failed:\n' + policeKitFailures.map((f) => '  - ' + f).join('\n'));
-    return;
-  }
+  // The assets and their kit check are four hundred lines above, beside the
+  // warm-up that compiles them. Only the squad is built here.
   const squad = new PoliceSquad(policeAssets, characters);
   for (const rig of squad.rigs) scene.add(rig.mesh);
 
@@ -1484,12 +1602,7 @@ async function main(): Promise<void> {
   // instead of *through* them -- but it is the same bargain: a pure function of
   // the anchor and the tick, evaluated identically by this browser and the
   // server, costing nothing on the wire and existing in both modes.
-  const streetAssets = new StreetlifeAssets(characters);
-  const streetKitFailures = verifyStreetlifeKit(streetAssets);
-  if (streetKitFailures.length) {
-    hud.fatal('Street kit self-checks failed:\n' + streetKitFailures.map((f) => '  - ' + f).join('\n'));
-    return;
-  }
+  // Likewise: the kit and its check are above, beside the warm-up.
   const streetCrowd = new StreetCrowd(streetAssets, characters);
   for (const rig of streetCrowd.rigs) scene.add(rig.mesh);
 
@@ -1501,19 +1614,13 @@ async function main(): Promise<void> {
   // ambient tier is a hash over the baked park discs and the footpath bands, so
   // like the beats and the loiterers it costs nothing on the wire and exists
   // identically in both modes.
-  const wildlifeAssets = new WildlifeAssets();
-  const wildlifeKitFailures = verifyWildlifeKit(wildlifeAssets);
-  if (wildlifeKitFailures.length) {
-    hud.fatal('Wildlife kit self-checks failed:\n' + wildlifeKitFailures.map((f) => '  - ' + f).join('\n'));
-    return;
-  }
+  // Likewise: the kit and its check are above, beside the warm-up.
   const flock = new WildlifeFlock(wildlifeAssets);
   for (const mesh of flock.meshes) scene.add(mesh);
   /** Scratch for the wildlife queries, so a fixed step and a frame both allocate nothing. */
   const wildScratch = createWildScratch();
   const wildPose = createWildPose();
 
-  const tracers = new Tracers();
   for (const mesh of tracers.meshes) scene.add(mesh);
   /** The offline authority. Empty and unstepped while a server is answering. */
   const factions = new FactionField();
@@ -1996,7 +2103,9 @@ async function main(): Promise<void> {
   //
   // One object for the whole feature -- one geometry, one material, one draw
   // call, and no per-player anything. See `world/nameplates.ts`.
-  const nameplates = new NameplateField();
+  // The field itself is built beside the warm-up, four hundred lines above, so
+  // its shader is compiled behind the loading screen rather than on the frame
+  // the first other player appears. Only the scene wiring is here.
   scene.add(nameplates.mesh);
   /** Where a plate's owner's head is. Reused every frame; never escapes the loop. */
   const plateHead = new Vector3();
@@ -4192,6 +4301,44 @@ async function main(): Promise<void> {
    */
   const renderGuard = new RenderGuard();
 
+  // --- The scene pass: the half of the warm-up that has to happen down here.
+  //
+  // Everything above `hud.ready` compiled *stand-ins* -- a throwaway mesh with
+  // the same material and the same attribute layout as the real thing, which is
+  // all a pipeline is keyed on for an ordinary mesh. That is why it can run
+  // before the far layer, the collision world and every renderer in this file
+  // exist, and it is why the first terrace and the first shot no longer hitch.
+  //
+  // It cannot work for an `InstancedMesh`. Three appends `object.uuid` to the
+  // node-builder cache key for anything instanced (`getMaterialCacheKey`,
+  // unconditionally, with a TODO pointing at three.js#29066, because the
+  // instance matrix is baked into the node graph as a uniform buffer over that
+  // mesh's own array), so a stand-in's pipeline is never the pipeline the real
+  // mesh draws with. The only way to warm an instanced set is to compile the set
+  // itself -- and the world-wide ones do not exist until here: the traffic's six
+  // movers, the crowd's six impostor sets, the flock's five, the bikes and their
+  // beacon, the gulls, the headlights and tail lights.
+  //
+  // So one `compileAsync` over the real scene, immediately before the first
+  // frame is issued. Nothing has been rendered yet -- `setAnimationLoop` below
+  // is what starts that -- so this is the last moment at which a compile is
+  // free, and every one of those sets is in the scene and `frustumCulled = false`
+  // by now, which is what makes the walk reach them wherever the camera points.
+  //
+  // Streamed tiles are *not* covered here and do not need to be: they arrive
+  // over the following minutes and each is compiled by `setPrecompiler` above,
+  // on the same argument. See `world/warmup.ts`.
+  const scenePass = await withDeadline(
+    renderer.compileAsync(scene, camera),
+    WARMUP_DEADLINE_MS,
+    'the scene shader pass',
+  );
+  console.debug(
+    `[warmup] scene pass ${scenePass === null ? 'timed out' : 'done'}; ` +
+      `pipelines ${(renderer as unknown as { _pipelines?: { caches?: Map<unknown, unknown> } })._pipelines?.caches?.size ?? -1}, ` +
+      `shaders ${renderer.info.memory.programs}`,
+  );
+
   renderer.setAnimationLoop(() => {
     const now = performance.now();
     // Clamp the frame delta: a tab that was backgrounded must not run hundreds of
@@ -5073,7 +5220,16 @@ async function main(): Promise<void> {
     // and for the frame count before the player is shown the error screen, is in
     // `world/texture-audit.ts` beside `TRANSIENT_FRAMES`. Everything below this
     // line -- the frame timing, the HUD, the network -- runs either way.
+    // Bracketed by the pipeline watch, which is two subtractions a frame and is
+    // the whole future-proofing story for shader compilation in this client.
+    // Three takes the *blocking* `device.createRenderPipeline` branch exactly
+    // when a pipeline is first needed inside `render` rather than inside
+    // `compileAsync`, so the cache growing across this one call is precisely
+    // "this frame stalled on a compile" -- with no wrapper around three's
+    // internals and nothing to keep in step. See `world/warmup.ts`.
+    pipelineWatch.begin(renderer);
     renderGuard.run(() => renderer.render(scene, camera), scene, hud);
+    pipelineWatch.end(renderer, performance.now() - now);
 
     // Cost of this frame, measured after the render call returns. Deltas above
     // 200 ms are dropped rather than recorded: they mean the browser stopped
@@ -5254,6 +5410,20 @@ async function main(): Promise<void> {
      *     streamed no tiles with poles in them, which is a completely different
      *     problem from a lighting bug and looks identical from inside the game.
      */
+    /**
+     * The warm-up, for the console.
+     *
+     * `sydney.warmupAudit()` is the one to type after adding a renderer, and it
+     * answers the question nothing else can: has any frame this session stalled
+     * on a shader compile? `syncFrames` is the number that matters and it should
+     * be **zero** once the ring has filled; `syncWorstMs` is what the player
+     * felt. `pipelinesSinceWarmup` climbing is normal and expected -- every tile
+     * brings its own, compiled off the main thread by
+     * `TileStreamer.setPrecompiler` -- so it is `syncFrames` rather than that
+     * count which says the bug is back. See `world/warmup.ts`.
+     */
+    warmupAudit: auditNow,
+
     night: {
       rig: nightLights,
       report: () => ({

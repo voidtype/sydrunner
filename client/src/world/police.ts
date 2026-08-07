@@ -65,6 +65,7 @@ import {
   Mesh,
   MeshStandardNodeMaterial,
 } from 'three/webgpu';
+import type { WarmupPart } from './warmup.ts';
 
 import { BONE } from '../player/animation.ts';
 import {
@@ -705,8 +706,14 @@ export class Tracers {
   /** Add this to the scene. One mesh per pooled tracer. */
   readonly meshes: Mesh[] = [];
   private readonly pool: Tracer[] = [];
-  private readonly material: MeshStandardNodeMaterial;
-  private readonly geometry: BufferGeometry;
+  /**
+   * Public so `policeWarmupParts` can name the pair. A tracer's shader is
+   * compiled the frame the first shot is fired unless the boot warm-up gets it,
+   * and the warm-up must be handed the **shared instances** rather than copies --
+   * see `world/warmup.ts`.
+   */
+  readonly material: MeshStandardNodeMaterial;
+  readonly geometry: BufferGeometry;
   private cursor = 0;
 
   constructor() {
@@ -914,4 +921,29 @@ export function verifyPoliceKit(assets: PoliceAssets): string[] {
   }
 
   return failures;
+}
+
+/**
+ * The police kit's own pipelines, as warm-up parts.
+ *
+ * The **cap and the band** rather than the body: an officer's body is a
+ * `CharacterActor`, whose skinned pipeline the warm-up already compiles from a
+ * throwaway actor, and `kitGeometry` produces the same attribute layout as every
+ * other kit so the swap in `PoliceSquad` costs no compile. The two props are the
+ * part nothing else in the game covers -- plain `Mesh`es on a material this file
+ * owns -- and the tracers likewise.
+ *
+ * Both receive variants for the props, because a cap is parented to a head whose
+ * `receiveShadow` follows the actor's, and `CharacterActor` builds bodies
+ * receiving while `castShadowOnly` turns it off for the local player's own.
+ */
+export function policeWarmupParts(assets: PoliceAssets, tracers: Tracers): WarmupPart[] {
+  return [
+    { geometry: assets.cap, material: assets.material, casts: true },
+    { geometry: assets.band, material: assets.material, casts: true },
+    // A tracer is an emissive sliver drawn for two frames. It neither casts nor
+    // receives, and without this entry the first shot fired in the session
+    // compiles a pipeline inside the frame that shot is supposed to be read on.
+    { geometry: tracers.geometry, material: tracers.material, casts: false, receives: [false] },
+  ];
 }

@@ -72,6 +72,7 @@ import {
   Mesh,
   MeshStandardNodeMaterial,
 } from 'three/webgpu';
+import type { WarmupPart } from './warmup.ts';
 
 import { BONE, RIG } from '../player/animation.ts';
 import {
@@ -1402,4 +1403,33 @@ export function verifyStreetlifeKit(assets: StreetlifeAssets): string[] {
   }
 
   return failures;
+}
+
+/**
+ * The street factions' own pipelines, as warm-up parts.
+ *
+ * The **props** rather than the bodies, for `policeWarmupParts`' reason: a
+ * loiterer's body is a `CharacterActor` whose skinned pipeline the boot warm-up
+ * already compiles from a throwaway actor, and the skinny meth-head kit is a
+ * modified position buffer on the same attribute layout, so it keys the same and
+ * costs no compile when `StreetCrowd.assign` swaps it in.
+ *
+ * The four props are a different matter. They are plain `Mesh`es on a material
+ * nothing else in the world uses and they start `visible = false`, and an
+ * invisible mesh is never drawn -- `_projectObject` returns early on it -- so
+ * without this entry the first meth head to come round a corner compiles a
+ * pipeline in the frame they appear in.
+ *
+ * One entry per prop even though all four share the material, because the cache
+ * key reads the geometry's attribute layout and the four are built by four
+ * different builders. `vests[0]` stands in for both vests: two geometries, one
+ * layout, one pipeline.
+ */
+export function streetlifeWarmupParts(assets: StreetlifeAssets): WarmupPart[] {
+  return [assets.beanie, assets.cap, assets.vests[0], assets.bottle].map((geometry) => ({
+    geometry,
+    material: assets.material,
+    // `StreetProps`' own flags: a prop casts and receives.
+    casts: true,
+  }));
 }

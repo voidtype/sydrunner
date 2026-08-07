@@ -73,22 +73,50 @@
  * boot or on where the sun has put its shadow volume.
  *
  * ---------------------------------------------------------------------------
+ * WHAT A STAND-IN CANNOT DO, WHICH IS EVERY INSTANCED DRAW IN THE GAME.
+ *
+ * This pass works because a pipeline is keyed on things a stand-in can copy: the
+ * material, the attribute layout, the shadow role. An `InstancedMesh` is the one
+ * case where that is false, and it was warmed here for the life of this module
+ * without ever compiling anything the game used.
+ *
+ * `RenderObject.getMaterialCacheKey` appends `object.uuid` for anything
+ * instanced -- unconditionally, with a TODO pointing at three.js#29066 -- because
+ * the instance matrix is baked into the node graph as a uniform buffer over that
+ * mesh's own array. So every instanced mesh gets its own `NodeBuilderState`, its
+ * own generated WGSL and its own render pipeline; the shaders are not even
+ * textually equal, since the matrix arrives as a struct named
+ * `NodeBuffer_<node id>` off a global counter. A stand-in has a different uuid,
+ * therefore a different pipeline, therefore warms nothing.
+ *
+ * Two things cover instanced draws instead, and neither is a stand-in:
+ *
+ *   - **`TileStreamer.setPrecompiler`** compiles each tile's real meshes with
+ *     `compileAsync` when the tile is built, and holds the tile out of the
+ *     picture until that lands. A tile has about thirteen instanced sets and the
+ *     streamer flips `group.visible` from a frustum test, so before this the
+ *     compiles landed on the frame the player's own turn brought the tile into
+ *     view -- one 360-degree turn with 56 tiles resident compiled 589 pipelines
+ *     and put a 1,492 ms frame in the middle of it.
+ *   - **the scene pass in `main.ts`**, which runs `compileAsync` over the real
+ *     scene once every renderer has been constructed. That is what reaches the
+ *     world-wide instanced sets -- the traffic, the crowd, the flock, the bikes,
+ *     the gulls, the headlights -- which are single objects and so can only be
+ *     warmed as themselves.
+ *
+ * ---------------------------------------------------------------------------
  * WHAT IT DOES NOT DO. It does not warm the *node graph* build, only the GPU
- * pipeline. Three re-derives a `NodeBuilderState` per `InstancedMesh` -- the
- * cache key carries `object.uuid` for those -- so a tile arriving with trees in
- * it still pays a few hundred microseconds of TSL generation. That is JS work on
- * an already-generated string that hashes to a `ProgrammableStage` this pass
- * created, so it never reaches `createShaderModule` and never reaches the
- * driver. It is not what a hitch is made of.
+ * pipeline. A merged tile mesh arriving with a facade material on it still pays
+ * a few hundred microseconds of TSL generation, on an already-generated string
+ * that hashes to a `ProgrammableStage` this pass created -- so it never reaches
+ * `createShaderModule` and never reaches the driver. It is not what a hitch is
+ * made of.
  */
 
 import {
   BufferAttribute,
   BufferGeometry,
-  Color,
   Group,
-  InstancedMesh,
-  Matrix4,
   Mesh,
   type Camera,
   type Material,
@@ -120,17 +148,6 @@ export interface WarmupPart {
    * with, and disposing it here would delete the trees out of the world.
    */
   owned?: boolean;
-  /** Instanced draws take a different vertex path, and so a different pipeline. */
-  instanced?: boolean;
-  /**
-   * Whether the real instanced mesh carries per-instance colour. It changes the
-   * shader -- `NodeMaterial.setupDiffuseColor` multiplies by `instanceColor`
-   * only when the attribute exists -- so warming the wrong one warms a pipeline
-   * nothing draws and leaves the real hitch in place. Defaults to true for
-   * instanced parts, which is every one in this build except the street-name
-   * blades; `furniture.ts` says why they have none.
-   */
-  instanceColor?: boolean;
   /** Whether the real thing ever appears in the sun's depth pass. */
   casts?: boolean;
   /**
@@ -255,26 +272,13 @@ export async function warmUpPipelines(
   const holder = new Group();
   holder.name = 'pipeline-warmup';
 
-  const identity = new Matrix4();
-  // A multiplier of one, so the warm-up draws what the real thing draws.
-  const white = new Color(1, 1, 1);
   const owned: BufferGeometry[] = [];
   let draws = 0;
 
   for (const part of parts) {
     if (part.owned) owned.push(part.geometry);
     for (const receive of part.receives ?? BOTH_WAYS) {
-      let mesh: Mesh;
-      if (part.instanced) {
-        const instanced = new InstancedMesh(part.geometry, part.material, 1);
-        instanced.setMatrixAt(0, identity);
-        // See `WarmupPart.instanceColor`: the attribute's presence is in the
-        // shader, so it has to match what the tile builders produce.
-        if (part.instanceColor !== false) instanced.setColorAt(0, white);
-        mesh = instanced;
-      } else {
-        mesh = new Mesh(part.geometry, part.material);
-      }
+      const mesh = new Mesh(part.geometry, part.material);
       // Never culled, in either walk. `_projectObject` short-circuits the
       // frustum test on this flag, and it is tested by both the colour walk
       // (with the view camera) and the nested shadow render (with the sun's
@@ -344,8 +348,174 @@ export async function warmUpPipelines(
  * because there is not one, and guarded because a private field is not a
  * contract -- a wrong number here must never be able to fail a boot.
  */
-function pipelineCount(renderer: WebGPURenderer): number {
+export function pipelineCount(renderer: WebGPURenderer): number {
   const caches = (renderer as unknown as { _pipelines?: { caches?: Map<unknown, unknown> } })
     ._pipelines?.caches;
   return caches instanceof Map ? caches.size : -1;
+}
+
+/**
+ * A running count of pipelines compiled **synchronously, inside a rendered
+ * frame** -- which is the one number this whole subject reduces to.
+ *
+ * Every other measure here is a proxy. A material that was never warmed only
+ * matters if it costs a frame; a tile that streams in only matters if its
+ * compile lands on the main thread. `Pipelines.getForRender` takes the blocking
+ * `device.createRenderPipeline` branch exactly when it is reached from `render`
+ * rather than from `compileAsync`, so the pipeline cache growing **across a
+ * render call** is precisely and only that failure -- no wrapper around three's
+ * internals, no attribution guesswork, one subtraction a frame.
+ *
+ * That is what makes it the right future-proofing check. The recurring shape of
+ * this bug is a renderer added without a warm-up entry, and the shape it will
+ * take next is one nobody here has thought of; a count that only asks "did a
+ * frame pay for a compile" catches all of them, including the one that made this
+ * pass necessary -- instanced meshes, which no boot-time stand-in can warm at
+ * all (see this file's header).
+ */
+export class PipelineWatch {
+  /** Frames that paid for at least one compile. Should be 0 after boot. */
+  frames = 0;
+  /** Pipelines compiled inside those frames. */
+  pipelines = 0;
+  /** The worst such frame, milliseconds. What the player actually felt. */
+  worstMs = 0;
+  /** Frames watched, so the count above can be read as a rate. */
+  watched = 0;
+  private before = -1;
+
+  /** Call immediately before `renderer.render`. */
+  begin(renderer: WebGPURenderer): void {
+    this.before = pipelineCount(renderer);
+  }
+
+  /**
+   * Call immediately after, with what the frame cost.
+   *
+   * `frameMs` is the caller's own measurement rather than one taken here,
+   * because the render call is not the whole frame and the number worth
+   * reporting is the one the player felt.
+   */
+  end(renderer: WebGPURenderer, frameMs: number): void {
+    this.watched++;
+    if (this.before < 0) return;
+    const grew = pipelineCount(renderer) - this.before;
+    if (grew <= 0) return;
+    this.frames++;
+    this.pipelines += grew;
+    if (frameMs > this.worstMs) this.worstMs = frameMs;
+  }
+}
+
+/**
+ * What the audit below found: everything in the scene that will compile a
+ * pipeline in the middle of play.
+ */
+export interface WarmupAudit {
+  /**
+   * Materials in the scene that the boot warm-up did not compile a stand-in
+   * for. **Diagnostic, not a failure**: the instanced populations are all in
+   * here by design, because a stand-in cannot warm them and they are covered by
+   * `TileStreamer.setPrecompiler` and the scene pass instead. It is the list to
+   * read when `syncFrames` is non-zero and you want a place to start.
+   */
+  coldMaterials: string[];
+  /** How many pipelines the renderer has compiled since the warm-up finished. */
+  pipelinesSinceWarmup: number;
+  /** Frames that paid for a synchronous compile. See `PipelineWatch`. */
+  syncFrames: number;
+  syncPipelines: number;
+  syncWorstMs: number;
+  /** Everything above that is a defect, as one list. Empty means covered. */
+  failures: string[];
+}
+
+/**
+ * Walk the live scene and name everything in it the warm-up did not cover.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS EXISTS, and it is not the same reason the warm-up exists.
+ *
+ * The recurring shape of this bug is not a wrong warm-up entry. It is a
+ * **missing** one: somebody adds a renderer -- the police kit, the meth heads,
+ * the wildlife, the nameplates, the night lamps, the far city -- and nobody adds
+ * the entry, and the defect is invisible until a player turns around fast enough
+ * to bring several of them into view on one frame. It cannot be caught by
+ * reading either file, because the fault is precisely that the two files do not
+ * mention each other. The only thing that can catch it is asking the *scene*,
+ * after it is populated, what it is about to draw.
+ *
+ * So it is run a few seconds into play, once the streamer has filled the ring
+ * and every ambient system has posed at least once, and the thing it actually
+ * asserts is `PipelineWatch`: **zero frames may have paid for a compile.** That
+ * is the symptom itself rather than a proxy for it, so it catches a renderer
+ * shipped without warm-up coverage however the coverage was supposed to arrive
+ * -- a boot stand-in, the scene pass, or `TileStreamer.setPrecompiler`.
+ *
+ * `coldMaterials` rides along as the place to start looking. It is deliberately
+ * **not** a failure: every instanced population in the world is in that list by
+ * construction, because no stand-in can warm one (see this file's header).
+ *
+ * Reported rather than thrown. A warm-up problem is a stutter, and a check that
+ * could stop a boot over one would be worse than the thing it guards; the
+ * console line plus `sydney.warmupAudit()` is enough to make the real thing
+ * impossible to miss.
+ */
+export function auditWarmup(
+  renderer: WebGPURenderer,
+  scene: Scene,
+  parts: readonly WarmupPart[],
+  extras: readonly Object3D[],
+  pipelinesAfterWarmup: number,
+  watch: PipelineWatch,
+): WarmupAudit {
+  const warmed = new Set<Material>();
+  for (const part of parts) warmed.add(part.material);
+  for (const extra of extras) {
+    extra.traverse((o) => {
+      const material = (o as Mesh).material;
+      if (!material) return;
+      if (Array.isArray(material)) for (const m of material) warmed.add(m);
+      else warmed.add(material);
+    });
+  }
+
+  // Keyed by material rather than by object, because the far city is 192 meshes
+  // over one material and the tiles are thousands over a dozen -- a list with an
+  // entry per object is a list nobody reads. One example object each is what
+  // makes the name actionable.
+  const cold = new Map<Material, string>();
+
+  scene.traverse((object) => {
+    const material = (object as Mesh).material;
+    if (!material) return;
+    const list = Array.isArray(material) ? material : [material];
+    for (const m of list) {
+      if (warmed.has(m) || cold.has(m)) continue;
+      cold.set(m, `${m.name || m.type} (e.g. ${object.name || object.type})`);
+    }
+  });
+  const coldMaterials = [...cold.values()];
+
+  const now = pipelineCount(renderer);
+  const pipelinesSinceWarmup = now < 0 || pipelinesAfterWarmup < 0 ? -1 : now - pipelinesAfterWarmup;
+
+  const failures: string[] = [];
+  if (watch.frames > 0) {
+    failures.push(
+      `${watch.pipelines} pipelines were compiled inside ${watch.frames} rendered frames ` +
+        `(worst frame ${watch.worstMs.toFixed(0)} ms). Every one of those is a stall the ` +
+        `player felt: warm it at boot if it is a shared material, or through ` +
+        `TileStreamer.setPrecompiler if it is instanced.`,
+    );
+  }
+
+  return {
+    coldMaterials,
+    pipelinesSinceWarmup,
+    syncFrames: watch.frames,
+    syncPipelines: watch.pipelines,
+    syncWorstMs: watch.worstMs,
+    failures,
+  };
 }

@@ -9189,6 +9189,7 @@ async function checkStreamingLifecycle(): Promise<void> {
     );
   }
 
+
   // --- 1b. The two formats a tile now arrives in, both of which are half
   // written in Python and half in TypeScript and neither of which fails loudly.
   //

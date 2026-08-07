@@ -858,3 +858,4 @@ export function verifyPedestrianModel(assets: PedestrianAssets = new PedestrianA
 
   return failures;
 }
+
