@@ -52,6 +52,7 @@ import { WaterLevels } from '../client/src/world/wading.ts';
 import { TrafficField, decodeLanes } from '../client/src/game/traffic.ts';
 import { PedestrianField } from '../client/src/game/pedestrians.ts';
 import { spawnCentre } from '../client/src/game/spawn.ts';
+import type { Place } from '../client/src/game/teleport.ts';
 import type { CombatWorld } from '../client/src/game/combat.ts';
 
 export interface TileEntry {
@@ -165,6 +166,19 @@ export interface ServerWorld {
    * dithered point out of the disc around it, per join.
    */
   spawn: { x: number; z: number };
+  /**
+   * The suburb label nodes, for `/tp <suburb>`.
+   *
+   * The same `world/suburbs.json` the client's locator strip reads, loaded here
+   * so the *server* can resolve a name — a teleport is an authoritative move, so
+   * the destination must be chosen from data this process holds rather than from
+   * anything a client sends. 16 kB and 316 names at 15.3 km.
+   *
+   * Empty rather than fatal when the file is missing: a world built before the
+   * pipeline emitted suburbs still runs, and `/tp` simply cannot find anything
+   * in it. See `game/teleport.ts`.
+   */
+  places: Place[];
 }
 
 /**
@@ -178,6 +192,16 @@ export interface ServerWorld {
  */
 export async function loadWorld(root: string): Promise<ServerWorld> {
   const index = JSON.parse(await readFile(join(root, 'index.json'), 'utf8')) as WorldIndex;
+
+  // The suburb names, for `/tp`. Optional by construction: a world built before
+  // the pipeline emitted this file is still a world, and the command reports
+  // "not found" rather than the boot failing over a 16 kB convenience.
+  let places: Place[] = [];
+  try {
+    places = JSON.parse(await readFile(join(root, 'suburbs.json'), 'utf8')) as Place[];
+  } catch {
+    places = [];
+  }
 
   const collision = new CollisionWorld();
   const terrain = new TerrainField(index.terrain.grid, index.tile_size, root);
@@ -308,6 +332,7 @@ export async function loadWorld(root: string): Promise<ServerWorld> {
     bytes,
     powerupSource,
     spawn: spawnCentre(index),
+    places,
   };
 }
 

@@ -89,6 +89,7 @@ import {
 import { verifyNames, verifyNet } from '../client/src/net/protocol.ts';
 import { verifyChat } from '../client/src/net/chat.ts';
 import { verifyUnstuck } from '../client/src/game/unstuck.ts';
+import { verifyTeleport } from '../client/src/game/teleport.ts';
 import { verifySuggestions } from '../client/src/net/suggestions.ts';
 import { verifyAoi } from './aoi.ts';
 import { ChatHub } from './chat.ts';
@@ -188,6 +189,7 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // `isSpawnable` puts them inside the next building along. See
     // `client/src/game/unstuck.ts`.
     ['verifyUnstuck', verifyUnstuck()],
+    ['verifyTeleport', verifyTeleport()],
     // The suggestions box's week arithmetic, sanitiser, order and codecs.
     // Run **here** rather than only in the browser because the server is the
     // side that keeps the ledger, and every failure in that file is silent in

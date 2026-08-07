@@ -1849,12 +1849,25 @@ export class Simulation {
    * Returns where they went, or null if the world around them had nothing --
    * which the caller reports rather than silently doing nothing.
    */
-  unstuck(p: Participant, rand: () => number = Math.random): UnstuckSpot | null {
+  unstuck(
+    p: Participant,
+    rand: () => number = Math.random,
+    /**
+     * Where to search from, when it is not where the player is standing.
+     *
+     * `/tp <suburb>` is this same move with a different origin: a suburb label
+     * node is an arbitrary point that may well be inside a building, so the
+     * arrival has to be chosen by the same road search, out of the same traffic,
+     * and handed to the client through the same teleport handshake. One code
+     * path, two commands. See `game/teleport.ts`.
+     */
+    to?: { x: number; z: number },
+  ): UnstuckSpot | null {
     // Read out rather than aliased: `body.position` is written below, and a
     // search that read its origin off the object it is about to move would be a
     // search whose second rung started from its own first answer.
-    const fromX = p.combat.body.position.x;
-    const fromZ = p.combat.body.position.z;
+    const fromX = to ? to.x : p.combat.body.position.x;
+    const fromZ = to ? to.z : p.combat.body.position.z;
     // A probe world rather than `p.world`, because `groundFor`'s closure carries
     // a `lastGround` that this search would otherwise fill with heights from a
     // kilometre away -- see `server/world.ts`. One closure per command.
@@ -2060,6 +2073,9 @@ export function verifySim(): string[] {
     // `world.roomWorld`, which is the only reader of this field.
     powerupSource: [],
     spawn: { x: 0, z: 0 },
+    // No suburbs: this fixture is about the ground query, and `/tp` resolving a
+    // name is `game/teleport.ts`'s own check.
+    places: [],
   };
 
   const sim = new Simulation(world);

@@ -131,6 +131,7 @@ import {
   unstuckWaitNotice,
   verifyUnstuck,
 } from './game/unstuck.ts';
+import { verifyTeleport } from './game/teleport.ts';
 import { verifySuggestions } from './net/suggestions.ts';
 import { SuggestionsPanel, clientId } from './suggestions.ts';
 import { ANIM, SNAPSHOT_INTERVAL, sanitiseName, suggestName, verifyNames, verifyNet } from './net/protocol.ts';
@@ -383,6 +384,7 @@ async function main(): Promise<void> {
   // moves somebody out of one piece of stuck geometry into another. Both leave a
   // game that runs. See `game/unstuck.ts`; the server runs this function too.
   const unstuckFailures = timed('unstuck', verifyUnstuck);
+  const teleportFailures = timed('teleport', verifyTeleport);
   // And the suggestions box, on the same criterion a third time, with one class
   // of failure the other two do not have: a **week boundary computed by epoch
   // arithmetic** is an hour out for half the year, and the symptom is a quota
@@ -646,6 +648,7 @@ async function main(): Promise<void> {
     chatFailures.length ||
     chatBoxFailures.length ||
     unstuckFailures.length ||
+    teleportFailures.length ||
     suggestionFailures.length
   ) {
     hud.fatal(
@@ -686,6 +689,7 @@ async function main(): Promise<void> {
           ...chatFailures,
           ...chatBoxFailures,
           ...unstuckFailures,
+          ...teleportFailures,
           ...suggestionFailures,
         ]
           .map((f) => '  - ' + f)

@@ -97,6 +97,13 @@ import {
   unstuckReply,
   unstuckWaitNotice,
 } from '../client/src/game/unstuck.ts';
+import {
+  TELEPORT_NO_QUERY,
+  findPlace,
+  parseTeleport,
+  teleportNotFound,
+  teleportReply,
+} from '../client/src/game/teleport.ts';
 import type { RoomHost, Socket } from './room.ts';
 
 /** What the sender is told when the bucket is empty. */
@@ -208,6 +215,8 @@ export class ChatHub {
      * and for the rest of the rule.
      */
     if (unstuckCommand(text)) return this.unstuck(host, ws, now);
+    const destination = parseTeleport(text);
+    if (destination !== null) return this.teleport(host, ws, now, destination);
 
     let gate = this.gates.get(ws);
     if (!gate) {
@@ -263,6 +272,69 @@ export class ChatHub {
    * The relocation itself is `Simulation.unstuck` -- the room's, so a room this
    * socket is not in cannot be moved -- and it credits nobody a knockout.
    */
+  /**
+   * `/tp <suburb>` — go to a named place.
+   *
+   * Shares `/unstuck`'s cooldown deliberately: both are teleports, and a player
+   * who could alternate them would have a 5-second escape from any fight rather
+   * than a 10-second one. The refusals, the no-death rule and the road search
+   * are all `/unstuck`'s too — the only new thing here is resolving a name to a
+   * point, which is `game/teleport.ts`.
+   */
+  private teleport(host: RoomHost, ws: Socket, now: number, query: string): 'command' {
+    const conn = ws.data;
+    const p = conn.participant;
+    if (!p) return 'command';
+
+    if (!query) {
+      this.notify(ws, TELEPORT_NO_QUERY);
+      return 'command';
+    }
+    if (p.combat.phase === 'ko') {
+      this.unstuckRefused++;
+      this.notify(ws, UNSTUCK_KO_NOTICE);
+      return 'command';
+    }
+    const last = this.unstuckAt.get(ws);
+    if (last !== undefined && now - last < UNSTUCK_COOLDOWN_MS) {
+      this.unstuckRefused++;
+      this.notify(ws, unstuckWaitNotice(UNSTUCK_COOLDOWN_MS - (now - last)));
+      return 'command';
+    }
+
+    const room = host.get(conn.room);
+    if (!room) {
+      this.unstuckRefused++;
+      this.notify(ws, unstuckReply(null));
+      return 'command';
+    }
+
+    const place = findPlace(query, room.sim.world.places);
+    if (!place) {
+      this.unstuckRefused++;
+      // The radius the build actually covers, not a constant: this message is
+      // the one that has to be true after the map grows.
+      this.notify(ws, teleportNotFound(query, room.sim.world.index.radius_m));
+      return 'command';
+    }
+
+    const fromX = p.combat.body.position.x;
+    const fromZ = p.combat.body.position.z;
+    const spot = room.sim.unstuck(p, Math.random, place);
+    if (!spot) {
+      this.unstuckRefused++;
+      this.notify(ws, unstuckReply(null));
+      return 'command';
+    }
+    this.unstuckAt.set(ws, now);
+    this.unstuckServed++;
+    // How far *they* travelled, which is not the search's own distance -- that
+    // one is measured from the suburb node the search started at.
+    const travelled = Math.hypot(spot.x - fromX, spot.z - fromZ);
+    this.notify(ws, teleportReply(place, travelled));
+    return 'command';
+  }
+
   private unstuck(host: RoomHost, ws: Socket, now: number): 'command' {
     const conn = ws.data;
     const p = conn.participant;
