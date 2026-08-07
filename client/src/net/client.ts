@@ -149,14 +149,47 @@ const INPUT_HISTORY = 128;
 /** Snapshots held for interpolation. 1.5 s at 20 Hz -- far more than the 100 ms buffer needs. */
 const SNAPSHOT_HISTORY = 30;
 
-/** A correction under this is not worth doing anything about, metres. */
-const CORRECTION_DEADZONE = 0.02;
+/**
+ * A correction under this is not worth doing anything about, metres.
+ *
+ * Exported because it is the honest bound for "did the two ends agree": this is
+ * the reconciler's own statement of what is not worth telling the camera, so a
+ * check that asserts a predicted body never left it is asserting agreement in
+ * the units the file itself uses. `server/integration-check.ts`'s
+ * `checkInputQueue` is that check, and it exists because they once did not.
+ */
+export const CORRECTION_DEADZONE = 0.02;
 
 /** Over this, snap and take the server's velocity. See the header. */
 export const CORRECTION_SNAP = 2.0;
 
 /** Time constant of the eased correction, seconds. Spec 10's "smoothing on correction". */
 const CORRECTION_TAU = 0.08;
+
+/**
+ * How many reconciled snapshots after `/unstuck` a teleport is still expected.
+ *
+ * A hundred, which at the 20 Hz snapshot rate is five seconds *of play* -- about
+ * fifty times the round trip this game runs over, and generous enough for a host
+ * that took a couple of frames to get to the road search. Counted in snapshots
+ * rather than milliseconds so a throttled or hidden tab does not spend the
+ * window without ever looking at one; see `teleportArmed`.
+ *
+ * Being generous costs nothing, because `TELEPORT_MIN_M` is what actually
+ * decides.
+ */
+const TELEPORT_ARM_SNAPSHOTS = 100;
+
+/**
+ * How far the server's own position must jump for it to be a teleport, metres.
+ *
+ * Twenty metres between consecutive snapshots is 400 m/s at 20 Hz. The hardest
+ * thing in this game is a car knockback at `CAR_KNOCKBACK_HORIZONTAL` (10.5 m/s)
+ * and the fastest is a tuned bike at 26 m/s, so the gap between "legitimate
+ * motion" and this threshold is more than an order of magnitude -- which is what
+ * makes it safe to leave the arming window open for five seconds.
+ */
+const TELEPORT_MIN_M = 20;
 
 /**
  * Twice a second, on a **timer** rather than on the animation frame.
@@ -1252,6 +1285,11 @@ export class NetClient {
       }
     }
 
+    // --- `/unstuck`, which is the other teleport this client cannot predict.
+    //     One call, because the whole of the decision is `adoptTeleport`'s and
+    //     the correction path below must not see it. See that method.
+    if (this.adoptTeleport(local, self)) return out.copy(this.correction);
+
     // --- The position. Drop every input the server has acknowledged.
     const ack = this.pendingAck;
     if (ack >= 0) {
@@ -1345,6 +1383,103 @@ export class NetClient {
     this.lastServerTick = this.pendingSelfTick;
     return out.copy(this.correction);
   }
+
+  // --- The unstuck teleport -----------------------------------------------------
+
+  /**
+   * How many more **reconciled snapshots** an authoritative teleport may arrive
+   * in. Zero for "not armed".
+   *
+   * A window rather than a latch, because the thing being waited for may never
+   * arrive: the server refuses `/unstuck` while knocked out and inside the
+   * cooldown, and a latch set on a refused command would sit there indefinitely
+   * waiting to swallow the next genuine knockback.
+   *
+   * **Counted in snapshots rather than in milliseconds**, and that is a fix
+   * rather than a preference. A browser pauses `requestAnimationFrame` outright
+   * in a hidden tab -- measured at zero frames in seven seconds in the pane this
+   * project is developed against -- so a wall-clock deadline is consumed by
+   * real time in which this client did not run at all, and expires before the
+   * snapshot it was armed for is ever looked at. A budget spent by `reconcile`
+   * is spent only when the game is actually playing, which is the thing the
+   * window is really trying to bound.
+   */
+  private teleportArmed = 0;
+
+  /**
+   * A teleport was just asked for. Called by `main.ts` when the player sends
+   * `/unstuck`; see `client/src/game/unstuck.ts`.
+   *
+   * This does **not** move anybody and does not predict anything -- the client
+   * has no idea where the server is about to put it, and inventing a guess would
+   * be a rubber-band on purpose. All it does is say "the next enormous jump in
+   * the server's own position is legitimate", which is the one fact the
+   * reconciler cannot work out for itself.
+   */
+  armTeleport(): void {
+    this.teleportArmed = TELEPORT_ARM_SNAPSHOTS;
+  }
+
+  /**
+   * Take the server's position outright, if this snapshot is the teleport.
+   *
+   * **This is `respawnAt`'s branch, minus the respawn.** A 200 m jump is a
+   * hundred times `CORRECTION_SNAP`, so the correction path below would classify
+   * it as a knockback and derive a velocity from two server positions a tick
+   * apart -- twelve thousand metres per second, with `onGround` cleared, which
+   * would fire the player out of the city for the two snapshots it takes to
+   * settle. That is the rubber-band this exists to prevent, and the fix is the
+   * one the knockout recovery already uses: clear the prediction, clear the
+   * eased camera offset, and reset `lastServerTick` so the *next* snapshot is
+   * not differenced against a position on the other side of Sydney.
+   *
+   * Two conditions, and both are needed:
+   *
+   *   - **Armed.** Only the player's own `/unstuck` arms it, so nothing the
+   *     server does on its own can be adopted this way.
+   *   - **A jump no legitimate motion can produce.** `TELEPORT_MIN_M` is 20 m
+   *     between consecutive snapshots -- 400 m/s at the snapshot rate, where the
+   *     hardest knockback in the game is 10.5 m/s and a tuned bike is 26. The
+   *     distance test is what stops the arming window swallowing an ordinary
+   *     correction that happens to land inside it: a command that was refused
+   *     produces no jump, so the window simply runs out.
+   *
+   * The budget is spent **here**, one per reconciled snapshot, rather than
+   * against a clock -- see `teleportArmed`.
+   *
+   * The health and the powerup clocks above have already been adopted from this
+   * same snapshot, so nothing is skipped by returning early -- the position is
+   * the only thing left, and it is being taken whole.
+   */
+  private adoptTeleport(local: CombatantState, self: SnapshotPlayer): boolean {
+    if (this.teleportArmed <= 0) return false;
+    this.teleportArmed--;
+    // Before the first snapshot has been differenced there is nothing to
+    // difference against, so there is no jump to recognise yet.
+    if (this.lastServerTick < 0) return false;
+    const jumped = Math.hypot(
+      self.x - this.lastServerPos.x,
+      self.y - this.lastServerPos.y,
+      self.z - this.lastServerPos.z,
+    );
+    if (jumped < TELEPORT_MIN_M) return false;
+
+    this.teleportArmed = 0;
+    this.teleports++;
+    local.body.position.set(self.x, self.y, self.z);
+    local.body.velocity.set(0, 0, 0);
+    // `server/sim.unstuck` sets the same flag on the same tick: the destination
+    // is a road surface and the player is standing on it, not falling onto it.
+    local.body.onGround = true;
+    this.pending.length = 0;
+    this.correction.set(0, 0, 0);
+    this.lastServerPos.set(self.x, self.y, self.z);
+    this.lastServerTick = -1;
+    return true;
+  }
+
+  /** How many teleports have been adopted this session. Read by the dev handle. */
+  teleports = 0;
 
   // --- Interpolation ----------------------------------------------------------
 

@@ -58,11 +58,16 @@ import {
 } from '../client/src/game/combat.ts';
 import { FootyField, applyFootyHit, type FootyEvent } from '../client/src/game/footy.ts';
 import { pickSpawnPoint } from '../client/src/game/spawn.ts';
+// `/unstuck`, and the whole of its rule. Shared with the client, which runs the
+// identical function offline -- see `client/src/game/unstuck.ts`, whose header
+// says why this is a chat command rather than a message id.
+import { UNSTUCK_CAR_CLEAR_M, unstuckDestination, type UnstuckSpot } from '../client/src/game/unstuck.ts';
 import { tickPowerups, type PickupEvent } from '../client/src/game/powerups.ts';
 import {
   applyCarHit,
   carHitting,
   createCarPose,
+  forEachCarNear,
   trafficTick,
   type CarPose,
   type LaneRoute,
@@ -1800,6 +1805,123 @@ export class Simulation {
     }
     return out;
   }
+
+  /**
+   * `/unstuck`: put this player on a random road, and charge them nothing for it.
+   *
+   * The rule -- where they go and whether they may go there -- is
+   * `client/src/game/unstuck.ts`, which the client runs verbatim offline. This
+   * method is only the three things that need the simulation: the roads out of
+   * the room's own `TrafficField`, the ground query, and the two pieces of
+   * bookkeeping a teleport must not skip.
+   *
+   * **Not `respawnAt`, deliberately.** That function is the *knockout's*
+   * recovery: it restores health and stamina, empties spec 8.3's coffees and
+   * takes the bike away. None of that is what being stuck in a wall deserves --
+   * a player who used this at three pips would be handed six, which is a free
+   * heal on a ten-second cooldown and the one way this command could decide a
+   * fight. So the body moves and nothing else about the combatant changes. No
+   * KO is credited to anybody and `downs` is untouched; see the module header.
+   *
+   * The two pieces of bookkeeping:
+   *
+   *   - **The velocity is zeroed and `onGround` set**, because a player who was
+   *     mid-fall arrives on a street carrying the fall, and the first thing the
+   *     next tick would do is drive them into the road surface.
+   *   - **The position history is seeded**, exactly as the respawn sweep in
+   *     `step` does and for its reason: for the next 250 ms an unseeded ring
+   *     would rewind this player back to where they were stuck, and a punch
+   *     thrown at that spot would land on somebody now 200 m away.
+   *
+   * Returns where they went, or null if the world around them had nothing --
+   * which the caller reports rather than silently doing nothing.
+   */
+  unstuck(p: Participant, rand: () => number = Math.random): UnstuckSpot | null {
+    // Read out rather than aliased: `body.position` is written below, and a
+    // search that read its origin off the object it is about to move would be a
+    // search whose second rung started from its own first answer.
+    const fromX = p.combat.body.position.x;
+    const fromZ = p.combat.body.position.z;
+    // A probe world rather than `p.world`, because `groundFor`'s closure carries
+    // a `lastGround` that this search would otherwise fill with heights from a
+    // kilometre away -- see `server/world.ts`. One closure per command.
+    const probe = groundFor(this.world);
+    const spot = unstuckDestination(
+      fromX,
+      fromZ,
+      (radius) => this.world.traffic.near(fromX, fromZ, radius, this.unstuckRoutes),
+      probe,
+      rand,
+      // Not in front of a car. The fleet is a pure function of the wall clock on
+      // both ends -- see `game/traffic.ts` -- so this is the same set of cars the
+      // player is about to see, evaluated once at the tick the command arrived.
+      // A preference rather than a veto; `UNSTUCK_CAR_CLEAR_M` says why.
+      this.unstuckClearOfTraffic(trafficTick(Date.now())),
+    );
+    if (!spot) return null;
+
+    p.combat.body.position.set(spot.x, spot.y + EYE_HEIGHT, spot.z);
+    p.combat.body.velocity.set(0, 0, 0);
+    p.combat.body.onGround = true;
+    // Off the bike, on `respawnAt`'s argument: the bike stays where it was, and
+    // riding one 200 m away would teleport it across Redfern. `BikeField.follow`
+    // parks it under the rider on the next tick it is not being ridden.
+    p.combat.ridingBike = 0;
+    p.history.seed(
+      this.tick,
+      p.combat.body.position.x,
+      p.combat.body.position.y,
+      p.combat.body.position.z,
+      p.combat.body.yaw,
+    );
+    return spot;
+  }
+
+  /**
+   * "Is there a car about to be here?", as `unstuckDestination` wants it.
+   *
+   * A closure per command rather than a method, so the traffic tick is captured
+   * once: a predicate that re-read the clock per candidate would evaluate the
+   * fleet at a slightly different instant for every point it looked at, which is
+   * not wrong so much as unrepeatable.
+   *
+   * The vertical test is `carOverlaps`' and is here for its reason: a car on the
+   * Cahill is directly above Alfred Street and eight metres up, and without the
+   * height comparison the whole viaduct would make the road underneath it
+   * permanently unavailable.
+   */
+  private unstuckClearOfTraffic(tick: number): (x: number, z: number, y: number) => boolean {
+    return (x, z, y) => {
+      let clear = true;
+      forEachCarNear(
+        this.world.traffic,
+        x,
+        z,
+        UNSTUCK_CAR_CLEAR_M,
+        tick,
+        this.unstuckCarRoutes,
+        this.unstuckCarPose,
+        (car) => {
+          if (car.y > y + 4 || car.y + car.height < y - 4) return;
+          clear = false;
+          // Stop at the first one: the answer cannot get any more false.
+          return true;
+        },
+      );
+      return clear;
+    };
+  }
+
+  /** Scratch for `unstuck`'s broadphase, so the command allocates one array ever. */
+  private readonly unstuckRoutes: LaneRoute[] = [];
+  /**
+   * And a **second** array for the traffic test, which runs inside the first
+   * one's result. One shared scratch would have the car query rewriting the road
+   * list the search is walking, which is the kind of aliasing that produces a
+   * destination in the middle of nowhere once in a hundred calls.
+   */
+  private readonly unstuckCarRoutes: LaneRoute[] = [];
+  private readonly unstuckCarPose = createCarPose();
 }
 
 /**

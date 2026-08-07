@@ -85,6 +85,7 @@ import {
   encodeBikes,
   encodeEvents,
   encodeInterestInto,
+  decodeInput,
   encodeInvestigationsInto,
   encodePowerups,
   encodeRoster,
@@ -111,15 +112,47 @@ export interface Conn {
   room: number;
   participant: Participant | null;
   /**
-   * The latest input, decoded straight into a record owned by this socket.
+   * The frames this socket has sent that this room has not stepped yet, oldest
+   * first. A preallocated ring; `inbox[inboxTail]` is the next one to apply.
    *
-   * PERFORMANCE.md phase 1. See the original note in `server/index.ts`'s history:
-   * this is the *latest* input rather than a queue, because replaying three
-   * bunched packets on one tick hands a speed hack to whoever has the worst
-   * connection.
+   * **One frame is one simulation step, and a tick takes exactly one frame.**
+   * That is the whole of the invariant client prediction rests on: the client
+   * ran `controller.step` once per input it sent, so this room's trajectory
+   * equals the client's only if it runs it once per input too.
+   *
+   * This replaced a single slot with last-write-wins, whose note said a queue
+   * would hand "a speed hack to whoever has the worst connection". That
+   * conflates two different things. What stops a speed hack is the **rate**:
+   * one frame, one step, one step per tick, which this ring obeys exactly and
+   * the slot obeyed too. What last-write-wins bought on top of that was the
+   * silent destruction of every frame that shared a tick with a newer one --
+   * while acknowledging both, so the client dropped both from its replay
+   * history and reconciled onto a position one whole step of movement behind
+   * the one it had predicted. See `INPUT_QUEUE` for how often that fired and
+   * `checkInputQueue` for the assertion that it no longer does.
    */
-  readonly input: InputFrame;
-  hasInput: boolean;
+  readonly inbox: InputFrame[];
+  /** Where the next arrival is written, where the next tick reads, and how many are held. */
+  inboxHead: number;
+  inboxTail: number;
+  inboxCount: number;
+  /**
+   * Frames still to be banked into the jitter reserve. See `INPUT_RESERVE`.
+   *
+   * Counted down at join, while the player is standing at the spawn with an
+   * all-zero input, which is what makes the reserve free: the ticks spent
+   * building it move nobody.
+   */
+  inboxBanking: number;
+  /** Frames thrown away because the ring was full. Should be zero; see `INPUT_QUEUE`. */
+  inputOverflow: number;
+  /**
+   * Ticks that arrived with an empty inbox and had to re-apply the previous
+   * frame -- one more step than the client ran, and therefore one correction on
+   * the client's camera. The number this whole arrangement exists to hold down,
+   * and `checkInputQueue` is what says how far down.
+   */
+  inputStarved: number;
   /** Smoothed round trip, ms. Seeded pessimistically so an early punch is not over-rewound. */
   rtt: number;
   lastSeen: number;
@@ -139,16 +172,102 @@ export type Socket = {
   close(code?: number, reason?: string): void;
 };
 
+/**
+ * How many input frames a socket may have waiting, and why it is not one.
+ *
+ * A client runs a fixed 60 Hz step off a `requestAnimationFrame` accumulator, so
+ * the *rate* it produces inputs at is exactly this room's tick rate -- but the
+ * *phase* is a browser's and the delivery is a network's. A display at 30 fps
+ * runs two steps in one frame and sends two frames a millisecond apart; a
+ * display at 144 runs one step every second or third frame; a display at exactly
+ * 60 still drifts across the tick boundary every few seconds. Every one of those
+ * lands two frames inside one tick, and one slot kept the newer and destroyed
+ * the older -- while acknowledging **both**, so the client dropped both from its
+ * replay history and reconciled onto a position that was one whole step of
+ * movement behind the one it had predicted. At 8.2 m/s that is 13.7 cm, on the
+ * camera, twenty times a second on a client that is not running at exactly 60.
+ *
+ * Eight frames is 133 ms, which is far more headroom than any of that needs.
+ * `inputOverflow` counts the times it was not enough and is expected to stay at
+ * zero: overflowing means a client producing steps faster than this room runs
+ * them, which no honest client does.
+ */
+const INPUT_QUEUE = 8;
+
+/**
+ * How many frames are held back as jitter reserve.
+ *
+ * With no reserve the ring is drained the tick it is filled, so an arrival that
+ * lands a millisecond *after* the tick that wanted it starves that tick -- and a
+ * starved tick re-applies the previous frame, which is a step the client never
+ * took. One frame of reserve absorbs one tick interval of arrival jitter
+ * outright, which measurement says is the whole of the distribution: the
+ * excursions are one frame, never two.
+ *
+ * It costs one tick -- 16.7 ms -- between a key going down and this room acting
+ * on it, and that price is paid by nobody the player can feel. Their own
+ * movement is predicted locally and is not delayed at all; what is delayed is
+ * when *other* people see it, and they already see it 100 ms in the past. The
+ * one place it would have mattered is the punch, and `step` compensates the
+ * rewind by exactly the number of frames still held, so a swing is adjudicated
+ * against the same instant it would have been without the reserve.
+ *
+ * It is banked at join, over ticks where the player is standing still with an
+ * all-zero input, which is what makes it free rather than a stutter.
+ */
+export const INPUT_RESERVE = 1;
+
 export function newConn(room: number): Conn {
+  const inbox: InputFrame[] = [];
+  for (let i = 0; i < INPUT_QUEUE; i++) {
+    inbox.push({ seq: 0, buttons: 0, forward: 0, right: 0, yaw: 0, pitch: 0 });
+  }
   return {
     room,
     participant: null,
-    input: { seq: 0, buttons: 0, forward: 0, right: 0, yaw: 0, pitch: 0 },
-    hasInput: false,
+    inbox,
+    inboxHead: 0,
+    inboxTail: 0,
+    inboxCount: 0,
+    inboxBanking: INPUT_RESERVE,
+    inputOverflow: 0,
+    inputStarved: 0,
     rtt: 60,
     lastSeen: Date.now(),
     interest: new InterestSet(),
   };
+}
+
+/**
+ * File one arriving input frame. Called from the socket reader; see
+ * `server/index.ts`.
+ *
+ * Decoded straight into the ring's own record, so a frame costs no allocation
+ * and no copy -- the same property the single slot had, kept.
+ *
+ * A full ring drops the **oldest**, which is the only place in this file an
+ * input the client stepped is ever thrown away. It is a safety valve rather than
+ * a mechanism: reaching it means a client has produced 8 more steps than this
+ * room has run, which a wall-clock-locked accumulator cannot do by drifting.
+ */
+export function receiveInput(conn: Conn, frame: ArrayBuffer): void {
+  if (!decodeInput(frame, conn.inbox[conn.inboxHead])) return;
+  conn.inboxHead = (conn.inboxHead + 1) % INPUT_QUEUE;
+  if (conn.inboxCount === INPUT_QUEUE) {
+    conn.inboxTail = (conn.inboxTail + 1) % INPUT_QUEUE;
+    conn.inputOverflow++;
+  } else {
+    conn.inboxCount++;
+  }
+}
+
+/** The oldest frame still waiting, or null. Advances the ring. */
+function takeInput(conn: Conn): InputFrame | null {
+  if (conn.inboxCount === 0) return null;
+  const frame = conn.inbox[conn.inboxTail];
+  conn.inboxTail = (conn.inboxTail + 1) % INPUT_QUEUE;
+  conn.inboxCount--;
+  return frame;
 }
 
 /**
@@ -382,24 +501,67 @@ export class Room {
   step(): void {
     const began = performance.now();
 
-    // Apply the newest input from each socket, before `sim.step` so the tick
+    // Take **one** input frame from each socket, before `sim.step` so the tick
     // sees it. The ack is recorded here rather than inside the simulation
     // because "which packet did I last hear from you" is a property of the
     // connection and not of the combatant.
+    //
+    // One frame per tick is the contract client prediction is built on. The
+    // client ran `controller.step` once for each frame it sent, so this room's
+    // trajectory equals the client's if and only if it runs it once for each
+    // frame too -- no more (which would be a speed hack) and no fewer (which
+    // reads to the player as their own body being dragged backwards). Everything
+    // in this loop is in service of that count staying equal; see `Conn.inbox`.
     for (const ws of this.conns) {
       const conn = ws.data;
       const p = conn.participant;
-      if (!p || !conn.hasInput) continue;
-      const frame = conn.input;
-      conn.hasInput = false;
-      p.input.forward = frame.forward;
-      p.input.right = frame.right;
-      p.input.yaw = frame.yaw;
-      p.input.pitch = frame.pitch;
-      applyButtons(p.input, frame.buttons);
-      p.ackSeq = frame.seq;
+      if (!p) continue;
+
+      // Bank the reserve. See `INPUT_RESERVE`: these are the only ticks that
+      // deliberately leave a frame unapplied, and they happen at join, where
+      // the frame being held describes somebody standing still.
+      if (conn.inboxBanking > 0) {
+        if (conn.inboxCount > 0) conn.inboxBanking--;
+        continue;
+      }
+
+      // A starved tick is **not** repaid by skipping a later frame, and that was
+      // measured rather than reasoned. Skipping one puts the two step counts
+      // back in agreement, which is the tidy answer -- but the client has
+      // already been reconciled onto the phantom by the snapshot in between, so
+      // the skip is not a cancellation, it is a second correction in the other
+      // direction. Worse, the skip spends the reserve, which starves the next
+      // tick, which owes another skip: at 30 fps that loop ran the starvation
+      // rate from 0.07/s to 7.25/s. The reserve alone is the fix; a debt ledger
+      // on top of it is a feedback path.
+      const frame = takeInput(conn);
+      if (frame === null) {
+        // Nothing to run. The world does not stop for one player, so the
+        // previous frame is stepped again -- `p.input` is deliberately left
+        // alone. That is one more step than the client took, and it is the one
+        // remaining way this room can hand the reconciler a real correction.
+        conn.inputStarved++;
+      } else {
+        p.input.forward = frame.forward;
+        p.input.right = frame.right;
+        p.input.yaw = frame.yaw;
+        p.input.pitch = frame.pitch;
+        applyButtons(p.input, frame.buttons);
+        p.ackSeq = frame.seq;
+      }
+
       // Spec 8.2's lag compensation, in ticks, clamped to spec 10's 250 ms.
-      const viewMs = Math.min(MAX_REWIND_MS, conn.rtt * 0.5 + INTERP_DELAY_MS);
+      //
+      // **Plus the frames still held**, which is the reserve paying for itself.
+      // The frame just applied was produced by the client `inboxCount` steps
+      // before the newest one it has sent, so it describes a moment that much
+      // further in the past -- and a punch on it must be rewound that much
+      // further or the buffer would be a hit-registration regression. The term
+      // is inside the clamp, so the 250 ms ceiling still holds.
+      const viewMs = Math.min(
+        MAX_REWIND_MS,
+        conn.rtt * 0.5 + INTERP_DELAY_MS + (conn.inboxCount * 1000) / TICK_HZ,
+      );
       p.viewTicks = (viewMs / 1000) * TICK_HZ;
     }
 

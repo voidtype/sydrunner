@@ -807,8 +807,15 @@
       <div id="chatlog"></div>
       <div id="chatcompose">
         <span id="chatprefix">say</span
-        ><input id="chatinput" maxlength="120" autocomplete="off" autocapitalize="off"
-                autocorrect="off" spellcheck="false" placeholder="enter to send · esc to cancel" />
+        ><!-- The placeholder carries `/unstuck` because this is the only surface
+             the command has: it is typed rather than bound, so a player who
+             never opens the `h` panel would have no way to learn it exists. The
+             two interaction keys stay first — they are what somebody who has
+             just opened the box needs — and the command is appended rather than
+             replacing anything. See `client/src/game/unstuck.ts`. -->
+        <input id="chatinput" maxlength="120" autocomplete="off" autocapitalize="off"
+                autocorrect="off" spellcheck="false"
+                placeholder="enter to send · esc to cancel · /unstuck if you are stuck" />
       </div>
     </div>
 
@@ -869,6 +876,18 @@
         <div><kbd>i</kbd>say something</div>
         <div><kbd>enter</kbd>send · <kbd>esc</kbd>cancel</div>
         <div>everyone on the server hears it, in every room</div>
+      </section>
+      <!-- Its own section rather than a fourth line under `chat`, on that
+           section's own argument: this is a topic somebody looks up ("I am
+           stuck in a wall"), not another thing you can say. The third line is
+           the part nobody would guess and the part that decides whether people
+           use it at all — it does not cost you a death. See
+           `client/src/game/unstuck.ts`. -->
+      <section>
+        <h2>getting unstuck</h2>
+        <div><kbd>i</kbd>then type <kbd>/unstuck</kbd></div>
+        <div>puts you on a random road within 200 m · <kbd>/kill</kbd> and <kbd>/stuck</kbd> do the same</div>
+        <div>no death is recorded and your score is untouched · once every 10 s</div>
       </section>
       <!-- Its own section for the same reason chat has one: it is a thing you
            do rather than a key you press, and the weekly rule is the part

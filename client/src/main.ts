@@ -118,6 +118,19 @@ import { BALL_RADIUS, FootyField, applyFootyHit, verifyFooty, type FootyEvent } 
 import { NetClient, chooseRoom, fetchRooms, verifyNetClient, type RemotePlayer } from './net/client.ts';
 import { verifyChat } from './net/chat.ts';
 import { ChatBox, verifyChatBox } from './chat.ts';
+// `/unstuck`. The rule is shared with `server/sim.ts` verbatim, which is what
+// makes the offline relocation below the same feature rather than a lookalike.
+// See `game/unstuck.ts` for why it is a chat command and not a message id.
+import {
+  UNSTUCK_CAR_CLEAR_M,
+  UNSTUCK_COOLDOWN_MS,
+  UNSTUCK_KO_NOTICE,
+  unstuckCommand,
+  unstuckDestination,
+  unstuckReply,
+  unstuckWaitNotice,
+  verifyUnstuck,
+} from './game/unstuck.ts';
 import { verifySuggestions } from './net/suggestions.ts';
 import { SuggestionsPanel, clientId } from './suggestions.ts';
 import { ANIM, SNAPSHOT_INTERVAL, sanitiseName, suggestName, verifyNames, verifyNet } from './net/protocol.ts';
@@ -364,6 +377,12 @@ async function main(): Promise<void> {
   // which is the half that makes it worth having. See `net/chat.ts`.
   const chatFailures = timed('chat', verifyChat);
   const chatBoxFailures = timed('chat box', verifyChatBox);
+  // And `/unstuck`, which arrives over that same chat wire and fails silently in
+  // its own way: a prefix match instead of an exact one turns "/kill bazza" into
+  // a teleport and swallows the sentence, and a destination that is not validated
+  // moves somebody out of one piece of stuck geometry into another. Both leave a
+  // game that runs. See `game/unstuck.ts`; the server runs this function too.
+  const unstuckFailures = timed('unstuck', verifyUnstuck);
   // And the suggestions box, on the same criterion a third time, with one class
   // of failure the other two do not have: a **week boundary computed by epoch
   // arithmetic** is an hour out for half the year, and the symptom is a quota
@@ -626,6 +645,7 @@ async function main(): Promise<void> {
     nightFailures.length ||
     chatFailures.length ||
     chatBoxFailures.length ||
+    unstuckFailures.length ||
     suggestionFailures.length
   ) {
     hud.fatal(
@@ -665,6 +685,7 @@ async function main(): Promise<void> {
           ...nightFailures,
           ...chatFailures,
           ...chatBoxFailures,
+          ...unstuckFailures,
           ...suggestionFailures,
         ]
           .map((f) => '  - ' + f)
@@ -1901,7 +1922,37 @@ async function main(): Promise<void> {
    * it existed, reused rather than reinvented.
    */
   const chat = new ChatBox({
-    send: (text) => net?.sendChat(text) ?? '',
+    /*
+     * `/unstuck` is intercepted here, on both paths, and the two halves are
+     * genuinely different jobs rather than one with a branch in it.
+     *
+     * **Online** the command still goes to the server -- it is the authority,
+     * and a client that moved itself 200 m would be rubber-banded back inside a
+     * snapshot. All this end does is warn the reconciler that an unpredictable
+     * jump is coming, so it is adopted the way a respawn is instead of being
+     * differenced into a four-hundred-metre-a-second velocity. See
+     * `NetClient.armTeleport`.
+     *
+     * **Offline** there is nobody to ask: `?offline` makes this client its own
+     * authority, `simulate` steps the world exactly as `server/sim.ts` does, and
+     * so the same relocation happens locally through the same shared rule. That
+     * is what keeps `?offline` a real test of the feature rather than a build
+     * where it quietly does not exist.
+     *
+     * The command is never handed to `sendChat` on the offline path, and the
+     * non-empty return is what stops `ChatBox` drawing its "no server" line: a
+     * player who typed `/unstuck` and got moved does not need to be told that
+     * chat needs a connection.
+     */
+    send: (text) => {
+      if (!unstuckCommand(text)) return net?.sendChat(text) ?? '';
+      if (!net) {
+        unstuckLocally();
+        return text;
+      }
+      net.armTeleport();
+      return net.sendChat(text);
+    },
     onTypingChange: (typing) => {
       hud.chatTyping = typing;
     },
@@ -3463,6 +3514,90 @@ async function main(): Promise<void> {
     punchBuffer = 0;
     throwBuffer = 0;
     void ensureGround(player.position.x, player.position.z);
+  }
+
+  /**
+   * Scratch for the offline unstuck. Two route arrays and a pose, for the reason
+   * `server/sim.ts` keeps two: the traffic test runs *inside* the road search's
+   * own result, and one shared array would have the car query rewriting the list
+   * the search is walking.
+   */
+  const unstuckRoutes: LaneRoute[] = [];
+  const unstuckCarRoutes: LaneRoute[] = [];
+  const unstuckCarPose = createCarPose();
+  /** When `/unstuck` was last served offline, for the same cooldown the server keeps. */
+  let unstuckAt = -Infinity;
+
+  /**
+   * `/unstuck`, offline: the server's rule, run by the only authority there is.
+   *
+   * `?offline` is spec 9's local stub and the client simulates the whole world
+   * itself there, so this is the same `unstuckDestination` the server calls, over
+   * the same `combatWorld` every other placement in this file uses and the same
+   * `TrafficField` the cars are driven from. The refusals are the same two the
+   * server applies for the same reasons -- see `ChatHub.unstuck`.
+   *
+   * The one honest difference is **coverage**, and it is a property of streaming
+   * rather than a decision: the server holds every lane graph in the extent and
+   * this holds the resident tiles, so the 800 m and 1.6 km rungs of the ladder
+   * reach less far offline than they do online. It costs nothing at the radius
+   * that was asked for -- 200 m is comfortably inside the streamer's ring -- and
+   * `isSpawnable` refuses unbuilt ground anyway, so the failure mode is a
+   * narrower search rather than a teleport into the dark.
+   *
+   * No death is recorded here either, which offline means the local `downs` is
+   * untouched and nothing reaches the kill feed.
+   */
+  function unstuckLocally(): void {
+    if (playerCombat.phase === 'ko') {
+      chat.system(UNSTUCK_KO_NOTICE);
+      return;
+    }
+    const now = performance.now();
+    if (now - unstuckAt < UNSTUCK_COOLDOWN_MS) {
+      chat.system(unstuckWaitNotice(UNSTUCK_COOLDOWN_MS - (now - unstuckAt)));
+      return;
+    }
+
+    const fromX = player.position.x;
+    const fromZ = player.position.z;
+    const carTick = trafficTick(Date.now());
+    const spot = unstuckDestination(
+      fromX,
+      fromZ,
+      (radius) => traffic.near(fromX, fromZ, radius, unstuckRoutes),
+      combatWorld,
+      Math.random,
+      // Not in front of a car, on exactly `Simulation.unstuck`'s terms and with
+      // the same vertical test: the fleet is a pure function of the wall clock,
+      // so this is the same set of cars that file would have seen.
+      (x, z, y) => {
+        let clear = true;
+        forEachCarNear(traffic, x, z, UNSTUCK_CAR_CLEAR_M, carTick, unstuckCarRoutes, unstuckCarPose, (car) => {
+          if (car.y > y + 4 || car.y + car.height < y - 4) return;
+          clear = false;
+          return true;
+        });
+        return clear;
+      },
+    );
+    if (spot) {
+      unstuckAt = now;
+      player.position.set(spot.x, spot.y + EYE_HEIGHT, spot.z);
+      player.velocity.set(0, 0, 0);
+      player.onGround = true;
+      // Not `respawnAt`: health, stamina, the coffees and the bat's clock are all
+      // left exactly as they were. `server/sim.unstuck` says why at length -- a
+      // free heal on a ten-second cooldown is the one way this could decide a
+      // fight. The bike is the single exception, and it is dropped for the reason
+      // a respawn drops it: it stays parked where it was, and riding one from
+      // 200 m away would drag it across Redfern.
+      playerCombat.ridingBike = 0;
+      // The destination is almost always a tile away, so the terrain for it is
+      // fetched on the same terms the respawn fetches its own.
+      void ensureGround(spot.x, spot.z);
+    }
+    chat.system(unstuckReply(spot));
   }
 
   function simulate(dt: number): void {

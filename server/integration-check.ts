@@ -82,8 +82,20 @@ import {
   spawnCentre,
   verifySpawn,
 } from '../client/src/game/spawn.ts';
+// `/unstuck`. See `checkUnstuck` at the foot of this file, which is entirely
+// self-contained: the destination rule against the real lane graph, then the
+// command surface over a real `ChatHub` and a real `RoomHost`.
+import {
+  UNSTUCK_CAR_CLEAR_M,
+  UNSTUCK_COOLDOWN_MS,
+  UNSTUCK_LADDER,
+  UNSTUCK_RADIUS_M,
+  unstuckCommand,
+  unstuckDestination,
+  verifyUnstuck,
+} from '../client/src/game/unstuck.ts';
 import { WADE_MAX_DEPTH, WaterLevels, waterDepth } from '../client/src/world/wading.ts';
-import { groundFor, loadWorld } from './world.ts';
+import { eyeAt, groundFor, loadWorld } from './world.ts';
 import {
   IP_VOTES_PER_WEEK,
   SUBMITS_PER_WEEK,
@@ -117,6 +129,8 @@ import { planSpeed, respawnAt } from '../client/src/game/combat.ts';
 // The three damage paths a rider can be knocked out by, and the flag bits their
 // consequences arrive on. See section 8b.
 import { applyCarHit, CAR_STAGE_DRIVING } from '../client/src/game/traffic.ts';
+import { CORRECTION_DEADZONE, CORRECTION_SNAP, NetClient } from '../client/src/net/client.ts';
+import { TICK_HZ, type NetTransport } from '../client/src/net/protocol.ts';
 import { FLAG } from '../client/src/net/protocol.ts';
 import type { Participant } from './sim.ts';
 import {
@@ -194,7 +208,8 @@ import {
   verifyChat,
   type ChatLine,
 } from '../client/src/net/chat.ts';
-import { Room, newConn, type Conn, type Socket } from './room.ts';
+import { INPUT_RESERVE, Room, RoomHost, newConn, receiveInput, type Conn, type Socket } from './room.ts';
+import { ChatHub } from './chat.ts';
 import { roomWorld } from './world.ts';
 // The streaming lifecycle. See `checkStreamingLifecycle` at the foot of this
 // file, which is entirely self-contained and appended after every check that
@@ -1380,6 +1395,19 @@ async function main(): Promise<void> {
   // silent failures it exists to catch.
   say('');
   await checkSuggestions();
+
+  // --- 24. `/unstuck`, against the real lane graph and over a real hub. The
+  // destination rule and the command surface are two different failures and are
+  // two different halves of it. See `checkUnstuck`, appended last and
+  // self-contained.
+  say('');
+  await checkUnstuck();
+
+  // --- 25. The input queue. One frame, one step -- the counting contract client
+  // prediction rests on, and the one whose failure was the reported camera
+  // jitter. See `checkInputQueue`, appended last and self-contained.
+  say('');
+  await checkInputQueue();
 
   say('');
   if (failures.length === 0) {
@@ -10907,4 +10935,949 @@ async function suggestProbe(
       socket.close();
     },
   };
+}
+
+// --- /unstuck --------------------------------------------------------------------
+
+/**
+ * The escape hatch, against the real lane graph and over a real `ChatHub`.
+ *
+ * The user's words were *"make it so i can kill my toon to move me if i am stuck
+ * somewhere. just move to a random road within 200m"*. Every way that breaks is
+ * silent in this file's usual sense -- the command answers, the player moves,
+ * and something else is wrong:
+ *
+ *   1. **A destination that is not on a road** is the feature not existing. It
+ *      still teleports you, it still says it worked, and the only symptom is
+ *      that people stop using it because "it puts you in weird places".
+ *   2. **A destination that is not validated** is the bug this command exists to
+ *      escape, delivered by the command: out of one building footprint and into
+ *      the next one along, or into the harbour. Restated here as a scan rather
+ *      than by calling `isSpawnable` again, so the check and the rule cannot
+ *      drift into agreeing about the wrong thing -- `checkAoi`'s `brute` makes
+ *      the same argument.
+ *   3. **A command that reaches the chat broadcast** publishes "/unstuck" to
+ *      every socket on the host. That is not a crash and not a wrong position;
+ *      it is the player looking like they typed a command at everyone.
+ *   4. **A repeat guard that eats it.** `/unstuck` is by construction typed
+ *      identically every time, so a command intercepted *after* `chatAdmit`
+ *      would be refused as a repeat on the third use -- which is exactly the use
+ *      somebody genuinely wedged in geometry is making. This is the single
+ *      strongest reason the interception sits where it does, and it is the one
+ *      that would never be found by hand.
+ *   5. **A cooldown that does not hold** turns a rescue into a 200 m movement
+ *      ability, which is the only way this feature could affect a fight.
+ *   6. **A score that moved.** The whole point of the no-death reading is that
+ *      the leaderboard is not polluted by terrain bugs; a `downs` that crept up
+ *      would be invisible to everybody except the person it happened to.
+ *
+ * The awful start points in section 2 are not invented coordinates -- they are
+ * *found*, by scanning the real world for ground that fails the spawn rule, so
+ * they are inside real footprints and under real decks and in real water. A
+ * check with hand-picked coordinates would go stale the next time the extent is
+ * rebuilt; this one finds whatever the current build has.
+ */
+async function checkUnstuck(): Promise<void> {
+  say('/unstuck — the escape hatch, its destination and its command surface');
+
+  // --- 1. The arithmetic, which both processes refuse to boot without.
+  {
+    const f = verifyUnstuck();
+    check(
+      f.length === 0,
+      `verifyUnstuck: the command surface, the validation, the ladder and the replies ` +
+        `(${f.join('; ') || 'clean'})`,
+    );
+  }
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const world = await loadWorld(root);
+  const probe = groundFor(world);
+
+  /**
+   * The validity rule, written out rather than imported. See the header.
+   *
+   * `y` is a feet height. The four questions are the four `isSpawnable` asks,
+   * in the same order and against the same constants, and the point of writing
+   * them again is that a change to one has to be made to both.
+   */
+  const standable = (x: number, z: number, y: number): string => {
+    if (!Number.isFinite(y)) return 'the ground under it is not finite';
+    const depth = waterDepth(world.water.surfaceAt(x, z), y);
+    if (depth > SPAWN_MAX_DEPTH) return `it is under ${depth.toFixed(2)} m of water`;
+    if (world.collision.resolve(x, z, x, z, SPAWN_PROBE_RADIUS, y + SPAWN_STEP_HEIGHT).hit) {
+      return 'it is inside a collision prism';
+    }
+    for (const [ox, oz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      const cx = x + ox * 1.2;
+      const cz = z + oz * 1.2;
+      if (world.collision.resolve(cx, cz, cx, cz, SPAWN_PROBE_RADIUS, y + SPAWN_STEP_HEIGHT).hit) {
+        return 'it has less than 1.2 m of clearance beside it';
+      }
+    }
+    return '';
+  };
+
+  /**
+   * How far this point is from the nearest lane, recomputed from the spatial
+   * index rather than taken from the answer.
+   *
+   * The perpendicular distance to every segment of every route within 30 m, so
+   * an off-by-one in the polyline walk or a mis-signed origin offset shows up
+   * as a destination floating beside the street rather than on it.
+   */
+  const routeScratch: LaneRoute[] = [];
+  const gapToRoad = (x: number, z: number): number => {
+    let best = Infinity;
+    for (const r of world.traffic.near(x, z, 30, routeScratch)) {
+      for (let i = 0; i + 1 < r.count; i++) {
+        const ax = r.x[i];
+        const az = r.z[i];
+        const bx = r.x[i + 1];
+        const bz = r.z[i + 1];
+        const dx = bx - ax;
+        const dz = bz - az;
+        const len2 = dx * dx + dz * dz;
+        const t = len2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / len2)) : 0;
+        best = Math.min(best, Math.hypot(x - (ax + dx * t), z - (az + dz * t)));
+      }
+    }
+    return best;
+  };
+
+  // --- 2. The start points: a grid over the whole extent, plus the three awful
+  // cases the user named. The awful ones are found rather than written down, so
+  // they stay awful when the world is rebuilt.
+  const starts: Array<{ x: number; z: number; what: string }> = [];
+  {
+    const size = world.index.tile_size;
+    // The built extent, from the tiles themselves rather than from `radius_m`:
+    // what matters is where there is ground, not what the pipeline aimed at.
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (const t of world.index.tiles) {
+      minX = Math.min(minX, t.bounds[0]);
+      maxX = Math.max(maxX, t.bounds[2]);
+      // North-positive bounds into renderer z, which runs south. The same three
+      // lines every other file here carries; see `spawn.spawnCentre`.
+      minZ = Math.min(minZ, -t.bounds[3]);
+      maxZ = Math.max(maxZ, -t.bounds[1]);
+    }
+    const keys = new Set(world.index.tiles.map((t) => t.key));
+    const built = (x: number, z: number): boolean =>
+      keys.has(`${Math.floor(x / size)}_${Math.floor(-z / size)}`);
+
+    // A lattice across the whole built extent, so this is the 15.3 km world and
+    // not the inner ring with a wider radius written on it.
+    for (let x = minX; x <= maxX; x += 1200) {
+      for (let z = minZ; z <= maxZ; z += 1200) {
+        if (built(x, z)) starts.push({ x, z, what: 'grid' });
+      }
+    }
+
+    // And the awful three, scanned for on a fine lattice over the inner city,
+    // where the buildings, the viaducts and the water all are.
+    let inPrism: { x: number; z: number } | null = null;
+    let underDeck: { x: number; z: number } | null = null;
+    let inWater: { x: number; z: number } | null = null;
+    for (let x = -3000; x <= 2000 && !(inPrism && underDeck && inWater); x += 5) {
+      for (let z = -3000; z <= 2000; z += 5) {
+        if (!built(x, z)) continue;
+        const ground = probe.groundHeight(x, z, -Infinity);
+        if (!Number.isFinite(ground)) continue;
+        const solid = world.collision.resolve(x, z, x, z, SPAWN_PROBE_RADIUS, ground + SPAWN_STEP_HEIGHT).hit;
+        if (!inPrism && solid) inPrism = { x, z };
+        // Something solid overhead with walkable ground underneath: a viaduct
+        // soffit, the Cahill, a bridge approach. `!solid` is what distinguishes
+        // it from a low warehouse -- inside a footprint you are in the prism,
+        // under a deck you are not -- and the 3.5 m floor is `BODY_HEIGHT_M`'s
+        // walk-under band, so this is a place a player can actually be.
+        if (!underDeck && !solid) {
+          const overhead = world.collision.roofHeight(x, z, ground + 25);
+          if (Number.isFinite(overhead) && overhead > ground + 3.5) underDeck = { x, z };
+        }
+        if (!inWater && waterDepth(world.water.surfaceAt(x, z), ground) > 1.0) inWater = { x, z };
+        if (inPrism && underDeck && inWater) break;
+      }
+    }
+    if (inPrism) starts.push({ ...inPrism, what: 'inside a building footprint' });
+    if (underDeck) starts.push({ ...underDeck, what: 'under a viaduct deck' });
+    if (inWater) starts.push({ ...inWater, what: 'standing in the harbour' });
+    check(
+      inPrism !== null && underDeck !== null && inWater !== null,
+      `found the three deliberately awful starts in the built world ` +
+        `(footprint ${inPrism ? 'yes' : 'NO'}, viaduct ${underDeck ? 'yes' : 'NO'}, water ${inWater ? 'yes' : 'NO'})`,
+    );
+  }
+
+  // --- 3. Many trials at every one of them. The claims, all at once, because a
+  // per-trial `check` would be four thousand lines of report.
+  {
+    // A tiny LCG, so a failure here is reproducible rather than "sometimes".
+    let seed = 20260807;
+    const rand = (): number => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+
+    const TRIALS = 6;
+    let trials = 0;
+    let none = 0;
+    let overRadius = 0;
+    let offRoad = 0;
+    let unstandable = 0;
+    let firstRung = 0;
+    let groundFallback = 0;
+    let worstGap = 0;
+    let worstDistance = 0;
+    const complaints: string[] = [];
+    const distinct = new Map<string, Set<string>>();
+
+    for (const start of starts) {
+      const spread = new Set<string>();
+      for (let i = 0; i < TRIALS; i++) {
+        trials++;
+        const spot = unstuckDestination(
+          start.x,
+          start.z,
+          (radius) => world.traffic.near(start.x, start.z, radius, routeScratch),
+          probe,
+          rand,
+        );
+        if (!spot) {
+          none++;
+          if (complaints.length < 4) complaints.push(`(${start.x}, ${start.z}) [${start.what}] produced nothing`);
+          continue;
+        }
+        spread.add(`${Math.round(spot.x)},${Math.round(spot.z)}`);
+        worstDistance = Math.max(worstDistance, spot.distance);
+
+        if (spot.kind === 'road') {
+          if (spot.radius === UNSTUCK_RADIUS_M) firstRung++;
+          // Inside the rung it says it used, which for the first rung is the
+          // 200 m the user asked for.
+          if (spot.distance > spot.radius + 1e-6) {
+            overRadius++;
+            if (complaints.length < 4) {
+              complaints.push(
+                `(${start.x}, ${start.z}) [${start.what}] moved ${spot.distance.toFixed(1)} m on the ${spot.radius} m rung`,
+              );
+            }
+          }
+          const gap = gapToRoad(spot.x, spot.z);
+          worstGap = Math.max(worstGap, gap);
+          if (gap > 0.05) {
+            offRoad++;
+            if (complaints.length < 4) {
+              complaints.push(`(${start.x}, ${start.z}) [${start.what}] landed ${gap.toFixed(2)} m off any lane`);
+            }
+          }
+        } else {
+          groundFallback++;
+        }
+
+        const verdict = standable(spot.x, spot.z, spot.y);
+        if (verdict !== '') {
+          unstandable++;
+          if (complaints.length < 4) {
+            complaints.push(`(${start.x}, ${start.z}) [${start.what}] landed somewhere ${verdict}`);
+          }
+        }
+      }
+      distinct.set(start.what + `@${start.x},${start.z}`, spread);
+    }
+
+    check(
+      none === 0,
+      `${trials} unstuck draws from ${starts.length} start points across the built extent all found somewhere to go ` +
+        `(${none} failures)`,
+    );
+    check(
+      overRadius === 0,
+      `every destination was inside the radius its own answer reported ` +
+        `(worst move ${worstDistance.toFixed(0)} m; ${overRadius} over)`,
+    );
+    check(
+      offRoad === 0,
+      `every road destination is on a lane, recomputed from the spatial index ` +
+        `(worst gap ${worstGap === 0 ? '0.00' : worstGap.toFixed(3)} m; ${offRoad} off)`,
+    );
+    check(
+      unstandable === 0,
+      `every destination passes the spawn rule restated here -- finite ground, out of the prisms, ` +
+        `1.2 m of clearance, above the wading floor (${unstandable} failures)`,
+    );
+    // The lattice deliberately includes the far edge of a 15.3 km extent --
+    // bushland, national park, open water -- where there genuinely is no street
+    // inside 200 m, so this is a floor rather than a target. What it catches is
+    // a ladder that had started widening for no reason.
+    check(
+      firstRung >= trials * 0.8,
+      `${firstRung} of ${trials} draws were answered by the ${UNSTUCK_RADIUS_M} m radius that was asked for; ` +
+        `${trials - firstRung - groundFallback} needed a wider rung and ${groundFallback} fell back to open ground`,
+    );
+
+    // And in the city itself, the radius that was asked for must answer **every**
+    // time. This is the claim the user actually made, tested where a player
+    // actually gets stuck: six points across the inner city, sixty draws each.
+    {
+      const urban: ReadonlyArray<readonly [number, number]> = [
+        [0, 0],
+        [-500, 500],
+        [500, -500],
+        [-1000, 1000],
+        [300, 800],
+        [-2000, 2000],
+      ];
+      let missed = 0;
+      for (const [x, z] of urban) {
+        for (let i = 0; i < 60; i++) {
+          const spot = unstuckDestination(
+            x,
+            z,
+            (radius) => world.traffic.near(x, z, radius, routeScratch),
+            probe,
+            rand,
+          );
+          if (!spot || spot.kind !== 'road' || spot.radius !== UNSTUCK_RADIUS_M) missed++;
+        }
+      }
+      check(
+        missed === 0,
+        `${urban.length * 60} draws from ${urban.length} inner-city points were all answered by a road inside ` +
+          `${UNSTUCK_RADIUS_M} m (${missed} were not)`,
+      );
+    }
+
+    // The join disc is the interesting counter-example and is worth naming: it
+    // is the middle of Sydney Park, which has no drivable lane inside 200 m at
+    // all. It is exactly the case the ladder exists for, and asserting that it
+    // still lands on a road is what stops a future change quietly turning
+    // "widen the search" into "give up".
+    {
+      let onRoad = 0;
+      let widest = 0;
+      for (let i = 0; i < 40; i++) {
+        const spot = unstuckDestination(
+          world.spawn.x,
+          world.spawn.z,
+          (radius) => world.traffic.near(world.spawn.x, world.spawn.z, radius, routeScratch),
+          probe,
+          rand,
+        );
+        if (spot && spot.kind === 'road') {
+          onRoad++;
+          widest = Math.max(widest, spot.radius);
+        }
+      }
+      check(
+        onRoad === 40,
+        `the join disc is parkland with no lane inside ${UNSTUCK_RADIUS_M} m, and the ladder still put all ` +
+          `${onRoad} of 40 draws on a road -- widening to ${widest} m and saying so in the reply`,
+      );
+    }
+    if (complaints.length > 0) for (const c of complaints) say(`    ${c}`);
+
+    // The pick is random rather than the same corner every time. Measured at the
+    // starts that had a choice at all; a scan would give one point each.
+    let varied = 0;
+    let sampled = 0;
+    for (const spread of distinct.values()) {
+      if (spread.size === 0) continue;
+      sampled++;
+      if (spread.size > 1) varied++;
+    }
+    check(
+      varied >= sampled * 0.8,
+      `${varied} of ${sampled} start points sent ${TRIALS} consecutive draws to more than one place -- ` +
+        `the destination is random rather than the first street in the tile`,
+    );
+
+    // The traffic preference. A route polyline is a driving lane, so "a random
+    // road" is by construction a place cars go -- and the first live online
+    // trial of this command put the player in front of one and took two pips off
+    // them before they had finished reading the reply. The rule is
+    // `UNSTUCK_CAR_CLEAR_M` and it is a preference rather than a veto, so both
+    // halves are asserted: it works, and it never costs an answer.
+    {
+      const carRoutes: LaneRoute[] = [];
+      const carPose = createCarPose();
+      const tick = trafficTick(Date.now());
+      const clearOfTraffic = (x: number, z: number, y: number): boolean => {
+        let clear = true;
+        forEachCarNear(world.traffic, x, z, UNSTUCK_CAR_CLEAR_M, tick, carRoutes, carPose, (car) => {
+          if (car.y > y + 4 || car.y + car.height < y - 4) return;
+          clear = false;
+          return true;
+        });
+        return clear;
+      };
+
+      // The inner city, where the fleet actually is: an unstuck out on the
+      // fringe is never near a car and would report a hundred per cent for the
+      // wrong reason.
+      const urban = starts.filter((s) => Math.hypot(s.x, s.z) < 4000);
+      let withCars = 0;
+      let lost = 0;
+      let served = 0;
+      for (const start of urban) {
+        for (let i = 0; i < 4; i++) {
+          const roads = (radius: number): readonly LaneRoute[] =>
+            world.traffic.near(start.x, start.z, radius, routeScratch);
+          const plain = unstuckDestination(start.x, start.z, roads, probe, rand);
+          const avoided = unstuckDestination(start.x, start.z, roads, probe, rand, clearOfTraffic);
+          if (plain && !avoided) lost++;
+          if (!avoided) continue;
+          served++;
+          if (avoided.kind === 'road' && !clearOfTraffic(avoided.x, avoided.z, avoided.y)) withCars++;
+        }
+      }
+      check(
+        lost === 0,
+        `the traffic preference never turned a findable destination into none ` +
+          `(${served} served across ${urban.length} inner-city starts, ${lost} lost)`,
+      );
+      check(
+        withCars <= served * 0.05,
+        `${served - withCars} of ${served} destinations had no car inside ${UNSTUCK_CAR_CLEAR_M} m of them at ` +
+          `the tick they were chosen -- the rest are streets where every lane had traffic on it, which is a ` +
+          `road anyway`,
+      );
+    }
+
+    // The awful three, called out by name, because "all 4,000 passed" hides
+    // whether the interesting ones were among them.
+    for (const start of starts.filter((s) => s.what !== 'grid')) {
+      const spot = unstuckDestination(
+        start.x,
+        start.z,
+        (radius) => world.traffic.near(start.x, start.z, radius, routeScratch),
+        probe,
+        rand,
+      );
+      check(
+        spot !== null && standable(spot.x, spot.z, spot.y) === '',
+        `a player ${start.what} at (${start.x}, ${start.z}) was moved ` +
+          `${spot ? `${spot.distance.toFixed(0)} m to ${spot.kind === 'road' ? 'a road' : 'open ground'}` : 'nowhere'}`,
+      );
+    }
+  }
+
+  // --- 4. The command surface, over a real hub against a real two-room host.
+  //
+  // Not over a socket, and that is the same decision `checkFooty` and
+  // `checkBikes` make: everything worth asserting here is *authority* and
+  // *interception*, both of which live in this process. What a socket would add
+  // is the wire, and `checkChat` already drives `CHAT_SAY` over one.
+  {
+    const host = new RoomHost(roomWorld(world), 2, 4, 0, 0);
+    const hub = new ChatHub();
+    const room = host.get(0)!;
+    const other = host.get(1)!;
+
+    const seat = (r: Room, name: string): { ws: FakeSocket; p: Participant } => {
+      const conn = newConn(r.id);
+      const ws = new FakeSocket(conn);
+      const p = r.join(conn, 3, name)!;
+      r.conns.add(ws as unknown as Socket);
+      return { ws, p };
+    };
+    const stuck = seat(room, 'Wedged');
+    const bystander = seat(room, 'Watcher');
+    const elsewhere = seat(other, 'Faraway');
+
+    const lines = (ws: FakeSocket, mark: number): ChatLine[] =>
+      ws.since(mark, MSG.CHAT_LINE).map((f) => decodeChatLine(f)!).filter(Boolean);
+
+    /** Type a line as this player, at this instant on the injected clock. */
+    const type = (text: string, at: number): { moved: number; mine: ChatLine[]; theirs: ChatLine[] } => {
+      const before = { x: stuck.p.combat.body.position.x, z: stuck.p.combat.body.position.z };
+      const markMine = stuck.ws.frames.length;
+      const markTheirs = bystander.ws.frames.length;
+      const markFar = elsewhere.ws.frames.length;
+      hub.say(host, stuck.ws as unknown as Socket, encodeChatSay(text), at);
+      return {
+        moved: Math.hypot(stuck.p.combat.body.position.x - before.x, stuck.p.combat.body.position.z - before.z),
+        mine: lines(stuck.ws, markMine),
+        theirs: [...lines(bystander.ws, markTheirs), ...lines(elsewhere.ws, markFar)],
+      };
+    };
+
+    // Put them somewhere real, and remember the score.
+    stuck.p.combat.body.position.set(world.spawn.x, probe.groundHeight(world.spawn.x, world.spawn.z, -Infinity) + EYE_HEIGHT, world.spawn.z);
+    const kosBefore = stuck.p.kos;
+    const downsBefore = stuck.p.downs;
+    const healthBefore = (stuck.p.combat.health = 2);
+
+    let clock = 1_000_000;
+
+    // --- 4a. The command moves them, answers them privately, and reaches
+    // nobody else. The third clause is the one this feature lives on.
+    {
+      const r = type('/unstuck', clock);
+      check(r.moved > 1, `/unstuck moved the player ${r.moved.toFixed(0)} m`);
+      check(
+        r.theirs.length === 0,
+        `and reached nobody else's chat log -- not the room, not the other room ` +
+          `(${r.theirs.length} line(s) leaked${r.theirs.length ? `: ${JSON.stringify(r.theirs[0].text)}` : ''})`,
+      );
+      check(
+        r.mine.length === 1 && (r.mine[0].flags & CHAT_FLAG.PRIVATE) !== 0 && (r.mine[0].flags & CHAT_FLAG.SYSTEM) !== 0,
+        `the sender got exactly one private system line back (${JSON.stringify(r.mine[0]?.text ?? '')})`,
+      );
+      check(
+        r.mine[0]?.text.includes('no death') === true,
+        'and it says that no death was recorded, so the rule is discoverable rather than a comment',
+      );
+      check(
+        stuck.p.kos === kosBefore && stuck.p.downs === downsBefore,
+        `no knockout was credited and no down was counted (${stuck.p.kos} KOs, ${stuck.p.downs} downs, unchanged)`,
+      );
+      check(
+        stuck.p.combat.health === healthBefore,
+        `and it is not a heal either -- health is still ${stuck.p.combat.health} of ${MAX_HEALTH}, ` +
+          'which is what stops a ten-second cooldown deciding a fight',
+      );
+      check(
+        stuck.p.combat.body.velocity.lengthSq() === 0 && stuck.p.combat.body.onGround,
+        'the player arrives stationary and on the ground rather than carrying whatever fall they were in',
+      );
+    }
+
+    // --- 4b. The cooldown, told with the time remaining.
+    {
+      const r = type('/unstuck', clock + 2000);
+      check(r.moved === 0, `a second /unstuck two seconds later did not move them (${r.moved.toFixed(2)} m)`);
+      check(
+        r.mine.length === 1 && r.mine[0].text.includes('s to go'),
+        `and said how long was left (${JSON.stringify(r.mine[0]?.text ?? '')})`,
+      );
+      check(r.theirs.length === 0, 'and still reached nobody else');
+    }
+
+    // --- 4c. THE REPEAT GUARD. Three identical commands in a row, each a full
+    // cooldown apart. `chatAdmit` refuses a third identical *sentence*; a
+    // command intercepted before it must not be refused at all.
+    {
+      let served = 0;
+      for (let i = 0; i < 4; i++) {
+        clock += UNSTUCK_COOLDOWN_MS + 500;
+        if (type('/unstuck', clock).moved > 1) served++;
+      }
+      check(
+        served === 4,
+        `four identical /unstuck commands in a row were all served (${served} of 4) -- the repeat guard ` +
+          `refuses a third identical sentence, and a command is not a sentence`,
+      );
+    }
+
+    // --- 4d. The aliases, and the thing that is not one.
+    {
+      for (const alias of ['/kill', '/stuck', '/UNSTUCK', '  /Kill  ']) {
+        clock += UNSTUCK_COOLDOWN_MS + 500;
+        const r = type(alias, clock);
+        check(
+          r.moved > 1 && r.theirs.length === 0,
+          `${JSON.stringify(alias)} moved the player ${r.moved.toFixed(0)} m and was not broadcast`,
+        );
+      }
+      clock += UNSTUCK_COOLDOWN_MS + 500;
+      const sentence = type('/kill bazza', clock);
+      check(
+        sentence.moved === 0 && sentence.theirs.length === 2,
+        `"/kill bazza" is a sentence: nobody was teleported and it reached ${sentence.theirs.length} other ` +
+          `client(s), including the one in the other room`,
+      );
+      check(
+        !unstuckCommand('/killer') && !unstuckCommand('unstuck'),
+        'and the match is exact rather than a prefix, so a sentence starting with a command is still a sentence',
+      );
+    }
+
+    // --- 4e. Knocked out is refused. The respawn is already about to move them,
+    // and a player who can teleport out of a knockout can teleport out of a
+    // fight.
+    {
+      clock += UNSTUCK_COOLDOWN_MS + 500;
+      stuck.p.combat.phase = 'ko';
+      const r = type('/unstuck', clock);
+      check(r.moved === 0, `a knocked-out player was not moved (${r.moved.toFixed(2)} m)`);
+      check(
+        r.mine.length === 1 && r.mine[0].text.includes('knocked out'),
+        `and was told why (${JSON.stringify(r.mine[0]?.text ?? '')})`,
+      );
+      check(r.theirs.length === 0, 'and it was still not broadcast');
+      stuck.p.combat.phase = 'idle';
+    }
+
+    // --- 4f. The counters, which is how a deployment would see this at all.
+    check(
+      hub.unstuckServed >= 9 && hub.unstuckRefused >= 2,
+      `the hub counted ${hub.unstuckServed} served and ${hub.unstuckRefused} refused`,
+    );
+
+    // --- 4g. And ordinary chat still works, which is the regression this whole
+    // interception could quietly cause.
+    {
+      const markTheirs = bystander.ws.frames.length;
+      hub.say(host, stuck.ws as unknown as Socket, encodeChatSay('oi mate'), clock + 60_000);
+      const heard = lines(bystander.ws, markTheirs);
+      check(
+        heard.length === 1 && heard[0].text === 'oi mate' && heard[0].flags === 0,
+        `an ordinary sentence still reaches the room unchanged (${JSON.stringify(heard[0]?.text ?? '')})`,
+      );
+    }
+  }
+
+  // --- 5. The ladder's own shape, asserted rather than assumed: it starts at
+  // what was asked for and only ever widens. A ladder that started wide would
+  // move somebody 900 m when a street was 40 m away.
+  check(
+    UNSTUCK_LADDER[0] === UNSTUCK_RADIUS_M &&
+      UNSTUCK_LADDER.every((r, i) => i === 0 || r > UNSTUCK_LADDER[i - 1]),
+    `the search ladder is ${UNSTUCK_LADDER.join(' → ')} m -- it starts at the ${UNSTUCK_RADIUS_M} m that was ` +
+      `asked for and only widens`,
+  );
+}
+
+// --- 25. The input queue -------------------------------------------------------
+
+/**
+ * *One frame, one step* -- the contract that makes client prediction exact, and
+ * the one this server spent its life quietly breaking.
+ *
+ * ---------------------------------------------------------------------------
+ * ## What was wrong
+ *
+ * A client runs a fixed 60 Hz simulation step off a `requestAnimationFrame`
+ * accumulator, predicts its own body with `controller.step`, and sends one input
+ * frame per step. The server runs its own 60 Hz tick and, until this check
+ * existed, kept **one** input slot per socket with last-write-wins. Two frames
+ * that shared a tick -- which is what a browser at 30 fps produces on *every*
+ * frame, what one at 120 produces whenever the accumulator's phase drifts, and
+ * what one at exactly 60 produces every few seconds anyway -- meant the older
+ * frame was destroyed. The tick after it, having nothing, re-applied the frame
+ * before.
+ *
+ * Neither half is visible in the server's own numbers: the tick is on time, the
+ * snapshot goes out, `/stats` is green. What the *client* sees is a snapshot
+ * that acknowledges an input the server never stepped, so the reconciler drops
+ * it from the replay history and lands on a position one whole simulation step
+ * of movement behind the one it predicted. At the sprint that is 13.7 cm, on the
+ * camera, at up to twenty times a second.
+ *
+ * Measured against the real reconciler over a real socket before the fix:
+ *
+ * | client frame rate | frames destroyed | ticks re-applied | median divergence |
+ * |---|---|---|---|
+ * | 30 fps  | 9.75/s | 9.83/s | **0.137 m** |
+ * | 45 fps  | 4.08/s | 4.08/s | 0.002 m |
+ * | 50 fps  | 3.83/s | 3.83/s | 0.002 m |
+ * | 60 fps  | 0.50/s | 0.50/s | 0.001 m |
+ * | 120 fps | 5.17/s | 5.25/s | **0.136 m** |
+ *
+ * and after it, 0.00-0.08/s destroyed at every one of those rates.
+ *
+ * ---------------------------------------------------------------------------
+ * ## What this check asserts, and why in this shape
+ *
+ * The claim is a **counting** claim -- the server takes exactly the steps the
+ * client took, no more and no fewer -- so it is asserted by counting rather than
+ * by measuring a distance and hoping the number means something. Sections 1-3
+ * drive a real `Room` with a real world and a delivery schedule chosen to be a
+ * browser's, and read the acknowledgement sequence back: a gap in it is a
+ * destroyed frame, a stall in it is a phantom step.
+ *
+ * Section 4 then closes the loop the only way that proves the *consequence*: it
+ * runs the genuine `net/client.ts` reconciler, with its genuine input history
+ * and its genuine replay, against a genuine `Room`, for 30 simulated seconds of
+ * sprinting, and asserts the divergence never leaves the reconciler's own
+ * deadzone and that it never snaps. Every part of that is the shipping code; the
+ * only thing this file supplies is the wire between them.
+ *
+ * The bound is **derived, not tuned**. `CORRECTION_DEADZONE` is the reconciler's
+ * own statement of what is not worth correcting, and one step of sprint movement
+ * is measured here by asking `controller.step` for it. Section 0 asserts the
+ * second is far larger than the first, which is the whole reason the counting
+ * claim matters: a single lost frame *cannot* hide inside the deadzone.
+ */
+async function checkInputQueue(): Promise<void> {
+  say('the input queue: one frame, one step (the 60 Hz camera jitter)');
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const world = await loadWorld(root);
+  const FIXED_DT = 1 / TICK_HZ;
+
+  // --- 0. What one lost frame costs, out of the controller rather than out of a
+  // table. A body on flat ground, sprinting, for exactly one step.
+  const ruler = createPlayerState(0, 0);
+  ruler.position.y = EYE_HEIGHT;
+  step(
+    ruler,
+    { forward: 1, right: 0, jump: false, sprint: true, yaw: 0, pitch: 0, speedScale: 1, jumpScale: 1 },
+    FIXED_DT,
+    null,
+    () => 0,
+  );
+  // Two steps in, so the ramp-up is past and this is the steady stride.
+  const before = ruler.position.z;
+  for (let i = 0; i < 30; i++) {
+    step(
+      ruler,
+      { forward: 1, right: 0, jump: false, sprint: true, yaw: 0, pitch: 0, speedScale: 1, jumpScale: 1 },
+      FIXED_DT,
+      null,
+      () => 0,
+    );
+  }
+  const oneStep = Math.abs(ruler.position.z - before) / 30;
+  check(
+    oneStep > CORRECTION_DEADZONE * 4,
+    `one lost input frame is ${oneStep.toFixed(4)} m of sprint movement, which is ` +
+      `${(oneStep / CORRECTION_DEADZONE).toFixed(1)}x the reconciler's ${CORRECTION_DEADZONE} m deadzone -- ` +
+      `so a frame the server drops cannot hide, it can only appear on the camera`,
+  );
+
+  /**
+   * Drive one socket through a room on a browser's delivery schedule.
+   *
+   * `schedule[t]` is how many input frames land in the tick at index `t`. The
+   * patterns below are what the three common displays actually produce: a 30 Hz
+   * display runs two accumulator steps in one frame and posts both inside a
+   * millisecond, a 120 Hz display runs one every other frame, and a 60 Hz
+   * display runs one per frame with a phase that walks across the tick boundary
+   * every few seconds.
+   */
+  const drive = (name: string, ticks: number, framesAt: (t: number) => number): {
+    sent: number; applied: number[]; overflow: number; starved: number;
+  } => {
+    const room = new Room(0, world, 8, 0);
+    const ws = new FakeSocket(newConn(0));
+    const p = room.join(ws.data, 0, `queue-${name}`)!;
+    room.conns.add(ws as unknown as Socket);
+    const frame = { seq: 0, buttons: BTN.SPRINT, forward: 1, right: 0, yaw: 0, pitch: 0 };
+    const applied: number[] = [];
+    let sent = 0;
+    let lastAck = -1;
+    for (let t = 0; t < ticks; t++) {
+      const n = framesAt(t);
+      for (let i = 0; i < n; i++) {
+        frame.seq = (frame.seq + 1) & 0xffff;
+        sent++;
+        receiveInput(ws.data, encodeInput(frame));
+      }
+      room.step();
+      if (p.ackSeq !== lastAck) {
+        applied.push(p.ackSeq);
+        lastAck = p.ackSeq;
+      }
+    }
+    return { sent, applied, overflow: ws.data.inputOverflow, starved: ws.data.inputStarved };
+  };
+
+  // --- 1. 30 fps: two frames per browser frame, both inside one tick. The worst
+  // case for last-write-wins, and the one that destroyed half of everything.
+  {
+    const ticks = 600;
+    const r = drive('30fps', ticks, (t) => (t % 2 === 0 ? 2 : 0));
+    const gaps = r.applied.filter((seq, i) => i > 0 && seq !== r.applied[i - 1] + 1).length;
+    check(
+      gaps === 0,
+      `30 fps -- two frames delivered in one tick, ${ticks / 2} times: the server applied all ` +
+        `${r.applied.length} of them in order, with ${gaps} gap(s) in the acknowledgement sequence`,
+    );
+    check(
+      r.overflow === 0 && r.starved <= INPUT_RESERVE,
+      `and threw none away (${r.overflow} overflow) and re-applied a stale frame ${r.starved} time(s), ` +
+        `which is the ${INPUT_RESERVE}-frame reserve being banked at join and nothing else`,
+    );
+  }
+
+  // --- 2. 120 fps: one frame every other tick's worth of wall clock, which is
+  // the same rate with the opposite phase problem.
+  {
+    const ticks = 600;
+    const r = drive('120fps', ticks, (t) => (t % 3 === 2 ? 2 : t % 3 === 0 ? 1 : 0));
+    const gaps = r.applied.filter((seq, i) => i > 0 && seq !== r.applied[i - 1] + 1).length;
+    check(
+      gaps === 0 && r.overflow === 0,
+      `120 fps -- a 1,0,2 arrival pattern: all ${r.applied.length} frames applied in order, ` +
+        `${gaps} gap(s), ${r.overflow} thrown away`,
+    );
+  }
+
+  // --- 3. 60 fps with the phase walking across the tick boundary: one frame per
+  // tick, except every 97th tick gets two and the next gets none. This is what a
+  // display that is nominally at the tick rate does over a minute, and it is why
+  // even a perfect client saw this bug.
+  {
+    const ticks = 900;
+    const r = drive('60fps-drift', ticks, (t) => (t % 97 === 0 ? 2 : t % 97 === 1 ? 0 : 1));
+    const gaps = r.applied.filter((seq, i) => i > 0 && seq !== r.applied[i - 1] + 1).length;
+    check(
+      gaps === 0 && r.starved <= INPUT_RESERVE,
+      `60 fps with a drifting phase -- ${ticks} ticks, ${Math.floor(ticks / 97)} boundary crossings: ` +
+        `${gaps} gap(s) and ${r.starved} phantom step(s). The reserve absorbs the crossing outright`,
+    );
+  }
+
+  // --- 4. The consequence, through the real reconciler.
+  //
+  // A headless client that sprints for thirty seconds, running `net/client.ts`'s
+  // own prediction, its own input history and its own replay against a real
+  // `Room` -- with the frames delivered on the 30 fps schedule, which before the
+  // fix was a 13.7 cm correction on the *median* snapshot.
+  //
+  // The wire is a loopback rather than a socket so the run is deterministic:
+  // every tick happens in a fixed order with no clock, no scheduler and no
+  // network, which is what makes a failure here a real regression rather than a
+  // flaky afternoon. What travels over it is the genuine protocol in both
+  // directions.
+  {
+    const room = new Room(0, world, 8, 0);
+    const combatWorld = groundFor(world);
+    const toServer: ArrayBuffer[] = [];
+    let ws: FakeSocket | null = null;
+    let joined: Participant | null = null;
+
+    const transport: NetTransport = {
+      open: true,
+      onframe: null,
+      onopen: null,
+      onclose: null,
+      send(f: ArrayBuffer): void {
+        toServer.push(f);
+      },
+      close(): void {},
+    };
+    const net = new NetClient('', {
+      onHit: () => {}, onBounce: () => {}, onPickup: () => {}, onJoin: () => {},
+      onLeave: () => {}, onDrop: () => {}, onStatus: () => {},
+    }, { name: 'reconcile-probe', transport });
+
+    /** The three client messages this room's own socket reader handles. */
+    const pump = (): void => {
+      for (const f of toServer.splice(0)) {
+        if (frameType(f) === MSG.HELLO && !joined) {
+          ws = new FakeSocket(newConn(0));
+          joined = room.join(ws.data, 0, 'reconcile-probe');
+          if (joined) {
+            room.conns.add(ws as unknown as Socket);
+            room.welcome(ws as unknown as Socket, joined);
+          }
+        } else if (frameType(f) === MSG.INPUT && ws) {
+          receiveInput(ws.data, f);
+        }
+      }
+    };
+    /** And everything the room said back. */
+    const drain = (): void => {
+      if (!ws) return;
+      for (const f of ws.frames.splice(0)) transport.onframe?.(f);
+    };
+
+    transport.onopen?.();
+    pump();
+    drain();
+    check(net.status === 'online' && joined !== null, `the headless client joined the room (id ${net.id})`);
+
+    // Both bodies pinned to the same known coordinate, and the route kept to a
+    // circle two metres across.
+    //
+    // Not for tidiness: `Simulation.joinSpot` dithers every join over a 100 m
+    // disc, so an unpinned probe runs a different 250 m of Sydney every time
+    // this file is run -- and out there are kerbs, ponds, fences and a crowd,
+    // every one of which moves a body for a reason the *client* cannot predict
+    // and none of which is what this section is asking about. A run that
+    // wandered into a pedestrian would fail this check and mean nothing by it.
+    // The disc centre is the one coordinate both ends derive from `index.json`
+    // and the rest of this file already treats as standable ground.
+    const w = net.welcome!;
+    const spawnY = eyeAt(combatWorld, world.spawn.x, world.spawn.z);
+    joined!.combat.body.position.set(world.spawn.x, spawnY, world.spawn.z);
+    joined!.combat.body.velocity.set(0, 0, 0);
+    joined!.history.seed(room.sim.tick, world.spawn.x, spawnY, world.spawn.z, 0);
+    const playerCombat = createCombatant(0, world.spawn.x, world.spawn.z);
+    playerCombat.body.position.set(world.spawn.x, spawnY, world.spawn.z);
+    playerCombat.body.yaw = w.yaw;
+    const correction = playerCombat.body.velocity.clone();
+    const input = {
+      forward: 1, right: 0, jump: false, sprint: true,
+      yaw: w.yaw, pitch: 0, speedScale: 1, jumpScale: 1,
+      punch: false, throwBall: false, mount: false,
+    };
+    // 4 rad/s against 8.2 m/s is a two-metre circle, which keeps the probe on
+    // the square of ground that was pinned above for the whole thirty seconds.
+    const TURN = 4;
+
+    // Thirty seconds of sprinting, with the mouse turning throughout -- a
+    // straight line with a frozen yaw is the one path on which a dropped frame
+    // and a repeated frame produce the same trajectory, and would be the one
+    // schedule that hid this bug.
+    const TICKS = TICK_HZ * 30;
+    // A second of running before anything is judged. The first quarter-second
+    // from a standing start is the one window where `reconcile` is knowingly
+    // approximate -- velocity is not on the wire, so the replay seeds the
+    // authoritative position with the *current* local velocity, which during an
+    // acceleration ramp is faster than the body actually had there. It settles
+    // to 0.4 mm once the stride is steady, and it is a different question from
+    // the one this check is asking. Measured: 5-15 cm for about twelve ticks.
+    const SETTLE = TICK_HZ;
+    let worst = 0;
+    let corrected = 0;
+    let path = 0;
+    let px = world.spawn.x;
+    let pz = world.spawn.z;
+    for (let t = 0; t < TICKS; t++) {
+      net.reconcile(playerCombat, combatWorld, correction);
+      if (t >= SETTLE && net.lastCorrection > worst) worst = net.lastCorrection;
+      input.yaw += TURN * FIXED_DT;
+      advance(playerCombat, input, FIXED_DT, combatWorld);
+      net.sendInput(input);
+      // The 30 fps schedule: the browser posts this tick's frame and the last
+      // one together, every other tick.
+      if (t % 2 === 1) pump();
+      room.step();
+      drain();
+      net.update(FIXED_DT);
+      if (t === SETTLE) corrected = net.corrections;
+      path += Math.hypot(playerCombat.body.position.x - px, playerCombat.body.position.z - pz);
+      px = playerCombat.body.position.x;
+      pz = playerCombat.body.position.z;
+    }
+    corrected = net.corrections - corrected;
+
+    check(
+      path > 200 && ws!.data.inputOverflow === 0,
+      `the probe ran ${path.toFixed(0)} m of ground over ${TICKS} ticks, turning the whole way, and ` +
+        `the room threw away ${ws!.data.inputOverflow} of its ${TICKS} input frames`,
+    );
+    check(
+      ws!.data.inputStarved <= INPUT_RESERVE,
+      `and re-applied a stale frame ${ws!.data.inputStarved} time(s) in thirty seconds -- the reserve ` +
+        `being banked at join, and nothing after it`,
+    );
+    check(
+      worst <= CORRECTION_DEADZONE,
+      `once the stride was steady the predicted body never left the reconciler's own ` +
+        `${CORRECTION_DEADZONE} m deadzone -- worst divergence ${worst.toFixed(4)} m over 29 s, against ` +
+        `the ${oneStep.toFixed(4)} m a single lost frame costs`,
+    );
+    check(
+      net.snaps === 0,
+      `and the reconciler snapped ${net.snaps} time(s). Zero, and it has to be zero: ` +
+        `${CORRECTION_SNAP} m is a knockback, and nobody punched this probe`,
+    );
+    check(
+      corrected === 0,
+      `and the reconciler applied ${corrected} eased correction(s) in those 29 s -- the deadzone was ` +
+        `never reached, so the camera was never told about anything`,
+    );
+    say(
+      `  the same run before the fix: 0.137 m on the median snapshot, ~20 corrections a second, ` +
+        `every one of them a visible step of the camera`,
+    );
+  }
 }

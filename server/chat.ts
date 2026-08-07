@@ -90,6 +90,13 @@ import {
   type ChatGate,
   type ChatLine,
 } from '../client/src/net/chat.ts';
+import {
+  UNSTUCK_COOLDOWN_MS,
+  UNSTUCK_KO_NOTICE,
+  unstuckCommand,
+  unstuckReply,
+  unstuckWaitNotice,
+} from '../client/src/game/unstuck.ts';
 import type { RoomHost, Socket } from './room.ts';
 
 /** What the sender is told when the bucket is empty. */
@@ -112,6 +119,22 @@ const REPEAT_NOTICE = 'you have said that three times — say something else';
 export class ChatHub {
   private readonly gates = new WeakMap<Socket, ChatGate>();
 
+  /**
+   * When each socket last used `/unstuck`.
+   *
+   * A second `WeakMap` beside `gates` rather than a field on `ChatGate`, and the
+   * split is the point: the chat gate is the *abuse floor for speech* -- a
+   * budget of sentences, a repeat guard, a notice throttle -- and a command is
+   * not speech. Folding the cooldown into it would mean a player who had been
+   * chatting could not get unstuck, and a player who got unstuck had spent a
+   * sentence. They are two rules about two things and they are kept apart.
+   *
+   * Weak and keyed by the socket for `gates`' own reasons: the garbage collector
+   * empties it on disconnect, so there is no cleanup path to forget, and nothing
+   * is added to `Conn` or to every fake socket in `server/integration-check.ts`.
+   */
+  private readonly unstuckAt = new WeakMap<Socket, number>();
+
   /** How many lines this hub has fanned out, and to how many sockets. Read by `/stats`. */
   lines = 0;
   sends = 0;
@@ -120,6 +143,9 @@ export class ChatHub {
   refusedRate = 0;
   refusedRepeat = 0;
   refusedEmpty = 0;
+  /** How many `/unstuck` commands were served, and how many refused. */
+  unstuckServed = 0;
+  unstuckRefused = 0;
 
   /**
    * A `CHAT_SAY` arrived on `ws`. Sanitise it, admit it or refuse it, and if it
@@ -129,7 +155,12 @@ export class ChatHub {
    * injected rather than read here so the integration check can drive a rate
    * limit's window without sleeping through it.
    */
-  say(host: RoomHost, ws: Socket, frame: ArrayBuffer, now = Date.now()): 'sent' | 'empty' | 'rate' | 'repeat' | 'bad' {
+  say(
+    host: RoomHost,
+    ws: Socket,
+    frame: ArrayBuffer,
+    now = Date.now(),
+  ): 'sent' | 'empty' | 'rate' | 'repeat' | 'bad' | 'command' {
     const conn = ws.data;
     const p = conn.participant;
     // No participant means a socket that has not said hello. Silently ignored
@@ -153,6 +184,30 @@ export class ChatHub {
       this.refusedEmpty++;
       return 'empty';
     }
+
+    /*
+     * The one thing in this file that is not chat.
+     *
+     * `/unstuck` is intercepted **here** -- after sanitisation, before the token
+     * bucket, and before the fan-out -- and each of those three positions is a
+     * decision:
+     *
+     *   - **After sanitisation**, so the command is matched against the same
+     *     string everybody else would have seen. A client that padded it with
+     *     zero-width spaces gets the same answer as one that typed it.
+     *   - **Before `chatAdmit`**, because a command is not speech and must not
+     *     spend a sentence. The repeat guard is the concrete reason: `/unstuck`
+     *     is by definition typed identically every time, so the third one in a
+     *     row would be refused as a repeat -- and the third one is exactly the
+     *     one somebody genuinely wedged in a wall is typing.
+     *   - **Before `broadcast`**, which is the rule this feature lives or dies
+     *     on: a command must never reach anybody else's chat log. There is one
+     *     `return` between here and the fan-out and it is unconditional.
+     *
+     * See `client/src/game/unstuck.ts` for why this is a chat command at all,
+     * and for the rest of the rule.
+     */
+    if (unstuckCommand(text)) return this.unstuck(host, ws, now);
 
     let gate = this.gates.get(ws);
     if (!gate) {
@@ -188,6 +243,66 @@ export class ChatHub {
   }
 
   /**
+   * Serve `/unstuck` for the player on `ws`, and answer them privately.
+   *
+   * Every path here ends in exactly one `notify` and no broadcast. The
+   * conditions, in the order that refuses most cheaply first:
+   *
+   *   1. **Knocked out.** Refused rather than served, because the respawn is
+   *      already about to move them and `pickRespawn` does the same job over a
+   *      shorter distance -- and because a player who can teleport out of a
+   *      knockout can teleport out of a fight. `combat.advance` clears the phase
+   *      on its own three seconds later; they lose nothing by waiting.
+   *   2. **The cooldown**, told with the time remaining, because a refusal that
+   *      does not say how long is a refusal somebody retries immediately.
+   *   3. **The search**, which is the only expensive branch and is therefore
+   *      last. The clock is only stamped once a move has actually happened, so a
+   *      player who asked from somewhere with no answer may ask again from two
+   *      steps away rather than being locked out for ten seconds by a failure.
+   *
+   * The relocation itself is `Simulation.unstuck` -- the room's, so a room this
+   * socket is not in cannot be moved -- and it credits nobody a knockout.
+   */
+  private unstuck(host: RoomHost, ws: Socket, now: number): 'command' {
+    const conn = ws.data;
+    const p = conn.participant;
+    // Unreachable: `say` returns 'bad' on a socket with no participant before
+    // this is called. Restated rather than asserted because it is what makes the
+    // rest of this method total, and the cost is one comparison.
+    if (!p) return 'command';
+
+    if (p.combat.phase === 'ko') {
+      this.unstuckRefused++;
+      this.notify(ws, UNSTUCK_KO_NOTICE);
+      return 'command';
+    }
+
+    const last = this.unstuckAt.get(ws);
+    if (last !== undefined && now - last < UNSTUCK_COOLDOWN_MS) {
+      this.unstuckRefused++;
+      this.notify(ws, unstuckWaitNotice(UNSTUCK_COOLDOWN_MS - (now - last)));
+      return 'command';
+    }
+
+    const room = host.get(conn.room);
+    if (!room) {
+      this.unstuckRefused++;
+      this.notify(ws, unstuckReply(null));
+      return 'command';
+    }
+
+    const spot = room.sim.unstuck(p);
+    if (spot) {
+      this.unstuckAt.set(ws, now);
+      this.unstuckServed++;
+    } else {
+      this.unstuckRefused++;
+    }
+    this.notify(ws, unstuckReply(spot));
+    return 'command';
+  }
+
+  /**
    * One line to every socket on this host, in every room.
    *
    * Encoded once. The iteration is rooms-then-sockets rather than a flat socket
@@ -210,8 +325,8 @@ export class ChatHub {
   }
 
   /**
-   * A private system line to one socket: a throttle explanation, and nothing
-   * else so far.
+   * A private system line to one socket: a throttle explanation, or `/unstuck`'s
+   * answer.
    *
    * `PRIVATE` and `SYSTEM` are two flags rather than one because they are two
    * different facts and a later line may want either alone -- a server-wide

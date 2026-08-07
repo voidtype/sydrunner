@@ -79,7 +79,6 @@ import {
   SNAPSHOT_HZ,
   TICK_HZ,
   decodeHello,
-  decodeInput,
   decodePing,
   encodeBye,
   encodePong,
@@ -89,6 +88,7 @@ import {
 } from '../client/src/net/protocol.ts';
 import { verifyNames, verifyNet } from '../client/src/net/protocol.ts';
 import { verifyChat } from '../client/src/net/chat.ts';
+import { verifyUnstuck } from '../client/src/game/unstuck.ts';
 import { verifySuggestions } from '../client/src/net/suggestions.ts';
 import { verifyAoi } from './aoi.ts';
 import { ChatHub } from './chat.ts';
@@ -101,7 +101,7 @@ import {
 } from './suggestions.ts';
 import { verifyRewind } from './rewind.ts';
 import { verifySim } from './sim.ts';
-import { RoomHost, newConn, type Conn, type Socket } from './room.ts';
+import { RoomHost, newConn, receiveInput, type Conn, type Socket } from './room.ts';
 import { loadWorld } from './world.ts';
 
 const PORT = Number(process.env.SYDNEY_PORT ?? 8787);
@@ -171,6 +171,14 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // by a factor either lets a flood through or throttles a conversation, and
     // neither has a frame that says so. See `client/src/net/chat.ts`.
     ['verifyChat', verifyChat()],
+    // `/unstuck`, which arrives over that same wire and is intercepted before
+    // the fan-out. Run here because this process is the one that actually moves
+    // the player, and because both of its silent failures land on the server: a
+    // prefix match instead of an exact one broadcasts nothing and teleports
+    // somebody who meant to type a sentence, and a destination that skipped
+    // `isSpawnable` puts them inside the next building along. See
+    // `client/src/game/unstuck.ts`.
+    ['verifyUnstuck', verifyUnstuck()],
     // The suggestions box's week arithmetic, sanitiser, order and codecs.
     // Run **here** rather than only in the browser because the server is the
     // side that keeps the ledger, and every failure in that file is silent in
@@ -500,11 +508,12 @@ const server = Bun.serve<Conn>({
 
         case MSG.INPUT: {
           if (!conn.participant) return;
-          // Decoded straight into this socket's own record. `decodeInput` takes
-          // its output, so there is no shared scratch to alias and no spread to
-          // allocate -- see `Conn.input`.
-          if (!decodeInput(frame, conn.input)) return;
-          conn.hasInput = true;
+          // Filed on this socket's own ring, oldest first, and taken one per
+          // tick. `receiveInput` decodes straight into the ring's record, so
+          // there is no shared scratch to alias and no allocation -- see
+          // `Conn.inbox`, which is also where the reason it is a ring and not
+          // one slot is written down.
+          receiveInput(conn, frame);
           return;
         }
 
