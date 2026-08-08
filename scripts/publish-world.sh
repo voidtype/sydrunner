@@ -46,6 +46,9 @@ set -eu
 DATA_REPO="voidtype/sydrunner-world"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORLD="$ROOT/client/public/world"
+
+# restamp_sidecars: the stamp must reach the compressed copies too.
+. "$ROOT/scripts/lib-sidecars.sh"
 DRY=""
 [ "${1:-}" = "--dry-run" ] && DRY=1
 
@@ -194,6 +197,7 @@ index["cdn"] = {"ref": ref, "repo": repo}
 with open(path, "w") as f:
     json.dump(index, f, separators=(", ", ": "))
 PY
+  restamp_sidecars "$1"
   echo "  stamped $1"
 }
 # Both pivots, since the world was cut into hexagons: `root.json` is what a

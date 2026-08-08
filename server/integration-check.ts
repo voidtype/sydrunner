@@ -1467,6 +1467,7 @@ async function main(): Promise<void> {
   // last and self-contained.
   say('');
   await checkRaves();
+  await checkPivotSidecars();
 
   // --- 28. The day/night cycle, on exactly the raves' argument: the sky is
   // shared by every player and sends nothing at all, so the only way to check
@@ -13092,6 +13093,81 @@ async function checkAccelerationRamp(): Promise<void> {
  * are on ground the world actually has, read off `index.json` the way
  * `checkWildlife` and `checkPolice` read it.
  */
+/**
+ * The compressed sidecars must carry the same cdn block as the file they shadow.
+ *
+ * Caddy serves `precompressed zstd br`, so a browser advertising zstd is answered
+ * from `root.json.zst` and never reads `root.json`. Both publish scripts stamp the
+ * cdn pointer into the plain file AFTER `precompress-dist.sh` has run, so a stamp
+ * that forgets the sidecars leaves the origin telling curl one thing and every
+ * real player another.
+ *
+ * That shipped once: eight curl fetches of `/world/root.json` returned the R2 base
+ * while four `fetch()` calls returned the old jsDelivr ref, same URL, different
+ * etags -- and jsDelivr has no hexagon manifests at all, so players silently fell
+ * back to the whole 851 kB index. `scripts/lib-sidecars.sh` is the fix; this is
+ * the guard that proves it stayed fixed.
+ *
+ * Skipped when there is no built tree -- a fresh clone has no `dist/`, and a check
+ * that failed there would be reporting on the absence of a build, not on a bug.
+ */
+async function checkPivotSidecars(): Promise<void> {
+  say('--- Pivot sidecars: the compressed copy carries the same cdn block');
+
+  const roots = ['../client/dist/world', '../client/public/world'];
+  let examined = 0;
+
+  for (const rel of roots) {
+    const dir = new URL(rel + '/', import.meta.url).pathname;
+    for (const pivot of ['index.json', 'root.json']) {
+      const plain = Bun.file(dir + pivot);
+      if (!(await plain.exists())) continue;
+      const want = JSON.stringify((await plain.json()).cdn ?? null);
+
+      for (const [ext, argv] of [
+        ['zst', ['zstd', '-dc']],
+        ['br', ['brotli', '-dc']],
+      ] as const) {
+        const side = Bun.file(`${dir}${pivot}.${ext}`);
+        if (!(await side.exists())) continue;   // identity-only is fine
+        examined++;
+
+        const proc = Bun.spawnSync([...argv], { stdin: side });
+        if (!proc.success) {
+          check(false, `${rel}/${pivot}.${ext} would not decompress`);
+          continue;
+        }
+        let got: string;
+        try {
+          got = JSON.stringify(JSON.parse(proc.stdout.toString()).cdn ?? null);
+        } catch {
+          check(false, `${rel}/${pivot}.${ext} is not JSON once decompressed`);
+          continue;
+        }
+        check(
+          got === want,
+          `${rel}/${pivot}.${ext} cdn block matches the plain file` +
+            (got === want ? '' : ` (plain ${want}, ${ext} ${got})`),
+        );
+
+        // Staleness is the mechanism, so name it directly: a sidecar older than
+        // its source is the shape of this bug even when the block happens to
+        // agree, because the next stamp will diverge again.
+        const p = Bun.file(dir + pivot);
+        const sMtime = (await side.stat()).mtimeMs;
+        const pMtime = (await p.stat()).mtimeMs;
+        check(
+          sMtime >= pMtime - 2000,
+          `${rel}/${pivot}.${ext} is not older than ${pivot}` +
+            (sMtime >= pMtime - 2000 ? '' : ` (${Math.round((pMtime - sMtime) / 1000)}s behind)`),
+        );
+      }
+    }
+  }
+
+  if (examined === 0) say('    no compressed sidecars present; nothing to compare');
+}
+
 async function checkRaves(): Promise<void> {
   say('--- Illegal raves: the same night, on two module instances');
 

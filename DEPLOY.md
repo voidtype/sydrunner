@@ -291,6 +291,39 @@ contain it. `vite build` copies `public/` into `dist/`, so stamping `public/` is
 enough for any future build; `dist/` is stamped too when it exists, so an
 already-built tree does not need rebuilding before the next rsync.
 
+#### Deploy the sidecars with the pivot, always
+
+Caddy serves `precompressed zstd br`, so a browser advertising `accept-encoding:
+zstd` — every current Chromium and Firefox — is answered from `root.json.zst`
+and **never reads `root.json` at all**. Stamping rewrites the plain file, so the
+sidecars must be regenerated and shipped in the same breath:
+
+```bash
+rsync -a client/dist/world/index.json client/dist/world/index.json.zst client/dist/world/index.json.br \
+         client/dist/world/root.json  client/dist/world/root.json.zst  client/dist/world/root.json.br \
+         root@oxford-tractor.bnr.la:/opt/sydney/dist/world/
+```
+
+Both publish scripts now recompress on stamp (`scripts/lib-sidecars.sh`), and
+`checkPivotSidecars` in the suite fails if a sidecar's cdn block ever drifts from
+its source. Both exist because this shipped once: `curl` was told the world lived
+on R2 while every real browser was told jsDelivr, off the same URL with different
+etags, because only the plain file had been copied. jsDelivr has no hexagon
+manifests at all, so players fell back to the entire 851 kB `index.json` and
+nothing looked broken.
+
+Verify by encoding, not just by `curl` — plain `curl` does not ask for zstd and
+so reads the one copy that is guaranteed to be fresh:
+
+```bash
+for enc in identity zstd br; do
+  printf '%-9s ' "$enc"
+  curl -s -H "Accept-Encoding: $enc" https://oxford-tractor.bnr.la/world/root.json |
+    case $enc in identity) cat ;; zstd) zstd -dc ;; br) brotli -dc ;; esac |
+    jq -c .cdn
+done
+```
+
 ### Why not GitHub releases
 
 The first version of this shipped to releases and had to be abandoned:

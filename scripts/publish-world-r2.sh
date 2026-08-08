@@ -75,6 +75,9 @@ set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORLD="$ROOT/client/public/world"
 
+# restamp_sidecars: the stamp must reach the compressed copies too.
+. "$ROOT/scripts/lib-sidecars.sh"
+
 # Not a secret: it is the hostname of the S3 endpoint and appears in every URL.
 R2_ACCOUNT_ID="${R2_ACCOUNT_ID:-b7f27f4a44cf2aea00155a84949b3879}"
 R2_BUCKET="${R2_BUCKET:-sydrunner-world}"
@@ -166,6 +169,9 @@ index["cdn"] = {"base": base}
 with open(path, "w") as f:
     json.dump(index, f, separators=(", ", ": "))
 PY
+  # The stamp only reaches a browser if the compressed copies carry it too --
+  # see scripts/lib-sidecars.sh for the failure this prevents.
+  restamp_sidecars "$1"
   echo "  stamped $1"
 }
 
