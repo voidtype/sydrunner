@@ -484,23 +484,86 @@
           rgba(150,10,10,0) 32%, rgba(168,14,10,.55) 74%, rgba(120,6,4,.92) 100%);
       }
 
-      /* Spec 8.2: "No world-space health bars. Health pips in the corner." */
+      /* Spec 8.2: "No world-space health bars. Health pips in the corner."
+         ------------------------------------------------------------------
+         THE CLUSTER SCALES WITH THE VIEWPORT. Every length below is the number
+         it has always been multiplied by `--vitals-scale`, so the group keeps
+         its proportions and there is exactly one knob.
+
+         *Viewport*, not `devicePixelRatio`, and that is the whole argument. DPR
+         measures pixel density; what governs how big this reads at a desk is how
+         many CSS pixels the window is, because a CSS pixel is the browser's own
+         reference angle and everything here is specified in them. A 14" MacBook
+         reports DPR 2 at 1512x982 -- dense, but small, and its HUD is already
+         the right size; a 4K panel driven unscaled reports DPR 1 at 3840x2160
+         and its HUD is half the physical size of the same pixels on a 1080p
+         screen of the same diagonal. Scaling on DPR would grow the laptop and
+         leave the 4K alone, which is backwards on both. A 4K run at 200% OS
+         scaling reports 1920 CSS px and DPR 2 -- and *should* land on the 1920
+         rung, which is what keying off the viewport gets for free. DPR does not
+         appear here at all; it has nothing left to say once the viewport is read.
+
+         Both axes gate every rung. Width alone would blow the cluster up on an
+         ultrawide that is only 1080 tall, where vertical room is the scarce
+         thing and the chat log above already wants it.
+
+               <1700x950   1.00   the laptop this was drawn on -- unchanged
+              >=1700x950   1.15   1920x1080
+             >=2200x1150   1.35   2560x1440
+             >=2900x1500   1.55
+             >=3500x1900   1.80   3840x2160, near-full compensation
+
+         `calc()` on each length rather than `transform: scale()` on `#vitals`.
+         A transform is one line and it takes the 1 px borders with it: `#pips
+         div` empty is *nothing but* its border, and a 1.8 px line is an
+         antialiased smear where a 1 px line is a line -- the failure the minimap
+         rim and `#clock`'s `non-scaling-stroke` are both already about. Under
+         `calc()` the borders stay integral and are stepped deliberately, below.
+         A transform would also leave layout thinking the cluster is still 54 px
+         tall, and `#chat` sits on that number.
+
+         The one thing that does not scale is the 16 px anchor: the four corners
+         of this HUD share two margins and the gutter is not part of the widget. */
+      :root {
+        --vitals-scale: 1;
+        /* Stepped, never multiplied. See the rim comment on `#minimap`: a hairline
+           at .34 over a bright sky is already marginal, and on a viewport wide
+           enough for the top two rungs a device pixel is physically half what it
+           was. 2 px there is that same fix, and an integer either way. */
+        --vitals-line: 1px;
+      }
+      @media (min-width: 1700px) and (min-height: 950px) {
+        :root { --vitals-scale: 1.15; }
+      }
+      @media (min-width: 2200px) and (min-height: 1150px) {
+        :root { --vitals-scale: 1.35; }
+      }
+      @media (min-width: 2900px) and (min-height: 1500px) {
+        :root { --vitals-scale: 1.55; --vitals-line: 2px; }
+      }
+      @media (min-width: 3500px) and (min-height: 1900px) {
+        :root { --vitals-scale: 1.8; --vitals-line: 2px; }
+      }
+
       #vitals {
         position: fixed; left: 16px; bottom: 16px;
-        pointer-events: none; display: flex; flex-direction: column; gap: 6px;
+        pointer-events: none; display: flex; flex-direction: column;
+        gap: calc(6px * var(--vitals-scale));
       }
-      #pips { display: flex; gap: 6px; }
+      #pips { display: flex; gap: calc(6px * var(--vitals-scale)); }
       #pips div {
-        width: 26px; height: 12px; border: 1px solid rgba(207,226,242,.34);
+        width: calc(26px * var(--vitals-scale)); height: calc(12px * var(--vitals-scale));
+        border: var(--vitals-line) solid rgba(207,226,242,.34);
         box-shadow: 0 1px 2px rgba(0,0,0,.85);
       }
       #pips div.full { background: #dfe9f2; border-color: #dfe9f2; }
       /* The last pip goes the colour the loading screen uses for a failure. It is
          the only red in the interface and it should mean exactly one thing. */
       #pips div.last { background: #f0a9a0; border-color: #f0a9a0; }
-      #stamina { display: flex; gap: 6px; }
+      #stamina { display: flex; gap: calc(6px * var(--vitals-scale)); }
       #stamina div {
-        width: 18px; height: 3px; background: rgba(207,226,242,.18);
+        width: calc(18px * var(--vitals-scale)); height: calc(3px * var(--vitals-scale));
+        background: rgba(207,226,242,.18);
         box-shadow: 0 1px 2px rgba(0,0,0,.85); overflow: hidden;
       }
       #stamina div i { display: block; height: 100%; width: 0; background: #9fc4e2; }
@@ -514,9 +577,10 @@
          mid-fight. See game/footy.ts for why it is a separate bar at all, and
          game/combat.ts for why it refills one block at a time where the stamina
          above it refills all at once. */
-      #balls { display: flex; gap: 5px; }
+      #balls { display: flex; gap: calc(5px * var(--vitals-scale)); }
       #balls div {
-        width: 24px; height: 2px; background: rgba(196,84,52,.16);
+        width: calc(24px * var(--vitals-scale)); height: calc(2px * var(--vitals-scale));
+        background: rgba(196,84,52,.16);
         box-shadow: 0 1px 2px rgba(0,0,0,.85); overflow: hidden;
       }
       #balls div i { display: block; height: 100%; width: 0; background: rgba(196,84,52,.55); }
@@ -527,13 +591,17 @@
          colour. Anything with an icon or a progress ring would be the only
          graphical element in a HUD that is otherwise four rectangles and a
          dot. */
-      #effects { display: flex; gap: 6px; }
+      #effects { display: flex; gap: calc(6px * var(--vitals-scale)); }
       /* Otherwise an empty chip row still contributes the column's 6px gap and
          the pips sit 6px higher for the whole game than they did before 8.3. */
       #effects:empty { display: none; }
       #effects div {
-        font-size: 9px; letter-spacing: .16em; padding: 3px 6px;
-        color: #cfe2f2; border: 1px solid rgba(207,226,242,.34);
+        /* The type scales with the rest of the cluster -- a chip whose box grew
+           and whose label did not would read as a mistake. `letter-spacing` is
+           already in `em`, so it follows on its own. */
+        font-size: calc(9px * var(--vitals-scale)); letter-spacing: .16em;
+        padding: calc(3px * var(--vitals-scale)) calc(6px * var(--vitals-scale));
+        color: #cfe2f2; border: var(--vitals-line) solid rgba(207,226,242,.34);
         text-shadow: 0 1px 2px rgba(0,0,0,.85); white-space: nowrap;
       }
 
@@ -554,11 +622,17 @@
          only part that comes and goes, and reserving their height unconditionally
          is what stops the chat sliding down when a coffee wears off.
 
+         54 of that 96 is the stack itself, and the stack now scales -- see
+         `--vitals-scale` above -- so the reserve tracks it and the 16 px margin
+         and 26 px breather do not. This is the collision the scale had to not
+         cause: the chips grow *up* into exactly this space.
+
          Width mirrors `#help`'s cap on the opposite side -- 42vw against its
          44vw -- so the two blocks can never meet in the middle of a narrow
          window, which is the same trade that comment describes making. */
       #chat {
-        position: fixed; left: 16px; bottom: 96px;
+        position: fixed; left: 16px;
+        bottom: calc(96px + 54px * (var(--vitals-scale) - 1));
         width: min(460px, 42vw);
         display: flex; flex-direction: column; gap: 6px;
         pointer-events: none; z-index: 3;

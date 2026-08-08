@@ -451,6 +451,16 @@ export class PedestrianCrowd {
       // `userData.cars` and `userData.traffic` so a change to either cannot
       // silently free this one's buffers.
       mesh.userData.pedestrians = true;
+      // **The kit buffer, allocated here rather than by the first `setColorAt`
+      // in `write`.** This whole tier is white geometry whose skin, singlet and
+      // shorts arrive through `instanceColor` -- see the header -- and
+      // `NodeMaterial.setupDiffuseColor` applies that attribute only when it
+      // exists at the moment the node graph is built. `main.ts` compiles every
+      // scene-wide instanced set with one `compileAsync` before the first frame,
+      // which is before this pool has ever been filled, so without this line the
+      // six impostor sets get a shader with no tint in it and the far tier is a
+      // crowd of white mannequins. `world/cars.ts` carries the full argument.
+      mesh.setColorAt(0, _colour.setRGB(1, 1, 1));
       this.meshes.push(mesh);
     }
 

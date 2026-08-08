@@ -68,7 +68,14 @@ import {
   type PedPose,
 } from './game/pedestrians.ts';
 import { PipelineWatch, auditWarmup, warmUpPipelines, type WarmupPart } from './world/warmup.ts';
-import { NIGHT_VISIBLE_LEVEL, NightLights, verifyNightLights } from './world/nightlights.ts';
+import {
+  NIGHT_VISIBLE_LEVEL,
+  NightLights,
+  createTorchMount,
+  torchBikeMount,
+  torchHandMount,
+  verifyNightLights,
+} from './world/nightlights.ts';
 import { CollisionWorld } from './player/collision.ts';
 import {
   EYE_HEIGHT,
@@ -85,7 +92,7 @@ import {
   verifyCharacterRig,
   type ActionName,
 } from './player/character.ts';
-import { verifyAnimation } from './player/animation.ts';
+import { BONE, verifyAnimation } from './player/animation.ts';
 import { BatAssets, BatProp, BatViewmodel, MAX_VIEW_REACH, verifyBat } from './player/bat.ts';
 import {
   CAST_RADIUS,
@@ -4653,6 +4660,15 @@ async function main(): Promise<void> {
   /** Reused: the HUD's chip list is rebuilt every frame and allocates nothing. */
   const powerupChips: Array<{ name: string; seconds: number }> = [];
   /**
+   * Where the torch is held this frame, and the scratch its hand case needs.
+   *
+   * Both reused, because this is filled every frame of every night and a mount
+   * allocated per frame is a garbage collection in the middle of a fight. See
+   * `world/nightlights.TorchMount`.
+   */
+  const torchMount = createTorchMount();
+  const _chest = new Vector3();
+  /**
    * Catches a throw out of the frame's render call so it cannot stop the world
    * in silence. Built here rather than at module scope so its failure count is
    * per-session, which is what `sydney.render.report()` is answering.
@@ -5093,12 +5109,51 @@ async function main(): Promise<void> {
     // The streamer is handed over as the `LampSource` it implements, so the
     // lights follow the lamps of tiles that are actually resident and nothing
     // here has to keep a second copy of where they are.
+    //
+    // --- And where the beam comes from, which is the only new thing here.
+    //
+    // Three cases, and `null` is the one that must not move: in first person the
+    // torch is the eye plus `TORCH_OFFSET` exactly as it has always been, and
+    // every display value in `sky/calibration.ts`'s torch table was measured
+    // that way. The other two are `world/nightlights.TorchMount`, which carries
+    // the whole argument for why one light does all three jobs.
+    //
+    // The **hand** mount is taken from the self body's own chest bone rather
+    // than from a constant, so the beam carries the walk bob, the run lean and
+    // the crumple of a knockout. Only the bone's *height above the actor's root*
+    // is used: `driver.update` places that root three hundred lines below this
+    // one, so the bone matrices here are last frame's, and taking x and z from
+    // the live `player.position` instead means the origin is never behind the
+    // body at speed. The pose is a frame old, which on a light that already lags
+    // the view by 0.075 s is not a thing that exists.
+    const torchMountNow =
+      playerCombat.ridingBike !== 0
+        ? torchBikeMount(
+            torchMount,
+            player.position.x,
+            player.position.y - EYE_HEIGHT,
+            player.position.z,
+            player.yaw,
+          )
+        : thirdPerson
+          ? (() => {
+              _chest.setFromMatrixPosition(self.bones[BONE.CHEST].matrixWorld);
+              return torchHandMount(
+                torchMount,
+                player.position.x,
+                player.position.y - EYE_HEIGHT + (_chest.y - self.mesh.position.y),
+                player.position.z,
+                player.yaw,
+              );
+            })()
+          : null;
     nightLights.update(
       frameDt,
       camera,
       alt,
       Math.hypot(player.velocity.x, player.velocity.z),
       streamer,
+      torchMountNow,
     );
     // And the sprites, which are hidden all day for the fill they would
     // otherwise cost. One comparison on every frame but the two a day where the
@@ -5547,12 +5602,25 @@ async function main(): Promise<void> {
     placeResidentBikes();
     maybeBuildStall();
     bikeMeshes.update(bikeWorld().all(), player.position.x, player.position.z, isRiddenLocally);
+    // And the headlight on every one of those, from the same three numbers and
+    // in the same two places, so a bike that is drawn is a bike that is lit and
+    // there is no fourth list to keep in step. `begin` is false all day, which
+    // makes this two comparisons outside the night. See `world/nightlights.BikeLights`.
+    const bikeLit = nightLights.bikeLights.begin();
     if (playerCombat.ridingBike !== 0) {
       // With the lean, which only the local rider gets: the wire carries a yaw
       // and not a yaw *rate*, so a remote's steering is not knowable here and a
       // guessed lean would be a bike rocking on other people's screens for
       // reasons nobody could see. See `world/bike.RiddenBike.set`.
       selfBike.set(player.position.x, player.position.y - EYE_HEIGHT, player.position.z, player.yaw, rideLean);
+      if (bikeLit) {
+        nightLights.bikeLights.add(
+          player.position.x,
+          player.position.y - EYE_HEIGHT,
+          player.position.z,
+          player.yaw,
+        );
+      }
     } else {
       selfBike.hide();
     }
@@ -5566,11 +5634,15 @@ async function main(): Promise<void> {
             scene.add(entry.bike.mesh);
           }
           entry.bike.set(r.position.x, r.position.y - EYE_HEIGHT, r.position.z, r.yaw);
+          if (bikeLit) {
+            nightLights.bikeLights.add(r.position.x, r.position.y - EYE_HEIGHT, r.position.z, r.yaw);
+          }
         } else if (entry.bike) {
           entry.bike.hide();
         }
       }
     }
+    nightLights.bikeLights.end();
 
     // --- Every football in the air, from both sources, into one pool.
     //
@@ -6017,7 +6089,15 @@ async function main(): Promise<void> {
         level: nightLights.level,
         lampsLit: nightLights.lampsLit,
         carsLit: nightLights.carLights.drawn,
+        bikesLit: nightLights.bikeLights.drawn,
         torch: nightLights.torch.intensity,
+        // Which of the three jobs the one spot light is doing, so a report taken
+        // on a bike is not mistaken for a torch that has gone the wrong colour.
+        beam: {
+          angle: nightLights.torch.angle,
+          distance: nightLights.torch.distance,
+          colour: nightLights.torch.color.getHex(),
+        },
         lights: nightLights.realLights.map((l) => ({
           name: l.name || l.type,
           visible: l.visible,

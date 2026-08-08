@@ -1003,6 +1003,29 @@ export class TrafficMovers {
       // freed by an eviction -- the geometry is shared with every parked car in
       // the city.
       mesh.userData.traffic = true;
+      // **The paint buffer, allocated here rather than by the first `setColorAt`
+      // in the fill loop, and this one line is load-bearing.**
+      //
+      // `InstancedMesh` allocates `instanceColor` lazily, and
+      // `NodeMaterial.setupDiffuseColor` multiplies the diffuse by it *only when
+      // the attribute exists at the moment the node graph is built* -- so its
+      // presence is baked into the shader. Nothing in
+      // `RenderObject.getMaterialCacheKey` or `getDynamicCacheKey` mentions it,
+      // so a graph built without it is never rebuilt when it appears.
+      //
+      // `main.ts` warms every scene-wide instanced set with one
+      // `compileAsync(scene, camera)` **before the first frame**, which is
+      // before this set has ever been filled -- so the moving fleet was
+      // compiling a shader with no per-instance tint in it and then computing,
+      // uploading and sampling a paint buffer that nothing read. Every car in
+      // the traffic was drawn in the geometry's own base colour. The parked
+      // fleet never had the bug: `buildTileCars` colours its instances in the
+      // same synchronous loop that constructs the mesh, long before anything
+      // compiles it.
+      //
+      // `setColorAt` is the allocation: three fills the new buffer with ones, so
+      // one call establishes the attribute and leaves every instance white.
+      mesh.setColorAt(0, _colour.setRGB(1, 1, 1));
       this.meshes.push(mesh);
       this.counts.push(0);
     }

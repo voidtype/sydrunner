@@ -183,7 +183,9 @@ import {
 import {
   LAMP_RECORD_STRIDE,
   StreetLampAssets,
+  buildTileColumnLamps,
   buildTileStreetLamps,
+  deriveColumnLamps,
   type LampSource,
 } from './nightlights.ts';
 import { createStreetMaterial } from './street.ts';
@@ -2817,6 +2819,46 @@ export class TileStreamer implements LampSource {
         yield;
       }
 
+      // --- And the third consumer of that ways block: the street lights on the
+      // streets that have no power pole to hang one from.
+      //
+      // Here rather than up in the power block, because a CBD tile has **no
+      // power sidecar at all** -- `decodePower` returns null when a tile has
+      // neither a pole nor a span, which is the case for 353 of the 3,187 tiles
+      // and for most of the city centre -- so the branch that builds pole lamps
+      // is exactly the branch that can never run where these are needed. It is
+      // also the first point in the build at which the ways are decoded.
+      //
+      // `world/nightlights.deriveColumnLamps` owns every decision about where
+      // one goes and refuses outright in any tile with a pole line in it; what
+      // is done here is only to turn its answer into two instanced sets and to
+      // hand their luminaire positions to the same array the pole lamps fill.
+      let columnLamps: Float32Array = EMPTY_LAMPS;
+      if (lanes !== null && lanes.ways.length > 0) {
+        const sites = deriveColumnLamps(
+          lanes.ways,
+          lines,
+          group.position.x,
+          group.position.z,
+          // World in, terrain out. `groundAt` above is tile-local like
+          // everything else the build places, and a way's coordinates are not.
+          (x, z) => groundAt(x - group.position.x, z - group.position.z),
+        );
+        if (sites.length > 0) {
+          const built = buildTileColumnLamps(sites, this.streetLamps, group.position.x, group.position.z);
+          if (built.post !== null) group.add(built.post);
+          if (built.glow !== null) {
+            // Dusk-gated on the streamer's own remembered state, exactly as the
+            // pole lamps are and for the same reason: a tile that lands at
+            // midnight has to arrive already lit.
+            built.glow.visible = this.nightLightsVisible;
+            group.add(built.glow);
+          }
+          columnLamps = built.lamps;
+        }
+        yield;
+      }
+
       // --- Ibises, derived from two things that are already in hand: the tree
       // sidecar decoded in phase 2, and the awning geometry collected on the way
       // past. Nothing is fetched for them and nothing was built for them --
@@ -2951,6 +2993,22 @@ export class TileStreamer implements LampSource {
       if (lanes !== null) {
         this.traffic?.adopt(entry.key, lanes);
         this.pedestrians?.adopt(entry.key, lanes);
+      }
+
+      // One array for both kinds of luminaire, because `nearestLamps` is asking
+      // "what can light what I am standing next to" and a column and a pole lamp
+      // are the same answer. Concatenated rather than kept as two lists so the
+      // search stays one linear pass over one buffer per tile; almost every tile
+      // has exactly one of the two, so the copy is a no-op on all but the fringe.
+      if (columnLamps.length > 0) {
+        if (lamps.length === 0) {
+          lamps = columnLamps;
+        } else {
+          const both = new Float32Array(lamps.length + columnLamps.length);
+          both.set(lamps, 0);
+          both.set(columnLamps, lamps.length);
+          lamps = both;
+        }
       }
 
       const tile: LoadedTile = {
@@ -3628,7 +3686,14 @@ function releaseGroupGeometry(group: Group): void {
       // matrix and the LED-or-sodium instance colour. Disposing it with a tile
       // would put out every street light in Sydney the first time the player
       // walked far enough to evict one.
-      mesh.userData.nightlights === true
+      mesh.userData.nightlights === true ||
+      // And the columns those lamps hang from where there is no pole. A separate
+      // flag from `nightlights` because the *visibility* rules differ -- a
+      // column is a physical object standing on the footpath at noon, where its
+      // glow is switched off by `setNightLightsVisible` at dawn -- but the
+      // release rule is identical: one shared geometry, per-tile instance
+      // buffers. See `world/nightlights.buildTileColumnLamps`.
+      mesh.userData.columns === true
     ) {
       (mesh as InstancedMesh).dispose();
     } else {

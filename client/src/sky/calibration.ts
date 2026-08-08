@@ -139,13 +139,62 @@ export const HORIZON_FADE_DEGREES = 0.9;
 export const HEMISPHERE_DAY = 3.4;
 
 /**
- * Hemisphere fill after dark. Chosen to land night at the same luminance the
- * previous rig produced, so this pass changes daylight only: the old
- * (0.08 intensity, 0.30/0.42/0.62 colour) under ACES at 0.86 exposure and the
- * new (0.30, 0.185/0.259/0.382) under Neutral at 0.62 differ by under a code
- * value on a mid-grey surface. Night is spec 6.4's problem, not this file's.
+ * Hemisphere fill after dark.
+ *
+ * It was 0.30, chosen to land night at the same luminance the rig before it
+ * produced -- the old (0.08 intensity, 0.30/0.42/0.62 colour) under ACES at 0.86
+ * exposure and the new (0.30, 0.185/0.259/0.382) under Neutral at 0.62 differ by
+ * under a code value on a mid-grey surface -- so that the day/night pass changed
+ * daylight only.
+ *
+ * **It is 0.33 now, and that ten per cent came from a player rather than from a
+ * calculation.** Somebody who had played the night asked for the ground and the
+ * building faces to come up "only like 10%", and the note is worth keeping
+ * because it says exactly which term was meant: not the lamps, not the torch,
+ * not the rave -- the *floor*, the light on everything that has no lamp near it,
+ * which is what decides whether an unlit back street is a place or a wall. This
+ * is the only number in the file that sets it.
+ *
+ * Ten per cent is a seventh of a stop and is deliberately below the threshold at
+ * which anybody could name it in a screenshot. What it does is measurable rather
+ * than visible: `nightAmbientOnWall` goes from 0.0631 to 0.0695 of luminance, so
+ * a 0.25-albedo wall moves from a display value of about 12 to about 12.5. That
+ * is the honest size of a ten per cent ask, and the reason to write it down is
+ * that the *next* ten per cent will feel just as small. Every night term in the
+ * second half of this file is quoted as a ratio to this floor, so four of these
+ * in a row is a moonless street lit like an overcast afternoon with the lamps
+ * contributing nothing anybody can see. `NIGHT_AMBIENT_FLOOR_MAX` is where that
+ * stops being allowed to happen quietly.
+ *
+ * **Daylight is untouched and provably so.** `solarRig` blends this to
+ * `HEMISPHERE_DAY` on the civil-twilight ramp, which reaches exactly 1 at and
+ * above 6 degrees of altitude, so the hemisphere at the 57.11-degree reference
+ * instant is `HEMISPHERE_DAY` and nothing else. `verifyLightRig` asserts that
+ * from the other end rather than trusting the arithmetic here.
  */
-export const HEMISPHERE_NIGHT = 0.3;
+export const HEMISPHERE_NIGHT = 0.33;
+
+/**
+ * The ceiling on the night ambient floor, as luminance on a shaded wall.
+ *
+ * A bound rather than a value, and it guards the one thing about the night that
+ * cannot be seen going wrong: `HEMISPHERE_NIGHT` is a single number that lifts
+ * *every* surface at *every* orientation at once, so raising it is always the
+ * cheapest way to make a dark scene readable and always the wrong one past a
+ * point. Past that point the city stops being lit by its lamps and starts being
+ * lit by nothing at all -- a flat, sourceless grey that reads as a broken
+ * exposure rather than as night, and which takes the street lamps, the torch and
+ * the headlights down with it, because every one of them is quoted as a ratio to
+ * this floor.
+ *
+ * 0.09 is 1.3x where the rig sits today and 1.43x the 0.0631 every night term
+ * below was originally quoted against -- half a stop. Half a stop is the point
+ * at which those ratios stop describing the night that is actually on screen:
+ * the lamp's "4x the floor at 20 m" and the torch's "4x at 10 m" are the
+ * sentences that decide whether the city is navigable, and they are arithmetic
+ * about this number. Anything past here needs the night re-derived, not nudged.
+ */
+export const NIGHT_AMBIENT_FLOOR_MAX = 0.09;
 
 /**
  * Hemisphere sky colour, linear, day and night endpoints.
@@ -421,14 +470,20 @@ export const SHADE_WARMTH_MIN = 0.95;
  * Everything above this line is the sun and what it bounced off, and every one
  * of those terms reaches exactly zero when the sun sets -- which was correct
  * right up until the point somebody pressed `N` and found a city that goes dark
- * and stays dark. What is left after dark is `HEMISPHERE_NIGHT` (0.30) against
- * `SKY_FILL_NIGHT`, which puts **0.064 of luminance** on a vertical wall and
- * 0.076 on a horizontal one. Through Lambert at a 0.25 albedo and `EXPOSURE`
+ * and stays dark. What is left after dark is `HEMISPHERE_NIGHT` (0.33) against
+ * `SKY_FILL_NIGHT`, which puts **0.070 of luminance** on a vertical wall and
+ * 0.083 on a horizontal one. Through Lambert at a 0.25 albedo and `EXPOSURE`
  * that is a display value of about 12: a silhouette, correctly, and nothing you
  * can walk through.
  *
+ * (Those two figures were 0.063 and 0.076 until a player who had spent an
+ * evening in it asked for the ground and the walls to come up about ten per
+ * cent. The ratios below are unchanged to two figures by that move and are still
+ * the calibration; `HEMISPHERE_NIGHT` carries the reasoning and
+ * `NIGHT_AMBIENT_FLOOR_MAX` carries the bound.)
+ *
  * So the city needs its own light after dark, and the numbers below are all
- * expressed against that 0.064 rather than against taste. It is the *only*
+ * expressed against that floor rather than against taste. It is the *only*
  * reference a night term has -- there is no photograph to calibrate to, because
  * a photograph of a Sydney street at night is an exposure decision -- so what is
  * pinned here is a set of **ratios to the ambient floor** at named distances,
@@ -1249,6 +1304,48 @@ export function verifyLightRig(rig = solarRig(REFERENCE_SOLAR.altitude)): string
   // `TORCH_INTENSITY`'s table.
   const dark = nightRig(-20);
   const floor = luminance(nightAmbientOnWall(-20));
+
+  // And the ambient floor itself, bounded at both ends. This is the term a
+  // player asks to have raised -- "make the ground a bit brighter at night" is
+  // the most reasonable request in the game and the easiest one to over-serve,
+  // because one constant lifts every surface at once and the result always
+  // looks better in the frame it was judged in. See `HEMISPHERE_NIGHT` and
+  // `NIGHT_AMBIENT_FLOOR_MAX`; the lower bound is the opposite failure, a night
+  // nobody can move in with the lamps carrying the whole city.
+  if (floor > NIGHT_AMBIENT_FLOOR_MAX) {
+    failures.push(
+      `The night ambient puts ${floor.toFixed(4)} of luminance on a shaded wall, over the ` +
+        `${NIGHT_AMBIENT_FLOOR_MAX} ceiling. That is half a stop past the 0.0631 every night term ` +
+        `in this file is quoted as a ratio to -- the torch's 4x at 10 m, the lamp's 4x at 20 m -- ` +
+        `so those sentences are no longer describing what is on screen. Raising ` +
+        `HEMISPHERE_NIGHT (${HEMISPHERE_NIGHT}) is always the cheapest way to make a dark scene ` +
+        `readable and past here it is the wrong one: a flat sourceless grey reads as a broken ` +
+        `exposure rather than as night, and it takes the lamps down with it.`,
+    );
+  }
+  if (floor < 0.05) {
+    failures.push(
+      `The night ambient is ${floor.toFixed(4)} of luminance on a shaded wall, under the 0.05 ` +
+        `floor. Below this a street with no lamp on it is not dark, it is *absent* -- there is no ` +
+        `silhouette, because a silhouette needs the thing in front of the sky to be lit by ` +
+        `something. Check HEMISPHERE_NIGHT (${HEMISPHERE_NIGHT}) and SKY_FILL_NIGHT.`,
+    );
+  }
+  // Daylight is untouched by any of that, and it is asserted from the other end
+  // rather than argued: the civil-twilight ramp reaches exactly 1 at and above
+  // 6 degrees, so the hemisphere at the reference instant must be
+  // `HEMISPHERE_DAY` to the last bit whatever the night endpoint is doing. A
+  // ramp that merely approached 1 would put a night constant into every
+  // calibrated display value in this file.
+  if (rig.hemisphereIntensity !== HEMISPHERE_DAY) {
+    failures.push(
+      `The hemisphere at the 3 pm reference is ${rig.hemisphereIntensity} rather than ` +
+        `HEMISPHERE_DAY (${HEMISPHERE_DAY}). The night endpoint has leaked into daylight, which ` +
+        `invalidates every predicted display value above at once -- silently, because a slightly ` +
+        `brighter wall looks like nothing at all.`,
+    );
+  }
+
   const torchAt10 = (dark.torchIntensity / 100) * luminance(TORCH_COLOUR as Rgb);
   if (!(torchAt10 > floor * 4)) {
     failures.push(
