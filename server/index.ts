@@ -226,8 +226,21 @@ console.log(
   `[sydney] world "${world.index.stage}": ${world.index.tiles.length} tiles, ` +
     `${world.collision.buildingCount.toLocaleString()} prisms (${(world.bytes.collision / 1e6).toFixed(1)} MB), ` +
     `${world.terrain.loadedTiles} terrain grids (${(world.bytes.terrain / 1e3).toFixed(0)} kB), ` +
-    `${world.points.length} powerups — ${(performance.now() - t0).toFixed(0)} ms`,
+    `${world.points.length} powerups, ${world.bikeSpots?.length ?? 0} bikes — ` +
+    `${(performance.now() - t0).toFixed(0)} ms`,
 );
+// What the prisms are actually costing, and what would happen if they cost more.
+// The second half of the line is the whole of the 60 km argument: the resident
+// figure is what the box pays, the cap is where it stops, and the hexagon count
+// is how much of the city is being held to serve nobody.
+if (world.segments) {
+  const s = world.segments.stats();
+  console.log(
+    `[sydney] collision per hexagon: ${s.resident}/${s.hexes} resident, ` +
+      `${(s.bytes / 1e6).toFixed(0)} MB estimated against a ${(s.capBytes / 1e6).toFixed(0)} MB cap ` +
+      `(SYDNEY_COLLISION_CAP_MB), ${s.tiles} tiles`,
+  );
+}
 
 /**
  * The rooms, sharing that one city read-only.
@@ -423,6 +436,16 @@ const server = Bun.serve<Conn>({
         },
         rss: process.memoryUsage.rss(),
         heap: process.memoryUsage().heapUsed,
+        /**
+         * What the city is costing, and whether the cap is doing anything.
+         *
+         * Reported beside `rss` on purpose: `rss` says what the box is paying
+         * and this says which part of it is prisms and how much of that is the
+         * hexagons somebody is standing in. `null` on a world with no hex
+         * contract, where the answer is "all of it, always". See
+         * `world.HexResidency`.
+         */
+        segments: world.segments?.stats() ?? null,
         windowMs: window,
         ticksInWindow,
         room: rooms,

@@ -76,14 +76,11 @@ import {
 // is what makes a claim mean the same thing on both ends. See `game/bikes.ts`.
 import {
   BikeField,
-  bikePlan,
   inTuningZone,
-  placeBike,
   type Bike,
-  type BikeGround,
   type RiderView,
 } from '../client/src/game/bikes.ts';
-import { EYE_HEIGHT, PLAYER_RADIUS } from '../client/src/player/controller.ts';
+import { EYE_HEIGHT } from '../client/src/player/controller.ts';
 import { COLOURWAYS } from '../client/src/player/character.ts';
 import {
   ANIM,
@@ -155,7 +152,7 @@ import { PositionHistory, createBounds, rewindInto, resolveLiveById, type Rewoun
 // are a stated API rather than whatever the melee happened to need. See its
 // header.
 import { SpatialHash } from '../client/src/game/spatialhash.ts';
-import { eyeAt, groundFor, type ServerWorld } from './world.ts';
+import { eyeAt, groundFor, layOutBikes, type ServerWorld } from './world.ts';
 import { CollisionWorld } from '../client/src/player/collision.ts';
 import { TerrainField } from '../client/src/world/terrain.ts';
 import { WaterLevels } from '../client/src/world/wading.ts';
@@ -175,20 +172,6 @@ export const FIXED_DT = 1 / TICK_HZ;
  */
 const JOIN_RING = 9;
 const JOIN_PER_RING = 8;
-
-/**
- * The capsule a parked bike is tested against, and how high a kerb it may stand
- * on. The player's own, deliberately.
- *
- * A bike is about the width of the person pushing it, and the thing that
- * actually matters is that a bike must never be parked somewhere a player cannot
- * walk up to. Testing it with the *player's* radius is what guarantees that: any
- * spot that admits a bike admits the person coming to fetch it. The 0.42 is the
- * controller's step height, so a kerb is not an obstacle -- a bike parked on a
- * kerb is a bike parked correctly.
- */
-const PLACE_RADIUS = PLAYER_RADIUS;
-const PLACE_STEP = 0.42;
 
 /** One connected player or one bot. */
 export interface Participant {
@@ -542,23 +525,21 @@ export class Simulation {
     };
 
     // The bikes, laid out from the same tile index every client reads and
-    // snapped to the same ground the players walk on. `placeBike` returning null
-    // is a tile with nowhere to park -- all building, all water, or out over the
-    // harbour -- and is a normal outcome rather than a failure.
-    const placeWorld = groundFor(world);
-    const ground: BikeGround = {
-      groundHeight: (x, z, feetY) => placeWorld.groundHeight(x, z, feetY),
-      // A null move against the prisms, which is `main.ts`'s own `placeClear`
-      // test and `combat.pickRespawn`'s: `resolve` pushes a circle out of
-      // anything it overlaps and reports whether it had to. The 0.42 is the
-      // controller's step height, so a kerb is not an obstacle -- a bike parked
-      // on a kerb is a bike parked correctly.
-      clear: (x, z, y) => !world.collision.resolve(x, z, x, z, PLACE_RADIUS, y + PLACE_STEP).hit,
-      waterSurface: (x, z) => world.water.surfaceAt(x, z),
-    };
-    for (const plan of bikePlan(world.index.tiles)) {
-      const spot = placeBike(plan, ground);
-      if (spot) this.bikes.adopt(plan.id, spot);
+    // snapped to the same ground the players walk on.
+    //
+    // **The layout arrives on the world rather than being computed here**, and
+    // that changed when collision stopped being whole. `loadWorld` walks the
+    // hexagons once at boot and places each hexagon's bikes while its prisms are
+    // resident; a room built later would test the same plan against whatever
+    // happened to be loaded at the time and park bike 412 somewhere room 1 did
+    // not. See `world.layOutBikes`.
+    //
+    // The fallback is for the worlds the checks build by hand -- `verifySim`'s
+    // empty city among them -- which have no `bikeSpots` and no hexagons either,
+    // so laying out here against a fully-resident (or entirely empty) world is
+    // exactly what it always was.
+    for (const placed of world.bikeSpots ?? layOutBikes(world)) {
+      this.bikes.adopt(placed.id, placed.spot);
     }
   }
 

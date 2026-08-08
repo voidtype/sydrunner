@@ -113,12 +113,35 @@ class Building:
     amenity: str | None = None
     shop: str | None = None
 
+    # What the source said about the structure not starting at the ground, and
+    # about it being a bridge. Carried raw and undecided, because the decision
+    # needs the terrain and the road network and neither exists at ingest --
+    # see `elevated.py`, which is the only reader of all five.
+    min_height: float | None = None
+    min_level: int | None = None
+    bridge: bool = False
+    man_made: str | None = None
+    layer: int = 0
+
     # Filled by attributes.py
     height: float = 0.0
     height_source: str = ""
     archetype: str = ""
     retail: bool = False
     roof_form: str = ""
+
+    # Filled by elevated.py: metres from this building's pad to the underside of
+    # its prism. Zero for everything that stands on the ground, which is all but
+    # a few dozen structures in the extent.
+    #
+    # It is *not* a world y and deliberately not one: the pad is measured at
+    # emission by `tiles._pad_and_skirt` against a terrain this class knows
+    # nothing about, so a base held as an absolute height would be a second
+    # answer to "where is the ground here" that could disagree with the first.
+    # `height` means the prism's own height once this is non-zero -- roof minus
+    # soffit, not roof minus ground -- which is exactly what
+    # `tiles.write_collision` documents its height word to be.
+    base_height: float = 0.0
 
     @property
     def tile(self) -> str:
@@ -205,6 +228,11 @@ def _from_osm(b: osm.OsmBuilding) -> Building:
         heritage=b.heritage,
         amenity=b.amenity,
         shop=b.shop,
+        min_height=b.min_height,
+        min_level=b.min_level,
+        bridge=b.bridge,
+        man_made=b.man_made,
+        layer=b.layer,
     )
 
 
@@ -321,6 +349,18 @@ def store(con: sqlite3.Connection, buildings: list[Building]) -> int:
                     "source": b.source,
                     "name": b.name,
                     "type": b.building_type,
+                    # The elevation tags ride here rather than in columns of
+                    # their own, on the same terms `source`, `name` and `type`
+                    # already do: they are read by exactly one pass, they are
+                    # never queried, and adding four columns to a 470,000-row
+                    # table for tags that fewer than 3,000 rows carry is a
+                    # migration for nothing. Written only when present, so the
+                    # blob is unchanged for every building that has none.
+                    **({"min_height": b.min_height} if b.min_height is not None else {}),
+                    **({"min_level": b.min_level} if b.min_level else {}),
+                    **({"bridge": True} if b.bridge else {}),
+                    **({"man_made": b.man_made} if b.man_made else {}),
+                    **({"layer": b.layer} if b.layer else {}),
                 }
             ),
         )

@@ -447,6 +447,16 @@ def _slice_building(parent: Building, index: int, poly: Polygon) -> Building:
         heritage=parent.heritage,
         amenity=parent.amenity,
         shop=parent.shop,
+        # And the elevation tags, on the same terms as the levels above: a row
+        # stated to start 3 m up is a row of houses each of which does. Carried
+        # rather than dropped because `elevated.py` runs long after this and has
+        # no way back to the parent -- a slice that lost them would be a piece
+        # of an elevated structure quietly put back on the ground.
+        min_height=parent.min_height,
+        min_level=parent.min_level,
+        bridge=parent.bridge,
+        man_made=parent.man_made,
+        layer=parent.layer,
     )
 
 

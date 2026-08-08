@@ -203,13 +203,53 @@ Four things then become incremental:
    (2.4 MB today → ~15 MB) and `far.bin` (3.1 MB → ~20 MB), which both become
    per-segment; the far skyline additionally wants a distance cut, since nobody
    needs Penrith's rooflines from Bondi.
-4. **The server's memory.** `server/world.ts` loads all collision and terrain at
-   boot: **25.4 MB measured today**, ~180–220 MB at 60 km, against an RSS
-   already at 480 MB and a 600 MB cap on a 1 GB box. Either the box grows, or
-   the server loads segments on demand — and since a room's players are almost
-   always in one part of the map, on-demand is both cheaper and more honest.
-   This is the only item on the list that touches the authoritative simulation,
-   so it gets its own round and its own checks.
+4. **The server's memory. Done — see "The server's memory, measured" below.**
+   The number in this line used to be 25.4 MB and it was the wrong number: that
+   is the collision *on disk*, and what the box pays is **193 MB of live heap
+   and 336 MB of RSS**. Collision is now held per hexagon and near a player,
+   under `SYDNEY_COLLISION_CAP_MB`. The lane graph is measured and left whole,
+   with a stated reason and a stated 60 km cost.
+
+## The server's memory, measured
+
+Every figure below is one Bun process per subsystem against the shipped 19.3 km
+world (3,187 tiles, 486,917 prisms), forced GC, `heapUsed` and RSS read after.
+Attributed rather than apportioned.
+
+| at boot | files | live heap | RSS delta |
+|---|---:|---:|---:|
+| collision prisms | 25.4 MB | **193 MB** | **336 MB** |
+| lanes → `TrafficField` | 13.9 MB | 53 MB | 92 MB |
+| lanes → `PedestrianField` | (same file) | 57 MB | 88 MB |
+| terrain grids | 3.7 MB | 3.9 MB | 3.9 MB |
+| `index.json` | 0.9 MB | ~5 MB | ~5 MB |
+| powerups | 0.04 MB | ~0 | ~0 |
+| **whole `loadWorld`** | **43.0 MB** | **310 MB** | **517 MB** |
+
+A prism is **428 bytes resident against 52 on disk**: a ten-field record, a
+`Float32Array` for its polygon, and one to four entries in a 32 m broadphase grid
+whose keys are strings. That ratio is the entire reason the file-byte estimate
+was off by 8x.
+
+**At 60 km**, on EXPANSION.md's own 7–8x tile estimate: collision 1.4–1.6 GB,
+lanes 780–890 MB. Both are fatal on a 1 GB box; collision is fatal on its own.
+
+**What was done.** `server/world.ts` holds collision **per hexagon**: a hexagon
+is loaded when any player or bot is inside it or within one tile (500 m) of its
+boundary, applied against a 2 ms per-tick decode budget, and evicted
+least-recently-needed when over `SYDNEY_COLLISION_CAP_MB` (450 by default,
+counted in estimated resident bytes because the file bytes never bind). A
+hexagon somebody is standing in is **never** evicted — the cap is broken, with a
+warning, instead. Measured on the 19.3 km world at 100 players: 601 MB RSS
+uncapped against 383 MB at a 30 MB cap, same tick p50, nobody fell.
+
+**What was not, and why.** The lane graph would take the same treatment on the
+same slots — `TrafficField.drop` and `PedestrianField.drop` already exist — but
+both rebuild their flat array and broadphase grid over *every* resident tile on
+the first query after any change. Timed: **3.4 ms + 11.2 ms at full residency**,
+3.7 ms at a quarter of it, landing inside the tick on every hexagon crossing.
+The fix is an incremental rebuild inside two `client/src/game/` classes shared
+with the renderer, which is a round of its own. It is the next one.
 
 ## Detail: my recommendation, and the user's call
 
@@ -235,8 +275,9 @@ full detail everywhere, the plan works unchanged at roughly 2.5× the bytes.
    learns to read a segmented index. This is the round that de-risks everything
    else, and it is independently useful — it takes us off a 5 GB ceiling we are
    already touching.
-2. **Server segment loading**, so the 1 GB box is not the constraint that
-   decides the map's size.
+2. ~~**Server segment loading**, so the 1 GB box is not the constraint that
+   decides the map's size.~~ **Collision done** — see "The server's memory,
+   measured". The lane graph is the remainder and is measured, not guessed.
 3. **`ring1` (19.3 → 30 km)**: prove the segmented build end to end on real
    data, including the anchor re-bake and the seven audits.
 4. **`ring2`, `ring3`** on the same machinery, one at a time.

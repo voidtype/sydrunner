@@ -413,10 +413,25 @@ class StreetNetwork:
         self._obstacle_tree = STRtree(self._obstacles)
 
     @classmethod
-    def load(cls, radius_m: float, buildings: list[Building]) -> StreetNetwork:
+    def load(
+        cls,
+        radius_m: float,
+        buildings: list[Building],
+        roads: list[osm.OsmRoad] | None = None,
+    ) -> StreetNetwork:
+        """`roads` is an optional hand-in of an already-read way set.
+
+        Exactly `decks.DeckNetwork.load`'s argument and there for the same
+        reason: `osm.read_roads` is a full pass over a 56 MB extract's `lines`
+        layer, and by the time this is called `cmd_build` has usually done that
+        pass already -- `elevated.py` needs the ways before the street network
+        exists, because a footprint's base has to be decided before anything is
+        bucketed by tile. Passing them through is a read saved, not a behaviour
+        change: the filter below is applied either way.
+        """
         roads = [
             r
-            for r in osm.read_roads(radius_m)
+            for r in (osm.read_roads(radius_m) if roads is None else roads)
             # Underground ways carry no surface. Left in, the Cross City and
             # Eastern Distributor tunnels drive asphalt straight through
             # Darlinghurst blocks that have no road on them.

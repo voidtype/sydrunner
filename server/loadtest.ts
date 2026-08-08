@@ -71,6 +71,22 @@
  * binds for everybody at once, and therefore the case that sets the worst-case
  * per-client downlink the protocol has to survive.
  *
+ * `--scatter` is the opposite end and the newest one: every client `/tp`s to a
+ * different suburb and does it again every twenty seconds, so the swarm is
+ * spread over the **whole built extent** and keeps moving across it. It exists
+ * for `world.HexResidency` -- the server now holds collision per hexagon and
+ * near somebody, and a hexagon is 12 km across, so nothing else this harness can
+ * do makes the resident set change at all. `--disperse`'s 700 m disc is one
+ * hexagon.
+ *
+ *     SYDNEY_COLLISION_CAP_MB=30 bun run server/index.ts
+ *     bun run server/loadtest.ts --players 100 --minutes 3 --shards 2 --scatter
+ *
+ * Every run, scattered or not, now reports the **lowest `y` any client saw**.
+ * That is the assertion hex-lazy collision is proved against and it is not
+ * visible in a tick-time table: a player whose prisms were taken away does not
+ * cost the server anything, they just fall for ever.
+ *
  * ---------------------------------------------------------------------------
  * ## What the server has to be started with
  *
@@ -90,6 +106,9 @@
  * and the harness is the fix.
  */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import {
   AOI_MAX_PLAYERS,
   MSG,
@@ -108,6 +127,10 @@ import {
   frameType,
   type InputFrame,
 } from '../client/src/net/protocol.ts';
+// `/tp <suburb>` over the ordinary chat channel, which is how `--scatter` moves
+// a client across the map: an authoritative teleport the server already
+// implements, rather than a harness-only door into the simulation.
+import { encodeChatSay } from '../client/src/net/chat.ts';
 
 // --- Arguments ------------------------------------------------------------------
 
@@ -175,6 +198,28 @@ interface Options {
    * them is what says the cost is O(local density) rather than O(room).
    */
   disperse: boolean;
+  /**
+   * Spread the swarm over the **whole built extent** by teleporting it, and keep
+   * moving it.
+   *
+   * `--disperse` above spreads a room over a 700 m disc, and the paragraph
+   * before it says why that is the honest shape of a busy room. It is not a
+   * shape that exercises `world.HexResidency` at all: a hexagon is 12 km across,
+   * so a 700 m disc is one hexagon and the server's resident set never changes.
+   *
+   * This sends each client `/tp <suburb>` at join and again every
+   * `scatterEverySec`, choosing a different suburb each round out of
+   * `suburbs.json`. A hundred clients then stand in a hundred different parts of
+   * Sydney and *move between them*, which is the only way the eviction path is
+   * reached by a real socket rather than by a check driving the class directly.
+   *
+   * The teleport is the real `/tp`, with the real 10 s cooldown, so the period
+   * must clear it -- see `server/chat.ts`.
+   */
+  scatter: boolean;
+  scatterEverySec: number;
+  /** Where `suburbs.json` is, for the names `--scatter` teleports to. */
+  world: string;
 }
 
 function parseArgs(argv: string[]): Options {
@@ -200,7 +245,31 @@ function parseArgs(argv: string[]): Options {
     convergeX: Number(get('cx', 'NaN')),
     convergeZ: Number(get('cz', 'NaN')),
     disperse: argv.includes('--disperse'),
+    scatter: argv.includes('--scatter'),
+    scatterEverySec: Number(get('scatter-every', '20')),
+    world: get('world', new URL('../client/public/world', import.meta.url).pathname),
   };
+}
+
+/**
+ * The suburb names `--scatter` teleports to, off the world on local disk.
+ *
+ * Read from the file rather than from the server, because the server does not
+ * publish them and adding them to `/health` would put 16 kB on the endpoint
+ * every client polls before every join. The harness runs against a host whose
+ * world it can see -- that is already true of every line in PERFORMANCE.md.
+ *
+ * Empty when there is no such file, which turns `--scatter` into a no-op rather
+ * than a crash: a world built before the pipeline emitted suburbs still runs.
+ */
+function suburbNames(worldDir: string): string[] {
+  try {
+    const raw = readFileSync(join(worldDir, 'suburbs.json'), 'utf8');
+    const places = JSON.parse(raw) as Array<{ name?: string }>;
+    return places.map((p) => p.name ?? '').filter((n) => n.length > 0);
+  } catch {
+    return [];
+  }
 }
 
 // --- One synthetic player ---------------------------------------------------------
@@ -258,6 +327,22 @@ class SwarmClient {
   private z = 0;
   private headingT = 0;
 
+  /**
+   * How low this client ever got, and the worst it dropped between two
+   * snapshots.
+   *
+   * The whole of the safety proof for hex-lazy collision, measured where it can
+   * actually be seen. A player whose hexagon has been evicted out from under
+   * them does not stop -- they fall, for ever, and the only place that is
+   * visible is the `y` on the wire. `minY` is the honest signal (the built world
+   * has no ground below about -80 m ENU) and `maxDrop` is the shape of it: a
+   * fall accelerates, so the drop per 50 ms snapshot climbs past anything a jump
+   * off a warehouse produces.
+   */
+  private y = 0;
+  minY = Infinity;
+  maxDrop = 0;
+
   /** The pileup's target, for `converge`. */
   private readonly targetX: number;
   private readonly targetZ: number;
@@ -292,13 +377,35 @@ class SwarmClient {
   /** The heading this client disperses on. Fixed per client, so they fan out. */
   private readonly disperseYaw: number;
 
-  constructor(n: number, seed: number, behaviour: Behaviour | null, targetX = 0, targetZ = 0, disperse = false) {
+  /** `--scatter`: the suburbs to visit, seconds to the next hop, and how many made. */
+  private readonly suburbs: readonly string[];
+  private readonly scatterEvery: number;
+  private scatterT: number;
+  scatterHops = 0;
+
+  constructor(
+    n: number,
+    seed: number,
+    behaviour: Behaviour | null,
+    targetX = 0,
+    targetZ = 0,
+    disperse = false,
+    suburbs: readonly string[] = [],
+    scatterEvery = 0,
+  ) {
     this.n = n;
     this.behaviour = behaviour ?? behaviourFor(n);
     this.targetX = targetX;
     this.targetZ = targetZ;
     this.rand = { s: (seed * 2654435761 + n * 40503) | 0 };
     this.disperseT = disperse ? 45 : 0;
+    this.suburbs = suburbs;
+    this.scatterEvery = scatterEvery;
+    // Staggered by client index over the first period, so a hundred clients do
+    // not all teleport on the same tick and hand the residency a hundred
+    // hexagons to start at once. That would measure the thundering herd rather
+    // than the steady state.
+    this.scatterT = suburbs.length > 0 ? (n % Math.max(1, scatterEvery)) * 1 : Infinity;
     // A golden-angle fan rather than a random one, so 128 clients in a room get
     // 128 evenly-spaced headings instead of a random walk's clumps. The same
     // trick `world/vegetation.ts` uses to scatter without gaps.
@@ -346,7 +453,9 @@ class SwarmClient {
             this.id = w.id;
             this.room = w.room;
             this.x = w.x;
+            this.y = w.y;
             this.z = w.z;
+            this.minY = w.y;
             this.frame.yaw = w.yaw;
             this.joined = true;
             done();
@@ -367,8 +476,18 @@ class SwarmClient {
             if (s.players.length > this.setMax) this.setMax = s.players.length;
             for (const p of s.players) {
               if (p.id === this.id) {
+                // A drop only counts when the player did not also move sideways
+                // by more than anything the game can do in 50 ms. The fastest
+                // thing in Sydney is a lime bike at 39.4 m/s, which is 2 m a
+                // snapshot; 20 m is a `/tp`, and a teleport from the Blue
+                // Mountains to Bondi reads as a 146 m plunge if you let it.
+                const moved = Math.hypot(p.x - this.x, p.z - this.z);
+                const drop = this.y - p.y;
+                if (this.snapshots > 1 && moved < 20 && drop > this.maxDrop) this.maxDrop = drop;
                 this.x = p.x;
                 this.z = p.z;
+                this.y = p.y;
+                if (p.y < this.minY) this.minY = p.y;
                 break;
               }
             }
@@ -453,6 +572,23 @@ class SwarmClient {
     if (!ws || !this.joined || ws.readyState !== 1) return;
     const f = this.frame;
     f.seq = (f.seq + 1) & 0xffff;
+
+    // The scatter hop, ahead of everything: a `/tp` is a chat frame rather than
+    // an input, so it neither replaces this tick's input nor skips it. See
+    // `Options.scatter`.
+    if (this.suburbs.length > 0) {
+      this.scatterT -= dt;
+      if (this.scatterT <= 0) {
+        this.scatterT = this.scatterEvery;
+        // A different suburb each hop and a different sequence per client, so
+        // the swarm keeps moving between hexagons instead of settling into one
+        // ring of them. `+ 7` rather than `+ 1` because consecutive entries in
+        // `suburbs.json` are neighbours, and hopping next-door is not a hop.
+        const at = (this.n * 7 + this.scatterHops * 7 + 1) % this.suburbs.length;
+        ws.send(encodeChatSay(`/tp ${this.suburbs[at]}`));
+        this.scatterHops++;
+      }
+    }
 
     // The dispersal, before the behaviour mix and overriding it. See
     // `Options.disperse`: 45 s of sprinting outward on a fixed heading spreads a
@@ -576,14 +712,39 @@ interface ShardResult {
   leftView: number;
   /** How many clients landed in each room. The gateway's spread, measured. */
   perRoom: Record<string, number>;
+  /**
+   * The lowest `y` any client in this shard ever reported, and the worst drop
+   * between two of its snapshots.
+   *
+   * The assertion the hex-lazy collision pass is proved against. Nothing in a
+   * tick-time table would show a player falling through the world -- the tick
+   * gets *cheaper* when the prisms are gone -- so the only honest proof is the
+   * altitude on the wire. See `SwarmClient.minY`.
+   */
+  minY: number;
+  maxDrop: number;
+  /** `--scatter` teleports issued, so a run that silently did not scatter says so. */
+  scatterHops: number;
 }
 
 async function runShard(opt: Options): Promise<ShardResult> {
   const clients: SwarmClient[] = [];
   const base = opt.shardIndex < 0 ? 0 : opt.shardIndex * 100000;
+  // Read once per shard rather than once per client: 316 names off a 16 kB file,
+  // and a hundred clients re-parsing it is a hundred reads for one answer.
+  const suburbs = opt.scatter ? suburbNames(opt.world) : [];
   for (let i = 0; i < opt.players; i++) {
     clients.push(
-      new SwarmClient(base + i, opt.seed, opt.converge ? 'converge' : null, opt.convergeX, opt.convergeZ, opt.disperse),
+      new SwarmClient(
+        base + i,
+        opt.seed,
+        opt.converge ? 'converge' : null,
+        opt.convergeX,
+        opt.convergeZ,
+        opt.disperse,
+        suburbs,
+        opt.scatterEverySec,
+      ),
     );
   }
 
@@ -681,6 +842,9 @@ async function runShard(opt: Options): Promise<ShardResult> {
     entered: 0,
     leftView: 0,
     perRoom: {},
+    minY: Infinity,
+    maxDrop: 0,
+    scatterHops: 0,
   };
   for (const c of joined) {
     result.snapshots += c.snapshots;
@@ -695,6 +859,9 @@ async function runShard(opt: Options): Promise<ShardResult> {
     result.leftView += c.leftView;
     const key = String(c.room);
     result.perRoom[key] = (result.perRoom[key] ?? 0) + 1;
+    if (c.minY < result.minY) result.minY = c.minY;
+    if (c.maxDrop > result.maxDrop) result.maxDrop = c.maxDrop;
+    result.scatterHops += c.scatterHops;
     const j = c.jitter();
     if (j.n > 0) {
       result.jitterP50.push(j.p50);
@@ -731,6 +898,21 @@ interface StatsSample {
   interest?: { mean: number; max: number };
   room?: RoomSample[];
   windowMs?: number;
+  /**
+   * `world.HexResidency`'s counters. Absent on a host with no hex contract and
+   * on any host older than this pass, which is why every read is guarded.
+   */
+  segments?: {
+    enabled: boolean;
+    hexes: number;
+    resident: number;
+    needed: number;
+    bytes: number;
+    capBytes: number;
+    loads: number;
+    evictions: number;
+    overCap: number;
+  } | null;
 }
 
 async function pollStats(url: string): Promise<StatsSample | null> {
@@ -744,6 +926,15 @@ async function pollStats(url: string): Promise<StatsSample | null> {
 }
 
 // --- Output -------------------------------------------------------------------------
+
+/**
+ * Below this, in ENU metres, nobody is standing on anything.
+ *
+ * The build's own floor is `root.json`'s `sea_level_y` at -71.075, and the
+ * deepest water in `world/wading.ts` is 3.5 m under it. -150 is that with 75 m
+ * of margin, which is more than any drop in the city and far less than a fall.
+ */
+const LOWEST_GROUND_M = -150;
 
 function fmt(n: number, places = 2): string {
   return n.toFixed(places);
@@ -794,6 +985,21 @@ function report(opt: Options, shards: ShardResult[], samples: StatsSample[]): vo
   L.push(`    tick p99 worst poll  ${fmt(peak((s) => s.tickMs.p99), 3)} ms      max seen ${fmt(peak((s) => s.tickMs.max), 2)} ms`);
   L.push(`    stalls (>4x budget)  ${warm.reduce((a, s) => a + s.stalls, 0)}   -- the GC proxy; Bun exposes no hook`);
   L.push(`    RSS / heap           ${fmt(peak((s) => s.rss) / 1e6, 1)} / ${fmt(peak((s) => s.heap) / 1e6, 1)} MB (peak)`);
+  // The hexagon residency, when the host has one. `evictions` climbing with
+  // `overCap` at zero is the whole of what a capped run is meant to show: the
+  // cap bound, the LRU cycled, and it never had to hold a needed hexagon over
+  // budget to do it.
+  const seg = warm.length > 0 ? warm[warm.length - 1].segments : null;
+  if (seg && seg.enabled) {
+    L.push(
+      `    collision hexagons   ${seg.resident}/${seg.hexes} resident, ${seg.needed} needed, ` +
+        `${fmt(seg.bytes / 1e6, 0)} / ${fmt(seg.capBytes / 1e6, 0)} MB cap`,
+    );
+    L.push(
+      `    loads / evictions    ${peak((s) => s.segments?.loads ?? 0)} / ${peak((s) => s.segments?.evictions ?? 0)}` +
+        `   over-cap updates ${peak((s) => s.segments?.overCap ?? 0)}`,
+    );
+  }
   L.push('');
   L.push('    phase                 ms/tick     % of tick');
   const tickTotal = Math.max(1e-9, avg((s) => s.tickMs.p50));
@@ -812,6 +1018,25 @@ function report(opt: Options, shards: ShardResult[], samples: StatsSample[]): vo
   L.push(`    snapshot gap p99     ${fmt(median(allP99), 2)} ms median, ${fmt(worst(allP99), 2)} ms on the worst client`);
   L.push(`    downlink per client  ${fmt((bytes / Math.max(1, joined) / seconds) * 8 / 1000, 1)} kbit/s (measured)`);
   L.push(`    server total out     ${fmt((bytes / seconds) * 8 / 1e6, 2)} Mbit/s`);
+
+  // --- Did anybody fall through the world?
+  //
+  // The whole safety proof for `world.HexResidency`, and it lives on the client
+  // side because that is where it is observable: a player whose prisms went away
+  // under them is a `y` that never stops going down, and nothing on the server
+  // notices. The built extent's terrain bottoms out near the sea floor at about
+  // -80 m ENU, so `LOWEST_GROUND_M` is that with a wide margin -- deep enough
+  // that wading, a harbour swim and a drop off the Cahill all clear it, shallow
+  // enough that four seconds of free fall does not.
+  const minY = Math.min(...shards.map((s) => s.minY));
+  const maxDrop = Math.max(...shards.map((s) => s.maxDrop));
+  const hops = shards.reduce((a, s) => a + s.scatterHops, 0);
+  const fell = Number.isFinite(minY) && minY < LOWEST_GROUND_M;
+  L.push(
+    `    lowest y seen        ${fmt(minY, 1)} m   worst drop between snapshots ${fmt(maxDrop, 2)} m` +
+      `   ${fell ? `** BELOW ${LOWEST_GROUND_M} m: somebody fell through the world **` : '(nobody fell)'}`,
+  );
+  if (opt.scatter) L.push(`    scatter teleports    ${hops} across ${suburbNames(opt.world).length} suburbs`);
 
   // --- v8's interest management, from both ends. The two disagreeing would mean
   // the server measures one working set and encodes another.
@@ -986,6 +1211,14 @@ if (opt.shards <= 1) {
     ];
     if (opt.converge) args.push('--converge', '--cx', String(opt.convergeX), '--cz', String(opt.convergeZ));
     if (opt.disperse) args.push('--disperse');
+    // `--world` with it, because a shard resolves the suburb list off disk and
+    // its `import.meta.url` default is only right when the harness is run from
+    // the repo it was built in. Forgetting this pair is a `--scatter` run that
+    // silently does not scatter -- the parent parses the flag, every client is
+    // in a forked shard that never saw it, and the report says zero teleports.
+    if (opt.scatter) {
+      args.push('--scatter', '--scatter-every', String(opt.scatterEverySec), '--world', opt.world);
+    }
     const proc = Bun.spawn(['bun', ...args], { stdout: 'pipe', stderr: 'inherit' });
     procs.push(
       new Response(proc.stdout).text().then((text) => {

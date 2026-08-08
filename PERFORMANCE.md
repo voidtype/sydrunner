@@ -96,7 +96,19 @@ bun run server/loadtest.ts --players 1000 --minutes 3 --shards 8 --disperse
 # the CBD pileup: one room, everybody converging on one intersection
 SYDNEY_ROOMS=1 SYDNEY_ROOM_CAP=128 SYDNEY_BOTS=0 bun run server/index.ts
 bun run server/loadtest.ts --players 100 --minutes 3 --shards 2 --converge
+
+# the whole city at once: every client /tp's to a different suburb and keeps
+# moving, against a collision cap small enough to force eviction
+SYDNEY_ROOMS=1 SYDNEY_ROOM_CAP=128 SYDNEY_BOTS=0 SYDNEY_COLLISION_CAP_MB=30 bun run server/index.ts
+bun run server/loadtest.ts --players 100 --minutes 3 --shards 2 --scatter
 ```
+
+`--scatter` is the only mode that moves the server's **hexagon residency**
+(`server/world.ts`): a hexagon is 12 km across, so `--disperse`'s 700 m disc is
+one hexagon and the resident set never changes. Every run now also reports the
+**lowest `y` any client saw**, which is the one place a player falling through
+the world is visible — it costs the server nothing, so no tick-time column shows
+it.
 
 `SYDNEY_ROOM_CAP` is the per-room join gate and defaults to 128;
 `SYDNEY_MAX_PLAYERS` is still accepted as an alias, because that is the name the
@@ -586,6 +598,49 @@ table's bandwidth column came off the *clients*, not off `/stats`.
   equal to a brute-force scan, and a ranking bias is a change to the rule.
   **This is the top phase 5 candidate**, with pooling the client's remote actors
   beside it.
+
+## Measured: collision held per hexagon
+
+The world's prisms are no longer all resident — `server/world.ts` holds them per
+hexagon, near a player, under `SYDNEY_COLLISION_CAP_MB`. Four runs, back to back
+on the same tree, 100 clients, 3 minutes each, one room, no bots. Paired rather
+than absolute: `npc` is the noisiest phase in the suite and the tree moves, so
+what is worth reading is capped against uncapped *within* a pair.
+
+| run | tick p50 | tick p99 | heap peak | resident | loads / evictions | lowest y |
+|---|---:|---:|---:|---|---:|---:|
+| dispersed, uncapped | 2.193 ms | 7.437 ms | 462 MB | 16/16 hexes, 209 MB | 16 / 0 | −63.1 m |
+| **dispersed, 30 MB cap** | **2.054 ms** | **7.297 ms** | **254 MB** | 2/16 hexes, 44 MB | 18 / 16 | −63.0 m |
+| scattered, uncapped | 2.114 ms | 7.488 ms | 432 MB | 16/16 hexes, 209 MB | 16 / 0 | −70.8 m |
+| **scattered, 30 MB cap** | 2.142 ms | **6.817 ms** | 416 MB | 12/16 hexes, 195 MB | 28 / 16 | −71.1 m |
+
+Zero stalls, zero join failures and 60.00 Hz in all four. **Nobody fell**: the
+floor of the built world is about −80 m ENU and the worst altitude any of 400
+clients reached was −71.1 m, with a worst snapshot-to-snapshot drop of 1.18 m.
+
+Three things in the table are the whole result:
+
+- **The cap costs nothing.** Capped is *faster* on p50 and p99 in the dispersed
+  pair and on p99 in the scattered one. It is not mysterious: with two hexagons
+  resident instead of sixteen, `advance`, `traffic` and `bikes` each have fewer
+  prisms to test, and the residency's own work is 0.003 ms p50 (measured
+  directly) against a 2 ms decode budget it only spends while a hexagon is
+  arriving.
+- **The saving is a function of where the players are, not of the cap.**
+  Dispersed — one room over a 700 m disc, which is what a real room is — holds
+  2 hexagons and saves 208 MB of heap. Scattered over the whole 19.3 km world,
+  **12 of 16 hexagons are genuinely needed** and the cap cannot be honoured: it
+  is broken deliberately, 19 warnings in three minutes, because evicting a
+  hexagon somebody is standing in is the one thing this must never do. That is
+  the honest shape of the mechanism and it matters at 60 km: a normal room will
+  hold 1–3 hexagons (~30–90 MB against 1.4–1.6 GB whole), and a hundred players
+  each in a different suburb will hold most of the map.
+- **Eviction had to be budgeted too, and that was found by the check rather
+  than by the harness.** `CollisionWorld.removeTile` walks every prism and
+  splices it out of its broadphase cells, so dropping the fattest hexagon —
+  374 tiles, 100,480 prisms — took **21.6 ms** in one call. It is now paid off
+  over ticks under the same 2 ms budget the decode uses; the worst single
+  residency update measured over a three-hexagon walk is 4.4 ms.
 
 ### The fixed floor is now multiplied by R
 

@@ -1254,8 +1254,44 @@ export class RoomHost {
   }
 
   step(): void {
+    // The world's residency first, and host-wide rather than per room, because
+    // the rooms share one `CollisionWorld` by reference: what has to be resident
+    // is the union of what everybody on this host needs, and a room stepping
+    // against a hexagon another room's players had just evicted is the failure
+    // this ordering rules out. See `world.HexResidency` and `roomWorld`.
+    //
+    // Before the rooms rather than after, so a hexagon started this tick has the
+    // whole of the tick's slack to read in. Nothing here blocks: `update` starts
+    // reads and forgets them, and spends at most `APPLY_BUDGET_MS` decoding what
+    // earlier ticks read.
+    const segments = this.world.segments;
+    if (segments !== undefined) segments.update(this.occupants());
     for (const room of this.rooms) room.step();
   }
+
+  /**
+   * Where everybody on this host is, as flat `x, z` pairs.
+   *
+   * Bots included, and that is not a nicety: a bot is a participant that walks
+   * the city and is resolved against the prisms exactly as a player is, so a
+   * hexagon with only bots in it is a hexagon whose collision has to be there.
+   *
+   * Into a reused array, because this runs at 60 Hz and a fresh 200-element
+   * array a tick is the kind of allocation PERFORMANCE.md phase 1 spent a round
+   * removing.
+   */
+  occupants(out: number[] = this.occupantScratch): number[] {
+    out.length = 0;
+    for (const room of this.rooms) {
+      for (const p of room.sim.participants.values()) {
+        const at = p.combat.body.position;
+        out.push(at.x, at.z);
+      }
+    }
+    return out;
+  }
+
+  private readonly occupantScratch: number[] = [];
 
   players(): number {
     let n = 0;

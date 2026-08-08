@@ -1485,6 +1485,14 @@ async function main(): Promise<void> {
   say('');
   await checkHexes();
 
+  // --- 30. And the server's half of the same cut: collision held per hexagon
+  // and near somebody, under a cap, because 193 MB of prisms at 19.3 km is
+  // 1.4 GB at 60 km on a 1 GB box. Every failure in it is silent -- a city that
+  // is quietly the wrong city, or one quietly taken out from under a player.
+  // See `checkServerSegments`, appended last and self-contained.
+  say('');
+  await checkServerSegments();
+
   say('');
   if (failures.length === 0) {
     say(`ALL CHECKS PASSED (${log.filter((l) => l.includes('PASS')).length})`);
@@ -2154,7 +2162,7 @@ async function checkBikes(): Promise<void> {
             // At a road speed, because the knockback now scales with it: a car
             // in one of its parked stages is stationary and shoves nobody, and
             // this case is a *run-down*. See `traffic.carHitStrength`.
-            stage: CAR_STAGE_DRIVING, routeT: 0, speed: 12,
+            stage: CAR_STAGE_DRIVING, routeT: 0, speed: 12, identity: 0,
           });
         },
       },
@@ -2747,28 +2755,39 @@ async function checkTraffic(): Promise<void> {
       `${cars.toLocaleString()} cars exist across the whole extent right now, ` +
         `${parked.toLocaleString()} of them parked at a kerb between runs`,
     );
-    // How many route ends had no way close enough to derive a kerb bay from --
-    // a motorway deck, or an end whose own way is in the next tile's sidecar.
-    // Reported rather than checked, because the right number is a property of
-    // the shipped world rather than of this code: those cars dwell at the lane
-    // offset instead, which is a car stopped in a lane, which is what a car
-    // stopped on a motorway is. It is here so that a pipeline change to the ways
-    // block shows up as this number moving.
+    // How the extent's route ends came out of `bays.py`'s arbitration, in three
+    // buckets rather than the two v1 had. The middle one is new and is the
+    // reason this had to be re-counted: `kerbShift === 0` used to mean "found no
+    // kerb", and now also means "took the lane itself", which is a real
+    // exclusive claim rather than a failure -- so counting it as one would have
+    // read as a 5% regression on a number that actually improved.
+    //
+    // Reported rather than asserted at a figure, because the right number is a
+    // property of the shipped world; the gate is the last line, which is what
+    // fires if the arbitration ever starts starving.
     {
-      let kerbless = 0;
+      let bayless = 0;
+      let inLane = 0;
       for (const route of routes) {
-        if (route.kerbShift0 === 0) kerbless++;
-        if (route.kerbShift1 === 0) kerbless++;
+        if (!route.bay0) bayless++;
+        else if (route.kerbShift0 === 0) inLane++;
+        if (!route.bay1) bayless++;
+        else if (route.kerbShift1 === 0) inLane++;
       }
       const ends = routes.length * 2;
+      const kerb = ends - bayless - inLane;
       say(
-        `  kerbs: ${(ends - kerbless).toLocaleString()} of ${ends.toLocaleString()} route ends park ` +
-          `against a derived kerb bay; ${kerbless.toLocaleString()} ` +
-          `(${((kerbless / ends) * 100).toFixed(1)}%) dwell at the lane offset instead`,
+        `  kerbs: ${kerb.toLocaleString()} of ${ends.toLocaleString()} route ends own a kerb bay, ` +
+          `${inLane.toLocaleString()} own the lane spot they drive through ` +
+          `(${((inLane / ends) * 100).toFixed(1)}%, \`bays.py\`'s last resort), and ` +
+          `${bayless.toLocaleString()} (${((bayless / ends) * 100).toFixed(1)}%) own nothing and have ` +
+          'no park stage at all',
       );
       check(
-        kerbless < ends * 0.25,
-        `at least three route ends in four found a kerb (${(((ends - kerbless) / ends) * 100).toFixed(1)}%)`,
+        bayless < ends * 0.1,
+        `at least nine route ends in ten own a bay outright ` +
+          `(${(((ends - bayless) / ends) * 100).toFixed(1)}%) -- an end that owns nothing is a car ` +
+          'that winks in mid-lane at road speed, which is the artefact the park stages exist to remove',
       );
     }
     // The datum puts sea level at y = -71.075. A lane whose height lookup missed
@@ -3111,6 +3130,697 @@ async function checkTraffic(): Promise<void> {
       bad === 0 && compared > 0,
       `${compared} car knockbacks reproduce bit-identically across two module instances`,
     );
+  }
+
+  // --- THE BAY LEDGER: at most one car in a bay, across every system at once.
+  //
+  // The user's report, in full: "when a car pulls in it must be to an empty
+  // spot, and when it leaves it must clear up that spot. they should never
+  // overlap." Everything below is that sentence as arithmetic against the
+  // shipped bytes, and none of it has a picture -- a schedule car standing
+  // inside a parked one renders as a car.
+  //
+  // Three claimants have to be arbitrated between and until lanes v2 none of
+  // them could see the other two:
+  //
+  //   * the **static fleet** in `.cars.bin`, which this process can read
+  //     (`checkTraffic` runs in Bun with a disk) even though `server/world.ts`
+  //     deliberately does not;
+  //   * every **other route's** two bays, which a per-tile decoder cannot see
+  //     because a claimant may be three tiles away;
+  //   * the route's **own successive slots**, which is a timing question rather
+  //     than a geometry one -- see `PARK_BAY_GAP`.
+  //
+  // The thing asserted is **an occupant of a bay**: a schedule car in
+  // `CAR_STAGE_PARKED_IN` or `CAR_STAGE_PARKED_OUT`, or any of the static
+  // fleet. No two of those may ever be inside each other, at any instant, over
+  // two simulation hours. That is invariants 1 and 2 verbatim -- a bay is
+  // exclusively owned, a car pulls in to an empty one and clears it when it
+  // leaves -- and it is the sentence the user actually wrote.
+  //
+  // Two exclusions, both counted and printed below rather than waved away.
+  //
+  //   * **A car in a lane.** A driving lane on a 7.5 m residential street sits
+  //     0.825 m from the kerb bay beside it while two cars need 1.8 m, so the
+  //     shipped world's traffic lane already overlaps its own parked cars by up
+  //     to 1.30 m, has done since `parking.py` was written, and is a question
+  //     about `lanes.LANE_FRACTION` against `parking.KERB_OFFSET` rather than
+  //     about bays. That includes a car held at a red light, which is why the
+  //     line is drawn at the *stage* and not at `CAR_HIT_MIN_SPEED` -- see
+  //     `carsAt`, where drawing it at the speed reported 33,290 false hits.
+  //   * **A car on a ramp.** A 6.0 m parallel bay holding a car up to 5.6 m
+  //     long means leaving one must sweep through the space in front of it.
+  //     That is what a parallel park is, and no arbitration can or should fix
+  //     it.
+  {
+    const root2 = new URL('../client/public/world', import.meta.url).pathname;
+    // The extent is 19 km across and the sweep below is quadratic in the cars it
+    // holds, so it runs on the ring around the origin -- the CBD and the inner
+    // terrace suburbs, which is both the densest kerb in the build and the one
+    // players actually stand on.
+    const RING = 1000;
+    // Statics are loaded well outside it because a route whose *bounds* reach
+    // the ring may put a bay 800 m away -- `lanes.MAX_ROUTE_M` -- and a bay
+    // checked against a fleet that was never loaded is a check that passes for
+    // the wrong reason.
+    const STATIC_RING = RING + 900;
+
+    /** `parking.BAY_SPACING`. The pitch of the canonical kerb bay grid, metres. */
+    const BAY_SPACING = 6.0;
+    /**
+     * `bays.RESERVE_HALF_LENGTH` / `RESERVE_HALF_WIDTH`. The rectangle the
+     * pipeline arbitrates with, restated here on the same terms every other
+     * pipeline constant in this file is: what is under test is whether the two
+     * agree, and a check that imported the number could not tell.
+     */
+    const RESERVE_HL = 2.9;
+    const RESERVE_HW = 1.05;
+
+    interface Box {
+      x: number; z: number; y: number; dx: number; dz: number;
+      hl: number; hw: number; tag: string;
+    }
+
+    /**
+     * Two oriented rectangles, by the separating-axis theorem, with a vertical
+     * gate first.
+     *
+     * The gate is `carOverlaps`' own and is here for the same reason: the
+     * Cahill Expressway runs eight metres over Alfred Street and a car on one
+     * is directly above a car on the other in plan all day.
+     */
+    const overlap = (a: Box, b: Box): boolean => {
+      if (Math.abs(a.y - b.y) > 3) return false;
+      const dx = b.x - a.x;
+      const dz = b.z - a.z;
+      const axes = [[a.dx, a.dz], [a.dz, -a.dx], [b.dx, b.dz], [b.dz, -b.dx]];
+      for (const [lx, lz] of axes) {
+        const d = Math.abs(dx * lx + dz * lz);
+        const ra = a.hl * Math.abs(a.dx * lx + a.dz * lz) + a.hw * Math.abs(a.dz * lx - a.dx * lz);
+        const rb = b.hl * Math.abs(b.dx * lx + b.dz * lz) + b.hw * Math.abs(b.dz * lx - b.dx * lz);
+        if (d > ra + rb) return false;
+      }
+      return true;
+    };
+
+    /**
+     * `world/cars.ts`'s per-instance size jitter, restated.
+     *
+     * That module imports three and can never be loaded in this process --
+     * `carBodySizes()`'s argument, and the same one `CAR_BODY_SIZE` makes. The
+     * scale matters: it takes the longest body from 5.4 m to 5.616 m, which is
+     * 21 cm of car that a footprint check taking the nominal size would miss.
+     */
+    const staticScale = (seed: number): number => {
+      let h = 0x811c9dc5;
+      for (const p of [seed, 11]) {
+        h ^= Math.imul(p | 0, 0x27d4eb2d) >>> 0;
+        h = Math.imul(h ^ (h >>> 15), 0x85ebca6b) >>> 0;
+      }
+      return 0.96 + 0.08 * (((h ^ (h >>> 13)) >>> 0) / 0xffffffff);
+    };
+
+    // --- The static fleet, straight off the disk.
+    const statics: Box[] = [];
+    const identities = new Set<number>();
+    let identityCollisions = 0;
+    let carTiles = 0;
+    for (const entry of world.index.tiles) {
+      const ox = entry.bounds[0];
+      const oz = entry.bounds[1] + world.index.tile_size;
+      const cx = ox + world.index.tile_size / 2;
+      const cz = oz - world.index.tile_size / 2;
+      if (cx * cx + cz * cz > STATIC_RING * STATIC_RING) continue;
+      const buf = await readFile(join(root2, 'tiles', `${entry.key}.cars.bin`)).catch(() => null);
+      if (buf === null) continue;
+      carTiles++;
+      const v = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+      // `cars.CAR_STRIDE`, and the bound is `decodeCars`' own: a count the file
+      // is too short to hold is a truncated sidecar, and reading past it throws
+      // a `RangeError` that would take the whole check down rather than
+      // reporting a missing tile.
+      const n = Math.min(v.getUint32(0, true), Math.max(0, Math.floor((buf.byteLength - 4) / 16)));
+      for (let i = 0; i < n; i++) {
+        const o = 4 + i * 16;
+        const x = v.getFloat32(o, true) + ox;
+        const z = v.getFloat32(o + 4, true) + oz;
+        const heading = v.getFloat32(o + 8, true);
+        const body = Math.min(v.getUint8(o + 12), one.CAR_BODY_SIZE.length - 1);
+        const seed = v.getUint16(o + 14, true);
+        const s = staticScale(seed);
+        const size = one.CAR_BODY_SIZE[body];
+        // The renderer builds a car with its nose along local +X and rotates it
+        // by `heading` about Y, which sends +X to `(cos h, 0, -sin h)`. Same
+        // conversion `parking._heading` derives from the other end.
+        statics.push({
+          x, z, y: world.terrain.height(x, z) + 0.02,
+          dx: Math.cos(heading), dz: -Math.sin(heading),
+          hl: size.length * 0.5 * s, hw: size.width * 0.5 * s,
+          tag: `${entry.key}#${i}`,
+        });
+        const id = one.staticCarIdentity(entry.key, i);
+        if (identities.has(id)) identityCollisions++;
+        else identities.add(id);
+      }
+    }
+    check(
+      statics.length > 1000,
+      `${statics.length.toLocaleString()} static parked cars loaded from ${carTiles} tiles inside ` +
+        `${STATIC_RING} m -- the fleet the schedule has to share the kerb with`,
+    );
+    // The static half of the identity contract. 32 bits over this many cars has
+    // a birthday-paradox expectation of a fraction of a collision, and a
+    // collision is not even a bug -- two cars getting the same model is a
+    // coincidence. What this is really gating is the mistake it would be easy to
+    // make: keying off the 16-bit `seed` the sidecar already carries, which over
+    // this fleet would collide tens of thousands of times. The bound is loose
+    // enough not to flake on an unlucky draw and three orders of magnitude below
+    // that failure.
+    const birthday = (statics.length * statics.length) / 2 / 4294967296;
+    check(
+      identityCollisions <= 3 + birthday * 5,
+      `their identities collide ${identityCollisions} times in ${statics.length.toLocaleString()} ` +
+        `cars (birthday expectation ${birthday.toFixed(2)}) -- \`cars.staticCarIdentity\` mixes the ` +
+        'tile key and the index, not the 16-bit sidecar seed, which would collide thousands of times',
+    );
+
+    const CELL = 12;
+    const cellOf = (x: number, z: number): number =>
+      (Math.floor(x / CELL) + 4096) * 8192 + (Math.floor(z / CELL) + 4096);
+    const staticGrid = new Map<number, Box[]>();
+    for (const b of statics) {
+      const cx = Math.floor(b.x / CELL);
+      const cz = Math.floor(b.z / CELL);
+      for (let i = -1; i <= 1; i++) {
+        for (let j = -1; j <= 1; j++) {
+          const k = (cx + i + 4096) * 8192 + (cz + j + 4096);
+          const bucket = staticGrid.get(k);
+          if (bucket === undefined) staticGrid.set(k, [b]);
+          else bucket.push(b);
+        }
+      }
+    }
+
+    // --- 1. No bay is claimed twice, anywhere in the extent.
+    //
+    // Time-independent: a bay is a route-time and an offset in the sidecar, so
+    // this is a claim on the *file* rather than on any instant, and it can
+    // therefore be run over all 23,778 routes rather than over the ring.
+    //
+    // The two bays are read by posing the car at the two ages that put it in
+    // them -- age 0 is the first tick of the pull-out, where the lateral blend
+    // is still exactly 1, and age just under `duration` is the last tick of the
+    // pull-in, where it has returned to 1. Read that way rather than
+    // reconstructed from `parkT0` and a binary search of my own, so that what is
+    // checked is the position a player actually sees.
+    {
+      const bayBox = one.createCarPose();
+      const bays: Box[] = [];
+      for (const route of routes) {
+        for (const [has, when, label] of [
+          [route.bay0, route.phase, 'near'],
+          [route.bay1, route.phase + route.duration - 1e-4, 'far'],
+        ] as const) {
+          if (!has) continue;
+          if (!one.poseCar(route, 0, when, bayBox)) continue;
+          bays.push({
+            x: bayBox.x, z: bayBox.z, y: bayBox.y, dx: bayBox.dx, dz: bayBox.dz,
+            hl: RESERVE_HL, hw: RESERVE_HW, tag: `r${route.rid}.${label}`,
+          });
+        }
+      }
+      const bayGrid = new Map<number, Box[]>();
+      let doubled = 0;
+      let worstPair = '';
+      for (const b of bays) {
+        const cx = Math.floor(b.x / CELL);
+        const cz = Math.floor(b.z / CELL);
+        const here = bayGrid.get(cellOf(b.x, b.z));
+        if (here !== undefined) {
+          for (const other of here) {
+            if (!overlap(b, other)) continue;
+            doubled++;
+            if (worstPair === '') {
+              worstPair = `${b.tag} and ${other.tag} at (${b.x.toFixed(0)}, ${b.z.toFixed(0)})`;
+            }
+          }
+        }
+        for (let i = -1; i <= 1; i++) {
+          for (let j = -1; j <= 1; j++) {
+            const k = (cx + i + 4096) * 8192 + (cz + j + 4096);
+            const bucket = bayGrid.get(k);
+            if (bucket === undefined) bayGrid.set(k, [b]);
+            else bucket.push(b);
+          }
+        }
+      }
+      check(
+        doubled === 0,
+        `${bays.length.toLocaleString()} kerb bays are claimed across the extent and no two of their ` +
+          `reserved ${(RESERVE_HL * 2).toFixed(1)} x ${(RESERVE_HW * 2).toFixed(1)} m rectangles ` +
+          `overlap (${doubled} did` + (worstPair ? `, first ${worstPair}` : '') + ')',
+      );
+      // The reservation has to be big enough to be worth reserving: it must
+      // cover the largest car the client will ever draw in it, or the pipeline
+      // arbitrated a smaller box than the thing that arrives.
+      let largestL = 0;
+      let largestW = 0;
+      for (const size of one.CAR_BODY_SIZE) {
+        if (size.length * 0.5 * 1.04 > largestL) largestL = size.length * 0.5 * 1.04;
+        if (size.width * 0.5 * 1.04 > largestW) largestW = size.width * 0.5 * 1.04;
+      }
+      check(
+        RESERVE_HL >= largestL && RESERVE_HW >= largestW && RESERVE_HL * 2 < BAY_SPACING,
+        `and the reserved rectangle covers the largest car anyone draws (${largestL.toFixed(3)} x ` +
+          `${largestW.toFixed(3)} m half-extents) while still fitting two to a ${BAY_SPACING} m ` +
+          'bay pitch -- any larger and every bay beside an occupied one would be refused',
+      );
+
+      // --- 2. No claimed bay is standing on a static car.
+      //
+      // The rectangle, not a centre distance, and that distinction was earned.
+      // The obvious rule -- "no reserved bay within half a bay pitch of a
+      // static car", 3 m, since two cars in the canonical grid are 6 m apart --
+      // is a *proxy* for the rectangle test, and over the 26,264 bays in the
+      // extent it produced exactly one false positive: a bay 2.63 m from a
+      // static car parked nose-to-nose with it **across a narrow carriageway**,
+      // which is two 1.9 m-wide cars with 0.73 m of road between them and is
+      // simply what a 5.3 m street looks like. The centre distance is still
+      // reported below, because it is the number that would move first if the
+      // arbitration started drifting off the grid.
+      let onStatic = 0;
+      let nearest = Infinity;
+      let nearestWhere = 'nothing within a cell';
+      let closePairs = 0;
+      let inRing = 0;
+      let worstWhere = '';
+      for (const b of bays) {
+        if (b.x * b.x + b.z * b.z > RING * RING) continue;
+        inRing++;
+        const bucket = staticGrid.get(cellOf(b.x, b.z));
+        if (bucket === undefined) continue;
+        for (const s of bucket) {
+          if (Math.abs(b.y - s.y) > 3) continue;
+          const d = Math.sqrt((b.x - s.x) ** 2 + (b.z - s.z) ** 2);
+          if (d < nearest) {
+            nearest = d;
+            nearestWhere = `${b.tag} / ${s.tag} at (${b.x.toFixed(0)}, ${b.z.toFixed(0)})`;
+          }
+          if (d < BAY_SPACING / 2) closePairs++;
+          if (!overlap(b, s)) continue;
+          onStatic++;
+          if (worstWhere === '') {
+            worstWhere = `${b.tag} on ${s.tag} at (${b.x.toFixed(0)}, ${b.z.toFixed(0)})`;
+          }
+        }
+      }
+      check(
+        onStatic === 0,
+        `none of the ${inRing.toLocaleString()} bays inside ${RING} m stands on a static car ` +
+          `(${onStatic} did${worstWhere ? `, first ${worstWhere}` : ''}); the closest pair of centres ` +
+          `is ${nearest.toFixed(2)} m apart at ${nearestWhere}, and ${closePairs} pair(s) sit inside ` +
+          `half a ${BAY_SPACING} m bay pitch without touching`,
+      );
+    }
+
+    // --- 2b. The park block decodes identically in two module instances.
+    //
+    // `checkRaves`' pattern, aimed at the thing v2 added. The determinism block
+    // at the top of this function already compares *poses*, which covers this
+    // transitively -- a parked pose is nothing but the bay -- but it compares
+    // them through one shared `TrafficField`, so a decoder that read the park
+    // block at the wrong offset would be read wrongly by both and agree. This
+    // opens the same bytes twice, independently, and compares the fields.
+    //
+    // `!==` on the doubles, not a tolerance: the claim is that the two produce
+    // the same bits.
+    {
+      let compared = 0;
+      let differing = 0;
+      let tilesRead = 0;
+      for (const entry of world.index.tiles) {
+        if (tilesRead >= 12) break;
+        const ox = entry.bounds[0];
+        const oz = entry.bounds[1] + world.index.tile_size;
+        const cx = ox + world.index.tile_size / 2;
+        const cz = oz - world.index.tile_size / 2;
+        if (cx * cx + cz * cz > RING * RING) continue;
+        const buf = await readFile(join(root2, 'tiles', `${entry.key}.lanes.bin`)).catch(() => null);
+        if (buf === null) continue;
+        const bytes = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+        const a = one.decodeLanes(bytes, ox, oz);
+        const b = two.decodeLanes(bytes, ox, oz);
+        if (a === null || b === null || a.routes.length !== b.routes.length) { differing++; continue; }
+        tilesRead++;
+        for (let i = 0; i < a.routes.length; i++) {
+          const ra = a.routes[i];
+          const rb = b.routes[i];
+          compared++;
+          if (
+            ra.bay0 !== rb.bay0 || ra.bay1 !== rb.bay1 ||
+            ra.parkT0 !== rb.parkT0 || ra.parkT1 !== rb.parkT1 ||
+            ra.outT !== rb.outT || ra.inT !== rb.inT ||
+            ra.outSpan !== rb.outSpan || ra.inSpan !== rb.inSpan || ra.inLen !== rb.inLen ||
+            ra.outA !== rb.outA || ra.outB !== rb.outB ||
+            ra.inA !== rb.inA || ra.inB !== rb.inB || ra.inC !== rb.inC ||
+            ra.kerbOffX0 !== rb.kerbOffX0 || ra.kerbOffZ0 !== rb.kerbOffZ0 ||
+            ra.kerbOffX1 !== rb.kerbOffX1 || ra.kerbOffZ1 !== rb.kerbOffZ1 ||
+            ra.dwellCap0 !== rb.dwellCap0 || ra.dwellCap1 !== rb.dwellCap1
+          ) differing++;
+        }
+      }
+      check(
+        compared > 0 && differing === 0,
+        `the v2 park block decodes bit-identically in two module instances across ${tilesRead} tiles ` +
+          `and ${compared.toLocaleString()} routes (${differing} differed) -- the client and the server ` +
+          'read one arbitration rather than repeating it',
+      );
+    }
+
+    // --- 3. The sweep: two sim-hours at 1 Hz, every car in the ring.
+    //
+    // Simulated rather than reasoned about, because the thing that broke in v1
+    // was not the geometry but the *timing*: a bay whose two occupants are
+    // correctly six metres from everything else and four seconds apart when they
+    // need to be six is invisible to any check that looks at one instant.
+    const ringRoutes = world.traffic.near(0, 0, RING, [] as typeof routes[number][]).slice();
+    const SWEEP_SECONDS = 7200;
+    /** How often the (reported, not asserted) moving-car count is taken. */
+    const MOVING_EVERY = 300;
+
+    /**
+     * Every schedule car alive at one instant, split three ways.
+     *
+     * **`occupant` is the assertable one and the line is drawn at the stage,
+     * not at the speed.** The first draft used the module's own furniture
+     * threshold -- `speed < CAR_HIT_MIN_SPEED` -- which is a nicer idea and is
+     * wrong twice over. It sweeps in a car held at a **red light**, which is
+     * stationary *in a traffic lane*; and it misses nothing, because a car in
+     * one of the two parked stages has a speed of exactly zero anyway. On the
+     * v1 world that mistake reported 33,290 overlaps, every one of them a car
+     * at a red beside the kerb it was driving past.
+     *
+     * `ramp` is counted and never asserted, and the reason is geometric rather
+     * than a concession. A parallel bay is 6.0 m and a car is up to 5.6 m, so a
+     * car leaving one **must** pass through the space in front of it -- that is
+     * what pulling out of a parallel park is. Half a second into a pull-out the
+     * car is already eight metres up the street and still a few tens of
+     * centimetres off the bay line, which is squarely on top of the next bay.
+     * No arbitration can fix that and no arbitration should: the alternative is
+     * a car that translates sideways out of a park.
+     */
+    const carsAt = (
+      pool: readonly typeof routes[number][],
+      now: number,
+      pose: ReturnType<typeof one.createCarPose>,
+      out: { occupant: Box[]; ramp: Box[]; driving: Box[] },
+    ): void => {
+      out.occupant.length = 0;
+      out.ramp.length = 0;
+      out.driving.length = 0;
+      for (const route of pool) {
+        const first =
+          Math.floor((now - route.phase - route.duration - route.dwellCap) / route.headway) + 1;
+        const last = Math.floor((now - route.phase + route.dwellCap) / route.headway);
+        for (let slot = first; slot <= last; slot++) {
+          if (!one.poseCar(route, slot, now, pose)) continue;
+          const size = one.CAR_BODY_SIZE[pose.body];
+          const box: Box = {
+            x: pose.x, y: pose.y, z: pose.z, dx: pose.dx, dz: pose.dz,
+            hl: size.length * 0.5 * pose.scale, hw: size.width * 0.5 * pose.scale,
+            tag: `r${pose.route}s${pose.slot}/stage${pose.stage}`,
+          };
+          if (pose.stage === one.CAR_STAGE_PARKED_IN || pose.stage === one.CAR_STAGE_PARKED_OUT) {
+            out.occupant.push(box);
+          } else if (pose.stage === one.CAR_STAGE_DRIVING) out.driving.push(box);
+          else out.ramp.push(box);
+        }
+      }
+    };
+
+    const scratchPose = one.createCarPose();
+    const buckets = { occupant: [] as Box[], ramp: [] as Box[], driving: [] as Box[] };
+    let occupantStatic = 0;
+    let occupantOccupant = 0;
+    let rampPairs = 0;
+    let movingMoving = 0;
+    let movingStatic = 0;
+    let sampledInstants = 0;
+    let movingCars = 0;
+    let occupantCars = 0;
+    let rampCars = 0;
+    const offenders: string[] = [];
+    const movingWorst: string[] = [];
+    const started = performance.now();
+
+    /** Fill a bucket grid over one list, so the pair scan is local. */
+    const gridOf = (boxes: readonly Box[]): Map<number, Box[]> => {
+      const grid = new Map<number, Box[]>();
+      for (const a of boxes) {
+        const cx = Math.floor(a.x / CELL);
+        const cz = Math.floor(a.z / CELL);
+        for (let i = -1; i <= 1; i++) {
+          for (let j = -1; j <= 1; j++) {
+            const k = (cx + i + 4096) * 8192 + (cz + j + 4096);
+            const bucket = grid.get(k);
+            if (bucket === undefined) grid.set(k, [a]);
+            else bucket.push(a);
+          }
+        }
+      }
+      return grid;
+    };
+
+    for (let s = 0; s < SWEEP_SECONDS; s++) {
+      const now = one.trafficSeconds(one.trafficTick(Date.UTC(2026, 0, 1, 8, 0, 0)) + s * 60);
+      carsAt(ringRoutes, now, scratchPose, buckets);
+      occupantCars += buckets.occupant.length;
+
+      // --- The assertion: an occupied bay holds one car, and that is true
+      // against the static fleet and against every other route at once.
+      for (const a of buckets.occupant) {
+        for (const b of staticGrid.get(cellOf(a.x, a.z)) ?? []) {
+          if (!overlap(a, b)) continue;
+          occupantStatic++;
+          if (offenders.length < 6) {
+            offenders.push(`${a.tag} on static ${b.tag} at (${a.x.toFixed(0)}, ${a.z.toFixed(0)})`);
+          }
+        }
+      }
+      const seen = new Map<number, Box[]>();
+      for (const a of buckets.occupant) {
+        for (const b of seen.get(cellOf(a.x, a.z)) ?? []) {
+          if (!overlap(a, b)) continue;
+          occupantOccupant++;
+          if (offenders.length < 6) {
+            offenders.push(`${a.tag} on ${b.tag} at (${a.x.toFixed(0)}, ${a.z.toFixed(0)})`);
+          }
+        }
+        const cx = Math.floor(a.x / CELL);
+        const cz = Math.floor(a.z / CELL);
+        for (let i = -1; i <= 1; i++) {
+          for (let j = -1; j <= 1; j++) {
+            const k = (cx + i + 4096) * 8192 + (cz + j + 4096);
+            const bucket = seen.get(k);
+            if (bucket === undefined) seen.set(k, [a]);
+            else bucket.push(a);
+          }
+        }
+      }
+
+      // --- The report: cars that are moving, and cars on a ramp. Sampled
+      // rather than swept, because this number is printed and not asserted and
+      // a full pass costs more than the assertion it is standing beside.
+      if (s % MOVING_EVERY !== 0) continue;
+      sampledInstants++;
+      movingCars += buckets.driving.length;
+      rampCars += buckets.ramp.length;
+      const drivingGrid = gridOf(buckets.driving);
+      const counted = new Set<string>();
+      for (const a of buckets.driving) {
+        for (const b of drivingGrid.get(cellOf(a.x, a.z)) ?? []) {
+          if (a === b) continue;
+          const pair = a.tag < b.tag ? `${a.tag}|${b.tag}` : `${b.tag}|${a.tag}`;
+          if (counted.has(pair)) continue;
+          counted.add(pair);
+          if (!overlap(a, b)) continue;
+          movingMoving++;
+          if (movingWorst.length < 4) {
+            movingWorst.push(`moving x moving at (${a.x.toFixed(0)}, ${a.z.toFixed(0)}): ${a.tag} / ${b.tag}`);
+          }
+        }
+        for (const b of staticGrid.get(cellOf(a.x, a.z)) ?? []) {
+          if (!overlap(a, b)) continue;
+          movingStatic++;
+          if (movingWorst.length < 4) {
+            movingWorst.push(`moving x static at (${a.x.toFixed(0)}, ${a.z.toFixed(0)}): ${a.tag} / ${b.tag}`);
+          }
+        }
+      }
+      for (const a of buckets.ramp) {
+        for (const b of staticGrid.get(cellOf(a.x, a.z)) ?? []) {
+          if (overlap(a, b)) rampPairs++;
+        }
+        for (const b of buckets.occupant) {
+          if (overlap(a, b)) rampPairs++;
+        }
+      }
+    }
+    const sweepMs = performance.now() - started;
+    say(
+      `  bays: swept ${SWEEP_SECONDS.toLocaleString()} s of simulation at 1 Hz over ` +
+        `${ringRoutes.length} routes inside ${RING} m -- ` +
+        `${(occupantCars / SWEEP_SECONDS).toFixed(0)} cars sitting in a bay per instant against ` +
+        `${statics.length.toLocaleString()} static, ${sweepMs.toFixed(0)} ms`,
+    );
+    check(
+      occupantStatic === 0,
+      `no schedule car sitting in a bay is ever inside a static parked car (${occupantStatic} ` +
+        'instants were)' + (offenders.length ? ` -- e.g. ${offenders[0]}` : ''),
+    );
+    check(
+      occupantOccupant === 0,
+      `and no two schedule cars sitting in a bay are ever inside each other (${occupantOccupant} ` +
+        'instants were), which covers two routes claiming one bay and two slots of one route ' +
+        'overstaying in it' + (offenders.length ? ` -- e.g. ${offenders[offenders.length - 1]}` : ''),
+    );
+    const per = Math.max(sampledInstants, 1);
+    say(
+      `  moving cars (reported, not asserted): over ${sampledInstants} sampled instants holding ` +
+        `${(movingCars / per).toFixed(0)} driving cars each, ` +
+        `**${movingMoving.toLocaleString()} moving-on-moving** overlapping pairs ` +
+        `(${(movingMoving / per).toFixed(1)} per instant) and ${movingStatic.toLocaleString()} ` +
+        `moving-on-static (${(movingStatic / per).toFixed(1)} per instant). The second number is not ` +
+        'about the traffic at all: a lane on a 7.5 m street runs 0.825 m from the kerb bay beside it ' +
+        'and two cars need 1.8 m, so it is `lanes.LANE_FRACTION` against `parking.KERB_OFFSET` and ' +
+        'has been true since `parking.py` was written. The first is two routes crossing at a junction ' +
+        'with a baked timetable and nobody giving way, which is the collision physics this round ' +
+        'deliberately did not attempt',
+    );
+    say(
+      `  cars on a ramp: ${rampPairs.toLocaleString()} overlapping pairs over the same instants of ` +
+        `${(rampCars / Math.max(sampledInstants, 1)).toFixed(0)} ramping cars -- also not asserted, ` +
+        'and for a sharper reason: a 6.0 m parallel bay holding a 5.6 m car means pulling out of one ' +
+        'must sweep through the space in front of it. That is what a parallel park is',
+    );
+    for (const w of movingWorst) say(`    at ${w}`);
+
+    // --- 4. The negative control: does the sweep above actually see anything?
+    //
+    // A check that reports zero is worth nothing until it has been shown to
+    // report something. So one tile's sidecar is decoded a **second time**, into
+    // a private `TileLanes` that nothing else holds, one route's near bay is
+    // dragged on top of the nearest static car, and the same resting-overlap
+    // test is run over it. It must fail. The shared `world.traffic` is never
+    // touched, so there is nothing to restore and no way for this to leak into
+    // the checks that follow.
+    {
+      let forced = -1;
+      let baseline = -1;
+      let where = '';
+      for (const entry of world.index.tiles) {
+        if (forced >= 0) break;
+        const ox = entry.bounds[0];
+        const oz = entry.bounds[1] + world.index.tile_size;
+        const cx = ox + world.index.tile_size / 2;
+        const cz = oz - world.index.tile_size / 2;
+        if (cx * cx + cz * cz > RING * RING) continue;
+        const buf = await readFile(join(root2, 'tiles', `${entry.key}.lanes.bin`)).catch(() => null);
+        if (buf === null) continue;
+        const copy = one.decodeLanes(
+          buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer, ox, oz,
+        );
+        if (copy === null) continue;
+        for (const route of copy.routes) {
+          if (!route.bay0 || route.dwellCap0 <= 0) continue;
+          const probe = one.createCarPose();
+          if (!one.poseCar(route, 0, route.phase - 0.25, probe)) continue;
+          if (probe.stage !== one.CAR_STAGE_PARKED_IN) continue;
+          // The nearest static car to this bay, wherever it is.
+          let target: Box | null = null;
+          let best = Infinity;
+          for (const s of staticGrid.get(cellOf(probe.x, probe.z)) ?? []) {
+            const d = (s.x - probe.x) ** 2 + (s.z - probe.z) ** 2;
+            if (d < best) { best = d; target = s; }
+          }
+          if (target === null) continue;
+
+          // The same `carsAt` the sweep above uses, pointed at a pool of one
+          // route. Same function, same buckets, same overlap test -- which is
+          // the whole point of a negative control: what is being shown to fire
+          // has to be the instrument, not a re-implementation of it.
+          const scratch = { occupant: [] as Box[], ramp: [] as Box[], driving: [] as Box[] };
+          const sweepOne = (): number => {
+            carsAt([route], route.phase - 0.25, one.createCarPose(), scratch);
+            let hits = 0;
+            for (const a of scratch.occupant) {
+              for (const b of staticGrid.get(cellOf(a.x, a.z)) ?? []) {
+                if (overlap(a, b)) hits++;
+              }
+            }
+            return hits;
+          };
+          baseline = sweepOne();
+          if (baseline !== 0) continue;
+          // Drag the claim onto the static car. The offsets are what the park
+          // block carries, so this is exactly the failure a pipeline that
+          // arbitrated badly would ship.
+          route.kerbOffX0 += target.x - probe.x;
+          route.kerbOffZ0 += target.z - probe.z;
+          forced = sweepOne();
+          where = `route ${route.rid}'s near bay onto static ${target.tag} at ` +
+            `(${target.x.toFixed(0)}, ${target.z.toFixed(0)})`;
+          break;
+        }
+      }
+      check(
+        baseline === 0 && forced > 0,
+        `the negative control fires: moving ${where} takes the resting-overlap test from ` +
+          `${baseline} hits to ${forced}, so the zero above is a measurement rather than a blind spot`,
+      );
+    }
+
+    // --- 5. Identity is stable across a whole life, on the shipped world.
+    //
+    // `verifyTraffic` makes the same claim on its synthetic route; this makes it
+    // on real ones, where the stages have real lengths and a real red light in
+    // the middle. What it would catch is a future change that re-rolled a car's
+    // hash on a stage boundary -- which would be invisible, because the body and
+    // the paint are drawn from that same hash and would change together.
+    {
+      const p = one.createCarPose();
+      const sample = routes.filter((_, i) => i % Math.max(1, Math.floor(routes.length / 50)) === 0);
+      let walked = 0;
+      let changes = 0;
+      let mismatched = 0;
+      let distinct = 0;
+      for (const route of sample) {
+        let id = 0;
+        const from = Math.floor((route.phase - route.dwellCap - 1) * 60);
+        const to = Math.ceil((route.phase + route.duration + route.dwellCap + 1) * 60);
+        // Every eleventh tick: a whole life at 60 Hz across fifty routes is
+        // three million poses for a property that cannot change between two
+        // ticks without changing across eleven.
+        for (let tick = from; tick <= to; tick += 11) {
+          if (!one.poseCar(route, 0, one.trafficSeconds(tick), p)) continue;
+          walked++;
+          if (id === 0) id = p.identity;
+          else if (p.identity !== id) changes++;
+          if (p.identity !== one.identityOf(route, 0)) mismatched++;
+        }
+        if (id !== 0 && one.identityOf(route, 1) !== id) distinct++;
+      }
+      check(
+        walked > 0 && changes === 0 && mismatched === 0,
+        `a car's identity never changes across its life on ${sample.length} real routes ` +
+          `(${walked.toLocaleString()} poses, ${changes} changes, ${mismatched} disagreeing with ` +
+          '`identityOf`)',
+      );
+      check(
+        distinct === sample.length,
+        `and consecutive slots of one route are different cars (${distinct} of ${sample.length})`,
+      );
+    }
   }
 }
 
@@ -13078,7 +13788,7 @@ async function checkAccelerationRamp(): Promise<void> {
  *
  * So this loads the module twice under two specifiers and asks both:
  *
- *   1. the same six sites out of 448, over six hundred nights;
+ *   1. the same six sites out of the table, over six hundred nights;
  *   2. the same beat, to the bit, at instants across a night;
  *   3. the same record on the decks at the same second of it, over a set built
  *      from the four tracks the folder actually holds;
@@ -13585,6 +14295,147 @@ async function checkRaves(): Promise<void> {
         outside === 0,
         `every one of the ${one.RAVE_SITES.length} sites is inside the ${(world.index.radius_m / 1000).toFixed(1)} km ` +
           `built extent${outside ? `; ${outside} are not, starting with ${worst}` : ''}`,
+      );
+    }
+  }
+
+  // --- And the buildings. *"i found a rave inside a building in alexandria. it
+  // shouldnt be INSIDE a building"*.
+  //
+  // Re-derived here from the **collision sidecars**, which is a different
+  // source than the one that produced the site table: the rows come from OSM
+  // parcels through `data/scratch/bake_rave_anchors.py`, and the correction in
+  // `CLEARED_PACKED` comes from `data/scratch/clear_rave_floors.ts` reading the
+  // prisms the pipeline shipped. A check that re-ran the bake's own arithmetic
+  // would pass on a table the bake got wrong; this one re-asks the question of
+  // the world the player actually walks around in, and it has already earned
+  // its place once — it caught three sites whose *shipped* decimetre-rounded
+  // coordinates clipped a wall by three centimetres, where the bake's own
+  // full-precision answer had cleared it.
+  //
+  // Structural prisms are skipped for `clear_rave_floors.ts`'s reason and it is
+  // load-bearing here: a span rave is *under* a viaduct, so counting the deck
+  // as a building would fail every one of the 65 span sites.
+  {
+    const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+    const world = await (async () => {
+      try {
+        return await loadWorld(root);
+      } catch {
+        return null;
+      }
+    })();
+    if (world === null) {
+      say('  (no world files on disk; the building check is skipped)');
+    } else {
+      /** Squared distance from a point to a segment. */
+      const segDist2 = (px: number, pz: number, ax: number, az: number, bx: number, bz: number): number => {
+        const dx = bx - ax;
+        const dz = bz - az;
+        const l2 = dx * dx + dz * dz;
+        let t = l2 > 0 ? ((px - ax) * dx + (pz - az) * dz) / l2 : 0;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const cx = ax + t * dx;
+        const cz = az + t * dz;
+        return (px - cx) * (px - cx) + (pz - cz) * (pz - cz);
+      };
+      const inside = (pts: Float32Array, x: number, z: number): boolean => {
+        let hit = false;
+        const n = pts.length / 2;
+        for (let i = 0, j = n - 1; i < n; j = i++) {
+          const xi = pts[i * 2];
+          const zi = pts[i * 2 + 1];
+          const xj = pts[j * 2];
+          const zj = pts[j * 2 + 1];
+          if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) hit = !hit;
+        }
+        return hit;
+      };
+      /** Metres to the nearest building footprint, negative if inside one. */
+      const clearance = (x: number, z: number, probe: number): number => {
+        let best = Infinity;
+        for (const p of world.collision.prismsWithin(x, z, probe)) {
+          if (p.structural) continue;
+          const n = p.points.length / 2;
+          let near = Infinity;
+          for (let i = 0, j = n - 1; i < n; j = i++) {
+            const d = segDist2(x, z, p.points[j * 2], p.points[j * 2 + 1], p.points[i * 2], p.points[i * 2 + 1]);
+            if (d < near) near = d;
+          }
+          const d = inside(p.points, x, z) ? -Math.sqrt(near) : Math.sqrt(near);
+          if (d < best) best = d;
+        }
+        return best;
+      };
+
+      // 1. Every site's dance floor, which is the rule the bake enforced.
+      let clipped = 0;
+      let centres = 0;
+      let worst = '';
+      let tightest = Infinity;
+      let tightestName = '';
+      for (const site of one.RAVE_SITES) {
+        const floor = one.raveFloorRadius(site.r);
+        const c = clearance(site.x, site.z, floor + 4);
+        if (c < 0) centres++;
+        if (c < floor) {
+          clipped++;
+          if (!worst) worst = `${site.name} at (${site.x}, ${site.z}), ${(floor - c).toFixed(1)} m of overlap`;
+        }
+        const slack = c - floor;
+        if (slack < tightest) {
+          tightest = slack;
+          tightestName = site.name;
+        }
+      }
+      check(
+        clipped === 0 && centres === 0,
+        `no rave's dance floor touches a building: all ${one.RAVE_SITES.length} sites clear every footprint in ` +
+          `the collision sidecars out to their full ${one.CROWD_DEPTH_FRACTION} * r + ${one.RAVE_FLOOR_MARGIN} m ` +
+          `floor${clipped ? `; ${clipped} do not, worst ${worst}` : ` (tightest is ${tightestName}, with ` +
+          `${tightest.toFixed(2)} m to spare)`}`,
+      );
+
+      // 2. And the people, which is the claim a player can actually see. Placed
+      // with the obstacle rejection **switched off** on purpose: `attendeeAt`'s
+      // four hashed retries would hide a bad site by quietly thinning its crowd,
+      // and "the rave is in a warehouse but only forty of the sixty people are"
+      // is not a fix. With `solid` null this is the raw layout.
+      const pose = one.createAttendeePose();
+      let placed = 0;
+      let indoors = 0;
+      let firstBad = '';
+      const NIGHTS = 120;
+      for (let n = 0; n < NIGHTS; n++) {
+        for (const venue of one.drawRaves(n)) {
+          for (let i = 0; i < venue.attendees; i++) {
+            if (!one.attendeeAt(venue, i, 0, 0, null, pose)) continue;
+            placed++;
+            if (clearance(pose.x, pose.z, 1) < 0) {
+              indoors++;
+              if (!firstBad) firstBad = `${venue.site.name} on night ${n}`;
+            }
+          }
+        }
+      }
+      check(
+        indoors === 0,
+        `  and not one of the ${placed} people at the ${NIGHTS} nights' worth of raves is standing inside a ` +
+          `building, with the obstacle rejection switched off so the layout has nowhere to hide` +
+          `${indoors ? `; ${indoors} are, starting at ${firstBad}` : ''}`,
+      );
+
+      // 3. The pass itself, reported rather than asserted: the count is a fact
+      // about this world build and will move when the world does, so a check on
+      // it would be a check that fails for being right. Two filters stand
+      // between the rows and the sites and they are not the same filter --
+      // `CLEARED_PACKED` drops a row with nowhere clear to stand, `SITE_MIN_R`
+      // drops one that was never big enough -- so this counts the pair rather
+      // than claiming a cause it cannot see from here.
+      const lost = one.RAVE_SOURCE_ROWS.length - one.RAVE_SITES.length;
+      say(
+        `  (${lost} of the ${one.RAVE_SOURCE_ROWS.length} source rows did not become sites, between the ` +
+          `clearance pass and the ${'SITE_MIN_R'} floor; ${one.RAVE_SITES.length} survive)`,
       );
     }
   }
@@ -14254,6 +15105,405 @@ async function checkHexes(): Promise<void> {
       `  NOTE  ${contract.list.length} hexagons at ${(contract.circumradius_m / 1000).toFixed(0)} km circumradius, ` +
         `${(total / 1e9).toFixed(2)} GB; fattest ${sorted[0].id} at ${(sorted[0].bytes / 1e6).toFixed(0)} MB ` +
         `(${sorted[0].tiles} tiles), median ${(sorted[Math.floor(sorted.length / 2)].bytes / 1e6).toFixed(0)} MB`,
+    );
+  }
+}
+
+/**
+ * The server's collision, held per hexagon: does the city it answers with change?
+ *
+ * `server/world.ts` used to read all 3,187 collision payloads at boot and hold
+ * them for the life of the process. Measured, that is **193 MB of live heap and
+ * 336 MB of RSS** for 25.4 MB of files -- a prism costs 428 bytes resident and
+ * 52 on disk -- and EXPANSION.md's 60 km world is 7-8x this one. So collision is
+ * now loaded per hexagon, near somebody, under `SYDNEY_COLLISION_CAP_MB`.
+ *
+ * Every failure that change can have is silent, which is why this is here rather
+ * than in a comment:
+ *
+ *   1. **A hexagon that loads to a different city than a whole-world load
+ *      would.** The `addTile` offset is the one thing this project's world file
+ *      says must be got exactly right -- prisms one tile north of the client's
+ *      is a game where players walk through buildings and are stopped by empty
+ *      air -- and the hexagon manifests carry a *second copy* of the bounds the
+ *      index carries. Two copies that disagree is exactly that bug, and nothing
+ *      in a running server says so. Checked bit-exact, on real queries.
+ *   2. **Nothing loading at all.** A needed-set rule that never fires leaves the
+ *      server with an empty city, which is not an error: it is a server where
+ *      every punch lands and nobody is ever stopped by a wall.
+ *   3. **Nothing evicting.** A cap that never binds is a cap that will not save
+ *      the 1 GB box, and the symptom is the box, not the log.
+ *   4. **Evicting a hexagon somebody is standing in.** The one failure here that
+ *      hurts a player: `world/tile-lifecycle.ts` calls dropping collision under
+ *      somebody "safety-critical", and it is the reason the cap is allowed to be
+ *      violated. Checked by walking a player across three hexagons with a cap
+ *      that cannot hold two, and asserting the hexagon under their feet survives
+ *      every update.
+ *   5. **A budget that is not a budget.** A hexagon is up to 374 tiles and about
+ *      63 ms of decode; applied in one go that is four tick budgets. Checked by
+ *      driving `update` and timing the worst call.
+ *   6. **An estimator that has drifted from the class it estimates.** The cap is
+ *      denominated in estimated resident bytes, because the file bytes never
+ *      bind at any radius; if `CollisionWorld`'s layout changes and
+ *      `BYTES_PER_PRISM` does not, the cap silently means something else.
+ *      Checked loosely -- within 2x of the measured heap delta -- because the
+ *      constant is allowed to drift and a layout change is not.
+ *
+ * Everything is driven against the **real world on disk** and a synthetic
+ * player, with no socket in it: the residency takes flat `x, z` pairs, so a
+ * check can walk somebody across Sydney in a loop.
+ */
+async function checkServerSegments(): Promise<void> {
+  say('server segments: collision per hexagon, on demand, under a cap');
+
+  const worldMod = await import('./world.ts');
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  if (!(await Bun.file(join(root, 'root.json')).exists())) {
+    say('    no built world here; skipped');
+    return;
+  }
+
+  // A cap of 8 MB against hexagons that cost 1-35 MB: it cannot hold the
+  // smallest two of the fat ones at once, so the eviction path is not something
+  // this has to contrive -- it is the only way through.
+  const TINY_CAP = 8e6;
+
+  const capped = await worldMod.loadWorld(root, TINY_CAP);
+  const segments = capped.segments;
+  if (!segments) {
+    check(false, 'the built world carries a hex contract the server can hold collision by');
+    return;
+  }
+
+  // --- 1. The world still says the same thing about itself.
+  {
+    check(
+      segments.stats().hexes === (capped.index.tiles.length > 0 ? segments.stats().hexes : 0) &&
+        segments.stats().hexes > 1,
+      `the residency knows all ${segments.stats().hexes} hexagons in the contract`,
+    );
+    check(
+      capped.terrain.loadedTiles === capped.index.tiles.length,
+      `terrain is still whole -- ${capped.terrain.loadedTiles}/${capped.index.tiles.length} grids resident, ` +
+        'which is what stops a missing hexagon being a player falling rather than a player walking ' +
+        'through a wall',
+    );
+  }
+
+  // --- 2. Three hexagons, walked. Loads happen, evictions happen, and the
+  //        hexagon under the player's feet is never one of the evictions.
+  //
+  // The three are chosen off the contract rather than named: the fattest hexagon
+  // and the two nearest its centre, so the walk crosses real ground with real
+  // prisms in it rather than three empty corners of the extent.
+  const byTiles = [...segments.entries].sort((a, b) => b.tiles - a.tiles);
+  const home = byTiles[0];
+  const others = [...segments.entries]
+    .filter((e) => e.id !== home.id && e.tiles > 50)
+    .sort(
+      (a, b) =>
+        Math.hypot(a.c[0] - home.c[0], a.c[1] - home.c[1]) -
+        Math.hypot(b.c[0] - home.c[0], b.c[1] - home.c[1]),
+    );
+  check(others.length >= 2, `the built world has three hexagons with tiles in them to walk across`);
+  if (others.length < 2) return;
+  const route = [home, others[0], others[1]];
+
+  {
+    const before = segments.stats();
+    let worstUpdateMs = 0;
+    let evictedUnderfoot = '';
+    let sawResident = 0;
+    const seenResident = new Set<string>();
+
+    // 900 steps a leg at 39.4 m/s and a 60 Hz tick is 590 m of travel per leg
+    // simulated in wall-clock milliseconds; the residency's own clock is the
+    // update count, so this walks the *rule* rather than the wall clock.
+    for (let leg = 0; leg + 1 < route.length; leg++) {
+      const from = route[leg].c;
+      const to = route[leg + 1].c;
+      for (let step = 0; step <= 900; step++) {
+        const t = step / 900;
+        const x = from[0] + (to[0] - from[0]) * t;
+        const z = from[1] + (to[1] - from[1]) * t;
+
+        const began = performance.now();
+        segments.update([x, z]);
+        const cost = performance.now() - began;
+        if (cost > worstUpdateMs) worstUpdateMs = cost;
+
+        // The rule, restated independently of the class: the hexagon this point
+        // is *inside* must never be one that has been given up. It is allowed to
+        // be still arriving -- that is the load gap, and it reads as open ground
+        // on both ends -- but once it has arrived it may not be taken away while
+        // somebody is standing in it.
+        const under = segments.hexAt(x, z);
+        if (under) {
+          if (segments.isResident(under.id)) seenResident.add(under.id);
+          else if (seenResident.has(under.id) && !evictedUnderfoot) {
+            evictedUnderfoot = `${under.id} was resident and then was not, with a player at (${x.toFixed(0)}, ${z.toFixed(0)})`;
+          }
+        }
+        // Let the reads land. `update` starts them and never awaits.
+        if (step % 60 === 0) await new Promise((r) => setTimeout(r, 0));
+      }
+      // Arrive, and give the hexagon time to finish under the budget.
+      await segments.settle();
+      segments.update([route[leg + 1].c[0], route[leg + 1].c[1]]);
+      if (segments.isResident(route[leg + 1].id)) sawResident++;
+    }
+
+    const after = segments.stats();
+    check(
+      after.loads > before.loads,
+      `the walk loaded hexagons on demand (${after.loads - before.loads} loads across ${route.length} hexagons)`,
+    );
+    check(
+      after.evictions > before.evictions,
+      `and evicted them again under an ${(TINY_CAP / 1e6).toFixed(0)} MB cap ` +
+        `(${after.evictions - before.evictions} evictions)`,
+    );
+    check(
+      sawResident === route.length - 1,
+      `every hexagon the walk arrived in was resident on arrival (${sawResident}/${route.length - 1})`,
+    );
+    check(
+      evictedUnderfoot === '',
+      `no hexagon was evicted with somebody standing in it${evictedUnderfoot ? `: ${evictedUnderfoot}` : ''}`,
+    );
+    // Four tick budgets is a stall by `/stats`' own definition. The budget is
+    // 2 ms and the overshoot is one tile, so the bar here is deliberately
+    // slack -- what it is catching is a whole hexagon applied in one call.
+    check(
+      worstUpdateMs < 16.67,
+      `the worst single residency update cost ${worstUpdateMs.toFixed(2)} ms -- inside one tick, ` +
+        'so a hexagon arriving never lands as a stall',
+    );
+  }
+
+  // --- 3. The city a resident hexagon answers with is the city a whole-world
+  //        load answers with, bit for bit.
+  //
+  // This is the one that catches a manifest whose bounds disagree with the
+  // index's, and it is checked on the three queries the simulation actually
+  // makes: `resolve` (the move), `roofHeight` (the floor) and `blocked` (the
+  // sight line). A tile-origin error moves a prism by 500 m, which every one of
+  // these reports differently and none of them reports as an error.
+  {
+    const whole = await worldMod.loadWorld(root, 1e12);
+    check(
+      whole.collision.tileCount === whole.index.tiles.length,
+      `an uncapped load is still the whole city -- ${whole.collision.tileCount}/${whole.index.tiles.length} tiles, ` +
+        `${whole.collision.buildingCount.toLocaleString()} prisms`,
+    );
+
+    // Sample inside the hexagon the capped world currently holds, so the two are
+    // answering about the same ground.
+    segments.update([home.c[0], home.c[1]]);
+    await segments.settle();
+    const resident = new Set(capped.collision.residentTiles());
+    const mine = capped.index.tiles.filter((t) => resident.has(t.key));
+    check(mine.length > 0, `the capped world is holding ${mine.length} tiles to compare against`);
+
+    let compared = 0;
+    let disagreed = 0;
+    let first = '';
+    for (let i = 0; i < mine.length && compared < 4000; i += Math.max(1, Math.floor(mine.length / 400))) {
+      const [minX, minZ, maxX, maxZ] = mine[i].bounds;
+      // **No negation**, and getting this wrong is the trap the world file's
+      // header is about. A tile's prisms are placed at `bounds[1] + tile_size`
+      // with a sidecar whose local z already runs negative, so they end up
+      // occupying world z in `[minZ, maxZ]` -- the bounds, used directly. An
+      // earlier draft of this check flipped the sign, sampled 500 m away in a
+      // *different* tile, and reported 131 disagreements that were entirely its
+      // own. Five points per tile, well inside it so a neighbouring tile's
+      // building cannot reach the sample.
+      for (const [fx, fz] of [[0.5, 0.5], [0.3, 0.35], [0.7, 0.65], [0.4, 0.75], [0.65, 0.3]]) {
+        const x = minX + (maxX - minX) * fx;
+        const z = minZ + (maxZ - minZ) * fz;
+        compared++;
+        const a = capped.collision.roofHeight(x, z, 500);
+        const b = whole.collision.roofHeight(x, z, 500);
+        const ra = capped.collision.resolve(x - 3, z - 3, x, z, 0.35, 0);
+        const rb = whole.collision.resolve(x - 3, z - 3, x, z, 0.35, 0);
+        // A short sight line, deliberately: an 80 m one crosses into the next
+        // tile, which in a capped world may be in a hexagon nobody is near, and
+        // then this would be asserting that eviction does not happen rather
+        // than that a resident hexagon answers correctly.
+        const ba = capped.collision.blocked(x - 12, 2, z - 12, x + 12, 2, z + 12);
+        const bb = whole.collision.blocked(x - 12, 2, z - 12, x + 12, 2, z + 12);
+        if (a !== b || ra.x !== rb.x || ra.z !== rb.z || ra.hit !== rb.hit || ba !== bb) {
+          disagreed++;
+          if (!first) {
+            first = `at (${x.toFixed(1)}, ${z.toFixed(1)}) roof ${a} vs ${b}, resolve ${ra.x.toFixed(3)},${ra.z.toFixed(3)},${ra.hit} vs ${rb.x.toFixed(3)},${rb.z.toFixed(3)},${rb.hit}, blocked ${ba} vs ${bb}`;
+          }
+        }
+      }
+    }
+    check(
+      disagreed === 0 && compared > 500,
+      `${compared.toLocaleString()} collision queries inside the resident hexagon are bit-identical to a ` +
+        `whole-world load${disagreed ? ` (${disagreed} disagreed, first ${first})` : ''}`,
+    );
+
+    // --- 3b. And the bikes, which is the same question asked of the *boot*
+    // path: `loadWorld` places them a hexagon at a time, so if a bike's spot
+    // depended on a neighbouring hexagon's prisms the two layouts would differ.
+    const wa = whole.bikeSpots ?? [];
+    const wb = capped.bikeSpots ?? [];
+    let bikeDiff = 0;
+    for (let i = 0; i < Math.max(wa.length, wb.length); i++) {
+      const p = wa[i];
+      const q = wb[i];
+      if (!p || !q || p.id !== q.id || p.spot.x !== q.spot.x || p.spot.y !== q.spot.y || p.spot.z !== q.spot.z) {
+        bikeDiff++;
+      }
+    }
+    check(
+      wa.length > 0 && bikeDiff === 0,
+      `all ${wa.length} bikes are parked in the identical spot whether the city was loaded whole or a ` +
+        `hexagon at a time${bikeDiff ? ` (${bikeDiff} differ)` : ''}`,
+    );
+
+    // --- 3c. The estimator the cap is denominated in, against the heap it
+    // estimates. Loose on purpose: what this catches is `CollisionWorld` growing
+    // a field or a second index while `BYTES_PER_PRISM` stays at 344.
+    //
+    // **In a process of its own**, and that is not fastidiousness. This one has
+    // two whole cities in it by now; a `heapUsed` delta taken here is dominated
+    // by whatever the collector decides to do during the measurement, and the
+    // first version of this check reported the heap going *down* by 309 MB
+    // while it was loading tiles. A fresh Bun reading 200 payloads into an empty
+    // `CollisionWorld` is the same measurement the constants were derived from.
+    {
+      const script = [
+        `const { CollisionWorld } = await import(${JSON.stringify(new URL('../client/src/player/collision.ts', import.meta.url).pathname)});`,
+        `const keys = ${JSON.stringify(mine.slice(0, 200).map((t) => [t.key, t.bounds[0], t.bounds[1] + capped.index.tile_size, t.b]))};`,
+        `const root = ${JSON.stringify(root)};`,
+        'Bun.gc(true); const before = process.memoryUsage().heapUsed;',
+        'const w = new CollisionWorld(); let prisms = 0, verts = 0;',
+        'for (const [key, ox, oz, b] of keys) {',
+        '  const buf = await Bun.file(root + "/collision/" + key + ".bin").arrayBuffer();',
+        '  const added = w.addTile(key, buf, ox, oz, b);',
+        '  prisms += added; verts += Math.max(0, (buf.byteLength - 4 - added * 10) / 8);',
+        '}',
+        'Bun.gc(true); await new Promise((r) => setTimeout(r, 100)); Bun.gc(true);',
+        'const real = process.memoryUsage().heapUsed - before;',
+        'console.log(JSON.stringify({ prisms, verts, real, held: w.buildingCount }));',
+      ].join('\n');
+      const proc = Bun.spawn(['bun', '-e', script], { stdout: 'pipe', stderr: 'pipe' });
+      const out = await new Response(proc.stdout).text();
+      await proc.exited;
+      let measured: { prisms: number; verts: number; real: number } | null = null;
+      try {
+        measured = JSON.parse(out.trim().split('\n').pop() ?? '');
+      } catch {
+        measured = null;
+      }
+      if (measured === null) {
+        check(false, `the estimator probe returned nothing parseable (${out.slice(0, 120)})`);
+      } else {
+        const estimate = worldMod.estimateCollisionBytes(measured.prisms, measured.verts);
+        const ratio = measured.real > 0 ? estimate / measured.real : 0;
+        check(
+          measured.prisms > 1000 && ratio > 0.5 && ratio < 2,
+          `the cap's estimator is within 2x of the heap it estimates: ${(estimate / 1e6).toFixed(1)} MB for ` +
+            `${measured.prisms.toLocaleString()} prisms against ${(measured.real / 1e6).toFixed(1)} MB ` +
+            `measured in a fresh process (${ratio.toFixed(2)}x)`,
+        );
+      }
+    }
+  }
+
+  // --- 4. The cap is a cap, and the needed set is the one thing that beats it.
+  //
+  // Two states, driven deliberately. With nobody anywhere the residency must
+  // come down to the cap; with a player in every hexagon it must go *over* it
+  // and say so, because the alternative is the failure this whole class is
+  // shaped around.
+  {
+    // Nobody. The spawn is pinned -- see `HexResidency.pin` -- so the floor is
+    // one hexagon rather than none.
+    for (let i = 0; i < 40; i++) segments.update([]);
+    await segments.settle();
+    for (let i = 0; i < 40; i++) segments.update([]);
+    const idle = segments.stats();
+    check(
+      idle.resident <= 2,
+      `an empty server holds ${idle.resident} hexagon(s) -- the spawn's, pinned, and nothing else`,
+    );
+
+    // Everybody, everywhere. Every hexagon is needed and none may be dropped.
+    //
+    // Driven to a fixed point rather than for a fixed number of ticks: the
+    // residency starts at most `LOAD_CONCURRENCY` hexagons per needed-set
+    // recomputation, on purpose, so sixteen of them take a couple of seconds of
+    // simulated ticks to all arrive. A loop with a count in it would be
+    // asserting the concurrency limit rather than the rule.
+    const everywhere: number[] = [];
+    for (const entry of segments.entries) everywhere.push(entry.c[0], entry.c[1]);
+    for (let round = 0; round < 200; round++) {
+      for (let i = 0; i < 20; i++) segments.update(everywhere);
+      await segments.settle();
+      if (segments.stats().resident === segments.stats().hexes) break;
+    }
+    for (let i = 0; i < 20; i++) segments.update(everywhere);
+    const full = segments.stats();
+    check(
+      full.needed === full.hexes,
+      `with somebody in every hexagon, all ${full.hexes} are needed`,
+    );
+    check(
+      full.bytes > full.capBytes && full.overCap > idle.overCap,
+      `and the cap is deliberately broken rather than a player dropped: ${(full.bytes / 1e6).toFixed(0)} MB ` +
+        `held against a ${(full.capBytes / 1e6).toFixed(0)} MB cap, reported ${full.overCap} times`,
+    );
+    check(
+      full.resident === full.hexes,
+      `every one of them is resident (${full.resident}/${full.hexes}) -- nothing was sacrificed to the cap`,
+    );
+
+    // And back: once they leave, the cap is honoured again. This is the half
+    // that says the over-cap state is a state and not a leak.
+    segments.update([]);
+    for (let i = 0; i < 40; i++) segments.update([]);
+    const recovered = segments.stats();
+    check(
+      recovered.bytes <= recovered.capBytes || recovered.resident <= 2,
+      `and when they leave it comes back down: ${(recovered.bytes / 1e6).toFixed(1)} MB, ` +
+        `${recovered.resident} hexagon(s) resident`,
+    );
+  }
+
+  // --- 5. The margin, against the speed it was chosen for. Arithmetic, so it
+  // cannot rot quietly when somebody tunes the bike.
+  {
+    const BIKE_MS = 39.4;
+    check(
+      worldMod.COLLISION_NEED_MARGIN_M / BIKE_MS > 5,
+      `the ${worldMod.COLLISION_NEED_MARGIN_M} m margin is ` +
+        `${(worldMod.COLLISION_NEED_MARGIN_M / BIKE_MS).toFixed(1)} s of warning at ${BIKE_MS} m/s -- ` +
+        'twenty times the half-second a hexagon takes to arrive',
+    );
+    check(
+      worldMod.COLLISION_NEED_MARGIN_M >= capped.index.tile_size,
+      `and it is at least one tile (${capped.index.tile_size} m), so no tile can be inside the ` +
+        'collision radius of a player and outside the hexagon they made the server load',
+    );
+  }
+
+  // --- 6. What it bought, reported rather than asserted.
+  {
+    const s = segments.stats();
+    const whole = worldMod.estimateCollisionBytes(
+      capped.collision.buildingCount,
+      0,
+    );
+    void whole;
+    say(
+      `  NOTE  collision at ${(capped.index.radius_m / 1000).toFixed(1)} km: 25.4 MB of files, ` +
+        '193 MB of live heap and 336 MB of RSS if held whole (measured). Per hexagon under an ' +
+        `${(TINY_CAP / 1e6).toFixed(0)} MB cap this process is holding ${s.resident}/${s.hexes} of them.`,
     );
   }
 }

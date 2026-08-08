@@ -48,9 +48,19 @@ WANTED_TAGS = (
     "roof:levels",
     "roof:colour",
     "height",
+    # The two tags that say a structure does not start at the ground. See
+    # `OsmBuilding.min_height` for what they mean and why the pipeline was
+    # silently wrong without them.
+    "min_height",
+    "building:min_level",
     "start_date",
     "heritage",
     "layer",
+    # `bridge` on an *area* rather than on a way. A way tagged `bridge` feeds
+    # `decks.py`; an area tagged `bridge` is a structure, and until now it went
+    # down the building path and was extruded from the ground like a warehouse.
+    "bridge",
+    "man_made",
     "name",
 )
 
@@ -149,6 +159,37 @@ class OsmBuilding:
     amenity: str | None
     shop: str | None
 
+    # --- Where the structure *starts* -----------------------------------------
+    #
+    # `min_height` is the underside of the built volume in metres above the
+    # ground, and `building:min_level` is the same statement counted in storeys.
+    # OSM's own wiki calls them "the bottom of the building part"; the pair is
+    # how a mapper says *this thing is in the air*. They are what a pedestrian
+    # overbridge, a skybridge between two towers, an elevated walkway and a
+    # building on stilts all have in common, and every one of them is a hole in
+    # the road network if it is drawn from the ground up.
+    #
+    # Neither tag existed anywhere in this pipeline before, which is why a
+    # `building=bridge` over Military Road came out as a solid prism from the
+    # asphalt to the parapet -- a wall across a trunk road that the player
+    # cannot pass and that no audit had anything to say about.
+    min_height: float | None = None
+    min_level: int | None = None
+
+    # --- Whether the polygon claims to be a bridge -----------------------------
+    #
+    # Three ways OSM says it, all of them seen in this extract:
+    #   `building=bridge`   the building-shaped span itself (14 in the extent)
+    #   `bridge=yes|...`    the same statement made as a property (1)
+    #   `man_made=bridge`   the structure outline, usually without `building`
+    #                       at all (44) -- it only reaches here when a mapper
+    #                       has *also* put a `building` tag on it.
+    # `layer` is kept beside them because on its own it means nothing about
+    # elevation -- see `elevated.py` for why it is only ever corroboration.
+    bridge: bool = False
+    man_made: str | None = None
+    layer: int = 0
+
 
 def _as_int(v: str | None) -> int | None:
     """OSM numeric tags are user-entered: '3', '3.5', '3;4', 'ground' all occur."""
@@ -169,6 +210,53 @@ def _as_float(v: str | None) -> float | None:
         return None
     f = float(m.group(1))
     return f if 0 < f <= 600 else None
+
+
+# Feet and inches still appear in OSM height tags, and `min_height` is no
+# exception: the wiki blesses `12'6"` alongside `3.8`. Rare here -- this extract
+# has none -- but a silently mis-parsed imperial value is a structure at four
+# times its stated height, so the conversion is a line rather than a hope.
+_FEET_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*'\s*(?:(\d+(?:\.\d+)?)\s*\")?\s*$")
+_METRES_PER_FOOT = 0.3048
+
+
+def _as_metres(v: str | None) -> float | None:
+    """A vertical OSM tag in metres, parsed defensively. None if unusable.
+
+    Deliberately not `_as_float`. That one rejects zero, because a building with
+    no levels and no height is a building with no data -- but `min_height=0` is
+    a *statement*, and the statement is "this thing does start at the ground".
+    Folding it into None would be harmless today and would quietly become wrong
+    the moment anything downstream treats None as "unknown, go and guess".
+
+    Accepts the four forms the tag is actually written in: a bare number, a
+    number with a unit suffix (`7 m`, `12.5 metres`), and feet-and-inches. A
+    value outside a plausible range for a *structure's underside* is refused
+    rather than clamped -- 600 m is taller than anything in the southern
+    hemisphere, and a negative one is a basement, which this pipeline has no
+    representation for and must not silently invert into a raised prism.
+    """
+    if v is None:
+        return None
+    s = str(v).strip()
+    if not s:
+        return None
+    ft = _FEET_RE.match(s)
+    if ft:
+        feet = float(ft.group(1)) + (float(ft.group(2) or 0.0) / 12.0)
+        m = feet * _METRES_PER_FOOT
+    else:
+        num = re.match(r"\s*(-?\d+(?:\.\d+)?)", s)
+        if not num:
+            return None
+        m = float(num.group(1))
+        # `7 m`, `7m`, `7 metres` are all the same number; anything else after
+        # the digits is a unit this parser does not know, and guessing at it is
+        # how a 7-foot clearance becomes a 7-metre one.
+        tail = s[num.end():].strip().lower().rstrip(".")
+        if tail and tail not in ("m", "metre", "metres", "meter", "meters"):
+            return None
+    return m if 0.0 <= m <= 600.0 else None
 
 
 def _as_layer(v: str | None) -> int:
@@ -227,6 +315,15 @@ def read_buildings(radius_m: float, path: Path = PBF_PATH) -> list[OsmBuilding]:
                 heritage=any(k.startswith("heritage") for k in a),
                 amenity=a.get("amenity"),
                 shop=a.get("shop"),
+                # Read but not acted on here. Whether a structure is in the air
+                # is a question about the terrain and the road under it, and
+                # neither is available at ingest -- `elevated.py` decides, once
+                # both exist. See `OsmBuilding` for what each tag means.
+                min_height=_as_metres(a.get("min_height")),
+                min_level=_as_int(a.get("building:min_level")),
+                bridge=a.get("bridge") in ("yes", "viaduct", "aqueduct", "boardwalk"),
+                man_made=a.get("man_made"),
+                layer=_as_layer(a.get("layer")),
             )
         )
     return out
