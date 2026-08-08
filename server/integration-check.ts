@@ -3822,6 +3822,366 @@ async function checkTraffic(): Promise<void> {
       );
     }
   }
+
+  await checkLaneLoadPath(world, one, two);
+}
+
+/**
+ * **A lazily-loaded server must pose every car exactly as a whole-world one does.**
+ *
+ * This is the invariant the hex-lazy lane graph stands on, and it is not the
+ * same claim as the two-instance determinism above it. That one asks whether two
+ * copies of the arithmetic agree about one route. This asks whether the
+ * arithmetic is even given the *same routes in the same order* when the tiles
+ * arrived by three different paths -- and until this pass the honest answer was
+ * no.
+ *
+ * `TrafficField`'s buckets used to be filled in `Map` iteration order, which is
+ * tile adoption order: `Promise.all` completion order on the server, streaming
+ * order in a browser, and hexagon eviction order on a server that streams. And
+ * `forEachCarNear` states in as many words that **the first car found wins the
+ * hit test**. So the same player, standing on the same corner, with the same
+ * routes resident, could be knocked over by a different car depending on which
+ * tile the disk answered first -- and the two ends would disagree about the
+ * direction they were thrown. Nothing observable said so, because both cars are
+ * real and both shoves look right.
+ *
+ * Three fields, three load paths, one comparison:
+ *
+ *   - **A** is instance one, every tile adopted in `index.json` order. The
+ *     whole-world client.
+ *   - **B** is instance two, adopted a *hexagon at a time* in a scrambled
+ *     hexagon order with the tiles inside each hexagon scrambled too. The lazy
+ *     server, on a disk that answered in a different order.
+ *   - **C** is B, with every hexagon then dropped in a third order and reloaded
+ *     in a fourth. The lazy server after an eviction cycle -- the state a
+ *     `SYDNEY_LANES_CAP_MB` that binds puts the process in every few minutes.
+ *
+ * The comparison is `forEachCarNear` itself rather than `poseCar`, because the
+ * order is the thing under test: it records every pose each field visits, in the
+ * order visited, and compares them field by field with `!==` on the doubles.
+ * A tolerance would pass a simulation that had begun to drift; a set comparison
+ * would pass the exact bug this exists to catch.
+ *
+ * The pedestrians ride along for the same reason and at no extra cost: the bands
+ * come out of the same sidecar, `PedestrianField.near` has the same bucket
+ * order problem, and `game/factions.forEachPoliceNear` takes the *nearest*
+ * officer with ties broken by iteration order.
+ */
+async function checkLaneLoadPath(
+  world: Awaited<ReturnType<typeof loadWorld>>,
+  one: typeof import('../client/src/game/traffic.ts'),
+  two: typeof import('../client/src/game/traffic.ts'),
+): Promise<void> {
+  const pedHere = new URL('../client/src/game/pedestrians.ts', import.meta.url).pathname;
+  const pedOne = (await import(pedHere)) as typeof import('../client/src/game/pedestrians.ts');
+  const pedTwo = (await import(`${pedHere}?instance=2`)) as typeof import('../client/src/game/pedestrians.ts');
+  const root = new URL('../client/public/world', import.meta.url).pathname;
+  const size = world.index.tile_size;
+
+  // Every lane sidecar, once, with the offset `decodeLanes` needs. Read here
+  // rather than taken off `world.traffic`, because two instances of the decoder
+  // have to be handed the same *bytes* for the comparison to mean anything.
+  const payloads: Array<{ key: string; buf: ArrayBuffer; ox: number; oz: number }> = [];
+  const CONC = 32;
+  for (let i = 0; i < world.index.tiles.length; i += CONC) {
+    const batch = world.index.tiles.slice(i, i + CONC).map(async (entry) => {
+      const file = Bun.file(join(root, 'tiles', `${entry.key}.lanes.bin`));
+      if (!(await file.exists())) return null;
+      return {
+        key: entry.key,
+        buf: await file.arrayBuffer(),
+        ox: entry.bounds[0],
+        oz: entry.bounds[1] + size,
+      };
+    });
+    for (const r of await Promise.all(batch)) if (r) payloads.push(r);
+  }
+  if (payloads.length === 0) {
+    say('  note: no lane sidecars on disk -- skipping the load-path proof.');
+    return;
+  }
+
+  // Which hexagon each tile belongs to, off the residency's own answer rather
+  // than off a second copy of the arithmetic. `checkHexCoverage` has already
+  // asserted that this is a pure function of the tile centre.
+  const byHex = new Map<string, typeof payloads>();
+  for (const p of payloads) {
+    const entry = world.index.tiles.find((t) => t.key === p.key)!;
+    const cx = (entry.bounds[0] + entry.bounds[2]) / 2;
+    const cz = (entry.bounds[1] + entry.bounds[3]) / 2;
+    const hex = world.segments?.hexAt(cx, cz)?.id ?? 'whole';
+    const list = byHex.get(hex);
+    if (list === undefined) byHex.set(hex, [p]);
+    else list.push(p);
+  }
+
+  // An integer shuffle, so the "scrambled" orders are the same scrambled orders
+  // on every machine and a failure is reproducible. `traffic.carHash` is the
+  // project's one source of randomness and this is no exception.
+  const shuffled = <T>(items: readonly T[], salt: number): T[] => {
+    const out = [...items];
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = one.carHash(salt, i) % (i + 1);
+      const swap = out[i];
+      out[i] = out[j];
+      out[j] = swap;
+    }
+    return out;
+  };
+
+  const fieldA = new one.TrafficField();
+  const pedA = new pedOne.PedestrianField();
+  for (const p of payloads) {
+    const decoded = one.decodeLanes(p.buf, p.ox, p.oz);
+    if (decoded === null) continue;
+    fieldA.adopt(p.key, decoded);
+    pedA.adopt(p.key, decoded);
+  }
+
+  const fieldB = new two.TrafficField();
+  const pedB = new pedTwo.PedestrianField();
+  const fieldC = new two.TrafficField();
+  const pedC = new pedTwo.PedestrianField();
+  const hexOrder = shuffled([...byHex.keys()], 0x51d1);
+  for (const hex of hexOrder) {
+    for (const p of shuffled(byHex.get(hex)!, 0x2ea7)) {
+      const decoded = two.decodeLanes(p.buf, p.ox, p.oz);
+      if (decoded === null) continue;
+      fieldB.adopt(p.key, decoded);
+      pedB.adopt(p.key, decoded);
+      fieldC.adopt(p.key, decoded);
+      pedC.adopt(p.key, decoded);
+    }
+  }
+  // And the eviction cycle: every hexagon out in a third order, back in a
+  // fourth. This is the state the cap actually produces.
+  for (const hex of shuffled([...byHex.keys()], 0x9b3f)) {
+    for (const p of byHex.get(hex)!) {
+      fieldC.drop(p.key);
+      pedC.drop(p.key);
+    }
+  }
+  check(
+    fieldC.routes().length === 0 && pedC.bands().length === 0 && fieldC.cellCount === 0 &&
+      pedC.cellCount === 0,
+    'dropping every hexagon leaves the two fields genuinely empty -- no routes, no bands, and no ' +
+      `orphaned broadphase cells (${fieldC.routes().length} / ${pedC.bands().length} / ` +
+      `${fieldC.cellCount} / ${pedC.cellCount})`,
+  );
+  for (const hex of shuffled([...byHex.keys()], 0x77c2)) {
+    for (const p of shuffled(byHex.get(hex)!, 0x1f0d)) {
+      const decoded = two.decodeLanes(p.buf, p.ox, p.oz);
+      if (decoded === null) continue;
+      fieldC.adopt(p.key, decoded);
+      pedC.adopt(p.key, decoded);
+    }
+  }
+
+  check(
+    fieldA.routes().length === fieldB.routes().length &&
+      fieldA.routes().length === fieldC.routes().length &&
+      pedA.bands().length === pedB.bands().length &&
+      pedA.bands().length === pedC.bands().length,
+    `all three load paths hold the same city: ${fieldA.routes().length.toLocaleString()} routes and ` +
+      `${pedA.bands().length.toLocaleString()} bands`,
+  );
+
+  // --- The poses, in visit order, at ten thousand (place, tick) samples.
+  //
+  // The places are route start points spread across the whole extent rather
+  // than random coordinates, because a random point in a 19 km disc is over the
+  // harbour and finds nothing. `DRAW` is the radius `world/cars.ts` actually
+  // sweeps, so this is the query the renderer makes; `HIT` is the 6 m one
+  // `carHitting` makes, and both are compared because a bucket-order bug shows
+  // up in the wide one and a residency bug in the narrow one.
+  const DRAW = 120;
+  const HIT = 6;
+  const routes = fieldA.routes();
+  const places: Array<[number, number]> = [];
+  const stride = Math.max(1, Math.floor(routes.length / 200));
+  for (let i = 0; i < routes.length && places.length < 200; i += stride) {
+    places.push([routes[i].x[0], routes[i].z[0]]);
+  }
+
+  const poseA = one.createCarPose();
+  const poseB = two.createCarPose();
+  const poseC = two.createCarPose();
+  const scratchA: Array<(typeof routes)[number]> = [];
+  const scratchB: Array<(typeof routes)[number]> = [];
+  const scratchC: Array<(typeof routes)[number]> = [];
+  type Shot = [number, number, number, number, number, number, number, number, number, number];
+  const snap = (p: typeof poseA): Shot => [
+    p.identity, p.x, p.y, p.z, p.dx, p.dz, p.speed, p.stage, p.body, p.colour,
+  ];
+  const sweep = (
+    mod: typeof one,
+    field: InstanceType<typeof one.TrafficField>,
+    pose: typeof poseA,
+    scratch: typeof scratchA,
+    x: number,
+    z: number,
+    r: number,
+    tick: number,
+    out: Shot[],
+  ): void => {
+    out.length = 0;
+    mod.forEachCarNear(field, x, z, r, tick, scratch, pose, (p) => {
+      out.push(snap(p));
+    });
+  };
+
+  let samples = 0;
+  let posesCompared = 0;
+  let disagreed = 0;
+  let first = '';
+  const shotA: Shot[] = [];
+  const shotB: Shot[] = [];
+  const shotC: Shot[] = [];
+  for (let s = 0; s < places.length; s++) {
+    const [x, z] = places[s];
+    for (let k = 0; k < 50; k++) {
+      // Spread over a whole timetable rather than over consecutive ticks: a
+      // 60 Hz walk of fifty ticks is 0.8 s and every car in it is on the same
+      // stage. 719 is coprime with the headways, so this lands all over them.
+      const tick = (s * 50 + k) * 719;
+      const radius = k % 5 === 0 ? HIT : DRAW;
+      sweep(one, fieldA, poseA, scratchA, x, z, radius, tick, shotA);
+      sweep(two, fieldB, poseB, scratchB, x, z, radius, tick, shotB);
+      sweep(two, fieldC, poseC, scratchC, x, z, radius, tick, shotC);
+      samples++;
+      posesCompared += shotA.length;
+      let bad = shotA.length !== shotB.length || shotA.length !== shotC.length;
+      if (!bad) {
+        for (let i = 0; i < shotA.length && !bad; i++) {
+          for (let f = 0; f < shotA[i].length; f++) {
+            if (shotA[i][f] !== shotB[i][f] || shotA[i][f] !== shotC[i][f]) {
+              bad = true;
+              break;
+            }
+          }
+        }
+      }
+      if (bad) {
+        disagreed++;
+        if (!first) {
+          first =
+            `at (${x.toFixed(0)}, ${z.toFixed(0)}) r=${radius} tick ${tick}: ` +
+            `${shotA.length} / ${shotB.length} / ${shotC.length} cars`;
+        }
+      }
+    }
+  }
+  check(
+    disagreed === 0 && posesCompared > 1000,
+    `${samples.toLocaleString()} car sweeps across three load paths -- whole, hexagon-by-hexagon ` +
+      `scrambled, and dropped-then-reloaded -- visit ${posesCompared.toLocaleString()} car poses in ` +
+      `the identical order with identical bits` +
+      (disagreed ? ` (${disagreed} disagreed, first ${first})` : ''),
+  );
+
+  // --- And the footpaths, on the same places and the same argument.
+  {
+    const bandA: Array<ReturnType<typeof pedA.bands>[number]> = [];
+    const bandB: typeof bandA = [];
+    const bandC: typeof bandA = [];
+    const pa = pedOne.createPedPose();
+    const pb = pedTwo.createPedPose();
+    const pc = pedTwo.createPedPose();
+    let compared = 0;
+    let walkers = 0;
+    let bad = 0;
+    let firstBand = '';
+    for (let s = 0; s < places.length; s++) {
+      const [x, z] = places[s];
+      pedA.near(x, z, DRAW, bandA);
+      pedB.near(x, z, DRAW, bandB);
+      pedC.near(x, z, DRAW, bandC);
+      compared++;
+      if (bandA.length !== bandB.length || bandA.length !== bandC.length) {
+        bad++;
+        if (!firstBand) firstBand = `at (${x.toFixed(0)}, ${z.toFixed(0)}): ${bandA.length} / ${bandB.length} / ${bandC.length} bands`;
+        continue;
+      }
+      for (let i = 0; i < bandA.length; i++) {
+        // The band's identity first -- that is the ordering claim -- and then a
+        // walker on it, which is what a police beat and a bat swing both read.
+        if (
+          bandA[i].osmId !== bandB[i].osmId || bandA[i].osmId !== bandC[i].osmId ||
+          bandA[i].side !== bandB[i].side || bandA[i].side !== bandC[i].side ||
+          bandA[i].seed !== bandB[i].seed || bandA[i].seed !== bandC[i].seed
+        ) {
+          bad++;
+          if (!firstBand) firstBand = `band ${i} at (${x.toFixed(0)}, ${z.toFixed(0)}) is ${bandA[i].osmId}/${bandA[i].side} vs ${bandB[i].osmId}/${bandB[i].side}`;
+          break;
+        }
+        const now = one.trafficSeconds(s * 977);
+        const liveA = pedOne.posePedestrian(bandA[i], 0, now, undefined, pa);
+        const liveB = pedTwo.posePedestrian(bandB[i], 0, now, undefined, pb);
+        const liveC = pedTwo.posePedestrian(bandC[i], 0, now, undefined, pc);
+        if (liveA !== liveB || liveA !== liveC) {
+          bad++;
+          break;
+        }
+        if (!liveA) continue;
+        walkers++;
+        if (
+          pa.key !== pb.key || pa.key !== pc.key ||
+          pa.x !== pb.x || pa.x !== pc.x || pa.y !== pb.y || pa.y !== pc.y ||
+          pa.z !== pb.z || pa.z !== pc.z || pa.dx !== pb.dx || pa.dx !== pc.dx ||
+          pa.speed !== pb.speed || pa.speed !== pc.speed
+        ) {
+          bad++;
+          if (!firstBand) firstBand = `walker ${pa.key} at (${pa.x.toFixed(3)}, ${pa.z.toFixed(3)}) vs (${pb.x.toFixed(3)}, ${pb.z.toFixed(3)})`;
+          break;
+        }
+      }
+    }
+    check(
+      bad === 0 && walkers > 100,
+      `${compared} footpath sweeps return the identical bands in the identical order across the same ` +
+        `three load paths, and the ${walkers.toLocaleString()} walkers posed off them are bit-identical` +
+        (bad ? ` (${bad} disagreed, first ${firstBand})` : ''),
+    );
+  }
+
+  // --- What it cost, which is the whole reason the lane graph can be streamed.
+  //
+  // The number that used to sit in `server/world.ts`'s header as the reason it
+  // could *not* be: one tile arriving or leaving forced a rebuild of the flat
+  // array and the whole broadphase grid over every resident tile, 14.42 ms at
+  // full residency. Measured here rather than asserted at a threshold, because
+  // it is a property of the machine as much as of the code -- but the bar is
+  // one tick, and a regression to the old behaviour misses it by an order of
+  // magnitude on any machine.
+  {
+    const victim = payloads[Math.floor(payloads.length / 2)];
+    const decoded = one.decodeLanes(victim.buf, victim.ox, victim.oz)!;
+    let worst = 0;
+    let total = 0;
+    const rounds = 30;
+    for (let i = 0; i < rounds; i++) {
+      const t0 = performance.now();
+      fieldA.drop(victim.key);
+      pedA.drop(victim.key);
+      fieldA.near(victim.ox, victim.oz, DRAW, scratchA);
+      pedA.near(victim.ox, victim.oz, DRAW, []);
+      fieldA.adopt(victim.key, decoded);
+      pedA.adopt(victim.key, decoded);
+      fieldA.near(victim.ox, victim.oz, DRAW, scratchA);
+      pedA.near(victim.ox, victim.oz, DRAW, []);
+      const cost = (performance.now() - t0) / 2;
+      total += cost;
+      if (cost > worst) worst = cost;
+    }
+    check(
+      worst < 16.67,
+      `a tile arriving or leaving at ${fieldA.tileCount.toLocaleString()} resident tiles costs ` +
+        `${(total / rounds).toFixed(3)} ms mean and ${worst.toFixed(3)} ms worst across both fields ` +
+        `-- against 14.42 ms measured before the index was incremental, which is 86% of a 60 Hz tick ` +
+        'paid on every hexagon crossing',
+    );
+  }
 }
 
 /**
@@ -15110,13 +15470,25 @@ async function checkHexes(): Promise<void> {
 }
 
 /**
- * The server's collision, held per hexagon: does the city it answers with change?
+ * The server's city, held per hexagon: does what it answers with change?
  *
- * `server/world.ts` used to read all 3,187 collision payloads at boot and hold
- * them for the life of the process. Measured, that is **193 MB of live heap and
- * 336 MB of RSS** for 25.4 MB of files -- a prism costs 428 bytes resident and
- * 52 on disk -- and EXPANSION.md's 60 km world is 7-8x this one. So collision is
- * now loaded per hexagon, near somebody, under `SYDNEY_COLLISION_CAP_MB`.
+ * `server/world.ts` used to read all 3,187 collision payloads and all 3,017 lane
+ * sidecars at boot and hold them for the life of the process. Measured, that is
+ * **193 MB of live heap** for 25.4 MB of collision files -- a prism costs 428
+ * bytes resident and 52 on disk -- and another **131.9 MB** for 13.9 MB of lane
+ * files, and EXPANSION.md's 60 km world is 7-8x this one. So both are now loaded
+ * per hexagon, near somebody, under `SYDNEY_COLLISION_CAP_MB` and
+ * `SYDNEY_LANES_CAP_MB` respectively.
+ *
+ * The lane layer is checked here on exactly the collision layer's terms -- it
+ * loads, it evicts, it never drops a hexagon somebody is standing in, it answers
+ * bit-identically to a whole-world load, and its estimator has not drifted from
+ * the classes it estimates. What it adds is one claim collision does not need:
+ * `LANES_NEED_MARGIN_M` is asserted against the widest route in the built city
+ * and against the police's own reach, which is what makes "a car the server is
+ * not holding cannot have hit anybody" arithmetic rather than a hope. See
+ * section 5b. The proof that the *field* answers the same however its tiles
+ * arrived is `checkLaneLoadPath`, in `checkTraffic`.
  *
  * Every failure that change can have is silent, which is why this is here rather
  * than in a comment:
@@ -15168,7 +15540,12 @@ async function checkServerSegments(): Promise<void> {
   // this has to contrive -- it is the only way through.
   const TINY_CAP = 8e6;
 
-  const capped = await worldMod.loadWorld(root, TINY_CAP);
+  // And the same for the lane graph, whose hexagons cost 0.8-22 MB. Both caps
+  // are broken deliberately by the pinned spawn, which is the state section 4
+  // exists to pin down.
+  const TINY_LANE_CAP = 6e6;
+
+  const capped = await worldMod.loadWorld(root, TINY_CAP, TINY_LANE_CAP);
   const segments = capped.segments;
   if (!segments) {
     check(false, 'the built world carries a hex contract the server can hold collision by');
@@ -15214,7 +15591,10 @@ async function checkServerSegments(): Promise<void> {
     let worstUpdateMs = 0;
     let evictedUnderfoot = '';
     let sawResident = 0;
+    let sawLanes = 0;
     const seenResident = new Set<string>();
+    const seenLanes = new Set<string>();
+    let laneEvictedUnderfoot = '';
 
     // 900 steps a leg at 39.4 m/s and a 60 Hz tick is 590 m of travel per leg
     // simulated in wall-clock milliseconds; the residency's own clock is the
@@ -15243,6 +15623,16 @@ async function checkServerSegments(): Promise<void> {
           else if (seenResident.has(under.id) && !evictedUnderfoot) {
             evictedUnderfoot = `${under.id} was resident and then was not, with a player at (${x.toFixed(0)}, ${z.toFixed(0)})`;
           }
+          // The identical rule for the lane layer. Losing the lanes under a
+          // player is not the safety failure losing the prisms is -- nobody
+          // falls -- but it is the one that produces the desync this whole pass
+          // is about, a client watching a car drive through somebody the server
+          // is not simulating. It must not happen for the same reason and by the
+          // same mechanism: a needed hexagon is never a victim.
+          if (segments.isLanesResident(under.id)) seenLanes.add(under.id);
+          else if (seenLanes.has(under.id) && !laneEvictedUnderfoot) {
+            laneEvictedUnderfoot = `${under.id}'s lanes went away with a player at (${x.toFixed(0)}, ${z.toFixed(0)})`;
+          }
         }
         // Let the reads land. `update` starts them and never awaits.
         if (step % 60 === 0) await new Promise((r) => setTimeout(r, 0));
@@ -15251,6 +15641,7 @@ async function checkServerSegments(): Promise<void> {
       await segments.settle();
       segments.update([route[leg + 1].c[0], route[leg + 1].c[1]]);
       if (segments.isResident(route[leg + 1].id)) sawResident++;
+      if (segments.isLanesResident(route[leg + 1].id)) sawLanes++;
     }
 
     const after = segments.stats();
@@ -15277,9 +15668,36 @@ async function checkServerSegments(): Promise<void> {
     check(
       worstUpdateMs < 16.67,
       `the worst single residency update cost ${worstUpdateMs.toFixed(2)} ms -- inside one tick, ` +
-        'so a hexagon arriving never lands as a stall',
+        'so a hexagon arriving never lands as a stall. **Both layers share that budget**: the lane ' +
+        'graph was added to this class without adding a millisecond to it',
+    );
+    check(
+      after.lanes.loads > before.lanes.loads && after.lanes.evictions > before.lanes.evictions,
+      `the lane layer loaded and evicted on the same walk (${after.lanes.loads - before.lanes.loads} ` +
+        `loads, ${after.lanes.evictions - before.lanes.evictions} evictions under a ` +
+        `${(TINY_LANE_CAP / 1e6).toFixed(0)} MB cap)`,
+    );
+    check(
+      sawLanes === route.length - 1,
+      `every hexagon the walk arrived in had its lanes resident on arrival (${sawLanes}/${route.length - 1})`,
+    );
+    check(
+      laneEvictedUnderfoot === '',
+      `and no hexagon's lanes were dropped with somebody standing in it` +
+        (laneEvictedUnderfoot ? `: ${laneEvictedUnderfoot}` : ''),
     );
   }
+
+  /**
+   * How far the widest route in the built city runs past its own tile.
+   *
+   * Measured inside section 3, where the whole-world load exists, and asserted
+   * against `LANES_NEED_MARGIN_M` in section 5b. It is the number the desync
+   * argument turns on: `.lanes.bin` is filed under the tile a route *starts*
+   * in, so a car can be driving a long way from the sidecar that describes it.
+   */
+  let worstRouteOverhangM = 0;
+  let worstRouteOverhangAt = '';
 
   // --- 3. The city a resident hexagon answers with is the city a whole-world
   //        load answers with, bit for bit.
@@ -15345,6 +15763,133 @@ async function checkServerSegments(): Promise<void> {
       `${compared.toLocaleString()} collision queries inside the resident hexagon are bit-identical to a ` +
         `whole-world load${disagreed ? ` (${disagreed} disagreed, first ${first})` : ''}`,
     );
+
+    // --- 3a-lanes. The same question, asked of the traffic.
+    //
+    // `checkTraffic`'s load-path proof already says that the *field* answers
+    // identically however its tiles arrived. This is the other half and it is
+    // the one this class is responsible for: that a **capped, needed-set-driven
+    // residency** puts the right tiles in that field. A margin rule that loaded
+    // a hexagon short would show up here and nowhere else -- a client would
+    // simply see a car nobody was knocked over by.
+    //
+    // Compared at the hit radius the simulation actually uses and at the draw
+    // radius the renderer does, on points inside the hexagon the capped world is
+    // currently holding.
+    {
+      const trafficMod = await import('../client/src/game/traffic.ts');
+      const poseA = trafficMod.createCarPose();
+      const poseB = trafficMod.createCarPose();
+      const scratchA: Parameters<typeof trafficMod.forEachCarNear>[5] = [];
+      const scratchB: typeof scratchA = [];
+      const shotA: number[][] = [];
+      const shotB: number[][] = [];
+      const wholeRoutes = whole.traffic.routes();
+
+      // The overhang sweep, here because this is where every route in the city
+      // is in one place. A route's home tile is the one its first point is in.
+      for (const route of wholeRoutes) {
+        const tx = Math.floor(route.x[0] / capped.index.tile_size) * capped.index.tile_size;
+        const tz = Math.floor(route.z[0] / capped.index.tile_size) * capped.index.tile_size;
+        const over = Math.max(
+          tx - route.minX,
+          route.maxX - (tx + capped.index.tile_size),
+          tz - route.minZ,
+          route.maxZ - (tz + capped.index.tile_size),
+          0,
+        );
+        if (over > worstRouteOverhangM) {
+          worstRouteOverhangM = over;
+          worstRouteOverhangAt = `${route.x[0].toFixed(0)}, ${route.z[0].toFixed(0)}`;
+        }
+      }
+
+      // Driven to a fixed point before sampling. `update` only recomputes the
+      // needed set every `NEED_INTERVAL_TICKS`, and it starts at most
+      // `LOAD_CONCURRENCY` hexagons per recomputation -- so a single `update`
+      // followed by `settle` is asserting the concurrency limit rather than the
+      // rule, and an earlier draft of this check did exactly that and reported
+      // "0 vs 11 cars" for a hexagon that had simply not been started yet.
+      for (let round = 0; round < 40; round++) {
+        for (let i = 0; i < 20; i++) segments.update([home.c[0], home.c[1]]);
+        await segments.settle();
+        if (segments.neededAllResident()) break;
+      }
+
+      // Points on real streets **where the residency's own rule says the lane
+      // graph is complete**: every hexagon within `LANES_NEED_MARGIN_M` is
+      // resident. That is the exact condition a participant is in, because the
+      // needed set is defined by that same radius around every participant --
+      // so this is the invariant restated as a filter rather than a weaker
+      // "inside a resident hexagon", which is not the claim and is not true.
+      //
+      // A route can run 1,165 m past its own tile, so a point 100 m inside a
+      // lone resident hexagon really does see fewer cars than a whole-world
+      // load: the ones belonging to the neighbour. That is correct behaviour
+      // and this filter is what separates it from a bug. An earlier draft did
+      // not have it and reported 211 disagreements of exactly that shape.
+      const covered = (x: number, z: number): boolean => {
+        for (const e of segments.entries) {
+          if (
+            segments.distance(e, x, z) <= worldMod.LANES_NEED_MARGIN_M &&
+            !segments.isLanesResident(e.id)
+          ) {
+            return false;
+          }
+        }
+        return true;
+      };
+      const places: Array<[number, number]> = [];
+      for (const r of wholeRoutes) {
+        if (!covered(r.x[0], r.z[0])) continue;
+        places.push([r.x[0], r.z[0]]);
+        if (places.length >= 150) break;
+      }
+      let sweeps = 0;
+      let poses = 0;
+      let laneDiff = 0;
+      let firstLane = '';
+      for (let i = 0; i < places.length; i++) {
+        const [x, z] = places[i];
+        for (let k = 0; k < 20; k++) {
+          const tick = (i * 20 + k) * 733;
+          const radius = k % 4 === 0 ? trafficMod.HIT_QUERY_RADIUS : 120;
+          shotA.length = 0;
+          shotB.length = 0;
+          trafficMod.forEachCarNear(capped.traffic, x, z, radius, tick, scratchA, poseA, (p) => {
+            shotA.push([p.identity, p.x, p.y, p.z, p.dx, p.dz, p.speed, p.stage]);
+          });
+          trafficMod.forEachCarNear(whole.traffic, x, z, radius, tick, scratchB, poseB, (p) => {
+            shotB.push([p.identity, p.x, p.y, p.z, p.dx, p.dz, p.speed, p.stage]);
+          });
+          sweeps++;
+          poses += shotA.length;
+          let bad = shotA.length !== shotB.length;
+          for (let a = 0; a < shotA.length && !bad; a++) {
+            for (let f = 0; f < shotA[a].length; f++) {
+              if (shotA[a][f] !== shotB[a][f]) {
+                bad = true;
+                break;
+              }
+            }
+          }
+          if (bad) {
+            laneDiff++;
+            if (!firstLane) {
+              firstLane = `at (${x.toFixed(0)}, ${z.toFixed(0)}) r=${radius} tick ${tick}: ` +
+                `${shotA.length} vs ${shotB.length} cars`;
+            }
+          }
+        }
+      }
+      check(
+        laneDiff === 0 && poses > 500 && places.length > 20,
+        `${sweeps.toLocaleString()} car sweeps at ${places.length} points the margin rule calls ` +
+          `covered visit ${poses.toLocaleString()} poses bit-identically to a whole-world load -- ` +
+          'the capped residency put the same routes under the same players' +
+          (laneDiff ? ` (${laneDiff} disagreed, first ${firstLane})` : ''),
+      );
+    }
 
     // --- 3b. And the bikes, which is the same question asked of the *boot*
     // path: `loadWorld` places them a hexagon at a time, so if a bike's spot
@@ -15413,6 +15958,72 @@ async function checkServerSegments(): Promise<void> {
         );
       }
     }
+
+    // --- 3d. The lane cap's estimator, on identical terms.
+    //
+    // A separate probe rather than a second reading off the same one, because
+    // it is a separate constant triple over a separate pair of classes, and
+    // because the thing it catches is the same: `TrafficField` or
+    // `PedestrianField` growing a field or a second index while
+    // `BYTES_PER_ROUTE` stays at 2160. Both fields, in one process, because
+    // that is how the server holds them -- one decoded sidecar, two consumers.
+    {
+      const laneKeys = mine
+        .slice(0, 400)
+        .map((t) => [t.key, t.bounds[0], t.bounds[1] + capped.index.tile_size]);
+      const script = [
+        `const { TrafficField, decodeLanes } = await import(${JSON.stringify(new URL('../client/src/game/traffic.ts', import.meta.url).pathname)});`,
+        `const { PedestrianField } = await import(${JSON.stringify(new URL('../client/src/game/pedestrians.ts', import.meta.url).pathname)});`,
+        `const keys = ${JSON.stringify(laneKeys)};`,
+        `const root = ${JSON.stringify(root)};`,
+        'const bufs = [];',
+        'for (const [key, ox, oz] of keys) {',
+        '  const f = Bun.file(root + "/tiles/" + key + ".lanes.bin");',
+        '  if (await f.exists()) bufs.push([await f.arrayBuffer(), ox, oz, key]);',
+        '}',
+        'Bun.gc(true); await new Promise((r) => setTimeout(r, 50)); Bun.gc(true);',
+        'const before = process.memoryUsage().heapUsed;',
+        'const traffic = new TrafficField(); const peds = new PedestrianField();',
+        'let routes = 0, routePoints = 0, wayPoints = 0;',
+        'for (const [buf, ox, oz, key] of bufs) {',
+        '  const lanes = decodeLanes(buf, ox, oz);',
+        '  if (!lanes) continue;',
+        '  traffic.adopt(key, lanes); peds.adopt(key, lanes);',
+        '  routes += lanes.routes.length;',
+        '  for (const r of lanes.routes) routePoints += r.count;',
+        '  for (const w of lanes.ways) wayPoints += w.count;',
+        '}',
+        'traffic.near(0, 0, 100, []); peds.near(0, 0, 100, []);',
+        'Bun.gc(true); await new Promise((r) => setTimeout(r, 100)); Bun.gc(true);',
+        'const real = process.memoryUsage().heapUsed - before;',
+        'console.log(JSON.stringify({ routes, routePoints, wayPoints, real }));',
+      ].join('\n');
+      const proc = Bun.spawn(['bun', '-e', script], { stdout: 'pipe', stderr: 'pipe' });
+      const out = await new Response(proc.stdout).text();
+      await proc.exited;
+      let measured: { routes: number; routePoints: number; wayPoints: number; real: number } | null = null;
+      try {
+        measured = JSON.parse(out.trim().split('\n').pop() ?? '');
+      } catch {
+        measured = null;
+      }
+      if (measured === null) {
+        check(false, `the lane estimator probe returned nothing parseable (${out.slice(0, 120)})`);
+      } else {
+        const estimate = worldMod.estimateLaneBytes(
+          measured.routes,
+          measured.routePoints,
+          measured.wayPoints,
+        );
+        const ratio = measured.real > 0 ? estimate / measured.real : 0;
+        check(
+          measured.routes > 500 && ratio > 0.5 && ratio < 2,
+          `the lane cap's estimator is within 2x of the heap it estimates: ` +
+            `${(estimate / 1e6).toFixed(1)} MB for ${measured.routes.toLocaleString()} routes against ` +
+            `${(measured.real / 1e6).toFixed(1)} MB measured in a fresh process (${ratio.toFixed(2)}x)`,
+        );
+      }
+    }
   }
 
   // --- 4. The cap is a cap, and the needed set is the one thing that beats it.
@@ -15431,6 +16042,16 @@ async function checkServerSegments(): Promise<void> {
     check(
       idle.resident <= 2,
       `an empty server holds ${idle.resident} hexagon(s) -- the spawn's, pinned, and nothing else`,
+    );
+    // And its lanes, at the wider margin. Three rather than one, and that is the
+    // pin's honest cost: the anchor is treated as a participant, and a
+    // participant wants lanes for 2 km around them. It is also exactly what the
+    // first person to join costs, so an idle server holds what a server with one
+    // player at the spawn holds -- which is the point of pinning it.
+    check(
+      idle.lanes.resident <= 4 && idle.lanes.resident >= 1,
+      `and ${idle.lanes.resident} hexagon(s) of lanes -- the spawn's 2 km skirt, ` +
+        `${(idle.lanes.bytes / 1e6).toFixed(0)} MB, which is what one player standing there costs`,
     );
 
     // Everybody, everywhere. Every hexagon is needed and none may be dropped.
@@ -15462,6 +16083,33 @@ async function checkServerSegments(): Promise<void> {
       full.resident === full.hexes,
       `every one of them is resident (${full.resident}/${full.hexes}) -- nothing was sacrificed to the cap`,
     );
+    // The margins nest, so the needed sets must too: anything within 500 m of a
+    // participant is within 2,000 m of them. Stated as a check rather than left
+    // to the arithmetic, because the day somebody makes the lane margin the
+    // *narrower* of the two is the day a hexagon has prisms and no traffic, and
+    // that reads as an empty street rather than as an error.
+    {
+      let nested = 0;
+      let broken = 0;
+      for (const entry of segments.entries) {
+        if (!segments.isNeeded(entry.id)) continue;
+        nested++;
+        if (!segments.isLanesNeeded(entry.id)) broken++;
+      }
+      check(
+        broken === 0 && nested > 0,
+        `every one of the ${nested} hexagons collision wants is also one the lanes want -- the two ` +
+          `margins nest, ${worldMod.COLLISION_NEED_MARGIN_M} m inside ${worldMod.LANES_NEED_MARGIN_M} m` +
+          (broken ? ` (${broken} did not)` : ''),
+      );
+    }
+    check(
+      full.lanes.needed === full.hexes && full.lanes.bytes > full.lanes.capBytes,
+      `the lane layer does the same and separately: all ${full.hexes} needed, ` +
+        `${(full.lanes.bytes / 1e6).toFixed(0)} MB held against a ` +
+        `${(full.lanes.capBytes / 1e6).toFixed(0)} MB cap. Two accounts, two trims -- evicting a ` +
+        'hexagon of lanes never freed a prism and was never allowed to look as though it had',
+    );
 
     // And back: once they leave, the cap is honoured again. This is the half
     // that says the over-cap state is a state and not a leak.
@@ -15492,18 +16140,71 @@ async function checkServerSegments(): Promise<void> {
     );
   }
 
+  // --- 5b. The lane margin, against the two things that actually reach through
+  // it. This is the desync argument, stated as arithmetic over measured
+  // geometry so that widening a motorway or tuning a police catchment cannot
+  // quietly invalidate it.
+  //
+  // The claim being defended: **a car the server is not simulating can never be
+  // close enough to a player to have hit them.** The server is authoritative for
+  // being run over, so a missing car cannot knock anybody down; the failure it
+  // could produce is the other way round -- a client, which streams lanes for
+  // rendering, drawing a car that passes through a player with no knockdown. The
+  // margin is what closes that rather than bounding it.
+  {
+    const trafficMod = await import('../client/src/game/traffic.ts');
+    const factionsMod = await import('../client/src/game/factions.ts');
+    const margin = worldMod.LANES_NEED_MARGIN_M;
+
+    // How far the worst route in the built city runs past the tile its sidecar
+    // is filed under. This is the number the whole argument turns on and it is
+    // measured here rather than assumed, because it is a property of the road
+    // network: `.lanes.bin` is filed by the tile a route *starts* in.
+    const worstOverhang = worstRouteOverhangM;
+    const worstTile = worstRouteOverhangAt;
+    check(
+      worstOverhang + trafficMod.HIT_QUERY_RADIUS < margin,
+      `no car the server is not holding can reach a player: the widest route in the city runs ` +
+        `${worstOverhang.toFixed(0)} m past its own tile (near ${worstTile}) and the hit test reaches ` +
+        `${trafficMod.HIT_QUERY_RADIUS} m, against a ${margin} m lane margin. ` +
+        `**Collision's ${worldMod.COLLISION_NEED_MARGIN_M} m would not have been enough** -- a car ` +
+        `whose sidecar sat in an unloaded hexagon could have been driving ` +
+        `${(worstOverhang - worldMod.COLLISION_NEED_MARGIN_M).toFixed(0)} m inside the loaded region`,
+    );
+    // And the police, which read further than the physics does: a station within
+    // `CATCHMENT_RESCUE_MAX + PROMOTE_RADIUS` of a player puts officers on the
+    // footpath, and it picks them out of the bands within `CATCHMENT_RESCUE_MAX`
+    // of *itself*.
+    const policeReach =
+      factionsMod.CATCHMENT_RESCUE_MAX + factionsMod.PROMOTE_RADIUS + factionsMod.CATCHMENT_RESCUE_MAX;
+    check(
+      margin >= policeReach,
+      `and no officer is placed off a band the server does not hold: the widest chain is ` +
+        `${factionsMod.CATCHMENT_RESCUE_MAX} m of rescued catchment plus ` +
+        `${factionsMod.PROMOTE_RADIUS} m of promotion plus another ` +
+        `${factionsMod.CATCHMENT_RESCUE_MAX} m of catchment = ${policeReach} m, inside the ${margin} m ` +
+        'margin. So a beat chosen by this process is the beat a whole-world process would choose',
+    );
+    check(
+      margin / 39.4 > 5,
+      `the ${margin} m margin is ${(margin / 39.4).toFixed(1)} s of warning at 39.4 m/s, so a hexagon ` +
+        'of lanes has the same lead time to arrive that a hexagon of prisms has',
+    );
+  }
+
   // --- 6. What it bought, reported rather than asserted.
   {
     const s = segments.stats();
-    const whole = worldMod.estimateCollisionBytes(
-      capped.collision.buildingCount,
-      0,
-    );
-    void whole;
     say(
       `  NOTE  collision at ${(capped.index.radius_m / 1000).toFixed(1)} km: 25.4 MB of files, ` +
         '193 MB of live heap and 336 MB of RSS if held whole (measured). Per hexagon under an ' +
         `${(TINY_CAP / 1e6).toFixed(0)} MB cap this process is holding ${s.resident}/${s.hexes} of them.`,
+    );
+    say(
+      `  NOTE  lanes at the same radius: 13.9 MB of files and 131.9 MB of live heap if held whole ` +
+        `(measured, both fields in one process). Under a ${(TINY_LANE_CAP / 1e6).toFixed(0)} MB cap ` +
+        `this process is holding ${s.lanes.resident}/${s.hexes}, ` +
+        `${(s.lanes.bytes / 1e6).toFixed(0)} MB, ${s.lanes.items.toLocaleString()} routes.`,
     );
   }
 }

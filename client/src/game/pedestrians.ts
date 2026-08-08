@@ -108,6 +108,8 @@ import {
   LANES_VERSION,
   carHash,
   decodeLanes,
+  insertSorted,
+  removeSorted,
   trafficSeconds,
   type LaneWay,
   type TileLanes,
@@ -554,6 +556,38 @@ function buildBand(way: LaneWay, side: number, offset: number, density: number):
 const CELL = 128;
 
 /**
+ * The canonical order of two bands. A pure function of what a band *is*.
+ *
+ * `compareRoutes`' argument, with the keys the rest of this project already
+ * sorts bands by: `game/factions.catchmentBands`, `game/factions.patrolBands`,
+ * `game/streetlife.anchorBands` and `game/wildlife`'s nest scan all end their
+ * comparators with `osmId || side || minX`, precisely because `near` used to
+ * return bands "in whatever order its grid buckets hold them -- streaming order
+ * on a browser, `Promise.all` completion order on the server". Those four
+ * sorts stay where they are; this one makes the thing they were defending
+ * against stop happening, so that a query which does *not* sort -- and
+ * `forEachPedestrianNear` is one -- is stable too.
+ *
+ * `osmId` is zero for a way OSM did not name, so the tail is not decoration:
+ * the unnamed service lanes of one industrial estate would otherwise all
+ * compare equal on the first two keys.
+ */
+export function compareBands(a: PedBand, b: PedBand): number {
+  if (a === b) return 0;
+  if (a.osmId !== b.osmId) return a.osmId < b.osmId ? -1 : 1;
+  if (a.side !== b.side) return a.side < b.side ? -1 : 1;
+  if (a.minX !== b.minX) return a.minX < b.minX ? -1 : 1;
+  if (a.minZ !== b.minZ) return a.minZ < b.minZ ? -1 : 1;
+  if (a.maxX !== b.maxX) return a.maxX < b.maxX ? -1 : 1;
+  if (a.maxZ !== b.maxZ) return a.maxZ < b.maxZ ? -1 : 1;
+  if (a.length !== b.length) return a.length < b.length ? -1 : 1;
+  if (a.count !== b.count) return a.count < b.count ? -1 : 1;
+  if (a.seed !== b.seed) return a.seed < b.seed ? -1 : 1;
+  if (a.klass !== b.klass) return a.klass < b.klass ? -1 : 1;
+  return 0;
+}
+
+/**
  * Every footpath band currently loaded, indexed for "who is near this player".
  *
  * Adopt and drop by tile key, exactly as `TrafficField` and `PowerupField` are,
@@ -561,12 +595,18 @@ const CELL = 128;
  * except the down registry -- a band is geometry, and a walker is a function --
  * so an eviction and a re-adoption put the identical people back on the
  * identical footpath.
+ *
+ * The index is maintained **per tile and in canonical order**, for the two
+ * reasons `TrafficField`'s header sets out at length and does not repeat here.
+ * This is the expensive half of that pair: a tile carries about eight routes and
+ * about thirty bands, and the whole-world rebuild this replaced cost 11.12 ms
+ * against traffic's 3.30 ms.
  */
 export class PedestrianField {
   private readonly tiles = new Map<string, PedBand[]>();
   private flat: PedBand[] = [];
-  private grid = new Map<number, PedBand[]>();
-  private dirty = true;
+  private readonly grid = new Map<number, PedBand[]>();
+  private flatDirty = true;
   /** Who is currently on the ground, and their accumulated offset. See `PedDown`. */
   private readonly downs = new Map<number, PedDown>();
 
@@ -577,12 +617,22 @@ export class PedestrianField {
    * walks a grid, rejects duplicates and returns a fresh answer every call. A
    * reader that wants the same query answered on every frame -- and
    * `game/factions.beatBand` is exactly that, for nineteen police stations --
-   * has no other way to know whether its last answer is still good. `dirty`
-   * below is the same fact and is private, because it is about whether *this*
-   * object needs to rebuild; this is about whether anybody else's derived thing
-   * is stale.
+   * has no other way to know whether its last answer is still good.
+   * `flatDirty` above is the same fact and is private, because it is about
+   * whether *this* object needs to rebuild; this is about whether anybody
+   * else's derived thing is stale.
    *
    * Never decreases, so a consumer stores the number rather than comparing sets.
+   *
+   * **It bumps per tile, and a hexagon is up to 374 of them**, so a server
+   * loading or evicting a hexagon invalidates every consumer's cache a few
+   * hundred times over the half second the load takes. That is the correct
+   * behaviour -- a beat chosen against half a hexagon is a beat that will be
+   * wrong -- and it is cheap because each recomputation is one grid walk over
+   * the stations within 940 m of somebody, memoised again immediately. Measured
+   * at 100 players with the lane cap cycling: the `npc` phase is 0.487 ms
+   * against 0.494 ms uncapped, which is noise. Do not "optimise" it into a
+   * coarser key without re-running that pair.
    */
   get generation(): number {
     return this.gen;
@@ -592,25 +642,41 @@ export class PedestrianField {
 
   /** Told a tile's decoded lane sidecar; derives the bands itself. */
   adopt(tileKey: string, tile: TileLanes): void {
-    this.tiles.set(tileKey, buildBands(tile));
-    this.dirty = true;
+    const previous = this.tiles.get(tileKey);
+    if (previous !== undefined) this.unindex(previous);
+    const bands = buildBands(tile);
+    this.tiles.set(tileKey, bands);
+    this.index(bands);
+    this.flatDirty = true;
     this.gen++;
   }
 
   drop(tileKey: string): void {
-    if (this.tiles.delete(tileKey)) {
-      this.dirty = true;
-      this.gen++;
-    }
+    const previous = this.tiles.get(tileKey);
+    if (previous === undefined) return;
+    this.tiles.delete(tileKey);
+    this.unindex(previous);
+    this.flatDirty = true;
+    this.gen++;
+  }
+
+  /** Is this tile's lane sidecar already held? The residency's accounting asks. */
+  hasTile(tileKey: string): boolean {
+    return this.tiles.has(tileKey);
   }
 
   get tileCount(): number {
     return this.tiles.size;
   }
 
-  /** Every band in a resident tile. Rebuilt on demand; do not hold across a drop. */
+  /** Every band in a resident tile, in canonical order. Do not hold across a drop. */
   bands(): readonly PedBand[] {
-    this.rebuild();
+    if (this.flatDirty) {
+      this.flatDirty = false;
+      this.flat = [];
+      for (const bands of this.tiles.values()) for (const band of bands) this.flat.push(band);
+      this.flat.sort(compareBands);
+    }
     return this.flat;
   }
 
@@ -717,7 +783,6 @@ export class PedestrianField {
    * on purpose -- a false positive costs one schedule evaluation.
    */
   near(x: number, z: number, radius: number, out: PedBand[]): PedBand[] {
-    this.rebuild();
     out.length = 0;
     const c0 = Math.floor((x - radius) / CELL);
     const c1 = Math.floor((x + radius) / CELL);
@@ -739,28 +804,46 @@ export class PedestrianField {
     return out;
   }
 
-  private rebuild(): void {
-    if (!this.dirty) return;
-    this.dirty = false;
-    this.flat = [];
-    this.grid = new Map();
-    for (const bands of this.tiles.values()) {
-      for (const band of bands) {
-        this.flat.push(band);
-        const c0 = Math.floor(band.minX / CELL);
-        const c1 = Math.floor(band.maxX / CELL);
-        const r0 = Math.floor(band.minZ / CELL);
-        const r1 = Math.floor(band.maxZ / CELL);
-        for (let cx = c0; cx <= c1; cx++) {
-          for (let cz = r0; cz <= r1; cz++) {
-            const k = cellKey(cx, cz);
-            const bucket = this.grid.get(k);
-            if (bucket === undefined) this.grid.set(k, [band]);
-            else bucket.push(band);
-          }
+  /** One tile's bands into the grid, each in its bucket's canonical place. */
+  private index(bands: readonly PedBand[]): void {
+    for (const band of bands) {
+      const c0 = Math.floor(band.minX / CELL);
+      const c1 = Math.floor(band.maxX / CELL);
+      const r0 = Math.floor(band.minZ / CELL);
+      const r1 = Math.floor(band.maxZ / CELL);
+      for (let cx = c0; cx <= c1; cx++) {
+        for (let cz = r0; cz <= r1; cz++) {
+          const k = cellKey(cx, cz);
+          const bucket = this.grid.get(k);
+          if (bucket === undefined) this.grid.set(k, [band]);
+          else insertSorted(bucket, band, compareBands);
         }
       }
     }
+  }
+
+  /** And back out again. `TrafficField.unindex`'s note on recomputing the span. */
+  private unindex(bands: readonly PedBand[]): void {
+    for (const band of bands) {
+      const c0 = Math.floor(band.minX / CELL);
+      const c1 = Math.floor(band.maxX / CELL);
+      const r0 = Math.floor(band.minZ / CELL);
+      const r1 = Math.floor(band.maxZ / CELL);
+      for (let cx = c0; cx <= c1; cx++) {
+        for (let cz = r0; cz <= r1; cz++) {
+          const k = cellKey(cx, cz);
+          const bucket = this.grid.get(k);
+          if (bucket === undefined) continue;
+          removeSorted(bucket, band, compareBands);
+          if (bucket.length === 0) this.grid.delete(k);
+        }
+      }
+    }
+  }
+
+  /** How many broadphase cells are occupied. Diagnostics, and the leak check. */
+  get cellCount(): number {
+    return this.grid.size;
   }
 }
 
@@ -1451,6 +1534,60 @@ export function verifyPedestrians(
       if (all === 0) failures.push('The field holds no bands after adopting a tile full of streets.');
       field.drop('grid');
       if (field.bands().length !== 0) failures.push('Dropping a tile left its footpath bands in the field.');
+      if (field.cellCount !== 0) failures.push(`Dropping the only tile left ${field.cellCount} broadphase cell(s) behind.`);
+
+      // --- And the index's order does not depend on arrival order.
+      //
+      // `TrafficField`'s own self-check, on this side. The stakes are the same
+      // shape: `forEachPedestrianNear` and `factions.forEachPoliceNear` both
+      // take the *nearest* and break ties by iteration order, so a band pool
+      // that reordered when a tile arrived early would put an officer on a
+      // different street in two processes holding the identical city.
+      {
+        const forwards = new PedestrianField();
+        const backwards = new PedestrianField();
+        const cycled = new PedestrianField();
+        const halves: TileLanes[] = [
+          { ways: grid.ways.filter((_, i) => i % 2 === 0), routes: [] },
+          { ways: grid.ways.filter((_, i) => i % 2 === 1), routes: [] },
+        ];
+        forwards.adopt('a', halves[0]);
+        forwards.adopt('b', halves[1]);
+        backwards.adopt('b', halves[1]);
+        backwards.adopt('a', halves[0]);
+        cycled.adopt('a', halves[0]);
+        cycled.adopt('b', halves[1]);
+        cycled.drop('a');
+        cycled.adopt('a', halves[0]);
+        const a: PedBand[] = [];
+        const b: PedBand[] = [];
+        const c: PedBand[] = [];
+        forwards.near(0, 0, 400, a);
+        backwards.near(0, 0, 400, b);
+        cycled.near(0, 0, 400, c);
+        if (a.length < 2) {
+          failures.push(`The band order check only found ${a.length} band(s); it needs at least two.`);
+        } else if (a.length !== b.length || a.length !== c.length) {
+          failures.push(`Three load orders gave ${a.length}, ${b.length} and ${c.length} bands for one query.`);
+        } else {
+          for (let i = 0; i < a.length; i++) {
+            // Content rather than identity: `buildBands` makes fresh objects on
+            // every adopt, so the three fields hold three sets of them.
+            if (
+              a[i].osmId !== b[i].osmId || a[i].osmId !== c[i].osmId ||
+              a[i].side !== b[i].side || a[i].side !== c[i].side ||
+              a[i].seed !== b[i].seed || a[i].seed !== c[i].seed
+            ) {
+              failures.push(
+                `The broadphase returned band ${i} of ${a.length} differently depending on the order ` +
+                  'the tiles were adopted; the police pick the nearest officer and break ties by that ' +
+                  'order, so two processes would put the same beat on different streets.',
+              );
+              break;
+            }
+          }
+        }
+      }
     }
   }
 

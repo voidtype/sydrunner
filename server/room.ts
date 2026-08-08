@@ -1255,10 +1255,18 @@ export class RoomHost {
 
   step(): void {
     // The world's residency first, and host-wide rather than per room, because
-    // the rooms share one `CollisionWorld` by reference: what has to be resident
-    // is the union of what everybody on this host needs, and a room stepping
-    // against a hexagon another room's players had just evicted is the failure
-    // this ordering rules out. See `world.HexResidency` and `roomWorld`.
+    // the rooms share one `CollisionWorld` and one pair of lane fields by
+    // reference: what has to be resident is the union of what everybody on this
+    // host needs, and a room stepping against a hexagon another room's players
+    // had just evicted is the failure this ordering rules out. See
+    // `world.HexResidency` and `roomWorld`.
+    //
+    // It is also what makes the lane fields safe to mutate at all. `TrafficField`
+    // and `PedestrianField` are queried from inside a room's tick; a residency
+    // that adopted or dropped a tile *between* two of a room's own queries would
+    // give that room two different cities inside one tick. This is the only
+    // place either field changes, and it is between rooms rather than inside
+    // one.
     //
     // Before the rooms rather than after, so a hexagon started this tick has the
     // whole of the tick's slack to read in. Nothing here blocks: `update` starts

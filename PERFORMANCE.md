@@ -98,17 +98,26 @@ SYDNEY_ROOMS=1 SYDNEY_ROOM_CAP=128 SYDNEY_BOTS=0 bun run server/index.ts
 bun run server/loadtest.ts --players 100 --minutes 3 --shards 2 --converge
 
 # the whole city at once: every client /tp's to a different suburb and keeps
-# moving, against a collision cap small enough to force eviction
-SYDNEY_ROOMS=1 SYDNEY_ROOM_CAP=128 SYDNEY_BOTS=0 SYDNEY_COLLISION_CAP_MB=30 bun run server/index.ts
+# moving, against caps small enough to force eviction
+SYDNEY_ROOMS=1 SYDNEY_ROOM_CAP=128 SYDNEY_BOTS=0 \
+  SYDNEY_COLLISION_CAP_MB=30 SYDNEY_LANES_CAP_MB=40 bun run server/index.ts
 bun run server/loadtest.ts --players 100 --minutes 3 --shards 2 --scatter
 ```
 
-`--scatter` is the only mode that moves the server's **hexagon residency**
-(`server/world.ts`): a hexagon is 12 km across, so `--disperse`'s 700 m disc is
-one hexagon and the resident set never changes. Every run now also reports the
-**lowest `y` any client saw**, which is the one place a player falling through
-the world is visible — it costs the server nothing, so no tick-time column shows
-it.
+`--scatter` is the only mode that moves the server's **collision** residency
+(`server/world.ts`): a hexagon is 12 km across, so `--disperse`'s 700 m disc plus
+a 500 m margin is one hexagon and the resident set never changes. The **lane**
+residency is different, and `--disperse` moves it: its margin is 2,000 m (see
+`LANES_NEED_MARGIN_M`), so a 700 m disc anywhere near a hexagon boundary wants
+two or three of them, and the 40 MB cap binds and cycles. Run both modes when
+either cap is what is under test.
+
+Every run also reports the **lowest `y` any client saw**, which is the one place
+a player falling through the world is visible, and the **live car count**, which
+is the one place a lane cap silently destroying the city is visible — a car costs
+no protocol, so a hundred clients can run a clean three minutes against a Sydney
+with nothing driving in it and every other number will look right. Neither costs
+the server anything, so no tick-time column shows them.
 
 `SYDNEY_ROOM_CAP` is the per-room join gate and defaults to 128;
 `SYDNEY_MAX_PLAYERS` is still accepted as an alias, because that is the name the
@@ -669,12 +678,130 @@ operational rule that falls out of it, and it is in DEPLOY.md: **run one room
 until there are enough players to fill more than one.** The 1 GB production box
 should stay at `SYDNEY_ROOMS=1`.
 
+## Measured: the lane graph held per hexagon
+
+The other third of the boot. `TrafficField` and `PedestrianField` — the cars and
+the footpaths, shared verbatim by the browser and the server — were measured at
+**131.9 MB of live heap** for 13.9 MB of files on the 19.3 km world, and
+EXPANSION.md's 7–8x puts that near a gigabyte at 60 km. They are now held per
+hexagon on the same `HexResidency` slots as the prisms, under
+`SYDNEY_LANES_CAP_MB`.
+
+### First, the thing that made it impossible
+
+Both classes set a dirty flag on `adopt`/`drop` and rebuilt their flat array and
+their **whole broadphase grid over every resident tile** on the next query. One
+tile arriving or leaving, both fields, on this machine:
+
+| resident lane tiles | before | after | who pays it |
+|---:|---:|---:|---|
+| 60 | 0.299 ms | **0.012 ms** | a browser at `loadRadius` 1,800 m |
+| 90 | 0.421 ms | **0.012 ms** | a browser in the CBD |
+| 200 | 0.893 ms | **0.007 ms** | — |
+| 754 | 3.402 ms | **0.019 ms** | a lazily-loaded server, mid-city |
+| 3,017 | 13.946 ms | **0.018 ms** | a whole-world server |
+
+and the case that actually mattered, a hexagon leaving — 374 tiles dropped one
+at a time with a query between each, which is what a browser does when it walks
+out of a hexagon and what an eviction cycle does on the server:
+
+| | before | after |
+|---|---:|---:|
+| 374-tile hexagon out | **4,978 ms** | **7.9 ms** |
+
+**The client was already paying this and nobody had measured it.** A browser
+streams tiles continuously; every arrival cost 0.3–0.4 ms of a 16.7 ms frame at
+its own residency, with a 1.14 ms worst case, and a hexagon eviction was five
+seconds of it. The server could not stream lanes at all: 13.9 ms is 84% of a tick
+paid on the first query after every single tile.
+
+Both indexes are now maintained **per tile**, and in an order that is a pure
+function of the routes and bands themselves rather than of arrival order.
+
+### The canonical order is not a nicety
+
+`forEachCarNear` documents that **the first car found wins the hit test**, and
+the buckets used to be filled in `Map` iteration order — which is tile adoption
+order, which is `Promise.all` completion order on the server and streaming order
+in a browser. Two processes holding the identical routes could pick different
+cars to knock the same player over with, and both shoves would look right.
+
+`checkTraffic` now builds three fields over three load paths — whole, hexagon by
+hexagon in a scrambled order, and dropped-then-reloaded — and compares
+`forEachCarNear` visit for visit: **10,000 sweeps, 81,814 car poses, identical
+order and identical bits**, plus 200 footpath sweeps and 3,750 posed walkers.
+The negative control is one line: make `compareRoutes` return 0 and 6,023 of the
+10,000 sweeps disagree, every one of them with the same number of cars in a
+different order. Do it to `compareBands` instead and the footpath half fails
+alone.
+
+### The margin is four times collision's, and the number is measured
+
+`.lanes.bin` is filed under the tile a route *starts* in. Swept over all 23,734
+routes in the built city, the widest one runs **1,164.7 m past its own tile's
+bounds**. At collision's 500 m margin a car whose sidecar sat in an unloaded
+hexagon could have been driving 665 m inside the loaded region — through a
+player the server was not testing it against. `LANES_NEED_MARGIN_M` is 2,000 m,
+which also clears the police (900 m of rescued catchment + 120 m of promotion +
+900 m of catchment = 1,920 m) and is 50.8 s of warning at the fastest speed in
+the game. Inside it, a lazily-loaded server answers **every** lane query exactly
+as a whole-world server does; `checkServerSegments` asserts both bounds against
+the constants they come from.
+
+### The runs
+
+Four, back to back on the same tree, 100 clients, 3 minutes each, one room.
+Paired capped-against-uncapped within a mode, for the reason the collision table
+gives.
+
+| run | tick p50 | tick p99 | RSS peak | heap peak | lanes resident | loads / ev | live cars | lowest y |
+|---|---:|---:|---:|---:|---|---:|---:|---:|
+| dispersed, uncapped | 1.003 ms | 2.876 ms | 643.5 MB | 427.0 MB | 16/16, 130 MB | 16 / 0 | 89,470 | −63.1 m |
+| **dispersed, 40 MB cap** | **0.957 ms** | **2.538 ms** | **579.8 MB** | **332.1 MB** | 3/16, 53 MB | 6 / 3 | 35,616 | −63.3 m |
+| scattered, uncapped | 1.228 ms | 2.449 ms | 641.9 MB | 424.2 MB | 16/16, 130 MB | 16 / 0 | 89,463 | −70.2 m |
+| **scattered, 40 MB cap** | 1.233 ms | 2.747 ms | 630.7 MB | 410.2 MB | 15/16, 130 MB | 18 / 3 | 88,922 | −70.9 m |
+
+60.00 Hz in all four, zero join failures in all four, zero stalls in three (the
+dispersed uncapped run had one, a 98 ms GC pause). Nobody fell. The traffic never
+stopped: the worst poll of the capped dispersed run still had 35,616 cars live on
+9,454 resident routes.
+
+Three things in that table:
+
+- **The cap costs nothing and saves a lot where it binds.** Dispersed and capped
+  is *faster* on both p50 and p99 and 63.7 MB lighter on RSS, 94.9 MB on heap —
+  fewer routes in the grid is less work in `traffic` as well as less memory.
+- **`--scatter` cannot honour it, deliberately, and that is the same finding the
+  collision pass reported.** A hundred players across 392 suburbs need 15 of 16
+  hexagons of lanes at a 2 km margin, so the cap is broken with a warning rather
+  than a needed hexagon dropped. 130 MB held against a 40 MB cap is the honest
+  shape of the mechanism, not a failure of it.
+- **Adding the lane layer did not add a millisecond to the residency's tick.**
+  Both layers drain against one `APPLY_BUDGET_MS`, collision first, with a
+  0.5 ms floor for the lanes so the priority cannot become starvation. The worst
+  single `update` call `checkServerSegments` measures walking three hexagons with
+  both caps too small to hold one is 5.8–7.1 ms against 4.4 ms before — one tile
+  of overshoot in each of two layers, still comfortably inside a tick.
+
+### Projected at 60 km
+
+The lane graph scales with road length rather than with area, so EXPANSION.md's
+7–8x tile estimate is the right multiplier: **0.92–1.06 GB of estimated resident
+bytes for the whole 60 km lane graph**, against 1.4–1.6 GB for collision. Neither
+is ever held: at the shipped default of `SYDNEY_LANES_CAP_MB=300` the boot walk
+warms up to the cap and stops, and the needed set decides the rest. A room that
+has not scattered wants 1–3 hexagons of lanes, which on the fattest ground in the
+build is 22 MB apiece — **22–66 MB, not a gigabyte**. DEPLOY.md's 1 GB box should
+set 100–150.
+
+
 ## What the checks say
 
-`bun run server/integration-check.ts` — **483 checks**, all green, up from the
-435 that phase 1's suite reports on a run where the two-probe fight does not
-happen to produce a knockout (the KO branch adds two, which is why that number
-is sometimes 437). The new ones, and what each is protecting:
+`bun run server/integration-check.ts` — **483 checks** at the time this section
+was written, all green, up from the 435 that phase 1's suite reports on a run
+where the two-probe fight does not happen to produce a knockout (the KO branch
+adds two, which is why that number is sometimes 437). It is **835** as of the
+lane-residency pass. The new ones, and what each is protecting:
 
 - **`checkAoi`** — the working set against a brute-force statement of the rule
   over a 90-player room stepped for real (360 snapshots, 0 disagreements, the

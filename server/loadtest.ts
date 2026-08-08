@@ -912,7 +912,33 @@ interface StatsSample {
     loads: number;
     evictions: number;
     overCap: number;
+    /** Per layer. Absent on a host older than the lane-residency pass. */
+    collision?: LayerSample;
+    lanes?: LayerSample;
   } | null;
+  /**
+   * Whether there is still traffic on the streets the host is holding.
+   *
+   * The one thing `SYDNEY_LANES_CAP_MB` can silently destroy, and it is
+   * invisible from a socket: a car costs no protocol, so a hundred clients can
+   * run a clean three minutes against a city with no cars in it and every other
+   * number in this report will look right. Absent on a host older than that
+   * pass, which is why every read is guarded.
+   */
+  cars?: { live: number; routes: number; laneTiles: number; bands: number } | null;
+}
+
+interface LayerSample {
+  resident: number;
+  needed: number;
+  bytes: number;
+  capBytes: number;
+  tiles: number;
+  items: number;
+  loads: number;
+  evictions: number;
+  overCap: number;
+  marginM: number;
 }
 
 async function pollStats(url: string): Promise<StatsSample | null> {
@@ -998,6 +1024,31 @@ function report(opt: Options, shards: ShardResult[], samples: StatsSample[]): vo
     L.push(
       `    loads / evictions    ${peak((s) => s.segments?.loads ?? 0)} / ${peak((s) => s.segments?.evictions ?? 0)}` +
         `   over-cap updates ${peak((s) => s.segments?.overCap ?? 0)}`,
+    );
+    const lanes = seg.lanes;
+    if (lanes) {
+      L.push(
+        `    lane hexagons        ${lanes.resident}/${seg.hexes} resident, ${lanes.needed} needed, ` +
+          `${fmt(lanes.bytes / 1e6, 0)} / ${fmt(lanes.capBytes / 1e6, 0)} MB cap (${lanes.marginM} m margin)`,
+      );
+      L.push(
+        `    lane loads / evict   ${peak((s) => s.segments?.lanes?.loads ?? 0)} / ` +
+          `${peak((s) => s.segments?.lanes?.evictions ?? 0)}` +
+          `   over-cap updates ${peak((s) => s.segments?.lanes?.overCap ?? 0)}`,
+      );
+    }
+  }
+  // Is the city still driving? See `StatsSample.cars`. Reported next to the
+  // residency because they are the same question asked from the two ends: the
+  // residency says which hexagons are held and this says whether anything is
+  // moving in them.
+  const cars = warm.length > 0 ? warm[warm.length - 1].cars : null;
+  if (cars) {
+    const worstLive = warm.reduce((a, s) => Math.min(a, s.cars?.live ?? 0), Infinity);
+    L.push(
+      `    live cars            ${cars.live.toLocaleString()} on ${cars.routes.toLocaleString()} resident routes ` +
+        `across ${cars.laneTiles} lane tiles` +
+        (worstLive > 0 ? '' : '   ** ZERO at some point in the run: the city stopped driving **'),
     );
   }
   L.push('');

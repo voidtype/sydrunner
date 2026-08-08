@@ -207,8 +207,10 @@ Four things then become incremental:
    The number in this line used to be 25.4 MB and it was the wrong number: that
    is the collision *on disk*, and what the box pays is **193 MB of live heap
    and 336 MB of RSS**. Collision is now held per hexagon and near a player,
-   under `SYDNEY_COLLISION_CAP_MB`. The lane graph is measured and left whole,
-   with a stated reason and a stated 60 km cost.
+   under `SYDNEY_COLLISION_CAP_MB`, and **the lane graph is too**, under
+   `SYDNEY_LANES_CAP_MB`. Between them that is 325 MB of the 310 MB whole-world
+   load's heap; what is left resident at any radius is terrain, the index and
+   the powerups, which are 9 MB.
 
 ## The server's memory, measured
 
@@ -243,13 +245,34 @@ hexagon somebody is standing in is **never** evicted — the cap is broken, with
 warning, instead. Measured on the 19.3 km world at 100 players: 601 MB RSS
 uncapped against 383 MB at a 30 MB cap, same tick p50, nobody fell.
 
-**What was not, and why.** The lane graph would take the same treatment on the
-same slots — `TrafficField.drop` and `PedestrianField.drop` already exist — but
-both rebuild their flat array and broadphase grid over *every* resident tile on
-the first query after any change. Timed: **3.4 ms + 11.2 ms at full residency**,
-3.7 ms at a quarter of it, landing inside the tick on every hexagon crossing.
-The fix is an incremental rebuild inside two `client/src/game/` classes shared
-with the renderer, which is a round of its own. It is the next one.
+**And the lane graph, on the same slots.** That round is now done. The blocker
+was that `TrafficField` and `PedestrianField` rebuilt their flat array and their
+whole broadphase grid over *every* resident tile on the first query after any
+change — **14.42 ms at full residency**, landing inside the tick on every
+hexagon crossing, and paid by the browser too on every tile arrival. Both
+classes now maintain those indexes **per tile**, and in an order that is a pure
+function of the routes and bands themselves rather than of arrival order. The
+same tile change costs **0.017 ms**; a 374-tile hexagon comes out in 7.8 ms
+instead of 4,930 ms.
+
+The canonical order was not a nicety. `forEachCarNear` documents that the first
+car found wins the hit test, and the buckets used to be filled in tile adoption
+order — `Promise.all` completion order on the server, streaming order in a
+browser. Two processes holding the identical routes could pick different cars to
+knock the same player over with. `checkTraffic` now builds three fields over
+three load paths (whole, hexagon-by-hexagon scrambled, and
+dropped-then-reloaded) and proves 10,000 sweeps visit the same 81,814 car poses
+in the same order with the same bits.
+
+The lane layer's needed margin is **2,000 m** against collision's 500 m, and the
+number is measured rather than chosen: `.lanes.bin` is filed under the tile a
+route *starts* in, and the widest route in the shipped city runs **1,164.7 m**
+past its own tile. At 500 m a car whose sidecar sat in an unloaded hexagon could
+have been driving 665 m inside the loaded region. 2,000 m also covers the police,
+whose beat selection chains 900 m of catchment, 120 m of promotion and another
+900 m of catchment — 1,920 m. Inside that margin a lazily-loaded server answers
+every lane query exactly as a whole-world one does, which is asserted rather than
+argued.
 
 ## Detail: my recommendation, and the user's call
 

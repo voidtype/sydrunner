@@ -381,6 +381,26 @@ the knobs are here and the multi-process shape is config, not code.
 | `SYDNEY_ROOM_CAP` | `128` | Players per room. `SYDNEY_MAX_PLAYERS` is an accepted alias |
 | `SYDNEY_ROOM_BASE` | `0` | The id of this host's first room; rooms are `BASE .. BASE+ROOMS-1` |
 | `SYDNEY_BOTS` | `2` | Bots **per room**, so 8 rooms at the default is 16 |
+| `SYDNEY_COLLISION_CAP_MB` | `450` | Collision prisms held, in **estimated resident megabytes**. The 1 GB box wants 150–250 |
+| `SYDNEY_LANES_CAP_MB` | `300` | The lane graph — cars and footpaths — on the same terms. The 1 GB box wants 100–150 |
+
+**The two caps are counted in estimated resident bytes, not file bytes**, and
+that is what makes them real controls: the 19.3 km world is 25.4 MB of collision
+files against 193 MB of heap, and 13.9 MB of lane files against 132 MB. A cap in
+file bytes would never bind at any radius this project will build. Both are held
+**per hexagon and near a player** — a hexagon is loaded when anybody is inside it
+or within 500 m (collision) or 2,000 m (lanes) of its boundary, and evicted
+least-recently-needed when over cap.
+
+**Neither cap will evict a hexagon somebody is standing in.** It goes over
+budget and logs a warning instead, once every ten seconds. `[sydney] collision
+over cap` or `[sydney] lanes over cap` in the journal means this many players are
+this far apart, not that anything is broken; it is a capacity signal. Raise the
+cap or accept the spread.
+
+They are separate rather than one number because the failure modes are: missing
+prisms is a player briefly walking through a wall, and missing lanes is a street
+with no traffic on it. `/stats` reports both layers separately.
 
 **One room is the default on purpose.** A default of eight would mean two
 browsers opened on one desk landing in different cities, which is the exact

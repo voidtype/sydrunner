@@ -134,8 +134,52 @@ import type { CombatWorld } from '../client/src/game/combat.ts';
  */
 export const COLLISION_NEED_MARGIN_M = 500;
 
+/**
+ * And how close before its **lanes** are wanted. Four times as far, and measured.
+ *
+ * Collision's 500 m is one tile, because collision is a query about the ground
+ * you are standing on: `resolve` reaches `PLAYER_RADIUS` and `blocked` reaches a
+ * sight line. Nothing in it asks about ground half a kilometre away.
+ *
+ * The lane graph is not like that, and two separate measurements say so.
+ *
+ *   - **A route runs out of its own tile.** `.lanes.bin` is filed under the tile
+ *     a route *starts* in and the route keeps going; swept over all 23,734
+ *     routes in the 19.3 km build, the worst one reaches **1,164.7 m** past its
+ *     own tile's bounds (tile -31_-20, a motorway run). With a 500 m margin a
+ *     car whose sidecar sits in an unloaded hexagon could be driving 660 m
+ *     inside the loaded region -- through a player -- and the server would not
+ *     be simulating it. That is precisely the failure this whole rule exists to
+ *     rule out, and it is not hypothetical arithmetic: it is the widest route in
+ *     the shipped city.
+ *   - **The police read further than the physics does.** `factions.ts` gates a
+ *     station's beat at `CATCHMENT_RESCUE_MAX + radius` from the query point --
+ *     900 + `PROMOTE_RADIUS` 120 = 1,020 m -- and then picks that beat out of
+ *     the bands within `CATCHMENT_RESCUE_MAX` of the *station*, another 900 m.
+ *     So a band 1,920 m from a player can decide where an officer near that
+ *     player is standing.
+ *
+ * 2,000 m covers both with room, and what it buys is worth stating plainly:
+ * **within this margin the lazily-loaded server answers every lane query
+ * exactly as a whole-world server would.** Not "closely" and not "the window is
+ * small" -- identically, because the resident set around any participant is a
+ * superset of everything any of these queries can reach. `checkServerSegments`
+ * asserts the arithmetic against the constants it is derived from, so tuning the
+ * catchment or widening a motorway cannot quietly invalidate it.
+ *
+ * It is not free, and the cost is small for the same reason the 500 m one is: a
+ * hexagon is 6 km of circumradius, so a wider skirt only pulls in a neighbour
+ * for players near a boundary. 62% of a hexagon's area is within 2 km of one
+ * against 18% within 500 m, and a neighbour's *lanes* are 7-13 MB where its
+ * prisms are 26 MB. Paying 13 MB to make the traffic exact is the trade.
+ */
+export const LANES_NEED_MARGIN_M = 2000;
+
 /** `SYDNEY_COLLISION_CAP_MB`'s default, megabytes of estimated resident prisms. */
 export const DEFAULT_COLLISION_CAP_MB = 450;
+
+/** `SYDNEY_LANES_CAP_MB`'s default, megabytes of estimated resident lane graph. */
+export const DEFAULT_LANES_CAP_MB = 300;
 
 /**
  * What one prism and one polygon vertex cost resident, bytes.
@@ -164,15 +208,63 @@ export const BYTES_PER_PRISM = 344;
 export const BYTES_PER_PRISM_VERTEX = 16;
 
 /**
- * How long one tick may spend decoding collision.
+ * And what the lane graph costs resident: a route, a route point, a way point.
+ *
+ * **Measured on the same terms as the prisms above** -- one Bun process per
+ * hexagon, read every `.lanes.bin` in its manifest, `decodeLanes` it, adopt it
+ * into a fresh `TrafficField` *and* a fresh `PedestrianField`, force both
+ * broadphase grids to exist, `Bun.gc(true)`, read `heapUsed`. Fifteen points on
+ * the 19.3 km build, and the fit
+ * `routes * 2160 + routePoints * 112 + wayPoints * 84` lands **1.4% under** the
+ * 131.9 MB total and within 0.94x-1.02x on every hexagon that carries a real
+ * street. The two low outliers -- 0.58x and 0.68x -- are the two near-empty
+ * hexagons out past Berowra, 0.8 MB and 1.4 MB, where the two `Map`s' fixed cost
+ * dominates. Those are hexagons nobody has to budget for, and it is the same
+ * shape of outlier `BYTES_PER_PRISM` reports for the same reason.
+ *
+ * The three terms are the three things the lane graph is. A route is a
+ * fourteen-field record with four `Float32Array`s and up to sixteen entries in
+ * the 256 m traffic grid; a route point is 16 bytes of those arrays plus
+ * rounding; a way point is the six `Float32Array`s of the footpath band
+ * `buildBands` derives from it, in the 128 m pedestrian grid. Bands are not a
+ * term of their own because they are a function of the ways -- one or two per
+ * way -- and counting them would mean asking `PedestrianField` a question at
+ * apply time to learn something the ways already say.
+ *
+ * Re-derive with a fresh sweep whenever either field's layout changes.
+ * `checkServerSegments` asserts the estimator within 2x of a real heap delta,
+ * which catches a layout change without pinning a constant that may drift.
+ */
+export const BYTES_PER_ROUTE = 2160;
+export const BYTES_PER_ROUTE_POINT = 112;
+export const BYTES_PER_WAY_POINT = 84;
+
+/**
+ * How long one tick may spend decoding, across **both** payloads.
  *
  * `addTile` costs about 0.17 ms for an average tile, so a 374-tile hexagon is
  * 63 ms of decode -- four tick budgets, applied in one go, which is the stall
  * this budget exists to refuse. Two milliseconds a tick spreads the fattest
  * hexagon over about half a second and costs 12% of one core while a load is
  * running and nothing at all when none is.
+ *
+ * One budget for the two layers rather than one each, so adding the lane graph
+ * did not double the residency's worst tick. Collision drains first because a
+ * player falling through the world outranks a car that has not started driving
+ * yet, and `LANES_FLOOR_MS` is what stops that priority becoming starvation.
  */
 const APPLY_BUDGET_MS = 2;
+
+/**
+ * The slice the lane layer is guaranteed even when collision spent the lot.
+ *
+ * Without it a hexagon of prisms arriving every tick would hold the lane layer's
+ * pending queue open indefinitely -- and that queue holds `ArrayBuffer`s, so
+ * starving it is a memory leak with a decode budget on the front of it. Half a
+ * millisecond is two or three lane tiles, which is enough to drain any queue the
+ * reader can fill.
+ */
+const LANES_FLOOR_MS = 0.5;
 
 // Measured against it, by `checkServerSegments` walking a player across three
 // hexagons with a cap that cannot hold two: the worst single `update` call is
@@ -207,10 +299,15 @@ export function estimateCollisionBytes(prisms: number, vertices: number): number
   return prisms * BYTES_PER_PRISM + vertices * BYTES_PER_PRISM_VERTEX;
 }
 
-/** Is any of these flat `x, z` pairs inside the margin of this hexagon? */
-function reaches(entry: HexEntry, points: readonly number[]): boolean {
+/** And its lane graph, as both fields hold it. See the constants. */
+export function estimateLaneBytes(routes: number, routePoints: number, wayPoints: number): number {
+  return routes * BYTES_PER_ROUTE + routePoints * BYTES_PER_ROUTE_POINT + wayPoints * BYTES_PER_WAY_POINT;
+}
+
+/** Is any of these flat `x, z` pairs inside `margin` of this hexagon? */
+function reaches(entry: HexEntry, points: readonly number[], margin: number): boolean {
   for (let i = 0; i + 1 < points.length; i += 2) {
-    if (hexDistance(entry, points[i], points[i + 1]) <= COLLISION_NEED_MARGIN_M) return true;
+    if (hexDistance(entry, points[i], points[i + 1]) <= margin) return true;
   }
   return false;
 }
@@ -245,17 +342,24 @@ interface PendingTile {
 
 type HexState = 'absent' | 'loading' | 'resident';
 
-interface HexSlot {
-  entry: HexEntry;
+/**
+ * One hexagon's residency **of one kind of payload**: prisms, or the lane graph.
+ *
+ * The split is what let the lane graph reuse every part of this class that was
+ * already right. The needed set, the LRU clock, the manifest, the cap and the
+ * budgeted applier were all keyed on hexagons rather than on prisms -- the
+ * original header said so and said a lane loader would be "another `apply` and
+ * another `drop` on the same slots" -- and this is that sentence made
+ * structural: `HexSlot` still names a hexagon, and holds one of these per layer.
+ */
+interface LayerSlot {
   state: HexState;
-  /** The manifest's tiles, read once and kept across evictions. ~9 kB a hexagon. */
-  tiles: HexTiles | null;
   /** Payloads read and waiting for a decode budget. */
   pending: PendingTile[];
-  /** Every tile key currently in the `CollisionWorld`, so an eviction is exact. */
+  /** Every tile key this layer currently holds, so an eviction is exact. */
   applied: string[];
   /**
-   * Keys this hexagon has given up but not yet taken out of the grid.
+   * Keys this hexagon has given up but not yet taken out of the index.
    *
    * **Eviction is as expensive as loading and this is what stops it landing in
    * one tick.** `CollisionWorld.removeTile` walks every prism in the tile and
@@ -264,18 +368,71 @@ interface HexSlot {
    * **21.6 ms**, which is a stall by `/stats`' own definition and was the first
    * thing `checkServerSegments` caught. So a drop is a *promise* to remove, paid
    * off by `drain` under the same millisecond budget the decode runs on.
+   *
+   * The lane layer needs it far less -- `TrafficField.drop` and
+   * `PedestrianField.drop` are O(that tile) since the incremental index landed,
+   * and a whole 374-tile hexagon comes out in 7.8 ms rather than 4,930 -- but it
+   * costs nothing to pay it off the same way and it means one drain loop rather
+   * than two shapes of one.
    */
   releasing: string[];
-  /** Bumped to abandon an in-flight load. See `drop`. */
+  /** Bumped to abandon an in-flight load. See `HexLayer.drop`. */
   generation: number;
   /** Has the reader finished queueing this hexagon's payloads? */
   read: boolean;
   /** Estimated resident bytes, and the file bytes behind them. */
   bytes: number;
   fileBytes: number;
-  prisms: number;
+  /** Prisms, for collision; routes, for the lane graph. Diagnostics. */
+  items: number;
+}
+
+interface HexSlot {
+  entry: HexEntry;
+  /** The manifest's tiles, read once, shared by both layers, kept across evictions. */
+  tiles: HexTiles | null;
+  /** In flight, so two layers wanting the same manifest read it once. */
+  reading: Promise<HexTiles | null> | null;
   /** The update counter at which this hexagon was last needed. The LRU key. */
   usedAt: number;
+  collision: LayerSlot;
+  lanes: LayerSlot;
+}
+
+function emptyLayerSlot(): LayerSlot {
+  return {
+    state: 'absent',
+    pending: [],
+    applied: [],
+    releasing: [],
+    generation: 0,
+    read: false,
+    bytes: 0,
+    fileBytes: 0,
+    items: 0,
+  };
+}
+
+/** What `/stats` and the checks read off one layer of the residency. */
+export interface LayerStats {
+  resident: number;
+  loading: number;
+  /** Estimated resident bytes, and the cap they are held under. */
+  bytes: number;
+  capBytes: number;
+  tiles: number;
+  /** Prisms, for collision; routes, for the lane graph. */
+  items: number;
+  loads: number;
+  evictions: number;
+  /** Updates that ended over cap because every resident hexagon was needed. */
+  overCap: number;
+  /** Tile payloads still queued for a decode budget, plus those queued for removal. */
+  pending: number;
+  /** How far a participant may be before this layer's payload is dropped. */
+  marginM: number;
+  /** How many hexagons this layer's margin currently wants. */
+  needed: number;
 }
 
 /** What `/stats` and the checks read off the residency. */
@@ -283,61 +440,427 @@ export interface SegmentStats {
   /** False on a world with no hex contract, where everything is resident. */
   enabled: boolean;
   hexes: number;
+  /**
+   * The collision layer, flattened onto this object.
+   *
+   * Kept flat rather than moved under `collision` because `/health`, `/stats`,
+   * the boot line and every existing check read these names, and renaming a
+   * shipped diagnostic to make a second layer symmetrical is a poor trade. The
+   * lane layer is `lanes` below and the collision layer is also available under
+   * `collision`, so anything new can be written symmetrically.
+   */
   resident: number;
   loading: number;
   needed: number;
-  /** Estimated resident bytes, and the cap they are held under. */
   bytes: number;
   capBytes: number;
   tiles: number;
   prisms: number;
   loads: number;
   evictions: number;
-  /** Updates that ended over cap because every resident hexagon was needed. */
   overCap: number;
-  /** Tile payloads still queued for a decode budget. */
   pending: number;
+  collision: LayerStats;
+  lanes: LayerStats;
 }
 
 /**
- * Which hexagons' prisms this process is holding, and why.
+ * What a layer has to know how to do with one tile. Four closures and two numbers.
+ *
+ * Everything else about residency -- when to want a hexagon, when to give it up,
+ * how much of a tick to spend, how to abandon a load in flight -- is the same
+ * for prisms and for lanes, and is in `HexLayer` once.
+ */
+interface LayerSpec {
+  /** For the over-cap warning, and for `checkServerSegments`' output. */
+  readonly name: string;
+  /** The environment variable an operator would raise. */
+  readonly capName: string;
+  readonly capBytes: number;
+  /** How close a participant has to be before this payload is wanted. */
+  readonly marginM: number;
+  /** Where one tile's payload lives, under the world root. */
+  path(key: string): string;
+  /** Is this tile's payload already held? A tile two hexagons both claim. */
+  has(key: string): boolean;
+  /** Decode and adopt one tile. Returns what it cost and what it added. */
+  apply(key: string, buffer: ArrayBuffer, originX: number, originZ: number, buildings: number): {
+    bytes: number;
+    items: number;
+  };
+  /** Give one tile back. */
+  remove(key: string): void;
+}
+
+/**
+ * One kind of payload, held per hexagon, under its own cap.
+ *
+ * Two of these exist: the prisms and the lane graph. Everything that is the same
+ * about holding them is here once -- start a read, decode against a millisecond
+ * budget, abandon a load that has been superseded, give the memory back over the
+ * following ticks, evict least-recently-needed-first, and refuse to evict a
+ * hexagon somebody is standing in. What differs is four closures and two
+ * numbers; see `LayerSpec`.
+ *
+ * The layer does **not** own the needed set, the LRU clock or the manifests.
+ * Those are per hexagon rather than per payload, and `HexResidency` owns them:
+ * one distance sweep answers both layers' questions, one manifest read serves
+ * both layers' tiles, and one `usedAt` stamp orders both layers' evictions.
+ */
+class HexLayer {
+  /** Hexagons this layer's margin currently wants. Filled by `HexResidency.update`. */
+  readonly needed = new Set<string>();
+  bytes = 0;
+  fileBytes = 0;
+  loads = 0;
+  evictions = 0;
+  overCap = 0;
+  private inFlight = 0;
+  private warnedAt = 0;
+  /** Slots with payloads waiting on a decode budget, in the order they started. */
+  private readonly applying = new Set<HexSlot>();
+  /** Slots with tiles still to be taken out of the index. See `LayerSlot.releasing`. */
+  private readonly releasing = new Set<HexSlot>();
+
+  constructor(
+    readonly spec: LayerSpec,
+    private readonly root: string,
+    private readonly slots: Map<string, HexSlot>,
+    /** This layer's half of a slot. */
+    private readonly of: (slot: HexSlot) => LayerSlot,
+    /** The hexagon's manifest, read once for both layers. */
+    private readonly manifest: (slot: HexSlot) => Promise<HexTiles | null>,
+  ) {}
+
+  isResident(slot: HexSlot): boolean {
+    return this.of(slot).state === 'resident';
+  }
+
+  /** Anything in flight or waiting on a budget. `settle` waits on this. */
+  get busy(): boolean {
+    return this.applying.size > 0 || this.releasing.size > 0;
+  }
+
+  /**
+   * Start reading a hexagon. Never awaited by the tick.
+   *
+   * A read that fails is a hexagon that goes back to `absent` and is started
+   * again the next time it is needed, on `hexes.ensureHex`'s argument: a hexagon
+   * that gives up after one flaky read is a part of the map the player can never
+   * reach, which is worse than one that retries. On local disk the failure that
+   * actually happens is a tile the pipeline did not emit, and `readOptional`
+   * already treats that as an empty tile rather than an error.
+   */
+  start(slot: HexSlot): void {
+    const mine = this.of(slot);
+    if (mine.state !== 'absent' || this.inFlight >= LOAD_CONCURRENCY) return;
+    // Not while its own payload is still coming out of the index: `read` skips a
+    // tile the field already holds, so a hexagon restarted mid-release would
+    // skip exactly the tiles the release is about to delete and come back
+    // missing them. A few ticks of waiting against 12.7 s of margin.
+    if (mine.releasing.length > 0) return;
+    mine.state = 'loading';
+    mine.read = false;
+    mine.generation++;
+    const generation = mine.generation;
+    this.inFlight++;
+    this.loads++;
+    this.applying.add(slot);
+    void this.read(slot, generation).finally(() => {
+      this.inFlight--;
+      if (mine.generation === generation) mine.read = true;
+    });
+  }
+
+  private async read(slot: HexSlot, generation: number): Promise<void> {
+    const mine = this.of(slot);
+    if (slot.tiles === null) {
+      const tiles = await this.manifest(slot);
+      if (mine.generation !== generation) return;
+      if (tiles === null) {
+        mine.state = 'absent';
+        this.applying.delete(slot);
+        return;
+      }
+    }
+    const keys = slot.tiles!.keys;
+    for (let i = 0; i < keys.length; i += READ_CONCURRENCY) {
+      const batch: Array<Promise<ArrayBuffer | null>> = [];
+      for (let j = i; j < Math.min(i + READ_CONCURRENCY, keys.length); j++) {
+        batch.push(readOptional(join(this.root, this.spec.path(keys[j]))));
+      }
+      const buffers = await Promise.all(batch);
+      if (mine.generation !== generation) return;
+      for (let j = 0; j < buffers.length; j++) {
+        const buffer = buffers[j];
+        // A tile already in the field is a tile another hexagon claimed -- which
+        // `checkHexCoverage` says cannot happen, and which the adopters would
+        // silently overwrite anyway, leaving this class thinking it owned bytes
+        // it did not. Skipped explicitly so the accounting stays true.
+        if (buffer === null || this.spec.has(keys[i + j])) continue;
+        mine.pending.push({ at: i + j, buffer });
+      }
+    }
+  }
+
+  /**
+   * Decode what has been read, until `deadline`.
+   *
+   * Oldest load first, so a hexagon somebody is walking into finishes rather
+   * than sharing the budget with one they are walking out of. The deadline is
+   * checked between tiles rather than inside the adopter, so the overshoot is
+   * one tile: 0.17 ms for an average collision tile, and 0.03 ms for an average
+   * lane one.
+   */
+  drain(deadline: number): void {
+    // Give memory back before taking more, and before the deadline is spent on
+    // decoding. A hexagon arriving can afford the eight ticks this costs -- the
+    // margin is 12.7 s -- and the process being over cap for those eight ticks
+    // is the thing the cap exists to stop.
+    if (this.releasing.size > 0) {
+      for (const slot of this.releasing) {
+        const mine = this.of(slot);
+        while (mine.releasing.length > 0) {
+          if (performance.now() >= deadline) return;
+          this.spec.remove(mine.releasing.pop()!);
+        }
+        this.releasing.delete(slot);
+      }
+    }
+    if (this.applying.size === 0) return;
+    for (const slot of this.applying) {
+      const tiles = slot.tiles;
+      if (tiles === null) continue;
+      const mine = this.of(slot);
+      while (mine.pending.length > 0) {
+        if (performance.now() >= deadline) return;
+        const next = mine.pending.pop()!;
+        const at = next.at;
+        const key = tiles.keys[at];
+        const added = this.spec.apply(
+          key,
+          next.buffer,
+          tiles.originX[at],
+          tiles.originZ[at],
+          tiles.buildings[at],
+        );
+        mine.applied.push(key);
+        mine.items += added.items;
+        mine.bytes += added.bytes;
+        mine.fileBytes += next.buffer.byteLength;
+        this.bytes += added.bytes;
+        this.fileBytes += next.buffer.byteLength;
+      }
+      if (mine.read) {
+        mine.state = 'resident';
+        this.applying.delete(slot);
+      }
+    }
+  }
+
+  /** Read and decode one hexagon to completion. The boot path, and only that. */
+  async loadNow(slot: HexSlot, clock: number): Promise<void> {
+    const mine = this.of(slot);
+    if (mine.state === 'resident') return;
+    // Any of its own tiles still queued for removal come out **first**, for
+    // `start`'s reason: `read` skips a tile the field already holds, so a
+    // hexagon reloaded over its own pending release would come back missing
+    // exactly those tiles. Synchronous here because this is boot and there is no
+    // tick to protect.
+    if (mine.releasing.length > 0) this.drain(Infinity);
+    if (mine.state === 'absent') {
+      mine.state = 'loading';
+      mine.read = false;
+      mine.generation++;
+      // Stamped, so the boot walk's own evictions are least-recently-loaded
+      // first rather than whatever order the slot map happens to be in.
+      slot.usedAt = clock;
+      this.loads++;
+      this.applying.add(slot);
+      await this.read(slot, mine.generation);
+      mine.read = true;
+    }
+    this.drain(Infinity);
+  }
+
+  /**
+   * Drop hexagons, least-recently-needed first, until under cap.
+   *
+   * The needed set is a hard floor and the loop gives up rather than crossing
+   * it. See `HexResidency`'s header: over cap is a log line, and the alternative
+   * is a player standing in a hexagon whose prisms have just been taken away.
+   */
+  trim(pinned: (slot: HexSlot) => boolean): void {
+    while (this.bytes > this.spec.capBytes) {
+      let victim: HexSlot | null = null;
+      for (const slot of this.slots.values()) {
+        if (this.of(slot).state === 'absent') continue;
+        if (this.needed.has(slot.entry.id)) continue;
+        if (pinned(slot)) continue;
+        if (victim === null || slot.usedAt < victim.usedAt) victim = slot;
+      }
+      if (victim === null) {
+        this.overCap++;
+        const now = performance.now();
+        if (now - this.warnedAt > WARN_INTERVAL_MS) {
+          this.warnedAt = now;
+          let held = 0;
+          for (const other of this.slots.values()) if (this.of(other).state !== 'absent') held++;
+          console.warn(
+            `[sydney] ${this.spec.name} over cap: ${(this.bytes / 1e6).toFixed(1)} MB resident against a ` +
+              `${(this.spec.capBytes / 1e6).toFixed(0)} MB cap, and all ${held} resident hexagon(s) are ` +
+              'needed. Holding them anyway — a player standing in one would fall through the ' +
+              `world. Raise ${this.spec.capName}, or accept that this many players this far ` +
+              'apart costs this much.',
+          );
+        }
+        return;
+      }
+      this.drop(victim);
+      this.evictions++;
+    }
+  }
+
+  /** Give a hexagon's payload back. Idempotent; keeps the manifest. */
+  drop(slot: HexSlot): void {
+    const mine = this.of(slot);
+    mine.generation++;
+    mine.pending.length = 0;
+    this.applying.delete(slot);
+    // The bytes come off the books now and the payload comes out of the index
+    // over the next few ticks. The accounting therefore runs a little ahead of
+    // the heap, which is the safe direction: `trim` believes it has already
+    // recovered the memory and so evicts *less*, where the other order would
+    // cascade -- every tick finding itself still over cap and giving up another
+    // hexagon that the previous tick's release was about to pay for.
+    for (const key of mine.applied) mine.releasing.push(key);
+    if (mine.releasing.length > 0) this.releasing.add(slot);
+    mine.applied.length = 0;
+    this.bytes -= mine.bytes;
+    this.fileBytes -= mine.fileBytes;
+    mine.bytes = 0;
+    mine.fileBytes = 0;
+    mine.items = 0;
+    mine.state = 'absent';
+    mine.read = false;
+  }
+
+  dropAll(): void {
+    for (const slot of this.slots.values()) if (this.of(slot).state !== 'absent') this.drop(slot);
+    this.drain(Infinity);
+  }
+
+  stats(): LayerStats {
+    let resident = 0;
+    let loading = 0;
+    let tiles = 0;
+    let items = 0;
+    let pending = 0;
+    for (const slot of this.slots.values()) {
+      const mine = this.of(slot);
+      if (mine.state === 'resident') resident++;
+      if (mine.state === 'loading') loading++;
+      tiles += mine.applied.length;
+      items += mine.items;
+      pending += mine.pending.length + mine.releasing.length;
+    }
+    return {
+      resident,
+      loading,
+      bytes: this.bytes,
+      capBytes: this.spec.capBytes,
+      tiles,
+      items,
+      loads: this.loads,
+      evictions: this.evictions,
+      overCap: this.overCap,
+      pending,
+      marginM: this.spec.marginM,
+      needed: this.needed.size,
+    };
+  }
+}
+
+/**
+ * Which hexagons' prisms and lane graphs this process is holding, and why.
  *
  * ---------------------------------------------------------------------------
- * WHY COLLISION AND NOT THE LANE GRAPH, WHICH IS THE OTHER THIRD.
+ * WHY BOTH, AND WHY THE LANE GRAPH TOOK A SECOND ROUND TO GET HERE.
  *
- * Measured on the same 19.3 km world, one process per subsystem: the lane
- * sidecars cost **53 MB of live heap as `TrafficField` and another 57 MB as
- * `PedestrianField`** -- 111 MB of the 310 MB whole-world load, against
- * collision's 193 MB. At EXPANSION.md's 7-8x it is 780-890 MB on its own, so
- * "routes are small" is not an argument that survives contact with the numbers,
- * and this is not a subsystem that fits at 60 km.
+ * Measured on the 19.3 km world, one process per subsystem: collision is
+ * **193 MB of live heap** for 25.4 MB of files, and the lane graph is
+ * **131.9 MB** for 13.9 MB -- 325 MB of a 1 GB box between them, and at
+ * EXPANSION.md's 7-8x, 1.4-1.6 GB and 0.9-1.0 GB respectively. Neither fits at
+ * 60 km and neither is optional: collision is what stops a player walking
+ * through a warehouse, and the lane graph is every car and every footpath in
+ * the city.
  *
- * It is nonetheless **deliberately left whole in this pass**, because the same
- * machinery is not cheap here and the reason is measurable rather than
- * aesthetic. `TrafficField.adopt`/`drop` and `PedestrianField.adopt`/`drop`
- * exist and are exactly the seam this would use -- but both set a dirty flag,
- * and the next `near()` rebuilds the flat array and the whole broadphase grid
- * over *every* resident tile. Timed at full residency on this world:
+ * Collision came first because the lane fields could not be streamed at all.
+ * `TrafficField.adopt`/`drop` and `PedestrianField.adopt`/`drop` existed, but
+ * both set a dirty flag and the next `near()` rebuilt the flat array and the
+ * whole broadphase grid over *every* resident tile -- 14.42 ms at full
+ * residency, 86% of a 60 Hz budget, paid on the first query after every single
+ * tile arrival. That is a stall on every hexagon crossing, and it is why the
+ * previous pass measured the lane graph, wrote the number down and left it
+ * whole. Those two classes now maintain their indexes per tile and in a
+ * canonical order (see `game/traffic.TrafficField`'s header for the design and
+ * the measurement); the same tile change now costs **0.017 ms**, and a whole
+ * 374-tile hexagon comes out in 7.8 ms instead of 4,930 ms.
  *
- *   | resident tiles | traffic rebuild | pedestrian rebuild | total |
- *   |---------------:|----------------:|-------------------:|------:|
- *   | 3,017          |         3.44 ms |           11.16 ms | **14.6 ms** |
- *   | 1,509          |         2.71 ms |            7.04 ms |  9.8 ms |
- *   |   754          |         0.85 ms |            2.86 ms |  3.7 ms |
- *   |   302          |         0.34 ms |            1.00 ms |  1.3 ms |
+ * ---------------------------------------------------------------------------
+ * TWO CAPS, ONE NEEDED SWEEP. Why the split falls where it does.
  *
- * That lands **inside the tick**, on the first query after any load or eviction:
- * 14.6 ms is 88% of a 60 Hz budget, and even at the reduced residency a lazy
- * loader would run at, every hexagon crossing would cost a 4 ms spike. The fix
- * is an incremental rebuild inside those two classes -- they would have to
- * splice one tile's bands out of `flat` and the grid instead of discarding both
- * -- and those two classes are `client/src/game/`, shared with the browser,
- * where the same change has to be right for a renderer as well as for this. It
- * is a round of its own with its own proof, and it is the next one.
+ * What the two layers **share** is everything that is a fact about a hexagon
+ * rather than about a payload: one distance sweep per recomputation answers both
+ * margins, one manifest read serves both layers' tiles, one `usedAt` stamp
+ * orders both layers' evictions, and one `APPLY_BUDGET_MS` bounds the tick.
+ * Adding the lane graph did not add a millisecond to the residency's worst tick.
  *
- * Nothing here is wasted on it when it comes: the needed set, the LRU, the cap
- * and the budgeted applier are all keyed on hexagons rather than on prisms, and
- * a lane loader is another `apply` and another `drop` on the same slots.
+ * What they do **not** share is the byte account, and that is deliberate:
+ *
+ *   - **The two numbers already mean different things and are already
+ *     deployed.** `SYDNEY_COLLISION_CAP_MB` is documented in DEPLOY.md with a
+ *     measured RSS ratio behind it. Folding the lane graph into it would
+ *     silently change what every existing setting of that variable does, on a
+ *     box that is sized to 1 GB.
+ *   - **The failure modes are different, so an operator wants to tune them
+ *     apart.** Missing prisms is a player walking through a wall -- visible,
+ *     reportable, and briefly unfair. Missing lanes is a street with no traffic
+ *     on it, which is invisible and costs nobody a fight. Those are not
+ *     interchangeable megabytes.
+ *   - **A shared cap could not trade between them anyway.** Evicting a
+ *     hexagon's lanes does not free a prism, so a single account would trim
+ *     whichever layer's victim happened to sort first and call it a saving.
+ *     Two accounts trim the thing that is actually over.
+ *
+ * The consequence to be aware of: a hexagon can be lanes-resident and
+ * collision-absent, or the reverse. That is correct rather than tolerated --
+ * the lane margin is four times the collision margin on purpose (see
+ * `LANES_NEED_MARGIN_M`), so the steady state near a boundary is exactly that.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT A HEXAGON WHOSE LANES HAVE NOT ARRIVED ANSWERS: no traffic, no crowd.
+ *
+ * The same shape of answer the collision gap gives, and the same argument.
+ * `TrafficField.near` finds no routes, so `carHitting` returns null and nobody
+ * is run over; `PedestrianField.near` finds no bands, so no walker is posed and
+ * no officer stands on a beat there. There is no "unknown" and nothing to
+ * synthesise one from.
+ *
+ * **The server is authoritative for being hit by a car, so the direction this
+ * fails in is not "invisible cars run people down".** A car the server is not
+ * simulating cannot knock anybody over. What a player could in principle see is
+ * the opposite: a client, which streams lanes for rendering, drawing a car that
+ * passes through somebody with no knockdown.
+ *
+ * That window is closed rather than bounded, and `LANES_NEED_MARGIN_M` is where
+ * the closing is argued: the widest route in the city reaches 1,164.7 m past its
+ * own tile and the hit test reaches 6 m, so 2,000 m of margin means every car
+ * that can touch a participant is in a hexagon that participant has already made
+ * this process load. What is left is the load *gap* -- the half second between a
+ * hexagon being wanted and its tiles being decoded -- and that is 250 ms of
+ * needed-set latency plus a budgeted decode against 12.7 s of travel at the
+ * fastest speed in the game. `checkServerSegments` walks it.
  *
  * ---------------------------------------------------------------------------
  * THE ONE RULE THIS CLASS WILL BREAK ITS OWN CAP FOR.
@@ -353,23 +876,13 @@ export class HexResidency {
   private contract: HexContract | null = null;
   private readonly rootIndex: HexIndex | null;
   readonly capBytes: number;
-  private readonly collision: CollisionWorld;
+  readonly lanesCapBytes: number;
+  private readonly collisionLayer: HexLayer;
+  private readonly lanesLayer: HexLayer;
 
   /** Monotonic, bumped per needed-set recomputation. The LRU clock. */
   private clock = 0;
   private ticks = 0;
-  private bytes = 0;
-  private fileBytes = 0;
-  private needed = new Set<string>();
-  private inFlight = 0;
-  private loads = 0;
-  private evictions = 0;
-  private overCap = 0;
-  private warnedAt = 0;
-  /** Slots with payloads waiting on a decode budget, in the order they started. */
-  private readonly applying = new Set<HexSlot>();
-  /** Slots with tiles still to be taken out of the grid. See `HexSlot.releasing`. */
-  private readonly releasing = new Set<HexSlot>();
   /** Points that count as occupied whether or not anybody is there. See `pin`. */
   private anchors: readonly number[] = [];
   /**
@@ -378,10 +891,10 @@ export class HexResidency {
    * The needed set is recomputed at 4 Hz and `trim` runs at 60, so for up to
    * 250 ms the set can be out of date -- and there is exactly one way to be
    * inside a hexagon that the set does not know about, which is to arrive
-   * without crossing the 500 m margin first. That is `/tp <suburb>`. Without
-   * this the teleport lands in a hexagon that is resident, unneeded and possibly
-   * the LRU victim, and the player has the prisms taken out from under them by
-   * the very next tick.
+   * without crossing the margin first. That is `/tp <suburb>`. Without this the
+   * teleport lands in a hexagon that is resident, unneeded and possibly the LRU
+   * victim, and the player has the prisms taken out from under them by the very
+   * next tick.
    *
    * So the eviction re-asks the question exactly, for the one hexagon it is
    * about to drop. That is O(players) per eviction rather than
@@ -393,27 +906,92 @@ export class HexResidency {
    */
   private readonly lastPoints: number[] = [];
 
-  constructor(root: string, rootIndex: HexIndex | null, collision: CollisionWorld, capBytes: number) {
+  constructor(
+    root: string,
+    rootIndex: HexIndex | null,
+    collision: CollisionWorld,
+    capBytes: number,
+    traffic: TrafficField,
+    peds: PedestrianField,
+    lanesCapBytes: number,
+  ) {
     this.root = root;
     this.rootIndex = rootIndex;
-    this.collision = collision;
     this.capBytes = capBytes;
+    this.lanesCapBytes = lanesCapBytes;
+    const manifest = (slot: HexSlot): Promise<HexTiles | null> => this.readManifest(slot);
+    this.collisionLayer = new HexLayer(
+      {
+        name: 'collision',
+        capName: 'SYDNEY_COLLISION_CAP_MB',
+        capBytes,
+        marginM: COLLISION_NEED_MARGIN_M,
+        path: (key) => join('collision', `${key}.bin`),
+        has: (key) => collision.hasTile(key),
+        apply: (key, buffer, originX, originZ, buildings) => {
+          const added = collision.addTile(key, buffer, originX, originZ, buildings);
+          return {
+            items: added,
+            bytes: estimateCollisionBytes(added, verticesInPayload(buffer.byteLength, added)),
+          };
+        },
+        remove: (key) => collision.removeTile(key),
+      },
+      root,
+      this.slots,
+      (slot) => slot.collision,
+      manifest,
+    );
+    this.lanesLayer = new HexLayer(
+      {
+        name: 'lanes',
+        capName: 'SYDNEY_LANES_CAP_MB',
+        capBytes: lanesCapBytes,
+        marginM: LANES_NEED_MARGIN_M,
+        path: (key) => join('tiles', `${key}.lanes.bin`),
+        has: (key) => traffic.hasTile(key),
+        // The identical offset the prisms use, and `loadWorld`'s whole-world
+        // path used before them: a car route runs out of its own tile and has no
+        // group to inherit a translation from, so `decodeLanes` folds the origin
+        // in once. The client applies the same pair in `streamer.loadLanes`.
+        // `originZ` is already `bounds[1] + tile_size`; see `readTiles`.
+        apply: (key, buffer, originX, originZ) => {
+          const decoded = decodeLanes(buffer, originX, originZ);
+          if (decoded === null) return { items: 0, bytes: 0 };
+          traffic.adopt(key, decoded);
+          // The footpaths, off the same decoded object. One file, two consumers,
+          // and no second decode -- `PedestrianField.adopt` derives its bands
+          // from the ways block the routes were built beside.
+          peds.adopt(key, decoded);
+          let routePoints = 0;
+          for (const route of decoded.routes) routePoints += route.count;
+          let wayPoints = 0;
+          for (const way of decoded.ways) wayPoints += way.count;
+          return {
+            items: decoded.routes.length,
+            bytes: estimateLaneBytes(decoded.routes.length, routePoints, wayPoints),
+          };
+        },
+        remove: (key) => {
+          traffic.drop(key);
+          peds.drop(key);
+        },
+      },
+      root,
+      this.slots,
+      (slot) => slot.lanes,
+      manifest,
+    );
     if (!hexesUsable(rootIndex)) return;
     this.arm();
     for (const entry of this.contract!.list) {
       this.slots.set(entry.id, {
         entry,
-        state: 'absent',
         tiles: null,
-        pending: [],
-        applied: [],
-        releasing: [],
-        generation: 0,
-        read: false,
-        bytes: 0,
-        fileBytes: 0,
-        prisms: 0,
+        reading: null,
         usedAt: 0,
+        collision: emptyLayerSlot(),
+        lanes: emptyLayerSlot(),
       });
     }
   }
@@ -457,150 +1035,17 @@ export class HexResidency {
     return hexDistance(entry, x, z);
   }
 
-  /**
-   * Points that are needed whether or not anybody is standing on them.
-   *
-   * There is exactly one, and it is the spawn. Every join is placed by
-   * `Sim.joinSpot`, which probes the prisms to keep somebody out of a warehouse,
-   * and a join is not a thing that can wait half a second for a hexagon: the
-   * player is already in the room by the time the collision would land. So the
-   * spawn's hexagon is held for the life of the process -- one hexagon, 26 MB on
-   * this build -- rather than being evicted by an empty server and re-fetched
-   * underneath the first person to arrive.
-   *
-   * `/tp <suburb>` is deliberately **not** pinned. A teleport is somewhere the
-   * player already is by the next tick, so the ordinary rule picks it up 250 ms
-   * later and they walk through a wall for a moment; pinning every suburb would
-   * be pinning the map.
-   */
-  pin(points: readonly number[]): void {
-    this.anchors = points;
-  }
-
-  /**
-   * The hexagons a set of participants needs, by the margin rule.
-   *
-   * `points` is flat `x, z` pairs -- every connected player and every bot across
-   * every room on this host, because the collision is shared by reference and a
-   * hexagon room 3 needs is a hexagon room 5 is holding too. See `roomWorld`.
-   */
-  neededFor(points: readonly number[], out = new Set<string>()): Set<string> {
-    out.clear();
-    if (this.contract === null) return out;
-    this.arm();
-    for (const slot of this.slots.values()) {
-      if (
-        reaches(slot.entry, points) ||
-        (this.anchors.length > 0 && reaches(slot.entry, this.anchors))
-      ) {
-        out.add(slot.entry.id);
-      }
+  /** Read one hexagon's manifest, once, however many layers ask for it. */
+  private readManifest(slot: HexSlot): Promise<HexTiles | null> {
+    if (slot.tiles !== null) return Promise.resolve(slot.tiles);
+    if (slot.reading === null) {
+      slot.reading = this.readTiles(slot.entry).then((tiles) => {
+        slot.reading = null;
+        if (tiles !== null) slot.tiles = tiles;
+        return tiles;
+      });
     }
-    return out;
-  }
-
-  /** Is this hexagon's collision fully resident right now? */
-  isResident(id: string): boolean {
-    return this.slots.get(id)?.state === 'resident';
-  }
-
-  /** Is it wanted by somebody, as of the last needed-set recomputation? */
-  isNeeded(id: string): boolean {
-    return this.needed.has(id);
-  }
-
-  /** The hexagon a point is in, or null out past the built extent. For `/tp` and the checks. */
-  hexAt(x: number, z: number): HexEntry | null {
-    if (this.contract === null) return null;
-    this.arm();
-    for (const slot of this.slots.values()) {
-      if (hexDistance(slot.entry, x, z) === 0) return slot.entry;
-    }
-    return null;
-  }
-
-  /**
-   * One tick of the residency: notice, start, decode, trim.
-   *
-   * Called once per host tick from `server/index.ts`, before the rooms step, so
-   * a hexagon started this tick has the whole tick's slack to read in. Nothing
-   * here awaits: the reads are started and forgotten, and their payloads are
-   * decoded by the budget below on later ticks.
-   */
-  update(points: readonly number[]): void {
-    if (this.contract === null) return;
-    this.lastPoints.length = 0;
-    for (let i = 0; i < points.length; i++) this.lastPoints.push(points[i]);
-    if (this.ticks++ % NEED_INTERVAL_TICKS === 0) {
-      this.clock++;
-      this.neededFor(points, this.needed);
-      for (const id of this.needed) {
-        const slot = this.slots.get(id)!;
-        slot.usedAt = this.clock;
-        if (slot.state === 'absent') this.start(slot);
-      }
-    }
-    this.drain(APPLY_BUDGET_MS);
-    // After the decode rather than before it, and every tick rather than every
-    // fifteenth. The bytes only ever *arrive* in `drain`, so trimming ahead of it
-    // measures the residency one budget out of date and leaves the process over
-    // cap for the rest of the interval. Under cap this is one comparison.
-    this.trim();
-  }
-
-  /**
-   * Decode what has been read, for at most `budgetMs`.
-   *
-   * Oldest load first, so a hexagon somebody is walking into finishes rather
-   * than sharing the budget with one they are walking out of. The deadline is
-   * checked between tiles rather than inside `addTile`, so the overshoot is one
-   * tile: 0.17 ms for an average one, and the worst whole call measured over a
-   * three-hexagon walk is 4.4 ms against the 2 ms budget.
-   */
-  private drain(budgetMs: number): void {
-    const deadline = performance.now() + budgetMs;
-    // Give memory back before taking more, and before the deadline is spent on
-    // decoding. A hexagon arriving can afford the eight ticks this costs -- the
-    // margin is 12.7 s -- and the process being over cap for those eight ticks
-    // is the thing the cap exists to stop.
-    if (this.releasing.size > 0) {
-      for (const slot of this.releasing) {
-        while (slot.releasing.length > 0) {
-          if (performance.now() >= deadline) return;
-          this.collision.removeTile(slot.releasing.pop()!);
-        }
-        this.releasing.delete(slot);
-      }
-    }
-    if (this.applying.size === 0) return;
-    for (const slot of this.applying) {
-      const tiles = slot.tiles;
-      if (tiles === null) continue;
-      while (slot.pending.length > 0) {
-        if (performance.now() >= deadline) return;
-        const next = slot.pending.pop()!;
-        const at = next.at;
-        const key = tiles.keys[at];
-        const added = this.collision.addTile(
-          key,
-          next.buffer,
-          tiles.originX[at],
-          tiles.originZ[at],
-          tiles.buildings[at],
-        );
-        slot.applied.push(key);
-        slot.prisms += added;
-        const bytes = estimateCollisionBytes(added, verticesInPayload(next.buffer.byteLength, added));
-        slot.bytes += bytes;
-        slot.fileBytes += next.buffer.byteLength;
-        this.bytes += bytes;
-        this.fileBytes += next.buffer.byteLength;
-      }
-      if (slot.read) {
-        slot.state = 'resident';
-        this.applying.delete(slot);
-      }
-    }
+    return slot.reading;
   }
 
   /** Read one hexagon's manifest down to the eight bytes a tile needs from it. */
@@ -638,89 +1083,164 @@ export class HexResidency {
   }
 
   /**
-   * Start reading a hexagon. Never awaited by the tick.
+   * Points that are needed whether or not anybody is standing on them.
    *
-   * A read that fails is a hexagon that goes back to `absent` and is started
-   * again the next time it is needed, on `hexes.ensureHex`'s argument: a hexagon
-   * that gives up after one flaky read is a part of the map the player can never
-   * reach, which is worse than one that retries. On local disk the failure that
-   * actually happens is a tile the pipeline did not emit, and `readOptional`
-   * already treats that as an empty tile rather than an error.
+   * There is exactly one, and it is the spawn. Every join is placed by
+   * `Sim.joinSpot`, which probes the prisms to keep somebody out of a warehouse,
+   * and a join is not a thing that can wait half a second for a hexagon: the
+   * player is already in the room by the time the collision would land. So the
+   * spawn's hexagon is held for the life of the process -- one hexagon, 26 MB of
+   * prisms and 22 MB of lanes on this build -- rather than being evicted by an
+   * empty server and re-fetched underneath the first person to arrive.
+   *
+   * `/tp <suburb>` is deliberately **not** pinned. A teleport is somewhere the
+   * player already is by the next tick, so the ordinary rule picks it up 250 ms
+   * later and they walk through a wall for a moment; pinning every suburb would
+   * be pinning the map.
    */
-  private start(slot: HexSlot): void {
-    if (slot.state !== 'absent' || this.inFlight >= LOAD_CONCURRENCY) return;
-    // Not while its own prisms are still coming out of the grid: `read` skips a
-    // tile the world already holds, so a hexagon restarted mid-release would
-    // skip exactly the tiles the release is about to delete and come back
-    // missing them. A few ticks of waiting against 12.7 s of margin.
-    if (slot.releasing.length > 0) return;
-    slot.state = 'loading';
-    slot.read = false;
-    slot.generation++;
-    const generation = slot.generation;
-    this.inFlight++;
-    this.loads++;
-    this.applying.add(slot);
-    void this.read(slot, generation).finally(() => {
-      this.inFlight--;
-      if (slot.generation === generation) slot.read = true;
-    });
+  pin(points: readonly number[]): void {
+    this.anchors = points;
   }
 
-  private async read(slot: HexSlot, generation: number): Promise<void> {
-    if (slot.tiles === null) {
-      const tiles = await this.readTiles(slot.entry);
-      if (slot.generation !== generation) return;
-      if (tiles === null) {
-        slot.state = 'absent';
-        this.applying.delete(slot);
-        return;
-      }
-      slot.tiles = tiles;
-    }
-    const keys = slot.tiles.keys;
-    for (let i = 0; i < keys.length; i += READ_CONCURRENCY) {
-      const batch: Array<Promise<ArrayBuffer | null>> = [];
-      for (let j = i; j < Math.min(i + READ_CONCURRENCY, keys.length); j++) {
-        batch.push(readOptional(join(this.root, 'collision', `${keys[j]}.bin`)));
-      }
-      const buffers = await Promise.all(batch);
-      if (slot.generation !== generation) return;
-      for (let j = 0; j < buffers.length; j++) {
-        const buffer = buffers[j];
-        // A tile already in the world is a tile another hexagon claimed -- which
-        // `checkHexCoverage` says cannot happen, and which `addTile` would
-        // silently no-op on anyway, leaving this class thinking it owned prisms
-        // it did not. Skipped explicitly so the accounting stays true.
-        if (buffer === null || this.collision.hasTile(keys[i + j])) continue;
-        slot.pending.push({ at: i + j, buffer });
-      }
-    }
+  /**
+   * The hexagons a set of participants needs, by the collision margin rule.
+   *
+   * `points` is flat `x, z` pairs -- every connected player and every bot across
+   * every room on this host, because the fields are shared by reference and a
+   * hexagon room 3 needs is a hexagon room 5 is holding too. See `roomWorld`.
+   */
+  neededFor(points: readonly number[], out = new Set<string>()): Set<string> {
+    return this.neededWithin(points, COLLISION_NEED_MARGIN_M, out);
   }
 
-  /** Read and decode one hexagon to completion. The boot path, and only that. */
+  /** The same question at an arbitrary margin. The lane layer asks at 2,000 m. */
+  neededWithin(points: readonly number[], margin: number, out = new Set<string>()): Set<string> {
+    out.clear();
+    if (this.contract === null) return out;
+    this.arm();
+    for (const slot of this.slots.values()) {
+      if (
+        reaches(slot.entry, points, margin) ||
+        (this.anchors.length > 0 && reaches(slot.entry, this.anchors, margin))
+      ) {
+        out.add(slot.entry.id);
+      }
+    }
+    return out;
+  }
+
+  /** Is this hexagon's collision fully resident right now? */
+  isResident(id: string): boolean {
+    const slot = this.slots.get(id);
+    return slot !== undefined && this.collisionLayer.isResident(slot);
+  }
+
+  /** And its lane graph? */
+  isLanesResident(id: string): boolean {
+    const slot = this.slots.get(id);
+    return slot !== undefined && this.lanesLayer.isResident(slot);
+  }
+
+  /** Is its collision wanted by somebody, as of the last needed-set recomputation? */
+  isNeeded(id: string): boolean {
+    return this.collisionLayer.needed.has(id);
+  }
+
+  /** And its lane graph, at the wider margin? */
+  isLanesNeeded(id: string): boolean {
+    return this.lanesLayer.needed.has(id);
+  }
+
+  /** The hexagon a point is in, or null out past the built extent. For `/tp` and the checks. */
+  hexAt(x: number, z: number): HexEntry | null {
+    if (this.contract === null) return null;
+    this.arm();
+    for (const slot of this.slots.values()) {
+      if (hexDistance(slot.entry, x, z) === 0) return slot.entry;
+    }
+    return null;
+  }
+
+  /**
+   * One tick of the residency: notice, start, decode, trim. Both layers.
+   *
+   * Called once per host tick from `server/index.ts`, before the rooms step, so
+   * a hexagon started this tick has the whole tick's slack to read in. Nothing
+   * here awaits: the reads are started and forgotten, and their payloads are
+   * decoded by the budget below on later ticks.
+   */
+  update(points: readonly number[]): void {
+    if (this.contract === null) return;
+    this.lastPoints.length = 0;
+    for (let i = 0; i < points.length; i++) this.lastPoints.push(points[i]);
+    if (this.ticks++ % NEED_INTERVAL_TICKS === 0) {
+      this.clock++;
+      // One sweep for the collision margin and one for the lanes margin. Two
+      // passes over `slots * points` rather than one, and it is 0.16 ms a
+      // recomputation at 100 players and 16 hexagons -- 0.01 ms a tick at 4 Hz
+      // -- because both are the same three multiplies against a hexagon centre.
+      // Merging them into a single pass that computed the distance once would
+      // save half of that and cost the two margins their independence.
+      this.neededWithin(points, COLLISION_NEED_MARGIN_M, this.collisionLayer.needed);
+      this.neededWithin(points, LANES_NEED_MARGIN_M, this.lanesLayer.needed);
+      // The stamp is per hexagon, so a hexagon wanted by either layer is
+      // recently-used for both. That is the right meaning: `usedAt` orders
+      // evictions by how long ago anybody cared about this piece of the map, and
+      // a hexagon whose lanes are wanted is one a player is walking toward.
+      for (const id of this.lanesLayer.needed) this.slots.get(id)!.usedAt = this.clock;
+      for (const id of this.collisionLayer.needed) {
+        const slot = this.slots.get(id)!;
+        slot.usedAt = this.clock;
+        this.collisionLayer.start(slot);
+      }
+      for (const id of this.lanesLayer.needed) this.lanesLayer.start(this.slots.get(id)!);
+    }
+    const began = performance.now();
+    const deadline = began + APPLY_BUDGET_MS;
+    this.collisionLayer.drain(deadline);
+    // Whatever collision left, and never less than `LANES_FLOOR_MS`. See there.
+    this.lanesLayer.drain(Math.max(deadline, performance.now() + LANES_FLOOR_MS));
+    // After the decode rather than before it, and every tick rather than every
+    // fifteenth. The bytes only ever *arrive* in `drain`, so trimming ahead of it
+    // measures the residency one budget out of date and leaves the process over
+    // cap for the rest of the interval. Under cap this is one comparison.
+    this.trim();
+  }
+
+  /**
+   * The exact test, for the one hexagon a layer is about to give up.
+   *
+   * See `lastPoints`: a teleport is inside a hexagon the 4 Hz needed set has not
+   * heard about yet. Asked at that layer's own margin, so the lane layer keeps
+   * the wider skirt it was given.
+   */
+  private pinnedFor(layer: HexLayer): (slot: HexSlot) => boolean {
+    const margin = layer.spec.marginM;
+    return (slot) =>
+      reaches(slot.entry, this.lastPoints, margin) || reaches(slot.entry, this.anchors, margin);
+  }
+
+  private trim(): void {
+    // The distance tests below read `world/hexes.ts`'s module contract, and this
+    // is a path `update` can reach without having gone through `neededWithin` on
+    // this tick. See `arm`.
+    this.arm();
+    this.collisionLayer.trim(this.pinnedFor(this.collisionLayer));
+    this.lanesLayer.trim(this.pinnedFor(this.lanesLayer));
+  }
+
+  /** Read and decode one hexagon's **collision** to completion. The boot path. */
   async loadNow(id: string): Promise<void> {
     const slot = this.slots.get(id);
-    if (slot === undefined || slot.state === 'resident') return;
-    // Any of its own tiles still queued for removal come out **first**, for
-    // `start`'s reason: `read` skips a tile the world already holds, so a
-    // hexagon reloaded over its own pending release would come back missing
-    // exactly those tiles. Synchronous here because this is boot and there is no
-    // tick to protect.
-    if (slot.releasing.length > 0) this.drain(Infinity);
-    if (slot.state === 'absent') {
-      slot.state = 'loading';
-      slot.read = false;
-      slot.generation++;
-      // Stamped, so the boot walk's own evictions are least-recently-loaded
-      // first rather than whatever order the slot map happens to be in.
-      slot.usedAt = ++this.clock;
-      this.loads++;
-      this.applying.add(slot);
-      await this.read(slot, slot.generation);
-      slot.read = true;
-    }
-    this.drain(Infinity);
+    if (slot === undefined) return;
+    await this.collisionLayer.loadNow(slot, ++this.clock);
+  }
+
+  /** And its lane graph. For the checks, and for nothing on the boot path. */
+  async loadLanesNow(id: string): Promise<void> {
+    const slot = this.slots.get(id);
+    if (slot === undefined) return;
+    await this.lanesLayer.loadNow(slot, ++this.clock);
   }
 
   /** Wait for every load in flight to land. The boot path's `ensureHexesNear`. */
@@ -729,78 +1249,11 @@ export class HexResidency {
     // giving up leaves the hexagon absent and re-startable rather than holding
     // the boot open, which is `ensureHexesNear`'s own call.
     const until = performance.now() + 10_000;
-    while ((this.applying.size > 0 || this.releasing.size > 0) && performance.now() < until) {
+    while ((this.collisionLayer.busy || this.lanesLayer.busy) && performance.now() < until) {
       await new Promise((resolve) => setTimeout(resolve, 1));
-      this.drain(Infinity);
+      this.collisionLayer.drain(Infinity);
+      this.lanesLayer.drain(Infinity);
     }
-  }
-
-  /**
-   * Drop hexagons, least-recently-needed first, until under cap.
-   *
-   * The needed set is a hard floor and the loop gives up rather than crossing
-   * it. See the class header: over cap is a log line, and the alternative is a
-   * player standing in a hexagon whose prisms have just been taken away.
-   */
-  private trim(): void {
-    while (this.bytes > this.capBytes) {
-      // The distance tests below read `world/hexes.ts`'s module contract, and
-      // this is a path `update` can reach without having gone through
-      // `neededFor` on this tick. See `arm`.
-      this.arm();
-      let victim: HexSlot | null = null;
-      for (const slot of this.slots.values()) {
-        if (slot.state === 'absent') continue;
-        if (this.needed.has(slot.entry.id)) continue;
-        // The exact test, for the one hexagon this is about to give up. See
-        // `lastPoints`: a teleport is inside a hexagon the 4 Hz needed set has
-        // not heard about yet.
-        if (reaches(slot.entry, this.lastPoints) || reaches(slot.entry, this.anchors)) continue;
-        if (victim === null || slot.usedAt < victim.usedAt) victim = slot;
-      }
-      if (victim === null) {
-        this.overCap++;
-        const now = performance.now();
-        if (now - this.warnedAt > WARN_INTERVAL_MS) {
-          this.warnedAt = now;
-          let held = 0;
-          for (const other of this.slots.values()) if (other.state !== 'absent') held++;
-          console.warn(
-            `[sydney] collision over cap: ${(this.bytes / 1e6).toFixed(1)} MB resident against a ` +
-              `${(this.capBytes / 1e6).toFixed(0)} MB cap, and all ${held} resident hexagon(s) are ` +
-              'needed. Holding them anyway — a player standing in one would fall through the ' +
-              'world. Raise SYDNEY_COLLISION_CAP_MB, or accept that this many players this far ' +
-              'apart costs this much.',
-          );
-        }
-        return;
-      }
-      this.drop(victim);
-      this.evictions++;
-    }
-  }
-
-  /** Give a hexagon's prisms back. Idempotent; keeps the manifest. */
-  private drop(slot: HexSlot): void {
-    slot.generation++;
-    slot.pending.length = 0;
-    this.applying.delete(slot);
-    // The bytes come off the books now and the prisms come out of the grid over
-    // the next few ticks. The accounting therefore runs a little ahead of the
-    // heap, which is the safe direction: `trim` believes it has already
-    // recovered the memory and so evicts *less*, where the other order would
-    // cascade -- every tick finding itself still over cap and giving up another
-    // hexagon that the previous tick's release was about to pay for.
-    for (const key of slot.applied) slot.releasing.push(key);
-    if (slot.releasing.length > 0) this.releasing.add(slot);
-    slot.applied.length = 0;
-    this.bytes -= slot.bytes;
-    this.fileBytes -= slot.fileBytes;
-    slot.bytes = 0;
-    slot.fileBytes = 0;
-    slot.prisms = 0;
-    slot.state = 'absent';
-    slot.read = false;
   }
 
   /**
@@ -815,44 +1268,55 @@ export class HexResidency {
     this.trim();
   }
 
-  /** Evict everything. For the checks, which build a world and then take it apart. */
+  /** Evict everything, both layers. For the checks, which build a world and take it apart. */
   dropAll(): void {
-    for (const slot of this.slots.values()) if (slot.state !== 'absent') this.drop(slot);
-    this.drain(Infinity);
+    this.collisionLayer.dropAll();
+    this.lanesLayer.dropAll();
   }
 
-  /** Resident file bytes, so the boot line can still say how much collision is held. */
+  /**
+   * Is everything both layers currently want actually here?
+   *
+   * The boot walk's fixed point, and the checks'. False while anything is still
+   * arriving, and false for good on a world whose cap cannot hold its own
+   * needed set -- which is why every caller bounds its loop rather than
+   * spinning on this.
+   */
+  neededAllResident(): boolean {
+    for (const id of this.collisionLayer.needed) if (!this.isResident(id)) return false;
+    for (const id of this.lanesLayer.needed) if (!this.isLanesResident(id)) return false;
+    return true;
+  }
+
+  /** Resident collision file bytes, so the boot line can still say how much is held. */
   get residentFileBytes(): number {
-    return this.fileBytes;
+    return this.collisionLayer.fileBytes;
+  }
+
+  /** And the lane sidecars'. */
+  get residentLaneFileBytes(): number {
+    return this.lanesLayer.fileBytes;
   }
 
   stats(): SegmentStats {
-    let resident = 0;
-    let loading = 0;
-    let tiles = 0;
-    let prisms = 0;
-    let pending = 0;
-    for (const slot of this.slots.values()) {
-      if (slot.state === 'resident') resident++;
-      if (slot.state === 'loading') loading++;
-      tiles += slot.applied.length;
-      prisms += slot.prisms;
-      pending += slot.pending.length + slot.releasing.length;
-    }
+    const collision = this.collisionLayer.stats();
+    const lanes = this.lanesLayer.stats();
     return {
       enabled: this.contract !== null,
       hexes: this.slots.size,
-      resident,
-      loading,
-      needed: this.needed.size,
-      bytes: this.bytes,
-      capBytes: this.capBytes,
-      tiles,
-      prisms,
-      loads: this.loads,
-      evictions: this.evictions,
-      overCap: this.overCap,
-      pending,
+      resident: collision.resident,
+      loading: collision.loading,
+      needed: collision.needed,
+      bytes: collision.bytes,
+      capBytes: collision.capBytes,
+      tiles: collision.tiles,
+      prisms: collision.items,
+      loads: collision.loads,
+      evictions: collision.evictions,
+      overCap: collision.overCap,
+      pending: collision.pending,
+      collision,
+      lanes,
     };
   }
 }
@@ -877,6 +1341,28 @@ export class HexResidency {
 export function collisionCapBytes(): number {
   const raw = Number(process.env.SYDNEY_COLLISION_CAP_MB ?? DEFAULT_COLLISION_CAP_MB);
   const mb = Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_COLLISION_CAP_MB;
+  return mb * 1e6;
+}
+
+/**
+ * And the lane graph's, in the same denomination and for the same reasons.
+ *
+ * 300 rather than 450 because the lane graph is smaller than the prisms at every
+ * radius -- 131.9 MB against 193 MB at 19.3 km, and EXPANSION.md's 7-8x puts it
+ * at 0.9-1.0 GB against 1.4-1.6 GB -- and because its margin is four times as
+ * wide, so a default that is generous costs more hexagons here than it does
+ * there. Like the collision cap it is a backstop against a pathological spread
+ * of players and not the thing that decides ordinary residency; DEPLOY.md's 1 GB
+ * box wants 100-150.
+ *
+ * Separate from `SYDNEY_COLLISION_CAP_MB` rather than folded into it. See
+ * `HexResidency`'s header for the three reasons, of which the operational one is
+ * that the two variables would otherwise silently change meaning under every
+ * deployment that already sets one of them.
+ */
+export function lanesCapBytes(): number {
+  const raw = Number(process.env.SYDNEY_LANES_CAP_MB ?? DEFAULT_LANES_CAP_MB);
+  const mb = Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_LANES_CAP_MB;
   return mb * 1e6;
 }
 
@@ -1005,13 +1491,20 @@ export interface ServerWorld {
   /** Tile keys that had a powerup sidecar, so a pickup can name its tile. */
   tileOf: Map<string, { tileX: number; tileZ: number }>;
   /**
-   * Every lane graph in the extent, and therefore every moving car.
+   * Every lane graph **near somebody**, and therefore every moving car.
    *
-   * Adopted whole at boot like everything else here: the routes for the inner
-   * ring are 1.4 MB, which is half a tile's GLB, and a server that streamed them
-   * would be a cache with an `await` in a 60 Hz tick to avoid holding a
-   * megabyte. Nothing about a car is ever sent to a client -- both ends evaluate
-   * the same baked timetable at the same wall-clock tick. See `game/traffic.ts`.
+   * Held per hexagon under `SYDNEY_LANES_CAP_MB`, on the prisms' own terms and
+   * on the same slots -- see `HexResidency`. It used to be adopted whole at boot
+   * on the argument that "the routes for the inner ring are 1.4 MB"; the file
+   * bytes were never the cost, and the two lane fields together were measured at
+   * **131.9 MB of live heap** on the 19.3 km build, which EXPANSION.md's 7-8x
+   * puts near a gigabyte.
+   *
+   * Nothing about a car is ever sent to a client -- both ends evaluate the same
+   * baked timetable at the same wall-clock tick -- so what a lazily-loaded field
+   * has to guarantee is that it *answers* identically, which is what
+   * `LANES_NEED_MARGIN_M` and `game/traffic.ts`'s canonical bucket order are
+   * between them for. See `game/traffic.ts`.
    */
   traffic: TrafficField;
   /**
@@ -1103,13 +1596,20 @@ export interface ServerWorld {
  * (or any static host) keeps that job, and this process never learns what a GLB
  * is.
  *
- * Everything but the collision is still read whole, and the header has the
- * measurement that says which of those is worth streaming next. Collision is
- * read per hexagon: this function ends with the hexagons around the spawn
- * resident and everything else on demand, which is `hexes.ensureHexesNear`'s
- * boot contract on the other side of the wire.
+ * **Collision and the lane graph are read per hexagon**; the terrain, the
+ * powerups, the index and the suburb names are still read whole. Between them
+ * the two segmented layers were 325 MB of the 310 MB whole-world load's
+ * measured heap -- the rest is 9 MB -- so what is left resident is the part that
+ * does not grow with the radius in a way a 1 GB box would notice. This function
+ * ends with the hexagons around the spawn resident and everything else on
+ * demand, which is `hexes.ensureHexesNear`'s boot contract on the other side of
+ * the wire.
  */
-export async function loadWorld(root: string, capBytes = collisionCapBytes()): Promise<ServerWorld> {
+export async function loadWorld(
+  root: string,
+  capBytes = collisionCapBytes(),
+  laneCapBytes = lanesCapBytes(),
+): Promise<ServerWorld> {
   const index = JSON.parse(await readFile(join(root, 'index.json'), 'utf8')) as WorldIndex;
 
   // The segment contract. Optional on the same terms as the suburbs below: a
@@ -1135,13 +1635,13 @@ export async function loadWorld(root: string, capBytes = collisionCapBytes()): P
   }
 
   const collision = new CollisionWorld();
-  const segments = new HexResidency(root, rootIndex, collision, capBytes);
+  const traffic = new TrafficField();
+  const peds = new PedestrianField();
+  const segments = new HexResidency(root, rootIndex, collision, capBytes, traffic, peds, laneCapBytes);
   const terrain = new TerrainField(index.terrain.grid, index.tile_size, root);
   const powerups = new PowerupField();
   const tileOf = new Map<string, { tileX: number; tileZ: number }>();
   const points: PowerupPoint[] = [];
-  const traffic = new TrafficField();
-  const peds = new PedestrianField();
   const bytes = { collision: 0, terrain: 0, powerups: 0, lanes: 0 };
   const powerupSource: Array<{
     tileKey: string;
@@ -1229,7 +1729,14 @@ export async function loadWorld(root: string, capBytes = collisionCapBytes()): P
       // group to inherit a translation from -- the client applies the identical
       // pair in `streamer.loadLanes`, and the two agreeing is what makes a
       // predicted knockdown and an authoritative one the same event.
-      const lanes = await readOptional(join(root, 'tiles', `${entry.key}.lanes.bin`));
+      //
+      // Not read here on a segmented world, on exactly the prisms' terms above:
+      // `HexResidency`'s lane layer owns it, per hexagon, at
+      // `LANES_NEED_MARGIN_M`. `HexTiles` carries the identical origin pair out
+      // of the hexagon manifest, which lists the same bounds.
+      const lanes = segments.enabled
+        ? null
+        : await readOptional(join(root, 'tiles', `${entry.key}.lanes.bin`));
       if (lanes) {
         const decoded = decodeLanes(
           lanes,
@@ -1294,6 +1801,17 @@ export async function loadWorld(root: string, capBytes = collisionCapBytes()): P
   //     default 450 MB this function returns exactly what it always returned,
   //     and every check that queries a building nobody is standing near still
   //     finds it.
+  //
+  // **The walk asks for collision and not for lanes, and that is checked rather
+  // than assumed.** `bikePlan` needs the tile's bounds and three integer hashes;
+  // `placeBike` needs `groundHeight` (terrain, whole-world resident),
+  // `clear` (`collision.resolve`) and `waterSurface` (the index's own table).
+  // No path through either reads a route or a band, so laying the bikes out with
+  // the lane layer empty produces the identical layout -- which is what lets the
+  // boot walk stay a collision-only walk and keeps its peak where it was.
+  // `checkServerSegments` asserts the layout against a whole-world load, which
+  // is the same assertion at a stronger point: if a bike ever did depend on a
+  // lane, the capped and uncapped layouts would part company.
   if (segments.enabled) {
     const placed: PlacedBike[] = [];
     const seen = new Set<string>();
@@ -1303,6 +1821,23 @@ export async function loadWorld(root: string, capBytes = collisionCapBytes()): P
     const plans = bikePlan(index.tiles);
     for (const entry of segments.entries) {
       await segments.loadNow(entry.id);
+      // And its lanes, **while the lane cap is not binding**.
+      //
+      // Nothing at boot needs a lane. This is here so that the property the
+      // collision walk gives for free -- *a world that fits under its cap ends
+      // up whole* -- holds for the lane graph too, because a great deal depends
+      // on it: `SYDNEY_LANES_CAP_MB` unset on a dev box, and every one of the
+      // hundred-odd checks in `integration-check.ts` that opens the real world
+      // and asks it about traffic, footpaths, police beats or meth heads three
+      // suburbs from where anybody is standing.
+      //
+      // It stops the moment the cap has actually bitten, and that is the whole
+      // of the difference from the collision walk. Past that point every further
+      // hexagon would be read off the disk, decoded, and evicted by the next
+      // `trimToCap` -- 110 MB of file reads and a few seconds of `buildBands` at
+      // 60 km, to arrive at exactly the residency this would have had anyway.
+      // The prisms cannot do this because the bikes genuinely need them.
+      if (segments.stats().lanes.evictions === 0) await segments.loadLanesNow(entry.id);
       const mine = new Set<string>();
       for (const key of collision.residentTiles()) if (!seen.has(key)) mine.add(key);
       for (const bike of layOutBikes(world, mine, plans)) placed.push(bike);
@@ -1327,11 +1862,26 @@ export async function loadWorld(root: string, capBytes = collisionCapBytes()): P
     // here, `Sim.joinSpot` probes the prisms to place them, and a spawn chosen
     // against an empty city is a player standing inside the first warehouse
     // somebody built there.
+    //
+    // Both layers, because `update` drives both: the spawn's lanes arrive here
+    // too, which is what stops the first joiner standing on a street with no
+    // traffic on it for the half second the lane layer would otherwise take.
     segments.pin([world.spawn.x, world.spawn.z]);
-    segments.update([]);
-    await segments.settle();
+    // Driven to a fixed point rather than once, because `LOAD_CONCURRENCY` is
+    // two per layer and the spawn's 2,000 m lane skirt can want three hexagons.
+    // One `update` would start two of them, `settle` would return with the third
+    // never begun, and the first joiner would stand on a street the server was
+    // not driving. The inner loop is `NEED_INTERVAL_TICKS` because that is the
+    // gate on the needed sweep; the outer one is bounded so a world whose cap
+    // cannot hold its own spawn still boots.
+    for (let round = 0; round < 40; round++) {
+      for (let i = 0; i < NEED_INTERVAL_TICKS; i++) segments.update([]);
+      await segments.settle();
+      if (segments.neededAllResident()) break;
+    }
     segments.trimToCap();
     bytes.collision = segments.residentFileBytes;
+    bytes.lanes = segments.residentLaneFileBytes;
   } else {
     world.bikeSpots = layOutBikes(world);
   }
@@ -1367,12 +1917,20 @@ export async function loadWorld(root: string, capBytes = collisionCapBytes()): P
  *   - `TerrainField`, `WaterLevels` and `TrafficField` are lookup tables. A car
  *     is a pure function of `trafficTick(Date.now())` -- see `game/traffic.ts`
  *     -- so every room sees the same fleet on the same timetable, which is
- *     correct: the traffic is the city, not the match.
+ *     correct: the traffic is the city, not the match. Both lane fields are now
+ *     *mutated* by the residency rather than frozen after boot, and that changes
+ *     nothing here for the reason `segments` gives below: one host-wide
+ *     residency, driven once per host tick before any room steps.
  *   - `PedestrianField` is bands derived from the lane graph; the crowd's poses
- *     are computed into caller-owned scratch (`Simulation` holds its own).
+ *     are computed into caller-owned scratch (`Simulation` holds its own). Its
+ *     one piece of mutable state is the knockdown registry, which is keyed on
+ *     `pedKey(osmId, side, slot)` rather than on a band object -- so a walker
+ *     who was on the ground when their hexagon was evicted is still on the
+ *     ground when it comes back, and a room does not notice either.
  *   - `index`, `tileOf` and `spawn` are data.
  *   - `segments` is host-wide **on purpose**, and it has to be: the rooms share
- *     one `CollisionWorld` by reference, so there is one set of resident
+ *     one `CollisionWorld` and one pair of lane fields by reference, so there is
+ *     one set of resident
  *     hexagons and it is the union of what every room's players need. A
  *     per-room residency would be R caches over one grid, each evicting tiles
  *     another room was standing on. `server/index.ts` gathers the positions from

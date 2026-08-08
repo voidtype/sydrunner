@@ -1031,48 +1031,199 @@ export function kerblessEndpoints(tile: TileLanes): [number, number] {
 const CELL = 256;
 
 /**
+ * Insert into an array that is held in `compare` order.
+ *
+ * Exported, and imported by `game/pedestrians.ts` rather than copied, because
+ * the pair below is the whole of what makes a lazily-loaded world answer the
+ * same query as a whole one -- see `TrafficField`'s header on canonical order --
+ * and two copies of a binary search that agree today is exactly the shape
+ * `world/hexes.ts`' header refuses.
+ *
+ * `splice` rather than a linked list: a broadphase bucket holds a few dozen
+ * entries, so the memmove is shorter than one cache line's worth of pointer
+ * chasing and the array stays contiguous for the scan in `near`, which is the
+ * 60 Hz path.
+ */
+export function insertSorted<T>(into: T[], item: T, compare: (a: T, b: T) => number): void {
+  let lo = 0;
+  let hi = into.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (compare(into[mid], item) < 0) lo = mid + 1;
+    else hi = mid;
+  }
+  into.splice(lo, 0, item);
+}
+
+/**
+ * Take one specific object back out of such an array. True if it was there.
+ *
+ * **Identity inside the equal run, not the first comparator match.** The
+ * comparators below are total on everything the decoder can emit, but "total"
+ * is a claim about data rather than about types: two routes that agree on their
+ * id, their bounds, their duration and their shape would compare equal, and
+ * removing the wrong one of those would leave the grid holding a route whose
+ * tile has been dropped. The run is length one in every real case, so this costs
+ * one comparison.
+ */
+export function removeSorted<T>(from: T[], item: T, compare: (a: T, b: T) => number): boolean {
+  let lo = 0;
+  let hi = from.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (compare(from[mid], item) < 0) lo = mid + 1;
+    else hi = mid;
+  }
+  for (let i = lo; i < from.length && compare(from[i], item) === 0; i++) {
+    if (from[i] === item) {
+      from.splice(i, 1);
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * The canonical order of two routes. A pure function of what a route *is*.
+ *
+ * `rid` first, which is `lanes.py`'s hash of the route's own geometry and is
+ * therefore the same number in every process and across every build that did
+ * not move the street. The rest is a tie-break tail, and it is there because
+ * `rid` is a 32-bit hash over 23,734 routes -- the birthday bound says a
+ * collision is likelier than not somewhere in a 60 km build, and a collision
+ * with no tail is an ordering that depends on which tile arrived first.
+ *
+ * `!==` before `<`, so the comparison never reads a NaN as "greater than
+ * everything in both directions". The decoder cannot emit one -- `decodeLanes`
+ * drops degenerate routes -- but an asymmetric comparator corrupts a binary
+ * search silently rather than loudly.
+ */
+export function compareRoutes(a: LaneRoute, b: LaneRoute): number {
+  if (a === b) return 0;
+  if (a.rid !== b.rid) return a.rid < b.rid ? -1 : 1;
+  if (a.minX !== b.minX) return a.minX < b.minX ? -1 : 1;
+  if (a.minZ !== b.minZ) return a.minZ < b.minZ ? -1 : 1;
+  if (a.maxX !== b.maxX) return a.maxX < b.maxX ? -1 : 1;
+  if (a.maxZ !== b.maxZ) return a.maxZ < b.maxZ ? -1 : 1;
+  if (a.count !== b.count) return a.count < b.count ? -1 : 1;
+  if (a.duration !== b.duration) return a.duration < b.duration ? -1 : 1;
+  if (a.headway !== b.headway) return a.headway < b.headway ? -1 : 1;
+  if (a.phase !== b.phase) return a.phase < b.phase ? -1 : 1;
+  if (a.klass !== b.klass) return a.klass < b.klass ? -1 : 1;
+  return 0;
+}
+
+/**
  * Every lane sidecar currently loaded, indexed for "what is near this player".
  *
  * Adopt/drop by tile key, exactly as `game/powerups.ts`'s `PowerupField` is --
  * the client's streamer calls both as a tile arrives and leaves, and the server
- * adopts every tile once at boot and never drops one. The flat route array and
- * the bucket grid are rebuilt only when the resident set changes, which on the
- * server is never after boot and on the client is a handful of times a minute.
+ * now does the same, per hexagon, under `SYDNEY_LANES_CAP_MB`. See
+ * `server/world.HexResidency`.
  *
  * The grid exists because the alternative is measurable: the server tests every
  * combatant against every car in Sydney every tick, and at 6,200 cars and 16
  * players that is 100,000 evaluations at 60 Hz. Bucketed, a player sees the
  * routes whose plan bounds overlap their own 3x3 cells -- a few dozen.
+ *
+ * ---------------------------------------------------------------------------
+ * THE INDEX IS MAINTAINED PER TILE, AND ITS ORDER IS CANONICAL. Both halves of
+ * that sentence are load-bearing and neither used to be true.
+ *
+ * **Per tile**, because this class used to set a dirty flag on adopt/drop and
+ * rebuild `flat` and the whole bucket grid over *every* resident tile on the
+ * next query. Measured on the shipped 19.3 km world, per single tile arriving
+ * or leaving:
+ *
+ *   | resident tiles | traffic rebuild | pedestrian rebuild | total |
+ *   |---------------:|----------------:|-------------------:|------:|
+ *   | 3,017          |         3.30 ms |           11.12 ms | **14.42 ms** |
+ *   |   754          |         0.82 ms |            2.75 ms |  3.57 ms |
+ *
+ * On the server that landed inside the tick on every hexagon crossing -- 14.4 ms
+ * is 86% of a 60 Hz budget -- and it was the reason `server/world.ts` held the
+ * lane graph whole while it held collision per hexagon. On the *client* it was
+ * worse and had been there all along, because a browser streams tiles
+ * continuously: every tile arrival paid the rebuild at whatever residency the
+ * ring happened to be at, and a hexagon eviction paid it 374 times.
+ *
+ * **Canonical**, because the order `near` returns routes in *is a decision the
+ * simulation makes*. `forEachCarNear` documents that the first car found wins
+ * the hit test, and the buckets used to be filled in `Map` iteration order --
+ * which is tile adoption order, which is `Promise.all` completion order on the
+ * server and streaming order in a browser. Two processes with the identical
+ * resident set could therefore pick different cars to knock the same player
+ * over with. That was survivable while the server loaded every tile in one
+ * `Promise.all` and nothing else ever changed; it is not survivable when a
+ * hexagon can arrive, be evicted and arrive again in a different order. So the
+ * buckets are held in `compareRoutes` order, which is a pure function of the
+ * routes themselves, and the answer to any query is now a function of the
+ * resident *set* rather than of the path taken to it.
+ *
+ * `flat` is the one thing still rebuilt whole, and it is deliberate: nothing on
+ * a 60 Hz path reads it (`near` no longer touches it), its readers are the dev
+ * handles and the checks, and sorting 23,734 routes on demand is cheaper in
+ * code than a second incremental structure nobody queries.
  */
 export class TrafficField {
   private readonly tiles = new Map<string, TileLanes>();
   private flat: LaneRoute[] = [];
-  private grid = new Map<number, LaneRoute[]>();
-  private dirty = true;
+  private readonly grid = new Map<number, LaneRoute[]>();
+  private flatDirty = true;
 
   adopt(tileKey: string, tile: TileLanes): void {
+    // Re-adopting a key replaces it, which is what the old `Map.set` plus a
+    // full rebuild did. Unindexed first, or the previous tile's routes stay in
+    // the grid with nothing left holding a reference to take them out.
+    const previous = this.tiles.get(tileKey);
+    if (previous !== undefined) this.unindex(previous.routes);
     this.tiles.set(tileKey, tile);
-    this.dirty = true;
+    this.index(tile.routes);
+    this.flatDirty = true;
   }
 
   drop(tileKey: string): void {
-    if (this.tiles.delete(tileKey)) this.dirty = true;
+    const previous = this.tiles.get(tileKey);
+    if (previous === undefined) return;
+    this.tiles.delete(tileKey);
+    this.unindex(previous.routes);
+    this.flatDirty = true;
+  }
+
+  /** Is this tile's lane sidecar already held? The residency's accounting asks. */
+  hasTile(tileKey: string): boolean {
+    return this.tiles.has(tileKey);
   }
 
   get tileCount(): number {
     return this.tiles.size;
   }
 
-  /** Every route in a resident tile. Rebuilt on demand; do not hold across a drop. */
+  /** Every route in a resident tile, in canonical order. Do not hold across a drop. */
   routes(): readonly LaneRoute[] {
-    this.rebuild();
+    if (this.flatDirty) {
+      this.flatDirty = false;
+      this.flat = [];
+      for (const tile of this.tiles.values()) for (const route of tile.routes) this.flat.push(route);
+      this.flat.sort(compareRoutes);
+    }
     return this.flat;
   }
 
-  /** Every way in a resident tile -- the geometry block. Nothing here reads it. */
+  /**
+   * Every way in a resident tile -- the geometry block. Nothing here reads it.
+   *
+   * Tiles in sorted key order rather than in adoption order, for the same reason
+   * the buckets are sorted: `checkPedestrians` builds a whole-city band set out
+   * of this and compares it against another process's, and the client's
+   * `world/nightlights.ts` lays lamps along it. Neither should depend on which
+   * tile the network answered first.
+   */
   ways(): LaneWay[] {
     const out: LaneWay[] = [];
-    for (const tile of this.tiles.values()) out.push(...tile.ways);
+    for (const key of [...this.tiles.keys()].sort()) {
+      for (const way of this.tiles.get(key)!.ways) out.push(way);
+    }
     return out;
   }
 
@@ -1094,7 +1245,6 @@ export class TrafficField {
    * negative is a car that goes through you without knocking you over.
    */
   near(x: number, z: number, radius: number, out: LaneRoute[]): LaneRoute[] {
-    this.rebuild();
     out.length = 0;
     const c0 = Math.floor((x - radius) / CELL);
     const c1 = Math.floor((x + radius) / CELL);
@@ -1119,28 +1269,59 @@ export class TrafficField {
     return out;
   }
 
-  private rebuild(): void {
-    if (!this.dirty) return;
-    this.dirty = false;
-    this.flat = [];
-    this.grid = new Map();
-    for (const tile of this.tiles.values()) {
-      for (const route of tile.routes) {
-        this.flat.push(route);
-        const c0 = Math.floor(route.minX / CELL);
-        const c1 = Math.floor(route.maxX / CELL);
-        const r0 = Math.floor(route.minZ / CELL);
-        const r1 = Math.floor(route.maxZ / CELL);
-        for (let cx = c0; cx <= c1; cx++) {
-          for (let cz = r0; cz <= r1; cz++) {
-            const key = cellKey(cx, cz);
-            const bucket = this.grid.get(key);
-            if (bucket === undefined) this.grid.set(key, [route]);
-            else bucket.push(route);
-          }
+  /** One tile's routes into the grid, each in its bucket's canonical place. */
+  private index(routes: readonly LaneRoute[]): void {
+    for (const route of routes) {
+      const c0 = Math.floor(route.minX / CELL);
+      const c1 = Math.floor(route.maxX / CELL);
+      const r0 = Math.floor(route.minZ / CELL);
+      const r1 = Math.floor(route.maxZ / CELL);
+      for (let cx = c0; cx <= c1; cx++) {
+        for (let cz = r0; cz <= r1; cz++) {
+          const key = cellKey(cx, cz);
+          const bucket = this.grid.get(key);
+          if (bucket === undefined) this.grid.set(key, [route]);
+          else insertSorted(bucket, route, compareRoutes);
         }
       }
     }
+  }
+
+  /**
+   * And back out again. The cells are recomputed rather than remembered.
+   *
+   * A route's plan bounds are frozen at decode, so the cell span this walks is
+   * bit-identical to the one `index` walked -- the same three `Math.floor`s over
+   * the same four numbers. Remembering them instead would be four more integers
+   * per route (95 kB on this world, 760 kB at 60 km) to avoid twelve
+   * instructions.
+   *
+   * Empty buckets are deleted rather than left behind. `near` skips a missing
+   * bucket and an empty one identically, so this is only about a `Map` that
+   * would otherwise grow one entry per cell the world has ever had a car in and
+   * never shrink -- which for a browser walking across Sydney is the whole city.
+   */
+  private unindex(routes: readonly LaneRoute[]): void {
+    for (const route of routes) {
+      const c0 = Math.floor(route.minX / CELL);
+      const c1 = Math.floor(route.maxX / CELL);
+      const r0 = Math.floor(route.minZ / CELL);
+      const r1 = Math.floor(route.maxZ / CELL);
+      for (let cx = c0; cx <= c1; cx++) {
+        for (let cz = r0; cz <= r1; cz++) {
+          const key = cellKey(cx, cz);
+          const bucket = this.grid.get(key);
+          if (bucket === undefined) continue;
+          removeSorted(bucket, route, compareRoutes);
+          if (bucket.length === 0) this.grid.delete(key);
+        }
+      }
+    }
+  }
+
+  /** How many broadphase cells are occupied. Diagnostics, and the leak check. */
+  get cellCount(): number {
+    return this.grid.size;
   }
 }
 
@@ -1482,7 +1663,7 @@ export function forEachCarNear(
  * derived per body because it is the *broadphase* radius and a broadphase that
  * changes size per candidate is not a broadphase.
  */
-const HIT_QUERY_RADIUS = 6;
+export const HIT_QUERY_RADIUS = 6;
 
 /**
  * Is this car on top of this combatant?
@@ -2144,6 +2325,64 @@ export function verifyTraffic(
     if (found.length !== 1) failures.push(`The broadphase found ${found.length} routes at a point on the only route in the field.`);
     field.drop('synthetic');
     if (field.routes().length !== 0) failures.push('Dropping a tile left its routes in the field.');
+    if (field.cellCount !== 0) failures.push(`Dropping the only tile left ${field.cellCount} broadphase cell(s) behind.`);
+  }
+
+  // --- The index is per tile, and its order does not depend on arrival order.
+  //
+  // The module's own statement of what `checkServerSegments` and
+  // `checkLaneLoadPath` prove against the real city, so a browser running
+  // `verifyTraffic` offline says it too. Four tiles, adopted forwards and
+  // backwards into two fields: `near` must return the same routes in the same
+  // sequence, because `forEachCarNear` gives the hit to the first one.
+  {
+    const tiles: TileLanes[] = [];
+    for (let i = 0; i < 4; i++) {
+      const one = syntheticTile(NORTH_LANE_OFFSET);
+      // Shift each copy along x so they occupy different broadphase cells but
+      // still overlap a single query, which is what makes the order visible.
+      for (const r of one.routes) {
+        for (let k = 0; k < r.count; k++) r.x[k] += i * 60;
+        r.minX += i * 60;
+        r.maxX += i * 60;
+        r.rid = (r.rid ^ Math.imul(i + 1, 0x9e3779b1)) >>> 0;
+      }
+      tiles.push(one);
+    }
+    const forwards = new TrafficField();
+    const backwards = new TrafficField();
+    for (let i = 0; i < tiles.length; i++) forwards.adopt(`t${i}`, tiles[i]);
+    for (let i = tiles.length - 1; i >= 0; i--) backwards.adopt(`t${i}`, tiles[i]);
+    // And a third that was built, taken apart and built again, which is what an
+    // eviction cycle does.
+    const cycled = new TrafficField();
+    for (let i = 0; i < tiles.length; i++) cycled.adopt(`t${i}`, tiles[i]);
+    for (let i = 0; i < tiles.length; i += 2) cycled.drop(`t${i}`);
+    for (let i = 0; i < tiles.length; i += 2) cycled.adopt(`t${i}`, tiles[i]);
+
+    const a: LaneRoute[] = [];
+    const b: LaneRoute[] = [];
+    const c: LaneRoute[] = [];
+    forwards.near(120, tiles[0].routes[0].z[0], 400, a);
+    backwards.near(120, tiles[0].routes[0].z[0], 400, b);
+    cycled.near(120, tiles[0].routes[0].z[0], 400, c);
+    if (a.length < 2) {
+      failures.push(`The order check only found ${a.length} route(s); it needs at least two to have an order.`);
+    }
+    if (a.length !== b.length || a.length !== c.length) {
+      failures.push(`Three load orders gave ${a.length}, ${b.length} and ${c.length} routes for one query.`);
+    } else {
+      for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i] || a[i] !== c[i]) {
+          failures.push(
+            `The broadphase returned route ${i} of ${a.length} differently depending on the order the ` +
+              'tiles were adopted; `forEachCarNear` gives the hit to the first one, so two processes ' +
+              'would knock the same player over with different cars.',
+          );
+          break;
+        }
+      }
+    }
   }
 
   return failures;

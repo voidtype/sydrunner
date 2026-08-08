@@ -90,6 +90,7 @@ import { verifyNames, verifyNet } from '../client/src/net/protocol.ts';
 import { verifyChat } from '../client/src/net/chat.ts';
 import { verifyUnstuck } from '../client/src/game/unstuck.ts';
 import { verifyTeleport } from '../client/src/game/teleport.ts';
+import { trafficTick } from '../client/src/game/traffic.ts';
 import { verifySuggestions } from '../client/src/net/suggestions.ts';
 import { verifyAoi } from './aoi.ts';
 import { ChatHub } from './chat.ts';
@@ -236,9 +237,17 @@ console.log(
 if (world.segments) {
   const s = world.segments.stats();
   console.log(
-    `[sydney] collision per hexagon: ${s.resident}/${s.hexes} resident, ` +
-      `${(s.bytes / 1e6).toFixed(0)} MB estimated against a ${(s.capBytes / 1e6).toFixed(0)} MB cap ` +
-      `(SYDNEY_COLLISION_CAP_MB), ${s.tiles} tiles`,
+    `[sydney] collision per hexagon: ${s.collision.resident}/${s.hexes} resident, ` +
+      `${(s.collision.bytes / 1e6).toFixed(0)} MB estimated against a ` +
+      `${(s.collision.capBytes / 1e6).toFixed(0)} MB cap (SYDNEY_COLLISION_CAP_MB), ` +
+      `${s.collision.tiles} tiles`,
+  );
+  console.log(
+    `[sydney] lanes per hexagon: ${s.lanes.resident}/${s.hexes} resident, ` +
+      `${(s.lanes.bytes / 1e6).toFixed(0)} MB estimated against a ` +
+      `${(s.lanes.capBytes / 1e6).toFixed(0)} MB cap (SYDNEY_LANES_CAP_MB), ` +
+      `${s.lanes.tiles} tiles, ${s.lanes.items.toLocaleString()} routes ` +
+      `(${s.lanes.marginM} m margin against collision's ${s.collision.marginM} m)`,
   );
 }
 
@@ -446,6 +455,26 @@ const server = Bun.serve<Conn>({
          * `world.HexResidency`.
          */
         segments: world.segments?.stats() ?? null,
+        /**
+         * Is there still traffic on the streets this process is holding?
+         *
+         * The one thing a lane cap can silently destroy. An eviction cycle that
+         * dropped the wrong hexagons, a needed-set rule that never fired, or a
+         * `TrafficField.drop` that took a route out and did not put it back
+         * would all show up here as a fleet that thinned and stopped -- and
+         * nowhere else, because a car costs no protocol and nothing on the wire
+         * mentions one. `loadtest.ts` asserts it is nonzero.
+         *
+         * Computed **on the poll rather than on the tick**: `liveCars` walks
+         * every resident route, which is 1-2 ms on a whole-world residency, and
+         * this endpoint is read every few seconds by a human or a harness.
+         */
+        cars: {
+          live: world.traffic.liveCars(trafficTick(Date.now())),
+          routes: world.traffic.routes().length,
+          laneTiles: world.traffic.tileCount,
+          bands: world.peds.tileCount,
+        },
         windowMs: window,
         ticksInWindow,
         room: rooms,
