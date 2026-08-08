@@ -2603,15 +2603,34 @@ async function main(): Promise<void> {
     // fighters are built means there is exactly one branch in this file rather
     // than a delete path that has to unpick a scene graph.
     //
-    // 1.5 s is a WebSocket handshake to a host on this machine (about a
-    // millisecond), to one on the LAN (a few), or to nothing at all -- where a
-    // refused TCP connection on localhost fails immediately and one to a dead
-    // LAN address is what the timeout is really for.
+    // **This timeout is a backstop, not the common path.** `onSettled` fires as
+    // soon as the socket resolves *either way* -- a refused connection errors in
+    // milliseconds and resolves `false` -- so the only thing waiting here costs
+    // is a server that accepts a TCP connection and then says nothing, which is
+    // a black hole rather than an absent host.
+    //
+    // It was 1.5 s, sized against the comment above it: a host "on this machine
+    // (about a millisecond), or on the LAN (a few)". That stopped being the
+    // deployment the day this went to a VPS in Sydney behind TLS, and it broke
+    // in production on 2026-08-08: measured from a Mac on a home connection,
+    // the socket opens at 306 ms and the WELCOME lands at 699 ms, and the boot
+    // pass that compiles the world's pipelines (see `world/warmup.ts`) puts
+    // enough work on the main thread that the callback resolving this promise
+    // can miss a 1.5 s window it used to clear. The server logged the player
+    // joining and the *client* hanging up one second later, having already
+    // decided nobody was home.
+    //
+    // 8 s is chosen against the failure it is actually for. It is never paid by
+    // an online player (they settle at ~0.7 s) nor by an offline one (a refused
+    // connection settles immediately); it is paid only by someone whose network
+    // swallows packets silently, and for them a few seconds of loading beats
+    // being told the game has no server when it has one.
+    const CONNECT_DEADLINE_MS = 8000;
     const settled = await Promise.race([
       new Promise<boolean>((resolve) => {
         client.onSettled = () => resolve(client.status === 'online');
       }),
-      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 1500)),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), CONNECT_DEADLINE_MS)),
     ]);
     if (settled) {
       net = client;
