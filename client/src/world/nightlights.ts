@@ -647,12 +647,63 @@ const LAMP_HEIGHT_FRACTION = 0.855;
 const LAMP_OUTREACH = 0.9;
 
 /**
- * The pool of light on the road: radius in metres and how high it floats.
+ * The pool of light on the road: its two semi-axes in metres, and how high it
+ * floats.
  *
- * 6.5 m against a lamp 9 m up is a 72-degree cone, which is a real luminaire's
- * beam and is also the width that makes a street read as a chain of pools rather
- * than as a continuous wash -- the dark between two lamps is what says the light
- * is coming from somewhere.
+ * ---------------------------------------------------------------------------
+ * **THIS WAS A 6.5 M CIRCLE AND THE MODEL BEHIND IT WAS THE WRONG LUMINAIRE.**
+ *
+ * *"still not enough street lighting, lamps should spill much further"* -- the
+ * second time this has been asked for, after `LAMP_SHARE` doubled the number of
+ * lamps and the player still said the streets were dark. That is worth reading
+ * as the diagnosis it is: the complaint survived the density fix, so the
+ * problem was never how many lamps there are. It is how far one reaches.
+ *
+ * The old number came with an argument that was internally consistent and
+ * modelled the wrong object: "6.5 m against a lamp 9 m up is a 72-degree cone,
+ * which is a real luminaire's beam". A 72-degree cone is a real *downlight*'s
+ * beam -- a bulkhead over a door, a bare lamp in a warehouse. **A street light
+ * is not a downlight.** The entire reason a road luminaire has an optic in it
+ * is to throw light *along* the kerb line, because poles are 40-60 m apart and
+ * a circle of light 13 m across cannot light a road that is lit every 50 m.
+ * The distributions have names for it -- Type II and Type III -- and the shape
+ * they produce on the road is roughly two to three times as long as it is wide,
+ * with its long axis down the street.
+ *
+ * So the pool is now an **ellipse aligned to the street**, and the axis it is
+ * aligned to costs nothing because it is already known: `LAMP_OUTREACH` is
+ * along the pole's local +X, which `power.deriveYaw` has aimed **across** the
+ * road (it is the crossarm's axis), and `deriveColumnLamps` yaws a kerb column
+ * to the kerb normal, which is the same axis for the same reason. Across the
+ * street is local X; along the street is local Z; and nothing new has to be
+ * derived, stored or guessed to know which is which.
+ *
+ * ```
+ *                       across (X)   along (Z)   area      of the old pool
+ *   before                  6.5 m       6.5 m    133 m2    1.00x
+ *   after                    10 m        26 m    817 m2    6.15x
+ * ```
+ *
+ * The equal-area radius is `sqrt(10 * 26)` = **16.1 m, which is 2.48x the old
+ * 6.5** -- so this is a two-and-a-half-times-wider pool spent unevenly, rather
+ * than a bigger circle. Across the street 20 m of width covers a 10 m
+ * carriageway and both footpaths, which is all there is to light. Along it,
+ * 52 m of lit road per lamp is the number that matters:
+ *
+ * ```
+ *   lamps every 51 m (the CBD and arterials, at LAMP_SHARE over a 40 m pitch)
+ *       -> pools overlap; the street is a continuous lit corridor
+ *   lamps every 62 m (residential, measured -- see LAMP_SHARE)
+ *       -> 10 m of dim road between two pools, against 49 m before
+ * ```
+ *
+ * That last row is the honest one and it is worth stating rather than rounding
+ * off: **on an ordinary residential street the pools still do not quite meet.**
+ * Closing that last ten metres needs either a third again of pool length -- at
+ * a fill cost the measurements below did not support -- or more lamps, which is
+ * `LAMP_SHARE`'s business and has already been argued to a Sydney figure. What
+ * a player sees now is a road lit end to end with a soft dip between lamps,
+ * instead of a chain of separate discs with fifty metres of black between them.
  *
  * **The pool is a shallow cone, not a disc, and it floats 30 cm at the middle
  * rising to 1.15 m at the rim.** Those are absurd numbers for a light on a road
@@ -679,44 +730,92 @@ const LAMP_OUTREACH = 0.9;
  * Neither number shows, and that is not luck -- it is what an additive gradient
  * with no hard edge and no contact cue buys. There is no shadow to detach, no
  * silhouette to float, and the rim is where the brightness has already reached
- * zero. The 4.8 degrees of tilt is below what any Sydney street reads as level.
+ * zero.
+ *
+ * **`POOL_RIM_LIFT` did not scale with the pool and that is deliberate.** Held
+ * at the same 0.85 m of rise, a pool that is now 26 m long is a 1.9-degree
+ * ramp rather than a 7.5-degree one, which clears a 3.3% grade over its whole
+ * length instead of 13%. That is a real reduction and it was chosen against the
+ * alternative rather than overlooked: scaling the rise proportionally would put
+ * the lit part of the cone at **1.4 m above the road eight metres from the
+ * lamp**, which is a bright additive sheet at chest height that the player
+ * walks through -- a new artefact, in exchange for grade tolerance on the
+ * steepest one street in fifty. The failure mode that is being accepted instead
+ * is the old, quiet one: on a genuinely steep street the far, dim end of a pool
+ * loses the depth test and the pool reads shorter. That was the bug once
+ * because the *whole* pool vanished; a tail at four percent brightness going
+ * missing on Nelson Street is not the same event.
  *
  * The polygon offset stays, and is now doing the job it was always for rather
  * than standing in for a height error: `world/contact.ts`'s argument that a
  * transparent surface which loses the depth fight does not z-fight, it
  * *disappears*.
  */
-const POOL_RADIUS = 6.5;
+const POOL_ACROSS = 10;
+const POOL_ALONG = 26;
 const POOL_LIFT = 0.3;
 /** How much higher the rim sits than the middle. See the header above. */
 const POOL_RIM_LIFT = 0.85;
 const POOL_SEGMENTS = 20;
 
 /**
- * The pool's falloff, as `[radius fraction, brightness]`.
+ * The pool's falloff, as `[radius fraction, brightness]`, the fraction being of
+ * the ellipse rather than of a circle: `t = 1` is the rim on either axis.
  *
- * Front-loaded, on `world/bike.ts`'s measured lesson about `NeutralToneMapping`:
- * the curve compresses its top hard, so a gentle ramp puts most of the disc
- * within a few code values of itself and crams the entire visible gradient into
- * the outer quarter -- which is a hard edge, not a fade. Spending the brightness
- * early puts the gradient where the curve is still steep.
+ * ---------------------------------------------------------------------------
+ * **DERIVED RATHER THAN DIALLED, WHICH THE OLD ONE WAS NOT.**
  *
- * The one departure from the bike's disc is the dip at the very centre. A
- * luminaire is 9 m up, so the brightest point of a real pool is not a spike --
- * the inverse-square difference between the point under the lamp and a point 2 m
- * away is 5%, not 100% -- and a disc with a hot core reads as a spotlight aimed
- * at the road rather than as a lamp hanging over it. Flat to a fifth of the
- * radius, then away.
+ * The previous table was six stops picked by eye, and measured against the
+ * physics it was between two and five times too dark from three metres out: it
+ * read 0.36 at 4 m where a lamp 9 m up puts 0.76, and it was at 0.05 by 6 m
+ * where the real answer is 0.55. That is the whole of *"still not enough street
+ * lighting"* in two numbers -- the pool was not merely small, it fell off the
+ * cliff a third of the way across itself.
  *
- * The last stop is exactly zero, which under an additive blend is what an edge
- * is.
+ * So the shape is now the actual illuminance under a source at height `h`,
+ *
+ *     E(r) = (1 + (r / h)^2) ^ -1.5
+ *
+ * -- the inverse square times the cosine of incidence, which is the whole of
+ * why the ground under a lamp is brighter than the ground beside it -- with
+ * `h` the real `NOMINAL_HEIGHT * LAMP_HEIGHT_FRACTION` of 8.98 m. It is then
+ * multiplied by `1 - t^3`, and that taper is not cosmetic: `E` at the rim is
+ * 0.12, and an additive surface that ends at 0.12 ends at a **visible ring**.
+ * The taper spends the last third of the pool going to exactly zero, which
+ * under an additive blend is what an edge is.
+ *
+ * ```
+ *        t      r along     E(r)   taper    stop    the old table at that r
+ *     0.00        0.0 m    1.000   1.000   1.000    1.000
+ *     0.12        1.9 m    0.935   0.998   0.933    0.807
+ *     0.25        4.0 m    0.762   0.984   0.750    0.364
+ *     0.40        6.4 m    0.540   0.936   0.505    0.010
+ *     0.55        8.8 m    0.364   0.834   0.304    0
+ *     0.72       11.5 m    0.232   0.627   0.146    0
+ *     0.88       14.1 m    0.155   0.319   0.049    0
+ *     1.00       16.0 m    0.117   0.000   0.000    0
+ * ```
+ *
+ * Seven rings rather than the old five, which is 280 triangles a lamp against
+ * 200. The extra two are spent entirely on the tail, where the gradient is
+ * shallow and a coarse ring would show as a band.
+ *
+ * `POOL_LEVEL` is **not** touched and neither is the night ambient. The centre
+ * of a pool is exactly as bright as it was; every stop between the middle and
+ * the rim is brighter, and there are far more metres of them. Note that this
+ * curve is applied in the ellipse's normalised coordinate, so along the street
+ * it delivers more light per metre than a bare downlight would -- which is
+ * precisely what a road optic is for, and is the same physical fact stated
+ * twice.
  */
 const POOL_FALLOFF: ReadonlyArray<readonly [number, number]> = [
   [0, 1],
-  [0.2, 0.95],
-  [0.42, 0.62],
-  [0.68, 0.28],
-  [0.86, 0.09],
+  [0.12, 0.933],
+  [0.25, 0.75],
+  [0.4, 0.505],
+  [0.55, 0.304],
+  [0.72, 0.146],
+  [0.88, 0.049],
   [1, 0],
 ];
 
@@ -979,7 +1078,7 @@ function ramp(stops: ReadonlyArray<readonly [number, number]>, t: number): numbe
 }
 
 /**
- * A flat disc lying in the XZ plane with a radial brightness ramp, centred on
+ * A flat ellipse lying in the XZ plane with a radial brightness ramp, centred on
  * `(cx, cz)` at height `y`.
  *
  * Emitted as a triangle fan from a centre vertex out through the ramp's own
@@ -987,6 +1086,12 @@ function ramp(stops: ReadonlyArray<readonly [number, number]>, t: number): numbe
  * rasteriser -- no texture, no sampler, no mip chain. `world/bike.ts` sets out
  * why that is the right call for a soft-edged additive shape: black is invisible
  * under an additive blend, so a colour ramp to black *is* the soft edge.
+ *
+ * `radiusZ` defaults to `radius`, so every caller that wants a circle writes
+ * one and reads as one. The street lamp is the only caller that does not: see
+ * `POOL_ACROSS`. The ramp parameter `t` is the **normalised** radius in both
+ * cases -- `t = 1` is the rim on whichever axis you leave along -- which is what
+ * makes one falloff table describe both shapes.
  */
 function disc(
   m: Emissive,
@@ -999,13 +1104,12 @@ function disc(
   segments: number,
   /** How much higher the rim sits than the middle. See `POOL_RIM_LIFT`. */
   rise = 0,
+  radiusZ = radius,
 ): void {
   const at = (t: number): number => y + rise * t;
   for (let ring = 1; ring < stops.length; ring++) {
     const t0 = stops[ring - 1][0];
     const t1 = stops[ring][0];
-    const r0 = t0 * radius;
-    const r1 = t1 * radius;
     const y0 = at(t0);
     const y1 = at(t1);
     const c0 = scaled(WHITE, stops[ring - 1][1] * level);
@@ -1013,11 +1117,15 @@ function disc(
     for (let s = 0; s < segments; s++) {
       const a0 = (s / segments) * Math.PI * 2;
       const a1 = ((s + 1) / segments) * Math.PI * 2;
+      const x0 = Math.cos(a0) * radius;
+      const x1 = Math.cos(a1) * radius;
+      const z0 = Math.sin(a0) * radiusZ;
+      const z1 = Math.sin(a1) * radiusZ;
       m.quadUp(
-        [cx + Math.cos(a0) * r0, y0, cz + Math.sin(a0) * r0],
-        [cx + Math.cos(a1) * r0, y0, cz + Math.sin(a1) * r0],
-        [cx + Math.cos(a1) * r1, y1, cz + Math.sin(a1) * r1],
-        [cx + Math.cos(a0) * r1, y1, cz + Math.sin(a0) * r1],
+        [cx + x0 * t0, y0, cz + z0 * t0],
+        [cx + x1 * t0, y0, cz + z1 * t0],
+        [cx + x1 * t1, y1, cz + z1 * t1],
+        [cx + x0 * t1, y1, cz + z0 * t1],
         [c0, c0, c1, c1],
       );
     }
@@ -1040,16 +1148,22 @@ function buildStreetLamp(): BufferGeometry {
   // The pool, under the luminaire rather than under the pole -- the same
   // `LAMP_OUTREACH` the head is offset by, so the light and the light it casts
   // are in the same place. `verifyNightLights` asserts exactly that.
+  //
+  // `POOL_ACROSS` on X and `POOL_ALONG` on Z, in that order and not the other:
+  // local +X is the crossarm's axis and therefore across the road, so the long
+  // axis of a road optic's footprint is Z. Swapping them would light twenty-six
+  // metres of somebody's front garden and ten metres of the street.
   disc(
     m,
     LAMP_OUTREACH,
     POOL_LIFT,
     0,
-    POOL_RADIUS,
+    POOL_ACROSS,
     POOL_FALLOFF,
     POOL_LEVEL,
     POOL_SEGMENTS,
     POOL_RIM_LIFT,
+    POOL_ALONG,
   );
 
   // The shaft. Three planes through the axis at 60 degrees, both windings, dim.
@@ -1607,10 +1721,11 @@ const COLUMN_FOOTPATH_MIN = 1.5;
  * Two heights, which is what a council buys: a 9 m column with a long outreach
  * on anything a bus runs down, and a 6.5 m one on a local street. The scale is
  * applied on Y alone, exactly as a pole's is, so the pool underneath keeps its
- * `POOL_RADIUS` -- which is correct rather than convenient: a shorter column
- * with the same luminaire throws a slightly smaller and much sharper pool, and
- * at 6.5 m radius against a 6.5 m mount that is a 45-degree cone, which is a
- * real category-P optic.
+ * `POOL_ACROSS` and `POOL_ALONG` -- which is correct rather than convenient: a
+ * shorter column with the same luminaire throws the same footprint at a steeper
+ * incidence, which is what a category-P optic on a 6.5 m mount does. The one
+ * thing it must not do is shrink, because a local street is exactly the street
+ * the player said was too dark.
  */
 const COLUMN_TALL_SCALE = 1;
 const COLUMN_SHORT_SCALE = 0.72;
@@ -2881,29 +2996,43 @@ export function verifyNightLights(): string[] {
   let maxY = -Infinity;
   let poolVerts = 0;
   let poolMaxR = 0;
+  let poolAcross = 0;
+  let poolAlong = 0;
   let offCone = 0;
   for (let i = 0; i < pos.count; i++) {
     const y = pos.getY(i);
     minY = Math.min(minY, y);
     maxY = Math.max(maxY, y);
     // A pool vertex is one whose height is exactly what the cone predicts for
-    // its distance from the luminaire: `POOL_LIFT` at the middle rising to
-    // `POOL_LIFT + POOL_RIM_LIFT` at `POOL_RADIUS`. That is a stronger test
+    // its **normalised** distance from the luminaire: `POOL_LIFT` at the middle
+    // rising to `POOL_LIFT + POOL_RIM_LIFT` at the rim. That is a stronger test
     // than a height band, because it is the *shape* that is load-bearing --
     // the rise is what keeps the far side of a pool out of an uphill footpath,
     // and a cone that had quietly gone flat again would still pass a band.
-    const r = Math.hypot(pos.getX(i) - LAMP_OUTREACH, pos.getZ(i));
-    if (r > POOL_RADIUS + 1e-3) continue;
-    const predicted = POOL_LIFT + POOL_RIM_LIFT * (r / POOL_RADIUS);
+    //
+    // Normalised, because the pool is an ellipse: `POOL_ACROSS` on X and
+    // `POOL_ALONG` on Z. `t` is 1 on the rim of either axis, which is the same
+    // coordinate `POOL_FALLOFF` is written in, and testing in it is what makes
+    // this a test of the ellipse rather than of a circle that happens to fit
+    // inside one. It also catches the axes being swapped, which the geometry
+    // alone cannot: `poolAcross` and `poolAlong` below are read off the built
+    // vertices and compared to the constants in the order they are declared.
+    const dx = pos.getX(i) - LAMP_OUTREACH;
+    const dz = pos.getZ(i);
+    const t = Math.hypot(dx / POOL_ACROSS, dz / POOL_ALONG);
+    if (t > 1 + 1e-3) continue;
+    const predicted = POOL_LIFT + POOL_RIM_LIFT * t;
     if (Math.abs(y - predicted) < 1e-3) {
       poolVerts++;
-      poolMaxR = Math.max(poolMaxR, r);
+      poolMaxR = Math.max(poolMaxR, t);
+      poolAcross = Math.max(poolAcross, Math.abs(dx));
+      poolAlong = Math.max(poolAlong, Math.abs(dz));
     } else if (y < POOL_LIFT + POOL_RIM_LIFT + 1e-3 && y < 2) {
       // Low, inside the pool's footprint, and not on the cone: that is either a
       // flattened pool or a shaft foot in the wrong place. The shaft's own feet
       // sit at exactly `POOL_LIFT` and within `SHAFT_HALF_FOOT` of the axis, so
       // they are excluded rather than counted.
-      if (!(Math.abs(y - POOL_LIFT) < 1e-3 && r <= SHAFT_HALF_FOOT + 1e-3)) offCone++;
+      if (!(Math.abs(y - POOL_LIFT) < 1e-3 && Math.hypot(dx, dz) <= SHAFT_HALF_FOOT + 1e-3)) offCone++;
     }
   }
   if (poolVerts === 0 || offCone > 0) {
@@ -2915,10 +3044,18 @@ export function verifyNightLights(): string[] {
         `pool being swallowed by the footpath it is lying on.`,
     );
   }
-  if (Math.abs(poolMaxR - POOL_RADIUS) > 0.05) {
+  if (Math.abs(poolMaxR - 1) > 0.01) {
     failures.push(
-      `The pool reaches ${poolMaxR.toFixed(2)} m from the luminaire against POOL_RADIUS ` +
-        `${POOL_RADIUS}.`,
+      `The pool reaches ${poolMaxR.toFixed(3)} of its own rim rather than exactly 1; the falloff ` +
+        `table's last stop is what the geometry ends at.`,
+    );
+  }
+  if (Math.abs(poolAcross - POOL_ACROSS) > 0.05 || Math.abs(poolAlong - POOL_ALONG) > 0.05) {
+    failures.push(
+      `The pool measures ${poolAcross.toFixed(2)} m across the street and ${poolAlong.toFixed(2)} m ` +
+        `along it, against POOL_ACROSS ${POOL_ACROSS} and POOL_ALONG ${POOL_ALONG}. The long axis ` +
+        `is Z because power.deriveYaw aims local +X across the road; swapped, every lamp in the ` +
+        `city lights the front gardens instead of the street.`,
     );
   }
   if (minY < 0) {

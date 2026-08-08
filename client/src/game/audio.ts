@@ -1156,14 +1156,21 @@ export class CombatAudio {
   // and `RAVE_CUTOFF_AT` metres decides the corner frequency. Measured against
   // the four tracks in the folder, which are level-matched at -14 LUFS:
   //
-  //     400 m   280 Hz   a thump you feel in a street with nothing else on it
-  //     150 m  1225 Hz   unmistakably music, no idea what music
-  //      60 m  4840 Hz   the hats arrive; you can hear the track
+  //     175 m   367 Hz   a thump you feel in a street with nothing else on it
+  //     100 m  1125 Hz   unmistakably music, no idea what music
+  //      50 m  4500 Hz   the hats arrive; you can hear the track
   //      25 m    18 kHz  full mix
+  //
+  // **Those four distances used to be 400, 150, 60 and 25**, over a range of
+  // 520 m, and the four *descriptions* are the thing that was kept when a
+  // player asked for a third of the range. The progression is the feature; the
+  // metres it is spread over are a tuning number. Only the last row is
+  // unchanged, and it is unchanged on purpose: the full mix still starts at
+  // 25 m, so a rave sounds exactly as it did once you are at one.
   //
   // Turning a corner at forty metres therefore opens the mix over about three
   // seconds of walking, and that transition is the single best trick available
-  // to this feature. It is the reason the audio range (520 m) is *shorter* than
+  // to this feature. It is the reason the audio range (175 m) is *shorter* than
   // the beam range (900 m) and longer than everything else: you see it, then you
   // hear it, then you arrive.
   //
@@ -1255,13 +1262,28 @@ export class CombatAudio {
     const d = Math.max(0, mix.distance);
     const gain = RAVE_GAIN / (1 + d / RAVE_HALF_DISTANCE);
     const near = Math.max(RAVE_CUTOFF_AT, d) / RAVE_CUTOFF_AT;
-    const cutoff = Math.min(20000, Math.max(120, RAVE_CUTOFF_MAX / (near * Math.sqrt(near))));
+    // `near * near` and it was `near * Math.sqrt(near)`: the corner frequency
+    // now falls as the square of the distance rather than as its 1.5 power.
+    //
+    // The exponent is where the range cut is paid for spectrally. `near` is
+    // measured in `RAVE_CUTOFF_AT` units, which did *not* shrink, so at the
+    // venue this expression is unchanged -- inside 25 m `near` is 1 and 1 to
+    // any power is 1. Outside it, the steeper exponent compresses the whole
+    // "thump, then music, then the track" progression into the new 175 m
+    // instead of leaving it stretched over a range that no longer exists.
+    // Squaring is also cheaper than the square root it replaces, which is the
+    // only free thing in this change.
+    const cutoff = Math.min(20000, Math.max(120, RAVE_CUTOFF_MAX / (near * near)));
     chain.out.gain.setTargetAtTime(gain, t, 0.08);
     chain.lowpass.frequency.setTargetAtTime(cutoff, t, 0.08);
     if (chain.wet) {
       // More of the room and less of the source as you back away, which is what
-      // reverberation *is* and which under a viaduct is most of the sound.
-      chain.wet.gain.setTargetAtTime(Math.min(0.55, 0.22 + d / 700), t, 0.2);
+      // reverberation *is* and which under a viaduct is most of the sound. The
+      // 233 was 700 and is the third distance constant this change divides by
+      // three: leaving it would have meant the wet mix never reached its
+      // ceiling inside the range, so a bridge rave would have lost the concrete
+      // it is made of at exactly the distance you first hear it.
+      chain.wet.gain.setTargetAtTime(Math.min(0.55, 0.22 + d / 233), t, 0.2);
     }
 
     const url = mix.url;
@@ -1696,11 +1718,29 @@ interface RaveChain {
  *
  * Deliberately shorter than `world/rave.BEAM_RANGE`'s 900 and longer than
  * everything else, which is the order the whole approach depends on: **you see
- * it, then you hear it, then you arrive.** 520 m is about four blocks of
+ * it, then you hear it, then you arrive.**
+ *
+ * ---------------------------------------------------------------------------
+ * **This was 520 and a player asked for a third of it.** *"audio from raves
+ * should not travel so far. maybe one third"*.
+ *
+ * The old number came with an argument — "520 m is about four blocks of
  * Alexandria, which is honestly how far a rig like this carries at 2 am with
- * nothing else running.
+ * nothing else running" — and the argument is not wrong about *sound*. It is
+ * wrong about *a game*. Four blocks of carry means that on a five-rave night in
+ * a 19.3 km city, a player crossing the inner west is inside somebody's rave
+ * for a large fraction of the walk, and a cue that is on most of the time is
+ * not a cue. The thing being modelled is not really how far a sub carries; it
+ * is how far away you should be when you start to suspect.
+ *
+ * 175 m is one third of it, and one third **of every distance in the model at
+ * once** — see `RAVE_HALF_DISTANCE`. That is what makes this a range cut rather
+ * than a volume cut: the ratio `range / half-distance` is held at 4.73, so the
+ * level the gate cuts at is 0.108 of the deck's own gain, exactly what it was
+ * before. Nothing pops off; the same near-inaudible level is reached three
+ * times sooner.
  */
-export const RAVE_AUDIBLE_RANGE = 520;
+export const RAVE_AUDIBLE_RANGE = 175;
 
 /** How close a player has to be before a single byte is fetched. See section 2. */
 export const RAVE_FETCH_RANGE = RAVE_AUDIBLE_RANGE;
@@ -1714,15 +1754,43 @@ const RAVE_GAIN = 0.62;
 /**
  * Where the level has halved, metres.
  *
- * 110 m, which is far gentler than anything else in this file -- `bark`'s is 22
- * and `footyThrow`'s 14 -- and the reason is the same reason `bark`'s is gentler
- * than an impact's. An impact tells you something happened; **this tells you
- * where to walk**, and a cue you cannot hear until you are already there is not
- * a cue.
+ * **37, and it was 110.** Still gentler than anything else in this file --
+ * `bark`'s is 22 and `footyThrow`'s 14 -- and for the reason that has not
+ * changed: an impact tells you something happened, **this tells you where to
+ * walk**, and a cue you cannot hear until you are already there is not a cue.
+ *
+ * It moved with `RAVE_AUDIBLE_RANGE` and had to, because the two are one model.
+ * Cutting the gate alone would have left the level at the gate three times
+ * higher than it was -- 0.24 of the deck's gain instead of 0.11 -- and a mix
+ * that is still clearly audible when it is switched off is a click every time
+ * you walk out of one. Dividing both by three moves the whole curve inward
+ * without changing its shape:
+ *
+ * ```
+ *              gain at   0 m    25 m    50 m   100 m   at the gate
+ *   before               0.62    0.50    0.43    0.32    0.108 (520 m)
+ *   after                0.62    0.37    0.26    0.17    0.108 (175 m)
+ * ```
+ *
+ * At the rig it is the same number it always was. Across the dance floor it is
+ * about 2 to 4 dB down, which is not nothing and is the honest cost of a
+ * steeper curve -- and is also what a smaller rig sounds like from the back of
+ * a crowd, which is what this now is.
  */
-const RAVE_HALF_DISTANCE = 110;
+const RAVE_HALF_DISTANCE = 37;
 
-/** Inside this the mix is fully open, metres, and the corner frequency there. */
+/**
+ * Inside this the mix is fully open, metres, and the corner frequency there.
+ *
+ * **`RAVE_CUTOFF_AT` deliberately did not move with the two distances above**,
+ * and that is the one asymmetry in this change. It is what keeps the sound
+ * *at* a rave bit-identical: everything inside 25 m of the booth runs at the
+ * full 18 kHz exactly as it did, so the thing the player asked to change --
+ * how far the music travels -- changes, and the thing they did not ask about
+ * -- what it sounds like when you are standing in it -- does not.
+ *
+ * What moved instead is the *exponent*, in `raveUpdate`. See it.
+ */
 const RAVE_CUTOFF_AT = 25;
 const RAVE_CUTOFF_MAX = 18000;
 

@@ -54,15 +54,24 @@
  * invented geography.
  *
  *   - **Yards.** 110 `landuse=industrial` parcels reduced to their largest
- *     inscribed circle — the same primitive `wildlife.PARKS` already uses, and
- *     for the same reason: the inscribed circle of a parcel is exactly "the
- *     biggest clear space in it", which for an industrial parcel is the truck
- *     apron between the sheds. Filtered to parcels with **at least three
- *     buildings standing within 160 m of that centre**, because a parcel with
- *     none is a paddock with an industrial tag on it and the brief is about
- *     Alexandria, not about a paddock. Glebe Island Container Terminal, the
- *     White Bay wharves, Eveleigh, the Marrickville depots, and the whole
- *     St Peters/Alexandria strip four hundred metres from the spawn.
+ *     inscribed circle — the same primitive `wildlife.PARKS` already uses.
+ *     Filtered to parcels with **at least three buildings standing within 160 m
+ *     of that centre**, because a parcel with none is a paddock with an
+ *     industrial tag on it and the brief is about Alexandria, not about a
+ *     paddock. Glebe Island Container Terminal, the White Bay wharves,
+ *     Eveleigh, the Marrickville depots, and the whole St Peters/Alexandria
+ *     strip four hundred metres from the spawn.
+ *
+ *     **The sentence that used to be here was wrong, and a player found it.**
+ *     It read: "the inscribed circle of a parcel is exactly the biggest clear
+ *     space in it, which for an industrial parcel is the truck apron between
+ *     the sheds." The first clause is true of the parcel *boundary* and says
+ *     nothing whatever about what is standing inside it. A parcel that is one
+ *     big warehouse has its largest inscribed circle **in the middle of the
+ *     warehouse** — the centroid of a shed area is a shed. Measured against the
+ *     shipped collision prisms: **57 of the 448 sites had their centre inside a
+ *     building footprint**, seven of them in Alexandria alone. See
+ *     `CLEARED_PACKED`, which is the pass that fixes it.
  *   - **Spans.** 74 `bridge=yes|viaduct` carriageways of 70 m or more, at their
  *     midpoint, **only where that midpoint is over land** — a rave under the
  *     Anzac Bridge's main span is a rave in Johnstons Bay. The Western
@@ -545,6 +554,9 @@ const SITE_MIN_R = 15;
  */
 export const WATCHED_RADIUS = 900;
 
+
+/** The extent the tables were baked inside. `verifyRaves` asserts it. */
+export const RAVE_EXTENT_M = 19300;
 /**
  * How wide the void under a viaduct is treated as being, metres of half-extent.
  *
@@ -557,12 +569,200 @@ export const WATCHED_RADIUS = 900;
 const SPAN_HALF_WIDTH = 46;
 
 /**
- * Every site, yards then spans then parks, in that order and no other.
+ * One candidate site as the three source tables describe it, before the
+ * clearance pass and before the `SITE_MIN_R` filter.
+ *
+ * Split out from `RAVE_SITES` for exactly one reason: `CLEARED_PACKED` has to
+ * address a row by index, and it must be an index that exists **whether or not
+ * that row survives**. Keying the clearance pass on `RaveSite.id` would be a
+ * table that renumbers itself when it drops a row, which is a table that is
+ * wrong the first time it is used.
+ *
+ * `r` here is the raw radius the source table carries — a parcel's inscribed
+ * circle, a span's half-strip, a park's disc — not the usable one. The scaling
+ * to usable is `SITE_USE_FRACTION`'s and happens below.
+ */
+export interface RaveSourceRow {
+  readonly kind: SiteKind;
+  readonly name: string;
+  readonly x: number;
+  readonly z: number;
+  readonly r: number;
+  readonly bearing: number;
+}
+
+/**
+ * Every candidate, yards then spans then parks, in that order and no other.
  *
  * The order is the invariance, and it is `wildlife.PARKS`' own words: a hash is
  * keyed on the site's **index**, so site 41 is the same yard on the same nights
  * before and after the span block existed only because site 41 is still the
  * Mitchell Industrial Estate. Appending a block is the whole trick.
+ */
+export const RAVE_SOURCE_ROWS: readonly RaveSourceRow[] = (() => {
+  const out: RaveSourceRow[] = [];
+  for (const rec of YARDS_PACKED.split(';')) {
+    const f = rec.split('|');
+    out.push({ kind: SITE_KIND.YARD, name: f[0], x: +f[1], z: +f[2], r: +f[3], bearing: NaN });
+  }
+  for (const rec of SPANS_PACKED.split(';')) {
+    const f = rec.split('|');
+    // A span's clear space is not an inscribed circle -- it is a strip of void
+    // under a deck. `SPAN_HALF_WIDTH` is what a two-carriageway viaduct actually
+    // shelters, and the length is capped by the same ceiling everything else is,
+    // because a 1.8 km motorway viaduct is still one rave and not a linear park.
+    out.push({
+      kind: SITE_KIND.SPAN,
+      name: f[0],
+      x: +f[1],
+      z: +f[2],
+      r: Math.min(+f[3] * 0.35, SPAN_HALF_WIDTH),
+      bearing: +f[4],
+    });
+  }
+  for (const park of PARKS) {
+    if (park.r < PARK_MIN_R) continue;
+    // `wildlife.PARKS` now reaches 60 km (the anchor tables were extended ahead
+    // of the world), but a rave needs ground for its crowd to stand on, so the
+    // site table stops at the BUILT extent. Cheap and load-bearing both ways:
+    // without it, 3,071 stage-4 park discs mint hundreds of sites whose tiles
+    // do not exist; with it, source-row indices for everything inside the
+    // extent are unchanged, because the stage-4 rows append strictly after the
+    // curated rows this table was cleared against. When the 60 km world ships,
+    // RAVE_EXTENT_M moves with it and `clear_rave_floors.ts` re-bakes against
+    // the new collision -- the two must move together or verifyRaves fails on
+    // exactly the assertion this comment is standing next to.
+    if (Math.hypot(park.x, park.z) > RAVE_EXTENT_M) continue;
+    out.push({ kind: SITE_KIND.PARK, name: park.name, x: park.x, z: park.z, r: park.r, bearing: NaN });
+  }
+  return out;
+})();
+
+/**
+ * The clearance pass: every site whose dance floor stood in a building, and
+ * where it moved to. `row|x|z|r`, semicolon separated, `r` already usable.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS TABLE EXISTS.
+ *
+ * *"i found a rave inside a building in alexandria. it shouldnt be INSIDE a
+ * building"* — and it was, at row 40, which is the `industrial yard` whose
+ * inscribed centre `(-1508.8, 4830.1)` sits **26.7 m inside a 6 m warehouse
+ * with a 111 x 126 m footprint**, 327 m from the Alexandria pin and 863 m from
+ * the spawn. Section 2 has the root cause: a parcel's largest inscribed circle
+ * is a fact about the parcel's *boundary*, and the shed standing in the middle
+ * of the parcel is not in that calculation at all.
+ *
+ * Measured against the shipped collision prisms, at `raveFloorRadius`:
+ *
+ * ```
+ *   centres inside a building            57 of 448
+ *   floors clipping a building          161 of 448
+ * ```
+ *
+ * ---------------------------------------------------------------------------
+ * WHY IT IS A SEPARATE TABLE RATHER THAN CORRECTED COORDINATES.
+ *
+ * Three reasons, and the third is the one that decided it.
+ *
+ *   1. `PARKS` is `wildlife.ts`'s and the wildlife reads it too. A park whose
+ *      centre moved here would move every bird in it, for a reason that has
+ *      nothing to do with birds.
+ *   2. `YARDS_PACKED` and `SPANS_PACKED` are the record of what OSM says, baked
+ *      by `data/scratch/bake_rave_anchors.py`. Editing numbers inside them
+ *      would make the bake and the file disagree with no note of which is
+ *      right, and the next person to re-run the bake would silently revert
+ *      this.
+ *   3. **The correction is derived from a different source than the sites are.**
+ *      The rows come from OSM parcels; this comes from the shipped collision
+ *      prisms. Two derivations, two tables, and the join between them is an
+ *      index — which is the same shape every other baked join in this project
+ *      has.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT THE PASS ACTUALLY DID, PER SITE.
+ *
+ * It searched outward from the original centre in 2 m rings for the nearest
+ * point whose whole `raveFloorRadius` disc clears every building footprint by
+ * `CLEAR_MARGIN`, subject to two constraints that keep the answer honest:
+ *
+ *   - **It stays inside the source circle.** `dist <= source r`, so a relocated
+ *     yard is still provably on its own parcel and a relocated park is still
+ *     provably in the park. That is the one guarantee the source tables *do*
+ *     carry, and it is what stops a nudge from putting a rave in the street
+ *     outside.
+ *   - **It stays out of the water**, against the same terrain and water tables
+ *     the server stands players on. Half the yards in this table are wharves,
+ *     and a wharf's nearest clear ground is the harbour.
+ *
+ * Where no such point exists the radius shrinks — a rave takes the apron it can
+ * actually stand in — and the search runs again, because a smaller floor both
+ * needs less room and is allowed to travel further. A row that cannot reach
+ * `SITE_MIN_R` anywhere is dropped, with `r = 0` saying so.
+ *
+ * The ideal outcome, and the common one, is exactly what you would expect of
+ * the real thing: the rave is now in the **car park beside the warehouse**
+ * rather than in the warehouse.
+ *
+ * Regenerated by `data/scratch/clear_rave_floors.ts`. `checkRaves` re-derives
+ * the whole assertion from the collision sidecars, so a stale row here fails
+ * the build rather than shipping.
+ */
+const CLEARED_PACKED =
+  '0|62.8|-1118.9|15.3;1|-1027.8|584.2|15.7;3|-287.5|1670.4|62.0;4|-1700.1|309.9|19.9;5|-1302.2|-1793.2|24.7;6|' +
+  '-2142.1|-812.2|40.1;8|-2381.5|4.7|33.7;9|-2063.9|-1400.3|17.1;12|-2618.2|-221.3|42.6;14|0|0|0;16|-881.6|-290' +
+  '3.4|16.1;17|-3181.4|245|17.9;19|-1570.8|3091.6|40.8;20|0|0|0;21|0|0|0;23|-3851.2|535.6|29.7;24|3065.1|2591.2' +
+  '|18.8;25|0|0|0;26|-2247.1|-3358|43.2;27|-1122.6|3978.4|47.5;28|-4077.1|616|19.7;29|-3563.4|-2119.3|16.4;30|-' +
+  '727.5|4063.3|37.6;31|-1924|4006.4|43.8;32|1737.3|4076.6|35.4;34|-3389.2|-3033.8|16.4;35|-2213.7|4061|18.4;36' +
+  '|-4591.3|923.2|58.7;37|0|0|0;38|2544.2|4096.1|42.2;39|-1805.1|4608.8|28.6;40|-1600.8|4900.7|54.3;41|0|0|0;42' +
+  '|0|0|0;44|-2124.9|5162.9|28.7;45|-3269.4|4551.9|38.1;46|0|0|0;47|0|0|0;48|-3826.2|4199.1|22.8;49|0|0|0;50|-3' +
+  '525.8|4650.5|19.3;51|-3217.9|4974.1|27.7;52|0|0|0;53|-1994|5502.9|54.3;54|-2367.7|5631.4|15.8;56|0|0|0;57|60' +
+  '74.6|-908.4|21.0;58|0|0|0;59|-2221.7|-5785.7|23.9;60|-2788.5|5524.5|41.0;61|0|0|0;62|-3662.2|5022.4|26.3;63|' +
+  '-4135.6|4787.1|24.1;64|0|0|0;65|-2401|5966.3|54.3;66|-2692.8|5972.3|24.6;68|0|0|0;69|0|0|0;70|-2509.6|6233.8' +
+  '|62.0;71|-3080.7|6036.7|46.4;72|3503.4|5856|16.1;73|-1768.8|6568.5|33.4;74|-2833.9|6274.8|31.1;75|-2781.5|-6' +
+  '302.3|31.7;76|-4683.5|5231.4|16.7;77|-4435|5516.3|62.0;78|0|0|0;81|-2815.4|-6944.2|20.7;83|0|0|0;84|-7450.3|' +
+  '764.6|17.4;85|-1117.8|7385.5|31.0;86|0|0|0;87|0|0|0;88|-4442.6|6231.5|35.8;90|-641.3|-7807.9|35.6;92|-4458.3' +
+  '|6602|17.7;93|-1203.7|7968.4|32.1;94|-3975.9|7060.5|44.3;95|0|0|0;96|-8340.1|293.6|26.4;97|-5596.1|-6112.2|1' +
+  '5.0;98|3528.4|7541.5|30.7;99|-8552.2|314.6|19.0;100|-7804.7|3486.5|24.7;102|4114.4|7578.9|40.6;103|-2399.6|8' +
+  '351|20.8;104|-5202|7213.3|40.3;105|-5868.6|6760.2|33.8;106|-933.4|-8926.6|23.3;107|-6119.4|-6591.7|29.2;108|' +
+  '0|0|0;109|382.8|9028.6|62.0;115|0|0|0;117|-534.4|-358.3|28.5;122|0|0|0;123|0|0|0;126|0|0|0;128|0|0|0;130|-11' +
+  '773.9|-557.3|28.5;132|-2030|7206.3|28.5;133|-2905.6|-6194.5|28.5;134|-1294.7|625.2|28.5;135|0|0|0;137|279.6|' +
+  '-2227.3|28.5;139|-2538.6|7175.7|28.5;141|-17446.1|-3808.9|28.5;142|-3900.2|7199.8|28.5;148|0|0|0;152|0|0|0;1' +
+  '54|0|0|0;155|1270.3|1255.1|28.5;160|-996.3|239.7|15.0;170|-877.4|2546.5|18.7;184|2463.6|3288|62.0;186|-4654|' +
+  '-104.7|62.0;189|731.1|-410.9|62.0;190|-5181.3|76.7|62.0;199|-1538.3|2042.8|62.0;201|220.8|747.9|62.0;203|121' +
+  '3.4|2286.4|62.0;206|574.4|166.9|62.0;208|564.6|-924.3|61.5;213|-3363.5|168.3|57.6;217|8135.1|-6164.5|62.0;21' +
+  '8|-5837.3|-8347|62.0;219|-6589.4|-8430.2|62.0;222|7228.6|-5790.6|62.0;227|-13179.1|-2634.4|62.0;233|-10365.6' +
+  '|-2503.7|62.0;241|4204.1|-3739.8|62.0;244|-1054.5|-14229.7|62.0;248|-7700.2|-6026.4|62.0;252|-11691.6|-5508.' +
+  '5|62.0;255|5142.5|-4897.8|62.0;259|-14522|-4456.9|62.0;260|-3213.7|-14874.3|62.0;261|-5341.7|-8138.8|62.0;26' +
+  '4|-10462.5|-3847.1|62.0;265|-13263.5|425.5|62.0;274|-15058.4|1176.5|62.0;276|-8403|-2696.8|62.0;279|-13178.5' +
+  '|-3957.5|62.0;282|0|0|0;287|-1642.9|-6403.8|62.0;289|-11657.6|1945.8|62.0;292|6832.6|-3160|62.0;301|1523|688' +
+  '2.9|62.0;305|-5784.5|10637.1|62.0;309|5816.5|-1632.8|62.0;319|-9816.5|656.1|62.0;328|-2017.8|-5005.8|62.0;33' +
+  '8|6116.6|-13126.4|62.0;340|-8516.7|-5021.8|62.0;341|-9131.5|-99|62.0;344|4704|-12808.3|62.0;346|-8040.7|4181' +
+  '|62.0;348|-14462.1|-874.1|61.6;357|-5662.3|14136.5|60.1;358|-8500|-10707.5|60.1;361|5740.9|4892.8|59.6;365|3' +
+  '805.4|7289|59.1;376|-5486.8|-1818.4|57.5;377|-6052.4|7484.3|57.3;378|-10442|-10045.7|57.1;380|6364.8|-9264.1' +
+  '|56.5;385|-4975.8|-9912.6|55.8;390|-4236.8|18125|62.0;402|-11933.1|-14368.4|62.0;405|-12273.4|10257.8|62.0;4' +
+  '08|-12089.1|-13712.6|62.0;409|8000.5|-14945.9|62.0;410|-13700.3|-6808.9|62.0;423|-17756.5|-1110.9|62.0;425|-' +
+  '15951.9|-10553.8|62.0;430|-15043.8|8214.1|62.0;439|-17784.8|2618|60.9;447|-18181.9|-367.7|57.2;448|-4514.2|-' +
+  '17637.9|57.1;450|-13802.9|10162.2|56.5';
+
+/** `CLEARED_PACKED` decoded: row index to its correction, or null for dropped. */
+const CLEARED: ReadonlyMap<number, { x: number; z: number; r: number } | null> = (() => {
+  const out = new Map<number, { x: number; z: number; r: number } | null>();
+  if (CLEARED_PACKED.length === 0) return out;
+  for (const rec of CLEARED_PACKED.split(';')) {
+    const f = rec.split('|');
+    const r = +f[3];
+    out.set(+f[0], r > 0 ? { x: +f[1], z: +f[2], r } : null);
+  }
+  return out;
+})();
+
+/**
+ * Every site that survived, in source-row order, `id` being its index here.
+ *
+ * Two filters, and they are different in kind: `CLEARED` drops a row that has
+ * nowhere clear to stand, and `SITE_MIN_R` drops one that was never big enough
+ * to begin with.
  */
 export const RAVE_SITES: readonly RaveSite[] = (() => {
   const out: RaveSite[] = [];
@@ -576,33 +776,52 @@ export const RAVE_SITES: readonly RaveSite[] = (() => {
     }
     return false;
   };
-  const push = (kind: SiteKind, name: string, x: number, z: number, r: number, bearing: number): void => {
-    const use = Math.min(r * SITE_USE_FRACTION, SITE_MAX_R);
-    if (use < SITE_MIN_R) return;
-    out.push({ id: out.length, kind, name, x, z, r: use, bearing, watched: near(x, z) });
-  };
 
-  for (const rec of YARDS_PACKED.split(';')) {
-    const f = rec.split('|');
-    push(SITE_KIND.YARD, f[0], +f[1], +f[2], +f[3], NaN);
-  }
-  for (const rec of SPANS_PACKED.split(';')) {
-    const f = rec.split('|');
-    // A span's clear space is not an inscribed circle -- it is a strip of void
-    // under a deck. `SPAN_HALF_WIDTH` is what a two-carriageway viaduct actually
-    // shelters, and the length is capped by the same ceiling everything else is,
-    // because a 1.8 km motorway viaduct is still one rave and not a linear park.
-    push(SITE_KIND.SPAN, f[0], +f[1], +f[2], Math.min(+f[3] * 0.35, SPAN_HALF_WIDTH), +f[4]);
-  }
-  for (const park of PARKS) {
-    if (park.r < PARK_MIN_R) continue;
-    push(SITE_KIND.PARK, park.name, park.x, park.z, park.r, NaN);
+  for (let row = 0; row < RAVE_SOURCE_ROWS.length; row++) {
+    const src = RAVE_SOURCE_ROWS[row];
+    const fix = CLEARED.get(row);
+    // `undefined` is "this row was already clear"; `null` is "the pass looked
+    // and there was nowhere". The two are not the same answer and a `?? `
+    // would have collapsed them.
+    if (fix === null) continue;
+    const x = fix === undefined ? src.x : fix.x;
+    const z = fix === undefined ? src.z : fix.z;
+    const use = fix === undefined ? Math.min(src.r * SITE_USE_FRACTION, SITE_MAX_R) : fix.r;
+    if (use < SITE_MIN_R) continue;
+    out.push({ id: out.length, kind: src.kind, name: src.name, x, z, r: use, bearing: src.bearing, watched: near(x, z) });
   }
   return out;
 })();
 
-/** The extent the tables were baked inside. `verifyRaves` asserts it. */
-export const RAVE_EXTENT_M = 19300;
+/**
+ * How much of a site's usable radius the crowd is allowed to reach, and the
+ * margin that turns that into the disc which must be clear of buildings.
+ *
+ * 0.66 is `venueFor`'s `depth` — the crowd's front edge, and the furthest from
+ * the centre any part of the event goes. Measured rather than assumed, by
+ * running `attendeeAt` over every site across forty nights with the obstacle
+ * rejection switched off: the furthest anybody ever stood from the centre was
+ * **0.637 of the usable radius**, and the booth itself sits at exactly 0.660.
+ * So `depth` bounds the whole event with 3.6% of slack already in it.
+ *
+ * The 2 m on top is for the rig rather than for the people. The booth stands at
+ * exactly `depth`, and a stack of speakers whose *centre* is tangent to a wall
+ * is still a stack of speakers in a wall.
+ */
+export const CROWD_DEPTH_FRACTION = 0.66;
+export const RAVE_FLOOR_MARGIN = 2;
+
+/**
+ * The disc a rave occupies, metres about `site.x, site.z`.
+ *
+ * The one definition of "the dance floor", exported because three separate
+ * things need to agree about it and none of them owns it: the clearance bake
+ * that moved the sites, `checkRaves` which asserts none of them is in a
+ * building, and this file's own `venueFor`.
+ */
+export function raveFloorRadius(r: number): number {
+  return r * CROWD_DEPTH_FRACTION + RAVE_FLOOR_MARGIN;
+}
 
 // --- Which sites are live tonight ----------------------------------------------
 
@@ -785,8 +1004,10 @@ export function venueFor(site: RaveSite, night: number): RaveVenue {
     // The crowd's front edge. Two thirds of the usable radius, so there is
     // always a rim of dark ground between the last dancer and whatever the site
     // is bounded by -- which is where you arrive, and arriving *at the edge of*
-    // a crowd is different from arriving in the middle of one.
-    depth: site.r * 0.66,
+    // a crowd is different from arriving in the middle of one. Named rather
+    // than written out, because `raveFloorRadius` is this same number and the
+    // clearance bake is the thing that must not disagree about it.
+    depth: site.r * CROWD_DEPTH_FRACTION,
   };
 }
 

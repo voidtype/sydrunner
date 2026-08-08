@@ -207,8 +207,15 @@ export interface Suburb {
  * at the station. One row per end of a 1.4 km high street, because a single
  * anchor at one end of King Street leaves the other end empty and King Street is
  * the walk this whole fix exists to populate.
+ *
+ * ---------------------------------------------------------------------------
+ * **This is the curated block only.** The 19,300 - 60,000 m ring lives in
+ * `SUBURBS_STAGE4_PACKED` below and is concatenated onto the end of this array
+ * by `SUBURBS`; nothing here moves, and the split is what makes "nothing here
+ * moves" a thing a diff can show rather than a thing to take on trust. It is
+ * `wildlife.PARKS_INNER`'s arrangement, for `wildlife.PARKS`' reason.
  */
-export const SUBURBS: readonly Suburb[] = [
+const SUBURBS_CURATED: readonly Suburb[] = [
   // --- Heavy. The user's own list first.
   { name: 'Redfern', x: -440.5, z: 2703.8, crime: 1.0, booze: 0.45 },
   { name: 'Kings Cross', x: 1207.1, z: 609.9, crime: 0.95, booze: 1.0 },
@@ -626,9 +633,347 @@ export const SUBURBS: readonly Suburb[] = [
 ];
 
 /**
- * The extent both tables were extracted inside. `verifyStreetlife` asserts it.
+ * The 19,300 - 60,000 m stage-4 ring: 505 more suburbs, packed into a string,
+ * with **weights a model produced rather than a person**.
+ *
+ * `name|x|z|crime|booze`, records separated by `;`, parsed once at module load
+ * into the same `Suburb` shape -- `wildlife.PARKS_MIDDLE_PACKED`'s format and
+ * its argument: 332 records is a table a reader checks by eye, 837 is fifteen
+ * pages nobody reads, and the frozen block above stays legible by staying a
+ * literal.
+ *
+ * ---------------------------------------------------------------------------
+ * **Why the weights are computed here and chosen above.**
+ *
+ * Everything above this line was set by hand and says so. The disc this block
+ * covers is 11,310 km2 and reaches Penrith, Katoomba's foothills, Gosford and
+ * Wollongong's northern beaches; hand-curating five hundred suburbs would be
+ * five hundred opinions nobody could check. So the opinions above were turned
+ * into a model and the model was fitted against them, in
+ * `data/scratch/bake_anchors_60km.py` over `data/cache/sydney-60km.osm.pbf`.
+ *
+ * Each suburb's `place` node gets a neighbourhood profile:
+ *
+ *   - **A800** street-level doors within 800 m: every `shop`, plus
+ *     restaurants, cafes, takeaways, pubs, bars, banks, pharmacies, cinemas.
+ *   - **B700** the licensed subset within 700 m, plus bottle shops.
+ *   - **M1500** marinas, yacht and sailing clubs, golf courses within 1,500 m.
+ *   - **RAIL** whether there is a railway station within 700 m.
+ *   - **POOLS** `leisure=swimming_pool` and back-garden tennis courts within
+ *     1 km, both as a raw count and as a rate per detached dwelling.
+ *
+ * Then a least-squares fit in log space, and the resulting *score* is
+ * quantile-mapped onto the curated weights -- so a new row is given the weight
+ * of the curated suburb with as much going on. Fitted on all 332 rows above:
+ *
+ *     crime = -1.5508 +0.4486*ln(1+B700) -0.2511*ln(1+M1500) +0.2080*RAIL
+ *                     -0.0269*ln(1+POOLRATE) -0.1585*ln(1+POOLRAW)
+ *     booze = -2.2213 +0.1608*ln(1+A800) +0.2225*ln(1+B700) -0.0249*ln(1+POOLRATE)
+ *
+ * **The pools are the interesting term and they are not a joke, or not only
+ * one.** OSM carries no income column, and the retail proxy cannot do this job
+ * alone: Roseville has *more* shops within 800 m than Earlwood and a fifth of
+ * the curated crime weight. What OSM does carry, because aerial-imagery tracers
+ * went suburb by suburb, is the back yards. The upper north shore and the
+ * harbour are wall-to-wall pools; Mount Druitt and Lakemba are not.
+ *
+ * The second interesting term is a negative result: **A800 does not survive
+ * into the crime fit and B700 does.** An exhaustive sweep over every subset of
+ * the seven features picked pub-and-bottle-shop density over shop density, by
+ * six percentage points. Read charitably that is a licensed strip rather than a
+ * retail one. Read the other way it is the same joke this file has been making
+ * since Kings Cross was given a 0.95.
+ *
+ * ---------------------------------------------------------------------------
+ * **What it reproduces, honestly: 153 of the 332 curated rows within 30%, and
+ * 195 of 332 for `booze`.** That is 46% and 59%, and it is not 90%, and saying
+ * so is the point. Where it fails it fails in a describable direction: it
+ * cannot reach Redfern's 1.00 (it says 0.60) or Kings Cross's 0.95 (0.50),
+ * because no combination of shopfronts and swimming pools explains why the
+ * inner city is the inner city -- and the only feature that would, distance
+ * from Town Hall, would also declare Mount Druitt to be Killara. The
+ * *ordering* is right where the level is not: Redfern, Kings Cross, Newtown and
+ * Marrickville are still the top of the curated set under the model, which is
+ * what the quantile map is reading.
+ *
+ * A second known bias, corrected rather than hidden: every deprivation signal
+ * here is an *absence*, so a suburb the map has not finished yet reads as
+ * rough. The first cut declared Schofields, Oran Park, Grantham Farm and North
+ * Kellyville -- all paddocks in 2015 -- the roughest places in the state. Each
+ * score is therefore shrunk toward the median in proportion to how much of the
+ * suburb is actually mapped, one-sidedly, because no thin suburb was ever
+ * scoring too *low*.
+ *
+ * And four rows are hand-set over the model's head, which the header above
+ * makes the tradition:
+ *
+ *   - **Blacktown** 0.45/0.30. The OSM `place` node is 1.3 km from the town
+ *     centre in a residential pocket, so the model sees 97 doors, no railway
+ *     station and eight pools where the real centre is a Westfield, the
+ *     junction and the biggest bus interchange in the west. Model said 0.10.
+ *   - **Campbelltown** 0.45/0.35. The same failure -- the node sits off Queen
+ *     Street with 54 dwellings inside a kilometre, so the evidence shrink pulls
+ *     it to the middle of the ladder. It is a regional city with a reputation.
+ *     Model said 0.25.
+ *   - **Thornton** 0.20/0.15 and **Jamisontown** 0.20/0.25. Two subdivisions
+ *     either side of Penrith station that inherit Penrith's entire activity
+ *     disc while having almost no mapped dwellings of their own; Thornton came
+ *     out at 0.55, the heaviest row in the ring, and it is new houses.
+ *
+ * ---------------------------------------------------------------------------
+ * **One venue in the frozen block changes its drunks**, and it is written down
+ * rather than smoothed over. `VENUE_DRUNKS` reads `booze` through a
+ * nearest-centroid search, so a new row can steal a venue that already exists.
+ * Measured over all 642: exactly one moves -- **venue 640**, the pub at
+ * (-18379, -5523) in Parramatta, which was attached to the `Experiment Farm`
+ * locality label at `booze` 0.08 and is now attached to `Parramatta` at 0.55.
+ * Its roll is 0.0384, so it goes from **two drunks to three**. That is a
+ * correction and not a regression: it is a Parramatta pub, and it was reading
+ * off a label that names a 1793 farmhouse museum. Every other one of the 642
+ * keeps the count it has today.
+ *
+ * The extract found 1,632 `place=suburb|neighbourhood|town` nodes inside 60 km.
+ * 671 inside the frozen ring are dropped wholesale (the curation above wins in
+ * its own ring), 232 more within 400 m of a curated centroid, 198 that would
+ * duplicate a name already in the table, 24 whose node lands in mapped water
+ * and 2 with no name at all.
  */
-export const STREET_EXTENT_M = 19300;
+const SUBURBS_STAGE4_PACKED =
+  'Parramatta|-18749.1|-5638.4|0.55|0.55;Liverpool|-26125.1|6152.3|0.55|0.50;Mount Druitt|-36193.9|' +
+  '-10201.2|0.55|0.40;Rooty Hill|-34155.3|-10019.8|0.50|0.30;Campbelltown|-35388.8|22445.6|0.45|0.3' +
+  '5;Blacktown|-28492.8|-9980.1|0.45|0.30;Jannali|-12763.3|16545.7|0.45|0.25;Bidwill|-36020.1|-1448' +
+  '8.6|0.45|0.15;Hebersham|-35805.1|-12981.2|0.45|0.15;Penrith|-47948.9|-12089.7|0.40|0.45;Kirrawee' +
+  '|-12291.3|18470.8|0.40|0.35;Cabramatta|-25360.4|3750.8|0.40|0.30;Emerton|-37523.2|-13241.7|0.40|' +
+  '0.30;Kingswood|-45267.3|-11011.0|0.40|0.30;Blaxland|-55104.8|-12476.7|0.35|0.35;Cronulla|-4887.9' +
+  '|21022.7|0.35|0.35;Ettalong Beach|10928.8|-39333.1|0.35|0.30;Sutherland|-13769.5|18273.2|0.35|0.' +
+  '30;Westmead|-20630.2|-6402.4|0.35|0.30;Menai|-17524.2|16520.5|0.35|0.25;Ourimbah|13778.7|-56109.' +
+  '8|0.35|0.25;Panania|-19184.7|9922.0|0.35|0.25;Thirroul|-25850.6|50155.7|0.35|0.25;Berowra|-5763.' +
+  '7|-26568.8|0.35|0.20;Pendle Hill|-23269.5|-7384.4|0.35|0.20;Erskine Park|-37879.0|-5942.9|0.35|0' +
+  '.15;Werrington|-42020.1|-11395.4|0.35|0.15;East Hills|-20279.6|10587.8|0.35|0.10;Mount Kuring-Ga' +
+  'i|-7158.1|-23586.2|0.35|0.10;Plumpton|-34167.9|-11784.8|0.35|0.10;Shalvey|-37581.2|-14918.2|0.35' +
+  '|0.10;Whalan|-37255.7|-11719.7|0.35|0.10;St Marys|-41095.5|-10710.4|0.30|0.30;Windsor|-36450.5|-' +
+  '28505.4|0.30|0.30;Camden|-47011.0|21401.3|0.30|0.25;Canley Heights|-26168.9|1919.5|0.30|0.25;Car' +
+  'nes Hill|-33036.2|8292.2|0.30|0.25;East Blaxland|-54632.3|-12565.5|0.30|0.25;Fairfield|-23503.5|' +
+  '479.5|0.30|0.25;Wentworthville|-22479.1|-6474.6|0.30|0.25;Chester Hill|-19231.6|1782.0|0.30|0.20' +
+  ';Gymea|-11096.0|18543.0|0.30|0.20;Heckenberg|-29306.9|4903.0|0.30|0.20;South Penrith|-47408.3|-9' +
+  '626.2|0.30|0.20;Berowra Heights|-6964.9|-28204.6|0.30|0.15;Caddens|-43922.2|-9864.8|0.30|0.15;Ca' +
+  'mbridge Gardens|-45532.3|-13532.9|0.30|0.15;Lemongrove|-46291.7|-12022.1|0.30|0.15;Mount Colah|-' +
+  '9108.9|-21808.4|0.30|0.15;Warwick Farm|-25296.3|5315.9|0.30|0.15;Camden South|-46514.3|24618.9|0' +
+  '.30|0.10;Glendenning|-33075.0|-12798.7|0.30|0.10;Grose Wold|-49436.0|-28778.5|0.30|0.10;Hoxton P' +
+  'ark|-32388.4|7415.0|0.30|0.10;Minchinbury|-35310.9|-8366.9|0.30|0.10;Niagara Park|12257.2|-54237' +
+  '.3|0.30|0.10;Oxley Ridge|-44582.7|14733.2|0.30|0.10;Tregear|-38542.6|-12576.7|0.30|0.10;Wilberfo' +
+  'rce|-33451.2|-34429.5|0.30|0.10;Willmot|-38770.4|-15199.6|0.30|0.10;Hornsby|-10394.0|-18092.6|0.' +
+  '25|0.35;Avalon Beach|10658.2|-25946.2|0.25|0.30;Bella Vista|-23831.3|-13656.8|0.25|0.20;Bundeena' +
+  '|-4939.9|24021.0|0.25|0.20;Canley Vale|-24254.7|2234.2|0.25|0.20;Como|-13307.3|14995.5|0.25|0.20' +
+  ';Ingleburn|-31786.1|15669.3|0.25|0.20;Kings Park|-28100.9|-13334.2|0.25|0.20;Merrylands|-20690.0' +
+  '|-3385.8|0.25|0.20;Mount Pritchard|-28245.2|4297.4|0.25|0.20;North Kellyville|-24059.0|-19836.8|' +
+  '0.25|0.20;Schofields|-31676.3|-17953.2|0.25|0.20;Wallacia|-52586.0|677.1|0.25|0.20;Asquith|-9192' +
+  '.5|-19849.5|0.25|0.15;Avoca Beach|20148.5|-45116.7|0.25|0.15;Busby|-29946.9|5694.9|0.25|0.15;Cam' +
+  'bridge Park|-44918.2|-12278.4|0.25|0.15;Coledale|-23565.4|47385.0|0.25|0.15;Grays Point|-11474.0' +
+  '|21055.9|0.25|0.15;Macquarie Fields|-29265.7|14122.6|0.25|0.15;Mulgrave|-35499.3|-26119.4|0.25|0' +
+  '.15;North St Marys|-39448.3|-11919.4|0.25|0.15;Stanwell Park|-19675.2|40318.4|0.25|0.15;Toongabb' +
+  'ie|-23390.6|-8056.6|0.25|0.15;Woonona|-27142.8|53409.6|0.25|0.15;Ashcroft|-28405.8|5663.3|0.25|0' +
+  '.10;Austinmer|-25054.3|48524.6|0.25|0.10;Bar Point|-4909.7|-39206.2|0.25|0.10;Bensville|15559.2|' +
+  '-41349.3|0.25|0.10;Carramar|-22695.3|2096.6|0.25|0.10;Chatsworth|-41055.5|-8864.2|0.25|0.10;Coly' +
+  'ton|-38432.2|-8867.3|0.25|0.10;Currawong Beach|7669.1|-30459.8|0.25|0.10;Edmondson Park|-32105.2' +
+  '|11256.1|0.25|0.10;Ellis Lane|-48981.7|19325.4|0.25|0.10;Great Mackerel Beach|7737.6|-30897.5|0.' +
+  '25|0.10;Hassall Grove|-34614.7|-14535.9|0.25|0.10;Hawkesbury Heights|-52852.3|-20967.5|0.25|0.10' +
+  ';Hewitt|-39512.0|-8897.6|0.25|0.10;Lethbridge Park|-38039.0|-13707.2|0.25|0.10;Loftus|-14326.2|1' +
+  '9634.8|0.25|0.10;Marsden Park|-35627.3|-17703.9|0.25|0.10;Miller|-30293.7|6318.5|0.25|0.10;Mount' +
+  ' Riverview|-53326.8|-14586.2|0.25|0.10;Oakhurst|-34959.4|-13925.7|0.25|0.10;Oxley Park|-38560.9|' +
+  '-10150.8|0.25|0.10;Spring Farm|-44103.9|23135.3|0.25|0.10;Tallawong|-29894.7|-19207.7|0.25|0.10;' +
+  'Vineyard|-32100.2|-23847.5|0.25|0.10;Woronora Heights|-16198.4|18632.3|0.25|0.10;Yarrawarrah|-15' +
+  '755.7|20863.6|0.25|0.10;Waitara|-9989.4|-17333.8|0.20|0.30;Jamisontown|-49496.0|-9989.9|0.20|0.2' +
+  '5;Cabramatta West|-27207.5|3053.2|0.20|0.20;Cardinal Gilroy Village|-22162.4|-3024.0|0.20|0.20;H' +
+  'eathcote|-18213.2|24303.5|0.20|0.20;Narellan|-43205.3|20059.6|0.20|0.20;The Ponds|-28130.4|-1745' +
+  '6.7|0.20|0.20;Ambarvale|-37246.4|24690.7|0.20|0.15;Arndell Park|-30443.4|-8137.6|0.20|0.15;Baulk' +
+  'ham Hills|-20390.4|-11569.2|0.20|0.15;Bonnyrigg|-29518.7|3290.7|0.20|0.15;Booker Bay|12154.4|-39' +
+  '570.4|0.20|0.15;Bossley Park|-30067.5|-158.4|0.20|0.15;Edensor Park|-30731.9|1688.2|0.20|0.15;Em' +
+  'u Heights|-51973.2|-13553.1|0.20|0.15;Emu Plains|-50400.4|-12356.0|0.20|0.15;Fairfield East|-217' +
+  '98.0|1148.1|0.20|0.15;Fairfield Heights|-24848.7|286.2|0.20|0.15;Grantham Farm|-31251.6|-22153.9' +
+  '|0.20|0.15;Helensburgh|-20302.9|36106.2|0.20|0.15;Huntingwood|-30310.9|-7334.6|0.20|0.15;Kellyvi' +
+  'lle|-23862.7|-16525.9|0.20|0.15;Killcare|13536.7|-38129.7|0.20|0.15;Lilli Pilli|-8225.4|22253.7|' +
+  '0.20|0.15;Minto|-32757.7|18698.1|0.20|0.15;Northmead|-19669.5|-9046.2|0.20|0.15;Pemulwuy|-26098.' +
+  '8|-5316.0|0.20|0.15;Quakers Hill|-29185.1|-14937.5|0.20|0.15;Raby|-35903.5|17461.9|0.20|0.15;Ros' +
+  'ary Village|-22390.4|278.5|0.20|0.15;Sadleir|-29403.1|5890.6|0.20|0.15;Seven Hills|-24868.3|-982' +
+  '6.6|0.20|0.15;South Wentworthville|-22091.6|-4796.2|0.20|0.15;Wakeley|-27805.8|1058.9|0.20|0.15;' +
+  'West Pennant Hills|-16374.6|-13120.4|0.20|0.15;Wetherill Park|-28556.9|-1730.3|0.20|0.15;Thornto' +
+  'n|-47471.6|-12531.1|0.20|0.15;Airds|-34187.1|24742.1|0.20|0.10;Bardia|-31904.0|12532.2|0.20|0.10' +
+  ';Blair Athol|-37113.1|22165.1|0.20|0.10;Bradbury|-35717.3|24308.7|0.20|0.10;Cawdor|-48503.1|2553' +
+  '7.4|0.20|0.10;Eagle Vale|-36280.7|19467.2|0.20|0.10;Fairfield West|-26361.4|510.4|0.20|0.10;Geor' +
+  'ges Hall|-20242.2|4708.2|0.20|0.10;Glossodia|-39424.3|-36715.5|0.20|0.10;Grasmere|-49328.1|21811' +
+  '.5|0.20|0.10;Hornsby Heights|-10328.4|-22638.2|0.20|0.10;Jordan Springs|-43654.3|-14815.3|0.20|0' +
+  '.10;Jordan Springs East|-42714.5|-14373.0|0.20|0.10;Kirkham|-45618.6|19230.0|0.20|0.10;Len Water' +
+  's Estate|-32836.8|5710.6|0.20|0.10;Morning Bay|6828.5|-26786.8|0.20|0.10;Quarry Hill|-42599.0|-8' +
+  '830.7|0.20|0.10;Rosemeadow|-37929.3|27094.7|0.20|0.10;Somersby|6024.9|-55985.2|0.20|0.10;St Hele' +
+  'ns Park|-36060.0|26989.2|0.20|0.10;St Johns Park|-28382.1|2073.8|0.20|0.10;The Sanctuary at Voya' +
+  'ger Point|-21582.4|11224.8|0.20|0.10;The Slopes|-47556.3|-36172.1|0.20|0.10;Wamberal|20866.9|-48' +
+  '808.2|0.20|0.10;Werrington Downs|-44444.0|-13267.2|0.20|0.10;Westleigh|-13412.0|-16819.1|0.20|0.' +
+  '10;Wisemans Ferry|-21640.0|-52112.1|0.20|0.10;Yennora|-22189.1|-371.7|0.20|0.10;Gosford|11405.4|' +
+  '-49517.6|0.15|0.30;Myrtle Glen Stanhope Gardens|-26530.6|-15741.5|0.15|0.30;Hookhams Corner|-105' +
+  '57.8|-19497.2|0.15|0.25;Lansvale|-23796.2|3938.5|0.15|0.20;North Narrabeen|7414.9|-18491.0|0.15|' +
+  '0.20;Umina Beach|8904.9|-38983.3|0.15|0.20;Woolooware|-6071.5|19267.9|0.15|0.20;Blackett|-36791.' +
+  '5|-13766.5|0.15|0.15;Clarendon|-39487.2|-27879.9|0.15|0.15;Constitution Hill|-21756.9|-7985.7|0.' +
+  '15|0.15;Dolans Bay|-7258.8|21624.2|0.15|0.15;Erina|16233.3|-47829.7|0.15|0.15;Greystanes|-24319.' +
+  '6|-4482.0|0.15|0.15;Hammondville|-22701.6|9489.2|0.15|0.15;Leumeah|-33939.1|21178.9|0.15|0.15;Mo' +
+  'orebank|-23079.3|8807.6|0.15|0.15;Oran Park|-42801.6|14376.5|0.15|0.15;Revesby|-17932.3|8637.6|0' +
+  '.15|0.15;Rouse Hill|-27553.7|-20704.9|0.15|0.15;Wattle Grove|-24587.2|9617.3|0.15|0.15;Woodbine|' +
+  '-35189.4|20289.5|0.15|0.15;Abbotsbury|-31692.7|658.8|0.15|0.10;Agnes Banks|-46683.3|-27288.8|0.1' +
+  '5|0.10;Akuna Bay|1907.3|-24489.0|0.15|0.10;Angus|-34383.3|-20258.0|0.15|0.10;Annangrove|-24824.1' +
+  '|-22979.6|0.15|0.10;Appin|-36479.8|38735.2|0.15|0.10;Arcadia|-14273.0|-27039.1|0.15|0.10;Austral' +
+  '|-36786.0|6822.5|0.15|0.10;Badgerys Creek|-43013.8|1883.4|0.15|0.10;Bangor|-15952.3|16567.0|0.15' +
+  '|0.10;Bankstown Aerodrome|-20159.2|6441.3|0.15|0.10;Bass Hill|-19426.6|3886.6|0.15|0.10;Bateau B' +
+  'ay|23246.7|-54039.9|0.15|0.10;Berkshire Park|-39750.3|-19988.1|0.15|0.10;Bickley Vale|-50127.1|2' +
+  '4326.7|0.15|0.10;Blairmount|-37887.1|20988.6|0.15|0.10;Blaxlands Ridge|-38030.3|-43448.8|0.15|0.' +
+  '10;Bligh Park|-38590.7|-24820.9|0.15|0.10;Bouddi|16985.5|-39245.6|0.15|0.10;Bow Bowing|-33768.2|' +
+  '16997.3|0.15|0.10;Box Head|12011.2|-37169.1|0.15|0.10;Box Hill|-29651.1|-23333.9|0.15|0.10;Bradf' +
+  'ield|-43993.8|6028.2|0.15|0.10;Brooklyn|1800.8|-31956.5|0.15|0.10;Bulli|-26404.9|51990.5|0.15|0.' +
+  '10;Calga|-51.5|-48488.5|0.15|0.10;Canoelands|-11726.9|-40638.0|0.15|0.10;Castlereagh|-49662.4|-1' +
+  '9174.5|0.15|0.10;Cataract|-34549.8|47770.7|0.15|0.10;Cattai|-27813.5|-35039.8|0.15|0.10;Cecil Hi' +
+  'lls|-33087.1|2986.3|0.15|0.10;Cecil Park|-36555.6|3309.7|0.15|0.10;Cheero Point|-2255.0|-39577.4' +
+  '|0.15|0.10;Claremont Meadows|-42595.8|-9628.4|0.15|0.10;Claymore|-36498.8|20493.5|0.15|0.10;Clif' +
+  'ton|-21408.3|43584.6|0.15|0.10;Cliftonville|-27946.6|-48031.6|0.15|0.10;Coalcliff|-20979.1|42004' +
+  '.2|0.15|0.10;Coasters Retreat|7820.1|-29400.5|0.15|0.10;Coba Point|-6640.7|-36034.8|0.15|0.10;Co' +
+  'gra Bay|1166.3|-38265.6|0.15|0.10;Copacabana|20190.3|-42344.5|0.15|0.10;Cumberland Reach|-30005.' +
+  '3|-44682.4|0.15|0.10;Darkes Forest|-27176.5|39355.7|0.15|0.10;Denham Court|-34793.2|13198.8|0.15' +
+  '|0.10;Dharruk|-36724.4|-12511.4|0.15|0.10;Dunheved|-40835.7|-13210.6|0.15|0.10;East Kurrajong|-3' +
+  '8429.1|-39558.7|0.15|0.10;Eastern Creek|-33251.1|-6846.0|0.15|0.10;Ebenezer|-30574.2|-38490.9|0.' +
+  '15|0.10;Elderslie|-45049.7|21857.6|0.15|0.10;Elvina Bay|5758.8|-25640.7|0.15|0.10;Engadine|-1812' +
+  '4.1|21271.6|0.15|0.10;Erina Heights|18146.4|-49249.9|0.15|0.10;Eschol Park|-37374.6|18796.2|0.15' +
+  '|0.10;Fiddletown|-11518.1|-33855.2|0.15|0.10;Forest Glen|-18400.1|-35214.0|0.15|0.10;Freemans Re' +
+  'ach|-38166.9|-32502.4|0.15|0.10;Gables|-28459.3|-26080.7|0.15|0.10;Galston|-14033.1|-24254.1|0.1' +
+  '5|0.10;Gilead|-38767.4|27716.5|0.15|0.10;Glenfield|-28771.4|12144.3|0.15|0.10;Glenhaven|-19645.1' +
+  '|-18060.6|0.15|0.10;Glenorie|-18959.9|-29241.5|0.15|0.10;Glenworth Valley|-3183.0|-50283.0|0.15|' +
+  '0.10;Green Point|13178.2|-45009.1|0.15|0.10;Green Valley|-31325.3|4349.0|0.15|0.10;Greendale|-49' +
+  '981.6|6129.2|0.15|0.10;Greenfield Park|-29343.8|1275.3|0.15|0.10;Greengrove|-5648.0|-54113.2|0.1' +
+  '5|0.10;Gronos Point|-31039.6|-33650.5|0.15|0.10;Grose Vale|-49680.1|-30144.2|0.15|0.10;Guildford' +
+  '|-19804.0|-744.4|0.15|0.10;Guildford West|-22576.3|-1853.3|0.15|0.10;Gunderman|-13981.0|-47315.2' +
+  '|0.15|0.10;Gymea Bay|-10917.2|20252.2|0.15|0.10;Hardys Bay|12807.2|-38129.6|0.15|0.10;Hillside|-' +
+  '21387.4|-29609.5|0.15|0.10;Hinchinbrook|-31746.4|6014.7|0.15|0.10;Hobartville|-43709.0|-28455.6|' +
+  '0.15|0.10;Holgate|17726.1|-51549.6|0.15|0.10;Holroyd|-19678.8|-3972.9|0.15|0.10;Holsworthy|-2376' +
+  '1.2|10532.3|0.15|0.10;Horsley Park|-33486.6|-2279.4|0.15|0.10;Kariong|4548.4|-45946.4|0.15|0.10;' +
+  'Kearns|-37306.6|17467.7|0.15|0.10;Kemps Creek|-39255.9|767.1|0.15|0.10;Kenthurst|-22056.8|-24567' +
+  '.0|0.15|0.10;Kincumber|16313.9|-44484.0|0.15|0.10;Kings Langley|-25433.1|-12642.2|0.15|0.10;Ku-r' +
+  'ing-gai Chase|-1206.2|-24219.3|0.15|0.10;Lalor Park|-26173.0|-11025.0|0.15|0.10;Laughtondale|-17' +
+  '345.7|-47529.2|0.15|0.10;Leets Vale|-24845.9|-48031.6|0.15|0.10;Leppington|-37534.2|11402.6|0.15' +
+  '|0.10;Little Wobby|3184.4|-35479.8|0.15|0.10;Llandilo|-42880.5|-17110.4|0.15|0.10;Londonderry|-4' +
+  '4147.1|-22952.0|0.15|0.10;Lovett Bay|5765.7|-26299.0|0.15|0.10;Lower Mangrove|-5507.9|-50242.1|0' +
+  '.15|0.10;Lower Portland|-30112.3|-46729.2|0.15|0.10;Lucas Heights|-21408.1|19217.8|0.15|0.10;Lug' +
+  'arno|-14983.0|12763.9|0.15|0.10;MacMasters Beach|18499.6|-41487.1|0.15|0.10;Macquarie Links|-308' +
+  '20.9|13109.9|0.15|0.10;Maddens Plains|-23454.1|43656.4|0.15|0.10;Maianbar|-6878.9|23368.2|0.15|0' +
+  '.10;Mangrove Creek|-8408.3|-56873.2|0.15|0.10;Maraylya|-27268.6|-29949.7|0.15|0.10;Marlow|-4875.' +
+  '6|-44281.9|0.15|0.10;Maroota|-21832.1|-45191.9|0.15|0.10;Matcham|19290.1|-50649.2|0.15|0.10;McGr' +
+  'aths Hill|-34508.2|-27717.7|0.15|0.10;Melonba|-38699.8|-18198.1|0.15|0.10;Melville|-41015.5|-701' +
+  '5.8|0.15|0.10;Menangle Park|-41234.8|26592.2|0.15|0.10;Middle Heights Estate|-24244.6|47960.3|0.' +
+  '15|0.10;Mill Dam Falls|-50532.0|-21594.6|0.15|0.10;Mooney Mooney Creek|130.1|-44563.8|0.15|0.10;' +
+  'Mornington|-23082.6|10650.6|0.15|0.10;Mount Annan|-40858.8|22469.1|0.15|0.10;Mount Vernon|-36921' +
+  '.5|-178.1|0.15|0.10;Mulgoa|-51540.5|-4849.2|0.15|0.10;Nelson|-27133.7|-24004.6|0.15|0.10;North R' +
+  'ichmond|-46356.4|-32596.4|0.15|0.10;North Rocks|-17880.5|-9984.5|0.15|0.10;Oakville|-31740.9|-26' +
+  '369.5|0.15|0.10;Old Guildford|-20771.1|-167.8|0.15|0.10;Orchard Hills|-44096.5|-5947.1|0.15|0.10' +
+  ';Otford|-18371.3|37946.1|0.15|0.10;Peach Trees|-3535.4|-26243.0|0.15|0.10;Peats Ridge|1310.0|-59' +
+  '603.7|0.15|0.10;Picketts Valley|17597.0|-45925.6|0.15|0.10;Pitt Town|-31842.5|-30958.8|0.15|0.10' +
+  ';Pitt Town Bottoms|-34355.7|-30580.1|0.15|0.10;Prestons|-30770.8|8588.4|0.15|0.10;Richards|-3339' +
+  '2.7|-21689.6|0.15|0.10;Richmond|-40885.6|-28455.6|0.15|0.10;Ropes Crossing|-40014.8|-14699.5|0.1' +
+  '5|0.10;Rossmore|-40495.6|8299.2|0.15|0.10;Ruse|-33364.8|22880.3|0.15|0.10;Sackville|-31040.2|-40' +
+  '643.1|0.15|0.10;Sackville North|-28097.8|-41838.4|0.15|0.10;Scarborough|-22205.9|44648.4|0.15|0.' +
+  '10;Scheyville|-30050.4|-28871.3|0.15|0.10;Shanes Park|-39019.4|-17137.4|0.15|0.10;Singletons Mil' +
+  'l|-12870.5|-44471.1|0.15|0.10;Smeaton Grange|-41374.9|19507.3|0.15|0.10;Smithfield|-24880.6|-180' +
+  '4.6|0.15|0.10;South Maroota|-24565.2|-39038.7|0.15|0.10;Spencer|-6783.8|-45507.6|0.15|0.10;Sprin' +
+  'gfield|14683.9|-49176.4|0.15|0.10;St Andrews|-34681.2|17536.7|0.15|0.10;Stanwell Tops|-20444.6|3' +
+  '9412.4|0.15|0.10;Summit Estate|-53639.2|-12344.0|0.15|0.10;Sunny Corner|-5482.7|-36871.5|0.15|0.' +
+  '10;Tennyson|-44750.5|-36523.2|0.15|0.10;The Hills of Carmel|-30073.1|-23255.6|0.15|0.10;Tumbi Um' +
+  'bi|19155.7|-54688.0|0.15|0.10;Varroville|-35894.8|15990.6|0.15|0.10;Villawood|-20828.5|2263.4|0.' +
+  '15|0.10;Waterfall|-19724.9|28572.8|0.15|0.10;Wedderburn|-35041.8|31111.5|0.15|0.10;Wendoree Park' +
+  '|-5324.4|-45716.0|0.15|0.10;Windsor Downs|-37388.8|-22582.4|0.15|0.10;Winmalee|-55449.3|-20231.6' +
+  '|0.15|0.10;Winston Hills|-21274.5|-9781.9|0.15|0.10;Wombarra|-23003.2|45712.3|0.15|0.10;Wondabyn' +
+  'e|1707.3|-40563.5|0.15|0.10;Woy Woy|5960.1|-40664.7|0.15|0.10;Yarramundi|-50672.1|-25279.0|0.15|' +
+  '0.10;Yattalunga|13829.0|-44680.4|0.15|0.10;Castle Hill|-19015.4|-14854.0|0.10|0.35;Mona Vale|832' +
+  '6.3|-21408.6|0.10|0.30;St Clair|-39311.9|-7091.6|0.10|0.30;Caringbah|-7419.7|18634.9|0.10|0.25;E' +
+  'ast Gosford|12664.7|-48319.2|0.10|0.25;Miranda|-9437.6|18413.7|0.10|0.25;Newport|9530.6|-23420.9' +
+  '|0.10|0.20;Norwest|-22962.7|-14633.1|0.10|0.20;Terrey Hills|622.7|-19763.6|0.10|0.20;Beaumont Hi' +
+  'lls|-25236.4|-18285.3|0.10|0.15;Caringbah South|-7917.9|20662.8|0.10|0.15;Casula|-28785.8|9826.7' +
+  '|0.10|0.15;Kellyville Ridge|-26948.4|-17839.6|0.10|0.15;Marayong|-29630.3|-12710.9|0.10|0.15;Mur' +
+  'ray Farm|-16395.4|-11215.1|0.10|0.15;North Parramatta|-18440.6|-7817.9|0.10|0.15;Palm Beach|1004' +
+  '8.5|-29924.6|0.10|0.15;Parklea|-27445.6|-15436.5|0.10|0.15;Prospect|-26746.7|-7102.7|0.10|0.15;R' +
+  'egentville|-50857.0|-9803.3|0.10|0.15;Rogans Hill|-17487.5|-15839.9|0.10|0.15;Stanhope Gardens|-' +
+  '26383.4|-16497.2|0.10|0.15;Thompsons Corner|-15006.6|-13140.6|0.10|0.15;Warriewood|7532.7|-19927' +
+  '.4|0.10|0.15;Werrington County|-42914.1|-12650.6|0.10|0.15;Woodcroft|-30607.6|-12027.8|0.10|0.15' +
+  ';Woronora|-14831.7|17577.1|0.10|0.15;Acacia Gardens|-27622.9|-14412.0|0.10|0.10;Alfords Point|-1' +
+  '6881.1|13079.6|0.10|0.10;Barden Ridge|-18038.9|18345.7|0.10|0.10;Berrilee|-10122.7|-28223.2|0.10' +
+  '|0.10;Bilgola Plateau|9375.4|-24999.8|0.10|0.10;Bonnet Bay|-14143.6|15875.7|0.10|0.10;Bonnyrigg ' +
+  'Heights|-31318.6|3078.5|0.10|0.10;Bungarribee|-32051.4|-8986.7|0.10|0.10;Burraneer|-6120.2|21740' +
+  '.8|0.10|0.10;Cartwright|-29227.6|6738.8|0.10|0.10;Catherine Field|-40900.2|13833.1|0.10|0.10;Chi' +
+  'pping Norton|-22737.5|5544.8|0.10|0.10;Clareville|8808.8|-26026.9|0.10|0.10;Colebee|-33016.6|-15' +
+  '383.8|0.10|0.10;Crestwood|-22414.1|-13596.1|0.10|0.10;Currans Hill|-39857.5|20517.0|0.10|0.10;Da' +
+  'leys Point|12227.5|-40614.3|0.10|0.10;Davistown|13252.7|-42819.7|0.10|0.10;Dean Park|-32624.2|-1' +
+  '4144.1|0.10|0.10;Doonside|-31779.9|-12025.0|0.10|0.10;Duncraig Estate|-22322.1|-18233.5|0.10|0.1' +
+  '0;Dural|-15230.7|-20051.7|0.10|0.10;Elizabeth Hills|-33242.6|4170.0|0.10|0.10;Englorie Park|-377' +
+  '42.1|24248.7|0.10|0.10;Forresters Beach|22841.1|-51381.7|0.10|0.10;Girraween|-24558.0|-7194.6|0.' +
+  '10|0.10;Gledswood Hills|-39373.6|16466.6|0.10|0.10;Glen Alpine|-38773.4|25299.2|0.10|0.10;Glenmo' +
+  're Park|-48980.3|-7467.0|0.10|0.10;Glenwood|-25949.2|-14149.5|0.10|0.10;Grey Gum Estate|-25577.7' +
+  '|-19749.6|0.10|0.10;Harrington Park|-42828.3|18145.5|0.10|0.10;Horningsea Park|-33685.6|9221.3|0' +
+  '.10|0.10;Horsfield Bay|7891.5|-41833.3|0.10|0.10;Illawong|-15114.8|14535.2|0.10|0.10;Ingleside|4' +
+  '196.6|-20087.8|0.10|0.10;Ingleside Heights|5078.3|-21835.0|0.10|0.10;Kareela|-11539.3|16511.2|0.' +
+  '10|0.10;Killcare Heights|14539.8|-38577.7|0.10|0.10;Lansdowne|-21650.7|3453.3|0.10|0.10;Long Poi' +
+  'nt|-28530.5|16394.1|0.10|0.10;Lurnea|-28718.1|7981.2|0.10|0.10;Mays Hill|-20531.4|-4970.3|0.10|0' +
+  '.10;McCarrs Creek|5894.1|-25122.0|0.10|0.10;Middle Dural|-18206.6|-25231.5|0.10|0.10;Middleton G' +
+  'range|-33815.7|5699.0|0.10|0.10;Mooney Mooney|-1215.5|-38238.2|0.10|0.10;Mount Elliot|15455.0|-5' +
+  '1512.3|0.10|0.10;Mount White|-2327.7|-45676.1|0.10|0.10;Mulgoa Sanctuary|-49790.1|-6109.9|0.10|0' +
+  '.10;Narara|10795.8|-52669.5|0.10|0.10;Nirimba Fields|-31491.3|-15911.2|0.10|0.10;North Gosford|1' +
+  '2598.5|-50134.4|0.10|0.10;Old Toongabbie|-22323.3|-8787.2|0.10|0.10;Padstow Heights|-15946.6|115' +
+  '83.0|0.10|0.10;Patonga|5014.6|-35290.3|0.10|0.10;Pearl Beach|8234.8|-36368.4|0.10|0.10;Picnic Po' +
+  'int|-18472.5|11673.3|0.10|0.10;Pleasure Point|-20267.3|11879.7|0.10|0.10;Port Hacking|-7315.1|22' +
+  '220.4|0.10|0.10;Prairiewood|-28116.5|-92.7|0.10|0.10;Pretty Beach|12190.7|-37971.6|0.10|0.10;Rev' +
+  'esby Heights|-17392.3|11367.1|0.10|0.10;Riverstone|-31835.0|-20881.7|0.10|0.10;Round Corner|-179' +
+  '00.4|-19046.9|0.10|0.10;Sandy Point|-19693.5|12191.0|0.10|0.10;Saratoga|12439.2|-43834.5|0.10|0.' +
+  '10;South Windsor|-38010.8|-25719.4|0.10|0.10;St Huberts Island|12037.2|-41552.1|0.10|0.10;Tascot' +
+  't|8898.6|-46173.0|0.10|0.10;Voyager Point|-21549.8|10334.6|0.10|0.10;Wagstaffe|11631.2|-38568.0|' +
+  '0.10|0.10;West Hoxton|-34531.1|7639.8|0.10|0.10;Woodpark|-23097.2|-2611.3|0.10|0.10;Yowie Bay|-9' +
+  '430.5|20301.8|0.10|0.10;Thornleigh|-12174.3|-15881.3|0.05|0.15;West Gosford|9662.1|-49836.2|0.05' +
+  '|0.15;Bilgola Beach|10345.4|-25029.8|0.05|0.10;Blackwall|10454.5|-40614.6|0.05|0.10;Cherrybrook|' +
+  '-15403.6|-15918.7|0.05|0.10;Church Point|6806.9|-24125.6|0.05|0.10;Cranebrook|-46519.9|-17023.1|' +
+  '0.05|0.10;Elanora Heights|5492.6|-18829.8|0.05|0.10;Empire Bay|13479.8|-41624.5|0.05|0.10;Gregor' +
+  'y Hills|-39675.1|18403.4|0.05|0.10;Kincumber South|14905.4|-42959.2|0.05|0.10;Koolewong|9358.9|-' +
+  '44855.6|0.05|0.10;Leonay|-51902.9|-10471.8|0.05|0.10;Lisarow|15337.5|-53846.6|0.05|0.10;Loquat V' +
+  'alley|7394.4|-23431.8|0.05|0.10;Milperra|-20630.4|8150.6|0.05|0.10;Mulgoa Rise|-49055.7|-6070.5|' +
+  '0.05|0.10;Narellan Vale|-42426.8|21154.3|0.05|0.10;North Avalon|11336.4|-26871.6|0.05|0.10;North' +
+  ' Avoca|20224.6|-46107.4|0.05|0.10;North Turramurra|-5710.5|-19584.5|0.05|0.10;Phegans Bay|8400.6' +
+  '|-42324.4|0.05|0.10;Point Clare|9615.8|-47676.7|0.05|0.10;Point Frederick|11591.5|-47391.7|0.05|' +
+  '0.10;Terrigal|19461.8|-47229.7|0.05|0.10;Twin Creeks|-41708.7|-1893.4|0.05|0.10;Whale Beach|1074' +
+  '6.6|-28631.9|0.05|0.10;Woy Woy Bay|8952.1|-42877.1|0.05|0.10;Wyoming|13076.1|-51477.4|0.05|0.10;' +
+  'Bayview|6873.5|-23329.6|0.05|0.05;Duffys Forest|-1908.5|-21650.3|0.05|0.05;Kentlyn|-30975.7|2171' +
+  '2.2|0.05|0.05;Minto Heights|-30571.2|19035.6|0.05|0.05;North Wahroonga|-7828.1|-18318.1|0.05|0.0' +
+  '5';
+
+/**
+ * Every suburb: the curated block, then the stage-4 ring, in that order.
+ *
+ * The order is the invariance, exactly as it is in `wildlife.PARKS`.
+ * `suburbSeed` is a function of the row and `streetKey` of its index, so a
+ * suburb keeps its loiterers only because it keeps its position -- and
+ * appending is the whole trick.
+ */
+export const SUBURBS: readonly Suburb[] = (() => {
+  const out: Suburb[] = SUBURBS_CURATED.slice();
+  for (const rec of SUBURBS_STAGE4_PACKED.split(';')) {
+    const f = rec.split('|');
+    out.push({ name: f[0], x: +f[1], z: +f[2], crime: +f[3], booze: +f[4] });
+  }
+  return out;
+})();
+
+/**
+ * The extent both tables were extracted inside. `verifyStreetlife` asserts it.
+ *
+ * **Sixty kilometres against a world on disk that reaches 19,300 m.** An anchor
+ * past the built extent is dormant, not broken: `forEachMethheadNear` and
+ * `forEachDrunkNear` both place their people on the footpath bands
+ * `PedestrianField.near` hands back, and outside the built world it hands back
+ * an empty list -- so the anchor poses nobody, costs one squared distance a
+ * query, and no frame anywhere has to know. `integration-check`'s `builtGate`
+ * names the same state from the other side and reports the skipped count.
+ */
+export const STREET_EXTENT_M = 60000;
 
 /**
  * The extent the frozen prefix of each table was baked inside, and how long that
@@ -648,17 +993,19 @@ export const VENUE_INNER_COUNT = 422;
  * Every `amenity=pub|bar|biergarten` in the extent, as flat integer x, z pairs.
  *
  * **Packed rather than records**, and it is the one place this file departs
- * from `POLICE_STATIONS`' shape. Forty-three stations with names is a table a
- * reader can check by eye; six hundred and eleven named venues is seven pages
- * nobody reads, and the names are not used for anything -- a drunk does not
- * know which pub they came out of. Metres, rounded: a pub's front door is
+ * from `POLICE_STATIONS`' shape. Ninety-three stations with names is a table a
+ * reader can check by eye; eight hundred and seventy-five named venues is ten
+ * pages nobody reads, and the names are not used for anything -- a drunk does
+ * not know which pub they came out of. Metres, rounded: a pub's front door is
  * not a surveyed point and the loiterer is placed on the nearest footpath in
  * any case.
  *
  * Extracted the same way the stations were: a read-only scratch script over
- * `data/cache/sydney.osm.pbf`, projected through `sydney.geo.lonlat_to_enu` and
- * `enu_to_world`, the points and multipolygon layers merged and deduped at 30 m
- * so a pub mapped as both a node and its own building outline arrives once.
+ * `data/cache/sydney.osm.pbf` for the first 642 and
+ * `data/cache/sydney-60km.osm.pbf` for the rest, projected through
+ * `sydney.geo.lonlat_to_enu` and `enu_to_world`, the points and multipolygon
+ * layers merged and deduped at 30 m so a pub mapped as both a node and its own
+ * building outline arrives once.
  */
 export const VENUE_XZ: readonly number[] = [
   61, -48, 69, 49, -7, -88, -73, -51, 90, -15, -56, 84, 136, -83, -29, 189,
@@ -755,6 +1102,61 @@ export const VENUE_XZ: readonly number[] = [
   -16192, 5660, -11684, 12580, -16115, 5973, -16320, 5638, 8252, -15354, -16441, 5889,
   -14973, -9249, -18128, 1955, -9397, 15691, -18073, -3802, -16102, 9586, -18379, -5523,
   -12901, -14219,
+  // --- The 19,300 - 60,000 m stage-4 ring: 233 more, appended. Extracted from
+  // `data/cache/sydney-60km.osm.pbf` by `data/scratch/bake_anchors_60km.py`,
+  // same projection, same 30 m dedupe seeded with all 642 rows above, so no
+  // index above changes its coordinate, its `venueSeed` or its drunks.
+  //
+  // The 60 km extract finds 712 `amenity=pub|bar|biergarten` inside the frozen
+  // 19,300 m line against the 642 baked above -- OSM has kept mapping. The 70
+  // are **not** appended: an insertion anywhere would be fine (the table is
+  // positional, not sorted) but a *new inner venue* is a drunk in a street a
+  // player already walks, and the rings above are frozen. They will arrive the
+  // next time the frozen line is redrawn.
+  //
+  // Two hundred and thirty-three past the line is thin for the whole western
+  // basin, and that is the data rather than the filter: OSM's pub coverage is
+  // excellent inside the harbour ring and patchy past Parramatta. One candidate
+  // was dropped for landing in mapped water; twelve deduped.
+  -17572, 8135, -18961, -4172, -19401, 1910, -12841, 14746, -18830, -5290, 585, -19605,
+  -18840, -5764, -18998, -5233, -19072, -5012, -19059, -5505, -18829, -6284, -19009, -5780,
+  -19030, -5913, -4635, 19475, -19201, -5710, -10162, -17312, -19268, -5762, -9993, -17491,
+  -19368, -5577, -19351, 5684, 6194, -19304, -19335, -6556, -20252, -3203, -6428, 19555,
+  -7514, 19359, -7547, 19377, -4717, 20335, -9656, 18547, -4689, 20389, -4729, 20390,
+  -7625, 19523, -10744, -18016, -13040, 16435, -10407, -18220, -19480, -7857, -5003, 20435,
+  -4973, 20447, -8929, -19116, -10651, -18270, -19405, 8583, -10866, 18360, -4697, 20909,
+  -20581, -6367, -19277, 9790, -11175, 18592, -12007, 18279, -22001, 460, -10302, -19608,
+  -5975, 21590, -22360, -3467, -13699, 18140, -22078, -6226, -13704, 18423, -13807, 18349,
+  -23110, 562, 8589, -21468, -23101, -1553, -20601, 10814, -23270, 903, -20299, -11496,
+  -23354, 762, -16367, 16881, -23561, 997, -19234, -14638, -24034, -4006, -4780, 23924,
+  -22197, -10134, -4915, 24025, -23503, -7087, -24708, 2430, 8811, -23250, 8851, -23285,
+  -24821, 2419, -24878, 2847, -23919, 7442, -24892, 3328, -23141, 10027, -25029, 3455,
+  -17144, -18653, -24146, -8569, -24370, 9966, -26284, 2135, -21591, -15256, -26220, 6060,
+  -26061, 6736, -26260, 6074, -26252, 6133, -26299, 6000, -26304, 6363, -26283, 6483,
+  -26331, -6539, -26344, 6626, -23058, -14370, -27234, 1955, -27465, 3516, -5810, -27153,
+  -26866, 7260, 10650, -25824, 10709, -25923, 10906, -26028, -17718, 22248, -28541, 3686,
+  -28670, 3552, -7128, -28237, -26997, -11088, -28505, -6303, -28941, 4360, -28024, -10505,
+  -27420, -13238, -30456, 101, -30459, 144, -29602, 7410, -29980, 6171, -18415, 24530,
+  -29045, -10517, -29713, 10483, -28809, -13092, -30809, 7246, -26365, -18130, -31613, -11229,
+  -27190, -19730, -27909, -21074, -31615, 14995, -19412, -29312, -33905, -10007, -34065, -10148,
+  922, -35585, -34260, -13012, -35187, -11473, -35855, -10714, -36140, -10468, -36152, -10680,
+  -36334, 11684, -34386, -16623, -37086, -9937, -36619, 12566, -36059, -14550, -31503, -23060,
+  -37923, -9373, -37209, -13160, 9733, -38687, -35644, 18093, -34602, 21042, -34825, 20852,
+  10944, -39483, 11132, -39535, -20317, 36067, -20551, 35960, -40685, -8201, -40508, -10417,
+  -40877, -10236, -36013, 22470, -36151, 24528, 10070, -42824, 9976, -42862, 10948, -42685,
+  -37355, 23406, -42830, -11531, -40682, 17859, -35309, -27489, -37287, 24822, -33065, -30729,
+  -42784, 15049, -41183, 20957, -36446, -28421, -36356, -28573, -36432, -28506, -36538, -28417,
+  -36639, -28333, -37019, -28012, -37340, -27646, -45511, -11279, 15335, -44567, -46331, -9311,
+  -43260, 19803, -45831, -13214, -43789, 20046, 7009, -47790, -47212, -10291, -39546, -28129,
+  -47702, -11754, -47813, -12130, -47901, -11840, -47914, -12131, 11480, -48105, -47832, -13000,
+  12689, -47935, -47949, -13739, -22023, 44875, -48348, -12800, -48895, -11306, 10342, -49271,
+  -48914, -12652, -49032, -12504, -49692, -10039, 15431, -48309, 11536, -49438, -49895, -12559,
+  -46870, 21432, 20944, -47095, 21118, -47048, 21072, -47114, -46941, 21475, 21044, -47147,
+  20985, -47210, -46977, 21537, -46995, 21504, -47095, 21595, -42952, -29038, -42884, -29256,
+  -47219, 21667, -47247, 21610, 20576, -47738, -42972, -29303, -52577, 620, 20334, -49013,
+  12352, -51738, -38163, 37494, -47073, 25641, -45550, -31149, -45789, -30862, 12457, -54112,
+  -55975, 3201, -25534, 49990, -25967, 50256, -55476, -11157, -26054, 50235, -55883, -12721,
+  -21867, -53320, 14043, -56286, 23512, -53358, -27061, 53228, -56112, -20861,
 ];
 
 export const VENUE_COUNT = VENUE_XZ.length / 2;
@@ -2419,7 +2821,7 @@ export function verifyStreetlife(): string[] {
     failures.push(`The venue table has ${VENUE_XZ.length} numbers, which is not a whole number of x, z pairs.`);
   }
   if (VENUE_COUNT < 100) {
-    failures.push(`Only ${VENUE_COUNT} venues are baked; the extract found 422 inside the extent.`);
+    failures.push(`Only ${VENUE_COUNT} venues are baked; the extract found 875 inside the extent.`);
   }
   {
     let outside = 0;

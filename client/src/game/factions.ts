@@ -169,15 +169,20 @@ import { EYE_HEIGHT } from '../player/controller.ts';
 /**
  * Every `amenity=police` in the built extent, and how busy its beat is.
  *
- * **Baked, with provenance.** Extracted from `data/cache/sydney.osm.pbf` -- the
- * same file the world was built from, stamp 1785746290 -- by a read-only scratch
- * script that projected each feature's centroid through `sydney.geo.lonlat_to_enu`
- * and `enu_to_world`, which is the identical path every building in the city took
- * to reach its tile. Forty-nine features inside 19,300 m, every one of them on a
- * built tile, verified by `verifyPolice`.
+ * **Baked, with provenance.** The first forty-nine rows were extracted from
+ * `data/cache/sydney.osm.pbf` -- the same file the world was built from, stamp
+ * 1785746290 -- by a read-only scratch script that projected each feature's
+ * centroid through `sydney.geo.lonlat_to_enu` and `enu_to_world`, which is the
+ * identical path every building in the city took to reach its tile. Forty-nine
+ * features inside 19,300 m, every one of them on a built tile.
+ *
+ * The forty-four after them come from `data/scratch/bake_anchors_60km.py` over
+ * `data/cache/sydney-60km.osm.pbf`, same projection, same 30 m dedupe, and
+ * reach Penrith, Camden, Gosford and Helensburgh. They are **outside the world
+ * on disk**, which is a real and handled state -- see `STATION_EXTENT_M`.
  *
  * It is a table here rather than a sidecar for the reason `game/bikes.TUNING_X`
- * is two numbers rather than a file: forty-nine records is under 3 kB, the
+ * is two numbers rather than a file: ninety-three records is under 6 kB, the
  * pipeline is not to be rebuilt, and a sidecar would be a fetch, a decoder, a
  * version word and a failure mode -- all to avoid typing coordinates that cannot
  * change without the world changing.
@@ -245,6 +250,51 @@ import { EYE_HEIGHT } from '../player/controller.ts';
  * a campus shopfront rather than a command. It is in the table because the
  * provenance line above says *every* `amenity=police` and an editorial exception
  * would quietly make that false; it is at 0.1 because it is a desk.
+ *
+ * ---------------------------------------------------------------------------
+ * **The fourth block is 19,300 - 60,000 m, and its weights are fitted rather
+ * than felt.** Everything above is hand-curated and stays exactly as it is; the
+ * forty-four rows below could not be, because the disc they cover is
+ * 11,310 km2 and hand-curation does not scale to that.
+ *
+ * So the ladder above was turned into a *model*, and the model was calibrated
+ * against the ladder. From `data/scratch/bake_anchors_60km.py`, over
+ * `data/cache/sydney-60km.osm.pbf`:
+ *
+ *     score = -2.1931 + 0.1778*ln(1+A800) + 0.2224*ln(1+P2000) + 0.0746*ln(1+B800)
+ *
+ * where **A800** is street-level doors within 800 m -- every `shop`, plus
+ * restaurants, cafes, takeaways, pubs, bars, banks, pharmacies and cinemas --
+ * **P2000** is how many *other* police stations are within 2 km, and **B800**
+ * is the licensed subset of A800. The coefficients are least squares against
+ * the curated weights; the score is then **quantile-mapped onto the curated
+ * weights themselves**, so a new station is given the weight of the curated
+ * station with as much going on around it. Rounded to 0.05 and clamped to
+ * [0.1, 0.5].
+ *
+ * Three things about that, stated plainly because they are the honest limits:
+ *
+ *   - It is fitted on the **forty-two district commands only**. The seven
+ *     specialist rows above -- Federal, Water, Mounted, Airport, Botany Bay,
+ *     Headquarters, Macquarie University -- are curated on what they *are*
+ *     rather than on what is around them, and the CBD's thousand shopfronts
+ *     drag the whole fit upward if the Federal Police post is in it.
+ *   - It reproduces **32 of those 42 within 30%**, and the ten it misses are
+ *     the small shopfronts the curation holds down on purpose: Petersham,
+ *     Five Dock, Eastwood, Gordon, Mosman. All of them are inside the frozen
+ *     ring, so the misses cost nothing here -- but the model would make the
+ *     same mistake out west, and the second half of the sentence is why the
+ *     block below has a `STATION_CAPS` tail.
+ *   - `P2000` is what makes the CBD the CBD. Nothing outside 19,300 m has
+ *     more than two stations within 2 km, so nothing out there can reach the
+ *     Cross, which is the ordering `verifyPolice` asserts.
+ *
+ * `Blacktown`, `Penrith`, `St Marys` and `Liverpool` come out at 0.35-0.40 with
+ * no help at all, which is Bankstown's and Marrickville's number, and is the
+ * answer. `NSW Police Headquarters` in Parramatta the model put at 0.5 and the
+ * cap brought to 0.45, which is exactly what the curation gave the Sydney
+ * headquarters -- a rule agreeing with a person rather than a model discovering
+ * one, and worth distinguishing.
  */
 export interface PoliceStation {
   readonly name: string;
@@ -341,6 +391,69 @@ const STATION_SPECS: readonly PoliceStationSpec[] = [
   { name: 'Riverwood', x: -14447.9, z: 9843.9, weight: 0.25 },
   { name: 'Ermington', x: -14572.7, z: -5673.8, weight: 0.2 },
   { name: 'Botany Bay Water Police', x: -7550.2, z: 14909.6, weight: 0.2 },
+  // --- The 19,300 - 60,000 m stage-4 ring. Forty-four more, and the first
+  // block in this table whose weights were **computed rather than chosen**. See
+  // the header: the model is fitted on the forty-two district commands above
+  // and reproduces thirty-two of them within 30%, the six specialist rows here
+  // are capped by name rather than by the model, and nothing out here is
+  // allowed above 0.5. Sorted by weight, then by name, like the blocks above.
+  //
+  // The 60 km extract found 53 `amenity=police` inside the frozen 19,300 m line
+  // against the 49 baked above. The four are not re-emitted and the table above
+  // is not retuned: this block is append-only and the curation wins inside its
+  // own ring. One candidate deduped at 30 m against a row above.
+  { name: 'Liverpool', x: -26139.2, z: 6302.2, weight: 0.4 },
+  { name: 'Blacktown', x: -28327.0, z: -10558.0, weight: 0.35 },
+  { name: 'Cabramatta', x: -25317.5, z: 3453.2, weight: 0.35 },
+  { name: 'Cronulla', x: -4934.8, z: 20342.0, weight: 0.35 },
+  { name: 'Hornsby', x: -10697.5, z: -18388.9, weight: 0.35 },
+  { name: 'Penrith', x: -47294.5, z: -11787.6, weight: 0.35 },
+  { name: 'St Marys', x: -40360.4, z: -10182.0, weight: 0.35 },
+  { name: 'police -36007,-10781', x: -36006.7, z: -10780.8, weight: 0.35 },
+  { name: 'Castle Hill', x: -19280.9, z: -14959.7, weight: 0.3 },
+  { name: 'Ingleburn', x: -31530.9, z: 14953.2, weight: 0.3 },
+  { name: 'Mona Vale', x: 8289.2, z: -20923.6, weight: 0.3 },
+  { name: 'Sutherland', x: -13215.7, z: 18363.8, weight: 0.3 },
+  { name: 'Terrigal', x: 20990.8, z: -47093.4, weight: 0.3 },
+  { name: 'Camden', x: -47132.0, z: 21443.0, weight: 0.25 },
+  { name: 'Fairfield', x: -23377.1, z: 569.2, weight: 0.25 },
+  { name: 'Merrylands', x: -20479.9, z: -3102.8, weight: 0.25 },
+  { name: 'Windsor', x: -36945.3, z: -27748.9, weight: 0.25 },
+  { name: 'Campbelltown', x: -35824.4, z: 22191.4, weight: 0.2 },
+  { name: 'Engadine', x: -17500.8, z: 21891.7, weight: 0.2 },
+  { name: 'Gosford', x: 11447.3, z: -48808.4, weight: 0.2 },
+  { name: 'Miranda', x: -9479.4, z: 18293.3, weight: 0.2 },
+  { name: 'Narellan', x: -43787.9, z: 20118.1, weight: 0.2 },
+  { name: 'Wentworth', x: -22055.1, z: -6509.0, weight: 0.2 },
+  { name: 'Wetherill Park', x: -28538.7, z: -217.0, weight: 0.2 },
+  { name: 'Woy Woy', x: 10007.7, z: -42561.9, weight: 0.2 },
+  { name: 'police -28457,-156', x: -28457.3, z: -156.0, weight: 0.2 },
+  { name: 'Austinmer', x: -24692.9, z: 49079.0, weight: 0.15 },
+  { name: 'Bass Hill', x: -19456.5, z: 2918.5, weight: 0.15 },
+  { name: 'Eagle Vale', x: -35838.7, z: 18868.8, weight: 0.15 },
+  { name: 'Green Valley', x: -31666.2, z: 4793.8, weight: 0.15 },
+  { name: 'Helensburgh', x: -20518.6, z: 36091.7, weight: 0.15 },
+  { name: 'Macquarie Fields', x: -29221.1, z: 13526.6, weight: 0.15 },
+  { name: 'Quakers Hill', x: -30198.7, z: -15196.3, weight: 0.15 },
+  { name: 'Revesby', x: -17570.1, z: 9558.2, weight: 0.15 },
+  { name: 'Riverstone', x: -32553.9, z: -20174.2, weight: 0.15 },
+  { name: 'Warragamba', x: -55751.4, z: 3469.6, weight: 0.15 },
+  { name: 'Wisemans Ferry', x: -21800.6, z: -53112.9, weight: 0.15 },
+  { name: 'NSW Police Headquarters', x: -18749.1, z: -5340.6, weight: 0.45 },
+  // The six the model was not allowed to weigh, and they are last so one
+  // comment covers them. Same argument as `Water Police` and `Macquarie
+  // University` above, applied by name because an activity proxy cannot see the
+  // difference between a command and a kennel: the aviation command sits beside
+  // Liverpool's high street and scored 0.4. `NSW Police Headquarters` is here
+  // too -- the model said 0.5 and the cap brought it to the 0.45 the curation
+  // gave the Sydney headquarters, which is a rule agreeing with a person rather
+  // than a model discovering one, and the difference is worth the sentence.
+  { name: 'Broken Bay Water', x: 6172.8, z: -24834.0, weight: 0.15 },
+  { name: 'Australian Border Force Canine Unit', x: -42788.0, z: 2318.9, weight: 0.15 },
+  { name: 'New South Wales Police Force Aviation Command', x: -20542.1, z: 5746.3, weight: 0.15 },
+  { name: 'Police Dog Unit', x: -18214.8, z: 16131.2, weight: 0.15 },
+  { name: 'Transit Police Branch', x: -36314.4, z: -10342.2, weight: 0.15 },
+  { name: 'WSI Command Centre', x: -45442.6, z: 3223.0, weight: 0.15 },
 ];
 
 /**
@@ -357,8 +470,21 @@ export const POLICE_STATIONS: readonly PoliceStation[] = STATION_SPECS.map((s) =
   weight: s.weight ?? STATION_WEIGHT_DEFAULT,
 }));
 
-/** The extent the stations were extracted inside. `verifyPolice` asserts it. */
-export const STATION_EXTENT_M = 19300;
+/**
+ * The extent the stations were extracted inside. `verifyPolice` asserts it.
+ *
+ * **Sixty kilometres, and the world on disk is 19,300 m.** That gap is not a
+ * bug and is not temporary-until-someone-notices: a station past the built
+ * extent is *dormant*, and dormancy is a state every consumer of this table
+ * already handles without being told. `forEachPoliceNear` places a beat on the
+ * footpath bands `PedestrianField.near` returns, and outside the built world it
+ * returns none, so the station poses nobody and costs one distance test a
+ * query. `patrolWeight` reads the lattice, which is a pure function of the
+ * table and needs no ground at all. And `integration-check`'s `builtGate`
+ * judges anchors against `index.json`'s own `radius_m` and reports the rest as
+ * skipped, which is exactly this state named and counted.
+ */
+export const STATION_EXTENT_M = 60000;
 
 /**
  * The extent the frozen prefix was extracted inside, and how many rows it is.
@@ -2766,7 +2892,7 @@ export function verifyPolice(kitTriangles?: number, snapshotInterval?: number): 
   if (POLICE_STATIONS.length <= STATION_INNER_COUNT) {
     failures.push(
       `Only ${POLICE_STATIONS.length} police stations are baked and the frozen inner ring is ` +
-        `${STATION_INNER_COUNT} of them; the 19,300 m extract found 49. The new ring would have no commands at all.`,
+        `${STATION_INNER_COUNT} of them; the 60,000 m extract found 93. The new ring would have no commands at all.`,
     );
   }
   // The frozen prefix, from the other end. Every one of the first
