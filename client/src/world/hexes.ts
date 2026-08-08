@@ -86,13 +86,31 @@
  * -- see `world/far.ts` and `far_cut_m`.
  *
  * ---------------------------------------------------------------------------
- * FRAMES. The contract is in **ENU metres** -- east and north -- because that
- * is the frame `index.json`'s tile bounds are written in and the frame the
- * pipeline computed the grid in. The player is in **renderer metres**, where
- * `x = east` and `z = -north`. The conversion happens in exactly one place,
- * `toEnu` below, for the reason every file in this directory gives about it:
- * a sign applied twice or not at all puts the world 500 m from where it is
- * drawn, and nothing in the picture says so.
+ * FRAMES. There is **one frame here and no conversion**, which is the opposite
+ * of what this file said when it shipped, and the difference was a hole in the
+ * world.
+ *
+ * A hex's `c` and `bounds` are in the same frame as `index.json`'s tile bounds,
+ * because the pipeline computes both from the same tile coordinates: `h+00+01`
+ * spans `z 5196..15588` and the tiles it lists span `z 5000..15500`. That frame
+ * is the renderer's -- the streamer compares `camera.z` straight against a
+ * tile's bounds -- so a player's `(x, z)` is directly comparable to a hexagon's
+ * and must not be flipped.
+ *
+ * The original `toEnu` negated `z` on the way in, which mirrored every hexagon
+ * about `z = 0`. A player 686 m from `h-01+01` was told they were 4,571 m from
+ * `h-01+00`, so the manifest for the ground they were about to walk onto was
+ * never fetched: 25 of the 56 tiles inside the load radius at the Sydney Park
+ * spawn, and a wanted-but-unasked tile at 844 of 1,912 positions swept across
+ * the world. Those tiles never entered the streamer's index, so they never
+ * loaded -- no ground, no buildings -- while the far layer kept drawing their
+ * skyline slabs, because a slab is only hidden when its own tile is resident.
+ * On screen: a void chasm ringed by hundred-metre grey boxes.
+ *
+ * It survived its own boot check because the check probed the coverage rule
+ * through the same negation it was testing, so the sign cancelled. The guard
+ * that actually holds this down now runs against the real manifests and the
+ * real tile bounds -- `checkHexCoverage` in `server/integration-check.ts`.
  *
  * DEV TOGGLE: `?nohex` ignores the hex contract entirely and loads `index.json`
  * whole, which is the pre-segmentation client, one reload away, for comparing
@@ -247,16 +265,10 @@ export function hexContract(): HexContract | null {
   return contract;
 }
 
-/**
- * Renderer metres to ENU metres. **The only place the sign lives.**
- *
- * `x = east` and `z = -north`, so a point the player is standing on becomes the
- * point the pipeline filed its tile under. Written as a pair rather than a
- * vector type because this module must not import `three`.
- */
-function toEnu(x: number, z: number): [number, number] {
-  return [x, -z];
-}
+// There is deliberately no frame conversion in this file. A hexagon's `c` and
+// `bounds` are already in the frame the player's `(x, z)` is in -- see FRAMES at
+// the top, and the hole in the world that the conversion which used to live here
+// put in front of players.
 
 /**
  * The six corners of a hexagon, ENU metres, anticlockwise from due east.
@@ -305,10 +317,14 @@ function segmentDistance2(
  * The bounding box is tested first and is a pure saving: a point outside the
  * box is outside the hexagon, and the box rejects every hex in the catalogue
  * but the handful nearby on four compares. When the box does not reject, the
- * six edges are measured exactly -- and the containment test is the winding
- * sum of cross products, which for a convex ring in a known winding is six
- * sign tests. `corners` is built anticlockwise, so "inside" is "every cross
- * product is non-negative".
+ * six edges are measured exactly.
+ *
+ * The containment test is six cross products, and it is deliberately **agnostic
+ * about the ring's winding**: inside means they all share a sign, rather than
+ * all being non-negative. `corners` walks the six angles with `+sin`, so which
+ * way the ring turns depends on which way the second axis points -- and hard-
+ * coding "anticlockwise" is half of the bug this replaces. A hexagon is convex
+ * either way, so one extra sign test buys immunity to the whole question.
  *
  * Exported because `world/far.ts` and `mapatlas.ts` both ask the same question
  * on different distances, and two copies of a hexagon's geometry is exactly the
@@ -316,19 +332,19 @@ function segmentDistance2(
  */
 export function hexDistance(entry: HexEntry, x: number, z: number): number {
   const radius = contract?.circumradius_m ?? 0;
-  const [e, n] = toEnu(x, z);
   const b = entry.bounds;
-  const bx = Math.max(b[0] - e, 0, e - b[2]);
-  const bn = Math.max(b[1] - n, 0, n - b[3]);
-  if (bx > 0 || bn > 0) {
-    const boxDistance = Math.hypot(bx, bn);
+  const bx = Math.max(b[0] - x, 0, x - b[2]);
+  const bz = Math.max(b[1] - z, 0, z - b[3]);
+  if (bx > 0 || bz > 0) {
+    const boxDistance = Math.hypot(bx, bz);
     // The box is inscribed *around* the hexagon, so its distance is a lower
     // bound and never an answer. Fall through to the edges whenever the point
     // is close enough for the difference to matter to any caller.
     if (boxDistance > radius) return boxDistance;
   }
   const pts = corners(entry, radius);
-  let inside = true;
+  let positive = 0;
+  let negative = 0;
   let best = Infinity;
   for (let i = 0; i < 6; i++) {
     const j = (i + 1) % 6;
@@ -336,11 +352,13 @@ export function hexDistance(entry: HexEntry, x: number, z: number): number {
     const ay = pts[i * 2 + 1];
     const cx = pts[j * 2];
     const cy = pts[j * 2 + 1];
-    if ((cx - ax) * (n - ay) - (cy - ay) * (e - ax) < 0) inside = false;
-    const d2 = segmentDistance2(ax, ay, cx, cy, e, n);
+    const cross = (cx - ax) * (z - ay) - (cy - ay) * (x - ax);
+    if (cross > 0) positive++;
+    else if (cross < 0) negative++;
+    const d2 = segmentDistance2(ax, ay, cx, cy, x, z);
     if (d2 < best) best = d2;
   }
-  return inside ? 0 : Math.sqrt(best);
+  return positive === 0 || negative === 0 ? 0 : Math.sqrt(best);
 }
 
 /**
@@ -499,13 +517,15 @@ export function hexesNear(x: number, z: number, approach?: number): HexEntry[] {
  */
 export function hexesInBox(minX: number, minZ: number, maxX: number, maxZ: number): HexEntry[] {
   if (!armed) return [];
-  // Renderer z runs south, so the box's z range inverts into north.
-  const minN = -maxZ;
-  const maxN = -minZ;
+  // No inversion: `mapatlas.ensureHexNames` passes the view box in the same
+  // frame a hexagon's bounds are in. This used to flip z, which fetched the
+  // hexagons mirrored about z = 0 -- the big map drew streets near the origin
+  // (where the mirror happens to land inside the same hexagon) and none further
+  // out. Same root cause as `hexDistance`; see FRAMES at the top.
   const out: HexEntry[] = [];
   for (const entry of catalogue.values()) {
     const b = entry.bounds;
-    if (b[2] < minX || b[0] > maxX || b[3] < minN || b[1] > maxN) continue;
+    if (b[2] < minX || b[0] > maxX || b[3] < minZ || b[1] > maxZ) continue;
     out.push(entry);
   }
   out.sort((a, b) => (a.id < b.id ? -1 : 1));
@@ -721,7 +741,7 @@ export function verifyHexes(): string[] {
           const reach = loadRadius + 354;
           const tx = px + Math.cos(th) * reach;
           const tz = pz + Math.sin(th) * reach;
-          const [q, r] = axialOf(...toEnu(tx, tz));
+          const [q, r] = axialOf(tx, tz);
           const owner = idOf(q, r);
           // Only hexes the synthetic grid actually holds; the ring at q,r = +/-4
           // has neighbours outside it that no rule could ask for.

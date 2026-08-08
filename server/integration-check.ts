@@ -1468,6 +1468,7 @@ async function main(): Promise<void> {
   say('');
   await checkRaves();
   await checkPivotSidecars();
+  await checkHexCoverage();
 
   // --- 28. The day/night cycle, on exactly the raves' argument: the sky is
   // shared by every player and sends nothing at all, so the only way to check
@@ -13166,6 +13167,139 @@ async function checkPivotSidecars(): Promise<void> {
   }
 
   if (examined === 0) say('    no compressed sidecars present; nothing to compare');
+}
+
+/**
+ * The hexagon rule, against the real world files rather than a synthetic grid.
+ *
+ * `verifyHexes` builds a nine-by-nine lattice from the pipeline's own formulas
+ * and probes it -- which is why it passed while players stood in a void. Its
+ * coverage probe converted a point into the grid's frame using the SAME helper
+ * the rule under test used, so a sign error on both sides cancelled and the
+ * check agreed with the bug. A model checked against itself proves consistency,
+ * not correctness.
+ *
+ * This asks the question with no model in it at all: given the manifests the
+ * pipeline actually wrote and the tile bounds the streamer actually reads,
+ *
+ *   1. every tile in `index.json` is owned by exactly one hexagon,
+ *   2. a tile's centre is geometrically inside the hexagon that claims it, and
+ *   3. every tile the streamer would want inside `loadRadius` belongs to a
+ *      hexagon `hexesNear` asked for at that position -- swept over the world.
+ *
+ * (3) is the one that matters: a tile outside every asked-for hexagon never
+ * enters the streamer's index, so it never loads. No ground, no buildings, and
+ * the far layer still drawing its skyline slabs, because a slab is hidden only
+ * when its own tile is resident. That was 25 of 56 tiles at the spawn.
+ */
+async function checkHexCoverage(): Promise<void> {
+  say('--- Hexagons: the approach rule covers the load radius, on the real world');
+
+  const hexes = await import('../client/src/world/hexes.ts');
+  const worldDir = new URL('../client/public/world/', import.meta.url).pathname;
+  const rootFile = Bun.file(worldDir + 'root.json');
+  if (!(await rootFile.exists())) {
+    say('    no built world here; skipped');
+    return;
+  }
+  const root = await rootFile.json();
+  const index = await Bun.file(worldDir + 'index.json').json();
+  if (!hexes.hexesUsable(root)) {
+    say('    world carries no hex contract; skipped');
+    return;
+  }
+  hexes.armHexes(root, worldDir, `?v=${root.built}`);
+  const contract = hexes.hexContract()!;
+  const LOAD = 1800;          // TileStreamer's default loadRadius
+
+  // Read the manifests off disk: `ensureHex` fetches, and this needs the files.
+  const owner = new Map<string, string>();
+  let doubled = 0;
+  for (const entry of contract.list) {
+    const manifest = await Bun.file(`${worldDir}hexes/${entry.id}.json`).json();
+    for (const tile of manifest.tiles as Array<{ key: string }>) {
+      if (owner.has(tile.key)) doubled++;
+      owner.set(tile.key, entry.id);
+    }
+  }
+  const tiles = index.tiles as Array<{ key: string; bounds: number[] }>;
+  check(doubled === 0, `no tile is listed by two hexagons (${doubled} were)`);
+  const orphans = tiles.filter((t) => !owner.has(t.key));
+  check(orphans.length === 0, `every one of ${tiles.length} tiles is owned by a hexagon` +
+    (orphans.length ? ` (${orphans.length} are not, e.g. ${orphans[0].key})` : ''));
+
+  // 2. A tile's centre is inside the hexagon that claims it. This is what makes
+  //    the ownership in the manifests and the geometry in `hexDistance` one
+  //    thing; a mirrored frame fails it on the first tile off the axis.
+  const byId = new Map(contract.list.map((e) => [e.id, e]));
+  let outside = 0;
+  let firstOutside = '';
+  for (const tile of tiles) {
+    const id = owner.get(tile.key);
+    if (!id) continue;
+    const [minX, minZ, maxX, maxZ] = tile.bounds;
+    const cx = (minX + maxX) / 2;
+    const cz = (minZ + maxZ) / 2;
+    const d = hexes.hexDistance(byId.get(id)!, cx, cz);
+    if (d > 0) {
+      outside++;
+      if (!firstOutside) firstOutside = `${tile.key} at (${cx}, ${cz}) is ${Math.round(d)} m outside ${id}`;
+    }
+  }
+  check(outside === 0, `every tile's centre is inside the hexagon that lists it` +
+    (outside ? ` (${outside} are not: ${firstOutside})` : ''));
+
+  // 3. The coverage guarantee, swept over the built world on a 1 km grid.
+  let badSpots = 0;
+  let worst = '';
+  let worstN = 0;
+  let probed = 0;
+  for (let px = -24_000; px <= 14_000; px += 1000) {
+    for (let pz = -24_000; pz <= 24_000; pz += 1000) {
+      const asked = new Set(hexes.hexesNear(px, pz).map((e) => e.id));
+      let missing = 0;
+      let example = '';
+      for (const tile of tiles) {
+        const [minX, minZ, maxX, maxZ] = tile.bounds;
+        const d = Math.hypot(
+          Math.max(minX - px, 0, px - maxX),
+          Math.max(minZ - pz, 0, pz - maxZ),
+        );
+        if (d > LOAD) continue;
+        const id = owner.get(tile.key);
+        if (!id || !asked.has(id)) {
+          missing++;
+          if (!example) example = `${tile.key} in ${id ?? 'no hexagon'}`;
+        }
+      }
+      probed++;
+      if (missing > 0) {
+        badSpots++;
+        if (missing > worstN) {
+          worstN = missing;
+          worst = `at (${px}, ${pz}) ${missing} wanted tiles are outside every asked-for hexagon, e.g. ${example}`;
+        }
+      }
+    }
+  }
+  check(badSpots === 0, `all ${probed} swept positions have every tile inside ${LOAD} m covered` +
+    (badSpots ? ` (${badSpots} do not; worst ${worst})` : ''));
+
+  // The specific regression, named so a future reader knows what broke: the
+  // spawn is 686 m from h-01+01 and 4,571 m from h-01+00, and the mirrored
+  // frame reported exactly those two the other way round.
+  const near = byId.get('h-01+01');
+  const far = byId.get('h-01+00');
+  if (near && far) {
+    const dNear = hexes.hexDistance(near, -2314, 4519);
+    const dFar = hexes.hexDistance(far, -2314, 4519);
+    check(dNear < dFar, `from the Sydney Park spawn h-01+01 (${Math.round(dNear)} m) is nearer than ` +
+      `h-01+00 (${Math.round(dFar)} m)`);
+    check(dNear < contract.approach_m,
+      `the spawn is inside the approach radius of h-01+01 (${Math.round(dNear)} m < ${contract.approach_m} m)`);
+  }
+
+  hexes.resetHexes();
 }
 
 async function checkRaves(): Promise<void> {
