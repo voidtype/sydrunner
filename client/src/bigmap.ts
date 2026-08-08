@@ -914,6 +914,21 @@ export class BigMap implements MarkerSink {
     const t0 = performance.now();
     const ctx = this.layerCtx;
     const zoom = ZOOMS[this.zoomIndex];
+    // The street names for what is about to be drawn, on a segmented world.
+    //
+    // The map's roads *are* the name centrelines -- see `drawRoads` -- so the
+    // set it needs is exactly the hexagons overlapping this view, which at the
+    // widest rung is a 9 km box and therefore two to four of them however big
+    // the world gets. Not awaited: whatever has already landed is drawn now and
+    // the atlas bumps its revision when the rest arrives, which is the same
+    // progressive contract every other layer here has. See
+    // `MapAtlas.ensureHexNames`.
+    void this.atlas.ensureHexNames(
+      view.cx - zoom.halfM,
+      view.cz - zoom.halfM,
+      view.cx + zoom.halfM,
+      view.cz + zoom.halfM,
+    );
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.size, this.size);
 

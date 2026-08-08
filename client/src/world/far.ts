@@ -529,23 +529,95 @@ function createSlabMaterial(): MeshBasicNodeMaterial {
  * tile's own ten-odd slots times the fifty tiles inside the radius.
  */
 export class FarCity extends Group {
-  /** Slabs in the file. Reported by the debug overlay, same as the mesh count was. */
-  readonly count: number;
-  readonly triangles: number;
+  /**
+   * Slabs and triangles resident. Reported by the debug overlay.
+   *
+   * **Accumulators rather than constants since the world was cut into hexes.**
+   * A segmented world builds this empty and merges one hexagon's slabs into it
+   * each time the player comes within `far_cut_m` of one, and drops them again
+   * when they leave -- see `FarHexes`. On an unsegmented world exactly one
+   * `buildFarSlabs` call ever runs and these are what they always were.
+   */
+  private slabCount = 0;
+  private triangleCount = 0;
   /** Tile key -> its mesh. The map is the whole of the residency state. */
   private readonly byTile = new Map<string, Mesh>();
+  /**
+   * Which tiles the streamer currently has geometry for.
+   *
+   * Remembered rather than only acted on, and that is what makes a late-arriving
+   * hexagon safe: `setTileResident` used to be an event with nowhere to record
+   * itself, so a mesh added *after* its tile had already loaded would draw a
+   * flat unlit box in front of a real facade until the tile was evicted. Now
+   * `addTile` reads this set and starts the mesh in the right state.
+   */
+  private readonly residentTiles = new Set<string>();
 
-  constructor(count: number, triangles: number) {
+  constructor(count = 0, triangles = 0) {
     super();
     this.name = 'far-city';
-    this.count = count;
-    this.triangles = triangles;
+    this.slabCount = count;
+    this.triangleCount = triangles;
+  }
+
+  get count(): number {
+    return this.slabCount;
+  }
+
+  get triangles(): number {
+    return this.triangleCount;
   }
 
   /** @internal Used by `buildFarSlabs`, which is the only thing that fills one. */
   addTile(key: string, mesh: Mesh): void {
+    const existing = this.byTile.get(key);
+    if (existing) this.dropMesh(key, existing);
+    mesh.visible = !this.residentTiles.has(key);
     this.byTile.set(key, mesh);
     this.add(mesh);
+  }
+
+  /** @internal `buildFarSlabs`, adding one hexagon's worth to what is here. */
+  addCounts(slabs: number, triangles: number): void {
+    this.slabCount += slabs;
+    this.triangleCount += triangles;
+  }
+
+  /** Which tile keys have a mesh, so a hex can take back exactly its own. */
+  tileKeys(): string[] {
+    return [...this.byTile.keys()];
+  }
+
+  /**
+   * Drop a set of tiles' slabs and release their buffers.
+   *
+   * The GPU side of `far_cut_m`: a hexagon 25 km away contributes nothing a
+   * camera can resolve and holds ~1 MB of vertex data for the session. The
+   * geometry is disposed rather than merely detached, because `Group.remove`
+   * leaves the buffers alive on the device and the whole point of the cut is
+   * the memory. The material is **not** disposed -- it is shared by every slab
+   * in the world and disposing it would take the far city down.
+   */
+  removeTiles(keys: Iterable<string>): void {
+    for (const key of keys) {
+      const mesh = this.byTile.get(key);
+      if (mesh) this.dropMesh(key, mesh);
+    }
+  }
+
+  /**
+   * The counts come off `mesh.userData`, written by `buildFarSlabs` when the
+   * mesh was made. Recomputing them from the geometry would work for the
+   * triangles and not for the slabs -- a prism's triangle count depends on its
+   * plan vertices, so the two are not derivable from one another.
+   */
+  private dropMesh(key: string, mesh: Mesh): void {
+    this.remove(mesh);
+    const held = mesh.userData as { farSlabs?: number; farTriangles?: number };
+    this.slabCount = Math.max(0, this.slabCount - (held.farSlabs ?? 0));
+    this.triangleCount = Math.max(0, this.triangleCount - (held.farTriangles ?? 0));
+    mesh.geometry.dispose();
+    this.byTile.delete(key);
   }
 
   /**
@@ -559,6 +631,8 @@ export class FarCity extends Group {
    * silently nothing to do.
    */
   setTileResident(key: string, resident: boolean): void {
+    if (resident) this.residentTiles.add(key);
+    else this.residentTiles.delete(key);
     const mesh = this.byTile.get(key);
     if (mesh) mesh.visible = !resident;
   }
@@ -599,9 +673,26 @@ export class FarCity extends Group {
  * is a real difference from the box geometry this replaces, which carried them
  * because 20 vertices for the whole city made correctness free.
  */
-export function buildFarSlabs(data: FarSlabs, towerArchetype: number): FarCity {
-  const material = createSlabMaterial();
-  const city = new FarCity(data.count, 3 * (data.plan.length / 2) - 2 * data.count);
+export function buildFarSlabs(
+  data: FarSlabs,
+  towerArchetype: number,
+  /**
+   * An existing city to merge into, and the material it is already using.
+   *
+   * A segmented world calls this once per hexagon as the player approaches it,
+   * and every one of those calls has to produce meshes the renderer treats as
+   * the *same* draw as the ones already there -- which means the same material
+   * instance, because a copy of a material has a different pipeline cache key
+   * and would compile a fresh shader on the frame it is first drawn.
+   * `TileStreamer`'s warm-up list makes exactly this argument about the tile
+   * materials. Passing the pair together rather than reaching for the group's
+   * first child makes it impossible to pass one without the other.
+   */
+  into?: { city: FarCity; material: MeshBasicNodeMaterial },
+): FarCity {
+  const material = into?.material ?? createSlabMaterial();
+  const city = into?.city ?? new FarCity();
+  city.addCounts(data.count, 3 * (data.plan.length / 2) - 2 * data.count);
 
   for (const group of data.groups) {
     let verts = 0;
@@ -711,6 +802,10 @@ export function buildFarSlabs(data: FarSlabs, towerArchetype: number): FarCity {
     // result it discards.
     mesh.castShadow = false;
     mesh.receiveShadow = false;
+    // What this mesh contributes, so `FarCity.removeTiles` can take back exactly
+    // what was added when its hexagon goes out of range. See `dropMesh`.
+    mesh.userData.farSlabs = group.count;
+    mesh.userData.farTriangles = indices / 3;
     city.addTile(group.key, mesh);
   }
   return city;
@@ -842,9 +937,187 @@ export interface FarLayer {
   ground: Mesh | null;
   /** Slabs resident, for the debug overlay. */
   count: number;
+  /**
+   * The per-hex skyline, on a segmented world. Null on every other world, and
+   * `main.ts` simply never pumps it. See `FarHexes`.
+   */
+  hexes: FarHexes | null;
 }
 
-const EMPTY: FarLayer = { slabs: null, ground: null, count: 0 };
+const EMPTY: FarLayer = { slabs: null, ground: null, count: 0, hexes: null };
+
+/**
+ * The far city, one hexagon at a time.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS IS NOT `far.bin`. The whole-world file is **3.08 MB, loaded at boot
+ * and never evicted**, and at 60 km it is ~20 MB of skyline held for the
+ * session. Nobody needs Penrith's rooflines from Bondi -- 45 km away, under
+ * fog, behind the Blue Mountains foothills. So the slabs are cut with the same
+ * hexagons everything else is (`world/hexes.ts`) and carried on a distance:
+ * `far_cut_m`, 20 km, which is `far-terrain.bin`'s own half-extent and
+ * therefore the distance past which there is no coarse ground for a prism to
+ * stand on anyway.
+ *
+ * At the shipped 19.3 km radius that cut is a no-op in the only direction that
+ * matters: the far city *is* the CBD cluster at the origin, and no point in the
+ * build is more than 19.3 km from it.
+ *
+ * ---------------------------------------------------------------------------
+ * NOTHING IS DRAWN BEFORE IT IS COMPILED, which is the constraint that shapes
+ * this class. A mesh entering the scene is a mesh whose pipeline is compiled on
+ * the frame that first draws it -- a freeze, and precisely what `PipelineWatch`
+ * asserts zero of. `TileStreamer.setPrecompiler` solved this for tiles by
+ * holding a tile out of the picture until its shaders were built off-thread,
+ * and this takes the same function and makes the same promise. A hexagon's
+ * meshes are added hidden, compiled, and only then allowed to draw.
+ *
+ * The cost of being wrong about it is nil in the other direction: a far slab
+ * that is late by a few hundred milliseconds is a building 20 km away that
+ * appears a moment later than it might have.
+ */
+export class FarHexes {
+  private readonly city: FarCity;
+  private readonly material: MeshBasicNodeMaterial;
+  private readonly baseUrl: string;
+  private readonly version: string;
+  private readonly towerArchetype: number;
+  private readonly cut: number;
+  private readonly dir: string;
+  /** Hex id -> the tile keys its slabs are filed under, so eviction is exact. */
+  private readonly resident = new Map<string, string[]>();
+  private readonly inFlight = new Set<string>();
+  private precompile: ((group: Group) => Promise<void>) | null = null;
+
+  constructor(
+    city: FarCity,
+    material: MeshBasicNodeMaterial,
+    options: {
+      baseUrl: string;
+      version: string;
+      towerArchetype: number;
+      cut: number;
+      dir: string;
+    },
+  ) {
+    this.city = city;
+    this.material = material;
+    this.baseUrl = options.baseUrl;
+    this.version = options.version;
+    this.towerArchetype = options.towerArchetype;
+    this.cut = options.cut;
+    this.dir = options.dir;
+  }
+
+  /** How many hexagons' slabs are in the city. For the debug overlay. */
+  get residentHexes(): number {
+    return this.resident.size;
+  }
+
+  /**
+   * How far a hexagon's slabs are worth carrying, metres, from the world's own
+   * contract. `main.ts` asks `hexes.hexesNear` for this radius rather than the
+   * approach radius, so the skyline reaches five times further than the
+   * manifests do -- which is the point: you can see a hexagon long before you
+   * need to know what is in it.
+   */
+  get cutM(): number {
+    return this.cut;
+  }
+
+  /**
+   * The same compiler `TileStreamer.setPrecompiler` is given. Optional: without
+   * one a hexagon's slabs are drawn as soon as they are built, which is what
+   * the far layer did before it was segmented.
+   */
+  setPrecompiler(precompile: (group: Group) => Promise<void>): void {
+    this.precompile = precompile;
+  }
+
+  /**
+   * Bring the resident set in line with where the player is.
+   *
+   * Called once a frame from `main.ts` with the camera's position, on
+   * `updateRegions`' terms. `entries` is whatever `hexes.hexesNear` hands back
+   * for `far_cut_m`, so this class holds no model of the grid.
+   */
+  update(inRange: ReadonlyArray<{ id: string; far?: { bytes: number } }>): void {
+    const wanted = new Set<string>();
+    for (const entry of inRange) {
+      if (!entry.far) continue;
+      wanted.add(entry.id);
+      if (this.resident.has(entry.id) || this.inFlight.has(entry.id)) continue;
+      void this.load(entry.id);
+    }
+    for (const [id, keys] of this.resident) {
+      if (wanted.has(id)) continue;
+      this.city.removeTiles(keys);
+      this.resident.delete(id);
+    }
+  }
+
+  /** Await the hexagons in range now. The boot path, so the warm-up has meshes. */
+  async ensure(inRange: ReadonlyArray<{ id: string; far?: { bytes: number } }>): Promise<void> {
+    await Promise.all(
+      inRange.filter((e) => e.far && !this.resident.has(e.id)).map((e) => this.load(e.id)),
+    );
+  }
+
+  private async load(id: string): Promise<void> {
+    if (this.inFlight.has(id)) return;
+    this.inFlight.add(id);
+    try {
+      const resp = await fetchWorldAsset(this.baseUrl, `${this.dir}/${id}.far.bin`, this.version);
+      if (!resp.ok) return;
+      const data = decodeFar(await resp.arrayBuffer());
+      if (data === null) return;
+      // The keys are taken from the payload rather than from the city, so a
+      // hexagon takes back exactly the tiles it put in even if two of them
+      // somehow overlapped -- which they cannot, since a tile is assigned to
+      // one hex by its centre, but eviction should not depend on that.
+      // **Staged off the scene graph, compiled, and only then moved in.**
+      //
+      // Not "added hidden and compiled", which was the obvious first shape and
+      // is wrong: `Renderer.compileAsync` walks the scene the same way `render`
+      // does and skips anything with `visible === false`, so a hidden mesh
+      // compiles nothing and the freeze lands on the frame it is shown. A
+      // detached group is visible to the compiler and invisible to the renderer
+      // at the same time, which is exactly the state this needs -- and it is
+      // the same trick `main.ts` warms the tile stand-ins with.
+      //
+      // The staging city shares `this.material`, so the pipelines compiled here
+      // are the ones the real city will draw with rather than lookalikes.
+      const staged = buildFarSlabs(data, this.towerArchetype, {
+        city: new FarCity(),
+        material: this.material,
+      });
+      try {
+        await this.precompile?.(staged);
+      } catch {
+        // A hexagon that would not compile is a hexagon that hitches once,
+        // which is what the far layer did before this existed.
+      }
+      // `Group.add` reparents, so this empties the staging city rather than
+      // copying out of it. Iterated over a snapshot for that reason.
+      const keys: string[] = [];
+      for (const key of staged.tileKeys()) {
+        const mesh = staged.getObjectByName(`far-city-${key}`);
+        if (!(mesh instanceof Mesh)) continue;
+        const held = mesh.userData as { farSlabs?: number; farTriangles?: number };
+        this.city.addTile(key, mesh);
+        this.city.addCounts(held.farSlabs ?? 0, held.farTriangles ?? 0);
+        keys.push(key);
+      }
+      this.resident.set(id, keys);
+    } catch {
+      // Counted by nothing and retried on the next frame that finds this
+      // hexagon in range, on `world/hexes.ts`'s argument: a skyline that gives
+      // up after one flaky request is a hole in the horizon for the session.
+    } finally {
+      this.inFlight.delete(id);
+    }
+  }
+}
 
 /**
  * Fetch and build the whole far layer, once, at startup.
@@ -869,20 +1142,48 @@ export async function loadFarLayer(
   groundMaterial: MeshStandardNodeMaterial,
   /** The build stamp, as a query suffix. See `world/version.ts`. */
   version = '',
+  /**
+   * The hex contract, when the world is segmented.
+   *
+   * Present means the slabs come one hexagon at a time out of
+   * `hexes/<id>.far.bin` and `far.bin` is never fetched at all; absent means
+   * the single 3.08 MB file, which is what every world before this pass has.
+   * The **ground** is whole in both cases: `far-terrain.bin` is 104 kB for the
+   * entire extent and is the surface every slab in the world stands on, so
+   * cutting it up would buy a rounding error and cost a seam.
+   */
+  hexes?: { dir: string; far_cut_m: number } | null,
 ): Promise<FarLayer> {
   if (!far) return EMPTY;
   try {
     const [slabBuf, terrBuf] = await Promise.all([
-      fetchWorldAsset(baseUrl, 'far.bin', version).then((r) => (r.ok ? r.arrayBuffer() : null)),
+      hexes
+        ? Promise.resolve(null)
+        : fetchWorldAsset(baseUrl, 'far.bin', version).then((r) => (r.ok ? r.arrayBuffer() : null)),
       fetchWorldAsset(baseUrl, 'far-terrain.bin', version).then((r) =>
         r.ok ? r.arrayBuffer() : null,
       ),
     ]);
 
+    const tower = archetypes.indexOf('tower');
     let slabs: FarCity | null = null;
-    if (slabBuf) {
+    let farHexes: FarHexes | null = null;
+    if (hexes) {
+      // Empty, and filled by `FarHexes.ensure` before the warm-up runs -- see
+      // `main.ts`. An empty far city at warm-up time would leave the slab
+      // pipeline uncompiled and put the compile on the first frame a hexagon
+      // landed, which is the freeze `PipelineWatch` exists to have none of.
+      slabs = new FarCity();
+      farHexes = new FarHexes(slabs, createSlabMaterial(), {
+        baseUrl,
+        version,
+        towerArchetype: tower,
+        cut: hexes.far_cut_m,
+        dir: hexes.dir,
+      });
+    } else if (slabBuf) {
       const data = decodeFar(slabBuf);
-      if (data) slabs = buildFarSlabs(data, archetypes.indexOf('tower'));
+      if (data) slabs = buildFarSlabs(data, tower);
     }
 
     let ground: Mesh | null = null;
@@ -891,7 +1192,7 @@ export async function loadFarLayer(
       ground = buildFarGround(new Float32Array(terrBuf), far, seaLevelY, groundMaterial);
     }
 
-    return { slabs, ground, count: slabs?.count ?? 0 };
+    return { slabs, ground, count: slabs?.count ?? 0, hexes: farHexes };
   } catch (err) {
     console.warn('far layer failed to load:', err);
     return EMPTY;

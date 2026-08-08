@@ -192,11 +192,22 @@ import { createStreetMaterial } from './street.ts';
 import type { NamedSegment, TileStreetNames } from './streetnames.ts';
 import { armCdn, fetchWorldAsset, fetchWorldBuffer, type CdnContract } from './cdn.ts';
 import {
+  addRegions,
   armRegions,
   updateRegions,
   verifyRegions,
   type RegionContract,
 } from './regions.ts';
+import {
+  armHexes,
+  ensureHexesNear,
+  hexesArmed,
+  hexesUsable,
+  onHexTiles,
+  updateHexes,
+  verifyHexes,
+  type HexContract,
+} from './hexes.ts';
 import { TileDecoder, verifyDecoderRoundTrip } from './decode-pool.ts';
 import {
   BLDIDX_LOWER,
@@ -461,6 +472,25 @@ export interface WorldIndex {
     carriageway_y_m?: number;
     footpath_y_m?: number;
   };
+  /**
+   * The hexagonal segments this world is cut into, from `root.json`.
+   *
+   * Present only on a segmented world, and its presence is what decides which
+   * of the two boot paths `loadIndex` takes. Absent means every tile is already
+   * in `tiles` because the client read `index.json` whole -- which is every
+   * build before this pass, and what `?nohex` forces. See `world/hexes.ts`.
+   */
+  hexes?: HexContract;
+  /**
+   * The emitted tiles.
+   *
+   * **Grows during the session on a segmented world.** It starts empty and each
+   * hex manifest pushes its own entries on as it lands, which is why every
+   * consumer of it in this client either re-reads it (`update`'s pass,
+   * `main.ts`'s `ensureGround`) or subscribes to `onHexTiles` for the delta
+   * (`WaterLevels`, the offline bike plan). Nothing may snapshot it at boot and
+   * assume it is the world.
+   */
   tiles: TileEntry[];
   totals: Record<string, number>;
 }
@@ -1592,15 +1622,67 @@ export class TileStreamer implements LampSource {
     return parts;
   }
 
-  async loadIndex(): Promise<WorldIndex> {
-    const resp = await fetch(`${this.baseUrl}/index.json`);
-    if (!resp.ok) {
-      throw new Error(
-        `No world index at ${this.baseUrl}/index.json (${resp.status}). ` +
-          `Run the pipeline first: cd pipeline && uv run python -m sydney build --stage inner`,
-      );
+  /**
+   * The world's manifest, and the two shapes it comes in.
+   *
+   * **`root.json` first.** On a segmented world it is 8.6 kB against
+   * `index.json`'s 851 kB, and it is fetched uncached every session because it
+   * is the version pivot -- so the 842 kB it does not carry is 842 kB nobody
+   * pays for again. What it leaves out is the two lists that grow linearly with
+   * the map: the tile entries and the region entries, which arrive per hex as
+   * the player approaches. See `world/hexes.ts`.
+   *
+   * **`index.json` when there is no root**, which is every world built before
+   * this pass and what `?nohex` produces. The tile list is complete on arrival
+   * and nothing below this line behaves differently -- that is the same promise
+   * `armCdn` and `armRegions` make, and it is what lets a world sit on a CDN
+   * across a client deploy.
+   *
+   * `focus` is where the player is about to be. The hexes in range of it are
+   * **awaited**, and they are the only hexes this client ever waits for: the
+   * spawn search in `game/spawn.ts` reads `index.tiles` looking for buildable
+   * ground, and an empty tile list is a world with nowhere to stand in it.
+   */
+  async loadIndex(focus: { x: number; z: number } = { x: 0, z: 0 }): Promise<WorldIndex> {
+    let segmented: WorldIndex | null = null;
+    try {
+      // No `?v=` suffix, on `world/version.ts`'s rule: this is the file that
+      // names the version, so caching it behind one would be using the answer
+      // to find the question. `caddy/world-cache.Caddyfile` says so for both
+      // pivots explicitly rather than by omission.
+      const rootResp = await fetch(`${this.baseUrl}/root.json`);
+      if (rootResp.ok) {
+        const parsed = (await rootResp.json()) as WorldIndex;
+        // A root index this client cannot use is not a root index. It carries
+        // no tile list, so booting from one and then failing to arm -- a
+        // half-written publish, a contract from a future pipeline, `?nohex` --
+        // would give a world with no tiles in it and no way to get any. Asked
+        // before committing rather than discovered afterwards, which is what
+        // makes `?nohex` mean "the pre-segmentation client" rather than "an
+        // empty world". See `hexes.hexesUsable`.
+        if (hexesUsable(parsed)) {
+          parsed.tiles = [];
+          segmented = parsed;
+        }
+      }
+    } catch {
+      // Offline, a 404, a proxy that rewrote it. All of them mean "this world
+      // is not segmented", which is a world that still loads.
+      segmented = null;
     }
-    this.index = (await resp.json()) as WorldIndex;
+
+    if (segmented === null) {
+      const resp = await fetch(`${this.baseUrl}/index.json`);
+      if (!resp.ok) {
+        throw new Error(
+          `No world index at ${this.baseUrl}/index.json (${resp.status}). ` +
+            `Run the pipeline first: cd pipeline && uv run python -m sydney build --stage inner`,
+        );
+      }
+      this.index = (await resp.json()) as WorldIndex;
+    } else {
+      this.index = segmented;
+    }
     // Before anything else is fetched, because everything else is fetched
     // *with* it. The index itself deliberately carries no suffix -- it is what
     // names the version, so it cannot be cached behind one.
@@ -1617,6 +1699,20 @@ export class TileStreamer implements LampSource {
     // twelve for itself. An index with no `regions` block leaves this off and
     // the world loads exactly as it did before -- see `world/regions.ts`.
     armRegions(this.index, this.baseUrl, this.version);
+    // And *which part* of it exists yet, last of the three, because a manifest
+    // that lands hands its region entries to the module armed on the line above
+    // and its tile entries to the array below. A world with no `hexes` block
+    // leaves this off and `index.tiles` is already the whole world -- see
+    // `world/hexes.ts`.
+    armHexes(this.index, this.baseUrl, this.version);
+    if (hexesArmed()) {
+      const index = this.index;
+      onHexTiles((manifest) => {
+        index.tiles.push(...(manifest.tiles as unknown as TileEntry[]));
+        addRegions(manifest.regions);
+      });
+      await ensureHexesNear(focus.x, focus.z);
+    }
     this.terrainField = new TerrainField(
       this.terrain.grid,
       this.index.tile_size,
@@ -2100,6 +2196,13 @@ export class TileStreamer implements LampSource {
     // serving *this* frame's tiles. It is about the region 2,200 m out being
     // started 400 m before its tiles enter the 1,800 m load radius, which at
     // 39.4 m/s is 10.2 seconds of lead. See `world/regions.ts`.
+    // Hexes first, and on the same argument one level up: a region bundle is
+    // the *bytes* of a square kilometre, a hex manifest is the fact that the
+    // square kilometre exists at all. Neither can land in time to serve this
+    // frame and neither is meant to -- the ordering only means a teleport is
+    // acted on in the frame it happens rather than the frame after. The lead is
+    // 2,200 m outside the load radius; see `world/hexes.ts`.
+    updateHexes(cam.x, cam.z);
     updateRegions(cam.x, cam.z);
 
     this.projScreen.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
@@ -3222,6 +3325,7 @@ export class TileStreamer implements LampSource {
       // --- The region bundles: the format, the ownership arithmetic, and that
       // a miss falls back per-tile rather than leaving a hole.
       for (const f of verifyRegions()) keyed.push(`regions: ${f}`);
+      for (const f of verifyHexes()) keyed.push(`hexes: ${f}`);
       for (const f of await this.verifyRegionFallback(entry)) keyed.push(`regions: ${f}`);
       return keyed;
     } catch (err) {

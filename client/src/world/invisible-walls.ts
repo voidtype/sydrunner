@@ -525,6 +525,47 @@ export function cellKey(x: number, z: number, size: number): string {
 }
 
 /**
+ * The slice of the 2D canvas API `hatchPattern` needs, declared here rather
+ * than taken from `lib.dom`.
+ *
+ * **This module is compiled a second time by `server/tsconfig.json`, which has
+ * no DOM lib** -- `server/integration-check.ts` imports `InvisibleWalls` to
+ * drive it over the hex boundary traverse, because reimplementing the hazard
+ * scan in a check would be checking a copy rather than the thing. `cdn.ts`
+ * hits the same wall over `window` and answers it the same way: reach for the
+ * global through a typed handle, and describe what is used rather than import
+ * a lib the other compile does not have.
+ *
+ * Structural, so a real `CanvasRenderingContext2D` satisfies `HatchTarget`
+ * without either caller changing, and the two maps keep passing theirs.
+ */
+interface HatchPattern {
+  setTransform(matrix: unknown): void;
+}
+interface HatchStrokes {
+  strokeStyle: string;
+  lineWidth: number;
+  beginPath(): void;
+  moveTo(x: number, y: number): void;
+  lineTo(x: number, y: number): void;
+  stroke(): void;
+}
+interface HatchCanvas {
+  width: number;
+  height: number;
+  getContext(id: '2d'): HatchStrokes | null;
+}
+export interface HatchTarget {
+  createPattern(image: unknown, repetition: string): HatchPattern | null;
+}
+
+/** `document`, when there is one. See `HatchTarget` and `cdn.ts`'s `globalScope`. */
+const domScope = globalThis as unknown as {
+  document?: { createElement(tag: string): unknown };
+  DOMMatrix?: new (values: number[]) => unknown;
+};
+
+/**
  * A diagonal hatch, as a canvas pattern, in the hazard's ink.
  *
  * Built once per kind per map and cached by the caller. A pattern rather than a
@@ -536,12 +577,13 @@ export function cellKey(x: number, z: number, size: number): string {
  * a test -- the caller falls back to the flat fill and the map still reads.
  */
 export function hatchPattern(
-  ctx: CanvasRenderingContext2D,
+  ctx: HatchTarget,
   kind: HazardKind,
   dpr: number,
-): CanvasPattern | null {
+): HatchPattern | null {
   const pitch = Math.max(2, Math.round(HATCH_PITCH_PX * dpr));
-  const tile = document.createElement('canvas');
+  const tile = domScope.document?.createElement('canvas') as HatchCanvas | undefined;
+  if (tile === undefined) return null;
   tile.width = pitch;
   tile.height = pitch;
   const tctx = tile.getContext('2d');
@@ -563,7 +605,8 @@ export function hatchPattern(
   // without this the hatch is `dpr` times too coarse on a retina display -- the
   // one thing about this overlay that would look like a bug rather than read as
   // one.
-  if (typeof DOMMatrix === 'function') pattern.setTransform(new DOMMatrix([1 / dpr, 0, 0, 1 / dpr, 0, 0]));
+  const Matrix = domScope.DOMMatrix;
+  if (typeof Matrix === 'function') pattern.setTransform(new Matrix([1 / dpr, 0, 0, 1 / dpr, 0, 0]));
   return pattern;
 }
 

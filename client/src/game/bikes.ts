@@ -522,9 +522,27 @@ export interface BikePlanEntry {
  * index by locating Redfern's label node in the tile the suburb file agrees it
  * is in.
  */
-export function bikePlan(tiles: readonly BikeTile[]): BikePlanEntry[] {
+/**
+ * `firstId` is for the **offline** client on a segmented world, and nothing
+ * else.
+ *
+ * The ids are 1..n in index order and both ends derive them from the same tile
+ * list, which is what makes a `u16` on the wire mean the same bike on the
+ * server and in the browser -- `net/protocol.ts` rests on that. The server
+ * still reads `index.json` whole and still plans 1..n, so **nothing about the
+ * online path changes.**
+ *
+ * A segmented client does not have the whole tile list: it gets one hexagon at
+ * a time (`world/hexes.ts`), so planning per hex from 1 every time would issue
+ * the same id to a bike in Bondi and a bike in Parramatta. `main.ts` therefore
+ * carries a running counter across manifests. Those ids are local to an offline
+ * session and are discarded the moment a server answers -- `placeResidentBikes`
+ * returns immediately when `net` is set, and `bikeWorld()` hands back the
+ * server's field -- so they never meet the server's numbering.
+ */
+export function bikePlan(tiles: readonly BikeTile[], firstId = 1): BikePlanEntry[] {
   const out: BikePlanEntry[] = [];
-  let id = 1;
+  let id = firstId;
   for (const tile of tiles) {
     if (bikeHash(tile.key, BIKE_STAMP) % BIKE_TILE_RARITY !== 0) continue;
     const [minX, minZ, maxX, maxZ] = tile.bounds;

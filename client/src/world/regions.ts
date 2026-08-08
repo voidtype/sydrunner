@@ -363,12 +363,34 @@ export function armRegions(index: RegionIndex | null | undefined, base: string, 
   baseUrl = base;
   version = ver;
   const block = index?.regions;
-  if (DISABLED || !block?.list?.length || block.version !== REGION_VERSION) return;
+  if (DISABLED || !block || block.version !== REGION_VERSION) return;
   if (!block.tiles_per_side || block.tiles_per_side <= 0) return;
   contract = block;
-  for (const entry of block.list) catalogue.set(entry.key, entry);
+  // `list` is **optional** since the world was cut into hexes. On a segmented
+  // world the contract arrives in `root.json` -- version, directory, tiles per
+  // side, trigger distance, all the things this module needs before it has seen
+  // a single region -- and the entries themselves arrive per hex, through
+  // `addRegions`. An empty catalogue is a safe state and not a broken one:
+  // `regionFor` finds nothing, `asset` returns null, and every tile takes the
+  // per-tile path, which is the world loading the way it loaded before bundles
+  // existed. See `world/hexes.ts`.
+  for (const entry of block.list ?? []) catalogue.set(entry.key, entry);
   stats.enabled = true;
   setLocalAssetSource(asset);
+}
+
+/**
+ * Add one hex's region entries to the catalogue.
+ *
+ * Called by `TileStreamer.loadIndex`'s hex listener as each manifest lands.
+ * Idempotent by key, so a hex re-fetched after a failure cannot double-count,
+ * and it deliberately does **not** touch `resident` or `inFlight`: a region
+ * whose entry arrives late is simply one `updateRegions` had not considered
+ * yet, and it is considered on the next frame.
+ */
+export function addRegions(entries: readonly RegionEntry[] | undefined): void {
+  if (!stats.enabled || !entries) return;
+  for (const entry of entries) catalogue.set(entry.key, entry);
 }
 
 /** Forget everything. Exported for the boot checks, which arm and disarm. */

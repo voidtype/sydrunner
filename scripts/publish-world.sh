@@ -196,9 +196,17 @@ with open(path, "w") as f:
 PY
   echo "  stamped $1"
 }
-echo "stamping index.json..."
+# Both pivots, since the world was cut into hexagons: `root.json` is what a
+# segmented client boots from and `index.json` is what an older one reads, and a
+# world served half from jsDelivr and half from the origin is the one state
+# neither of them should be able to reach. A world with no `root.json` -- one
+# that has not been through `sydney hex-pack` -- simply skips it; `stamp` returns
+# for a file that is not there.
+echo "stamping index.json and root.json..."
 stamp "$WORLD/index.json"
+stamp "$WORLD/root.json"
 stamp "$ROOT/client/dist/world/index.json"
+stamp "$ROOT/client/dist/world/root.json"
 
 echo
 echo "repo    https://github.com/$DATA_REPO"

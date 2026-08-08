@@ -80,6 +80,10 @@
 
 import { decodeStreetNames, translateStreetNames } from './world/streetnames.ts';
 import { fetchWorldAsset } from './world/cdn.ts';
+// The world's segments. On a segmented world the map's street names arrive per
+// hexagon and per view box rather than as one whole-world bundle -- see
+// `ensureHexNames`.
+import { hexContract, hexesArmed, hexesInBox } from './world/hexes.ts';
 import { decodeWater } from './world/water.ts';
 import { abbreviateStreet } from './game/locator.ts';
 
@@ -302,6 +306,14 @@ export class MapAtlas {
   private fetches = 0;
   private failures = 0;
   private revisionCounter = 0;
+  /**
+   * Which hexagons' name bundles have been asked for, on a segmented world.
+   * Set before the fetch and removed again on failure, so a hexagon is in
+   * flight at most once and a failed one is retried on the next rebuild.
+   */
+  private readonly hexNames = new Map<string, boolean>();
+  /** Tiles the folded hexagons cover, for the progress readout. */
+  private hexTiles = 0;
   private startedAt = 0;
   private finishedMs = 0;
 
@@ -891,7 +903,91 @@ export class MapAtlas {
    * against a payload laid out by hand, and the equivalence over the real build
    * rests on it.
    */
+  /**
+   * The street names for one hexagon, folded in on demand.
+   *
+   * ---------------------------------------------------------------------------
+   * THE MAP'S ROADS *ARE* THE STREET NAMES. `drawRoads` renders the centrelines
+   * out of this index -- there is no separate road geometry on the big map --
+   * so "which names does the map need" is exactly "which part of the city is on
+   * screen", and the answer is a rectangle rather than the world.
+   *
+   * **So the rule is: the hexagons whose bounds overlap the view box, and no
+   * others.** The widest rung of the zoom ladder is 9 km across, which at a
+   * 6 km circumradius is two to four hexagons wherever the player is standing
+   * -- and it is *still* two to four hexagons when the world is 60 km wide,
+   * which is the whole point. The alternative rules were both considered and
+   * both rejected: fetching every hexagon on the first press of `M` is the
+   * 15 MB this pass exists to avoid, and gating on the label zoom would leave
+   * the city zoom with no roads on it at all.
+   *
+   * It is called on every rebuild -- an open, a zoom, a pan, a re-anchor --
+   * which is a handful of times a minute, and it is a `Map.has` per hexagon
+   * when there is nothing to do.
+   *
+   * The fold is `foldBundle`, the same three lines the whole-world bundle and
+   * the 357 sidecars both go through, so nothing about what the map draws
+   * depends on which of the three paths delivered the points. What *is*
+   * different is the order names are interned in -- it now follows the player
+   * rather than the tile key -- and the label ranking is by total length with
+   * the name id only as a last tie-break. `server/integration-check.ts` holds
+   * that down by ranking the real build both ways and comparing the labels.
+   */
+  async ensureHexNames(minX: number, minZ: number, maxX: number, maxZ: number): Promise<void> {
+    if (!hexesArmed()) return;
+    const contract = hexContract();
+    if (!contract) return;
+    const jobs: Array<Promise<void>> = [];
+    for (const entry of hexesInBox(minX, minZ, maxX, maxZ)) {
+      if (entry.names === undefined) continue;
+      if (this.hexNames.has(entry.id)) continue;
+      this.hexNames.set(entry.id, true);
+      jobs.push(
+        (async () => {
+          try {
+            this.fetches++;
+            const resp = await fetchWorldAsset(
+              this.baseUrl,
+              `${contract.dir}/${entry.id}.names.bin`,
+              this.version,
+            );
+            if (!resp.ok) throw new Error(String(resp.status));
+            const decoded = decodeStreetNameBundle(await resp.arrayBuffer());
+            if (decoded === null) throw new Error('not a name bundle');
+            this.foldBundle(decoded);
+            // The counter `bigmap.ts` watches. Without it the runs land in the
+            // index and the map never repaints, which is a map with suburbs and
+            // a harbour on it and no streets -- and it looks exactly like a
+            // world that has no street names in it at all.
+            this.revisionCounter++;
+            this.hexTiles += decoded.tiles;
+            this.tilesWanted = this.hexTiles;
+            this.tilesDone = this.hexTiles;
+          } catch {
+            // Retryable: the hexagon is dropped from the set so the next
+            // rebuild asks again. A hexagon that gave up would be a permanent
+            // blank rectangle in the middle of the map.
+            this.hexNames.delete(entry.id);
+            this.failures++;
+          }
+        })(),
+      );
+    }
+    if (jobs.length === 0) return;
+    await Promise.all(jobs);
+  }
+
   private async loadNameBundle(): Promise<boolean> {
+    // A segmented world has no whole-world bundle to fetch and must not fall
+    // through to the 357-sidecar path either -- its names come from
+    // `ensureHexNames`, driven by the view box. Reporting "done" here is
+    // honest: there is nothing left for `loadNames` to do.
+    if (hexesArmed()) {
+      this.bundled = true;
+      this.tilesWanted = 1;
+      this.tilesDone = 1;
+      return true;
+    }
     const path = this.index.street_names?.path;
     if (!path) return false;
     // Reported before the fetch so the shimmer has something to say: a bundle

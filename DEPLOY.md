@@ -200,6 +200,42 @@ the safe order is: rsync `dist/`, then reload Caddy.
 
 **Status: live in the client, off in production until the next deploy.**
 
+> **There is now a second target: Cloudflare R2.** `scripts/publish-world-r2.sh`
+> uploads the same tree to the `sydrunner-world` bucket, served publicly from
+> **`https://world.3rp.uk`**, and stamps `"cdn": { "base": "https://world.3rp.uk" }`
+> into both pivots. It is a *second* target rather than a replacement: this
+> script still works, and whichever of the two ran last is where players go.
+> R2 is where the world has to end up — the data repo is at 4.1 GB against
+> GitHub's 5 GB ceiling and `EXPANSION.md` measures the 60 km world at ~20 GB —
+> and its decisive property is **zero egress fees**. It also takes `--hex
+> h-01+01` to republish one hexagonal segment on its own; see
+> [Hexagonal segments](#hexagonal-segments) and `pipeline/sydney/hexes.py`.
+>
+> Credentials come from `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` in
+> `/etc/sydney/secrets.env`, never from the script. It prefers **rclone**
+> (`brew install rclone`) and falls back to the `aws` CLI. It never uses
+> `wrangler r2 object`, which defaults to a *local simulated bucket* and reports
+> success having sent nothing — the `--remote` flag is the fix if you ever do,
+> and `wrangler r2 bucket info`'s object count lags a real upload, so the
+> script's success check is a `GET` of the public URL.
+
+## Hexagonal segments
+
+The world is cut into **6 km hexagons** by `uv run python -m sydney hex-pack` —
+a repack of the emitted world, no retile, about a second — which writes
+`world/root.json` and `world/hexes/<id>.{json,names.bin,far.bin}`.
+`scripts/expand-world.sh` runs it on every build.
+
+`root.json` is the new boot pivot: **8.4 kB against `index.json`'s 851 kB**,
+carrying everything except the tile list and the region list, which arrive one
+hexagon at a time as the player approaches (`client/src/world/hexes.ts`).
+`index.json` is unchanged, still published, still what `server/world.ts` reads
+off the disk and what a client from before this pass boots from.
+
+**Both are cache pivots** and both are excluded from the immutable rule in
+`caddy/world-cache.Caddyfile`. Everything under `world/hexes/` is an ordinary
+versioned asset.
+
 The box has a **20 GB/month transfer cap** and a first visit streams ~175 MB of
 city, so the site is roughly a hundred first visits from being shaped or billed —
 it breaks by being played. The world is 3,928 immutable files, identical for

@@ -9,6 +9,7 @@
 
 import {
   Fog,
+  Group,
   NeutralToneMapping,
   Object3D,
   PCFSoftShadowMap,
@@ -25,6 +26,10 @@ import { verifyDuskRig } from './sky/dusk.ts';
 import { SkyClockHud, verifyClock } from './sky/clock.ts';
 import { verifySouthernHemisphere } from './sky/solar.ts';
 import { fetchWorldAsset, verifyCdn } from './world/cdn.ts';
+// The world's segments. Everything positional in this file that used to make a
+// single pass over `index.json` at boot now makes that same pass once per hex
+// as the player approaches it -- see `world/hexes.ts`.
+import { hexContract, hexesArmed, hexesNear, onHexTiles } from './world/hexes.ts';
 import { createFacadeGlobals } from './world/facade.ts';
 import { loadFarLayer } from './world/far.ts';
 import { loadLandmarks, verifyLandmarks } from './world/landmarks.ts';
@@ -114,7 +119,13 @@ import {
   type HitReport,
 } from './game/combat.ts';
 import { ActorDriver, Dummy, type DummyKind } from './game/dummies.ts';
-import { SPAWN_DITHER_RADIUS, pickSpawnPoint, spawnCentre, verifySpawn } from './game/spawn.ts';
+import {
+  SPAWN_DITHER_RADIUS,
+  SPAWN_TARGET,
+  pickSpawnPoint,
+  spawnCentre,
+  verifySpawn,
+} from './game/spawn.ts';
 // The knockout clock, for the one place the police are the cause of one. See
 // `offlineFactionCtx`'s `damagePlayer`, which is `combat.applyHit` without a
 // puncher.
@@ -1014,7 +1025,12 @@ async function main(): Promise<void> {
 
   let index: WorldIndex;
   try {
-    index = await streamer.loadIndex();
+    // The spawn pin, so a segmented world arrives with the hexes the player is
+    // about to stand in already loaded. `SPAWN_TARGET` is a constant rather than
+    // a search -- it is the dropped pin, projected -- which is what lets it be
+    // known before the index it would otherwise be looked up in. On an
+    // unsegmented world this argument is ignored. See `world/hexes.ts`.
+    index = await streamer.loadIndex(SPAWN_TARGET);
   } catch (err) {
     hud.fatal(String(err instanceof Error ? err.message : err));
     return;
@@ -1425,7 +1441,12 @@ async function main(): Promise<void> {
   // uses and for the same reason -- it passes a promise array to the backend,
   // which is what selects `device.createRenderPipelineAsync` over the blocking
   // call. See `TileStreamer.setPrecompiler` and `LoadedTile.warm`.
-  streamer.setPrecompiler(async (group) => {
+  //
+  // Named rather than inline because the far layer needs the identical
+  // function: `FarHexes` compiles a staged, detached group of slab meshes
+  // before moving them into the scene, on exactly this argument. Two copies of
+  // the visibility dance would be two chances to get it wrong.
+  const precompileGroup = async (group: Group): Promise<void> => {
     // Visible for the walk and hidden again immediately, because the two
     // visibilities are the same flag: `_projectObject` skips an invisible object
     // in `compileAsync` exactly as it does in `render`. `compileAsync` does its
@@ -1441,7 +1462,8 @@ async function main(): Promise<void> {
     const compiled = renderer.compileAsync(group, camera, scene);
     group.visible = false;
     await compiled;
-  });
+  };
+  streamer.setPrecompiler(precompileGroup);
 
   // And the loading overlay goes now, on the same argument. It exists to cover
   // the gap before the renderer can draw, and the renderer can draw: the world
@@ -1537,10 +1559,29 @@ async function main(): Promise<void> {
         streamer.terrain.sea_level_y,
         streamer.groundMaterial,
         streamer.assetVersion,
+        // On a segmented world the skyline arrives one hexagon at a time out of
+        // `hexes/<id>.far.bin` instead of one 3.08 MB `far.bin` held for the
+        // session. Null on every other world, and nothing below changes.
+        hexContract(),
       ),
       FAR_LAYER_DEADLINE_MS,
       'the far layer',
-    )) ?? ({ slabs: null, ground: null, count: 0 } as Awaited<ReturnType<typeof loadFarLayer>>);
+    )) ??
+    ({ slabs: null, ground: null, count: 0, hexes: null } as Awaited<
+      ReturnType<typeof loadFarLayer>
+    >);
+  if (far.hexes) {
+    // The same compiler the streamer uses, so a hexagon's slabs are built off
+    // the main thread before anything draws them -- see `FarHexes`.
+    far.hexes.setPrecompiler(precompileGroup);
+    // Awaited once, here, so the warm-up below has real slab meshes to compile
+    // against. Everything after this is pumped from the frame loop.
+    await withDeadline(
+      far.hexes.ensure(hexesNear(SPAWN_TARGET.x, SPAWN_TARGET.z, far.hexes.cutM)),
+      FAR_LAYER_DEADLINE_MS,
+      'the spawn hexes of the far layer',
+    );
+  }
   if (far.slabs) {
     scene.add(far.slabs);
     // And the streamer takes it from here. This is the whole of the far layer's
@@ -2203,6 +2244,11 @@ async function main(): Promise<void> {
   // the whole of how the two ends agree about wading without a protocol change
   // -- see `world/wading.ts`.
   const waterLevels = WaterLevels.fromIndex(index.tiles, index.tile_size);
+  // And every tile that has not arrived yet, on a segmented world. `index.tiles`
+  // grows one hexagon at a time as the player approaches, so a table built once
+  // at boot would answer "dry land" for the whole harbour the moment somebody
+  // rode north. See `world/hexes.ts`; on an unsegmented world this never fires.
+  onHexTiles((manifest) => waterLevels.addTiles(manifest.tiles as Array<{ key: string; wy?: number }>));
   const combatWorld: CombatWorld = {
     collision,
     groundHeight: groundHeightAt,
@@ -2489,16 +2535,45 @@ async function main(): Promise<void> {
   scene.add(selfBike.mesh);
   /** The offline authority. Unused while a server is answering; see `bikeWorld`. */
   const localBikes = new BikeField();
-  const bikePlanned = bikePlan(index.tiles);
   /** Which planned bikes have been placed offline, so a tile is not re-tried forever. */
   const bikePlaced = new Set<number>();
   /** Planned bikes still waiting on their tile's collision and terrain, by tile key. */
   const bikeWaiting = new Map<string, BikePlanEntry[]>();
-  for (const plan of bikePlanned) {
-    const list = bikeWaiting.get(plan.tileKey);
-    if (list) list.push(plan);
-    else bikeWaiting.set(plan.tileKey, [plan]);
+  /**
+   * The next offline bike id. A running counter across hex manifests, because
+   * `bikePlan` numbers from 1 within whatever list it is handed and a segmented
+   * world hands it one hexagon at a time -- see `bikePlan`'s `firstId`.
+   */
+  let bikeNextId = 1;
+  const planBikes = (tiles: typeof index.tiles): void => {
+    for (const plan of bikePlan(tiles, bikeNextId)) {
+      bikeNextId = plan.id + 1;
+      const list = bikeWaiting.get(plan.tileKey);
+      if (list) list.push(plan);
+      else bikeWaiting.set(plan.tileKey, [plan]);
+    }
+  };
+  // One source or the other, never both: `onHexTiles` replays the manifests
+  // that have already landed, so a segmented world that also planned from
+  // `index.tiles` here would plan the spawn's own hexes twice and stand two
+  // bikes on every planned spot. `bikePlan` is a per-tile hash with no
+  // cross-tile state -- see `game/bikes.ts` -- so planning one hexagon at a
+  // time produces exactly the plan a whole-world pass would have, tile for tile.
+  if (hexesArmed()) {
+    onHexTiles((manifest) => planBikes(manifest.tiles as unknown as typeof index.tiles));
+  } else {
+    planBikes(index.tiles);
   }
+  /**
+   * How many bikes the offline plan holds. A function rather than a length,
+   * because on a segmented world the plan grows as the map does and a number
+   * read once at boot would say "115" for the rest of the session.
+   */
+  const bikePlannedCount = (): number => {
+    let n = 0;
+    for (const list of bikeWaiting.values()) n += list.length;
+    return n + bikePlaced.size;
+  };
   /**
    * The ground a bike is placed against, offline.
    *
@@ -5086,6 +5161,12 @@ async function main(): Promise<void> {
     // sun's bearing by 1/sin(altitude) and is what decides which tiles are told
     // to receive. See `streamer.sunReceiveRange`.
     streamer.update(camera, sky.shadowVolume, alt);
+    // The skyline, on its own much wider radius. `streamer.update` has just
+    // moved the hex manifests along on `approach_m` = 4 km; this moves the far
+    // slabs along on `far_cut_m` = 20 km, because a hexagon is visible from
+    // five times further away than it is worth knowing the tile list of. Only
+    // on a segmented world; `far.hexes` is null on every other. See `FarHexes`.
+    if (far.hexes) far.hexes.update(hexesNear(camera.position.x, camera.position.z, far.hexes.cutM));
     // Ambient life, after the streamer so a tile that arrived this frame has its
     // birds in it, and before the render so their matrices are current. It takes
     // `frameDt` rather than reading a clock of its own, which is what makes a
@@ -6229,9 +6310,9 @@ async function main(): Promise<void> {
     bikes: {
       assets: bikes,
       field: () => bikeWorld(),
-      planned: bikePlanned.length,
+      planned: bikePlannedCount(),
       report: () => ({
-        planned: bikePlanned.length,
+        planned: bikePlannedCount(),
         placed: bikeWorld().size,
         drawn: bikeMeshes.drawn,
         // How many are wearing a marker, which is the shorter range and the

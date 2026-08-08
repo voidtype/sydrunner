@@ -128,6 +128,27 @@ export interface CdnContract {
   ref?: string;
   /** `owner/name` of the data repo. */
   repo?: string;
+  /**
+   * A plain origin the world sits directly under, with no ref in the path:
+   * `https://world.example.com` or an R2 `*.r2.dev` development URL, and the
+   * asset is `<base>/<path>`.
+   *
+   * **The R2 target**, and it takes precedence over `ref`/`repo` when both are
+   * present, so a publish to either host is a one-key change in `index.json`
+   * and `root.json` rather than a client deploy. `scripts/publish-world-r2.sh`
+   * stamps this; `scripts/publish-world.sh` stamps the other two. Both scripts
+   * still work and both worlds still load, which is the point: R2 is a second
+   * target until it is proven, not a replacement.
+   *
+   * There is **no ref in an R2 URL and there does not need to be one.** The
+   * immutability comes from the same place it has always come from -- the
+   * `?v=<built>` suffix in `world/version.ts`, which every asset but the two
+   * pivots carries -- and R2 is configured to serve objects with a long
+   * `cache-control`. jsDelivr needed a ref because it caches a *path* forever
+   * and the paths repeat across builds; an origin that honours a query string
+   * does not.
+   */
+  base?: string;
 }
 
 /** The index fields this reads. */
@@ -166,6 +187,8 @@ let consecutiveFailures = 0;
 let probe: Promise<boolean> | null = null;
 let ref = '';
 let repo = '';
+/** The `cdn.base` origin, when the world is on one. See `CdnContract.base`. */
+let base = '';
 
 /** A snapshot for the HUD. Copied, so a caller cannot edit the counters. */
 export function cdnStats(): CdnStats {
@@ -231,12 +254,29 @@ export function armCdn(index: CdnIndex | null | undefined): void {
     stats.reason = 'pinned to origin';
     return;
   }
-  if (!contract?.ref || !contract.repo) {
+  ref = '';
+  repo = '';
+  base = '';
+  if (contract?.base) {
+    // A plain origin, checked rather than concatenated blind: an empty or
+    // relative `base` would build URLs that resolve against the game's own
+    // host, which is the bandwidth bill this module exists to remove wearing a
+    // CDN's clothes. `?cdnbogus` points it at a host that cannot answer, which
+    // exercises the per-asset fallback for real.
+    if (!/^https?:\/\/[^/]/.test(contract.base)) {
+      stats.reason = 'cdn.base is not an absolute http(s) origin';
+      return;
+    }
+    base = BOGUS
+      ? 'https://cdn-bogus.invalid'
+      : contract.base.replace(/\/+$/, '');
+  } else if (contract?.ref && contract.repo) {
+    ref = BOGUS ? '0000000000000000000000000000000000000000' : contract.ref;
+    repo = contract.repo;
+  } else {
     stats.reason = 'no cdn block in index';
     return;
   }
-  ref = BOGUS ? '0000000000000000000000000000000000000000' : contract.ref;
-  repo = contract.repo;
   stats.enabled = true;
   stats.reason = '';
   probe = null;
@@ -249,8 +289,10 @@ export function armCdn(index: CdnIndex | null | undefined): void {
  * paths -- no flattening, no name mangling, no second encoding to keep in sync.
  */
 export function cdnAssetUrl(path: string): string | null {
+  const clean = path.replace(/^\/+/, '');
+  if (base) return `${base}/${clean}`;
   if (!ref || !repo) return null;
-  return `${JSDELIVR}/${repo}@${ref}/${path.replace(/^\/+/, '')}`;
+  return `${JSDELIVR}/${repo}@${ref}/${clean}`;
 }
 
 /** The origin URL: exactly what every call site built before this module. */
@@ -439,6 +481,8 @@ export function verifyCdn(): string[] {
   const failures: string[] = [];
   const savedRef = ref;
   const savedRepo = repo;
+  const savedBase = base;
+  base = '';
 
   // --- 1. The URL, against what publish-world.sh prints and jsDelivr answers.
   ref = 'a'.repeat(40);
@@ -485,7 +529,58 @@ export function verifyCdn(): string[] {
   }
   stats.enabled = enabledBefore;
 
+  // --- 6. The R2 target. `cdn.base` is the second half of a contract whose
+  // other half is a shell script, exactly as `ref`/`repo` is -- and it is the
+  // half that has no ref in it, so a mistake here is not a 404 but a *wrong
+  // build's* bytes under the right name. The `?v=` suffix is what stops that
+  // and it is only on the origin URL, so the check below is that the R2 URL is
+  // a plain concatenation and that a relative or empty base arms nothing.
+  //
+  // The URL cases set the module's state **directly**, exactly as cases 1 to 4
+  // do and for a reason a browser found before this shipped: `armCdn` honours
+  // `?nocdn` and returns before it reads the contract, so a check that armed
+  // its way to a URL would fail every time a developer loaded the page with the
+  // CDN pinned off. Only the *arming rules* need `armCdn`, and those are
+  // skipped under `?nocdn` because there is nothing left for them to assert.
+  {
+    const cases: Array<[string, string, string | null]> = [
+      ['https://world.3rp.uk', 'tiles/-5_9.glb', 'https://world.3rp.uk/tiles/-5_9.glb'],
+      ['https://world.3rp.uk/', '/tiles/-5_9.glb', 'https://world.3rp.uk/tiles/-5_9.glb'],
+      ['https://pub-abc.r2.dev', 'hexes/h-01+01.json', 'https://pub-abc.r2.dev/hexes/h-01+01.json'],
+    ];
+    for (const [origin, path, want] of cases) {
+      ref = '';
+      repo = '';
+      base = origin.replace(/\/+$/, '');
+      const got = cdnAssetUrl(path);
+      if (got !== want) failures.push(`cdn.base ${origin} + ${path}: expected ${want}, got ${got}`);
+    }
+
+    // `base` wins over `ref`/`repo`, so a world republished to R2 does not need
+    // its jsDelivr block removed first -- whichever script ran last decides.
+    ref = 'a'.repeat(40);
+    repo = 'voidtype/sydrunner-world';
+    base = 'https://world.3rp.uk';
+    if (cdnAssetUrl('far.bin') !== 'https://world.3rp.uk/far.bin') {
+      failures.push('cdn.base did not take precedence over ref/repo');
+    }
+    base = '';
+
+    if (!PINNED_TO_ORIGIN) {
+      for (const bad of ['', '/world', 'world.3rp.uk', 'ftp://world.3rp.uk']) {
+        stats.enabled = false;
+        armCdn({ cdn: { base: bad } });
+        if (stats.enabled) failures.push(`armCdn armed on cdn.base ${JSON.stringify(bad)}`);
+      }
+      stats.enabled = false;
+      armCdn({ cdn: { base: 'https://world.3rp.uk' } });
+      if (!stats.enabled) failures.push('armCdn refused a well-formed cdn.base');
+    }
+    stats.enabled = enabledBefore;
+  }
+
   ref = savedRef;
   repo = savedRepo;
+  base = savedBase;
   return failures;
 }

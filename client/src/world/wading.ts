@@ -138,10 +138,29 @@ export class WaterLevels {
     tileSize: number,
   ): WaterLevels {
     const out = new WaterLevels(tileSize);
-    for (const t of tiles) {
-      if (typeof t.wy === 'number' && Number.isFinite(t.wy)) out.levels.set(t.key, t.wy);
-    }
+    out.addTiles(tiles);
     return out;
+  }
+
+  /**
+   * Fold more tiles in, for the world that arrives one hexagon at a time.
+   *
+   * `fromIndex` was a single pass over the whole of `index.json` at boot, which
+   * a segmented world no longer has -- the tile entries come per hex as the
+   * player approaches. This is the same three lines run once per manifest
+   * instead of once per session, and it is additive by key, so a hex re-fetched
+   * after a failed request cannot disturb a level already set. See
+   * `world/hexes.ts`.
+   *
+   * The table stays whole-world and is never trimmed: it is one float per wet
+   * tile -- 1,108 of them in the shipped build, ~8 kB even at 60 km -- and the
+   * question it answers (*is the player standing in water*) has to be
+   * answerable the instant they arrive rather than after a fetch.
+   */
+  addTiles(tiles: ReadonlyArray<{ key: string; wy?: number }>): void {
+    for (const t of tiles) {
+      if (typeof t.wy === 'number' && Number.isFinite(t.wy)) this.levels.set(t.key, t.wy);
+    }
   }
 
   get wetTiles(): number {

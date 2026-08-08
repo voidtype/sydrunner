@@ -41,6 +41,7 @@ from . import (
     fences,
     furniture,
     geo,
+    hexes,
     landmarks,
     lanes,
     ledger,
@@ -4274,6 +4275,190 @@ def cmd_name_bundle(args: argparse.Namespace) -> int:
     return 0
 
 
+#: How far a hex's far-layer slabs are worth carrying, metres.
+#:
+#: 20,000 rather than a taste: `far-terrain.bin` is a grid of `half_extent_m`
+#: 20 km about the origin, so past that there is no coarse ground for a slab to
+#: stand on and a prism there would be a roofline floating over nothing. It is
+#: also the honest reading of the user's requirement -- nobody needs Penrith's
+#: rooflines from Bondi -- and at the current 19.3 km radius it changes nothing
+#: a player can see: the far city is the CBD cluster at the origin, and no point
+#: in the build is more than 19.3 km from it.
+FAR_CUT_M = 20_000.0
+
+#: How close the player gets before a hex's manifest is fetched, metres.
+#:
+#: `TileStreamer.loadRadius` is 1,800 m, so 1,800 is the *correctness* floor: a
+#: tile inside the load radius is inside its own hex, so its hex is within
+#: 1,800 m of the player, so a manifest fetched at 1,800 m is never late in the
+#: sense of being absent. What it would be is *unarrived* -- and a hex whose
+#: manifest has not landed is not a slow tile, it is a tile the client does not
+#: know exists, which is a hole in the world rather than a hole in a texture.
+#:
+#: So 4,000: 2,200 m of lead outside the load radius, which at the fastest
+#: travel in the game (the tuned e-bike, 39.4 m/s) is **56 seconds** for one
+#: ~90 kB JSON. The region bundles take 400 m of lead for 2.4 MB on the same
+#: argument; this is 5.5x the lead for a thirtieth of the payload, because the
+#: failure it is buying off is categorically worse. The cost is over-fetch, and
+#: it is small: the hex apothem is 5,196 m, so a player at a hex centre is
+#: outside every neighbour's 4,000 m ring and holds exactly one manifest.
+APPROACH_M = 4_000.0
+
+
+def cmd_hex_pack(args: argparse.Namespace) -> int:
+    """Cut the world already on disk into hexagonal segments. No retile.
+
+    A **repack**, on `cmd_name_bundle`'s precedent and for the same reason: the
+    tiles, the regions and the sidecars are unchanged bytes, and re-emitting a
+    world to change how its manifests are packaged would be a twenty-hour job to
+    produce files that are already correct. Everything here reads what the last
+    build wrote and writes four new things beside it:
+
+        world/root.json           the boot pivot: `index.json` without the two
+                                  lists that grow with the map
+        world/hexes/<id>.json     one hex's tile and region entries
+        world/hexes/<id>.names.bin  one hex's street centrelines, for the map
+        world/hexes/<id>.far.bin  one hex's skyline slabs
+
+    `index.json` is **patched, not rewritten** -- the `hexes` contract is added
+    and every other key including `cdn` survives, which is `cmd_name_bundle`'s
+    rule and exists for the same reason: `scripts/publish-world.sh` stamps `cdn`
+    afterwards and a regenerated index would silently drop it. `built` is left
+    alone: not one byte of world geometry changed, so moving the stamp would
+    expire the entire city's cache to republish its table of contents.
+    """
+    if not config.INDEX_PATH.exists():
+        print(f"no index at {config.INDEX_PATH} -- build the world first")
+        return 1
+    index = json.loads(config.INDEX_PATH.read_text())
+    radius = float(args.circumradius)
+    size = float(index.get("tile_size", config.TILE_SIZE))
+    out_dir = config.OUT_ROOT / "hexes"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for stale in out_dir.glob("h*"):
+        stale.unlink()
+
+    tile_entries = list(index.get("tiles", []))
+    region_entries = list((index.get("regions") or {}).get("list", []))
+    by_hex = hexes.assign(tile_entries, radius)
+    regions_by_hex = hexes.assign(region_entries, radius)
+    hex_of_tile = {
+        entry["key"]: hid for hid, entries in by_hex.items() for entry in entries
+    }
+    print(
+        f"{len(tile_entries):,} tiles and {len(region_entries):,} regions"
+        f" -> {len(by_hex)} hexes at {radius:,.0f} m circumradius"
+    )
+
+    # --- The far layer, cut by whole tile groups. See `hexes.split_far`.
+    far_path = config.OUT_ROOT / "far.bin"
+    far_by_hex: dict[str, bytes] = {}
+    if far_path.exists():
+        far_by_hex = hexes.split_far(far_path.read_bytes(), hex_of_tile)
+
+    # --- Bytes on disk per hex, which is the number that decides whether the
+    # circumradius is right. Counted from the files themselves rather than from
+    # the index's own `size` fields, because the publish moves files.
+    payload: dict[str, int] = defaultdict(int)
+    for hid, entries in by_hex.items():
+        for entry in entries:
+            key = entry["key"]
+            for path in config.TILE_DIR.glob(f"{key}.*"):
+                payload[hid] += path.stat().st_size
+            collision = config.COLLISION_DIR / f"{key}.bin"
+            if collision.exists():
+                payload[hid] += collision.stat().st_size
+    for hid, entries in regions_by_hex.items():
+        for entry in entries:
+            payload[hid] += int(entry.get("size", 0))
+
+    listing: list[dict] = []
+    for hid in sorted(by_hex):
+        q, r = hexes.parse_hex_id(hid)
+        entries = sorted(by_hex[hid], key=lambda e: e["key"])
+        mine = sorted(regions_by_hex.get(hid, []), key=lambda e: e["key"])
+
+        # The tile order inside a hex is `index.json`'s -- sorted by key -- for
+        # `_emit_name_bundle`'s reason: the client interns a street name in the
+        # order it first meets it, and that order is the last tie-break when two
+        # streets rank equal for a label on the big map.
+        names = tiles.write_street_name_bundle(
+            out_dir / f"{hid}.names.bin",
+            [
+                (e["key"], float(e["bounds"][0]), float(e["bounds"][1]) + size)
+                for e in entries
+                if e.get("sn")
+            ],
+            config.TILE_DIR,
+        )
+
+        far = far_by_hex.get(hid)
+        far_contract = None
+        if far:
+            (out_dir / f"{hid}.far.bin").write_bytes(far)
+            far_contract = hexes.far_stats(far)
+
+        manifest_bytes = hexes.write_json(
+            out_dir / f"{hid}.json",
+            {
+                "v": hexes.HEX_VERSION,
+                "id": hid,
+                "tile_size": size,
+                "tiles": entries,
+                "regions": mine,
+            },
+        )
+
+        listing.append(
+            {
+                "id": hid,
+                "q": q,
+                "r": r,
+                "c": [round(v, 3) for v in hexes.centre_of(q, r, radius)],
+                "bounds": hexes.bounds_of(q, r, radius),
+                "tiles": len(entries),
+                "regions": len(mine),
+                "index_bytes": manifest_bytes,
+                # Absent rather than zero when there is nothing to fetch, so the
+                # client's rule is "is there a file" rather than "is the number
+                # non-zero", and an empty hex costs no request at all.
+                **({"names": names["bytes"]} if names.get("runs") else {}),
+                **({"far": far_contract} if far_contract else {}),
+                "bytes": payload.get(hid, 0),
+            }
+        )
+
+    contract = {
+        "version": hexes.HEX_VERSION,
+        "dir": "hexes",
+        "circumradius_m": radius,
+        "neighbour_m": round(math.sqrt(3.0) * radius, 3),
+        "approach_m": APPROACH_M,
+        "far_cut_m": FAR_CUT_M,
+        "count": len(listing),
+    }
+    index["hexes"] = contract
+    config.INDEX_PATH.write_text(json.dumps(index))
+    root_bytes = hexes.write_json(
+        config.OUT_ROOT / "root.json", hexes.root_index(index, listing, contract)
+    )
+
+    fat = max(listing, key=lambda h: h["bytes"])
+    print(f"  root.json {root_bytes / 1024:,.0f} kB (index.json is {config.INDEX_PATH.stat().st_size / 1024:,.0f} kB)")
+    for h in sorted(listing, key=lambda h: -h["bytes"]):
+        print(
+            f"  {h['id']}  {h['tiles']:>4} tiles  {h['bytes'] / 1e6:>7.1f} MB payload"
+            f"  index {h['index_bytes'] / 1024:>6,.0f} kB"
+            f"  names {h.get('names', 0) / 1024:>6,.0f} kB"
+            f"  far {(h.get('far') or {}).get('bytes', 0) / 1024:>6,.0f} kB"
+        )
+    print(
+        f"  fattest {fat['id']} at {fat['bytes'] / 1e6:,.0f} MB;"
+        f" total {sum(h['bytes'] for h in listing) / 1e9:,.2f} GB"
+    )
+    return 0
+
+
 def cmd_reset(args: argparse.Namespace) -> int:
     con = ledger.connect()
     print(f"reset {ledger.reset(con, args.kind):,} '{args.kind}' units to pending")
@@ -4306,6 +4491,21 @@ def main(argv: list[str] | None = None) -> int:
         help="repack the .names.bin sidecars into world/street-names.bin and patch the index",
     )
     nb.set_defaults(func=cmd_name_bundle)
+
+    hx = sub.add_parser(
+        "hex-pack",
+        help="cut the emitted world into hexagonal segments and write root.json"
+        " plus world/hexes/<id>.{json,names.bin,far.bin}. A repack: no retile.",
+    )
+    hx.add_argument(
+        "--circumradius",
+        type=float,
+        default=hexes.CIRCUMRADIUS_M,
+        help="hex centre-to-vertex in metres. Changing it renumbers every hex,"
+        " so it is an argument for measuring rather than for shipping --"
+        f" see `sydney/hexes.py`. Default {hexes.CIRCUMRADIUS_M:,.0f}.",
+    )
+    hx.set_defaults(func=cmd_hex_pack)
 
     t = sub.add_parser("terrain-audit", help="read the emitted world back and check its heights")
     t.add_argument(

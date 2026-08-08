@@ -183,6 +183,17 @@ uv run python -m sydney build --stage "$STAGE" --rebuild --retile
 echo "  build took $(( ($(date +%s) - START) / 60 )) min"
 
 echo
+# The segments. A pure repack of what the build just wrote -- no retile, a
+# second or two -- producing `root.json` and `world/hexes/<id>.{json,names.bin,
+# far.bin}`, which is what a segmented client boots from and what
+# `publish-world-r2.sh --hex` uploads a piece at a time. It runs on every build
+# because the manifests are derived from `index.json`: a world rebuilt without
+# it would serve last build's tile lists against this build's tiles, and every
+# hexagon's `?v=` would name geometry that had moved. See `sydney/hexes.py`.
+echo "== segmenting into hexagons"
+uv run python -m sydney hex-pack
+
+echo
 echo "== audits"
 FAILED=""
 for audit in winding-audit road-grade-audit carriageway-audit vegetation-audit \

@@ -42,13 +42,24 @@
 @world_versioned {
 	path /world/*
 	not path /world/index.json
+	not path /world/root.json
 }
 header @world_versioned Cache-Control "public, max-age=31536000, immutable"
 
-# The pivot. `no-cache` is "revalidate before use", not "do not store" -- the
-# browser keeps it and gets a 304 on the common path, so this costs one
+# The pivots. `no-cache` is "revalidate before use", not "do not store" -- the
+# browser keeps them and gets a 304 on the common path, so this costs one
 # conditional request per session and is what makes every rule above safe.
-@world_index path /world/index.json
+#
+# TWO of them since the world was cut into hexagons. `root.json` is what a
+# segmented client boots from -- 8.4 kB against index.json's 851 kB, carrying
+# everything except the tile and region lists, which arrive one hexagon at a
+# time (`client/src/world/hexes.ts`). `index.json` is still what an older client
+# reads and what `server/world.ts` loads off the disk, so both are pivots and
+# both are excluded here explicitly rather than by omission -- for the reason
+# stated above, that "excluded by accident" and "excluded on purpose" are the
+# same file and very different bugs. The per-hex manifests underneath them are
+# ordinary versioned assets and take the immutable rule.
+@world_index path /world/index.json /world/root.json
 header @world_index Cache-Control "no-cache"
 
 # The client bundle, on the same argument with none of the caveats: vite content-

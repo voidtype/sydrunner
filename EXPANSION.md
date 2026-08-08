@@ -138,6 +138,42 @@ thousands of them.**
 hex takes its tier from its centroid's distance from Town Hall, which is one
 comparison at build time.
 
+### Measured, 2026-08-08, against the shipped 19.3 km world
+
+`uv run python -m sydney hex-pack` cut the existing build into **16 hexagons**
+holding all 3,187 tiles and all 852 region bundles. The distribution:
+
+| hex | tiles | payload | what it is |
+|---|---|---|---|
+| `h-01+01` | 374 | **788 MB** | the inner west, 9 km west and 5 km north of Town Hall |
+| `h+00+00` | 353 | 593 MB | the CBD, centred on the origin |
+| `h-01+00` | 374 | 481 MB | Newtown, Marrickville, the inner south-west |
+| `h+00-01` | 378 | 400 MB | the eastern suburbs |
+| … | | | median **209 MB**, smallest 0.2 MB |
+
+**The 400–500 MB estimate above is right for the median and low by 1.6x for the
+fattest.** It was derived from 374 tiles at ~1.2 MB each; a *fully built* inner
+hexagon is 374 tiles at ~2.1 MB, because the estimate averaged in the sparse
+tiles that the inner ring does not have. 6 km is kept anyway: the fat hexagons
+are the four innermost, which at 60 km are four of ~70, and 788 MB is still a
+unit that builds in under an hour and uploads in minutes. 5 km would bring the
+worst to 587 MB at the cost of 23 segments instead of 16, and 4.5 km to 496 MB
+at 25 — available as `--circumradius`, but changing it **renumbers every hex**
+and therefore invalidates every client's cache, so it is a decision to make once.
+
+Measured effect on what a session downloads, in a real browser:
+
+| | before | after |
+|---|---|---|
+| table of contents, at boot, uncached | 851 kB (`index.json`) | **8.4 kB** (`root.json`) + 252 kB (3 manifests) |
+| street names, first press of `M`, district zoom | 2.46 MB (whole world) | **1.12 MB** (3 hexagons in view) |
+| far skyline, at boot | 3.08 MB | 3.06 MB (14 hexagons inside the 20 km cut) |
+
+The far cut is a **no-op at this radius and the mechanism that pays at 60 km**:
+the whole 19.3 km world is inside 20 km of the spawn, so nothing is dropped
+today. At 60 km the same rule holds the skyline at ~13 hexagons wherever the
+player is, instead of ~70.
+
 | band | hexes (est.) | est. tiles | est. size | what is in it |
 |---|---|---|---|---|
 | 0–19.3 km | ~13 | 3,187 | 3.9 GB | today's world, re-cut into hexes |
