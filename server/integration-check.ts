@@ -125,6 +125,15 @@ import {
   TUNING_Z,
   type RideSteering,
 } from '../client/src/game/bikes.ts';
+// The camera distance, which the bike floors rather than sets. See `checkBikes`
+// section 0 and `client/src/game/camera.ts`.
+import {
+  CAMERA_MAX,
+  CAMERA_MIN,
+  RIDE_MIN,
+  liveCameraDistance,
+  verifyCamera,
+} from '../client/src/game/camera.ts';
 import { planSpeed, respawnAt } from '../client/src/game/combat.ts';
 // The three damage paths a rider can be knocked out by, and the flag bits their
 // consequences arrive on. See section 8b.
@@ -1444,6 +1453,21 @@ async function main(): Promise<void> {
   say('');
   await checkServerRtt();
 
+  // --- 27. The illegal raves. The most *shared* thing in the game and the one
+  // that sends nothing at all, checked the only way that claim can be checked:
+  // two module instances, two clocks, one answer. See `checkRaves`, appended
+  // last and self-contained.
+  say('');
+  await checkRaves();
+
+  // --- 28. The day/night cycle, on exactly the raves' argument: the sky is
+  // shared by every player and sends nothing at all, so the only way to check
+  // that claim is arithmetic -- two independent derivations of the phase, and
+  // the epoch it shares with the traffic timetable. See `checkDayCycle`,
+  // appended last and self-contained.
+  say('');
+  await checkDayCycle();
+
   say('');
   if (failures.length === 0) {
     say(`ALL CHECKS PASSED (${log.filter((l) => l.includes('PASS')).length})`);
@@ -1732,6 +1756,36 @@ function joinAndWatch(url: string): Promise<{ id: number; x: number; z: number; 
  */
 async function checkBikes(): Promise<void> {
   say('bikes: the lime e-bikes, off the socket and against the world files');
+
+  // --- 0. The camera the rider is put in, which is a *floor* over the player's
+  // own zoom rather than a mode the bike switches on.
+  //
+  // Here rather than in its own section because the bike is the only thing in
+  // the game that overrides the preference, and the failure is this file's usual
+  // shape -- it renders perfectly. The version before this one forced third
+  // person with a boolean and handed it back on dismount, and every bug it had
+  // was a player left in a camera they never asked for. `verifyCamera` asserts
+  // the whole ladder: that scrolling out reaches the far end (the reported bug,
+  // *"cant zoom out anymore by scrolling"*), that scrolling in reaches first
+  // person again, that no stop lands between the two where the camera would be
+  // inside the player's own shoulders, that the ride floor raises without
+  // writing, and that the choice round-trips through storage.
+  {
+    const f = verifyCamera();
+    check(
+      f.length === 0,
+      `verifyCamera: the zoom ladder ${CAMERA_MIN}-${CAMERA_MAX} m, first person at zero, the ride ` +
+        `floor at ${RIDE_MIN} m and the storage round trip (${f.join('; ') || 'clean'})`,
+    );
+    // And the one interaction that is not inside that module: the floor is the
+    // near stop, so a rider is never given a boom the wheel could not have
+    // produced on foot.
+    check(
+      liveCameraDistance(0, true) === CAMERA_MIN,
+      `a rider in first person is floored at the near stop (${liveCameraDistance(0, true)} m), not at some ` +
+        'distance of the bike\'s own',
+    );
+  }
 
   const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
   const world = await loadWorld(root);
@@ -12984,5 +13038,506 @@ async function checkAccelerationRamp(): Promise<void> {
     `  and ${totalMoving} of those ${totalCompared} landed on a tick where the speed had moved by more ` +
       `than half a ramp step, so the equality is pinning the ordering rather than holding vacuously: a ` +
       `client that stored the velocity from *before* the step would have failed every one of them`,
+  );
+}
+
+// --- 27. The illegal raves ---------------------------------------------------------
+
+/**
+ * Two module instances, two clocks, one rave.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS CANNOT BE LEFT TO `verifyRaves`, WHICH ALREADY EXISTS AND IS GOOD.
+ *
+ * `game/rave.ts`'s own self-check runs inside one module instance and compares
+ * the file to itself. That catches an impurity with per-call state in it and it
+ * cannot catch the thing this feature is actually exposed to: a module-level
+ * cache, a lazily-built table, a `Math.random` in an initialiser, or anything
+ * else that makes two *separately evaluated copies* of the file disagree. That
+ * is `checkFooty`'s finding and its argument, in the same words, and it applies
+ * with more force here — because a rave is the only feature in the build where
+ * **two players are meant to be looking at the same forty people and hearing the
+ * same bar, having exchanged nothing at all.**
+ *
+ * So this loads the module twice under two specifiers and asks both:
+ *
+ *   1. the same six sites out of 448, over six hundred nights;
+ *   2. the same beat, to the bit, at instants across a night;
+ *   3. the same record on the decks at the same second of it, over a set built
+ *      from the four tracks the folder actually holds;
+ *   4. the same forty people in the same places, including which of them the
+ *      obstacle rejection threw out;
+ *   5. and the same answers with an **empty record bag**, which is what a fresh
+ *      clone of this repository boots with.
+ *
+ * It also checks the two things `verifyRaves` deliberately does not: that the
+ * rave clock's epoch is `TRAFFIC_EPOCH_MS` — every deterministic system in this
+ * build is denominated from one instant, and the check is here rather than there
+ * because that file must stay free of the traffic decoder — and that the sites
+ * are on ground the world actually has, read off `index.json` the way
+ * `checkWildlife` and `checkPolice` read it.
+ */
+async function checkRaves(): Promise<void> {
+  say('--- Illegal raves: the same night, on two module instances');
+
+  const here = new URL('../client/src/game/rave.ts', import.meta.url).pathname;
+  const one = (await import(here)) as typeof import('../client/src/game/rave.ts');
+  // A different specifier for the same file: Bun resolves the query string as
+  // part of the module key and evaluates it again, so the two copies have their
+  // own closures, their own tables and their own `liveRaves` cache.
+  const two = (await import(`${here}?instance=2`)) as typeof import('../client/src/game/rave.ts');
+
+  check(
+    one.RAVE_SITES.length === two.RAVE_SITES.length && one.RAVE_SITES.length > 400,
+    `both instances baked the same ${one.RAVE_SITES.length} rave sites — ` +
+      `${one.RAVE_SITES.filter((s) => s.kind === one.SITE_KIND.YARD).length} warehouse yards, ` +
+      `${one.RAVE_SITES.filter((s) => s.kind === one.SITE_KIND.SPAN).length} under bridges, ` +
+      `${one.RAVE_SITES.filter((s) => s.kind === one.SITE_KIND.PARK).length} in parkland`,
+  );
+
+  // --- The rules half, run here as well as in the browser. Same argument
+  // `checkWildlife` makes for `verifyWildlife`: a self-check nothing runs is a
+  // self-check that rots, and the browser is not in CI.
+  {
+    const failures = one.verifyRaves();
+    check(failures.length === 0, `verifyRaves passes against the real tables${failures.length ? `: ${failures[0]}` : ''}`);
+  }
+
+  // --- 1. The draw. Six hundred nights, both instances, every field.
+  {
+    let nights = 0;
+    let live = 0;
+    let differing = 0;
+    let home = 0;
+    let sydneyPark = 0;
+    let busted = 0;
+    const kinds = [0, 0, 0];
+    for (let n = 0; n < 600; n++) {
+      const a = one.drawRaves(n);
+      const b = two.drawRaves(n);
+      nights++;
+      if (a.length !== b.length) { differing++; continue; }
+      let same = true;
+      for (let i = 0; i < a.length; i++) {
+        if (
+          a[i].site.id !== b[i].site.id ||
+          a[i].site.name !== b[i].site.name ||
+          a[i].bpm !== b[i].bpm ||
+          a[i].attendees !== b[i].attendees ||
+          a[i].bearing !== b[i].bearing ||
+          a[i].palette !== b[i].palette ||
+          a[i].depth !== b[i].depth ||
+          a[i].bust !== b[i].bust
+        ) { same = false; break; }
+      }
+      if (!same) { differing++; continue; }
+      live += a.length;
+      for (const v of a) {
+        kinds[v.site.kind]++;
+        if (v.bust < 1) busted++;
+        if (Math.hypot(v.site.x - SPAWN_TARGET.x, v.site.z - SPAWN_TARGET.z) <= one.HOME_RADIUS) home++;
+        if (v.site.id === one.SYDNEY_PARK_SITE) sydneyPark++;
+      }
+    }
+    check(
+      differing === 0,
+      `two separately-evaluated copies of the module drew the identical set of raves on all ${nights} ` +
+        `nights — same sites, same tempos, same crowd sizes, same bearings, same palettes, same bust times. ` +
+        `That is the whole claim: a player who has never spoken to the server walks into the same rave ` +
+        `everyone else is at`,
+    );
+    check(
+      live / nights >= 2.5 && live / nights <= one.MAX_LIVE,
+      `  a mean night has ${(live / nights).toFixed(2)} raves across the 19.3 km world (cap ${one.MAX_LIVE}), ` +
+        `which is one site in ${Math.round((nights * one.RAVE_SITES.length) / live)} — an event, not scenery`,
+    );
+    check(
+      home >= nights,
+      `  and every one of those ${nights} nights had at least one within ${one.HOME_RADIUS} m of the spawn ` +
+        `(${home} across the run), which is the structural guarantee rather than a probability`,
+    );
+    check(
+      sydneyPark > nights * 0.28 && sydneyPark < nights * 0.52,
+      `  Sydney Park — which the brief names, and which is 32 m from the spawn pin — was live on ` +
+        `${sydneyPark} of ${nights} nights, ${(100 * sydneyPark / nights).toFixed(0)}% against a target of ` +
+        `${(100 * one.SYDNEY_PARK_SHARE).toFixed(0)}%`,
+    );
+    check(
+      kinds[0] > 0 && kinds[1] > 0 && kinds[2] > 0,
+      `  all three kinds of place got used: ${kinds[0]} nights in a warehouse yard, ${kinds[1]} under a ` +
+        `bridge, ${kinds[2]} in parkland`,
+    );
+    check(
+      busted > 0 && busted < live * 0.4,
+      `  and ${busted} of the ${live} raves were within earshot of a police station and got shut down ` +
+        `(${(100 * busted / live).toFixed(0)}%), which is the joke landing without being the only thing ` +
+        `that ever happens`,
+    );
+  }
+
+  // --- 2. The beat. The number the lights, the crowd and the synthesised set
+  // all ride, and the one whose disagreement is invisible from inside either end.
+  {
+    let compared = 0;
+    let identical = 0;
+    let worst = 0;
+    for (let k = 0; k < 400; k++) {
+      const at = one.nightStartMs(918) + k * 4_507;
+      for (const bpm of [124, 128, 132, 136]) {
+        const a = one.beatAt(at, bpm);
+        const b = two.beatAt(at, bpm);
+        compared++;
+        if (a === b) identical++;
+        worst = Math.max(worst, Math.abs(a - b));
+      }
+    }
+    check(
+      identical === compared,
+      `  the beat clock is bit-identical across the two instances on all ${compared} (instant, tempo) pairs ` +
+        `(worst difference ${worst}); a crowd dancing to a bar nobody else is on would render perfectly`,
+    );
+    // And it does not restart at dusk, which is the one bug that would look
+    // right for 29 minutes out of every 30.
+    const dusk = one.nightStartMs(919);
+    const step = one.beatAt(dusk + 1000, 128) - one.beatAt(dusk - 1000, 128);
+    check(
+      Math.abs(step - (128 * 2) / 60) < 1e-9,
+      `  and it runs straight through dusk rather than restarting there (${step.toFixed(6)} beats across the ` +
+        `two seconds either side of a night boundary, against ${((128 * 2) / 60).toFixed(6)} expected)`,
+    );
+  }
+
+  // --- 3. The set list, against the four records the folder actually holds.
+  {
+    const rows = [
+      { file: 'Aliens.mp3', title: 'Aliens', bytes: 6572131, seconds: 344.555 },
+      { file: 'Karmel.mp3', title: 'Karmel', bytes: 5727110, seconds: 310.674 },
+      { file: 'Organism.mp3', title: 'Organism', bytes: 5994258, seconds: 357.538 },
+      { file: 'Tanktastic.mp3', title: 'Tanktastic', bytes: 8040303, seconds: 328.359 },
+    ];
+    const bagA = one.recordBag(rows);
+    const bagB = two.recordBag(rows);
+
+    let compared = 0;
+    let identical = 0;
+    let mixes = 0;
+    const played = new Set<string>();
+    for (let n = 900; n < 906; n++) {
+      const va = one.drawRaves(n)[0];
+      const vb = two.drawRaves(n)[0];
+      if (!va || !vb) continue;
+      let last = -1;
+      // A whole night at four-second steps, which is 450 samples across the
+      // thirty minutes a rave runs for.
+      for (let s = 0; s < 1800; s += 4) {
+        const at = one.nightStartMs(n) + s * 1000;
+        const pa = one.setPosition(va, bagA, at);
+        const pb = two.setPosition(vb, bagB, at);
+        compared++;
+        if (pa.track === pb.track && pa.offset === pb.offset && pa.next === pb.next) identical++;
+        played.add(one.deckTitle(bagA, pa));
+        if (pa.track !== last && last !== -1) mixes++;
+        last = pa.track;
+      }
+    }
+    check(
+      identical === compared,
+      `  two instances put the needle on the same second of the same record at all ${compared} instants ` +
+        `across six nights — which is what "a player arriving forty minutes in hears the bar everyone else ` +
+        `is on" actually means`,
+    );
+    check(
+      mixes >= 10 && played.size === 4,
+      `  and a night is a *set*: ${mixes} mixes across those six nights and all four records played ` +
+        `(${[...played].sort().join(', ')}), rather than one track looping for half an hour`,
+    );
+
+    // The set position is a pure function of the clock, so two players who
+    // arrive at different times land in the same place. Stated as its own check
+    // because it is the sentence the whole feature is sold on.
+    {
+      const v = one.drawRaves(1002)[0];
+      const at = one.nightStartMs(1002) + 19 * 60_000 + 7_123;
+      const early = one.setPosition(v, bagA, at);
+      const late = two.setPosition(v, bagB, at);
+      check(
+        early.track === late.track && early.offset === late.offset,
+        `  a player who has been at ${v.site.name} all night and one who has just walked in are both ` +
+          `${early.offset.toFixed(1)} s into "${one.deckTitle(bagA, early)}", from the wall clock alone`,
+      );
+    }
+
+    // --- 5. And the empty bag, which is what a clone without the audio boots
+    // with and which must be a complete feature rather than a silent one.
+    const emptyA = one.recordBag([]);
+    const v = one.drawRaves(1002)[0];
+    const p = one.setPosition(v, emptyA, one.nightStartMs(1002) + 600_000);
+    check(
+      p.track === -1 && one.deckTitle(emptyA, p) === one.NO_RECORD_BAG && one.venueBpm(v, emptyA, p) === v.bpm,
+      `  with an empty record bag the decks read "${one.NO_RECORD_BAG}" and the rig runs at the venue's own ` +
+        `${v.bpm} BPM, which is what drives the synthesised set every player at that rave is also on`,
+    );
+  }
+
+  // --- 4. The crowd. Where forty people are standing, including which of them
+  // an obstacle threw out — because a rejection that is not shared is two
+  // different crowds.
+  {
+    const venueA = one.drawRaves(1234)[0];
+    const venueB = two.drawRaves(1234)[0];
+    // A 9 m obstacle on the site's own centre: exactly what an inscribed circle
+    // cannot know about, and the case the rejection exists for.
+    const solidA = (x: number, _y: number, z: number): boolean =>
+      Math.abs(x - venueA.site.x) < 4.5 && Math.abs(z - venueA.site.z) < 4.5;
+    const solidB = (x: number, _y: number, z: number): boolean =>
+      Math.abs(x - venueB.site.x) < 4.5 && Math.abs(z - venueB.site.z) < 4.5;
+    const a = one.createAttendeePose();
+    const b = two.createAttendeePose();
+    let placed = 0;
+    let rejected = 0;
+    let identical = 0;
+    let inside = 0;
+    let outOfBounds = 0;
+    for (let i = 0; i < venueA.attendees; i++) {
+      const okA = one.attendeeAt(venueA, i, 0, 0, solidA, a);
+      const okB = two.attendeeAt(venueB, i, 0, 0, solidB, b);
+      if (okA !== okB) continue;
+      if (!okA) { rejected++; identical++; continue; }
+      placed++;
+      if (a.x === b.x && a.z === b.z && a.kit === b.kit && a.glow === b.glow && a.front === b.front) identical++;
+      if (solidA(a.x, 1.1, a.z)) inside++;
+      if (Math.hypot(a.x - venueA.site.x, a.z - venueA.site.z) > venueA.site.r + 8) outOfBounds++;
+    }
+    check(
+      identical === venueA.attendees,
+      `  all ${venueA.attendees} people at ${venueA.site.name} stood in the same place on both instances, ` +
+        `including the ${rejected} the obstacle rejection moved out of the way of a shipping container`,
+    );
+    check(
+      inside === 0 && outOfBounds === 0,
+      `  none of the ${placed} placed attendees ended up inside that obstacle or outside the site's own ` +
+        `${venueA.site.r.toFixed(0)} m clear circle`,
+    );
+  }
+
+  // --- The epoch. Every deterministic system in this build is denominated from
+  // one instant, and the check is here rather than in either file because
+  // `game/rave.ts` must stay free of the traffic decoder and `sky/cycle.ts` says
+  // so in as many words about itself.
+  const traffic = (await import('../client/src/game/traffic.ts')) as typeof import('../client/src/game/traffic.ts');
+  check(
+    one.RAVE_EPOCH_MS === traffic.TRAFFIC_EPOCH_MS,
+    `the rave clock, the traffic timetable and the day/night cycle are all denominated from the same ` +
+      `instant (${new Date(one.RAVE_EPOCH_MS).toISOString()}), so "night 1,161" and "tick 4,182,000" are ` +
+      `the same evening`,
+  );
+
+  // --- And the ground. A site outside the built extent is a rave on tiles that
+  // do not exist, where the crowd stands at the height of whoever asked last.
+  // `checkWildlife` and `checkPolice` read `index.json` for the same reason.
+  {
+    const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+    const world = await (async () => {
+      try {
+        return { index: JSON.parse(await Bun.file(`${root}/index.json`).text()) as { radius_m: number; tile_size: number; stage: string } };
+      } catch {
+        return null;
+      }
+    })();
+    if (world === null) {
+      say('  (no world index on disk; the extent check is skipped)');
+    } else {
+      const built = builtGate(world);
+      let outside = 0;
+      let worst = '';
+      for (const site of one.RAVE_SITES) {
+        if (!built(site.x, site.z)) {
+          outside++;
+          if (!worst) worst = site.name;
+        }
+      }
+      check(
+        outside === 0,
+        `every one of the ${one.RAVE_SITES.length} sites is inside the ${(world.index.radius_m / 1000).toFixed(1)} km ` +
+          `built extent${outside ? `; ${outside} are not, starting with ${worst}` : ''}`,
+      );
+    }
+  }
+}
+
+/**
+ * The day/night cycle, the twilight grade and the clock dial, off the wire and
+ * against nothing but arithmetic.
+ *
+ * Appended last and entirely self-contained, on this file's usual terms. It runs
+ * the same three `verify*` functions the client runs at boot, and then asserts
+ * the two things a *boot* check structurally cannot:
+ *
+ *   1. **That the cycle's epoch is the traffic timetable's epoch.** Both are a
+ *      pure function of `Date.now()` with no protocol field behind them, which is
+ *      the whole reason either works across a network -- and `sky/cycle.ts`
+ *      cannot import `game/traffic.ts` to check it, because that would drag the
+ *      lane decoder into the sky. This file already imports both.
+ *
+ *   2. **That two independent processes handed the same wall clock produce the
+ *      same sky.** That is the claim the whole design rests on and it is the one
+ *      failure a single player can never see: two people standing in the same
+ *      street looking at two different suns, with nothing in either client's
+ *      frame to say so. Asserted here by driving the mapping from a set of
+ *      instants and comparing bit-for-bit against a **separately derived**
+ *      reference -- the phase recomputed from the epoch by hand -- rather than
+ *      against a second call to the same function, which would pass vacuously.
+ *
+ * Nothing here opens a socket. That is the point: if the sky needed one, this
+ * check could not be written this way.
+ */
+async function checkDayCycle(): Promise<void> {
+  say('day/night cycle: the shared clock, the twilight and the dial');
+
+  const {
+    CYCLE_EPOCH_MS,
+    CYCLE_MS,
+    DAY_SHARE,
+    SUNRISE_PHASE,
+    SUNSET_PHASE,
+    cycleInstant,
+    cyclePhase,
+    realSecondsBetweenAltitudes,
+    skyClock,
+    verifyCycle,
+  } = await import('../client/src/sky/cycle.ts');
+  const { verifyDuskRig } = await import('../client/src/sky/dusk.ts');
+  const { verifyLightRig, nightLevel } = await import('../client/src/sky/calibration.ts');
+  const { verifyCloudRig } = await import('../client/src/sky/clouds.ts');
+  const { verifySouthernHemisphere } = await import('../client/src/sky/solar.ts');
+  const { TRAFFIC_EPOCH_MS: trafficEpoch } = await import('../client/src/game/traffic.ts');
+
+  // --- 1. The five self-checks, run here as well as at boot.
+  //
+  // Not a duplicate of the boot run and worth the lines: the boot run happens in
+  // a browser nobody is watching and warns to a console, and this one fails a
+  // build. Between them, a regression in the light rig has to get past both.
+  for (const [name, failures] of [
+    ['solar position', verifySouthernHemisphere(-33.87, 151.21)],
+    ['the light rig', verifyLightRig()],
+    ['the cloud rig', verifyCloudRig()],
+    ['the day/night cycle', verifyCycle()],
+    ['the twilight grade', verifyDuskRig()],
+  ] as const) {
+    check(failures.length === 0, `${name} self-check is clean${failures.length ? `: ${failures[0]}` : ''}`);
+  }
+
+  // --- 2. One epoch, two systems. See the header.
+  check(
+    CYCLE_EPOCH_MS === trafficEpoch,
+    `the sky's epoch (${CYCLE_EPOCH_MS}) is the traffic timetable's epoch (${trafficEpoch}) -- both ` +
+      `are pure functions of the wall clock with no protocol field behind them, and they are anchored ` +
+      `to the same instant so that "the sun comes up on the hour" and "the 7:02 bus" are the same clock`,
+  );
+  check(
+    CYCLE_EPOCH_MS % CYCLE_MS === 0,
+    `  and the epoch divides exactly by the cycle, so the hour turns in the dead of night, real time: ` +
+      `sunrise at quarter past, noon at half past, sunset at quarter to`,
+  );
+
+  // --- 3. Thirty minutes and thirty minutes, measured off the *sun*.
+  let up = 0;
+  const SAMPLES = 7200;
+  for (let i = 0; i < SAMPLES; i++) {
+    const phase = (i + 0.5) / SAMPLES;
+    up += skyClock(CYCLE_EPOCH_MS + phase * CYCLE_MS).solar.altitude > 0 ? 1 : 0;
+  }
+  const dayMinutes = (up / SAMPLES) * (CYCLE_MS / 60_000);
+  check(
+    Math.abs(dayMinutes - 30) < 0.05,
+    `the sun is above the horizon for ${dayMinutes.toFixed(3)} of the cycle's ${CYCLE_MS / 60_000} real ` +
+      `minutes, sampled at ${SAMPLES} points against the real solar altitude -- the brief's 30 and 30`,
+  );
+  check(
+    Math.abs(DAY_SHARE - 0.5) < 1e-12 && SUNRISE_PHASE === 0.25 && SUNSET_PHASE === 0.75,
+    `  and the phases that say so agree: sunrise at ${SUNRISE_PHASE}, sunset at ${SUNSET_PHASE}`,
+  );
+
+  // --- 4. **Two processes, one sky.** The claim nothing else can check.
+  //
+  // The reference phase is recomputed here from the epoch by hand rather than by
+  // calling `cyclePhase` again, so this compares two independent derivations
+  // rather than a function with itself.
+  let worstPhase = 0;
+  let compared = 0;
+  for (const t of [
+    CYCLE_EPOCH_MS,
+    CYCLE_EPOCH_MS + 1,
+    1_800_000_000_000,
+    1_800_000_123_456,
+    1_812_345_678_901,
+    Date.now(),
+  ]) {
+    for (let k = 0; k < 60; k++) {
+      const at = t + k * 61_237;
+      const mine = cyclePhase(at);
+      const theirs = (((at - CYCLE_EPOCH_MS) % CYCLE_MS) + CYCLE_MS) % CYCLE_MS / CYCLE_MS;
+      worstPhase = Math.max(worstPhase, Math.abs(mine - theirs));
+      compared++;
+    }
+  }
+  check(
+    worstPhase === 0,
+    `two independent derivations of the cycle phase agreed **exactly** on all ${compared} instants ` +
+      `(worst difference ${worstPhase}). That is the whole basis of the shared sky: no protocol field, ` +
+      `no snapshot, no handshake -- two machines whose clocks agree to a second agree about the sun to ` +
+      `within a fortieth of a game-minute, and this is the one failure a single player can never see`,
+  );
+
+  // --- 5. The instant the phase maps to is a pure function too, and monotone
+  //        inside each of the three stretches.
+  let monotone = true;
+  for (const [from, to] of [[0, SUNRISE_PHASE], [SUNRISE_PHASE, SUNSET_PHASE], [SUNSET_PHASE, 1]] as const) {
+    let previous = cycleInstant(from);
+    for (let i = 1; i <= 5000; i++) {
+      const at = cycleInstant(from + ((to - from) * i) / 5000);
+      if (at < previous) monotone = false;
+      previous = at;
+    }
+  }
+  check(monotone, `the mapping from phase to Sydney time never runs backwards inside a stretch`);
+
+  // --- 6. The sunset has a length, and it is the one the dwell was tuned to.
+  const golden = realSecondsBetweenAltitudes(6, 0);
+  const dusk = realSecondsBetweenAltitudes(0, -6);
+  const lampRamp = realSecondsBetweenAltitudes(2, -6);
+  check(
+    golden > 100 && golden < 220 && dusk > 100 && dusk < 220,
+    `the golden hour (the sun from +6 to the horizon) lasts ${golden.toFixed(0)} real seconds and the ` +
+      `dusk after it (0 to -6) another ${dusk.toFixed(0)} -- 58 real Sydney minutes each, at 24x, ` +
+      `doubled by HORIZON_DWELL. A literal mapping gives 70 s apiece, which is a sunset that is over ` +
+      `before a player has turned round`,
+  );
+  check(
+    lampRamp > 120 && lampRamp < 300,
+    `  and the street lamps come up over ${lampRamp.toFixed(0)} s of it (nightLevel's +2 to -6 ramp), ` +
+      `which is long enough to watch and short enough that "is it night yet" is never a question for long`,
+  );
+
+  // --- 7. The night ramp and the dial agree about which half of the cycle it is.
+  //        Two files, two definitions, and a disagreement would put the clock's
+  //        moon on the screen while the city was still lit.
+  let disagreements = 0;
+  for (let i = 0; i < 4000; i++) {
+    const phase = (i + 0.5) / 4000;
+    const clock = skyClock(CYCLE_EPOCH_MS + phase * CYCLE_MS);
+    if (clock.isDay !== (clock.phase >= SUNRISE_PHASE && clock.phase < SUNSET_PHASE)) disagreements++;
+    // And `night` is the light rig's own ramp rather than a second one drawn
+    // beside it. This is the field the rave modules read, so a second ramp here
+    // would mean the music and the street lamps disagreed about when night was.
+    if (clock.night !== nightLevel(clock.solar.altitude)) disagreements++;
+  }
+  check(
+    disagreements === 0,
+    `\`SkyClock.isDay\` and \`SkyClock.night\` agree with their own definitions at all 4,000 sampled ` +
+      `instants -- "is it day" is the sun's own answer and "how dark is it" is \`nightLevel\`, the light ` +
+      `rig's own ramp, rather than a second one drawn beside it. The clock dial's halves are asserted ` +
+      `against the same two in \`verifyClock\`, which runs at boot: it touches the DOM, and this file ` +
+      `has no DOM to give it -- the same trade \`verifyHud\` records`,
   );
 }

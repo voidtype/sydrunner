@@ -147,7 +147,7 @@ import {
 } from 'three/tsl';
 import { Vector3 } from 'three/webgpu';
 
-import { luminance, solarRig, type Rgb } from './calibration.ts';
+import { luminance, solarRig, warmthAt, type Rgb } from './calibration.ts';
 
 /* ===========================================================================
  * How bright a cloud is, from the rig that already decides how bright
@@ -249,8 +249,48 @@ export interface CloudRig {
  * `solarRig()`: one pure function, so the renderer and the self-check cannot
  * disagree about what the numbers are.
  */
+/**
+ * How much further above the horizon the sun is **as seen from a cloud base**,
+ * degrees.
+ *
+ * `acos(R / (R + h))` for R = 6,371 km and h = `CUMULUS_ALTITUDE`: the dip of the
+ * true horizon from 1,800 m up. Small, obvious once stated, and the whole of
+ * why a sunset has clouds on fire in it.
+ *
+ * **The ground goes into shadow first.** A cumulus base at 1,800 m keeps its
+ * direct beam for another 1.36 degrees of solar altitude after the street below
+ * it has lost the sun -- which through this cycle is **another 32 real seconds**,
+ * and, far more importantly, means that at the *moment* of sunset the ground is
+ * receiving nothing while the deck overhead is still taking a full grazing beam.
+ * That is the picture everybody has of a Sydney sunset: a dark street, a burning
+ * horizon, and the underside of the cloud lit orange from below.
+ *
+ * Before this the clouds used the ground's own solar altitude, so they went out
+ * with the street and the last two minutes of every day had a spectacular sky
+ * with flat grey cloud sitting in front of it. One term, exactly derived, and
+ * the whole reason it is worth having is that the *order* the two go out in is
+ * the thing the eye reads.
+ *
+ * It applies to the beam only. The skylight a cloud collects is the same sky the
+ * ground sees to within a rounding error, so `fill` below is still built from
+ * the ground's rig -- and the night gate on the warm tint is still the ground's,
+ * which is what stops this term leaving lit clouds over a dark city.
+ *
+ * A function rather than a constant only because `CUMULUS_ALTITUDE` is declared
+ * further down this file, with the rest of the cumulus geometry it belongs
+ * beside; evaluating at call time is a `Math.acos` a frame and keeps the deck's
+ * height stated in exactly one place.
+ */
+export function cloudHorizonDip(): number {
+  const R = 6_371_000;
+  return (Math.acos(R / (R + CUMULUS_ALTITUDE)) * 180) / Math.PI;
+}
+
 export function cloudRig(altitudeDeg: number): CloudRig {
   const rig = solarRig(altitudeDeg);
+  // The beam a *cloud* receives, from a sun that is still up for it. See
+  // `cloudHorizonDip`.
+  const beamRig = solarRig(altitudeDeg + cloudHorizonDip());
   const k = CLOUD_ALBEDO / Math.PI;
 
   /**
@@ -265,19 +305,21 @@ export function cloudRig(altitudeDeg: number): CloudRig {
    * reddened air the beam came through. So the warmth goes on the skylight
    * term, where it lifts all three faces together and keeps their order.
    *
-   * `under` is `calibration.ts`'s own `warmth` shape -- zero above 32 degrees,
-   * one at the horizon -- and `day` is its civil-twilight ramp. Multiplying by
-   * `day` is what stops the tint surviving into the night: below the horizon
+   * `under` is `calibration.ts`'s own warmth curve -- **imported now rather than
+   * copied**, because the day/night pass moved its knee from 32 degrees to 42 and
+   * a second copy of that expression is how the clouds end up turning gold eight
+   * minutes after the light does. `day` is the civil-twilight ramp. Multiplying
+   * by `day` is what stops the tint surviving into the night: below the horizon
    * `under` is 1 and `sunColour` is still the sunset orange it froze at, so
    * without the gate the night sky would carry orange clouds under it.
    */
-  const under = Math.pow(clamp01(1 - Math.max(altitudeDeg, 0) / 32), 1.6);
+  const under = warmthAt(altitudeDeg);
   const day = clamp01((altitudeDeg + 6) / 12);
   const fill = rig.skyColour.map(
     (s, i) => (s + (rig.sunColour[i] - s) * under * day) * rig.hemisphereIntensity,
   ) as Rgb;
 
-  const beam = rig.sunColour.map((c) => c * rig.sunIntensity) as Rgb;
+  const beam = beamRig.sunColour.map((c) => c * beamRig.sunIntensity) as Rgb;
 
   return {
     sunward: beam.map((b, i) => k * (b + fill[i])) as Rgb,

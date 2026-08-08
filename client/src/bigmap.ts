@@ -1522,7 +1522,7 @@ export function verifyBigMap(): string[] {
   // rendered as "somebody who can hit you" is the exact failure that is
   // invisible in a screenshot and wrong in a fight.
   {
-    const kinds: MarkerKind[] = ['training', 'flat-white', 'combatant', 'bike'];
+    const kinds: MarkerKind[] = ['training', 'flat-white', 'combatant', 'bike', 'rave'];
     const seen = new Map<string, MarkerKind>();
     for (const kind of kinds) {
       const ink = markerInk(kind);

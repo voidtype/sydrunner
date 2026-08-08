@@ -20,7 +20,10 @@ import {
 
 import { EXPOSURE } from './sky/calibration.ts';
 import { SydneySky } from './sky/sky.ts';
-import { sydneyTime, verifySouthernHemisphere } from './sky/solar.ts';
+import { verifyCycle } from './sky/cycle.ts';
+import { verifyDuskRig } from './sky/dusk.ts';
+import { SkyClockHud, verifyClock } from './sky/clock.ts';
+import { verifySouthernHemisphere } from './sky/solar.ts';
 import { fetchWorldAsset, verifyCdn } from './world/cdn.ts';
 import { createFacadeGlobals } from './world/facade.ts';
 import { loadFarLayer } from './world/far.ts';
@@ -194,7 +197,21 @@ import {
   verifyBikeGlow,
   verifyBikeMesh,
 } from './world/bike.ts';
-import { CombatAudio } from './game/audio.ts';
+import { CombatAudio, RAVE_AUDIBLE_RANGE } from './game/audio.ts';
+// The camera distance, which is a *scalar* and not a mode -- see `game/camera.ts`
+// for why the boolean this replaced was the reported bug rather than a feature.
+import {
+  CAMERA_MAX,
+  CHASE_RADIUS,
+  isThirdPerson,
+  liveCameraDistance,
+  loadCameraDistance,
+  marchCameraBoom,
+  saveCameraDistance,
+  stepCameraDistance,
+  toggleCameraDistance,
+  verifyCamera,
+} from './game/camera.ts';
 import { FOV_BASE, Feedback } from './game/feedback.ts';
 import { Locator, verifyLocator } from './game/locator.ts';
 // The police, and the faction framework they are the first user of. `factions.ts`
@@ -223,6 +240,28 @@ import {
   type NpcActor,
 } from './game/factions.ts';
 import { PoliceAssets, PoliceSquad, Tracers, policeWarmupParts, verifyPoliceKit } from './world/police.ts';
+// The illegal raves, on the same two-file split as everything ambient in this
+// build: `game/rave.ts` is the arithmetic every client agrees about -- which
+// warehouse, viaduct or park is live tonight, what is on the decks, where forty
+// people are standing -- and `world/rave.ts` is the rig, the lasers and the
+// haze. Nothing about a rave crosses the wire; see either header.
+import {
+  EMPTY_BAG,
+  RAVE_CYCLE_MS,
+  SYDNEY_PARK_SITE,
+  beatAt,
+  deckTitle,
+  drawRaves,
+  liveRaves,
+  nightStartMs,
+  raveNight,
+  raveState,
+  recordBag,
+  setPosition,
+  verifyRaves,
+  type RecordBag,
+} from './game/rave.ts';
+import { RaveAssets, RaveWorld, raveWarmupParts, verifyRaveKit } from './world/rave.ts';
 // The street factions -- meth heads and drunks -- on the same split again:
 // `game/streetlife.ts` is the shared simulation the server runs and
 // `world/streetlife.ts` is the renderer. See either header.
@@ -293,6 +332,12 @@ const WARMUP_DEADLINE_MS = 11000;
 
 async function main(): Promise<void> {
   const hud = new Hud();
+  // The day/night clock, top centre. Constructed here beside the HUD rather than
+  // inside it because it is fed the sky's own `SkyClock` rather than the
+  // `HudState` the overlay takes, and because it draws whether or not the debug
+  // overlay is showing -- it is a player-facing readout, not a diagnostic. It
+  // writes its own SVG into `index.html`'s empty `#clock`; see `sky/clock.ts`.
+  const clockHud = new SkyClockHud();
 
   // --- Self-checks, before anything expensive.
   //
@@ -444,6 +489,16 @@ async function main(): Promise<void> {
   // pedalling in mid-air beside its own saddle, which reads as a rigging bug and
   // is really two files disagreeing. See `game/bikes.ts` and `world/bike.ts`.
   const bikeFailures = timed('bikes', verifyBikes);
+  // And where the camera is looking from, which fails in this project's shape
+  // exactly: every broken version of a zoom draws a perfectly good frame. A
+  // ladder that cannot reach the far end is the reported bug -- *"cant zoom out
+  // anymore by scrolling"* -- and a ladder that cannot get back to first person
+  // is the same bug pointed the other way, with the player stuck behind their own
+  // head. A stop between zero and the near boom puts the camera inside the
+  // player's shoulders, which reads as a broken character model. And a ride floor
+  // that *writes* the preference hands somebody a camera they never asked for on
+  // dismount, which is the bug the boolean before it had. See `game/camera.ts`.
+  const cameraFailures = timed('camera', verifyCamera);
   const bikeMeshFailures = timed('bike model', verifyBikeMesh);
   // And the light a parked one gives off -- the marker under it and the beam
   // over it -- which fails in a third silent way: a flat horizontal surface
@@ -605,6 +660,46 @@ async function main(): Promise<void> {
   // onto one street -- all of them draw something plausible and none of them
   // throws. See `world/nightlights.ts`.
   const nightFailures = timed('night-lights', () => verifyNightLights());
+  // And the day/night cycle, on exactly the night rig's criterion and with one
+  // failure mode nothing else in this list has: **the cycle is the only thing
+  // here that two players can disagree about.** It is a pure function of the
+  // wall clock, deliberately, so that the sky needs no protocol field -- and if
+  // that purity ever breaks, the symptom is two people in the same room looking
+  // at two different skies, which neither of them can see. `verifyCycle` asserts
+  // it directly, along with the halves being half an hour of real time, the
+  // seams landing on the horizon, the wrap being taken in the dark, and the
+  // debug scrub composing.
+  //
+  // `verifyDuskRig` is the same argument one file over: a twilight grade that
+  // leaks into daylight lifts every horizon in the game by a few code values and
+  // reads as a taste decision, and one that never switches off leaves an orange
+  // stain over the western sky at two in the morning that reads as a bloom
+  // artefact. `verifyClock` is the dial, where a quarter turn of rotation reads
+  // as a clock running fast. See `sky/cycle.ts`, `sky/dusk.ts`, `sky/clock.ts`.
+  const cycleFailures = timed('day-cycle', () => verifyCycle());
+  const duskFailures = timed('dusk', () => verifyDuskRig());
+  const clockFailures = timed('clock', () => verifyClock());
+  // And the raves, which sit on the cycle above and inherit its one distinctive
+  // failure mode with interest: **a rave is the most shared thing in the game
+  // and it costs no bytes**, so every way it breaks is a thing two players
+  // disagree about and neither can see. A site draw that is not a pure function
+  // of the night gives everybody their own private rave, and from inside one
+  // browser it looks exactly right. A beat clock that resets at dusk is a crowd
+  // dancing to a bar nobody else is on. A set position that is not a modulo of
+  // wall time is a player who walks in and hears the track start from the top.
+  // A crowd layout that trusts the site's inscribed circle puts forty people
+  // inside the shipping container standing in the middle of the yard.
+  //
+  // It also checks the thing no constant could: `verifyRaves` asks
+  // `skyClock` how dark it actually is in the middle of a modelled night and in
+  // the middle of the morning after, which is the only test that can catch the
+  // quarter-turn rotation between the two clocks being applied the wrong way.
+  // See `game/rave.ts` sections 1 and 6.
+  //
+  // The **kit** half runs later, beside the assets -- see `verifyRaveKit` by
+  // `RaveAssets` -- and is the one that would otherwise ship a laser fan that is
+  // invisible from half the angles it is seen from.
+  const raveFailures = timed('raves', () => verifyRaves());
   // Once, at `debug` so it is out of the way, and slowest-first because the only
   // question anyone asks of this line is which one it was.
   checkMs.sort((a, b) => b[1] - a[1]);
@@ -632,6 +727,7 @@ async function main(): Promise<void> {
     cdnFailures.length ||
     spawnFailures.length ||
     bikeFailures.length ||
+    cameraFailures.length ||
     bikeMeshFailures.length ||
     bikeGlowFailures.length ||
     pedFailures.length ||
@@ -645,6 +741,10 @@ async function main(): Promise<void> {
     wallFailures.length ||
     lifecycleFailures.length ||
     nightFailures.length ||
+    raveFailures.length ||
+    cycleFailures.length ||
+    duskFailures.length ||
+    clockFailures.length ||
     chatFailures.length ||
     chatBoxFailures.length ||
     unstuckFailures.length ||
@@ -673,6 +773,7 @@ async function main(): Promise<void> {
           ...cdnFailures,
           ...spawnFailures,
           ...bikeFailures,
+          ...cameraFailures,
           ...bikeMeshFailures,
           ...bikeGlowFailures,
           ...pedFailures,
@@ -686,6 +787,10 @@ async function main(): Promise<void> {
           ...wallFailures,
           ...lifecycleFailures,
           ...nightFailures,
+          ...raveFailures,
+          ...cycleFailures,
+          ...duskFailures,
+          ...clockFailures,
           ...chatFailures,
           ...chatBoxFailures,
           ...unstuckFailures,
@@ -1090,6 +1195,48 @@ async function main(): Promise<void> {
     hud.fatal('Wildlife kit self-checks failed:\n' + wildlifeKitFailures.map((f) => '  - ' + f).join('\n'));
     return;
   }
+  // The rave rig, up here with the other kits and for the same reason every one
+  // of them moved up here: it has to exist *before* the warm-up runs or its
+  // banner compiles a pipeline on the frame a player first walks within sight of
+  // a rave, which is the frame it is least affordable. Everything else it draws
+  // is instanced and can only be warmed by the scene pass at the bottom of this
+  // function -- see `world/rave.ts` section 2.
+  const raveAssets = new RaveAssets();
+  const raveKitFailures = verifyRaveKit(raveAssets);
+  if (raveKitFailures.length) {
+    hud.fatal('Rave kit self-checks failed:\n' + raveKitFailures.map((f) => '  - ' + f).join('\n'));
+    return;
+  }
+  /**
+   * The record bag, fetched once and never blocking anything.
+   *
+   * `client/public/audio/dj/tracks.json` is written by `scripts/dj-manifest.sh`
+   * and is the whole of what a browser can know about that folder, because a
+   * browser cannot list a directory. It is **28 MB of audio described by 300
+   * bytes of JSON**, and the 300 bytes are all that is fetched here: the records
+   * themselves are streamed by `game/audio.ts` only once a player is close
+   * enough to a live rave to hear one, so somebody who plays for an hour and
+   * never finds a rave downloads nothing.
+   *
+   * Fire-and-forget on `loadClip`'s own terms: a missing or malformed manifest is
+   * a game whose raves run on the synthesised set, which is a complete feature.
+   * A promise anything had to await would put a network round trip in front of
+   * the first frame for a file that is optional by design.
+   */
+  let bag: RecordBag = EMPTY_BAG;
+  void fetch('audio/dj/tracks.json')
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    .then((rows: unknown) => {
+      if (!Array.isArray(rows)) return;
+      bag = recordBag(rows);
+      console.debug(
+        `[rave] record bag: ${bag.tracks.length} track(s)` +
+          (bag.totalSeconds > 0 ? `, ${(bag.totalSeconds / 60).toFixed(1)} min set` : ', no durations (slot fallback)'),
+      );
+    })
+    .catch(() => {
+      // Left empty, which is a working rave with a synthesised set on it.
+    });
   /**
    * The plate field, built here and added to the scene where it always was.
    *
@@ -1164,6 +1311,11 @@ async function main(): Promise<void> {
         ...policeWarmupParts(policeAssets, tracers),
         ...streetlifeWarmupParts(streetAssets),
         ...nameplateWarmupParts(nameplates),
+        // The rave's booth banner, which is the one thing in that whole feature
+        // a stand-in can warm: everything else it draws is instanced, and
+        // `world/rave.ts` section 2 sets out why that means twelve pipelines
+        // that only the scene pass below can reach.
+        ...raveWarmupParts(raveAssets),
         // And **nothing instanced**, which is the change this list most needs
         // explaining. The bikes, the crowd, the traffic, the flock and the
         // headlights were all warmed here and none of them was ever warmed at
@@ -1621,6 +1773,74 @@ async function main(): Promise<void> {
   const wildScratch = createWildScratch();
   const wildPose = createWildPose();
 
+  // --- And the raves, which are the same bargain a fourth time and the densest
+  // instance of it. Six or so are live across the 19.3 km world on any given
+  // night; which six, what is on the decks, how far into it, and where each of
+  // forty people is standing are all pure functions of the wall clock and a site
+  // index, so the whole feature costs **nothing on the wire** and two players
+  // who walk into the same crowd from opposite directions are watching the same
+  // beam sweep the same way to the same bar. `game/rave.ts` section 1 makes the
+  // argument; `game/traffic.ts` and `game/pedestrians.ts` made it first.
+  //
+  // Added to the scene here, at boot, and never removed -- which is what puts
+  // its twelve instanced sets in front of the scene pass at the bottom of this
+  // function. An `InstancedMesh` created later, when a player first neared a
+  // rave, would compile its pipeline inside that frame. See `world/rave.ts`
+  // section 2 and `world/warmup.ts`.
+  const raves = new RaveWorld(raveAssets, pedAssets, characters);
+  for (const mesh of raves.meshes) scene.add(mesh);
+  for (const rig of raves.rigs) scene.add(rig.mesh);
+  scene.add(raves.banner);
+  /**
+   * Which rave the police were last seen arriving at, so the barks fire on the
+   * **edge** rather than every frame of the bust.
+   *
+   * `game/dummies.ts`' rule and `PedestrianCrowd.poseRigs`' rule: a line
+   * re-triggered sixty times a second is not a line, it is a texture. The bust
+   * itself is entirely deterministic and shared -- see `game/rave.ts` section 5
+   * -- and this is the *local presentation* of it, which is the only part a
+   * client is allowed to own.
+   */
+  let bustedVenue = -1;
+
+  /**
+   * The raves this player has been within earshot of, tonight.
+   *
+   * The whole of the map marker's design; see the marker source below for why
+   * one `Set` is the difference between a map and a quest log. Reset when the
+   * night rolls over, in the frame loop, where the index is already in hand.
+   */
+  const heardRaves = new Set<number>();
+  let heardNight = -1;
+
+  /**
+   * What is on, where, at an instant. `sydney.raves.tonight()`'s answer.
+   *
+   * Reads the same three pure functions the renderer and the mixer do, so a
+   * listing can never disagree with what is actually in the world -- which is
+   * the failure a second, console-only path would have had, and which would have
+   * made this tool worse than useless the one time somebody needed it.
+   */
+  const raveListing = (
+    atMs: number,
+  ): Array<{ name: string; kind: string; metres: number; stage: string; deck: string; watched: boolean }> => {
+    const { index } = raveNight(atMs);
+    const out = [];
+    for (const venue of liveRaves(index)) {
+      const state = raveState(venue, atMs);
+      out.push({
+        name: venue.site.name,
+        kind: ['warehouse yard', 'under a bridge', 'parkland'][venue.site.kind],
+        metres: Math.round(Math.hypot(venue.site.x - player.position.x, venue.site.z - player.position.z)),
+        stage: ['load-in', 'doors', 'peak', 'wind-down', 'pack-up', 'busted', 'over'][state.stage],
+        deck: deckTitle(bag, setPosition(venue, bag, atMs)),
+        watched: venue.site.watched,
+      });
+    }
+    out.sort((a, b) => a.metres - b.metres);
+    return out;
+  };
+
   for (const mesh of tracers.meshes) scene.add(mesh);
   /** The offline authority. Empty and unstepped while a server is answering. */
   const factions = new FactionField();
@@ -1875,6 +2095,24 @@ async function main(): Promise<void> {
    * per tick, and a fresh closure on either would be an allocation forever.
    */
   const wildGround = (x: number, z: number): number => groundHeightAt(x, z, -Infinity);
+
+  /**
+   * Is there a building standing here? The rave crowd's own rejection test.
+   *
+   * The same question `setSpawnGuard`'s `solid` asks an ibis and asked in the
+   * same words, because it is the same question: `roofHeight` returns the top of
+   * any prism whose footprint contains the point, so a roof above somebody's
+   * chest means they are *inside* the building rather than beside it.
+   *
+   * A rave site is an inscribed circle -- of an industrial parcel, of a park, of
+   * the void under a viaduct -- and an inscribed circle is guaranteed clear of
+   * the *boundary* and says nothing at all about the shipping container in the
+   * middle of it or the pavilion in the middle of the park. This is what stops
+   * forty people standing in one. Hoisted to a `const` rather than written at
+   * the call site because it is read up to `ATTENDEE_CAP` times a frame and a
+   * fresh closure per frame would be an allocation forever.
+   */
+  const raveSolid = (x: number, y: number, z: number): boolean => collision.roofHeight(x, z, y) > y + 0.4;
 
   // --- Player. Spawn in Sydney Park, dithered about 100 m -- `game/spawn.ts`
   // holds the pin, the rule that keeps the disc on built ground, and the reason
@@ -2839,6 +3077,36 @@ async function main(): Promise<void> {
     }
   });
 
+  /**
+   * The raves you have heard, as a third source.
+   *
+   * ---------------------------------------------------------------------------
+   * **NOT A QUEST ARROW, AND THE DIFFERENCE IS ONE `Set`.**
+   *
+   * The brief was explicit -- *"maybe a marker on the big map once you have
+   * heard it. Do not make it a quest arrow; make it findable the way a real one
+   * is."* -- and there is exactly one line in this build that decides which of
+   * those it is: `heardRaves` only ever gains a site when the player has been
+   * inside `RAVE_AUDIBLE_RANGE` of it with the music on.
+   *
+   * So the map never tells you where a rave is. It remembers where one *was*,
+   * which is the difference between a waypoint and knowing the city -- and it is
+   * how you actually find out about one of these, which is that somebody who was
+   * there tells you afterwards.
+   *
+   * The set is cleared when the night index changes, because a rave is one
+   * night's event and a marker for last night's is a lie about tonight. That
+   * clearing happens in the frame loop beside the rave update, where the night
+   * index is already in hand.
+   */
+  minimap.addMarkerSource((sink) => {
+    if (heardRaves.size === 0) return;
+    for (const venue of liveRaves(raveNight(sky.now.nowMs).index)) {
+      if (!heardRaves.has(venue.site.id)) continue;
+      sink.mark(venue.site.x, venue.site.z, 'rave');
+    }
+  });
+
   // --- The big map, on `M`.
   //
   // The city at up to nine kilometres, north-up, lettered with suburb and street
@@ -2904,21 +3172,37 @@ async function main(): Promise<void> {
    */
   let throwBuffer = 0;
   /**
-   * Whether the player has asked for third person on foot, with `V`.
+   * How far back the player has asked the camera to sit, in metres. 0 is first
+   * person.
    *
-   * A *preference*, not a state: riding forces third person regardless of it,
-   * and dismounting returns to whatever this says. That is why it is a separate
-   * boolean from `thirdPerson` below rather than the same one being toggled by
-   * two things -- a bike that flipped this would leave the player in third
-   * person after getting off, having never asked for it, and the only way back
-   * would be to press a key they may not know exists.
+   * A *preference*, not a state: riding raises a floor under it and dismounting
+   * returns to exactly this number, because nothing but the wheel and `V` ever
+   * writes it. That is the property the boolean this replaced kept getting wrong
+   * -- a bike that wrote the preference left the player in a camera they never
+   * asked for -- and it is now `liveCameraDistance`'s single `Math.max` rather
+   * than a rule anybody has to remember.
    *
-   * Defaults to false. Spec 1 is a first-person game and this is an addition to
-   * it; a build that booted into third person would be a different game by
-   * default.
+   * It is also not `chaseDistance`, which is further down and is the *actual*
+   * boom after the occlusion pull-in has had its say. That separation is what
+   * lets a player back into a terrace, watch the camera duck in to 1 m, and step
+   * out again to the 9.6 m they chose. See `game/camera.ts`.
+   *
+   * Restored from `localStorage`, so the camera you played in last night is the
+   * camera you get tonight. Defaults to first person on a fresh browser: spec 1
+   * is a first-person game and a build that booted into a chase camera would be
+   * a different game by default.
    */
-  let thirdPersonPreferred = false;
-  /** What the camera is actually doing this frame. Riding forces it true. */
+  let cameraDistance = loadCameraDistance();
+  /**
+   * The third-person distance `V` goes back to.
+   *
+   * Separate from `cameraDistance` because that one is zero in first person and
+   * a toggle needs somewhere to have come *from*. Seeded from storage as well,
+   * so the first `V` of a session returns to last night's boom rather than to
+   * the default.
+   */
+  let lastThirdDistance = cameraDistance;
+  /** What the camera is actually doing this frame. Riding floors it at `RIDE_MIN`. */
   let thirdPerson = false;
   /**
    * `E` last frame, for the mount toggle's rising edge.
@@ -3024,45 +3308,83 @@ async function main(): Promise<void> {
   });
 
   /**
-   * Ask for a camera, from `V` or from the wheel.
+   * Ask for a camera distance, from `V` or from the wheel.
    *
-   * One function because there is one preference, and the two bindings differ
-   * only in how they arrive at a boolean. The nudge is the interesting half: a
-   * rider is *forced* into third person, so a request made in the saddle changes
-   * nothing anybody can see, and a control that silently does nothing is a
-   * control a player decides is broken. It goes through the ride pill rather
-   * than `hud.notice` for `simulate`'s reason -- the line says "when you get
-   * off", so it is only true while you are on, and the pill is derived every
-   * tick and comes down by itself the moment you are not.
+   * One function because there is one preference and one place it is written,
+   * which is what keeps the two bindings from disagreeing. It does three things
+   * a caller must not be trusted to remember: it records the distance `V` comes
+   * back to, it persists the choice, and it says something when the choice is
+   * being overridden.
+   *
+   * The nudge is the interesting part, and it is now **conditional** where it
+   * used to be unconditional. A rider has a floor under them (`RIDE_MIN`), so a
+   * rider scrolling between 3.2 m and 12.8 m sees exactly what they asked for
+   * and needs no explanation; only a rider asking for something *under* the
+   * floor -- first person, on a bicycle -- gets a camera other than the one they
+   * pressed for, and a control that silently does nothing is a control a player
+   * decides is broken. It goes through the ride pill rather than `hud.notice`
+   * for `simulate`'s reason: the line says "when you get off", so it is only
+   * true while you are on, and the pill is derived every tick and comes down by
+   * itself the moment you are not.
    */
-  const setCameraPreference = (third: boolean): void => {
-    thirdPersonPreferred = third;
-    if (playerCombat.ridingBike !== 0) {
-      rideNudgeText = `camera: ${third ? 'third' : 'first'} person when you get off`;
+  const setCameraDistance = (metres: number): void => {
+    cameraDistance = metres;
+    // Only a third-person distance is worth remembering: seeding this with zero
+    // would make `V` a key that toggles first person with first person.
+    if (isThirdPerson(cameraDistance)) lastThirdDistance = cameraDistance;
+    saveCameraDistance(cameraDistance);
+    const live = liveCameraDistance(cameraDistance, playerCombat.ridingBike !== 0);
+    if (live !== cameraDistance) {
+      rideNudgeText = `camera: first person when you get off — a bike needs ${live.toFixed(1)} m`;
       rideNudgeT = RIDE_NUDGE_SECONDS;
     }
   };
 
   /**
-   * The wheel: down for third person, up for first.
+   * The wheel: **out for further back, in for closer**, all the way to first
+   * person.
    *
-   * A player found third person by accident, liked it, and asked for the wheel
-   * -- which is the right instinct, because it is the gesture every game with a
-   * chase camera already uses and `V` is a key nobody finds without reading the
-   * list. Both bindings stay, and both write the same `thirdPersonPreferred`.
-   * There is no second flag: two toggles over one preference is how a camera ends
-   * up in a state neither control can explain.
+   * This binding started as a two-state toggle -- down for third person, up for
+   * first -- and the report that came back was *"cant zoom out anymore by
+   * scrolling"*. That is the correct reading of it: every game with a chase
+   * camera puts a distance on this wheel, so a wheel that stops at one fixed
+   * boom is a zoom that has been taken away rather than a mode switch that has
+   * been added. It now moves `cameraDistance` one notch of `game/camera.ts`'s
+   * ladder per event, and `V` toggles the two ends of it. There is still only
+   * one preference behind both bindings: two toggles over one camera is how it
+   * ends up in a state neither control can explain.
    *
    * **Accumulated to a threshold rather than acted on per event**, because the
    * two devices that produce this event are nothing alike. A mouse notch is one
-   * event of about 100 px and should flip the camera on the spot. A trackpad
-   * produces a stream of 2-10 px events for the same physical gesture, and a
-   * handler that flipped on each of them would toggle the camera thirty times
-   * during one two-finger swipe. `WHEEL_CAMERA_STEP` is a shade under a notch so
-   * the mouse keeps its one-gesture-one-flip feel and the trackpad has to mean
-   * it. Reversing direction clears the tally rather than unwinding it, so a
-   * player who overshoots and comes back gets the flip on the gesture they make
-   * next rather than one gesture later.
+   * event of about 100 px and should move the camera one stop on the spot. A
+   * trackpad produces a stream of 2-10 px events for the same physical gesture,
+   * and a handler that stepped on each of them would run the boom from the eye
+   * to 12.8 m during one two-finger swipe. `WHEEL_CAMERA_STEP` is a shade under
+   * a notch so the mouse keeps its one-gesture-one-stop feel and the trackpad has
+   * to mean it.
+   *
+   * Two things changed from the toggle's version of this accumulator, and both
+   * are because the target is a scalar rather than a flag. A **single event
+   * worth several notches steps several times**, which is what a flick of a
+   * free-spinning wheel is. And **the remainder is kept when the event that
+   * produced it was smaller than a step, and discarded when it was bigger**,
+   * which is the one line here that had to be measured rather than reasoned:
+   *
+   *   - A mouse notch arrives as one event of 100-120 px against an 80 px step.
+   *     Keeping the 20-40 px over would bank a whole extra step every three or
+   *     four notches, so a steady scroll would go 1, 1, 1, **2**, 1, 1, 1, **2**
+   *     -- which is not a rounding detail, it is a camera that lurches. Zeroing
+   *     makes one notch exactly one stop for any mouse whose notch is at least
+   *     the step, which is all of them.
+   *   - A trackpad arrives as a stream of 2-10 px events, and zeroing *those*
+   *     throws away up to a step of travel every step, which is a swipe that
+   *     does about half of what the fingers did.
+   *
+   * The size of the event is the only thing here that tells the two devices
+   * apart, and it tells them apart perfectly, because the gap between 10 px and
+   * 100 px is an order of magnitude. Reversing direction still clears the tally
+   * rather than unwinding it, so a player who overshoots and comes back gets the
+   * stop on the gesture they make next rather than one gesture later.
    *
    * `deltaMode` is normalised because Firefox reports lines and not pixels; an
    * unnormalised threshold is a control that needs a different flick per browser.
@@ -3070,7 +3392,7 @@ async function main(): Promise<void> {
    * Passive, and it is the guards below that make that safe. The **map owns the
    * wheel while it is open** -- `bigmap.ts` binds its own non-passive listener on
    * this same window and calls `preventDefault` there -- so this one returns
-   * before it counts anything rather than zooming the map and flipping the camera
+   * before it counts anything rather than zooming the map and moving the camera
    * on one flick. The two listeners never fight, in either bind order, because
    * only one of them is ever interested in the event.
    */
@@ -3096,10 +3418,13 @@ async function main(): Promise<void> {
       if (delta > 0 !== wheelCamera > 0) wheelCamera = 0;
       wheelCamera += delta;
       if (Math.abs(wheelCamera) < WHEEL_CAMERA_STEP) return;
-      // Down -- the direction that pushes the view away from you, which is the
-      // one every chase camera in every game zooms out on.
-      setCameraPreference(wheelCamera > 0);
-      wheelCamera = 0;
+      // Down is positive `deltaY` and is the direction that pushes the view away
+      // from you, which is the one every chase camera in every game zooms out on.
+      // Whole notches only; what happens to the remainder is decided by the size
+      // of the event that produced it -- see the header.
+      const notches = Math.trunc(wheelCamera / WHEEL_CAMERA_STEP);
+      wheelCamera = Math.abs(delta) >= WHEEL_CAMERA_STEP ? 0 : wheelCamera - notches * WHEEL_CAMERA_STEP;
+      setCameraDistance(stepCameraDistance(cameraDistance, notches));
     },
     { passive: true },
   );
@@ -3141,15 +3466,19 @@ async function main(): Promise<void> {
       throwBuffer = PUNCH_BUFFER;
       enableAudio();
     }
-    // `V`: the camera preference, toggled. Edge-triggered like every other toggle
-    // here, or key repeat flips it thirty times a second.
+    // `V`: first person, and back to the distance you were last at. Edge-triggered
+    // like every other toggle here, or key repeat flips it thirty times a second.
     //
-    // Through `setCameraPreference`, which the wheel goes through too -- see
-    // there for the ride nudge and for why there is one preference and not two.
-    // A toggle here and an absolute up/down on the wheel is the difference
-    // between the two bindings and the whole of it: a key has no direction and a
-    // wheel has nothing but one.
-    if (e.code === 'KeyV' && !held) setCameraPreference(!thirdPersonPreferred);
+    // Through `setCameraDistance`, which the wheel goes through too -- see there
+    // for the ride nudge and for why there is one preference and not two. A
+    // toggle here and a relative step on the wheel is the difference between the
+    // two bindings and the whole of it: a key has no direction and a wheel has
+    // nothing but one. `lastThirdDistance` is what makes the key a *toggle* over
+    // a continuous scalar rather than a jump to a fixed boom -- you get back the
+    // camera you were zoomed to, not somebody's default.
+    if (e.code === 'KeyV' && !held) {
+      setCameraDistance(toggleCameraDistance(cameraDistance, lastThirdDistance));
+    }
     // `E`: get on the bike beside you, or off the one you are on.
     //
     // Edge-triggered here for the *prediction* and sent as a level bit for the
@@ -3157,10 +3486,17 @@ async function main(): Promise<void> {
     // level to `simulate`, and this only fires the audio unlock, because the
     // mount itself has to happen inside a fixed step to be predicted at all.
     if (e.code === 'KeyE' && !held) enableAudio();
+    // The four sky scrubs. The time of day now runs on its own and is the same
+    // for every player (see `sky/cycle.ts`), so these no longer *set* a time --
+    // they move an offset on the shared clock, which keeps running underneath.
+    // `T` is solar noon and `N` is the dead of night, both expressed as points
+    // on the cycle rather than as wall-clock times, because the cycle is what
+    // the sky is a function of. A player holding these disagrees with the server
+    // about the sky and about nothing else; `cycle.ts` says why that is safe.
     if (e.code === 'BracketLeft') sky.advance(-30);
     if (e.code === 'BracketRight') sky.advance(30);
-    if (e.code === 'KeyT') sky.setTime(sydneyTime(2026, 2, 15, 15, 0));
-    if (e.code === 'KeyN') sky.setTime(sydneyTime(2026, 2, 15, 21, 30));
+    if (e.code === 'KeyT') sky.scrubTo(0.5);
+    if (e.code === 'KeyN') sky.scrubTo(0.0);
     if (e.code === 'Minus' || e.code === 'Equal') {
       renderScale = Math.max(0.5, Math.min(1.0, renderScale + (e.code === 'Equal' ? 0.05 : -0.05)));
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * renderScale);
@@ -4267,29 +4603,32 @@ async function main(): Promise<void> {
   let koCamera = 0;
 
   /**
-   * The chase camera's numbers.
+   * The chase camera's numbers -- the *rendering* half. How far back the player
+   * asked to be is `cameraDistance`, above, and none of these may write it.
    *
-   * `CHASE_MIN`..`CHASE_MAX` is the brief's 3.5-4.5 m, and it is a *range* rather
-   * than a distance because the two ends do different jobs: 3.5 m is close
-   * enough to walk a footpath in third person without the camera in the shop
-   * window behind you, and 4.5 m at 26 m/s opens the frame up so the speed has
-   * somewhere to read. `CHASE_LIFT` is the brief's 1.5 m over the *eye*, which
-   * puts it about head height above a rider.
+   * `CHASE_OPEN` is the only thing left of the old 3.5-4.5 m range: the boom
+   * opens by up to a metre as the body winds up to 26 m/s, which is the cheapest
+   * way to make a bike read as fast. It is scaled *down* as the chosen distance
+   * grows -- a player already sitting at 11 m does not need another metre, and
+   * would only get the far clamp -- so it is a metre of drama at the near stop
+   * and nothing at the far one. `CHASE_LIFT` is the brief's 1.5 m over the
+   * *eye*, which puts it about head height above a rider.
    *
-   * `CHASE_RADIUS` is the sphere marched out for occlusion: a shade over the
-   * camera's own 0.1 m near plane, so a wall the sphere clears is a wall the
-   * frustum clears. `CHASE_NEAR` is how close it may be driven -- inside that
-   * the player's own body fills the frame and first person is the better answer,
-   * but snapping to first person on a wall would be a jump cut, so it stops
-   * instead. `CHASE_FLOOR` keeps it off the pavement on a downhill.
+   * How far back it can *get* is `camera.marchCameraBoom`, which owns the probe
+   * length, the refinement and `CHASE_RADIUS` -- it is over there rather than
+   * here because those three are the numbers a long boom broke, and
+   * `verifyCamera` marches them against walls a millimetre apart to prove the
+   * camera neither tunnels through one nor hops along it.
+   *
+   * `CHASE_NEAR` is how close the pull-in may drive it -- inside that the
+   * player's own body fills the frame and first person is the better answer, but
+   * snapping to first person on a wall would be a jump cut, so it stops instead.
+   * `CHASE_FLOOR` keeps it off the pavement on a downhill.
    */
-  const CHASE_MIN = 3.5;
-  const CHASE_MAX = 4.5;
+  const CHASE_OPEN = 1.0;
   const CHASE_LIFT = 1.5;
-  const CHASE_RADIUS = 0.28;
   const CHASE_NEAR = 0.9;
   const CHASE_FLOOR = 0.4;
-  const CHASE_STEPS = 8;
   /** Time constant for easing *outward* only. See the loop. */
   const CHASE_TAU = 0.14;
   let chaseDistance = CHASE_NEAR;
@@ -4456,10 +4795,14 @@ async function main(): Promise<void> {
     // *looked at from*. Nothing here is ever written back into `PlayerState` --
     // `game/feedback.ts` states that rule and the knockout drop above obeys it.
     //
-    // **Riding forces it**, and a preference is remembered separately, so
-    // getting off a bike returns you to whatever you had before rather than
-    // leaving you in a camera you never asked for. See `thirdPersonPreferred`.
-    const wantThird = playerCombat.ridingBike !== 0 || thirdPersonPreferred;
+    // **Riding puts a floor under the distance** rather than overwriting it, so
+    // getting off a bike returns you to exactly what you had before rather than
+    // leaving you in a camera you never asked for. `liveCameraDistance` is that
+    // one `Math.max` and is called every frame rather than on the mount event,
+    // because a ride can end for reasons no event fires for. See
+    // `game/camera.ts`.
+    const chosenDistance = liveCameraDistance(cameraDistance, playerCombat.ridingBike !== 0);
+    const wantThird = isThirdPerson(chosenDistance);
     if (wantThird !== thirdPerson) {
       thirdPerson = wantThird;
       // The body, the bat in its hand and the football in the other. Three calls
@@ -4503,11 +4846,23 @@ async function main(): Promise<void> {
       const dirX = -sinY * cosP;
       const dirY = Math.sin(player.pitch);
       const dirZ = -cosY * cosP;
-      // How far back the camera *wants* to be, before anything is in the way.
-      // Further at speed, which is the cheapest way to make 26 m/s read as fast:
-      // the frame opens up as the bike winds on.
+      // How far back the camera *wants* to be, before anything is in the way:
+      // the distance the player asked for, opened up a little at speed. See
+      // `CHASE_OPEN` -- the bonus fades out as the chosen boom grows, so it is a
+      // metre of drama on a bike at the near stop and nothing at all at 12.8 m,
+      // where it would only be eaten by the clamp anyway.
+      //
+      // Recomputed from `chosenDistance` every frame rather than accumulated,
+      // which is the property that keeps the occlusion pull-in below temporary:
+      // `chaseDistance` is where the camera *is* and this is what it is trying to
+      // get back to, so backing into a terrace and stepping out again returns you
+      // to the boom you chose rather than to wherever the wall left you.
       const speed = Math.hypot(player.velocity.x, player.velocity.z);
-      const want = CHASE_MIN + Math.min(1, speed / 26) * (CHASE_MAX - CHASE_MIN);
+      const want = Math.min(
+        CAMERA_MAX,
+        chosenDistance +
+          Math.min(1, speed / 26) * CHASE_OPEN * Math.max(0, 1 - chosenDistance / CAMERA_MAX),
+      );
       // --- Occlusion, as a sphere march rather than a ray cast.
       //
       // `collision.resolve` answers "can a circle of radius r be here", which is
@@ -4516,16 +4871,17 @@ async function main(): Promise<void> {
       // wall's corner and leave the camera inside it; a sphere of the camera's
       // own near-plane radius cannot.
       //
-      // Eight steps over 4.5 m is 56 cm a step, which is under the sphere's own
-      // diameter, so nothing thinner than a step can be tunnelled through. It
-      // runs once a frame against a grid query that is already the cheapest
-      // thing in `collision.ts`.
+      // The march itself is `camera.marchCameraBoom` -- a fixed step length and
+      // therefore a variable number of probes, refined by bisection at the end.
+      // Its header carries that argument and `verifyCamera` asserts it; what is
+      // left here is the only part that needs the world, which is the question
+      // it asks. It runs once a frame against a grid query that is already the
+      // cheapest thing in `collision.ts`.
       const headX = player.position.x;
       const headY = player.position.y;
       const headZ = player.position.z;
-      let reach = want;
-      for (let s = 1; s <= CHASE_STEPS; s++) {
-        const d = (want * s) / CHASE_STEPS;
+      /** Is the boom clear at `d` metres back? */
+      const blockedAt = (d: number): boolean => {
         const px = headX - dirX * d;
         const pz = headZ - dirZ * d;
         const py = headY - dirY * d + CHASE_LIFT;
@@ -4534,14 +4890,12 @@ async function main(): Promise<void> {
         // boom's own height -- a camera is a point, and a 1.8 m head on it would
         // snap the chase in against a soffit the player is walking happily
         // under. See `CollisionWorld.resolve`.
-        if (
+        return (
           collision.resolve(px, pz, px, pz, CHASE_RADIUS, py, py).hit ||
           py < groundHeightAt(px, pz, py) + CHASE_FLOOR
-        ) {
-          reach = Math.max(CHASE_NEAR, ((want * (s - 1)) / CHASE_STEPS) - 0.05);
-          break;
-        }
-      }
+        );
+      };
+      const reach = marchCameraBoom(want, CHASE_NEAR, blockedAt);
       // Eased outward and snapped inward. Coming *out* from a wall should be
       // gentle; going *in* must be immediate, or the camera spends a frame
       // inside the building it just found.
@@ -4685,6 +5039,12 @@ async function main(): Promise<void> {
     minimap.setReadout(locator.text);
 
     // Night factor drives the lit-window shader. Ramps across civil twilight.
+    //
+    // Read one line *before* `sky.update()`, which is where the shared day/night
+    // clock now advances, so these two uniforms are a frame behind the sky they
+    // belong to. Left that way deliberately rather than reordered: the ramp they
+    // sit on takes 187 real seconds to cross, so a frame is 0.009% of it, and
+    // the alternative is moving lines that the camera work in flight owns.
     const alt = sky.solar.altitude;
     globals.nightFactor.value = 1 - Math.min(Math.max((alt + 5) / 11, 0), 1);
     const d = sky.solar.direction;
@@ -4698,6 +5058,12 @@ async function main(): Promise<void> {
     // otherwise be the first thing to compose them, one call too late.
     camera.updateMatrixWorld();
     sky.update(camera);
+    // The clock, fed the sky's own instant rather than reading `Date.now()` for
+    // itself -- which is what makes the HUD agree with the window while somebody
+    // is scrubbing with `[` and `]`. Cheap by construction: it compares four
+    // numbers and touches the DOM only when the marker has moved a third of a
+    // pixel or the game minute has rolled over. See `sky/clock.ts`.
+    clockHud.update(sky.now);
     // The altitude goes with the frustum, and it is not a duplicate of it: the
     // frustum says where the shadow *volume* is, and the altitude is what turns
     // that box into the patch of ground it covers -- which stretches along the
@@ -4779,6 +5145,98 @@ async function main(): Promise<void> {
       player.position.x,
       player.position.z,
     );
+
+    // --- And the raves, immediately after the crowd because they are the same
+    // crowd: `world/rave.ts` draws its attendees out of `PedestrianAssets`'
+    // geometry and its dancers out of the same `CharacterActor` pool the street
+    // uses, so the two features share a budget as well as a rig.
+    //
+    // Fed `sky.now` rather than `Date.now()`, which is the one line that keeps
+    // this feature honest about the clock. `SkyClock.nowMs` carries the debug
+    // scrub, so pressing `[` back to two in the morning genuinely moves the
+    // raves with the sky rather than leaving an empty warehouse under a night
+    // sky; and `SkyClock.night` is the *same* darkness ramp the street lamps,
+    // the lit windows and the torch already share, so nothing here can glow at
+    // three in the afternoon even if the two clocks were ever rotated apart.
+    // See `game/rave.ts` section 6 and `sky/cycle.ts`.
+    //
+    // `wildGround` rather than `groundHeightAt`: a rave stands on the ground,
+    // and a query that folded in a roof would put a truss on top of the shed it
+    // is parked beside the moment the two footprints overlapped. It is exactly
+    // the argument that function's own comment makes for a bush turkey.
+    raves.update({
+      nowMs: sky.now.nowMs,
+      dt: frameDt,
+      x: player.position.x,
+      z: player.position.z,
+      night: sky.now.night,
+      ground: wildGround,
+      solid: raveSolid,
+      bag,
+    });
+
+    // The sound system. One call, unconditionally, with whatever was nearest --
+    // so there is exactly one place in the build that decides what a rave sounds
+    // like and no audio state anywhere else. `game/audio.ts`'s own header sets
+    // out the low-pass, the streaming decks and the synthesised set; what is
+    // here is the translation from "the nearest rave" to "the mix".
+    //
+    // The record is chosen for the *nearest* venue only. A second rave inside
+    // earshot would be a second `MediaElementAudioSourceNode` and a second
+    // stream for something the first one is already drowning out; what a player
+    // between two raves hears is the nearer one, which is what a player between
+    // two raves hears.
+    const near = raves.nearest;
+    // What the map is allowed to remember. One test, in one place: you have to
+    // have been close enough to hear it, with the music actually on. See the
+    // marker source for why that single condition is the entire design of this
+    // feature's UI.
+    {
+      const tonight = raveNight(sky.now.nowMs).index;
+      if (tonight !== heardNight) {
+        heardNight = tonight;
+        heardRaves.clear();
+      }
+      if (near && near.playing && near.distance <= RAVE_AUDIBLE_RANGE) heardRaves.add(near.venue.site.id);
+    }
+    if (near && near.playing && near.distance <= RAVE_AUDIBLE_RANGE) {
+      const track = near.position.track >= 0 ? bag.tracks[near.position.track] : undefined;
+      const nextTrack = near.position.next >= 0 ? bag.tracks[near.position.next] : undefined;
+      audio.raveUpdate({
+        // The venue *and* the night, so a rave that runs over into a second
+        // evening rebuilds rather than carrying yesterday's deck state.
+        key: near.venue.site.id * 4096 + (near.venue.night & 0xfff),
+        distance: near.distance,
+        url: track ? `audio/dj/${encodeURIComponent(track.file)}` : null,
+        offset: near.position.offset,
+        nextUrl: nextTrack ? `audio/dj/${encodeURIComponent(nextTrack.file)}` : null,
+        remaining: near.position.remaining,
+        bpm: near.bpm,
+        beat: beatAt(sky.now.nowMs, near.bpm),
+        // Under a viaduct, and nowhere else. A concrete soffit over a hard apron
+        // is the most recognisable acoustic in the city and it costs one
+        // convolver; see `game/audio.ts`'s `raveImpulse`.
+        reverb: near.venue.site.kind === 1,
+        playing: true,
+      });
+    } else {
+      audio.raveUpdate(null);
+    }
+
+    // And the police arriving, which is the *local* half of a shared event. The
+    // bust itself is a pure function of the night and the site -- every client
+    // agrees about it to the millisecond, and a player cannot cause it, for the
+    // reason `game/rave.ts` section 5 gives at length. What a client owns is
+    // what it feels like to be standing there when it happens: one bark from
+    // whoever is nearest, on the edge rather than every frame.
+    if (near && near.busted && near.distance < 90) {
+      if (bustedVenue !== near.venue.site.id) {
+        bustedVenue = near.venue.site.id;
+        audio.bark(POLICE_CLIPS[near.venue.site.id % POLICE_CLIPS.length], near.distance, 8);
+      }
+    } else if (!near || !near.busted) {
+      bustedVenue = -1;
+    }
 
     // --- The police, both tiers, from whichever authority is running.
     //
@@ -5320,6 +5778,34 @@ async function main(): Promise<void> {
           actors: flock.actors,
           costMs: flock.costMs,
         },
+        /**
+         * The raves. `costMs` is the number this feature is judged on and the
+         * one to read after adding anything to `world/rave.ts`; the rest is
+         * there because a rave is the one ambient system whose *absence* is
+         * indistinguishable from it working -- five nights in eighty a given
+         * site is dark on purpose, so "I cannot find one" needs an answer that
+         * is not "walk around".
+         *
+         * `sydney.raves.tonight()` lists them; `sydney.raves.go()` goes.
+         */
+        raves: {
+          drawn: raves.drawn,
+          beams: raves.beamsDrawn,
+          attendees: raves.attendeesDrawn,
+          rigged: raves.rigged,
+          costMs: raves.costMs,
+          nearest: raves.nearest
+            ? {
+                name: raves.nearest.venue.site.name,
+                metres: Math.round(raves.nearest.distance),
+                stage: ['load-in', 'doors', 'peak', 'wind-down', 'pack-up', 'busted', 'over'][raves.nearest.stage],
+                deck: raves.nearest.title,
+                bpm: raves.nearest.bpm,
+                into: Math.round(raves.nearest.position.offset),
+              }
+            : null,
+          tracks: bag.tracks.length,
+        },
         collisionBuildings: collision.buildingCount,
         // The invisible walls. `tiles` returning to zero as the player stands
         // still is the streaming gap closing; a `tiles` that does not move is a
@@ -5442,6 +5928,88 @@ async function main(): Promise<void> {
      * count which says the bug is back. See `world/warmup.ts`.
      */
     warmupAudit: auditNow,
+
+    /**
+     * The raves, for the console.
+     *
+     * `sydney.raves.tonight()` is the one to type, and it exists because this is
+     * the only ambient feature in the build whose *absence* is indistinguishable
+     * from it working: a given site is dark seventy-nine nights in eighty by
+     * design, so "there is no rave in Sydney Park" is almost always correct and
+     * is occasionally a bug. This lists what the shared clock says is on, where,
+     * how far through, and what is on the decks -- and because every one of
+     * those is a pure function of the night index, **two people running it at
+     * the same moment get the same list**, which is the whole claim the feature
+     * makes and the only way to check it from outside.
+     *
+     * `sydney.raves.at(n)` does the same for any night, past or future, which is
+     * how you find one to look at rather than waiting for one.
+     */
+    raves: {
+      world: raves,
+      tonight: () => raveListing(sky.now.nowMs),
+      at: (night: number) => raveListing(nightStartMs(night) + RAVE_CYCLE_MS * 0.25),
+      /** Which nights, from here on, Sydney Park is on. The user asked for it by name. */
+      sydneyPark: (within = 40) => {
+        const from = raveNight(sky.now.nowMs).index;
+        const out: number[] = [];
+        for (let n = from; n < from + within; n++) {
+          if (drawRaves(n).some((v) => v.site.id === SYDNEY_PARK_SITE)) out.push(n);
+        }
+        return out;
+      },
+      selfChecks: () => verifyRaves().concat(verifyRaveKit(raveAssets)),
+      /**
+       * Stand at the back of a live rave's crowd, facing the rig.
+       *
+       * `sydney.raves.go()` takes the nearest one on tonight; a name takes that
+       * one. The viewpoint is deliberately *behind* the crowd rather than in it,
+       * because that is where the layout is designed to be arrived at from --
+       * see `boothPosition` in `game/rave.ts`.
+       */
+      go: (name?: string) => {
+        const list = liveRaves(raveNight(sky.now.nowMs).index);
+        const venue = name
+          ? list.find((v) => v.site.name.toLowerCase().includes(name.toLowerCase()))
+          : list
+              .slice()
+              .sort(
+                (p, q) =>
+                  Math.hypot(p.site.x - player.position.x, p.site.z - player.position.z) -
+                  Math.hypot(q.site.x - player.position.x, q.site.z - player.position.z),
+              )[0];
+        if (!venue) return `nothing on tonight${name ? ` called "${name}"` : ''}`;
+        // Behind the crowd on the bearing, looking down it at the booth -- but
+        // *outdoors*. A warehouse yard's inscribed circle is clear of the fence
+        // and says nothing about the shed the arrival point lands in, and being
+        // teleported inside a wall is the one way this tool can waste somebody's
+        // time. Six offers, the crowd's own rejection test, first one that is
+        // standing in the open.
+        const s = Math.sin(venue.bearing);
+        const c = Math.cos(venue.bearing);
+        let x = venue.site.x + s * venue.depth * 1.5;
+        let z = venue.site.z + c * venue.depth * 1.5;
+        for (const [back, side] of [[1.5, 0], [1.9, 0], [1.5, 0.5], [1.5, -0.5], [2.4, 0], [1.1, 0]] as const) {
+          const px = venue.site.x + s * venue.depth * back + c * venue.depth * side;
+          const pz = venue.site.z + c * venue.depth * back - s * venue.depth * side;
+          const g = wildGround(px, pz);
+          if (!raveSolid(px, g + 1.1, pz)) { x = px; z = pz; break; }
+        }
+        player.position.set(x, wildGround(x, z) + EYE_HEIGHT, z);
+        player.velocity.set(0, 0, 0);
+        // Looking *down* the bearing at the booth. `controller`'s convention is
+        // that yaw 0 faces -Z and forward is `(-sin yaw, -cos yaw)`; the booth is
+        // at `centre - (sin b, cos b) * depth` and the arrival point is on the
+        // far side of it, so the direction to look is exactly `-(sin b, cos b)`
+        // and the yaw that produces it is `atan2(sin b, cos b)`. Adding a half
+        // turn -- which the first cut did -- points the camera at the suburb
+        // behind you, which is a very quiet way for this tool to appear broken.
+        input.yaw = Math.atan2(s, c);
+        input.pitch = 0;
+        applyToCamera(player, camera);
+        return `${venue.site.name}, ${['warehouse yard', 'under a bridge', 'parkland'][venue.site.kind]}`;
+      },
+    },
 
     night: {
       rig: nightLights,

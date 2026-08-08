@@ -25,6 +25,7 @@
 import {
   Color,
   DirectionalLight,
+  Fog,
   Frustum,
   HemisphereLight,
   LinearSRGBColorSpace,
@@ -37,7 +38,19 @@ import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
 
 import { bounceDirection, solarRig, verifyLightRig } from './calibration.ts';
 import { CloudLayer, verifyCloudRig } from './clouds.ts';
-import { solarPosition, sydneyTime, type SolarPosition } from './solar.ts';
+import {
+  CYCLE_MS,
+  DAY_LENGTH_MS,
+  DAY_SHARE,
+  SYDNEY_LATITUDE,
+  SYDNEY_LONGITUDE,
+  cyclePhase,
+  skyClock,
+  verifyCycle,
+  type SkyClock,
+} from './cycle.ts';
+import { DuskGrade, duskRig, verifyDuskRig } from './dusk.ts';
+import { type SolarPosition } from './solar.ts';
 
 export interface SkyOptions {
   latitude: number;
@@ -46,6 +59,19 @@ export interface SkyOptions {
   shadowRadius?: number;
   shadowMapSize?: number;
 }
+
+/**
+ * The clock's default step for `advance()`, in **game** minutes.
+ *
+ * The debug scrub is expressed in game minutes because that is what a developer
+ * means by "half an hour later", and it is converted here rather than in
+ * `cycle.ts` because the conversion is not exact: the cycle's rate varies with
+ * the dwell, so half an hour of Sydney is 75 real seconds in the middle of the
+ * day and 150 at the horizon. The average rate is used, so `]` moves *about*
+ * half an hour and always the same amount of real time -- which is the property
+ * that keeps the scrub composable (see `skyClock`'s contract).
+ */
+const SCRUB_MS_PER_GAME_MINUTE = (DAY_SHARE * CYCLE_MS * 60_000) / DAY_LENGTH_MS;
 
 /**
  * Sydney's atmosphere. Turbidity 2.2 is a clean coastal sky -- the value that
@@ -118,6 +144,23 @@ export class SydneySky {
    */
   readonly clouds: CloudLayer;
 
+  /**
+   * The twilight grade, composited **under** the clouds.
+   *
+   * `SkyMesh` is a daylight model and goes to black 2.3 degrees below the
+   * horizon; this is the horizon burn, the anti-twilight arch and the zenith
+   * wash that a real dusk has and Preetham does not. See `dusk.ts` for the
+   * measurement and for why it must never become a material variant.
+   *
+   * The ordering is load-bearing: the dome's node goes through this and the
+   * result is handed to `CloudLayer`, so the clouds composite over an already
+   * burning sky and read as silhouettes against it. Wrapping the other way round
+   * -- grading the composited result -- would put the glow *on* the clouds and
+   * is the difference between a sunset with clouds in it and a sunset with
+   * clouds painted on top.
+   */
+  readonly dusk: DuskGrade;
+
   /** Half-extent of the shadow volume, metres. Read by the streamer. */
   readonly shadowRadius: number;
 
@@ -131,8 +174,6 @@ export class SydneySky {
    */
   readonly shadowVolume = new Frustum();
 
-  private readonly latitude: number;
-  private readonly longitude: number;
   private readonly sunDistance: number;
   private readonly shadowProjScreen = new Matrix4();
   /** Light-space basis, rebuilt each frame for the texel snap below. */
@@ -140,13 +181,48 @@ export class SydneySky {
   private readonly lightUp = new Vector3();
   private readonly snapCentre = new Vector3();
   private sunVector = new Vector3();
-  private current: SolarPosition;
-  private date: Date;
+  private clock: SkyClock;
+
+  /**
+   * The scene, kept so `applySolar` can colour the fog.
+   *
+   * `scene.fog` is created by `main.ts` *after* this constructor runs, so it is
+   * read lazily rather than captured -- see `applySolar`. Aerial perspective
+   * stands in for the sky behind the thing it is fading, which is exactly why it
+   * cannot be a constant once the sky changes colour: a pale blue haze over a
+   * burning horizon reads as a bug in the renderer rather than as distance.
+   */
+  private readonly scene: Scene;
+
+  /**
+   * The debug scrub, in **real** milliseconds added to the wall clock.
+   *
+   * One number, added in one place, because `skyClock` guarantees
+   * `skyClock(t, s) === skyClock(t + s)` -- so this is genuinely an offset and
+   * not a second clock. Zero in every shipped session; `T`, `N`, `[` and `]`
+   * move it. A player who has scrubbed disagrees with everyone else about the
+   * sky and about nothing else at all; see `cycle.ts`'s note on why that is
+   * safe, and check it again if anything in the simulation ever starts caring
+   * what time it is.
+   */
+  private scrubMs = 0;
 
   constructor(scene: Scene, opts: SkyOptions) {
-    this.latitude = opts.latitude;
-    this.longitude = opts.longitude;
+    this.scene = scene;
     this.shadowRadius = opts.shadowRadius ?? 220;
+    // The coordinates are `cycle.ts`'s now, because the cycle's two seams are
+    // *solved horizon crossings* and a horizon is a function of latitude -- a
+    // sky built for Perth would run Sydney's sunrise over Perth's sun. The
+    // options are kept rather than removed so the call site still reads as a
+    // statement of where this is, and checked rather than ignored so that
+    // statement cannot quietly become false.
+    if (opts.latitude !== SYDNEY_LATITUDE || opts.longitude !== SYDNEY_LONGITUDE) {
+      console.warn(
+        `[sky] Built at ${opts.latitude}, ${opts.longitude} but the day/night cycle is solved for ` +
+          `${SYDNEY_LATITUDE}, ${SYDNEY_LONGITUDE}. The sun will be right and the sunrise and sunset ` +
+          `seams will not be on the horizon. See cycle.ts.`,
+      );
+    }
 
     this.sky = new SkyMesh();
     // The sky is a fixed backdrop; scaling it large and disabling frustum
@@ -191,7 +267,15 @@ export class SydneySky {
     if (this.sky.material.colorNode === null) {
       throw new Error('[sky] SkyMesh built no colorNode; the cloud layer has nothing to composite over.');
     }
-    this.clouds = new CloudLayer(this.sky.material.colorNode, this.sky.sunPosition);
+    // Dome -> twilight grade -> clouds, in that order, and the order is the
+    // whole design. The grade adds the horizon burn and the anti-twilight arch
+    // to the *sky*, and the clouds then composite over it, so at dusk they read
+    // as silhouettes against a burning horizon rather than as bright shapes with
+    // a glow painted over them. Both are one node graph on one material, built
+    // here and never rebuilt: no dusk-only variant exists to be compiled the
+    // frame the sun goes down. See `dusk.ts`'s header on why that matters.
+    this.dusk = new DuskGrade(this.sky.material.colorNode, this.sky.sunPosition);
+    this.clouds = new CloudLayer(this.dusk.colourNode, this.sky.sunPosition);
     this.sky.material.colorNode = this.clouds.colourNode;
     scene.add(this.sky);
 
@@ -310,9 +394,10 @@ export class SydneySky {
     scene.add(this.bounce);
     scene.add(this.bounce.target);
 
-    // 3 pm, mid-February -- the spec's own reference for "looks like Sydney".
-    this.date = sydneyTime(2026, 2, 15, 15, 0);
-    this.current = solarPosition(this.date, this.latitude, this.longitude);
+    // The shared clock. Not a fixed reference instant any more: the time of day
+    // is a pure function of the wall clock, identical on every machine, and this
+    // is simply the first read of it. See `cycle.ts`.
+    this.clock = skyClock(Date.now(), this.scrubMs);
     this.applySolar();
 
     // Same philosophy as `verifySouthernHemisphere()`: the failures this project
@@ -330,30 +415,93 @@ export class SydneySky {
     for (const failure of verifyCloudRig()) {
       console.warn(`[sky] ${failure}`);
     }
+    // And the two this pass adds, on identical terms. A cycle whose halves are
+    // not half an hour is a feature that quietly does not do what it was asked;
+    // a twilight grade that leaks into daylight lifts every horizon in the game
+    // by a few code values. Neither throws, neither costs frame time, and both
+    // read as taste decisions from inside the game.
+    for (const failure of verifyCycle()) {
+      console.warn(`[sky] ${failure}`);
+    }
+    for (const failure of verifyDuskRig()) {
+      console.warn(`[sky] ${failure}`);
+    }
   }
 
-  /** The instant being rendered. */
+  /**
+   * **The clock, and the answer to "what time is it and how dark is it".**
+   *
+   * Refreshed once per `update()`, so everything in a frame reads one consistent
+   * instant rather than sampling `Date.now()` at four different points. Anything
+   * outside `sky/` that wants the time of day should read this rather than
+   * calling `skyClock()` itself -- not for the cost (it is a few hundred
+   * nanoseconds) but so that a scrubbing developer's `[` and `]` move the whole
+   * world's appearance together instead of half of it.
+   *
+   * `night` on it is `calibration.nightLevel` and is the single ramp everything
+   * after dark shares.
+   */
+  get now(): SkyClock {
+    return this.clock;
+  }
+
+  /** The Sydney instant being rendered. */
   get time(): Date {
-    return this.date;
+    return this.clock.date;
   }
 
   get solar(): SolarPosition {
-    return this.current;
+    return this.clock.solar;
   }
 
-  setTime(date: Date): void {
-    this.date = date;
-    this.current = solarPosition(date, this.latitude, this.longitude);
+  /**
+   * Re-read the shared clock. Called at the top of `update()`, which is the only
+   * caller -- the clock advances by itself and nothing has to drive it.
+   */
+  private tick(): void {
+    this.clock = skyClock(Date.now(), this.scrubMs);
     this.applySolar();
   }
 
-  /** Advance the clock by `minutes` of Sydney time. */
+  /**
+   * Scrub the sky by `minutes` of Sydney time. `[` and `]`.
+   *
+   * An **offset on the shared clock**, not a second clock: the sky keeps
+   * running, and what changes is where in the cycle it is running. Half an hour
+   * of Sydney is not a fixed amount of real time (the dwell sees to that), so
+   * the average rate is used -- `]` moves the same 75 real seconds every time,
+   * which is what keeps `skyClock(t, s) === skyClock(t + s)` true and what makes
+   * the scrub a single number rather than a piece of state with its own rules.
+   */
   advance(minutes: number): void {
-    this.setTime(new Date(this.date.getTime() + minutes * 60_000));
+    this.scrubMs += minutes * SCRUB_MS_PER_GAME_MINUTE;
+    this.tick();
+  }
+
+  /**
+   * Scrub to a given point in the cycle: 0.25 is sunrise, 0.5 solar noon, 0.75
+   * sunset, 0 the dead of night. `T` and `N`, and the handle to reach for from
+   * the console when looking at a sunset -- `sydney.sky.scrubTo(0.752)`.
+   *
+   * Always forward, so the sky never runs backwards to get there.
+   */
+  scrubTo(phase: number): void {
+    const wanted = ((phase % 1) + 1) % 1;
+    const current = cyclePhase(Date.now() + this.scrubMs);
+    // Parenthesised rather than relying on `%` and `*` having equal precedence,
+    // which they do and which nobody should have to remember while reading a
+    // line whose whole job is to wrap.
+    this.scrubMs += ((((wanted - current) % 1) + 1) % 1) * CYCLE_MS;
+    this.tick();
+  }
+
+  /** How far the sky has been scrubbed from the shared clock, in real ms. Zero in a shipped session. */
+  get scrub(): number {
+    return this.scrubMs;
   }
 
   private applySolar(): void {
-    const d = this.current.direction;
+    const d = this.clock.solar.direction;
     this.sunVector.set(d.x, d.y, d.z);
     this.sky.sunPosition.value.copy(this.sunVector);
 
@@ -362,7 +510,8 @@ export class SydneySky {
     // numbers are. Intensity now falls off by Beer-Lambert against air mass
     // rather than an invented power curve, so the sun dims and reddens together
     // and actually reaches zero at the horizon.
-    const rig = solarRig(this.current.altitude);
+    const altitude = this.clock.solar.altitude;
+    const rig = solarRig(altitude);
 
     this.sun.intensity = rig.sunIntensity;
     // `setRGB` writes in the *working* colour space, which is linear -- these
@@ -387,7 +536,7 @@ export class SydneySky {
     // night handling: it is a fraction of the beam that landed on the pavement,
     // so it goes to zero exactly when the beam does. `KeyN` at 21:30 gets a rig
     // identical to the one before this light existed.
-    const b = bounceDirection(this.current.azimuth);
+    const b = bounceDirection(this.clock.solar.azimuth);
     this.bounce.position.set(
       b.x * BOUNCE_DISTANCE,
       b.y * BOUNCE_DISTANCE,
@@ -399,7 +548,38 @@ export class SydneySky {
     // The clouds, from the same altitude and in the same place, so a cloud lit
     // for 3 pm can never be left over a 6 pm city. This is the only call in this
     // file that touches them: they take the rig and give nothing back.
-    this.clouds.setSolarAltitude(this.current.altitude);
+    this.clouds.setSolarAltitude(altitude);
+
+    // The twilight, from the same altitude, into the same kind of uniforms. Two
+    // of the four things it sets are `SkyMesh`'s *own* parameters -- turbidity
+    // and the Mie coefficient -- which are uniforms on the dome's existing
+    // material and therefore cost nothing to move: no new node, no new key, no
+    // recompile. Ramping them is the cheapest large improvement in this whole
+    // pass, because Preetham already knows how to draw a hazy sunset and was
+    // only ever being asked for a clear noon.
+    const twilight = duskRig(altitude);
+    this.sky.turbidity.value = twilight.turbidity;
+    this.sky.mieCoefficient.value = twilight.mieCoefficient;
+    this.dusk.setSolarAltitude(altitude);
+
+    // And the aerial perspective, which has to follow all of it.
+    //
+    // Read off `scene.fog` each time rather than captured in the constructor,
+    // because `main.ts` creates the fog *after* this object exists -- so the
+    // first few `applySolar` calls legitimately find nothing there. Guarded on
+    // the type as well as on the null: `Fog` and `FogExp2` both have a `color`,
+    // but only the linear one is what `main.ts`'s 500/9000 range was solved for,
+    // and silently colouring the wrong kind of fog would be worse than not
+    // colouring it.
+    //
+    // Mutating `color` is free and safe. Three's `NodeManager.updateFog` builds
+    // the fog node from `reference('color', 'color', sceneFog)` and caches it
+    // against the *fog object*, so the colour is a live uniform and the material
+    // cache key does not contain it. Replacing `scene.fog` would rebuild every
+    // pipeline in the scene; writing to it does nothing at all.
+    if (this.scene.fog instanceof Fog) {
+      this.scene.fog.color.setRGB(...twilight.fog, LinearSRGBColorSpace);
+    }
   }
 
   /**
@@ -421,6 +601,22 @@ export class SydneySky {
    * carried by aerial perspective, not by contact shadows.
    */
   update(camera: Camera): void {
+    // **The clock advances here, and nowhere else.**
+    //
+    // Deliberately inside the call `main.ts` already makes every frame, rather
+    // than as a second call it would have to remember: the time of day is a pure
+    // function of the wall clock, so there is nothing to step and nothing that
+    // can fall behind -- reading it is the whole of advancing it. A frame that
+    // never runs simply produces a sky for whenever the next one does, which is
+    // exactly right for a backgrounded tab.
+    //
+    // Costed rather than assumed: `skyClock` is one `solarPosition` (about 60
+    // flops), `applySolar` is three pure rig functions and eleven uniform
+    // writes, and the fog is one `setRGB`. 5.4 microseconds a frame measured, or
+    // 0.03% of a 16.7 ms budget. Nothing here allocates except the `Date` inside
+    // `skyClock`, which is one short-lived object a frame.
+    this.tick();
+
     // Texel snapping, and it has to be done in the *light's* frame rather than
     // in world XZ, which is what was here before.
     //

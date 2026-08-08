@@ -161,6 +161,27 @@ export interface HudState {
    * that never fires looks exactly like a park full of very calm turkeys.
    */
   wildlife?: { ambient: number; actors: number; costMs: number };
+  /**
+   * The illegal raves, on the same line as the three ambient systems above it.
+   *
+   * `costMs` is the number the feature is judged on. The rest is here for a
+   * reason none of the others need: **a rave that is not there is the correct
+   * answer almost every night.** Six sites are live across 448 on any given
+   * night, so "I walked to Sydney Park and there was nothing" is usually the
+   * design working and is occasionally the draw being broken, and nothing inside
+   * the game can tell those two apart. `drawn` says how many are in range at
+   * all and `nearest` names the one the mixer is playing, which between them
+   * answer it. See `game/rave.ts` section 3.
+   */
+  raves?: {
+    drawn: number;
+    beams: number;
+    attendees: number;
+    rigged: number;
+    costMs: number;
+    tracks: number;
+    nearest: { name: string; metres: number; stage: string; deck: string; bpm: number; into: number } | null;
+  };
   collisionBuildings: number;
   /**
    * Invisible walls around the player: collision you are stopped by with nothing
@@ -1112,6 +1133,16 @@ export class Hud {
         ? [
             `wild  ${s.wildlife.ambient} birds about, ${s.wildlife.actors} awake, ` +
               `${s.wildlife.costMs.toFixed(2)} ms`,
+          ]
+        : []),
+      ...(s.raves
+        ? [
+            `rave  ${s.raves.drawn} in range, ${s.raves.beams} beams, ${s.raves.attendees} dancing ` +
+              `(${s.raves.rigged} rigged), ${s.raves.costMs.toFixed(2)} ms` +
+              (s.raves.nearest
+                ? `\n      ${s.raves.nearest.name} ${s.raves.nearest.metres} m, ${s.raves.nearest.stage}, ` +
+                  `"${s.raves.nearest.deck}" ${s.raves.nearest.bpm} bpm @${s.raves.nearest.into}s`
+                : `\n      nothing within earshot (${s.raves.tracks} track${s.raves.tracks === 1 ? '' : 's'} in the bag)`),
           ]
         : []),
       `shdw ${s.shadow.map ? `${s.shadow.size}²` : 'NO MAP'}  ` +

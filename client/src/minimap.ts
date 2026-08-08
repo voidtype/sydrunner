@@ -215,7 +215,7 @@ export type HazardSource = (prism: Prism) => HazardKind | null;
  * `world/bike.ts`'s beam, gated on exactly the same test, so the column in the
  * street and the dot on the map go out together the instant somebody gets on.
  */
-export type MarkerKind = 'training' | 'flat-white' | 'combatant' | 'bike';
+export type MarkerKind = 'training' | 'flat-white' | 'combatant' | 'bike' | 'rave';
 
 /**
  * One thing on the map, in world metres.
@@ -408,10 +408,30 @@ export function markerInk(kind: MarkerKind): string {
       return FLAT_WHITE_DOT;
     case 'bike':
       return BIKE_DOT;
+    case 'rave':
+      return RAVE_DOT;
     default:
       return COMBATANT_DOT;
   }
 }
+
+/**
+ * A rave you have heard, in the rig's own magenta.
+ *
+ * `world/rave.ts`'s first palette opens on a magenta and it is what the default
+ * warehouse rig throws into the sky, so the same argument the bike's lime dot
+ * makes applies exactly: the thing you are looking for out there is magenta, and
+ * so is the dot that says where it was. It is also the one hue on this map that
+ * is neither a person nor a coffee, which matters because a rave marker means
+ * something categorically different from every other dot here -- it is not a
+ * thing that is there *now*, it is a place you have been told about.
+ *
+ * **Only raves the player has actually been within earshot of are marked**, and
+ * that is the whole design of this marker. A map that showed every live site
+ * would be a quest list; a map that remembers the one whose bass you walked past
+ * an hour ago is a map. See `main.ts`'s rave marker source.
+ */
+const RAVE_DOT = 'rgb(236,86,196)';
 
 const TAU = Math.PI * 2;
 

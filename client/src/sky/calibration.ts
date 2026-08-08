@@ -57,15 +57,66 @@ export const SUN_ZENITH_INTENSITY = 17.0;
  *
  * The old intensity curve was `0.35 + 3.1 * (alt/90)^0.42`: a shape chosen to
  * look plausible, with a 0.35 floor that kept the sun burning after it had set.
- * This replaces it with the physical thing -- Beer-Lambert against Kasten-Young
+ * That was replaced with the physical thing -- Beer-Lambert against Kasten-Young
  * air mass -- which costs the same and gets the ends right for free. The sun
  * fades and reddens together as it drops, and reaches zero at the horizon
  * instead of a tenth of noon.
  *
- * 0.32 is mid-range for a clear day with marine aerosol; it holds 94% of the
- * beam at 3 pm, 23% at 10 degrees altitude, and 5% at 5 degrees.
+ * **And then the day/night pass found that it was too aggressive at low sun,
+ * which cost the game its golden hour.** Straight Beer-Lambert against air mass
+ * assumes a uniform atmosphere, and the standard empirical correction for that
+ * is Meinel's -- direct normal irradiance goes as `0.7^(AM^0.678)` rather than
+ * `0.7^AM`, because the aerosol and water vapour that do most of the absorbing
+ * live in the bottom kilometre and a slant path does *not* sample proportionally
+ * more of them. The difference is everything at the end of the day:
+ *
+ *     solar altitude      10 deg   6 deg   4 deg   2 deg
+ *     Meinel (real)        0.455   0.299   0.201   0.098
+ *     exp(-k(AM-1))        0.231   0.081   0.027   0.003
+ *     exp(-k(AM^0.678-1))  0.418   0.263   0.171   0.077
+ *
+ * The middle row is what shipped before this pass: at 6 degrees -- 139 real
+ * seconds before sunset, the *middle of the golden hour* -- it put 8% of noon on
+ * the beam where the real sky delivers 30%. So there was no golden light on
+ * anything. The whole city was lit by skylight alone for the last four minutes
+ * of every day, which is why the first screenshots of this cycle's golden hour
+ * came back reading as overcast rather than as golden. The bottom row is what
+ * ships now.
+ *
+ * **0.40 rather than the old 0.32, and the coefficient was re-solved rather than
+ * kept**: the exponent changes the shape at *both* ends, and 0.40 is the value
+ * that leaves the reference instant where the whole of this file was calibrated
+ * against it. Sun intensity at 57.11 degrees goes from 16.00 to 16.16 -- **1.0%,
+ * under half a code value on a sunlit footpath** -- and every ratio bounded at
+ * the bottom of this file stays comfortably inside its window. `verifyLightRig`
+ * checks both ends: the reference is still in band, and there is now a case that
+ * fails if the golden hour ever goes dark again.
  */
-export const SUN_EXTINCTION = 0.32;
+export const SUN_EXTINCTION = 0.4;
+
+/**
+ * The Meinel exponent. See `SUN_EXTINCTION`; 0.678 is the published value and
+ * there is no reason to treat it as a free parameter.
+ */
+export const AIR_MASS_POWER = 0.678;
+
+/**
+ * Degrees of altitude over which the beam fades out as the disc sets.
+ *
+ * Needed only because of the change above. Under straight Beer-Lambert the beam
+ * was already down to 0.3% of noon at the horizon, so cutting it to zero there
+ * was a step nobody could see; under Meinel it is at 2%, which on a sunlit wall
+ * is a fifth of its irradiance disappearing between two frames.
+ *
+ * 0.9 degrees, and it is not a fudge: the solar disc is 0.53 degrees across, so
+ * the beam genuinely does ramp out over about that much altitude as the disc
+ * goes under -- and the last of it is crossing 35 air masses, where the same
+ * refraction that keeps the disc visible after geometric sunset has also spread
+ * and dimmed it. Smoothstepped, so there is no corner at either end. It costs
+ * the last 20 real seconds of beam, which is time the limb in `dusk.ts` has
+ * already taken over.
+ */
+export const HORIZON_FADE_DEGREES = 0.9;
 
 /**
  * Hemisphere fill, full daylight.
@@ -117,6 +168,48 @@ export const HEMISPHERE_NIGHT = 0.3;
  */
 export const SKY_FILL_DAY: Readonly<Rgb> = [0.48, 0.7, 1.0];
 export const SKY_FILL_NIGHT: Readonly<Rgb> = [0.185, 0.259, 0.382];
+
+/**
+ * The third endpoint of the fill: the colour the sky half turns at dusk.
+ *
+ * Added by the day/night pass, and it is the term that makes the *city* catch
+ * the sunset rather than just the sky. The two endpoints above are a day and a
+ * night, and between them the fill only ever gets darker and slightly bluer --
+ * which is a defensible model of a clear zenith and a completely wrong model of
+ * the thing that is actually lighting a street at 7 pm. At sunset the sun's own
+ * beam is down to 5% of noon by Beer-Lambert, so **the sky is the light source**,
+ * and the sky is orange. A hemisphere that stays blue through that puts a
+ * burning horizon behind a city lit as though it were an overcast afternoon,
+ * which is the single most common way a game sunset fails to land.
+ *
+ * Blended in by `warmthAt(altitude) * day`, so:
+ *
+ *   - It is **exactly zero above `SUN_WARM_KNEE`** (42 degrees), which is what
+ *     keeps every calibrated value in this file, in `clouds.ts` and in
+ *     `facade.ts` untouched -- all of them were measured at 57.11 degrees.
+ *   - The `day` factor is the civil-twilight ramp the fill already uses, so the
+ *     warmth dies with the light rather than leaving an orange floor over a
+ *     night scene. `verifyLightRig` asserts both ends.
+ *
+ * Not as saturated as `dusk.ts`'s `LIMB_COLOUR`, and deliberately: that is the
+ * radiance of the burning band itself, and this is the *hemispherical average*
+ * of a sky which is orange at the bottom, violet opposite and still deep blue
+ * overhead. R/B 2.5 against the limb's 12.5. What it produces on the ground is
+ * a shaded wall at R/B 1.68 against daylight's 1.13 -- warm-grey rather than
+ * blue-grey, which is what a photograph of Crown Street at ten past seven shows.
+ *
+ * **There is no separate strength constant, and the reason is worth reading.**
+ * The blend weight is `warmthAt(alt) * day`, and those two move in opposite
+ * directions -- the warmth climbs as the sun drops, the civil-twilight ramp
+ * falls. Their product peaks at **0.781, with the sun 6 degrees up**, and is back
+ * to 0.5 by the moment of sunset and zero by the end of twilight. So the fill is
+ * at its warmest during the golden hour and then *cools* into the blue hour
+ * while the horizon behind it is still burning, which is exactly what happens
+ * outside: the warm light on the buildings goes before the colour in the sky
+ * does. It fell out of the gating rather than being designed, it is right, and a
+ * strength constant on top of it would only be a way to break it.
+ */
+export const SKY_FILL_DUSK: Readonly<Rgb> = [1.0, 0.66, 0.4];
 
 /**
  * Hemisphere ground colour, linear. Warm, because what bounces up off a Sydney
@@ -541,6 +634,68 @@ export const LAMP_SODIUM_SHARE = 0.34;
 
 export type Rgb = [number, number, number];
 
+/* ---------------------------------------------------------------------------
+ * THE GOLDEN HOUR.
+ *
+ * Three separate things in this project reddened together as the sun dropped --
+ * the beam, the skylight and the cloud fill -- and each of them had its own copy
+ * of the same expression, `(1 - alt/32)^1.6`. The day/night pass had to move that
+ * curve, and moving it in three places is how two of them end up disagreeing, so
+ * it is one function now and `clouds.ts` imports it.
+ *
+ * What moved, and why:
+ *
+ *   - **The knee went from 32 degrees to 42.** This is the "longer golden hour"
+ *     the brief asks for and it is the cheapest possible way to buy one, because
+ *     the alternative -- slowing the clock further -- costs the whole rest of the
+ *     day. At 32 the beam is still 96% white at 20 degrees of altitude and only
+ *     turns in the last eight minutes of a thirty-minute day. At 42 the turn
+ *     begins around 25 degrees, which through this cycle is **six and a half
+ *     real minutes before sunset**, and it arrives gradually enough that a
+ *     player notices the light changing rather than noticing it having changed.
+ *
+ *   - **The coefficients deepened, 0.30/0.62 to 0.42/0.78.** The old curve
+ *     bottomed out at (1, 0.70, 0.38) -- a warm yellow. A sun on the horizon has
+ *     crossed 38 air masses; Rayleigh optical depth at 440 nm over that path is
+ *     about 4.5, so roughly 1% of the blue survives, and the honest colour is far
+ *     past yellow. (1, 0.58, 0.22) is where this lands, which is an orange you
+ *     can name.
+ *
+ * Neither change touches anything calibrated. Every predicted display value in
+ * this file, in `clouds.ts` and in `facade.ts` was measured at 57.11 degrees,
+ * where this returns exactly zero -- and `verifyLightRig` asserts that as its
+ * own case rather than leaving it to this paragraph.
+ * ------------------------------------------------------------------------- */
+
+/** Solar altitude above which the beam is pure white, degrees. */
+export const SUN_WARM_KNEE = 42;
+/** How much green the beam loses at the horizon, and how much blue. */
+export const SUN_WARM_GREEN = 0.42;
+export const SUN_WARM_BLUE = 0.78;
+/** The shape of the run into it. Above 1 the turn stays late and then hurries. */
+export const SUN_WARM_POWER = 1.6;
+
+/**
+ * How warm the light is: 0 above `SUN_WARM_KNEE`, 1 with the sun on the horizon.
+ *
+ * Clamped at zero altitude rather than continuing below it, which matters: below
+ * the horizon there is no beam at all (`sunIntensity` is zero and so is the
+ * bounce), and every consumer of this multiplies it by something that has
+ * already gone out. What must not happen is this continuing to climb into the
+ * night, because `clouds.ts` gates its warm fill on `warmth * day` and a warmth
+ * that kept rising would fight that gate.
+ */
+/** `smoothstep(0, 1, x)`, clamped. The one easing shape this file uses. */
+function smoothstep01(x: number): number {
+  const t = x < 0 ? 0 : x > 1 ? 1 : x;
+  return t * t * (3 - 2 * t);
+}
+
+export function warmthAt(altitudeDeg: number): number {
+  const above = Math.min(Math.max(altitudeDeg, 0) / SUN_WARM_KNEE, 1);
+  return Math.pow(1 - above, SUN_WARM_POWER);
+}
+
 /**
  * How far into the night the rig is: 0 in daylight, 1 once it is dark.
  *
@@ -644,25 +799,40 @@ export function opticalAirMass(altitudeDeg: number): number {
  * renderer cannot drift apart -- they call this same function.
  */
 export function solarRig(altitudeDeg: number): LightRig {
+  // Beer-Lambert against the *Meinel* air mass, times the disc-set fade. See
+  // `SUN_EXTINCTION` for why the exponent is there and what it bought, and
+  // `HORIZON_FADE_DEGREES` for why the last degree needs a ramp now that it did
+  // not need before.
+  const disc = smoothstep01(altitudeDeg / HORIZON_FADE_DEGREES);
   const sunIntensity =
     altitudeDeg <= 0
       ? 0
-      : SUN_ZENITH_INTENSITY * Math.exp(-SUN_EXTINCTION * (opticalAirMass(altitudeDeg) - 1));
+      : SUN_ZENITH_INTENSITY *
+        Math.exp(
+          -SUN_EXTINCTION * (Math.pow(opticalAirMass(altitudeDeg), AIR_MASS_POWER) - 1),
+        ) *
+        disc;
 
-  // The warm shift near the horizon, unchanged: full white above 32 degrees,
-  // then a steep run into orange over the last few. This is the curve that makes
-  // late afternoon in February look like late afternoon in February, and its
-  // character is deliberately preserved from the previous rig.
-  const warmth = Math.pow(1 - Math.min(Math.max(altitudeDeg, 0) / 32, 1), 1.6);
-  const sunColour: Rgb = [1.0, 1.0 - 0.3 * warmth, 1.0 - 0.62 * warmth];
+  // The warm shift near the horizon. See `warmthAt` for the knee and the two
+  // coefficients, which the day/night pass deepened and widened -- this is the
+  // "longer golden hour" half of that brief, and it is exactly zero at the 57.11
+  // degrees everything in this file is calibrated at.
+  const warmth = warmthAt(altitudeDeg);
+  const sunColour: Rgb = [1.0, 1.0 - SUN_WARM_GREEN * warmth, 1.0 - SUN_WARM_BLUE * warmth];
 
   // Civil-twilight ramp for the fill, so the sky half fades to a dim blue-grey
   // rather than switching off with the sun.
   const day = Math.min(Math.max((altitudeDeg + 6) / 12, 0), 1);
   const hemisphereIntensity = HEMISPHERE_NIGHT + (HEMISPHERE_DAY - HEMISPHERE_NIGHT) * day;
-  const skyColour = SKY_FILL_NIGHT.map(
-    (n, i) => n + (SKY_FILL_DAY[i] - n) * day,
-  ) as Rgb;
+  // Three endpoints, not two: night, day, and the dusk warmth laid over the top
+  // of the day value by the same `warmth` the beam uses. `warmth * day` is what
+  // makes it both start at the golden hour and die with the light -- see
+  // `SKY_FILL_DUSK`, and `verifyLightRig`'s two cases that pin the ends.
+  const dusk = warmth * day;
+  const skyColour = SKY_FILL_NIGHT.map((n, i) => {
+    const clear = n + (SKY_FILL_DAY[i] - n) * day;
+    return clear + (SKY_FILL_DUSK[i] - clear) * dusk;
+  }) as Rgb;
 
   // Bounce off the pavement: the beam that landed on the horizontal, times the
   // fraction that comes back. `sunIntensity` is already zero below the horizon,
@@ -912,6 +1082,142 @@ export function verifyLightRig(rig = solarRig(REFERENCE_SOLAR.altitude)): string
         `horizon; it must be exactly zero. It is meant to be a fraction of the beam landing on ` +
         `the pavement, so it should switch itself off with the sun that feeds it rather than ` +
         `needing a separate night path.`,
+    );
+  }
+
+  // --- The golden hour and the dusk, in four parts.
+  //
+  // Added by the day/night pass, and they are here rather than in `dusk.ts`
+  // because they are about the *light on the city*, not about the sky: `dusk.ts`
+  // draws the burning horizon, and these four say whether the street in front of
+  // it is lit to match. The whole class of failure is one thing -- a spectacular
+  // sky over a city still lit for three in the afternoon -- and it renders
+  // perfectly, throws nothing, and reads as "the sunset looks a bit fake".
+
+  // 5. The pass did not touch the calibration. First, because it is the case
+  //    that invalidates every predicted display value above if it fails: the
+  //    warmth curve and the dusk fill must both be *exactly* zero at the
+  //    reference instant, so the sky fill there is `SKY_FILL_DAY` to the last
+  //    bit and none of the arithmetic at the top of this file has moved.
+  if (warmthAt(solar.altitude) !== 0) {
+    failures.push(
+      `warmthAt is ${warmthAt(solar.altitude)} at the reference altitude ` +
+        `${solar.altitude.toFixed(2)} deg; it must be exactly zero. SUN_WARM_KNEE is ` +
+        `${SUN_WARM_KNEE} degrees and has to stay below it, or the beam colour, the dusk fill and ` +
+        `the cloud fill all move at 3 pm on 15 February and every display value in this file, in ` +
+        `clouds.ts and in facade.ts is wrong at once -- silently, because a slightly warmer wall ` +
+        `looks like nothing at all.`,
+    );
+  }
+  const referenceSky = solarRig(solar.altitude).skyColour;
+  if (SKY_FILL_DAY.some((c, i) => Math.abs(referenceSky[i] - c) > 1e-12)) {
+    failures.push(
+      `The hemisphere sky colour at the reference is ` +
+        `(${referenceSky.map((c) => c.toFixed(4)).join(', ')}) rather than SKY_FILL_DAY ` +
+        `(${SKY_FILL_DAY.join(', ')}). The dusk endpoint is blended by warmthAt * day and must ` +
+        `reach zero weight in full daylight rather than merely approach it.`,
+    );
+  }
+
+  // 6. The golden hour is long enough to be an hour. Stated as an altitude
+  //    rather than as a duration, because this file has no clock in it -- the
+  //    duration is `cycle.ts`'s to measure and it does. What is asserted here is
+  //    that the beam has *visibly* turned by 25 degrees of altitude, which
+  //    through the shipped cycle is six and a half real minutes before sunset.
+  const turning = solarRig(25).sunColour;
+  if (!(turning[2] < 0.9)) {
+    failures.push(
+      `At 25 degrees of solar altitude the beam is still (${turning.map((c) => c.toFixed(3)).join(', ')}) ` +
+        `-- effectively white. The golden hour is supposed to have begun by there: SUN_WARM_KNEE is ` +
+        `${SUN_WARM_KNEE} degrees and the brief asks for a longer golden hour than a literal ` +
+        `simulation gives, which this curve is half of (the other half is HORIZON_DWELL in cycle.ts).`,
+    );
+  }
+
+  // 6b. **And there is still a beam to be golden.** The case that guards the
+  //     Meinel exponent, and the one the whole golden hour rests on: a warm sun
+  //     colour is worth nothing multiplied by a sun intensity of 0.08.
+  //
+  //     Quoted as a fraction of the reference beam and bounded on both sides.
+  //     Too low and there is no low-angle light on anything -- the city is lit by
+  //     skylight alone for the last four minutes of the day, which is what
+  //     shipped before this pass and what read as overcast. Too high and the sun
+  //     is still blazing at a grazing angle, which reads as a rig with no
+  //     atmosphere in it and throws shadows a hundred metres long off every kerb.
+  const referenceBeam = solarRig(solar.altitude).sunIntensity;
+  const goldenBeam = solarRig(6).sunIntensity / referenceBeam;
+  if (!(goldenBeam > 0.18 && goldenBeam < 0.45)) {
+    failures.push(
+      `With the sun 6 degrees up the beam is ${(goldenBeam * 100).toFixed(1)}% of its reference ` +
+        `strength, outside the 18-45% window. Meinel's empirical clear-sky model puts the real ` +
+        `figure at 31% and this rig is calibrated to 27%. Straight Beer-Lambert against air mass ` +
+        `-- which is what this was before the day/night pass -- gives 8%, and at 8% there is no ` +
+        `golden light on anything: the whole city is lit by skylight for the last four minutes of ` +
+        `every day and the golden hour reads as an overcast one. Check SUN_EXTINCTION ` +
+        `(${SUN_EXTINCTION}) and AIR_MASS_POWER (${AIR_MASS_POWER}).`,
+    );
+  }
+
+  // 6c. And it lands on the horizon rather than falling off it. The disc-set
+  //     fade exists only because 6b made the beam strong enough at a grazing
+  //     angle that switching it off at zero altitude became a visible step.
+  const lastLight = solarRig(0.02).sunIntensity / referenceBeam;
+  if (!(lastLight < 0.005)) {
+    failures.push(
+      `The beam is still at ${(lastLight * 100).toFixed(2)}% of reference with the sun 0.02 degrees ` +
+        `above the horizon, and it is cut to exactly zero at 0 -- so a fifth of the irradiance on ` +
+        `every west-facing wall vanishes between two frames. HORIZON_FADE_DEGREES ` +
+        `(${HORIZON_FADE_DEGREES}) is what ramps it out over the width of the solar disc; check it ` +
+        `is still applied.`,
+    );
+  }
+
+  // 7. And it ends somewhere worth calling a sunset. A beam that bottoms out at
+  //    a warm yellow is the difference between "the light goes a bit orange" and
+  //    a sunset, and it is one coefficient.
+  const setting = solarRig(0.001).sunColour;
+  if (!(setting[2] < 0.3 && setting[1] > 0.45 && setting[1] < 0.7)) {
+    failures.push(
+      `The beam at the horizon is (${setting.map((c) => c.toFixed(3)).join(', ')}); it should be a ` +
+        `nameable orange -- blue under 0.3, green between 0.45 and 0.7. A sun that has crossed 38 ` +
+        `air masses has about 1% of its blue left, so anything paler than this is a yellow filter ` +
+        `rather than a sunset. Check SUN_WARM_GREEN and SUN_WARM_BLUE.`,
+    );
+  }
+
+  // 8. **The city catches it.** The one that matters, and the one nothing else
+  //    here can see: through the golden hour the beam is already down to a tenth
+  //    of noon by Beer-Lambert, so the hemisphere *is* the light, and if it is
+  //    still blue then the frame is a burning sky over an afternoon street.
+  //
+  //    Measured on the same shaded wall as `SHADE_WARMTH_MIN` above, at **6
+  //    degrees of altitude**, which is where `warmthAt * day` peaks and therefore
+  //    where the claim is strongest -- see `SKY_FILL_DUSK`. Through the shipped
+  //    cycle that is 139 real seconds before the sun touches the horizon.
+  const duskShade = shadedWallIrradiance(solarRig(6));
+  const duskWarmth = duskShade[2] > 0 ? duskShade[0] / duskShade[2] : Infinity;
+  if (!(duskWarmth > 1.55)) {
+    failures.push(
+      `With the sun 6 degrees up -- the warmest moment of the golden hour -- a shaded wall is ` +
+        `receiving R/B ${duskWarmth.toFixed(2)}, under the 1.55 that says the city has caught the ` +
+        `sunset. Daylight's value is 1.13, so this has to be visibly past it. The beam is down to ` +
+        `8% of noon by then and the hemisphere is doing nearly all the lighting; leave it blue and ` +
+        `the result is a spectacular sky over a street lit for three in the afternoon, which is the ` +
+        `single most common way a game sunset fails to land. Check SKY_FILL_DUSK.`,
+    );
+  }
+
+  // 9. And it lets go. The warmth is gated on the civil-twilight ramp precisely
+  //    so it cannot survive into the night as an orange floor under a city whose
+  //    whole look after dark is silhouette and window light.
+  const nightSky = solarRig(-8).skyColour;
+  if (SKY_FILL_NIGHT.some((c, i) => Math.abs(nightSky[i] - c) > 1e-12)) {
+    failures.push(
+      `The hemisphere sky colour 8 degrees under the horizon is ` +
+        `(${nightSky.map((c) => c.toFixed(4)).join(', ')}) rather than SKY_FILL_NIGHT ` +
+        `(${SKY_FILL_NIGHT.join(', ')}). The dusk warmth is multiplied by the same civil-twilight ` +
+        `ramp the rest of the fill uses so that it goes out with the light; anything left here is a ` +
+        `warm cast over every night scene, which reads as a tone-mapping fault rather than as this.`,
     );
   }
 

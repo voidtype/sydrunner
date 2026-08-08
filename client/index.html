@@ -317,6 +317,163 @@
         pointer-events: none;
       }
 
+      /* The day/night clock, top centre. See `client/src/sky/clock.ts`, which
+         owns the SVG inside it and the arithmetic that places the marker; this
+         is the position, the panel, the type and the palette.
+
+         TOP CENTRE IS THE ONE LAYOUT DECISION HERE, and the constraint it has to
+         satisfy is the reticle. The clock is a *state you are in* rather than a
+         resource, so it belongs in the top-centre column with `#investigation`
+         and not in the bottom-left with the pips -- but the middle of the screen
+         is where the player is aiming. So it sits hard against the top edge and
+         stops well short of the centre: 10 px down and 56 px tall, which clears
+         the reticle by a third of the viewport at any window height and clears
+         `#investigation`'s 13% down to a 620 px window, below which the media
+         queries shrink it.
+
+         THE PANEL, and why this element has one when `#help` and `#locator` do
+         not. Those two follow the rule stated above them -- a persistent element
+         with a background is a persistent hole in the picture -- and this one
+         deliberately does not, for `#minimap`'s reason. The map is the other
+         permanent *instrument* in this HUD and it carries this same
+         `rgba(10,14,20,.55)`, because an instrument has to be readable against
+         every background the game can put behind it. The background this one is
+         guaranteed to sit over is a bright noon sky: rgb(114, 166, 249) at the
+         zenith, rgb(238, 250, 254) in the haze band. `#cfe2f2` is
+         rgb(207, 226, 242). Bare strokes in the interface colour over the haze
+         band are a two-code-value contrast and no drop shadow fixes that.
+
+         The two glyphs sit *outside* the panel, one at each end -- they are the
+         two halves of the cycle, not decoration, and keeping them out of the
+         dial means the travelling marker can never collide with them. */
+      #clock {
+        position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+        display: flex; align-items: center; gap: 9px;
+        pointer-events: none; z-index: 2;
+        color: #cfe2f2;
+      }
+      /* The moon and sun at the ends. Outside the panel, so they get the shadow
+         treatment the rest of the over-the-world text gets rather than the
+         panel's contrast. */
+      /* TWO SHADOWS, and the first one is the load-bearing half. The glyphs are
+         the only part of this widget with no panel behind them, and the sky they
+         have to survive is the noon haze band at rgb(238, 250, 254) -- against
+         which `#cfe2f2` is a nine-code-value contrast and effectively invisible.
+         A tight, opaque 1.5 px dark halo gives every edge of the glyph something
+         to be seen against on any background; the softer offset shadow under it
+         is the one the rest of the over-the-world text uses, and it does the
+         separation rather than the contrast. Chained rather than combined,
+         because one shadow cannot be both tight and soft. */
+      #clock .glyph {
+        width: 26px; height: 26px; flex: 0 0 auto;
+        filter: drop-shadow(0 0 1.5px rgba(6,10,16,.95)) drop-shadow(0 1px 2px rgba(0,0,0,.8));
+      }
+      #clock .glyph svg { display: block; width: 100%; height: 100%; }
+      /* The dial: the hint pill's own background and the panels' own border, so
+         it reads as the same program. `border-radius: 999px` for the pill's
+         reason -- it is a lozenge, and a lozenge is round. */
+      #clock .dial {
+        width: 264px; padding: 4px 6px 2px;
+        background: rgba(10,14,20,.55);
+        -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+        border: 1px solid rgba(207,226,242,.34);
+        border-radius: 999px;
+        box-shadow: 0 2px 10px rgba(0,0,0,.55);
+      }
+      #clock .dial svg { display: block; width: 100%; height: auto; overflow: visible; }
+      /* `non-scaling-stroke` throughout, so the media-query shrink below thins
+         nothing: an 0.8 scale on a 1 px line is a line that disappears against a
+         bright sky, which is the one background this element is guaranteed to be
+         over. */
+      #clock line, #clock .rays {
+        fill: none; stroke: currentColor; vector-effect: non-scaling-stroke;
+        stroke-linecap: round;
+      }
+      #clock circle { fill: currentColor; stroke: none; }
+      /* The two end glyphs are **outlined and then filled**, and the fill is what
+         says which half of the cycle you are in -- solid is now, hollow is the
+         other one. Dimming them was the first version and it failed the one test
+         this element has to pass: `#cfe2f2` at 0.3 opacity over the noon haze
+         band, rgb(238, 250, 254), cannot be seen at all, so half of what the
+         widget says disappeared in daylight. An outline at full strength is
+         legible over anything. */
+      #clock .glyph circle, #clock .glyph .moon path {
+        fill: currentColor; stroke: currentColor; stroke-width: 1.3;
+        vector-effect: non-scaling-stroke;
+      }
+      /* The travelling marker is always the body that is up, so it is always
+         solid -- no state to carry, and a hollow marker would be harder to find
+         on the track. */
+      #clock #clock-marker .moon path { fill: currentColor; stroke: none; }
+      /* The night half of the track is dimmer than the day half. That difference
+         is doing real work: it is what makes the marker's *side* readable at the
+         edge of vision, before the glyphs or the numerals are looked at. */
+      #clock .track { stroke-width: 2; }
+      #clock .track.night { opacity: .34; }
+      #clock .track.day { opacity: .62; }
+      /* The sunset warning, drawn over the day half and faded in by opacity from
+         `clock.ts`. In #e8b9a8, which this stylesheet already uses for the footy
+         bar and for a player's own chat line -- borrowed rather than invented,
+         because the only other non-blue here is #pips' red and that means
+         exactly one thing (see there). A sunset is not that thing. */
+      #clock .track.dusk { stroke: #e8b9a8; stroke-width: 2.4; opacity: 0; }
+      /* Twelve divisions: five real minutes, two game hours. The instrument
+         markings -- what stops a dial reading as a progress bar. */
+      #clock .ticks line { stroke-width: 1; opacity: .3; }
+      /* Sunrise, in the middle, and the two ends. Brighter than the ticks
+         because they are the landmarks the ticks are counted between. */
+      #clock .divider { stroke-width: 1.2; opacity: .6; }
+      #clock .cap { stroke-width: 1.4; opacity: .48; }
+      #clock .sun .rays { stroke-width: 1.3; }
+      /* NO `opacity` HERE, deliberately. `clock.ts` animates the halo's opacity
+         every frame and writes it as an inline style precisely because a rule at
+         this specificity would outrank a presentation attribute -- which is what
+         the first version did, and the halo sat at a fixed .26 and drew a grey
+         disc behind the moon all night while the code hiding it ran correctly.
+         Same shape as the bug `hud.ballBlockWidth` records, from the other
+         direction: there an inline width could not be taken back, here a rule
+         could not be overridden. */
+      #clock .halo { fill: currentColor; }
+      /* The numerals. 15 px -- larger than anything else in this interface,
+         including `#help`'s 13 -- because they are read at a glance from the
+         middle distance while the player is doing something else, which is the
+         same argument that took the control block from 11 to 13, one step
+         further. */
+      #clock .time {
+        fill: #e6eef6; font: 15px ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: .1em; text-anchor: middle; stroke: none;
+      }
+      /* The countdown under them, in the dim tone `#help .more` and the
+         leaderboard headings establish for "label, not content" -- until dread
+         makes it the content, which is what the rule under `.dread` is for. */
+      #clock .edge {
+        fill: #7f95ab; font: 8px ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: .2em; text-anchor: middle; stroke: none;
+      }
+      #clock.dread .edge { fill: #e8b9a8; }
+      /* Two seconds and shallow -- .84 to 1 -- on `#investigation`'s own
+         argument: a thing that flashes hard is a thing that is hard to read, and
+         this one has to stay readable for the whole five minutes it is up. */
+      #clock.dread .dial { animation: sundown 2s ease-in-out infinite; }
+      @keyframes sundown {
+        0%, 100% { opacity: 1; }
+        50% { opacity: .84; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #clock.dread .dial { animation: none; }
+      }
+      /* A short window is a laptop with the dev tools open across the bottom and
+         a narrow one is a phone or a split screen. Both want the same thing --
+         less clock -- and both get it by scaling rather than by hiding, because
+         the dial at 78% is still legible and a clock that is not there is a
+         feature nobody knows exists. */
+      @media (max-height: 620px), (max-width: 960px) {
+        #clock { transform: translateX(-50%) scale(.78); transform-origin: top center; }
+      }
+      @media (max-width: 640px) {
+        #clock { transform: translateX(-50%) scale(.6); transform-origin: top center; }
+      }
+
       /* Taking a hit. A DOM overlay rather than a post-process pass: it is one
          composited div against a full-screen read-modify-write of a 3.7 Mpixel
          target, for a red flash nobody looks at directly. Spec 8.2 says sell it
@@ -786,6 +943,11 @@
     <div id="locator"></div>
     <div id="bigmap"><canvas id="bigmap-canvas"></canvas></div>
     <div id="ko"></div>
+    <!-- The day/night clock. Empty: `client/src/sky/clock.ts` writes the SVG,
+         because the dial's geometry is derived from that file's constants and
+         splitting the two would put the shape a file away from the arithmetic
+         that places the marker on it. -->
+    <div id="clock"></div>
     <div id="investigation">
       <div id="investigation-title">Under Investigation!</div>
       <div id="investigation-reason"></div>
@@ -827,6 +989,13 @@
     <div id="help">
       <div class="keys">wasd move · space jump · shift sprint</div>
       <div class="keys">mouse look · left click bat · right click footy</div>
+      <!-- The zoom is here, in the block nobody has to press anything to read,
+           because the report that produced it was a player who could not find
+           it: "cant zoom out anymore by scrolling". A control every game binds
+           to the wheel is a control people try before they read a list, so the
+           one line that says the wheel does something has to be on the screen.
+           See `main.ts`'s wheel listener. -->
+      <div class="keys">wheel zoom out · v third person</div>
       <div class="more">h — all controls · esc — suggestions</div>
     </div>
 
@@ -841,9 +1010,11 @@
         <!-- Here rather than under `lime bikes`, where it started: the camera is
              a thing you have all the time and the bike only forces it. A player
              who wants to watch themselves run looks under `movement`. Both
-             bindings on one line because they set one preference — see
-             `main.ts`'s `setCameraPreference`. -->
-        <div><kbd>wheel</kbd>camera — down third person, up first · <kbd>v</kbd>toggle</div>
+             bindings on one line because they set one number — see `main.ts`'s
+             `setCameraDistance` and `game/camera.ts`. The distance is spelled
+             out because "zoom" alone does not say whether it ends at arm's
+             length or across the street. -->
+        <div><kbd>wheel</kbd>zoom out to third person, to 12.8 m · <kbd>v</kbd>toggle</div>
       </section>
       <!-- Its own section rather than two more lines in `movement`, because the
            bike is a thing you find rather than a thing you always have, and a
@@ -857,7 +1028,7 @@
              standing on: `a`/`d` strafe on foot and steer on a bike. See
              `game/bikes.shapeRideSteering`. -->
         <div><kbd>a d</kbd>steer · <kbd>w</kbd>throttle · <kbd>s</kbd>brake</div>
-        <div>a ride is always third person — the wheel and <kbd>v</kbd> set what you get back</div>
+        <div>a ride is always third person — the wheel still zooms, and your camera is waiting when you get off</div>
         <div>look for the green glow — find one parked, or the tuning stall in Redfern</div>
       </section>
       <section>
@@ -918,9 +1089,13 @@
       </section>
       <section>
         <h2>time</h2>
+        <!-- The clock runs on its own now and is the same for every player --
+             one real hour is one Sydney day, thirty minutes of it light. These
+             four scrub *your own* sky and nobody else's; see
+             `client/src/sky/cycle.ts`. -->
         <div><kbd>[ ]</kbd>±30 minutes</div>
-        <div><kbd>n</kbd>night</div>
-        <div><kbd>t</kbd>3 pm</div>
+        <div><kbd>n</kbd>midnight</div>
+        <div><kbd>t</kbd>noon</div>
       </section>
       <!-- The fallbacks, grouped rather than scattered through the two above,
            because they are one situation rather than four bindings: a browser
