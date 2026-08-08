@@ -109,7 +109,24 @@ export interface HudState {
    * a quaternion and a matrix compose, every frame. `costMs` is the budget this
    * feature was scoped against and the only place anyone can see it.
    */
-  traffic: { drawn: number; parked: number; costMs: number; tiles: number; liveried: number };
+  traffic: {
+    drawn: number;
+    parked: number;
+    costMs: number;
+    tiles: number;
+    liveried: number;
+    /**
+     * Cars inside the near field drawn as real 3D models rather than boxes, and
+     * what the assignment sweep that decided it cost.
+     *
+     * `sweepMs` is on the overlay beside the traffic's own `costMs` because it
+     * is the budget that feature was scoped against (0.5 ms) and because the two
+     * are the same trade seen from both ends: the sweep runs at 5 Hz precisely
+     * so that it does not join `costMs` in the per-frame column.
+     */
+    modelled: number;
+    sweepMs: number;
+  };
   /**
    * The crowd: people posed this frame, how many of them got a real skinned rig,
    * how long the whole thing took, and how many are lying on the footpath.
@@ -1116,6 +1133,7 @@ export class Hud {
       `traf  ${s.traffic.drawn - s.traffic.parked} cars driving, ${s.traffic.parked} parked, ` +
         `${s.traffic.costMs.toFixed(2)} ms to place, ${s.traffic.tiles} lane tiles` +
         (s.traffic.liveried ? `, ${s.traffic.liveried} marked` : ''),
+      `near  ${s.traffic.modelled} cars as models, ${s.traffic.sweepMs.toFixed(2)} ms to assign`,
       `peds  ${s.pedestrians.drawn} walking (${s.pedestrians.rigged} rigged), ` +
         `${s.pedestrians.costMs.toFixed(2)} ms to place, ${s.pedestrians.tiles} footpath tiles` +
         (s.pedestrians.down ? `, ${s.pedestrians.down} down` : ''),

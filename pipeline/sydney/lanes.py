@@ -130,7 +130,7 @@ import numpy as np
 from shapely.geometry import Point, Polygon
 from shapely.prepared import prep
 
-from . import geo, streets
+from . import bays, geo, streets
 from .sources import osm
 
 # --- What carries traffic -----------------------------------------------------
@@ -281,7 +281,11 @@ MIN_VERTEX_GAP = 0.05
 # --- Sidecar ------------------------------------------------------------------
 
 LANES_MAGIC = 0x454E414C  # 'LANE' little-endian
-LANES_VERSION = 1
+# v2 added the two kerb bays a route's cars park in -- see `bays.py`. The bump
+# is not optional: v1 carried no bay at all and the client *derived* one from
+# the ways block, which is precisely the drift this version exists to end, so a
+# v1 file read by a v2 client would silently go back to deriving.
+LANES_VERSION = 2
 
 # The class byte in the sidecar, in this order. **Append only** -- an index in a
 # file already on disk must keep meaning what it meant, exactly as
@@ -348,6 +352,17 @@ def manifest(net: LaneNetwork | None) -> dict | None:
         "route_length_m": round(float(s.get("route_length_m", 0.0)), 1),
         "way_spans": int(s.get("way_spans", 0)),
         "signal_nodes": int(s.get("signal_nodes", 0)),
+        # The kerb bays, v2's whole reason for existing. `bay_ends` is two per
+        # route and `bay_assigned` is how many of them found a bay nothing else
+        # owns; the difference is the number the client reports as "dwells at
+        # the lane offset instead". Carried here so a pipeline change that
+        # started starving the arbitration shows up in the index rather than
+        # only in a check nobody runs. See `bays.py`.
+        "bay_ends": int(s.get("bay_ends", 0)),
+        "bay_assigned": int(s.get("bay_assigned", 0)),
+        "bay_no_way": int(s.get("bay_no_way", 0)),
+        "bay_no_free": int(s.get("bay_no_free_bay", 0)),
+        "bay_reserve_half_m": [bays.RESERVE_HALF_LENGTH, bays.RESERVE_HALF_WIDTH],
         # What a consumer needs to put people on the footpaths beside these
         # ways without opening `streets.py`. See `tiles.write_lanes`.
         "kerb_width_m": streets.KERB_WIDTH,
@@ -483,6 +498,14 @@ class Route:
     # and then thrown away: a dwell is two identical points with time between
     # them by the time anything reads the file.
     stops: list[int] = field(default_factory=list)
+    # The kerb bay this route's cars sit in before they depart, and the one they
+    # pull into at the far end. `None` where the arbitration found nothing free
+    # -- that end then has no park stage at all and the car winks in and out at
+    # the lane offset, which is the pre-v2 behaviour for a route with no kerb.
+    # Assigned by `bays.BayLedger.assign` after `_schedule`, because it needs
+    # the timetable that gives a bay a route-time. See `bays.py`.
+    bay0: bays.Bay | None = None
+    bay1: bays.Bay | None = None
 
     @property
     def duration(self) -> float:
@@ -567,6 +590,8 @@ class LaneNetwork:
         deck_network=None,
         hero: HeroDeck | None = None,
         signal_nodes: list | None = None,
+        street_network=None,
+        parking_network=None,
     ) -> LaneNetwork:
         """Build the lane graph, the routes and the per-tile way spans."""
         height = _HeightField(terrain, deck_network, hero)
@@ -582,6 +607,17 @@ class LaneNetwork:
         signals = _signalised(nodes, signal_nodes or [])
         routes, trail_stats = _trails(arcs, signals, height)
         routes = _schedule(routes, signals)
+
+        # The kerb bays, **after** the timetable and before anything is written.
+        # A bay is a route-time, so it cannot be chosen until `_schedule` has
+        # given the route one; and it is a claim on ground the static fleet may
+        # already hold, so it cannot be chosen by a per-tile decoder that has
+        # never seen `parking.py`. See `bays.py`, which is the whole argument.
+        bay_stats: dict[str, int] = {}
+        if street_network is not None:
+            ledger = bays.BayLedger(street_network, parking_network)
+            ledger.assign(routes)
+            bay_stats = {f"bay_{k}": v for k, v in ledger.stats.items()}
 
         stats = {
             "surface_ways": len(surface),
@@ -600,6 +636,7 @@ class LaneNetwork:
             "hero_bridge_points": hero.covered if hero is not None else 0,
             **trail_stats,
             **height.stats,
+            **bay_stats,
         }
         return cls(spans, routes, stats)
 

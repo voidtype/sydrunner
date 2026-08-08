@@ -1399,13 +1399,18 @@ def write_lanes(path: Path, tile: lanes.TileLanes, origin: tuple[float, float]) 
           per point:
             f32  x, f32 y, f32 z
 
-        per route (16-byte header, then 16 bytes a point):
+        per route (16-byte header, 24-byte park block, then 16 bytes a point):
           u32  rid            stable route id; the hash seed for its cars
           u8   klass
-          u8   flags          reserved, zero
+          u8   flags          bit 0: a near bay is assigned
+                              bit 1: a far bay is assigned
           u16  point count
           f32  headway        seconds between departures
           f32  phase          seconds, this route's offset into the headway
+          f32  parkT0         route-time the car waits at in the near bay
+          f32  offX0, offZ0   near bay centre minus the lane point at parkT0
+          f32  parkT1         route-time the car comes to rest at in the far bay
+          f32  offX1, offZ1   far bay centre minus the lane point at parkT1
           per point:
             f32  x, f32 y, f32 z
             f32  t            cumulative seconds from the route's start
@@ -1436,6 +1441,17 @@ def write_lanes(path: Path, tile: lanes.TileLanes, origin: tuple[float, float]) 
     `lanes.MAX_ROUTE_M`. That is `write_power`'s wire-span convention and it is
     here for the same reason: a car has to be able to drive across a seam. The
     client must not clamp or cull on these coordinates.
+
+    **The park block is a claim, not a hint.** `bays.py` arbitrates every route
+    end against the static fleet in `.cars.bin` and against every other route's
+    claims, in one global pass, and writes the winner here. The client and the
+    server *read* it; neither derives anything. Before v2 both derived a bay from
+    the ways block at decode time, which put a schedule car on top of a parked
+    one 654 times in a 360-sample sweep of the inner 1.5 km and put two routes in
+    one bay 1,163 times -- not because the derivation was wrong but because a
+    per-tile function cannot see the other claimants. The offsets are **deltas
+    from the lane point**, in the same renderer axes as the points, so they carry
+    no origin and mean the same thing whatever tile the route is written into.
 
     **The ways block is not read by the traffic at all.** It is the street
     network as reusable geometry -- centreline, solved height, kerb-to-kerb half
@@ -1473,14 +1489,35 @@ def write_lanes(path: Path, tile: lanes.TileLanes, origin: tuple[float, float]) 
         for (e, n), y in zip(w.pts, w.y):
             out += struct.pack("<fff", float(e - oe), float(y), float(-(n - on)))
     for r in tile.routes:
+        bay0 = getattr(r, "bay0", None)
+        bay1 = getattr(r, "bay1", None)
+        duration = float(r.t[-1]) if len(r.t) else 0.0
+        flags = (1 if bay0 is not None else 0) | (2 if bay1 is not None else 0)
         out += struct.pack(
             "<IBBHff",
             int(r.rid) & 0xFFFFFFFF,
             lanes.class_index(r.highway),
-            0,
+            flags,
             len(r.pts) & 0xFFFF,
             float(r.headway),
             float(r.phase),
+        )
+        # An unassigned end still writes a well-formed record: `parkT0 = 0` and
+        # `parkT1 = duration` are the degenerate bay at the route's own end with
+        # no lateral offset, which is what the client falls back to anyway. A
+        # NaN or a sentinel here would reach the binary search in `poseCar`, and
+        # a NaN in a binary search is a car in the wrong place rather than a
+        # decode failure anybody notices.
+        out += struct.pack(
+            "<ffffff",
+            float(bay0.t) if bay0 is not None else 0.0,
+            # ENU east is renderer x; ENU north is renderer -z. The same flip
+            # every point in this file gets, applied to a delta, so no origin.
+            float(bay0.off_e) if bay0 is not None else 0.0,
+            float(-bay0.off_n) if bay0 is not None else 0.0,
+            float(bay1.t) if bay1 is not None else duration,
+            float(bay1.off_e) if bay1 is not None else 0.0,
+            float(-bay1.off_n) if bay1 is not None else 0.0,
         )
         for (e, n), y, t in zip(r.pts, r.y, r.t):
             out += struct.pack("<ffff", float(e - oe), float(y), float(-(n - on)), float(t))
@@ -1700,7 +1737,32 @@ def build_tile(
         for i, b in enumerate(buildings):
             bases[i], skirts[i] = _pad_and_skirt(terrain, b)
 
+    # And the structures that do not start at the ground: bridges, elevated
+    # walkways, anything OSM gave a `min_height`. `elevated.py` has already
+    # decided how far over its own pad each one's underside sits and has taken
+    # the same distance off its height, so the prism is [pad + base, roof] and
+    # the player walks under it. Added here rather than folded into the pad
+    # above because a pad is a measurement of the ground and this is not -- see
+    # `merge.Building.base_height`.
+    #
+    # The skirt goes too, and has to: a skirt is the buried tail that stops
+    # daylight showing under a wall on sloping ground, and on a structure that
+    # is *meant* to have daylight under it, it is a metre and a half of wall
+    # hanging below the soffit into the road.
     for i, b in enumerate(buildings):
+        if b.base_height > 0.0:
+            bases[i] += b.base_height
+            skirts[i] = 0.0
+
+    for i, b in enumerate(buildings):
+        # An elevated structure gets no ground-level dressing. Each of the four
+        # passes below assumes the wall it is decorating meets the footpath, and
+        # on a bridge deck five metres up every one of them is nonsense in a
+        # different way: a contact shadow on pavement the wall never touches, a
+        # footpath awning cantilevered over the middle of a road, a front door
+        # onto thin air, a garden fence around a span. The roof is the one
+        # per-building emitter that still makes sense and is left alone.
+        grounded = b.base_height <= 0.0
         wall_slot = slots[b.material]
         mesh.build_walls(wall_slot, b, i, origin, bases[i], skirts[i])
         roof_material = mesh.ROOF_MATERIAL.get(b.archetype, "roof_steel")
@@ -1714,7 +1776,7 @@ def build_tile(
         # question about the road network, so this one takes the network rather
         # than the slot table alone. Spec 6.3's ground-floor override and 7.7's
         # "continuous cantilevered awnings"; see `mesh.AwningNetwork`.
-        if awning_network is not None:
+        if awning_network is not None and grounded:
             awning_network.emit(slots, b, i, origin, bases[i])
         # The front door, spec 6.3's "Openings". Emits no geometry at all -- it
         # hands back one number, where the door stands along this building's own
@@ -1722,14 +1784,16 @@ def build_tile(
         # same reason the awning does and asks it the same question through the
         # same test; see `mesh.DoorNetwork`.
         door_u = (
-            mesh.DOOR_NONE if door_network is None else door_network.place(b)
+            mesh.DOOR_NONE
+            if (door_network is None or not grounded)
+            else door_network.place(b)
         )
         # The front fence, on the property line rather than on the building --
         # which is why it is the only per-building emitter here that takes the
         # terrain: everything else in this loop stands on the pad, and a fence
         # three metres out in the garden stands on the ground. It takes `door_u`
         # so the gate lines up with the way in. See `fences.py`.
-        if fence_network is not None:
+        if fence_network is not None and grounded:
             fence_network.emit(slots, b, i, origin, door_u, terrain)
         params.append(
             mesh.facade_params(b, mesh.facade_seed(b.id, i), roof_half_short, door_u)
@@ -1739,7 +1803,12 @@ def build_tile(
     # no `base` and wants none: a pad daylight-cuts into a slope, so the line
     # where wall visibly meets ground is the terrain at both ends of a building
     # and the pad at neither. See `contact.py`.
-    contact.emit(buildings, slots, origin, terrain)
+    #
+    # Filtered rather than given a base, and the filter is the point: a raised
+    # structure has no line where wall meets ground, so there is nothing for the
+    # skirt to be the shadow *of*. Left in, it painted a bridge-shaped stain on
+    # the road surface underneath the span.
+    contact.emit([b for b in buildings if b.base_height <= 0.0], slots, origin, terrain)
 
     if street_network is not None:
         street_network.emit(tile_key, slots, origin, terrain)
@@ -1885,7 +1954,12 @@ def build_tile(
     # sizes its cull box from this number, and a tile that is nothing but harbour
     # and the Western Distributor has no building to size it from -- so without
     # the deck the viaduct vanishes the moment the player is not standing on it.
-    height_max = max((b.height for b in buildings), default=0.0)
+    # An elevated structure's top is its soffit *plus* its own height, so the
+    # base has to be in this number: a footbridge 5 m up is 5 m taller than its
+    # prism, and a cull box sized from the prism alone would pop it out of frame
+    # the moment the player is not standing under it -- the same failure the
+    # decks below already had to be added for.
+    height_max = max((b.height + b.base_height for b in buildings), default=0.0)
     if deck_network is not None:
         height_max = max(height_max, deck_network.height_max(tile_key))
 
@@ -2598,6 +2672,17 @@ def write_far(path: Path, buildings: list[Building], terrain, floor) -> dict:
     by_tile: dict[str, list[tuple[bytes, np.ndarray]]] = defaultdict(list)
     for b in buildings:
         if b.height < FAR_MIN_HEIGHT and b.area < FAR_MIN_AREA:
+            continue
+        # An elevated structure gets no far slab at all, and the reason is this
+        # layer's own invariant: a slab is drawn on the argument that it is
+        # *inside* the building it stands for, so a wrong silhouette is hidden
+        # by the real walls the moment the tile arrives. A prism that starts 5 m
+        # up has nothing at ground level for a slab to hide inside -- the slab
+        # would be the only thing there, a solid block sitting on a road at
+        # exactly the distance the player cannot yet see it is wrong. Sinking or
+        # raising it instead would cost this record a base it does not carry;
+        # omitting it costs a footbridge nobody can resolve at 2 km.
+        if b.base_height > 0.0:
             continue
         plan = _slab_plan(b.ring)
         if plan is None:

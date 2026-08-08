@@ -40,6 +40,7 @@ import { loadFarWater, verifyWater } from './world/water.ts';
 import { atlasTextureSize } from './world/params-atlas.ts';
 import { TileStreamer, type WorldIndex } from './world/streamer.ts';
 import { TrafficMovers, carBodySizes } from './world/cars.ts';
+import { SWEEP_HZ, loadCarModels } from './world/carlod.ts';
 import {
   CAR_STAGE_PARKED_IN,
   CAR_STAGE_PARKED_OUT,
@@ -1744,6 +1745,48 @@ async function main(): Promise<void> {
   // second pass that would have to agree with it. By day `begin()` returns false
   // and the whole thing is one comparison per frame. See `world/cars.ts`.
   trafficMovers.lights = nightLights.carLights;
+
+  // And the near field, where a box stops being enough.
+  //
+  // Every car within 90 m of the camera -- moving or parked, from either fleet --
+  // is drawn as one of 24 real models instead, chosen by the car's own stable
+  // identity so it is the same car to everyone forever. `world/carlod.ts` carries
+  // the whole argument; the three lines below are the whole of the wiring, and
+  // each is a different half of it: the models have to be *in the scene* before
+  // the boot scene pass compiles it, the moving fleet has to know which cars not
+  // to draw as boxes, and the streamer has to hand over each tile's parked cars
+  // as it arrives and take them back as it leaves.
+  //
+  // Awaited here, well above the scene pass, and bounded like every other asset
+  // on this path. 2.4 MB of glTF, and losing it costs the near field its models
+  // -- which is the picture this game had for its whole life -- where waiting
+  // forever for it costs the game.
+  const carModels = await withDeadline(
+    loadCarModels(undefined, createCarPose()),
+    FAR_LAYER_DEADLINE_MS,
+    'the car models',
+  );
+  if (carModels) {
+    for (const mesh of carModels.meshes) scene.add(mesh);
+    trafficMovers.models = carModels;
+    streamer.setParkedCarSink(carModels);
+    console.debug(
+      `[carlod] ${carModels.loadedFiles.length} car models over pools ` +
+        `${JSON.stringify(carModels.poolSizes())}` +
+        (carModels.skipped.length
+          ? `; skipped ${carModels.skipped.map((s) => `${s.file} (${s.why})`).join(', ')}`
+          : ''),
+    );
+  }
+  /**
+   * When the model fleet last decided who is near enough, milliseconds.
+   *
+   * The sweep runs at `SWEEP_HZ` rather than per frame, and the hysteresis band
+   * between the claim and release radii is what pays for that -- see
+   * `world/carlod.ts` section 4. Held here rather than inside the fleet because
+   * it is a property of this loop's clock, not of the fleet.
+   */
+  let lastCarSweep = 0;
   /** Scratch for the per-tick hit query, so a fixed step allocates nothing. */
   const carRoutes: LaneRoute[] = [];
   const carPose: CarPose = createCarPose();
@@ -5257,6 +5300,23 @@ async function main(): Promise<void> {
     // a backgrounded tab costs nothing and comes back with the whole city's
     // traffic where it would have been, with no catch-up step. That is what a
     // position-by-lookup buys that an integrated fleet could not.
+    // Who is close enough to be a real car, at 5 Hz.
+    //
+    // **Before** the movers, not after: a claim taken this frame has to be
+    // visible to the box fleet on this frame, or the car is drawn twice -- once
+    // as a model and once as the box that did not know. The other order is a
+    // frame of double-draw every time a car crosses 90 m, which is exactly the
+    // artefact this feature must not have.
+    if (carModels && now - lastCarSweep >= 1000 / SWEEP_HZ) {
+      lastCarSweep = now;
+      carModels.sweep(
+        traffic,
+        trafficTick(Date.now()) + accumulator / FIXED_DT,
+        player.position.x,
+        player.position.z,
+      );
+    }
+
     trafficMovers.update(
       traffic,
       trafficTick(Date.now()) + accumulator / FIXED_DT,
@@ -5901,6 +5961,12 @@ async function main(): Promise<void> {
           costMs: trafficMovers.costMs,
           liveried: trafficMovers.liveried,
           tiles: traffic.tileCount,
+          // The near field. `modelled` is cars from *both* fleets drawn as real
+          // models rather than boxes, and `sweepMs` is the 0.5 ms budget the
+          // assignment pass was scoped against -- the one number that says
+          // whether running it at 5 Hz was enough. See `world/carlod.ts`.
+          modelled: carModels?.claimedCount ?? 0,
+          sweepMs: carModels?.sweepMs ?? 0,
         },
         // The crowd, beside the traffic and for the same reason: neither is part
         // of a tile, and both are a per-frame CPU cost rather than a draw cost.
@@ -6629,6 +6695,32 @@ async function main(): Promise<void> {
      * is drawn through geometry to 60 m, so "I can see it" says nothing about
      * where it is. `walkTo` is the coordinate to hand `sydney.look`.
      */
+    /**
+     * What the near-field model fleet is doing.
+     *
+     * `trafficReport`'s argument again and one of its own: a claim is not in the
+     * scene graph in any legible form -- it is an index into one of 24 instanced
+     * sets -- so there is no way to ask "which cars are models right now" except
+     * to ask the fleet. `sweepMs` is the number this feature is judged on and
+     * `overflows` is the one that should never move: it counts sweeps that found
+     * a model at capacity, which is the only way a car near enough to be a model
+     * ends up drawn as a box.
+     */
+    carModelReport() {
+      if (!carModels) return { loaded: false };
+      return {
+        loaded: true,
+        models: carModels.loadedFiles.length,
+        pools: carModels.poolSizes(),
+        skipped: carModels.skipped,
+        claimed: carModels.claimedCount,
+        parked: carModels.parkedTiles,
+        triangles: carModels.triangles,
+        sweepMs: Math.round(carModels.sweepMs * 1000) / 1000,
+        overflows: carModels.overflows,
+      };
+    },
+
     /**
      * What the traffic is doing, and where to stand to be hit by it.
      *

@@ -1,0 +1,292 @@
+[
+  {
+    "file": "city_bus.glb",
+    "body": "bus",
+    "tris": 4532,
+    "lengthM": 12,
+    "tint": "none",
+    "license": "CC-BY 3.0",
+    "attribution": "\"Montreal Bus\" by Nick Ladd, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/fFCCghvRImG)",
+    "source_url": "https://poly.pizza/m/fFCCghvRImG"
+  },
+  {
+    "file": "garbage_truck_kenney.glb",
+    "body": "garbage",
+    "tris": 3124,
+    "lengthM": 9,
+    "tint": "none",
+    "license": "CC0 1.0",
+    "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
+    "source_url": "https://kenney.nl/assets/car-kit"
+  },
+  {
+    "file": "hatch_filler.glb",
+    "body": 1,
+    "tris": 2854,
+    "lengthM": 4.2,
+    "tint": "multiply",
+    "license": "CC-BY 3.0",
+    "attribution": "\"Car\" by Quaternius, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/HQ0hvRM2XR)",
+    "source_url": "https://poly.pizza/m/HQ0hvRM2XR"
+  },
+  {
+    "file": "hatch_generic_a.glb",
+    "body": 1,
+    "tris": 1194,
+    "lengthM": 4.2,
+    "tint": "multiply",
+    "license": "CC0 1.0",
+    "attribution": "none required (CC0). Courtesy credit: Kay Lousberg via Poly Pizza",
+    "source_url": "https://poly.pizza/m/BG0KAhmGDt"
+  },
+  {
+    "file": "hatch_kenney.glb",
+    "body": 1,
+    "tris": 2088,
+    "lengthM": 4.2,
+    "tint": "multiply",
+    "license": "CC0 1.0",
+    "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
+    "source_url": "https://kenney.nl/assets/car-kit"
+  },
+  {
+    "file": "hatch_micro.glb",
+    "body": 1,
+    "tris": 3570,
+    "lengthM": 4.2,
+    "tint": "multiply",
+    "license": "CC-BY 3.0",
+    "attribution": "\"Mini Car !\" by Romain Revert, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/eNH2gURnsVB)",
+    "source_url": "https://poly.pizza/m/eNH2gURnsVB"
+  },
+  {
+    "file": "mitsubishi_l200.glb",
+    "body": 3,
+    "tris": 2899,
+    "lengthM": 5.2,
+    "tint": "multiply",
+    "license": "CC-BY 3.0",
+    "attribution": "\"Mitsubishi L200\" by Muhammad Reyhan, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/4qjS9tFhsJg)",
+    "source_url": "https://poly.pizza/m/4qjS9tFhsJg"
+  },
+  {
+    "file": "nissan_terrano.glb",
+    "body": 2,
+    "tris": 2950,
+    "lengthM": 4.7,
+    "tint": "multiply",
+    "license": "CC-BY 3.0",
+    "attribution": "\"Terrano\" by Muhammad Reyhan, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/fWGNi96ckzn)",
+    "source_url": "https://poly.pizza/m/fWGNi96ckzn"
+  },
+  {
+    "file": "police_kenney.glb",
+    "body": "police",
+    "tris": 2304,
+    "lengthM": 4.7,
+    "tint": "none",
+    "license": "CC0 1.0",
+    "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
+    "source_url": "https://kenney.nl/assets/car-kit"
+  },
+  {
+    "file": "sedan_filler.glb",
+    "body": 0,
+    "tris": 3124,
+    "lengthM": 4.6,
+    "tint": "multiply",
+    "license": "CC0 1.0",
+    "attribution": "none required (CC0). Courtesy credit: Quaternius via Poly Pizza",
+    "source_url": "https://poly.pizza/m/unqqkULtRU"
+  },
+  {
+    "file": "sedan_generic_a.glb",
+    "body": 0,
+    "tris": 2944,
+    "lengthM": 4.6,
+    "tint": "multiply",
+    "license": "CC-BY 3.0",
+    "attribution": "\"Car\" by Poly by Google, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/eRu2kPYOCa7)",
+    "source_url": "https://poly.pizza/m/eRu2kPYOCa7"
+  },
+  {
+    "file": "sedan_generic_b.glb",
+    "body": 0,
+    "tris": 2954,
+    "lengthM": 4.6,
+    "tint": "multiply",
+    "license": "CC0 1.0",
+    "attribution": "none required (CC0). Courtesy credit: Quaternius via Poly Pizza",
+    "source_url": "https://poly.pizza/m/Cz6yDaUcM9"
+  },
+  {
+    "file": "sedan_generic_c.glb",
+    "body": 0,
+    "tris": 1688,
+    "lengthM": 4.6,
+    "tint": "multiply",
+    "license": "CC-BY 3.0",
+    "attribution": "\"Red Car\" by J-Toastie, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/dVLJ5CjB0h)",
+    "source_url": "https://poly.pizza/m/dVLJ5CjB0h"
+  },
+  {
+    "file": "sedan_kenney.glb",
+    "body": 0,
+    "tris": 2032,
+    "lengthM": 4.6,
+    "tint": "multiply",
+    "license": "CC0 1.0",
+    "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
+    "source_url": "https://kenney.nl/assets/car-kit"
+  },
+  {
+    "file": "sedan_sports_kenney.glb",
+    "body": 0,
+    "tris": 2088,
+    "lengthM": 4.6,
+    "tint": "multiply",
+    "license": "CC0 1.0",
+    "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
+    "source_url": "https://kenney.nl/assets/car-kit"
+  },
+  {
+    "file": "suv_generic_a.glb",
+    "body": 2,
+    "tris": 3294,
+    "lengthM": 4.7,
+    "tint": "multiply",
+    "license": "CC0 1.0",
+    "attribution": "none required (CC0). Courtesy credit: Quaternius via Poly Pizza",
+    "source_url": "https://poly.pizza/m/xsMtZhBkxL"
+  },
+  {
+    "file": "suv_generic_b.glb",
+    "body": 2,
+    "tris": 7346,
+    "lengthM": 4.7,
+    "tint": "multiply",
+    "license": "CC0 1.0",
+    "attribution": "none required (CC0). Courtesy credit: Quaternius via Poly Pizza",
+    "source_url": "https://poly.pizza/m/tzOLXetacM"
+  },
+  {
+    "file": "suv_kenney.glb",
+    "body": 2,
+    "tris": 2474,
+    "lengthM": 4.7,
+    "tint": "multiply",
+    "license": "CC0 1.0",
+    "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
+    "source_url": "https://kenney.nl/assets/car-kit"
+  },
+  {
+    "file": "suv_luxury_kenney.glb",
+    "body": 2,
+    "tris": 2086,
+    "lengthM": 4.7,
+    "tint": "multiply",
+    "license": "CC0 1.0",
+    "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
+    "source_url": "https://kenney.nl/assets/car-kit"
+  },
+  {
+    "file": "suv_offroad_a.glb",
+    "body": 2,
+    "tris": 4371,
+    "lengthM": 4.7,
+    "tint": "multiply",
+    "license": "CC-BY 3.0",
+    "attribution": "\"Orange Vehicle\" by J-Toastie, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/QFSOUuYTIw)",
+    "source_url": "https://poly.pizza/m/QFSOUuYTIw"
+  },
+  {
+    "file": "taxi_generic.glb",
+    "body": "taxi",
+    "tris": 1256,
+    "lengthM": 4.6,
+    "tint": "none",
+    "license": "CC0 1.0",
+    "attribution": "none required (CC0). Courtesy credit: Kay Lousberg via Poly Pizza",
+    "source_url": "https://poly.pizza/m/u5PhZQ35XG"
+  },
+  {
+    "file": "taxi_kenney.glb",
+    "body": "taxi",
+    "tris": 2072,
+    "lengthM": 4.6,
+    "tint": "none",
+    "license": "CC0 1.0",
+    "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
+    "source_url": "https://kenney.nl/assets/car-kit"
+  },
+  {
+    "file": "toyota_hilux_97.glb",
+    "body": 3,
+    "tris": 1908,
+    "lengthM": 5.2,
+    "tint": "multiply",
+    "license": "CC-BY 3.0",
+    "attribution": "\"Toyota Hilux 97\" by Muhammad Reyhan, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/8-0nFArehjd)",
+    "source_url": "https://poly.pizza/m/8-0nFArehjd"
+  },
+  {
+    "file": "ute_generic.glb",
+    "body": 3,
+    "tris": 6432,
+    "lengthM": 5.2,
+    "tint": "multiply",
+    "license": "CC0 1.0",
+    "attribution": "none required (CC0). Courtesy credit: Quaternius via Poly Pizza",
+    "source_url": "https://poly.pizza/m/qn4grQgHm8"
+  },
+  {
+    "file": "ute_tray_kenney.glb",
+    "body": 3,
+    "tris": 2488,
+    "lengthM": 5.2,
+    "tint": "multiply",
+    "license": "CC0 1.0",
+    "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
+    "source_url": "https://kenney.nl/assets/car-kit"
+  },
+  {
+    "file": "van_courier_kenney.glb",
+    "body": 4,
+    "tris": 2476,
+    "lengthM": 5.4,
+    "tint": "multiply",
+    "license": "CC0 1.0",
+    "attribution": "none required (CC0). Courtesy credit: Kenney - www.kenney.nl",
+    "source_url": "https://kenney.nl/assets/car-kit"
+  },
+  {
+    "file": "van_generic_a.glb",
+    "body": 4,
+    "tris": 1534,
+    "lengthM": 5.4,
+    "tint": "multiply",
+    "license": "CC-BY 3.0",
+    "attribution": "\"Low Poly Multicab\" by Jordan Diamante (djiordhan), licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/8V0uzZMZTsr)",
+    "source_url": "https://poly.pizza/m/8V0uzZMZTsr"
+  },
+  {
+    "file": "van_panel.glb",
+    "body": 4,
+    "tris": 3225,
+    "lengthM": 5.4,
+    "tint": "multiply",
+    "license": "CC-BY 3.0",
+    "attribution": "\"Generic Van\" by PuKkBuMXDD, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/BbRojf2v3H)",
+    "source_url": "https://poly.pizza/m/BbRojf2v3H"
+  },
+  {
+    "file": "vw_golf_mk.glb",
+    "body": 1,
+    "tris": 680,
+    "lengthM": 4.2,
+    "tint": "multiply",
+    "license": "CC-BY 3.0",
+    "attribution": "\"MK Golf - Low Poly\" by Yogoshimo 2.0, licensed CC-BY 3.0, via Poly Pizza (https://poly.pizza/m/2u4e9d0aePt)",
+    "source_url": "https://poly.pizza/m/2u4e9d0aePt"
+  }
+]

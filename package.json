@@ -15,5 +15,9 @@
     "world": "cd pipeline && uv run python -m sydney build --stage inner",
     "world:middle": "cd pipeline && uv run python -m sydney build --stage middle",
     "world:status": "cd pipeline && uv run python -m sydney status"
+  },
+  "devDependencies": {
+    "@gltf-transform/core": "^4.4.2",
+    "@gltf-transform/functions": "^4.4.2"
   }
 }

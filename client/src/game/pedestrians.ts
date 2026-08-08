@@ -105,6 +105,7 @@ import {
 } from './combat.ts';
 import {
   LANE_CLASSES,
+  LANES_VERSION,
   carHash,
   decodeLanes,
   trafficSeconds,
@@ -1559,7 +1560,12 @@ function encodeWays(ways: SyntheticWay[]): TileLanes | null {
   const buffer = new ArrayBuffer(bytes);
   const v = new DataView(buffer);
   v.setUint32(0, 0x454e414c, true); // 'LANE'
-  v.setUint32(4, 1, true);
+  // The version this build reads rather than a literal 1. The routes block is
+  // where lanes v2 grew its park block, and this encoder writes none -- but a
+  // decoder that refuses the version refuses the whole file, so a literal here
+  // would have made every pedestrian check fail on a format bump that has
+  // nothing to do with footpaths.
+  v.setUint32(4, LANES_VERSION, true);
   v.setUint32(8, ways.length, true);
   v.setUint32(12, 0, true);
   let o = 16;

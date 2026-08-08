@@ -151,7 +151,8 @@ import {
   type SpawnGuard,
   type TileIbises,
 } from './birds.ts';
-import { CarAssets, buildTileCars, decodeCars } from './cars.ts';
+import { CarAssets, buildTileCars, decodeCars, type TileCars } from './cars.ts';
+import type { ParkedCarSink } from './carlod.ts';
 import { decodeLanes, type TrafficField } from '../game/traffic.ts';
 import type { PedestrianField } from '../game/pedestrians.ts';
 import { createContactMaterial } from './contact.ts';
@@ -1037,6 +1038,21 @@ export class TileStreamer implements LampSource {
    */
   private pedestrians: PedestrianField | null = null;
   /**
+   * Whoever draws the near-field car models, told about each tile's *parked*
+   * cars on the traffic's terms and from the same two call sites.
+   *
+   * Different from the three above in one way that matters: it is handed the
+   * tile's own `InstancedMesh`es, not just data, because the only way to stop a
+   * parked box drawing under a parked model is to reach into the matrix buffer
+   * the tile built. That makes `release` a hard requirement rather than
+   * housekeeping -- it is what guarantees the reference is dropped before
+   * `dispose` frees the buffer. See `world/carlod.ts` section 3.
+   *
+   * Null is a working configuration: it means every parked car stays a box,
+   * which is what this client did before the model fleet existed.
+   */
+  private parkedCars: ParkedCarSink | null = null;
+  /**
    * The far city, or null before `main.ts` supplies one -- and null is a working
    * configuration, not a broken one: it means every slab draws always, which is
    * exactly what this world did before the far layer had a residency rule. See
@@ -1426,6 +1442,18 @@ export class TileStreamer implements LampSource {
    */
   setPedestrianField(field: PedestrianField): void {
     this.pedestrians = field;
+  }
+
+  /**
+   * Hand the streamer whoever draws the near-field car models.
+   *
+   * On `setPowerupSink`'s terms, with the powerups' own asymmetry inverted: a
+   * powerup's state outlives its tile, and a parked car's model claim must
+   * emphatically not. The tile owns the matrix buffer the claim reached into, so
+   * `dispose` calls `release` and the claim goes with the geometry.
+   */
+  setParkedCarSink(sink: ParkedCarSink): void {
+    this.parkedCars = sink;
   }
 
   /**
@@ -2779,15 +2807,27 @@ export class TileStreamer implements LampSource {
       // rather than in phase 2 because `decodeCars` lives in `world/cars.ts`,
       // which imports `three`. It is 0.03 ms a tile.
       let cars = 0;
+      // Held for the commit step below rather than adopted here, on the lane
+      // graph's own rule: nothing outside the tile learns about it until it is
+      // whole, so a build that is abandoned half-way never leaves a claim
+      // pointing at a mesh that was thrown away.
+      let parkedCars: TileCars | null = null;
+      let parkedMeshes: InstancedMesh[] = [];
       if (carsBuffer !== null) {
-        const parked = safeDecode(() => decodeCars(carsBuffer));
+        // The tile key goes in because a parked car's identity is derived from
+        // it -- see `cars.staticCarIdentity`. The sidecar carries no id of its
+        // own and does not need to: the file's own name plus the order the
+        // bytes are in *is* the identity.
+        const parked = safeDecode(() => decodeCars(carsBuffer, entry.key));
         if (parked !== null) {
-          for (const mesh of buildTileCars(parked, this.carAssets, groundAt)) {
+          parkedMeshes = buildTileCars(parked, this.carAssets, groundAt);
+          for (const mesh of parkedMeshes) {
             mesh.castShadow = true;
             mesh.receiveShadow = false;
             group.add(mesh);
           }
           cars = parked.count;
+          parkedCars = parked;
         }
         yield;
       }
@@ -3096,6 +3136,20 @@ export class TileStreamer implements LampSource {
       if (lanes !== null) {
         this.traffic?.adopt(entry.key, lanes);
         this.pedestrians?.adopt(entry.key, lanes);
+      }
+
+      // And the parked cars, to whoever is drawing the near ones as models. The
+      // group's translation goes with them because the sidecar's coordinates are
+      // tile-local and the model fleet hangs off the scene -- the same
+      // conversion `powerupSink` above is handed, and for the same reason.
+      if (parkedCars !== null && this.parkedCars !== null) {
+        this.parkedCars.adopt(
+          entry.key,
+          parkedCars,
+          parkedMeshes,
+          group.position.x,
+          group.position.z,
+        );
       }
 
       // One array for both kinds of luminaire, because `nearestLamps` is asking
@@ -3692,6 +3746,11 @@ export class TileStreamer implements LampSource {
    * change that makes it bind shows up as a number rather than as a bug report.
    */
   private dispose(key: string, tile: LoadedTile, cam: Vector3 | null = null): void {
+    // **First**, before anything frees a buffer. The model fleet holds direct
+    // references into this tile's parked-car instance matrices, and a claim
+    // that outlived its mesh would write into a disposed buffer the next time
+    // the car left the near field. See `world/carlod.ts` section 3.
+    this.parkedCars?.release(key);
     this.root.remove(tile.group);
     // And the far layer takes the tile back. Paired with the line in `loadTile`;
     // between them a building is drawn by exactly one of the two systems at

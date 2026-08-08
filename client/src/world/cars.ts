@@ -90,7 +90,7 @@ import {
   Vector3,
 } from 'three/webgpu';
 
-import { CAR_BODY_SIZE } from '../game/traffic.ts';
+import { CAR_BODY_SIZE, staticCarIdentity } from '../game/traffic.ts';
 import {
   CAR_STAGE_PARKED_IN,
   CAR_STAGE_PARKED_OUT,
@@ -102,6 +102,7 @@ import {
 } from '../game/traffic.ts';
 import { policeLiveried } from '../game/factions.ts';
 import type { CarLightSink } from './nightlights.ts';
+import type { CarModelSink } from './carlod.ts';
 
 /** Must match `parking.SEDAN` .. `parking.VAN` in the pipeline. */
 export const BODY_COUNT = 5;
@@ -179,6 +180,17 @@ const PAINT: Rgb[] = [
   //          roof sun rgb(197,190,175)  flank sun rgb(156,150,137)  shade rgb( 85, 74, 59)
   [0.32, 0.288, 0.23],
 ];
+
+/**
+ * The palette, for the near-field model fleet.
+ *
+ * Handed out read-only rather than re-derived over in `world/carlod.ts`, because
+ * a car that changed colour as the player walked toward it is precisely the
+ * failure that file exists to avoid: the model a car swaps to has to be painted
+ * in the colour its box was painted in a frame earlier, and two palettes that
+ * agree today is not the same thing as one palette.
+ */
+export const CAR_PAINT: ReadonlyArray<Readonly<Rgb>> = PAINT;
 
 /**
  * The dark parts, as a multiplier on the car's own paint colour rather than as
@@ -612,14 +624,32 @@ export interface TileCars {
   body: Uint8Array;
   colour: Uint8Array;
   seed: Uint16Array;
+  /**
+   * Who each of these cars *is*, as a stable 32-bit number. See
+   * `staticCarIdentity`; empty when `decodeCars` was not told the tile key.
+   */
+  identity: Uint32Array;
 }
+
+/**
+ * Who a parked car is, as a stable well-distributed 32-bit number.
+ *
+ * **Implemented in `game/traffic.ts` and re-exported here**, which is where a
+ * reader will look for it. The reason it lives over there is the reason
+ * `carBodySizes()` is handed *out* of this file rather than imported into it:
+ * this module pulls in three, so the Bun server and `integration-check.ts` can
+ * never load it, and an identity nothing headless can evaluate is an identity
+ * no check can assert is stable. `traffic.ts` imports nothing from three by
+ * rule, so both fleets' identities are testable from one process.
+ */
+export { staticCarIdentity };
 
 /**
  * Decode a `.cars.bin`. Returns `null` for anything that is not one, because a
  * tile with no cars must be indistinguishable from a tile whose sidecar is
  * missing -- see `streamer.ts`.
  */
-export function decodeCars(buffer: ArrayBuffer): TileCars | null {
+export function decodeCars(buffer: ArrayBuffer, tileKey = ''): TileCars | null {
   if (buffer.byteLength < 4) return null;
   const view = new DataView(buffer);
   const count = view.getUint32(0, true);
@@ -633,7 +663,15 @@ export function decodeCars(buffer: ArrayBuffer): TileCars | null {
     body: new Uint8Array(count),
     colour: new Uint8Array(count),
     seed: new Uint16Array(count),
+    // Filled only when the caller named the tile. The sidecar carries no
+    // identity of its own -- it does not need to, because the tile key is
+    // already the file's own name and the index is already the order the bytes
+    // are in. See `staticCarIdentity`.
+    identity: new Uint32Array(tileKey === '' ? 0 : count),
   };
+  if (tileKey !== '') {
+    for (let i = 0; i < count; i++) out.identity[i] = staticCarIdentity(tileKey, i);
+  }
   for (let i = 0; i < count; i++) {
     const o = 4 + i * CAR_STRIDE;
     out.x[i] = view.getFloat32(o, true);
@@ -796,6 +834,9 @@ export const TRAFFIC_DRAW_RADIUS = 420;
  * whites in one street is two whites.
  */
 const LIVERY_WHITE: Rgb = [0.805, 0.81, 0.808];
+
+/** Fleet white, for the model fleet. See `CAR_PAINT` on why it is shared. */
+export const CAR_LIVERY_WHITE: Readonly<Rgb> = LIVERY_WHITE;
 
 /**
  * The chequer band, as a unit ring the instance matrix scales onto a body.
@@ -973,6 +1014,25 @@ export class TrafficMovers {
    */
   lights: CarLightSink | null = null;
 
+  /**
+   * Who, if anyone, is drawing some of these cars as real 3D models.
+   *
+   * The whole of the coupling to `world/carlod.ts`, and it is one property for
+   * `lights`' reason twice over. This loop already computes the exact pose of
+   * every car in view, and the near-field fleet needs that pose for the couple
+   * of dozen it has claimed -- so it is fed from inside this loop rather than
+   * from a second pass that would have to *agree* with it, because the car you
+   * see as a model has to be the car that is there.
+   *
+   * And the answer feeds straight back in: a claimed car does not fill an
+   * instance here, which is what stops a model and a box being drawn in the same
+   * parking space. `begin()` returning false makes the far-from-anywhere case
+   * one comparison per frame rather than a map lookup per car.
+   */
+  models: CarModelSink | null = null;
+  /** Cars drawn as models rather than boxes this frame. Diagnostics only. */
+  modelled = 0;
+
   constructor(assets: CarAssets) {
     this.band = new InstancedMesh(chequerBand(), assets.material, MOVER_CAPACITY);
     this.band.name = 'traffic_livery';
@@ -1046,8 +1106,11 @@ export class TrafficMovers {
     for (let b = 0; b < BODY_COUNT; b++) this.counts[b] = 0;
     this.bandCount = 0;
     let parked = 0;
+    let modelled = 0;
     const lights = this.lights;
     const lighting = lights !== null && lights.begin();
+    const models = this.models;
+    const modelling = models !== null && models.begin();
 
     forEachCarNear(field, x, z, TRAFFIC_DRAW_RADIUS, tick, this.scratch, this.pose, (p) => {
       const n = this.counts[p.body];
@@ -1064,6 +1127,15 @@ export class TrafficMovers {
       // worse failure than the missing car. The night rig makes its own decision
       // about whether a *parked* one is lit; that is not this file's business.
       if (lighting) lights!.add(p);
+      // **Is this one already being drawn properly?** A claim means
+      // `world/carlod.ts` has an `InstancedMesh` of a real car standing exactly
+      // here, and it has just written that instance's matrix from this very
+      // pose -- so filling a box for it as well would put two cars in one
+      // parking space. Asked *after* the headlights, deliberately: a model has
+      // no lamps of its own and the night rig's pair belongs on it exactly as it
+      // belonged on the box.
+      const claimed = modelling && models!.claimed(p);
+      if (claimed) modelled++;
       const mesh = this.meshes[p.body];
       _position.set(p.x, p.y, p.z);
       // The heading, straight off the pose's unit direction and with no
@@ -1088,28 +1160,40 @@ export class TrafficMovers {
         // about Y and the formula above divides by zero.
         _quaternion.set(0, 1, 0, 0);
       }
-      _scale.set(p.scale, p.scale, p.scale);
-      _matrix.compose(_position, _quaternion, _scale);
-      mesh.setMatrixAt(n, _matrix);
-
       const wearsLivery = liveried(p.route, p.slot, p.x, p.z);
-      // White, flat, with **no tonal jitter** -- which is the point of the
-      // exception. Every other car in the city gets a +/-10% tone off the same
-      // hash so a street reads as a fleet of individuals; a marked car is a
-      // *fleet vehicle* and the thing that says so is that it is the same white
-      // as the one behind it.
-      const paint = wearsLivery ? LIVERY_WHITE : (PAINT[p.colour] ?? PAINT[0]);
-      const tone = wearsLivery ? 1 : 0.9 + 0.2 * hash(p.route, p.slot);
-      _colour.setRGB(paint[0] * tone, paint[1] * tone, paint[2] * tone);
-      mesh.setColorAt(n, _colour);
-      this.counts[p.body] = n + 1;
 
+      // The body, unless somebody better is already drawing it.
+      if (!claimed) {
+        _scale.set(p.scale, p.scale, p.scale);
+        _matrix.compose(_position, _quaternion, _scale);
+        mesh.setMatrixAt(n, _matrix);
+
+        // White, flat, with **no tonal jitter** -- which is the point of the
+        // exception. Every other car in the city gets a +/-10% tone off the same
+        // hash so a street reads as a fleet of individuals; a marked car is a
+        // *fleet vehicle* and the thing that says so is that it is the same white
+        // as the one behind it.
+        const paint = wearsLivery ? LIVERY_WHITE : (PAINT[p.colour] ?? PAINT[0]);
+        const tone = wearsLivery ? 1 : 0.9 + 0.2 * hash(p.route, p.slot);
+        _colour.setRGB(paint[0] * tone, paint[1] * tone, paint[2] * tone);
+        mesh.setColorAt(n, _colour);
+        this.counts[p.body] = n + 1;
+      }
+
+      // The band, whichever way the car is drawn. **A marked car within the
+      // model radius must not quietly stop being marked**, which is exactly the
+      // "type switch at the boundary" the near-field swap is supposed to have
+      // none of -- and the police model is a plain white car with no livery
+      // painted on it, so the chequer is the only thing that says what it is.
       if (wearsLivery && this.bandCount < MOVER_CAPACITY) {
         // The band's geometry is a unit ring; scaling it to the body's own
         // dimensions is what puts it on the doors of a van and on the doors of a
         // hatch. `CAR_BODY_SIZE` is the hit box's table, so this cannot drift
-        // from the shape it is drawn around.
-        const size = CAR_BODY_SIZE[p.body] ?? CAR_BODY_SIZE[0];
+        // from the shape it is drawn around -- except when the shape is a model,
+        // which is a different size from its hit box and has to be measured
+        // rather than assumed, or the band ends up buried inside the doors.
+        const size = (claimed ? models!.bandBox(p.identity) : null)
+          ?? CAR_BODY_SIZE[p.body] ?? CAR_BODY_SIZE[0];
         _scale.set(
           (size.length * 0.5 + 0.01) * p.scale,
           size.height * p.scale,
@@ -1136,11 +1220,16 @@ export class TrafficMovers {
       drawn += n;
     }
     if (lights !== null) lights.end();
+    // Uploaded from here rather than from the caller so that the model fleet's
+    // buffers are flushed in the same place its matrices were written, on
+    // exactly the headlights' terms: one pass over the cars, one flush.
+    if (modelling) models!.end();
     if (this.bandCount > 0 || this.band.count > 0) this.band.instanceMatrix.needsUpdate = true;
     this.band.count = this.bandCount;
     this.liveried = this.bandCount;
     this.drawn = drawn;
     this.parked = parked;
+    this.modelled = modelled;
     this.costMs = performance.now() - at;
   }
 

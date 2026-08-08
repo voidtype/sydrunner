@@ -86,13 +86,39 @@
  *     except in dwells shorter than the headway. `driveT` is monotone
  *     non-decreasing and identical for every slot on a route, so the same
  *     argument holds verbatim -- provided a parked dwell is itself shorter than
- *     the headway, which is why `PARK_DWELL_HEADWAY_SHARE` exists and is the
- *     binding constraint on how long a car may sit.
+ *     the *window the bay is held for*, which is why `PARK_BAY_GAP` exists and
+ *     is the binding constraint on how long a car may sit.
  *
  * A parked car is stationary, and `applyCarHit` now knows it: the knockback
  * scales continuously with the car's own speed, so standing beside one at the
  * kerb is safe and being clipped by one pulling out at 2 m/s is a shove rather
  * than a flight over the bonnet.
+ *
+ * ---------------------------------------------------------------------------
+ * AND THE BAY IS OWNED, NOT GUESSED. THIS IS WHAT LANES v2 IS.
+ *
+ * "when a car pulls in it must be to an empty spot, and when it leaves it must
+ * clear up that spot. they should never overlap." Three things had to change
+ * before that sentence was true, and only one of them was in this file.
+ *
+ *   1. **Which bay.** v1 derived it here, from the ways block of the tile being
+ *      decoded, which cannot see the 23,020 static parked cars in `.cars.bin`
+ *      (the server never opens that file) and cannot see any other route's
+ *      claim (the claimant may be three tiles away). So it collided with both.
+ *      `pipeline/sydney/bays.py` now arbitrates every bay in the extent in one
+ *      pass and bakes the answer into the sidecar. This file reads it.
+ *   2. **For how long.** v1 capped a dwell at `0.9 * headway` and argued a bay
+ *      therefore held one car -- which is true of two *parked* cars and says
+ *      nothing about the one still pulling out of the bay the next has arrived
+ *      in. That was the largest single class of overlap in the shipped city.
+ *      See `PARK_BAY_GAP`.
+ *   3. **What "the same car" means.** `CarPose.identity` is a stable 32-bit
+ *      name for a car that never changes across its five stages, so the thing
+ *      that pulls out of one bay is the thing that pulls into the other.
+ *
+ * `checkTraffic` sweeps two simulation hours at 1 Hz over the inner ring and
+ * asserts that no car sitting in a bay is ever inside another car sitting in a
+ * bay, or inside any of the static fleet.
  *
  * ---------------------------------------------------------------------------
  * THE CLOCK IS UNIX TIME, AND THAT IS A DECISION.
@@ -151,7 +177,25 @@ import { EYE_HEIGHT } from '../player/controller.ts';
 
 /** ASCII 'LANE' little-endian. Must match `tiles.LANES_MAGIC`. */
 export const LANES_MAGIC = 0x454e414c;
-export const LANES_VERSION = 1;
+/**
+ * v2: every route carries the two kerb bays its cars park in.
+ *
+ * v1 *derived* them here, at decode time, from the ways block in the same tile
+ * -- and that is the bug this version exists to end. A derivation cannot see
+ * what it is not given, and what a per-tile decoder is not given is (a) the
+ * 23,020 static cars in `.cars.bin`, which the server never opens at all, and
+ * (b) every other route's claim on the same three metres of gutter. So schedule
+ * cars parked on top of parked cars and on top of each other. Measured on the
+ * shipped v1 world, 360 one-second samples of the inner 1.5 km: 654 pairs of a
+ * schedule car interpenetrating a static one and 1,163 pairs of two routes in
+ * one bay.
+ *
+ * `pipeline/sydney/bays.py` now arbitrates every bay in the extent in one
+ * global pass and bakes the winner into the sidecar. Both ends *read* it, which
+ * is also why the bump is not optional: a v1 file has no park block, so a v2
+ * decoder pointed at one would fall straight back to deriving.
+ */
+export const LANES_VERSION = 2;
 
 /**
  * The class byte in `.lanes.bin`, in the pipeline's own order.
@@ -340,27 +384,17 @@ export interface LaneWay {
  * whole point of parking it. `verifyTraffic` asserts the derived pose against a
  * way of known width.
  *
- * The way's own `halfWidth` is the kerb face -- `tiles.write_lanes` states that
- * contract -- so a bay is `halfWidth - KERB_OFFSET` left of the centreline, and
- * the lane the route polyline already sits in is however far left it happens to
- * be. The shift between the two is measured rather than re-derived: the
- * perpendicular distance from the route point to the way's centreline *is* the
- * lane offset in force at that point, which sidesteps re-implementing
- * `lanes._lane_offset`'s clamps and its one-way special case.
+ * Since v2 **nothing in this file uses it**. The bay a schedule car parks in is
+ * chosen by `pipeline/sydney/bays.py` off `parking.py`'s own canonical grid and
+ * arrives in the sidecar as a vector, so the two fleets line up because they
+ * came out of one arbitration rather than because two constants agree. It is
+ * kept, exported and asserted because it is the *contract* the pipeline is held
+ * to: `verifyTraffic` still checks a synthetic route's parked pose against
+ * `halfWidth - PARKED_KERB_OFFSET`, which is the number `parking.py` would have
+ * used, and a pipeline that started emitting bays somewhere else would fail
+ * that check rather than quietly shipping a row of cars 30 cm out of line.
  */
 export const PARKED_KERB_OFFSET = 1.05;
-
-/**
- * How far along the route from its endpoint the kerb bay sits, metres.
- *
- * A route endpoint is a graph node, which is a junction, and a car parked in the
- * middle of an intersection is a worse artefact than the pop this feature
- * exists to remove. Eight metres is inside `parking.CLEAR_OF_JUNCTION`'s 10 m
- * yellow-line keep-out, which is doing double duty: it puts the bay clear of the
- * intersection *and* on the one stretch of kerb the static fleet is guaranteed
- * never to have parked in, so the two can never interpenetrate.
- */
-const PARK_INSET_M = 8;
 
 /** The pull-out and the pull-in, seconds. A standing start and a stop. */
 const PULL_OUT_SECONDS = 2.6;
@@ -377,6 +411,28 @@ const PULL_IN_SECONDS = 2.6;
 const RAMP_BUDGET = 3 * PULL_OUT_SECONDS + PULL_IN_SECONDS;
 
 /**
+ * Guaranteed empty seconds between two occupants of one bay.
+ *
+ * The user's rule, in full: "when a car pulls in it must be to an empty spot,
+ * and when it leaves it must clear up that spot." The second half of that was
+ * never enforced. v1 capped a dwell at `0.9 * headway` and argued that a bay
+ * therefore held one car at a time -- which is true of two *parked* cars and
+ * says nothing at all about the car still pulling out of the bay the next one
+ * has already arrived in. Measured on the shipped v1 world over 360 samples of
+ * the inner 1.5 km: 2,127 pairs of a parked car overlapping the car ahead of it
+ * on the same route mid-pull-out, and 2,343 of a parked car overlapping the one
+ * behind it mid-pull-in. Both were the largest single class of overlap in the
+ * city and neither was a bay conflict at all -- they were the same bay, used
+ * twice, too soon.
+ *
+ * So the cap is now the *occupancy window* rather than a share: a bay is held
+ * from the moment a car's ramp starts touching it until the moment it is done,
+ * which is `outT` after departure at the near end and `inLen` before arrival at
+ * the far end. See `buildParkPhases`.
+ */
+const PARK_BAY_GAP = 1.5;
+
+/**
  * Shorter than this and a route gets no park stages at all, seconds.
  *
  * A two-second route is a stub whose ramps would be a fifth of a second each,
@@ -386,79 +442,36 @@ const RAMP_BUDGET = 3 * PULL_OUT_SECONDS + PULL_IN_SECONDS;
  */
 const MIN_PARK_DURATION = 2.0;
 
+/**
+ * The share of a route's own duration either park stage may consume.
+ *
+ * **`bays.MAX_PARK_SHARE`, and it is the entire interface between the two
+ * halves of this feature.** The pipeline refuses any bay outside it; this file
+ * then knows, without being told anything else, that it can always choose ramp
+ * spans that are monotone *and* leave a driving stage between them -- see
+ * `buildParkPhases` for the derivation. Duplicating `PULL_OUT_SECONDS` into
+ * Python instead would have put a constant on both sides of a file format,
+ * which is the drift v2 exists to remove.
+ */
+const MAX_PARK_SHARE = 0.25;
+
 /** How long a car sits at the kerb, seconds, before the headway cap bites. */
 const PARK_DWELL_MIN = 6;
 const PARK_DWELL_MAX = 18;
 
 /**
- * The hard ceiling on a parked dwell, as a share of the route's headway.
+ * The bay the arbitration could not fill, and what the car does instead.
  *
- * **This is the load-bearing number in the whole feature.** `lanes.py` proves
- * that two cars on one route never coincide from the fact that the timetable is
- * strictly increasing except in dwells shorter than the headway. A parked dwell
- * is a dwell, and slot `k` sits in the start bay over `[dep - dwell, dep)` while
- * slot `k+1` arrives at `dep + headway - dwell` -- so the bay holds one car at a
- * time exactly when `dwell < headway`. At 0.9 the margin is a tenth of a headway
- * either side, and every route in the shipped world has a headway of five to
- * fifteen seconds (`lanes.HEADWAY`, raised per route above its longest red), so
- * this and not `PARK_DWELL_MAX` is what most cars actually get.
- *
- * Raising it above 1.0 would put two cars in one bay, which is the one failure
- * mode this feature can produce that is worse than the pop it removes.
+ * `bays.py` walks sixty metres of kerb from each route end looking for ground
+ * nothing else owns, and then -- as a last resort -- offers the lane itself,
+ * which is why so few ends come back empty: 29 of 1,004 over the inner 1.6 km.
+ * An end that still has nothing gets no park stage at all, and its cars wink in
+ * and out mid-lane at road speed, which is exactly the artefact the park stages
+ * were added to remove. That is deliberate and it is the right trade: the
+ * alternative is a car that materialises *on top of another car*, and a pop is
+ * a thing you might catch where two bodies in one place is a thing you
+ * photograph. `kerblessEndpoints` counts them and `checkTraffic` bounds them.
  */
-const PARK_DWELL_HEADWAY_SHARE = 0.9;
-
-/**
- * How far from a lane point a way has to be to be its kerb, metres.
- *
- * `lanes.LANE_OFFSET_MAX` is 5, so a route point is never more than five metres
- * from the centreline it belongs to; nine leaves room for the mitre a corner
- * puts in `lanes._offset_left` without reaching across to the next street.
- */
-const KERB_SEARCH_RADIUS = 9;
-
-/**
- * The lateral move a pull-out is allowed to make, metres.
- *
- * A 40 m arterial (`streets.MAX_ROAD_WIDTH`) puts its kerb 20 m from the
- * centreline while `lanes.LANE_OFFSET_MAX` pins the lane at 5, and a car sliding
- * fifteen metres sideways in two and a half seconds reads as a glitch rather
- * than as a driver indicating. Those classes are clearways that
- * `parking.PARKING_CLASSES` excludes anyway, so the cap costs nothing where the
- * static fleet actually is and buys a sane ramp everywhere else.
- */
-const MAX_KERB_SHIFT = 5.0;
-
-/** Under this much lateral travel there is no kerb worth pulling into, metres. */
-const MIN_KERB_SHIFT = 0.25;
-
-/**
- * The most of one end's measured kerb a route may lend to its other end, metres.
- *
- * A route belongs to the tile holding its *first* point and is written whole --
- * `tiles.write_lanes` says so, and it is what lets a car drive across a seam --
- * so a route's far end routinely lies in the next tile, whose ways block is in a
- * different file this decoder will never see in the same call. Measured on the
- * shipped world: 94% of route starts find their way and only 58% of ends do.
- *
- * The fix is the one piece of geometry that *is* in this file: the same route's
- * other end. A trail follows one road through a junction far more often than it
- * turns onto a different class, so the near end's kerb is the best available
- * estimate of the far end's -- and this is a *cap* on it rather than the value
- * because the two error directions are not equal. Falling short leaves the car
- * on the shoulder, between the lane and the kerb, which reads as a car pulled
- * over. Overshooting puts it on the footpath. 1.5 m covers the whole residential
- * and tertiary population (their measured median shift is 0.83 m) and refuses to
- * fling a car five metres sideways because the route happened to start on an
- * arterial.
- *
- * What is left over -- an end whose route found no kerb at either end -- keeps a
- * shift of zero and dwells in its lane. That is not a failure either: it is a
- * car stopped eight metres short of a junction, which is what a car waiting at a
- * red light is, and `lanes.py`'s edge-disjoint decomposition guarantees nothing
- * else is using that lane to drive through it.
- */
-const BORROWED_KERB_SHIFT_MAX = 1.5;
 
 /** The five stages of a schedule car's life. `CarPose.stage`. */
 export const CAR_STAGE_PARKED_IN = 0;
@@ -491,8 +504,10 @@ export interface LaneRoute {
   minZ: number;
   maxZ: number;
 
-  // --- The park stages. All of it derived at decode from this same file; see
-  // `buildParkPhases`, which is the only thing that writes any of it.
+  // --- The park stages. The two *bays* come out of the sidecar's park block --
+  // `bays.py` arbitrated them against the static fleet and against every other
+  // route -- and everything else here is the ramp arithmetic that reaches them.
+  // `buildParkPhases` is the only thing that writes any of it.
 
   /** Route-time the car waits at, parked, before it departs. Seconds. */
   parkT0: number;
@@ -512,11 +527,19 @@ export interface LaneRoute {
   inA: number;
   inB: number;
   inC: number;
-  /** Metres left of the lane the start and end bays sit. Zero where no kerb. */
+  /**
+   * How far each bay sits from the lane, metres. Diagnostics only.
+   *
+   * Derived from the two vectors below rather than carried separately, and
+   * **zero is a legal value for a real bay** -- `bays.py` takes the lane spot
+   * itself when no kerb is free. `bay0`/`bay1` are what say whether an end has
+   * a bay; this only says how far off the lane it is.
+   */
   kerbShift0: number;
   kerbShift1: number;
   /**
-   * The same two shifts as **world vectors**, frozen at decode.
+   * The two bays as **world vectors from the lane point**, straight out of the
+   * sidecar's park block.
    *
    * Not recomputed per frame from the car's instantaneous heading, and that is a
    * correctness fix rather than an optimisation. A route polyline turns corners,
@@ -527,16 +550,38 @@ export interface LaneRoute {
    * frozen: a 1.51 m jump in one tick on a secondary road that turns 80 degrees
    * a metre and a half into its pull-out.
    *
-   * Frozen, the offset is the vector from the lane to the bay *at the bay*, and
+   * Fixed, the offset is the vector from the lane to the bay *at the bay*, and
    * everything between there and the lane is a straight blend of it. The car
    * still turns the corner -- that is `driveT` and the polyline -- it just stops
-   * dragging its kerb offset round the corner with it.
+   * dragging its kerb offset round the corner with it. Since v2 it is not even
+   * derived here: the pipeline measured it against the bay it claimed, which is
+   * the only way both processes can be sure they mean the same three metres of
+   * gutter.
    */
   kerbOffX0: number;
   kerbOffZ0: number;
   kerbOffX1: number;
   kerbOffZ1: number;
-  /** The longest either dwell may run, seconds. Bounds `liveSlots`. */
+  /**
+   * Does this end own a bay at all? Straight off the sidecar's flags byte.
+   *
+   * Not `kerbShift > 0`, which is what v1 used and which is now wrong in the
+   * one case that matters: `bays.py`'s last-resort fallback claims the *lane*
+   * itself when no kerb is free, and a lane bay has a shift of exactly zero
+   * while being a perfectly real exclusive claim. Reading the flag instead of
+   * inferring it from the geometry is the difference between a car that dwells
+   * where it drives -- which is what a car at a red light is -- and a car that
+   * winks into existence at 50 km/h.
+   */
+  bay0: boolean;
+  bay1: boolean;
+  /**
+   * The longest each dwell may run, seconds. Per end, because the two ends hold
+   * their bays for different lengths of time -- see `PARK_BAY_GAP`.
+   */
+  dwellCap0: number;
+  dwellCap1: number;
+  /** The larger of the two. Bounds `liveSlots`, which needs one number. */
   dwellCap: number;
 }
 
@@ -593,13 +638,38 @@ export interface CarPose {
    * length that root came from is the numerator here.
    */
   speed: number;
+  /**
+   * Who this car *is*, as a stable well-distributed 32-bit number.
+   *
+   * A pure function of `(route.rid, slot)` and of nothing else -- the same hash
+   * the body, the paint and both dwells are already drawn from, handed over
+   * rather than re-derived so that a consumer cannot accidentally key off a
+   * different stream. Three properties, and all three are the point:
+   *
+   *   - **It never changes across a car's life.** The five stages read this
+   *     hash and none of them re-rolls it, so the thing that pulls out of a bay
+   *     is the same thing that pulls into the far one. `checkTraffic` walks a
+   *     whole life at 60 Hz and asserts it.
+   *   - **It is the same number in every process.** `carHash` is `Math.imul`,
+   *     xor and shift, which are exact 32-bit integer operations everywhere, so
+   *     the browser and the Bun server name the same car the same thing with no
+   *     byte on the wire.
+   *   - **It survives a rebuild.** `rid` is hashed from the route's geometry by
+   *     `lanes._schedule` and is stable across builds that do not move the road.
+   *
+   * What it is *for* is the pass after this one: a model table keyed by
+   * identity, so a given car is the same 3D model every time anyone sees it.
+   * Nothing here knows or cares what that table holds. `world/cars.ts` exports
+   * the matching function for the static fleet.
+   */
+  identity: number;
 }
 
 export function createCarPose(): CarPose {
   return {
     route: 0, slot: 0, x: 0, y: 0, z: 0, dx: 0, dz: 1,
     body: 0, colour: 0, scale: 1, halfLength: 0, halfWidth: 0, height: 0,
-    stage: CAR_STAGE_DRIVING, routeT: 0, speed: 0,
+    stage: CAR_STAGE_DRIVING, routeT: 0, speed: 0, identity: 0,
   };
 }
 
@@ -658,13 +728,24 @@ export function decodeLanes(
   }
 
   for (let r = 0; r < routeCount; r++) {
-    if (o + 16 > buffer.byteLength) return null;
+    if (o + 40 > buffer.byteLength) return null;
     const rid = v.getUint32(o, true);
     const klass = v.getUint8(o + 4);
+    const bayFlags = v.getUint8(o + 5);
     const n = v.getUint16(o + 6, true);
     const headway = v.getFloat32(o + 8, true);
     const phase = v.getFloat32(o + 12, true);
-    o += 16;
+    // The park block, v2. Twenty-four bytes of *claim*: two route-times and two
+    // lane-to-bay vectors that `pipeline/sydney/bays.py` arbitrated against the
+    // static fleet and against every other route in the extent. Read, not
+    // derived -- see `LANES_VERSION`.
+    const bayT0 = v.getFloat32(o + 16, true);
+    const bayOffX0 = v.getFloat32(o + 20, true);
+    const bayOffZ0 = v.getFloat32(o + 24, true);
+    const bayT1 = v.getFloat32(o + 28, true);
+    const bayOffX1 = v.getFloat32(o + 32, true);
+    const bayOffZ1 = v.getFloat32(o + 36, true);
+    o += 40;
     if (n < 2 || o + n * 16 > buffer.byteLength) return null;
     const x = new Float32Array(n);
     const y = new Float32Array(n);
@@ -692,203 +773,53 @@ export function decodeLanes(
     // rather than clamped: a car in the wrong place is a bug you can see, and a
     // hang is not.
     if (!(headway > 0) || !(t[n - 1] > 0)) continue;
-    routes.push({
+    const route: LaneRoute = {
       rid, klass, headway, phase, duration: t[n - 1], count: n, x, y, z, t, minX, maxX, minZ, maxZ,
-      // Filled by `buildParkPhases` below, which needs the ways block and so
-      // cannot run until every way has been read. Zeroed rather than left
-      // undefined so a route that somehow escapes that pass is a car with no
-      // park stages -- the old behaviour -- rather than a NaN in a hit box.
+      // Filled by `buildParkPhases` below. Zeroed rather than left undefined so
+      // a route that somehow escaped that pass is a car with no park stages --
+      // a cruise from end to end -- rather than a NaN in a hit box.
       parkT0: 0, outT: 0, inT: t[n - 1], parkT1: t[n - 1],
       outSpan: 0, outA: 0, outB: 0,
       inLen: 0, inSpan: 0, inA: 0, inB: 0, inC: 0,
       kerbShift0: 0, kerbShift1: 0,
-      kerbOffX0: 0, kerbOffZ0: 0, kerbOffX1: 0, kerbOffZ1: 0,
-      dwellCap: 0,
-    });
+      kerbOffX0: bayOffX0, kerbOffZ0: bayOffZ0, kerbOffX1: bayOffX1, kerbOffZ1: bayOffZ1,
+      bay0: (bayFlags & 1) !== 0, bay1: (bayFlags & 2) !== 0,
+      dwellCap0: 0, dwellCap1: 0, dwellCap: 0,
+    };
+    route.parkT0 = bayT0;
+    route.parkT1 = bayT1;
+    routes.push(route);
   }
-  if (routes.length > 0) buildParkPhases(ways, routes);
+  for (const route of routes) buildParkPhases(route);
   return { ways, routes };
 }
 
 // --- Parking the ends of a route -----------------------------------------------
 
 /**
- * Every way segment in one tile, flattened, for the kerb query.
+ * Turn a route's two baked bays into the two ramps that reach them.
  *
- * A structure of arrays and not a list of objects, built once per sidecar and
- * thrown away at the end of the decode. The query below runs twice per route --
- * a few thousand times for the whole city, once, at load -- so this is nowhere
- * near a hot path; it is flat because the alternative allocates one object per
- * segment of every street in Sydney and hands the collector 200,000 corpses
- * during a tile load, which on the client is a frame the streamer was trying to
- * spend on GPU uploads.
- */
-interface WaySegments {
-  count: number;
-  ax: Float64Array;
-  az: Float64Array;
-  bx: Float64Array;
-  bz: Float64Array;
-  /** The way's kerb face, metres from its centreline. */
-  half: Float64Array;
-}
-
-function flattenWays(ways: LaneWay[]): WaySegments {
-  let total = 0;
-  for (const w of ways) total += w.count - 1;
-  const seg: WaySegments = {
-    count: 0,
-    ax: new Float64Array(total),
-    az: new Float64Array(total),
-    bx: new Float64Array(total),
-    bz: new Float64Array(total),
-    half: new Float64Array(total),
-  };
-  let k = 0;
-  for (const w of ways) {
-    for (let i = 0; i + 1 < w.count; i++) {
-      seg.ax[k] = w.x[i];
-      seg.az[k] = w.z[i];
-      seg.bx[k] = w.x[i + 1];
-      seg.bz[k] = w.z[i + 1];
-      seg.half[k] = w.halfWidth;
-      k++;
-    }
-  }
-  seg.count = k;
-  return seg;
-}
-
-/**
- * How far left of this lane point the kerb bay beside it is, metres.
+ * ---------------------------------------------------------------------------
+ * WHERE THE BAY COMES FROM, AND WHY IT IS NOT FROM HERE ANY MORE.
  *
- * Zero when there is no way close enough to have a kerb -- a route end on a
- * motorway deck, or one whose own way lives in the next tile's sidecar. That
- * fallback is deliberate and it is *not* a failure: the car then dwells at the
- * lane offset, which is a car stopped in a lane, which is what a car stopped on
- * a motorway is. `verifyTraffic` and `checkTraffic` both count them, because the
- * number going up is how a pipeline change to the ways block would show itself.
+ * v1 derived a bay in this function: find the nearest way in *this tile's* ways
+ * block, take `halfWidth - PARKED_KERB_OFFSET` left of its centreline, land the
+ * car there. It was the same pure function of the same bytes on both ends, so
+ * the client and the server agreed -- and it was still wrong, because agreeing
+ * is not the same as being right. Two things this function could not see:
  *
- * **Tile-local by construction.** The only input is the sidecar being decoded,
- * so two processes that have read the same bytes derive the same bay -- which is
- * the same argument the rest of this module rests on, and the reason this cannot
- * be allowed to consult the resident set: the server holds every tile at boot
- * and the client holds a moving handful, so a query across tiles would put the
- * two fleets in different places.
- */
-function kerbShiftAt(seg: WaySegments, x: number, z: number): number {
-  let bestD2 = KERB_SEARCH_RADIUS * KERB_SEARCH_RADIUS;
-  let bestHalf = 0;
-  let found = false;
-  for (let i = 0; i < seg.count; i++) {
-    const ax = seg.ax[i];
-    const az = seg.az[i];
-    const bx = seg.bx[i];
-    const bz = seg.bz[i];
-    // Segment bounding box, inflated by the radius. Cheap enough that it is
-    // worth doing before the projection on every one of them.
-    if (x < (ax < bx ? ax : bx) - KERB_SEARCH_RADIUS) continue;
-    if (x > (ax > bx ? ax : bx) + KERB_SEARCH_RADIUS) continue;
-    if (z < (az < bz ? az : bz) - KERB_SEARCH_RADIUS) continue;
-    if (z > (az > bz ? az : bz) + KERB_SEARCH_RADIUS) continue;
-    const dx = bx - ax;
-    const dz = bz - az;
-    const l2 = dx * dx + dz * dz;
-    let u = l2 > 0 ? ((x - ax) * dx + (z - az) * dz) / l2 : 0;
-    if (u < 0) u = 0;
-    else if (u > 1) u = 1;
-    const px = x - (ax + u * dx);
-    const pz = z - (az + u * dz);
-    const d2 = px * px + pz * pz;
-    if (d2 < bestD2) {
-      bestD2 = d2;
-      bestHalf = seg.half[i];
-      found = true;
-    }
-  }
-  if (!found) return 0;
-  // The measured perpendicular distance *is* the lane offset in force here, so
-  // the shift is the difference between where the car drives and where the kerb
-  // bay is. `Math.sqrt` is IEEE-754 exact and is the one root this module
-  // allows itself; see the header.
-  const shift = bestHalf - PARKED_KERB_OFFSET - Math.sqrt(bestD2);
-  if (!(shift > MIN_KERB_SHIFT)) return 0;
-  return shift > MAX_KERB_SHIFT ? MAX_KERB_SHIFT : shift;
-}
-
-/** Route-time at `metres` of arc from the start (or, negative, from the end). */
-function timeAtArc(route: LaneRoute, metres: number, fromEnd: boolean): number {
-  const n = route.count;
-  let acc = 0;
-  for (let s = 0; s + 1 < n; s++) {
-    const i = fromEnd ? n - 2 - s : s;
-    const dx = route.x[i + 1] - route.x[i];
-    const dz = route.z[i + 1] - route.z[i];
-    const len = Math.sqrt(dx * dx + dz * dz);
-    if (acc + len >= metres) {
-      const u = len > 0 ? (metres - acc) / len : 0;
-      const t0 = route.t[i];
-      const t1 = route.t[i + 1];
-      return fromEnd ? t1 - u * (t1 - t0) : t0 + u * (t1 - t0);
-    }
-    acc += len;
-  }
-  return fromEnd ? route.t[0] : route.t[n - 1];
-}
-
-/**
- * The point on a route at route-time `tt`, and the heading there, into `out`.
+ *   1. **The static fleet.** 23,020 parked cars live in `.cars.bin`, which the
+ *      server never opens and which this module has no business opening. So a
+ *      schedule car pulled into a bay that already held one.
+ *   2. **Every other route.** Two routes whose ends meet at one corner each
+ *      derived the same bay, independently, and both were satisfied.
  *
- * `poseCar`'s own lookup, minus the identity and the stages -- the same binary
- * search, the same lerp and the same walk out of a red-light dwell to find a
- * segment with a direction in it. Decode-time only.
- */
-function sampleRoute(
-  route: LaneRoute,
-  tt: number,
-  out: { x: number; z: number; dx: number; dz: number },
-): void {
-  const t = route.t;
-  let lo = 0;
-  let hi = route.count - 1;
-  while (hi - lo > 1) {
-    const mid = (lo + hi) >> 1;
-    if (t[mid] <= tt) lo = mid;
-    else hi = mid;
-  }
-  const span = t[lo + 1] - t[lo];
-  const u = span > 0 ? (tt - t[lo]) / span : 0;
-  out.x = route.x[lo] + u * (route.x[lo + 1] - route.x[lo]);
-  out.z = route.z[lo] + u * (route.z[lo + 1] - route.z[lo]);
-  let hx = route.x[lo + 1] - route.x[lo];
-  let hz = route.z[lo + 1] - route.z[lo];
-  let d2 = hx * hx + hz * hz;
-  for (let step = lo + 1; d2 < 1e-12 && step < route.count - 1; step++) {
-    hx = route.x[step + 1] - route.x[step];
-    hz = route.z[step + 1] - route.z[step];
-    d2 = hx * hx + hz * hz;
-  }
-  for (let step = lo - 1; d2 < 1e-12 && step >= 0; step--) {
-    hx = route.x[step + 1] - route.x[step];
-    hz = route.z[step + 1] - route.z[step];
-    d2 = hx * hx + hz * hz;
-  }
-  if (d2 < 1e-12) {
-    out.dx = 0;
-    out.dz = 1;
-  } else {
-    const inv = 1 / Math.sqrt(d2);
-    out.dx = hx * inv;
-    out.dz = hz * inv;
-  }
-}
-
-/** Scratch for `buildParkPhases`. Decode-time only; never touched at 60 Hz. */
-const _samplePoint = { x: 0, z: 0, dx: 0, dz: 1 };
-const _sampleEnd = { x: 0, z: 0, dx: 0, dz: 1 };
-
-/**
- * Give every route its two kerb bays and the two ramps that reach them.
+ * Neither is fixable from inside a per-tile decoder, because neither is
+ * per-tile. So the arbitration moved to `pipeline/sydney/bays.py`, which walks
+ * `parking.py`'s own canonical bay grid outward from each route end until it
+ * finds ground that nothing else in the extent owns, claims it, and writes the
+ * claim into the sidecar. What is left here is arithmetic on numbers that
+ * arrived in the file -- which is also why the server gets this for free.
  *
  * ---------------------------------------------------------------------------
  * THE RAMP IS A REPARAMETRISATION, NOT AN EXTRA PHASE OF THE TIMETABLE.
@@ -909,16 +840,43 @@ const _sampleEnd = { x: 0, z: 0, dx: 0, dz: 1 };
  *
  * On [0, outT] the warp is the cubic `w(s) = a s^3 + b s^2` with `w(0) = 0`,
  * `w'(0) = 0` (a standing start), `w(1) = 1` and `w'(1) = g` where
- * `g = outT / (outT - parkT0)` is whatever slope makes the join seamless. That
- * gives `a = g - 2`, `b = 3 - g`, and `w' = s(3a s + 2b)`, which is non-negative
- * across [0, 1] **exactly when `g <= 3`** -- so `parkT0 <= (2/3) outT`, which is
- * where `2 * PULL_OUT_SECONDS` in the clamp below comes from. Monotone `w` is
- * not an aesthetic preference: a car that went backwards for a tenth of a second
- * would break the ordering the no-coincidence proof depends on.
+ * `g = outT / outSpan` is whatever slope makes the join seamless. That gives
+ * `a = g - 2`, `b = 3 - g`, and `w' = s(3a s + 2b)`, which is non-negative
+ * across [0, 1] **exactly when `g <= 3`**. Monotone `w` is not an aesthetic
+ * preference: a car that went backwards for a tenth of a second would break the
+ * ordering the no-coincidence proof depends on.
  *
- * The pull-in is the same cubic read backwards -- `v(0) = 0`, `v'(0) = g'`,
- * `v(1) = 1`, `v'(1) = 0` -- and comes to rest at `parkT1`, short of the route's
- * own end, which is what puts the far bay eight metres back from the junction.
+ * ---------------------------------------------------------------------------
+ * THE RAMP SPANS ARE CHOSEN, NOT FIXED, AND THAT IS WHAT LETS A BAY MOVE.
+ *
+ * v1 pinned the pull-out's *span* at `PULL_OUT_SECONDS` and then had to clamp
+ * `parkT0` to `2 * PULL_OUT_SECONDS` to keep `g <= 3`, which put a hard ceiling
+ * of about five seconds of route-time on how far into the route a bay could
+ * sit. The far end was worse: its ceiling was `(2/3) * PULL_IN_SECONDS`, about
+ * 1.7 seconds, which is nineteen metres at a residential speed and about three
+ * bays. An arbitration that can only look three bays down the street is not an
+ * arbitration.
+ *
+ * So the span is `max(P, parkT0 / 2)` instead -- exactly `P` for every bay
+ * inside the old ceiling, so nothing that used to work behaves differently, and
+ * growing beyond it for a bay the walk had to reach for. `g <= 3` is
+ * `parkT0 <= 2 * outSpan`, which that expression satisfies by construction for
+ * any `parkT0 >= 0`. A car whose bay is forty metres in simply takes longer to
+ * get up to speed, which is what a car pulling out forty metres further up the
+ * street looks like.
+ *
+ * The pull-in is the same cubic read backwards -- `v(0) = 0`, `v'(0) = gIn`,
+ * `v(1) = 1`, `v'(1) = 0` -- over an age span `inLen` and a route-time span
+ * `inSpan`, with `gIn = inLen / inSpan <= 3`. Given how far back from the route
+ * end the bay is (`inset`), `inSpan = max(Q - inset, inset / 2)` and
+ * `inLen = inset + inSpan`, which is `Q` exactly while `inset <= (2/3) Q` and
+ * stretches after that.
+ *
+ * **The only thing this needs from the pipeline is `bays.MAX_PARK_SHARE`**:
+ * both `parkT0` and `duration - parkT1` are at most a quarter of the route's
+ * duration. That is what makes `outT < inT` -- the car has to actually drive
+ * between its two bays -- and it is one bound rather than a shared copy of
+ * `PULL_OUT_SECONDS`, so the two sides of the file format cannot drift.
  *
  * The lateral blend rides on top: `(1 - w)^2` out and `v^2` in, squared so that
  * the sideways velocity is zero at both ends of both ramps as well. Without the
@@ -926,100 +884,143 @@ const _sampleEnd = { x: 0, z: 0, dx: 0, dz: 1 };
  * stops drifting in one frame, which is small but is exactly the kind of kink
  * the eye finds.
  */
-function buildParkPhases(ways: LaneWay[], routes: LaneRoute[]): void {
-  const seg = flattenWays(ways);
-  for (const r of routes) {
-    const duration = r.duration;
-    if (duration < MIN_PARK_DURATION || seg.count === 0) {
-      // No stages at all: `inT === duration` makes the whole life one cruise and
-      // `dwellCap === 0` makes `liveSlots` the function it always was. A world
-      // whose ways block is empty -- `pedestrians.ts` writes one, and so does a
-      // tile of pure motorway -- degrades to exactly the old behaviour.
-      r.inT = duration;
-      r.parkT1 = duration;
-      continue;
-    }
-    const k = duration >= RAMP_BUDGET ? 1 : duration / RAMP_BUDGET;
-    const P = PULL_OUT_SECONDS * k;
-    const Q = PULL_IN_SECONDS * k;
+function buildParkPhases(r: LaneRoute): void {
+  const duration = r.duration;
+  // A route too short to ramp, or one the arbitration gave nothing at either
+  // end: `inT === duration` makes the whole life one cruise and a zero
+  // `dwellCap` makes `liveSlots` the function it always was.
+  if (duration < MIN_PARK_DURATION || (!r.bay0 && !r.bay1)) {
+    r.parkT0 = 0;
+    r.outT = 0;
+    r.inT = duration;
+    r.parkT1 = duration;
+    r.bay0 = false;
+    r.bay1 = false;
+    r.kerbOffX0 = 0;
+    r.kerbOffZ0 = 0;
+    r.kerbOffX1 = 0;
+    r.kerbOffZ1 = 0;
+    return;
+  }
+  const k = duration >= RAMP_BUDGET ? 1 : duration / RAMP_BUDGET;
+  const P = PULL_OUT_SECONDS * k;
+  const Q = PULL_IN_SECONDS * k;
 
-    // The near bay: `PARK_INSET_M` of arc into the route, but never so far in
-    // that the warp above stops being monotone, and never more than a quarter of
-    // a short route.
-    let parkT0 = timeAtArc(r, PARK_INSET_M, false);
-    const outCap = 2 * P;
-    if (parkT0 > outCap) parkT0 = outCap;
-    if (parkT0 > duration * 0.25) parkT0 = duration * 0.25;
+  // --- The near end.
+  //
+  // An end with no bay gets **no ramp at all**: `outT = 0` skips the pull-out
+  // branch of `poseCar` entirely and the car is driving from its first tick,
+  // which is v1's behaviour for a route that found no kerb. Giving it a ramp
+  // anyway would make it appear *stationary in a lane* for the half-second the
+  // ramp takes to reach 1 m/s, and a stationary car is a thing this feature now
+  // promises never overlaps anything.
+  //
+  // The clamp is defensive rather than load-bearing: `bays.py` already refuses
+  // any bay outside `[0, MAX_PARK_SHARE * duration]`, and a file that broke
+  // that would break `outT < inT` below rather than the monotonicity above. It
+  // is here because a NaN or a negative in a binary search is a car in the
+  // wrong place, and this is the cheapest place in the whole feature to stop
+  // one.
+  let parkT0 = 0;
+  let outSpan = 0;
+  let outT = 0;
+  if (r.bay0) {
+    parkT0 = r.parkT0;
     if (!(parkT0 > 0)) parkT0 = 0;
-    const outT = parkT0 + P;
-    const g = outT / P;
-
-    // The far bay, the same distance back from the end. Bounded by `(2/3) Q` for
-    // the pull-in's own monotonicity, which is the same `g <= 3`.
-    let inset1 = duration - timeAtArc(r, PARK_INSET_M, true);
-    const inCap = (2 / 3) * Q;
-    if (inset1 > inCap) inset1 = inCap;
-    if (!(inset1 > 0)) inset1 = 0;
-    const inT = duration - Q;
-    const parkT1 = duration - inset1;
-    const inSpan = parkT1 - inT;
-    const gIn = Q / inSpan;
-
-    r.parkT0 = parkT0;
-    r.outT = outT;
-    r.outSpan = P;
+    if (parkT0 > duration * MAX_PARK_SHARE) parkT0 = duration * MAX_PARK_SHARE;
+    outSpan = P > parkT0 * 0.5 ? P : parkT0 * 0.5;
+    outT = parkT0 + outSpan;
+    const g = outT / outSpan;
     r.outA = g - 2;
     r.outB = 3 - g;
-    r.inT = inT;
-    r.parkT1 = parkT1;
-    r.inLen = Q;
-    r.inSpan = inSpan;
+  }
+
+  // --- The far end. The same, read backwards.
+  let inset = 0;
+  let inSpan = 0;
+  let inLen = 0;
+  if (r.bay1) {
+    inset = duration - r.parkT1;
+    if (!(inset > 0)) inset = 0;
+    if (inset > duration * MAX_PARK_SHARE) inset = duration * MAX_PARK_SHARE;
+    const rest = Q - inset;
+    inSpan = rest > inset * 0.5 ? rest : inset * 0.5;
+    inLen = inset + inSpan;
+    const gIn = inLen / inSpan;
     r.inA = gIn - 2;
     r.inB = 3 - 2 * gIn;
     r.inC = gIn;
-
-    sampleRoute(r, parkT0, _samplePoint);
-    let shift0 = kerbShiftAt(seg, _samplePoint.x, _samplePoint.z);
-    sampleRoute(r, parkT1, _sampleEnd);
-    let shift1 = kerbShiftAt(seg, _sampleEnd.x, _sampleEnd.z);
-    // One end lends to the other. See `BORROWED_KERB_SHIFT_MAX` -- this is what
-    // rescues the far end of every route that crosses a tile seam, which is most
-    // of them.
-    if (shift1 === 0 && shift0 > 0) {
-      shift1 = shift0 < BORROWED_KERB_SHIFT_MAX ? shift0 : BORROWED_KERB_SHIFT_MAX;
-    } else if (shift0 === 0 && shift1 > 0) {
-      shift0 = shift1 < BORROWED_KERB_SHIFT_MAX ? shift1 : BORROWED_KERB_SHIFT_MAX;
-    }
-    r.kerbShift0 = shift0;
-    r.kerbShift1 = shift1;
-    // Left of a heading (dx, dz) is (dz, -dx), the same axes `lanes._offset_left`
-    // put the lane on. Frozen here rather than rebuilt per frame -- see
-    // `LaneRoute.kerbOffX0` for the corner that made that necessary.
-    r.kerbOffX0 = _samplePoint.dz * shift0;
-    r.kerbOffZ0 = -_samplePoint.dx * shift0;
-    r.kerbOffX1 = _sampleEnd.dz * shift1;
-    r.kerbOffZ1 = -_sampleEnd.dx * shift1;
-
-    // See `PARK_DWELL_HEADWAY_SHARE`. One number for both ends, because
-    // `liveSlots` needs a single bound and the two dwells are drawn from it.
-    const cap = r.headway * PARK_DWELL_HEADWAY_SHARE;
-    r.dwellCap = cap < PARK_DWELL_MAX ? cap : PARK_DWELL_MAX;
   }
+
+  r.parkT0 = parkT0;
+  r.outT = outT;
+  r.outSpan = outSpan;
+  r.inT = duration - inLen;
+  r.parkT1 = duration - inset;
+  r.inLen = inLen;
+  r.inSpan = inSpan;
+
+  // The magnitudes, for the diagnostics and for `verifyTraffic`. `Math.sqrt` is
+  // IEEE-754 exact and is the one root this module allows itself; see the
+  // header. Zero is a legal answer for a bay the arbitration placed in the lane
+  // itself, which is why `bay0`/`bay1` and not these are what say whether an
+  // end has a bay.
+  r.kerbShift0 = r.bay0
+    ? Math.sqrt(r.kerbOffX0 * r.kerbOffX0 + r.kerbOffZ0 * r.kerbOffZ0)
+    : 0;
+  r.kerbShift1 = r.bay1
+    ? Math.sqrt(r.kerbOffX1 * r.kerbOffX1 + r.kerbOffZ1 * r.kerbOffZ1)
+    : 0;
+  if (!r.bay0) {
+    r.kerbOffX0 = 0;
+    r.kerbOffZ0 = 0;
+  }
+  if (!r.bay1) {
+    r.kerbOffX1 = 0;
+    r.kerbOffZ1 = 0;
+  }
+
+  // --- How long a car may sit, per end. See `PARK_BAY_GAP`.
+  //
+  // A bay is held from the moment its occupant's ramp starts touching it until
+  // the moment that ramp is done -- `[dep - dwellIn, dep + outT]` at the near
+  // end, `[arr - inLen, arr + dwellOut]` at the far one. The next slot arrives
+  // one headway later, so the two windows are disjoint exactly when the dwell
+  // is under `headway - (the ramp's own length) - a gap`. That is the whole
+  // invariant, and it is per end because the two ramps are different lengths.
+  //
+  // Negative is legal and means what it says: on a route whose headway is
+  // shorter than its own pull-out -- a motorway at five seconds -- there is no
+  // room for a dwell at all, and the car appears at rest in its bay and leaves
+  // immediately. That is still not a pop: it is stationary at a kerb when it
+  // appears, which is the whole property the park stages exist to buy.
+  const cap0 = r.headway - outT - PARK_BAY_GAP;
+  const cap1 = r.headway - inLen - PARK_BAY_GAP;
+  r.dwellCap0 = r.bay0 ? clampDwell(cap0) : 0;
+  r.dwellCap1 = r.bay1 ? clampDwell(cap1) : 0;
+  r.dwellCap = r.dwellCap0 > r.dwellCap1 ? r.dwellCap0 : r.dwellCap1;
+}
+
+function clampDwell(cap: number): number {
+  if (!(cap > 0)) return 0;
+  return cap < PARK_DWELL_MAX ? cap : PARK_DWELL_MAX;
 }
 
 /**
- * How many route endpoints in a decoded tile found no kerb to park against.
+ * How many route endpoints in a decoded tile own no bay at all.
  *
- * Diagnostics, and the one number worth watching if the ways block ever changes:
- * a car with no kerb dwells in its lane, which is correct on a motorway and
- * wrong everywhere else, so a jump here is a pipeline regression rather than a
- * rendering one. Returns `[kerbless, total]`.
+ * The one number worth watching about `bays.py`: an end with no bay has no park
+ * stage, so its cars wink in and out mid-lane at road speed -- the artefact the
+ * park stages exist to remove. It is not zero and cannot be (a route end on a
+ * motorway deck has no kerb within sixty metres and no lane spot free either),
+ * but it going *up* means the arbitration is starving, which would be a
+ * pipeline regression rather than a rendering one. Returns `[bayless, total]`.
  */
 export function kerblessEndpoints(tile: TileLanes): [number, number] {
   let kerbless = 0;
   for (const r of tile.routes) {
-    if (r.kerbShift0 === 0) kerbless++;
-    if (r.kerbShift1 === 0) kerbless++;
+    if (!r.bay0) kerbless++;
+    if (!r.bay1) kerbless++;
   }
   return [kerbless, tile.routes.length * 2];
 }
@@ -1171,6 +1172,60 @@ function unit(h: number): number {
   return h / 4294967296;
 }
 
+/**
+ * Which car slot `slot` of this route is, without posing it.
+ *
+ * The same number `poseCar` writes into `CarPose.identity`, exported so that
+ * anything holding a route and a slot -- a model table, a check, a dev handle
+ * -- can name a car without evaluating where it is. One line, and it exists so
+ * that there is exactly one definition of a schedule car's identity rather than
+ * two that agree today.
+ */
+export function identityOf(route: LaneRoute, slot: number): number {
+  return carHash(route.rid, slot);
+}
+
+/**
+ * Who a parked car is, as a stable well-distributed 32-bit number.
+ *
+ * The static half of `CarPose.identity`, with the same three jobs: never
+ * changes for a given car, is the same number in every process, and survives a
+ * rebuild. The two spaces are deliberately *not* disjoint -- a schedule car and
+ * a parked car that happen to hash alike simply get the same model, which is a
+ * coincidence and not a bug.
+ *
+ * **The tile key and the index, and nothing else.** Not the `seed` byte pair
+ * that already travels in `.cars.bin`, which looks like the obvious choice:
+ * `seed` is `hash & 0xFFFF` from `parking._place`, so over the 414,939 cars in
+ * the extent it collides six times over on average and a model table keyed off
+ * it would put the same car all over Sydney. Not the position either, which is
+ * a float and moves whenever a road is retagged. The tile key is the world's
+ * own address for a patch of ground and the index is the car's order within it,
+ * which `parking.instances` fixes by sorting on easting before anything greedy
+ * runs -- so this is stable across a rebuild that does not change the street.
+ *
+ * The key is folded a character at a time rather than parsed into two integers,
+ * because the tile key's shape (`-3_11`) is `tiles.py`'s business and a parser
+ * here would be a second place that has to know it.
+ *
+ * **It lives in this file rather than in `world/cars.ts`**, which re-exports it
+ * and is where a reader will look. That module imports three, so the Bun server
+ * and `integration-check.ts` can never load it -- and an identity nothing
+ * headless can evaluate is an identity no check can assert is stable.
+ */
+export function staticCarIdentity(tileKey: string, index: number): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < tileKey.length; i++) {
+    h ^= Math.imul(tileKey.charCodeAt(i) | 0, 0x27d4eb2d) >>> 0;
+    h = Math.imul(h ^ (h >>> 15), 0x85ebca6b) >>> 0;
+  }
+  // A different mixing constant from `carHash`'s, so the two identity streams
+  // are independent rather than two views of one sequence.
+  h ^= Math.imul(index | 0, 0x9e3779b1) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b) >>> 0;
+  return (h ^ (h >>> 13)) >>> 0;
+}
+
 /** Scratch for `liveSlots`, so the range query allocates nothing. */
 interface SlotRange { first: number; last: number }
 const SLOT_RANGE: SlotRange = { first: 0, last: -1 };
@@ -1203,12 +1258,13 @@ function liveSlots(route: LaneRoute, now: number, range: SlotRange): number {
  * How long this car sits in one of its two bays, seconds.
  *
  * `which` is 0 for the bay it departs from and 1 for the bay it arrives in, and
- * they are separate draws so a car does not wait the same time at both ends.
- * Capped by the headway share -- see `PARK_DWELL_HEADWAY_SHARE`, which is the
- * constraint that keeps one bay to one car.
+ * they are separate draws so a car does not wait the same time at both ends --
+ * and they are capped separately too, by `dwellCap0` and `dwellCap1`, because
+ * the two bays are held for different lengths of time. See `PARK_BAY_GAP`,
+ * which is the constraint that keeps one bay to one car.
  */
 function parkDwell(route: LaneRoute, h: number, which: number): number {
-  const cap = route.dwellCap;
+  const cap = which === 0 ? route.dwellCap0 : route.dwellCap1;
   if (!(cap > 0)) return 0;
   const d = PARK_DWELL_MIN + (PARK_DWELL_MAX - PARK_DWELL_MIN) * unit(carHash(h, 0x50a1 + which));
   return d < cap ? d : cap;
@@ -1305,6 +1361,12 @@ export function poseCar(route: LaneRoute, slot: number, now: number, out: CarPos
   const z1 = route.z[lo + 1];
   out.route = route.rid;
   out.slot = slot;
+  // Who this is. `h` and not a fresh hash of it: every other per-car choice
+  // below is drawn from this same number, so a consumer keying a 3D model off
+  // the identity is keying off the same draw the body type came from -- and a
+  // car whose identity changed between two stages of its own life would be a
+  // car that changed model mid-street. See `CarPose.identity`.
+  out.identity = h;
   out.x = x0 + u * (x1 - x0);
   out.y = route.y[lo] + u * (route.y[lo + 1] - route.y[lo]);
   out.z = z0 + u * (z1 - z0);
@@ -1822,7 +1884,7 @@ export function verifyTraffic(
     let moving = 0;
     let wrongStage = 0;
     // Slot 1 departs at `headway`, so any tick before that has it in its bay.
-    for (let tick = 60; tick < Number(SYNTHETIC_HEADWAY) * 60 - 60; tick += 11) {
+    for (let tick = 60; tick < Number(SYNTHETIC_HEADWAY) * 60 - 6; tick += 11) {
       if (!poseCar(route, 1, trafficSeconds(tick), parked)) continue;
       sampled++;
       if (parked.stage !== CAR_STAGE_PARKED_IN) { wrongStage++; continue; }
@@ -1845,14 +1907,112 @@ export function verifyTraffic(
         failures.push(`${moving} of ${sampled} parked samples reported a non-zero speed.`);
       }
     }
+    if (!route.bay0 || !route.bay1) {
+      failures.push(
+        `The synthetic route decoded no bay (flags ${route.bay0}, ${route.bay1}); the park block ` +
+          'is not reaching `buildParkPhases`.',
+      );
+    }
     if (!(route.kerbShift0 > 0) || !(route.kerbShift1 > 0)) {
       failures.push(
-        `The synthetic route found no kerb to park against (shifts ${route.kerbShift0}, ` +
-          `${route.kerbShift1}); the ways block is not reaching \`buildParkPhases\`.`,
+        `The synthetic route parked with no lateral shift (${route.kerbShift0}, ` +
+          `${route.kerbShift1}); the bay offsets in the park block are being dropped.`,
       );
     }
     const [kerbless] = kerblessEndpoints(tile);
     if (kerbless !== 0) failures.push(`${kerbless} of 2 synthetic route ends found no kerb.`);
+  }
+
+  // --- THE v2 CONTRACT, as arithmetic on the decoded route.
+  //
+  // Everything `buildParkPhases` promises, checked rather than argued. All four
+  // fail by rendering a city: a non-monotone warp is two ticks of reverse in a
+  // pull-out, an inverted driving stage is a car that arrives before it leaves,
+  // and a dwell longer than the bay is free is two cars in one bay -- which is
+  // the whole reason this version exists.
+  {
+    // Monotone ramps. `g <= 3` both ways; see `buildParkPhases` for where the
+    // number comes from.
+    const g = route.outT / route.outSpan;
+    const gIn = route.inLen / route.inSpan;
+    if (!(g <= 3 + 1e-9)) {
+      failures.push(`The pull-out warp has g = ${g}; over 3 it runs the car backwards.`);
+    }
+    if (!(gIn <= 3 + 1e-9)) {
+      failures.push(`The pull-in warp has g = ${gIn}; over 3 it runs the car backwards.`);
+    }
+    // A driving stage exists between the two ramps. This is what
+    // `bays.MAX_PARK_SHARE` buys and it is the only thing this file needs the
+    // pipeline to guarantee.
+    if (!(route.outT < route.inT)) {
+      failures.push(
+        `The pull-out ends at ${route.outT} and the pull-in begins at ${route.inT}; the car would ` +
+          'arrive before it had finished leaving.',
+      );
+    }
+    if (!(route.parkT0 <= route.duration * MAX_PARK_SHARE + 1e-6)) {
+      failures.push(`The near bay sits at route-time ${route.parkT0} of ${route.duration}; the file broke MAX_PARK_SHARE.`);
+    }
+    if (!(route.duration - route.parkT1 <= route.duration * MAX_PARK_SHARE + 1e-6)) {
+      failures.push(`The far bay sits ${route.duration - route.parkT1} s back from the end; the file broke MAX_PARK_SHARE.`);
+    }
+    // The bay is empty before the next car needs it. See `PARK_BAY_GAP`.
+    if (route.dwellCap0 + route.outT + PARK_BAY_GAP > route.headway + 1e-9) {
+      failures.push(
+        `The near bay is held for ${route.dwellCap0 + route.outT} s of a ${route.headway} s headway; ` +
+          'the next car arrives before the last has cleared it.',
+      );
+    }
+    if (route.dwellCap1 + route.inLen + PARK_BAY_GAP > route.headway + 1e-9) {
+      failures.push(
+        `The far bay is held for ${route.dwellCap1 + route.inLen} s of a ${route.headway} s headway; ` +
+          'the next car arrives before the last has cleared it.',
+      );
+    }
+  }
+
+  // --- Identity is stable across a whole life.
+  //
+  // A car that changed identity between its pull-out and its pull-in would get
+  // a different 3D model halfway down the street, and nothing else in this file
+  // would notice: the body, the paint and the scale are all drawn from the same
+  // hash, so they would change with it and the car would still look like *a*
+  // car. Walked at 60 Hz across every stage, which is also what makes this a
+  // check on the stages rather than on the hash.
+  {
+    const step = createCarPose();
+    let id = 0;
+    let changes = 0;
+    let stagesSeen = 0;
+    let ticks = 0;
+    const from = Math.floor((SYNTHETIC_HEADWAY - route.dwellCap - 1) * 60);
+    const to = Math.ceil((SYNTHETIC_HEADWAY + route.duration + route.dwellCap + 1) * 60);
+    for (let tick = from; tick <= to; tick++) {
+      if (!poseCar(route, 1, trafficSeconds(tick), step)) continue;
+      ticks++;
+      stagesSeen |= 1 << step.stage;
+      if (id === 0) id = step.identity;
+      else if (step.identity !== id) changes++;
+    }
+    if (ticks === 0 || id === 0) {
+      failures.push('No live tick was found for the identity sweep.');
+    } else {
+      if (changes > 0) {
+        failures.push(`A car changed identity ${changes} times in one life; it must never change.`);
+      }
+      if (stagesSeen !== 0b11111) {
+        failures.push(
+          `The identity sweep only reached stages ${stagesSeen.toString(2)} of 11111; it did not walk ` +
+            'a whole life.',
+        );
+      }
+      if (identityOf(route, 1) !== id) {
+        failures.push('`poseCar` and the identity hash disagree about which car this is.');
+      }
+      if (identityOf(route, 1) === identityOf(route, 2)) {
+        failures.push('Two slots of one route share an identity.');
+      }
+    }
   }
 
   // --- No teleports, anywhere in the five stages.
@@ -1930,7 +2090,7 @@ export function verifyTraffic(
     // Parked. Standing against a stationary car must be as safe as standing
     // against a bollard -- this is the case the user's report is really about,
     // because the fix parks cars where players walk.
-    if (poseCar(route, 1, trafficSeconds(60), at) && at.stage === CAR_STAGE_PARKED_IN) {
+    if (poseCar(route, 1, trafficSeconds(SYNTHETIC_PARKED_TICK), at) && at.stage === CAR_STAGE_PARKED_IN) {
       if (carHitStrength(at) !== 0) {
         failures.push(`A parked car reported a hit strength of ${carHitStrength(at)}; it must be 0.`);
       }
@@ -1939,7 +2099,7 @@ export function verifyTraffic(
       if (!carOverlaps(at, bystander)) {
         failures.push('A combatant standing on a parked car was not overlapped by it; the box moved with the pose but the test did not.');
       }
-      if (carHitting(field, bystander, 60, scratchHit, pose) !== null) {
+      if (carHitting(field, bystander, SYNTHETIC_PARKED_TICK, scratchHit, pose) !== null) {
         failures.push('A parked car knocked over somebody standing beside it.');
       }
     } else {
@@ -1996,7 +2156,19 @@ const SYNTHETIC_DWELL = 5;
 const SYNTHETIC_HALF_WIDTH = 3.75;
 
 /** The synthetic route's headway, seconds. Bounds its parked dwells. */
-const SYNTHETIC_HEADWAY = 9;
+const SYNTHETIC_HEADWAY = 14;
+
+/**
+ * A tick at which slot 1 of the synthetic route is certainly in its near bay.
+ *
+ * One second before it departs. Not a literal, and the reason is the v2 dwell
+ * rule: a dwell is now capped at `headway - outT - PARK_BAY_GAP` rather than at
+ * `0.9 * headway`, so on a nine-second headway the near bay was held from 4.8 s
+ * rather than from 0.9 s and every check that sampled tick 60 found the car not
+ * yet in existence. Anchoring to the departure instead of to the epoch is what
+ * makes those checks survive a change to either constant.
+ */
+const SYNTHETIC_PARKED_TICK = Math.round((SYNTHETIC_HEADWAY - 1) * 60);
 
 /**
  * A 200 m two-way street running due north, encoded and decoded through the real
@@ -2025,7 +2197,7 @@ function syntheticTile(offset: number): TileLanes {
   // The way: the same street's centreline, at x = 0, over the same 200 m.
   const wayPts: Array<[number, number, number]> = [[0, -12.5, 0], [0, -12.5, -200]];
 
-  const bytes = new ArrayBuffer(16 + (16 + wayPts.length * 12) + 16 + pts.length * 16);
+  const bytes = new ArrayBuffer(16 + (16 + wayPts.length * 12) + 40 + pts.length * 16);
   const v = new DataView(bytes);
   v.setUint32(0, LANES_MAGIC, true);
   v.setUint32(4, LANES_VERSION, true);
@@ -2047,11 +2219,32 @@ function syntheticTile(offset: number): TileLanes {
   }
   v.setUint32(o, 0x5eed, true);
   v.setUint8(o + 4, 10); // residential
-  v.setUint8(o + 5, 0);
+  v.setUint8(o + 5, 3); // both bays assigned
   v.setUint16(o + 6, pts.length, true);
   v.setFloat32(o + 8, SYNTHETIC_HEADWAY, true);
   v.setFloat32(o + 12, 0, true); // phase
   o += 16;
+  // The park block, standing in for `bays.py`.
+  //
+  // The route's lane is `offset` west of a 7.5 m street's centreline and
+  // `parking.py` would put a bay at `SYNTHETIC_HALF_WIDTH - PARKED_KERB_OFFSET`
+  // -- so the delta the pipeline would emit is exactly the difference, due west,
+  // which in renderer axes is -X. Writing the arithmetic out rather than a
+  // literal is the point: this is the one place in the codebase that states, as
+  // executable code, what `bays.py` is supposed to produce, and the parked-pose
+  // assertion above then reads it back through the real decoder.
+  const bayShift = SYNTHETIC_HALF_WIDTH - PARKED_KERB_OFFSET - offset;
+  // `PARK_INSET_M`'s eight metres of arc, as route-time on an 11.1 m/s street,
+  // at both ends. The far bay is measured back from the route's own end.
+  const inset = 8 / 11.1;
+  const total = pts[pts.length - 1][3];
+  v.setFloat32(o, inset, true);
+  v.setFloat32(o + 4, -bayShift, true);
+  v.setFloat32(o + 8, 0, true);
+  v.setFloat32(o + 12, total - inset, true);
+  v.setFloat32(o + 16, -bayShift, true);
+  v.setFloat32(o + 20, 0, true);
+  o += 24;
   for (const [x, y, z, at] of pts) {
     v.setFloat32(o, x, true);
     v.setFloat32(o + 4, y, true);

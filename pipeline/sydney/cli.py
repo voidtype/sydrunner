@@ -10,6 +10,7 @@
     uv run python -m sydney road-grade-audit
     uv run python -m sydney water-audit
     uv run python -m sydney landmark-audit
+    uv run python -m sydney clearance-audit
     uv run python -m sydney reset --kind tile
 
 Resumable throughout: every tile emission is a ledger unit, so an interrupted
@@ -35,9 +36,11 @@ from tqdm import tqdm
 
 from . import (
     attributes,
+    bays,
     config,
     contact,
     decks,
+    elevated,
     fences,
     furniture,
     geo,
@@ -324,6 +327,14 @@ def _read_buildings_table(con) -> list[merge.Building]:
                 centroid=(r["east"], r["north"]),
                 name=g.get("name"),
                 building_type=g.get("type"),
+                # The elevation tags, back out of the same blob `merge.store`
+                # put them in. Absent on every building that carries none, which
+                # is all but a few thousand -- see the note there.
+                min_height=g.get("min_height"),
+                min_level=g.get("min_level"),
+                bridge=bool(g.get("bridge")),
+                man_made=g.get("man_made"),
+                layer=int(g.get("layer") or 0),
                 levels=r["levels"],
                 material=r["material"],
                 start_date=r["start_date"],
@@ -360,14 +371,32 @@ def cmd_build(args: argparse.Namespace) -> int:
     buildings, suppressed = landmarks.suppress(buildings, zones)
     _report_suppression(anchors, suppressed)
 
-    by_tile: dict[str, list[merge.Building]] = defaultdict(list)
-    for b in buildings:
-        by_tile[b.tile].append(b)
-
     print("  reading the terrain ...")
     terrain = Terrain.load(stage.radius_m)
     _report_terrain(terrain)
     _report_water(terrain)
+
+    # The ways, read once here and handed to the three passes that need them.
+    # `elevated`, `streets` and `decks` each used to read the extract's `lines`
+    # layer for themselves, which is three full passes over 56 MB to answer
+    # three questions about the same 180,000 objects.
+    print("  reading the road network ...")
+    roads = osm.read_roads(stage.radius_m)
+    print(f"    {len(roads):,} ways")
+
+    # Which footprints do not start at the ground -- bridges, elevated walkways,
+    # and the ML blobs that swallowed a footbridge and walled a road with it.
+    # **Before the tile bucketing below and after the terrain**, and it has to be
+    # both: a derived soffit is measured off the ground, and cutting the arm off
+    # a footprint moves its centroid, which is what `Building.tile` is. See
+    # `elevated.py` for the rule and for why the drop is asymmetric.
+    print("  resolving elevated structures ...")
+    buildings, elevated_report = elevated.resolve(buildings, roads, terrain)
+    _report_elevated(elevated_report)
+
+    by_tile: dict[str, list[merge.Building]] = defaultdict(list)
+    for b in buildings:
+        by_tile[b.tile].append(b)
 
     # And the landmarks themselves, which need the terrain: a pylon stands on the
     # ground at Dawes Point, the Opera House podium is cut into Bennelong Point,
@@ -378,8 +407,17 @@ def cmd_build(args: argparse.Namespace) -> int:
     landmark_prisms = landmarks.prisms_by_tile(marks)
     _report_landmarks(marks, terrain)
 
+    # Only the grounded footprints are handed over as obstacles, and that is the
+    # last of the elevated pass's ground-level exclusions. The street network
+    # subtracts every footprint it is given out of the paved footpath band
+    # (`_subtract_buildings`) and offers the same set to the furniture and awning
+    # passes as `buildings_near`. A structure five metres up occupies no
+    # footpath: left in, it cut a bridge-shaped hole in the pavement under itself
+    # and made the bins on the far kerb dodge something that is over their heads.
     print("  reading the street network ...")
-    street_network = streets.StreetNetwork.load(stage.radius_m, buildings)
+    street_network = streets.StreetNetwork.load(
+        stage.radius_m, [b for b in buildings if b.base_height <= 0.0], roads
+    )
     print(f"    {len(street_network):,} surface ways")
 
     # The elevated roads. After the terrain and after the landmarks, and it needs
@@ -389,7 +427,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     # one. See `decks.py`.
     print("  solving the bridge decks ...")
     deck_network = decks.DeckNetwork.load(
-        stage.radius_m, terrain, decks.hero_bridge_zone(anchors, zones)
+        stage.radius_m, terrain, decks.hero_bridge_zone(anchors, zones), roads
     )
     _report_decks(deck_network)
 
@@ -437,6 +475,12 @@ def cmd_build(args: argparse.Namespace) -> int:
     # hero Harbour Bridge gets a profile of its own -- `decks.py` deliberately
     # clipped its ways out of the generic deck pass, so without `HeroDeck` the
     # Bradfield Highway's traffic would be on the harbour bed. See `lanes.py`.
+    #
+    # It also takes the street network and the parking network, which is newer
+    # and is the whole of lanes v2: a route's two kerb bays are arbitrated
+    # against the static fleet and against every other route in one global pass
+    # and baked into the sidecar, rather than derived per tile at decode time by
+    # two processes that cannot see each other's claims. See `bays.py`.
     print("  solving the lane graph ...")
     lane_network = lanes.LaneNetwork.load(
         stage.radius_m,
@@ -445,6 +489,8 @@ def cmd_build(args: argparse.Namespace) -> int:
         deck_network,
         lanes.HeroDeck(anchors, decks.hero_bridge_zone(anchors, zones), terrain),
         signal_nodes,
+        street_network,
+        parking_network,
     )
     _report_lanes(lane_network)
 
@@ -773,6 +819,38 @@ def _carry_index_tiles(have: set[str], wanted: set[str]) -> list[tiles.TileResul
     if out:
         print(f"  index carries {len(out):,} tiles from the previous build (not re-emitted)")
     return out
+
+
+def _report_elevated(r: elevated.ElevatedReport) -> None:
+    """Every structure this pass moved or deleted, by name.
+
+    Named rather than counted, and that is deliberate: the whole set is a few
+    dozen buildings out of half a million, every one of them is a visible change
+    to the world, and a drop is a structure that will not be in the build. A
+    count would let a rule change quietly delete two hundred buildings and still
+    print one tidy line. `_report_suppression` sets the same precedent for the
+    landmark suppression zones and for the same reason.
+    """
+    print(
+        f"    {r.examined:,} footprints, {r.candidates:,} candidates;"
+        f" {r.spanning:,} of those have a public carriageway through them"
+        f" and {r.corroborated:,} are corroborated as a crossing"
+    )
+    for label, rows_ in (
+        ("stated a base", r.stated),
+        ("declared a bridge", r.declared),
+        ("raised as a crossing", r.raised),
+        ("cut clear of the road", r.cut),
+        ("dropped", r.dropped),
+        ("left grounded (stated base unusable, spans nothing)", r.quirks),
+    ):
+        if not rows_:
+            continue
+        print(f"    {label}: {len(rows_)}")
+        for bid, why in rows_[:12]:
+            print(f"      {bid}  {why}")
+        if len(rows_) > 12:
+            print(f"      ... and {len(rows_) - 12} more")
 
 
 def _report_suppression(anchors: dict, removed: dict[str, list[str]]) -> None:
@@ -1557,6 +1635,24 @@ def _report_lanes(net) -> None:
         f"    {st['way_spans']:,} way spans in the reusable geometry block"
         f" ({st['surface_ways']:,} surface ways, {st['way_points']:,} points)"
     )
+    # The kerb bays. Two numbers matter and neither is the total: how many route
+    # ends got an exclusively owned bay, and why the rest did not. `no_way` is a
+    # route end with no kerb near it at all -- a motorway deck -- and is a
+    # property of the world; `no_free` is a kerb the arbitration walked sixty
+    # metres of and found full, and is the number that would climb if the static
+    # fleet's fill rate ever went up. Both cars dwell at the lane offset
+    # instead, which is what a car stopped in a lane is. See `bays.py`.
+    if "bay_ends" in st:
+        ends = max(st["bay_ends"], 1)
+        print(
+            f"    kerb bays: {st['bay_assigned']:,} of {st['bay_ends']:,} route ends"
+            f" ({100.0 * st['bay_assigned'] / ends:.1f}%) own a bay outright"
+            f" -- {st['bay_no_way']:,} found no kerb,"
+            f" {st['bay_no_free_bay']:,} found none free within"
+            f" {bays.WINDOW_M:.0f} m, {st['bay_too_short']:,} on routes too short to park"
+            f" ({st['bay_walked_bays']:,} bays walked,"
+            f" {st['bay_static_reserved']:,} static cars held ground)"
+        )
 
 
 def _report_powerups(net: powerups.PowerupNetwork) -> None:
@@ -3935,11 +4031,19 @@ def _decode_lanes(key: str):
         ways.append({"osm_id": osm_id, "klass": klass, "oneway": bool(flags & 1),
                      "half": half, "foot": foot, "p": pts.astype(np.float64)})
     for _ in range(n_routes):
-        rid, klass, _f, n, headway, phase = struct.unpack_from("<IBBHff", buf, o)
+        rid, klass, flags, n, headway, phase = struct.unpack_from("<IBBHff", buf, o)
         o += 16
+        # The park block, v2. Read here rather than skipped so that a route
+        # whose bay bytes are missing shows up as a trailing-byte failure below
+        # rather than as a polyline read at the wrong offset -- which would
+        # decode as a plausible route somewhere else entirely.
+        pt0, ox0, oz0, pt1, ox1, oz1 = struct.unpack_from("<ffffff", buf, o)
+        o += 24
         rec = np.frombuffer(buf, dtype="<f4", count=n * 4, offset=o).reshape(n, 4)
         o += n * 16
         routes.append({"rid": rid, "klass": klass, "headway": headway, "phase": phase,
+                       "bay0": bool(flags & 1), "bay1": bool(flags & 2),
+                       "park": (pt0, ox0, oz0, pt1, ox1, oz1),
                        "p": rec[:, :3].astype(np.float64), "t": rec[:, 3].astype(np.float64)})
     if o != len(buf):
         return f"{len(buf) - o} trailing bytes"
@@ -3982,6 +4086,12 @@ def cmd_lane_audit(args: argparse.Namespace) -> int:
         opposite end to `verifyTraffic`'s synthetic one.
       * **The timetable is strictly increasing.** A route whose cumulative times
         repeat is a divide by zero in the client's lookup.
+      * **The v2 park block is inside the bounds the client's ramp arithmetic
+        assumes.** `game/traffic.ts` chooses ramp spans that are monotone and
+        that leave a driving stage between them on one guarantee and one only --
+        `bays.MAX_PARK_SHARE` -- so a park block outside it is a car that
+        arrives before it has finished leaving. Read here from the disk, with a
+        third decoder, which is the point of this file.
     """
     index = json.loads(config.INDEX_PATH.read_text())
     contract = index.get("lanes")
@@ -4006,6 +4116,8 @@ def cmd_lane_audit(args: argparse.Namespace) -> int:
     elevated: list[float] = []
     left_ok = left_total = 0
     nonmono = 0
+    bay_ends = bay_owned = bay_over_share = bay_far_shift = 0
+    bay_shifts: list[float] = []
     ways = routes = points = 0
     tiles_with_routes = 0
     hero_hits = 0
@@ -4051,6 +4163,26 @@ def cmd_lane_audit(args: argparse.Namespace) -> int:
                 continue
             if not np.all(np.diff(t) > 0.0):
                 nonmono += 1
+            # The park block. `parkT0` and `duration - parkT1` must each be
+            # inside `bays.MAX_PARK_SHARE` of the route's own duration, and a
+            # bay must be within `bays.MAX_KERB_SHIFT` of the lane -- a car that
+            # slides five metres sideways in two seconds reads as a glitch.
+            pt0, ox0_, oz0_, pt1, ox1_, oz1_ = r["park"]
+            dur = float(t[-1])
+            bay_ends += 2
+            for has, at, offx, offz in (
+                (r["bay0"], float(pt0), float(ox0_), float(oz0_)),
+                (r["bay1"], dur - float(pt1), float(ox1_), float(oz1_)),
+            ):
+                if not has:
+                    continue
+                bay_owned += 1
+                if at < -1e-6 or at > dur * bays.MAX_PARK_SHARE + 1e-4:
+                    bay_over_share += 1
+                shift = math.hypot(offx, offz)
+                bay_shifts.append(shift)
+                if shift > bays.MAX_KERB_SHIFT + 1e-3:
+                    bay_far_shift += 1
             for i in range(0, len(p), max(1, len(p) // 8)):
                 x, y, z = float(p[i, 0]), float(p[i, 1]), float(p[i, 2])
                 if grid is not None:
@@ -4114,6 +4246,18 @@ def cmd_lane_audit(args: argparse.Namespace) -> int:
     share = left_ok / max(left_total, 1)
     print(f"  left-hand: {left_ok:,}/{left_total:,} sampled two-way points on the left ({share * 100:.1f}%)")
     print(f"  routes with a non-increasing timetable: {nonmono}")
+    if bay_ends:
+        sh = np.asarray(bay_shifts) if bay_shifts else np.zeros(1)
+        print(
+            f"  kerb bays: {bay_owned:,}/{bay_ends:,} route ends own one"
+            f" ({bay_owned / bay_ends * 100:.1f}%);"
+            f" lateral shift p50 {float(np.percentile(sh, 50)):.2f} m"
+            f" p95 {float(np.percentile(sh, 95)):.2f} m max {float(sh.max()):.2f} m"
+        )
+        print(
+            f"  park blocks outside MAX_PARK_SHARE: {bay_over_share};"
+            f" bays further than MAX_KERB_SHIFT from the lane: {bay_far_shift}"
+        )
 
     bad = []
     if broken:
@@ -4130,6 +4274,18 @@ def cmd_lane_audit(args: argparse.Namespace) -> int:
         bad.append(f"only {share * 100:.1f}% of sampled points are on the left, under {args.min_left_share * 100:.0f}%")
     if routes == 0:
         bad.append("no routes at all")
+    if bay_over_share:
+        bad.append(
+            f"{bay_over_share} park block(s) sit further than"
+            f" {bays.MAX_PARK_SHARE:.0%} into their route -- the client's ramps would invert"
+        )
+    if bay_far_shift:
+        bad.append(f"{bay_far_shift} bay(s) are further than {bays.MAX_KERB_SHIFT} m from their lane")
+    if bay_ends and bay_owned < bay_ends * args.min_bay_share:
+        bad.append(
+            f"only {bay_owned / bay_ends * 100:.1f}% of route ends own a kerb bay,"
+            f" under {args.min_bay_share * 100:.0f}% -- the arbitration is starving"
+        )
 
     if bad:
         print("\nFAIL:")
@@ -4202,6 +4358,372 @@ def _nearest_centreline(centres, x: float, z: float, ox: float, oz: float):
             best_d = float(d[k])
             best = (float(foot[k, 0]), float(foot[k, 1]), not oneway)
     return best
+
+
+# --- clearance-audit ------------------------------------------------------------
+#
+# The two places the user reported, as the audit's own fixture. Named rather
+# than derived, because a regression test for "the bridge at Spit Junction is a
+# wall again" has to know where Spit Junction is; the general scan below would
+# find it anyway, but only if the general scan is still looking in the right
+# place, and a fixture is what says so when the general rule is what broke.
+REPORTED_SPOTS: tuple[tuple[str, float, float], ...] = (
+    ("Spit Junction / Military Rd, Mosman", 151.2405, -33.8290),
+    ("Longueville Rd overbridge, Lane Cove", 151.1680, -33.8135),
+)
+
+# How far around each reported spot the fixture looks, metres. Generous, because
+# the coordinates are a description of a place rather than a survey mark -- the
+# Mosman blob's centroid is 470 m from the pin the user gave.
+SPOT_RADIUS_M = 700.0
+
+# A prism this much of whose plan lies outside the carriageway corridors it
+# crosses is a structure standing over the road. Below it, the prism *is* road
+# surface and is exempt.
+#
+# The exemption is not a loophole, it is the difference between the two things
+# that can put a prism on a carriageway. A footbridge over Military Road reaches
+# past the kerb on both sides, because that is where its abutments are; a slab
+# lying in the road does not. Measured, the Lane Cove blob had 43% of its plan
+# outside the corridor.
+ASIDE_SHARE = 0.15
+
+# A prism this much of whose plan lies inside a bridge way's own ribbon is a
+# piece of that bridge's deck, and is not this audit's business.
+#
+# **This is the exemption that keeps the audit off `decks.py`'s ground.** A deck
+# is emitted as one prism per 6 m station, cut to the bridge way's own half
+# width, and at a touchdown its base is deliberately *below* the ground -- see
+# `decks.DeckNetwork.prisms`, which turns the last few stations of a ramp into a
+# solid embankment on purpose so the player walks up it continuously instead of
+# falling through a floating deck. Where such a ramp crosses another carriageway
+# at grade, as the Gore Hill Freeway's ramps do over the Pacific Highway
+# offramp, the prism is a road over a road and the clearance question is the
+# deck solve's to answer, not this command's.
+#
+# Identified geometrically rather than by a flag, because the collision format
+# has no flag: a deck prism is a ribbon centred on a bridge centreline and fits
+# inside that centreline buffered to the same half width, and nothing else in
+# the payload does. 0.85 rather than 1.0 leaves room for the ring being a
+# straight chord where the buffer is a curve.
+DECK_RIBBON_SHARE = 0.85
+
+
+def _public_carriageways(radius_m: float):
+    """(centrelines, bridge plans) for the extent, as the audit's witnesses.
+
+    Read from the OSM extract rather than from anything this build produced,
+    which is the whole point: a check that asks the pipeline where the roads are
+    is a check that agrees with the pipeline by construction. `elevated.py`
+    reaches the same two sets from the same source and that is unavoidable --
+    there is one OSM -- but nothing here reads its verdict, its constants or its
+    building set.
+    """
+    from shapely.geometry import LineString
+
+    roads = osm.read_roads(radius_m)
+    lines, halves = [], []
+    for r in roads:
+        if r.is_foot or r.tunnel or r.bridge or r.layer != 0 or len(r.line) < 2:
+            continue
+        if r.highway not in elevated.PUBLIC_CLASSES:
+            continue
+        lines.append(LineString(r.line))
+        halves.append(r.width * 0.5)
+    plans, ribbons = [], []
+    for r in roads:
+        if not r.bridge or r.layer < 1 or len(r.line) < 2:
+            continue
+        centre = LineString(r.line)
+        plans.append(centre.buffer(elevated.BRIDGE_WAY_REACH_M))
+        # The structure this way would be built as, to `decks._half_width`'s
+        # rule restated: the clamped carriageway half plus the edge beam. A
+        # tolerance on top, so a straight prism chord across a buffered curve
+        # still counts as inside its own ribbon.
+        half = (
+            min(max(r.width, streets.MIN_ROAD_WIDTH), streets.MAX_ROAD_WIDTH) * 0.5
+            + decks.EDGE_MARGIN_M
+        )
+        ribbons.append(centre.buffer(half + 0.5))
+    return lines, halves, plans, ribbons
+
+
+def _tile_prism_plans(key: str):
+    """Every prism in one shipped tile, as (base, ENU plan ring)."""
+    path = config.COLLISION_DIR / f"{key}.bin"
+    if not path.exists():
+        raise AuditUnresolved(
+            f"{path} is named by index.json but is not on disk; the audit cannot"
+            " see this tile's collision and will not pretend it did"
+        )
+    tx, tz = (int(v) for v in key.split("_"))
+    oe, on = tx * config.TILE_SIZE, tz * config.TILE_SIZE
+    for base, pts in _collision_prisms(path.read_bytes()):
+        if len(pts) < 3:
+            continue
+        yield base, np.column_stack((pts[:, 0] + oe, on - pts[:, 1])), pts
+
+
+@_audit
+def cmd_clearance_audit(args: argparse.Namespace) -> int:
+    """No shipped prism may stand on the ground across a road OSM bridges.
+
+    THE BUG THIS IS THE GATE ON. Every footprint in the build was extruded from
+    the terrain up, with no notion that a structure might start in the air, and
+    nothing measured whether one had been put across a carriageway. The player
+    found it the only way it can be found without a check: by running into a
+    solid wall where Military Road goes through Spit Junction, and another where
+    Longueville Road passes under the Lane Cove footbridge.
+
+    The rule, and it is a statement about the *world* rather than about the pass
+    that produced it: **wherever OSM has mapped a bridge over a public
+    carriageway, the collision payload must not contain a prism that spans that
+    carriageway from the ground.** A prism qualifies as spanning when a public
+    centreline runs through its plan for `elevated.SPAN_MIN_M` or more, and it
+    passes when its base stands at least `decks.WALK_UNDER_M` over the highest
+    ground beneath it -- which is not a number invented here either. It is the
+    threshold `decks.DeckNetwork.prisms` uses to decide that a deck's collision
+    base lifts off the ground because the player can walk under it. A bridge
+    that satisfies it is a bridge the player passes under; one that does not is
+    a wall, whatever it was called upstream.
+
+    **What the audit does not read: the pipeline's own answer.** It opens the
+    shipped `collision/*.bin` and `*.terr.bin`, decodes both with readers written
+    against the format rather than borrowed from the writer, and compares them to
+    the OSM extract. It never looks at `merge.Building.base_height`, at the
+    elevated pass's report, or at the ledger. That is deliberate -- a rule that
+    checked the classifier's verdict against the classifier would pass on the
+    day the classifier stopped running.
+
+    Two verdicts are taken, and both must hold:
+
+      1. the general scan above, over every tile in the index (or `--only`);
+      2. the two places the user reported, by name, whether or not the general
+         scan happened to cover them. See `REPORTED_SPOTS`.
+    """
+    if not config.INDEX_PATH.exists():
+        raise AuditUnresolved(f"no {config.INDEX_PATH}; there is no world to audit")
+    index = json.loads(config.INDEX_PATH.read_text())
+    keys = [t["key"] if isinstance(t, dict) else t for t in index["tiles"]]
+    only = {k.strip() for spec in (args.only or []) for k in spec.split(",") if k.strip()}
+    if only:
+        missing = only - set(keys)
+        if missing:
+            print(f"  --only names {len(missing)} tile(s) the index does not have: {sorted(missing)}")
+        keys = [k for k in keys if k in only]
+    if not keys:
+        raise AuditUnresolved("no tiles to audit after --only was applied")
+
+    radius = float(args.radius or index.get("radius_m") or config.STAGES[1].radius_m)
+    print(f"stage '{index.get('stage')}', {len(keys):,} tiles, clearance rule"
+          f" base >= ground + {decks.WALK_UNDER_M:.1f} m")
+
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    from shapely.strtree import STRtree
+
+    print("  reading the road network ...")
+    lines, halves, plans, ribbons = _public_carriageways(radius)
+    if not lines:
+        raise AuditUnresolved("the extract yielded no public ground carriageways")
+    print(f"    {len(lines):,} public carriageways, {len(plans):,} bridge ways at layer >= 1")
+    line_tree = STRtree(lines)
+    plan_tree = STRtree(plans) if plans else None
+    ribbon_tree = STRtree(ribbons) if ribbons else None
+
+    n = config.TERRAIN_GRID
+    offenders: list[tuple] = []
+    spanning = crossings = decked = prisms_read = 0
+
+    for key in tqdm(keys, unit="tile", disable=not sys.stderr.isatty()):
+        grid = _tile_ground(key)
+        for base, enu, local in _tile_prism_plans(key):
+            prisms_read += 1
+            poly = Polygon(enu)
+            if not poly.is_valid:
+                poly = poly.buffer(0)
+            if poly.is_empty or poly.geom_type != "Polygon":
+                continue
+            hit = line_tree.query(poly)
+            if not len(hit):
+                continue
+            spanned = 0.0
+            corridor = []
+            for i in hit:
+                inside = poly.intersection(lines[i])
+                length = float(getattr(inside, "length", 0.0))
+                if length < elevated.SPAN_MIN_M:
+                    continue
+                spanned += length
+                corridor.append(lines[i].buffer(halves[i]))
+            if not corridor:
+                continue
+            spanning += 1
+            # Is OSM saying there is a bridge here at all? Without that this is
+            # a building the road was drawn through, which is a mapping question
+            # rather than a clearance one -- 1,432 footprints in the extract have
+            # a service driveway through them and none of them is this bug.
+            if plan_tree is None or not any(poly.intersects(plans[j]) for j in plan_tree.query(poly)):
+                continue
+            aside = poly.difference(unary_union(corridor)).area
+            if poly.area <= 0 or aside / poly.area < ASIDE_SHARE:
+                continue  # road surface, not a structure over the road -- see ASIDE_SHARE
+            if _is_deck_prism(poly, ribbon_tree, ribbons):
+                decked += 1
+                continue
+            crossings += 1
+            if grid is None:
+                raise AuditUnresolved(
+                    f"tile {key} ships collision but no {key}.terr.bin; a clearance"
+                    " cannot be measured without the ground under it"
+                )
+            ground = max(
+                _sample_tile_grid(grid, n, float(x), float(z)) for x, z in local
+            )
+            clearance = base - ground
+            if clearance >= decks.WALK_UNDER_M:
+                continue
+            lon, lat = geo.enu_to_lonlat(poly.centroid.x, poly.centroid.y)
+            if _spot_allowed(float(lon), float(lat)):
+                continue
+            offenders.append((clearance, key, spanned, poly.area, float(lon), float(lat)))
+
+    print(
+        f"  {prisms_read:,} prisms; {spanning:,} have a public carriageway through them,"
+        f" {decked:,} of those are deck geometry and {crossings:,} are a structure"
+        f" over a bridged road"
+    )
+    offenders.sort()
+    for clearance, key, spanned, area, lon, lat in offenders[: args.worst]:
+        print(
+            f"    tile {key}  base is {clearance:+.2f} m over the ground,"
+            f" {spanned:.0f} m of carriageway inside a {area:,.0f} m2 plan"
+            f"  ({lat:.6f}, {lon:.6f})"
+        )
+    if len(offenders) > args.worst:
+        print(f"    ... and {len(offenders) - args.worst} more")
+
+    # The named fixture, second and independent of the scan's verdict.
+    spot_fail = _report_spots(
+        keys, lines, halves, plans, ribbons, line_tree, plan_tree, ribbon_tree, n, only
+    )
+
+    if offenders:
+        print(f"\n  FAIL: {len(offenders)} prism(s) stand on the ground across a bridged road")
+        return EXIT_FAIL
+    if spot_fail:
+        print(f"\n  FAIL: {spot_fail} of the reported spots still has a wall across the road")
+        return EXIT_FAIL
+    print("\n  PASS: nothing stands on the ground across a road OSM bridges")
+    return EXIT_PASS
+
+
+# Structures the audit is content to find on the ground across a road, as
+# (lon, lat, radius_m, why). Empty, and it is meant to stay that way -- the
+# mechanism is here so that a genuine building astride a private way can be
+# named and argued for in one place rather than by loosening the rule. A
+# gatehouse over its own drive is the shape of thing that belongs here; nothing
+# in the extent currently reaches the audit's gate, because a driveway is not a
+# public carriageway and a gatehouse has no bridge mapped over it.
+ASTRIDE_ALLOWED: tuple[tuple[float, float, float, str], ...] = ()
+
+
+def _is_deck_prism(poly, ribbon_tree, ribbons) -> bool:
+    """Is this prism a piece of a bridge's own deck? See `DECK_RIBBON_SHARE`."""
+    if ribbon_tree is None or poly.area <= 0:
+        return False
+    for j in ribbon_tree.query(poly):
+        if poly.intersection(ribbons[j]).area / poly.area >= DECK_RIBBON_SHARE:
+            return True
+    return False
+
+
+def _spot_allowed(lon: float, lat: float) -> bool:
+    for alon, alat, radius, _why in ASTRIDE_ALLOWED:
+        e0, n0 = geo.lonlat_to_enu(alon, alat)
+        e1, n1 = geo.lonlat_to_enu(lon, lat)
+        if math.hypot(float(e1 - e0), float(n1 - n0)) <= radius:
+            return True
+    return False
+
+
+def _report_spots(
+    keys, lines, halves, plans, ribbons, line_tree, plan_tree, ribbon_tree, n, only
+) -> int:
+    """The two reported places, checked by name. Returns how many still fail.
+
+    Deliberately re-derived from the tiles around each pin rather than from the
+    scan above, so that a scan narrowed by `--only`, or one whose gate has been
+    loosened, still cannot make these two places quietly disappear.
+    """
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+
+    print("\n  the two reported spots:")
+    failed = 0
+    have = set(keys)
+    for name, lon, lat in REPORTED_SPOTS:
+        ce, cn = (float(v) for v in geo.lonlat_to_enu(lon, lat))
+        near = sorted(
+            {
+                geo.tile_for_enu(ce + dx, cn + dy).key
+                for dx in (-SPOT_RADIUS_M, 0.0, SPOT_RADIUS_M)
+                for dy in (-SPOT_RADIUS_M, 0.0, SPOT_RADIUS_M)
+            }
+            & have
+        )
+        if not near:
+            note = "no tile in scope" if only else "no tile in the index"
+            print(f"    {name}: SKIPPED -- {note}")
+            continue
+        worst = None
+        for key in near:
+            grid = _tile_ground(key)
+            for base, enu, local in _tile_prism_plans(key):
+                poly = Polygon(enu)
+                if not poly.is_valid:
+                    poly = poly.buffer(0)
+                if poly.is_empty or poly.geom_type != "Polygon" or poly.area <= 0:
+                    continue
+                if math.hypot(poly.centroid.x - ce, poly.centroid.y - cn) > SPOT_RADIUS_M:
+                    continue
+                spanned, corridor = 0.0, []
+                for i in line_tree.query(poly):
+                    length = float(getattr(poly.intersection(lines[i]), "length", 0.0))
+                    if length >= elevated.SPAN_MIN_M:
+                        spanned += length
+                        corridor.append(lines[i].buffer(halves[i]))
+                if not corridor:
+                    continue
+                if plan_tree is None or not any(poly.intersects(plans[j]) for j in plan_tree.query(poly)):
+                    continue
+                if poly.difference(unary_union(corridor)).area / poly.area < ASIDE_SHARE:
+                    continue
+                if _is_deck_prism(poly, ribbon_tree, ribbons):
+                    continue
+                if grid is None:
+                    raise AuditUnresolved(f"tile {key} ships collision but no terrain")
+                ground = max(_sample_tile_grid(grid, n, float(x), float(z)) for x, z in local)
+                if worst is None or base - ground < worst[0]:
+                    lon_c, lat_c = geo.enu_to_lonlat(poly.centroid.x, poly.centroid.y)
+                    worst = (base - ground, key, spanned, poly.area, float(lat_c), float(lon_c))
+        if worst is None:
+            print(f"    {name}: PASS -- no prism spans a bridged carriageway in {len(near)} tiles")
+            continue
+        clearance, key, spanned, area, lat_c, lon_c = worst
+        if clearance >= decks.WALK_UNDER_M:
+            print(
+                f"    {name}: PASS -- worst crossing prism clears the ground by"
+                f" {clearance:.2f} m (tile {key})"
+            )
+            continue
+        failed += 1
+        print(
+            f"    {name}: FAIL -- tile {key} has a prism {clearance:+.2f} m over the"
+            f" ground with {spanned:.0f} m of carriageway through a {area:,.0f} m2"
+            f" plan, at ({lat_c:.6f}, {lon_c:.6f})"
+        )
+    return failed
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -4728,7 +5250,41 @@ def main(argv: list[str] | None = None) -> int:
     # against. 90% is comfortably above what those cost and far below what a
     # flipped sign would read.
     ln.add_argument("--min-left-share", type=float, default=0.90)
+    # Not 100% either, and it cannot be: a route end on a motorway deck has no
+    # kerb within `bays.WINDOW_M` and no free lane spot, and one on a genuinely
+    # full inner-city kerb is a kerb that is genuinely full. Measured on the
+    # inner 1.6 km at 97.1% (975 of 1,004 ends). 0.85 sits under that and far
+    # above the 45.5% the first draft of the arbitration produced when its walk
+    # could not follow a route past the end of one way, which is the regression
+    # class this gate exists for.
+    ln.add_argument("--min-bay-share", type=float, default=0.85)
     ln.set_defaults(func=cmd_lane_audit)
+
+    ca = sub.add_parser(
+        "clearance-audit",
+        help="no shipped prism may stand on the ground across a road OSM bridges",
+        description=cmd_clearance_audit.__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    ca.add_argument(
+        "--only",
+        action="append",
+        default=[],
+        metavar="TILES",
+        help="restrict the general scan to these tile keys (repeatable, or"
+        " comma-separated). The two reported spots are checked either way, from"
+        " whichever of their tiles are in scope -- see `_report_spots`.",
+    )
+    ca.add_argument(
+        "--radius",
+        type=float,
+        default=None,
+        help="metres of OSM to read for the road witness. Defaults to the"
+        " index's own radius, which is the set of roads the world was built"
+        " from; a smaller one narrows the witness and not the world.",
+    )
+    ca.add_argument("--worst", type=int, default=12, help="offenders to name")
+    ca.set_defaults(func=cmd_clearance_audit)
 
     r = sub.add_parser("reset", help="mark a stage's units pending again")
     r.add_argument("--kind", required=True)
