@@ -1493,6 +1493,12 @@ async function main(): Promise<void> {
   say('');
   await checkServerSegments();
 
+  // --- 31. The train service. The timetable is solved at bake time and proved
+  // twice in Python; this is the third reader and the only one that is the code
+  // the game will run. See `checkRail`, appended last and self-contained.
+  say('');
+  await checkRail();
+
   say('');
   if (failures.length === 0) {
     say(`ALL CHECKS PASSED (${log.filter((l) => l.includes('PASS')).length})`);
@@ -14843,9 +14849,15 @@ async function checkDayCycle(): Promise<void> {
     verifyCycle,
   } = await import('../client/src/sky/cycle.ts');
   const { verifyDuskRig } = await import('../client/src/sky/dusk.ts');
-  const { verifyLightRig, nightLevel } = await import('../client/src/sky/calibration.ts');
+  const { verifyLightRig, nightLevel, HEMISPHERE_NIGHT, moonlightLevel } = await import(
+    '../client/src/sky/calibration.ts'
+  );
   const { verifyCloudRig } = await import('../client/src/sky/clouds.ts');
   const { verifySouthernHemisphere } = await import('../client/src/sky/solar.ts');
+  const { verifyLunar, lunarPosition } = await import('../client/src/sky/lunar.ts');
+  const { verifyMoonDisc } = await import('../client/src/sky/moon.ts');
+  const { verifySkyglow, nightSkyRig, cloudCover } = await import('../client/src/sky/skyglow.ts');
+  const { verifyStars, decodeStars, skyRotation } = await import('../client/src/sky/stars.ts');
   const { TRAFFIC_EPOCH_MS: trafficEpoch } = await import('../client/src/game/traffic.ts');
 
   // --- 1. The five self-checks, run here as well as at boot.
@@ -14859,6 +14871,9 @@ async function checkDayCycle(): Promise<void> {
     ['the cloud rig', verifyCloudRig()],
     ['the day/night cycle', verifyCycle()],
     ['the twilight grade', verifyDuskRig()],
+    ['the lunar ephemeris', verifyLunar(-33.87, 151.21)],
+    ['the moon disc', verifyMoonDisc()],
+    ['the skyglow and night ambient', verifySkyglow()],
   ] as const) {
     check(failures.length === 0, `${name} self-check is clean${failures.length ? `: ${failures[0]}` : ''}`);
   }
@@ -14976,6 +14991,287 @@ async function checkDayCycle(): Promise<void> {
       `against the same two in \`verifyClock\`, which runs at boot: it touches the DOM, and this file ` +
       `has no DOM to give it -- the same trade \`verifyHud\` records`,
   );
+
+  /* =========================================================================
+   * THE NIGHT SKY: the moon, the stars, and the light they and the city put on
+   * the world.
+   *
+   * Everything below is a claim about the *real sky* rather than about this
+   * renderer, and that is why it is worth a build failure: a moon a degree out
+   * of place, a Southern Cross that is upside down and a city that does not glow
+   * are all things that render beautifully and are wrong, and none of them has a
+   * frame that says so.
+   * ======================================================================= */
+  say('  and the night: a real moon, the southern sky, and the city glowing back off the cloud');
+
+  // --- 8. THE MOON, against JPL Horizons.
+  //
+  // Two rows, transcribed from the same DE441 query `verifyLunar` carries, kept
+  // here as well because these are the two instants a *person* can check: a
+  // full moon and a new one, both on dates a reader can look up.
+  for (const [iso, wantIllum, note] of [
+    ['2026-01-03T10:00Z', 0.9989, 'the full moon of 3 January 2026'],
+    ['2026-03-19T02:00Z', 0.0018, 'the new moon of 19 March 2026'],
+  ] as const) {
+    const m = lunarPosition(new Date(iso), -33.87, 151.21);
+    check(
+      Math.abs(m.illumination - wantIllum) < 0.01,
+      `${note} is ${(m.illumination * 100).toFixed(1)}% illuminated against Horizons' ` +
+        `${(wantIllum * 100).toFixed(1)}% -- the phase comes from the sun-moon elongation and the ` +
+        `Meeus phase angle, not from a synodic-month clock`,
+    );
+  }
+  {
+    // And the southern-hemisphere claim, in the other body: a full moon transits
+    // in the NORTH from Sydney, exactly as the sun does.
+    let best = { altitude: -90, azimuth: 0 };
+    for (let minute = 0; minute < 24 * 60; minute += 2) {
+      const p = lunarPosition(new Date(Date.UTC(2026, 0, 3, 0, minute)), -33.87, 151.21);
+      if (p.altitude > best.altitude) best = p;
+    }
+    check(
+      Math.cos((best.azimuth * Math.PI) / 180) > 0.5 && best.altitude > 20,
+      `the full moon of 3 January 2026 transits ${best.altitude.toFixed(1)} degrees up at azimuth ` +
+        `${best.azimuth.toFixed(1)} -- in the northern half of the sky, which is where a southern ` +
+        `observer's moon goes and where every stock night sky puts it wrong`,
+    );
+  }
+
+  // --- 9. THE MOON'S CLOCK. It runs a day per cycle so successive nights differ,
+  //        and the seam at the cycle wrap has to be **exactly** closed: the moon
+  //        moves 13.2 degrees a day, twenty-six of its own diameters, so a seam
+  //        the sun can hide in the dark would be a moon teleporting at midnight.
+  {
+    const before = skyClock(CYCLE_EPOCH_MS + CYCLE_MS - 1);
+    const after = skyClock(CYCLE_EPOCH_MS + CYCLE_MS + 1);
+    const step = Math.hypot(
+      before.lunar.direction.x - after.lunar.direction.x,
+      before.lunar.direction.y - after.lunar.direction.y,
+      before.lunar.direction.z - after.lunar.direction.z,
+    );
+    const stepDeg = (Math.asin(Math.min(step / 2, 1)) * 2 * 180) / Math.PI;
+    check(
+      stepDeg < 0.05,
+      `the moon moves ${stepDeg.toFixed(4)} degrees across the cycle's wrap at solar midnight -- it ` +
+        `must be nothing. \`lunarInstant\` adds \`DAY_SPAN_MS\` per cycle, which is the Sydney time ` +
+        `\`cycleInstant\` itself spans, so the sawtooth and the step cancel to the millisecond; a ` +
+        `nominal 86,400,000 there would leave a couple of minutes of lunar motion visible once an hour`,
+    );
+    // And it does advance, or every night in the game is the same one.
+    const tomorrow = skyClock(CYCLE_EPOCH_MS + CYCLE_MS * 1.5);
+    const today = skyClock(CYCLE_EPOCH_MS + CYCLE_MS * 0.5);
+    check(
+      Math.abs(tomorrow.moonPhase - today.moonPhase) > 0.005,
+      `the moon's phase moves ${Math.abs(tomorrow.moonPhase - today.moonPhase).toFixed(4)} from one ` +
+        `game day to the next. The sun replays one date forever and the moon must not: 20 March 2026 ` +
+        `is a 2.8%-lit moon that is down all night, so a moon pinned to CYCLE_DATE would make every ` +
+        `night in the game the same moonless one`,
+    );
+    // Over a synodic month it must cover the whole range, or "variety is free"
+    // is not true of anything.
+    let low = 1;
+    let high = 0;
+    for (let n = 0; n < 30; n++) {
+      const k = skyClock(CYCLE_EPOCH_MS + CYCLE_MS * (n + 0.5)).moonPhase;
+      low = Math.min(low, k);
+      high = Math.max(high, k);
+    }
+    check(
+      low < 0.05 && high > 0.95,
+      `across thirty consecutive game days the moon runs from ${(low * 100).toFixed(1)}% to ` +
+        `${(high * 100).toFixed(1)}% illuminated -- a whole synodic month in 29.5 real hours, so a ` +
+        `player who comes back tomorrow evening gets a different moon`,
+    );
+  }
+
+  // --- 10. THE SOUTHERN CROSS, at a known instant, to within a degree.
+  //
+  // The whole point of shipping a catalogue rather than noise, and the check
+  // runs the full chain -- decode, precession, sidereal rotation, horizon
+  // transform -- against positions worked out independently inside
+  // `verifyStars`. Skipped rather than failed when the bake is absent, on the
+  // terms the world checks use, because a client can run without it.
+  {
+    const path = 'client/public/stars.bin';
+    const file = Bun.file(path);
+    if (!(await file.exists())) {
+      say(`  (no ${path}; the star field's checks need the bake)`);
+    } else {
+      const catalogue = decodeStars(await file.arrayBuffer());
+      check(catalogue !== null, `${path} decodes: 8 bytes a record behind a 'SYDS' header`);
+      const failures = verifyStars(catalogue, -33.87, 151.21);
+      check(
+        failures.length === 0,
+        `the southern sky is right: the Southern Cross and the Pointers within an arcminute of their ` +
+          `catalogue positions, the sky rotation a proper rotation with determinant +1, the south ` +
+          `celestial pole 33.87 degrees up due south and not moving, the sky wheeling the right way, ` +
+          `and both Magellanic Clouds present${failures.length ? ` -- ${failures[0]}` : ''}`,
+      );
+      if (catalogue !== null) {
+        check(
+          catalogue.count > 4000 && catalogue.count < 9000,
+          `  ${catalogue.count} records in ${(file.size / 1024).toFixed(1)} kB -- BSC5 to magnitude ` +
+            `6.0, the naked-eye limit at a dark site, plus 640 soft points for the two galaxies`,
+        );
+      }
+      /* The pole, restated here because it is the one number a reader of *this*
+       * file can check against an atlas: at Sydney's latitude the south
+       * celestial pole is 33.87 degrees above the southern horizon.
+       *
+       * `skyRotation` wants a `Matrix4` and this file cannot import three -- the
+       * server tsconfig has no three in it, deliberately -- so the matrix is
+       * stood in for by the four fields the function actually touches. That is
+       * uglier than an import and much better than not checking it. */
+      const scratch = { elements: new Array(16).fill(0), set(...v: number[]) { this.elements = [
+        v[0], v[4], v[8], v[12], v[1], v[5], v[9], v[13],
+        v[2], v[6], v[10], v[14], v[3], v[7], v[11], v[15],
+      ]; return this; } };
+      const m = skyRotation(new Date('2026-06-21T12:00:00Z'), -33.87, 151.21, scratch as never);
+      const alt = (Math.asin(-m.elements[9]) * 180) / Math.PI;
+      check(
+        Math.abs(alt - 33.87) < 0.2,
+        `  the south celestial pole sits ${alt.toFixed(2)} degrees above the horizon, which is ` +
+          `Sydney's latitude and is the one fact about the southern sky anybody can check with a ` +
+          `protractor`,
+      );
+    }
+  }
+
+  // --- 11. THE COUNTER-INTUITIVE ONE, which is the whole feature: an overcast
+  //         night over the city is BRIGHTER than a clear one, and out past the
+  //         last streetlight the same cloud makes it darker.
+  {
+    const DARK = -20;
+    const cityClear = nightSkyRig(DARK, -30, 0, 0, 1);
+    const cityCloud = nightSkyRig(DARK, -30, 0, 1, 1);
+    const bushClear = nightSkyRig(DARK, -30, 0, 0, 0);
+    const bushCloud = nightSkyRig(DARK, -30, 0, 1, 0);
+    check(
+      cityCloud.ambientIntensity > cityClear.ambientIntensity * 1.25,
+      `an overcast night in the CBD is ${(cityCloud.ambientIntensity / cityClear.ambientIntensity).toFixed(2)}x ` +
+        `as bright as a clear one, with the sky's own glow up ` +
+        `${(cityCloud.glow / cityClear.glow).toFixed(1)}x -- the cloud base reflects the city's own ` +
+        `light back down, which is why an overcast urban night is luminous and orange while a clear ` +
+        `one is dark and blue`,
+    );
+    check(
+      bushCloud.starVisibility < bushClear.starVisibility * 0.2 &&
+        bushCloud.ambientIntensity <= bushClear.ambientIntensity + 1e-9,
+      `  and out where there is no city the same cloud makes it *darker*: ` +
+        `${(bushCloud.starVisibility * 100).toFixed(0)}% of the stars left against ` +
+        `${(bushClear.starVisibility * 100).toFixed(0)}%, with no glow to reflect. That inversion is ` +
+        `the other half of the effect and a sign flip leaves the first half passing`,
+    );
+    check(
+      cityCloud.ambientIntensity > bushCloud.ambientIntensity * 1.4,
+      `  and the CBD is ${(cityCloud.ambientIntensity / bushCloud.ambientIntensity).toFixed(2)}x the ` +
+        `bush under the same sky, which is the 60 km gradient the baked urban field exists for`,
+    );
+  }
+
+  // --- 12. AMBIENT RISES WITH THE MOON, monotonically, and never falls below
+  //         the floor. The floor is the ten per cent a player asked for and it
+  //         is the basis of the derived night rather than something replaced by
+  //         it -- `NIGHT_AMBIENT_FLOOR_MAX` only means anything while a moonless
+  //         clear night reduces to `HEMISPHERE_NIGHT` exactly.
+  {
+    let monotone = true;
+    let previous = -1;
+    let worstFloor = Infinity;
+    for (let alt = 0; alt <= 90; alt += 0.5) {
+      const v = nightSkyRig(-20, alt, moonlightLevel(alt, 1), 0, 0.3).ambientIntensity;
+      if (v < previous - 1e-12) monotone = false;
+      previous = v;
+    }
+    for (let alt = -40; alt <= 12; alt += 0.5) {
+      for (const cover of [0, 0.5, 1]) {
+        for (const urban of [0, 0.5, 1]) {
+          for (const moon of [0, 0.4, 1]) {
+            worstFloor = Math.min(
+              worstFloor,
+              nightSkyRig(alt, 55, moonlightLevel(55, moon), cover, urban).ambientIntensity,
+            );
+          }
+        }
+      }
+    }
+    const moonless = nightSkyRig(-20, -30, 0, 0, 0).ambientIntensity;
+    const full = nightSkyRig(-20, 80, moonlightLevel(80, 1), 0, 0).ambientIntensity;
+    check(
+      monotone,
+      `the night ambient rises monotonically as a full moon climbs from the horizon to the zenith, ` +
+        `over 181 sampled altitudes`,
+    );
+    check(
+      worstFloor >= HEMISPHERE_NIGHT - 1e-9,
+      `  and never falls below the ${HEMISPHERE_NIGHT} floor anywhere in the (altitude, cover, urban, ` +
+        `moon) box -- ${worstFloor.toFixed(4)} at worst. Every night term is *added* to ` +
+        `HEMISPHERE_NIGHT so it can only make the night brighter`,
+    );
+    check(
+      Math.abs(moonless - HEMISPHERE_NIGHT) < 1e-9 && full > HEMISPHERE_NIGHT * 2,
+      `  a moonless clear night away from the city is exactly HEMISPHERE_NIGHT (${moonless.toFixed(4)}), ` +
+        `so verifyLightRig's NIGHT_AMBIENT_FLOOR_MAX ceiling still guards what it was written to guard, ` +
+        `and a full moon overhead is ${(full / HEMISPHERE_NIGHT).toFixed(2)}x it -- bright enough to ` +
+        `walk the city without the torch`,
+    );
+    // The counter-intuitive half of the moon: a half moon is a ninth of a full
+    // one, not half. Without it every night in the game is a moonlit one.
+    const half = nightSkyRig(-20, 80, moonlightLevel(80, 0.5), 0, 0).ambientIntensity;
+    const share = (half - HEMISPHERE_NIGHT) / (full - HEMISPHERE_NIGHT);
+    check(
+      share < 0.2,
+      `  and a half moon gives ${(share * 100).toFixed(1)}% of a full moon's light, against the real ` +
+        `8% (magnitude -10.0 at quarter against -12.7 at full). The opposition surge is the least ` +
+        `intuitive number in the rig and MOON_PHASE_POWER is the one constant the disc and the ` +
+        `ambient share`,
+    );
+  }
+
+  // --- 13. THE WEATHER IS ON THE SAME TERMS AS THE SUN. Pure function of the
+  //         wall clock, no protocol field, so two players in the same room get
+  //         the same cloud -- which, again, is the one failure here that no
+  //         single player can ever observe.
+  {
+    let same = true;
+    for (const t of [CYCLE_EPOCH_MS, 1_800_000_000_000, 1_800_000_123_456, Date.now()]) {
+      if (cloudCover(t) !== cloudCover(t)) same = false;
+    }
+    let clear = 0;
+    let overcast = 0;
+    const SAMPLES = 40000;
+    for (let i = 0; i < SAMPLES; i++) {
+      const c = cloudCover(CYCLE_EPOCH_MS + i * 41_000);
+      if (c < 0.15) clear++;
+      if (c > 0.85) overcast++;
+    }
+    check(
+      same,
+      `cloud cover is a pure function of the wall clock -- two octaves of hashed value noise on a ` +
+        `22-minute period, deliberately not a divisor of the hour-long cycle, so nothing crosses the ` +
+        `wire and no two evenings are the same`,
+    );
+    check(
+      clear / SAMPLES > 0.15 && overcast / SAMPLES > 0.1,
+      `  and it reaches both ends: ${((clear / SAMPLES) * 100).toFixed(0)}% of the time genuinely ` +
+        `clear and ${((overcast / SAMPLES) * 100).toFixed(0)}% genuinely overcast, which is roughly ` +
+        `Sydney's own climatology and is what makes both of this feature's two pictures happen`,
+    );
+  }
+
+  // --- 14. And nothing in the night touches the day. Every term is gated on
+  //         `nightLevel`, which is exactly zero above +2 degrees, so the 57.11
+  //         reference instant the whole renderer is calibrated at must come back
+  //         with the night rig completely inert.
+  {
+    const noon = nightSkyRig(57.11, 60, 1, 1, 1);
+    check(
+      noon.ambientBoost === 0 && noon.moonIntensity === 0 && noon.starVisibility === 0,
+      `the night rig is completely inert at the 57.11-degree reference instant even with a full moon ` +
+        `up, full cloud and the brightest cell of the urban field -- so every calibrated display value ` +
+        `in calibration.ts, clouds.ts and facade.ts is provably untouched by any of this`,
+    );
+  }
 }
 
 /**
@@ -16205,6 +16501,241 @@ async function checkServerSegments(): Promise<void> {
         `(measured, both fields in one process). Under a ${(TINY_LANE_CAP / 1e6).toFixed(0)} MB cap ` +
         `this process is holding ${s.lanes.resident}/${s.hexes}, ` +
         `${(s.lanes.bytes / 1e6).toFixed(0)} MB, ${s.lanes.items.toLocaleString()} routes.`,
+    );
+  }
+}
+
+/**
+ * The train service: one timetable, three readers, and a control that fails.
+ *
+ * `pipeline/sydney/rail.py` solves the block-section phases at bake time and its
+ * own `rail-audit` re-simulates the whole cycle to prove them. That is two
+ * readers and they are both Python. This is the third, and it is the one that
+ * matters most, because it is the code the *game* will run: `game/rail.ts`'s
+ * `poseTrain`, evaluated over the same cycle, landed on the same rails.
+ *
+ * Four things, and only the first is about arithmetic:
+ *
+ *   1. **Two module instances agree bit for bit.** Ten thousand sampled poses
+ *      across every line and direction, compared with `Object.is` rather than
+ *      an epsilon -- `checkRaves` and `checkTraffic` make the identical claim
+ *      about their own schedules and for the identical reason: a client that
+ *      predicts a train half a metre from where the server puts it is a client
+ *      whose passengers stand in the wrong carriage.
+ *   2. **The separation invariant, re-derived here.** Not by reading the
+ *      solver's answer back but by asking `poseTrain` where each train is at
+ *      10 Hz over the whole repeating cycle and looking for two of them on one
+ *      rail inside the safety margin.
+ *   3. **A negative control.** Zero one line's phase offset in a scratch copy
+ *      of the bake and watch the sweep go red, then restore it and watch it go
+ *      green again. A check that has never been seen to fail is not evidence.
+ *   4. **The timetable a passenger reads**, because a service nobody can catch
+ *      is not a service.
+ */
+async function checkRail(): Promise<void> {
+  say('--- The trains: one timetable, three readers, and a control that fails');
+
+  const bakePath =
+    process.env.SYDNEY_RAIL ??
+    new URL('../data/scratch/rail/rail.bin', import.meta.url).pathname;
+  if (!(await Bun.file(bakePath).exists())) {
+    say(`    no rail bake at ${bakePath}; run \`uv run python -m sydney.rail bake\`. Skipped.`);
+    return;
+  }
+
+  const here = new URL('../client/src/game/rail.ts', import.meta.url).pathname;
+  const one = (await import(here)) as typeof import('../client/src/game/rail.ts');
+  // A different specifier for the same file: Bun keys the module cache on the
+  // whole string, so the query evaluates it again and the two copies have their
+  // own closures. `checkRaves` does exactly this and says why.
+  const two = (await import(`${here}?instance=2`)) as typeof import('../client/src/game/rail.ts');
+
+  const bytes = await Bun.file(bakePath).arrayBuffer();
+  const a = one.decodeRail(bytes);
+  const b = two.decodeRail(bytes.slice(0));
+
+  {
+    const bad = one.verifyRail(a);
+    check(bad.length === 0, `game/rail.ts's own self-check passes against the real bake${bad.length ? `: ${bad[0]}` : ''}`);
+  }
+  check(
+    a.epochMs === one.RAIL_EPOCH_MS,
+    `the bake and the module count from the same instant (${a.epochMs})`,
+  );
+
+  const totalKm = a.lines.reduce((s, l) => s + l.dirs.reduce((t, d) => t + d.lengthM, 0), 0) / 1000;
+  const calls = a.lines.reduce(
+    (s, l) => s + l.dirs[0].stops.filter((x) => x.calls).length, 0,
+  );
+  say(
+    `  ${a.lines.length} lines, ${a.lines.length * 2} directions, ${totalKm.toFixed(0)} km of routed ` +
+      `track, ${calls} calls one way, ${a.stations.length} stations, ` +
+      `${a.blockLength.length} block sections, ${a.stanchionKinds.length} catenary masts`,
+  );
+  say(
+    `  periods: ${a.lines.map((l) => `${l.id} ${l.period}s`).join('  ')}` +
+      (Object.keys(a.degraded).length
+        ? `\n  degraded: ${Object.entries(a.degraded).map(([k]) => k).join(', ')}`
+        : ''),
+  );
+
+  // --- 1. Bit-exactness across two module instances.
+  {
+    const pa = one.createTrainPose();
+    const pb = two.createTrainPose();
+    let compared = 0;
+    let identical = 0;
+    let live = 0;
+    let doors = 0;
+    let worstField = '';
+    // A deliberately awkward sampling grid: a prime step in milliseconds so the
+    // instants are not multiples of any period, and a walk over every trip of
+    // every direction so the ends of a run are sampled as often as the middle.
+    for (let k = 0; k < 500 && compared < 10_000; k++) {
+      const t = one.railSeconds(one.RAIL_EPOCH_MS + k * 7_919);
+      for (let li = 0; li < a.lines.length && compared < 10_000; li++) {
+        for (let di = 0; di < 2; di++) {
+          const da = a.lines[li].dirs[di];
+          const db = b.lines[li].dirs[di];
+          const n = one.liveTripCount(da);
+          for (let j = 0; j <= n && compared < 10_000; j++) {
+            const trip = one.tripIndexAt(da, t, j);
+            const ok1 = one.poseTrain(a, da, trip, t, pa);
+            const ok2 = two.poseTrain(b, db, two.tripIndexAt(db, t, j), t, pb);
+            compared++;
+            if (ok1 !== ok2) { worstField ||= 'liveness'; continue; }
+            if (!ok1) { identical++; continue; }
+            live++;
+            if (pa.doorsOpen) doors++;
+            const same =
+              Object.is(pa.x, pb.x) && Object.is(pa.y, pb.y) && Object.is(pa.z, pb.z) &&
+              Object.is(pa.dx, pb.dx) && Object.is(pa.dz, pb.dz) &&
+              Object.is(pa.speed, pb.speed) && Object.is(pa.s, pb.s) &&
+              Object.is(pa.age, pb.age) && pa.doorsOpen === pb.doorsOpen &&
+              pa.atStop === pb.atStop && pa.identity === pb.identity;
+            if (same) identical++;
+            else if (!worstField) {
+              worstField = `${a.lines[li].id} dir ${di} trip ${trip}: ` +
+                `x ${pa.x} vs ${pb.x}, s ${pa.s} vs ${pb.s}`;
+            }
+          }
+        }
+      }
+    }
+    check(
+      identical === compared,
+      `two separately-evaluated copies of game/rail.ts put every train in the identical place on ` +
+        `all ${compared.toLocaleString()} sampled (line, direction, trip, instant) tuples -- ` +
+        `${live.toLocaleString()} of them running, ${doors.toLocaleString()} with doors open at a ` +
+        `platform. Bit-identical doubles, compared with Object.is, not an epsilon` +
+        (worstField ? `. FIRST DIFFERENCE: ${worstField}` : ''),
+    );
+    check(
+      live > 1000,
+      `  and the grid actually caught trains rather than gaps: ${live.toLocaleString()} live poses`,
+    );
+  }
+
+  // --- 2. The separation invariant, from this decoder.
+  const sweep = one.separationSweep(a, 10);
+  check(
+    sweep.violations === 0,
+    `over the full ${a.cycleS} s cycle at 10 Hz, ${sweep.samples.toLocaleString()} (train, rail) ` +
+      `occupancies and ${sweep.violations} violation(s) of the ${a.physics.sepS} s separation rule ` +
+      `(${a.physics.sepJunctionS} s through junctions). The closest any two trains came to sharing ` +
+      `a rail was ${sweep.closest.toFixed(1)} s` + (sweep.worst ? `. WORST: ${sweep.worst}` : ''),
+  );
+  check(
+    sweep.samples > 100_000,
+    `  and the sweep is a real sweep: ${sweep.samples.toLocaleString()} samples, not an empty loop`,
+  );
+
+  // --- 3. The negative control. Break it on purpose, in a copy.
+  {
+    const scratch = two.decodeRail(bytes.slice(0));
+    // The busiest line that shares rails with somebody: zeroing a line nobody
+    // meets would prove nothing, so pick the one the solver worked hardest on --
+    // the longest total route among lines whose period the solver had to raise,
+    // falling back to the longest overall.
+    const degradedIds = new Set(Object.keys(scratch.degraded));
+    const pool = scratch.lines.filter((l) => degradedIds.has(l.id));
+    const victim = (pool.length ? pool : scratch.lines).reduce((best, l) =>
+      l.dirs[0].lengthM > best.dirs[0].lengthM ? l : best,
+    );
+    const restore = victim.dirs.map((d) => d.offset);
+    const solved = two.separationSweep(scratch, 10);
+    check(
+      solved.violations === 0,
+      `  the untouched copy agrees with the original (${solved.violations} violations)`,
+    );
+
+    for (const d of victim.dirs) d.offset = 0;
+    const broken = two.separationSweep(scratch, 10);
+    check(
+      broken.violations > 0,
+      `  NEGATIVE CONTROL: zeroing ${victim.id}'s phase offsets (was ${restore.join('/')}) breaks ` +
+        `the timetable -- ${broken.violations} violation(s) appear, worst ${broken.worst || 'n/a'}. ` +
+        `The sweep can fail, so its passing means something`,
+    );
+
+    victim.dirs.forEach((d, i) => { d.offset = restore[i]; });
+    const healed = two.separationSweep(scratch, 10);
+    check(
+      healed.violations === 0,
+      `  and restoring ${victim.id}'s offsets puts it back to ${healed.violations} violations, so ` +
+        `the failure was the phase and not the copy`,
+    );
+    check(
+      one.separationSweep(a, 10).violations === 0,
+      `  the original bake was never touched by any of that`,
+    );
+  }
+
+  // --- 4. The timetable a passenger reads.
+  {
+    const t = one.railSeconds(Date.now());
+    let named = 0;
+    let worstWait = 0;
+    let example = '';
+    for (const stn of ['Town Hall', 'Central', 'Parramatta', 'Blacktown', 'Chatswood', 'Bondi Junction']) {
+      const next = one.nextArrivals(a, stn, t, 4);
+      if (next.length === 0) continue;
+      named++;
+      worstWait = Math.max(worstWait, next[0].inSeconds);
+      if (!example) {
+        example = `${stn}: ` + next.map((n) =>
+          `${n.line.id} to ${n.towards} in ${Math.round(n.inSeconds)}s`).join(', ');
+      }
+      const sorted = next.every((n, i) => i === 0 || next[i - 1].t <= n.t);
+      check(sorted, `  arrivals at ${stn} come back in time order`);
+    }
+    check(named >= 5, `  the timetable answers "next arrivals" at ${named} of six named stations`);
+    check(
+      worstWait <= 360,
+      `  and nobody waits more than ${Math.round(worstWait)} s at any of them, against the worst ` +
+        `period in the bake (${Math.max(...a.lines.map((l) => l.period))} s)`,
+    );
+    say(`  ${example}`);
+  }
+
+  // --- 5. Where the trains actually are, reported rather than asserted.
+  {
+    const t = one.railSeconds(Date.now());
+    const counts: Record<string, number> = {};
+    const seen = one.trainsNear(a, 0, 0, 3000, t, (_p, dir) => {
+      counts[dir.line.id] = (counts[dir.line.id] ?? 0) + 1;
+    });
+    say(
+      `  NOTE  within 3 km of the CBD origin right now: ${seen} trains -- ` +
+        (Object.entries(counts).map(([k, v]) => `${k}x${v}`).join(' ') || 'none'),
+    );
+    let total = 0;
+    for (const l of a.lines) for (const d of l.dirs) total += one.liveTripCount(d);
+    say(`  NOTE  ${total} trains are running across the whole disc at any instant`);
+    const gantries = [...a.stanchionKinds].filter((k) => k === 2).length;
+    say(
+      `  NOTE  overhead power staged for the geometry round: ${a.stanchionKinds.length} masts at ` +
+        `${a.physics ? 60 : 60} m spacing, ${gantries} of them portal gantries over wide corridors`,
     );
   }
 }

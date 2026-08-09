@@ -39,9 +39,11 @@ import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
 import { bounceDirection, solarRig, verifyLightRig } from './calibration.ts';
 import { CloudLayer, verifyCloudRig } from './clouds.ts';
 import {
+  CYCLE_EPOCH_MS,
   CYCLE_MS,
   DAY_LENGTH_MS,
   DAY_SHARE,
+  LUNAR_PERIOD_CYCLES,
   SYDNEY_LATITUDE,
   SYDNEY_LONGITUDE,
   cyclePhase,
@@ -50,6 +52,17 @@ import {
   type SkyClock,
 } from './cycle.ts';
 import { DuskGrade, duskRig, verifyDuskRig } from './dusk.ts';
+import { verifyLunar } from './lunar.ts';
+import { MoonDisc, verifyMoonDisc } from './moon.ts';
+import {
+  NightGlow,
+  UrbanField,
+  cloudCover,
+  nightSkyRig,
+  verifySkyglow,
+  type NightSkyRig,
+} from './skyglow.ts';
+import { StarField, decodeStars, verifyStars, type StarCatalogue } from './stars.ts';
 import { type SolarPosition } from './solar.ts';
 
 export interface SkyOptions {
@@ -161,6 +174,49 @@ export class SydneySky {
    */
   readonly dusk: DuskGrade;
 
+  /**
+   * The night sky's own light -- skyglow and scattered moonlight -- composited
+   * **between** the twilight grade and the clouds.
+   *
+   * The ordering is the same argument `dusk` makes one paragraph up, run again
+   * for the night: the clouds have to composite over an already-glowing sky, so
+   * that an overcast urban night reads as a lid lit from below rather than as
+   * grey shapes over an orange wash. Same material, same single node graph, no
+   * night-only variant to be compiled the frame the sun goes down.
+   */
+  readonly nightGlow: NightGlow;
+
+  /**
+   * Five thousand real stars and both Magellanic Clouds, in one draw.
+   *
+   * Added to the scene in this constructor with its buffers already allocated,
+   * so `main.ts`'s scene-wide `compileAsync` reaches it -- the catalogue arrives
+   * over the network some milliseconds later and only fills the buffers in. See
+   * the capacity note in `stars.ts`.
+   */
+  readonly stars: StarField;
+
+  /** The moon: one billboarded quad, real ephemeris, real phase. */
+  readonly moon: MoonDisc;
+
+  /**
+   * Moonlight, as a third `DirectionalLight`.
+   *
+   * **It exists from the constructor and is never added or removed**, because
+   * three's WebGPU lights node is built from the lights that are in the scene
+   * when a material first compiles: adding a light at moonrise would rebuild the
+   * node graph and recompile *every material in the world*, which is the single
+   * most expensive thing this project knows how to do by accident. At intensity
+   * zero it costs one clamped `N.L` per fragment, which is the same price the
+   * bounce light has always paid.
+   *
+   * `castShadow` is false and must stay false -- see `MOON_LIGHT_INTENSITY`.
+   */
+  readonly moonLight: DirectionalLight;
+
+  /** The baked urban-density field. See `skyglow.ts` for why it is baked. */
+  readonly urban = new UrbanField();
+
   /** Half-extent of the shadow volume, metres. Read by the streamer. */
   readonly shadowRadius: number;
 
@@ -206,6 +262,31 @@ export class SydneySky {
    * what time it is.
    */
   private scrubMs = 0;
+
+  /** The decoded catalogue, kept so the debug overlay can report the count. */
+  private starCatalogue: StarCatalogue | null = null;
+
+  /** Where the player is, for the urban field. Refreshed by `update`. */
+  private readonly here = new Vector3();
+
+  /** The night rig for the current frame. Published through `night`. */
+  private nightRig: NightSkyRig = nightSkyRig(90, -90, 0, 0, 0);
+
+  /**
+   * The weather override, `null` when the shared clock is in charge.
+   *
+   * A scrubbing player already disagrees with everyone else about the sky and
+   * `cycle.ts` explains why that is safe; this is the same bargain for the
+   * weather, and it exists because two of the four pictures this feature is
+   * about -- the overcast CBD and the overcast bush -- are otherwise reachable
+   * only by waiting up to twenty minutes for the noise to come round.
+   *
+   * There is deliberately **no moon override**. The moon is reached by scrubbing
+   * to a night that has one (`scrubToMoon`), which exercises the ephemeris
+   * instead of stepping around it -- so a screenshot of a full moon is a
+   * screenshot of something the shipped game will actually produce.
+   */
+  private coverOverride: number | null = null;
 
   constructor(scene: Scene, opts: SkyOptions) {
     this.scene = scene;
@@ -275,9 +356,20 @@ export class SydneySky {
     // here and never rebuilt: no dusk-only variant exists to be compiled the
     // frame the sun goes down. See `dusk.ts`'s header on why that matters.
     this.dusk = new DuskGrade(this.sky.material.colorNode, this.sky.sunPosition);
-    this.clouds = new CloudLayer(this.dusk.colourNode, this.sky.sunPosition);
+    this.nightGlow = new NightGlow(this.dusk.colourNode, new Vector3(0, -1, 0));
+    this.clouds = new CloudLayer(this.nightGlow.colourNode, this.sky.sunPosition);
     this.sky.material.colorNode = this.clouds.colourNode;
     scene.add(this.sky);
+
+    // The stars and the moon, in the scene from here so the boot warm-up
+    // compiles them. Both draw nothing until the sun is down -- `StarField`
+    // hides itself outright below a visibility threshold and the moon hides
+    // below the horizon -- so the daytime cost of both is one visibility test.
+    this.stars = new StarField();
+    scene.add(this.stars);
+    this.moon = new MoonDisc();
+    scene.add(this.moon);
+    void this.loadNightAssets();
 
     // Intensity and colour are both a function of solar altitude and are set by
     // the first `applySolar()` below, so constructing at zero is deliberate --
@@ -394,6 +486,13 @@ export class SydneySky {
     scene.add(this.bounce);
     scene.add(this.bounce.target);
 
+    // Moonlight. See the field's own note for why it is constructed here rather
+    // than the first time the moon comes up, and why it never casts.
+    this.moonLight = new DirectionalLight(0xffffff, 0);
+    this.moonLight.castShadow = false;
+    scene.add(this.moonLight);
+    scene.add(this.moonLight.target);
+
     // The shared clock. Not a fixed reference instant any more: the time of day
     // is a pure function of the wall clock, identical on every machine, and this
     // is simply the first read of it. See `cycle.ts`.
@@ -425,6 +524,58 @@ export class SydneySky {
     }
     for (const failure of verifyDuskRig()) {
       console.warn(`[sky] ${failure}`);
+    }
+    // And the night's three, on identical terms. A moon a degree out of place, a
+    // sky that wheels backwards and a city that does not glow are all things
+    // that render perfectly and are wrong.
+    for (const failure of verifyLunar(SYDNEY_LATITUDE, SYDNEY_LONGITUDE)) {
+      console.warn(`[sky] ${failure}`);
+    }
+    for (const failure of verifySkyglow()) {
+      console.warn(`[sky] ${failure}`);
+    }
+    for (const failure of verifyMoonDisc()) {
+      console.warn(`[sky] ${failure}`);
+    }
+  }
+
+  /**
+   * Fetch the star catalogue and the urban field.
+   *
+   * Fire-and-forget, and neither is awaited by anything: the sky renders
+   * correctly without either -- no stars, and a uniformly lit city -- so
+   * blocking the first frame on 62 kB of static assets would trade a real cost
+   * for an imaginary one. Both are decoded into structures that were already
+   * allocated in the constructor, so nothing recompiles when they land.
+   *
+   * `import.meta.env.BASE_URL` rather than a bare path, because the game is
+   * served from a sub-path in some deployments and a leading slash would fetch
+   * the index page and decode it as a star catalogue.
+   */
+  private async loadNightAssets(): Promise<void> {
+    const base = import.meta.env.BASE_URL ?? '/';
+    try {
+      const response = await fetch(`${base}stars.bin`);
+      if (response.ok) {
+        const catalogue = decodeStars(await response.arrayBuffer());
+        if (catalogue === null) {
+          console.warn('[sky] stars.bin did not decode; the sky has no stars in it.');
+        } else {
+          this.starCatalogue = catalogue;
+          this.stars.adopt(catalogue);
+          for (const failure of verifyStars(catalogue, SYDNEY_LATITUDE, SYDNEY_LONGITUDE)) {
+            console.warn(`[sky] ${failure}`);
+          }
+        }
+      }
+    } catch {
+      // A star catalogue that will not load is a worse night, not a broken game.
+    }
+    if (!(await this.urban.load(`${base}skyglow.bin`))) {
+      console.warn(
+        '[sky] skyglow.bin did not load; the whole world will glow like the inner city. ' +
+          'See the header of skyglow.ts.',
+      );
     }
   }
 
@@ -500,6 +651,95 @@ export class SydneySky {
     return this.scrubMs;
   }
 
+  /**
+   * What the night sky is doing this frame: cloud cover, the urban field at the
+   * player, the skyglow, the moonlight and the derived ambient.
+   *
+   * Published for the debug overlay and for the integration check, and for the
+   * same reason `now` is: anything that wants to know how dark it is should read
+   * one answer that the whole frame shares rather than recomputing it.
+   */
+  get night(): NightSkyRig {
+    return this.nightRig;
+  }
+
+  /** How many stars are in the field. Zero until the catalogue lands. */
+  get starCount(): number {
+    return this.starCatalogue?.count ?? 0;
+  }
+
+  /**
+   * Force the weather and the moon, or hand them back to the shared clock with
+   * `null`. See `coverOverride`.
+   *
+   * The four pictures this feature exists for are a clear high moon, a clear
+   * moonless sky, an overcast CBD and an overcast bush, and three of the four
+   * are otherwise reachable only by waiting for the weather. `null` on both is a
+   * shipped session.
+   */
+  setNightOverride(cover: number | null): void {
+    this.coverOverride = cover === null ? null : Math.min(Math.max(cover, 0), 1);
+    this.applySolar();
+  }
+
+  /**
+   * Scrub forward to a night whose moon is closest to a wanted illuminated
+   * fraction, and stop at the given point in the cycle.
+   *
+   * **A search rather than an override**, and that is the whole point of it. The
+   * moon walks one day per cycle (see `cycle.ts`), so somewhere in the next
+   * 2,160 cycles there is a night with any moon you like -- and scrubbing to it
+   * means what you are looking at is a sky the shipped game genuinely produces
+   * on some evening, not a debug state. It is what the four verification
+   * screenshots were taken through.
+   *
+   * `sydney.sky.scrubToMoon(1)` for a full moon at solar midnight;
+   * `scrubToMoon(0)` for a moonless one; `scrubToMoon(0.15, 0.78)` for a thin
+   * crescent just after sunset, which is the prettiest thing this sky does.
+   *
+   * The cost is 2,160 evaluations of the lunar series, about 4 ms, once, from a
+   * console. `altitudeWeight` breaks ties toward a moon that is actually *up*,
+   * because half the nights with a given phase have it below the horizon and
+   * those are not the ones anybody is looking for.
+   */
+  scrubToMoon(illumination = 1, atPhase = 0, altitudeWeight = 0.35): number {
+    let bestScore = Infinity;
+    let bestAt = 0;
+    const from = Date.now() + this.scrubMs;
+    const startIndex = Math.floor((from - CYCLE_EPOCH_MS) / CYCLE_MS);
+    for (let step = 0; step < LUNAR_PERIOD_CYCLES; step++) {
+      const at = (startIndex + step + atPhase) * CYCLE_MS + CYCLE_EPOCH_MS;
+      const clock = skyClock(at);
+      const wanted = Math.abs(clock.moonPhase - illumination);
+      // Reward altitude, but only up to 45 degrees: past that the difference is
+      // not worth trading phase accuracy for.
+      const up = Math.min(Math.max(clock.lunar.altitude, 0) / 45, 1);
+      const score = wanted - altitudeWeight * up;
+      if (score < bestScore) {
+        bestScore = score;
+        bestAt = at;
+      }
+    }
+    this.scrubMs += bestAt - from;
+    this.tick();
+    return this.clock.moonPhase;
+  }
+
+  /**
+   * Tell the star field and the moon how big the frame is.
+   *
+   * On resize rather than per frame, and it has to be called at least once or
+   * both will draw at the 1920x1080 they were constructed assuming -- which
+   * would make the moon the wrong angular size on any other display, and is
+   * exactly the kind of thing that looks like a tuning problem.
+   */
+  setViewport(widthPx: number, heightPx: number, camera: Camera): void {
+    const perspective = camera as Camera & { fov?: number; isPerspectiveCamera?: boolean };
+    if (!perspective.isPerspectiveCamera) return;
+    this.stars.setViewport(widthPx, heightPx, perspective as never);
+    this.moon.setViewport(widthPx, heightPx, perspective as never);
+  }
+
   private applySolar(): void {
     const d = this.clock.solar.direction;
     this.sunVector.set(d.x, d.y, d.z);
@@ -513,6 +753,22 @@ export class SydneySky {
     const altitude = this.clock.solar.altitude;
     const rig = solarRig(altitude);
 
+    /* The night, before the ambient is written, because it is what the ambient
+     * now is. Three inputs and they come from three different places on purpose:
+     * the clock (deterministic, shared), the weather (deterministic, shared) and
+     * the *place* (the baked urban field, which is why an overcast night in the
+     * CBD and one in the foothills are different pictures). */
+    const cover = this.coverOverride ?? cloudCover(this.clock.nowMs);
+    const moonlight = this.clock.moonlight;
+    const night = nightSkyRig(
+      altitude,
+      this.clock.lunar.altitude,
+      moonlight,
+      cover,
+      this.urban.sample(this.here.x, this.here.z),
+    );
+    this.nightRig = night;
+
     this.sun.intensity = rig.sunIntensity;
     // `setRGB` writes in the *working* colour space, which is linear -- these
     // are radiometric multipliers, not swatches, so the colour space is stated
@@ -520,11 +776,44 @@ export class SydneySky {
     // silently invert.
     this.sun.color.setRGB(...rig.sunColour, LinearSRGBColorSpace);
 
-    // Night ramps the fill across civil twilight to a dim blue-grey, so the city
-    // silhouette and the lit windows carry the image, per spec section 6.4.
-    this.ambient.intensity = rig.hemisphereIntensity;
-    this.ambient.color.setRGB(...rig.skyColour, LinearSRGBColorSpace);
+    /* The ambient, and this is where the night stopped being a constant.
+     *
+     * `solarRig` still owns the *floor*: it ramps the fill across civil twilight
+     * from `HEMISPHERE_DAY` down to `HEMISPHERE_NIGHT`, and that bottom end
+     * carries the ten per cent a player who had spent an evening in the game
+     * asked for. What is new is that the floor is no longer where the night
+     * stops. `nightSkyRig` returns an *additional* intensity and the
+     * intensity-weighted colour that goes with it -- so a moonlit night is
+     * brighter and blue, an overcast city night is brighter and orange, and a
+     * moonless clear night in the mountains reduces to exactly the value that
+     * shipped before, to the last bit. `verifySkyglow` asserts that last clause
+     * from both ends, which is what keeps `NIGHT_AMBIENT_FLOOR_MAX` meaningful.
+     *
+     * `max` rather than a sum against the day value, because the two overlap
+     * across twilight: the sky fill is still 3.4 at dusk while the night terms
+     * are already ramping up, and adding them would put a moonlit gain on top of
+     * a daylit hemisphere. Every night term is gated on `nightLevel`, which is
+     * zero above +2 degrees, so by day this reduces to `rig.hemisphereIntensity`
+     * exactly and the whole daytime calibration is untouched. */
+    const litIntensity = Math.max(rig.hemisphereIntensity, night.ambientIntensity);
+    const nightShare =
+      litIntensity > 1e-9 ? Math.min(night.ambientBoost / litIntensity, 1) : 0;
+    this.ambient.intensity = litIntensity;
+    this.ambient.color.setRGB(
+      ...(rig.skyColour.map(
+        (c, i) => c + (night.ambientColour[i] - c) * nightShare,
+      ) as [number, number, number]),
+      LinearSRGBColorSpace,
+    );
     this.ambient.groundColor.setRGB(...rig.groundColour, LinearSRGBColorSpace);
+
+    /* Moonlight as a direction. The light is placed the way the sun is -- a
+     * directional light reads `position - target`, and the target is left at the
+     * origin -- so this is the whole of aiming it. */
+    const m = this.clock.lunar.direction;
+    this.moonLight.position.set(m.x * BOUNCE_DISTANCE, m.y * BOUNCE_DISTANCE, m.z * BOUNCE_DISTANCE);
+    this.moonLight.intensity = night.moonIntensity;
+    this.moonLight.color.setRGB(...night.moonColour, LinearSRGBColorSpace);
 
     // The bounce, aimed on the sun's bearing plus 180 at a low altitude. The
     // direction is rebuilt here rather than in `update()` because it depends
@@ -546,9 +835,12 @@ export class SydneySky {
     this.bounce.color.setRGB(...rig.bounceColour, LinearSRGBColorSpace);
 
     // The clouds, from the same altitude and in the same place, so a cloud lit
-    // for 3 pm can never be left over a 6 pm city. This is the only call in this
-    // file that touches them: they take the rig and give nothing back.
-    this.clouds.setSolarAltitude(altitude);
+    // for 3 pm can never be left over a 6 pm city. They now also take the cover
+    // -- which slides their coverage window and holds their night opacity up --
+    // and the city's glow, which lands on the underside of the deck and is where
+    // the orange lid actually comes from. They still give nothing back.
+    this.clouds.setSolarAltitude(altitude, cover);
+    this.clouds.setGlow(night.glowRadiance);
 
     // The twilight, from the same altitude, into the same kind of uniforms. Two
     // of the four things it sets are `SkyMesh`'s *own* parameters -- turbidity
@@ -561,6 +853,9 @@ export class SydneySky {
     this.sky.turbidity.value = twilight.turbidity;
     this.sky.mieCoefficient.value = twilight.mieCoefficient;
     this.dusk.setSolarAltitude(altitude);
+    // And the night's own grade, from the same rig, into the same kind of
+    // uniforms on the same material.
+    this.nightGlow.set(night, this.clock.lunar.direction);
 
     // And the aerial perspective, which has to follow all of it.
     //
@@ -615,7 +910,33 @@ export class SydneySky {
     // writes, and the fog is one `setRGB`. 5.4 microseconds a frame measured, or
     // 0.03% of a 16.7 ms budget. Nothing here allocates except the `Date` inside
     // `skyClock`, which is one short-lived object a frame.
+    /* Where the player is, read **before** the tick so `applySolar` can sample
+     * the urban field at this frame's position rather than the last one's. It is
+     * the only spatially-varying input the sky has, and one frame of lag in it
+     * would be invisible -- it is read first because the ordering is free and a
+     * reader should not have to work out whether it matters. */
+    this.here.copy(camera.position);
+
     this.tick();
+
+    /* The stars and the moon. Both are placed at the camera and rotated by the
+     * shared clock, so they cost one matrix build and two uniform writes a
+     * frame; the star field hides itself outright whenever its visibility is
+     * effectively zero, which is every daylight frame and every overcast one. */
+    this.stars.update(
+      this.clock.date,
+      SYDNEY_LATITUDE,
+      SYDNEY_LONGITUDE,
+      camera,
+      this.nightRig.starVisibility,
+      this.nightRig.starThreshold,
+    );
+    this.moon.update(
+      this.clock.lunar,
+      this.clock.moonPhase,
+      this.clock.solar.direction,
+      camera,
+    );
 
     // Texel snapping, and it has to be done in the *light's* frame rather than
     // in world XZ, which is what was here before.

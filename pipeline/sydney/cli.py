@@ -4799,13 +4799,19 @@ def cmd_name_bundle(args: argparse.Namespace) -> int:
 
 #: How far a hex's far-layer slabs are worth carrying, metres.
 #:
-#: 20,000 rather than a taste: `far-terrain.bin` is a grid of `half_extent_m`
-#: 20 km about the origin, so past that there is no coarse ground for a slab to
-#: stand on and a prism there would be a roofline floating over nothing. It is
-#: also the honest reading of the user's requirement -- nobody needs Penrith's
-#: rooflines from Bondi -- and at the current 19.3 km radius it changes nothing
-#: a player can see: the far city is the CBD cluster at the origin, and no point
-#: in the build is more than 19.3 km from it.
+#: 20,000 rather than a taste -- but **not for the reason this comment used to
+#: give**. It said the far terrain was a 20 km grid, so past that there was no
+#: coarse ground for a slab to stand on and a prism there would be a roofline
+#: floating over nothing. That was true at a 19.3 km build and is not true now:
+#: `far-terrain.bin`'s half-extent is derived from the built radius and is
+#: 60,500 m at 60 km, so there is coarse ground under every slab in the world.
+#:
+#: What survives is the other half of the argument, which was always the real
+#: one: nobody needs Penrith's rooflines from Bondi, 45 km away, under fog that
+#: closes at 9 km. So this is a **payload** cut, not a geometric one -- it is
+#: what keeps the far city at ~13 hexagons wherever the player stands instead of
+#: holding the whole 60 km skyline for the session. Frozen at 20,000 across this
+#: build: moving it renumbers nothing, but it changes every hex's `far.bin`.
 FAR_CUT_M = 20_000.0
 
 #: How close the player gets before a hex's manifest is fetched, metres.
@@ -4985,6 +4991,21 @@ def cmd_reset(args: argparse.Namespace) -> int:
     con = ledger.connect()
     print(f"reset {ledger.reset(con, args.kind):,} '{args.kind}' units to pending")
     return 0
+
+
+def _rail_entry(name: str):
+    """A handler that imports `sydney.rail` only when it is actually run.
+
+    See the registration block in `main` for why the import is deferred.
+    """
+
+    def run(args: argparse.Namespace) -> int:
+        from . import rail
+
+        return int(getattr(rail, name)(args))
+
+    run.__name__ = name
+    return run
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -5285,6 +5306,27 @@ def main(argv: list[str] | None = None) -> int:
     )
     ca.add_argument("--worst", type=int, default=12, help="offenders to name")
     ca.set_defaults(func=cmd_clearance_audit)
+
+    # --- The rail service core -------------------------------------------------
+    #
+    # Wired with a **lazy import**: `sydney.rail` is imported inside the handler,
+    # not at the top of this file. That is deliberate and it is not caution for
+    # its own sake -- this was added while a 60 km world build was running, and
+    # an ImportError at module scope here would have taken out `sydney build`'s
+    # resume path along with it. Nothing above this block changed, and
+    # `python -m sydney.rail bake|audit` reaches the same two commands without
+    # going through this file at all.
+    for _name, _fn, _help in (
+        ("rail-bake", "cmd_rail_bake", "bake the rail graph, curves and solved phases into data/scratch/rail"),
+        ("rail-audit", "cmd_rail_audit", "check the rail service: continuity, gradient, station profiles, separation"),
+    ):
+        _p = sub.add_parser(_name, help=_help)
+        _p.add_argument("--radius", type=float, default=None,
+                        help="metres of extract to read; defaults to the middle stage")
+        _p.add_argument("--out", default=None, help="output directory")
+        _p.add_argument("--no-terrain", action="store_true",
+                        help="skip the DEM; heights come out relative to the datum")
+        _p.set_defaults(func=_rail_entry(_fn))
 
     r = sub.add_parser("reset", help="mark a stage's units pending again")
     r.add_argument("--kind", required=True)

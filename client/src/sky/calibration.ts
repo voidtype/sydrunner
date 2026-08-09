@@ -781,6 +781,78 @@ export function nightLevel(altitudeDeg: number): number {
   return t * t * (3 - 2 * t);
 }
 
+/* ---------------------------------------------------------------------------
+ * MOONLIGHT.
+ *
+ * The one term in this file that is a *light* rather than a floor, and the
+ * reason the night stopped being a constant. Everything below is the shape of
+ * it; `skyglow.ts` turns that shape into an ambient level and a colour.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * The exponent on the illuminated fraction, and the number that stops a half
+ * moon looking like half a full moon.
+ *
+ * **A half moon is not half as bright; it is about a ninth.** This is measured,
+ * long-standing and deeply counter-intuitive: full moon is visual magnitude
+ * -12.7 and first quarter is -10.0, a factor of **12** in flux for a factor of 2
+ * in lit area. Two things cause it, and both are about the lunar surface rather
+ * than about geometry:
+ *
+ *   - **Opposition surge.** The regolith is a jumble of grains that hide their
+ *     own shadows, so at zero phase angle -- sun exactly behind the observer --
+ *     every shadow is behind its own grain and the surface brightens sharply.
+ *     It is worth about 0.4 magnitudes in the last few degrees alone.
+ *   - **Limb darkening the other way round.** Away from full, the lit crescent
+ *     is the part of the disc where the sun is *grazing*, so the same area of
+ *     ground returns far less light per square metre than the sub-solar point
+ *     does.
+ *
+ * The empirical fit everybody uses is roughly `10^(-0.026|a| - 4e-9 a^4)` in
+ * magnitudes of the phase angle `a`, which over 0-90 degrees is within a few per
+ * cent of `k^3.4` in the illuminated fraction. 3.4 is used directly rather than
+ * the magnitude fit because it costs one `pow`, it is exact at both ends, and
+ * being a few per cent off a crescent that is already a hundredth of full is not
+ * a difference anything downstream can express.
+ *
+ * What it buys, concretely: a first-quarter moon overhead lifts the ambient by
+ * 9% rather than by 50%, so the *full* moon keeps its authority as the one night
+ * you can walk around without the torch. Set this to 1 and every night in the
+ * game becomes moonlit, which is the same failure as a flat ambient floor with
+ * an astronomy paper attached.
+ */
+export const MOON_PHASE_POWER = 3.4;
+
+/**
+ * How much of the night the moon is lighting: 0 down or new, 1 full at the
+ * zenith through a clear sky.
+ *
+ * The three terms, and each is the same physics the sun already goes through in
+ * this file:
+ *
+ *   - `sin(altitude)`  -- Lambert's cosine law on a horizontal surface. Zero at
+ *                         the horizon, so a moon that has just risen lights the
+ *                         *sky* (which is what makes it beautiful) and not the
+ *                         ground (which is what makes it accurate).
+ *   - `phase^3.4`      -- see `MOON_PHASE_POWER`.
+ *   - Beer-Lambert     -- against `opticalAirMass`, with `SUN_EXTINCTION`,
+ *                         because it is the same atmosphere. A full moon two
+ *                         degrees up delivers 4% of what it delivers overhead,
+ *                         which is why a moonrise is orange and useless and a
+ *                         moon overhead is neither.
+ *
+ * Normalised so the zenith full moon is exactly 1, which makes every constant
+ * downstream a fraction of "the brightest natural night there is".
+ */
+export function moonlightLevel(altitudeDeg: number, phase: number): number {
+  if (altitudeDeg <= 0) return 0;
+  const lambert = Math.sin((altitudeDeg * Math.PI) / 180);
+  const extinction = Math.exp(
+    -SUN_EXTINCTION * (Math.pow(opticalAirMass(altitudeDeg), AIR_MASS_POWER) - 1),
+  );
+  return lambert * Math.pow(Math.max(phase, 0), MOON_PHASE_POWER) * extinction;
+}
+
 /** What the night rig is doing at one instant. Everything is `nightLevel` times a constant. */
 export interface NightRig {
   /** 0 in daylight, 1 once dark. */

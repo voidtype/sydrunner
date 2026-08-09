@@ -57,7 +57,8 @@
  */
 
 import { solarPosition, sydneyTime, type SolarPosition } from './solar.ts';
-import { nightLevel } from './calibration.ts';
+import { lunarPosition, type LunarPosition } from './lunar.ts';
+import { moonlightLevel, nightLevel } from './calibration.ts';
 
 /**
  * Sydney. Repeated from `main.ts` so this file can be run standalone, and
@@ -312,6 +313,103 @@ export function cycleInstant(phase: number): number {
   return NIGHT_AFTER.from + cycleEase(u) * NIGHT_LENGTH_MS;
 }
 
+/* ---------------------------------------------------------------------------
+ * THE MOON'S CLOCK, which is the sun's plus one day per game day.
+ *
+ * The sun replays one date forever, and that is right for the sun: the equinox
+ * is what buys the 30/30 split and the constant rate, and `CYCLE_DATE` spends
+ * three paragraphs on why. Handing the moon the same treatment produces a sky
+ * that is *correct and useless* -- the moon on 20 March 2026 is 2.8% lit and
+ * below the horizon all night, so every night in the game would be the same
+ * moonless one, forever, and the entire reason to compute a real lunar phase
+ * would be thrown away.
+ *
+ * So the moon gets its own instant: **`cycleInstant` plus one whole cycle-day
+ * for every cycle that has elapsed.** One game day is one lunar day. A synodic
+ * month is 29.5 real hours, so a player who comes back tomorrow evening gets a
+ * different moon, and one who plays across a fortnight sees the whole month.
+ *
+ * Three properties, and the third is the one that took the work:
+ *
+ *   1. **Monotone and exactly continuous**, including across the wrap. The day
+ *      it adds per cycle is `DAY_SPAN` -- the Sydney time `cycleInstant` itself
+ *      spans -- rather than a nominal 86,400,000, so the sawtooth in
+ *      `cycleInstant` and the step in the cycle count cancel *to the
+ *      millisecond* rather than to within the couple of minutes a real day
+ *      differs from a solar one. The moon moves 13.2 degrees a day, which is
+ *      twenty-six of its own diameters, so a seam the sun can hide in the dark
+ *      would be a moon visibly teleporting at midnight. `verifyCycle` measures
+ *      the step.
+ *
+ *   2. **Eased exactly as the sun is**, because the within-cycle part *is*
+ *      `cycleInstant`. Without that the sun would crawl through the dwell at
+ *      sunset while the moon kept moving at full rate, and the two would visibly
+ *      slide past each other over the one minute everybody is watching.
+ *
+ *   3. **The phase is not taken from this clock.** It is computed in `skyClock`
+ *      from the angle between the moon as placed here and the sun as actually
+ *      rendered -- see `moonIllumination`. That is what keeps the crescent
+ *      pointing at the sun that is in the sky rather than at the one that would
+ *      have been in the sky on the moon's own date, and it is the reason the two
+ *      clocks are allowed to differ at all.
+ * ------------------------------------------------------------------------- */
+
+/** The Sydney time one cycle spans. A day, to within the seconds the seams cost. */
+export const DAY_SPAN_MS = /*#__PURE__*/ (() => cycleInstant(1) - cycleInstant(0))();
+
+/**
+ * How many cycles the moon walks before it repeats, and it is a bound on the
+ * *ephemeris* rather than a design choice.
+ *
+ * The series in `lunar.ts` is a linear element set: its mean motions are exact
+ * near its epoch and drift over centuries. Left unbounded, ten years of real
+ * time would put the moon's date 240 years out and quietly outside the range the
+ * accuracy in that file's header was measured over. 2,160 cycles is 5.9 years of
+ * lunar dates -- 2026 into 2032, comfortably inside it -- and repeats every 90
+ * days of real time, which no session will ever see the far end of.
+ */
+export const LUNAR_PERIOD_CYCLES = 2160;
+
+/** The Sydney instant the moon is placed at, for a wall-clock instant. */
+export function lunarInstant(nowMs: number): number {
+  const elapsed = Math.floor((nowMs - CYCLE_EPOCH_MS) / CYCLE_MS);
+  // Floor-mod, so a clock set before the epoch walks the same 2,160 moons
+  // forwards rather than running the series backwards into the 1990s.
+  const n = ((elapsed % LUNAR_PERIOD_CYCLES) + LUNAR_PERIOD_CYCLES) % LUNAR_PERIOD_CYCLES;
+  return cycleInstant(cyclePhase(nowMs)) + n * DAY_SPAN_MS;
+}
+
+/**
+ * Illuminated fraction of the moon's disc, from the sun and moon **as drawn**.
+ *
+ * Not `LunarPosition.illumination`, which is the fraction on the moon's own
+ * date. The two clocks above are deliberately allowed to differ, so the moon's
+ * ephemeris elongation is not the angle a player can see between the moon and
+ * the sun -- and the angle a player can see is the one that has to be right,
+ * because the shader draws the terminator by pointing it at the sun that is
+ * actually in the sky. A "full" moon thirty degrees from the sun is the single
+ * most obviously broken thing a sky can contain.
+ *
+ * So the phase is re-derived from the rendered geometry, with Meeus's phase
+ * angle rather than the raw elongation -- the moon is close enough to the Earth
+ * that the sun-moon-Earth angle differs from the Earth-centred one by up to a
+ * quarter of a degree, which is 0.2% of the disc. Both directions are unit
+ * vectors in renderer axes, so this is one dot product.
+ */
+export function moonIllumination(
+  sun: Readonly<{ x: number; y: number; z: number }>,
+  moon: Readonly<{ x: number; y: number; z: number }>,
+  moonDistanceKm: number,
+): number {
+  const cosPsi = Math.min(Math.max(sun.x * moon.x + sun.y * moon.y + sun.z * moon.z, -1), 1);
+  const psi = Math.acos(cosPsi);
+  // Earth-sun distance in the same units as the moon's, to a per cent, which is
+  // all the phase angle can feel.
+  const AU_KM = 149_597_871;
+  const phaseAngle = Math.atan2(AU_KM * Math.sin(psi), moonDistanceKm - AU_KM * Math.cos(psi));
+  return (1 + Math.cos(phaseAngle)) / 2;
+}
+
 /**
  * Everything anyone needs to know about the time of day at one instant.
  *
@@ -334,6 +432,35 @@ export interface SkyClock {
   date: Date;
   /** Where the sun is at `date`. */
   solar: SolarPosition;
+  /**
+   * Where the moon is, at `moonDate` -- **not** at `date`. See the moon's clock
+   * above for why the two differ and why that is the point.
+   *
+   * `lunar.illumination` on this is the fraction for the moon's *own* date and
+   * is not what is drawn; read `moonPhase` below instead.
+   */
+  lunar: LunarPosition;
+  /** The Sydney instant the moon is placed at. One day per cycle ahead of `date`. */
+  moonDate: Date;
+  /**
+   * **The illuminated fraction that is actually drawn**: 0 at new, 1 at full,
+   * from the angle between the sun and the moon as this clock places them.
+   */
+  moonPhase: number;
+  /**
+   * How much of the night the moon is lighting: 0 when it is down or new, 1 for
+   * a full moon at the zenith on a clear night.
+   *
+   * The single scalar the whole night rig hangs off, in the same spirit as
+   * `night` below -- the ambient level, the ambient colour, the moon's own
+   * directional light and the wash that takes the stars out are all this number
+   * times a constant, so they cannot come up at different rates. It is
+   * `sin(altitude) * phase^1.4 * extinction(altitude)`: the cosine law for a
+   * horizontal surface, the *non-linear* phase law (see `MOON_PHASE_POWER` in
+   * `skyglow.ts` -- a half moon is nowhere near half as bright as a full one),
+   * and the same Beer-Lambert extinction the sun goes through.
+   */
+  moonlight: number;
   /**
    * **How dark it is: 0 in daylight, 1 once night has fully arrived.**
    *
@@ -383,6 +510,9 @@ export function skyClock(nowMs: number = Date.now(), scrubMs = 0): SkyClock {
   const phase = cyclePhase(at);
   const date = new Date(cycleInstant(phase));
   const solar = solarPosition(date, LATITUDE, LONGITUDE);
+  const moonDate = new Date(lunarInstant(at));
+  const lunar = lunarPosition(moonDate, LATITUDE, LONGITUDE);
+  const moonPhase = moonIllumination(solar.direction, lunar.direction, lunar.topocentricKm);
   const isDay = phase >= SUNRISE_PHASE && phase < SUNSET_PHASE;
   // Forward to the next edge, wrapping: by day that is sunset, by night it is
   // the next sunrise, which may be on the other side of phase 0.
@@ -393,6 +523,10 @@ export function skyClock(nowMs: number = Date.now(), scrubMs = 0): SkyClock {
     isDay,
     date,
     solar,
+    lunar,
+    moonDate,
+    moonPhase,
+    moonlight: moonlightLevel(lunar.altitude, moonPhase),
     night: nightLevel(solar.altitude),
     label: clockLabel(date),
     secondsToEdge: ((edge - phase) * CYCLE_MS) / 1000,

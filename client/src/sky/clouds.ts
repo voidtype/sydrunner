@@ -286,7 +286,7 @@ export function cloudHorizonDip(): number {
   return (Math.acos(R / (R + CUMULUS_ALTITUDE)) * 180) / Math.PI;
 }
 
-export function cloudRig(altitudeDeg: number): CloudRig {
+export function cloudRig(altitudeDeg: number, cover = 0): CloudRig {
   const rig = solarRig(altitudeDeg);
   // The beam a *cloud* receives, from a sun that is still up for it. See
   // `cloudHorizonDip`.
@@ -325,7 +325,17 @@ export function cloudRig(altitudeDeg: number): CloudRig {
     sunward: beam.map((b, i) => k * (b + fill[i])) as Rgb,
     flank: beam.map((b, i) => k * (b * FLANK_COSINE + fill[i])) as Rgb,
     base: beam.map((b, i) => k * (b * BASE_TRANSMISSION + fill[i] * BASE_SKY_VIEW)) as Rgb,
-    opacity: NIGHT_OPACITY + (1 - NIGHT_OPACITY) * day,
+    /* The night opacity pull-down, and why cover overrides it.
+     *
+     * `NIGHT_OPACITY` exists so that a *scattered* deck stops drawing hard-edged
+     * shapes across a night sky that has nothing else in it -- which was right
+     * when the deck was always scattered and is exactly wrong for an overcast
+     * night, where the lid is the brightest thing in the sky and the whole
+     * subject of the picture. So cover takes it back: at full cover the deck is
+     * as opaque at night as it is at noon. `max` rather than a blend, because
+     * the two reasons are independent -- a cloudy afternoon should not be less
+     * opaque than a cloudy midnight. */
+    opacity: NIGHT_OPACITY + (1 - NIGHT_OPACITY) * Math.max(day, clamp01(cover)),
   };
 }
 
@@ -439,6 +449,47 @@ const CUMULUS_FEATURE = 2200;
  */
 const COVER_LO = 0.505;
 const COVER_HI = 0.66;
+
+/**
+ * How far down the window slides at full cloud cover.
+ *
+ * **The deck was a constant until `skyglow.ts` needed a cloudy night.** The
+ * window above is a *fair-weather* deck and always was -- 21.5% of the plane,
+ * measured -- and "the sky is more luminous when cloudy" needs a sky that can
+ * actually be cloudy. Sliding the window is the cheapest possible way to get
+ * one: it is two subtractions on a uniform inside an existing smoothstep, so
+ * there is no second field, no second material, no new pipeline and no cost at
+ * all on a clear night.
+ *
+ * 0.52 is set against the field's own statistics rather than by eye. The field
+ * has mean 0.473 and standard deviation 0.132, so this puts the window at
+ * -0.015 to 0.14 -- three and a half standard deviations below the mean, where
+ * essentially every sample is above it and the mask saturates. What is left is
+ * the thinning at the very edges of the noise, which is what stops a full
+ * overcast reading as a flat grey plate: a real stratocumulus lid has structure
+ * in it, just not holes.
+ */
+const COVER_SHIFT_MAX = 0.52;
+
+/**
+ * How much of the city's upward glow a cloud base collects, as a multiplier on
+ * `NightSkyRig.glowRadiance`.
+ *
+ * **This is where the orange lid actually comes from.** The dome grade in
+ * `skyglow.ts` puts the general wash in the air; this puts it on the *cloud*,
+ * which is the thing that has a shape and is therefore the thing a player reads
+ * as "the sky is lit up tonight". Physically it is the same statement from the
+ * other side: a cloud base a kilometre over the CBD is a diffuse reflector
+ * looking straight down at a hundred thousand streetlights, and it is by a wide
+ * margin the brightest thing in an overcast urban night sky.
+ *
+ * 6.0 is large because the glow radiance it multiplies is a *sky* radiance --
+ * the light per steradian arriving at the eye through a kilometre of air -- and
+ * the cloud base is the surface that light came off, which is much brighter than
+ * the air in front of it. Calibrated by eye against screenshots, on the brief's
+ * warning about additive blending in sRGB.
+ */
+const BASE_GLOW_GAIN = 6.0;
 
 /**
  * Peak opacity of solid cloud. Not 1: a cumulus is optically thick but it is
@@ -713,6 +764,10 @@ export class CloudLayer {
   private readonly flank = uniform(new Vector3());
   private readonly base = uniform(new Vector3());
   private readonly opacity = uniform(0);
+  /** How far the coverage window has slid down. See `COVER_SHIFT_MAX`. */
+  private readonly coverShift = uniform(0);
+  /** The city's light on the underside of the deck. See `BASE_GLOW_GAIN`. */
+  private readonly baseGlow = uniform(new Vector3());
 
   /**
    * @param skyColour   the material's existing `colorNode`, a vec4.
@@ -785,9 +840,20 @@ export class CloudLayer {
       // Forward scatter only where the cloud is between you and the sun, which
       // is what `backlit` already measures.
       const forward: any = pow(saturate(cosSun), FORWARD_POWER).mul(backlit).toVar();
-      const cumulusColour: any = mix(mix(this.base, this.flank, lit), this.sunward, forward);
+      /* The city on the underside. `faceUp` is already "how much of the base you
+       * are looking at" -- 1 for the deck straight overhead, 0 for a flank up
+       * near the top of the frame -- which is exactly the weighting the glow
+       * wants, because only the base can see the streetlights. It goes into the
+       * base *before* the sunward mix, so a cloud lit by the city at dusk is
+       * still overridden by a cloud lit by the sun. */
+      const litBase: any = this.base.add(this.baseGlow.mul(faceUp));
+      const cumulusColour: any = mix(mix(litBase, this.flank, lit), this.sunward, forward);
 
-      const cumulusAlpha: any = smoothstep(COVER_LO, COVER_HI, field)
+      const cumulusAlpha: any = smoothstep(
+        float(COVER_LO).sub(this.coverShift),
+        float(COVER_HI).sub(this.coverShift),
+        field,
+      )
         .mul(smoothstep(HAZE_LO, HAZE_HI, upness))
         .mul(smoothstep(SUN_HOLE_OUTER, SUN_HOLE_INNER, cosSun).oneMinus())
         .mul(this.opacity)
@@ -833,11 +899,27 @@ export class CloudLayer {
    * place `sky.ts` applies the light rig, so the clouds and the sun are never a
    * frame apart.
    */
-  setSolarAltitude(altitudeDeg: number): void {
-    const rig = cloudRig(altitudeDeg);
+  setSolarAltitude(altitudeDeg: number, cover = 0): void {
+    const rig = cloudRig(altitudeDeg, cover);
     this.sunward.value.set(...rig.sunward);
     this.flank.value.set(...rig.flank);
     this.base.value.set(...rig.base);
     this.opacity.value = rig.opacity;
+    this.coverShift.value = COVER_SHIFT_MAX * cover;
+  }
+
+  /**
+   * The city's glow on the base of the deck. Separate from `setSolarAltitude`
+   * because it depends on *where the player is standing* and the rest of the
+   * rig does not -- the light rig is a function of the sun's altitude alone and
+   * is the same over the whole 60 km world, while this is the whole point of the
+   * urban field.
+   */
+  setGlow(glowRadiance: Readonly<Rgb>): void {
+    this.baseGlow.value.set(
+      glowRadiance[0] * BASE_GLOW_GAIN,
+      glowRadiance[1] * BASE_GLOW_GAIN,
+      glowRadiance[2] * BASE_GLOW_GAIN,
+    );
   }
 }

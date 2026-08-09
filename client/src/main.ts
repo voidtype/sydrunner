@@ -15,6 +15,7 @@ import {
   PCFSoftShadowMap,
   PerspectiveCamera,
   Scene,
+  Vector2,
   Vector3,
   WebGPURenderer,
 } from 'three/webgpu';
@@ -23,6 +24,9 @@ import { EXPOSURE } from './sky/calibration.ts';
 import { SydneySky } from './sky/sky.ts';
 import { verifyCycle } from './sky/cycle.ts';
 import { verifyDuskRig } from './sky/dusk.ts';
+import { verifyLunar } from './sky/lunar.ts';
+import { verifyMoonDisc } from './sky/moon.ts';
+import { verifySkyglow } from './sky/skyglow.ts';
 import { SkyClockHud, verifyClock } from './sky/clock.ts';
 import { verifySouthernHemisphere } from './sky/solar.ts';
 import { fetchWorldAsset, verifyCdn } from './world/cdn.ts';
@@ -3787,6 +3791,13 @@ async function main(): Promise<void> {
     camera.updateProjectionMatrix();
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * renderScale);
     renderer.setSize(w, h);
+    // The star field and the moon size themselves in *pixels* from an angular
+    // size, so they are the only things in the renderer that need to be told how
+    // big the frame is. Told the drawing-buffer size rather than the CSS size,
+    // because that is what the shader's clip-space offset is measured in -- pass
+    // the CSS size at a render scale of 0.7 and the moon comes out 40% too big.
+    const buffer = renderer.getDrawingBufferSize(new Vector2());
+    sky.setViewport(buffer.x, buffer.y, camera);
   };
   window.addEventListener('resize', applySize);
   // A ResizeObserver also fires when the element gains a size again after the
@@ -4820,6 +4831,20 @@ async function main(): Promise<void> {
   // Streamed tiles are *not* covered here and do not need to be: they arrive
   // over the following minutes and each is compiled by `setPrecompiler` above,
   // on the same argument. See `world/warmup.ts`.
+  // The star field and the moon hide themselves whenever they would draw
+  // nothing, which is every daylight frame -- and `_projectObject` skips an
+  // invisible object in the `compileAsync` walk exactly as it does in `render`.
+  // So if the boot ever happens in daylight *and* anything has called
+  // `sky.update()` before this line, their two pipelines would be compiled the
+  // first time the sun went down: a dropped frame at dusk, which is the lesson
+  // this file has already paid for twice.
+  //
+  // Nothing renders before `setAnimationLoop` below, so as the boot stands today
+  // both are still at their constructor default of visible and this line is
+  // redundant. It is here because "redundant today" is exactly the state the
+  // previous two instances of this bug were in.
+  sky.stars.visible = true;
+  sky.moon.visible = true;
   const scenePass = await withDeadline(
     renderer.compileAsync(scene, camera),
     WARMUP_DEADLINE_MS,
@@ -6176,6 +6201,46 @@ async function main(): Promise<void> {
      * `sydney.raves.at(n)` does the same for any night, past or future, which is
      * how you find one to look at rather than waiting for one.
      */
+    /**
+     * The night sky, from a console.
+     *
+     * The four pictures this feature is about are a clear sky with a high moon,
+     * a clear moonless sky showing the Southern Cross, an overcast night in the
+     * CBD, and the same overcast night out where there is no city -- and three
+     * of the four are otherwise reachable only by waiting up to twenty minutes
+     * for the weather noise to come round to them.
+     *
+     *     sydney.nightsky.now()            what the sky is doing here, right now
+     *     sydney.nightsky.moon(1)          scrub to a night with a full moon up
+     *     sydney.nightsky.moon(0.15, 0.78) a thin crescent just after sunset
+     *     sydney.nightsky.cover(1)         force overcast; null hands it back
+     *
+     * `moon` is a *search*, not an override: it walks the 2,160 moons the cycle
+     * carries and scrubs to the one that matches, so what you end up looking at
+     * is a sky the shipped game genuinely produces on some evening.
+     *
+     * `nightsky` rather than `night`, which is already taken by the street-lamp
+     * rig -- and the two are genuinely different things: that one is what the
+     * city switches on after dark, this one is what the sky does about it.
+     */
+    nightsky: {
+      now: () => ({
+        time: sky.now.label,
+        cover: Number(sky.night.cover.toFixed(3)),
+        urban: Number(sky.night.urban.toFixed(3)),
+        skyglow: Number(sky.night.glow.toFixed(3)),
+        moonAltitude: Number(sky.now.lunar.altitude.toFixed(2)),
+        moonPhase: Number(sky.now.moonPhase.toFixed(3)),
+        moonlight: Number(sky.night.moonlight.toFixed(4)),
+        ambient: Number(sky.night.ambientIntensity.toFixed(4)),
+        stars: Number(sky.night.starVisibility.toFixed(3)),
+        starsLoaded: sky.starCount,
+        moonDate: sky.now.moonDate.toISOString().slice(0, 10),
+      }),
+      moon: (illumination = 1, atPhase = 0) => sky.scrubToMoon(illumination, atPhase),
+      cover: (value: number | null) => sky.setNightOverride(value),
+      selfChecks: () => verifyLunar().concat(verifySkyglow(), verifyMoonDisc()),
+    },
     raves: {
       world: raves,
       tonight: () => raveListing(sky.now.nowMs),
