@@ -768,6 +768,8 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
   private readonly scratch: LaneRoute[] = [];
   private readonly pose: CarPose;
   private sweepNo = 0;
+  /** One error, not one per frame. See `begin`. */
+  private warnedNoEnd = false;
   private frameNo = 0;
 
   constructor(pose: CarPose) {
@@ -863,6 +865,34 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
   // --- The per-frame half, as `TrafficMovers` sees it ---------------------------
 
   begin(): boolean {
+    // A slot still dirty at the *start* of a frame means nobody called `end()`
+    // at the finish of the last one, and that is silent catastrophe rather than
+    // a glitch: `claimed()` writes matrices that are never uploaded, so every
+    // claimed car draws at whatever the GPU last had -- all zeroes on a mesh
+    // that has never uploaded, which is a point rather than a car -- while the
+    // box fleet suppresses it precisely because it *was* claimed. The city's
+    // near-field cars vanish, and nothing throws.
+    //
+    // It shipped exactly once, and it was invisible to every check: the sink is
+    // a three.js object, so `integration-check.ts` cannot import it, and the
+    // contract being broken lives in `main.ts`'s frame loop rather than in this
+    // file. So the check lives here, costs one boolean per frame, and says the
+    // whole sentence -- a console line nobody reads is worth nothing.
+    if (!this.warnedNoEnd && this.frameNo > 1) {
+      for (const pool of this.pools.values()) {
+        for (const slot of pool) {
+          if (slot === null || !slot.dirty) continue;
+          this.warnedNoEnd = true;
+          console.error(
+            '[carlod] end() was not called last frame: claimed cars have matrices ' +
+              'that were never uploaded and are drawing as degenerate points, with ' +
+              'their boxes suppressed. Call carModels.end() after trafficMovers.update().',
+          );
+          break;
+        }
+        if (this.warnedNoEnd) break;
+      }
+    }
     this.frameNo++;
     return this.byIdentity.size > 0;
   }

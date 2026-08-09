@@ -5323,6 +5323,18 @@ async function main(): Promise<void> {
       player.position.x,
       player.position.z,
     );
+    // **After** the movers, and it is not optional: `claimed()` writes a claimed
+    // car's matrix into the instance buffer from inside that loop, and `end()`
+    // is the only thing in `carlod.ts` that raises `needsUpdate` on it. Without
+    // this line every claimed car draws with the matrix the GPU was last given
+    // -- which, for a mesh that has never uploaded one, is all zeroes, and a
+    // zero matrix collapses the car to a point. The box fleet has meanwhile
+    // suppressed it *because* it was claimed, so the car is not drawn at all.
+    // That shipped: "moving cars appear to be invisible", and every near-field
+    // car in the city was gone with them. The sibling per-frame fleets
+    // (`bikeLights`, `footyPool`, `nameplates`) all end here for the same
+    // reason; this one was simply missed.
+    carModels?.end();
 
     // And the crowd, on exactly the same terms and immediately after, because
     // they come out of the same file and the same clock: the fractional tick so
