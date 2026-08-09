@@ -2575,13 +2575,51 @@ def build_far_terrain(terrain) -> tuple[np.ndarray, float, float, float]:
         _Lattice(coarse, -(posts // 2), -(posts // 2), post_m), terrain.base_elevation, {}
     )
 
-    # Overshoot at every real post. The far grid agrees exactly at its own posts,
-    # so the worst case is always in the middle of a coarse cell, and sampling
-    # the finer lattice is what finds it.
+    # Overshoot at every real post *that a tile could be standing on*. The far
+    # grid agrees exactly at its own posts, so the worst case is always in the
+    # middle of a coarse cell, and sampling the finer lattice is what finds it.
+    #
+    # --- WHY THIS IS MASKED TO A DISC AND DID NOT USED TO BE -----------------
+    #
+    # The sink exists for exactly one reason, stated above: the coarse ground
+    # must lose to a streamed tile's ground *everywhere the two overlap*. The
+    # lattice is a square and the build is a disc, so the two overlap on the
+    # disc and nowhere else -- past it there is no tile, and the coarse surface
+    # is not competing with the real one, it *is* the only one. Overshoot out
+    # there cannot produce the artefact this number is paid to prevent.
+    #
+    # Measuring it over the whole square was harmless while the square was
+    # small: at 19.3 km its corners are 27 km out, over the same coastal plain
+    # as everything else. At 60 km the corners are 85.6 km out, in the Blue
+    # Mountains, and they were setting the number for the entire world -- 250 m
+    # of sink measured over the square against 165 m over the disc, i.e. 85 m
+    # of the horizon's drop was being charged by ground no tile will ever be
+    # emitted on and no player can stand within 25 km of.
+    #
+    # The radius is recovered from the lattice rather than threaded through
+    # three call sites, by inverting `Terrain.load`'s own reach formula; the
+    # assert is what keeps that inversion honest if the formula moves. One tile
+    # diagonal of margin, because `tiles_within_radius` keeps a tile whose
+    # *nearest corner* is inside the radius, so tile ground runs that far past
+    # it.
+    assert reach % config.TERRAIN_GRID == 0, reach
+    covered = (reach // config.TERRAIN_GRID - 1) * config.TILE_SIZE
+    covered += config.TILE_SIZE * math.sqrt(2.0)
+
     idx = np.arange(-reach, reach + 1, dtype=np.float64) * lat.spacing
-    east = np.repeat(idx[None, :], len(idx), axis=0).ravel()
-    north = np.repeat(idx[:, None], len(idx), axis=1).ravel()
-    overshoot = float(np.max(coarse_field.sample(east, north) - terrain.sample(east, north)))
+    # Chunked over rows: at 60 km the square is 3,873^2 = 15.0 M posts, and
+    # sampling it in one call is several gigabytes of float64 temporaries.
+    overshoot = 0.0
+    for i in range(0, len(idx), 128):
+        rows = idx[i : i + 128]
+        east = np.repeat(idx[None, :], len(rows), axis=0).ravel()
+        north = np.repeat(rows[:, None], len(idx), axis=1).ravel()
+        inside = (east * east + north * north) <= covered * covered
+        if not inside.any():
+            continue
+        east, north = east[inside], north[inside]
+        delta = coarse_field.sample(east, north) - terrain.sample(east, north)
+        overshoot = max(overshoot, float(delta.max()))
     sink = round(max(overshoot, 0.0) + FAR_SINK_MARGIN, 2)
 
     # Row 0 north: `_Lattice` stores north ascending with the row index, and the

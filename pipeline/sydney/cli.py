@@ -4887,15 +4887,30 @@ def cmd_hex_pack(args: argparse.Namespace) -> int:
     # --- Bytes on disk per hex, which is the number that decides whether the
     # circumradius is right. Counted from the files themselves rather than from
     # the index's own `size` fields, because the publish moves files.
+    # One pass over the directories, not a glob per tile. `glob(f"{key}.*")`
+    # rescans the *whole* tile directory every time it is called, so this loop
+    # was quadratic in the size of the world: 3,187 tiles over ~28,000 files was
+    # a couple of seconds and nobody noticed, but 18,113 tiles over 159,002
+    # files is 2.9 billion path comparisons and turned a repack that advertises
+    # itself as "no retile, a second or two" into the better part of an hour.
+    # Building the key -> bytes maps once is O(files) and costs about a second.
+    tile_bytes: dict[str, int] = defaultdict(int)
+    for path in config.TILE_DIR.iterdir():
+        if path.is_file():
+            # Tile keys are "{tx}_{tz}" and carry no dot, so the first dot ends
+            # the key -- "-96_22.terr.bin" and "-96_22.glb" both fold onto it.
+            tile_bytes[path.name.split(".", 1)[0]] += path.stat().st_size
+    collision_bytes: dict[str, int] = {}
+    if config.COLLISION_DIR.exists():
+        for path in config.COLLISION_DIR.iterdir():
+            if path.is_file():
+                collision_bytes[path.name.split(".", 1)[0]] = path.stat().st_size
+
     payload: dict[str, int] = defaultdict(int)
     for hid, entries in by_hex.items():
         for entry in entries:
             key = entry["key"]
-            for path in config.TILE_DIR.glob(f"{key}.*"):
-                payload[hid] += path.stat().st_size
-            collision = config.COLLISION_DIR / f"{key}.bin"
-            if collision.exists():
-                payload[hid] += collision.stat().st_size
+            payload[hid] += tile_bytes.get(key, 0) + collision_bytes.get(key, 0)
     for hid, entries in regions_by_hex.items():
         for entry in entries:
             payload[hid] += int(entry.get("size", 0))

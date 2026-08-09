@@ -21,8 +21,16 @@ CRS_GEODETIC = "EPSG:4326"  # source data (Microsoft footprints, OSM)
 CRS_PROJECTED = "EPSG:7856"  # MGA2020 Zone 56 -- metres, correct for Sydney
 
 # The local ENU origin. Sydney CBD, near Town Hall. Every runtime coordinate is
-# metres from this point, which keeps the whole playable world inside +/-40 km
-# and therefore comfortably inside float32 precision.
+# metres from this point.
+#
+# This used to say the origin-shift "keeps the whole playable world inside
+# +/-40 km". At the final 60 km radius it does not: the terrain lattice reaches
+# +/-60,500 m and the far-ground sheet is drawn to its corners, 85.6 km out. The
+# claim the number was standing in for still holds, so state that instead --
+# a float32's ulp at 60,500 m is 60_500 * 2**-23 ~= 7.2 mm, against 4.8 mm at
+# 40 km. Both are an order of magnitude under anything the renderer resolves,
+# and the ratio is linear, so there is no radius inside this project's reach
+# where the shift stops being enough.
 ORIGIN_LAT = -33.8688
 ORIGIN_LON = 151.2093
 
@@ -69,20 +77,59 @@ class Stage:
 
 # Build outward in this order. Ship at stage 2; the tile format must allow
 # adding stage 3 later without rebuilding what already exists.
+#
+# --- THE LADDER TERMINATED AT STAGE 2, AND THAT IS WHY 3 AND 4 READ ODDLY -----
+#
+# `middle` is now 60,000: the final radius. It therefore passed `outer` (35,000)
+# and caught `horizon` (60,000), and a ladder whose second rung is above its
+# third is worth explaining rather than quietly re-sorting.
+#
+# **Nothing reads `outer` or `horizon`.** That was checked before they were
+# touched, and it is the fact that makes this a naming problem rather than a
+# behavioural one. Across the whole pipeline the only consumers of this tuple
+# are `STAGE_BY_NAME` (the `--stage` choices, and `cli.build` taking the named
+# stage's `radius_m`) and one default in `cli.clearance_audit`, which falls back
+# to `STAGES[1]` -- `middle` -- when neither `--radius` nor the index supplies
+# one. Grep confirms 35_000 and this 60_000 appear nowhere else in
+# `pipeline/sydney/`. So they were never gates; they were a plan.
+#
+# The things one might reasonably assume they gate are all governed elsewhere,
+# and none of them moved with this build:
+#
+#   * far-slab carry distance -- `cli.FAR_CUT_M`, 20 km, frozen, and mirrored in
+#     the hex contract as `far_cut_m`. A policy cut, not a physical one: it is
+#     what stops a 60 km build holding ~20 MB of Penrith rooflines for the
+#     session. See `client/src/world/far.ts`.
+#   * far-terrain extent -- derived, not declared. `Terrain.load` sets
+#     `reach = (ceil(radius_m / TILE_SIZE) + 1) * TERRAIN_GRID`, so the sheet's
+#     half-extent follows the built radius on its own: 20,000 m at 19.3 km,
+#     60,500 m here. Nothing had to be widened by hand.
+#   * the sky ring -- there is no such thing; the horizon is `far-terrain.bin`
+#     plus `far-water.bin` plus fog, which `main.ts` closes at 9 km.
+#
+# They are kept rather than deleted because `--stage` is a CLI contract and
+# because the spec's four names are how section 3.3 is discussed. They are set
+# to the final radius because the alternative -- pushing them outward
+# proportionally, to 108 km and 186 km -- would be inventing rings that cannot
+# be built: the OSM extract is clipped at 60 km, `scripts/expand-world.sh`
+# refuses anything above 60,000, and the user has called the radius final. A
+# number no build can reach is worse than a number that repeats one.
 STAGES: tuple[Stage, ...] = (
     # 5,300 rather than the original 4,000: the user's spawn point is Sydney
     # Park (5,064 m from origin at the pin) and the whole park plus a 100 m
     # dither disc and a working margin must be playable tiles, not far scenery.
     Stage(1, "inner", 5_300, "Sydney LGA + inner ring, out to Sydney Park"),
-    # 15,300 rather than 15,000: the user asked for "another 10 km in each
-    # direction" from the 5,300 inner ring, and 300 m is not worth the
-    # difference between a number that answers the request and one that nearly
-    # does. Measured at this radius: 117,681 OSM buildings (3.34x the inner
-    # ring) over ~2,100 emitted tiles, roughly 30% of the disc being harbour
-    # and open ocean, which the pipeline skips.
-    Stage(2, "middle", 19_300, "Marrickville, Bondi, Balmain, Randwick, North Sydney, Chatswood"),
-    Stage(3, "outer", 35_000, "Parramatta, Bankstown, Hornsby, Sutherland, Manly"),
-    Stage(4, "horizon", 60_000, "terrain and coastline only, buildings optional"),
+    # The full-detail world, and now the whole of it. This rung has been 15,300
+    # ("another 10 km in each direction" from the inner ring), then 19,300, and
+    # is now 60,000 -- Town Hall to Penrith, which is the radius the user has
+    # called final. Everything inside it is built to the same detail; there is
+    # no reduced-quality outer band, which is what collapsed stages 3 and 4 into
+    # this one. `scripts/expand-world.sh` rewrites this number in place, so edit
+    # it there rather than here.
+    Stage(2, "middle", 60_000, "the built world: Penrith to the coast, Hornsby to Sutherland"),
+    # Reached by stage 2 rather than built separately -- see the note above.
+    Stage(3, "outer", 60_000, "Parramatta, Bankstown, Hornsby, Sutherland, Manly -- inside stage 2"),
+    Stage(4, "horizon", 60_000, "the extract's own edge; stage 2 builds it at full detail"),
 )
 
 STAGE_BY_NAME = {s.name: s for s in STAGES}

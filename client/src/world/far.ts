@@ -315,8 +315,23 @@ const BASE_SHADE = 0.8;
 const BASE_SHADE_TOP = 0.28;
 const SLAB_Y = 'slabY';
 
-/** The far ground's outer apron reaches this far from the origin, metres. */
+/**
+ * The far ground's outer apron reaches this far from the origin, metres --
+ * **or the heightfield's own half-extent, whichever is greater**. See
+ * `apronHalf`.
+ *
+ * 20,000 was the flat far plane's half-width, and until the 60 km build it was
+ * also, by coincidence, `far.terrain.half_extent_m`: the apron ring landed
+ * exactly on the outermost row of posts and read as a vertical skirt. The
+ * coincidence ended when the extent went to 60,500 m. A fixed 20,000 against a
+ * 60,500 m heightfield does not shrink the apron -- it folds it 40 km back
+ * *inside* the data, inverting every triangle in the border ring and drawing a
+ * sea-level scar through the coarse ground at 20 km. Hence the max.
+ */
 const APRON_HALF = 20000;
+
+/** Where the apron ring sits for a given heightfield half-extent, metres. */
+const apronHalf = (half: number): number => Math.max(APRON_HALF, half);
 
 // --- Decode -------------------------------------------------------------------
 
@@ -862,8 +877,9 @@ export function buildFarGround(
   const uv = new Float32Array(total * 2);
 
   /** World x of a column, world z of a row. Ring 0 and ring inner+1 are apron. */
+  const outer = apronHalf(half);
   const coord = (k: number): number =>
-    k === 0 ? -APRON_HALF : k > inner ? APRON_HALF : -half + (k - 1) * step;
+    k === 0 ? -outer : k > inner ? outer : -half + (k - 1) * step;
   // The apron sits at sea level minus four -- `ground.FAR_PLANE_SINK`, kept
   // exactly where the flat plane had it, because the apron is where the harbour
   // and the ocean are and four metres of water level is not a thing anyone can
@@ -955,13 +971,18 @@ const EMPTY: FarLayer = { slabs: null, ground: null, count: 0, hexes: null };
  * session. Nobody needs Penrith's rooflines from Bondi -- 45 km away, under
  * fog, behind the Blue Mountains foothills. So the slabs are cut with the same
  * hexagons everything else is (`world/hexes.ts`) and carried on a distance:
- * `far_cut_m`, 20 km, which is `far-terrain.bin`'s own half-extent and
- * therefore the distance past which there is no coarse ground for a prism to
- * stand on anyway.
+ * `far_cut_m`, 20 km.
  *
- * At the shipped 19.3 km radius that cut is a no-op in the only direction that
- * matters: the far city *is* the CBD cluster at the origin, and no point in the
- * build is more than 19.3 km from it.
+ * That used to be justified as `far-terrain.bin`'s own half-extent, and
+ * therefore the distance past which there was no coarse ground for a prism to
+ * stand on anyway. **It is no longer.** The far terrain's half-extent follows
+ * the built radius and is 60,500 m at 60 km, so every slab in the world now has
+ * ground under it and the cut is purely a payload decision -- which is what it
+ * was really buying all along, and the 20 MB figure above is the size of it.
+ *
+ * At the old 19.3 km radius the cut was a no-op in the only direction that
+ * mattered: the far city *was* the CBD cluster at the origin, and no point in
+ * the build was more than 19.3 km from it. At 60 km it does real work.
  *
  * ---------------------------------------------------------------------------
  * NOTHING IS DRAWN BEFORE IT IS COMPILED, which is the constraint that shapes

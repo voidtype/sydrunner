@@ -71,7 +71,18 @@ if stage not in config.STAGE_BY_NAME:
     sys.exit(f"no stage named {stage!r}; have {', '.join(config.STAGE_BY_NAME)}")
 
 want = geo.bbox_geodetic_for_radius(radius)          # (min_lon, min_lat, max_lon, max_lat)
+
+# A PBF need not carry a header bbox, and a clipped one very often does not.
+# GDAL will not invent one: `fast_total_bounds` comes back False and
+# `total_bounds` comes back **None**, which this line used to subscript --
+# so the guard protecting an eight-hour build died with a TypeError on the
+# perfectly ordinary input of a fresh clip. Scan for the bounds instead; it is
+# about four seconds on a 73 MB extract.
 have = pyogrio.read_info(str(osm.PBF_PATH), layer="lines")["total_bounds"]
+if have is None:
+    b = pyogrio.read_bounds(str(osm.PBF_PATH), layer="lines")[1]
+    have = (float(b[0].min()), float(b[1].min()), float(b[2].max()), float(b[3].max()))
+    print(f"  extract {osm.PBF_PATH.name} carries no header bbox; scanned for it")
 print(f"  extract {osm.PBF_PATH.name}: lon {have[0]:.3f}..{have[2]:.3f}  lat {have[1]:.3f}..{have[3]:.3f}")
 print(f"  need for {radius/1000:.1f} km:  lon {want[0]:.3f}..{want[2]:.3f}  lat {want[1]:.3f}..{want[3]:.3f}")
 
@@ -144,6 +155,26 @@ if blocking:
     print("  ring would come out with terrain and no city. Fetch a wider extract")
     print("  (Geofabrik australia-oceania, clipped) before building.")
     sys.exit(1)
+
+# The test above is negative -- it can only object. That was enough while the
+# bounds came from the header, which a clipper writes tight around what it kept.
+# A *scanned* bound is a different animal: one ferry route, power line or
+# boundary way running to Cape York puts the extract's nominal edge 2,000 km out
+# while the city data stops at Parramatta, and every shortfall test then passes
+# vacuously. So ask the positive question too, and print the answer rather than
+# judging it -- is there a city at the far edge of the radius being built?
+print("\n  coverage at the edge of the requested radius:")
+for name, strip in (
+    ("west", (want[0], want[1], want[0] + inset, want[3])),
+    ("east", (want[2] - inset, want[1], want[2], want[3])),
+    ("south", (want[0], want[1], want[2], want[1] + inset)),
+    ("north", (want[0], want[3] - inset, want[2], want[3])),
+):
+    counts = built_features(strip)
+    if counts is None:
+        print(f"    {name:5} unreadable")
+    else:
+        print(f"    {name:5} {counts[0]:>6,} roads  {counts[1]:>7,} buildings")
 
 # Rough disk: the shipped 15.3 km world is 2.9 GB of tiles + region bundles, and
 # it scales with area. Free space is checked against three copies, because the
