@@ -1382,7 +1382,7 @@ export function streetKey(kind: number, anchor: number, index: number): number {
  */
 interface PoolCache {
   gen: number;
-  byKey: Map<number, PedBand[]>;
+  byKey: Map<number, Pool>;
 }
 
 const poolCache = new WeakMap<PedestrianField, PoolCache>();
@@ -1445,6 +1445,93 @@ const POOL_SIZE = 10;
 const LOITER_REACH = 100;
 const SPREAD_DIAGONAL = 1.415;
 
+/**
+ * How far a **suburb** will widen its search when its own spread holds no
+ * footpath at all, metres. `factions.CATCHMENT_RESCUE_MAX` for a loiterer, and
+ * the same shape of answer: double until there is real concrete, and put the
+ * person on it.
+ *
+ * ---------------------------------------------------------------------------
+ * Why a suburb needs one, measured against the shipped 60 km world.
+ *
+ * A `Suburb` row is a `place=suburb` **node**, which OSM puts wherever the
+ * label belongs and not where the streets are. In the inner city those are the
+ * same place. Out past Blacktown they routinely are not, and the extent now
+ * reaches far enough that the difference is a hole rather than a curiosity:
+ *
+ *   - **Marsden Park** is a greenfield estate whose node sits in the paddock
+ *     that has not been subdivided yet. 157 lane routes and 472 bands within a
+ *     kilometre; **none** within its 183 m spread.
+ *   - **Bankstown Aerodrome**'s node is on the runway.
+ *   - **Woy Woy**'s node is over Brisbane Water; the town is 1.3 km away.
+ *   - **Ku-ring-gai Chase** is a national park.
+ *
+ * Thirty-seven of the 693 suburbs that carry loiterers on a built tile placed
+ * **nobody** for this reason -- not "nobody visible from here", but
+ * `poseMethhead` returning false, which means those people do not exist. That
+ * is exactly the silent thinning the per-loiterer patch fallback below was
+ * written to stop, one rung further out. With this rung: 990 of 990.
+ *
+ * ---------------------------------------------------------------------------
+ * Why 1,400 and not the police's 900.
+ *
+ * Measured, per starved suburb, as the doubling rung at which
+ * `PedestrianField.near` first returns a band around the centroid: nine land at
+ * 646 m, one at 688, three at 1,292, one at 1,376, and three past 2,500. Nine
+ * hundred would have left **Woy Woy** empty, which is a town of ten thousand
+ * people and reads as a bug; 1,400 reaches every suburb in the table whose
+ * centroid is on land anybody can drive to.
+ *
+ * The two it does not reach -- **Coba Point** and **Sunny Corner** -- are
+ * boat-access-only Hawkesbury settlements whose nearest street is kilometres
+ * away across the river. They place nobody, which is the honest answer:
+ * `checkStreetlife` counts and names them rather than pretending, on
+ * `integration-check.builtGate`'s own argument that an anchor the world cannot
+ * hold is inert rather than broken.
+ *
+ * **It is a rescue, not a widening.** The pool is searched at the suburb's own
+ * spread first and this only runs when that came back empty, so no loiterer who
+ * is placed today moves by a millimetre: the frozen inner ring's 122 across 59
+ * suburbs is the same 122 in the same places.
+ */
+export const METH_RESCUE_MAX = 1400;
+
+/**
+ * The furthest a loiterer can possibly stand from their suburb's centroid,
+ * metres -- **derived from the search that places them, not measured**, exactly
+ * as `DRUNK_REACH` is derived from `VENUE_BAND_RADIUS`.
+ *
+ * Three terms, and the middle one is the one that is easy to forget.
+ * `PedestrianField.near` selects on a band's **axis-aligned bounding box**
+ * against the query *square*, so a band admitted at radius `r` can have its
+ * nearest real point out at the corner of that square -- `r * sqrt(2)`, which
+ * is what `SPREAD_DIAGONAL` already is elsewhere in this file. On top of that
+ * the rescue branch adds at most `LOITER_REACH` of stroll along the kerb.
+ *
+ * Measured against the shipped 60 km world, the worst loiterer in the city
+ * stands **1,903 m** from their centroid -- Ku-ring-gai Chase, whose node is in
+ * the middle of a national park and whose nearest footpath really is that far
+ * away -- against the 2,081 m this derivation allows. `checkStreetlife` asserts
+ * the bound over every loiterer in the built city rather than trusting it,
+ * which is the assertion the drunks have had since the frontage fix and the
+ * meth heads did not.
+ */
+export const METH_REACH = METH_RESCUE_MAX * SPREAD_DIAGONAL + LOITER_REACH;
+
+/**
+ * The band pool around a point, and **the radius it was actually found at**.
+ *
+ * `factions.Beat` verbatim, and here for the same reason: a rescued anchor
+ * reaches past the radius it was asked for, and every broadphase gate
+ * downstream of it has to be widened by the search that actually placed the
+ * person rather than by the one that was asked for. See
+ * `forEachMethheadNear`'s gate.
+ */
+interface Pool {
+  bands: PedBand[];
+  reach: number;
+}
+
 function anchorBands(
   field: PedestrianField,
   key: number,
@@ -1453,7 +1540,8 @@ function anchorBands(
   radius: number,
   backstreets: boolean,
   out: PedBand[],
-): PedBand[] {
+  rescueMax = 0,
+): Pool {
   let entry = poolCache.get(field);
   if (entry === undefined || entry.gen !== field.generation) {
     entry = { gen: field.generation, byKey: new Map() };
@@ -1461,7 +1549,17 @@ function anchorBands(
   }
   const cached = entry.byKey.get(key);
   if (cached !== undefined) return cached;
-  field.near(x, z, radius, out);
+  let reach = radius;
+  field.near(x, z, reach, out);
+  // Doubling rather than stepping, so the common case costs one grid walk and
+  // the starved case costs four. `catchmentBands`' loop, with the pool size
+  // that matters here being one -- a suburb with a single band under it can
+  // still stand its loiterer somewhere, and widening past that would move
+  // people who already have a street for no reason.
+  while (out.length === 0 && reach < rescueMax) {
+    reach = Math.min(reach * 2, rescueMax);
+    field.near(x, z, reach, out);
+  }
   const score = (b: PedBand): number => {
     const dx = Math.max(b.minX - x, 0, x - b.maxX);
     const dz = Math.max(b.minZ - z, 0, z - b.maxZ);
@@ -1475,8 +1573,9 @@ function anchorBands(
   const bands = [...out]
     .sort((a, b) => score(a) - score(b) || a.osmId - b.osmId || a.side - b.side || a.minX - b.minX)
     .slice(0, POOL_SIZE);
-  entry.byKey.set(key, bands);
-  return bands;
+  const pool: Pool = { bands, reach };
+  entry.byKey.set(key, pool);
+  return pool;
 }
 
 /**
@@ -1700,8 +1799,13 @@ export function poseMethhead(
   const spread = methSpread(s);
   const px = s.x + (((carHash(h, 0x6b1f) % 2001) - 1000) / 1000) * spread;
   const pz = s.z + (((carHash(h, 0xc70d) % 2001) - 1000) / 1000) * spread;
-  let bands = anchorBands(peds, carHash(seed, index ^ 0x11a3), px, pz, LOITER_REACH, true, scratch);
-  if (bands.length === 0) {
+  let pool = anchorBands(peds, carHash(seed, index ^ 0x11a3), px, pz, LOITER_REACH, true, scratch);
+  // Set only by the rescue rung below, never by the two tight ones. An explicit
+  // flag rather than comparing `pool.reach` to `spread` at the placement, so
+  // that this cannot start meaning something else if `SPREAD_MIN` ever drops
+  // under `LOITER_REACH`.
+  let rescued = false;
+  if (pool.bands.length === 0) {
     // The patch landed on a rail corridor, in a park, or over water -- which
     // around Sydney Park and Eveleigh is a lot of the ground. Fall back to the
     // suburb's own pool rather than returning false, because returning false
@@ -1713,11 +1817,49 @@ export function poseMethhead(
     // `factions.CATCHMENT_RESCUE_MAX` is the same idea for a beat, and the
     // shape of the answer is the same: widen until there is a real footpath,
     // and put the person on it.
-    bands = anchorBands(peds, seed, s.x, s.z, spread, true, scratch);
+    //
+    // And this rung widens too, out to `METH_RESCUE_MAX`, because the suburb's
+    // own spread is not always enough either: a `place=suburb` node lands where
+    // the label belongs, which out west is regularly a paddock, a runway or the
+    // middle of Brisbane Water. See `METH_RESCUE_MAX` for the measurement. The
+    // widening is inside `anchorBands` rather than a second call here so that
+    // the pool cache holds one entry per anchor and the *reach* that found it,
+    // which is what `forEachMethheadNear` gates on.
+    pool = anchorBands(peds, seed, s.x, s.z, spread, true, scratch, METH_RESCUE_MAX);
+    rescued = pool.reach > spread;
   }
+  const bands = pool.bands;
   if (bands.length === 0) return false;
   const band = bands[h % bands.length];
-  pointOnBand(band, (carHash(h, 0x51ab) % 4096) / 4096, out);
+  if (rescued) {
+    // --- Rescued, and therefore **projected rather than dropped uniformly**.
+    //
+    // A band is a whole OSM way clipped to a tile, so it can be most of a
+    // kilometre long, and `near` selects on its *bounding box*. Taking a
+    // uniform fraction of a band found 1.4 km away puts somebody an unbounded
+    // distance from the suburb that owns them: measured before this branch
+    // existed, the worst rescued loiterer stood **1,921 m** from their
+    // centroid, at Ku-ring-gai Chase. That is the same bug `nearestOnBand`'s
+    // header describes for the drunks, and it costs the same two things -- a
+    // person standing nowhere near what they belong to, and a broadphase gate
+    // that can no longer be derived, so `forEachMethheadNear` silently deletes
+    // them.
+    //
+    // So the rescue stands them at the point on the band closest to the suburb,
+    // plus a hashed stroll of at most `LOITER_REACH` along the kerb. What that
+    // buys is a *derivable* bound -- `METH_REACH`, which is where the search
+    // could have found a band plus that stroll -- rather than "the length of
+    // the longest band in Sydney", which is not a number this file can know.
+    //
+    // Only on the rescued path. The two tight rungs keep the uniform fraction
+    // they shipped with, so no loiterer who is placed today moves.
+    const at = nearestOnBand(band, s.x, s.z).s +
+      (((carHash(h, 0x51ab) % 2001) - 1000) / 1000) * LOITER_REACH;
+    const clamped = at < 0 ? 0 : at > band.length ? band.length : at;
+    pointOnBand(band, band.length > 1e-6 ? clamped / band.length : 0, out);
+  } else {
+    pointOnBand(band, (carHash(h, 0x51ab) % 4096) / 4096, out);
+  }
 
   out.key = streetKey(NPC_KIND.METHHEAD, suburb, index);
   out.kind = NPC_KIND.METHHEAD;
@@ -1765,7 +1907,11 @@ export function poseDrunk(
   // Tight: a drunk outside a pub is outside *that* pub. 45 m is far enough to
   // find the footpath a corner hotel actually fronts and near enough that
   // nobody is standing outside the wrong one.
-  const bands = anchorBands(peds, seed, vx, vz, VENUE_BAND_RADIUS, false, scratch);
+  // No rescue rung here, deliberately. A drunk stands outside *their own pub*,
+  // and `DRUNK_REACH` is derived from `VENUE_BAND_RADIUS` -- widening the search
+  // would put somebody outside the wrong pub and would silently break the bound
+  // `forEachDrunkNear` gates on. A pub with no frontage carries nobody.
+  const bands = anchorBands(peds, seed, vx, vz, VENUE_BAND_RADIUS, false, scratch).bands;
   if (bands.length === 0) return false;
   const h = carHash(seed, index ^ 0x63d7);
 
@@ -1938,7 +2084,23 @@ export function forEachMethheadNear(
     // The suburb's spread, out to the corner of the square patch, plus the reach
     // of a patch's own band search, plus the query's. Anything tighter than this
     // drops a loiterer who is genuinely inside `radius` -- see `LOITER_REACH`.
-    const gate = methSpread(suburb) * SPREAD_DIAGONAL + LOITER_REACH + radius;
+    //
+    // **Floored at `METH_RESCUE_MAX + LOITER_REACH`**, which is the bound
+    // `poseMethhead`'s rescue branch is written to satisfy: a rescued loiterer
+    // stands at the point on their band nearest the suburb, plus at most
+    // `LOITER_REACH` of stroll along the kerb. A gate tighter than the search
+    // that placed somebody deletes them from the query -- not "does not draw
+    // them", *deletes* them, because this is the only enumeration there is --
+    // which is exactly the bug `DRUNK_REACH`'s header describes one tier over.
+    //
+    // It is a broadphase and nothing else, so being generous costs one squared
+    // distance per suburb and a cached pool lookup, while being tight costs a
+    // person. Measured against the built city at the spawn, the whole ambient
+    // placement inside 150 m is 0.019 ms a frame against a 4 ms budget.
+    // `METH_REACH` subsumes the old term rather than sitting beside it: at
+    // `SPREAD_MAX` the tight rungs reach 581 m and this is 2,081 m, so one
+    // constant covers both rungs and there is one derivation to keep honest.
+    const gate = METH_REACH + radius;
     const sdx = suburb.x - x;
     const sdz = suburb.z - z;
     if (sdx * sdx + sdz * sdz > gate * gate) continue;

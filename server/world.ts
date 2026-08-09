@@ -1359,6 +1359,28 @@ export function collisionCapBytes(): number {
  * `HexResidency`'s header for the three reasons, of which the operational one is
  * that the two variables would otherwise silently change meaning under every
  * deployment that already sets one of them.
+ *
+ * ---------------------------------------------------------------------------
+ * **At 60 km the whole lane graph estimates at 394.6 MB, so this default now
+ * bites at boot.** Measured, not projected: 86 hexagons, 15,057 lane tiles,
+ * 71,798 items, `estimateLaneBytes` = 394,583,136 B. EXPANSION.md's 7-8x on the
+ * 131.9 MB figure above would have said 0.9-1.0 GB; it is under half that,
+ * because the outer ring is paddocks and national park rather than more
+ * Newtown.
+ *
+ * Three hundred is still the right default and nothing here changes: the boot
+ * walk stops loading lanes the moment the cap bites (see `loadWorld`), and the
+ * residency then loads what participants actually need at
+ * `LANES_NEED_MARGIN_M`, which for any one player is three to seven hexagons at
+ * about 4.6 MB apiece. A player standing in Penrith gets Penrith's footpaths.
+ *
+ * What it *does* change is that **a bare `loadWorld` no longer hands back the
+ * whole city**, and anything that treats one as a picture of the world is now
+ * wrong: it comes back with roughly the first two thirds of the hexagon walk,
+ * and the third it drops is a contiguous slab of the map. `integration-check`'s
+ * coverage checks hit exactly that and now open the world through
+ * `loadWholeWorld`; see its header for the nine police stations and 168 suburbs
+ * this quietly emptied.
  */
 export function lanesCapBytes(): number {
   const raw = Number(process.env.SYDNEY_LANES_CAP_MB ?? DEFAULT_LANES_CAP_MB);

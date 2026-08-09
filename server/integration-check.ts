@@ -305,22 +305,113 @@ function check(ok: boolean, line: string): void {
  * and a check that instead asserted the tables against a stage nobody built
  * would fail for a whole afternoon while telling you nothing.
  *
- * So the gate is `index.radius_m` exactly -- the pipeline's own statement of what
+ * So the gate starts at `index.radius_m` -- the pipeline's own statement of what
  * it built, and the same disc the anchors were extracted inside, which is why a
  * table baked at a stage matches that stage's world with nothing skipped and
- * every check unweakened. No margin: a tile is emitted when it *intersects* the
- * disc, so everything inside the radius is on one, while a margin outward would
- * admit exactly the anchors the pipeline decided not to build.
+ * every check unweakened. No margin outward: a margin would admit exactly the
+ * anchors the pipeline decided not to build.
+ *
+ * ---------------------------------------------------------------------------
+ * **And it asks the tile list, not only the radius**, which the note this
+ * replaced said was the same question. It was, at 5.3 km and at 19.3 km. It
+ * stopped being the same question at 60 km.
+ *
+ * The old text asserted that "a tile is emitted when it *intersects* the disc,
+ * so everything inside the radius is on one". That is true of the disc the
+ * pipeline *sweeps* and false of the tiles it *writes*: a tile with no OSM
+ * feature and no terrain sample under it -- open water, or National Park with
+ * nothing in it -- is not written at all. Inside the shipped 60 km disc there
+ * are 22 `place=suburb` nodes and 14 park poles of inaccessibility sitting on
+ * ground the pipeline never emitted a tile for: Royal National Park, Dharawal,
+ * Brisbane Water, Scheyville, Cockle Bay, the Hawkesbury oyster leases. At
+ * 19.3 km there were none, because the disc did not reach that far out.
+ *
+ * An anchor there is **inert, not broken** -- `groundHeight` has nothing to
+ * answer with, so nothing is placed and nothing is drawn -- and that is the
+ * same state as an anchor outside the radius, so it is the same gate rather
+ * than a second one. What it must not do is disappear: the count comes back in
+ * `builtNote`, on every check that uses it.
  */
-function builtGate(world: { index: { radius_m: number; tile_size: number } }): (x: number, z: number) => boolean {
+function builtGate(world: {
+  index: { radius_m: number; tile_size: number; tiles?: ReadonlyArray<{ key: string }> };
+}): (x: number, z: number) => boolean {
   const r2 = world.index.radius_m * world.index.radius_m;
-  return (x: number, z: number) => x * x + z * z <= r2;
+  const size = world.index.tile_size;
+  // Undefined only for the one caller that reads `index.json` for its extent
+  // alone and never opens a tile; there the radius is the whole question.
+  const keys = world.index.tiles === undefined
+    ? null
+    : new Set(world.index.tiles.map((t) => t.key));
+  return (x: number, z: number) => {
+    if (x * x + z * z > r2) return false;
+    if (keys === null) return true;
+    return keys.has(`${Math.floor(x / size)}_${Math.floor(-z / size)}`);
+  };
 }
 
 /** How that gate reads in a check message. Empty once the world catches up. */
 function builtNote(world: { index: { radius_m: number; stage: string } }, skipped: number): string {
   if (skipped === 0) return '';
-  return ` (${skipped} skipped: outside the built ${world.index.stage} stage's ${world.index.radius_m} m)`;
+  return (
+    ` (${skipped} skipped: outside the built ${world.index.stage} stage's ` +
+    `${world.index.radius_m} m, or on ground inside it the pipeline emitted no tile for)`
+  );
+}
+
+/**
+ * The world with **every lane sidecar resident**, for the coverage checks.
+ *
+ * ---------------------------------------------------------------------------
+ * Why this exists, and it is the single largest thing this suite was getting
+ * wrong about the 60 km world.
+ *
+ * `loadWorld` holds the lane graph under `SYDNEY_LANES_CAP_MB`, and its boot
+ * walk stops reading lanes "the moment the cap has actually bitten" -- see
+ * `server/world.ts`, where that early exit is deliberate and correct, because
+ * past it every further hexagon would be read, decoded and evicted by the next
+ * `trimToCap` to arrive at the same residency anyway. At 19.3 km the whole lane
+ * graph was 131.9 MB and the 300 MB default never bit, so a plain `loadWorld`
+ * happened to hand back every band in the city and every coverage check here
+ * was silently asking the whole world.
+ *
+ * At 60 km the whole lane graph estimates at **394.6 MB**, so the default bites
+ * about two thirds of the way through the hexagon walk and a plain `loadWorld`
+ * comes back holding **10,128 of the 15,057 lane tiles**. The 4,929 it dropped
+ * are whichever hexagons the walk had not reached, which is the outer west --
+ * and every check that then asked "does Penrith have a footpath" was measuring
+ * the cap rather than the city. Measured, the same suite against the same world
+ * files with the cap on and then off, and **nothing else changed** -- these are
+ * the cap's own contribution, not the final numbers:
+ *
+ *     police stations whose catchment holds no band     9  ->  0
+ *     suburbs with no footpath to loiter on           168  ->  60
+ *     pubs with no footpath within 45 m                30  ->  11
+ *     middle-ring drunks placed                       77%  ->  90%
+ *     /unstuck draws that found nowhere to go         160  ->  22
+ *     /unstuck draws that fell back to open ground   5840  -> 357
+ *
+ * The residue -- 60 suburbs, 22 draws -- is real and is fixed elsewhere: see
+ * `streetlife.METH_RESCUE_MAX` and `unstuck.UNSTUCK_LADDER`.
+ *
+ * None of that is a fault in the shipped world and none of it is visible to a
+ * player: the residency loads a hexagon's lanes when somebody is within
+ * `LANES_NEED_MARGIN_M` of it, so the server a player is actually standing on
+ * has Penrith's footpaths in it. It is only a fault in *asking the question
+ * this way*, and the fix is to ask a world that holds all of them.
+ *
+ * It costs about 1.4 GB of RSS while one is alive, against 0.9 GB for a capped
+ * one, and it is deliberately **not** used by the checks that do not need it --
+ * the traffic determinism proof, the lane load path, the room and AOI checks --
+ * both to keep the peak down and because `checkServerSegments` exists precisely
+ * to assert that a capped world and a whole one agree.
+ */
+async function loadWholeWorld(root: string): ReturnType<typeof loadWorld> {
+  // A terabyte rather than `Infinity`: the residency does arithmetic on this
+  // number (headroom, over-cap accounting), and a finite cap that nothing can
+  // reach behaves like no cap without asking every one of those expressions to
+  // be correct at infinity. `checkServerSegments` already passes `1e12` for the
+  // same reason.
+  return loadWorld(root, undefined, 1e12);
 }
 
 /** One synthetic player: a socket, a yaw, and whatever it last heard. */
@@ -659,6 +750,32 @@ async function checkWading(): Promise<void> {
         // Dry. Now find a cardinal that walks *into* the water rather than along
         // it: deep at 15 m and deeper still at 30, so the whole run is a
         // shoreline crossing and not a stroll down a promenade.
+        //
+        // **And a shoreline you can actually wade, which is not the same test
+        // and is what this got wrong at 60 km.** The old search sampled at 15 m
+        // and 30 m only, and accepted anything deep at both. `WaterLevels` holds
+        // one surface *per tile*, so at a seam between two tiles with different
+        // levels the depth is a **step**, not a slope -- and the very first wet
+        // tile in the 60 km index is `-100_-1`, on the Warragamba side of the
+        // disc, where tile `-100_-1` sits at y = -1.709 and its neighbour
+        // `-101_-1` at y = +7.231. Walking west from the point that search
+        // picked, the ground falls 0.01 m a metre and the depth goes 0.00 m,
+        // 0.00 m, ..., **2.56 m** in one step across the seam.
+        //
+        // The wading rule then did exactly its job: it refused a move from dry
+        // land straight into 2.56 m of water, the player stopped at the seam
+        // and never got wet, and the fastest they ever moved *while wading* was
+        // 0.00 m/s -- which is what "wading topped out at 0.00 m/s" was. Not a
+        // regression in the rule, and not a bad water table either: an 8.9 m
+        // step between adjacent tiles is what a dam wall is. It is a start
+        // point at which the thing being measured does not happen.
+        //
+        // So the search now insists on a genuinely wadeable approach: at least
+        // eight of the thirty half-metre samples over the first 15 m must sit
+        // between the 0.3 m the speed sampler counts as "in the water" and the
+        // `WADE_MAX_DEPTH` ceiling. That is four metres of beach, which is the
+        // condition under which "wading is slower than walking" is a claim the
+        // world can answer at all.
         for (const [dx, dz] of [
           [1, 0],
           [-1, 0],
@@ -670,11 +787,16 @@ async function checkWading(): Promise<void> {
               world.water.surfaceAt(x + dx * m, z + dz * m),
               server.groundHeight(x + dx * m, z + dz * m, -Infinity),
             );
-          if (at(15) > WADE_MAX_DEPTH && at(30) > at(15)) {
-            // `forward = (-sin yaw, -cos yaw)`, so facing (dx, dz) is atan2(-dx, -dz).
-            start = { x, z, yaw: Math.atan2(-dx, -dz) };
-            break;
+          if (!(at(15) > WADE_MAX_DEPTH && at(30) > at(15))) continue;
+          let wadeable = 0;
+          for (let m = 0.5; m <= 15.0001; m += 0.5) {
+            const d = at(m);
+            if (d > 0.3 && d <= WADE_MAX_DEPTH) wadeable++;
           }
+          if (wadeable < 8) continue;
+          // `forward = (-sin yaw, -cos yaw)`, so facing (dx, dz) is atan2(-dx, -dz).
+          start = { x, z, yaw: Math.atan2(-dx, -dz) };
+          break;
         }
       }
     }
@@ -4248,8 +4370,18 @@ async function checkPedestrians(): Promise<void> {
   }
   // The ways block, out of the field the traffic already decoded -- one fetch,
   // one decode, two consumers, exactly as `streamer.loadTile` does it on the
-  // client. Adopted as a single tile because the server holds the whole world
-  // resident and the bands carry their own world coordinates.
+  // client. Adopted as a single tile because the bands carry their own world
+  // coordinates.
+  //
+  // **Capped, unlike the coverage checks, and the reports below say so.** This
+  // section is a determinism and geometry proof -- two module instances, the
+  // same bytes, the same bands in the same order -- and every claim in it is
+  // local to whatever bands it is handed. Handing it the whole 60 km lane graph
+  // would build two `PedestrianField`s of 255,678 bands each on top of a 1.4 GB
+  // world to prove exactly the same thing about the same arithmetic. See
+  // `loadWholeWorld` for what the cap does and does not change; what it must
+  // not do is let a *coverage* number be quoted off a partial city, which is
+  // why the counts below name the resident set rather than "the built extent".
   const ways = world.traffic.ways();
   if (ways.length === 0) {
     say('  note: this world has no lane graph in it -- skipping the pedestrian checks.');
@@ -4263,9 +4395,14 @@ async function checkPedestrians(): Promise<void> {
   const bandsB = fieldB.bands();
   say(
     `  world: ${ways.length.toLocaleString()} way spans -> ${bandsA.length.toLocaleString()} footpath ` +
-      `bands, ${fieldA.slotCount.toLocaleString()} scheduled walkers`,
+      `bands, ${fieldA.slotCount.toLocaleString()} scheduled walkers, off the ` +
+      `${world.peds.tileCount.toLocaleString()} of ${world.index.tiles.length.toLocaleString()} tiles ` +
+      `whose lanes are resident under SYDNEY_LANES_CAP_MB`,
   );
-  check(bandsA.length > 1000, `the built extent carries ${bandsA.length.toLocaleString()} footpath bands`);
+  check(
+    bandsA.length > 1000,
+    `the resident extent carries ${bandsA.length.toLocaleString()} footpath bands`,
+  );
   check(
     bandsA.length === bandsB.length,
     `both module instances derived the same ${bandsA.length.toLocaleString()} bands from the same bytes`,
@@ -4599,7 +4736,10 @@ async function checkPolice(): Promise<void> {
   }
 
   const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
-  const world = await loadWorld(root);
+  // Whole-lane, because this asks whether *every station in the city* has a
+  // footpath at its door. See `loadWholeWorld`: a capped one answers for two
+  // thirds of the disc and calls the rest bandless.
+  const world = await loadWholeWorld(root);
 
   // --- 1. The station table lands on the built city.
   //
@@ -6056,7 +6196,10 @@ async function checkStreetlife(): Promise<void> {
   }
 
   const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
-  const world = await loadWorld(root);
+  // Whole-lane: the suburb and venue tables reach the rim of the disc, and a
+  // capped lane layer reports the outer west as having no footpaths at all.
+  // See `loadWholeWorld`.
+  const world = await loadWholeWorld(root);
   const probeWorld = groundFor(world);
 
   // --- 2. Both anchor tables land on the built city.
@@ -6065,10 +6208,16 @@ async function checkStreetlife(): Promise<void> {
     const keys = new Set(world.index.tiles.map((t) => t.key));
     const built = builtGate(world);
     const scratch: PedBand[] = [];
+    const routes: LaneRoute[] = [];
     let subOff = 0;
     let subBandless = 0;
     let subSkipped = 0;
     let populated = 0;
+    // Suburbs with no *road* inside the reach that places their loiterers, as
+    // against ones with a road and no footpath. See the two checks below: the
+    // difference between them is the whole question of whether this world needs
+    // a verge fallback.
+    const roadless: string[] = [];
     for (const s of st.SUBURBS) {
       if (st.methLoiterers(s) === 0) continue;
       if (!built(s.x, s.z)) {
@@ -6077,10 +6226,43 @@ async function checkStreetlife(): Promise<void> {
       }
       populated++;
       if (!keys.has(`${Math.floor(s.x / size)}_${Math.floor(-s.z / size)}`)) subOff++;
-      if (world.peds.near(s.x, s.z, st.methSpread(s), scratch).length === 0) subBandless++;
+      // `METH_RESCUE_MAX`, not `methSpread`, because that is the radius
+      // `poseMethhead` actually searches: a suburb node that landed in a
+      // paddock, on a runway or over Brisbane Water has no footpath inside its
+      // own spread and is not thereby empty. See `streetlife.METH_RESCUE_MAX`.
+      if (world.peds.near(s.x, s.z, st.METH_RESCUE_MAX, scratch).length > 0) continue;
+      if (world.traffic.near(s.x, s.z, st.METH_RESCUE_MAX, routes).length === 0) roadless.push(s.name);
+      else subBandless++;
     }
     check(subOff === 0, `all ${populated} suburbs that carry meth heads are on a built tile (${subOff} were not)${builtNote(world, subSkipped)}`);
-    check(subBandless === 0, `every one of them has footpaths to loiter on (${subBandless} had none)`);
+    // **The two halves of "has somewhere to stand", split on purpose.**
+    //
+    // `subBandless` is a suburb with a road inside the rescue and no footpath
+    // band on it -- the case a road-verge fallback would exist to serve, where
+    // the lane graph knows about a street and `pedestrians.buildBands` produced
+    // no concrete beside it. Measured against the shipped 60 km world with
+    // every lane sidecar resident: **zero**, out of 693 suburbs. A band is
+    // derived from a way, `streets.FOOTPATH_WIDTH` gives every class except the
+    // motorways and their ramps a 1.5-3.0 m band, and the outer west is mapped
+    // with ordinary `residential` and `unclassified` ways like everywhere else.
+    // There is no footpath gap out there to fall back from.
+    //
+    // `roadless` is the other half and it is data, not tuning: a suburb with no
+    // road at all within 1,400 m. Two of them, both boat-access-only Hawkesbury
+    // settlements -- Coba Point and Sunny Corner, whose nearest street is
+    // kilometres away across the river. They carry nobody, which is the same
+    // inert-not-broken answer `builtGate` gives an anchor on a tile that was
+    // never written, and they are named here rather than folded into a
+    // tolerance so that a third one showing up is visible.
+    check(
+      subBandless === 0,
+      `every suburb with a road inside METH_RESCUE_MAX has a footpath band on it to loiter on ` +
+        `(${subBandless} had a road and no band)` +
+        (roadless.length
+          ? ` -- ${roadless.length} more have no road at all inside ${st.METH_RESCUE_MAX} m and carry ` +
+            `nobody: ${roadless.join(', ')}`
+          : ''),
+    );
 
     let venueOff = 0;
     let venueBandless = 0;
@@ -6922,7 +7104,11 @@ async function checkStreetlife(): Promise<void> {
       let claimed = 0;
       let placed = 0;
       let skipped = 0;
+      let roadlessSkipped = 0;
+      let worstReach = 0;
+      let worstWho = '';
       const built = builtGate(world);
+      const bandScratch: PedBand[] = [];
       const missing: string[] = [];
       for (let s = 0; s < st.SUBURBS.length; s++) {
         const suburb = st.SUBURBS[s];
@@ -6931,10 +7117,25 @@ async function checkStreetlife(): Promise<void> {
           skipped += want;
           continue;
         }
+        // The two boat-access-only suburbs. Skipped on `builtGate`'s own
+        // argument and counted separately from it: an anchor with no footpath
+        // anywhere inside the radius that places its people is as inert as one
+        // on a tile the pipeline never wrote, and folding the two counts
+        // together would hide which is which. The check above names them.
+        if (world.peds.near(suburb.x, suburb.z, st.METH_RESCUE_MAX, bandScratch).length === 0) {
+          roadlessSkipped += want;
+          continue;
+        }
         claimed += want;
         let got = 0;
         for (let i = 0; i < want; i++) {
-          if (st.poseMethhead(world.peds, s, i, 12345, bands, pose)) got++;
+          if (!st.poseMethhead(world.peds, s, i, 12345, bands, pose)) continue;
+          got++;
+          const d = Math.hypot(pose.x - suburb.x, pose.z - suburb.z);
+          if (d > worstReach) {
+            worstReach = d;
+            worstWho = suburb.name;
+          }
         }
         placed += got;
         if (got < want) missing.push(`${suburb.name} ${got}/${want}`);
@@ -6943,7 +7144,27 @@ async function checkStreetlife(): Promise<void> {
         placed === claimed,
         `all ${claimed} loiterers the table claims are placed on a real footpath` +
           (missing.length ? ` -- ${missing.slice(0, 4).join(', ')}` : '') +
-          builtNote(world, skipped),
+          builtNote(world, skipped) +
+          (roadlessSkipped
+            ? ` (${roadlessSkipped} more skipped: their suburb has no footpath inside ` +
+              `METH_RESCUE_MAX = ${st.METH_RESCUE_MAX} m)`
+            : ''),
+      );
+      // **The bound the query gate is derived from**, asserted rather than
+      // trusted -- `DRUNK_REACH`'s assertion, which the meth heads never had.
+      // `forEachMethheadNear` skips a suburb whose centroid is further than
+      // `METH_REACH + radius` away, so a loiterer standing outside that bound is
+      // not "drawn late", they are **deleted from the only enumeration there
+      // is**. That is exactly the bug the drunks had at 60 m, and the rescue
+      // rung is what makes it live here: a band admitted at 1,400 m by its
+      // bounding box can carry somebody most of a kilometre further along
+      // itself, which is why the rescue projects the suburb onto the band
+      // instead of dropping them at a uniform fraction of it.
+      check(
+        worstReach <= st.METH_REACH,
+        `no loiterer stands further than METH_REACH = ${st.METH_REACH.toFixed(0)} m from their own ` +
+          `suburb, which is the bound forEachMethheadNear's gate is derived from ` +
+          `(worst is ${worstReach.toFixed(0)} m, at ${worstWho})`,
       );
     }
   }
@@ -7512,7 +7733,9 @@ async function checkWildlife(): Promise<void> {
   }
 
   const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
-  const world = await loadWorld(root);
+  // Whole-lane, for the band-derived half of the wildlife -- the nests and the
+  // bins hang off `PedestrianField`. See `loadWholeWorld`.
+  const world = await loadWholeWorld(root);
   const probeWorld = groundFor(world);
   const ground = (x: number, z: number): number => probeWorld.groundHeight(x, z, -Infinity);
 
@@ -12190,7 +12413,10 @@ async function checkUnstuck(): Promise<void> {
   }
 
   const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
-  const world = await loadWorld(root);
+  // Whole-lane. The lattice below walks the entire built extent asking "is
+  // there a road near here", which is precisely the question a capped lane
+  // layer answers wrongly for a third of the disc. See `loadWholeWorld`.
+  const world = await loadWholeWorld(root);
   const probe = groundFor(world);
 
   /**
@@ -12328,16 +12554,41 @@ async function checkUnstuck(): Promise<void> {
     let offRoad = 0;
     let unstandable = 0;
     let firstRung = 0;
+    let servedFirst = 0;
     let groundFallback = 0;
     let worstGap = 0;
     let worstDistance = 0;
     const complaints: string[] = [];
     const distinct = new Map<string, Set<string>>();
 
+    // Does this start have a lane inside the 200 m the user asked for at all?
+    // The denominator of the first-rung claim below, and it is recomputed from
+    // the polylines rather than inferred from the answers -- an answer cannot
+    // be evidence about the question it was asked.
+    let servable = 0;
+    let servableTrials = 0;
+    const hasLaneInside = (fx: number, fz: number): boolean => {
+      for (const r of world.traffic.near(fx, fz, UNSTUCK_RADIUS_M, routeScratch)) {
+        for (let i = 0; i + 1 < r.count; i++) {
+          const ax = r.x[i];
+          const az = r.z[i];
+          const dx = r.x[i + 1] - ax;
+          const dz = r.z[i + 1] - az;
+          const len2 = dx * dx + dz * dz;
+          const t = len2 > 0 ? Math.max(0, Math.min(1, ((fx - ax) * dx + (fz - az) * dz) / len2)) : 0;
+          if (Math.hypot(fx - (ax + dx * t), fz - (az + dz * t)) <= UNSTUCK_RADIUS_M) return true;
+        }
+      }
+      return false;
+    };
+
     for (const start of starts) {
       const spread = new Set<string>();
+      const servableHere = hasLaneInside(start.x, start.z);
+      if (servableHere) servable++;
       for (let i = 0; i < TRIALS; i++) {
         trials++;
+        if (servableHere) servableTrials++;
         const spot = unstuckDestination(
           start.x,
           start.z,
@@ -12354,7 +12605,10 @@ async function checkUnstuck(): Promise<void> {
         worstDistance = Math.max(worstDistance, spot.distance);
 
         if (spot.kind === 'road') {
-          if (spot.radius === UNSTUCK_RADIUS_M) firstRung++;
+          if (spot.radius === UNSTUCK_RADIUS_M) {
+            firstRung++;
+            if (servableHere) servedFirst++;
+          }
           // Inside the rung it says it used, which for the first rung is the
           // 200 m the user asked for.
           if (spot.distance > spot.radius + 1e-6) {
@@ -12408,13 +12662,37 @@ async function checkUnstuck(): Promise<void> {
       `every destination passes the spawn rule restated here -- finite ground, out of the prisms, ` +
         `1.2 m of clearance, above the wading floor (${unstandable} failures)`,
     );
-    // The lattice deliberately includes the far edge of a 15.3 km extent --
-    // bushland, national park, open water -- where there genuinely is no street
-    // inside 200 m, so this is a floor rather than a target. What it catches is
-    // a ladder that had started widening for no reason.
+    // **The denominator is the draws that could have been served at 200 m, not
+    // all of them, and that is a change of claim rather than a change of bar.**
+    //
+    // This used to be `firstRung >= trials * 0.8` -- four fifths of every draw
+    // in the extent answered by the radius the user asked for -- with a note
+    // saying the lattice "deliberately includes the far edge of a 15.3 km
+    // extent" where there is no street inside 200 m, so it was a floor rather
+    // than a target. At 15.3 km that floor held. At 60 km the same ratio
+    // measures something else entirely: **1,087 of the 3,080 lattice points on
+    // built tiles, 35% of them, have no lane within 200 m at all** -- Royal
+    // National Park, Dharawal, the Blue Mountains foot, Broken Bay, the lower
+    // Hawkesbury. No ladder can answer those on the first rung, so the old
+    // number was reporting how much bushland is inside the disc.
+    //
+    // What the check is *for* is the failure in its own list: "a ladder that had
+    // started widening for no reason". Asked of the starts where a first-rung
+    // answer exists, that is a sharper question than the old one and it does not
+    // move when the extent does: **11,830 of 11,958 = 98.93%**. The 128 that
+    // widened are starts whose only lane inside 200 m fails the spawn rule at
+    // every sample -- a bridge deck over water, a lane inside a footprint --
+    // where widening is the right answer rather than a lazy one.
+    //
+    // The lane-less starts are not dropped from the suite; they are exactly what
+    // the `none === 0` check above is about, and the ladder and the ground rings
+    // were extended so that all 1,087 of them now land somewhere.
     check(
-      firstRung >= trials * 0.8,
-      `${firstRung} of ${trials} draws were answered by the ${UNSTUCK_RADIUS_M} m radius that was asked for; ` +
+      servedFirst >= servableTrials * 0.95,
+      `${servedFirst} of ${servableTrials} draws from the ${servable} start points that have a lane ` +
+        `inside ${UNSTUCK_RADIUS_M} m were answered by that radius ` +
+        `(${((servedFirst / Math.max(1, servableTrials)) * 100).toFixed(2)}%); across the whole lattice ` +
+        `${firstRung} of ${trials} draws were answered by the ${UNSTUCK_RADIUS_M} m radius that was asked for; ` +
         `${trials - firstRung - groundFallback} needed a wider rung and ${groundFallback} fell back to open ground`,
     );
 

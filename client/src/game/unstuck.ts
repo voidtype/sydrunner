@@ -141,13 +141,25 @@ export const UNSTUCK_RADIUS_M = 200;
  * Doubling rather than stepping, because the case this exists for is not "the
  * road is at 210 m" -- it is being in the middle of Centennial Park, on the
  * harbour foreshore, or inside a rail corridor, where the nearest street is a
- * different order of magnitude away. Four rungs reach 1.6 km, which is a tenth
- * of the built extent and further than anywhere in this city is from a road.
+ * different order of magnitude away.
+ *
+ * **Five rungs, not four, and the fifth is the sixty-kilometre world.** Four
+ * rungs reached 1.6 km, and the note that used to be here said that was
+ * "further than anywhere in this city is from a road". That was true of the
+ * 19.3 km build and it stopped being true when the extent went to 60 km: the
+ * disc now contains Broken Bay, the lower Hawkesbury and Pittwater, which are
+ * kilometres of open water on built tiles a player can be standing in. Swept
+ * over the 3,080-point, 1,200 m lattice `checkUnstuck` walks, the five start
+ * points that reached no road at any rung sit **1,024 m to 2,996 m** from the
+ * nearest lane -- all five in deep water, all five on a tile the pipeline
+ * built. 3,200 m covers the worst of them with room, and it costs nothing
+ * anywhere else because a rung is only tried when every tighter one came back
+ * empty.
  *
  * The rung that answered is reported back to the player, because "you were
  * moved 900 m" with no explanation reads as a bug.
  */
-export const UNSTUCK_LADDER: readonly number[] = [UNSTUCK_RADIUS_M, 400, 800, 1600];
+export const UNSTUCK_LADDER: readonly number[] = [UNSTUCK_RADIUS_M, 400, 800, 1600, 3200];
 
 /**
  * How finely a lane polyline is sampled, metres.
@@ -195,8 +207,27 @@ const VALIDATE_ATTEMPTS = 160;
  */
 const ROAD_SURFACE_TOLERANCE = 4;
 
-/** The fallback's rings, metres, and how many bearings each gets. */
-const GROUND_RINGS: readonly number[] = [3, 6, 10, 16, 25, 40, 60, 90];
+/**
+ * The fallback's rings, metres, and how many bearings each gets.
+ *
+ * **The last three rings are the sixty-kilometre world's, and they are measured
+ * rather than padded.** The ladder above can reach a road 3.2 km away, but a
+ * road is only an answer if a *sample on it* passes the spawn rule, and the
+ * five worst starts in the extent -- the middle of Broken Bay, the lower
+ * Hawkesbury, Port Hacking -- are surrounded by water and by lanes carried on
+ * bridge decks whose ground answer disagrees with the lane by more than
+ * `ROAD_SURFACE_TOLERANCE`. For those, open ground is the real rescue, and the
+ * nearest standable ground at those five points is **79 m to 156 m** away.
+ * Ninety metres was the whole ladder, so all five fell off the end of it and
+ * `unstuckDestination` returned null -- which is the one answer this command is
+ * not allowed to give. Rings at 140, 200 and 280 m clear the worst of them with
+ * a ring to spare.
+ *
+ * They stay in ascending order and nothing before 90 m moves, so a player who
+ * used to be rescued at 6 m is still rescued at 6 m: this only extends the tail
+ * that used to give up.
+ */
+const GROUND_RINGS: readonly number[] = [3, 6, 10, 16, 25, 40, 60, 90, 140, 200, 280];
 const GROUND_BEARINGS = 16;
 
 /**
