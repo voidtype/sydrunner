@@ -16,7 +16,8 @@ proxied same-origin at `/ws`, TLS from Let's Encrypt on renewal autopilot.
 
 ```
 /opt/sydney/
-  dist/            client/dist — index.html, assets/, world/   (330 MB)
+  dist/            client/dist — index.html, assets/, cars/, and the world
+                   files the SERVER reads (no .glb; players use R2)  (488 MB)
   client/
     src/           the shared modules the server imports        (1.4 MB)
     package.json   + package-lock.json
@@ -90,27 +91,67 @@ re-compress (~2 min on the Mac). Verify after a deploy:
 curl -sI -H 'Accept-Encoding: zstd' 'https://oxford-tractor.bnr.la/world/landmarks.glb?v=1' | grep -i content-encoding
 ```
 
+> **Since the 60 km world, `dist/` no longer fits on the box and must never be
+> rsynced whole.** It is 20 GB against a 20 GB disk. The command that used to be
+> here would fill the filesystem. See *What the box actually needs* below.
+
 ```bash
 SSHOPT="ssh -i ~/.ssh/sydney_deploy -o BatchMode=yes -o ServerAliveInterval=30"
+BOX=root@oxford-tractor.bnr.la
 
-# The world + client bundle. ~113 MB on the wire (-z gets ~3x), about 20 s.
-rsync -az --partial --stats -e "$SSHOPT" \
-  client/dist/ root@oxford-tractor.bnr.la:/opt/sydney/dist/
+# 1. The app bundle -- everything in dist EXCEPT the world. A few tens of MB.
+rsync -a --partial --delete --exclude 'world/' -e "$SSHOPT" client/dist/ $BOX:/opt/sydney/dist/
 
-# The shared simulation modules, and the server itself.
-rsync -az --partial -e "$SSHOPT" \
-  client/src/ root@oxford-tractor.bnr.la:/opt/sydney/client/src/
-rsync -az --partial -e "$SSHOPT" \
-  client/package.json client/package-lock.json root@oxford-tractor.bnr.la:/opt/sydney/client/
-rsync -az --partial --exclude node_modules -e "$SSHOPT" \
-  server/ root@oxford-tractor.bnr.la:/opt/sydney/server/
+# 2. The world files the SERVER reads. It never opens a .glb: players get
+#    geometry from R2. Collision, the hex manifests, the pivots and the far
+#    layer, then the per-tile sidecars by pattern -- the include/exclude order
+#    matters, `*/` first or rsync never descends.
+rsync -a --partial --delete -e "$SSHOPT" client/dist/world/collision/ $BOX:/opt/sydney/dist/world/collision/
+rsync -a --partial --delete -e "$SSHOPT" client/dist/world/hexes/      $BOX:/opt/sydney/dist/world/hexes/
+rsync -a --partial -e "$SSHOPT" \
+  client/dist/world/index.json client/dist/world/index.json.zst client/dist/world/index.json.br \
+  client/dist/world/root.json  client/dist/world/root.json.zst  client/dist/world/root.json.br \
+  client/dist/world/suburbs.json client/dist/world/far.bin client/dist/world/far-terrain.bin \
+  client/dist/world/far-water.bin client/dist/world/street-names.bin client/dist/world/landmarks.glb \
+  $BOX:/opt/sydney/dist/world/
+rsync -a --partial -e "$SSHOPT" \
+  --include='*/' --include='*.lanes.bin' --include='*.terr.bin' --include='*.pow.bin' --exclude='*' \
+  client/dist/world/tiles/ $BOX:/opt/sydney/dist/world/tiles/
 
-ssh -i ~/.ssh/sydney_deploy root@oxford-tractor.bnr.la \
-  'chown -R root:root /opt/sydney && systemctl restart sydney'
+# 3. The shared simulation modules, and the server itself. NOT OPTIONAL when the
+#    world's radius changes: the box booting last release's whole-world lane
+#    loader against a 60 km world wants ~850 MB and stalls against MemoryMax.
+rsync -az --partial --delete -e "$SSHOPT" client/src/ $BOX:/opt/sydney/client/src/
+rsync -az --partial --delete --exclude node_modules -e "$SSHOPT" server/ $BOX:/opt/sydney/server/
+
+ssh -i ~/.ssh/sydney_deploy $BOX 'chown -R root:root /opt/sydney && systemctl restart sydney'
 ```
 
-Add `--delete` to the `dist/` line when a pipeline rebuild has removed tiles;
-without it, stale tiles linger but are never referenced by `world/index.json`.
+Note `$SSHOPT` is only ever passed to `rsync -e`, which splits it itself. A bare
+`$SSHOPT root@host …` does **not** word-split under zsh and fails with `no such
+file or directory` — it bit twice during the 60 km ship.
+
+### What the box actually needs
+
+| | size | who reads it |
+|---|---|---|
+| `tiles/*.glb`, `regions/` | **11 GB** | the browser, **from R2 only** |
+| `collision/` | 333 MB | the server |
+| `tiles/*.{lanes,terr,pow}.bin` | 155 MB | the server |
+| `hexes/`, pivots, far layer | ~70 MB | both |
+
+488 MB on the box against 12 GB of world. **The consequence is that the CDN is
+now load-bearing rather than an optimisation**: if `world.3rp.uk` were down the
+page would load and the server would simulate, but no geometry would stream and
+the origin has none to fall back on. That is a deliberate trade — a 20 GB disk
+cannot hold a 20 GB `dist` and leave room to write one.
+
+After a pipeline rebuild, delete the box's stale `tiles/` and `regions/` **before**
+copying, or the old build's files linger and the disk fills:
+
+```bash
+ssh -i ~/.ssh/sydney_deploy $BOX 'rm -rf /opt/sydney/dist/world/tiles /opt/sydney/dist/world/regions'
+```
 
 Two notes on rsync. macOS ships **openrsync**, which does not support
 `--info=progress2` — use `--stats` (and `--progress` if you want per-file
@@ -580,7 +621,14 @@ welcome, ≥20 snapshots, a rising `ackSeq`, and a close code of 1000.
 
 ## Operational notes
 
-- **Memory.** `MemoryMax=600M` on a 1 GB box, leaving room for Caddy and the
+- **Memory.** `MemoryMax=820M` on a 1 GB box (600M until the 60 km world:
+  boot peaked at exactly 600M and stalled, though steady state is 434 MB).
+  `SYDNEY_COLLISION_CAP_MB=64` and `SYDNEY_LANES_CAP_MB=90` make the hex
+  residency actually bind — at their 450/300 defaults the whole 19.3 km
+  world fit under the cap, the residency never evicted, and RSS pinned to
+  the cgroup ceiling: the kernel then reclaimed *inside* the cgroup, so bun
+  re-faulted its own pages off disk 825 times a second and a 60 Hz tick
+  degraded to 28 ms with two players. Leaving room for Caddy and the
   OS. Measured steady state is 81 MB with a 134 MB peak, so the cap is ~4.5x
   headroom and exists to make a leak restart the service rather than the box.
   **A room host needs more**: PERFORMANCE.md phase 4 measured 202 MB mean and

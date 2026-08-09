@@ -14449,7 +14449,7 @@ async function checkRaves(): Promise<void> {
     );
     check(
       live / nights >= 2.5 && live / nights <= one.MAX_LIVE,
-      `  a mean night has ${(live / nights).toFixed(2)} raves across the 19.3 km world (cap ${one.MAX_LIVE}), ` +
+      `  a mean night has ${(live / nights).toFixed(2)} raves across the built world (cap ${one.MAX_LIVE}), ` +
         `which is one site in ${Math.round((nights * one.RAVE_SITES.length) / live)} — an event, not scenery`,
     );
     check(
