@@ -323,6 +323,71 @@ export class CollisionWorld {
     return mine.length;
   }
 
+  /**
+   * Index a set of prisms that never came off the wire, under a key
+   * `removeTile` can take back.
+   *
+   * **Everything else in this class arrives as a tile payload the pipeline
+   * wrote, and the railway does not.** `world/rail-geo.ts` builds viaduct decks,
+   * piers, station platforms and underground station boxes on the client, out of
+   * the rail bake, and they have to be solid for the same reason the road decks
+   * are: a deck the player falls through is worse than no deck, and a viaduct
+   * you cannot walk under is the whole thing that round was for. Routing them
+   * through an encode/decode round trip purely to reuse `addTile` would put a
+   * second writer of the payload format in the client -- which is exactly the
+   * mistake `encodeCheckPayload`'s own comment refuses to make.
+   *
+   * `base` semantics are the caller's and are honoured here unchanged: a deck
+   * passes its soffit and is walked under, a pier passes ground level and is
+   * walked into. See this file's header.
+   *
+   * Same key discipline as `addTile`: a key already resident is a no-op, so a
+   * caller that rebuilds a chunk must `removeTile` first.
+   */
+  addPrisms(
+    key: string,
+    prisms: ReadonlyArray<{ points: Float32Array; height: number; base: number }>,
+  ): number {
+    if (this.tiles.has(key)) return 0;
+    const mine: Prism[] = [];
+    this.tiles.set(key, mine);
+    for (const source of prisms) {
+      const points = source.points;
+      if (points.length < 6) continue;
+      let minX = Infinity;
+      let minZ = Infinity;
+      let maxX = -Infinity;
+      let maxZ = -Infinity;
+      for (let v = 0; v < points.length; v += 2) {
+        const x = points[v];
+        const z = points[v + 1];
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (z < minZ) minZ = z;
+        if (z > maxZ) maxZ = z;
+      }
+      const prism: Prism = {
+        points,
+        height: source.height,
+        base: source.base,
+        top: source.base + source.height,
+        minX,
+        minZ,
+        maxX,
+        maxZ,
+        // Structural, like every deck and pier the pipeline writes: this is what
+        // `Prism.structural` means and what stops `world/invisible-walls.ts`
+        // counting a viaduct as a building.
+        structural: true,
+        seen: 0,
+      };
+      this.insert(prism);
+      mine.push(prism);
+      this.count++;
+    }
+    return mine.length;
+  }
+
   /** How many tiles' prisms are resident. For the overlay and the checks. */
   get tileCount(): number {
     return this.tiles.size;

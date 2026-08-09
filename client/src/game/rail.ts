@@ -369,6 +369,40 @@ function evalCurve(
   return { s: s0 + v0 * dt + 0.5 * a * dt * dt, v: v0 + a * dt };
 }
 
+/**
+ * How long this trip has been stationary at `age` seconds, or 0 while moving.
+ *
+ * **For the doors, and it adds nothing to `poseTrain`.** A dwell is a phase with
+ * `v0 = 0` and `a = 0` -- that is the whole of how a stop is represented here --
+ * so "how far into the dwell" is `age` minus that phase's own `t0`, and a door
+ * that opens over the first second and a half of a fifteen-second stand needs
+ * exactly that number and nothing else.
+ *
+ * It is a second function rather than a field on `TrainPose` deliberately.
+ * `poseTrain` is the function the server and every client agree bit-for-bit on
+ * and the one `checkRail` sweeps ten thousand times; the doors are presentation,
+ * only the near tier asks, and a pose struct that grew a field for them would
+ * put a renderer's needs inside the determinism contract. Pure, allocation-free
+ * and the same binary search, so nothing about it can disagree with the pose it
+ * is asked alongside.
+ */
+export function dwellElapsed(bake: RailBake, dir: RailDirection, age: number): number {
+  if (age < 0 || age > dir.duration) return 0;
+  const phases = bake.phases;
+  const off = dir.phaseOff;
+  let lo = 0;
+  let hi = dir.phaseCount - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (phases[(off + mid) * 4] <= age) lo = mid;
+    else hi = mid - 1;
+  }
+  const base = (off + lo) * 4;
+  if (phases[base + 2] !== 0 || phases[base + 3] !== 0) return 0;
+  const dt = age - phases[base];
+  return dt > 0 ? dt : 0;
+}
+
 /** How many trips of this direction can be running at once. */
 export function liveTripCount(dir: RailDirection): number {
   return Math.floor(dir.duration / dir.line.period) + 2;
@@ -386,20 +420,23 @@ export function tripIndexAt(dir: RailDirection, t: number, j: number): number {
 }
 
 /**
- * Pose of one trip at one instant. Returns false when that trip is not running.
+ * Where arc length `s` along a direction's polyline is, and which way it points.
  *
- * Pure, allocation-free, and the only `Math.sqrt` in the module is the heading
- * normalisation -- which is the same one `poseCar` takes, for the same reason,
- * and is the only root ECMAScript specifies exactly.
+ * Lifted out of `poseTrain` **unchanged, statement for statement**, and the
+ * reason it had to come out is a carriage: a train is eight vehicles over 163 m
+ * of a curving, graded railway, and the renderer needs the position of each
+ * bogie rather than of one point. Two samples a carriage and the vehicle can be
+ * put on the rails properly instead of being hung off a single heading.
+ *
+ * It writes `x, y, z, dx, dz, s` and touches nothing else on the struct, which
+ * is what lets `poseTrain` keep filling in the rest afterwards. The arithmetic
+ * is untouched for the reason the file's header gives: two engines handed the
+ * same bake and the same `s` must return the same bits, and reordering a single
+ * add would be a thing to have to re-prove.
  */
-export function poseTrain(
-  bake: RailBake, dir: RailDirection, trip: number, t: number, out: TrainPose,
-): boolean {
-  const age = t - dir.offset - trip * dir.line.period;
-  if (age < 0 || age > dir.duration || dir.vertexCount < 2) return false;
-
-  const { s, v } = evalCurve(bake.phases, dir.phaseOff, dir.phaseCount, age);
-
+export function sampleAlong(
+  bake: RailBake, dir: RailDirection, s: number, out: TrainPose,
+): void {
   // Locate `s` along the polyline. The cumulative array is non-decreasing by
   // construction, so this is the same binary search as the phase lookup.
   const c = bake.cum;
@@ -442,6 +479,25 @@ export function poseTrain(
   }
   out.dx = hx;
   out.dz = hz;
+  out.s = s;
+}
+
+/**
+ * Pose of one trip at one instant. Returns false when that trip is not running.
+ *
+ * Pure, allocation-free, and the only `Math.sqrt` in the module is the heading
+ * normalisation -- which is the same one `poseCar` takes, for the same reason,
+ * and is the only root ECMAScript specifies exactly.
+ */
+export function poseTrain(
+  bake: RailBake, dir: RailDirection, trip: number, t: number, out: TrainPose,
+): boolean {
+  const age = t - dir.offset - trip * dir.line.period;
+  if (age < 0 || age > dir.duration || dir.vertexCount < 2) return false;
+
+  const { s, v } = evalCurve(bake.phases, dir.phaseOff, dir.phaseCount, age);
+
+  sampleAlong(bake, dir, s, out);
   out.speed = v;
   out.s = s;
   out.age = age;

@@ -1,0 +1,758 @@
+{
+  "models": [
+    {
+      "file": "tangara.glb",
+      "pitch": 20.4,
+      "cars": [
+        {
+          "key": "cab",
+          "centreX": 0.111,
+          "lengthM": 20.367,
+          "widthM": 3.156,
+          "heightM": 5.581,
+          "railY": -0.0269,
+          "box": {
+            "minX": -10.0725,
+            "maxX": 10.2946,
+            "minZ": -1.5781,
+            "maxZ": 1.5781
+          },
+          "nodes": [
+            "Object_4",
+            "Object_6",
+            "Object_8",
+            "Object_10",
+            "Object_12",
+            "Object_14",
+            "Object_16",
+            "Object_18",
+            "Object_20",
+            "Object_22",
+            "Object_24",
+            "Object_26",
+            "Object_28",
+            "Object_30",
+            "Object_32",
+            "Object_34",
+            "Object_36",
+            "Object_38",
+            "Object_40",
+            "Object_42",
+            "Object_44",
+            "Object_46",
+            "Object_48",
+            "Object_50",
+            "Object_52",
+            "Object_54",
+            "Object_56",
+            "Object_58",
+            "Object_60",
+            "Object_62",
+            "Object_64",
+            "Object_66",
+            "Object_128",
+            "Object_130"
+          ]
+        },
+        {
+          "key": "mid",
+          "centreX": -19.6,
+          "lengthM": 19.142,
+          "widthM": 2.916,
+          "heightM": 4.435,
+          "railY": -0.0269,
+          "box": {
+            "minX": -29.1709,
+            "maxX": -10.0291,
+            "minZ": -1.4594,
+            "maxZ": 1.4566
+          },
+          "nodes": [
+            "Object_198",
+            "Object_200",
+            "Object_202",
+            "Object_204",
+            "Object_206",
+            "Object_208",
+            "Object_210",
+            "Object_212",
+            "Object_214",
+            "Object_216",
+            "Object_218",
+            "Object_220",
+            "Object_222",
+            "Object_224",
+            "Object_226",
+            "Object_228",
+            "Object_230",
+            "Object_232",
+            "Object_234",
+            "Object_236",
+            "Object_238",
+            "Object_240",
+            "Object_242",
+            "Object_244",
+            "Object_246",
+            "Object_248",
+            "Object_250",
+            "Object_252"
+          ]
+        },
+        {
+          "key": "cab_pride",
+          "centreX": 0.111,
+          "lengthM": 20.367,
+          "widthM": 3.156,
+          "heightM": 5.581,
+          "railY": -0.0269,
+          "box": {
+            "minX": -10.0725,
+            "maxX": 10.2946,
+            "minZ": -12.5781,
+            "maxZ": -9.4219
+          },
+          "nodes": [
+            "Object_68",
+            "Object_70",
+            "Object_72",
+            "Object_74",
+            "Object_76",
+            "Object_78",
+            "Object_80",
+            "Object_82",
+            "Object_84",
+            "Object_86",
+            "Object_88",
+            "Object_90",
+            "Object_92",
+            "Object_94",
+            "Object_96",
+            "Object_98",
+            "Object_100",
+            "Object_102",
+            "Object_104",
+            "Object_106",
+            "Object_108",
+            "Object_110",
+            "Object_112",
+            "Object_114",
+            "Object_116",
+            "Object_118",
+            "Object_120",
+            "Object_122",
+            "Object_124",
+            "Object_126",
+            "Object_132",
+            "Object_134",
+            "Object_136",
+            "Object_138"
+          ]
+        },
+        {
+          "key": "mid_pride",
+          "centreX": -19.6,
+          "lengthM": 19.142,
+          "widthM": 2.916,
+          "heightM": 4.435,
+          "railY": -0.0269,
+          "box": {
+            "minX": -29.1709,
+            "maxX": -10.0291,
+            "minZ": -12.4594,
+            "maxZ": -9.5434
+          },
+          "nodes": [
+            "Object_140",
+            "Object_142",
+            "Object_144",
+            "Object_146",
+            "Object_148",
+            "Object_150",
+            "Object_152",
+            "Object_154",
+            "Object_156",
+            "Object_158",
+            "Object_160",
+            "Object_162",
+            "Object_164",
+            "Object_166",
+            "Object_168",
+            "Object_170",
+            "Object_172",
+            "Object_174",
+            "Object_176",
+            "Object_178",
+            "Object_180",
+            "Object_182",
+            "Object_184",
+            "Object_186",
+            "Object_188",
+            "Object_190",
+            "Object_192",
+            "Object_194",
+            "Object_196"
+          ]
+        }
+      ],
+      "doors": {
+        "left_door_front_a_1": [
+          1,
+          0,
+          -0.0399
+        ],
+        "left_door_front_b_3": [
+          -1,
+          0,
+          -0.0399
+        ],
+        "right_door_front_a_28": [
+          -1,
+          0,
+          0.0399
+        ],
+        "right_door_front_b_30": [
+          1,
+          0,
+          0.0399
+        ],
+        "left_door_back_a_24": [
+          1,
+          0,
+          -0.0399
+        ],
+        "left_door_back_b_26": [
+          -1,
+          0,
+          -0.0399
+        ],
+        "right_door_back_a_32": [
+          -1,
+          0,
+          0.0399
+        ],
+        "left_door_front_a001_34": [
+          1,
+          0,
+          -0.0399
+        ],
+        "left_door_front_b001_36": [
+          -1,
+          0,
+          -0.0399
+        ],
+        "left_door_back_a003_56": [
+          1,
+          0,
+          -0.0399
+        ],
+        "left_door_back_b003_58": [
+          -1,
+          0,
+          -0.0399
+        ],
+        "right_door_front_a001_60": [
+          -1,
+          0,
+          0.0399
+        ],
+        "right_door_front_b001_62": [
+          1,
+          0,
+          0.0399
+        ],
+        "right_door_back_b003_64": [
+          1,
+          0,
+          0.0399
+        ],
+        "right_door_back_a003_66": [
+          -1,
+          0,
+          0.0399
+        ],
+        "right_door_back_b006_68": [
+          1,
+          0,
+          0.0399
+        ],
+        "left_door_back_a001_83": [
+          1,
+          0,
+          -0.0399
+        ],
+        "left_door_back_b001_85": [
+          -1,
+          0,
+          -0.0399
+        ],
+        "left_door_back_a002_87": [
+          1,
+          0,
+          -0.0399
+        ],
+        "left_door_back_b002_89": [
+          -1,
+          0,
+          -0.0399
+        ],
+        "right_door_back_a002_91": [
+          -1,
+          0,
+          0.0399
+        ],
+        "right_door_back_b002_93": [
+          1,
+          0,
+          0.0399
+        ],
+        "right_door_back_a001_95": [
+          -1,
+          0,
+          0.0399
+        ],
+        "right_door_back_b001_97": [
+          1,
+          0,
+          0.0399
+        ],
+        "left_door_back_a004_111": [
+          1,
+          0,
+          -0.0399
+        ],
+        "left_door_back_b004_113": [
+          -1,
+          0,
+          -0.0399
+        ],
+        "left_door_back_a005_115": [
+          1,
+          0,
+          -0.0399
+        ],
+        "left_door_back_b005_117": [
+          -1,
+          0,
+          -0.0399
+        ],
+        "right_door_back_a004_119": [
+          -1,
+          0,
+          0.0399
+        ],
+        "right_door_back_b004_121": [
+          1,
+          0,
+          0.0399
+        ],
+        "right_door_back_a005_123": [
+          -1,
+          0,
+          0.0399
+        ],
+        "right_door_back_b005_125": [
+          1,
+          0,
+          0.0399
+        ]
+      }
+    },
+    {
+      "file": "metropolis.glb",
+      "pitch": 22,
+      "cars": [
+        {
+          "key": "lead",
+          "centreX": 1.7072,
+          "lengthM": 23.126,
+          "widthM": 3.049,
+          "heightM": 4.121,
+          "railY": 0.0043,
+          "box": {
+            "minX": -9.8557,
+            "maxX": 13.2701,
+            "minZ": -1.5249,
+            "maxZ": 1.5244
+          },
+          "nodes": [
+            "DoorLeftA_exterior_0",
+            "DoorLeftA_Glass_0",
+            "DoorLeftA.001_exterior_0",
+            "DoorLeftA.001_Glass_0",
+            "DoorLeftA.002_exterior_0",
+            "DoorLeftA.002_Glass_0",
+            "DoorLeftB_exterior_0",
+            "DoorLeftB_Glass_0",
+            "DoorLeftB.001_exterior_0",
+            "DoorLeftB.001_Glass_0",
+            "DoorLeftB.002_exterior_0",
+            "DoorLeftB.002_Glass_0",
+            "DoorRightA_exterior_0",
+            "DoorRightA_Glass_0",
+            "DoorRightA.001_exterior_0",
+            "DoorRightA.001_Glass_0",
+            "DoorRightA.002_exterior_0",
+            "DoorRightA.002_Glass_0",
+            "DoorRightB_exterior_0",
+            "DoorRightB_Glass_0",
+            "DoorRightB.001_exterior_0",
+            "DoorRightB.001_Glass_0",
+            "DoorRightB.002_exterior_0",
+            "DoorRightB.002_Glass_0",
+            "bogie01_exterior_0",
+            "Wheel.002_exterior_0",
+            "Wheel.003_exterior_0",
+            "bogie02_exterior_0",
+            "Wheel.004_exterior_0",
+            "Wheel.005_exterior_0",
+            "exterior_exterior_0",
+            "glass_Glass_0",
+            "interior_interior_0",
+            "interior_interior_light_0",
+            "light_light_0",
+            "light_bottom_light_0"
+          ]
+        },
+        {
+          "key": "mid",
+          "centreX": -20.7415,
+          "lengthM": 21.925,
+          "widthM": 3.049,
+          "heightM": 5.959,
+          "railY": 0.0043,
+          "box": {
+            "minX": -31.704,
+            "maxX": -9.779,
+            "minZ": -1.524,
+            "maxZ": 1.5253
+          },
+          "nodes": [
+            "DoorLeftA.003_exterior_0",
+            "DoorLeftA.003_Glass_0",
+            "DoorLeftA.004_exterior_0",
+            "DoorLeftA.004_Glass_0",
+            "DoorLeftA.005_exterior_0",
+            "DoorLeftA.005_Glass_0",
+            "DoorLeftB.003_exterior_0",
+            "DoorLeftB.003_Glass_0",
+            "DoorLeftB.004_exterior_0",
+            "DoorLeftB.004_Glass_0",
+            "DoorLeftB.005_exterior_0",
+            "DoorLeftB.005_Glass_0",
+            "DoorRightA.003_exterior_0",
+            "DoorRightA.003_Glass_0",
+            "DoorRightA.004_exterior_0",
+            "DoorRightA.004_Glass_0",
+            "DoorRightA.005_exterior_0",
+            "DoorRightA.005_Glass_0",
+            "DoorRightB.003_exterior_0",
+            "DoorRightB.003_Glass_0",
+            "DoorRightB.004_exterior_0",
+            "DoorRightB.004_Glass_0",
+            "DoorRightB.005_exterior_0",
+            "DoorRightB.005_Glass_0",
+            "bogie02.001_exterior_0",
+            "Wheel.001_exterior_0",
+            "Wheel.006_exterior_0",
+            "bogie02.002_exterior_0",
+            "Wheel.009_exterior_0",
+            "Wheel.010_exterior_0",
+            "exterior.001_exterior_panto_0",
+            "glass.001_Glass_0",
+            "interior.001_interior_0",
+            "interior.001_interior_light_0",
+            "panto_base_exterior_trailer_0",
+            "panto_lower_arm_exterior_trailer_0",
+            "panto_upper_arm_exterior_trailer_0",
+            "panto_head_exterior_trailer_0",
+            "undercarriage_lod0_undercarriage_0"
+          ]
+        },
+        {
+          "key": "trail",
+          "centreX": -42.6168,
+          "lengthM": 21.956,
+          "widthM": 3.049,
+          "heightM": 4.121,
+          "railY": 0.0043,
+          "box": {
+            "minX": -53.5946,
+            "maxX": -31.639,
+            "minZ": -1.5249,
+            "maxZ": 1.5244
+          },
+          "nodes": [
+            "DoorLeftA.006_exterior_0",
+            "DoorLeftA.006_Glass_0",
+            "DoorLeftA.007_exterior_0",
+            "DoorLeftA.007_Glass_0",
+            "DoorLeftA.008_exterior_0",
+            "DoorLeftA.008_Glass_0",
+            "DoorLeftB.006_exterior_0",
+            "DoorLeftB.006_Glass_0",
+            "DoorLeftB.007_exterior_0",
+            "DoorLeftB.007_Glass_0",
+            "DoorLeftB.008_exterior_0",
+            "DoorLeftB.008_Glass_0",
+            "DoorRightA.006_exterior_0",
+            "DoorRightA.006_Glass_0",
+            "DoorRightA.007_exterior_0",
+            "DoorRightA.007_Glass_0",
+            "DoorRightA.008_exterior_0",
+            "DoorRightA.008_Glass_0",
+            "DoorRightB.006_exterior_0",
+            "DoorRightB.006_Glass_0",
+            "DoorRightB.007_exterior_0",
+            "DoorRightB.007_Glass_0",
+            "DoorRightB.008_exterior_0",
+            "DoorRightB.008_Glass_0",
+            "bogie02.003_exterior_0",
+            "Wheel.007_exterior_0",
+            "Wheel.008_exterior_0",
+            "bogie02.004_exterior_0",
+            "Wheel.011_exterior_0",
+            "Wheel.012_exterior_0",
+            "exterior_trailer_lod0_exterior_0",
+            "glass.002_Glass_0",
+            "interior.002_interior_0",
+            "interior.002_interior_light_0",
+            "undercarriage_lod0.001_undercarriage_0"
+          ]
+        }
+      ],
+      "doors": {}
+    }
+  ],
+  "removed": [
+    {
+      "file": "tangara.glb",
+      "texture": 0,
+      "role": "base:exterior",
+      "rect": [
+        136,
+        119,
+        179,
+        158
+      ],
+      "what": "Sydney Trains swoosh + wordmark, no. 1 side"
+    },
+    {
+      "file": "tangara.glb",
+      "texture": 0,
+      "role": "base:exterior",
+      "rect": [
+        838,
+        327,
+        888,
+        366
+      ],
+      "what": "Sydney Trains swoosh + wordmark, no. 2 side"
+    },
+    {
+      "file": "tangara.glb",
+      "texture": 0,
+      "role": "base:exterior",
+      "rect": [
+        456,
+        119,
+        624,
+        156
+      ],
+      "what": "TANGARA fleet wordmark, no. 1 side"
+    },
+    {
+      "file": "tangara.glb",
+      "texture": 0,
+      "role": "base:exterior",
+      "rect": [
+        452,
+        327,
+        624,
+        366
+      ],
+      "what": "TANGARA fleet wordmark, no. 2 side"
+    },
+    {
+      "file": "tangara.glb",
+      "texture": 8,
+      "role": "base:exterior_pride",
+      "rect": [
+        493,
+        122,
+        792,
+        167
+      ],
+      "what": "\"Ride with Pride\" campaign wordmark, no. 1 side"
+    },
+    {
+      "file": "tangara.glb",
+      "texture": 8,
+      "role": "base:exterior_pride",
+      "rect": [
+        251,
+        330,
+        534,
+        369
+      ],
+      "what": "\"Ride with Pride\" campaign wordmark, no. 2 side"
+    },
+    {
+      "file": "tangara.glb",
+      "texture": 8,
+      "role": "base:exterior_pride",
+      "rect": [
+        888,
+        102,
+        1024,
+        124
+      ],
+      "what": "\"Proud supporter of your journey\", no. 1 side"
+    },
+    {
+      "file": "tangara.glb",
+      "texture": 8,
+      "role": "base:exterior_pride",
+      "rect": [
+        0,
+        311,
+        139,
+        330
+      ],
+      "what": "\"Proud supporter of your journey\", no. 2 side"
+    },
+    {
+      "file": "tangara.glb",
+      "texture": 8,
+      "role": "base:exterior_pride",
+      "rect": [
+        122,
+        117,
+        198,
+        159
+      ],
+      "what": "Sydney Trains swoosh, Pride variant, no. 1 side"
+    },
+    {
+      "file": "tangara.glb",
+      "texture": 8,
+      "role": "base:exterior_pride",
+      "rect": [
+        826,
+        326,
+        902,
+        366
+      ],
+      "what": "Sydney Trains swoosh, Pride variant, no. 2 side"
+    },
+    {
+      "file": "tangara.glb",
+      "texture": 13,
+      "role": "base:exterior_middle_pride",
+      "rect": [
+        403,
+        121,
+        682,
+        162
+      ],
+      "what": "\"Ride with Pride\" campaign wordmark, no. 1 side"
+    },
+    {
+      "file": "tangara.glb",
+      "texture": 13,
+      "role": "base:exterior_middle_pride",
+      "rect": [
+        342,
+        330,
+        622,
+        370
+      ],
+      "what": "\"Ride with Pride\" campaign wordmark, no. 2 side"
+    },
+    {
+      "file": "tangara.glb",
+      "texture": 13,
+      "role": "base:exterior_middle_pride",
+      "rect": [
+        888,
+        102,
+        1024,
+        124
+      ],
+      "what": "\"Proud supporter of your journey\", no. 1 side"
+    },
+    {
+      "file": "tangara.glb",
+      "texture": 13,
+      "role": "base:exterior_middle_pride",
+      "rect": [
+        0,
+        311,
+        139,
+        330
+      ],
+      "what": "\"Proud supporter of your journey\", no. 2 side"
+    },
+    {
+      "file": "tangara.glb",
+      "texture": 13,
+      "role": "base:exterior_middle_pride",
+      "rect": [
+        122,
+        117,
+        198,
+        159
+      ],
+      "what": "Sydney Trains swoosh, Pride variant, no. 1 side"
+    },
+    {
+      "file": "tangara.glb",
+      "texture": 13,
+      "role": "base:exterior_middle_pride",
+      "rect": [
+        838,
+        326,
+        884,
+        366
+      ],
+      "what": "Sydney Trains swoosh, Pride variant, no. 2 side"
+    },
+    {
+      "file": "metropolis.glb",
+      "texture": 0,
+      "role": "base:exterior+base:exterior_panto",
+      "rect": [
+        728,
+        102,
+        804,
+        139
+      ],
+      "what": "NSW waratah crest + Transport for NSW wordmark + green Metro nameplate, no. 1 end"
+    },
+    {
+      "file": "metropolis.glb",
+      "texture": 0,
+      "role": "base:exterior+base:exterior_panto",
+      "rect": [
+        89,
+        493,
+        162,
+        531
+      ],
+      "what": "NSW waratah crest + Transport for NSW wordmark + green Metro nameplate, no. 2 end"
+    }
+  ],
+  "provenance": {
+    "tangara.glb": {
+      "title": "Sydney Trains Tangara T-set Double Decker Train",
+      "source": "Sketchfab",
+      "license": "Sketchfab Free Standard",
+      "evidence": "the download dialog the user supplied, 2026-08-09: 'Under basic restrictions, use worldwide, on all types of media, commercially or not, and in all types of derivative works'"
+    },
+    "metropolis.glb": {
+      "title": "Sydney Metro driverless train (Alstom Metropolis)",
+      "source": "Sketchfab (same source as the Tangara, per the user)",
+      "license": "UNCONFIRMED -- assumed Sketchfab Free Standard, not evidenced",
+      "evidence": "none on file; the user supplied the file without its licence page"
+    }
+  }
+}

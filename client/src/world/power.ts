@@ -178,19 +178,106 @@ const MAX_TILT = (1.2 * Math.PI) / 180;
 
 // --- Wire construction --------------------------------------------------------
 
-/** Segments per catenary. 9 puts the parabola within 3 mm of a true `cosh`. */
-const WIRE_SEGMENTS = 9;
+/**
+ * Segments per catenary. 9 puts the parabola within 3 mm of a true `cosh`.
+ *
+ * Exported, with the four numbers below and `catenarySag` and `writeCatenary`,
+ * because `world/rail-geo.ts` strings the overhead line over the railway and a
+ * second implementation of a sagging conductor is a second wire that does not
+ * look like the wires already in the city. What it needs is exactly what is
+ * here: the same parabola, the same cross-section trick, the same 35 mm drawn
+ * width, and the same unlit near-black -- and what it does *not* share is the
+ * pole, the crossarm and the two-strand LV spacing, which are this file's.
+ */
+export const WIRE_SEGMENTS = 9;
 /** Half-width of each ribbon strip, metres. Drawn ~4x the real conductor. */
-const WIRE_HALF_WIDTH = 0.0175;
+export const WIRE_HALF_WIDTH = 0.0175;
 /** Sag at the reference span, metres, and the span it is quoted at. */
 const SAG_AT_REFERENCE = 0.55;
 const SAG_REFERENCE_SPAN = 40;
 const SAG_MIN = 0.2;
 const SAG_MAX = 1.2;
 
+/**
+ * How far a conductor of this plan length hangs below its two attachments.
+ *
+ * With the square of the span, because a catenary's does: a conductor is strung
+ * to a tension, and doubling the span quadruples the sag at constant tension.
+ * Clamped at both ends -- a 20 m span with 0.14 m of sag reads as a taut cable
+ * rather than a wire, and nothing over 1.2 m stays clear of a truck.
+ */
+export function catenarySag(planLength: number): number {
+  const ratio = planLength / SAG_REFERENCE_SPAN;
+  return Math.min(Math.max(SAG_AT_REFERENCE * ratio * ratio, SAG_MIN), SAG_MAX);
+}
+
+/**
+ * Vertices and indices for **one** sagging conductor, as the two crossed
+ * ribbons the header argues for. Returns the new vertex cursor.
+ *
+ * `vp` is in vertices and `ip` in indices, both written in place; the caller
+ * sizes the arrays with `CATENARY_VERTS` and `CATENARY_INDICES`. `px, pz` is the
+ * unit plan-perpendicular of the run, which is the axis the horizontal ribbon's
+ * width lies along -- passed in rather than derived because both callers already
+ * have it and the wire's own ends are not always where the run's are.
+ */
+export function writeCatenary(
+  position: Float32Array,
+  index: Uint16Array | Uint32Array,
+  cursor: { vp: number; ip: number },
+  ax: number, ay: number, az: number,
+  bx: number, by: number, bz: number,
+  px: number, pz: number,
+  sag: number,
+  halfWidth: number = WIRE_HALF_WIDTH,
+): void {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const dz = bz - az;
+  // The two ribbons of the cross. The first is horizontal, its width along the
+  // plan perpendicular; the second is vertical. `(0, 1, 0)` is within 3 degrees
+  // of the true binormal at the steepest point of the sag, which is a 0.1% error
+  // on a 35 mm ribbon.
+  for (const [wx, wy, wz] of [
+    [px * halfWidth, 0, pz * halfWidth],
+    [0, halfWidth, 0],
+  ] as const) {
+    const first = cursor.vp;
+    for (let s = 0; s <= WIRE_SEGMENTS; s++) {
+      const t = s / WIRE_SEGMENTS;
+      const cx = ax + dx * t;
+      const cz = az + dz * t;
+      // Parabolic sag, zero at both ends and `sag` at mid span.
+      const cy = ay + dy * t - sag * 4 * t * (1 - t);
+      position[cursor.vp * 3] = cx - wx;
+      position[cursor.vp * 3 + 1] = cy - wy;
+      position[cursor.vp * 3 + 2] = cz - wz;
+      cursor.vp++;
+      position[cursor.vp * 3] = cx + wx;
+      position[cursor.vp * 3 + 1] = cy + wy;
+      position[cursor.vp * 3 + 2] = cz + wz;
+      cursor.vp++;
+    }
+    for (let s = 0; s < WIRE_SEGMENTS; s++) {
+      const a = first + s * 2;
+      index[cursor.ip++] = a;
+      index[cursor.ip++] = a + 1;
+      index[cursor.ip++] = a + 3;
+      index[cursor.ip++] = a;
+      index[cursor.ip++] = a + 3;
+      index[cursor.ip++] = a + 2;
+    }
+  }
+}
+
+/** Vertices one `writeCatenary` consumes. */
+export const CATENARY_VERTS = 2 * (WIRE_SEGMENTS + 1) * 2;
+/** Indices one `writeCatenary` consumes. */
+export const CATENARY_INDICES = 2 * WIRE_SEGMENTS * 6;
+
 // --- The palette --------------------------------------------------------------
 
-type Rgb = [number, number, number];
+export type Rgb = [number, number, number];
 
 /**
  * Aged hardwood, linear. **Grey, not brown.**
@@ -253,7 +340,7 @@ const TRANSFORMER_GREY: Rgb = [0.165, 0.17, 0.176];
  * length, and a pure neutral at this level reads as a scratch on the lens rather
  * than as an object. See the note at the top on why this is not a lit material.
  */
-const WIRE_COLOUR: Rgb = [0.03, 0.032, 0.036];
+export const WIRE_COLOUR: Rgb = [0.03, 0.032, 0.036];
 
 // --- Geometry -----------------------------------------------------------------
 
@@ -752,17 +839,16 @@ export function buildTilePoles(
 export function buildTileWires(data: TilePower, assets: PowerAssets): Mesh | null {
   if (data.wireCount === 0) return null;
 
-  // Two strands, two ribbons each, `WIRE_SEGMENTS + 1` samples of two vertices.
-  const perSpanVerts = 2 * 2 * (WIRE_SEGMENTS + 1) * 2;
-  const perSpanIndex = 2 * 2 * WIRE_SEGMENTS * 6;
+  // Two strands, each one `writeCatenary`.
+  const perSpanVerts = 2 * CATENARY_VERTS;
+  const perSpanIndex = 2 * CATENARY_INDICES;
   const position = new Float32Array(data.wireCount * perSpanVerts * 3);
   const index =
     data.wireCount * perSpanVerts > 65535
       ? new Uint32Array(data.wireCount * perSpanIndex)
       : new Uint16Array(data.wireCount * perSpanIndex);
 
-  let vp = 0; // vertex write cursor, in vertices
-  let ip = 0; // index write cursor
+  const cursor = { vp: 0, ip: 0 };
 
   for (let w = 0; w < data.wireCount; w++) {
     const o = w * 6;
@@ -783,63 +869,29 @@ export function buildTileWires(data: TilePower, assets: PowerAssets): Mesh | nul
     const px = -dz / plan;
     const pz = dx / plan;
 
-    // Sag with the square of the span, because a catenary's does: a conductor is
-    // strung to a tension, and doubling the span quadruples the sag at constant
-    // tension. Clamped at both ends -- a 20 m span with 0.14 m of sag reads as a
-    // taut cable rather than a wire, and nothing over 1.2 m stays clear of a
-    // truck.
-    const ratio = plan / SAG_REFERENCE_SPAN;
-    const sag = Math.min(Math.max(SAG_AT_REFERENCE * ratio * ratio, SAG_MIN), SAG_MAX);
+    const sag = catenarySag(plan);
 
     for (const strand of [-1, 1]) {
       const ox = px * STRAND_OFFSET * strand;
       const oz = pz * STRAND_OFFSET * strand;
-      // The two ribbons of the cross. The first is horizontal, its width along
-      // the crossarm axis; the second is vertical. `(0, 1, 0)` is within 3
-      // degrees of the true binormal at the steepest point of the sag, which is
-      // a 0.1% error on a 35 mm ribbon.
-      for (const [wx, wy, wz] of [
-        [px * WIRE_HALF_WIDTH, 0, pz * WIRE_HALF_WIDTH],
-        [0, WIRE_HALF_WIDTH, 0],
-      ] as const) {
-        const first = vp;
-        for (let s = 0; s <= WIRE_SEGMENTS; s++) {
-          const t = s / WIRE_SEGMENTS;
-          const cx = ax + dx * t + ox;
-          const cz = az + dz * t + oz;
-          // Parabolic sag, zero at both ends and `sag` at mid span.
-          const cy = ay + (by - ay) * t - sag * 4 * t * (1 - t);
-          position[vp * 3] = cx - wx;
-          position[vp * 3 + 1] = cy - wy;
-          position[vp * 3 + 2] = cz - wz;
-          vp++;
-          position[vp * 3] = cx + wx;
-          position[vp * 3 + 1] = cy + wy;
-          position[vp * 3 + 2] = cz + wz;
-          vp++;
-        }
-        for (let s = 0; s < WIRE_SEGMENTS; s++) {
-          const a = first + s * 2;
-          index[ip++] = a;
-          index[ip++] = a + 1;
-          index[ip++] = a + 3;
-          index[ip++] = a;
-          index[ip++] = a + 3;
-          index[ip++] = a + 2;
-        }
-      }
+      writeCatenary(
+        position, index, cursor,
+        ax + ox, ay, az + oz,
+        bx + ox, by, bz + oz,
+        px, pz, sag,
+      );
     }
   }
 
   // Only reachable if every span in the tile was degenerate in plan, which the
   // pipeline's `MIN_HALF_WIDTH` and pole spacing make impossible -- but an empty
   // geometry is a draw call that draws nothing and a bounding sphere of NaN.
-  if (vp === 0) return null;
+  if (cursor.vp === 0) return null;
 
   const geometry = new BufferGeometry();
   geometry.name = 'wires';
-  geometry.setAttribute('position', new BufferAttribute(position.subarray(0, vp * 3), 3));
-  geometry.setIndex(new BufferAttribute(index.subarray(0, ip), 1));
+  geometry.setAttribute('position', new BufferAttribute(position.subarray(0, cursor.vp * 3), 3));
+  geometry.setIndex(new BufferAttribute(index.subarray(0, cursor.ip), 1));
   // No normals: the material is unlit and reads none, and a normal buffer here
   // would be 12 bytes a vertex of upload that nothing ever samples.
   geometry.computeBoundingSphere();

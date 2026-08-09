@@ -285,6 +285,17 @@ import {
   type RecordBag,
 } from './game/rave.ts';
 import { RaveAssets, RaveWorld, raveWarmupParts, verifyRaveKit } from './world/rave.ts';
+import {
+  RailAssets,
+  RailWorld,
+  buildNetwork,
+  loadRailBake,
+  railWarmupParts,
+  verifyRailGeometry,
+  type RailNetwork,
+} from './world/rail-geo.ts';
+import { TrainFleet } from './world/trains.ts';
+import { railSeconds, verifyRail } from './game/rail.ts';
 // The street factions -- meth heads and drunks -- on the same split again:
 // `game/streetlife.ts` is the shared simulation the server runs and
 // `world/streetlife.ts` is the renderer. See either header.
@@ -352,6 +363,17 @@ const COLLISION_FETCH_TIMEOUT_MS = 8000;
  * same tax for the same reason, so one number is what keeps them consistent.
  */
 const WARMUP_DEADLINE_MS = 11000;
+
+/**
+ * How long the 1 MB rail bake gets before the railway is written off.
+ *
+ * At module scope rather than beside `FAR_LAYER_DEADLINE_MS` because it is
+ * awaited **above** the shader warm-up -- the sign atlas has to exist before the
+ * sign material is compiled -- and `FAR_LAYER_DEADLINE_MS` is a `const` four
+ * hundred lines below that point. Same generous shape and the same rule: a bake
+ * that does not arrive costs the city its railway and not its boot.
+ */
+const RAIL_BAKE_DEADLINE_MS = 12000;
 
 async function main(): Promise<void> {
   const hud = new Hud();
@@ -1236,6 +1258,59 @@ async function main(): Promise<void> {
     return;
   }
   /**
+   * The railway's kit, and the bake it is derived from, both **above** the
+   * warm-up and for two different reasons.
+   *
+   * The materials are here on exactly the argument every kit above is here on:
+   * ten shared materials that a stand-in *can* warm, and a chunk of railway
+   * arriving three minutes into a session must not compile one. The 1 MB bake is
+   * here because the sign atlas is built from the station names and the sign
+   * material's texture has to be on it before the pipeline is keyed -- assigning
+   * a map to a material the warm-up has already compiled is a compile on the
+   * frame the first station comes into view, which is the whole thing being
+   * avoided.
+   *
+   * Bounded and optional on the far layer's terms. No bake is a city with no
+   * railway drawn in it, which is the city that shipped last week.
+   */
+  const railAssets = new RailAssets();
+  const railBake = await withDeadline(loadRailBake(), RAIL_BAKE_DEADLINE_MS, 'the rail bake');
+  let railNetwork: RailNetwork | null = null;
+  if (railBake) {
+    const bakeFailures = verifyRail(railBake);
+    if (bakeFailures.length) {
+      console.warn(
+        '[rail] the bake failed its own self-check and is not drawn:\n  - ' +
+          bakeFailures.join('\n  - '),
+      );
+    } else {
+      railNetwork = buildNetwork(railBake);
+      const geometryFailures = verifyRailGeometry(railNetwork);
+      if (geometryFailures.length) {
+        console.warn('[rail] derived network self-check:\n  - ' + geometryFailures.join('\n  - '));
+      }
+      railAssets.prepareSigns(railNetwork.stations.map((s) => s.name));
+      console.debug(
+        `[rail] ${railNetwork.segments.length} unique segments from ` +
+          `${railNetwork.directedSegments} directed (${(
+            100 - (railNetwork.segments.length / railNetwork.directedSegments) * 100
+          ).toFixed(0)}% shared), ${railNetwork.portals.length} tunnel portals, ` +
+          `${railNetwork.stations.length} stations on the network, ` +
+          `${railNetwork.chunks.size} chunks`,
+      );
+    }
+  }
+  /**
+   * The trains, constructed here and **loaded below**.
+   *
+   * The object exists this early only so its box-train material and its one
+   * `InstancedMesh` are in the scene before either warm-up pass; the 10.5 MB of
+   * hero models are fetched two hundred lines down beside the car models, which
+   * is where an asset of that size belongs.
+   */
+  const trains = new TrainFleet();
+  scene.add(trains.group);
+  /**
    * The record bag, fetched once and never blocking anything.
    *
    * `client/public/audio/dj/tracks.json` is written by `scripts/dj-manifest.sh`
@@ -1344,6 +1419,15 @@ async function main(): Promise<void> {
         // `world/rave.ts` section 2 sets out why that means twelve pipelines
         // that only the scene pass below can reach.
         ...raveWarmupParts(raveAssets),
+        // The railway's ten shared materials -- ballast, rail steel, concrete,
+        // canopy, tunnel lining, the far corridor, the overhead wire and the
+        // station-name atlas. Every one of them is a plain `Mesh` over a shared
+        // material, which is exactly the case a stand-in can warm, and without
+        // this the first chunk of railway to come inside a kilometre compiles
+        // eight pipelines on one frame. The sleepers and the masts are *not*
+        // here and cannot be: they are instanced, and `world/warmup.ts` sets out
+        // why no stand-in warms one. The scene pass below reaches those.
+        ...railWarmupParts(railAssets),
         // And **nothing instanced**, which is the change this list most needs
         // explaining. The bikes, the crowd, the traffic, the flock and the
         // headlights were all warmed here and none of them was ever warmed at
@@ -1783,6 +1867,33 @@ async function main(): Promise<void> {
     );
   }
   /**
+   * The two hero trains, on exactly the car models' terms and immediately after
+   * them, because they are the same asset class one order of magnitude up:
+   * 10.5 MB of glTF for a Tangara and a Metropolis, bounded, and optional.
+   *
+   * Two lines of wiring and each is a different half of it. `load` splits both
+   * files into carriage templates -- see `world/trains.ts` -- and `warm` walks
+   * one instance of every template through `precompileGroup`, which is the same
+   * function `TileStreamer.setPrecompiler` was given and is here for the same
+   * reason: these materials came out of a GLB with four textures on them, no
+   * boot stand-in can stand in for one, and the scene pass below cannot reach
+   * them because no train is in the scene until one comes within 260 m. Without
+   * it the first train the player sees costs six pipelines in one frame.
+   */
+  await withDeadline(trains.load(), FAR_LAYER_DEADLINE_MS, 'the train models');
+  // Unconditionally, models or not: the box train is an `InstancedMesh` whose
+  // count is zero until a train is in range, and a draw with no instances is a
+  // pipeline the scene pass never compiles.
+  await withDeadline(trains.warm(precompileGroup), WARMUP_DEADLINE_MS, 'the train shader pass');
+  if (trains.hasModels) {
+    console.debug(
+      `[trains] ${Object.keys(trains.templateTriangles()).length} carriage templates, ` +
+        `triangles ${JSON.stringify(trains.templateTriangles())}`,
+    );
+  }
+  for (const warning of trains.warnings) console.warn(`[trains] ${warning}`);
+
+  /**
    * When the model fleet last decided who is near enough, milliseconds.
    *
    * The sweep runs at `SWEEP_HZ` rather than per frame, and the hysteresis band
@@ -2190,6 +2301,23 @@ async function main(): Promise<void> {
    * per tick, and a fresh closure on either would be an allocation forever.
    */
   const wildGround = (x: number, z: number): number => groundHeightAt(x, z, -Infinity);
+
+  /**
+   * The railway in the scene, built here because this is the first line at which
+   * both of the things it needs exist.
+   *
+   * `wildGround` rather than `groundHeightAt`, and it is the same argument the
+   * raves make one paragraph down: a viaduct pier stands on the *ground*, and a
+   * query that folded in a roof would stop the pier at the top of whatever
+   * warehouse the viaduct happens to pass over. `collision` is handed over as
+   * the `RailSolids` it implements, so a deck's soffit, a pier, a platform and
+   * an underground station box are prisms with the same `base` semantics
+   * `decks.py` writes -- which is the whole of what makes a player walk under a
+   * viaduct instead of into it.
+   */
+  const railWorld =
+    railNetwork === null ? null : new RailWorld(railNetwork, railAssets, wildGround, collision);
+  if (railWorld) scene.add(railWorld.group);
 
   /**
    * Is there a building standing here? The rave crowd's own rejection test.
@@ -5243,6 +5371,23 @@ async function main(): Promise<void> {
     // rather than by however long the browser was not drawing.
     streamer.updateLife(frameDt, camera);
 
+    // --- The railway, after the streamer for the same reason everything else
+    // is: a tile that arrived this frame has terrain under it, so a viaduct
+    // pier built now stands on the ground rather than on the fallback depth.
+    //
+    // `update` is free on every frame but the two transitions -- crossing a
+    // 512 m chunk boundary rebuilds the ring, crossing a 64 m one refills the
+    // sleepers -- and there is no clock in it at all. See `world/rail-geo.ts`.
+    railWorld?.update(player.position.x, player.position.z);
+    // And the trains, on the traffic's own contract one line up from it: no
+    // frame delta, no state, and the wall clock read through `railSeconds` so a
+    // backgrounded tab costs nothing and comes back with every train in the
+    // city exactly where it would have been. `poseTrain` is the same function
+    // the server evaluates, so what is drawn here is what the server says.
+    if (railBake) {
+      trains.update(railBake, railSeconds(Date.now()), player.position.x, player.position.z);
+    }
+
     // The night rig, after the streamer -- so a tile that arrived this frame
     // already has its luminaires in the set the four real lights are picked from
     // -- and before the traffic, so `carLights.begin()` answers for this frame
@@ -6349,6 +6494,71 @@ async function main(): Promise<void> {
      * `dropped` should be zero for the life of the process; it counts players
      * refused a plate because the buffers were full.
      */
+    /**
+     * The railway, for the console -- and this is the only way to look at it.
+     *
+     * A railway is 300 km of thin thing spread over a 60 km disc, so "does it
+     * work" cannot be answered from wherever a player happens to be standing.
+     * Three questions and three answers:
+     *
+     *     sydney.rail.report()        what is built, what it costs, what is drawn
+     *     sydney.rail.stations('red') which stations match, and their vertical class
+     *     sydney.rail.go('Redfern')   stand on the platform at one
+     *
+     * `report().chunkDraws` and `trains.modelDraws` together are the budget line
+     * this feature is written against; `overflows` on either should stay at zero
+     * for the life of the process.
+     */
+    rail: {
+      /** The chunk ring itself, for poking at from the console. */
+      world: railWorld,
+      fleet: trains,
+      report: () => ({
+        bake: railBake === null ? 'absent' : `${railBake.lines.length} lines`,
+        segments: railNetwork?.segments.length ?? 0,
+        portals: railNetwork?.portals.length ?? 0,
+        stations: railNetwork?.stations.length ?? 0,
+        residentChunks: railWorld?.residentChunks ?? 0,
+        chunkDraws: railWorld?.chunkDraws ?? 0,
+        sleepers: railWorld?.sleeperCount ?? 0,
+        masts: railWorld?.mastCount ?? 0,
+        rebuildMs: railWorld?.rebuildMs ?? 0,
+        overflows: railWorld?.overflows ?? 0,
+        trains: { ...trains.stats },
+      }),
+      stations: (query = '') =>
+        (railNetwork?.stations ?? [])
+          .filter((s) => s.name.toLowerCase().includes(query.toLowerCase()))
+          .map((s) => `${s.name} (${s.vertical}, ${s.platforms} platforms)`),
+      /**
+       * Stand on the platform at a station, facing across the track.
+       *
+       * Offset to the platform side rather than dropped on the station node,
+       * which is the *track* centre: arriving between the rails is arriving
+       * where the next train is, and the point of this tool is to watch one
+       * arrive.
+       */
+      go: (name = 'Central', along = -46) => {
+        const station = (railNetwork?.stations ?? []).find((s) =>
+          s.name.toLowerCase().includes(name.toLowerCase()),
+        );
+        if (!station) return `no station matching "${name}"`;
+        // Along the platform rather than across it, and back from the middle:
+        // standing on the station node is standing between the rails, and
+        // standing beside it is standing with your nose on the name board. Down
+        // the platform looking back at the canopy is the view the whole thing is
+        // composed for, and it is the one a train arrives into.
+        const px = -station.uz;
+        const pz = station.ux;
+        const x = station.x + station.ux * along + px * 4.4;
+        const z = station.z + station.uz * along + pz * 4.4;
+        player.position.set(x, station.trackY + 1.05 + EYE_HEIGHT, z);
+        player.velocity.set(0, 0, 0);
+        player.yaw = Math.atan2(-(station.z - z), station.x - x);
+        return `${station.name} (${station.vertical}, ${station.platforms} platforms) at ${x.toFixed(0)}, ${z.toFixed(0)}`;
+      },
+    },
+
     /**
      * The render guard, and the texture audit behind it.
      *

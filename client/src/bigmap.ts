@@ -184,14 +184,32 @@ interface Zoom {
  * driveway stubs -- and `1000` at the city zoom keeps 201, which is the arterial
  * skeleton and reads as one at 0.09 px/m.
  *
- * `city.halfM` is 4,500 because that is exactly the build: the tiles run from
- * -4,500 to +4,500 on both axes, so this rung is the world and there is nothing
- * past it to zoom out to.
+ * `city.halfM` was 4,500 because that was exactly the build: the tiles ran from
+ * -4,500 to +4,500 and the rung was the whole world. That has been false through
+ * three expansions and is now off by more than an order of magnitude -- the
+ * tiles run -60,000 to +25,000 east and -60,500 to +54,500 north.
+ *
+ * So there is a fourth rung, `region`, at three times the city's reach: 27 km
+ * across, which puts Parramatta and the harbour on one screen from the CBD, or
+ * the whole Cumberland Plain from Penrith. Its `roadFloor` of 4,000 is not a
+ * taste number either -- at 0.03 px/m the 201 names the city rung keeps would
+ * be a grey wash, and 4,000 holds the motorways and the named arterials, which
+ * is the only thing legible at that scale and the only thing worth navigating
+ * by from 27 km up.
+ *
+ * **It deliberately stops there rather than framing the whole 120 km disc.**
+ * `mapatlas` fetches the street-name bundle of every hexagon the view box
+ * touches; 27 km spans about a dozen of the 86, where the full disc would pull
+ * all of them and some tens of megabytes to draw a picture in which no street
+ * is one pixel wide. If the whole-world view is ever wanted it needs its own
+ * representation -- suburb blobs and motorway spines off a baked overview --
+ * not another rung on this ladder.
  */
 const ZOOMS: Zoom[] = [
   { name: 'neighbourhood', halfM: 500, roadFloor: 0, labelFloor: 0, buildings: true, span: '1 km' },
   { name: 'district', halfM: 1500, roadFloor: 0, labelFloor: 400, buildings: false, span: '3 km' },
   { name: 'city', halfM: 4500, roadFloor: 1000, labelFloor: Infinity, buildings: false, span: '9 km' },
+  { name: 'region', halfM: 13500, roadFloor: 4000, labelFloor: Infinity, buildings: false, span: '27 km' },
 ];
 
 /**
