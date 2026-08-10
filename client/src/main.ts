@@ -105,7 +105,6 @@ import {
 import { BONE, verifyAnimation } from './player/animation.ts';
 import { BatAssets, BatProp, BatViewmodel, MAX_VIEW_REACH, verifyBat } from './player/bat.ts';
 import {
-  applyWorldDamage,
   CAST_RADIUS,
   MAX_HEALTH,
   MAX_STAMINA,
@@ -296,45 +295,7 @@ import {
   type RailNetwork,
 } from './world/rail-geo.ts';
 import { TrainFleet } from './world/trains.ts';
-import {
-  aboardFrame,
-  aboardPose,
-  buildPlatforms,
-  callsAhead,
-  dwellAt,
-  dwellStand,
-  nextDwell,
-  alightPlatform,
-  alightTrackside,
-  bailoutDamage,
-  clearAboard,
-  consistOf,
-  createBoardOffer,
-  createCarFrame,
-  createCarriageStand,
-  createRideBanner,
-  dirOf,
-  enterLocal,
-  exitLocal,
-  findBoarding,
-  frameYaw,
-  insideCarriage,
-  interiorOfCar,
-  isAboard,
-  nearestDwell,
-  nextCall,
-  poseAheadOnLine,
-  projectAboard,
-  rideBanner,
-  spanFlagsAt,
-  stopPlatform,
-  verifyRiding,
-  worldToLocal,
-  type CarriageInterior,
-  type PlatformField,
-  type Stand,
-} from './game/riding.ts';
-import { SPAN_TUNNEL, railSeconds, verifyRail } from './game/rail.ts';
+import { railSeconds, verifyRail } from './game/rail.ts';
 // The street factions -- meth heads and drunks -- on the same split again:
 // `game/streetlife.ts` is the shared simulation the server runs and
 // `world/streetlife.ts` is the renderer. See either header.
@@ -1313,21 +1274,8 @@ async function main(): Promise<void> {
    * railway drawn in it, which is the city that shipped last week.
    */
   const railAssets = new RailAssets();
-  /** Station platforms as rectangles, for `groundHeightAt`. Null with no bake. */
-  let platforms: PlatformField | null = null;
   const railBake = await withDeadline(loadRailBake(), RAIL_BAKE_DEADLINE_MS, 'the rail bake');
   let railNetwork: RailNetwork | null = null;
-  {
-    // The riding module's own self-check, at boot, on `verifyRail`'s terms: a
-    // self-check nothing runs is a self-check that rots, and the browser is not
-    // in CI. It is also the only place the two constants `game/riding.ts` had to
-    // restate -- the eye height and the body radius -- are compared against the
-    // controller's real ones, because that file may not import the controller.
-    const rideFailures = verifyRiding(EYE_HEIGHT, PLAYER_RADIUS);
-    if (rideFailures.length) {
-      console.warn('[rail] riding self-check:\n  - ' + rideFailures.join('\n  - '));
-    }
-  }
   if (railBake) {
     const bakeFailures = verifyRail(railBake);
     if (bakeFailures.length) {
@@ -1342,11 +1290,6 @@ async function main(): Promise<void> {
         console.warn('[rail] derived network self-check:\n  - ' + geometryFailures.join('\n  - '));
       }
       railAssets.prepareSigns(railNetwork.stations.map((s) => s.name));
-      // The analytic platforms, for `groundHeightAt`. Built from the bake rather
-      // than from the network for the reason the server needs them at all: this
-      // is the copy of the platform that exists on both ends. See
-      // `game/riding.PlatformField`.
-      platforms = buildPlatforms(railBake);
       console.debug(
         `[rail] ${railNetwork.segments.length} unique segments from ` +
           `${railNetwork.directedSegments} directed (${(
@@ -2344,27 +2287,7 @@ async function main(): Promise<void> {
     if (Number.isFinite(sampled)) lastGround = sampled;
     // `roofHeight` returns -Infinity when the player is not standing on
     // anything, so the max falls through to the ground on its own.
-    //
-    // And the station platforms, **analytically**, beside the prisms
-    // `world/rail-geo.RailWorld` has already put in `collision` for the same
-    // surfaces. Two answers for one thing looks like a mistake and is the fix
-    // for one: the prisms are built per chunk as the player approaches and only
-    // exist in a browser, and the *server* has never had them at all -- so a
-    // platform was a surface on one end and thin air on the other, and standing
-    // on one meant being corrected downwards forever. The arithmetic version is
-    // the same 1.05 m over the same rail head from the same bake, so where both
-    // exist they agree to the bit, and where the chunk has not been built yet
-    // this one still answers. See `game/riding.PlatformField`.
-    // **Replaces the terrain rather than competing with it** when it answers at
-    // all, which `server/world.groundFor` does identically and for the reason it
-    // states there: `PlatformField.heightAt` only answers within a step below
-    // and a jump above a platform, so an answer means "standing on it", and at a
-    // cutting station the terrain grid is metres above the surface the train's
-    // doors open onto.
-    const platform = platforms === null ? -Infinity : platforms.heightAt(x, z, feetY);
-    const roof = collision.roofHeight(x, z, feetY);
-    if (platform > -Infinity) return Math.max(platform, roof);
-    return Math.max(lastGround, roof);
+    return Math.max(lastGround, collision.roofHeight(x, z, feetY));
   };
 
   /**
@@ -3206,11 +3129,6 @@ async function main(): Promise<void> {
     ]);
     if (settled) {
       net = client;
-      // The timetable, so remote riders are composed rather than interpolated.
-      // Handed over rather than fetched again: it is the same 1 MB the renderer
-      // already holds, and two decodes would be two objects that could disagree
-      // about which train is which. See `net/client.placeRiders`.
-      client.setRail(railBake);
       // The server chose where this player stands, so the local prediction has
       // to start there rather than at the client's own draw. Both ends compute
       // the same disc centre from the same `index.json` (see `game/spawn.ts`),
@@ -3553,218 +3471,6 @@ async function main(): Promise<void> {
    * is true.
    */
   let mountHeld = false;
-
-  // --- Riding a train ----------------------------------------------------------
-  //
-  // The client's half of `game/riding.ts`: predict the boarding, step the body
-  // inside the carriage, keep the camera in there with it, and say where you are
-  // going. Everything authoritative is the server's -- see `sim.tryBoard` -- and
-  // everything here is a prediction that the very next snapshot can overrule.
-
-  /** The carriage the local body is stepped inside. Aimed once a tick, at most. */
-  const carriageStand = createCarriageStand();
-  /** The frame of that carriage this tick, and whether it is live. */
-  const rideFrame = createCarFrame();
-  let rideActive = false;
-  const boardOffer = createBoardOffer();
-  const rideLanding = { x: 0, y: 0, z: 0 };
-  /** Carriage-local velocity, handed to `net.sendInput`. One vector, reused. */
-  const rideVelocity = new Vector3();
-  const rideLocal = { x: 0, y: 0, z: 0 };
-  const rideText = createRideBanner();
-  /** Where `sydney.rail.goto` puts you. One record, reused. */
-  const railStand: Stand = { x: 0, y: 0, z: 0, yaw: 0 };
-  /**
-   * Whether the body was on a train at the end of the last fixed step, and which
-   * way the carriage was pointing.
-   *
-   * **`input.yaw` changes meaning when you step aboard**, and this pair is what
-   * converts it at the seam. Off a train it is the world heading; on one it is
-   * the heading *in the carriage's frame*, which is what makes the view turn with
-   * the train through a curve instead of the player's shoulders swinging round
-   * the vestibule. `controller.step` copies it straight into `body.yaw`, so the
-   * conversion has to happen to `input.yaw` itself and it has to happen exactly
-   * once per transition.
-   *
-   * Driven off the *state* rather than off the two places that change it, for
-   * `bikes.ridePrompt`'s reason: the ride can also start or end because the
-   * server said so (`net.adoptRide`), because the train reached its terminus, or
-   * because a respawn moved the body -- and a conversion attached to the `E`
-   * handler would miss all three and leave the view rotated by the bearing of a
-   * train that is no longer there.
-   */
-  let wasAboard = false;
-  let lastRideYaw = 0;
-
-  /**
-   * The nearest open doorway right now, or none. Recomputed per tick.
-   *
-   * Held rather than recomputed for the HUD, because `findBoarding` walks the
-   * live trips of every direction whose bounding box the player is inside and
-   * the prompt wants the same answer the `E` key would get. It is dead code
-   * except within 100 m of a train that is standing at a platform.
-   */
-  let boardable = false;
-  /**
-   * The carriage the camera boom must stay inside this frame, or null.
-   *
-   * Set once a frame beside the composition that refreshes `rideFrame`, and read
-   * by the chase camera's `blockedAt` a hundred lines down. A field rather than a
-   * parameter because `blockedAt` is a closure the camera march owns and its
-   * signature is `(d) => boolean` by contract -- see `game/camera.marchCameraBoom`.
-   */
-  let rideAboardForCamera: CarriageInterior | null = null;
-
-  /**
-   * Step aboard, if the client's own copy of the timetable says there is a door.
-   *
-   * The prediction half of `sim.tryBoard`, running the identical `findBoarding`
-   * against the identical bake at the identical instant -- so it is right
-   * essentially always, and when it is not the next snapshot puts the player back
-   * on the platform. It is the bike's bargain: the ride starts on the frame the
-   * key goes down rather than on the next round trip.
-   */
-  const predictBoard = (): boolean => {
-    if (!railBake) return false;
-    const t = railSeconds(Date.now());
-    const feet = player.position.y - EYE_HEIGHT;
-    if (!findBoarding(railBake, player.position.x, feet, player.position.z, t, boardOffer)) {
-      return false;
-    }
-    const a = playerCombat.aboard;
-    a.line = boardOffer.line;
-    a.dir = boardOffer.dir;
-    a.trip = boardOffer.trip;
-    a.car = boardOffer.car;
-    a.x = boardOffer.x;
-    a.y = boardOffer.y;
-    a.z = boardOffer.z;
-    a.vx = 0;
-    a.vy = 0;
-    a.vz = 0;
-    if (!aboardFrame(railBake, a, t, rideFrame)) {
-      clearAboard(a);
-      return false;
-    }
-    a.yaw = player.yaw - frameYaw(rideFrame);
-    projectAboard(a, player, rideFrame);
-    player.onGround = true;
-    net?.predictedAboardChange();
-    audio.pickupFlatWhite();
-    hud.notice(
-      boardOffer.station
-        ? `aboard at ${boardOffer.station} — E to get off`
-        : 'aboard — E to get off',
-    );
-    return true;
-  };
-
-  /**
-   * Step off, by whichever of the three doors this is. `sim.alight`'s prediction.
-   *
-   * The same three branches in the same order and against the same helpers, so
-   * that the position the client draws is the position the server is about to
-   * send: at a dwell, onto the platform; in a tunnel, to the next station, framed
-   * as being dragged out by staff; otherwise out the side at speed, which hurts.
-   *
-   * The damage is applied here **only offline**. Online it is the server's -- the
-   * next snapshot overwrites `health` either way, and a client that took pips off
-   * itself would flicker the bar for one round trip in the ordinary case and
-   * double-count nothing in any case.
-   */
-  const predictAlight = (): void => {
-    const a = playerCombat.aboard;
-    net?.predictedAboardChange();
-    if (!railBake) {
-      clearAboard(a);
-      return;
-    }
-    const t = railSeconds(Date.now());
-    const dir = dirOf(railBake, a.line, a.dir);
-    const pose = dir === null ? null : aboardPose(railBake, a, t);
-    const it = dir === null ? null : interiorOfCar(consistOf(dir, a.trip), a.car);
-    if (dir === null || pose === null || it === null || !aboardFrame(railBake, a, t, rideFrame)) {
-      clearAboard(a);
-      return;
-    }
-    const speed = pose.speed;
-    const tunnel = (spanFlagsAt(railBake, dir, pose.s) & SPAN_TUNNEL) !== 0;
-    let hurt = 0;
-    if (pose.doorsOpen) {
-      alightPlatform(rideFrame, it, a.x, a.z, platforms, rideLanding);
-    } else if (tunnel) {
-      const stop = nextCall(dir, pose.s);
-      if (stop >= 0 && stopPlatform(railBake, dir, stop, a.z, rideLanding)) {
-        hud.notice(`dragged out by staff at ${dir.stops[stop].name}`);
-      } else {
-        alightTrackside(rideFrame, it, a.x, a.z, rideLanding);
-        hurt = bailoutDamage(speed);
-      }
-    } else {
-      alightTrackside(rideFrame, it, a.x, a.z, rideLanding);
-      hurt = bailoutDamage(speed);
-      hud.notice(`out the side at ${Math.round(speed * 3.6)} km/h`);
-    }
-    player.position.set(rideLanding.x, rideLanding.y, rideLanding.z);
-    if (hurt > 0) {
-      // Thrown along the train's own heading rather than dropped -- the one
-      // moment in this feature where the train's velocity *is* the player's is
-      // the moment they stop being a passenger. `sim.alight` uses the same
-      // damping for the same reason: the ragdoll's friction is written for a
-      // body that was punched, and 36 m/s of tumble crosses two suburbs.
-      player.velocity.set(pose.dx * speed * 0.22, 1.5, pose.dz * speed * 0.22);
-      player.onGround = false;
-      if (!online) applyWorldDamage(playerCombat, hurt);
-    } else {
-      player.velocity.set(0, 0, 0);
-      player.onGround = true;
-    }
-    clearAboard(a);
-    void ensureGround(rideLanding.x, rideLanding.z);
-  };
-
-  /**
-   * Put the body into its carriage for one step, and say which world to step it
-   * against. `sim.enterCarriage`, client side, argument for argument.
-   */
-  const enterCarriage = (): CombatWorld => {
-    rideActive = false;
-    const a = playerCombat.aboard;
-    if (!isAboard(a)) return combatWorld;
-    if (!railBake) {
-      clearAboard(a);
-      return combatWorld;
-    }
-    const t = railSeconds(Date.now());
-    if (!aboardFrame(railBake, a, t, rideFrame)) {
-      // The trip ran out from under them. Offline that is a terminus; online the
-      // server has already put them on a platform and the snapshot is on its way,
-      // so leaving the body where it is for one round trip is the smaller lie.
-      clearAboard(a);
-      return combatWorld;
-    }
-    if (!enterLocal(a, player, rideFrame)) {
-      clearAboard(a);
-      return combatWorld;
-    }
-    const dir = dirOf(railBake, a.line, a.dir);
-    const it = dir === null ? null : interiorOfCar(consistOf(dir, a.trip), a.car);
-    if (it === null) {
-      exitLocal(a, player, rideFrame);
-      clearAboard(a);
-      return combatWorld;
-    }
-    carriageStand.interior = it;
-    rideActive = true;
-    return carriageStand as unknown as CombatWorld;
-  };
-
-  const exitCarriage = (): void => {
-    if (!rideActive) return;
-    rideActive = false;
-    exitLocal(playerCombat.aboard, player, rideFrame);
-  };
-
   /**
    * The ride pill: what it would say, and how long it has left to say it.
    *
@@ -4626,320 +4332,6 @@ async function main(): Promise<void> {
     chat.system(unstuckReply(spot));
   }
 
-
-  /**
-   * What `E` does, in one function, so there is exactly one of it.
-   *
-   * Called by the key handler in `simulate` and by `sydney.rail.board()` /
-   * `alight()` in the console. **The console must not have its own path**: a dev
-   * helper that boarded by writing the aboard state directly would pass on every
-   * build in which the real interaction was broken, which is the one thing a
-   * harness must not do. So the harness presses the same button, and it fails
-   * for the same reasons -- no train, doors shut, standing too far from the door.
-   */
-  const pressMount = (): void => {
-    const field = bikeWorld();
-    // --- The train, ahead of the bike, on one key. `sim.resolveMount` runs the
-    //     identical chain in the identical order, which is what makes this a
-    //     prediction rather than a second opinion: off a train, then off a
-    //     bike, then onto a train, then onto a bike. The rule underneath it is
-    //     *leaving beats arriving*, and it settles the only ambiguous case
-    //     there is -- a rider standing at an open door does not re-board the
-    //     carriage they are already in.
-    if (isAboard(playerCombat.aboard)) {
-      predictAlight();
-    } else if (playerCombat.ridingBike !== 0) {
-      // Off. Offline this parks the bike here and now; online the server does
-      // it, and the sweep below is a no-op because `net.bikes` is a mirror.
-      const wasRiding = playerCombat.ridingBike;
-      playerCombat.ridingBike = 0;
-      if (!net) {
-        field.release(
-          wasRiding,
-          player.position.x,
-          player.position.y - EYE_HEIGHT,
-          player.position.z,
-          player.yaw,
-        );
-      }
-      net?.predictedBikeChange();
-      // No `hud.notice('')` here any more, and its absence is the point. It
-      // used to be the one line in the client that took the ride nudge down,
-      // which made every other way to stop riding a way to strand it. The
-      // pill is derived at the top of this function now, so getting off with
-      // `E` clears it for the same reason getting knocked off does: the
-      // question is asked again and the answer is different.
-    } else if (!predictBoard()) {
-      const bike = field.nearestFree(player.position.x, player.position.y - EYE_HEIGHT, player.position.z);
-      if (bike && field.claim(bike.id, playerCombat.id)) {
-        playerCombat.ridingBike = bike.id;
-        net?.predictedBikeChange();
-        audio.pickupFlatWhite();
-      }
-    }
-  };
-
-  /**
-   * The rail harness: `sydney.rail.goto`, `catch`, `board`, `alight`, `ride`.
-   *
-   * ---------------------------------------------------------------------------
-   * SOLVE, DO NOT POLL. That is the whole design.
-   *
-   * A T4 has its doors open at St Peters for fifteen seconds every ninety, so
-   * every way of testing riding by hand or in CI used to begin with waiting --
-   * and waiting is how a test suite ends up taking four minutes to discover that
-   * boarding is broken. It does not have to. The timetable is a pure function of
-   * the clock, so:
-   *
-   *   - **when** the next train is standing at a station is a division and a
-   *     ceiling, `riding.nextDwell`;
-   *   - **where** a boarder stands for it is one composition through the
-   *     carriage's own frame, `riding.dwellStand`.
-   *
-   * `server/integration-check.checkRiding` drives those same two functions,
-   * which is why they live in `game/riding.ts` and not here. A harness with its
-   * own idea of where a doorway is would be a harness that passed while the game
-   * was broken.
-   *
-   * ---------------------------------------------------------------------------
-   * AND IT PRESSES THE BUTTON.
-   *
-   * `board()` and `alight()` call `pressMount` -- the function the `E` key
-   * calls, with the same priority chain and the same predicates. They fail for
-   * exactly the reasons a real press fails: no train, doors shut, standing too
-   * far from the door. Online, the server then re-runs `findBoarding` against
-   * its own position and refuses whatever it does not believe, and nothing here
-   * touches that. A helper that wrote the aboard state directly would be a
-   * helper that hid the bug it exists to catch.
-   *
-   * ---------------------------------------------------------------------------
-   * THE CLOCK IS NOT WARPED, and that is a decision. `railSeconds(Date.now())`
-   * is the instant the traffic, the sky, the raves and -- online -- the server
-   * are all reading. Moving it would move the whole world and desynchronise this
-   * client from the one authority that matters. So a dwell is *solved* and the
-   * wait is *reported*, which is all a caller needs to schedule a press instead
-   * of hunting for one.
-   */
-  const railHarness = {
-    stations: (query = '') =>
-      (railNetwork?.stations ?? [])
-        .filter((s) => s.name.toLowerCase().includes(query.toLowerCase()))
-        .map((s) => ({
-          name: s.name,
-          metres: Math.round(Math.hypot(s.x - player.position.x, s.z - player.position.z)),
-          vertical: s.vertical,
-          platforms: s.platforms,
-        }))
-        .sort((a, b) => a.metres - b.metres)
-        .slice(0, 40),
-
-    /** When the next train is standing at a station. Solved; moves nobody. */
-    when: (station = 'Central', line?: string) => {
-      if (railBake === null) return 'no bake';
-      const t = railSeconds(Date.now());
-      const d = nextDwell(railBake, station, t, { lineId: line });
-      if (d === null) return `no service calls at "${station}"`;
-      return {
-        line: d.lineId,
-        towards: d.towards,
-        trip: d.trip,
-        carriage: d.car,
-        doorsOpenIn: +(d.opensAt - t).toFixed(1),
-        dwellSeconds: +(d.closesAt - d.opensAt).toFixed(1),
-      };
-    },
-
-    /**
-     * Stand in the doorway the next train will open, facing the track.
-     *
-     * Placed for the instant the doors *will* open rather than for now: a train
-     * still 400 m out has a different frame, and standing where its doorway is
-     * going to be is the whole job.
-     */
-    /**
-     * Stand in the doorway the next train will open, facing the track.
-     *
-     * **A client-side teleport, so it is an offline tool.** Online the server
-     * has not heard of it -- there is no teleport message on this wire and there
-     * must not be one, since a client that could relocate itself is a client
-     * that can be anywhere -- so `net.reconcile` snaps the body back within a
-     * snapshot and `board()` then correctly refuses, reporting the doorway as
-     * three hundred metres away. That is the harness declining to fake a
-     * boarding, and it is the right failure; it is reported here up front so it
-     * is not a surprise. Online, walk to the platform and use `when()` to know
-     * when to press `E`.
-     */
-    goto: (station = 'Central', line?: string, then?: string) => {
-      if (railBake === null) return 'no bake';
-      const t = railSeconds(Date.now());
-      const d = nextDwell(railBake, station, t, { lineId: line, then });
-      if (d === null) return `no service calls at "${station}"`;
-      if (!dwellStand(railBake, d, Math.max(d.opensAt + 1, t), railStand)) {
-        return `could not place a stand at the ${d.lineId} dwell at ${station}`;
-      }
-      clearAboard(playerCombat.aboard);
-      player.position.set(railStand.x, railStand.y, railStand.z);
-      player.velocity.set(0, 0, 0);
-      player.onGround = true;
-      input.yaw = railStand.yaw;
-      input.pitch = 0;
-      void ensureGround(railStand.x, railStand.z);
-      return {
-        at: station,
-        line: d.lineId,
-        towards: d.towards,
-        carriage: d.car,
-        doorsOpenIn: +(d.opensAt - t).toFixed(1),
-        dwellSeconds: +(d.closesAt - d.opensAt).toFixed(1),
-        standing: [+railStand.x.toFixed(1), +railStand.z.toFixed(1)],
-        ...(net === null
-          ? {}
-          : { warning: 'online: the server will pull you back within a snapshot -- see goto()' }),
-      };
-    },
-
-    /** What riding thinks is going on: the ride, or why there is no offer. */
-    state: () => {
-      const a = playerCombat.aboard;
-      if (railBake === null) return 'no bake';
-      const t = railSeconds(Date.now());
-      if (isAboard(a)) {
-        const ok = rideBanner(railBake, a, t, rideText);
-        return {
-          aboard: { line: a.line, dir: a.dir, trip: a.trip, car: a.car },
-          local: { x: +a.x.toFixed(2), y: +a.y.toFixed(2), z: +a.z.toFixed(2), yaw: +a.yaw.toFixed(2) },
-          world: {
-            x: +player.position.x.toFixed(1),
-            y: +player.position.y.toFixed(1),
-            z: +player.position.z.toFixed(1),
-          },
-          banner: ok ? `${rideText.line} → ${rideText.towards} · next: ${rideText.next}` : 'trip not running',
-          speedKmh: ok ? Math.round(rideText.speed * 3.6) : 0,
-          doorsOpen: rideText.doorsOpen,
-          calls: callsAhead(railBake, a, aboardPose(railBake, a, t)?.s ?? 0).slice(0, 6),
-        };
-      }
-      const feet = player.position.y - EYE_HEIGHT;
-      if (findBoarding(railBake, player.position.x, feet, player.position.z, t, boardOffer)) {
-        const dir = dirOf(railBake, boardOffer.line, boardOffer.dir);
-        return {
-          offer: `${dir?.line.id} carriage ${boardOffer.car} bay ${boardOffer.bay} at ${boardOffer.station}`,
-          metres: +boardOffer.distance.toFixed(2),
-        };
-      }
-      // Say *why*. The three reasons -- no train standing here, doors shut, not
-      // beside a door -- are indistinguishable from outside, and the third one
-      // is the only one anybody can do anything about.
-      const near = nearestDwell(railBake, player.position.x, feet, player.position.z, t);
-      return near === null
-        ? 'no train is standing at a platform within 300 m'
-        : `nearest open doors: ${near.line} at ${near.station}, ${near.metres.toFixed(1)} m away ` +
-          `(carriage ${near.car}, ${near.alongBay.toFixed(1)} m along the bay, ` +
-          `${near.outside.toFixed(2)} m off the bodyside, ${near.rise.toFixed(2)} m of rise)`;
-    },
-
-    /** Press `E` to board. The same press the key makes. */
-    board: () => {
-      const was = isAboard(playerCombat.aboard);
-      pressMount();
-      const now = isAboard(playerCombat.aboard);
-      return was || !now
-        ? { boarded: false, why: railHarness.state() }
-        : { boarded: true, ...(railHarness.state() as object) };
-    },
-
-    /** Press `E` to get off. The same press, and the same three ways off. */
-    alight: () => {
-      if (!isAboard(playerCombat.aboard)) return { alighted: false, why: 'not aboard' };
-      pressMount();
-      const p = player.position;
-      return {
-        alighted: !isAboard(playerCombat.aboard),
-        at: [+p.x.toFixed(1), +p.z.toFixed(1)],
-        feet: +(p.y - EYE_HEIGHT).toFixed(2),
-        onGround: player.onGround,
-        health: +playerCombat.health.toFixed(1),
-      };
-    },
-
-    /**
-     * The whole journey in one call: place, board, ride, get off, report.
-     *
-     *     await sydney.rail.ride('St Peters', 'Central')
-     *
-     * Every wait is a `setTimeout` against a number the timetable gave us. The
-     * only reason it takes as long as the journey is that the journey takes that
-     * long -- there is no searching in it anywhere.
-     */
-    ride: async (from = 'St Peters', to = 'Central', line?: string) => {
-      if (railBake === null) return { pass: false, why: 'no bake' };
-      if (net !== null) {
-        return {
-          pass: false,
-          why: 'ride() places the player, and placement is client-side -- online the server pulls ' +
-            'you back and board() then correctly refuses. Run it with ?offline, or online walk to ' +
-            'the platform and use when() and board(). The authoritative round trip is asserted ' +
-            'headlessly by integration-check.checkRiding against a real Simulation.',
-        };
-      }
-      const log: string[] = [];
-      const sleep = (sec: number): Promise<void> =>
-        new Promise((r) => { setTimeout(r, Math.max(0, sec) * 1000); });
-
-      // `then` is what makes this the train you want rather than the next one:
-      // half the T4s at St Peters are going to Waterfall, which reaches Central
-      // four minutes before you got on. See `riding.DwellWanted.then`.
-      const placed = railHarness.goto(from, line, to);
-      if (typeof placed === 'string') return { pass: false, why: placed, log };
-      log.push(
-        `placed in the doorway on the ${from} platform for the ${placed.line} to ` +
-          `${placed.towards}; doors in ${placed.doorsOpenIn} s`,
-      );
-      // Two seconds into the dwell. The doors take 1.6 s to slide and stand open
-      // for fifteen, so this is a passenger who was waiting rather than running.
-      await sleep(placed.doorsOpenIn + 2);
-
-      const got = railHarness.board();
-      if (!got.boarded) return { pass: false, why: got.why, log };
-      const a = playerCombat.aboard;
-      log.push(`boarded carriage ${a.car} of ${placed.line} trip ${a.trip}`);
-
-      const off = dwellAt(railBake, a, to);
-      if (off === null) {
-        return {
-          pass: false,
-          why: `the ${placed.line} to ${placed.towards} does not call at ${to}`,
-          calls: callsAhead(railBake, a, aboardPose(railBake, a, railSeconds(Date.now()))?.s ?? 0),
-          log,
-        };
-      }
-      const wait = off.opensAt - railSeconds(Date.now());
-      log.push(`${to} is ${wait.toFixed(0)} s down the line`);
-      if (wait > 900) return { pass: false, why: `${to} is ${Math.round(wait)} s away`, log };
-      await sleep(wait + 3);
-
-      const down = railHarness.alight();
-      if (!down.alighted) return { pass: false, why: 'E did not get us off', log, down };
-      // Half a second to settle: "on solid ground" is a claim about where a body
-      // comes to rest, not about the frame it was put down on.
-      await sleep(0.6);
-      const p = player.position;
-      const stn = (railNetwork?.stations ?? []).find((st) => st.name === to);
-      const metres = stn ? Math.hypot(p.x - stn.x, p.z - stn.z) : NaN;
-      const pass = player.onGround && metres < 140;
-      log.push(`off at ${to}, ${metres.toFixed(0)} m from the station's own anchor`);
-      return {
-        pass,
-        log,
-        at: [+p.x.toFixed(1), +p.z.toFixed(1)],
-        feet: +(p.y - EYE_HEIGHT).toFixed(2),
-        onGround: player.onGround,
-        health: +playerCombat.health.toFixed(1),
-        metresFromStation: +metres.toFixed(1),
-      };
-    },
-  };
-
   function simulate(dt: number): void {
     // Every input first, from the state as it stands at the top of the tick. A
     // dummy that thought *during* the loop would be reacting to a player who had
@@ -4981,37 +4373,7 @@ async function main(): Promise<void> {
     // ends the line on the very next tick, because the answer to the question
     // changed. There is no path left that can strand it, which is the property
     // that was actually missing.
-    //
-    // The train's pill shares the channel and takes precedence, on the same
-    // "asked what is true, every tick" contract: there is exactly one derived
-    // line and the two states it can be about are mutually exclusive -- you
-    // cannot be on a bike and on a train.
-    let trainPill = '';
-    boardable = false;
-    if (railBake && playerCombat.phase !== 'ko') {
-      if (isAboard(playerCombat.aboard)) {
-        trainPill = rideBanner(railBake, playerCombat.aboard, railSeconds(Date.now()), rideText)
-          ? (rideText.doorsOpen
-            ? `${rideText.line} · ${rideText.next} — E to get off`
-            : 'E to get off — at speed, it hurts')
-          : '';
-      } else {
-        // The offer, from the same function `E` will ask and the server will
-        // adjudicate, so what the pill promises is what the key delivers.
-        const feet = player.position.y - EYE_HEIGHT;
-        boardable = findBoarding(
-          railBake, player.position.x, feet, player.position.z, railSeconds(Date.now()), boardOffer,
-        );
-        if (boardable) {
-          const dir = dirOf(railBake, boardOffer.line, boardOffer.dir);
-          const towards = dir && dir.stops.length > 0 ? dir.stops[dir.stops.length - 1].name : '';
-          trainPill = `E to board the ${dir?.line.id ?? ''} to ${towards}`;
-        }
-      }
-    }
-    hud.derived(
-      trainPill || ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText),
-    );
+    hud.derived(ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText));
 
     // Reconciliation, at the top of the tick and before anything is advanced.
     //
@@ -5037,7 +4399,38 @@ async function main(): Promise<void> {
     // on this side at all, and a client that edited these lines would move at
     // its own speed for exactly as long as it takes the next snapshot to arrive.
     input.mount = keys.has('KeyE');
-    if (input.mount && !mountHeld && playerCombat.phase !== 'ko') pressMount();
+    if (input.mount && !mountHeld && playerCombat.phase !== 'ko') {
+      const field = bikeWorld();
+      if (playerCombat.ridingBike !== 0) {
+        // Off. Offline this parks the bike here and now; online the server does
+        // it, and the sweep below is a no-op because `net.bikes` is a mirror.
+        const wasRiding = playerCombat.ridingBike;
+        playerCombat.ridingBike = 0;
+        if (!net) {
+          field.release(
+            wasRiding,
+            player.position.x,
+            player.position.y - EYE_HEIGHT,
+            player.position.z,
+            player.yaw,
+          );
+        }
+        net?.predictedBikeChange();
+        // No `hud.notice('')` here any more, and its absence is the point. It
+        // used to be the one line in the client that took the ride nudge down,
+        // which made every other way to stop riding a way to strand it. The
+        // pill is derived at the top of this function now, so getting off with
+        // `E` clears it for the same reason getting knocked off does: the
+        // question is asked again and the answer is different.
+      } else {
+        const bike = field.nearestFree(player.position.x, player.position.y - EYE_HEIGHT, player.position.z);
+        if (bike && field.claim(bike.id, playerCombat.id)) {
+          playerCombat.ridingBike = bike.id;
+          net?.predictedBikeChange();
+          audio.pickupFlatWhite();
+        }
+      }
+    }
     mountHeld = input.mount;
 
     // --- Redfern, offline.
@@ -5053,45 +4446,8 @@ async function main(): Promise<void> {
       }
     }
 
-    // --- `input.yaw` changes frame at the seam. See `wasAboard`.
-    //
-    // Done here, after everything that can start or end a ride this tick and
-    // before the step that reads it, and driven off the *state* rather than off
-    // the transitions -- so a ride that ended because the server said so, or
-    // because the train reached its terminus, or because a respawn moved the
-    // body, converts exactly as one that ended with `E`.
-    {
-      const nowAboard = isAboard(playerCombat.aboard);
-      if (nowAboard !== wasAboard) {
-        if (nowAboard) {
-          // Into the carriage's frame. `predictBoard` has already put the same
-          // subtraction on `playerCombat.aboard.yaw`; this is the copy the mouse
-          // keeps writing to.
-          if (railBake && aboardFrame(railBake, playerCombat.aboard, railSeconds(Date.now()), rideFrame)) {
-            lastRideYaw = frameYaw(rideFrame);
-            input.yaw -= lastRideYaw;
-          }
-        } else {
-          // And back out, using the bearing the carriage had on the last tick it
-          // existed -- which is the only one available once the ride is over, and
-          // is within a degree of the one it had a sixtieth of a second ago.
-          input.yaw += lastRideYaw;
-          lastRideYaw = 0;
-        }
-        wasAboard = nowAboard;
-      } else if (nowAboard && rideActive) {
-        lastRideYaw = frameYaw(rideFrame);
-      }
-    }
-
     for (const f of fighters) {
-      // The one seam trains put in this loop, and it is `sim.step`'s verbatim:
-      // the local body is moved into its carriage's coordinates, stepped by the
-      // same unchanged `advance` against a floor and four walls, and composed
-      // back out. Everybody else is stepped against Sydney. See `game/riding.ts`.
-      const self = f.combat === playerCombat;
-      const events = advance(f.combat, f.input, dt, self ? enterCarriage() : combatWorld);
-      if (self) exitCarriage();
+      const events = advance(f.combat, f.input, dt, combatWorld);
 
       // A buffered click is spent the moment it produces a swing, so one press
       // is one swing even if the buffer has 100 ms left on it.
@@ -5429,11 +4785,6 @@ async function main(): Promise<void> {
       const tick = trafficTick(Date.now());
       for (const f of fighters) {
         if (online && f.combat !== playerCombat) continue;
-        // Nobody on a train is run over by a Camry. `server/sim.ts` makes the
-        // identical check in the identical place, which is what keeps this a
-        // prediction rather than a second opinion -- see its comment for the
-        // argument.
-        if (isAboard(f.combat.aboard)) continue;
         const car = carHitting(traffic, f.combat, tick, carRoutes, carPose);
         if (car === null) continue;
         const ko = applyCarHit(f.combat, car);
@@ -5493,21 +4844,7 @@ async function main(): Promise<void> {
     // can touch it -- the step, and the car shove, which both ends apply in the
     // same place in their own loop -- so it is the body as this tick leaves it,
     // which is the thing the server will acknowledge.
-    // The velocity recorded against this seq is the one the reconciler's replay
-    // will start from -- see `NetClient.sendInput`'s ordering contract and
-    // `ackedVelocity`. For a rider that has to be the **carriage-local**
-    // velocity, because the replay runs in the carriage's frame: seeding it with
-    // the world velocity would start every replay with the train's own 44 m/s
-    // rotated into the aisle, which is the acceleration-ramp bug at forty times
-    // the scale.
-    if (net) {
-      if (isAboard(playerCombat.aboard)) {
-        rideVelocity.set(playerCombat.aboard.vx, playerCombat.aboard.vy, playerCombat.aboard.vz);
-        net.sendInput(input, rideVelocity);
-      } else {
-        net.sendInput(input, playerCombat.body.velocity);
-      }
-    }
+    if (net) net.sendInput(input, playerCombat.body.velocity);
   }
 
   /** Handed to `tickPowerups` online. A constant, so the online path allocates nothing. */
@@ -5554,23 +4891,6 @@ async function main(): Promise<void> {
    */
   const CHASE_OPEN = 1.0;
   const CHASE_LIFT = 1.5;
-  /**
-   * And the lift inside a carriage, which is a different number for a reason.
-   *
-   * 1.5 m over a body whose eye is already 1.68 m puts the boom at 3.2 m, and a
-   * Tangara's lower saloon has 2.03 m of headroom. So the ordinary chase camera
-   * aboard a train is a camera pressed against the air-conditioning grille --
-   * which is exactly what it was, and which the `insideCarriage` clamp faithfully
-   * kept it inside of while producing a picture of nothing.
-   *
-   * The fix is not to abandon third person in here, because the aisle is the one
-   * place in this game with 9 m of clear room *behind* a player and it is worth
-   * looking down. It is to take the lift out: at 15 cm the boom runs level down
-   * the carriage, past the poles and the stairwell, and the clamp only ever bites
-   * on the bulkhead at the end. `verifyCamera`'s march is untouched -- this is
-   * the height it is asked about, not the rule it applies.
-   */
-  const RIDE_CHASE_LIFT = 0.15;
   const CHASE_NEAR = 0.9;
   const CHASE_FLOOR = 0.4;
   /** Time constant for easing *outward* only. See the loop. */
@@ -5723,45 +5043,6 @@ async function main(): Promise<void> {
       accumulator -= FIXED_DT;
       steps++;
     }
-
-    // --- The rail clock, once a frame, for everything that has to agree about
-    //     where a train is on *this* frame.
-    //
-    // Read here and passed down rather than read again at each of the three
-    // sites, because `Date.now()` is a millisecond and an express does 4.4 cm in
-    // one: a passenger composed against 14:22:07.412 standing inside a carriage
-    // drawn at 14:22:07.413 is a passenger 4 cm behind the floor, every frame,
-    // for the whole journey.
-    const railNow = railSeconds(Date.now());
-
-    // --- A rider's world position is recomposed **every frame**, not every tick.
-    //
-    // This is the line that makes riding look right, and leaving it out is the
-    // one mistake this architecture makes easy to make. The fixed step composes a
-    // world position at the instant of that step; the renderer runs at up to
-    // 165 Hz and the carriages are drawn at present time, because a train is a
-    // pure function of the clock and there is nothing to interpolate. Between
-    // the two there can be a whole frame of clock, which at 44 m/s is 70 cm --
-    // so the body would slide backwards through the floor and snap forward on
-    // each tick, sixty times a second, at a metre of amplitude.
-    //
-    // Composing here costs nine multiplies and fixes it exactly: the passenger
-    // and the vehicle are evaluated at the same instant, so the floor is
-    // stationary under them no matter what the frame rate is doing. It writes
-    // `AboardSlot.w*` as it goes, which is what the next tick's `enterLocal`
-    // compares against -- so this counts as "the ride moved the body" rather
-    // than as a teleport, which is exactly what it is.
-    rideAboardForCamera = null;
-    if (railBake && isAboard(playerCombat.aboard)) {
-      if (aboardFrame(railBake, playerCombat.aboard, railNow, rideFrame)) {
-        projectAboard(playerCombat.aboard, player, rideFrame);
-        const dir = dirOf(railBake, playerCombat.aboard.line, playerCombat.aboard.dir);
-        rideAboardForCamera = dir === null
-          ? null
-          : interiorOfCar(consistOf(dir, playerCombat.aboard.trip), playerCombat.aboard.car);
-      }
-    }
-
     applyToCamera(player, camera);
     if (net) {
       net.update(frameDt);
@@ -5808,31 +5089,7 @@ async function main(): Promise<void> {
     // because a ride can end for reasons no event fires for. See
     // `game/camera.ts`.
     const chosenDistance = liveCameraDistance(cameraDistance, playerCombat.ridingBike !== 0);
-    // --- Aboard a train the view is **first person**, and this is the call the
-    //     riding round makes after having looked at both alternatives on screen.
-    //
-    // The brief allowed either: clamp the boom inside the carriage, or fall back.
-    // The clamp exists and works -- `blockedAt` below marches the boom against
-    // `insideCarriage` in the carriage's own frame and it never leaves the shell
-    // -- and the picture it produces is the problem. A Tangara's lower saloon is
-    // 2.03 m from floor to ceiling and 2.8 m across, so:
-    //
-    //   - with the usual 1.5 m of `CHASE_LIFT` the boom is at 3.2 m and the
-    //     clamp holds it against the air-conditioning grille. The screenshot is
-    //     a close-up of a grille.
-    //   - with the lift taken out (`RIDE_CHASE_LIFT`, kept below because it is
-    //     the right number for the frames either side of this decision) the boom
-    //     runs level down the aisle and ends up inside the back of a seat --
-    //     because the interior collision is walls, floors and a staircase, and
-    //     deliberately has no furniture in it (`game/riding.ts` section 3).
-    //
-    // There is no boom position in an eight-car double-decker that reads as a
-    // third-person camera, and adding seat volumes to make one would be modelling
-    // furniture for the sake of a view nobody wants: the inside of a train is the
-    // one place in this game that is *better* in first person, because the thing
-    // worth looking at is out of the window. So the ride forces it, the preference
-    // is untouched, and stepping off puts the player back in whatever they chose.
-    const wantThird = isThirdPerson(chosenDistance) && !isAboard(playerCombat.aboard);
+    const wantThird = isThirdPerson(chosenDistance);
     if (wantThird !== thirdPerson) {
       thirdPerson = wantThird;
       // The body, the bat in its hand and the football in the other. Three calls
@@ -5914,29 +5171,7 @@ async function main(): Promise<void> {
       const blockedAt = (d: number): boolean => {
         const px = headX - dirX * d;
         const pz = headZ - dirZ * d;
-        const py = headY - dirY * d + (rideAboardForCamera !== null ? RIDE_CHASE_LIFT : CHASE_LIFT);
-        // --- Aboard, the carriage is the only thing in the way, and it is the
-        //     only thing that must be.
-        //
-        // **Clamped inside the vehicle rather than dropped to first person**,
-        // and the argument is what the two failures look like. A camera allowed
-        // out through the bodyside at 130 km/h does not merely clip -- it is
-        // outside a box that is moving, so it spends every frame being left
-        // behind and re-caught, and the picture is the carriage strobing across
-        // the screen. A forced first person is legible but it takes the third-
-        // person view away from the one place in the game with a *room* in it,
-        // which is the place it is most worth having: an eight-car interior with
-        // a staircase is the best thing this feature has to look at.
-        //
-        // So the boom marches against the shell in the carriage's own frame,
-        // which is exactly the question `insideCarriage` answers, and the city
-        // is not consulted at all. It must not be: the warehouse the train is
-        // passing through is 4 m away and would pin the camera to the player's
-        // ears on every gantry between here and Strathfield.
-        if (rideAboardForCamera !== null) {
-          worldToLocal(rideFrame, px, py, pz, rideLocal);
-          return !insideCarriage(rideAboardForCamera, rideLocal.x, rideLocal.y, rideLocal.z);
-        }
+        const py = headY - dirY * d + CHASE_LIFT;
         // Against the roofs as well as the walls: a camera that swung up over a
         // warehouse would otherwise end up inside it. Head and feet both at the
         // boom's own height -- a camera is a point, and a 1.8 m head on it would
@@ -5961,8 +5196,7 @@ async function main(): Promise<void> {
       // silently turns reconciliation off in third person, and the symptom is
       // remote-looking rubber-banding that only happens on a bike.
       camera.position.x -= dirX * chaseDistance;
-      camera.position.y +=
-        (rideAboardForCamera !== null ? RIDE_CHASE_LIFT : CHASE_LIFT) - dirY * chaseDistance;
+      camera.position.y += CHASE_LIFT - dirY * chaseDistance;
       camera.position.z -= dirZ * chaseDistance;
     } else {
       // Reset, so stepping back into third person starts at the near distance
@@ -5989,20 +5223,6 @@ async function main(): Promise<void> {
     // no countdown to sort by: a ride lasts until you get off and the tuning
     // lasts the session. `hud.vitals` draws a chip with `seconds <= 0` as a bare
     // label, which is what these are.
-    // The train's line goes first and on its own, because it is the one chip in
-    // this list that is *navigation* rather than a buff: TRAINS.md's "T1 ->
-    // Penrith . next: Blacktown", derived from the bake every frame by
-    // `riding.rideBanner` so there is no state to strand. A chip with no
-    // countdown draws as a bare label -- see `hud.vitals` -- which is what these
-    // are.
-    if (railBake && isAboard(playerCombat.aboard)) {
-      if (rideBanner(railBake, playerCombat.aboard, railSeconds(Date.now()), rideText)) {
-        powerupChips.unshift({
-          name: `${rideText.line} → ${rideText.towards} · next: ${rideText.next}`,
-          seconds: 0,
-        });
-      }
-    }
     if (playerCombat.ridingBike !== 0) {
       powerupChips.push({
         name: `RIDING x${bikeSpeedScale(playerCombat.bikeTuned).toFixed(1)}`,
@@ -6137,37 +5357,6 @@ async function main(): Promise<void> {
     // sun's bearing by 1/sin(altitude) and is what decides which tiles are told
     // to receive. See `streamer.sunReceiveRange`.
     streamer.update(camera, sky.shadowVolume, alt);
-    // --- And, for a rider, where they will be rather than where they are.
-    //
-    // TRAINS.md's deterministic prefetch. The radial guess `update` just made is
-    // sized against a bike: 1,800 m of load radius at 39.4 m/s is 46 s of lead,
-    // and the hex manifests reach 2,200 m past that. At 44.4 m/s on an express
-    // those become 40 s and a shrinking margin -- but the margin is not the
-    // point. The *route* is known, in closed form, so a guess of any radius is
-    // strictly worse than the answer: a train on the Bankstown line is not going
-    // to be 1,800 m north of here in forty seconds, it is going to be 1,780 m
-    // west of here, and half of every disc fetched around a rider is bytes for a
-    // suburb they will never enter.
-    //
-    // Sixty seconds ahead, sampled *along the arc* rather than extrapolated from
-    // a heading -- so the lead follows the curve at Redfern and the line through
-    // Sydenham instead of leaving the corridor at the first bend. Two samples,
-    // at 30 s and 60 s, because one at the far end skips the hexagon in the
-    // middle when the streamer's own cell test says nothing changed.
-    //
-    // Tunnels are the cheap case and get it for free: `poseTrain` puts the
-    // sample under the hill, the hexagon there is fetched, and there is nothing
-    // in it to build because the city above is untouched.
-    if (railBake && isAboard(playerCombat.aboard)) {
-      const dir = dirOf(railBake, playerCombat.aboard.line, playerCombat.aboard.dir);
-      const pose = dir === null ? null : aboardPose(railBake, playerCombat.aboard, railNow);
-      if (dir !== null && pose !== null) {
-        for (const lead of [30, 60]) {
-          const ahead = poseAheadOnLine(railBake, dir, playerCombat.aboard.trip, railNow + lead);
-          if (ahead !== null) streamer.prefetchAt(ahead.x, ahead.z);
-        }
-      }
-    }
     // The skyline, on its own much wider radius. `streamer.update` has just
     // moved the hex manifests along on `approach_m` = 4 km; this moves the far
     // slabs along on `far_cut_m` = 20 km, because a hexagon is visible from
@@ -6196,7 +5385,7 @@ async function main(): Promise<void> {
     // city exactly where it would have been. `poseTrain` is the same function
     // the server evaluates, so what is drawn here is what the server says.
     if (railBake) {
-      trains.update(railBake, railNow, player.position.x, player.position.z);
+      trains.update(railBake, railSeconds(Date.now()), player.position.x, player.position.z);
     }
 
     // The night rig, after the streamer -- so a tile that arrived this frame
@@ -7337,30 +6526,28 @@ async function main(): Promise<void> {
         overflows: railWorld?.overflows ?? 0,
         trains: { ...trains.stats },
       }),
-      // --- The rail harness. See `railHarness` for what these are and why the
-      //     board/alight pair presses the same button the player does.
-      stations: railHarness.stations,
-      when: railHarness.when,
-      goto: railHarness.goto,
-      catch: railHarness.goto,
-      board: railHarness.board,
-      alight: railHarness.alight,
-      ride: railHarness.ride,
-      state: railHarness.state,
-      keys: () => ({ down: [...keys], mountHeld }),
+      stations: (query = '') =>
+        (railNetwork?.stations ?? [])
+          .filter((s) => s.name.toLowerCase().includes(query.toLowerCase()))
+          .map((s) => `${s.name} (${s.vertical}, ${s.platforms} platforms)`),
       /**
        * Stand on the platform at a station, facing across the track.
        *
-       * The original tool, kept because it is the one that answers "let me look
-       * at this station" rather than "let me catch a train from it": it takes an
-       * offset along the platform and does not care whether a service is due.
-       * `goto` is the one to use for boarding -- it stands you in a doorway.
+       * Offset to the platform side rather than dropped on the station node,
+       * which is the *track* centre: arriving between the rails is arriving
+       * where the next train is, and the point of this tool is to watch one
+       * arrive.
        */
       go: (name = 'Central', along = -46) => {
         const station = (railNetwork?.stations ?? []).find((s) =>
           s.name.toLowerCase().includes(name.toLowerCase()),
         );
         if (!station) return `no station matching "${name}"`;
+        // Along the platform rather than across it, and back from the middle:
+        // standing on the station node is standing between the rails, and
+        // standing beside it is standing with your nose on the name board. Down
+        // the platform looking back at the canopy is the view the whole thing is
+        // composed for, and it is the one a train arrives into.
         const px = -station.uz;
         const pz = station.ux;
         const x = station.x + station.ux * along + px * 4.4;
@@ -7368,8 +6555,6 @@ async function main(): Promise<void> {
         player.position.set(x, station.trackY + 1.05 + EYE_HEIGHT, z);
         player.velocity.set(0, 0, 0);
         player.yaw = Math.atan2(-(station.z - z), station.x - x);
-        input.yaw = player.yaw;
-        clearAboard(playerCombat.aboard);
         return `${station.name} (${station.vertical}, ${station.platforms} platforms) at ${x.toFixed(0)}, ${z.toFixed(0)}`;
       },
     },

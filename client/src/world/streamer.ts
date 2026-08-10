@@ -2185,34 +2185,6 @@ export class TileStreamer implements LampSource {
    * 3 pm so a caller with no sky gets the geometry this rig was tuned against
    * rather than a shadow range of NaN.
    */
-  /**
-   * Warm the manifests and bundles for somewhere the player is not yet.
-   *
-   * The radial prefetch in `update` is a *guess*: it assumes the next 2,200 m
-   * are as likely to be in one direction as another, which is true of somebody
-   * walking and false of somebody on a train. A rider's next sixty seconds are
-   * **known** -- the route is a polyline and the timetable is closed form -- so
-   * `main.ts` samples where they will be and hands the point over here, and the
-   * hexagons along the line are asked for instead of the disc around the player.
-   *
-   * Only the two long-lead layers, and deliberately: a hex manifest is the fact
-   * that a square kilometre exists at all and a region bundle is its bytes, and
-   * both are the things that cannot arrive in time if they are started late.
-   * The tiles themselves stay on the radial `loadRadius`, because a tile is
-   * 1.6 MB of geometry that is only worth building when it is about to be
-   * visible -- and 1,800 m of radius is already 40 s of lead at 44 m/s.
-   *
-   * Cheap enough to call every frame: both functions are a hex-coordinate
-   * conversion and a set membership, and both return immediately when the point
-   * has not left the cell it was in last time. `update` calls them once for the
-   * camera already.
-   */
-  prefetchAt(x: number, z: number): void {
-    if (!this.index) return;
-    updateHexes(x, z);
-    updateRegions(x, z);
-  }
-
   update(
     camera: Camera,
     shadowVolume: Frustum | null = null,

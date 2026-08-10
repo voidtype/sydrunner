@@ -14,7 +14,7 @@
 
 import { Euler, Vector3 } from 'three/webgpu';
 
-import { BODY_HEIGHT_M, type MoveResolver } from './collision.ts';
+import { BODY_HEIGHT_M, type CollisionWorld } from './collision.ts';
 
 export interface InputSnapshot {
   forward: number; // -1..1
@@ -127,7 +127,7 @@ export function step(
   state: PlayerState,
   input: InputSnapshot,
   dt: number,
-  world: MoveResolver | null,
+  world: CollisionWorld | null,
   groundHeightAt: (x: number, z: number, feetY: number) => number,
 ): void {
   state.yaw = input.yaw;

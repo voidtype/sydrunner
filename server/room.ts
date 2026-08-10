@@ -98,7 +98,6 @@ import {
   type InterestEnter,
   type InvestigationRecord,
   type SnapshotBall,
-  type SnapshotAboard,
   type SnapshotNpc,
   type SnapshotPlayer,
 } from '../client/src/net/protocol.ts';
@@ -593,16 +592,6 @@ export class Room {
   private readonly subPlayers: SnapshotPlayer[] = [];
   private readonly subBalls: SnapshotBall[] = [];
   private readonly subNpcs: SnapshotNpc[] = [];
-  /**
-   * v10's riders, for the group currently being encoded.
-   *
-   * Not a member of the group key, and it does not need to be: the aboard
-   * section is a strict function of the *player* set -- a rider appears in it
-   * exactly when their ordinary record appears above -- so two clients with the
-   * same working set have the same riders by construction and the interning in
-   * `Groups` is still sound. See `protocol.ABOARD_BYTES`.
-   */
-  private readonly subAboard: SnapshotAboard[] = [];
   /** The enter records for one client's INTEREST frame. Pooled. */
   private readonly enterRecords: InterestEnter[] = [];
   /** One INTEREST buffer for the room: it is per client and cannot be deduped. */
@@ -1052,7 +1041,6 @@ export class Room {
     const players = sim.snapshot(this.snapshotScratch);
     const balls = sim.ballSnapshot();
     const npcs = sim.npcSnapshot();
-    const aboard = sim.aboardSnapshot();
     this.interest.begin(players, balls, npcs);
     this.groups.begin();
     this.aoiMs += performance.now() - t;
@@ -1109,12 +1097,10 @@ export class Room {
       // --- The bodies. Encoded once per distinct set; see the header.
       t = performance.now();
       if (group.length === 0) {
-        this.fill(players, balls, npcs, aboard, group.players, group.balls, group.npcs);
-        group.reserve(snapshotBytes(
-          this.subPlayers.length, this.subBalls.length, this.subNpcs.length, this.subAboard.length,
-        ));
+        this.fill(players, balls, npcs, group.players, group.balls, group.npcs);
+        group.reserve(snapshotBytes(this.subPlayers.length, this.subBalls.length, this.subNpcs.length));
         group.length = encodeSnapshotInto(
-          group.view, sim.tick, 0, this.subPlayers, this.subBalls, this.subNpcs, this.subAboard,
+          group.view, sim.tick, 0, this.subPlayers, this.subBalls, this.subNpcs,
         );
         this.framesEncoded++;
       }
@@ -1145,23 +1131,14 @@ export class Room {
     players: readonly SnapshotPlayer[],
     balls: readonly SnapshotBall[],
     npcs: readonly SnapshotNpc[],
-    aboard: ReadonlyMap<number, SnapshotAboard>,
     ids: readonly number[],
     ballIdx: readonly number[],
     npcIdx: readonly number[],
   ): void {
     this.subPlayers.length = 0;
-    this.subAboard.length = 0;
     for (const id of ids) {
       const slot = this.interest.slotOf(id);
       if (slot >= 0) this.subPlayers.push(players[slot]);
-      // The rider record for the same id, if there is one. `aboard` is usually
-      // empty and this is a map lookup per player in view, which at the 40-player
-      // cap is forty misses -- against the alternative, a second interest pass.
-      if (aboard.size > 0) {
-        const rider = aboard.get(id);
-        if (rider !== undefined) this.subAboard.push(rider);
-      }
     }
     this.subBalls.length = 0;
     for (const i of ballIdx) this.subBalls.push(balls[i]);

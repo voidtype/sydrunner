@@ -105,20 +105,13 @@ import {
   dwellElapsed,
   liveTripCount,
   poseTrain,
+  sampleAlong,
+  trainIdentity,
   tripIndexAt,
   type RailBake,
   type RailDirection,
   type TrainPose,
 } from '../game/rail.ts';
-import {
-  METROPOLIS,
-  TANGARA,
-  carFrameAt,
-  consistOf,
-  consistOffset,
-  createCarFrame,
-  type ConsistCar,
-} from '../game/riding.ts';
 
 const MODEL_DIR = '/trains/';
 
@@ -140,9 +133,13 @@ const IMPOSTOR_RADIUS = 1700;
 /** Carriages the impostor set can hold: about 110 trains, which the AOI never has. */
 const IMPOSTOR_CAPACITY = 900;
 
+/** Bogie centres, from the carriage centre. A Tangara's are 14.2 m apart. */
+const BOGIE_HALF = 7.1;
 /** How long a door takes to open, and to close again at the end of the dwell. */
 const DOOR_SECONDS = 1.6;
 
+/** One trip in sixteen wears the Pride livery. A rare variant, hashed. */
+const PRIDE_SHARE = 16;
 
 // --- The manifest ------------------------------------------------------------------
 
@@ -214,7 +211,10 @@ const _matrix = /*#__PURE__*/ new Matrix4();
 const _f = /*#__PURE__*/ new Vector3();
 const _u = /*#__PURE__*/ new Vector3();
 const _r = /*#__PURE__*/ new Vector3();
+const _a = /*#__PURE__*/ new Vector3();
+const _b = /*#__PURE__*/ new Vector3();
 const _colour = /*#__PURE__*/ new Color();
+const WORLD_UP = /*#__PURE__*/ new Vector3(0, 1, 0);
 
 /**
  * A mesh's geometry, in the carriage's own frame, as plain float32.
@@ -502,22 +502,50 @@ function findDoorAncestor(mesh: Object3D): Object3D | null {
 
 // --- The consist ---------------------------------------------------------------------
 
+interface ConsistCar {
+  key: string;
+  /** True for a carriage coupled the other way round. */
+  flip: boolean;
+}
+
 /**
- * What a service is made of, and where each carriage of it sits.
+ * What a service is made of.
  *
- * **Both moved to `game/riding.ts`** and are imported back here rather than
- * copied, which is the whole reason the move happened: the carriage a passenger
- * is standing in has to be the carriage this file draws, on the client *and on
- * the server*, which has no renderer and no manifest. Two tables would be two
- * tables that drift, and the symptom of a drift is a rider standing in the gap
- * between carriages four and five with the doors of both open beside them.
- *
- * Template keys are namespaced by model, and that is not tidiness either. Both
- * files call their intermediate carriage `mid`. Filed under the bare key one
- * silently overwrites the other, and the symptom is a Tangara whose middle six
- * carriages are Sydney Metro single-deckers -- which is exactly what the first
- * build did, and it took a triangle count in the console to notice.
+ * Eight cars for a suburban line -- two four-car Tangara sets, each
+ * driving-intermediate-intermediate-driving with the rear cab reversed, which is
+ * how they actually run -- and six for the Metro, lead-intermediate-trailer and
+ * the same three back the other way.
  */
+/**
+ * Template keys are namespaced by model, and that is not tidiness either.
+ *
+ * Both files call their intermediate carriage `mid`. Filed under the bare key
+ * one silently overwrites the other, and the symptom is a Tangara whose middle
+ * six carriages are Sydney Metro single-deckers -- which is exactly what the
+ * first build did, and it took a triangle count in the console to notice.
+ */
+const TANGARA = 'tangara';
+const METROPOLIS = 'metropolis';
+
+const SUBURBAN: readonly ConsistCar[] = [
+  { key: `${TANGARA}:cab`, flip: false },
+  { key: `${TANGARA}:mid`, flip: false },
+  { key: `${TANGARA}:mid`, flip: true },
+  { key: `${TANGARA}:cab`, flip: true },
+  { key: `${TANGARA}:cab`, flip: false },
+  { key: `${TANGARA}:mid`, flip: false },
+  { key: `${TANGARA}:mid`, flip: true },
+  { key: `${TANGARA}:cab`, flip: true },
+];
+
+const METRO: readonly ConsistCar[] = [
+  { key: `${METROPOLIS}:lead`, flip: false },
+  { key: `${METROPOLIS}:mid`, flip: false },
+  { key: `${METROPOLIS}:trail`, flip: false },
+  { key: `${METROPOLIS}:trail`, flip: true },
+  { key: `${METROPOLIS}:mid`, flip: true },
+  { key: `${METROPOLIS}:lead`, flip: true },
+];
 
 /** Warm grey Tangara body and Metro blue, linear, for the box trains. */
 const IMPOSTOR_SUBURBAN: readonly [number, number, number] = [0.2, 0.198, 0.19];
@@ -794,30 +822,19 @@ export class TrainFleet {
     dir: RailDirection,
     trip: number,
   ): { cars: readonly ConsistCar[]; pitch: number; pride: boolean; metro: boolean } {
-    // `game/riding.consistOf` decides all four, including the Pride set's stable
-    // one-in-sixteen over the train's own identity, because the server has to
-    // agree about every one of them and cannot read a manifest.
-    //
-    // The manifest's pitch is still consulted, and it is a **check** rather than
-    // a source: `riding.SUBURBAN_PITCH` is the manifest's own 20.4 restated, and
-    // if a re-prepped model ever changes it this is where the two would part
-    // company. Preferring the loaded value would put the renderer's carriages
-    // 1.2 m from where every rider on the server thinks they are.
-    const consist = consistOf(dir, trip);
-    const loaded = consist.metro
-      ? this.pitches.get(`${METROPOLIS}:lead`)
-      : this.pitches.get(`${TANGARA}:cab`);
-    if (loaded !== undefined && Math.abs(loaded - consist.pitch) > 0.01 && !this.pitchWarned) {
-      this.pitchWarned = true;
-      this.warnings.push(
-        `manifest pitch ${loaded} m against game/riding.ts's ${consist.pitch} m; ` +
-          'riders and carriages will not line up until the two agree',
-      );
-    }
-    return consist;
+    const metro = dir.line.metro;
+    // The Pride set: a stable one-in-sixteen over the train's own identity, so
+    // the same service is the same livery for every player and for the whole of
+    // its run. `trainIdentity` is `traffic.ts`' `carHash` with the same argument.
+    const pride = !metro && trainIdentity(dir, trip) % PRIDE_SHARE === 0;
+    return {
+      cars: metro ? METRO : SUBURBAN,
+      pitch:
+        (metro ? this.pitches.get(`${METROPOLIS}:lead`) : this.pitches.get(`${TANGARA}:cab`)) ?? 21,
+      pride,
+      metro,
+    };
   }
-
-  private pitchWarned = false;
 
   /**
    * The namespaced key of the template this carriage should wear.
@@ -927,13 +944,22 @@ export class TrainFleet {
 }
 
 /**
- * Where each carriage of a consist sits: `game/riding.consistOffset`.
+ * Arc length of carriage `k`'s centre, for a consist of `n` at `pitch` metres,
+ * whose reference point is at `s`.
  *
- * Moved with the consist tables and imported back, and the argument that used
- * to live here moved with it: **the reference point is the middle of the train,
- * not its nose.** A 163 m train hung behind `poseTrain`'s single point puts its
- * rear four carriages out over the points at every platform in Sydney.
+ * **The reference point is the middle of the train, not its nose**, and that is
+ * a decision this file makes rather than one the bake made. `poseTrain` answers
+ * for one point and the bake's stopping arc lengths are that point; hanging the
+ * consist *behind* it puts a 163 m train on a 160 m platform with its front
+ * doors at the platform's middle and its rear four carriages out over the
+ * points. Centred, a stopped train covers the platform the way a stopped train
+ * does. Nothing about the timetable changes -- `poseTrain` is untouched -- and
+ * the seam the riding round needs is `k = 0` being the leading carriage, which
+ * it still is.
  */
+function consistOffset(s: number, k: number, n: number, pitch: number): number {
+  return s + (n / 2 - k - 0.5) * pitch;
+}
 
 /** How far open the doors are, given how long the train has been standing. */
 function doorOpenness(stopped: number, dwell: number): number {
@@ -944,30 +970,30 @@ function doorOpenness(stopped: number, dwell: number): number {
   return Math.max(0, Math.min(opening, closing));
 }
 
-/**
- * The matrix that puts a carriage centred at arc length `centre` on the rails.
- *
- * **The two-bogie sample and the basis it builds now live in
- * `game/riding.carFrameAt`**, and this is a nine-component copy of the answer
- * rather than a second derivation of it. That move is the point: a rider's
- * position is composed against exactly this frame on the server, in a process
- * with no three in it, and a renderer that built its own basis would draw the
- * carriage a few centimetres from where the person standing in it is. Section 3
- * of this file's header still describes what the frame is and why it takes two
- * samples; the arithmetic is over there now, unchanged statement for statement.
- */
+/** The matrix that puts a carriage centred at arc length `centre` on the rails. */
 function carMatrix(
   bake: RailBake, dir: RailDirection, centre: number, flip: boolean, out: Matrix4,
 ): void {
-  carFrameAt(bake, dir, centre, flip, _frame);
-  _f.set(_frame.fx, _frame.fy, _frame.fz);
-  _u.set(_frame.ux, _frame.uy, _frame.uz);
-  _r.set(_frame.rx, _frame.ry, _frame.rz);
+  sampleAlong(bake, dir, Math.max(centre - BOGIE_HALF, 0), _scratchA);
+  sampleAlong(bake, dir, centre + BOGIE_HALF, _scratchB);
+  _a.set(_scratchA.x, _scratchA.y, _scratchA.z);
+  _b.set(_scratchB.x, _scratchB.y, _scratchB.z);
+  _f.subVectors(_b, _a);
+  if (_f.lengthSq() < 1e-6) _f.set(_scratchB.dx, 0, _scratchB.dz);
+  _f.normalize();
+  if (flip) _f.negate();
+  // Orthonormal basis with +X the nose, +Y up and +Z its cross, which is the
+  // convention `prep-train-models.mjs` verified both models already ship in.
+  _r.copy(WORLD_UP).sub(_f.clone().multiplyScalar(WORLD_UP.dot(_f)));
+  if (_r.lengthSq() < 1e-6) _r.set(0, 1, 0);
+  _u.copy(_r).normalize();
+  _r.crossVectors(_f, _u);
   out.makeBasis(_f, _u, _r);
-  out.setPosition(_frame.ox, _frame.oy, _frame.oz);
+  out.setPosition((_a.x + _b.x) / 2, (_a.y + _b.y) / 2, (_a.z + _b.z) / 2);
 }
 
-const _frame = /*#__PURE__*/ createCarFrame();
+const _scratchA = /*#__PURE__*/ createTrainPose();
+const _scratchB = /*#__PURE__*/ createTrainPose();
 
 function placeCar(
   bake: RailBake, dir: RailDirection, centre: number, root: Object3D, flip: boolean,
