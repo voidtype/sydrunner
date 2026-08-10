@@ -4,7 +4,7 @@ TRAINS.md is the plan of record and this module is its phase-2 half -- the
 *service*, not the geometry. Nothing here emits a triangle. What it emits is the
 one artefact every later round needs and none of them can re-derive cheaply:
 
-    a rail graph in world ENU metres, ten stopping patterns pathed end to end
+    a rail graph in world ENU metres, eleven stopping patterns pathed end to end
     through it, a closed-form distance-time curve per line per direction, and a
     set of integer phase offsets proved to keep every train out of every other
     train's block section.
@@ -105,7 +105,10 @@ PARALLEL_TRACK_M = 12.0  # how far sideways to look for a neighbouring track
 # and neither may drag the other's module into its process.
 RAIL_EPOCH_MS = 1767225600000
 
-BAKE_VERSION = 1
+# 2: the `vertexClearance` buffer and the derived `vertical` (RAIL-VERTICAL.md).
+# The decoder checks this exactly, which is deliberate -- a stale rail.bin in a
+# browser cache would otherwise read the new station fields off an old file.
+BAKE_VERSION = 2
 RAIL_MAGIC = 0x4C494152  # 'RAIL' little-endian
 
 OUT_DIR = config.DATA_ROOT / "scratch" / "rail"
@@ -159,6 +162,20 @@ class RailStation:
     track_y: float = 0.0
     # Metres of terrain over the platform. See `classify_vertical`.
     depth: float = 0.0
+    # --- RAIL-VERTICAL.md's measurement, and the thing `vertical` is derived
+    # from. `clearance = trackY - groundY`, median over the platform length,
+    # positive above the DEM and negative below it. `depth` above is its
+    # negation at a single sampled point, and is kept only because the audit
+    # table and `stations.json` have printed it since the first bake.
+    clearance: float = 0.0
+    clearance_lo: float = 0.0  # 25th percentile over the platform
+    clearance_hi: float = 0.0  # 75th
+    # 'tunnel' | 'bridge' | 'open': what OSM says is *built* here, which is a
+    # different question from where the ground is.
+    structure: str = "open"
+    # Non-empty when the structure and the DEM contradict each other. Reported
+    # by `rail-audit` section 4a, never silently obeyed.
+    conflict: str = ""
     # Tunnel share of the track at this station's own level within
     # `STATION_APPROACH_RADIUS_M`, and whether it was what decided the verdict.
     approach_share: float = 0.0
@@ -367,6 +384,11 @@ class RailGraph:
     way_of: np.ndarray  # (E,) index into `ways`
     ways: list[RailWay]
     adj: list[list[int]] = field(default_factory=list)  # node -> edge indices
+    # (N,) the DEM under each node, kept beside the solved `y` rather than
+    # discarded, because `clearance = y - ground` is the number RAIL-VERTICAL.md
+    # makes geometry's only input and re-sampling it downstream would be
+    # sampling a different surface and calling it the same one.
+    ground: np.ndarray = field(default_factory=lambda: np.zeros(0))
 
     @property
     def n_nodes(self) -> int:
@@ -617,7 +639,7 @@ def span_flags(g: RailGraph, edge_seq: Sequence[int]) -> np.ndarray:
     return out
 
 
-# --- The ten lines --------------------------------------------------------------
+# --- The eleven lines --------------------------------------------------------------
 #
 # Hand-curated, because the relations do not carry an ordered stop list through
 # GDAL (see the module header). `*` on a name means the line runs *through* the
@@ -636,20 +658,33 @@ def span_flags(g: RailGraph, edge_seq: Sequence[int]) -> np.ndarray:
 
 LINE_SPECS: list[dict[str, Any]] = [
     {
+        # --- The express that was too express ---------------------------------
+        #
+        # TRAINS.md said "express west of Strathfield, north of Chatswood" and
+        # this list implemented it faithfully, which left seven North Shore
+        # stations -- Roseville, Lindfield, Killara, Pymble, Warrawee, Wahroonga,
+        # Waitara -- five Western ones -- Kingswood, Werrington, Mount Druitt,
+        # Rooty Hill, Doonside -- and Asquith, Mount Colah and Mount Kuring-gai
+        # with a platform, a name board and no train, because T1 is the *only*
+        # service that reaches any of them. A player stood on Roseville platform
+        # and watched them go through at line speed.
+        #
+        # T1 now calls everywhere it goes, and so does every other line: see
+        # `ALL_STATIONS` below for the decision and what it cost.
         "id": "T1",
         "name": "North Shore & Western",
         "relation_ref": "T1",
         "colour": 0xF99D1C,
         "stations": [
-            "Emu Plains", "Penrith", "Kingswood*", "Werrington*", "St Marys",
-            "Mount Druitt*", "Rooty Hill*", "Doonside*", "Blacktown", "Seven Hills",
-            "Toongabbie*", "Pendle Hill*", "Wentworthville*", "Westmead", "Parramatta",
-            "Harris Park*", "Granville", "Clyde*", "Auburn*", "Lidcombe", "Strathfield",
-            "Burwood*", "Redfern", "Central", "Town Hall", "Wynyard", "Milsons Point",
+            "Emu Plains", "Penrith", "Kingswood", "Werrington", "St Marys",
+            "Mount Druitt", "Rooty Hill", "Doonside", "Blacktown", "Seven Hills",
+            "Toongabbie", "Pendle Hill", "Wentworthville", "Westmead", "Parramatta",
+            "Harris Park", "Granville", "Clyde", "Auburn", "Lidcombe", "Strathfield",
+            "Burwood", "Redfern", "Central", "Town Hall", "Wynyard", "Milsons Point",
             "North Sydney", "Waverton", "Wollstonecraft", "St Leonards", "Artarmon",
-            "Chatswood", "Roseville*", "Lindfield*", "Killara*", "Gordon", "Pymble*",
-            "Turramurra", "Warrawee*", "Wahroonga*", "Waitara*", "Hornsby",
-            "Asquith*", "Mount Colah*", "Mount Kuring-gai*", "Berowra",
+            "Chatswood", "Roseville", "Lindfield", "Killara", "Gordon", "Pymble",
+            "Turramurra", "Warrawee", "Wahroonga", "Waitara", "Hornsby",
+            "Asquith", "Mount Colah", "Mount Kuring-gai", "Berowra",
         ],
     },
     {
@@ -670,7 +705,7 @@ LINE_SPECS: list[dict[str, Any]] = [
     {
         # --- The one line the extract overruled -------------------------------
         #
-        # TRAINS.md has T3 as "Liverpool <-> City Circle **via Bankstown**",
+        # TRAINS.md has T3 as "Liverpool <-> City Circle **via Bankstown*",
         # which is the pre-conversion network. In this extract the whole of
         # Sydenham -- Marrickville -- Dulwich Hill -- Hurlstone Park -- Canterbury
         # -- Campsie -- Belmore -- Lakemba -- Wiley Park -- Punchbowl -- Bankstown
@@ -689,7 +724,7 @@ LINE_SPECS: list[dict[str, Any]] = [
         "stations": [
             "Liverpool", "Warwick Farm", "Cabramatta", "Carramar", "Villawood",
             "Leightonfield", "Chester Hill", "Sefton", "Birrong", "Regents Park",
-            "Berala", "Lidcombe", "Flemington*", "Homebush*", "Strathfield",
+            "Berala", "Lidcombe", "Flemington", "Homebush", "Strathfield",
             "Burwood", "Croydon", "Ashfield", "Summer Hill", "Lewisham",
             "Petersham", "Stanmore", "Newtown", "Macdonaldtown", "Redfern",
             "Central",
@@ -703,8 +738,12 @@ LINE_SPECS: list[dict[str, Any]] = [
         "stations": [
             "Waterfall", "Heathcote", "Engadine", "Loftus", "Sutherland", "Jannali",
             "Como", "Oatley", "Mortdale", "Penshurst", "Hurstville",
-            "Allawah*", "Carlton*", "Kogarah*", "Rockdale*", "Banksia*", "Arncliffe*",
-            "Wolli Creek*", "Tempe*", "Sydenham", "St Peters", "Erskineville",
+            # TRAINS.md's "express Hurstville--Sydenham" had T1's fault: T4 is
+            # the only service that reaches Allawah, Carlton, Kogarah, Rockdale,
+            # Banksia, Arncliffe or Tempe, so expressing them left seven
+            # platforms with no train.
+            "Allawah", "Carlton", "Kogarah", "Rockdale", "Banksia", "Arncliffe",
+            "Wolli Creek", "Tempe", "Sydenham", "St Peters", "Erskineville",
             # **Not** via Town Hall. The Eastern Suburbs Railway leaves from
             # Central's platforms 24/25 and runs straight to Martin Place; Town
             # Hall is on the City Circle, a different pair of tracks. Putting it
@@ -754,8 +793,11 @@ LINE_SPECS: list[dict[str, Any]] = [
         "stations": [
             "Macarthur", "Campbelltown", "Leumeah", "Minto", "Ingleburn",
             "Macquarie Fields", "Glenfield", "Holsworthy", "East Hills", "Panania",
-            "Revesby", "Padstow*", "Riverwood*", "Narwee*", "Beverly Hills*",
-            "Kingsgrove*", "Bexley North*", "Bardwell Park*", "Turrella*",
+            # Same correction as T1 and T4. "Express Revesby--Wolli Creek" is a
+            # peak pattern, and the eight stations it skipped have no other
+            # service in the model: T8 *is* the East Hills line.
+            "Revesby", "Padstow", "Riverwood", "Narwee", "Beverly Hills",
+            "Kingsgrove", "Bexley North", "Bardwell Park", "Turrella",
             "Wolli Creek", "International Airport", "Domestic Airport", "Mascot",
             "Green Square", "Central", "Town Hall", "Wynyard", "Circular Quay",
             "St James", "Museum", "Central",
@@ -770,7 +812,81 @@ LINE_SPECS: list[dict[str, Any]] = [
             "Hornsby", "Normanhurst", "Thornleigh", "Pennant Hills", "Beecroft",
             "Cheltenham", "Epping", "Eastwood", "Denistone", "West Ryde",
             "Meadowbank", "Rhodes", "Concord West", "North Strathfield",
-            "Strathfield", "Burwood*", "Redfern", "Central",
+            "Strathfield", "Burwood", "Redfern", "Central",
+        ],
+    },
+    {
+        # --- The intercity TRAINS.md scoped out, and why it is back ------------
+        #
+        # TRAINS.md section 2 said Central Coast services "run to the disc edge
+        # and terminate at the boundary station", and then modelled only the
+        # boundary station: T1 stops at Berowra and nothing ran past it. But the
+        # disc is 60 km and Gosford is at 50.9 km, so the bake had already built
+        # a real platform, real catenary and a real station board at a station
+        # with no service -- and five more north of it: Narara, Niagara Park,
+        # Lisarow, Ourimbah, plus Point Clare, Tascott, Koolewong and Woy Woy on
+        # the way. A platform with no train is worse than no platform.
+        #
+        # CCN therefore runs Central <-> Ourimbah. Ourimbah is the northernmost
+        # station in the extract -- the real line carries on to Wyong and
+        # Newcastle, both outside the disc -- and TRAINS.md's own rule is to
+        # terminate at the boundary station rather than despawn mid-track.
+        #
+        # Wondabyne is not a call. It *is* in the extract, but tagged
+        # `railway=halt` rather than `railway=station`, so `read_rail` never
+        # makes a RailStation for it and there is no platform, no board and no
+        # anchor to route through. The tag is telling the truth: the real
+        # platform is one carriage long, has no road to it, and is a request
+        # stop served by the rear door -- OSM even records
+        # `access:carriages=last;1` on it. Modelling it means teaching the
+        # reader about halts across the whole disc, which is a different change.
+        #
+        # Rolling stock: an intercity set is not a Tangara, but the fleet has
+        # one double-deck model and `world/trains.ts` picks it for every
+        # non-`metro` line, so CCN runs Tangaras. Wrong-but-plausible carriage,
+        # deliberately; a Mariyung is a model round, not a timetable round.
+        "id": "CCN",
+        "name": "Central Coast & Newcastle",
+        "relation_ref": "CCN",
+        "relation_names": ("CCN", "Central Coast & Newcastle Line"),
+        # The official intercity red, which is exactly T9's red: the real network
+        # paints the Northern Line and the Central Coast line the same colour
+        # because they are the same corridor. Noted rather than invented around.
+        "colour": 0xD11F2F,
+        # --- Listed outer terminus first, and that is not cosmetic -----------
+        #
+        # `build_lines` routes every line's direction 0 in one global pass and
+        # then routes every direction 1 against a mask of the rails pass 0 took.
+        # That is the *only* thing that puts the two directions of a railway on
+        # the up road and the down road rather than head to head -- and it works
+        # by geographic sense, not by line. T1 and T9 both list the outer end
+        # first, so their direction 0 is the down train.
+        #
+        # Written the other way round -- "Central" first, which is how the brief
+        # phrases the run -- CCN's direction 0 was a northbound train in the same
+        # pass as T9's southbound one, both of them claiming Main North rails as
+        # pass-0 rails. The result was T9 and CCN sharing 41 rails outright and
+        # T1 sharing 28 with T2, and the phase solver ran the whole ladder to
+        # 360 s on every trunk line and still reported no assignment: 22,584
+        # separation violations. Reversing this list took the shared-rail count
+        # from 234 to 182 and the solve came out first try.
+        "stations": [
+            # The coast first, where CCN is the only service there is. South of
+            # Hornsby the real intercity is express to Strathfield and Central;
+            # this one is not, because no line in this model is any more. What
+            # the southern half of the list still does is *anchor the route*:
+            # naming Eastwood and Burwood holds the path on the Main North pair
+            # and the suburban pair instead of letting a 20 km Dijkstra leg
+            # choose among the six roads out of Central.
+            "Ourimbah", "Lisarow", "Niagara Park", "Narara", "Gosford",
+            "Point Clare", "Tascott", "Koolewong", "Woy Woy", "Hawkesbury River",
+            "Cowan", "Berowra",
+            # Hornsby to Berowra is T1's territory and CCN runs through it.
+            "Mount Kuring-gai", "Mount Colah", "Asquith", "Hornsby",
+            "Normanhurst", "Thornleigh", "Pennant Hills", "Beecroft",
+            "Cheltenham", "Epping", "Eastwood", "Denistone", "West Ryde",
+            "Meadowbank", "Rhodes", "Concord West", "North Strathfield",
+            "Strathfield", "Burwood", "Redfern", "Central",
         ],
     },
     {
@@ -820,6 +936,43 @@ LINE_NOTES: list[str] = [
         "20 s of clearance either side, so one track tops out near one train per "
         "75 s. T2 and T8 loop it; the solver's period ladder does the rest."
     ),
+    (
+        "CCN is the Central Coast & Newcastle intercity, which TRAINS.md scoped out "
+        "and the 60 km disc scoped back in: Gosford is at 50.9 km with a platform and "
+        "no train. It runs Central -> Ourimbah, the northernmost station in the "
+        "extract, because TRAINS.md's rule is to terminate at the boundary station "
+        "rather than despawn mid-track; the real line goes on to Wyong and Newcastle, "
+        "which are outside the disc."
+    ),
+    (
+        "CCN does not call at Wondabyne. The extract has it as railway=halt, not "
+        "railway=station, so there is no station record to anchor a call to -- which "
+        "is the tag being right: a request stop with a one-carriage platform, no road "
+        "access, and access:carriages=last;1 in OSM. Adding it means teaching the "
+        "station reader about halts disc-wide."
+    ),
+    (
+        "CCN runs Tangaras. An intercity set is a different vehicle, but the fleet has "
+        "one double-deck model and world/trains.ts picks it for every non-metro line. "
+        "Deliberate: a wrong-but-plausible carriage beats a missing service."
+    ),
+    (
+        "Every service calls at every station on its own route. TRAINS.md's express "
+        "patterns were peak patterns, and a model with one pattern per line cannot "
+        "hold a peak pattern without stranding the stations it skips: 30 stations had "
+        "platforms, name boards and no calling service. There are now no pass-throughs "
+        "in any stopping pattern at all."
+    ),
+    (
+        "12 stations still sit within 100 m of a line's centreline without being one of "
+        "its stops, and every one of them is the four-track case: T1, T9 and CCN run "
+        "the Main pair through the inner west, where the platforms at Macdonaldtown, "
+        "Newtown, Stanmore, Petersham, Lewisham, Summer Hill, Ashfield and Croydon are "
+        "on the Suburban pair, and T1 runs the Main pair past Flemington and Homebush "
+        "for the same reason. M1's tunnel passes under St Peters and St Leonards. A "
+        "train cannot open a door onto a platform it has no face to. Every one of the "
+        "twelve is called at by another line; rail-audit section 4b lists them."
+    ),
 ]
 
 
@@ -848,6 +1001,12 @@ class Direction:
     # re-deriving it against a graph it does not have, and any disagreement puts
     # a portal somewhere the train does not pass through one.
     flags: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.uint8))
+    # Per vertex, `trackY - groundY` in metres: positive on a structure,
+    # negative in a cutting or a bore. RAIL-VERTICAL.md section 1 -- the signed
+    # number geometry consumes instead of a discrete class. Per point and not
+    # per station, because a 200 m platform changes category along its own
+    # length, which is exactly what Chatswood does.
+    clearance: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float32))
     phases: list[tuple[float, float, float, float]] = field(default_factory=list)
     duration: float = 0.0
     period: int = BASE_PERIOD_S
@@ -1130,6 +1289,24 @@ def _polyline(g: RailGraph, nodes: Sequence[int]) -> tuple[np.ndarray, np.ndarra
     return xyz, cum
 
 
+def _clearance(g: RailGraph, nodes: Sequence[int]) -> np.ndarray:
+    """`trackY - groundY` per polyline vertex, metres. RAIL-VERTICAL.md section 1.
+
+    Signed, and the sign is the whole content: above zero a structure holds the
+    track up and reaching the platform needs steps; below zero the terrain is
+    over the track and something has to be carved or the train renders buried.
+    Baked per vertex so the geometry round consumes the measurement rather than
+    a word derived from it -- the word is what went wrong at Chatswood, and a
+    word cannot say "the first sixty metres of this platform are on a deck and
+    the rest is in a cutting", which is what a station on the approach to a
+    viaduct actually is.
+    """
+    idx = np.asarray(nodes, dtype=np.int64)
+    if idx.size == 0 or g.ground.size != g.y.size or g.ground.size == 0:
+        return np.zeros(idx.size, dtype=np.float32)
+    return np.asarray(g.y[idx] - g.ground[idx], dtype=np.float32)
+
+
 def build_lines(
     g: RailGraph,
     stations: Sequence[RailStation],
@@ -1137,7 +1314,7 @@ def build_lines(
     specs: Sequence[dict] = LINE_SPECS,
     log=print,
 ) -> list[Line]:
-    """Path all ten lines, both directions, through the graph.
+    """Path all eleven lines, both directions, through the graph.
 
     Direction 1 is routed *after* every direction 0 and with a heavy penalty on
     every edge direction 0 used. That single ordering is what makes the two
@@ -1226,7 +1403,8 @@ def build_lines(
             label = f"{seq[0].name} -> {seq[-1].name}" if seq else "?"
             d = Direction(index=direction, label=label, nodes=nodes, xyz=xyz, cum=cum,
                           edge_seq=edge_seq, stops=out_stops,
-                          flags=span_flags(g, edge_seq))
+                          flags=span_flags(g, edge_seq),
+                          clearance=_clearance(g, nodes))
             d.gaps = gaps  # type: ignore[attr-defined]
             if direction == 0:
                 lines.append(
@@ -2202,22 +2380,65 @@ UNDERGROUND_MIN_DEPTH_M = 8.0
 APPROACH_MIN_SIDE_M = 60.0
 
 
+# --- RAIL-VERTICAL.md, in three constants ----------------------------------------
+#
+# `clearance = trackY - groundY`, and every band below is a band of it. The
+# document's own table draws the geometry boundaries at -1.0 and +2.0 metres:
+# below -1 is a cutting to carve, above +2 is a structure to stand on, between
+# them is ballast on the ground.
+GRADE_BAND_LO_M = -1.0
+GRADE_BAND_HI_M = 2.0
+# ...and the *label* wants a higher bar than the geometry does, which is the one
+# place this module goes past the document and therefore the one that has to
+# argue for itself. Roseville and Artarmon measure +2.5 and +2.7: real
+# embankments, and the reason Roseville's platform needs steps -- but a station
+# board that says "elevated" at Roseville is wrong about Roseville. Every
+# station that is actually a deck measures +7 or more (Circular Quay +7.9, Rouse
+# Hill +7.0, Kellyville +7.1), because that is what a viaduct is. 4 m is the gap
+# between the two populations and it means the thing a person means by the word:
+# a deck you can walk under.
+ELEVATED_MIN_M = 4.0
+
+
 def classify_vertical(
     g: RailGraph, stations: Sequence[RailStation], terrain=None
 ) -> None:
-    """surface / elevated / underground per station, read off the ways that reach it.
+    """Measure `clearance` per station, then *derive* surface/elevated/underground.
 
-    TRAINS.md's requirement in one function: *"the under/over question is
-    answered by the data, per way -- no hand-modelling of vertical profiles"*.
-    So this counts the edges within `STATION_WAY_RADIUS_M`, weighted by length,
-    and asks what they are tagged. A `layer` below zero counts as tunnel and a
-    layer above zero as bridge, because plenty of Sydney's tunnelled ways carry
-    one tag and not the other -- `sources/osm.py` makes the same point about
-    roads.
+    RAIL-VERTICAL.md replaced the tag-first classifier that used to live here,
+    and the reason it had to is worth keeping: the old rule read `bridge=yes`
+    off the ways within a platform's length and stopped looking, so Chatswood
+    came out `elevated` with its track 6.9 m *under* the terrain grid. Two
+    systems that had never been introduced -- and the label then went on to tell
+    the cutting carve not to dig, which is how a station ends up buried under a
+    plaza the player is standing on.
 
-    The threshold is a majority of the track length, not a majority of the ways:
-    a station with fourteen short tunnel ways and one long surface approach is
-    underground, and counting ways would say the opposite.
+    So the measurement comes first and the word comes out of it:
+
+        clearance(s) = trackY(s) - groundY(s),  median over the platform length
+
+    and the precedence when the sources disagree is stated rather than
+    improvised (RAIL-VERTICAL.md section 3):
+
+      1. `tunnel=yes` **wins outright**. A DEM cannot see a bore, so no measured
+         clearance may argue a tunnel station back to the surface. The approach
+         window below is part of this rule and not an exception to it: it is
+         more tunnel evidence, for stations whose platform-level ways OSM leaves
+         untagged inside the box.
+      2. `bridge=yes` decides the **structure** -- a deck with piers -- and does
+         **not** get to claim the ground is lower than the DEM says. A bridge
+         span measuring at or below terrain is recorded in `st.conflict` and
+         reported by name; it is not obeyed.
+      3. **Otherwise the DEM wins**, because the DEM is the ground that renders
+         and the player's feet stand on it.
+
+    One line: OSM is the authority on what the structure is, the DEM on where
+    the ground is, and neither may answer the other's question.
+
+    `tunnel_share` and `bridge_share` are still measured exactly as before --
+    length-weighted over the ways within `STATION_WAY_RADIUS_M`, a majority of
+    the track length rather than a majority of the ways -- because that is the
+    structure question, and OSM is still the authority on it.
     """
     from scipy.spatial import cKDTree
 
@@ -2247,18 +2468,61 @@ def classify_vertical(
         st.ways_near = len(idx)
         st.tunnel_share = tun / tot if tot else 0.0
         st.bridge_share = bri / tot if tot else 0.0
+        st.structure = (
+            "tunnel" if st.tunnel_share >= 0.5
+            else "bridge" if st.bridge_share >= 0.5
+            else "open"
+        )
         if terrain is not None:
             st.ground_y = float(terrain.sample(st.east, st.north))
         near = min(idx, key=lambda e: (mid[e][0] - st.east) ** 2 + (mid[e][1] - st.north) ** 2)
         st.track_y = float(0.5 * (g.y[int(g.edges[near, 0])] + g.y[int(g.edges[near, 1])]))
         st.depth = st.ground_y - st.track_y
 
-        if st.tunnel_share >= 0.5:
+        # --- The measurement, over the platform rather than at one point.
+        #
+        # RAIL-VERTICAL.md is specific that this is per corridor point and
+        # summarised by the median, and it is specific for a reason: "a 200 m
+        # platform routinely changes category along its own length". One sample
+        # at the station node is what `depth` is, and at Chatswood that node
+        # sits on the interchange deck while the platform runs out from under it.
+        nodes = sorted(
+            {int(g.edges[e, 0]) for e in idx} | {int(g.edges[e, 1]) for e in idx}
+        )
+        if nodes and g.ground.size == g.y.size and g.ground.size:
+            c = g.y[nodes] - g.ground[nodes]
+            st.clearance = float(np.median(c))
+            st.clearance_lo = float(np.percentile(c, 25))
+            st.clearance_hi = float(np.percentile(c, 75))
+        else:
+            st.clearance = -st.depth
+            st.clearance_lo = st.clearance_hi = st.clearance
+
+        # --- The precedence, in the order the document states it.
+        if st.structure == "tunnel":
             st.vertical = "underground"
-        elif st.bridge_share >= 0.5:
+        elif st.clearance > ELEVATED_MIN_M:
             st.vertical = "elevated"
         else:
             st.vertical = "surface"
+        # A deck that measures at or under the terrain is the Chatswood defect.
+        # The label already refuses to say `elevated` -- that is rule 3 doing its
+        # work -- but a silent refusal is how this shipped twice, so the
+        # disagreement is recorded and `rail-audit` prints it by name.
+        if st.structure == "bridge" and st.clearance <= GRADE_BAND_HI_M:
+            st.conflict = (
+                f"OSM says bridge ({st.bridge_share:.0%} of the track over "
+                f"{STATION_WAY_RADIUS_M:.0f} m) and the DEM puts that deck "
+                f"{st.clearance:+.2f} m against the ground it is supposed to be over. "
+                f"The DEM decides where the ground is, so the label is {st.vertical}; "
+                f"the structure is still a deck and the terrain has to be carved"
+            )
+        elif st.structure == "open" and st.clearance > ELEVATED_MIN_M:
+            st.conflict = (
+                f"nothing in OSM says structure here and the DEM puts the track "
+                f"{st.clearance:+.2f} m over the ground beside it, so something holds "
+                f"it up: embankment, causeway, or a span nobody mapped"
+            )
 
         # --- A light-rail stop standing over somebody else's tunnel.
         #
@@ -2288,6 +2552,9 @@ def classify_vertical(
             st.vertical = "unknown"
             st.track_y = st.ground_y
             st.depth = 0.0
+            st.clearance = st.clearance_lo = st.clearance_hi = 0.0
+            st.structure = "open"
+            st.conflict = ""
             st.orphaned = True
             continue
 
@@ -2304,7 +2571,10 @@ def classify_vertical(
         # close call at all -- and it is the same thing a person means when they
         # say a station is underground: you cannot see daylight either way down
         # the platform.
-        if st.vertical == "underground" or st.depth < UNDERGROUND_MIN_DEPTH_M:
+        # Gated on `clearance` rather than `depth`, so the window and the
+        # verdict read the same number: a platform whose median is less than 8 m
+        # under the DEM is a cutting, not a box.
+        if st.vertical == "underground" or -st.clearance < UNDERGROUND_MIN_DEPTH_M:
             continue
         # The local track direction, from the same nearest edge `track_y` came
         # from, so "which side" is measured along the railway rather than along
@@ -2340,7 +2610,13 @@ def classify_vertical(
             if tot >= APPROACH_MIN_SIDE_M
         ]
         if votes and all(votes):
+            # Still precedence rule 1: this is tunnel evidence, from the running
+            # tunnels either side of a box OSM did not tag inside. So the
+            # structure becomes `tunnel` too and any conflict recorded against
+            # the DEM goes with it -- a bore is allowed to be under the ground.
             st.vertical = "underground"
+            st.structure = "tunnel"
+            st.conflict = ""
             st.promoted = True
 
 
@@ -2448,6 +2724,7 @@ def write_bake(
     verts: list[np.ndarray] = []
     cums: list[np.ndarray] = []
     flags: list[np.ndarray] = []
+    clears: list[np.ndarray] = []
     phases: list[float] = []
     jlines = []
     v_off = 0
@@ -2463,6 +2740,10 @@ def write_bake(
             if fl.size != xyz.shape[0]:
                 fl = np.zeros(xyz.shape[0], dtype=np.uint8)
             flags.append(fl)
+            cl = np.asarray(d.clearance, dtype=np.float32)
+            if cl.size != xyz.shape[0]:
+                cl = np.zeros(xyz.shape[0], dtype=np.float32)
+            clears.append(cl)
             n = int(xyz.shape[0])
             ph = list(d.phases)
             for t0, s0, v0, a in ph:
@@ -2512,6 +2793,7 @@ def write_bake(
     vert_arr = np.concatenate(verts) if verts else np.zeros(0, dtype=np.float32)
     cum_arr = np.concatenate(cums) if cums else np.zeros(0, dtype=np.float64)
     flag_arr = np.concatenate(flags) if flags else np.zeros(0, dtype=np.uint8)
+    clear_arr = np.concatenate(clears) if clears else np.zeros(0, dtype=np.float32)
     ph_arr = np.asarray(phases, dtype=np.float64)
     st_arr = np.asarray(
         [[s.x, s.y, s.z, s.dx, s.dz] for s in stanchions], dtype=np.float32
@@ -2527,6 +2809,14 @@ def write_bake(
             "groundY": float(s.ground_y),
             "vertical": s.vertical,
             "depth": s.depth,
+            # RAIL-VERTICAL.md's measurement. `vertical` above is derived from
+            # this and can therefore never contradict it; `rail-audit` section
+            # 4a asserts exactly that, with a control that fails.
+            "clearance": round(float(s.clearance), 3),
+            "clearanceLo": round(float(s.clearance_lo), 3),
+            "clearanceHi": round(float(s.clearance_hi), 3),
+            "structure": s.structure,
+            "conflict": s.conflict,
             "approachShare": s.approach_share,
             "approachWays": s.approach_ways,
             "promoted": s.promoted,
@@ -2585,6 +2875,10 @@ def write_bake(
         ("stanchions", st_arr),
         ("stanchionKinds", st_kind),
         ("vertexFlags", flag_arr),
+        # Appended last, which is the only place a new array may go: the offsets
+        # are derived by walking this tuple, so inserting one anywhere else
+        # silently moves every array after it.
+        ("vertexClearance", clear_arr),
     )
     header["buffers"] = {
         name: {"count": int(arr.size), "itemBytes": int(arr.itemsize)}
@@ -2671,14 +2965,22 @@ def build_all(radius_m: float, log=print, terrain=True) -> dict:
             ground_note = (
                 f"terrarium DEM, unconformed (datum y=0 is {field.base_elevation:.1f} m AHD). "
                 "It is a *surface* model, so CBD ground reads high by roughly a "
-                "building; the vertical class of a station is read off tags, never "
-                "off this."
+                "building -- which is no longer a caveat but an input: "
+                "RAIL-VERTICAL.md makes this surface the authority on where the "
+                "ground is, and clearance = trackY - groundY is measured against "
+                "it. Where OSM says bridge and this says the deck is under the "
+                "ground, the disagreement is reported by name rather than settled "
+                "by preferring the tag."
             )
         except Exception as exc:  # noqa: BLE001 -- reported, not swallowed
             ground_note = f"terrain unavailable ({exc.__class__.__name__}: {exc})"
             log(f"  terrain: {ground_note}")
-    y_raw, _ground = raw_heights(g, field)
+    y_raw, ground = raw_heights(g, field)
     g.y, hstats = solve_heights(g, y_raw)
+    # RAIL-VERTICAL.md section 1: keep the ground beside the solved track so
+    # `clearance = y - ground` is one subtraction, and not a second sampling of
+    # a surface that might have been loaded with different options.
+    g.ground = np.asarray(ground, dtype=np.float64)
     log(f"  heights: worst grade {100 * hstats['worst_grade_before']:.1f}% raw -> "
         f"{100 * hstats['worst_grade_after']:.2f}% after the envelope solve, "
         f"moved p95 {hstats['moved_p95_m']:.2f} m")
@@ -2735,9 +3037,171 @@ HAND_ASSERTED: list[tuple[str, str, str]] = [
     ("Martin Place", "underground", "Eastern Suburbs Railway"),
     ("Kings Cross", "underground", "Eastern Suburbs Railway"),
     ("Bondi Junction", "underground", "Eastern Suburbs Railway"),
-    ("Milsons Point", "elevated", "the Harbour Bridge approach"),
+    # --- The one row RAIL-VERTICAL.md moved, and it moved for a finding ------
+    #
+    # This said `elevated`, "the Harbour Bridge approach", and it is right about
+    # the world: the station is on the approach viaduct and you can walk under
+    # it. It is wrong about *this bake*. The platform measures a median
+    # clearance of -4.4 m: the terrain grid is a surface model, it reads the
+    # Milsons Point towers either side of the corridor, and it puts its "ground"
+    # over the deck. That is the Chatswood defect at a hand-asserted station,
+    # and the new invariant is what found it -- the track renders under the
+    # terrain here too, and calling it elevated is what stopped anybody
+    # noticing. The row now asserts what the bake measures, and section 4a
+    # prints the conflict by name so it cannot become folklore.
+    ("Milsons Point", "surface",
+     "the Harbour Bridge approach viaduct, which the DEM buries by 4.4 m -- a "
+     "reported structure/ground conflict, not a quiet reclassification"),
     ("Meadowbank", "surface", "the bridge approach is beside it, not under it"),
+    # ...and the row that pins the bug this started from. Chatswood was
+    # `elevated` with its track 6.9 m under the grid, so the cutting carve
+    # refused to dig, and the train ended up buried under a plaza the player was
+    # standing on.
+    ("Chatswood", "surface",
+     "the interchange deck is over the station, not under it: OSM says bridge, "
+     "the DEM says -6.0 m, and the DEM is the ground that renders"),
 ]
+
+# --- Stations with a platform and no service, deliberately ------------------------
+#
+# RAIL-VERTICAL.md section 5: "a station you cannot catch a train from is a bug,
+# with deliberate exceptions named". These are the named ones. Every other
+# station in the extract with a platform must have a service that *calls* there,
+# and `rail-audit` section 4b fails the build if it does not.
+#
+# Light rail is excluded by rule rather than by name: TRAINS.md section 10 scopes
+# it out, and this bake reads `railway=rail|subway` and no light rail at all, so
+# a light-rail stop has no track here to run a train down. Roughly fifty names,
+# and listing them would be listing a network we did not read.
+SERVICE_EXCEPTIONS: dict[str, str] = {
+    # The South Coast line south of Waterfall. Exactly the Gosford problem --
+    # real platforms, no service -- and exactly the same shape of fix: an SCO
+    # intercity terminating at the boundary station, the way CCN now does. Not
+    # done here because it is a line and not a stopping pattern, and it deserves
+    # its own solve rather than being smuggled into this one.
+    **{n: "South Coast line beyond T4's Waterfall terminus; wants an SCO intercity, the CCN treatment"
+       for n in ("Helensburgh", "Otford", "Stanwell Park", "Coalcliff", "Scarborough",
+                 "Wombarra", "Coledale", "Austinmer", "Thirroul", "Bulli", "Woonona")},
+    # The Blue Mountains line west of Emu Plains, same argument. TRAINS.md
+    # already named Blue Mountains as an intercity it was scoping out.
+    **{n: "Blue Mountains line beyond T1's Emu Plains terminus; wants a BMT intercity"
+       for n in ("Lapstone", "Glenbrook", "Blaxland", "Warrimoo")},
+    # The Main South beyond Macarthur, which is Southern Highlands territory.
+    **{n: "Main South beyond T8's Macarthur terminus; wants a Southern Highlands service"
+       for n in ("Menangle Park", "Menangle", "Douglas Park")},
+    # The Cronulla branch. This one is *not* an intercity: it is a suburban
+    # branch off T4 at Sutherland, and it is out only because TRAINS.md modelled
+    # T4 as a single Waterfall--Bondi Junction run with no branch. A line whose
+    # two directions branch is a change to the routing model rather than to a
+    # stopping pattern, so it is named here rather than half-done.
+    **{n: "T4's Cronulla branch, which the one-run-per-line model cannot express yet"
+       for n in ("Kirrawee", "Gymea", "Miranda", "Caringbah", "Woolooware", "Cronulla")},
+}
+
+
+def stations_without_service(
+    stations: Sequence[RailStation], lines: Sequence[Line]
+) -> list[tuple[str, int, str]]:
+    """Stations with a platform that no modelled service calls at.
+
+    Passing through is not serving. This is the check that would have caught
+    Roseville: seven North Shore stations with platforms, name boards, a T1
+    going past at line speed and `calls=False` on every one of them.
+    """
+    calling: set[str] = set()
+    passing: dict[str, set[str]] = defaultdict(set)
+    for ln in lines:
+        for d in ln.dirs:
+            for s in d.stops:
+                if s.stops:
+                    calling.add(s.name)
+                else:
+                    passing[s.name].add(ln.id)
+    out: list[tuple[str, int, str]] = []
+    for st in stations:
+        if st.platforms <= 0 or st.kind == "light_rail" or st.name in calling:
+            continue
+        if st.name in SERVICE_EXCEPTIONS:
+            continue
+        seen = passing.get(st.name)
+        why = (f"passed without stopping by {', '.join(sorted(seen))}" if seen
+               else "on no modelled line at all")
+        out.append((st.name, st.platforms, why))
+    return sorted(out)
+
+
+# How near a routed centreline has to run before "it goes past there" is fair.
+# A platform face is within ~15 m of its own track and the next pair over is
+# ~12 m beyond that, so 100 m reaches the far pair of a six-track corridor and
+# stops well short of the next railway.
+PASSES_NEAR_M = 100.0
+
+
+def unlisted_passes(
+    lines: Sequence[Line], stations: Sequence[RailStation]
+) -> list[tuple[str, int, list[str]]]:
+    """Stations a line physically runs past that are not among its stops.
+
+    Every service calls at every station on its route, so a station near the
+    centreline and absent from the list is a claim that needs a reason. There is
+    exactly one legitimate reason and it is physical: on a four- or six-track
+    corridor the fast pair has no platform face, and a train cannot open a door
+    onto a platform it does not have a side to. This finds them so the claim can
+    be read rather than believed -- and section 4b then proves the separate,
+    stronger thing, which is that each of them is served by somebody.
+    """
+    from scipy.spatial import cKDTree
+
+    if not stations:
+        return []
+    sx, sz = geo.enu_to_world(
+        np.array([s.east for s in stations]), np.array([s.north for s in stations])
+    )
+    tree = cKDTree(np.column_stack([np.asarray(sx), np.asarray(sz)]))
+    found: dict[str, tuple[int, set[str]]] = {}
+    for ln in lines:
+        listed = {s.name for d in ln.dirs for s in d.stops}
+        near: set[int] = set()
+        for d in ln.dirs:
+            if not len(d.xyz):
+                continue
+            pts = np.column_stack([d.xyz[:, 0], d.xyz[:, 2]])
+            for hit in tree.query_ball_point(pts, PASSES_NEAR_M):
+                near.update(hit)
+        for k in near:
+            st = stations[k]
+            if st.name in listed or st.kind == "light_rail" or st.platforms <= 0:
+                continue
+            ent = found.setdefault(st.name, (st.platforms, set()))
+            ent[1].add(ln.id)
+    return sorted((nm, pl, sorted(ids)) for nm, (pl, ids) in found.items())
+
+
+def label_disagreements(stations: Sequence[RailStation]) -> list[str]:
+    """Where `vertical` and the measured clearance contradict each other.
+
+    RAIL-VERTICAL.md section 2. `classify_vertical` derives the label from the
+    measurement, so in a healthy bake this returns nothing *by construction* --
+    which is the point, and also exactly why it needs a control: a check that
+    cannot fail proves nothing, so `audit` hands it a station broken on purpose
+    and watches it name that one.
+    """
+    bad: list[str] = []
+    for st in stations:
+        if st.vertical == "unknown":
+            continue
+        if st.vertical == "underground":
+            if st.structure != "tunnel":
+                bad.append(f"{st.name} is underground with no tunnel evidence "
+                           f"(structure={st.structure})")
+            continue
+        if st.vertical == "elevated" and not st.clearance > ELEVATED_MIN_M:
+            bad.append(f"{st.name} is elevated with a measured clearance of "
+                       f"{st.clearance:+.2f} m")
+        elif st.vertical == "surface" and st.clearance > ELEVATED_MIN_M:
+            bad.append(f"{st.name} is surface with a measured clearance of "
+                       f"{st.clearance:+.2f} m")
+    return bad
 
 
 def audit(radius_m: float, built: dict | None = None, log=print) -> int:
@@ -2798,7 +3262,7 @@ def audit(radius_m: float, built: dict | None = None, log=print) -> int:
     log(f"  note: ground came from {b['ground_note']}")
 
     log("")
-    log("--- 4. Vertical profile, from the tags, for every station on a line")
+    log("--- 4. Vertical profile, measured, for every station on a line")
     on_line = {s.name for ln in lines for d in ln.dirs for s in d.stops}
     by_name = {s.name: s for s in stations}
     tally = defaultdict(int)
@@ -2831,7 +3295,7 @@ def audit(radius_m: float, built: dict | None = None, log=print) -> int:
             odd.append(f"{nm} ({st.vertical})")
     log(f"  {len(odd)} station(s) are not at grade: {', '.join(odd)}")
     log("")
-    log(f"  {'station':<22} {'verdict':<12} {'expected':<12} {'tunnel':>7} {'bridge':>7} "
+    log(f"  {'station':<22} {'verdict':<12} {'expected':<12} {'struct':<7} {'clear':>7} "
         f"{'track y':>8} {'ground y':>9}")
     for nm, want, why in HAND_ASSERTED:
         st = by_name.get(nm)
@@ -2839,10 +3303,116 @@ def audit(radius_m: float, built: dict | None = None, log=print) -> int:
             check(False, f"{nm}: not in the extract at all")
             continue
         ok = st.vertical == want
-        log(f"  {nm:<22} {st.vertical:<12} {want:<12} {st.tunnel_share:7.2f} "
-            f"{st.bridge_share:7.2f} {st.track_y:8.1f} {st.ground_y:9.1f}   {why}")
+        log(f"  {nm:<22} {st.vertical:<12} {want:<12} {st.structure:<7} {st.clearance:7.2f} "
+            f"{st.track_y:8.1f} {st.ground_y:9.1f}   {why}")
         check(ok, f"{nm} is {st.vertical} as expected" if ok
               else f"{nm} came out {st.vertical}, expected {want} ({why})")
+
+    # --- 4a ------------------------------------------------------------------
+    log("")
+    log("--- 4a. The label agrees with the ground it is a claim about")
+    log(f"  clearance = trackY - groundY, median over the platform. "
+        f"elevated above {ELEVATED_MIN_M:.0f} m, cutting below {GRADE_BAND_LO_M:.0f} m, "
+        f"at grade between; tunnel evidence outranks all of it.")
+    disagree = label_disagreements(stations)
+    check(
+        not disagree,
+        f"every one of {len(stations)} stations' vertical class agrees with its measured "
+        f"clearance -- the class is derived from the measurement, so this is a claim about "
+        f"the derivation and not a coincidence"
+        + (f". FIRST: {disagree[0]}" if disagree else ""),
+    )
+    # The control. A check that has never been seen to fail is not evidence, and
+    # this one cannot fail by construction, which makes the control the only
+    # thing standing between it and decoration. `checkRail` makes the same
+    # argument about the separation sweep and for the same reason.
+    ctrl = RailStation(osm_id="", name="CONTROL", east=0.0, north=0.0, kind="")
+    ctrl.vertical, ctrl.clearance, ctrl.structure = "elevated", -6.90, "bridge"
+    caught = label_disagreements([ctrl])
+    check(
+        len(caught) == 1,
+        f"  NEGATIVE CONTROL: a station classed elevated with Chatswood's own -6.90 m "
+        f"clearance is caught -- {caught[0] if caught else 'IT WAS NOT'}. "
+        f"So the check above can fail, and its passing means something",
+    )
+
+    conflicts = [s for s in stations if s.conflict and not s.orphaned]
+    log("")
+    log(f"  {len(conflicts)} station(s) where OSM and the DEM disagree, reported and not obeyed:")
+    for st in sorted(conflicts, key=lambda s: s.clearance):
+        log(f"    {st.name:<24} {st.vertical:<12} clear {st.clearance:+7.2f} m -- {st.conflict}")
+    buried = [s for s in conflicts if s.structure == "bridge"]
+    if buried:
+        notes.append(
+            f"{len(buried)} bridge-tagged station(s) measure at or under the terrain grid: "
+            + ", ".join(f"{s.name} {s.clearance:+.1f} m" for s in buried)
+            + ". OSM is right about the structure and the DEM is right about the ground; "
+            "the label follows the DEM and the geometry round has to carve or the train "
+            "renders buried."
+        )
+
+    # --- 4b ------------------------------------------------------------------
+    log("")
+    log("--- 4b. Every platform has a service (RAIL-VERTICAL section 5)")
+    stranded = stations_without_service(stations, lines)
+    for nm, plats, why in stranded:
+        log(f"    {nm:<26} {plats} platform(s), {why}")
+    served = sum(
+        1 for s in stations
+        if s.platforms > 0 and s.kind != "light_rail" and s.name not in SERVICE_EXCEPTIONS
+    ) - len(stranded)
+    check(
+        not stranded,
+        f"all {served} heavy-rail stations with a platform have at least one service that "
+        f"calls there, against {len(SERVICE_EXCEPTIONS)} named exceptions and light rail, "
+        f"which this bake does not read at all"
+        + (f". STRANDED: {stranded[0][0]} ({stranded[0][2]})" if stranded else ""),
+    )
+    ghost = RailStation(osm_id="", name="CONTROL", east=0.0, north=0.0, kind="")
+    ghost.platforms = 2
+    caught2 = stations_without_service([ghost], lines)
+    check(
+        len(caught2) == 1,
+        f"  NEGATIVE CONTROL: a station with two platforms and no line at all is caught -- "
+        f"{caught2[0][2] if caught2 else 'IT WAS NOT'}",
+    )
+    by_reason: dict[str, list[str]] = defaultdict(list)
+    for nm, why in SERVICE_EXCEPTIONS.items():
+        if nm in by_name:
+            by_reason[why].append(nm)
+    log(f"  and the {sum(len(v) for v in by_reason.values())} named exceptions, by reason:")
+    for why, names in sorted(by_reason.items()):
+        log(f"    {len(names):2d}  {why}")
+        log(f"        {', '.join(sorted(names))}")
+    lr = [s for s in stations if s.kind == "light_rail" and s.platforms > 0]
+    log(f"    {len(lr):2d}  light rail, excluded by rule: TRAINS.md section 10 scopes it out "
+        f"and this bake reads no light-rail track")
+
+    # Every service calls at every station on its route, so the only stations a
+    # line runs past without stopping are the ones it has no platform face to.
+    # Print them, and prove the thing that actually matters about them.
+    passed = unlisted_passes(lines, stations)
+    calling = {s.name for ln in lines for d in ln.dirs for s in d.stops if s.stops}
+    log("")
+    log(f"  no stopping pattern has a pass-through left: "
+        f"{sum(1 for ln in lines for d in ln.dirs for s in d.stops if not s.stops)} of "
+        f"{sum(len(d.stops) for ln in lines for d in ln.dirs)} stops are non-calling.")
+    log(f"  {len(passed)} station(s) sit within {PASSES_NEAR_M:.0f} m of a line's centreline "
+        f"without being one of its stops -- the four-track case, where the pair that line "
+        f"runs on has no platform face:")
+    orphaned_pass = []
+    for nm, plats, ids in passed:
+        ok = nm in calling
+        log(f"    {nm:<24} {plats:2d} plat, run past by {','.join(ids):<12} "
+            f"{'served by another line' if ok else 'AND NOTHING CALLS THERE'}")
+        if not ok:
+            orphaned_pass.append(nm)
+    check(
+        not orphaned_pass,
+        f"every one of those {len(passed)} is called at by a different line, so running "
+        f"past a platform is never the reason a platform has no train"
+        + (f". STRANDED: {', '.join(orphaned_pass)}" if orphaned_pass else ""),
+    )
 
     log("")
     log("--- 5. The full-cycle separation sweep, simulated at 10 Hz")

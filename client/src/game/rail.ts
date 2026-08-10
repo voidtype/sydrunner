@@ -56,8 +56,13 @@
 /** ASCII 'RAIL' little-endian. Must match `rail.RAIL_MAGIC`. */
 export const RAIL_MAGIC = 0x4c494152;
 
-/** Must match `rail.BAKE_VERSION`. */
-export const RAIL_VERSION = 1;
+/**
+ * Must match `rail.BAKE_VERSION`.
+ *
+ * 2: the `vertexClearance` buffer, and `station.vertical` derived from the
+ * measured clearance rather than from the OSM tags alone. See RAIL-VERTICAL.md.
+ */
+export const RAIL_VERSION = 2;
 
 /**
  * 2026-01-01T00:00:00Z. The same instant `traffic.ts` counts from.
@@ -135,6 +140,20 @@ export interface RailStation {
   trackY: number;
   groundY: number;
   vertical: 'surface' | 'elevated' | 'underground' | 'unknown';
+  /**
+   * `trackY - groundY`, metres, median over the platform length.
+   *
+   * `vertical` is *derived* from this (RAIL-VERTICAL.md section 2), so the two
+   * can never contradict each other the way Chatswood's `elevated` contradicted
+   * its own -6.9 m. `verifyRail` asserts it from this side of the file.
+   */
+  clearance: number;
+  clearanceLo: number;
+  clearanceHi: number;
+  /** What OSM says is built here: 'tunnel' | 'bridge' | 'open'. */
+  structure: string;
+  /** Non-empty where the structure and the DEM disagree. Reported, not obeyed. */
+  conflict: string;
   kind: string;
   platforms: number;
   tunnelShare: number;
@@ -163,6 +182,17 @@ export interface RailBake {
   stanchionKinds: Uint8Array;
   /** `SPAN_*` bit flags per polyline vertex, parallel to `vertices`. */
   vertexFlags: Uint8Array;
+  /**
+   * `trackY - groundY` in metres per polyline vertex, parallel to `vertices`.
+   *
+   * Positive: a structure holds the track over the terrain, and reaching the
+   * platform needs steps up. Negative: the terrain is over the track, and
+   * something must be carved or the train renders buried. RAIL-VERTICAL.md's
+   * one rule -- this number, and not a discrete class, is what geometry reads,
+   * because a class cannot say "the first sixty metres of this platform are on
+   * a deck and the rest is in a cutting", which is what Chatswood is.
+   */
+  vertexClearance: Float32Array;
   physics: {
     accel: number; brake: number; vLocal: number; vExpress: number;
     expressMinM: number; dwell: number;
@@ -198,6 +228,7 @@ export function railKey(block: number, slot: number): number {
  */
 const BUFFER_ORDER = [
   'vertices', 'cum', 'phases', 'stanchions', 'stanchionKinds', 'vertexFlags',
+  'vertexClearance',
 ] as const;
 
 /**
@@ -302,6 +333,7 @@ export function decodeRail(buffer: ArrayBuffer): RailBake {
     stanchions: arrays.stanchions as Float32Array,
     stanchionKinds: arrays.stanchionKinds as Uint8Array,
     vertexFlags: arrays.vertexFlags as Uint8Array,
+    vertexClearance: arrays.vertexClearance as Float32Array,
     physics: meta.physics,
     notes: meta.notes ?? [],
     degraded: meta.degraded ?? {},
@@ -705,10 +737,25 @@ export function verifyRail(bake: RailBake): string[] {
       `${bake.vertexFlags.length} vertex flags against ${bake.vertices.length / 3} vertices`,
     );
   }
+  if (bake.vertexClearance.length * 3 !== bake.vertices.length) {
+    bad.push(
+      `${bake.vertexClearance.length} vertex clearances against ${bake.vertices.length / 3} vertices`,
+    );
+  }
   if (bake.stanchions.length !== bake.stanchionKinds.length * 5) {
     bad.push(
       `${bake.stanchions.length / 5} stanchion positions against ${bake.stanchionKinds.length} kinds`,
     );
+  }
+  // RAIL-VERTICAL.md section 2, re-derived from the third reader. `elevated` is
+  // the claim that a structure holds the track over the ground; a station whose
+  // measured clearance is negative makes the opposite claim in the same record,
+  // and Chatswood shipped exactly that -- `elevated` with the track 6.9 m under
+  // the terrain grid, which then told the cutting carve not to dig.
+  for (const st of bake.stations) {
+    if (st.vertical === 'elevated' && !(st.clearance > 0)) {
+      bad.push(`${st.name} is classed elevated with a measured clearance of ${st.clearance} m`);
+    }
   }
   return bad;
 }
