@@ -338,6 +338,15 @@ import {
   type Stand,
 } from './game/riding.ts';
 import { SPAN_TUNNEL, railSeconds, verifyRail } from './game/rail.ts';
+// What the train is saying, which is a lookup on the same timetable the train
+// itself is a lookup on. See `game/rail-audio.ts`: no queue, no timers, and the
+// sound system is handed a mix exactly as `world/rave.ts` hands it one.
+import {
+  createRailAnnounceMix,
+  railAnnounceMix,
+  verifyRailAudio,
+} from './game/rail-audio.ts';
+import { RailCut } from './world/rail-cut.ts';
 // The street factions -- meth heads and drunks -- on the same split again:
 // `game/streetlife.ts` is the shared simulation the server runs and
 // `world/streetlife.ts` is the renderer. See either header.
@@ -1320,6 +1329,8 @@ async function main(): Promise<void> {
   let platforms: PlatformField | null = null;
   const railBake = await withDeadline(loadRailBake(), RAIL_BAKE_DEADLINE_MS, 'the rail bake');
   let railNetwork: RailNetwork | null = null;
+  /** The rail corridor, for the terrain carve and the trench. See below. */
+  let railCut: RailCut | null = null;
   {
     // The riding module's own self-check, at boot, on `verifyRail`'s terms: a
     // self-check nothing runs is a self-check that rots, and the browser is not
@@ -1345,7 +1356,36 @@ async function main(): Promise<void> {
           bakeFailures.join('\n  - '),
       );
     } else {
+      // And the announcements, which are a second reading of the same
+      // `dir.arrivals` the doors are driven from. `verifyRailAudio` proves the
+      // two readings agree -- that every clip is anchored to a real dwell phase
+      // and that no two of one kind overlap -- on `verifyRail`'s terms: the
+      // browser is not in CI, and a self-check nothing runs is one that rots.
+      const announceFailures = verifyRailAudio(railBake);
+      if (announceFailures.length) {
+        console.warn(
+          '[rail] the announcement schedule failed its own self-check:\n  - ' +
+            announceFailures.join('\n  - '),
+        );
+      }
       railNetwork = buildNetwork(railBake);
+      // **The hole in the ground, before anything is drawn in it.**
+      //
+      // The DEM carries one post every 31 m and a rail cutting is fifteen metres
+      // wide, so the heightfield cannot represent one and the terrain sheet was
+      // drawn straight over the top of the railway -- 11.8% of every track sample
+      // in the city, the worst by 13.5 m. `world/rail-cut.ts` is the corridor
+      // that both halves of the fix read: the streamer stops drawing ground
+      // inside it, and `RailWorld` builds the trench that stands in the hole.
+      //
+      // The platform sites are handed over separately because only `buildNetwork`
+      // knows them: `bake.stations[].x, z` is the OSM node, which at Meadowbank
+      // is 471 m from where a train stops, and the corridor has to open out where
+      // the platforms actually are or half of every cutting station is buried in
+      // its own retaining wall.
+      railCut = new RailCut(railBake);
+      railCut.setStations(railNetwork.stations);
+      streamer.setRailCut(railCut);
       const geometryFailures = verifyRailGeometry(railNetwork);
       if (geometryFailures.length) {
         console.warn('[rail] derived network self-check:\n  - ' + geometryFailures.join('\n  - '));
@@ -2401,6 +2441,36 @@ async function main(): Promise<void> {
   const wildGround = (x: number, z: number): number => groundHeightAt(x, z, -Infinity);
 
   /**
+   * The **raw** terrain height, which is deliberately not `groundHeightAt`.
+   *
+   * Two reasons, and both of them were bugs before they were reasons.
+   *
+   *   1. `groundHeightAt` never returns a non-finite value: it falls back to
+   *      `lastGround`, the last height the *player* stood on, which is exactly
+   *      right for walking a player across a seam and exactly wrong for anything
+   *      placing an object. A bike three tiles away whose terrain has not arrived
+   *      would be placed at the player's own elevation -- buried in Redfern or
+   *      hovering over Alexandria -- and, worse, `placeBike` would *succeed*, so
+   *      the tile would be struck off and never retried.
+   *   2. `groundHeightAt` **writes** `lastGround`. Querying it for a point 700 m
+   *      away leaves the player's own fallback height set to somewhere they have
+   *      never been, which is a real position bug in a function that only meant
+   *      to ask a question.
+   *
+   * So this asks the streamer directly and answers `NO_GROUND` for a tile that
+   * is not resident, which is what makes "wait until the terrain is here" a
+   * thing `placeBike`, `maybeBuildStall` and `RailWorld` can all simply test for.
+   *
+   * **Declared here rather than beside the bikes**, which is where it used to
+   * live and where its two callers still are: `RailWorld` is constructed twenty
+   * lines below and needs it, and a rail chunk built against `wildGround` at the
+   * edge of its 1100 m ring would compare a track height against ground from
+   * seven hundred metres away and conclude the railway is underground. That is
+   * the exact failure the paragraph above describes, in a third place.
+   */
+  const rawGroundAt = (x: number, z: number): number => streamer.ground?.height(x, z) ?? NO_GROUND;
+
+  /**
    * The railway in the scene, built here because this is the first line at which
    * both of the things it needs exist.
    *
@@ -2414,7 +2484,9 @@ async function main(): Promise<void> {
    * viaduct instead of into it.
    */
   const railWorld =
-    railNetwork === null ? null : new RailWorld(railNetwork, railAssets, wildGround, collision);
+    railNetwork === null
+      ? null
+      : new RailWorld(railNetwork, railAssets, wildGround, collision, railCut, rawGroundAt);
   if (railWorld) scene.add(railWorld.group);
 
   /**
@@ -2855,28 +2927,6 @@ async function main(): Promise<void> {
    * admits a bike has to admit the person walking over to fetch it, and a kerb
    * is not an obstacle.
    */
-  /**
-   * The **raw** terrain height, which is deliberately not `groundHeightAt`.
-   *
-   * Two reasons, and both of them were bugs before they were reasons.
-   *
-   *   1. `groundHeightAt` never returns a non-finite value: it falls back to
-   *      `lastGround`, the last height the *player* stood on, which is exactly
-   *      right for walking a player across a seam and exactly wrong here. A bike
-   *      three tiles away whose terrain has not arrived would be placed at the
-   *      player's own elevation -- buried in Redfern or hovering over
-   *      Alexandria -- and, worse, `placeBike` would *succeed*, so the tile
-   *      would be struck off and never retried.
-   *   2. `groundHeightAt` **writes** `lastGround`. Querying it for a point 700 m
-   *      away leaves the player's own fallback height set to somewhere they have
-   *      never been, which is a real position bug in a function that only meant
-   *      to ask a question.
-   *
-   * So this asks the streamer directly and answers `NO_GROUND` for a tile that
-   * is not resident, which is what makes "wait until the terrain is here" a
-   * thing `placeBike` and `maybeBuildStall` can both simply test for.
-   */
-  const rawGroundAt = (x: number, z: number): number => streamer.ground?.height(x, z) ?? NO_GROUND;
   const bikeGround: BikeGround = {
     groundHeight: (x, z) => rawGroundAt(x, z),
     clear: (x, z, y) => !collision.resolve(x, z, x, z, PLAYER_RADIUS, y + 0.42).hit,
@@ -3593,6 +3643,17 @@ async function main(): Promise<void> {
   const rideVelocity = new Vector3();
   const rideLocal = { x: 0, y: 0, z: 0 };
   const rideText = createRideBanner();
+  /**
+   * What the trains are announcing this frame. One record, reused.
+   *
+   * Reused rather than returned for the reason every other per-frame struct in
+   * this file is: `railAnnounceMix` runs at 60 Hz over the whole timetable and a
+   * fresh object a frame is 3,600 allocations a minute for two booleans and a
+   * float. It carries no state between frames -- every field is overwritten
+   * before it is read -- which is what lets the schedule stay a pure function of
+   * the clock while the buffer it is written into is not.
+   */
+  const railAnnounce = createRailAnnounceMix();
   /** Where `sydney.rail.goto` puts you. One record, reused. */
   const railStand: Stand = { x: 0, y: 0, z: 0, yaw: 0 };
   /**
@@ -6268,6 +6329,27 @@ async function main(): Promise<void> {
     // the server evaluates, so what is drawn here is what the server says.
     if (railBake) {
       trains.update(railBake, railNow, player.position.x, player.position.z);
+      // And what those trains are saying, on the identical contract: one call,
+      // the same `railNow` the carriages were placed from, and no state on
+      // either side of it. `game/rail-audio.ts` turns the timetable into "which
+      // sentence, how far in, and how far away"; `game/audio.railAnnounce`
+      // turns that into sound. The split, and the single unconditional call
+      // per frame, is `raveUpdate`'s two hundred lines down.
+      //
+      // Aboard, the mix collapses to the player's own train and comes through
+      // at full clarity -- see section 6 of `game/rail-audio.ts` -- which is
+      // also why the aboard slot is handed over rather than just a position.
+      railAnnounceMix(
+        railBake,
+        railNow,
+        player.position.x,
+        player.position.z,
+        isAboard(playerCombat.aboard) ? playerCombat.aboard : null,
+        railAnnounce,
+      );
+      audio.railAnnounce(railAnnounce);
+    } else {
+      audio.railAnnounce(null);
     }
     // The boarding marker's own breathing. Aimed in `simulate` at the tick rate
     // and animated here at the frame rate, which is the split every other

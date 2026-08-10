@@ -72,6 +72,17 @@
  * is a phase with `v0 = 0`, so "1.4 seconds into the stand at Redfern" is exact,
  * shared by every client, and needs no state here at all.
  *
+ * **`game/rail-audio.ts` reads the same anchor and this file does not call it.**
+ * The announcements are hung off `dir.arrivals[c]` -- the age the dwell phase
+ * above begins at -- so the approach clip is counting down to the instant these
+ * doors start opening, and the departure clip starts on it. The two agree
+ * because they are the same number, not because anything here tells the sound
+ * system when a door moved; and the source position agrees because that file
+ * calls the same `riding.consistOffset` this one places carriages with. There is
+ * deliberately no hook: a renderer that had to fire an audio event would be a
+ * renderer a headless server could not run, and the whole schedule is
+ * re-derived without one in `checkRailAnnouncements`.
+ *
  * ---------------------------------------------------------------------------
  * 5. THE RENDERER RULES. The impostor's `InstancedMesh` calls
  * `setColorAt(0, white)` in its constructor, for the reason `world/rail-geo.ts`

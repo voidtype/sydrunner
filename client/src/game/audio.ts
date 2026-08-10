@@ -60,6 +60,8 @@
  * browser suspended on a tab switch.
  */
 
+import type { RailAnnounceMix, RailVoice } from './rail-audio.ts';
+
 export class CombatAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -1668,6 +1670,243 @@ export class CombatAudio {
       osc.stop(at + spb * 0.5);
     }
   }
+
+  // --- The train PA ---------------------------------------------------------------
+  //
+  // `game/rail-audio.ts` decides *what* is being announced and from how far
+  // away; this decides what that is made of. The split is `world/rave.ts`'s and
+  // for the same reason -- that file computes a `RaveMix` and has never heard of
+  // a convolver -- with the consequence that the whole schedule can be
+  // re-derived on the Bun server by a process with no `AudioContext` in it.
+  //
+  // -------------------------------------------------------------------------
+  // 1. A DECODED BUFFER, WHERE THE RAVE STREAMS.
+  //
+  // The rave's own comment says why it streams: 344 seconds of 48 kHz stereo is
+  // 132 MB decoded, four times over. An announcement is 27 or 65 seconds and
+  // **mono** -- see the folder's README, and see the loudness pass that made it
+  // so -- which is 12.5 MB decoded for the pair and buys the one thing a
+  // `MediaElementAudioSourceNode` cannot give: `start(when, offset)` is
+  // sample-accurate, so a player who walks onto a platform 31.4 seconds into a
+  // sentence hears the syllable that is 31.4 seconds in. Seeking a media element
+  // to that is a `currentTime` write, a rebuffer and an audible gap.
+  //
+  // That accuracy is the feature. It is what makes two players in one carriage
+  // hear one voice rather than two out-of-phase copies of it, and it is free
+  // because the schedule is closed form.
+  //
+  // -------------------------------------------------------------------------
+  // 2. TWO CHANNELS, EACH source -> gate -> lowpass -> out -> master.
+  //
+  // `out` carries the distance, `lowpass` carries the shell, and `gate` exists
+  // only so a source can be replaced without a click: a buffer entered at 31.4
+  // seconds starts on whatever sample is there, and a buffer cut mid-word ends
+  // on one, so both ends get a 15 ms ramp. That is short enough not to be a fade
+  // -- `bark`'s comment is right that an envelope over a recording is what makes
+  // a voice line sound like a game asset -- and long enough that the
+  // discontinuity is gone.
+  //
+  // The gate is per *source* rather than per channel, which is the only reason
+  // pre-emption sounds like a PA interrupting itself rather than like a bug: the
+  // outgoing sentence rings out over 40 ms while the incoming one is already
+  // playing through the same filter.
+  //
+  // -------------------------------------------------------------------------
+  // 3. THE LEVEL, AND WHY THERE ARE TWO NUMBERS RATHER THAN ONE.
+  //
+  // Inside the carriage there is nothing between the speaker and the ear, so a
+  // rider gets `ANNOUNCE_GAIN` flat and the filter wide open. Outside there is a
+  // steel box, so the level is cut by `ANNOUNCE_SHELL` **and** the top end comes
+  // off with distance. Distance alone would have given a player standing three
+  // metres from an open door the same thing the driver hears, which is wrong in
+  // a way that is hard to place: it sounds like the announcement is being made
+  // at you rather than in the train.
+  //
+  //      metres   gain    corner     what it is
+  //     inside    0.62    20 kHz     the carriage you are standing in
+  //          3    0.30    5.2 kHz    beside the doors, unmistakably from inside
+  //         12    0.22    5.2 kHz    across the platform, every word
+  //         25    0.16    2.5 kHz    the far platform, still every word
+  //         50    0.11    1.2 kHz    a voice with the shape of words in it
+  //        110    0.06    567 Hz     the gate. Gone.
+  //
+  // The corner is held flat inside 12 m -- the far edge of a platform -- for
+  // `RAVE_CUTOFF_AT`'s reason: what should change as you back away is the
+  // distance, not what the thing sounds like, so everywhere a passenger
+  // actually stands gets one timbre.
+  //
+  // **Outside it the corner falls with the first power of the distance, and
+  // `raveUpdate` uses the square.** That difference is deliberate and is worth
+  // the two lines. The rave squared its exponent when its range was cut to a
+  // third, precisely to keep the whole "thump, then music, then the track"
+  // progression inside the shorter range. This range is short to begin with, so
+  // squaring here does the opposite of that: it reaches the 520 Hz floor at
+  // 44 m and leaves the outer 60 % of the range at one uniform mumble. Linear
+  // spreads the progression over the whole 110 m and never touches the floor,
+  // which is left in as a clamp rather than as a destination -- below about
+  // 500 Hz speech stops being speech and becomes a hum, and a hum fading out is
+  // worse than a muffled voice fading out.
+  //
+  // Against the limiter, on `raveUpdate`'s arithmetic: the clips are normalised
+  // to about -14 LUFS with a measured -0.37 dBTP, so 0.958 linear, and
+  // `master` is 0.55. The loudest an announcement can be is inside a carriage at
+  // 0.55 * 0.62 * 0.958 = **0.327** against the compressor's -8 dB threshold of
+  // 0.398. It never touches it on its own, which is what that limiter is for.
+
+  /** The two channels, built on the first announcement and then kept. */
+  private announce: AnnounceChannel[] | null = null;
+
+  /**
+   * Drive the train PA for this frame, or pass `null` for silence.
+   *
+   * Called unconditionally from the frame loop with whatever
+   * `rail-audio.railAnnounceMix` found, so there is exactly one place that
+   * decides what is audible and no audio state anywhere else. Returns nothing
+   * and throws nothing.
+   */
+  railAnnounce(mix: RailAnnounceMix | null): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+
+    if (mix === null) {
+      this.announceRelease(ctx, 0);
+      this.announceRelease(ctx, 1);
+      return;
+    }
+    // The prefetch, and the whole of the policy: nothing is fetched until a
+    // train that is actually announcing is within `ANNOUNCE_FETCH_RANGE`, so a
+    // player who never goes near a railway never downloads either clip.
+    //
+    // Read off the mix's own voices, which carry their URL whether they are
+    // playing or not. That is what keeps this file's dependency on
+    // `game/rail-audio.ts` a **type-only** one: nothing in the schedule module
+    // is evaluated here, so the sound system still imports nothing at runtime.
+    if (mix.wanted) {
+      this.loadClip(mix.arrive.url);
+      this.loadClip(mix.depart.url);
+    }
+
+    const chans = this.announce ?? this.announceBuild(ctx, master);
+    this.announce = chans;
+    this.announceVoice(ctx, 0, mix.arrive);
+    this.announceVoice(ctx, 1, mix.depart);
+  }
+
+  private announceBuild(ctx: AudioContext, master: GainNode): AnnounceChannel[] {
+    const chans: AnnounceChannel[] = [];
+    for (let i = 0; i < 2; i++) {
+      const out = ctx.createGain();
+      out.gain.value = 0.0001;
+      out.connect(master);
+      const lowpass = ctx.createBiquadFilter();
+      lowpass.type = 'lowpass';
+      // Butterworth, `raveBuild`'s reason: a default Q of 1 puts a 1.2 dB bump
+      // on the corner, and a corner sweeping from 520 Hz to 5 kHz as a train
+      // pulls in would sweep that bump with it -- a filter sound rather than a
+      // distance.
+      lowpass.Q.value = 0.707;
+      lowpass.frequency.value = 20000;
+      lowpass.connect(out);
+      chans.push({ key: 0, out, lowpass, source: null, gate: null });
+    }
+    return chans;
+  }
+
+  private announceVoice(ctx: AudioContext, index: number, voice: RailVoice): void {
+    const chans = this.announce;
+    if (!chans) return;
+    const ch = chans[index];
+    if (!voice.active) {
+      this.announceRelease(ctx, index);
+      return;
+    }
+    const buffer = this.clips.get(voice.url);
+    if (!buffer) {
+      // Not decoded yet. Deliberately not queued to start on arrival: a sentence
+      // that begins four seconds after the schedule says it did would be four
+      // seconds out for the rest of its minute, and every other client would be
+      // right.
+      this.loadClip(voice.url);
+      this.announceRelease(ctx, index);
+      return;
+    }
+
+    const t = ctx.currentTime;
+    const d = voice.distance > 0 ? voice.distance : 0;
+    const gain = voice.inside
+      ? ANNOUNCE_GAIN
+      : (ANNOUNCE_GAIN * ANNOUNCE_SHELL) / (1 + d / ANNOUNCE_HALF_DISTANCE);
+    let cutoff = 20000;
+    if (!voice.inside) {
+      const near = Math.max(ANNOUNCE_CUTOFF_AT, d) / ANNOUNCE_CUTOFF_AT;
+      cutoff = Math.min(20000, Math.max(ANNOUNCE_CUTOFF_MIN, ANNOUNCE_CUTOFF_MAX / near));
+    }
+
+    if (ch.key !== voice.key) {
+      this.announceRelease(ctx, index);
+      ch.key = voice.key;
+      // Past the end of what was decoded -- a clip shorter than the schedule
+      // believes, or the last frame of one. Nothing to play, and the key is
+      // recorded anyway so this is not retried sixty times a second.
+      if (voice.offset < buffer.duration - 0.05) {
+        const gate = ctx.createGain();
+        gate.gain.setValueAtTime(0.0001, t);
+        gate.gain.linearRampToValueAtTime(1, t + ANNOUNCE_EDGE_S);
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(gate).connect(ch.lowpass);
+        source.start(t, voice.offset > 0 ? voice.offset : 0);
+        ch.source = source;
+        ch.gate = gate;
+      }
+      // Set rather than ramped, and only on the frame a sentence begins: the
+      // channel may have been left at the level of a train that has since gone,
+      // and a quarter-second slide up to the right one is the fade `bark`
+      // refuses to put on a recording.
+      ch.out.gain.cancelScheduledValues(t);
+      ch.out.gain.setValueAtTime(gain, t);
+      ch.lowpass.frequency.cancelScheduledValues(t);
+      ch.lowpass.frequency.setValueAtTime(cutoff, t);
+      return;
+    }
+
+    // And thereafter ramped, `raveUpdate`'s reason: at 60 fps a stepped
+    // `frequency.value` on a biquad is a zipper, and a train pulling in moves
+    // this the full width of its range in eight seconds.
+    ch.out.gain.setTargetAtTime(gain, t, 0.08);
+    ch.lowpass.frequency.setTargetAtTime(cutoff, t, 0.08);
+  }
+
+  /** Ring the current sentence out over 40 ms and forget it. Idempotent. */
+  private announceRelease(ctx: AudioContext, index: number): void {
+    const chans = this.announce;
+    if (!chans) return;
+    const ch = chans[index];
+    ch.key = 0;
+    const source = ch.source;
+    const gate = ch.gate;
+    ch.source = null;
+    ch.gate = null;
+    if (!source || !gate) return;
+    const t = ctx.currentTime;
+    gate.gain.cancelScheduledValues(t);
+    gate.gain.setValueAtTime(gate.gain.value, t);
+    gate.gain.linearRampToValueAtTime(0.0001, t + ANNOUNCE_EDGE_S);
+    try {
+      source.stop(t + ANNOUNCE_EDGE_S * 2);
+    } catch {
+      // Already stopped by an earlier release. Nothing to do.
+    }
+    // Disconnected on a timer rather than now, so the ramp above is heard.
+    setTimeout(() => {
+      try {
+        gate.disconnect();
+      } catch {
+        // A node already disconnected by a context teardown.
+      }
+    }, 400);
+  }
 }
 
 // --- The sound system's own types and numbers ---------------------------------------
@@ -1813,3 +2052,87 @@ const RAVE_LOOKAHEAD = 0.3;
  * oscillator takes hertz.
  */
 const BASS_FIGURE: readonly number[] = [55, 55, 65.41, 55, 73.42, 55, 65.41, 82.41];
+
+// --- The train PA's own numbers ------------------------------------------------------
+
+/** One channel of it. See section 2 of the PA's comment. */
+interface AnnounceChannel {
+  /** Which announcement is on this channel, or 0 for none. `announceKey`'s. */
+  key: number;
+  out: GainNode;
+  lowpass: BiquadFilterNode;
+  source: AudioBufferSourceNode | null;
+  /** The current source's own edge ramp, so it can be replaced without a click. */
+  gate: GainNode | null;
+}
+
+/**
+ * The announcement's gain in the carriage it is being made in.
+ *
+ * `RAVE_GAIN` exactly, and that is not laziness: the two are the loudest
+ * sustained things in the mix and they were both checked against the same
+ * limiter. Section 3 has the arithmetic -- 0.327 peak against a 0.398 threshold.
+ * A rave and an announcement together would engage the compressor, which is a
+ * rave beside a station, which is a thing the limiter exists for.
+ */
+const ANNOUNCE_GAIN = 0.62;
+
+/**
+ * What is left of it through a carriage shell, on the platform side.
+ *
+ * -5.2 dB. Aluminium and laminated glass would take far more than that off a
+ * speaker two metres inside, and the number is deliberately generous, because a
+ * train that has announced something on a platform is a thing a player should
+ * hear. What it has to buy is the *difference*: standing beside the doors must
+ * not sound like standing under the speaker, or the announcement reads as being
+ * made at you rather than in the train.
+ */
+const ANNOUNCE_SHELL = 0.55;
+
+/**
+ * Where the level has halved, metres.
+ *
+ * 23, against `RAVE_HALF_DISTANCE`'s 37 and `bark`'s 22. Almost exactly a bark's
+ * and for almost the opposite reason: a police officer's shout is gentle because
+ * a warning you cannot hear is not a warning, and this is steep because there is
+ * an announcement at every station every two minutes and a cue that is always on
+ * is not a cue. The two arrive at the same number from opposite ends, which is a
+ * coincidence worth writing down rather than one worth hiding.
+ *
+ * It holds `ANNOUNCE_RANGE / this` at 4.78, matching the rave model's 4.73, so
+ * the level at the gate is `1 / (1 + 4.78)` = 0.173 of what the same curve gives
+ * at the carriage side -- the identical near-inaudible fraction the music is cut
+ * at, and the reason nothing pops off when you walk away from a platform.
+ * Against the level *inside* the carriage it is 0.095, because the shell is
+ * between you and it either way.
+ */
+const ANNOUNCE_HALF_DISTANCE = 23;
+
+/**
+ * Inside this the shell filter is flat, metres, and the corner frequency there.
+ *
+ * 12 m is the far edge of a platform. `RAVE_CUTOFF_AT`'s argument, one scale
+ * down: what should change as you back away is the distance, not what the thing
+ * sounds like, so everywhere a passenger actually waits gets the identical
+ * timbre and only leaving the platform opens the filter's own progression.
+ *
+ * 5.2 kHz rather than 20 is the shell itself. Speech intelligibility lives
+ * between 1 and 4 kHz, so a corner just above it is a tannoy heard through a
+ * door -- every word, no sibilance -- which is what a train announcement on a
+ * platform is. The floor is 520 Hz because below that speech stops being speech
+ * and becomes a hum, and a hum fading out is worse than a muffled voice fading
+ * out.
+ */
+const ANNOUNCE_CUTOFF_AT = 12;
+const ANNOUNCE_CUTOFF_MAX = 5200;
+const ANNOUNCE_CUTOFF_MIN = 520;
+
+/**
+ * The ramp on both ends of a source, seconds.
+ *
+ * 15 ms. A buffer entered 31.4 seconds in starts on whatever sample is there and
+ * a buffer cut by a pre-emption ends on one; both are clicks. Short enough that
+ * it is not a fade -- see `bark` on what an envelope does to a recording -- and
+ * long enough to remove the step.
+ */
+const ANNOUNCE_EDGE_S = 0.015;

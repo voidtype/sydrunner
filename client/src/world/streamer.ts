@@ -219,7 +219,8 @@ import {
   type TileDecodeRequest,
   type TileDecodeResult,
 } from './tile-decode.ts';
-import { TerrainField, buildTerrainMesh, sampleTileGrid } from './terrain.ts';
+import { TerrainField, buildTerrainMesh, sampleTileGrid, type TileCut } from './terrain.ts';
+import type { RailCut } from './rail-cut.ts';
 import {
   TileFetchError,
   TileRetryLedger,
@@ -1088,6 +1089,11 @@ export class TileStreamer implements LampSource {
    * a tile's sidecar, but it outlives any individual tile -- see `terrain.ts`.
    */
   private terrainField: TerrainField | null = null;
+  /**
+   * The rail corridor, once `main.ts` has a bake. Null means "draw the ground
+   * as the DEM left it", which is every world built before the railway was.
+   */
+  private railCut: RailCut | null = null;
 
   constructor(
     scene: Scene,
@@ -1775,6 +1781,66 @@ export class TileStreamer implements LampSource {
    */
   get ground(): TerrainField | null {
     return this.terrainField;
+  }
+
+  /**
+   * Hand the streamer the rail corridor, so the ground stops being drawn across
+   * the top of it. See `world/rail-cut.ts` for the whole argument.
+   *
+   * **Late is allowed, and this is the half of that which is not obvious.** The
+   * bake is fetched at boot and in practice lands long before the first tile is
+   * built, but "in practice" is how a tile ends up with an uncarved sheet over
+   * the Bankstown line for the rest of the session -- a tile is built once, and
+   * nothing would ever come back for it. So a corridor arriving after tiles are
+   * already standing rebuilds their ground, and only their ground: the terrain
+   * mesh is the one child of a tile group that this changes, everything else in
+   * the tile was draped by the pipeline and is untouched.
+   */
+  setRailCut(cut: RailCut | null): void {
+    this.railCut = cut;
+    if (cut === null || this.loaded.size === 0) return;
+    const tileSize = this.index?.tile_size ?? 0;
+    if (tileSize <= 0 || this.terrainField === null) return;
+    let recut = 0;
+    for (const tile of this.loaded.values()) {
+      const grid = this.terrainField.grid(tile.entry.key);
+      if (!grid) continue;
+      const old = tile.group.children.find((c) => c.name === 'terrain');
+      if (!(old instanceof Mesh)) continue;
+      const fresh = buildTerrainMesh(
+        grid,
+        this.terrain.grid,
+        tileSize,
+        this.groundMaterial,
+        this.tileCut(tile.entry),
+      );
+      if ((fresh.userData.cutArea as number) <= 0) {
+        fresh.geometry.dispose();
+        continue;
+      }
+      tile.group.remove(old);
+      old.geometry.dispose();
+      tile.group.add(fresh);
+      recut++;
+    }
+    if (recut > 0) console.debug(`[terrain] re-cut ${recut} resident tiles for the railway`);
+  }
+
+  /**
+   * The corridor as one tile sees it: the same `RailCut`, plus where this tile's
+   * local frame sits in the world. Null when there is no bake, which is a world
+   * with an uncut ground and is exactly the world that shipped.
+   */
+  private tileCut(entry: TileEntry): TileCut | null {
+    const cut = this.railCut;
+    if (cut === null || this.index === null) return null;
+    const tileSize = this.index.tile_size;
+    return {
+      originX: entry.bounds[0],
+      originZ: entry.bounds[1] + tileSize,
+      near: (x, z, pad) => cut.near(x, z, pad),
+      cutAt: (x, z, groundY) => cut.cutAt(x, z, groundY),
+    };
   }
 
   /**
@@ -2743,7 +2809,15 @@ export class TileStreamer implements LampSource {
           : (x: number, z: number): number =>
               sampleTileGrid(terrain, this.terrain.grid, tileSize, x, z);
       if (terrain !== null) {
-        group.add(buildTerrainMesh(terrain, this.terrain.grid, tileSize, this.groundMaterial));
+        group.add(
+          buildTerrainMesh(
+            terrain,
+            this.terrain.grid,
+            tileSize,
+            this.groundMaterial,
+            this.tileCut(entry),
+          ),
+        );
       }
       yield;
 

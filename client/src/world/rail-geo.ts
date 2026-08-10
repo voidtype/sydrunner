@@ -141,6 +141,12 @@ import {
   type RailBake,
   type RailStation,
 } from '../game/rail.ts';
+import {
+  CUT_MIN_DEPTH,
+  drawnAsTunnel,
+  inCutting,
+  type RailCut,
+} from './rail-cut.ts';
 
 // --- Where the bake comes from ------------------------------------------------
 
@@ -198,6 +204,33 @@ const TUNNEL_RISE = 1.9;
 /** Portal headwall: how far it stands proud of the bore. */
 const PORTAL_MARGIN = 1.1;
 const PORTAL_THICKNESS = 0.9;
+
+/**
+ * The cutting. Where the ground has been taken away by `world/rail-cut.ts`,
+ * this is what stands in the hole.
+ *
+ * `TRENCH_BATTER` is the lean of the retaining wall, horizontal over vertical.
+ * A real cutting wall is between 1:4 and 1:8 depending on whether it is
+ * sandstone, brick or sprayed concrete; 1:6 reads as a wall rather than as an
+ * embankment and keeps a 13 m cutting's foot 2.2 m inboard of its top, which is
+ * still clear of the ballast.
+ *
+ * `TRENCH_STEP_M` is how often the wall re-reads the terrain along the run. The
+ * bake's segments average 40 m, which is longer than a DEM post, so a wall built
+ * as one ruled quad per segment would leave its top a metre off the rim of the
+ * hole in the middle of every span. Eight metres tracks the grid closely enough
+ * that the two never part company by more than a few centimetres.
+ */
+const TRENCH_BATTER = 1 / 6;
+const TRENCH_STEP_M = 8;
+/** The coping: how far the wall's top laps *over* the rim of the hole. */
+const TRENCH_COPING = 0.5;
+/** And how far it stands over the ground, so the lap is never a hairline. */
+const TRENCH_COPING_RISE = 0.12;
+/** The wall foot never comes inboard of this, whatever the batter says. */
+const TRENCH_FOOT_MIN = BALLAST_BASE_HALF + 0.3;
+/** Below this a wall is not worth its triangles; the track is at grade. */
+const TRENCH_MIN_HEIGHT = 0.45;
 
 /** Overhead line. Contact wire at the regulated height above the rail head. */
 const CONTACT_HEIGHT = 5.1;
@@ -258,6 +291,8 @@ const BUILD_RADIUS = 1100;
 const BUILDS_PER_FRAME = 2;
 /** And disposed past this. The hysteresis is the streamer's own pattern. */
 const KEEP_RADIUS = 1500;
+/** How many times a chunk is rebuilt waiting for terrain. See `retryProvisional`. */
+const PROVISIONAL_ATTEMPTS = 4;
 /** Sleepers are geometry only this close; past it the ballast ribbon reads. */
 const SLEEPER_RADIUS = 165;
 const MAST_RADIUS_M = 520;
@@ -946,6 +981,13 @@ interface BuiltChunk {
   group: Group;
   geometries: BufferGeometry[];
   collisionKey: string | null;
+  /**
+   * Built against terrain that had not all arrived, and therefore wrong in a way
+   * that will not fix itself. See the `rawGround` argument to `RailWorld`.
+   */
+  provisional: boolean;
+  /** How many times it has been rebuilt hoping for terrain. Bounded; see below. */
+  attempts: number;
   /** Instance sources, held so the global sets can be refilled without a rebuild. */
   sleepers: Float32Array;
   masts: number[];
@@ -977,6 +1019,8 @@ export class RailWorld {
   mastCount = 0;
   /** Instances the capacities refused. Should stay at zero. */
   overflows = 0;
+  /** Chunks rebuilt because their terrain arrived late. See `retryProvisional`. */
+  provisionalRebuilds = 0;
 
   private readonly built = new Map<string, BuiltChunk>();
   /** Chunk keys inside the build radius that have not been built yet. */
@@ -992,6 +1036,28 @@ export class RailWorld {
     private readonly assets: RailAssets,
     private readonly ground: GroundAt,
     private readonly solids: RailSolids | null = null,
+    /**
+     * The corridor, so a cutting can be drawn as one. Null draws the railway
+     * exactly as it drew before the carve existed, which is what a world with no
+     * bake and every check that builds a `RailWorld` by hand gets.
+     */
+    private readonly cut: RailCut | null = null,
+    /**
+     * The **raw** terrain height, `NaN` where no tile is loaded -- and this is
+     * the whole reason it is a second argument rather than a reuse of `ground`.
+     *
+     * `main.ts`'s `wildGround` never returns `NaN`: it falls back to
+     * `lastGround`, the last height the *player* stood on. That is right for a
+     * viaduct pier, which wants a plausible depth rather than none. It is
+     * catastrophic for the depth test below, because rail chunks build to
+     * `BUILD_RADIUS` 1100 m while `ensureGround` only guarantees terrain to
+     * `COLLISION_RADIUS` 420 m -- so at the edge of the ring a naive test would
+     * compare a track height against ground from seven hundred metres away and
+     * decide, permanently, that the North Shore line is thirty metres
+     * underground. An honest `NaN` instead marks the chunk **provisional** and
+     * it is built again once its tiles arrive. See `retryProvisional`.
+     */
+    private readonly rawGround: GroundAt = ground,
   ) {
     this.group.name = 'rail';
 
@@ -1102,6 +1168,7 @@ export class RailWorld {
     }
     wanted.sort((a, b) => b.d - a.d);
     this.pending = wanted.map((w) => w.key);
+    this.retryProvisional(x, z);
     for (const [key, chunk] of this.built) {
       if (chunkDistance(chunk.cx, chunk.cz, x, z) <= KEEP_RADIUS) continue;
       this.disposeChunk(key, chunk);
@@ -1146,10 +1213,26 @@ export class RailWorld {
     const sleepers: number[] = [];
 
     let wireSpans = 0;
+    /** See `BuiltChunk.provisional`: any depth this chunk could not measure. */
+    let provisional = false;
     for (const si of chunk.segments) {
       const s = this.net.segments[si];
-      const tunnel = (s.flags & SPAN_TUNNEL) !== 0;
+      // **How deep this span is, honestly.** `rawGround` rather than `ground`:
+      // an unknown depth must read as unknown here, not as zero. See the
+      // constructor's `rawGround` argument for what a wrong answer costs.
+      const depth = this.rawGround((s.ax + s.bx) / 2, (s.az + s.bz) / 2) - (s.ay + s.by) / 2;
+      // Bore, trench or grade -- one rule, shared with the carve so the hole and
+      // the thing standing in it cannot disagree. See `rail-cut.ts`, which also
+      // records the measurement that killed the obvious version of this: reading
+      // `SPAN_SUBWAY` as "Metro, therefore tunnel below 6 m" lined the deepest
+      // 70 spans of the *open* cutting at Sydenham. Sydney Metro's tunnels all
+      // carry `tunnel=yes`; the flag that earns its place is `SPAN_CUTTING`, and
+      // `inCutting` is where it is spent.
+      const tunnel = drawnAsTunnel(s.flags);
       const bridge = (s.flags & SPAN_BRIDGE) !== 0;
+      // A span whose depth is unknown cannot be trenched, and a chunk built
+      // without knowing is built again. See `retryProvisional`.
+      if (!Number.isFinite(depth) && !tunnel && !bridge) provisional = true;
       if (tunnel) {
         writeTunnel(lining, s);
       } else {
@@ -1163,6 +1246,11 @@ export class RailWorld {
             s.az + (s.bz - s.az) * f,
             Math.atan2(-s.ux, -s.uz),
           );
+        }
+        // And the cutting. The ground over this span has been taken away by
+        // `terrain.buildTerrainMesh`; this is the trench that stands in the hole.
+        if (this.cut !== null && inCutting(s.flags, depth)) {
+          if (!writeTrench(concrete, prisms, s, this.cut, this.rawGround)) provisional = true;
         }
       }
       if (!tunnel) writeRails(rails, s);
@@ -1269,11 +1357,46 @@ export class RailWorld {
       group,
       geometries,
       collisionKey,
+      provisional,
+      attempts: 0,
       sleepers: new Float32Array(sleepers),
       masts: chunk.masts,
       cx,
       cz,
     };
+  }
+
+  /**
+   * Build again the chunks that were built blind.
+   *
+   * The window this closes: a chunk 900 m away is inside `BUILD_RADIUS` and its
+   * tiles are not yet resident, so every depth in it came back `NaN`, so every
+   * subway span in it was drawn as a bore and no cutting was trenched. Nothing
+   * would ever revisit it -- `reshapeRing` skips anything already in `built` --
+   * and the player would walk into a suburb whose railway was decided before its
+   * ground existed.
+   *
+   * Run on chunk transitions rather than per frame, because that is when the
+   * terrain set has meaningfully changed, and **bounded**: a chunk over the
+   * harbour or past the edge of coverage has no terrain and never will, and
+   * rebuilding it every 512 m for the rest of the session would be a permanent
+   * cost for a permanently unanswerable question. Four attempts is enough for the
+   * ring to fill in behind a player who walked straight out from the spawn.
+   */
+  private retryProvisional(x: number, z: number): void {
+    for (const [key, chunk] of [...this.built]) {
+      if (!chunk.provisional || chunk.attempts >= PROVISIONAL_ATTEMPTS) continue;
+      if (chunkDistance(chunk.cx, chunk.cz, x, z) > BUILD_RADIUS) continue;
+      const attempts = chunk.attempts + 1;
+      this.disposeChunk(key, chunk);
+      const fresh = this.buildChunk(key, chunk.cx, chunk.cz);
+      fresh.attempts = attempts;
+      this.built.set(key, fresh);
+      this.provisionalRebuilds++;
+      // One a transition. A rebuild is the same work as a first build and the
+      // frame budget that made `BUILDS_PER_FRAME` two applies here identically.
+      return;
+    }
   }
 
   private refillSleepers(x: number, z: number): void {
@@ -1530,6 +1653,196 @@ function writeViaduct(
       base,
     });
   }
+}
+
+/**
+ * A cutting: two battered retaining walls and the cess between them and the
+ * ballast, standing in the hole `terrain.buildTerrainMesh` cut for them.
+ *
+ * ---------------------------------------------------------------------------
+ * **The wall top is the rim of the hole and that is not a coincidence.** Its
+ * offset from the track centre is `cut.halfWidthAt` at the same centreline point
+ * the carve asked about, so the two are the same number by construction rather
+ * than by two constants that agree today. The coping then laps `TRENCH_COPING`
+ * further out and `TRENCH_COPING_RISE` higher, over ground that is still there,
+ * so even a floating-point disagreement about the rim is covered by half a metre
+ * of stone instead of showing the void through a hairline.
+ *
+ * The wall re-reads the terrain every `TRENCH_STEP_M` along the run, because a
+ * 40 m segment is longer than a DEM post and a single ruled quad would leave its
+ * top a metre off the ground in the middle. Where the terrain is not loaded this
+ * returns **false** and the caller marks the chunk provisional: a wall built to a
+ * guessed height is worse than one built a second time.
+ *
+ * ---------------------------------------------------------------------------
+ * The collision is the wall prism and there is deliberately no floor prism.
+ * `CollisionWorld.solidFor` makes a prism with `base` = the cess and `top` = the
+ * terrain do both jobs at once -- you walk over it from the street and into it
+ * from the trench -- while a floor prism would be dead weight, because
+ * `groundHeightAt` takes the max of everything and the grade above always wins.
+ * Standing at track level is `main.ts`'s `groundHeightAt` and `RailCutField`'s
+ * business, not this function's.
+ */
+function writeTrench(
+  s: Solid,
+  prisms: Array<{ points: Float32Array; height: number; base: number }>,
+  seg: Segment,
+  cut: RailCut,
+  rawGround: GroundAt,
+): boolean {
+  const px = -seg.uz;
+  const pz = seg.ux;
+  const steps = Math.max(1, Math.round(seg.len / TRENCH_STEP_M));
+  // Extended half a metre each end, on `writeBallast`'s argument: consecutive
+  // segments are built independently and the overlap is what keeps a bend from
+  // leaving a wedge of daylight on the outside of the turn.
+  const ext = 0.5;
+  let complete = true;
+
+  // One pass to measure, so the two sides can be built as strips.
+  interface Station { cx: number; cz: number; rail: number; cess: number }
+  const line: Station[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const along = -ext + t * (seg.len + 2 * ext);
+    const cx = seg.ax + seg.ux * along;
+    const cz = seg.az + seg.uz * along;
+    const rail = seg.ay + (seg.by - seg.ay) * t;
+    line.push({ cx, cz, rail, cess: rail - BALLAST_TOP_DROP - BALLAST_DEPTH });
+  }
+
+  for (const side of [-1, 1]) {
+    interface Rib { rim: number; foot: number; top: number; cess: number; cx: number; cz: number }
+    const ribs: Rib[] = [];
+    let anyWall = false;
+    for (const st of line) {
+      const rim = cut.halfWidthAt(st.cx, st.cz);
+      const g = rawGround(st.cx + px * rim * side, st.cz + pz * rim * side);
+      let top: number;
+      if (Number.isFinite(g)) {
+        top = g;
+      } else {
+        // Not loaded. Build to the depth the *track* says, so the chunk still
+        // draws something coherent, and tell the caller it was a guess.
+        complete = false;
+        top = st.rail + CUT_MIN_DEPTH;
+      }
+      // Never below the cess: at the taper where a cutting runs out to grade the
+      // wall goes to nothing rather than turning inside out.
+      if (top < st.cess) top = st.cess;
+      const height = top - st.cess;
+      if (height > TRENCH_MIN_HEIGHT) anyWall = true;
+      const foot = Math.max(TRENCH_FOOT_MIN, rim - TRENCH_BATTER * height);
+      ribs.push({ rim, foot, top, cess: st.cess, cx: st.cx, cz: st.cz });
+    }
+    if (!anyWall) continue;
+
+    const at = (rib: Rib, o: number, y: number): [number, number, number] => [
+      rib.cx + px * o * side, y, rib.cz + pz * o * side,
+    ];
+    /**
+     * One quad, wound so it faces the way it is meant to on **both** sides.
+     *
+     * `at` places an offset at `px * o * side`, so the `side = -1` frame is the
+     * `side = +1` frame mirrored -- and a mirror reverses handedness. Emitting
+     * the same four corners in the same order on both sides gives one side its
+     * normal and the other side the opposite of it, which on a `FrontSide`
+     * material means one whole wall of every cutting in Sydney is culled and the
+     * player looks straight through it into the void. Every quad in this
+     * function has that property, so the reversal is here rather than repeated
+     * four times: with the run as `u` and the up-and-out direction as `v`, the
+     * cross product comes out along `+px` on both sides, which is outward on one
+     * and inward on the other.
+     */
+    const face = (
+      p0: [number, number, number], p1: [number, number, number],
+      p2: [number, number, number], p3: [number, number, number],
+    ): void => {
+      if (side > 0) s.quad(...p3, ...p2, ...p1, ...p0);
+      else s.quad(...p0, ...p1, ...p2, ...p3);
+    };
+    for (let i = 0; i < ribs.length - 1; i++) {
+      const a = ribs[i];
+      const b = ribs[i + 1];
+      // The cess: the walking strip from the ballast toe out to the wall foot.
+      // It is what stops the hole showing between the ballast's batter and the
+      // wall, and it is the surface a cutting is recognised by from a train.
+      face(
+        at(a, BALLAST_BASE_HALF - 0.15, a.cess),
+        at(b, BALLAST_BASE_HALF - 0.15, b.cess),
+        at(b, b.foot, b.cess),
+        at(a, a.foot, a.cess),
+      );
+      // The wall, leaning out as it rises. Faces **into** the trench, which is
+      // the only side anybody ever sees it from.
+      face(
+        at(a, a.foot, a.cess),
+        at(b, b.foot, b.cess),
+        at(b, b.rim, b.top + TRENCH_COPING_RISE),
+        at(a, a.rim, a.top + TRENCH_COPING_RISE),
+      );
+      // The coping, lapping over the rim of the hole and onto the ground.
+      face(
+        at(a, a.rim, a.top + TRENCH_COPING_RISE),
+        at(b, b.rim, b.top + TRENCH_COPING_RISE),
+        at(b, b.rim + TRENCH_COPING, b.top + TRENCH_COPING_RISE),
+        at(a, a.rim + TRENCH_COPING, a.top + TRENCH_COPING_RISE),
+      );
+      face(
+        at(a, a.rim + TRENCH_COPING, a.top + TRENCH_COPING_RISE),
+        at(b, b.rim + TRENCH_COPING, b.top + TRENCH_COPING_RISE),
+        at(b, b.rim + TRENCH_COPING, b.top - 0.4),
+        at(a, a.rim + TRENCH_COPING, a.top - 0.4),
+      );
+    }
+    // The two ends, closed. Mostly buried inside the next segment's overlap,
+    // which is where they should be; the ones that are not are the end ramps
+    // where a cutting runs out to grade, and there a wall that simply stopped
+    // would show its own back face to the street.
+    for (const [rib, flip] of [[ribs[0], true], [ribs[ribs.length - 1], false]] as const) {
+      if (rib.top - rib.cess <= TRENCH_MIN_HEIGHT) continue;
+      const corners: Array<[number, number]> = [
+        [rib.foot, rib.cess],
+        [rib.rim, rib.top + TRENCH_COPING_RISE],
+        [rib.rim + TRENCH_COPING, rib.top + TRENCH_COPING_RISE],
+        [rib.rim + TRENCH_COPING, rib.cess],
+      ];
+      const pts = corners.map(([o, y]) => at(rib, o, y));
+      // Composed with the side mirror above: the two ends of a wall face
+      // opposite ways along the run, and each side flips both of them again.
+      if (flip === side > 0) s.quad(...pts[0], ...pts[1], ...pts[2], ...pts[3]);
+      else s.quad(...pts[3], ...pts[2], ...pts[1], ...pts[0]);
+    }
+
+    // One prism for the whole wall: `base` the cess, `top` the terrain. Walkable
+    // over from the street and solid from inside the trench, which is exactly the
+    // pair of behaviours a retaining wall has. See the header.
+    let base = Infinity;
+    let top = -Infinity;
+    let foot = Infinity;
+    let rim = 0;
+    for (const rib of ribs) {
+      if (rib.cess < base) base = rib.cess;
+      if (rib.top > top) top = rib.top;
+      if (rib.foot < foot) foot = rib.foot;
+      if (rib.rim > rim) rim = rib.rim;
+    }
+    if (top - base > TRENCH_MIN_HEIGHT) {
+      const a = ribs[0];
+      const b = ribs[ribs.length - 1];
+      prisms.push({
+        points: new Float32Array([
+          a.cx + px * foot * side, a.cz + pz * foot * side,
+          b.cx + px * foot * side, b.cz + pz * foot * side,
+          b.cx + px * (rim + TRENCH_COPING) * side, b.cz + pz * (rim + TRENCH_COPING) * side,
+          a.cx + px * (rim + TRENCH_COPING) * side, a.cz + pz * (rim + TRENCH_COPING) * side,
+        ]),
+        height: top + TRENCH_COPING_RISE - base,
+        base,
+      });
+    }
+  }
+  return complete;
 }
 
 /** The plan rectangle of a swept box, as the ring `addPrisms` wants. */

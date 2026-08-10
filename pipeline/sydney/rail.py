@@ -157,6 +157,15 @@ class RailStation:
     bridge_share: float = 0.0
     ground_y: float = 0.0
     track_y: float = 0.0
+    # Metres of terrain over the platform. See `classify_vertical`.
+    depth: float = 0.0
+    # Tunnel share of the track at this station's own level within
+    # `STATION_APPROACH_RADIUS_M`, and whether it was what decided the verdict.
+    approach_share: float = 0.0
+    approach_ways: int = 0
+    promoted: bool = False
+    # A light-rail stop whose nearest track was somebody else's tunnel.
+    orphaned: bool = False
 
 
 # `railway=platform` also appears on the `lines` layer as an open way; only the
@@ -2162,6 +2171,36 @@ def _repair(
 # a platform and a little more.
 STATION_WAY_RADIUS_M = 85.0
 
+# --- And the window that catches what the one above cannot -------------------------
+#
+# 85 m is a platform, and inside a station box that is exactly the problem: OSM
+# maps the *running tunnels* either side of a Metro station with `tunnel=yes` and
+# very often leaves the platform-level ways inside the box untagged, because the
+# box is a building rather than a tunnel. So the tunnel share measured over a
+# platform's length comes out near zero at a station that is twenty metres
+# underground -- Cherrybrook reads 0.13 with every metre of track for a
+# kilometre either side of it in tunnel.
+#
+# The approach window is the fix, and it is deliberately three things at once:
+#   * **wide** (260 m), so it reaches past the box to the running tunnels;
+#   * **level-banded**, so it counts only track at the station's own height --
+#     without this Central Chalmers Street would still be measured against the
+#     great train shed fifteen metres above it, and Wolli Creek against the
+#     Airport Line tunnel that dives under its platforms;
+#   * **promotion only**. It can make a station underground and can never make
+#     one surface, so every verdict the 85 m rule got right is untouched.
+STATION_APPROACH_RADIUS_M = 260.0
+APPROACH_LEVEL_BAND_M = 6.0
+# How far under the DEM a platform has to be before the approach window is even
+# consulted. Kingsgrove -- the hand-asserted case that made the radius 85 m in
+# the first place -- sits 4.3 m down in its cutting and stays comfortably below
+# this, and so does every real cutting on the Bankstown line.
+UNDERGROUND_MIN_DEPTH_M = 8.0
+# How much track a side needs before its vote counts. A terminus and a station at
+# the edge of the 60 km clip both have a side with nothing in it, and an empty
+# side must not read as "open sky that way".
+APPROACH_MIN_SIDE_M = 60.0
+
 
 def classify_vertical(
     g: RailGraph, stations: Sequence[RailStation], terrain=None
@@ -2208,16 +2247,101 @@ def classify_vertical(
         st.ways_near = len(idx)
         st.tunnel_share = tun / tot if tot else 0.0
         st.bridge_share = bri / tot if tot else 0.0
+        if terrain is not None:
+            st.ground_y = float(terrain.sample(st.east, st.north))
+        near = min(idx, key=lambda e: (mid[e][0] - st.east) ** 2 + (mid[e][1] - st.north) ** 2)
+        st.track_y = float(0.5 * (g.y[int(g.edges[near, 0])] + g.y[int(g.edges[near, 1])]))
+        st.depth = st.ground_y - st.track_y
+
         if st.tunnel_share >= 0.5:
             st.vertical = "underground"
         elif st.bridge_share >= 0.5:
             st.vertical = "elevated"
         else:
             st.vertical = "surface"
-        if terrain is not None:
-            st.ground_y = float(terrain.sample(st.east, st.north))
-        near = min(idx, key=lambda e: (mid[e][0] - st.east) ** 2 + (mid[e][1] - st.north) ** 2)
-        st.track_y = float(0.5 * (g.y[int(g.edges[near, 0])] + g.y[int(g.edges[near, 1])]))
+
+        # --- A light-rail stop standing over somebody else's tunnel.
+        #
+        # This bake reads `railway=rail|subway` and no light rail at all, so a
+        # `station=light_rail` node has no track of its own here. `track_y` above
+        # takes the nearest edge in *plan*, and for a stop on the surface over a
+        # Metro box the nearest edge in plan is the Metro, fifteen metres down --
+        # which is how "Central Chalmers Street", a light rail stop on the
+        # footpath outside Central, ended up with its platforms baked at the
+        # height of the tunnel underneath it. It is not an underground station and
+        # it is not a station this bake models: it is a stop whose track is
+        # missing, and the honest answer is to put it back on the street and say
+        # its class is unknown.
+        # `tunnel_share < 0.5` is what keeps this off Town Hall, Wynyard and the
+        # QVB, all three of which carry `station=light_rail` on the node that won
+        # the name and all three of which are genuinely underground heavy-rail or
+        # Metro stations. There the whole 85 m neighbourhood is tunnel, so the
+        # nearest edge is not passing under the stop -- it *is* the stop. At
+        # Central Chalmers Street only a fifth of it is, because the rest is the
+        # Central train shed at grade fifteen metres above.
+        if (
+            st.kind == "light_rail"
+            and st.tunnel_share < 0.5
+            and st.depth >= UNDERGROUND_MIN_DEPTH_M
+            and g.ways[int(g.way_of[near])].tunnel
+        ):
+            st.vertical = "unknown"
+            st.track_y = st.ground_y
+            st.depth = 0.0
+            st.orphaned = True
+            continue
+
+        # --- The approach window. Promotion only; see the constants above.
+        #
+        # **Tunnel on both sides, and that is the whole rule.** A share taken over
+        # the window as a whole cannot tell a station in a box from a station in a
+        # cutting that happens to sit beside a portal, and Sydney has both within
+        # a kilometre of each other: Cherrybrook is a box with tunnel running away
+        # from it in both directions, and Wolli Creek is an open cutting with the
+        # Airport Line diving under it at one end. Measured over the whole window
+        # those score 0.68 and 0.59, which no threshold separates honestly. Split
+        # by side they score (tunnel, tunnel) and (tunnel, open), which is not a
+        # close call at all -- and it is the same thing a person means when they
+        # say a station is underground: you cannot see daylight either way down
+        # the platform.
+        if st.vertical == "underground" or st.depth < UNDERGROUND_MIN_DEPTH_M:
+            continue
+        # The local track direction, from the same nearest edge `track_y` came
+        # from, so "which side" is measured along the railway rather than along
+        # the compass.
+        ax, an = g.xy[int(g.edges[near, 0])]
+        bx, bn = g.xy[int(g.edges[near, 1])]
+        ux, un = float(bx - ax), float(bn - an)
+        norm = math.hypot(ux, un) or 1.0
+        ux, un = ux / norm, un / norm
+
+        wide = tree.query_ball_point([st.east, st.north], STATION_APPROACH_RADIUS_M)
+        # [behind, ahead], each (tunnelled metres, total metres).
+        halves = [[0.0, 0.0], [0.0, 0.0]]
+        for ei in wide:
+            ey = 0.5 * (g.y[int(g.edges[ei, 0])] + g.y[int(g.edges[ei, 1])])
+            if abs(ey - st.track_y) > APPROACH_LEVEL_BAND_M:
+                continue
+            side = 1 if (mid[ei][0] - st.east) * ux + (mid[ei][1] - st.north) * un >= 0 else 0
+            L = float(g.length[ei])
+            halves[side][1] += L
+            if g.ways[int(g.way_of[ei])].tunnel:
+                halves[side][0] += L
+        tot_all = halves[0][1] + halves[1][1]
+        st.approach_share = (halves[0][0] + halves[1][0]) / tot_all if tot_all else 0.0
+        st.approach_ways = len(wide)
+        # Every side that has enough track in it to have an opinion must agree.
+        # `APPROACH_MIN_SIDE_M` is there for a terminus and for a station at the
+        # edge of the extract, where one side is simply not in the data and a
+        # missing half must not be read as a vote against.
+        votes = [
+            tun / tot >= 0.5
+            for tun, tot in halves
+            if tot >= APPROACH_MIN_SIDE_M
+        ]
+        if votes and all(votes):
+            st.vertical = "underground"
+            st.promoted = True
 
 
 # --- Overhead power, staged for the geometry round ---------------------------------
@@ -2402,6 +2526,11 @@ def write_bake(
             "trackY": float(s.track_y),
             "groundY": float(s.ground_y),
             "vertical": s.vertical,
+            "depth": s.depth,
+            "approachShare": s.approach_share,
+            "approachWays": s.approach_ways,
+            "promoted": s.promoted,
+            "orphaned": s.orphaned,
             "kind": s.kind,
             "platforms": int(s.platforms),
             "tunnelShare": round(float(s.tunnel_share), 4),

@@ -44,6 +44,48 @@ import { BufferAttribute, BufferGeometry, Mesh, type Material } from 'three/webg
 import { fetchWorldAsset } from './cdn.ts';
 
 /**
+ * The rail corridor, as much of it as this module needs: where to stop drawing
+ * ground, in this tile's own world frame.
+ *
+ * A hook rather than a `RailCut` import, on `rail-geo.RailSolids`' argument --
+ * the terrain is about the ground and the corridor is about the railway, and
+ * the only thing they must agree on is a half-width and a floor. It also means
+ * the mesh builds exactly as it always did when there is no bake, which is what
+ * a check and a world built before the railway existed both get.
+ *
+ * See `world/rail-cut.ts` for what fills the hole and why the two must never
+ * hold separate opinions about where its rim is.
+ */
+export interface TileCut {
+  /** World X of this tile's local origin: its south-west corner. */
+  originX: number;
+  /** World Z of the same corner. Tile-local z runs `-tileSize..0` from here. */
+  originZ: number;
+  /** Is any rail corridor within `pad` of this world point? The broad phase. */
+  near(x: number, z: number, pad: number): boolean;
+  /**
+   * The rail head the ground must be cut down to here, or `NaN` to leave it.
+   * `groundY` is the height this mesh is about to draw at that point, so the
+   * test is made against the sheet being cut and not a second opinion.
+   */
+  cutAt(x: number, z: number, groundY: number): number;
+}
+
+/**
+ * How fine a terrain quad the corridor crosses is subdivided, per side.
+ *
+ * At `post_m` 31.25 this is 3.9 m sub-quads, which is a third of the corridor
+ * width -- fine enough that the rim of the hole follows a curving cutting
+ * without visible stair-stepping from the street above it, and coarse enough
+ * that a fully-refined quad is 128 triangles rather than a thousand.
+ *
+ * **Only quads that actually lose a sub-quad are refined**, and the ones the
+ * corridor covers entirely lose all sixty-four and cost nothing at all, so the
+ * bill is two rows of sub-quads either side of the railway and nothing else.
+ */
+const CUT_SUBDIVISION = 8;
+
+/**
  * How far the skirt around each tile hangs below its edge, metres.
  *
  * Belt and braces, not the fix. Neighbouring tiles share their edge posts by
@@ -352,6 +394,7 @@ export function buildTerrainMesh(
   gridN: number,
   tileSize: number,
   material: Material,
+  cut: TileCut | null = null,
 ): Mesh {
   const stride = gridN + 1;
   const posts = stride * stride;
@@ -360,11 +403,17 @@ export function buildTerrainMesh(
   // Grid posts, then four skirt rails. The rails duplicate the edge posts'
   // positions dropped by SKIRT_DROP; the *top* of each skirt quad reuses the
   // grid's own vertices, so the two can never part company.
+  //
+  // Refined sub-posts, where a corridor crosses a quad, are appended after all
+  // of that and are the only reason these are growable arrays rather than the
+  // exactly-sized typed ones this used to allocate. A tile with no railway in it
+  // appends nothing and comes out byte-identical to the version before the
+  // carve existed.
   const skirtCount = 4 * stride;
   const total = posts + skirtCount;
-  const position = new Float32Array(total * 3);
-  const normal = new Float32Array(total * 3);
-  const uv = new Float32Array(total * 2);
+  const position: number[] = new Array(total * 3).fill(0);
+  const normal: number[] = new Array(total * 3).fill(0);
+  const uv: number[] = new Array(total * 2).fill(0);
 
   const heightAt = (r: number, c: number): number => grid[r * stride + c];
 
@@ -397,16 +446,138 @@ export function buildTerrainMesh(
     }
   }
 
+  // --- The quads, and the holes cut in them.
+  //
+  // **Why a refined quad cannot crack against an unrefined neighbour**, which is
+  // the one thing that had to be true before any of this was worth building: two
+  // adjacent quads share an edge, and a sub-post placed on that edge is placed
+  // by `subHeight` below, which on all four boundaries reduces to the straight
+  // line between the two posts the neighbour's own edge already is. The
+  // neighbour may be a single segment and this side eight, but every one of the
+  // eight lands on that segment. Only the *interior* of a refined quad differs
+  // from the two triangles it replaces -- and it differs from them by nothing
+  // either, because `subHeight`'s interior branch is `sampleTileGrid`'s
+  // north-west-to-south-east split verbatim. The visible ground, the ground the
+  // player walks on and the ground the pipeline draped every road against stay
+  // one surface.
   const indices: number[] = [];
+  /**
+   * Height inside a quad, in the quad's own `fc, fr` in `0..1`.
+   *
+   * The four boundary cases are written out rather than left to the general
+   * expression, and they are not redundant: the general form reaches the east
+   * edge as `nw + (ne - nw) + (se - ne) * fr`, and `nw + (ne - nw)` is not
+   * bit-identical to `ne` in floating point. One ulp of daylight along every
+   * refined quad boundary in the city is not a crack anybody would see, but it
+   * is also four lines to not have.
+   */
+  const subHeight = (
+    nw: number, ne: number, sw: number, se: number, fc: number, fr: number,
+  ): number => {
+    if (fr === 0) return nw + (ne - nw) * fc;
+    if (fr === 1) return sw + (se - sw) * fc;
+    if (fc === 0) return nw + (sw - nw) * fr;
+    if (fc === 1) return ne + (se - ne) * fr;
+    return fc >= fr
+      ? nw + (ne - nw) * fc + (se - ne) * fr
+      : nw + (sw - nw) * fr + (se - sw) * fc;
+  };
+  /** Bilinear over the four corner values. For normals and UVs. */
+  const lerp4 = (a: number, b: number, c2: number, d: number, fc: number, fr: number): number =>
+    (a + (b - a) * fc) * (1 - fr) + (c2 + (d - c2) * fc) * fr;
+
+  /** How much of this tile's ground the corridor took, in square metres. */
+  let cutArea = 0;
+  const sub = CUT_SUBDIVISION;
+  // Half the diagonal of a quad: the radius that finds a corridor touching any
+  // part of it from its centre.
+  const quadReach = spacing * Math.SQRT1_2;
+  const keep = new Uint8Array(sub * sub);
+  const lattice = new Int32Array((sub + 1) * (sub + 1));
+
   for (let r = 0; r < gridN; r++) {
     for (let c = 0; c < gridN; c++) {
-      const nw = r * stride + c;
-      const ne = nw + 1;
-      const sw = nw + stride;
-      const se = sw + 1;
+      const inw = r * stride + c;
+      const ine = inw + 1;
+      const isw = inw + stride;
+      const ise = isw + 1;
       // Split north-west to south-east, matching `sampleTileGrid` above and
       // `terrain.py`'s `sample`. Wound so both faces look up.
-      indices.push(nw, se, ne, nw, sw, se);
+      const plain = (): void => {
+        indices.push(inw, ise, ine, inw, isw, ise);
+      };
+      if (cut === null) {
+        plain();
+        continue;
+      }
+      const wx0 = cut.originX + c * spacing;
+      const wz0 = cut.originZ + r * spacing - tileSize;
+      if (!cut.near(wx0 + spacing / 2, wz0 + spacing / 2, quadReach)) {
+        plain();
+        continue;
+      }
+
+      const nw = grid[inw];
+      const ne = grid[ine];
+      const sw = grid[isw];
+      const se = grid[ise];
+      let dropped = 0;
+      for (let sr = 0; sr < sub; sr++) {
+        for (let sc = 0; sc < sub; sc++) {
+          const fc = (sc + 0.5) / sub;
+          const fr = (sr + 0.5) / sub;
+          const h = subHeight(nw, ne, sw, se, fc, fr);
+          const gone = Number.isFinite(
+            cut.cutAt(wx0 + fc * spacing, wz0 + fr * spacing, h),
+          );
+          keep[sr * sub + sc] = gone ? 0 : 1;
+          if (gone) dropped++;
+        }
+      }
+      if (dropped === 0) {
+        // The corridor is near this quad but takes nothing from it. The common
+        // case beside a railway at grade, and it must cost two triangles.
+        plain();
+        continue;
+      }
+      cutArea += (dropped / (sub * sub)) * spacing * spacing;
+      if (dropped === sub * sub) continue; // wholly inside the corridor
+
+      // Refine. Every sub-post is emitted, kept quads index into them; the
+      // handful nothing references are eight floats each and are cheaper than
+      // the bookkeeping that would drop them.
+      for (let sr = 0; sr <= sub; sr++) {
+        for (let sc = 0; sc <= sub; sc++) {
+          const fc = sc / sub;
+          const fr = sr / sub;
+          const at = position.length / 3;
+          lattice[sr * (sub + 1) + sc] = at;
+          position.push(
+            wx0 - cut.originX + fc * spacing,
+            subHeight(nw, ne, sw, se, fc, fr),
+            wz0 - cut.originZ + fr * spacing,
+          );
+          // The corner normals, interpolated. Along a shared edge this is linear
+          // between the two posts' own normals, which is exactly what the
+          // neighbour quad shades to, so a refined quad does not draw a seam.
+          const nx = lerp4(normal[inw * 3], normal[ine * 3], normal[isw * 3], normal[ise * 3], fc, fr);
+          const ny = lerp4(normal[inw * 3 + 1], normal[ine * 3 + 1], normal[isw * 3 + 1], normal[ise * 3 + 1], fc, fr);
+          const nz = lerp4(normal[inw * 3 + 2], normal[ine * 3 + 2], normal[isw * 3 + 2], normal[ise * 3 + 2], fc, fr);
+          const len = Math.hypot(nx, ny, nz) || 1;
+          normal.push(nx / len, ny / len, nz / len);
+          uv.push((c + fc) / gridN, (r + fr) / gridN);
+        }
+      }
+      for (let sr = 0; sr < sub; sr++) {
+        for (let sc = 0; sc < sub; sc++) {
+          if (keep[sr * sub + sc] === 0) continue;
+          const a = lattice[sr * (sub + 1) + sc];
+          const b = a + 1;
+          const d = lattice[(sr + 1) * (sub + 1) + sc];
+          const e = d + 1;
+          indices.push(a, e, b, a, d, e);
+        }
+      }
     }
   }
 
@@ -441,15 +612,30 @@ export function buildTerrainMesh(
       next++;
     }
     for (let k = 0; k < rail.length - 1; k++) {
+      // **The skirt gets cut too.** Without this the two-metre apron around
+      // every tile draws a wall straight across the trench wherever a cutting
+      // crosses a tile boundary -- which on the inner west is every 500 m, and
+      // is the one artefact that would make the carve look like a bug rather
+      // than like a railway.
+      if (cut !== null) {
+        const a = rail[k];
+        const b = rail[k + 1];
+        const mx = cut.originX + (position[a * 3] + position[b * 3]) / 2;
+        const mz = cut.originZ + (position[a * 3 + 2] + position[b * 3 + 2]) / 2;
+        // Linear between two posts along a grid line, which is exactly what the
+        // quad's own edge is, so the skirt and the sheet make the same decision.
+        const mh = (position[a * 3 + 1] + position[b * 3 + 1]) / 2;
+        if (Number.isFinite(cut.cutAt(mx, mz, mh))) continue;
+      }
       indices.push(rail[k], rail[k + 1], bottom[k + 1]);
       indices.push(rail[k], bottom[k + 1], bottom[k]);
     }
   }
 
   const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new BufferAttribute(position, 3));
-  geometry.setAttribute('normal', new BufferAttribute(normal, 3));
-  geometry.setAttribute('uv', new BufferAttribute(uv, 2));
+  geometry.setAttribute('position', new BufferAttribute(new Float32Array(position), 3));
+  geometry.setAttribute('normal', new BufferAttribute(new Float32Array(normal), 3));
+  geometry.setAttribute('uv', new BufferAttribute(new Float32Array(uv), 2));
   geometry.setIndex(indices);
 
   const mesh = new Mesh(geometry, material);
@@ -464,6 +650,11 @@ export function buildTerrainMesh(
   mesh.receiveShadow = true;
   mesh.castShadow = false;
   mesh.userData.surface = true;
+  // Square metres of ground this tile gave up to the railway. Nothing draws it;
+  // the debug overlay reports it and `integration-check` asserts it is not zero
+  // over a tile whose railway is known to be in a cutting, which is the only
+  // cheap way to prove from outside that the carve ran at all.
+  mesh.userData.cutArea = cutArea;
   mesh.frustumCulled = false; // culled with its tile, like every other primitive
   return mesh;
 }

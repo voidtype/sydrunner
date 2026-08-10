@@ -1674,6 +1674,20 @@ async function main(): Promise<void> {
   say('');
   await checkRidingOnline();
 
+  // --- 34. And whether any of the above can be *seen*. Two rounds shipped a
+  // railway that was drawn correctly and buried under an opaque terrain sheet,
+  // and nothing in this file would have noticed. See `checkRailCutting`.
+  say('');
+  await checkRailCutting();
+
+  // --- 35. And whether any of it can be *heard*. The announcements are a
+  // second reading of the same `dir.arrivals` the doors are driven from, so the
+  // failure mode is not silence -- it is a train saying "Erskineville" while the
+  // HUD says "Redfern", which no screenshot catches. See
+  // `checkRailAnnouncements`.
+  say('');
+  await checkRailAnnouncements();
+
   say('');
   if (failures.length === 0) {
     say(`ALL CHECKS PASSED (${log.filter((l) => l.includes('PASS')).length})`);
@@ -4753,6 +4767,11 @@ if (only === 'ridingOnline') {
   process.exit(failures.length === 0 ? 0 : 1);
 } else if (only === 'riding') {
   await checkRiding();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'cutting') {
+  await checkRailCutting();
   for (const f of failures) say(`  - ${f}`);
   say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
   process.exit(failures.length === 0 ? 0 : 1);
@@ -18394,6 +18413,615 @@ async function checkRidingOnline(): Promise<void> {
       rider.body.onGround,
       `  on solid ground at (${clientOff.x.toFixed(1)}, ${clientOff.z.toFixed(1)}), ` +
         `feet ${(clientOff.y - EYE_HEIGHT).toFixed(2)} m`,
+    );
+  }
+}
+
+/**
+ * **Is the railway visible?**
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS CHECK EXISTS, AND WHY THE 911 BEFORE IT COULD NOT HAVE CAUGHT IT.
+ *
+ * Two rounds shipped a railway. The bake was proved by `checkRail`, the
+ * passenger by `checkRiding`, the seam by `checkRidingOnline` -- and every one
+ * of those is a claim about *arithmetic*: where a train is, where a body is,
+ * whether two processes agree. None of them is a claim about what is on the
+ * screen, and what was on the screen was nothing at all.
+ *
+ * The DEM carries one height post every 31.25 m and a rail cutting is fifteen
+ * metres wide, so the heightfield cannot represent one and `buildTerrainMesh`
+ * drew an opaque sheet straight across the corridor. Measured on the bake this
+ * replaces: **5,577 of 47,273 track samples more than 1.5 m under the grid, the
+ * worst by 13.5 m.** At Sydenham, hiding the twenty-five meshes named `terrain`
+ * was the difference between two mast tips and the entire railway. Every check
+ * in this file passed the whole time.
+ *
+ * So this one asks the only question those cannot: **for every length of track
+ * the client will draw as open railway, is the ground still drawn over the top
+ * of it?** It re-runs the carve rather than trusting it -- the same
+ * `RailCut.cutAt` `buildTerrainMesh` calls, at the same sub-quad centres, on the
+ * same grids the server loaded off disk -- so it fails if the corridor moves, if
+ * the subdivision changes, if the flags stop being read, or if somebody passes
+ * `null` where the cut should be.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT IS DELIBERATELY NOT A FAILURE.
+ *
+ * **Bridges.** `inCutting` refuses to dig under a `SPAN_BRIDGE` span, and 584
+ * samples are viaduct decks that the DEM -- a *surface* model, so the CBD reads
+ * high by roughly a building -- has buried. The worst is the Circular Quay
+ * viaduct, 8.9 m under a grid that is really the roofs of Alfred Street.
+ * Trenching those would cut a canyon through Circular Quay to expose a bridge,
+ * which is a worse picture and a wrong one. They are counted and reported
+ * separately so the number cannot drift without somebody seeing it.
+ *
+ * **Sub-quad quantisation.** The carve keeps or drops a whole 3.9 m sub-quad on
+ * the evidence at its centre, so at the very tip of a cutting that is running
+ * out to grade one sub-quad can survive over track that is a metre and a half
+ * down. One sample in 156,539.
+ *
+ * ---------------------------------------------------------------------------
+ * THE NEGATIVE CONTROL, AND WHY IT IS THE MOST IMPORTANT LINE HERE.
+ *
+ * The first version of this round read `SPAN_SUBWAY` as "Metro, therefore
+ * tunnel below 6 m", on the reasoning that the Metro's deep alignment was
+ * drawing as open surface railway. It measured out backwards: every
+ * subway-flagged span in this extract that carries no `tunnel` tag is at or near
+ * grade, the deepest populations being the *open cuttings* at Sydenham,
+ * Chatswood, Bella Vista and Campsie, and the rule buried Sydenham station under
+ * a tunnel lining. `checkRailCutting`'s buried count did not catch it, because a
+ * bore is not drawn track. So the third assertion below is the one that would
+ * have: **no subway-flagged span without a tunnel tag may be drawn as a bore.**
+ */
+async function checkRailCutting(): Promise<void> {
+  say('--- The cutting: no drawn track under un-carved terrain');
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const bakePath =
+    process.env.SYDNEY_RAIL ??
+    new URL('../data/scratch/rail/rail.bin', import.meta.url).pathname;
+  if (!(await Bun.file(bakePath).exists())) {
+    say(`    no rail bake at ${bakePath}. Skipped.`);
+    return;
+  }
+
+  const world = await loadWorld(root);
+  const bake = world.rail;
+  if (!bake) {
+    say('    the world carries no rail bake. Skipped.');
+    return;
+  }
+
+  const cutHere = new URL('../client/src/world/rail-cut.ts', import.meta.url).pathname;
+  const geoHere = new URL('../client/src/world/rail-geo.ts', import.meta.url).pathname;
+  const railHere = new URL('../client/src/game/rail.ts', import.meta.url).pathname;
+  const cutMod = (await import(cutHere)) as typeof import('../client/src/world/rail-cut.ts');
+  // A structural type rather than `typeof import`, and it is not shorthand:
+  // `world/rail-geo.ts` reaches for `document` to lay out the station-name
+  // atlas, and the server's tsconfig has no DOM lib, so naming its module type
+  // here would fail the build over a canvas this check never touches. What it
+  // needs is two functions' worth of shape.
+  const geoMod = (await import(geoHere)) as {
+    buildNetwork(bake: typeof world.rail): {
+      segments: Array<{
+        ax: number; ay: number; az: number;
+        bx: number; by: number; bz: number;
+        flags: number; len: number;
+      }>;
+      stations: Array<{ x: number; z: number; ux: number; uz: number }>;
+    };
+  };
+  const railMod = (await import(railHere)) as typeof import('../client/src/game/rail.ts');
+
+  const net = geoMod.buildNetwork(bake);
+  const cut = new cutMod.RailCut(bake);
+  cut.setStations(net.stations);
+
+  const gridN = world.terrain.gridN;
+  const tileSize = world.terrain.tileSize;
+  const spacing = tileSize / gridN;
+  // Must match `terrain.CUT_SUBDIVISION`. Restated rather than exported,
+  // because a check that imported the number could not notice it changing.
+  const SUB = 8;
+
+  /** `terrain.buildTerrainMesh`'s own `subHeight`, to the branch. */
+  const subHeight = (nw: number, ne: number, sw: number, se: number, fc: number, fr: number): number => {
+    if (fr === 0) return nw + (ne - nw) * fc;
+    if (fr === 1) return sw + (se - sw) * fc;
+    if (fc === 0) return nw + (sw - nw) * fr;
+    if (fc === 1) return ne + (se - ne) * fr;
+    return fc >= fr
+      ? nw + (ne - nw) * fc + (se - ne) * fr
+      : nw + (sw - nw) * fr + (se - sw) * fc;
+  };
+
+  /**
+   * Is the terrain sheet still drawn over this world point?
+   *
+   * The mesh's decision, replayed: find the tile, the quad and the sub-quad the
+   * point falls in, and ask `cutAt` about that sub-quad's own centre and its own
+   * interpolated height -- which is exactly the call `buildTerrainMesh` makes and
+   * exactly the value it passes.
+   */
+  const sheetOver = (x: number, z: number): boolean => {
+    const tx = Math.floor(x / tileSize);
+    const tz = Math.floor(-z / tileSize);
+    const grid = world.terrain.grid(`${tx}_${tz}`);
+    if (!grid) return false;
+    const originX = tx * tileSize;
+    const originZ = -tz * tileSize;
+    const c = Math.min(Math.floor((x - originX) / spacing), gridN - 1);
+    const r = Math.min(Math.floor((z - originZ + tileSize) / spacing), gridN - 1);
+    const stride = gridN + 1;
+    const nw = grid[r * stride + c];
+    const ne = grid[r * stride + c + 1];
+    const sw = grid[(r + 1) * stride + c];
+    const se = grid[(r + 1) * stride + c + 1];
+    const wx0 = originX + c * spacing;
+    const wz0 = originZ + r * spacing - tileSize;
+    const sc = Math.min(SUB - 1, Math.max(0, Math.floor(((x - wx0) / spacing) * SUB)));
+    const sr = Math.min(SUB - 1, Math.max(0, Math.floor(((z - wz0) / spacing) * SUB)));
+    const fc = (sc + 0.5) / SUB;
+    const fr = (sr + 0.5) / SUB;
+    const h = subHeight(nw, ne, sw, se, fc, fr);
+    return !Number.isFinite(cut.cutAt(wx0 + fc * spacing, wz0 + fr * spacing, h));
+  };
+
+  let drawn = 0;
+  let grade = 0;
+  let trenched = 0;
+  let buried = 0;
+  let bridged = 0;
+  let noTerrain = 0;
+  let boreSegments = 0;
+  let boreKm = 0;
+  let subwayBores = 0;
+  let cutTagTrenched = 0;
+  let trenchSegments = 0;
+  let worst = 0;
+  let worstAt = '';
+  for (const seg of net.segments) {
+    const segDepth =
+      world.terrain.height((seg.ax + seg.bx) / 2, (seg.az + seg.bz) / 2) - (seg.ay + seg.by) / 2;
+    if (cutMod.drawnAsTunnel(seg.flags, segDepth)) {
+      boreSegments++;
+      boreKm += seg.len;
+      // See the header: a subway span with no tunnel tag being drawn as a bore
+      // is the regression that buried Sydenham.
+      if ((seg.flags & railMod.SPAN_SUBWAY) !== 0 && (seg.flags & railMod.SPAN_TUNNEL) === 0) {
+        subwayBores++;
+      }
+      continue;
+    }
+    if ((seg.flags & railMod.SPAN_CUTTING) !== 0) cutTagTrenched++;
+    const bridge = (seg.flags & railMod.SPAN_BRIDGE) !== 0;
+    const steps = Math.max(1, Math.ceil(seg.len / 5));
+    let anyTrench = false;
+    for (let k = 0; k <= steps; k++) {
+      const t = k / steps;
+      const x = seg.ax + (seg.bx - seg.ax) * t;
+      const y = seg.ay + (seg.by - seg.ay) * t;
+      const z = seg.az + (seg.bz - seg.az) * t;
+      const g = world.terrain.height(x, z);
+      drawn++;
+      if (!Number.isFinite(g)) {
+        noTerrain++;
+        continue;
+      }
+      const depth = g - y;
+      if (depth <= 1.5) {
+        grade++;
+        continue;
+      }
+      if (!sheetOver(x, z)) {
+        trenched++;
+        anyTrench = true;
+        continue;
+      }
+      if (bridge) {
+        bridged++;
+        continue;
+      }
+      buried++;
+      if (depth > worst) {
+        worst = depth;
+        worstAt = `${x.toFixed(0)}, ${z.toFixed(0)}`;
+      }
+    }
+    if (anyTrench) trenchSegments++;
+  }
+
+  // The negative control, and it is what stops every line below from being
+  // vacuous: if the carve took nothing, "no track is buried" would be a claim
+  // about a railway that is entirely at grade, and this city's is not.
+  check(
+    trenched > 5000,
+    `${trenched.toLocaleString()} of ${drawn.toLocaleString()} sampled points on drawn track sit ` +
+      `in ground the carve actually removed, over ${trenchSegments.toLocaleString()} segments. ` +
+      `The corridor is being cut; a zero here would make the assertion below meaningless`,
+  );
+
+  // The assertion this whole check exists for.
+  const BURIED_CAP = 20;
+  check(
+    buried <= BURIED_CAP,
+    `${buried} sampled points of open railway are still under a terrain sheet nobody cut ` +
+      `(cap ${BURIED_CAP}` +
+      (worstAt ? `, worst ${worst.toFixed(1)} m at ${worstAt}` : '') +
+      `). Before world/rail-cut.ts there were 5,577 of them and the whole railway was invisible`,
+  );
+
+  check(
+    boreSegments > 3000 && boreKm > 100_000 && subwayBores === 0,
+    `${boreSegments.toLocaleString()} segments (${(boreKm / 1000).toFixed(0)} km) draw as tunnel ` +
+      `lining rather than as ballast and catenary, and ${subwayBores} of them are a subway-flagged ` +
+      `span with no tunnel tag. That second number must be zero: Sydney Metro's tunnels all carry ` +
+      `tunnel=yes, so every *untagged* subway span is an open cutting -- 1.0 km of it at Sydenham -- ` +
+      `and a depth rule on SPAN_SUBWAY lined the deepest 70 spans of that cutting and left the ` +
+      `terrain sheet over the station`,
+  );
+
+  check(
+    cutTagTrenched > 150,
+    `${cutTagTrenched} spans tagged cutting=yes in OSM are trenched. SPAN_CUTTING is the flag that ` +
+      `is worth reading: the DEM agrees with the tag 216 times out of 249, so it is trusted to lower ` +
+      `the depth at which the ground is cut from ${cutMod.CUT_MIN_DEPTH} m to ` +
+      `${cutMod.CUT_TAGGED_MIN_DEPTH} m -- a cutting the 31 m heightfield smoothed away is still a cutting`,
+  );
+
+  say(
+    `    at grade ${grade.toLocaleString()}, in a carved cutting ${trenched.toLocaleString()}, ` +
+      `viaduct under a surface-model DEM ${bridged.toLocaleString()} (excluded by design), ` +
+      `no terrain ${noTerrain}`,
+  );
+}
+
+/**
+ * The announcements: one timetable read twice, and the HUD as the tie-breaker.
+ *
+ * `checkRail` proves the train is in the same place on both ends and
+ * `checkRiding` proves the passenger is. This proves the *third* reading of
+ * `dir.arrivals` -- the one that decides what the train is saying -- agrees with
+ * the two that were already there, and it exists because of how this feature
+ * fails.
+ *
+ * It does not fail silently and it does not fail loudly. It fails by being
+ * **plausible**: a train pulling into Redfern announcing Erskineville sounds
+ * exactly like a train pulling into Erskineville, and nothing on screen is
+ * wrong. A screenshot cannot catch it, a player cannot catch it unless they are
+ * looking out of the window, and the only thing in the build that already knows
+ * the right answer is the HUD chip -- `riding.rideBanner`, which derives "next:"
+ * from the same bake by a completely different route. So the HUD is the oracle
+ * here, and where the two disagree, this file says the announcement is wrong.
+ *
+ * Six things:
+ *
+ *   1. **`game/rail-audio.ts`'s own self-check** passes against the real bake:
+ *      every clip anchored to an actual dwell phase, no two of one kind
+ *      overlapping, nothing running past the end of a trip.
+ *   2. **Bit-exact across two module instances.** `checkRail`'s claim one level
+ *      up: two separately-evaluated copies of the schedule module, handed two
+ *      separately-decoded bakes, return the identical offset into the identical
+ *      clip. Compared with `Object.is`, not an epsilon.
+ *   3. **Nothing is ever announced for a station a service runs through.** 82 of
+ *      the bake's 510 stops are passed rather than called at, and `dir.stops`
+ *      and `dir.arrivals` are indexed differently, so this is a real off-by-one
+ *      waiting to happen rather than a tautology.
+ *   4. **The announcement and the HUD name the same station.** The invariant in
+ *      full: while the approach clip about stop k is playing and the train is
+ *      still more than 30 m short of that platform, `riding.nextCall(s + 30)` --
+ *      the banner's own expression -- must return k.
+ *   5. **A worked example, in wall-clock time**, printed rather than asserted
+ *      and then asserted against the dwell it was derived from.
+ *   6. **A negative control.** Delete the pre-emption rule and overlaps appear,
+ *      so the absence of overlaps means something.
+ */
+async function checkRailAnnouncements(): Promise<void> {
+  say('--- The announcements: a third reading of the timetable, against the HUD');
+
+  const bakePath =
+    process.env.SYDNEY_RAIL ??
+    new URL('../data/scratch/rail/rail.bin', import.meta.url).pathname;
+  if (!(await Bun.file(bakePath).exists())) {
+    say(`    no rail bake at ${bakePath}. Skipped.`);
+    return;
+  }
+
+  const railPath = new URL('../client/src/game/rail.ts', import.meta.url).pathname;
+  const audioPath = new URL('../client/src/game/rail-audio.ts', import.meta.url).pathname;
+  const ridePath = new URL('../client/src/game/riding.ts', import.meta.url).pathname;
+  const rail = (await import(railPath)) as typeof import('../client/src/game/rail.ts');
+  const ride = (await import(ridePath)) as typeof import('../client/src/game/riding.ts');
+  const one = (await import(audioPath)) as typeof import('../client/src/game/rail-audio.ts');
+  // `checkRail`'s trick: Bun keys the module cache on the whole specifier, so
+  // the query evaluates the file again into its own closures. The schedule
+  // arithmetic is genuinely duplicated by this; `game/rail.ts` underneath is
+  // shared, which is fine because `checkRail` has already proved *that* layer
+  // bit-identical across its own two instances.
+  const two = (await import(`${audioPath}?instance=2`)) as typeof import('../client/src/game/rail-audio.ts');
+
+  const bytes = await Bun.file(bakePath).arrayBuffer();
+  const a = rail.decodeRail(bytes);
+  const b = rail.decodeRail(bytes.slice(0));
+
+  // --- 1. The module's own self-check.
+  {
+    const bad = one.verifyRailAudio(a);
+    check(
+      bad.length === 0,
+      `game/rail-audio.ts's own self-check passes against the real bake -- every clip anchored to a ` +
+        `real dwell phase, no two of a kind overlapping, none running past the buffers` +
+        (bad.length ? `: ${bad[0]}` : ''),
+    );
+  }
+
+  const dwell = a.physics.dwell;
+  say(
+    `  dwell ${dwell} s; approach ${one.ARRIVE_SECONDS} s starting ${one.ARRIVE_LEAD_S} s before the ` +
+      `doors open; departure ${one.DEPART_SECONDS} s starting ${one.DEPART_LEAD_S} s before they ` +
+      `close, so it runs ${(one.DEPART_SECONDS - one.DEPART_LEAD_S).toFixed(1)} s into the journey`,
+  );
+
+  // --- 2, 3 and 4, on one sweep of the clock.
+  {
+    const pa = rail.createTrainPose();
+    const annA = one.createRailAnnouncement();
+    const annB = two.createRailAnnouncement();
+    let compared = 0;
+    let identical = 0;
+    let playing = 0;
+    let arriving = 0;
+    let departing = 0;
+    let bothAtOnce = 0;
+    let nonCalling = 0;
+    let hudChecked = 0;
+    let hudAgreed = 0;
+    let firstDrift = '';
+    let firstHud = '';
+    // `checkRail`'s awkward grid: a prime step in milliseconds so no instant is
+    // a multiple of any period, walked over every trip of every direction so the
+    // ends of a run are sampled as often as the middle.
+    for (let k = 0; k < 900 && compared < 60_000; k++) {
+      const t = rail.railSeconds(rail.RAIL_EPOCH_MS + k * 7_919);
+      for (let li = 0; li < a.lines.length && compared < 60_000; li++) {
+        for (let di = 0; di < 2; di++) {
+          const da = a.lines[li].dirs[di];
+          const db = b.lines[li].dirs[di];
+          const n = rail.liveTripCount(da);
+          for (let j = 0; j <= n && compared < 60_000; j++) {
+            const trip = rail.tripIndexAt(da, t, j);
+            if (!rail.poseTrain(a, da, trip, t, pa)) continue;
+            let here = 0;
+            for (let kind = 0; kind < 2; kind++) {
+              const okA = one.announcementAt(a, da, pa.age, kind, annA);
+              const okB = two.announcementAt(b, db, pa.age, kind, annB);
+              compared++;
+              if (okA !== okB) {
+                firstDrift ||= `${a.lines[li].id} dir ${di} trip ${trip} kind ${kind}: one says ${okA}, two says ${okB}`;
+                continue;
+              }
+              if (!okA) { identical++; continue; }
+              const same =
+                Object.is(annA.offset, annB.offset) && annA.call === annB.call &&
+                annA.stop === annB.stop && Object.is(annA.startAge, annB.startAge) &&
+                Object.is(annA.endAge, annB.endAge);
+              if (same) identical++;
+              else if (!firstDrift) {
+                firstDrift = `${a.lines[li].id} dir ${di} trip ${trip} kind ${kind}: ` +
+                  `offset ${annA.offset} vs ${annB.offset}, call ${annA.call} vs ${annB.call}`;
+              }
+              playing++;
+              here++;
+              if (kind === one.ANNOUNCE_ARRIVE) arriving++; else departing++;
+
+              // 3. The station is one this service actually calls at.
+              const stop = da.stops[annA.stop];
+              if (stop === undefined || !stop.calls) {
+                nonCalling++;
+                continue;
+              }
+
+              // 4. And the HUD agrees about which station that is. Only while
+              // the train is still short of the platform: once it is inside the
+              // banner's own 30 m the banner has correctly moved on to the next
+              // one, and an approach clip is still finishing its last two
+              // seconds. That is not a disagreement, it is the handover.
+              if (kind === one.ANNOUNCE_ARRIVE && stop.s - pa.s > 30) {
+                hudChecked++;
+                if (one.bannerNextStop(da, pa.s) === annA.stop) hudAgreed++;
+                else if (!firstHud) {
+                  const said = one.bannerNextStop(da, pa.s);
+                  firstHud = `${a.lines[li].id} dir ${di} at s=${pa.s.toFixed(0)}: the PA says ` +
+                    `${stop.name} and the HUD says ${said >= 0 ? da.stops[said].name : 'nothing'}`;
+                }
+              }
+            }
+            if (here === 2) bothAtOnce++;
+          }
+        }
+      }
+    }
+
+    check(
+      identical === compared && firstDrift === '',
+      `two separately-evaluated copies of game/rail-audio.ts, over two separately-decoded bakes, ` +
+        `agree about every one of ${compared.toLocaleString()} sampled (line, direction, trip, ` +
+        `instant, clip) tuples -- which clip, which station, and the offset into it to the bit. ` +
+        `${playing.toLocaleString()} of them had something playing` +
+        (firstDrift ? `. FIRST DIFFERENCE: ${firstDrift}` : ''),
+    );
+    check(
+      playing > 5_000 && arriving > 500 && departing > 500,
+      `  and the grid caught real announcements rather than gaps: ${arriving.toLocaleString()} ` +
+        `approach, ${departing.toLocaleString()} departure, ${bothAtOnce.toLocaleString()} instants ` +
+        `where one train was playing both at once (the deliberate ${(one.ARRIVE_SECONDS - one.ARRIVE_LEAD_S).toFixed(1)} s handover at a platform)`,
+    );
+    check(
+      nonCalling === 0,
+      `no announcement was ever scheduled for a station its service runs through -- ` +
+        `${nonCalling} of ${playing.toLocaleString()}, over a bake where 82 of 510 stops are passed ` +
+        `rather than called at and dir.stops and dir.arrivals are indexed differently`,
+    );
+    check(
+      hudChecked > 500 && hudAgreed === hudChecked,
+      `the PA and the HUD chip named the same next station on all ${hudChecked.toLocaleString()} ` +
+        `sampled instants where a train was approaching one -- riding.rideBanner's own ` +
+        `nextCall(s + 30), not a restatement of it. The HUD is the oracle: where they differ, the ` +
+        `announcement is wrong` + (firstHud ? `. FIRST DISAGREEMENT: ${firstHud}` : ''),
+    );
+  }
+
+  // --- 5. A worked example, in wall-clock time.
+  {
+    const line = a.lines.find((l) => l.id === 'T2') ?? a.lines[0];
+    const dir = line.dirs[0];
+    const calls: { call: number; stop: number; name: string }[] = [];
+    for (let c = 0; c < dir.arrivals.length; c++) {
+      const stop = one.callToStop(dir, c);
+      calls.push({ call: c, stop, name: dir.stops[stop]?.name ?? '?' });
+    }
+    // A station in the middle of the run, so both clips are present and neither
+    // is clipped by an end of the trip.
+    const pick = calls.find((c) => c.name === 'Erskineville') ?? calls[Math.floor(calls.length / 2)];
+    const now = rail.railSeconds(Date.now());
+    // The next trip of this direction that has not yet reached that station.
+    let trip = rail.tripIndexAt(dir, now, 0);
+    while (dir.offset + trip * line.period + dir.arrivals[pick.call] < now) trip++;
+
+    const depart = dir.offset + trip * line.period;
+    const opens = depart + dir.arrivals[pick.call];
+    const closes = opens + dwell;
+    const wall = (railS: number) => new Date(rail.RAIL_EPOCH_MS + railS * 1000).toISOString().slice(11, 23);
+
+    const arriveStart = depart + one.announceStart(a, dir, pick.call, one.ANNOUNCE_ARRIVE);
+    const arriveEnd = depart + one.announceEnd(a, dir, pick.call, one.ANNOUNCE_ARRIVE);
+    const departStart = depart + one.announceStart(a, dir, pick.call, one.ANNOUNCE_DEPART);
+    const departEnd = depart + one.announceEnd(a, dir, pick.call, one.ANNOUNCE_DEPART);
+
+    say(
+      `  WORKED EXAMPLE  ${line.id} dir ${dir.index} (${dir.label}) trip ${trip}, at ${pick.name}:`,
+    );
+    say(`    ${wall(depart)}  departs ${dir.stops[0].name}`);
+    say(`    ${wall(arriveStart)}  approach clip starts  (${(opens - arriveStart).toFixed(1)} s before the doors open)`);
+    say(`    ${wall(opens)}  DOORS OPEN            (dwell phase begins; dwellElapsed = 0)`);
+    say(`    ${wall(departStart)}  departure clip starts (${(closes - departStart).toFixed(1)} s before the doors close)`);
+    say(`    ${wall(arriveEnd)}  approach clip ends    (${(arriveEnd - opens).toFixed(1)} s into the stand)`);
+    say(`    ${wall(closes)}  DOORS CLOSE           (dwellElapsed = ${dwell})`);
+    say(`    ${wall(departEnd)}  departure clip ends   (${(departEnd - closes).toFixed(1)} s into the journey)`);
+
+    // And now the same instants, checked against the thing they were supposed to
+    // be derived from rather than against the arithmetic that derived them.
+    // `dir.arrivals[pick.call]` and not `opens - depart`: the two are the same
+    // number in exact arithmetic and are not the same double, because `depart`
+    // is nineteen million and the difference is nineteen hundred. Subtracting
+    // them back apart loses four digits, which is enough to miss a 1e-9 window
+    // and to make a passing check look like a broken dwell.
+    check(
+      Math.abs(rail.dwellElapsed(a, dir, dir.arrivals[pick.call] + dwell / 2) - dwell / 2) < 1e-9,
+      `  the instant the approach clip is counting down to is a real dwell: ${dwell / 2} s after ` +
+        `${wall(opens)} the train has been standing exactly ${dwell / 2} s, by rail.dwellElapsed -- ` +
+        `the same function world/trains.ts opens the doors from`,
+    );
+    check(
+      Math.abs((opens - arriveStart) - one.ARRIVE_LEAD_S) < 1e-9,
+      `  the approach clip starts ${(opens - arriveStart).toFixed(1)} s before the doors open, which is ` +
+        `the ${one.ARRIVE_LEAD_S} s the recording is named for`,
+    );
+    check(
+      Math.abs((closes - departStart) - one.DEPART_LEAD_S) < 1e-9,
+      `  the departure clip starts ${(closes - departStart).toFixed(1)} s before the doors close, which ` +
+        `is the ${one.DEPART_LEAD_S} s the recording is named for`,
+    );
+    check(
+      departEnd > closes + 30,
+      `  and it is NOT cut at the doors: it runs ${(departEnd - closes).toFixed(1)} s past them, which is ` +
+        `what a "this train goes to ${dir.stops[dir.stops.length - 1].name}" announcement does`,
+    );
+
+    // --- The positional half, from the same instant. A rider is inside their
+    // own carriage; a bystander is not; a block away there is nothing.
+    {
+      const mix = one.createRailAnnounceMix();
+      const li = ride.lineIndexOf(a, dir);
+      const mid = opens + 1;
+      const aboard = { line: li, dir: dir.index, trip, car: 3 };
+      one.railAnnounceMix(a, mid, 0, 0, aboard, mix);
+      check(
+        mix.depart.active && mix.depart.inside && mix.depart.distance === 0,
+        `  a rider in carriage 4 of that trip hears the departure announcement inside, at ` +
+          `distance ${mix.depart.distance} and inside=${mix.depart.inside} -- full clarity from their ` +
+          `own carriage, which is what every other local-player sound in game/audio.ts does by not ` +
+          `passing a distance at all`,
+      );
+
+      // Where that train's carriages actually are, so the bystander stands
+      // somewhere real rather than at the origin.
+      const pose = rail.createTrainPose();
+      rail.poseTrain(a, dir, trip, mid, pose);
+      const nx = -pose.dz;
+      const nz = pose.dx;
+      for (const [metres, want] of [[4, true], [60, true], [400, false]] as const) {
+        one.railAnnounceMix(a, mid, pose.x + nx * metres, pose.z + nz * metres, null, mix);
+        check(
+          mix.depart.active === want,
+          `  standing ${metres} m to the side of it: ${mix.depart.active
+            ? `heard at ${mix.depart.distance.toFixed(1)} m, inside=${mix.depart.inside}`
+            : 'nothing'}, against a ${one.ANNOUNCE_RANGE} m range measured from the nearest carriage`,
+        );
+        if (mix.depart.active) {
+          check(
+            !mix.depart.inside && Math.abs(mix.depart.distance - metres) < 12,
+            `    and the distance is to the carriage (${mix.depart.distance.toFixed(1)} m against ` +
+              `${metres} m to the train's centreline), not to the station`,
+          );
+        }
+      }
+      one.railAnnounceMix(a, mid, pose.x + nx * 4, pose.z + nz * 4, null, mix);
+      check(
+        mix.depart.station === pick.name && mix.depart.line === line.id,
+        `  and the bystander hears ${line.id} announcing ${mix.depart.station}, which is the station ` +
+          `the HUD chip on that train reads`,
+      );
+    }
+  }
+
+  // --- 6. The negative control: the pre-emption rule is load-bearing.
+  {
+    let naiveOverlaps = 0;
+    let realOverlaps = 0;
+    let worst = '';
+    for (const line of a.lines) {
+      for (const dir of line.dirs) {
+        for (let c = 0; c + 1 < dir.arrivals.length; c++) {
+          if (!one.announces(dir, c, one.ANNOUNCE_DEPART)) continue;
+          if (!one.announces(dir, c + 1, one.ANNOUNCE_ARRIVE)) continue;
+          const nextStart = one.announceStart(a, dir, c + 1, one.ANNOUNCE_ARRIVE);
+          // What the clip would do with no pre-emption at all: run its full
+          // length. This is the rule this file exists to justify.
+          const naiveEnd = one.announceStart(a, dir, c, one.ANNOUNCE_DEPART) + one.DEPART_SECONDS;
+          if (naiveEnd > nextStart + 1e-9) {
+            naiveOverlaps++;
+            const over = naiveEnd - nextStart;
+            if (!worst || over > Number(worst.split('|')[0])) {
+              worst = `${over.toFixed(1)}|${line.id} dir ${dir.index} leaving ` +
+                `${dir.stops[one.callToStop(dir, c)]?.name} into ` +
+                `${dir.stops[one.callToStop(dir, c + 1)]?.name}`;
+            }
+          }
+          if (one.announceEnd(a, dir, c, one.ANNOUNCE_DEPART) > nextStart + 1e-9) realOverlaps++;
+        }
+      }
+    }
+    check(
+      naiveOverlaps > 50,
+      `NEGATIVE CONTROL: without the pre-emption rule, ${naiveOverlaps} hops in the bake would have ` +
+        `a 65 s departure announcement still talking when the next approach announcement began -- ` +
+        `worst ${worst.split('|')[1]}, by ${worst.split('|')[0]} s of two voices at once`,
+    );
+    check(
+      realOverlaps === 0,
+      `  and with it, ${realOverlaps}. The rule can fail, so its passing means something`,
     );
   }
 }
