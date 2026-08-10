@@ -148,8 +148,37 @@ export interface Prism {
  */
 export const BODY_HEIGHT_M = 1.8;
 
+/**
+ * The one method a body being *moved* needs from a world, as an interface.
+ *
+ * `CollisionWorld` satisfies it structurally and every existing caller is
+ * unchanged. It exists because a second kind of world turned up that has no
+ * prisms and no grid and is nonetheless a thing a player walks around inside:
+ * the carriage of a train (`game/riding.carriageResolve`), which is six clamps
+ * in the carriage's own frame. `controller.step` and `combat.ragdollStep` take
+ * this rather than the class, so the integrator has no opinion about which one
+ * it is holding -- which is what lets a rider be stepped by the identical
+ * function the server, the client and the reconciler's replay all run.
+ *
+ * Deliberately **only** `resolve`. Everything else `CollisionWorld` offers --
+ * `blocked`, `roofHeight`, the tile lifecycle -- is a question about the *city*,
+ * and `game/combat.pickRespawn` still takes the real class for exactly that
+ * reason: choosing a respawn point inside a moving train is not a thing.
+ */
+export interface MoveResolver {
+  resolve(
+    fromX: number,
+    fromZ: number,
+    toX: number,
+    toZ: number,
+    radius: number,
+    feetY: number,
+    headY?: number,
+  ): { x: number; z: number; hit: boolean };
+}
+
 /** Uniform grid over prisms, so a move query touches only nearby buildings. */
-export class CollisionWorld {
+export class CollisionWorld implements MoveResolver {
   private readonly cells = new Map<string, Prism[]>();
   private readonly cellSize: number;
   /**

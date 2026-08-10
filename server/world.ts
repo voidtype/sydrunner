@@ -114,6 +114,8 @@ import {
 import { bikePlan, placeBike, type BikeGround, type BikeSpot } from '../client/src/game/bikes.ts';
 import type { Place } from '../client/src/game/teleport.ts';
 import type { CombatWorld } from '../client/src/game/combat.ts';
+import { decodeRail, verifyRail, type RailBake } from '../client/src/game/rail.ts';
+import { buildPlatforms, type PlatformField } from '../client/src/game/riding.ts';
 
 // --- Hex-lazy collision ---------------------------------------------------------
 
@@ -1607,6 +1609,41 @@ export interface ServerWorld {
    * `layOutBikes`.
    */
   bikeSpots?: readonly PlacedBike[];
+  /**
+   * The train timetable, or null on a build with no rail bake beside the world.
+   *
+   * **The server needs this and never used to**, and the reason is a boarding
+   * claim. `INPUT` carries a button and nothing else, so a client pressing `E`
+   * beside a train is asking a question -- and the only way to answer it is to
+   * evaluate `poseTrain` at this tick against this server's own idea of where
+   * that player is standing. See `sim.resolveMount` and
+   * `game/riding.findBoarding`.
+   *
+   * Nothing about a train is *sent* to a client, which is the whole shape of
+   * this feature: the timetable is a closed-form function of the millisecond and
+   * both ends read the identical bake. This is a read of the same 1 MB file the
+   * browser fetches from `/rail/rail.bin`, decoded by the same
+   * `game/rail.decodeRail`, and it costs 1.0 MB of file and about 3 MB resident
+   * against the 310 MB the city already is.
+   *
+   * Optional, and absent is a working configuration rather than a broken one:
+   * the checks build worlds by hand and a deployment whose pipeline predates the
+   * rail round has no bake. Boarding is simply refused, which is the same answer
+   * a player standing in the harbour gets.
+   */
+  rail?: RailBake | null;
+  /**
+   * Every station platform in the city, as rectangles. Null with no bake.
+   *
+   * Built once at boot from the same bake the browser draws its platform prisms
+   * from, and folded into `groundFor` so that a body standing on a platform is
+   * standing at the same height on both ends. See `game/riding.PlatformField`,
+   * which is honest about this being a bug the riding round inherited: the
+   * pipeline does not emit platform prisms, `world/rail-geo.ts` builds them at
+   * runtime in a module that imports three, and this process has therefore never
+   * had them.
+   */
+  platforms?: PlatformField | null;
 }
 
 /**
@@ -1803,7 +1840,10 @@ export async function loadWorld(
     spawn: spawnCentre(index),
     places,
     segments: segments.enabled ? segments : undefined,
+    rail: await loadRail(root),
+    platforms: null,
   };
+  world.platforms = world.rail ? buildPlatforms(world.rail) : null;
 
   // --- The bikes, and the one walk over every hexagon this boot makes ---------
   //
@@ -1912,6 +1952,40 @@ export async function loadWorld(
 }
 
 /**
+ * The train timetable, off the same file the browser fetches.
+ *
+ * `client/public/rail/rail.bin` sits beside `client/public/world`, which is the
+ * `root` this module is handed, so it is one directory up and back down --
+ * spelled out rather than parameterised, because there is exactly one of these
+ * and a second path to keep in sync is a second path that goes stale. The
+ * browser's `world/rail-geo.loadRailBake` fetches the identical bytes from
+ * `/rail/rail.bin` and runs the identical decoder.
+ *
+ * Never throws. A world with no bake is a world where `E` beside a train does
+ * nothing, which is what every hand-built check world already is, and a bake
+ * that fails its own `verifyRail` is refused rather than half-trusted: a
+ * timetable the two ends disagree about is worse than no timetable, because the
+ * disagreement is a passenger standing in a train the server says is 400 m away.
+ */
+async function loadRail(root: string): Promise<RailBake | null> {
+  const path = join(root, '..', 'rail', 'rail.bin');
+  try {
+    const buf = await readFile(path);
+    const bake = decodeRail(
+      buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer,
+    );
+    const bad = verifyRail(bake);
+    if (bad.length > 0) {
+      console.warn(`[sydney] rail bake at ${path} failed its own check: ${bad[0]}. Trains are scenery.`);
+      return null;
+    }
+    return bake;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * A world for one room: the same city, its own coffees.
  *
  * PERFORMANCE.md phase 3. A host process runs R rooms and **loads the city
@@ -2012,12 +2086,32 @@ async function readOptional(path: string): Promise<ArrayBuffer | null> {
  */
 export function groundFor(world: ServerWorld): CombatWorld {
   let lastGround = 0;
+  const platforms = world.platforms ?? null;
   return {
     collision: world.collision,
     groundHeight(x: number, z: number, feetY: number): number {
       const sampled = world.terrain.height(x, z);
       if (Number.isFinite(sampled)) lastGround = sampled;
-      return Math.max(lastGround, world.collision.roofHeight(x, z, feetY));
+      // The station platforms. This is the *only* place the server learns that a
+      // platform is a surface -- see `ServerWorld.platforms` -- and `main.ts`'s
+      // `groundHeightAt` folds in the identical call beside the prisms
+      // `world/rail-geo.ts` has already given it, so both ends compute the same
+      // 1.05 m over the same rail head. Without it, a player who has just got
+      // off a train at Central is dragged down through the platform at the
+      // correction rate.
+      //
+      // **It replaces the terrain rather than competing with it**, which is not
+      // how the roofs are folded in one line up, and the difference is a cutting.
+      // `PlatformField.heightAt` answers at all only when the asker is within a
+      // step below and a jump above the surface, so an answer here means "you are
+      // standing on this platform" and not "there is a platform somewhere under
+      // you". At St Leonards the terrain grid is eleven metres over the platform
+      // -- the heightfield does not model the cutting -- and a max would put a
+      // passenger who had just stepped off the train up on the paddock.
+      const platform = platforms === null ? -Infinity : platforms.heightAt(x, z, feetY);
+      const roof = world.collision.roofHeight(x, z, feetY);
+      if (platform > -Infinity) return Math.max(platform, roof);
+      return Math.max(lastGround, roof);
     },
     // Shared rather than per combatant, unlike the ground above it: this one
     // carries no state at all, because where the water is does not depend on who

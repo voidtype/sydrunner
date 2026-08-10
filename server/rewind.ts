@@ -308,6 +308,34 @@ export function rewind(
  * getters rather than copying them. So a health that changes between building
  * this list and reading it is still seen.
  */
+/**
+ * A second chance to say where a rewound body *appeared to be*.
+ *
+ * Called with the historical sample and how far back it is, and free to rewrite
+ * it. Exactly one thing uses it and it is worth the seam: a passenger on a
+ * train. `net/client.placeRiders` draws a remote rider by composing their
+ * carriage-local offset with the train's pose **at present time** rather than at
+ * render time -- because a train is a closed-form function of the clock and
+ * there is nothing about it to interpolate -- so what the swinger saw is a body
+ * 250 ms old *in the carriage* and zero milliseconds old *along the railway*.
+ *
+ * A rewind that ignored that would look for the victim where the train was a
+ * quarter of a second ago, which at 44 m/s is eleven metres behind the carriage
+ * the fight is happening in, and every swing aboard a moving train would miss.
+ *
+ * The correction needs nothing stored, which is the whole reason this is a
+ * callback and not four more `Float64Array`s: `poseTrain` can be evaluated at
+ * *any* instant, so the historical world position can be pushed back into the
+ * carriage's frame at the instant it was recorded and pulled out again at the
+ * instant the swing happened. `server/sim.ts` supplies it; this file still knows
+ * nothing about trains.
+ */
+export type RewindReframe = (
+  live: CombatantState,
+  backSeconds: number,
+  at: { x: number; y: number; z: number; yaw: number },
+) => void;
+
 export function rewindInto(
   attacker: CombatantState,
   candidates: readonly CombatantState[],
@@ -315,6 +343,8 @@ export function rewindInto(
   viewTick: number,
   pool: CombatantState[],
   proxies: RewoundProxy[],
+  reframe?: RewindReframe,
+  nowTick = viewTick,
 ): CombatantState[] {
   const at = sampleScratch;
   let used = 0;
@@ -328,6 +358,7 @@ export function rewindInto(
       pool.push(c);
       continue;
     }
+    if (reframe !== undefined) reframe(c, (nowTick - viewTick) / TICK_HZ, at);
     let view = proxies[used];
     if (view === undefined) {
       view = new RewoundProxy();

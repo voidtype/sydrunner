@@ -168,7 +168,8 @@
 
 import { Vector3 } from 'three/webgpu';
 
-import type { CollisionWorld } from '../player/collision.ts';
+import type { CollisionWorld, MoveResolver } from '../player/collision.ts';
+import { createAboardSlot, type AboardSlot } from './riding.ts';
 import {
   EYE_HEIGHT,
   GRAVITY,
@@ -458,6 +459,27 @@ export interface CombatantState {
    * once, not a thing you do again every time you are knocked over.
    */
   bikeTuned: boolean;
+  /**
+   * The train this combatant is riding, in the carriage's own coordinates.
+   *
+   * Here on `ridingBike`'s argument and for the same reason it is stronger than
+   * `trainingT`'s: this **is** movement state. `advance` steps the body against
+   * the carriage rather than against the city while it is set, so a second
+   * record of who is on a train would be a second opinion about which floor
+   * somebody is standing on.
+   *
+   * A record rather than eight loose fields, and a record allocated once by
+   * `createCombatant` rather than a nullable one, so that boarding allocates
+   * nothing during the one moment the feature is on screen. `line < 0` is "on
+   * foot" and is what `riding.isAboard` asks.
+   *
+   * **`advance` does not read it and must not.** Deciding to board needs the
+   * timetable, which lives in `game/rail.ts`, and this file may not import it
+   * for the reason the bikes may not import `BikeField`: the callers that own a
+   * bake do the deciding and hand `advance` a world. The one thing this file
+   * does with it is the sweep in the knockout branch below.
+   */
+  readonly aboard: AboardSlot;
 }
 
 /** The controller's input plus the swing bit and the throw one. */
@@ -504,6 +526,17 @@ export interface CombatInput extends InputSnapshot {
 export interface CombatWorld {
   collision: CollisionWorld | null;
   groundHeight(x: number, z: number, feetY: number): number;
+  /**
+   * A resolver that stands in for `collision` while this body is being moved.
+   *
+   * Absent on every world written before trains were rideable, which is what
+   * "the city" means. Present only on the throwaway world a caller builds around
+   * an aboard player for the duration of one `advance`, where it is the carriage
+   * (`game/riding.carriageResolve`) and `groundHeight` is the carriage floor. See
+   * `moverOf`, and see `game/riding.ts`'s header for why a rider is stepped in
+   * the carriage's coordinates rather than the world's.
+   */
+  mover?: MoveResolver | null;
   /**
    * Where the water surface is over a point, or `NaN` where there is none.
    *
@@ -586,6 +619,9 @@ export function createCombatant(id: number, x = 0, z = 0): CombatantState {
     // On foot, and untuned. Both are session state a joiner starts without.
     ridingBike: 0,
     bikeTuned: false,
+    // On foot. See `CombatantState.aboard`: the record is allocated here once
+    // and mutated forever after, never replaced.
+    aboard: createAboardSlot(),
   };
 }
 
@@ -891,7 +927,7 @@ export function advance(
 
   const fromX = c.body.position.x;
   const fromZ = c.body.position.z;
-  step(c.body, movement, dt, world?.collision ?? null, groundOf(world));
+  step(c.body, movement, dt, moverOf(world), groundOf(world));
 
   // And the deep-entry limit, after the step rather than inside it, because it
   // is a question about where the step *landed*. Undoing the move rather than
@@ -931,6 +967,22 @@ function groundOf(world: CombatWorld | null): (x: number, z: number, feet: numbe
 }
 
 /**
+ * Which resolver this body is moving against: the carriage if there is one.
+ *
+ * `CombatWorld.mover` is set only while a body is being stepped inside a
+ * vehicle, and when it is it *replaces* the city rather than adding to it --
+ * a rider walking around a carriage must not be stopped by the warehouse the
+ * train is passing, and must not be able to walk out through the bodyside into
+ * open air at 130 km/h. Everything else on the world is unchanged, which is why
+ * `pickRespawn` below still reads `collision` directly: choosing where to put a
+ * respawned body is a question about the city and never about the carriage.
+ */
+function moverOf(world: CombatWorld | null): MoveResolver | null {
+  if (world === null) return null;
+  return world.mover ?? world.collision;
+}
+
+/**
  * One step of a knocked-out body.
  *
  * Deliberately *not* `controller.step`: a corpse has no wish velocity, does not
@@ -953,11 +1005,12 @@ function ragdollStep(c: CombatantState, dt: number, world: CombatWorld | null): 
 
   let x = toX;
   let z = toZ;
-  if (world?.collision) {
+  const mover = moverOf(world);
+  if (mover) {
     // No step height in the query: a body sliding along the pavement does not
     // climb a kerb, and passing the controller's STEP_HEIGHT here would let a
     // knockout mount a 0.4 m wall it was thrown at.
-    const r = world.collision.resolve(fromX, fromZ, toX, toZ, PLAYER_RADIUS, feet);
+    const r = mover.resolve(fromX, fromZ, toX, toZ, PLAYER_RADIUS, feet);
     x = r.x;
     z = r.z;
     if (r.hit) {
@@ -1137,6 +1190,46 @@ export function segmentDistance(
 // --- The consequence ----------------------------------------------------------
 
 const impulseDir = /*#__PURE__*/ new Vector3();
+
+/**
+ * Pips off a combatant with nobody to blame. True if it was a knockout.
+ *
+ * The knockout is spelled **once**, here, and that is the whole reason this
+ * function exists. Four things in the game hurt somebody without a puncher --
+ * a police round, a car, the ground at the end of a fall, and now jumping out of
+ * a train at 130 km/h -- and each of them was reaching for the same six lines:
+ * clamp the health, set the phase, zero the two clocks, set the respawn, drop
+ * the bike. Six lines copied four times is four places a future fifth cause can
+ * be spelled *nearly* right, and the failure mode is a body that is at zero pips
+ * and still walking.
+ *
+ * Deliberately **not** `applyHit` with the victim as their own attacker, which
+ * is the other way this could have gone. That function sets a knockback from the
+ * attacker's *view direction*, applies hitstop to both parties and fills in a
+ * `HitReport` -- none of which mean anything when the thing that hurt you is
+ * gravity, and the first of which would throw a body along whatever it happened
+ * to be looking at.
+ *
+ * The caller owns the velocity, the event and the killfeed. `server/sim.hurt`
+ * emits a `HIT` with the victim as their own attacker (the sentinel a car
+ * already uses, meaning "the world did this"), and `main.ts` does the same thing
+ * offline by simply not emitting one.
+ */
+export function applyWorldDamage(c: CombatantState, pips: number): boolean {
+  if (c.phase === 'ko' || c.health <= 0) return false;
+  c.health = Math.max(0, c.health - pips);
+  // `applyHit`'s float snap, for its reason: a victim alive by half a femto-pip
+  // draws one pip on the HUD and cannot be knocked out by any finite number of
+  // further hits.
+  if (c.health < 1e-9) c.health = 0;
+  if (c.health > 0) return false;
+  c.phase = 'ko';
+  c.phaseT = 0;
+  c.koT = 0;
+  c.respawnT = KO_SECONDS;
+  c.ridingBike = 0;
+  return true;
+}
 
 /**
  * One pip, one comic launch, one flinch or one knockout, and hitstop on both.
