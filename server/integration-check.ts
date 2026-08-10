@@ -275,6 +275,45 @@ import { createPlayerState, step } from '../client/src/player/controller.ts';
 // error a mis-seeded replay makes *is* one step of this per unacknowledged
 // input. See `net/client.ts`'s `ackedVelocity`.
 import { ACCELERATION } from '../client/src/player/controller.ts';
+// --- `checkRidingOnline`'s imports. Static, and deliberately the *same*
+// instances `main.ts` and `server/sim.ts` hold: `checkRiding` above evaluates
+// two separate copies of `game/riding.ts` on purpose, to prove a composition
+// agrees across processes, and this section is asking the opposite question --
+// whether the one shared seam survives a wire.
+import {
+  RAIL_EPOCH_MS,
+  createTrainPose,
+  railSeconds,
+  sampleAlong,
+  type RailBake,
+} from '../client/src/game/rail.ts';
+import {
+  RIDE_MOVED,
+  RIDE_ON,
+  RIDE_TRIP_GONE,
+  aboardFrame,
+  aboardPose,
+  boardHere,
+  clearAboard,
+  consistOf,
+  createBoardOffer,
+  createCarFrame,
+  createCarriageStand,
+  dirOf,
+  dwellAt,
+  dwellStand,
+  exitLocal,
+  findBoarding,
+  interiorOfCar,
+  nearestDwell,
+  isAboard,
+  callsAhead,
+  nextDwell,
+  rideEnter,
+  worldToLocal,
+  type Stand,
+} from '../client/src/game/riding.ts';
+import type { PlayerState } from '../client/src/player/controller.ts';
 
 const PORT = Number(process.env.SYDNEY_CHECK_PORT ?? 8799);
 const SERVER_URL = `ws://127.0.0.1:${PORT}`;
@@ -1627,6 +1666,13 @@ async function main(): Promise<void> {
   // both ends, every tick. See `checkRiding`, appended last and self-contained.
   say('');
   await checkRiding();
+
+  // --- 33. And the same passenger, over the wire, with a reconciler in the
+  // middle of it. `checkRiding` proves the composition; this proves the *seam*,
+  // which is the half that shipped broken and could not have been caught by
+  // anything that ran against a local `Simulation`. See `checkRidingOnline`.
+  say('');
+  await checkRidingOnline();
 
   say('');
   if (failures.length === 0) {
@@ -4696,6 +4742,21 @@ async function checkPedestrians(): Promise<void> {
   }
 }
 
+// One section, by name, for the loop a fix is developed in: the whole file is
+// several minutes and a reconciler bug is iterated on in tens of seconds.
+// `SYDNEY_CHECK_ONLY=ridingOnline bun run server/integration-check.ts`.
+const only = process.env.SYDNEY_CHECK_ONLY ?? '';
+if (only === 'ridingOnline') {
+  await checkRidingOnline();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'riding') {
+  await checkRiding();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
+}
 await main();
 
 /**
@@ -17748,6 +17809,591 @@ async function checkRiding(): Promise<void> {
       `every one of ${tested.toLocaleString()} sampled tunnel points on the network relocates a ` +
         `bail-out to the next station **ahead** on that trip, and never to one behind it. Nobody is ` +
         `left in the hill: world/rail-geo.ts builds a tube around the track and no floor beside it`,
+    );
+  }
+}
+
+/**
+ * Riding, **online**: the board -> ride -> alight round trip through a real room.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS EXISTS, IN ONE PARAGRAPH.
+ *
+ * The riding round shipped, was reported broken within the hour, and was rolled
+ * back. Its acceptance test ran against a local `Simulation` -- one process, one
+ * copy of the state, no wire -- and passed. The only path a player can take is
+ * the networked one, and on that path the client boarded, the server boarded,
+ * and then `net/client.adoptRide` handed the ride back to `riding.enterLocal`
+ * without a witness (see `AboardSlot.wx`), so the seam concluded the body had
+ * been teleported and ended the ride. The server said "aboard" in the next
+ * snapshot, the client adopted it again, and the pair of them did that twenty
+ * times a second: a camera flickering between the platform and the carriage, a
+ * body that never left the platform, and `E` appearing to "fix" it because it
+ * cleared the state the client kept re-adopting.
+ *
+ * `checkRiding` could not have caught that and no amount of adding to it could,
+ * because there is no reconciler in it. This section is the missing one. It is
+ * two clients, a real `Room`, real `encodeSnapshot`/`decodeSnapshot` frames over
+ * a lag-injecting transport, and the real `NetClient` -- and the seam it drives
+ * is `riding.boardHere` and `riding.rideEnter`, which are the functions
+ * `main.ts` and `server/sim.ts` call and not a third copy. A harness with its
+ * own copy of the seam is the hole that let this through.
+ *
+ * ---------------------------------------------------------------------------
+ * AND IT RUNS IN A SECOND, because both ends are put on one virtual clock.
+ *
+ * A train is a closed-form function of the millisecond, so a test that waits for
+ * a real dwell waits ninety seconds before it can press anything. The server has
+ * had `Simulation.railNowMs` since the rail round and `NetClient.nowMs` is its
+ * other end, so the whole journey -- the wait, the dwell, the leg, the next
+ * dwell -- is stepped at 60 Hz as fast as the machine can run it. Nothing is
+ * faked: the timetable is read at the same instants it would be read at, by both
+ * ends, in the same order.
+ */
+async function checkRidingOnline(): Promise<void> {
+  say('--- Riding, online: two clients, a real room, and the wire in between');
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const world = await loadWorld(root);
+  const loaded = world.rail ?? null;
+  if (loaded === null) {
+    say('    no rail bake beside the world. Skipped.');
+    return;
+  }
+  const bake: RailBake = loaded;
+  const combatWorld = groundFor(world);
+  const FIXED_DT = 1 / TICK_HZ;
+  const STATION = process.env.SYDNEY_RIDE_FROM ?? 'St Peters';
+
+  // --- The clock, wound to four seconds before a real dwell at `STATION`.
+  //
+  // Solved rather than searched, off the same `nextDwell` the harness and the
+  // HUD use: the timetable is periodic and invertible, so "when is the next
+  // train" is a division and this is its answer turned back into milliseconds.
+  const openDwell = nextDwell(bake, STATION, railSeconds(Date.now()), {});
+  if (openDwell === null) {
+    say(`    no service calls at ${STATION}. Skipped.`);
+    return;
+  }
+  let clockMs = (openDwell.opensAt - 4) * 1000 + RAIL_EPOCH_MS;
+  const nowMs = (): number => clockMs;
+  const railNow = (): number => railSeconds(clockMs);
+
+  const room = new Room(0, world, 8, 0);
+  room.sim.railNowMs = nowMs;
+
+  /**
+   * One connected player: a real `NetClient`, a real participant, and the ride
+   * seam every other caller of `game/riding.ts` uses.
+   *
+   * The seam is deliberately three lines long. Everything that made `main.ts`'s
+   * copy of it longer -- the pill, the chime, the yaw conversion at the
+   * transition -- is presentation, and the two functions underneath are shared.
+   */
+  class Pilot {
+    readonly net: NetClient;
+    readonly combat = createCombatant(0, world.spawn.x, world.spawn.z);
+    readonly frame = createCarFrame();
+    readonly stand = createCarriageStand();
+    readonly offer = createBoardOffer();
+    readonly input = {
+      forward: 0, right: 0, jump: false, sprint: false,
+      yaw: 0, pitch: 0, speedScale: 1, jumpScale: 1,
+      punch: false, throwBall: false, mount: false,
+    };
+    ws: FakeSocket | null = null;
+    participant: Participant | null = null;
+    private readonly toServer: Array<{ f: ArrayBuffer; at: number }> = [];
+    private readonly toClient: Array<{ f: ArrayBuffer; at: number }> = [];
+    private readonly transport: NetTransport;
+    readonly correction = this.combat.body.velocity.clone();
+    /** Every way the ride ended under this pilot, counted. All should be zero mid-ride. */
+    rideEnded = 0;
+    lastEnd = '';
+    /** The worst |client world position - server world position| seen while judging. */
+    worstGap = 0;
+    /** The worst eased camera correction seen while judging, and when. */
+    worstCorrection = 0;
+    worstCorrectionAt = -1;
+
+    constructor(readonly name: string, private readonly lag: number, private readonly clock: () => number) {
+      const self = this;
+      this.transport = {
+        open: true, onframe: null, onopen: null, onclose: null,
+        send(f: ArrayBuffer): void { self.toServer.push({ f, at: tick + self.lag }); },
+        close(): void {},
+      };
+      this.net = new NetClient('', {
+        onHit: () => {}, onBounce: () => {}, onPickup: () => {}, onJoin: () => {},
+        onLeave: () => {}, onDrop: () => {}, onStatus: () => {},
+      }, { name, transport: this.transport, nowMs: this.clock });
+      this.net.setRail(bake);
+      this.transport.onopen?.();
+    }
+
+    get body(): PlayerState { return this.combat.body; }
+    get aboard(): boolean { return isAboard(this.combat.aboard); }
+
+    pump(): void {
+      for (let i = this.toServer.length - 1; i >= 0; i--) {
+        if (this.toServer[i].at > tick) continue;
+        const { f } = this.toServer.splice(i, 1)[0];
+        if (frameType(f) === MSG.HELLO && !this.participant) {
+          const sock = new FakeSocket(newConn(0));
+          this.ws = sock;
+          this.participant = room.join(sock.data, 0, this.name);
+          if (this.participant) {
+            room.conns.add(sock as unknown as Socket);
+            room.welcome(sock as unknown as Socket, this.participant);
+          }
+        } else if (frameType(f) === MSG.INPUT && this.ws) {
+          receiveInput(this.ws.data, f);
+        }
+      }
+    }
+
+    drain(): void {
+      if (this.ws) for (const f of this.ws.frames.splice(0)) this.toClient.push({ f, at: tick + this.lag });
+      for (let i = this.toClient.length - 1; i >= 0; i--) {
+        if (this.toClient[i].at > tick) continue;
+        this.transport.onframe?.(this.toClient.splice(i, 1)[0].f);
+      }
+    }
+
+    /** `main.ts`'s tick, minus the presentation. Reconcile, press, step, send. */
+    step(): void {
+      this.net.reconcile(this.combat, combatWorld, this.correction);
+      const c = Math.hypot(this.correction.x, this.correction.y, this.correction.z);
+      if (quiet && c > this.worstCorrection) { this.worstCorrection = c; this.worstCorrectionAt = tick; }
+
+      const t = railNow();
+      let world: CombatWorld = combatWorld;
+      if (this.aboard) {
+        const got = rideEnter(bake, this.combat.aboard, this.body, t, this.frame, this.stand);
+        if (got === RIDE_ON) {
+          world = this.stand as unknown as CombatWorld;
+        } else {
+          this.rideEnded++;
+          this.lastEnd = got === RIDE_MOVED
+            ? 'the body was moved in world space (riding.enterLocal refused)'
+            : got === RIDE_TRIP_GONE ? 'the trip stopped running' : 'no bake';
+          clearAboard(this.combat.aboard);
+        }
+      }
+      advance(this.combat, this.input, FIXED_DT, world);
+      if (world !== combatWorld) exitLocal(this.combat.aboard, this.body, this.frame);
+      this.net.sendInput(this.input, this.body.velocity);
+    }
+
+    /** `E`, on the client's side of it: `riding.boardHere`, the shared one. */
+    predictBoard(): boolean {
+      if (!boardHere(bake, this.combat.aboard, this.body, railNow(), this.frame, this.offer, EYE_HEIGHT)) {
+        return false;
+      }
+      this.net.predictedAboardChange();
+      return true;
+    }
+
+    predictAlight(): void {
+      clearAboard(this.combat.aboard);
+      this.net.predictedAboardChange();
+    }
+
+    /** How far the client's own body is from the server's, in metres. */
+    gap(): number {
+      const s = this.participant?.combat.body.position;
+      if (!s) return 0;
+      return Math.hypot(this.body.position.x - s.x, this.body.position.y - s.y, this.body.position.z - s.z);
+    }
+  }
+
+  let tick = 0;
+  /** Aboard bookkeeping: the whole ride, from one round trip after the press. */
+  let judging = false;
+  /**
+   * And the camera's own window, which stops before the bat.
+   *
+   * A knockback is a correction the client could not have predicted and is
+   * *supposed* to be flown rather than dragged -- `reconcile`'s snap branch
+   * exists for it. Counting it against the ride would make this section assert
+   * that being hit on a train is a bug. So the quiet window is the sixty
+   * seconds of ordinary riding before anybody swings, which is the window the
+   * reported flicker lived in.
+   */
+  let quiet = false;
+  const rider = new Pilot('rider', 3, nowMs);
+  const witness = new Pilot('witness', 3, nowMs);
+  const pilots = [rider, witness];
+
+  // --- Placed by the SERVER, which is the only end allowed to place anybody.
+  //
+  // The client is told nothing and is pulled there by reconciliation, exactly as
+  // it is by `/tp`. A harness that moved its own body would be testing a
+  // teleport the server refuses -- which is the shape of the previous round's
+  // `sydney.rail.goto`, and is why its `ride()` could not run online at all.
+  const stand: Stand = { x: 0, y: 0, z: 0, yaw: 0 };
+  const placedOk = dwellStand(bake, openDwell, Math.max(openDwell.opensAt + 1, railNow()), stand);
+  check(placedOk, `a boarding stand was solved for the ${openDwell.lineId} dwell at ${STATION}`);
+  if (!placedOk) return;
+
+  // --- The wayfinding, asserted rather than eyeballed.
+  //
+  // "its not obvious where i board" is a design bug and the fix is two objects:
+  // a street-level station board (`rail-geo.writeStationBoard`) and a marker on
+  // the doorway (`world/doormarker.ts`). The board is geometry and is checked
+  // where it is built; the marker's claim is testable here and is the one that
+  // matters, because it is a *promise*: the ring says "stand here and press E".
+  // A marker that pointed anywhere `findBoarding` would refuse would be worse
+  // than no marker, so the check is that walking to it makes the key work.
+  {
+    const t = Math.max(openDwell.opensAt + 2, railNow());
+    // Twelve metres along the platform from the boarding stand: out of reach of
+    // any door -- which is where the player who filed this report was standing.
+    const away = { x: stand.x, y: stand.y, z: stand.z };
+    const dir0 = dirOf(bake, openDwell.line, openDwell.dir)!;
+    const at = createTrainPose();
+    sampleAlong(bake, dir0, openDwell.trip >= 0 ? dir0.stops[0].s : 0, at);
+    away.x = stand.x + at.dx * 12;
+    away.z = stand.z + at.dz * 12;
+    const probe = createBoardOffer();
+    const feet = away.y - EYE_HEIGHT;
+    const inReachThere = findBoarding(bake, away.x, feet, away.z, t, probe);
+    const near = nearestDwell(bake, away.x, feet, away.z, t);
+    check(
+      !inReachThere && near !== null,
+      `standing 12 m along the ${STATION} platform, \`findBoarding\` refuses (so the bare prompt does ` +
+        `not appear) and \`nearestDwell\` still names a doorway ` +
+        `${near === null ? '(it did not)' : `${near.metres.toFixed(1)} m away on the ${near.line}`}. ` +
+        `That gap is the whole of the reported complaint: a train with its doors open, and nothing on ` +
+        `screen saying where`,
+    );
+    if (near !== null) {
+      // And now walk to what the marker is pointing at.
+      const mFeet = near.wy;
+      const got = findBoarding(bake, near.wx, mFeet, near.wz, t, probe);
+      check(
+        got,
+        `and a body standing on the marker -- the point \`nearestDwell\` hands the renderer, ` +
+          `(${near.wx.toFixed(1)}, ${near.wz.toFixed(1)}) -- is offered carriage ${probe.car}, bay ` +
+          `${probe.bay}, ${probe.distance.toFixed(2)} m from the door centre. The marker cannot promise ` +
+          `something \`E\` will refuse, because it is the same function's own answer`,
+      );
+      check(
+        got && Math.hypot(probe.wx - near.wx, probe.wz - near.wz) < 1.5,
+        `  and the two agree about which doorway: the in-reach marker lands ` +
+          `${got ? Math.hypot(probe.wx - near.wx, probe.wz - near.wz).toFixed(2) : '?'} m from the ` +
+          `out-of-reach one, so it does not jump to a different door as the player arrives`,
+      );
+    }
+  }
+
+  let placed = false;
+  const place = (): void => {
+    if (placed || !rider.participant || !witness.participant) return;
+    placed = true;
+    for (const [i, p] of pilots.entries()) {
+      const b = p.participant!.combat.body;
+      // A pace apart along the platform, so two bodies are not one body.
+      b.position.set(stand.x + i * 0.9, stand.y, stand.z);
+      b.velocity.set(0, 0, 0);
+      b.yaw = stand.yaw;
+      p.participant!.history.seed(room.sim.tick, b.position.x, b.position.y, b.position.z, b.yaw);
+    }
+  };
+
+  // --- The journey, solved. Where we get off is the next station this service
+  //     calls at, which is a lookup and not a wait.
+  let leg = '';
+  let alightAt = -Infinity;
+  let boardedTick = -1;
+  let riderAboardTicks = 0;
+  let quietTicks = 0;
+  let witnessRodeTicks = 0;
+  let quietCorrections = 0;
+  let serverAboardTicks = 0;
+  let snapshotsCarryingRider = 0;
+  let insideChecks = 0;
+  let insideHits = 0;
+  let worstInside = 0;
+  let startS = 0;
+  let endS = 0;
+  let batLanded = false;
+  let swingAfter = Infinity;
+  let firstSwingTick = -1;
+  let swingsThrown = 0;
+  let swingRange = 0;
+  let healthBefore = 0;
+  let alightedTick = -1;
+
+  const localScratch = { x: 0, y: 0, z: 0 };
+  const witnessFrame = createCarFrame();
+
+  const TICKS = TICK_HZ * 60 * 6;
+  for (tick = 0; tick < TICKS; tick++) {
+    clockMs += 1000 / TICK_HZ;
+
+    for (const p of pilots) p.step();
+
+    // --- Press `E` two seconds into the dwell, both of them, one after the
+    //     other so the witness has a moment on the platform first.
+    if (placed && boardedTick < 0 && railNow() > openDwell.opensAt + 2) {
+      const got = rider.predictBoard();
+      check(got, `the client's own \`riding.boardHere\` found a doorway at ${STATION} two seconds ` +
+        `into the ${openDwell.lineId} dwell -- carriage ${rider.offer.car}, bay ${rider.offer.bay}, ` +
+        `${rider.offer.distance.toFixed(2)} m from the door centre`);
+      if (!got) break;
+      boardedTick = tick;
+      rider.input.mount = true;
+      const a = rider.combat.aboard;
+      const pose = aboardPose(bake, a, railNow());
+      startS = pose?.s ?? 0;
+      // The next station this service calls at, and **not** the one it is
+      // standing in. `callsAhead` is the one that means that: it drops
+      // everything within 30 m of the current arc length, which is the platform
+      // the doors are open on.
+      const ahead = callsAhead(bake, a, startS);
+      leg = ahead.length > 0 ? ahead[0] : '';
+      const off = leg === '' ? null : dwellAt(bake, a, leg);
+      alightAt = off === null ? Infinity : off.opensAt + 2;
+      // The bat goes in at the far end of the leg, so the quiet window in front
+      // of it is most of the journey rather than a couple of seconds.
+      swingAfter = Number.isFinite(alightAt) ? alightAt - 25 : Infinity;
+      check(
+        leg !== '' && Number.isFinite(alightAt),
+        `  and the next station this service calls at is ${leg || '(none)'}, whose doors open ` +
+          `${Number.isFinite(alightAt) ? (alightAt - railNow()).toFixed(0) : '?'} s down the line`,
+      );
+    } else if (boardedTick >= 0 && tick > boardedTick + 2) {
+      rider.input.mount = false;
+    }
+
+    // --- The witness boards half a second later, and **predicts nothing**.
+    //
+    // That is not laziness, it is the other half of the coverage. A client that
+    // predicts its own boarding keeps a ride whose witness it wrote itself, and
+    // a bug in `net/client.adoptRide` can hide behind that. This one presses the
+    // button and waits to be told -- which is what a client does whose own
+    // `findBoarding` said no (it was a pace too far by its own clock), whose
+    // bake has not finished loading, or who was simply unlucky with the
+    // millisecond. `adoptRide` is the whole of how that player gets aboard, and
+    // it is where the rolled-back bug lived.
+    if (boardedTick >= 0 && tick === boardedTick + 30) {
+      witness.input.mount = true;
+    } else if (boardedTick >= 0 && tick > boardedTick + 33) {
+      witness.input.mount = false;
+    }
+
+    // --- Judging starts one round trip after the press, so the window either
+    //     side of the acknowledgement is not counted against the reconciler.
+    judging = boardedTick >= 0 && tick > boardedTick + 20 && alightedTick < 0;
+    quiet = judging && (firstSwingTick < 0 || tick < firstSwingTick - 30);
+    if (quiet) quietTicks++;
+
+    for (const p of pilots) { p.pump(); }
+    place();
+    room.step();
+
+    if (judging) {
+      const sa = isAboard(rider.participant!.combat.aboard);
+      if (sa) serverAboardTicks++;
+      if (rider.aboard) riderAboardTicks++;
+      if (quiet) {
+        const g = rider.gap();
+        if (g > rider.worstGap) rider.worstGap = g;
+        quietCorrections = rider.net.corrections;
+        const wg = witness.gap();
+        if (witness.aboard && wg > witness.worstGap) witness.worstGap = wg;
+      }
+      if (witness.aboard && isAboard(witness.participant!.combat.aboard)) witnessRodeTicks++;
+
+      // --- What the OTHER client sees. `placeRiders` composes a remote rider
+      //     from the carriage-local offset in the aboard section, so the test is
+      //     not "are they near the train" but "are they inside this carriage",
+      //     asked by pushing the drawn position back through the carriage's own
+      //     frame. A rider drawn from the plain interpolated world position
+      //     would fail it by tens of metres at 44 m/s.
+      const seen = witness.net.remotes.get(rider.participant!.id);
+      const a = rider.participant!.combat.aboard;
+      if (seen && isAboard(a) && tick % 6 === 0) {
+        const dir = dirOf(bake, a.line, a.dir);
+        const it = dir === null ? null : interiorOfCar(consistOf(dir, a.trip), a.car);
+        if (it !== null && aboardFrame(bake, a, railNow(), witnessFrame)) {
+          worldToLocal(witnessFrame, seen.position.x, seen.position.y, seen.position.z, localScratch);
+          insideChecks++;
+          const outX = Math.max(it.xMin - localScratch.x, localScratch.x - it.xMax, 0);
+          const outZ = Math.abs(localScratch.z) - it.halfWidth;
+          const out = Math.max(outX, outZ, 0);
+          if (out > worstInside) worstInside = out;
+          if (out < 0.5) insideHits++;
+        }
+      }
+    }
+
+    // --- The bat, aboard, at speed. `sim.reframeRider` is the thing under test:
+    //     without it the rewind hunts eleven metres behind the carriage.
+    if (
+      boardedTick >= 0 && !batLanded && rider.aboard && witness.aboard &&
+      railNow() > swingAfter && tick % 40 === 0
+    ) {
+      if (healthBefore === 0) healthBefore = rider.participant!.combat.health;
+      // Face the rider, **in the carriage's frame**, and then swing. While a
+      // body is aboard, `input.yaw` is the heading in that frame -- that is the
+      // conversion `main.ts` does at the seam -- so this is the same arithmetic
+      // a player's mouse performs, one basis in. `combat.viewDirection` is
+      // (-sin y, *, -cos y), hence the negations.
+      const w = witness.combat.aboard;
+      const r = rider.combat.aboard;
+      witness.input.yaw = Math.atan2(-(r.x - w.x), -(r.z - w.z));
+      witness.input.punch = true;
+      if (firstSwingTick < 0) firstSwingTick = tick;
+      swingsThrown++;
+      swingRange = Math.hypot(r.x - w.x, r.y - w.y, r.z - w.z);
+    } else {
+      witness.input.punch = false;
+    }
+    if (healthBefore > 0 && rider.participant!.combat.health < healthBefore - 0.05) batLanded = true;
+
+    // --- Off at the next station.
+    if (boardedTick >= 0 && alightedTick < 0 && railNow() > alightAt) {
+      const a = rider.combat.aboard;
+      endS = aboardPose(bake, a, railNow())?.s ?? startS;
+      alightedTick = tick;
+      for (const p of pilots) { p.predictAlight(); p.input.mount = true; }
+    } else if (alightedTick >= 0) {
+      // Released immediately, and it matters: the doors of the train we just
+      // stepped off are still open beside us, and a held `E` re-boards it.
+      for (const p of pilots) p.input.mount = false;
+    }
+
+    for (const p of pilots) {
+      if (p.participant && isAboard(p.participant.combat.aboard)) snapshotsCarryingRider += 0;
+      p.drain();
+      p.net.update(FIXED_DT);
+    }
+    if (rider.participant && witness.ws) {
+      // The wire itself: did the frame the witness was sent carry the rider's
+      // carriage offset? Read off the decoded snapshot the client holds, which
+      // is the only copy that proves the section survived encode and decode.
+      const held = (witness.net as unknown as { snapshots: Array<{ aboard: Array<{ id: number }> }> }).snapshots;
+      const newest = held.length > 0 ? held[held.length - 1] : null;
+      if (newest && newest.aboard.some((x) => x.id === rider.participant!.id)) snapshotsCarryingRider++;
+    }
+
+    if (alightedTick >= 0 && tick > alightedTick + 90) break;
+  }
+
+  for (const p of pilots) p.net.close();
+
+  // --- 1. The server agreed, and kept agreeing.
+  check(
+    serverAboardTicks > TICK_HZ * 10,
+    `the server carried the rider aboard for ${(serverAboardTicks / TICK_HZ).toFixed(1)} s of the ` +
+      `journey -- \`sim.tryBoard\` answered the button against its own body, its own \`railT\` and ` +
+      `its own \`doorsOpen\`, and nothing the client sent could have named a train`,
+  );
+  // --- 2. And so did the client, without a single re-adoption.
+  check(
+    rider.rideEnded === 0,
+    `and the client's ride survived every tick of it: \`riding.rideEnter\` ended the ride ` +
+      `${rider.rideEnded} time(s)` + (rider.lastEnd ? ` (last: ${rider.lastEnd})` : '') +
+      `. THIS IS THE ROLLED-BACK BUG: before the fix this was one ending per snapshot, because ` +
+      `\`adoptRide\` re-established the ride without re-establishing the witness \`enterLocal\` reads`,
+  );
+  check(
+    riderAboardTicks >= serverAboardTicks,
+    `  and the two ends were aboard together for ${riderAboardTicks} of the server's ` +
+      `${serverAboardTicks} judged ticks -- a client that was aboard on some ticks and not others is ` +
+      `the camera flicker, and it is what "pressing e again fixed it" was actually reporting`,
+  );
+
+  // --- 3. The world position, which is the thing a player feels.
+  check(
+    rider.worstGap < 0.25,
+    `the client's own world position never left the server's by more than ` +
+      `${rider.worstGap.toFixed(3)} m across ${(quietTicks / TICK_HZ).toFixed(0)} s of riding, at a ` +
+      `100 ms round trip. Both ends compose it ` +
+      `from a carriage-local offset through \`poseTrain\`, so this is two walks on one floor and not a ` +
+      `44 m/s prediction problem`,
+  );
+  check(
+    rider.worstCorrection <= CORRECTION_DEADZONE && quietCorrections === 0,
+    `  and the camera was told about ${quietCorrections} correction(s) in that window, worst eased offset ` +
+      `${rider.worstCorrection.toFixed(4)} m at tick ${rider.worstCorrectionAt} against a ` +
+      `${CORRECTION_DEADZONE} m deadzone. A ride that fights the reconciler shows up here first, and ` +
+      `it is exactly what "camera goes crazy flickering" was`,
+  );
+
+  // --- 4. It actually went somewhere.
+  check(
+    Math.abs(endS - startS) > 300,
+    `the train carried them ${Math.abs(endS - startS).toFixed(0)} m along the railway from ${STATION} ` +
+      `to ${leg} -- the world position advanced with the carriage rather than staying on the platform, ` +
+      `which is the other half of the report`,
+  );
+
+  // --- 5. The second client saw them inside it.
+  check(
+    insideChecks > 20 && insideHits === insideChecks,
+    `a second connected client drew the rider INSIDE the carriage on ${insideHits} of ${insideChecks} ` +
+      `samples -- its own decoded aboard section pushed back through the carriage's frame lands within ` +
+      `${worstInside.toFixed(2)} m of the interior box. Composed at present time by ` +
+      `\`net/client.placeRiders\`, because a train is not a thing to interpolate`,
+  );
+  check(
+    snapshotsCarryingRider > TICK_HZ * 5,
+    `  and the section was on the wire for ${snapshotsCarryingRider} of the frames it decoded: the ` +
+      `rider's eight bytes survived \`encodeSnapshot\`, the AOI group interning in \`Room.fill\` and ` +
+      `\`decodeSnapshot\` at the far end`,
+  );
+
+  // --- 5b. The client that predicted nothing.
+  check(
+    witnessRodeTicks > TICK_HZ * 20 && witness.rideEnded === 0,
+    `the second client boarded without predicting anything -- it pressed the button and \`adoptRide\` ` +
+      `put it aboard from the snapshot -- and then rode for ${(witnessRodeTicks / TICK_HZ).toFixed(1)} s ` +
+      `with the ride ending ${witness.rideEnded} time(s)` +
+      (witness.lastEnd ? ` (last: ${witness.lastEnd})` : '') +
+      `. This is the exact path that shipped broken: an adopted ride left ` +
+      `\`AboardSlot.wx/wy/wz\` stale, so \`riding.rideEnter\` threw it away on the next tick and the ` +
+      `server put it back on the next snapshot, twenty times a second, forever`,
+  );
+  check(
+    witness.worstGap < 0.25,
+    `  and its world position tracked the server's to ${witness.worstGap.toFixed(3)} m, having been ` +
+      `composed entirely out of eight bytes of carriage offset it was sent`,
+  );
+
+  // --- 6. A bat, aboard, at line speed.
+  check(
+    batLanded,
+    `a swing thrown aboard the moving train landed: ${swingsThrown} thrown from ` +
+      `${swingRange.toFixed(2)} m away in the carriage, and the victim's health fell from ` +
+      `${healthBefore.toFixed(1)} to ${(rider.participant?.combat.health ?? 0).toFixed(1)}. \`sim.reframeRider\` is what makes it possible -- the historical ` +
+      `position is pushed into the carriage's frame at the instant it was recorded and pulled out ` +
+      `through the frame now, so the rewind does not hunt eleven metres behind a train doing 44 m/s`,
+  );
+
+  // --- 7. And off, onto something solid.
+  {
+    const stn = (bake.lines.flatMap((l) => l.dirs).flatMap((d) => d.stops)).find((s) => s.name === leg);
+    const off = rider.participant!.combat.body.position;
+    const clientOff = rider.body.position;
+    const agree = Math.hypot(clientOff.x - off.x, clientOff.y - off.y, clientOff.z - off.z);
+    check(
+      !isAboard(rider.participant!.combat.aboard) && !rider.aboard,
+      `\`E\` at ${leg} got both ends off the train: server aboard ` +
+        `${isAboard(rider.participant!.combat.aboard)}, client aboard ${rider.aboard}`,
+    );
+    check(
+      agree < 1.5,
+      `  and the client landed ${agree.toFixed(2)} m from where the server put them, having predicted ` +
+        `nothing about the landing and simply been told -- which is the reconciler doing its ordinary ` +
+        `job the moment the ride is over` + (stn ? '' : ''),
+    );
+    check(
+      rider.body.onGround,
+      `  on solid ground at (${clientOff.x.toFixed(1)}, ${clientOff.z.toFixed(1)}), ` +
+        `feet ${(clientOff.y - EYE_HEIGHT).toFixed(2)} m`,
     );
   }
 }

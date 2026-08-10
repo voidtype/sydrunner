@@ -1275,14 +1275,31 @@ export interface BoardOffer {
   distance: number;
   /** The station this train is standing at, for the prompt. */
   station: string;
+  /**
+   * And the same doorway in **world** coordinates, at the bodyside on the side
+   * the asker is standing.
+   *
+   * Here rather than recomposed by the caller because the caller would need the
+   * carriage's frame to do it, and getting the frame means naming the trip,
+   * which is the one thing a UI layer has no business doing. Reported as "its
+   * not obvious where i board": a prompt that says `E` and does not say *where*
+   * is a prompt for somebody who already knew.
+   */
+  wx: number;
+  wy: number;
+  wz: number;
 }
 
 export function createBoardOffer(): BoardOffer {
-  return { line: -1, dir: 0, trip: 0, car: 0, bay: 0, x: 0, y: 0, z: 0, distance: Infinity, station: '' };
+  return {
+    line: -1, dir: 0, trip: 0, car: 0, bay: 0, x: 0, y: 0, z: 0,
+    distance: Infinity, station: '', wx: 0, wy: 0, wz: 0,
+  };
 }
 
 const _frame: CarFrame = /*#__PURE__*/ createCarFrame();
 const _local: Vec3Out = { x: 0, y: 0, z: 0 };
+const _doorAt: Vec3Out = { x: 0, y: 0, z: 0 };
 
 /**
  * The nearest open doorway a body at `(wx, feetY, wz)` could step into, or none.
@@ -1375,11 +1392,137 @@ export function findBoarding(
           out.distance = distance;
           out.station =
             _pose.atStop >= 0 && _pose.atStop < dir.stops.length ? dir.stops[_pose.atStop].name : '';
+          // The doorway itself, in world, on the platform side of the bodyside:
+          // where the marker goes and where the body is being invited to walk.
+          localToWorld(_frame, it.doors[bay].x, it.vestibuleY, side * (it.halfWidth + 0.35), _local);
+          out.wx = _local.x;
+          out.wy = _local.y;
+          out.wz = _local.z;
+          worldToLocal(_frame, wx, feetY, wz, _local);
         }
       }
     }
   }
   return found;
+}
+
+// --- The seam, shared ------------------------------------------------------------------
+//
+// `main.ts`, `server/sim.ts` and `integration-check.checkRidingOnline` all put a
+// body on a train and all step it inside one, and until this section existed
+// each of them wrote the sequence out by hand. That is how the feature shipped
+// broken: the acceptance test wrote its *own* copy of the seam, so it was
+// testing a boarding that no player could perform. The two functions below are
+// the sequence, and everything else is HUD, audio and authority.
+
+/**
+ * Board the nearest open doorway, witness and all. False if there is none.
+ *
+ * The whole of `sim.tryBoard` minus the authority, and the whole of `main.ts`'s
+ * `predictBoard` minus the notice and the chime. `frame` is written as a side
+ * effect and is the carriage's frame at `t`, which the caller usually wants.
+ *
+ * **`projectAboard` is not optional and is the last line for a reason.** It
+ * writes the derived world position *and* `AboardSlot.wx/wy/wz`, which is the
+ * witness `enterLocal` reads to decide whether this body is still the one the
+ * carriage put where it is. A boarding that skipped it would be undone by the
+ * very next `rideEnter`. See `net/client.adoptRide`, which owed the same debt
+ * and did not pay it.
+ */
+export function boardHere(
+  bake: RailBake,
+  a: AboardSlot,
+  body: RiderBody & { onGround: boolean },
+  t: number,
+  frame: CarFrame,
+  offer: BoardOffer,
+  eyeHeight: number,
+): boolean {
+  const feetY = body.position.y - eyeHeight;
+  if (!findBoarding(bake, body.position.x, feetY, body.position.z, t, offer)) return false;
+  a.line = offer.line;
+  a.dir = offer.dir;
+  a.trip = offer.trip;
+  a.car = offer.car;
+  a.x = offer.x;
+  a.y = offer.y;
+  a.z = offer.z;
+  // Standing still, in the carriage's frame, which is a body doing 130 km/h in
+  // the world's. See `AboardSlot.vx`.
+  a.vx = 0;
+  a.vy = 0;
+  a.vz = 0;
+  if (!aboardFrame(bake, a, t, frame)) {
+    clearAboard(a);
+    return false;
+  }
+  // The heading they already had, in the carriage's frame, so boarding a train
+  // pointing north while facing east leaves them facing east.
+  a.yaw = body.yaw - frameYaw(frame);
+  projectAboard(a, body, frame);
+  body.onGround = true;
+  return true;
+}
+
+/** `rideEnter` succeeded: the body is in the carriage and `stand` is aimed at it. */
+export const RIDE_ON = 0;
+/** There is no timetable. Nothing can be aboard anything. */
+export const RIDE_NO_BAKE = 1;
+/**
+ * The trip is no longer running, or its carriage is not one this build models.
+ *
+ * The train reached its terminus under a passenger, or the bake changed. The
+ * two ends answer this differently -- which is the whole reason the status is
+ * returned rather than acted on here -- because the client waits one round trip
+ * to be told where it ended up and the server *is* the telling.
+ */
+export const RIDE_TRIP_GONE = 2;
+/**
+ * The body was moved in world space since the last composition.
+ *
+ * `enterLocal`'s rule, and the level the whole feature is swept at: a respawn,
+ * an unstuck, a teleport, a knockback snap and a bat all end a ride here
+ * without any of them having heard of a train. See `enterLocal`.
+ */
+export const RIDE_MOVED = 3;
+
+/**
+ * Move a body into its carriage for one step. `RIDE_ON` means it is in there.
+ *
+ * **Nothing is cleared here, and no body is relocated.** This function reports;
+ * the caller decides. That split is not fastidiousness -- it is the one place
+ * the two simulations legitimately differ, and folding the policy in was how
+ * they came to differ in ways nobody meant. On `RIDE_TRIP_GONE` the server puts
+ * the passenger on the last platform the trip called at and the client leaves
+ * the body where it is for a round trip; on `RIDE_MOVED` both simply stop being
+ * aboard, because whatever moved the body has already put it somewhere.
+ *
+ * `stand` is aimed at the interior on success and the caller passes it straight
+ * to `combat.advance` as the world. `exitLocal` is the other half and must be
+ * called if and only if this returned `RIDE_ON`.
+ */
+export function rideEnter(
+  bake: RailBake | null,
+  a: AboardSlot,
+  body: RiderBody,
+  t: number,
+  frame: CarFrame,
+  stand: CarriageStand,
+): number {
+  stand.interior = null;
+  if (bake === null) return RIDE_NO_BAKE;
+  if (!aboardFrame(bake, a, t, frame)) return RIDE_TRIP_GONE;
+  if (!enterLocal(a, body, frame)) return RIDE_MOVED;
+  const dir = dirOf(bake, a.line, a.dir);
+  const it = dir === null ? null : interiorOfCar(consistOf(dir, a.trip), a.car);
+  if (it === null) {
+    // The body is in local coordinates and there is nothing to be local to. Put
+    // it back before letting go of it, which is what `exitLocal` is for.
+    exitLocal(a, body, frame);
+    return RIDE_TRIP_GONE;
+  }
+  stand.interior = it;
+  return RIDE_ON;
 }
 
 /**
@@ -1403,6 +1546,10 @@ export interface DwellReport {
   alongBay: number;
   outside: number;
   rise: number;
+  /** The doorway in world, on the side the asker is standing. See `BoardOffer.wx`. */
+  wx: number;
+  wy: number;
+  wz: number;
 }
 
 export function nearestDwell(
@@ -1443,7 +1590,14 @@ export function nearestDwell(
               // other two: a body under the viaduct a train is crossing is
               // beside its doors in plan and nowhere near them in fact.
               rise: _local.y - it.vestibuleY,
+              wx: 0, wy: 0, wz: 0,
             };
+            localToWorld(
+              _frame, bay.x, it.vestibuleY, (_local.z < 0 ? -1 : 1) * (it.halfWidth + 0.35), _doorAt,
+            );
+            best.wx = _doorAt.x;
+            best.wy = _doorAt.y;
+            best.wz = _doorAt.z;
           }
         }
       }

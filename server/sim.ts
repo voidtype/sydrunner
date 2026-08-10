@@ -174,20 +174,20 @@ import {
   createCarFrame,
   createCarriageStand,
   dirOf,
-  enterLocal,
   exitLocal,
-  findBoarding,
-  frameYaw,
   interiorOfCar,
   isAboard,
   nextCall,
-  projectAboard,
   localToWorld,
   spanFlagsAt,
   stopPlatform,
   worldToLocal,
   type CarFrame,
   type Vec3Out,
+  boardHere,
+  rideEnter,
+  RIDE_ON,
+  RIDE_TRIP_GONE,
 } from '../client/src/game/riding.ts';
 
 export const FIXED_DT = 1 / TICK_HZ;
@@ -1497,8 +1497,8 @@ export class Simulation {
       return;
     }
 
+    if (this.tryBoard(p)) return;
     const feet = c.body.position.y - EYE_HEIGHT;
-    if (this.tryBoard(p, feet)) return;
     const bike = this.bikes.nearestFree(c.body.position.x, feet, c.body.position.z);
     if (!bike) return;
     // The one place a claim is decided, and it can still fail: an earlier
@@ -1593,41 +1593,17 @@ export class Simulation {
    * the ride starts on the next frame rather than on the next round trip. If it
    * was wrong, the very next snapshot has them on the platform.
    */
-  private tryBoard(p: Participant, feet: number): boolean {
+  private tryBoard(p: Participant): boolean {
     const bake = this.world.rail ?? null;
     if (bake === null) return false;
-    const c = p.combat;
-    if (!findBoarding(
-      bake, c.body.position.x, feet, c.body.position.z, this.railT, this.boardOffer,
-    )) {
-      return false;
-    }
-    const o = this.boardOffer;
-    const a = c.aboard;
-    a.line = o.line;
-    a.dir = o.dir;
-    a.trip = o.trip;
-    a.car = o.car;
-    a.x = o.x;
-    a.y = o.y;
-    a.z = o.z;
-    // Standing still, in the carriage's frame, which is a body doing 130 km/h in
-    // the world's. See `AboardSlot.vx`.
-    a.vx = 0;
-    a.vy = 0;
-    a.vz = 0;
-    if (!aboardFrame(bake, a, this.railT, this.frame)) {
-      clearAboard(a);
-      return false;
-    }
-    // The heading they already had, expressed in the carriage's frame, so that
-    // boarding a train pointing north while facing east leaves them facing east.
-    // The client does the same subtraction against its own accumulated look, and
-    // the two agree because both are reading the same frame.
-    a.yaw = c.body.yaw - frameYaw(this.frame);
-    projectAboard(a, c.body, this.frame);
-    c.body.onGround = true;
-    return true;
+    // `riding.boardHere` is the sequence, and it is the client's: the same
+    // `findBoarding`, the same yaw subtraction into the carriage's frame, the
+    // same `projectAboard` closing it. What makes this the authority is the two
+    // arguments -- **this** server's body and **this** server's `railT` -- and
+    // not a second copy of the arithmetic.
+    return boardHere(
+      bake, p.combat.aboard, p.combat.body, this.railT, this.frame, this.boardOffer, EYE_HEIGHT,
+    );
   }
 
   /**
@@ -1724,6 +1700,25 @@ export class Simulation {
   }
 
   /**
+   * Put any body at a world point, authoritatively. `/platform`'s arrival.
+   *
+   * `placeRider` below is this with the ride's bookkeeping around it; this is the
+   * bare move, and it is public because a chat command is not a member of this
+   * class and has no business reaching into a participant's body to seed a
+   * rewind ring it has never heard of. The ride is ended first, on
+   * `enterLocal`'s own rule -- a body that has been teleported is a body that is
+   * no longer on the train it was on.
+   */
+  placeAt(p: Participant, x: number, y: number, z: number, yaw: number): void {
+    clearAboard(p.combat.aboard);
+    p.combat.body.position.set(x, y, z);
+    p.combat.body.velocity.set(0, 0, 0);
+    p.combat.body.onGround = true;
+    p.combat.body.yaw = yaw;
+    p.history.seed(this.tick, x, y, z, yaw);
+  }
+
+  /**
    * Put a rider on the ground at a world point, ending the ride's bookkeeping.
    *
    * The velocity is cleared here and re-set by the one caller that wants one.
@@ -1790,31 +1785,24 @@ export class Simulation {
     const a = c.aboard;
     if (!isAboard(a)) return p.world;
 
-    const bake = this.world.rail ?? null;
-    if (bake === null) {
-      clearAboard(a);
-      return p.world;
+    // `riding.rideEnter` is the sequence and this is the policy. The trip
+    // running out is the one case this end answers differently from the browser:
+    // a client leaves the body where it is for a round trip and waits to be
+    // told, and the server *is* the telling, so `strandRider` puts them on the
+    // last platform the trip called at rather than over the buffers.
+    switch (rideEnter(this.world.rail ?? null, a, c.body, this.railT, this.frame, this.carriage)) {
+      case RIDE_ON:
+        this.carriageFrame = this.frame;
+        return this.carriage as unknown as CombatWorld;
+      case RIDE_TRIP_GONE:
+        this.strandRider(p);
+        return p.world;
+      default:
+        // No bake, or something moved the body. Either way there is nowhere to
+        // put them that is better than where they already are.
+        clearAboard(a);
+        return p.world;
     }
-    if (!aboardFrame(bake, a, this.railT, this.frame)) {
-      this.strandRider(p);
-      return p.world;
-    }
-    if (!enterLocal(a, c.body, this.frame)) {
-      clearAboard(a);
-      return p.world;
-    }
-    const dir = dirOf(bake, a.line, a.dir);
-    const it = dir === null ? null : interiorOfCar(consistOf(dir, a.trip), a.car);
-    if (it === null) {
-      // The body is in local coordinates and there is nothing to be local to.
-      // Put it back before letting go of it, which is what `exitLocal` is.
-      exitLocal(a, c.body, this.frame);
-      this.strandRider(p);
-      return p.world;
-    }
-    this.carriage.interior = it;
-    this.carriageFrame = this.frame;
-    return this.carriage as unknown as CombatWorld;
   }
 
   /** Compose the stepped body back into the world. The other half of `enterCarriage`. */

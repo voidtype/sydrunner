@@ -228,6 +228,18 @@ const SIGN_WIDTH = 3.6;
 const SIGN_HEIGHT = 0.45;
 const SIGN_Y = 2.6;
 
+/**
+ * The street-level station board. See `writeStationBoard`.
+ *
+ * Bigger than the platform blade on both axes and higher off its own datum,
+ * because the reader is further away and is looking for the station rather than
+ * confirming which one they are standing in. 4.2 m at 3.4 m up subtends about
+ * the same angle at 60 m that the blade does at 20.
+ */
+const BOARD_WIDTH = 4.2;
+const BOARD_HEIGHT = 1.1;
+const BOARD_Y = 3.4;
+
 // --- Chunking -------------------------------------------------------------------
 
 const CHUNK_M = 512;
@@ -1167,7 +1179,16 @@ export class RailWorld {
         writePlatforms(concrete, canopy, prisms, station);
       }
       const uv = this.assets.signUv(station.name);
-      if (uv) writeSign(signs, concrete, station, uv);
+      if (uv) {
+        // The platform blade, for the person already on the platform.
+        if (station.vertical !== 'underground') writeSign(signs, concrete, station, uv);
+        // And the board, for the person in the street who does not yet know
+        // there is a station here. See `writeStationBoard`: reported as "there
+        // is no sign for the train station", and the platform blade is not an
+        // answer to it -- it is 45 cm tall, it is under the canopy, and at a
+        // station in a cutting it is metres below the footpath.
+        writeStationBoard(signs, concrete, station, uv);
+      }
     }
 
     // The overhead line, strung span by span over the electrified segments. The
@@ -1820,6 +1841,81 @@ function writeSign(
 }
 
 /**
+ * The station name on a mast, at **street** level, for somebody who is not on the platform yet.
+ *
+ * ---------------------------------------------------------------------------
+ * Reported, in these words: *"there is no sign for the train station, its not
+ * obvious where i board"*. There was a sign. `writeSign` puts a 3.6 x 0.45 m
+ * blade 2.6 m over the platform, which is the right object in the right place
+ * for a passenger who is already standing on the platform and is no use at all
+ * to the one this complaint is about -- somebody in the street, who cannot see
+ * the platform, cannot see the blade under the canopy, and at a station in a
+ * cutting is standing several metres above both.
+ *
+ * So this is a second, different object with a different job: a 5 m mast either
+ * side of the tracks carrying a 4.2 x 1.1 m board, and -- the part that
+ * matters -- its height is measured from `station.groundY`, the **street**, and
+ * not from the platform. At Sydenham the platform is seven metres under the
+ * terrain grid and the board still stands at the footpath where a person can
+ * read it. At an underground station it is the only thing there is, which is
+ * why it is written for those too and `writeSign` is not.
+ *
+ * The plate spans the track direction, so its normal points across the railway
+ * and it reads from the street on both sides -- and it is written twice, back to
+ * back with the U range reversed, for `writeSign`'s reason: a `DoubleSide` plate
+ * shows the name in mirror writing to half the people who look at it.
+ */
+function boardDatum(station: { trackY: number; groundY: number }): number {
+  const platform = station.trackY + PLATFORM_HEIGHT;
+  return Number.isFinite(station.groundY) ? Math.max(station.groundY, platform) : platform;
+}
+
+function writeStationBoard(
+  signs: Solid,
+  concrete: Solid,
+  station: RailStation & { ux: number; uz: number },
+  uv: readonly number[],
+): void {
+  const ux = station.ux;
+  const uz = station.uz;
+  const px = -uz;
+  const pz = ux;
+  // The footpath, or the platform if the bake has no better idea. `groundY` is
+  // the terrain the OSM station node sits on, which is the level somebody
+  // walking past is at; `trackY + PLATFORM_HEIGHT` is where the train is. At a
+  // surface station they are within a step of each other and this picks either.
+  const platform = station.trackY + PLATFORM_HEIGHT;
+  const foot = boardDatum(station);
+  const y0 = foot + BOARD_Y;
+  const y1 = y0 + BOARD_HEIGHT;
+  for (const side of [-1, 1]) {
+    const o = (PLATFORM_INNER + PLATFORM_WIDTH + 1.4) * side;
+    const cx = station.x + px * o;
+    const cz = station.z + pz * o;
+    const hx = ux * (BOARD_WIDTH / 2);
+    const hz = uz * (BOARD_WIDTH / 2);
+    signs.quad(
+      cx - hx, y0, cz - hz, cx + hx, y0, cz + hz, cx + hx, y1, cz + hz, cx - hx, y1, cz - hz,
+      [uv[0], uv[1], uv[2], uv[1], uv[2], uv[3], uv[0], uv[3]],
+    );
+    signs.quad(
+      cx + hx, y0, cz + hz, cx - hx, y0, cz - hz, cx - hx, y1, cz - hz, cx + hx, y1, cz + hz,
+      [uv[0], uv[1], uv[2], uv[1], uv[2], uv[3], uv[0], uv[3]],
+    );
+    // Two posts down to the footpath, so the board is standing on something
+    // rather than floating. Down to the platform as well where that is lower,
+    // which is what makes it read as one structure from either level.
+    const base = Math.min(foot, platform) - 0.3;
+    for (const t of [-1, 1]) {
+      const post = 0.09;
+      const qx = cx + ux * (BOARD_WIDTH / 2 - 0.35) * t;
+      const qz = cz + uz * (BOARD_WIDTH / 2 - 0.35) * t;
+      concrete.box(qx - post, base, qz - post, qx + post, y1, qz + post);
+    }
+  }
+}
+
+/**
  * The always-on corridor layer: the whole network as flat ribbons, filed by
  * 8 km cell so the frustum can throw most of it away.
  *
@@ -1896,6 +1992,57 @@ export function verifyRailGeometry(net: RailNetwork): string[] {
   }
   if (net.portals.length === 0) bad.push('no tunnel portals were found, and the City Circle is a tunnel');
   if (net.stations.length === 0) bad.push('no station was matched to a track');
+
+  // --- **Every station has a board somebody in the street can read.**
+  //
+  // Reported as "there is no sign for the train station". The platform blade is
+  // measured from the platform, and 82 of the 288 platform sites in this bake
+  // sit more than a metre *below* the terrain grid -- 28 underground stations
+  // and a dozen more in cuttings the heightfield does not model -- so a sign
+  // referenced to the platform is a sign underground at nearly a third of the
+  // network. `writeStationBoard` measures from `groundY` instead, and this is
+  // the assertion that says so: the board's plate must clear the street at every
+  // station, including the ones whose platform is metres under it.
+  {
+    let sunk = 0;
+    let bladeSunk = 0;
+    let checked = 0;
+    let worstName = '';
+    let worstBy = 0;
+    for (const st of net.stations) {
+      if (!Number.isFinite(st.groundY)) continue;
+      checked++;
+      // The plate, against the footpath it is read from. `boardDatum` is the
+      // function the geometry itself uses, so this cannot pass while the board
+      // is built somewhere else.
+      const bottom = boardDatum(st) + BOARD_Y;
+      if (bottom - st.groundY < 2.2) {
+        sunk++;
+        if (2.2 - (bottom - st.groundY) > worstBy) {
+          worstBy = 2.2 - (bottom - st.groundY);
+          worstName = st.name;
+        }
+      }
+      // The negative control, and it is what makes the line above mean
+      // something: the *platform* blade, measured from the platform as it always
+      // has been, is under the footpath at this many stations. If this number is
+      // zero the board is solving a problem that does not exist and the check
+      // above is vacuous.
+      if (st.trackY + PLATFORM_HEIGHT + SIGN_Y + SIGN_HEIGHT < st.groundY) bladeSunk++;
+    }
+    if (sunk > 0) {
+      bad.push(
+        `${sunk} of ${checked} station boards do not clear the footpath by 2.2 m` +
+          (worstName ? ` (worst ${worstName}, ${worstBy.toFixed(2)} m short)` : ''),
+      );
+    }
+    if (checked > 50 && bladeSunk === 0) {
+      bad.push(
+        'no station has its platform blade below the footpath, so the street-level board is ' +
+          'answering a question nobody asked -- check that `groundY` is still being read',
+      );
+    }
+  }
   // **A platform must be where its own trains stop**, which is the invariant the
   // stopping-anchor placement above exists for and the one that is invisible
   // when it fails: the station is drawn, the trains run, and they stop two

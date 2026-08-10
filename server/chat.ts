@@ -98,12 +98,19 @@ import {
   unstuckWaitNotice,
 } from '../client/src/game/unstuck.ts';
 import {
+  PLATFORM_NO_QUERY,
   TELEPORT_NO_QUERY,
   findPlace,
+  parsePlatform,
   parseTeleport,
+  platformNotFound,
+  platformReply,
+  splitPlatformQuery,
   teleportNotFound,
   teleportReply,
 } from '../client/src/game/teleport.ts';
+import { railSeconds } from '../client/src/game/rail.ts';
+import { dwellStand, nextDwell, type Stand } from '../client/src/game/riding.ts';
 import type { RoomHost, Socket } from './room.ts';
 
 /** What the sender is told when the bucket is empty. */
@@ -217,6 +224,8 @@ export class ChatHub {
     if (unstuckCommand(text)) return this.unstuck(host, ws, now);
     const destination = parseTeleport(text);
     if (destination !== null) return this.teleport(host, ws, now, destination);
+    const station = parsePlatform(text);
+    if (station !== null) return this.platform(host, ws, now, station);
 
     let gate = this.gates.get(ws);
     if (!gate) {
@@ -332,6 +341,84 @@ export class ChatHub {
     // one is measured from the suburb node the search started at.
     const travelled = Math.hypot(spot.x - fromX, spot.z - fromZ);
     this.notify(ws, teleportReply(place, travelled));
+    return 'command';
+  }
+
+  /**
+   * `/platform <station>` — stand in the doorway of the next train to call here.
+   *
+   * `/tp`'s twin, and everything about the *refusals* is shared with it by
+   * calling the same guards in the same order: not while knocked out, not inside
+   * the ten-second cooldown, and the same accounting. What differs is the
+   * resolver and the arrival.
+   *
+   * **The resolver is the timetable, read here.** `nextDwell` solves which
+   * service is next to open its doors at that station and `dwellStand` composes
+   * the point a boarder stands at through the carriage's own frame -- both out of
+   * `world.rail`, which is *this process's* bake, at *this process's* clock. A
+   * client asking for this is asking a question; the answer is the server's, and
+   * a modified client that lied about a station name gets a station name it did
+   * not ask for or nothing at all.
+   *
+   * **The arrival is the platform**, not `unstuckDestination`'s road. A boarder
+   * put on the nearest carriageway is a boarder standing in traffic on the wrong
+   * side of a fence, which is what made the previous round's harness unusable
+   * online. The body is placed, its velocity cleared and its rewind ring seeded,
+   * exactly as `sim.placeRider` does when somebody steps off a train -- and for
+   * the same reason: for the next 250 ms an unseeded history would adjudicate
+   * punches against wherever this player used to be.
+   */
+  private platform(host: RoomHost, ws: Socket, now: number, query: string): 'command' {
+    const conn = ws.data;
+    const p = conn.participant;
+    if (!p) return 'command';
+
+    if (!query) {
+      this.notify(ws, PLATFORM_NO_QUERY);
+      return 'command';
+    }
+    if (p.combat.phase === 'ko') {
+      this.unstuckRefused++;
+      this.notify(ws, UNSTUCK_KO_NOTICE);
+      return 'command';
+    }
+    const last = this.unstuckAt.get(ws);
+    if (last !== undefined && now - last < UNSTUCK_COOLDOWN_MS) {
+      this.unstuckRefused++;
+      this.notify(ws, unstuckWaitNotice(UNSTUCK_COOLDOWN_MS - (now - last)));
+      return 'command';
+    }
+
+    const room = host.get(conn.room);
+    const bake = room?.sim.world.rail ?? null;
+    if (!room || !bake) {
+      this.unstuckRefused++;
+      this.notify(ws, unstuckReply(null));
+      return 'command';
+    }
+
+    const t = railSeconds(room.sim.railNowMs());
+    const { station, then } = splitPlatformQuery(query);
+    const dwell = nextDwell(bake, station, t, { then });
+    if (dwell === null) {
+      this.unstuckRefused++;
+      this.notify(ws, platformNotFound(then ? `${station} > ${then}` : station));
+      return 'command';
+    }
+    // Placed for the instant the doors *will* open rather than for now: a train
+    // still four hundred metres out has a different frame, and standing where
+    // its doorway is going to be is the whole job.
+    const stand: Stand = { x: 0, y: 0, z: 0, yaw: 0 };
+    if (!dwellStand(bake, dwell, Math.max(dwell.opensAt + 1, t), stand)) {
+      this.unstuckRefused++;
+      this.notify(ws, unstuckReply(null));
+      return 'command';
+    }
+
+    this.unstuckAt.set(ws, now);
+    this.unstuckServed++;
+    room.sim.placeAt(p, stand.x, stand.y, stand.z, stand.yaw);
+    this.notify(ws, platformReply(station, dwell.lineId, dwell.towards, dwell.opensAt - t));
     return 'command';
   }
 

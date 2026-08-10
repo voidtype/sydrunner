@@ -20,6 +20,7 @@ import {
   WebGPURenderer,
 } from 'three/webgpu';
 
+import { BOARD_HINT_M, DoorMarker, verifyDoorMarker } from './world/doormarker.ts';
 import { EXPOSURE } from './sky/calibration.ts';
 import { SydneySky } from './sky/sky.ts';
 import { verifyCycle } from './sky/cycle.ts';
@@ -307,6 +308,7 @@ import {
   alightPlatform,
   alightTrackside,
   bailoutDamage,
+  boardHere,
   clearAboard,
   consistOf,
   createBoardOffer,
@@ -314,7 +316,6 @@ import {
   createCarriageStand,
   createRideBanner,
   dirOf,
-  enterLocal,
   exitLocal,
   findBoarding,
   frameYaw,
@@ -326,6 +327,8 @@ import {
   poseAheadOnLine,
   projectAboard,
   rideBanner,
+  rideEnter,
+  RIDE_ON,
   spanFlagsAt,
   stopPlatform,
   verifyRiding,
@@ -1327,6 +1330,12 @@ async function main(): Promise<void> {
     if (rideFailures.length) {
       console.warn('[rail] riding self-check:\n  - ' + rideFailures.join('\n  - '));
     }
+    // And the boarding marker, whose whole job is that its two states look
+    // different from each other. See `world/doormarker.verifyDoorMarker`.
+    const markerFailures = verifyDoorMarker();
+    if (markerFailures.length) {
+      console.warn('[rail] door marker self-check:\n  - ' + markerFailures.join('\n  - '));
+    }
   }
   if (railBake) {
     const bakeFailures = verifyRail(railBake);
@@ -1367,6 +1376,18 @@ async function main(): Promise<void> {
    */
   const trains = new TrainFleet();
   scene.add(trains.group);
+  /**
+   * And where to stand to get on one. See `world/doormarker.ts`, which is the
+   * other half of the answer to "its not obvious where i board" -- the first
+   * half is the street-level station board in `world/rail-geo.ts`.
+   *
+   * Driven from `simulate`, beside the pill, off the same `findBoarding` /
+   * `nearestDwell` pair the key and the server ask: the marker and the prompt
+   * are one answer shown twice, and neither can promise something `E` will not
+   * deliver.
+   */
+  const doorMarker = new DoorMarker();
+  scene.add(doorMarker.group);
   /**
    * The record bag, fetched once and never blocking anything.
    *
@@ -3627,28 +3648,13 @@ async function main(): Promise<void> {
   const predictBoard = (): boolean => {
     if (!railBake) return false;
     const t = railSeconds(Date.now());
-    const feet = player.position.y - EYE_HEIGHT;
-    if (!findBoarding(railBake, player.position.x, feet, player.position.z, t, boardOffer)) {
+    // The sequence itself is `riding.boardHere` -- the same function
+    // `server/sim.tryBoard` runs against its own body and its own clock, and the
+    // same one the online check drives. Everything left here is the notice and
+    // the chime.
+    if (!boardHere(railBake, playerCombat.aboard, player, t, rideFrame, boardOffer, EYE_HEIGHT)) {
       return false;
     }
-    const a = playerCombat.aboard;
-    a.line = boardOffer.line;
-    a.dir = boardOffer.dir;
-    a.trip = boardOffer.trip;
-    a.car = boardOffer.car;
-    a.x = boardOffer.x;
-    a.y = boardOffer.y;
-    a.z = boardOffer.z;
-    a.vx = 0;
-    a.vy = 0;
-    a.vz = 0;
-    if (!aboardFrame(railBake, a, t, rideFrame)) {
-      clearAboard(a);
-      return false;
-    }
-    a.yaw = player.yaw - frameYaw(rideFrame);
-    projectAboard(a, player, rideFrame);
-    player.onGround = true;
     net?.predictedAboardChange();
     audio.pickupFlatWhite();
     hud.notice(
@@ -3728,35 +3734,24 @@ async function main(): Promise<void> {
    * against. `sim.enterCarriage`, client side, argument for argument.
    */
   const enterCarriage = (): CombatWorld => {
-    rideActive = false;
+    // `riding.rideEnter` is the sequence, shared with `server/sim.ts` and with
+    // the online check. What is left here is this end's policy, and it is one
+    // line: any ending at all puts the body back in the city. The trip running
+    // out is a terminus offline; online the server has already put them on a
+    // platform and the snapshot is on its way, so leaving the body where it is
+    // for one round trip is the smaller lie.
     const a = playerCombat.aboard;
-    if (!isAboard(a)) return combatWorld;
-    if (!railBake) {
-      clearAboard(a);
+    if (!isAboard(a)) {
+      rideActive = false;
       return combatWorld;
     }
-    const t = railSeconds(Date.now());
-    if (!aboardFrame(railBake, a, t, rideFrame)) {
-      // The trip ran out from under them. Offline that is a terminus; online the
-      // server has already put them on a platform and the snapshot is on its way,
-      // so leaving the body where it is for one round trip is the smaller lie.
-      clearAboard(a);
-      return combatWorld;
-    }
-    if (!enterLocal(a, player, rideFrame)) {
-      clearAboard(a);
-      return combatWorld;
-    }
-    const dir = dirOf(railBake, a.line, a.dir);
-    const it = dir === null ? null : interiorOfCar(consistOf(dir, a.trip), a.car);
-    if (it === null) {
-      exitLocal(a, player, rideFrame);
-      clearAboard(a);
-      return combatWorld;
-    }
-    carriageStand.interior = it;
-    rideActive = true;
-    return carriageStand as unknown as CombatWorld;
+    const got = rideEnter(
+      railBake, a, player, railSeconds(Date.now()), rideFrame, carriageStand,
+    );
+    rideActive = got === RIDE_ON;
+    if (rideActive) return carriageStand as unknown as CombatWorld;
+    clearAboard(a);
+    return combatWorld;
   };
 
   const exitCarriage = (): void => {
@@ -4752,28 +4747,46 @@ async function main(): Promise<void> {
     /**
      * Stand in the doorway the next train will open, facing the track.
      *
-     * Placed for the instant the doors *will* open rather than for now: a train
-     * still 400 m out has a different frame, and standing where its doorway is
-     * going to be is the whole job.
-     */
-    /**
-     * Stand in the doorway the next train will open, facing the track.
+     * ---------------------------------------------------------------------------
+     * ONLINE IT ASKS THE SERVER, and that is the fix for the hole this whole
+     * round exists to close.
      *
-     * **A client-side teleport, so it is an offline tool.** Online the server
-     * has not heard of it -- there is no teleport message on this wire and there
-     * must not be one, since a client that could relocate itself is a client
-     * that can be anywhere -- so `net.reconcile` snaps the body back within a
-     * snapshot and `board()` then correctly refuses, reporting the doorway as
-     * three hundred metres away. That is the harness declining to fake a
-     * boarding, and it is the right failure; it is reported here up front so it
-     * is not a surprise. Online, walk to the platform and use `when()` to know
-     * when to press `E`.
+     * The previous version moved the *client's* body and said so: "online the
+     * server has not heard of it ... `board()` then correctly refuses". Which
+     * was true, honest, and fatal -- because it meant `ride()` could only ever
+     * run offline, so the one acceptance test the feature had ran against a
+     * local `Simulation` and passed while the networked path was broken.
+     *
+     * So online this sends `/platform <station> > <destination>`, which the
+     * server honours through `chat.platform`: it solves the dwell out of its own
+     * bake at its own clock and moves the body itself. Nothing here relocates
+     * anybody. `net.armTeleport` is the same courtesy `/unstuck` pays the
+     * reconciler -- "a jump you cannot predict is coming, adopt it rather than
+     * differencing it into a four-hundred-metre-a-second velocity".
+     *
+     * Offline the client *is* the authority, so it places itself, through the
+     * same `nextDwell` and `dwellStand` the server would have used. Both paths
+     * end with a body in a doorway; only the question of who put it there
+     * differs, and that is exactly the difference that was never tested.
      */
     goto: (station = 'Central', line?: string, then?: string) => {
       if (railBake === null) return 'no bake';
       const t = railSeconds(Date.now());
       const d = nextDwell(railBake, station, t, { lineId: line, then });
       if (d === null) return `no service calls at "${station}"`;
+      const summary = {
+        at: station,
+        line: d.lineId,
+        towards: d.towards,
+        carriage: d.car,
+        doorsOpenIn: +(d.opensAt - t).toFixed(1),
+        dwellSeconds: +(d.closesAt - d.opensAt).toFixed(1),
+      };
+      if (net !== null) {
+        net.armTeleport();
+        net.sendChat(`/platform ${station}${then ? ` > ${then}` : ''}`);
+        return { ...summary, placedBy: 'the server, via /platform' };
+      }
       if (!dwellStand(railBake, d, Math.max(d.opensAt + 1, t), railStand)) {
         return `could not place a stand at the ${d.lineId} dwell at ${station}`;
       }
@@ -4785,16 +4798,9 @@ async function main(): Promise<void> {
       input.pitch = 0;
       void ensureGround(railStand.x, railStand.z);
       return {
-        at: station,
-        line: d.lineId,
-        towards: d.towards,
-        carriage: d.car,
-        doorsOpenIn: +(d.opensAt - t).toFixed(1),
-        dwellSeconds: +(d.closesAt - d.opensAt).toFixed(1),
+        ...summary,
         standing: [+railStand.x.toFixed(1), +railStand.z.toFixed(1)],
-        ...(net === null
-          ? {}
-          : { warning: 'online: the server will pull you back within a snapshot -- see goto()' }),
+        placedBy: 'this client (offline)',
       };
     },
 
@@ -4873,15 +4879,6 @@ async function main(): Promise<void> {
      */
     ride: async (from = 'St Peters', to = 'Central', line?: string) => {
       if (railBake === null) return { pass: false, why: 'no bake' };
-      if (net !== null) {
-        return {
-          pass: false,
-          why: 'ride() places the player, and placement is client-side -- online the server pulls ' +
-            'you back and board() then correctly refuses. Run it with ?offline, or online walk to ' +
-            'the platform and use when() and board(). The authoritative round trip is asserted ' +
-            'headlessly by integration-check.checkRiding against a real Simulation.',
-        };
-      }
       const log: string[] = [];
       const sleep = (sec: number): Promise<void> =>
         new Promise((r) => { setTimeout(r, Math.max(0, sec) * 1000); });
@@ -4889,12 +4886,40 @@ async function main(): Promise<void> {
       // `then` is what makes this the train you want rather than the next one:
       // half the T4s at St Peters are going to Waterfall, which reaches Central
       // four minutes before you got on. See `riding.DwellWanted.then`.
+      const wasAt = player.position.clone();
       const placed = railHarness.goto(from, line, to);
       if (typeof placed === 'string') return { pass: false, why: placed, log };
       log.push(
         `placed in the doorway on the ${from} platform for the ${placed.line} to ` +
-          `${placed.towards}; doors in ${placed.doorsOpenIn} s`,
+          `${placed.towards} by ${placed.placedBy}; doors in ${placed.doorsOpenIn} s`,
       );
+
+      // --- Online, wait for the authority to actually move us.
+      //
+      // `/platform` is a request over a chat channel and the move arrives in a
+      // snapshot, so there is a round trip here that does not exist offline.
+      // Waited on by watching the body rather than by sleeping a guessed
+      // number: what this is really asserting is that the server honoured the
+      // command at all, and a fixed sleep would turn a refusal -- the cooldown,
+      // a knockout, a station nobody calls at -- into a mysterious failure to
+      // board four seconds later.
+      if (net !== null) {
+        const deadline = Date.now() + 6000;
+        while (Date.now() < deadline && player.position.distanceTo(wasAt) < 5) {
+          await sleep(0.1);
+        }
+        if (player.position.distanceTo(wasAt) < 5) {
+          return {
+            pass: false,
+            why: 'the server did not move us: /platform was refused. The usual reasons are the ' +
+              "10 s teleport cooldown shared with /unstuck, being knocked out, or a station " +
+              'name no service calls at. The chat panel has the refusal.',
+            log,
+          };
+        }
+        log.push(`the server placed us at (${player.position.x.toFixed(1)}, ${player.position.z.toFixed(1)})`);
+      }
+
       // Two seconds into the dwell. The doors take 1.6 s to slide and stand open
       // for fifteen, so this is a passenger who was waiting rather than running.
       await sleep(placed.doorsOpenIn + 2);
@@ -4903,6 +4928,32 @@ async function main(): Promise<void> {
       if (!got.boarded) return { pass: false, why: got.why, log };
       const a = playerCombat.aboard;
       log.push(`boarded carriage ${a.car} of ${placed.line} trip ${a.trip}`);
+
+      // --- And online, wait for the server to agree, because a client's own
+      //     `isAboard` is a prediction until it does.
+      //
+      // This is the assertion the rolled-back round did not have anywhere. A
+      // boarding that the server refuses looks *identical* on this side for one
+      // round trip -- the pill says aboard, the camera is in the carriage -- and
+      // the difference only shows up as the ride quietly ending. Half a second
+      // is five snapshots at a 100 ms round trip.
+      if (net !== null) {
+        await sleep(0.5);
+        if (!isAboard(playerCombat.aboard)) {
+          return {
+            pass: false,
+            why: 'the client boarded and the server did not agree: the ride was gone within half a ' +
+              'second. That is `sim.tryBoard` refusing against its own body -- too far from the ' +
+              'door by its reckoning, or the doors had shut.',
+            log,
+          };
+        }
+        const rode = playerCombat.aboard;
+        log.push(
+          `the server agrees: still aboard carriage ${rode.car} half a second later, ` +
+            `${Math.round((rideBanner(railBake, rode, railSeconds(Date.now()), rideText) ? rideText.speed : 0) * 3.6)} km/h`,
+        );
+      }
 
       const off = dwellAt(railBake, a, to);
       if (off === null) {
@@ -4999,16 +5050,36 @@ async function main(): Promise<void> {
         // The offer, from the same function `E` will ask and the server will
         // adjudicate, so what the pill promises is what the key delivers.
         const feet = player.position.y - EYE_HEIGHT;
-        boardable = findBoarding(
-          railBake, player.position.x, feet, player.position.z, railSeconds(Date.now()), boardOffer,
-        );
+        const t = railSeconds(Date.now());
+        boardable = findBoarding(railBake, player.position.x, feet, player.position.z, t, boardOffer);
         if (boardable) {
           const dir = dirOf(railBake, boardOffer.line, boardOffer.dir);
           const towards = dir && dir.stops.length > 0 ? dir.stops[dir.stops.length - 1].name : '';
-          trainPill = `E to board the ${dir?.line.id ?? ''} to ${towards}`;
+          // Which door, and not only that there is one. See `doorMarker`: the
+          // pill and the marker are one answer shown twice, and the pill is the
+          // half that survives a player who is looking the other way.
+          trainPill =
+            `E — board the ${dir?.line.id ?? ''} to ${towards} · carriage ${boardOffer.car + 1}`;
+          doorMarker.aim(boardOffer.wx, boardOffer.wy, boardOffer.wz, true);
+        } else {
+          // --- Not in reach, but there may still be a train standing here with
+          //     its doors open, and *that* is the reported complaint: "its not
+          //     obvious where i board". `nearestDwell` asks the same three
+          //     questions `findBoarding` asks and answers them from any
+          //     distance, so this is the same doorway, named before it is
+          //     reachable rather than only once the player has stumbled into it.
+          const near = nearestDwell(railBake, player.position.x, feet, player.position.z, t);
+          if (near !== null && near.metres < BOARD_HINT_M && Math.abs(near.rise) < 6) {
+            trainPill =
+              `${near.line} at ${near.station} — doors ${Math.round(near.metres)} m away, walk to them`;
+            doorMarker.aim(near.wx, near.wy, near.wz, false);
+          } else {
+            doorMarker.hide();
+          }
         }
       }
     }
+    if (isAboard(playerCombat.aboard) || playerCombat.phase === 'ko' || !railBake) doorMarker.hide();
     hud.derived(
       trainPill || ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText),
     );
@@ -6198,6 +6269,10 @@ async function main(): Promise<void> {
     if (railBake) {
       trains.update(railBake, railNow, player.position.x, player.position.z);
     }
+    // The boarding marker's own breathing. Aimed in `simulate` at the tick rate
+    // and animated here at the frame rate, which is the split every other
+    // overlay in this file makes.
+    doorMarker.update(frameDt);
 
     // The night rig, after the streamer -- so a tile that arrived this frame
     // already has its luminaires in the set the four real lights are picked from

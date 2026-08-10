@@ -145,6 +145,7 @@ import {
   isAboard,
   localToWorld,
   localToWorldDir,
+  projectAboard,
   type CarFrame,
   type CarriageInterior,
   type CarriageMove,
@@ -704,14 +705,33 @@ export class NetClient {
    */
   private readonly clientId: string;
 
+  /**
+   * The wall clock the timetable is read on. `Date.now` in a browser.
+   *
+   * Injectable for one reason and it is the reason this feature shipped broken:
+   * a train is a closed-form function of the millisecond, so anything that
+   * tests riding against a real server either waits for a real dwell -- ninety
+   * seconds of a check, per station, per run -- or it drives the clock. The
+   * server has had `Simulation.railNowMs` for exactly this since the rail round;
+   * this is its other end, so `integration-check.checkRidingOnline` can put both
+   * ends on one virtual clock and board a train in fifteen milliseconds.
+   *
+   * Nothing else in this file reads the wall clock. `performance.now` is used
+   * for interpolation and for the ping, and neither is a timetable.
+   */
+  private readonly nowMs: () => number;
+
   constructor(
     url: string,
     handlers: NetHandlers,
-    options: { name?: string; transport?: NetTransport; clientId?: string } = {},
+    options: {
+      name?: string; transport?: NetTransport; clientId?: string; nowMs?: () => number;
+    } = {},
   ) {
     this.handlers = handlers;
     this.wantedName = options.name ?? '';
     this.clientId = options.clientId ?? '';
+    this.nowMs = options.nowMs ?? Date.now;
     // Injectable so the integration harness and any future WebTransport class
     // can be dropped in without this file knowing. See `protocol.NetTransport`.
     this.transport = options.transport ?? new WebSocketTransport(url);
@@ -1544,6 +1564,31 @@ export class NetClient {
       return out.copy(this.correction);
     }
 
+    // --- And the window either side of that, which is the other half of the
+    //     rolled-back bug.
+    //
+    // Between the frame `E` goes down and the snapshot that answers it, this
+    // client is aboard and the server is not -- every snapshot in flight was a
+    // picture taken before the press. The adoption twenty lines up is gated on
+    // exactly that (`aboardPredictedAt`), so the *ride* is protected. The
+    // position was not: the replay below would drag the body from the carriage
+    // back onto the platform, and moving a rider's body in world space is how
+    // `riding.enterLocal` is told the ride is over. So the prediction survived
+    // the reconciler and was then thrown away by the seam, one tick later,
+    // before the server ever got a chance to agree with it.
+    //
+    // Doing nothing here is the whole fix, and it is bounded: the gate clears
+    // the moment the input carrying the press is acknowledged, which is one
+    // round trip. If the board was wrong, `adoptRide` clears the ride on that
+    // same snapshot and this branch stops firing; if it was right, the ride is
+    // already agreed and `reconcileAboard` above is what runs. Either way there
+    // is no path in which this holds the body for longer than the answer takes.
+    if (isAboard(local.aboard) && this.aboardPredictedAt >= 0) {
+      this.lastServerPos.set(self.x, self.y, self.z);
+      this.lastServerTick = this.pendingSelfTick;
+      return out.copy(this.correction);
+    }
+
     // Replay: start from the authoritative position and run every input the
     // server has not yet seen, through the same pure `step` the server ran.
     const body = this.replayBody;
@@ -1701,6 +1746,36 @@ export class NetClient {
    *   - **The server agrees about the train.** Touch nothing. The position is
    *     reconciled by `reconcileAboard`, which is the path that runs on every
    *     ordinary tick of a ride.
+   *
+   * ---------------------------------------------------------------------------
+   * THE WITNESS, which is the whole of the bug this feature shipped with and was
+   * rolled back for.
+   *
+   * `riding.enterLocal` is the seam that lets the rest of the game know nothing
+   * about trains, and the way it decides whether a ride is still live is by
+   * comparing the body's world position against `AboardSlot.wx/wy/wz` -- the
+   * world position the last composition wrote *into that body*. Anything that
+   * moves the body without going through the carriage is a teleport, and the
+   * ride ends. That rule is right and it is the reason a respawn, an unstuck, a
+   * knockback snap and a bat all get a rider off a train without ever having
+   * heard of one.
+   *
+   * The rule has one obligation on the other side: **anybody who puts a body
+   * aboard owes it a witness.** `predictBoard` pays it (through `projectAboard`)
+   * and `server/sim.tryBoard` pays it. This function did not -- it wrote the
+   * ride's identity and its carriage-local offset and left the body where it
+   * was -- so a ride that arrived from the server rather than from a local press
+   * was ended by `enterCarriage` on the very next tick, at which point the
+   * server said "aboard" again and the whole thing repeated at the snapshot
+   * rate. That is the reported bug exactly: the camera flickering between the
+   * platform and the carriage twenty times a second, the body never leaving the
+   * platform, and `E` "fixing" it by clearing the state the client kept
+   * re-adopting.
+   *
+   * So the adoption ends with `projectAboard`, which writes the derived world
+   * position, the derived velocity, the heading **and** the witness in one call.
+   * The body is now somewhere a composition put it, which is what the seam
+   * requires and what it is entitled to assume.
    */
   private adoptRide(local: CombatantState): void {
     const server = this.serverAboard;
@@ -1713,11 +1788,21 @@ export class NetClient {
     if (bake === null) return;
     const dir = dirOf(bake, server.line, server.dir);
     if (dir === null) return;
-    const trip = this.resolveTrip(dir, railSeconds(Date.now()), server.tripLow);
+    const now = railSeconds(this.nowMs());
+    const trip = this.resolveTrip(dir, now, server.tripLow);
     if (trip === null) return;
     if (a.line === server.line && a.dir === server.dir && a.trip === trip && a.car === server.car) {
       return;
     }
+    // The frame first, and no adoption at all without one. Writing the identity
+    // and then failing to compose would leave a ride whose witness is stale --
+    // which is the failure this method exists to not have.
+    this.rideRef.line = server.line;
+    this.rideRef.dir = server.dir;
+    this.rideRef.trip = trip;
+    this.rideRef.car = server.car;
+    if (!aboardFrame(bake, this.rideRef, now, this.replayFrame)) return;
+
     a.line = server.line;
     a.dir = server.dir;
     a.trip = trip;
@@ -1730,9 +1815,12 @@ export class NetClient {
     a.vz = 0;
     // The heading they are already looking in, expressed in the new carriage's
     // frame, so that being put aboard by the server does not spin the camera.
-    if (aboardFrame(bake, a, railSeconds(Date.now()), this.replayFrame)) {
-      a.yaw = local.body.yaw - frameYaw(this.replayFrame);
-    }
+    a.yaw = local.body.yaw - frameYaw(this.replayFrame);
+    // And the composition, which is the witness. See the header: `projectAboard`
+    // writes `wx/wy/wz` from the position it just derived, so the next
+    // `enterLocal` sees a body that a carriage put where it is.
+    projectAboard(a, local.body, this.replayFrame);
+    local.body.onGround = true;
     this.pending.length = 0;
     this.ackedVelocityKnown = false;
     this.correction.set(0, 0, 0);
@@ -1758,7 +1846,7 @@ export class NetClient {
     if (a.line !== server.line || a.dir !== server.dir || a.car !== server.car) return false;
     const dir = dirOf(bake, a.line, a.dir);
     if (dir === null) return false;
-    if (this.resolveTrip(dir, railSeconds(Date.now()), server.tripLow) !== a.trip) return false;
+    if (this.resolveTrip(dir, railSeconds(this.nowMs()), server.tripLow) !== a.trip) return false;
     const it = interiorOfCar(consistOf(dir, a.trip), a.car);
     if (it === null) return false;
     this.replayInterior = it;
@@ -1862,7 +1950,7 @@ export class NetClient {
     if (bake === null) return;
     const source = newer ?? older;
     if (source.aboard.length === 0) return;
-    const now = railSeconds(Date.now());
+    const now = railSeconds(this.nowMs());
     for (const b of source.aboard) {
       if (b.id === this.id) continue;
       const r = this.remotes.get(b.id);
@@ -1922,7 +2010,7 @@ export class NetClient {
   aboardFrameNow(local: CombatantState, out: CarFrame): boolean {
     const bake = this.rail;
     if (bake === null || !isAboard(local.aboard)) return false;
-    return aboardFrame(bake, local.aboard, railSeconds(Date.now()), out);
+    return aboardFrame(bake, local.aboard, railSeconds(this.nowMs()), out);
   }
 
   // --- The unstuck teleport -----------------------------------------------------

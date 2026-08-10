@@ -56,6 +56,79 @@ export function parseTeleport(text: string): string | null {
 }
 
 /**
+ * `/platform <station>`: put me in the doorway of the next train to call here.
+ *
+ * ---------------------------------------------------------------------------
+ * A SECOND COMMAND RATHER THAN A MODE OF `/tp`, and it is not tidiness.
+ *
+ * `/tp` resolves a *suburb label* out of `world/suburbs.json`. A station is not
+ * in that table, the arrival rule is different (`unstuckDestination` finds a
+ * road, and a road is the one place a boarder must not be), and the answer
+ * depends on the timetable rather than only on the map. Overloading one command
+ * with two resolvers and two arrival rules would make the refusals unreadable.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THE SERVER OWNS IT, WHICH IS THE WHOLE REASON IT EXISTS.
+ *
+ * The previous round's `sydney.rail.goto()` moved the *client's* body and said
+ * so in its own docstring: "online the server has not heard of it ... `board()`
+ * then correctly refuses". So the harness worked offline and could not be run
+ * against a server at all -- and the feature shipped with its only acceptance
+ * test running against a local `Simulation`. That is the hole. This command
+ * closes it: the placement is solved and applied by the authority, out of the
+ * authority's own bake at the authority's own `railT`, and the client learns
+ * about it the way it learns about every other authoritative move -- through a
+ * snapshot. A harness driving this is exercising the path a player uses.
+ *
+ * It is not a new power, either. `/tp` already relocates a player anywhere in
+ * Greater Sydney on a ten-second cooldown; this lands them on a platform instead
+ * of a street, and shares that cooldown, that knockout refusal and that
+ * accounting.
+ */
+export const PLATFORM_COMMANDS: readonly string[] = ['/platform', '/plat'];
+
+/** The query after `/platform`, or null if this is not that command. */
+export function parsePlatform(text: string): string | null {
+  const trimmed = text.trim();
+  const space = trimmed.search(/\s/);
+  const head = (space < 0 ? trimmed : trimmed.slice(0, space)).toLowerCase();
+  if (!PLATFORM_COMMANDS.includes(head)) return null;
+  return space < 0 ? '' : trimmed.slice(space + 1).trim();
+}
+
+export const PLATFORM_NO_QUERY = 'name a station — try /platform st peters';
+
+/**
+ * `st peters > central` -> the station and the service to wait for.
+ *
+ * The `>` is there so `sydney.rail.ride('St Peters', 'Central')` means the same
+ * thing online as it does offline. Half the T4s at St Peters are going to
+ * Waterfall, which reaches Central four minutes before you got on, so "the next
+ * train" and "the next train I want" are different questions and a harness that
+ * could only ask the first one would be a coin flip. See `riding.DwellWanted.then`.
+ */
+export function splitPlatformQuery(query: string): { station: string; then?: string } {
+  const at = query.indexOf('>');
+  if (at < 0) return { station: query.trim() };
+  const station = query.slice(0, at).trim();
+  const then = query.slice(at + 1).trim();
+  return then ? { station, then } : { station };
+}
+
+export function platformNotFound(query: string): string {
+  return `no service calls at "${query}" — try /platform central`;
+}
+
+export function platformReply(
+  station: string, lineId: string, towards: string, opensIn: number,
+): string {
+  return opensIn <= 0.5
+    ? `on the ${station} platform; the ${lineId} to ${towards} has its doors open now — E to board`
+    : `on the ${station} platform; the ${lineId} to ${towards} is ${Math.round(opensIn)} s away — ` +
+      `stand on the marker and press E when the doors open`;
+}
+
+/**
  * Find a place by name, case-insensitively.
  *
  * Three passes, each preferring the **shortest** name among its matches, which
@@ -161,6 +234,47 @@ export function verifyTeleport(): string[] {
     if (got !== want) {
       failures.push(`parseTeleport(${JSON.stringify(text)}) gave ${JSON.stringify(got)}, wanted ${JSON.stringify(want)}`);
     }
+  }
+
+  // --- `/platform`, on the same terms. See `parsePlatform`.
+  //
+  // The last two cases are the ones that matter: a command must not be matched
+  // as a prefix of a word, and it must not be matched in the middle of a
+  // sentence -- either would silently swallow somebody's chat message, and the
+  // one rule this whole intercept lives on is that a command never reaches
+  // anybody else's log while speech always does.
+  const platforms: Array<[string, string | null]> = [
+    ['/platform st peters', 'st peters'],
+    ['/PLATFORM St Peters > Central', 'St Peters > Central'],
+    ['/plat central', 'central'],
+    ['/platform', ''],
+    ['/platformer', null],
+    ['platform central', null],
+    ['meet me at /platform central', null],
+  ];
+  for (const [text, want] of platforms) {
+    const got = parsePlatform(text);
+    if (got !== want) {
+      failures.push(`parsePlatform(${JSON.stringify(text)}) gave ${JSON.stringify(got)}, wanted ${JSON.stringify(want)}`);
+    }
+  }
+  const splits: Array<[string, string, string | undefined]> = [
+    ['st peters > central', 'st peters', 'central'],
+    ['st peters', 'st peters', undefined],
+    ['  st peters  >  central  ', 'st peters', 'central'],
+    ['st peters >', 'st peters', undefined],
+  ];
+  for (const [q, station, then] of splits) {
+    const got = splitPlatformQuery(q);
+    if (got.station !== station || got.then !== then) {
+      failures.push(
+        `splitPlatformQuery(${JSON.stringify(q)}) gave ${JSON.stringify(got)}, wanted ` +
+          `${JSON.stringify({ station, then })}`,
+      );
+    }
+  }
+  if (TELEPORT_COMMANDS.some((c) => PLATFORM_COMMANDS.includes(c))) {
+    failures.push('a command name is claimed by both /tp and /platform');
   }
 
   if (!teleportNotFound('lane cove', 15300).includes('15.3 km of Town Hall')) {
