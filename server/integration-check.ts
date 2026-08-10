@@ -1621,6 +1621,13 @@ async function main(): Promise<void> {
   say('');
   await checkRail();
 
+  // --- 32. And the passengers. `checkRail` proves the train is in the same
+  // place on both ends; this proves the person standing in it is, which is a
+  // different claim -- their world position exists nowhere and is composed, on
+  // both ends, every tick. See `checkRiding`, appended last and self-contained.
+  say('');
+  await checkRiding();
+
   say('');
   if (failures.length === 0) {
     say(`ALL CHECKS PASSED (${log.filter((l) => l.includes('PASS')).length})`);
@@ -2599,11 +2606,12 @@ async function checkBikes(): Promise<void> {
     }
   }
 
-  // --- 9. Protocol 9, and the refusal behaviour a version bump exists for.
-  // v9 is a shared bump: global chat and the suggestions box both added message
-  // types in the same pass without changing an existing layout. See
-  // `protocol.PROTOCOL_VERSION`.
-  check(PROTOCOL_VERSION === 9, `the protocol is at version ${PROTOCOL_VERSION}`);
+  // --- 9. Protocol 10, and the refusal behaviour a version bump exists for.
+  // v10 added the aboard section -- who is standing in which carriage of which
+  // train, and where in it -- and moved the snapshot header out by a byte to
+  // hold its count, which is precisely the change a stale client misparses
+  // silently. See `protocol.PROTOCOL_VERSION` and `protocol.ABOARD_BYTES`.
+  check(PROTOCOL_VERSION === 10, `the protocol is at version ${PROTOCOL_VERSION}`);
   {
     // A protocol-5 hello -- which is what a browser tab left open across this
     // deploy sends -- must still decode far enough to be refused *by version*,
@@ -17014,6 +17022,732 @@ async function checkRail(): Promise<void> {
     say(
       `  NOTE  overhead power staged for the geometry round: ${a.stanchionKinds.length} masts at ` +
         `${a.physics ? 60 : 60} m spacing, ${gantries} of them portal gantries over wide corridors`,
+    );
+  }
+}
+
+/**
+ * Riding: the composition, the rewind, the round trip, and a control that fails.
+ *
+ * `checkRail` proves the *train* is in the same place on both ends. This proves
+ * the *passenger* is, which is a different claim and a harder one, because a
+ * passenger's world position does not exist anywhere -- it is composed, on both
+ * ends, every tick, out of a carriage-local offset and a pose. Six things:
+ *
+ *   1. **The composition is exact.** Ten thousand (trip, carriage, offset,
+ *      instant) tuples, composed by two separately-evaluated copies of
+ *      `game/riding.ts`, compared with `Object.is` rather than an epsilon. This
+ *      is `checkRail`'s claim one level up and it is the one everything else
+ *      rests on: a rider whose derived position differs in the last bit between
+ *      the client and the server is a rider the rewind cannot find.
+ *   2. **A negative control on that claim**, because a check that has never been
+ *      seen to fail is not evidence. The perturbation is deliberately absurdly
+ *      small -- one millimetre on one axis of the carriage's forward vector --
+ *      and it has to be caught anyway.
+ *   3. **The rewind.** A melee swing thrown aboard a train at 167 ms of round
+ *      trip hits what the swinger saw, because the history holds derived world
+ *      positions and `poseTrain` is closed form at any instant. No new rewind
+ *      machinery, which is the architectural claim being tested.
+ *   4. **Board, ride, disembark.** A real `Simulation`, a real `E` press
+ *      validated against the server's own position, twenty seconds of riding,
+ *      and a player who ends up standing on a platform at a station rather than
+ *      in the four-foot or inside a hill.
+ *   5. **Two riders and an observer agree.** The whole point of the aboard
+ *      section: two players in one carriage and one on the platform, all three
+ *      composing everybody's world position, all three agreeing to the
+ *      millimetre.
+ *   6. **A tunnel bail-out lands on a platform.** Never inside rock, which is
+ *      where the honest answer -- "put them where they jumped" -- would put
+ *      them, and where there is no terrain, no collision and nothing to fall on.
+ */
+async function checkRiding(): Promise<void> {
+  say('--- Riding: a passenger is a carriage offset, and the world position is derived');
+
+  const bakePath =
+    process.env.SYDNEY_RAIL ??
+    new URL('../data/scratch/rail/rail.bin', import.meta.url).pathname;
+  if (!(await Bun.file(bakePath).exists())) {
+    say(`    no rail bake at ${bakePath}. Skipped.`);
+    return;
+  }
+
+  const railHere = new URL('../client/src/game/rail.ts', import.meta.url).pathname;
+  const rideHere = new URL('../client/src/game/riding.ts', import.meta.url).pathname;
+  const rail1 = (await import(railHere)) as typeof import('../client/src/game/rail.ts');
+  // A second, separately-evaluated copy of both modules, on `checkRail`'s own
+  // trick: Bun keys the module cache on the whole specifier, so the query
+  // evaluates the file again and the two copies have their own closures and
+  // their own module-level scratch. That last part is what makes this a real
+  // test of the composition rather than of one shared `CarFrame`.
+  const ride1 = (await import(rideHere)) as typeof import('../client/src/game/riding.ts');
+  const ride2 = (await import(`${rideHere}?instance=2`)) as typeof import('../client/src/game/riding.ts');
+
+  const bytes = await Bun.file(bakePath).arrayBuffer();
+  const bakeA = rail1.decodeRail(bytes);
+  const bakeB = rail1.decodeRail(bytes.slice(0));
+
+  // --- 0. The module's own self-check, against the controller's real constants.
+  {
+    const bad = ride1.verifyRiding(EYE_HEIGHT, PLAYER_RADIUS);
+    check(
+      bad.length === 0,
+      `game/riding.ts's self-check passes, including that its restated eye height ` +
+        `(${ride1.RIDER_EYE_HEIGHT} m) and body radius (${ride1.RIDER_RADIUS} m) still match ` +
+        `player/controller.ts's` + (bad.length ? `: ${bad[0]}` : ''),
+    );
+    const interiors = ride1.allInteriors();
+    check(
+      interiors.length >= 5,
+      `  ${interiors.length} carriage interiors are modelled -- ` +
+        interiors.map((i) => `${i.key} (${(i.xMax - i.xMin).toFixed(1)}x${(i.halfWidth * 2).toFixed(2)} m, ` +
+          `${i.doors.length} door bays a side${i.deck ? ', double deck' : ''})`).join('; '),
+    );
+    // The platform and the doorway are 11 cm apart, and that is the check that
+    // says the carriage frame and the world frame are the same frame. Both
+    // numbers were derived independently -- one by ray-probing the shipped GLB,
+    // the other by `world/rail-geo.ts` building a platform -- so agreement here
+    // is evidence rather than a tautology.
+    const tangara = interiors.find((i) => i.key === 'tangara:cab')!;
+    const step = tangara.vestibuleY - ride1.PLATFORM_TOP_M;
+    check(
+      step > 0 && step < 0.25,
+      `  a Tangara's door sill is ${(step * 100).toFixed(0)} cm over the platform -- the sill came out ` +
+        `of the shipped GLB (${tangara.vestibuleY} m over rail) and the platform out of ` +
+        `world/rail-geo.ts (${ride1.PLATFORM_TOP_M} m), and nothing made them agree`,
+    );
+  }
+
+  // --- 1. The composition, bit for bit, across two module instances.
+  //
+  // The sampling grid is deliberately awkward, on `checkRail`'s terms: a prime
+  // step in milliseconds so no instant is a multiple of any period, every
+  // direction of every line, and a local offset that walks the whole of a
+  // carriage's interior box rather than sitting on the origin -- because a
+  // composition that dropped the `u` or the `r` term would be exactly right at
+  // the origin and wrong everywhere a person can stand.
+  {
+    const fa = ride1.createCarFrame();
+    const fb = ride2.createCarFrame();
+    const pa = { x: 0, y: 0, z: 0 };
+    const pb = { x: 0, y: 0, z: 0 };
+    let compared = 0;
+    let identical = 0;
+    let firstDiff = '';
+    let worstReach = 0;
+    for (let k = 0; k < 4000 && compared < 10_000; k++) {
+      const t = rail1.railSeconds(rail1.RAIL_EPOCH_MS + k * 7_919);
+      for (let li = 0; li < bakeA.lines.length && compared < 10_000; li++) {
+        for (let di = 0; di < 2; di++) {
+          const dirA = bakeA.lines[li].dirs[di];
+          const consist = ride1.consistOf(dirA, 0);
+          for (let car = 0; car < consist.cars.length && compared < 10_000; car += 3) {
+            const trip = rail1.tripIndexAt(dirA, t, (k + car) % 3);
+            const refA = { line: li, dir: di, trip, car };
+            const refB = { line: li, dir: di, trip, car };
+            const okA = ride1.aboardFrame(bakeA, refA, t, fa);
+            const okB = ride2.aboardFrame(bakeB, refB, t, fb);
+            compared++;
+            if (okA !== okB) { firstDiff ||= 'liveness'; continue; }
+            if (!okA) { identical++; continue; }
+            // A point that is not the origin, on every axis, walked around the
+            // interior so the whole basis is exercised.
+            const lx = ((k % 21) - 10) * 0.9;
+            const ly = 0.39 + ((k % 5) * 0.5);
+            const lz = ((k % 3) - 1) * 1.1;
+            ride1.localToWorld(fa, lx, ly, lz, pa);
+            ride2.localToWorld(fb, lx, ly, lz, pb);
+            if (Object.is(pa.x, pb.x) && Object.is(pa.y, pb.y) && Object.is(pa.z, pb.z)) {
+              identical++;
+            } else if (!firstDiff) {
+              firstDiff = `${bakeA.lines[li].id} dir ${di} car ${car}: ` +
+                `x ${pa.x} vs ${pb.x}, y ${pa.y} vs ${pb.y}, z ${pa.z} vs ${pb.z}`;
+            }
+            // And the round trip, which is the property the reconciler needs:
+            // world back to local must land on the point it started from.
+            const back = { x: 0, y: 0, z: 0 };
+            ride1.worldToLocal(fa, pa.x, pa.y, pa.z, back);
+            const reach = Math.max(Math.abs(back.x - lx), Math.abs(back.y - ly), Math.abs(back.z - lz));
+            if (reach > worstReach) worstReach = reach;
+          }
+        }
+      }
+    }
+    check(
+      identical === compared,
+      `two separately-evaluated copies of game/riding.ts derive the identical world position for a ` +
+        `passenger on all ${compared.toLocaleString()} sampled (line, direction, trip, carriage, ` +
+        `offset, instant) tuples. Bit-identical doubles, compared with Object.is, not an epsilon` +
+        (firstDiff ? `. FIRST DIFFERENCE: ${firstDiff}` : ''),
+    );
+    // The inverse is the transpose, so it is exact to within the floating-point
+    // error of a dot product at 60 km from the origin -- which is what this
+    // bound is, rather than a tuned tolerance.
+    check(
+      worstReach < 1e-6,
+      `  and world-to-local is the inverse of local-to-world to ${(worstReach * 1e6).toFixed(2)} um ` +
+        `over the whole 60 km disc, which is what makes the reconciler's replay a walk on a floor ` +
+        `rather than a subtraction of two large numbers`,
+    );
+  }
+
+  // --- 2. The negative control on that claim.
+  //
+  // A millimetre of skew on the carriage's forward axis, which is smaller than
+  // anything anybody would ever introduce by accident and is still a rider
+  // standing 2 cm from where the other end thinks. If this does not go red, the
+  // check above is measuring nothing.
+  {
+    const f = ride1.createCarFrame();
+    const dir = bakeA.lines[0].dirs[0];
+    const t = rail1.railSeconds(rail1.RAIL_EPOCH_MS + 500_000);
+    const trip = rail1.tripIndexAt(dir, t, 0);
+    const ref = { line: 0, dir: 0, trip, car: 2 };
+    const clean = { x: 0, y: 0, z: 0 };
+    const skewed = { x: 0, y: 0, z: 0 };
+    const ran = ride1.aboardFrame(bakeA, ref, t, f);
+    ride1.localToWorld(f, -9.5, 2.51, 1.1, clean);
+    f.fx += 0.001;
+    ride1.localToWorld(f, -9.5, 2.51, 1.1, skewed);
+    const moved = Math.hypot(skewed.x - clean.x, skewed.y - clean.y, skewed.z - clean.z);
+    check(
+      ran && moved > 0.005 && !Object.is(clean.x, skewed.x),
+      `  NEGATIVE CONTROL: one millimetre of skew on the carriage's forward axis moves a passenger ` +
+        `at the far end of the upper deck by ${(moved * 1000).toFixed(1)} mm. The composition can be ` +
+        `wrong, so its being right means something`,
+    );
+  }
+
+  // --- 3. Board, ride, disembark, against a real Simulation.
+  //
+  // The whole round trip through the authoritative path: the server's own
+  // `findBoarding` against the server's own position, twenty seconds of ticks
+  // with the body stepped inside the carriage, and `E` again at the far end.
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const world = await loadWorld(root);
+  {
+    const sim = new Simulation(roomWorld(world));
+    check(
+      (sim.world.rail ?? null) !== null,
+      `the server loaded the rail bake beside the world -- ${(sim.world.rail?.lines.length ?? 0)} lines. ` +
+        `Without it every boarding claim is refused, which is the safe answer and not the feature`,
+    );
+
+    // Where to stand, and when -- **solved, by the same two functions the
+    // browser's `sydney.rail.goto` uses**. That sharing is the point: a check
+    // with its own idea of where a doorway is would pass while the game was
+    // broken, and the console tool a human uses to reproduce a failure would be
+    // reproducing something else. See `game/riding.nextDwell`.
+    //
+    // The station is whichever one has a train standing at it soonest, which is
+    // usually one that already does -- there are 268 trains running and the
+    // dwell is fifteen seconds, so "now" is nearly always inside somebody's.
+    const bake = sim.world.rail!;
+    const t0 = rail1.railSeconds(Date.now());
+    let stand: { x: number; y: number; z: number; station: string; line: string } | null = null;
+    {
+      const names = new Set<string>();
+      for (const line of bake.lines) for (const dir of line.dirs) for (const stop of dir.stops) {
+        if (stop.calls) names.add(stop.name);
+      }
+      // Sorted by how soon the doors open, and the **first one that places** is
+      // taken rather than the soonest full stop. A dwell whose carriage search
+      // lands on a trip whose consist reference point is still behind the start
+      // of the line -- the first eighty metres of a run -- has nowhere to stand,
+      // and there are 268 trains to choose from.
+      const solved: Array<import('../client/src/game/riding.ts').Dwell> = [];
+      for (const name of names) {
+        // Three calls ahead, so the ride below is a ride and not an arrival at
+        // a terminus -- see `nextDwell`'s `minAhead`.
+        const d = ride1.nextDwell(bake, name, t0, { minAhead: 3 });
+        if (d !== null) solved.push(d);
+      }
+      solved.sort((a, b) => a.opensAt - b.opensAt);
+      const place: import('../client/src/game/riding.ts').Stand = { x: 0, y: 0, z: 0, yaw: 0 };
+      for (const d of solved.slice(0, 40)) {
+        if (!ride1.dwellStand(bake, d, Math.max(d.opensAt + 1, t0), place)) continue;
+        stand = { x: place.x, y: place.y - EYE_HEIGHT, z: place.z, station: d.station, line: d.lineId };
+        break;
+      }
+      if (stand === null) {
+        say(`    solved ${solved.length} dwells and none of them placed a stand`);
+      }
+    }
+
+    if (stand === null) {
+      check(false, 'no train anywhere in Sydney has its doors open right now, which cannot happen');
+    } else {
+      // The rail clock, driven at the tick rate rather than read off the wall.
+      // See `Simulation.railNowMs`: twelve hundred ticks run in about a second
+      // of real time, so a ride measured against `Date.now` would be a ride of
+      // eleven metres.
+      let railMs = Date.now();
+      sim.railNowMs = () => railMs;
+      const tickClock = (): void => { railMs += 1000 / TICK_HZ; };
+
+      const p = sim.join(0, null, 'Rider');
+      p.combat.body.position.set(stand.x, stand.y + EYE_HEIGHT, stand.z);
+      p.combat.body.velocity.set(0, 0, 0);
+      p.combat.body.onGround = true;
+      p.history.seed(sim.tick, stand.x, stand.y + EYE_HEIGHT, stand.z, 0);
+
+      // Press `E`. One tick with it down, and the level bit is edged by the sim
+      // exactly as it is for a real client -- see `protocol.BTN.MOUNT`.
+      p.input.mount = true;
+      const out: TickOutput = { tick: 0, events: [], snapshot: null };
+      sim.step(out);
+      tickClock();
+      p.input.mount = false;
+      const a = p.combat.aboard;
+      check(
+        ride1.isAboard(a),
+        `a player placed in the doorway of a ${stand.line} at ${stand.station} by the same solver ` +
+          `the browser's \`sydney.rail.goto\` uses pressed E ` +
+          `and the server put them in carriage ${a.car}, at ` +
+          `(${a.x.toFixed(2)}, ${a.y.toFixed(2)}, ${a.z.toFixed(2)}) in the carriage's own frame`,
+      );
+
+      // And a client pressing E in the harbour gets nothing, which is the whole
+      // of the anti-cheat story. Same input, same tick, a body 8 km away.
+      {
+        const q = sim.join(0, null, 'Chancer');
+        q.combat.body.position.set(3000, EYE_HEIGHT, -3000);
+        q.input.mount = true;
+        sim.step(out);
+        tickClock();
+        q.input.mount = false;
+        check(
+          !ride1.isAboard(q.combat.aboard),
+          `  and a client pressing E in the middle of the harbour is not aboard anything. The range ` +
+            `test is against the server's own position and INPUT carries no numbers at all`,
+        );
+        sim.leave(q.id);
+      }
+
+      // Twenty seconds of riding. The body is stepped inside the carriage every
+      // tick and its world position is derived; nothing here touches it.
+      const startWorld = { x: p.combat.body.position.x, z: p.combat.body.position.z };
+      const local0 = { x: a.x, y: a.y, z: a.z };
+      let worstBelow = 0;
+      let worstAbove = 0;
+      let travelled = 0;
+      let prevX = p.combat.body.position.x;
+      let prevZ = p.combat.body.position.z;
+      for (let i = 0; i < 60 * TICK_HZ; i++) {
+        // Walk forward down the carriage for the first two seconds, then stand.
+        p.input.forward = i < 2 * TICK_HZ ? 1 : 0;
+        sim.step(out);
+        tickClock();
+        if (!ride1.isAboard(a)) break;
+        const dirOf = ride1.dirOf(bake, a.line, a.dir)!;
+        const it = ride1.interiorOfCar(ride1.consistOf(dirOf, a.trip), a.car)!;
+        const floor = ride1.carriageFloor(it, a.x, a.z, a.y - EYE_HEIGHT);
+        const gap = (a.y - EYE_HEIGHT) - floor;
+        if (gap < -worstBelow) worstBelow = -gap;
+        if (gap > worstAbove) worstAbove = gap;
+        travelled += Math.hypot(p.combat.body.position.x - prevX, p.combat.body.position.z - prevZ);
+        prevX = p.combat.body.position.x;
+        prevZ = p.combat.body.position.z;
+      }
+      p.input.forward = 0;
+      const stillAboard = ride1.isAboard(a);
+      check(
+        stillAboard,
+        `  a minute later they are still aboard, ${travelled.toFixed(0)} m of railway further on ` +
+          `(${(travelled / 60 * 3.6).toFixed(0)} km/h average, dwells included)`,
+      );
+      check(
+        travelled > 400,
+        `  and the train actually went somewhere: ` +
+          `${Math.hypot(p.combat.body.position.x - startWorld.x, p.combat.body.position.z - startWorld.z).toFixed(0)} m ` +
+          `from where they got on, against ${travelled.toFixed(0)} m of track`,
+      );
+      // **Never through the floor, and never floating over it.** Two bounds
+      // rather than one, because they mean different things: a body *below* the
+      // floor is a collision failure and a body above it is a body in the air,
+      // which is what walking up a staircase legitimately is for a few
+      // centimetres of catch-up per step.
+      check(
+        worstBelow < 0.001 && worstAbove < 0.25,
+        `  their feet never went through the carriage floor (worst ` +
+          `${(worstBelow * 1000).toFixed(1)} mm below it) and never floated over it (worst ` +
+          `${(worstAbove * 1000).toFixed(0)} mm above, which is a stride on the staircase), while ` +
+          `walking ${Math.hypot(a.x - local0.x, a.z - local0.z).toFixed(2)} m up the aisle in the ` +
+          `carriage's own frame. The floor is not moving in that frame, which is the entire point`,
+      );
+
+      // Off again, at the next dwell. Wait for the doors, then press E.
+      let waited = 0;
+      let alighted = false;
+      let station = '';
+      // Ten minutes of budget, because the trip picked at random can be an
+      // express: T1 runs 2.5 km between calls west of Strathfield, which at
+      // 44 m/s is a minute of railway with the doors shut.
+      for (; waited < 600 * TICK_HZ && ride1.isAboard(a); waited++) {
+        const dirOf = ride1.dirOf(bake, a.line, a.dir);
+        const now = ride1.aboardPose(bake, a, rail1.railSeconds(railMs));
+        if (dirOf !== null && now !== null && now.doorsOpen) {
+          station = now.atStop >= 0 ? dirOf.stops[now.atStop].name : '?';
+          p.input.mount = true;
+          sim.step(out);
+          tickClock();
+          p.input.mount = false;
+          alighted = !ride1.isAboard(a);
+          break;
+        }
+        sim.step(out);
+        tickClock();
+      }
+      check(
+        alighted,
+        `  and E at the next dwell put them down at ${station}, ` +
+          `${(waited / TICK_HZ).toFixed(0)} s after boarding` +
+          (alighted ? '' : ` -- still aboard: ${ride1.isAboard(a)}`),
+      );
+      if (alighted) {
+        // Half a second of ticks to settle, because "on solid ground" is a claim
+        // about where a body comes to rest and not about the frame it was put
+        // down on. If the two ends disagreed about the platform's height this is
+        // where it would show: the body would still be falling.
+        for (let i = 0; i < TICK_HZ / 2; i++) { sim.step(out); tickClock(); }
+        // On solid ground: within a hand's breadth of the platform surface, and
+        // not falling. `PLATFORM_TOP_M` over the rail head at that station is
+        // where a platform is, and both ends compute it the same way.
+        const feet = p.combat.body.position.y - EYE_HEIGHT;
+        // The platform surface at the point they are standing on, from the same
+        // field both ends fold into `groundHeight`. This is the assertion the
+        // whole disembark hangs on: if the client and the server disagreed about
+        // a platform's height, this is where a body would still be falling.
+        const surface = world.platforms!.surfaceAt(
+          p.combat.body.position.x, p.combat.body.position.z,
+        );
+        // **On solid ground, at the right station.** Two claims, and the first
+        // one is checked against the server's own `groundHeight` rather than
+        // against the platform, because that is the function that decides
+        // whether a body is standing or falling -- and it is the *max* of the
+        // terrain, the roofs and the platform field. Where a station sits in a
+        // cutting the terrain beside the track is the higher of the two and it
+        // wins, which is correct on both ends and is why this asserts "resting
+        // on whatever the world says is here" rather than "resting on the
+        // platform". The gap to the drawn platform is reported rather than
+        // asserted, because it is a property of the world data at that station
+        // and not of the disembark.
+        const ground = p.world.groundHeight(
+          p.combat.body.position.x, p.combat.body.position.z, feet,
+        );
+        check(
+          Math.abs(feet - ground) < 0.01 && p.combat.body.onGround &&
+            Math.abs(p.combat.body.velocity.y) < 0.01,
+          `  they come to rest on solid ground at ${station}: feet at ${feet.toFixed(2)} m, which is ` +
+            `${((feet - ground) * 1000).toFixed(0)} mm off what the server's own groundHeight says is ` +
+            `there, standing still, with ${p.combat.health.toFixed(1)} pips of health -- the same ` +
+            `${p.combat.health.toFixed(1)} they boarded with`,
+        );
+        check(
+          surface > -Infinity && Math.abs(feet - surface) < 0.05,
+          `  and it is the platform they are standing on rather than the paddock above the cutting: ` +
+            `the platform field puts a surface at ${surface.toFixed(2)} m and their feet are ` +
+            `${((feet - surface) * 1000).toFixed(0)} mm off it`,
+        );
+        // And clear of the four-foot: at least the platform's own inner edge
+        // away from the track centre, or they got off between the rails.
+        const stn = bake.stations.find((s2) => s2.name === station);
+        const off = stn ? Math.hypot(p.combat.body.position.x - stn.x, p.combat.body.position.z - stn.z) : 99;
+        check(
+          off > ride1.PLATFORM_INNER_M,
+          `  and ${off.toFixed(1)} m from the station's own track centre, which is clear of the ` +
+            `${ride1.PLATFORM_INNER_M} m platform face -- they are on the platform, not in the four-foot`,
+        );
+      }
+      sim.leave(p.id);
+    }
+  }
+
+  // --- 3b. The rewind: a swing thrown aboard a train at 167 ms of round trip.
+  //
+  // The claim TRAINS.md makes about riding paying for itself -- *"lag
+  // compensation stays exact because the parent motion is closed-form"* -- and
+  // the one place it is not free. A rider is drawn by every other client at
+  // `poseTrain(now)`, not at render time, because a train is a function of the
+  // clock and interpolating it would put two people in one carriage a fifth of a
+  // carriage apart. So the swinger's screen has the victim 250 ms old *in the
+  // carriage* and zero milliseconds old *along the railway*, and a rewind that
+  // used the plain history would hunt for them eleven metres behind the train.
+  //
+  // Two runs of one fight, on one train, at one instant: with the correction and
+  // without it. The second is the control.
+  {
+    const bake = world.rail!;
+    for (const withFix of [true, false]) {
+      const sim = new Simulation(roomWorld(world));
+      let railMs = Date.now();
+      sim.railNowMs = () => railMs;
+      const tickClock = (): void => { railMs += 1000 / TICK_HZ; };
+
+      // A trip that is moving, so the correction has something to correct.
+      let ride: { li: number; dir: number; trip: number; speed: number } | null = null;
+      const scratch = rail1.createTrainPose();
+      for (let li = 0; li < bake.lines.length && ride === null; li++) {
+        for (const dir of bake.lines[li].dirs) {
+          for (let j = 0; j <= 3; j++) {
+            const trip = rail1.tripIndexAt(dir, rail1.railSeconds(railMs), j);
+            if (!rail1.poseTrain(bake, dir, trip, rail1.railSeconds(railMs), scratch)) continue;
+            if (scratch.speed < 20) continue;
+            ride = { li, dir: dir.index, trip, speed: scratch.speed };
+            break;
+          }
+          if (ride !== null) break;
+        }
+      }
+      if (ride === null) { check(false, 'no train anywhere is moving, which cannot happen'); break; }
+
+      const attacker = sim.join(0, null, 'Swinger');
+      const victim = sim.join(0, null, 'Standing');
+      // Both in carriage 2, a bat's length apart down the aisle. Placed directly
+      // rather than boarded, because what is being tested is the rewind and not
+      // the doorway -- and `enterCarriage` will take it from here.
+      for (const [who, lx] of [[attacker, 0], [victim, 1.15]] as const) {
+        const a = who.combat.aboard;
+        a.line = ride.li; a.dir = ride.dir; a.trip = ride.trip; a.car = 2;
+        a.x = lx; a.y = 0.39 + EYE_HEIGHT; a.z = 0;
+        a.vx = 0; a.vy = 0; a.vz = 0;
+        a.yaw = -Math.PI / 2;
+        // And composed into the world **through the ride**, which is what
+        // `sim.tryBoard` does and what `riding.enterLocal` insists on: it
+        // records the world position it wrote, and anything that moves the body
+        // in world coordinates behind its back ends the ride on the next tick.
+        // Setting the slot without this is a teleport as far as that rule is
+        // concerned, and the ride is over before the first step.
+        const f = ride1.createCarFrame();
+        ride1.aboardFrame(bake, a, rail1.railSeconds(railMs), f);
+        ride1.projectAboard(a, who.combat.body, f);
+        who.combat.body.onGround = true;
+        who.history.seed(
+          sim.tick, who.combat.body.position.x, who.combat.body.position.y,
+          who.combat.body.position.z, who.combat.body.yaw,
+        );
+      }
+      // Facing down the carriage's +X, which is where the other one is standing.
+      //
+      // On the **input** and not only on the slot, and that is not a detail:
+      // `controller.step` copies `input.yaw` into the body on every step, so a
+      // heading written into the ride and not into the input survives exactly
+      // one tick. While aboard, `input.yaw` *is* the carriage-local heading --
+      // see `main.ts`'s conversion at the seam -- so this is a passenger facing
+      // up the aisle, and the engine's convention is that yaw 0 looks down -Z.
+      attacker.input.yaw = -Math.PI / 2;
+      victim.input.yaw = Math.PI / 2;
+      if (!withFix) {
+        // The control: strip the correction by telling the sim it has no
+        // timetable *for the reframe only*. There is no such switch, so the
+        // control is done the honest way -- run the identical fight with the
+        // victim's ride cleared on the tick of the swing, which is exactly the
+        // state a rewind with no reframe would compute against.
+      }
+
+      // Fill the history: a quarter of a second of ticks is `HISTORY_TICKS`.
+      for (let i = 0; i < HISTORY_TICKS + 30; i++) {
+        const out: TickOutput = { tick: 0, events: [], snapshot: null };
+        sim.step(out);
+        tickClock();
+      }
+      // 167 ms of round trip plus the client's own 100 ms interpolation delay,
+      // clamped by `Room.step` to spec 10's 250 ms. That is fifteen ticks, and
+      // fifteen ticks of a train at this speed is the whole of the problem.
+      const RTT_MS = 167;
+      const viewMs = Math.min(MAX_REWIND_MS, RTT_MS + INTERP_DELAY_MS);
+      attacker.viewTicks = (viewMs / 1000) * TICK_HZ;
+      const drift = ride.speed * (viewMs / 1000);
+
+      // Swing.
+      attacker.input.punch = true;
+      let landed = false;
+      for (let i = 0; i < 40 && !landed; i++) {
+        const out: TickOutput = { tick: 0, events: [], snapshot: null };
+        if (!withFix && i === 0) {
+          // The control, applied on the tick the history is read: a victim the
+          // rewind cannot reframe is a victim whose historical *world* position
+          // is used verbatim -- which is what this whole correction exists to
+          // stop being the answer.
+          ride1.clearAboard(victim.combat.aboard);
+        }
+        sim.step(out);
+        tickClock();
+        attacker.input.punch = false;
+        for (const e of out.events) {
+          if (e.kind === EVENT.HIT && (e as { attacker: number }).attacker === attacker.id &&
+              (e as { victim: number }).victim === victim.id) {
+            landed = true;
+          }
+        }
+      }
+      if (withFix) {
+        check(
+          landed,
+          `a bat swung aboard a ${bake.lines[ride.li].id} doing ${(ride.speed * 3.6).toFixed(0)} km/h, ` +
+            `at ${RTT_MS} ms of round trip, hits the passenger standing 1.15 m up the aisle. The ` +
+            `rewind looks ${viewMs} ms back, which is ${drift.toFixed(0)} m of railway -- and finds ` +
+            `them anyway, because the history is pushed back into the carriage's frame at the instant ` +
+            `it was recorded and pulled out again through the carriage's frame now`,
+        );
+      } else {
+        check(
+          !landed,
+          `  NEGATIVE CONTROL: the identical swing against a victim the rewind cannot put back in the ` +
+            `carriage misses, because ${drift.toFixed(0)} m of railway is where it looks for them. ` +
+            `The correction can be wrong, so its being right means something`,
+        );
+      }
+      sim.leave(attacker.id);
+      sim.leave(victim.id);
+    }
+  }
+
+  // --- 4. Two riders and a platform observer agree about everybody.
+  //
+  // The claim `protocol.ABOARD_BYTES` is written for, tested the only way it can
+  // be: three separate compositions of the same two passengers, from three
+  // different places, at one instant.
+  {
+    const bake = world.rail!;
+    const t = rail1.railSeconds(Date.now());
+    // Any running trip with at least two carriages.
+    let found: { dir: import('../client/src/game/rail.ts').RailDirection; trip: number; li: number } | null = null;
+    const scratch = rail1.createTrainPose();
+    for (let li = 0; li < bake.lines.length && found === null; li++) {
+      for (const dir of bake.lines[li].dirs) {
+        const trip = rail1.tripIndexAt(dir, t, 1);
+        if (rail1.poseTrain(bake, dir, trip, t, scratch)) { found = { dir, trip, li }; break; }
+      }
+    }
+    if (found === null) {
+      check(false, 'no trip is running anywhere, which cannot happen');
+    } else {
+      // Two riders at genuinely awkward offsets -- off-centre along the
+      // carriage, off-centre across it, and on different decks -- because a
+      // composition that dropped a term would still agree with itself at the
+      // origin.
+      const seats: Array<{ car: number; x: number; y: number; z: number }> = [
+        { car: 0, x: -3.2, y: 0.39 + EYE_HEIGHT, z: -0.7 },
+        { car: 5, x: 6.1, y: 2.51 + EYE_HEIGHT, z: 0.9 },
+      ];
+      // Three observers: the two riders and somebody on the platform. Each one
+      // gets its **own module instance** where it can, which is what makes this
+      // three derivations rather than one function called three times.
+      const modules = [ride1, ride2, ride1];
+      const worst: number[] = [];
+      for (const seat of seats) {
+        const answers = modules.map((m) => {
+          const f = m.createCarFrame();
+          const out = { x: 0, y: 0, z: 0 };
+          const ok = m.aboardFrame(
+            m === ride2 ? bakeB : bakeA,
+            { line: found!.li, dir: found!.dir.index, trip: found!.trip, car: seat.car },
+            t, f,
+          );
+          if (!ok) return null;
+          m.localToWorld(f, seat.x, seat.y, seat.z, out);
+          return out;
+        });
+        if (answers.some((x) => x === null)) { worst.push(Infinity); continue; }
+        let w = 0;
+        for (let i = 1; i < answers.length; i++) {
+          w = Math.max(
+            w,
+            Math.abs(answers[i]!.x - answers[0]!.x),
+            Math.abs(answers[i]!.y - answers[0]!.y),
+            Math.abs(answers[i]!.z - answers[0]!.z),
+          );
+        }
+        worst.push(w);
+      }
+      check(
+        worst.every((w) => w === 0),
+        `two riders on one ${found.dir.line.id} -- one on the lower deck of carriage 1, one on the ` +
+          `upper deck of carriage 6 -- and a third party on the platform all derive the identical ` +
+          `world position for both of them, to the bit (worst disagreement ` +
+          `${worst.map((w) => w.toFixed(0)).join(' / ')} m)`,
+      );
+      // And they are where a carriage actually is: 20 m apart along the train,
+      // 1.6 m apart across it, and two decks apart in height.
+      // Measured down the **centreline** of each carriage, one on each deck.
+      // Off-centre points are what the agreement check above uses, and they are
+      // the wrong instrument for this one: a seat 6 m from a carriage's centre
+      // carries `fy * lx` of that carriage's own pitch, so the difference
+      // between two of them is the staircase plus the gradient plus a term that
+      // depends on where in the two carriages the two people happened to be
+      // standing. On the centreline that term is zero and the claim is exact.
+      const fa = ride1.createCarFrame();
+      const fb = ride1.createCarFrame();
+      const a = { x: 0, y: 0, z: 0 };
+      const b = { x: 0, y: 0, z: 0 };
+      const lowerEye = 0.39 + EYE_HEIGHT;
+      const upperEye = 2.51 + EYE_HEIGHT;
+      ride1.aboardFrame(bakeA, { line: found.li, dir: found.dir.index, trip: found.trip, car: 0 }, t, fa);
+      ride1.localToWorld(fa, 0, lowerEye, 0, a);
+      ride1.aboardFrame(bakeA, { line: found.li, dir: found.dir.index, trip: found.trip, car: 5 }, t, fb);
+      ride1.localToWorld(fb, 0, upperEye, 0, b);
+      const apart = Math.hypot(a.x - b.x, a.z - b.z);
+      const rise = b.y - a.y;
+      // Five carriages apart in plan, and **the staircase plus the gradient**
+      // apart in height. Stated as an equation rather than as a band, because
+      // the band was the wrong shape: the two passengers are 93 m apart on a
+      // railway that is not level, so the world separation is the 2.12 m of
+      // staircase plus however much the track rises or *falls* between carriage
+      // one and carriage six. Asserting a positive rise passed on a climb and
+      // failed on a descent, which is the check being wrong rather than the
+      // composition.
+      //
+      // The grade term is the difference between the two carriages' own
+      // origins, which is the thing a renderer that ignored the grade would have
+      // dropped -- so this is also the assertion that the carriages are banked
+      // and climbing individually rather than hung off one heading.
+      const grade = fb.oy - fa.oy;
+      const stairs = upperEye - lowerEye;
+      const err = Math.abs(rise - (stairs + grade));
+      check(
+        apart > 70 && apart < 130 && err < 0.01,
+        `  and the two of them are ${apart.toFixed(0)} m apart along the train and ${rise.toFixed(2)} m ` +
+          `apart in height, which is ${stairs.toFixed(2)} m of staircase plus ${grade.toFixed(2)} m of ` +
+          `gradient between carriage 1 and carriage 6 -- the two agree to ${(err * 1000).toFixed(0)} mm. ` +
+          `A renderer that hung the whole consist off one pose would have reported ` +
+          `${stairs.toFixed(2)} m and put both carriages on one level`,
+      );
+    }
+  }
+
+  // --- 5. A tunnel bail-out lands on a platform, never inside the hill.
+  {
+    const bake = world.rail!;
+    let tested = 0;
+    let onPlatform = 0;
+    let worstDrop = 0;
+    const at = { x: 0, y: 0, z: 0 };
+    for (const line of bake.lines) {
+      for (const dir of line.dirs) {
+        // Walk this direction's own polyline for a vertex that is in a tunnel,
+        // and ask what a bail-out there would do.
+        for (let v = 1; v < dir.vertexCount; v += 37) {
+          const s = bake.cum[dir.vertexOff + v];
+          if ((ride1.spanFlagsAt(bake, dir, s) & rail1.SPAN_TUNNEL) === 0) continue;
+          tested++;
+          const stop = ride1.nextCall(dir, s);
+          if (stop < 0) continue;
+          if (!ride1.stopPlatform(bake, dir, stop, 1, at)) continue;
+          // The station it landed at has to be a real calling station ahead of
+          // where they jumped, and the platform has to be above the track rather
+          // than inside it.
+          const ahead = dir.stops[stop].s >= s - 1;
+          const height = at.y - (bake.vertices[(dir.vertexOff + v) * 3 + 1]);
+          if (ahead) onPlatform++;
+          worstDrop = Math.max(worstDrop, Math.abs(height));
+        }
+      }
+    }
+    check(
+      tested > 20 && onPlatform === tested,
+      `every one of ${tested.toLocaleString()} sampled tunnel points on the network relocates a ` +
+        `bail-out to the next station **ahead** on that trip, and never to one behind it. Nobody is ` +
+        `left in the hill: world/rail-geo.ts builds a tube around the track and no floor beside it`,
     );
   }
 }

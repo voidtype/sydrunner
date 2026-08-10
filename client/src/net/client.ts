@@ -127,9 +127,28 @@ import {
   type RoomInfo as RoomInfoShape,
   type Snapshot,
   type SnapshotBall,
+  type SnapshotAboard,
   type SnapshotNpc,
   type SnapshotPlayer,
 } from './protocol.ts';
+import { railSeconds, tripIndexAt, type RailBake, type RailDirection } from '../game/rail.ts';
+import {
+  aboardFrame,
+  carriageFloor,
+  carriageResolve,
+  clearAboard,
+  consistOf,
+  createCarFrame,
+  dirOf,
+  frameYaw,
+  interiorOfCar,
+  isAboard,
+  localToWorld,
+  localToWorldDir,
+  type CarFrame,
+  type CarriageInterior,
+  type CarriageMove,
+} from '../game/riding.ts';
 import { decodeChatLine, encodeChatSay, sanitiseChat, type ChatLine } from './chat.ts';
 import {
   decodeSuggestAck,
@@ -357,6 +376,8 @@ interface TimedSnapshot {
   players: SnapshotPlayer[];
   balls: SnapshotBall[];
   npcs: SnapshotNpc[];
+  /** v10's riders. Usually empty, and empty costs one array. */
+  aboard: SnapshotAboard[];
   /** `performance.now()` when it arrived. The jitter buffer's clock. */
   at: number;
 }
@@ -586,6 +607,61 @@ export class NetClient {
   /** The two most recent authoritative positions for the local player. See the header. */
   private readonly lastServerPos = new Vector3();
   private lastServerTick = -1;
+
+  // --- The ride ------------------------------------------------------------------
+  //
+  // Everything about riding a train that this file owns, which is two things:
+  // adopting the server's opinion of *which* train, and reconciling where in it.
+  // See `game/riding.ts`'s header for why the second of those is a slow walk on
+  // a flat floor rather than a 44 m/s prediction problem.
+
+  /**
+   * The timetable, handed over once by `main.ts` after the bake has loaded.
+   *
+   * Null on a client whose bake failed to fetch, and that is a working
+   * configuration: riders arrive with a perfectly good world position in their
+   * ordinary player record and are drawn one interpolation delay behind, which
+   * is 4.4 m on an express and is the *old* answer rather than a broken one.
+   * Nothing in here throws when it is absent.
+   */
+  private rail: RailBake | null = null;
+
+  setRail(bake: RailBake | null): void {
+    this.rail = bake;
+  }
+
+  /**
+   * The seq the local player's own board or alight was predicted on, or -1.
+   *
+   * `bikePredictedAt`'s twin and for its argument exactly: everything in flight
+   * when `E` went down predates the press, so adopting the server's opinion of
+   * the ride before it has acknowledged that input would undo the prediction for
+   * a round trip -- a player who steps aboard and is yanked back onto the
+   * platform for 60 ms.
+   */
+  private aboardPredictedAt = -1;
+  /** The server's own last word on this player's ride, from the aboard section. */
+  private serverAboard: SnapshotAboard | null = null;
+  private serverAboardKnown = false;
+  private readonly selfAboard: SnapshotAboard =
+    { id: 0, line: 0, dir: 0, tripLow: 0, car: 0, x: 0, y: 0, z: 0 };
+  /** Scratch for the reconciler's local-space replay and for the remotes. */
+  private readonly replayFrame: CarFrame = createCarFrame();
+  private readonly remoteFrame: CarFrame = createCarFrame();
+  private replayInterior: CarriageInterior | null = null;
+  private readonly replayMove: CarriageMove = { x: 0, z: 0, hit: false };
+  private readonly localScratch = { x: 0, y: 0, z: 0 };
+
+  /**
+   * Called by `main.ts` on the frame it predicts a board or an alight.
+   *
+   * `predictedBikeChange`'s twin, arithmetic included: a press read inside the
+   * fixed step is sent at the *end* of that step, so the input carrying it is
+   * `seq + 1`. See `sendInput`'s ordering contract.
+   */
+  predictedAboardChange(): void {
+    this.aboardPredictedAt = (this.seq + 1) & 0xffff;
+  }
 
   /** Reconciliation scratch: a body to replay into, allocated once. */
   private readonly replayBody: PlayerState = {
@@ -1214,6 +1290,7 @@ export class NetClient {
       players: s.players.map((p) => ({ ...p })),
       balls: s.balls.map((b) => ({ ...b })),
       npcs: s.npcs.map((n) => ({ ...n })),
+      aboard: s.aboard.map((a) => ({ ...a })),
       at: performance.now(),
     });
     if (this.snapshots.length > SNAPSHOT_HISTORY) this.snapshots.shift();
@@ -1252,6 +1329,28 @@ export class NetClient {
     this.pendingAck = s.ackSeq;
     this.pendingSelf = s.players.find((p) => p.id === this.id) ?? null;
     this.pendingSelfTick = s.tick;
+    // The ride, **copied** rather than referenced. `decodeSnapshot` reuses its
+    // record objects across snapshots (it says so, and for the allocation
+    // reason), and `pendingSelf` above gets away with holding a reference only
+    // because it is consumed inside the same frame. This one is eight numbers
+    // and copying them costs nothing, so it does not have to get away with
+    // anything.
+    const mine = s.aboard.find((a) => a.id === this.id);
+    this.serverAboardKnown = true;
+    if (mine === undefined) {
+      this.serverAboard = null;
+    } else {
+      const dst = this.selfAboard;
+      dst.id = mine.id;
+      dst.line = mine.line;
+      dst.dir = mine.dir;
+      dst.tripLow = mine.tripLow;
+      dst.car = mine.car;
+      dst.x = mine.x;
+      dst.y = mine.y;
+      dst.z = mine.z;
+      this.serverAboard = dst;
+    }
   }
 
   private pendingAck = -1;
@@ -1314,6 +1413,25 @@ export class NetClient {
     if (this.serverBikeKnown && (this.bikePredictedAt < 0 || bikeAcked)) {
       this.bikePredictedAt = -1;
       local.ridingBike = this.serverBike;
+    }
+
+    // --- The ride, on the bike's own gate and for its own reason.
+    //
+    // Adopted only once the server has acknowledged the input that carried the
+    // press: everything in flight when `E` went down predates it, and taking the
+    // server's word before then would put a player who has just stepped aboard
+    // back on the platform for one round trip.
+    //
+    // What is adopted is the ride's **identity** -- which line, which direction,
+    // which departure, which carriage -- and never the position, which is
+    // predicted and reconciled below like every other position in this file.
+    // That split is the same one the bike makes and it matters more here: the
+    // identity is a fact only the server can establish (it validated the
+    // doorway), and the position inside the carriage is a walk this client can
+    // predict perfectly.
+    if (this.serverAboardKnown && (this.aboardPredictedAt < 0 || seqLE(this.aboardPredictedAt, this.pendingAck))) {
+      this.aboardPredictedAt = -1;
+      this.adoptRide(local);
     }
 
     // --- Things the client cannot predict, adopted on the transition only.
@@ -1403,6 +1521,27 @@ export class NetClient {
         this.ackedVelocity.set(done.vx, done.vy, done.vz);
         this.ackedVelocityKnown = true;
       }
+    }
+
+    // --- Riding: the same replay, one basis in.
+    //
+    // A rider is reconciled in **carriage-local coordinates** and never in world
+    // ones, which is `game/riding.ts`'s whole architecture arriving at the one
+    // place it pays for itself. The server's authoritative position for a rider
+    // is the eight-byte offset in the aboard section, not the world position in
+    // the player record; the replay runs the identical `controller.step` against
+    // the identical carriage floor; and the error being measured is the
+    // difference between two walks on a stationary floor.
+    //
+    // If this were done in world space instead, every replayed frame would have
+    // to re-evaluate the train's pose at that frame's own instant and the error
+    // would be dominated by the 44 m/s the floor is moving at -- which is not a
+    // prediction error at all, it is a clock difference wearing one, and it is
+    // exactly the shape of the bug `checkAccelerationRamp` was written for.
+    if (this.reconcileAboard(local)) {
+      this.lastServerPos.set(self.x, self.y, self.z);
+      this.lastServerTick = this.pendingSelfTick;
+      return out.copy(this.correction);
     }
 
     // Replay: start from the authoritative position and run every input the
@@ -1516,6 +1655,274 @@ export class NetClient {
     this.lastServerPos.set(self.x, self.y, self.z);
     this.lastServerTick = this.pendingSelfTick;
     return out.copy(this.correction);
+  }
+
+  // --- Riding -------------------------------------------------------------------
+
+  /**
+   * Which departure of `dir` ends in the byte the wire carried, at time `t`.
+   *
+   * `protocol.ABOARD_BYTES` argues out why the wire carries a low byte rather
+   * than an index or a "how many back": a trip number grows forever, and the
+   * only bounded thing about it is that at any instant a direction has a
+   * handful of departures running. This walks that handful -- 27 at the worst on
+   * the longest line in the bake -- and returns the one whose low byte matches.
+   *
+   * One extra step past the live count at each end, because the server's clock
+   * and this one are a few tens of milliseconds apart and a departure can be on
+   * the other side of the period boundary from where this client thinks it is.
+   * Two trips in the same live set cannot share a low byte -- there are never
+   * 256 of them -- so the match is unique.
+   */
+  private resolveTrip(dir: RailDirection, t: number, tripLow: number): number | null {
+    const live = Math.floor(dir.duration / dir.line.period) + 3;
+    for (let j = -1; j <= live; j++) {
+      const trip = tripIndexAt(dir, t, j);
+      if ((trip & 0xff) === tripLow) return trip;
+    }
+    return null;
+  }
+
+  /**
+   * Take the server's word for which train this player is on, and only that.
+   *
+   * Three cases, and the middle one is the interesting one:
+   *
+   *   - **The server says nobody.** Off, immediately. It is the answer to a
+   *     mispredicted boarding, to being knocked out, to a respawn, and to the
+   *     train having reached its terminus, and none of those is worth a case of
+   *     its own here -- the server has already decided, and this is the client
+   *     declining to spend a round trip in a state the server has left.
+   *   - **The server names a different train, or a different carriage, from the
+   *     one this client thinks it is on.** Adopt the whole thing including the
+   *     position, because there is nothing to reconcile: a prediction that put
+   *     the player in carriage 3 of the 14:22 has nothing useful to say about
+   *     where they are in carriage 5 of the 14:24.
+   *   - **The server agrees about the train.** Touch nothing. The position is
+   *     reconciled by `reconcileAboard`, which is the path that runs on every
+   *     ordinary tick of a ride.
+   */
+  private adoptRide(local: CombatantState): void {
+    const server = this.serverAboard;
+    const a = local.aboard;
+    if (server === null) {
+      if (isAboard(a)) clearAboard(a);
+      return;
+    }
+    const bake = this.rail;
+    if (bake === null) return;
+    const dir = dirOf(bake, server.line, server.dir);
+    if (dir === null) return;
+    const trip = this.resolveTrip(dir, railSeconds(Date.now()), server.tripLow);
+    if (trip === null) return;
+    if (a.line === server.line && a.dir === server.dir && a.trip === trip && a.car === server.car) {
+      return;
+    }
+    a.line = server.line;
+    a.dir = server.dir;
+    a.trip = trip;
+    a.car = server.car;
+    a.x = server.x;
+    a.y = server.y;
+    a.z = server.z;
+    a.vx = 0;
+    a.vy = 0;
+    a.vz = 0;
+    // The heading they are already looking in, expressed in the new carriage's
+    // frame, so that being put aboard by the server does not spin the camera.
+    if (aboardFrame(bake, a, railSeconds(Date.now()), this.replayFrame)) {
+      a.yaw = local.body.yaw - frameYaw(this.replayFrame);
+    }
+    this.pending.length = 0;
+    this.ackedVelocityKnown = false;
+    this.correction.set(0, 0, 0);
+  }
+
+  /**
+   * Replay the unacknowledged inputs inside the carriage. True if it ran.
+   *
+   * False -- meaning "reconcile normally" -- whenever this client and the server
+   * are not agreed that this player is on the same train, which is every tick
+   * of every player who is not riding and the one or two ticks either side of a
+   * boarding.
+   *
+   * The correction handed back to the camera is the local error **rotated into
+   * world**, because that is the frame `main.ts` applies it in. Rotated rather
+   * than composed: it is a displacement, not a point.
+   */
+  private reconcileAboard(local: CombatantState): boolean {
+    const bake = this.rail;
+    const server = this.serverAboard;
+    const a = local.aboard;
+    if (bake === null || server === null || !isAboard(a)) return false;
+    if (a.line !== server.line || a.dir !== server.dir || a.car !== server.car) return false;
+    const dir = dirOf(bake, a.line, a.dir);
+    if (dir === null) return false;
+    if (this.resolveTrip(dir, railSeconds(Date.now()), server.tripLow) !== a.trip) return false;
+    const it = interiorOfCar(consistOf(dir, a.trip), a.car);
+    if (it === null) return false;
+    this.replayInterior = it;
+
+    const body = this.replayBody;
+    // The server's own carriage-local position for the input it acknowledged.
+    body.position.set(server.x, server.y, server.z);
+    if (this.ackedVelocityKnown) body.velocity.copy(this.ackedVelocity);
+    else body.velocity.set(a.vx, a.vy, a.vz);
+    body.onGround = true;
+    body.yaw = a.yaw;
+    body.pitch = local.body.pitch;
+
+    for (const p of this.pending) {
+      const input = this.replayInput;
+      input.forward = p.input.forward;
+      input.right = p.input.right;
+      input.jump = p.input.jump;
+      input.sprint = p.input.sprint;
+      input.yaw = p.input.yaw;
+      input.pitch = p.input.pitch;
+      input.speedScale = speedScaleOf(local);
+      input.jumpScale = jumpScaleOf(local);
+      // **No `shapeRideInput`.** You cannot bring the bike aboard, and a replay
+      // that forced the sprint on would run a rider up the aisle at 26 m/s.
+      step(body, input, FIXED_DT, this.aboardMover, this.aboardGround);
+    }
+
+    const dx = body.position.x - a.x;
+    const dy = body.position.y - a.y;
+    const dz = body.position.z - a.z;
+    const error = Math.hypot(dx, dy, dz);
+    this.lastCorrection = error;
+    if (error > CORRECTION_DEADZONE) {
+      // No snap branch, and its absence is the point. A snap exists for the
+      // knockback -- a prediction the client could not have made, that has to
+      // be flown rather than dragged -- and in a carriage there is no arc to
+      // fly: the worst disagreement possible between two copies of a 4.4 m/s
+      // walk on a 20 m floor is a stride. The correction is taken whole and the
+      // camera is told about it over the usual 80 ms.
+      this.corrections++;
+      localToWorldDir(this.replayFrame, -dx, -dy, -dz, this.localScratch);
+      this.correction.x += this.localScratch.x;
+      this.correction.y += this.localScratch.y;
+      this.correction.z += this.localScratch.z;
+      if (this.correction.length() > CORRECTION_SNAP) this.correction.setLength(CORRECTION_SNAP);
+      a.x = body.position.x;
+      a.y = body.position.y;
+      a.z = body.position.z;
+      a.vx = body.velocity.x;
+      a.vy = body.velocity.y;
+      a.vz = body.velocity.z;
+      local.body.onGround = body.onGround;
+    }
+    return true;
+  }
+
+  /** The carriage `reconcileAboard`'s replay walks around. See `riding.CarriageStand`. */
+  private readonly aboardMover = {
+    resolve: (
+      fromX: number, fromZ: number, toX: number, toZ: number, radius: number, feetY: number,
+    ): CarriageMove => {
+      const it = this.replayInterior;
+      if (it === null) {
+        this.replayMove.x = toX;
+        this.replayMove.z = toZ;
+        this.replayMove.hit = false;
+        return this.replayMove;
+      }
+      return carriageResolve(it, fromX, fromZ, toX, toZ, radius, feetY, this.replayMove);
+    },
+  };
+
+  private readonly aboardGround = (x: number, z: number, feetY: number): number => {
+    const it = this.replayInterior;
+    return it === null ? -1000 : carriageFloor(it, x, z, feetY);
+  };
+
+  /**
+   * Put every remote rider where the composition says, rather than where the
+   * interpolation left them.
+   *
+   * Called at the end of `interpolate`, after the ordinary lerp has already run
+   * -- so a rider whose aboard record is missing from one end of the pair, or
+   * whose trip this client cannot resolve, keeps the world position it just got
+   * and is merely one interpolation delay behind. Failing back to the old answer
+   * rather than to no answer is the whole reason this is a second pass and not a
+   * branch inside the first.
+   *
+   * **The instant is `Date.now()`, not the render tick**, and that is not a slip.
+   * `world/trains.ts` draws the carriages at present wall-clock time, because a
+   * train is a pure function of the clock and there is nothing to interpolate.
+   * A passenger composed at the *render* tick would be placed against a carriage
+   * that is 100 ms further down the line than the one on screen -- 4.4 m of it
+   * -- so they would stand in the wrong seat by exactly the amount this section
+   * exists to remove. The passenger and the vehicle have to be evaluated on one
+   * clock, and it is the vehicle's.
+   */
+  private placeRiders(older: TimedSnapshot, newer: TimedSnapshot | null, t: number): void {
+    const bake = this.rail;
+    if (bake === null) return;
+    const source = newer ?? older;
+    if (source.aboard.length === 0) return;
+    const now = railSeconds(Date.now());
+    for (const b of source.aboard) {
+      if (b.id === this.id) continue;
+      const r = this.remotes.get(b.id);
+      if (r === undefined) continue;
+      const dir = dirOf(bake, b.line, b.dir);
+      if (dir === null) continue;
+      const trip = this.resolveTrip(dir, now, b.tripLow);
+      if (trip === null) continue;
+      const consist = consistOf(dir, trip);
+      if (b.car >= consist.cars.length) continue;
+      this.rideRef.line = b.line;
+      this.rideRef.dir = b.dir;
+      this.rideRef.trip = trip;
+      this.rideRef.car = b.car;
+      if (!aboardFrame(bake, this.rideRef, now, this.remoteFrame)) continue;
+
+      // The walk, interpolated in the carriage's frame -- where the pair is
+      // 50 ms of a 4.4 m/s stride apart rather than 50 ms of a 44 m/s train.
+      let lx = b.x;
+      let ly = b.y;
+      let lz = b.z;
+      if (newer !== null && older !== newer) {
+        const a = older.aboard.find((o: SnapshotAboard) => o.id === b.id);
+        // Only when it is the same carriage of the same train at both ends. A
+        // rider who changed carriage between the two snapshots did not slide
+        // through the gangway, and lerping them would draw exactly that.
+        if (a !== undefined && a.line === b.line && a.dir === b.dir && a.car === b.car && a.tripLow === b.tripLow) {
+          lx = a.x + (b.x - a.x) * t;
+          ly = a.y + (b.y - a.y) * t;
+          lz = a.z + (b.z - a.z) * t;
+          // And the stride, off the same pair, in the frame the walking happens
+          // in. Taken from world positions it would be the train's own speed and
+          // every passenger in Sydney would be drawn sprinting on the spot.
+          const dt = newer.tick > older.tick ? (newer.tick - older.tick) / TICK_HZ : 1 / SNAPSHOT_HZ;
+          r.speed = r.speed * 0.6 + (Math.hypot(b.x - a.x, b.z - a.z) / dt) * 0.4;
+        } else {
+          r.speed = 0;
+        }
+      } else {
+        r.speed = 0;
+      }
+      localToWorld(this.remoteFrame, lx, ly, lz, this.localScratch);
+      r.position.set(this.localScratch.x, this.localScratch.y, this.localScratch.z);
+    }
+  }
+
+  private readonly rideRef = { line: 0, dir: 0, trip: 0, car: 0 };
+
+  /**
+   * Where the local player is in the world right now, if they are on a train.
+   *
+   * `main.ts` needs it after its own fixed step and cannot compose it itself
+   * without holding a frame; this is the one place a frame is already to hand.
+   * Returns false when the ride has ended under the player -- the trip reached
+   * its terminus, or the bake went away -- and the caller puts them down.
+   */
+  aboardFrameNow(local: CombatantState, out: CarFrame): boolean {
+    const bake = this.rail;
+    if (bake === null || !isAboard(local.aboard)) return false;
+    return aboardFrame(bake, local.aboard, railSeconds(Date.now()), out);
   }
 
   // --- The unstuck teleport -----------------------------------------------------
@@ -1707,6 +2114,11 @@ export class NetClient {
 
     this.interpolateBalls(older, newer, t, frameDt);
     this.interpolateActors(older, newer, t);
+    // And last, over the top of the world positions the loop above just wrote:
+    // anybody who is on a train goes where the composition says instead. See
+    // `placeRiders`, and `protocol.ABOARD_BYTES` for what the difference is
+    // worth.
+    this.placeRiders(older, newer, t);
   }
 
   /**

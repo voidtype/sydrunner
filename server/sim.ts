@@ -42,10 +42,10 @@
  */
 
 import {
-  KO_SECONDS,
   MAX_HEALTH,
   advance,
   applyHit,
+  applyWorldDamage,
   createCombatant,
   createHitReport,
   hitTest,
@@ -97,6 +97,7 @@ import {
   type NetEvent,
   type RosterEntry,
   type SnapshotBall,
+  type SnapshotAboard,
   type SnapshotNpc,
   type SnapshotPlayer,
 } from '../client/src/net/protocol.ts';
@@ -159,6 +160,35 @@ import { WaterLevels } from '../client/src/world/wading.ts';
 import { PowerupField } from '../client/src/game/powerups.ts';
 import { TrafficField } from '../client/src/game/traffic.ts';
 import { PedestrianField } from '../client/src/game/pedestrians.ts';
+
+import { railSeconds, SPAN_TUNNEL } from '../client/src/game/rail.ts';
+import {
+  aboardFrame,
+  aboardPose,
+  alightPlatform,
+  alightTrackside,
+  bailoutDamage,
+  clearAboard,
+  consistOf,
+  createBoardOffer,
+  createCarFrame,
+  createCarriageStand,
+  dirOf,
+  enterLocal,
+  exitLocal,
+  findBoarding,
+  frameYaw,
+  interiorOfCar,
+  isAboard,
+  nextCall,
+  projectAboard,
+  localToWorld,
+  spanFlagsAt,
+  stopPlatform,
+  worldToLocal,
+  type CarFrame,
+  type Vec3Out,
+} from '../client/src/game/riding.ts';
 
 export const FIXED_DT = 1 / TICK_HZ;
 
@@ -495,6 +525,41 @@ export class Simulation {
   /** Reused by `follow`, so a tick with nobody riding allocates nothing. */
   private readonly bikeSweep: Bike[] = [];
   private readonly riderViews: RiderView[] = [];
+
+  // --- The trains. See `game/riding.ts`, and `resolveMount` for the one place
+  //     a client's claim to be standing beside an open door is adjudicated.
+  /**
+   * The rail clock for this tick, seconds. One read of the wall clock, shared.
+   *
+   * One read rather than one per participant, and it is the same discipline
+   * `stepFactions` applies to `trafficTick(Date.now())`: two participants
+   * resolved against two different instants would be two participants boarding
+   * two different positions of the same train.
+   */
+  private railT = 0;
+  /**
+   * Where the rail clock comes from. `Date.now` in production, always.
+   *
+   * A seam rather than a call, for `checkInputQueue`'s reason stated about a
+   * different clock: *a measurement of a network taken over a real one is a
+   * measurement of the afternoon*. A ride from St Peters to Central is four
+   * minutes of railway and twelve hundred ticks, and twelve hundred ticks run in
+   * about a second -- so a check that read the wall clock would step the whole
+   * journey while the train moved eleven metres, and would prove nothing about
+   * riding at all. `checkRiding` drives this at the tick rate; nothing else ever
+   * assigns to it.
+   */
+  railNowMs: () => number = Date.now;
+  /** The carriage a body is being stepped inside, aimed per participant. */
+  private readonly carriage = createCarriageStand();
+  /** Set for the length of one `advance` when the body above is in a carriage. */
+  private carriageFrame: CarFrame | null = null;
+  private readonly frame = createCarFrame();
+  private readonly boardOffer = createBoardOffer();
+  private readonly landing: Vec3Out = { x: 0, y: 0, z: 0 };
+  /** Pooled aboard records, on `snapshot`'s terms. Keyed for `Room.fill`. */
+  private readonly aboardPool: SnapshotAboard[] = [];
+  readonly aboardById = new Map<number, SnapshotAboard>();
 
   /** See `stepFactions`, which mutates the two members that change and nothing else. */
   private factionCtx!: FactionCtx;
@@ -935,6 +1000,10 @@ export class Simulation {
       if (p.bot) p.bot.think(this.combatants, FIXED_DT);
     }
 
+    // --- The rail clock, once, before anything asks where a train is. See
+    //     `railT`.
+    this.railT = railSeconds(this.railNowMs());
+
     // --- The bikes, before anybody moves.
     //
     // Before, and in ascending id, for exactly the reason the strike resolution
@@ -952,7 +1021,13 @@ export class Simulation {
     // on the same tick have to resolve in an order both ends agree on.
     t = performance.now();
     for (const p of this.ordered) {
-      const events = advance(p.combat, p.input, FIXED_DT, p.world);
+      // The one seam trains put in this loop. `enterCarriage` either hands back
+      // the city -- which is every tick of every player who is not on a train --
+      // or moves this body into its carriage's coordinates and hands back the
+      // carriage. See `game/riding.ts`'s header for why the whole feature is one
+      // change of basis around one unchanged `advance`.
+      const events = advance(p.combat, p.input, FIXED_DT, this.enterCarriage(p));
+      this.exitCarriage(p);
 
       if (events.strike) this.resolveStrike(p);
       // A throw is not adjudicated at all -- it puts an object in the world and
@@ -962,6 +1037,12 @@ export class Simulation {
       if (events.ballThrown) this.balls.add(p.combat);
 
       if (events.respawnDue) {
+        // And off the train, here rather than one tick later. `enterLocal` would
+        // catch the teleport `respawnAt` is about to do and end the ride on the
+        // next tick anyway -- that is the level this feature is swept at -- but
+        // one tick later is one snapshot in which a body standing in Redfern is
+        // also listed as being in carriage 4 of a train through Strathfield.
+        clearAboard(p.combat.aboard);
         const spot = pickRespawn(p.combat.body.position.x, p.combat.body.position.z, p.world);
         if (spot) {
           respawnAt(p.combat, spot.x, spot.y, spot.z, p.combat.body.yaw);
@@ -1082,6 +1163,21 @@ export class Simulation {
     {
       const tick = trafficTick(Date.now());
       for (const p of this.ordered) {
+        // Nobody on a train is run over by a Camry.
+        //
+        // A rider's world position is real and is exactly where the query wants
+        // it -- which is the point of deriving it -- so a train crossing a level
+        // crossing at 130 km/h would otherwise put every passenger on the
+        // pavement, one by one, at the crossing. TRAINS.md has the rule the
+        // other way round (a train through a crossing applies the car-hit rule
+        // *scaled up*, and that is the train's to apply, not the Camry's), and
+        // it is not a rule about the people inside the train.
+        //
+        // Here rather than inside `carHitting`, because that function answers a
+        // question about geometry and this is a question about what a body is
+        // standing in. The client makes the identical check in the identical
+        // place -- `main.ts` -- which is what keeps the prediction exact.
+        if (isAboard(p.combat.aboard)) continue;
         const car = carHitting(this.world.traffic, p.combat, tick, this.carRoutes, this.carPose);
         if (car === null) continue;
         const ko = applyCarHit(p.combat, car);
@@ -1307,22 +1403,31 @@ export class Simulation {
    * snapshot either way.
    */
   private shoot(playerId: number, pips: number, actor: NpcActor): void {
+    void actor;
+    this.hurt(playerId, pips);
+  }
+
+  /**
+   * Take pips off a player with nobody to blame but the world.
+   *
+   * Split out of `shoot` when jumping out of a moving train needed the same
+   * thing: the phase, the clock, the respawn and the `HIT` event with the victim
+   * as their own attacker are all the shared machine's, and a second copy of
+   * them would be a second place the knockout could be spelled differently.
+   * `factions.NpcKindDef.scoresKo` reasoning applies unchanged -- nobody's
+   * leaderboard row moves, and the *down* is still counted, because being
+   * thrown off a train at 130 km/h is a thing that happened to you.
+   */
+  private hurt(playerId: number, pips: number): void {
     const p = this.participants.get(playerId);
     if (!p) return;
     const c = p.combat;
     if (c.phase === 'ko' || c.health <= 0) return;
-    c.health = Math.max(0, c.health - pips);
-    const ko = c.health <= 0;
+    // The knockout, spelled once, in the function both authorities run --
+    // `combat.applyWorldDamage`. See its header for why it is not `applyHit`
+    // with the victim as their own attacker.
+    const ko = applyWorldDamage(c, pips);
     if (ko) {
-      // The knockout, on `combat.applyHit`'s own terms but without a puncher:
-      // the phase, the clock and the respawn are the shared machine's, so
-      // everything downstream -- the animation byte, the movement lock, the
-      // respawn sweep -- works with no change at all.
-      c.phase = 'ko';
-      c.phaseT = 0;
-      c.koT = 0;
-      c.respawnT = KO_SECONDS;
-      c.ridingBike = 0;
       this.creditKo(playerId, playerId);
       // The investigation ends with the player. Being shot by the police is the
       // countdown's other terminal state, and a banner that survived a respawn
@@ -1339,7 +1444,6 @@ export class Simulation {
       flags: ko ? EVENT_FLAG.KO : 0,
       health: c.health,
     });
-    void actor;
   }
 
   /**
@@ -1366,6 +1470,26 @@ export class Simulation {
     const c = p.combat;
     if (c.phase === 'ko') return;
 
+    // --- The train, ahead of the bike, and one key for both.
+    //
+    // `E` has one meaning -- "get on or off the thing beside you" -- and adding
+    // a second key for trains would have been a second key for a mutually
+    // exclusive state. So this is a priority chain rather than two features:
+    // off a train, then off a bike, then onto a train, then onto a bike. The
+    // ordering falls out of one rule, *leaving beats arriving*, and it settles
+    // the only ambiguous case there is: a rider standing at an open door does
+    // not re-board the carriage they are already in.
+    //
+    // A player on a bike who walks up to an open door presses `E` twice, and
+    // that is the right number: the first press parks the bike on the platform
+    // where they are standing, which is where a bike belongs, and the second
+    // takes them aboard. Carrying it on would mean a lime bike arriving at
+    // Central inside carriage four with nothing to park it on.
+    if (isAboard(c.aboard)) {
+      this.alight(p);
+      return;
+    }
+
     if (c.ridingBike !== 0) {
       // Off. The bike is parked where the body is -- by `follow` at the end of
       // this tick, which has the position after the step rather than before it.
@@ -1374,6 +1498,7 @@ export class Simulation {
     }
 
     const feet = c.body.position.y - EYE_HEIGHT;
+    if (this.tryBoard(p, feet)) return;
     const bike = this.bikes.nearestFree(c.body.position.x, feet, c.body.position.z);
     if (!bike) return;
     // The one place a claim is decided, and it can still fail: an earlier
@@ -1381,6 +1506,362 @@ export class Simulation {
     if (!this.bikes.claim(bike.id, c.id)) return;
     c.ridingBike = bike.id;
     this.bikeChanges.push(bike);
+  }
+
+  // --- Trains ---------------------------------------------------------------------
+
+  /**
+   * Where a rewound passenger *appeared to be*: 250 ms old in the carriage, and
+   * not one millisecond old along the railway.
+   *
+   * The rewind's whole job is to put a target where the swinger's screen had it,
+   * and for a rider the swinger's screen had them somewhere the plain history
+   * does not. `net/client.placeRiders` composes a remote rider from their
+   * carriage-local offset and the train's pose **at present time** -- a train is
+   * a closed-form function of the clock, so there is nothing about it to
+   * interpolate and interpolating it anyway would put two people in one carriage
+   * a fifth of a carriage apart. What *is* interpolated is the walking, in the
+   * carriage's frame, where 250 ms is a stride.
+   *
+   * So the correction is: take the historical world position, push it back into
+   * the carriage's frame **at the instant it was recorded**, and pull it out
+   * again through the carriage's frame **now**.
+   *
+   *     seen = frame(now) . frame(now - back)^-1 . recorded
+   *
+   * Nothing is stored to make that possible, and that is the architectural claim
+   * TRAINS.md makes about riding paying for itself: `poseTrain` is closed form,
+   * so a frame at any past instant is one evaluation away, and the inverse is
+   * the transpose because the basis is orthonormal. Without it every swing
+   * aboard a train at 44 m/s would be adjudicated eleven metres behind the
+   * carriage the fight is in, and would miss.
+   *
+   * A rider who was not on this train 250 ms ago -- they boarded inside the
+   * window -- is reframed with a frame that did not have them in it, and the
+   * answer is wrong by however far they walked. That is bounded by a stride and
+   * is the same error every non-rider already carries.
+   */
+  private readonly reframeRider = (
+    live: CombatantState,
+    back: number,
+    at: { x: number; y: number; z: number; yaw: number },
+  ): void => {
+    const a = live.aboard;
+    if (!isAboard(a)) return;
+    const bake = this.world.rail ?? null;
+    if (bake === null) return;
+    if (!aboardFrame(bake, a, this.railT - back, this.pastFrame)) return;
+    if (!aboardFrame(bake, a, this.railT, this.nowFrame)) return;
+    worldToLocal(this.pastFrame, at.x, at.y, at.z, this.reframeTmp);
+    localToWorld(this.nowFrame, this.reframeTmp.x, this.reframeTmp.y, this.reframeTmp.z, this.reframeTmp);
+    at.x = this.reframeTmp.x;
+    at.y = this.reframeTmp.y;
+    at.z = this.reframeTmp.z;
+  };
+
+  private readonly pastFrame = createCarFrame();
+  private readonly nowFrame = createCarFrame();
+  private readonly reframeTmp: Vec3Out = { x: 0, y: 0, z: 0 };
+
+  /**
+   * Get on the train beside you, if the *server* agrees there is one.
+   *
+   * This is the whole of the anti-cheat story for boarding and it is the bikes'
+   * verbatim, one level harder. `INPUT` is ten bytes of buttons and a look
+   * direction: there is no field in which a client could name a trip, a
+   * carriage or an offset, so a boarding claim is not a claim at all -- it is a
+   * question asked with a button, answered here against
+   *
+   *   1. **this server's own position for that body**, not one the client sent;
+   *   2. **this server's own evaluation of `poseTrain`** at this tick's
+   *      `railT`, which is a closed-form function of the millisecond and is
+   *      asserted bit-identical to the browser's by `checkRail`;
+   *   3. `doorsOpen`, which `poseTrain` sets only while the curve is stationary
+   *      at a *calling* station -- a fifteen-second window, at a platform,
+   *      per trip.
+   *
+   * `findBoarding`'s reach is 2.2 m off the bodyside and 2.4 m of rise, which is
+   * "standing in the doorway or one pace back from it". A client pressing `E`
+   * in the middle of the harbour gets nothing, a client pressing it beside a
+   * train that is not stopped gets nothing, and a client pressing it under the
+   * viaduct a train is crossing gets nothing -- the rise test is what closes
+   * that last one, and it is the only one of the three that is not obvious.
+   *
+   * The one thing the client *does* decide is when to ask, which is the same
+   * prediction the bike makes: `main.ts` runs the identical function against the
+   * identical bake and puts the player aboard on the frame the key goes down, so
+   * the ride starts on the next frame rather than on the next round trip. If it
+   * was wrong, the very next snapshot has them on the platform.
+   */
+  private tryBoard(p: Participant, feet: number): boolean {
+    const bake = this.world.rail ?? null;
+    if (bake === null) return false;
+    const c = p.combat;
+    if (!findBoarding(
+      bake, c.body.position.x, feet, c.body.position.z, this.railT, this.boardOffer,
+    )) {
+      return false;
+    }
+    const o = this.boardOffer;
+    const a = c.aboard;
+    a.line = o.line;
+    a.dir = o.dir;
+    a.trip = o.trip;
+    a.car = o.car;
+    a.x = o.x;
+    a.y = o.y;
+    a.z = o.z;
+    // Standing still, in the carriage's frame, which is a body doing 130 km/h in
+    // the world's. See `AboardSlot.vx`.
+    a.vx = 0;
+    a.vy = 0;
+    a.vz = 0;
+    if (!aboardFrame(bake, a, this.railT, this.frame)) {
+      clearAboard(a);
+      return false;
+    }
+    // The heading they already had, expressed in the carriage's frame, so that
+    // boarding a train pointing north while facing east leaves them facing east.
+    // The client does the same subtraction against its own accumulated look, and
+    // the two agree because both are reading the same frame.
+    a.yaw = c.body.yaw - frameYaw(this.frame);
+    projectAboard(a, c.body, this.frame);
+    c.body.onGround = true;
+    return true;
+  }
+
+  /**
+   * Get off, by whichever of the three doors this is.
+   *
+   * TRAINS.md's rule, in the order it is written there: at a dwell you step onto
+   * the platform; at speed you may jump, and it hurts; in a tunnel there is
+   * nothing to jump onto, so you are relocated to the next station and told you
+   * were dragged out by staff.
+   *
+   * The tunnel case is not a mercy, it is the only defensible answer. The
+   * pipeline builds a tube around the track and no floor beside it -- nobody
+   * walks the tunnels, and TRAINS.md says so in as many words -- so "put them
+   * where they jumped" is putting them inside rock, where there is no terrain
+   * grid, no collision and no water table, and `groundHeight`'s last-known
+   * fallback means they would not even fall. They would stand in the dark on the
+   * height of whoever asked last. `checkRiding` asserts a tunnel bail-out lands
+   * on a platform and never in the hill.
+   */
+  private alight(p: Participant): void {
+    const bake = this.world.rail ?? null;
+    const c = p.combat;
+    const a = c.aboard;
+    if (bake === null) {
+      clearAboard(a);
+      return;
+    }
+    const dir = dirOf(bake, a.line, a.dir);
+    const pose = aboardPose(bake, a, this.railT);
+    if (dir === null || pose === null || !aboardFrame(bake, a, this.railT, this.frame)) {
+      // The trip has run out from under them -- a terminus, or a bake that no
+      // longer holds this line. `strandRider` is the same path the tick loop
+      // takes when `aboardFrame` fails, so there is one answer to it.
+      this.strandRider(p);
+      return;
+    }
+    const it = interiorOfCar(consistOf(dir, a.trip), a.car);
+    if (it === null) {
+      this.strandRider(p);
+      return;
+    }
+    const speed = pose.speed;
+    const s = pose.s;
+    const tunnel = (spanFlagsAt(bake, dir, s) & SPAN_TUNNEL) !== 0;
+
+    if (pose.doorsOpen) {
+      // The ordinary way off: onto the platform, at platform height, on the side
+      // they were standing. Composed through the carriage's own frame so the two
+      // ends land on the same square metre -- see `riding.alightPlatform`.
+      alightPlatform(this.frame, it, a.x, a.z, this.world.platforms ?? null, this.landing);
+      this.placeRider(p, this.landing);
+      clearAboard(a);
+      return;
+    }
+
+    if (tunnel) {
+      const stop = nextCall(dir, s);
+      if (stop >= 0 && stopPlatform(bake, dir, stop, a.z, this.landing)) {
+        this.placeRider(p, this.landing);
+        clearAboard(a);
+        // The killfeed line is the client's -- see `main.ts` -- but the *event*
+        // is here, as a self-inflicted zero-damage hit, so a spectator's feed
+        // says something happened rather than a body silently teleporting.
+        this.events.push({
+          kind: EVENT.HIT,
+          attacker: p.id,
+          victim: p.id,
+          flags: 0,
+          health: c.health,
+        });
+        return;
+      }
+      this.strandRider(p);
+      return;
+    }
+
+    // Out the side at speed. Two metres clear of the bodyside at rail level,
+    // which is the ballast, and then the arithmetic decides how much of them
+    // arrives.
+    alightTrackside(this.frame, it, a.x, a.z, this.landing);
+    this.placeRider(p, this.landing);
+    clearAboard(a);
+    // The fall, thrown along the train's own heading rather than dropped: a body
+    // leaving a train at 36 m/s does not stop being at 36 m/s, and the one place
+    // in this feature where the train's velocity *is* the player's is the moment
+    // they stop being a passenger. Damped hard, because the ragdoll's own
+    // friction is written for a body that was punched rather than for one that
+    // left a train, and 36 m/s of tumble crosses two suburbs.
+    const damp = 0.22;
+    c.body.velocity.set(pose.dx * speed * damp, 1.5, pose.dz * speed * damp);
+    c.body.onGround = false;
+    const pips = bailoutDamage(speed);
+    if (pips > 0.05) this.hurt(p.id, pips);
+  }
+
+  /**
+   * Put a rider on the ground at a world point, ending the ride's bookkeeping.
+   *
+   * The velocity is cleared here and re-set by the one caller that wants one.
+   * Nothing else about the body is touched -- health, stamina, the coffees and
+   * the bat's clock all survive getting off a train, which is `unstuck`'s rule
+   * and for its reason: a free heal on a fifteen-second dwell is the one way
+   * this could decide a fight.
+   */
+  private placeRider(p: Participant, at: Vec3Out): void {
+    const c = p.combat;
+    c.body.position.set(at.x, at.y, at.z);
+    c.body.velocity.set(0, 0, 0);
+    c.body.onGround = true;
+    // Seed the rewind ring, on `respawnAt`'s argument: for the next 250 ms an
+    // unseeded history would rewind this player back inside a train that has
+    // since left the station, and a punch thrown at that spot would land on
+    // somebody standing 400 m up the line.
+    p.history.seed(this.tick, at.x, at.y, at.z, c.body.yaw);
+  }
+
+  /**
+   * The ride ended and there is no carriage left to get out of.
+   *
+   * Reached two ways, and both of them are "the trip stopped existing": the
+   * train reached its terminus while somebody was still on it, or the bake
+   * changed under a live ride. The last known world position is where the body
+   * already is, so the honest thing is to leave it there and let the ground
+   * claim it -- but the last known world position of a passenger is *inside a
+   * train*, and a train at a terminus is over the buffers. So this puts them on
+   * the platform of the last station the trip called at, which is where a
+   * passenger who fell asleep actually ends up.
+   */
+  private strandRider(p: Participant): void {
+    const bake = this.world.rail ?? null;
+    const a = p.combat.aboard;
+    const dir = bake === null ? null : dirOf(bake, a.line, a.dir);
+    if (bake !== null && dir !== null) {
+      const stop = nextCall(dir, dir.lengthM);
+      if (stop >= 0 && stopPlatform(bake, dir, stop, a.z, this.landing)) {
+        this.placeRider(p, this.landing);
+      }
+    }
+    clearAboard(a);
+  }
+
+  /**
+   * Move this body into its carriage for one step, and say which world to use.
+   *
+   * Returns `p.world` -- the city -- for everybody who is not on a train, which
+   * is the overwhelming majority of every tick and costs one boolean. For a
+   * rider it aims the shared `CarriageStand` at their carriage's interior and
+   * returns that instead, so `advance` steps them against a floor, four walls
+   * and a staircase rather than against Sydney.
+   *
+   * The three ways a ride ends here are all "something else already decided":
+   * the world has no bake, the trip is no longer running, or `enterLocal` found
+   * that the body had been moved in world coordinates since the last tick --
+   * a respawn, an unstuck, a teleport, a hard reconciliation snap. See
+   * `riding.enterLocal`, which is where that last one is argued out.
+   */
+  private enterCarriage(p: Participant): CombatWorld {
+    this.carriageFrame = null;
+    const c = p.combat;
+    const a = c.aboard;
+    if (!isAboard(a)) return p.world;
+
+    const bake = this.world.rail ?? null;
+    if (bake === null) {
+      clearAboard(a);
+      return p.world;
+    }
+    if (!aboardFrame(bake, a, this.railT, this.frame)) {
+      this.strandRider(p);
+      return p.world;
+    }
+    if (!enterLocal(a, c.body, this.frame)) {
+      clearAboard(a);
+      return p.world;
+    }
+    const dir = dirOf(bake, a.line, a.dir);
+    const it = dir === null ? null : interiorOfCar(consistOf(dir, a.trip), a.car);
+    if (it === null) {
+      // The body is in local coordinates and there is nothing to be local to.
+      // Put it back before letting go of it, which is what `exitLocal` is.
+      exitLocal(a, c.body, this.frame);
+      this.strandRider(p);
+      return p.world;
+    }
+    this.carriage.interior = it;
+    this.carriageFrame = this.frame;
+    return this.carriage as unknown as CombatWorld;
+  }
+
+  /** Compose the stepped body back into the world. The other half of `enterCarriage`. */
+  private exitCarriage(p: Participant): void {
+    const f = this.carriageFrame;
+    if (f === null) return;
+    this.carriageFrame = null;
+    exitLocal(p.combat.aboard, p.combat.body, f);
+  }
+
+  /**
+   * Every rider in this room, as wire records, indexed by player id.
+   *
+   * Indexed rather than listed because `Room.fill` selects by the *player*
+   * interest set -- a rider is in your snapshot's aboard section exactly when
+   * they are in its player section -- so the lookup is by id and the section is
+   * built per client from this map. Pooled on `snapshot`'s terms.
+   */
+  aboardSnapshot(): Map<number, SnapshotAboard> {
+    this.aboardById.clear();
+    let n = 0;
+    for (const p of this.ordered) {
+      const a = p.combat.aboard;
+      if (!isAboard(a)) continue;
+      let rec = this.aboardPool[n];
+      if (rec === undefined) {
+        rec = { id: 0, line: 0, dir: 0, tripLow: 0, car: 0, x: 0, y: 0, z: 0 };
+        this.aboardPool.push(rec);
+      }
+      rec.id = p.id;
+      rec.line = a.line;
+      rec.dir = a.dir;
+      // The low byte, resolved back against the live departures by the receiver.
+      // `& 0xff` on a negative trip index is still the right byte: trips before
+      // the epoch are negative and the mask is two's complement, so the
+      // receiver's `trip & 0xff` matches whatever this wrote.
+      rec.tripLow = a.trip & 0xff;
+      rec.car = a.car;
+      rec.x = a.x;
+      rec.y = a.y;
+      rec.z = a.z;
+      // No yaw: a rider's world yaw is already in their ordinary player record
+      // and that is the only one anybody draws with. See `protocol.ABOARD_BYTES`.
+      this.aboardById.set(p.id, rec);
+      n++;
+    }
+    return this.aboardById;
   }
 
   /** Spec 8.2's punch, against the attacker's own view of the world. */
@@ -1412,6 +1893,11 @@ export class Simulation {
       this.tick - p.viewTicks,
       this.rewindPool,
       this.strikeProxies,
+      // And the one correction a passenger needs. See `RewindReframe`, and
+      // `reframeRider` below for the arithmetic. It is a no-op for everybody who
+      // is not on a train, which is everybody, almost always.
+      this.reframeRider,
+      this.tick,
     );
     const victim = resolveLiveById(hitTest(p.combat, targets), this.byId);
     if (victim) {

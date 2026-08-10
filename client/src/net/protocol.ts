@@ -350,7 +350,25 @@ export const MSG = {
  * is a client that would silently ignore frames it should be showing a player.
  * Whichever feature is edited next: check this number before bumping it.
  */
-export const PROTOCOL_VERSION = 9;
+/*
+ * v10 adds the **aboard section**: who is standing inside which carriage of
+ * which train, and where in it.
+ *
+ * A section of its own after the actors rather than a widening of the player
+ * record, on the argument the projectiles are filed under: this is a property of
+ * a *relationship* and not of a person, it is empty in the overwhelming majority
+ * of snapshots, and thirteen bytes of zeros per player per snapshot is 104 kbit/s
+ * of nothing at a full working set. Membership of the section is itself the
+ * "is aboard" bit, so no flag byte was widened either -- and `FLAG` had no spare
+ * bits left to widen with, which is the other half of why.
+ *
+ * A player in that section is **still a completely ordinary player** in the
+ * record above it: their `x, y, z` is the derived world position, so the roster,
+ * the leaderboard, the kill feed, the minimap, the nameplates and every client
+ * that never learned what a train is keep working unchanged. What the section
+ * buys is exactness -- see `ABOARD_BYTES`.
+ */
+export const PROTOCOL_VERSION = 10;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
@@ -1192,6 +1210,7 @@ export const NPC_BYTES = 18;
  *     u16  players   (7)  -- v8: was a u8, which aliased above 255
  *     u16  balls     (9)  -- v8: was a u8
  *     u8   actors    (11) -- still a byte; `factions.MAX_ACTORS` is 24 per room
+ *     u8   aboard    (12) -- v10; bounded by `AOI_MAX_PLAYERS`, which is 40
  *
  * The actor count stayed a byte deliberately rather than by omission. It is the
  * one count in this header that is bounded by a *constant* rather than by a
@@ -1200,7 +1219,105 @@ export const NPC_BYTES = 18;
  * point the section would be 4.6 kB a snapshot and the count byte would be the
  * least of it.
  */
-export const SNAPSHOT_HEADER_BYTES = 12;
+export const SNAPSHOT_HEADER_BYTES = 13;
+
+/**
+ * One rider, 8 bytes, in the carriage's own coordinates.
+ *
+ *     u16  id            the player, as everywhere else on this wire
+ *     u8   line << 4 | dir << 3 | car
+ *     u8   tripLow       `trip & 0xff`; see below
+ *     i16  lx            along the carriage, 2.5 cm
+ *     u8   ly            above rail level, 2.5 cm
+ *     i8   lz            across the carriage, 2.5 cm
+ *
+ * **Why any of this is on the wire at all**, when the player record above
+ * already carries a perfectly good world position: because that position is
+ * 100 ms old by the time it is drawn. `net/client.ts` renders remotes at
+ * `now - INTERP_DELAY_MS`, which is the right rule for a body walking at
+ * 4.4 m/s -- it is 44 cm -- and the wrong one for a body standing on a floor
+ * doing 44 m/s, where it is **4.4 metres**, or a fifth of a carriage. Two
+ * players riding the same train would each see the other sliding along the
+ * aisle, permanently one interpolation behind, and a player on the platform
+ * would watch them stream past the windows in the wrong seats.
+ *
+ * Composed instead -- `poseTrain(trip, renderTime)` applied to the local offset
+ * -- the answer is exact, because the train's own motion is a closed-form
+ * function of the clock that both ends evaluate identically (`checkRail`
+ * asserts it bit-for-bit over ten thousand samples). Only the *walking* is
+ * interpolated, and only in the carriage's frame, where it is 44 cm again.
+ *
+ * **2.5 cm, and not the millimetre every other position on this wire uses.**
+ * The other fields have to span a 60 km disc and this one spans a carriage, so
+ * the argument that fixed their unit does not reach here -- what fixes this one
+ * is that it is a *correction to an already-exact composition*. The train's pose
+ * is bit-exact; the only thing being quantised is how far along the aisle
+ * somebody has walked, against a remote body that is drawn as a 0.34 m capsule
+ * and is being interpolated anyway. At the millimetre this record was 13 bytes;
+ * at 2.5 cm it is 8, and the difference is a byte-and-a-half per rider per
+ * snapshot that nobody can see. `verifyNet` asserts the tolerance rather than
+ * trusting the prose.
+ *
+ * **There is no yaw field, and that is not an omission.** A rider's *world*
+ * yaw is already in their ordinary player record two sections up, at the same
+ * 1/65,536 of a turn everybody else gets, and world yaw is the only one a
+ * receiver draws with. The carriage-local yaw exists on both simulations --
+ * `riding.AboardSlot.yaw` -- but the local player's own copy is just their input
+ * yaw, which they already have, and nobody else needs it. Sending it would be
+ * sending a number that can be derived on one end and is unused on the other.
+ *
+ * **`trip` is a low byte and it is resolved rather than read.** A trip index is
+ * the unbounded departure counter `rail.tripIndexAt` hands out -- it grows
+ * forever and is an identity, never an array index -- so it does not fit in a
+ * byte and does not need to: the receiver knows `t`, so it knows the handful of
+ * departures of that direction that can possibly be running (the longest line in
+ * the bake has 27), and exactly one of them ends in the byte that arrived. The
+ * alternative, "how many departures back from the newest", is the one that
+ * looks cheaper and is wrong: the newest departure changes at the period
+ * boundary, so the answer would be off by one for every client whose clock is on
+ * the other side of it from the server's.
+ *
+ * Four bits of line (the bake has ten), one of direction and three of carriage
+ * (a consist is eight cars, six on the Metro). `verifyNet` asserts all three.
+ *
+ * **What the section costs when nobody is riding is one byte** -- the count in
+ * the header -- and that is the number this design was chosen for. A snapshot in
+ * an ordinary street is v9's snapshot plus 160 bit/s.
+ */
+export const ABOARD_BYTES = 8;
+
+/** The wire unit of a carriage-local offset, metres. See `ABOARD_BYTES`. */
+export const ABOARD_STEP_M = 0.025;
+
+/** Along the carriage: `i16` steps, which reaches far past any carriage. */
+export function quantiseAlong(metres: number): number {
+  if (!Number.isFinite(metres)) return 0;
+  const n = Math.round(metres / ABOARD_STEP_M);
+  return n < -32768 ? -32768 : n > 32767 ? 32767 : n;
+}
+
+/** Above rail level: `u8` steps, 0 to 6.375 m. An upper-deck eye mid-jump is 5.3. */
+export function quantiseRise(metres: number): number {
+  if (!Number.isFinite(metres)) return 0;
+  const n = Math.round(metres / ABOARD_STEP_M);
+  return n < 0 ? 0 : n > 255 ? 255 : n;
+}
+
+/** Across the carriage: `i8` steps, +/- 3.175 m against a 1.42 m half-width. */
+export function quantiseAcross(metres: number): number {
+  if (!Number.isFinite(metres)) return 0;
+  const n = Math.round(metres / ABOARD_STEP_M);
+  return n < -128 ? -128 : n > 127 ? 127 : n;
+}
+
+export function dequantiseLocal(raw: number): number {
+  return raw * ABOARD_STEP_M;
+}
+
+/** What each of the three fields can hold, metres. Asserted by `verifyNet`. */
+export const ABOARD_ALONG_LIMIT_M = 32767 * ABOARD_STEP_M;
+export const ABOARD_RISE_LIMIT_M = 255 * ABOARD_STEP_M;
+export const ABOARD_ACROSS_LIMIT_M = 127 * ABOARD_STEP_M;
 
 /** i8 half-metres a second. See `BALL_BYTES` for why this is so coarse. */
 const VELOCITY_SCALE = 2;
@@ -1257,6 +1374,28 @@ export interface SnapshotNpc {
   state: number;
 }
 
+/**
+ * One rider, decoded. See `ABOARD_BYTES` for the layout and the arguments.
+ *
+ * `trip` here is the **low byte as it arrived**, not the resolved trip index:
+ * this decoder has no bake and no clock, and resolving it needs both. The one
+ * caller that can -- `net/client.ts`, which holds the bake the renderer holds --
+ * does it against the live set. Decoding it into something that looked like a
+ * trip index would be inventing a number.
+ */
+export interface SnapshotAboard {
+  id: number;
+  line: number;
+  dir: number;
+  /** `trip & 0xff`. Resolve against the live departures at the receiver's `t`. */
+  tripLow: number;
+  car: number;
+  /** Carriage-local metres. The rider's eye. Quantised to 2.5 cm on the wire. */
+  x: number;
+  y: number;
+  z: number;
+}
+
 export interface Snapshot {
   tick: number;
   /** The last input seq the server applied **for the client this went to**. */
@@ -1282,10 +1421,28 @@ export interface Snapshot {
    * one for that reason.
    */
   npcs: SnapshotNpc[];
+  /**
+   * Everybody in this snapshot's working set who is on a train, and where in it.
+   *
+   * Filtered by interest exactly as the players are, because it *is* the
+   * players: an entry here is always accompanied by that id's ordinary record
+   * above, and a receiver that ignored this section entirely would still draw
+   * everybody in the right place to within one interpolation delay. See
+   * `ABOARD_BYTES` for what the fifth of a carriage that buys is worth.
+   */
+  aboard: SnapshotAboard[];
 }
 
-export function snapshotBytes(playerCount: number, ballCount = 0, npcCount = 0): number {
-  return SNAPSHOT_HEADER_BYTES + playerCount * PLAYER_BYTES + ballCount * BALL_BYTES + npcCount * NPC_BYTES;
+export function snapshotBytes(
+  playerCount: number, ballCount = 0, npcCount = 0, aboardCount = 0,
+): number {
+  return (
+    SNAPSHOT_HEADER_BYTES +
+    playerCount * PLAYER_BYTES +
+    ballCount * BALL_BYTES +
+    npcCount * NPC_BYTES +
+    aboardCount * ABOARD_BYTES
+  );
 }
 
 export function encodeSnapshot(
@@ -1294,9 +1451,12 @@ export function encodeSnapshot(
   players: readonly SnapshotPlayer[],
   balls: readonly SnapshotBall[] = EMPTY_BALLS,
   npcs: readonly SnapshotNpc[] = EMPTY_NPCS,
+  aboard: readonly SnapshotAboard[] = EMPTY_ABOARD,
 ): ArrayBuffer {
-  const buffer = new ArrayBuffer(snapshotBytes(players.length, balls.length, npcs.length));
-  encodeSnapshotInto(new DataView(buffer), tick, ackSeq, players, balls, npcs);
+  const buffer = new ArrayBuffer(
+    snapshotBytes(players.length, balls.length, npcs.length, aboard.length),
+  );
+  encodeSnapshotInto(new DataView(buffer), tick, ackSeq, players, balls, npcs, aboard);
   return buffer;
 }
 
@@ -1328,6 +1488,7 @@ export function encodeSnapshotInto(
   players: readonly SnapshotPlayer[],
   balls: readonly SnapshotBall[] = EMPTY_BALLS,
   npcs: readonly SnapshotNpc[] = EMPTY_NPCS,
+  aboard: readonly SnapshotAboard[] = EMPTY_ABOARD,
 ): number {
   v.setUint8(0, MSG.SNAPSHOT);
   v.setUint32(1, tick >>> 0, true);
@@ -1335,6 +1496,7 @@ export function encodeSnapshotInto(
   v.setUint16(7, players.length & 0xffff, true);
   v.setUint16(9, balls.length & 0xffff, true);
   v.setUint8(11, npcs.length);
+  v.setUint8(12, aboard.length & 0xff);
   let p = SNAPSHOT_HEADER_BYTES;
   for (const s of players) {
     v.setUint16(p, s.id & 0xffff, true);
@@ -1382,6 +1544,20 @@ export function encodeSnapshotInto(
     v.setUint8(p + 17, n.state & 0xff);
     p += NPC_BYTES;
   }
+  // The riders, last, and after the actors on the same argument they sit after
+  // the balls: this is a relationship rather than a person, it is usually empty,
+  // and a section appended at the end is the one shape a v9 reader would have
+  // ignored harmlessly if the version had not been bumped -- which it was, since
+  // a v9 reader would also have misread the header byte above.
+  for (const a of aboard) {
+    v.setUint16(p, a.id & 0xffff, true);
+    v.setUint8(p + 2, ((a.line & 0x0f) << 4) | ((a.dir & 1) << 3) | (a.car & 0x07));
+    v.setUint8(p + 3, a.tripLow & 0xff);
+    v.setInt16(p + 4, quantiseAlong(a.x), true);
+    v.setUint8(p + 6, quantiseRise(a.y));
+    v.setInt8(p + 7, quantiseAcross(a.z));
+    p += ABOARD_BYTES;
+  }
   return p;
 }
 
@@ -1397,6 +1573,7 @@ export function patchSnapshotAck(v: DataView, ackSeq: number): void {
 
 const EMPTY_BALLS: readonly SnapshotBall[] = [];
 const EMPTY_NPCS: readonly SnapshotNpc[] = [];
+const EMPTY_ABOARD: readonly SnapshotAboard[] = [];
 
 export function decodeSnapshot(buffer: ArrayBuffer, out: Snapshot): Snapshot | null {
   if (buffer.byteLength < SNAPSHOT_HEADER_BYTES) return null;
@@ -1407,7 +1584,8 @@ export function decodeSnapshot(buffer: ArrayBuffer, out: Snapshot): Snapshot | n
   const count = v.getUint16(7, true);
   const ballCount = v.getUint16(9, true);
   const npcCount = v.getUint8(11);
-  if (buffer.byteLength < snapshotBytes(count, ballCount, npcCount)) return null;
+  const aboardCount = v.getUint8(12);
+  if (buffer.byteLength < snapshotBytes(count, ballCount, npcCount, aboardCount)) return null;
   // The arrays are reused across snapshots and grown to their high-water mark,
   // on the terms `minimap.ts`'s marker pool is: a snapshot arrives twenty times
   // a second forever and a fresh array of fresh records each time is the most
@@ -1470,11 +1648,29 @@ export function decodeSnapshot(buffer: ArrayBuffer, out: Snapshot): Snapshot | n
     n.state = v.getUint8(p + 17);
     p += NPC_BYTES;
   }
+  out.aboard.length = aboardCount;
+  for (let i = 0; i < aboardCount; i++) {
+    let a = out.aboard[i];
+    if (a === undefined) {
+      a = { id: 0, line: 0, dir: 0, tripLow: 0, car: 0, x: 0, y: 0, z: 0 };
+      out.aboard[i] = a;
+    }
+    a.id = v.getUint16(p, true);
+    const ldc = v.getUint8(p + 2);
+    a.line = (ldc >> 4) & 0x0f;
+    a.dir = (ldc >> 3) & 1;
+    a.car = ldc & 0x07;
+    a.tripLow = v.getUint8(p + 3);
+    a.x = dequantiseLocal(v.getInt16(p + 4, true));
+    a.y = dequantiseLocal(v.getUint8(p + 6));
+    a.z = dequantiseLocal(v.getInt8(p + 7));
+    p += ABOARD_BYTES;
+  }
   return out;
 }
 
 export function createSnapshot(): Snapshot {
-  return { tick: 0, ackSeq: 0, players: [], balls: [], npcs: [] };
+  return { tick: 0, ackSeq: 0, players: [], balls: [], npcs: [], aboard: [] };
 }
 
 // --- Interest: who came into view, and who went out of it -----------------------
@@ -2480,6 +2676,52 @@ export function verifyNet(): string[] {
     failures.push('A NaN velocity did not quantise to zero. A NaN on this field is a ball that never dies.');
   }
 
+  // --- v10's carriage-local 2.5 cm steps, over the box a carriage actually is
+  // and past all three ends of the field. See `ABOARD_BYTES`.
+  //
+  // The extremes are the point, again: an `lz` that *wrapped* would put a rider
+  // through the far bodyside of a train doing 130 km/h, and the platform
+  // observer would watch them ride the outside of the carriage all the way to
+  // Central. Clamped, the worst a broken table can do is stick somebody to a
+  // wall. The three fields have three different widths because they measure
+  // three different things -- 20 m of carriage, 6 m of double deck, 3 m of
+  // width -- so each is tested against its own limit.
+  for (const m of [0, 0.025, -0.025, 1.42, -1.42, 11.6, -11.6, 900, -900]) {
+    const back = dequantiseLocal(quantiseAlong(m));
+    const want = Math.max(-ABOARD_ALONG_LIMIT_M - ABOARD_STEP_M, Math.min(ABOARD_ALONG_LIMIT_M, m));
+    if (Math.abs(back - want) > ABOARD_STEP_M / 2 + 1e-9) {
+      failures.push(`A carriage-local along-offset of ${m} m round-tripped to ${back} m.`);
+    }
+  }
+  for (const m of [0, -3, 0.39, 1.16, 2.07, 4.19, 5.32, 6.375, 90]) {
+    const back = dequantiseLocal(quantiseRise(m));
+    const want = Math.max(0, Math.min(ABOARD_RISE_LIMIT_M, m));
+    if (Math.abs(back - want) > ABOARD_STEP_M / 2 + 1e-9) {
+      failures.push(`A carriage-local rise of ${m} m round-tripped to ${back} m.`);
+    }
+  }
+  for (const m of [0, 1.084, -1.084, 1.42, -1.42, 3.175, -3.175, 90, -90]) {
+    const back = dequantiseLocal(quantiseAcross(m));
+    const want = Math.max(-ABOARD_ACROSS_LIMIT_M - ABOARD_STEP_M, Math.min(ABOARD_ACROSS_LIMIT_M, m));
+    if (Math.abs(back - want) > ABOARD_STEP_M / 2 + 1e-9) {
+      failures.push(`A carriage-local across-offset of ${m} m round-tripped to ${back} m.`);
+    }
+  }
+  // The widest carriage in `game/riding.INTERIORS` is 20.3 m of interior and the
+  // tallest place to stand in one is the upper deck of a Tangara. Both have to
+  // be inside their own field with room for a jump, or the clamp above becomes
+  // a rider stuck to a bulkhead rather than a guard that never fires.
+  if (ABOARD_ALONG_LIMIT_M < 12 || ABOARD_RISE_LIMIT_M < 5.5 || ABOARD_ACROSS_LIMIT_M < 1.8) {
+    failures.push(
+      `The aboard record reaches ${ABOARD_ALONG_LIMIT_M.toFixed(2)} m along, ` +
+        `${ABOARD_RISE_LIMIT_M.toFixed(2)} m up and ${ABOARD_ACROSS_LIMIT_M.toFixed(2)} m across; ` +
+        `a carriage needs 12, 5.5 and 1.8.`,
+    );
+  }
+  if (dequantiseLocal(quantiseAlong(NaN)) !== 0 || dequantiseLocal(quantiseRise(NaN)) !== 0) {
+    failures.push('A NaN carriage offset did not quantise to zero.');
+  }
+
   // --- Input: encode, decode, and the seq wrap at 65536.
   {
     const scratch: InputFrame = { seq: 0, buttons: 0, forward: 0, right: 0, yaw: 0, pitch: 0 };
@@ -2557,10 +2799,22 @@ export function verifyNet(): string[] {
       { id: 1, kind: 1, x: -1234.56, y: 42.5, z: 987.65, yaw: 2.5, state: 3 },
       { id: 65535, kind: 4, x: 3999.99, y: -70.125, z: -3999.99, yaw: 6.28, state: 6 },
     ];
-    const bytes = encodeSnapshot(123456, 65530, players, balls, npcs);
-    if (bytes.byteLength !== snapshotBytes(4, 3, 2)) {
+    // Two riders, and they are the two the section has to get right: the same
+    // 40,000-id player from the array above -- so a rider is provably a normal
+    // player as well -- standing at the far end of the eighth carriage of a
+    // suburban set, and one on the upper deck of the second carriage of the
+    // other direction of the same line. Between them they exercise the
+    // direction bit, the three-bit carriage index, the trip low byte at the
+    // wrap, and all three local axes at the extremes a carriage reaches.
+    const aboard: SnapshotAboard[] = [
+      { id: 40000, line: 9, dir: 1, tripLow: 255, car: 7, x: -9.875, y: 2.825, z: 1.075 },
+      { id: 7, line: 0, dir: 0, tripLow: 0, car: 1, x: 4.8, y: 4.2, z: -1.075 },
+    ];
+    const bytes = encodeSnapshot(123456, 65530, players, balls, npcs, aboard);
+    if (bytes.byteLength !== snapshotBytes(4, 3, 2, 2)) {
       failures.push(
-        `A 4-player 3-ball 2-actor snapshot is ${bytes.byteLength} bytes; the layout says ${snapshotBytes(4, 3, 2)}.`,
+        `A 4-player 3-ball 2-actor 2-rider snapshot is ${bytes.byteLength} bytes; the layout says ` +
+          `${snapshotBytes(4, 3, 2, 2)}.`,
       );
     }
     const got = decodeSnapshot(bytes, createSnapshot());
@@ -2640,20 +2894,62 @@ export function verifyNet(): string[] {
         );
         if (yawErr > 0.006) failures.push(`Actor ${a.id}: yaw ${a.yaw} came back as ${b.yaw}.`);
       }
+
+      // --- v10's aboard section, which is now the tail. The failure this one
+      // catches is the quiet one: every section before it decodes perfectly,
+      // and the riders come back in plausible carriages at plausible offsets --
+      // so two people on the same train stand in each other, or in the wrong
+      // car, and nothing anywhere reports an error.
+      if (got.aboard.length !== 2) {
+        failures.push(
+          `Snapshot carried ${got.aboard.length} riders, not 2. The aboard count byte is not being read.`,
+        );
+      }
+      for (let i = 0; i < Math.min(2, got.aboard.length); i++) {
+        const a = aboard[i];
+        const b = got.aboard[i];
+        if (b.id !== a.id) failures.push(`Rider ${i}: id ${a.id} came back as ${b.id}.`);
+        if (b.line !== a.line) failures.push(`Rider ${a.id}: line ${a.line} came back as ${b.line}.`);
+        if (b.dir !== a.dir) {
+          failures.push(
+            `Rider ${a.id}: direction ${a.dir} came back as ${b.dir}. That bit shares a byte with ` +
+              `the carriage index, and getting it wrong puts a passenger on the train going the ` +
+              `other way.`,
+          );
+        }
+        if (b.car !== a.car) failures.push(`Rider ${a.id}: carriage ${a.car} came back as ${b.car}.`);
+        if (b.tripLow !== a.tripLow) failures.push(`Rider ${a.id}: trip byte ${a.tripLow} came back as ${b.tripLow}.`);
+        for (const [axis, want, back] of [['x', a.x, b.x], ['y', a.y, b.y], ['z', a.z, b.z]] as Array<[string, number, number]>) {
+          if (Math.abs(back - want) > ABOARD_STEP_M / 2 + 1e-9) {
+            failures.push(
+              `Rider ${a.id}: carriage-local ${axis} ${want} m came back as ${back} m; the field ` +
+                `is ${ABOARD_STEP_M * 100} cm steps.`,
+            );
+          }
+        }
+      }
     }
 
-    // A snapshot with no balls and no actors in it -- every snapshot in a quiet
-    // city -- still has to decode.
+    // A snapshot with no balls, no actors and nobody aboard -- every snapshot in
+    // a quiet city -- still has to decode.
     const empty = decodeSnapshot(encodeSnapshot(1, 2, players), createSnapshot());
     if (!empty || empty.balls.length !== 0 || empty.npcs.length !== 0 || empty.players.length !== 4) {
       failures.push('A snapshot with no balls and no faction actors in it did not decode cleanly.');
     }
+    if (empty && empty.aboard.length !== 0) {
+      failures.push(`A snapshot with nobody aboard carried ${empty.aboard.length} riders.`);
+    }
     // And the decoder must refuse a truncated tail rather than reading past the
     // end of the buffer, which `DataView` throws on -- taking the whole client
     // down on one short frame. Trimmed by four bytes, which lands inside the
-    // last actor now that the faction section is the tail.
+    // last rider now that the aboard section is the tail.
     if (decodeSnapshot(bytes.slice(0, bytes.byteLength - 4), createSnapshot()) !== null) {
-      failures.push('A snapshot truncated mid-actor decoded anyway. The length guard is not covering the faction section.');
+      failures.push('A snapshot truncated mid-rider decoded anyway. The length guard is not covering the aboard section.');
+    }
+    // And one trimmed into the faction section, which is no longer the tail.
+    const intoNpcs = encodeSnapshot(1, 2, players, balls, npcs);
+    if (decodeSnapshot(intoNpcs.slice(0, intoNpcs.byteLength - 4), createSnapshot()) !== null) {
+      failures.push('A snapshot truncated mid-actor decoded anyway.');
     }
     // And one trimmed into the ball section, which is no longer the tail and
     // would otherwise stop being covered by the test above.
@@ -2998,6 +3294,64 @@ export function verifyNet(): string[] {
           `this build is actually played at. The projectile section is ${BALL_BYTES} B a ball.`,
       );
     }
+    // --- v10's aboard section, at the three counts that say what it costs.
+    //
+    // **The first one is the headline and the design was chosen for it**: a
+    // snapshot with nobody on a train is v9's snapshot plus the one count byte
+    // in the header. Riding is free in every street in Sydney, which is where
+    // this game is played, and that is the property a widened *player* record
+    // would have thrown away for the sake of thirteen bytes of zeros each.
+    const idle = snapshotBytes(6, 2, 0, 0) - snapshotBytes(6, 2, 0, 0) + ABOARD_BYTES * 0;
+    if (idle !== 0 || snapshotBytes(6, 2) !== SNAPSHOT_HEADER_BYTES + 6 * PLAYER_BYTES + 2 * BALL_BYTES) {
+      failures.push('A snapshot with nobody aboard is not the plain snapshot plus a header byte.');
+    }
+    // Then a train with two of the six players on it and no footballs in the
+    // air, which is what the count this build is actually played at looks like
+    // on a commute. Spec 10's budget, unchanged.
+    const commute = snapshotBytes(6, 0, 0, 2) * SNAPSHOT_HZ * 8;
+    if (commute > 30000) {
+      failures.push(
+        `Six players with two of them aboard is ${(commute / 1000).toFixed(1)} kbit/s, which breaks ` +
+          `spec 10's budget. The aboard section is ${ABOARD_BYTES} B a rider.`,
+      );
+    }
+    // And the pathological one: a whole working set in one carriage, which is
+    // the most this section can ever be because it is filtered by the same
+    // interest cap the players are. It moves the documented ceiling from 143 to
+    // 194 kbit/s, and that is the number to re-read before widening anything.
+    const ridingCap = snapshotBytes(AOI_MAX_PLAYERS, 0, 0, AOI_MAX_PLAYERS) * SNAPSHOT_HZ * 8;
+    if (ridingCap > 200000) {
+      failures.push(
+        `A full working set of ${AOI_MAX_PLAYERS}, all of them on one train, is ` +
+          `${(ridingCap / 1000).toFixed(1)} kbit/s against the 194 the record documents.`,
+      );
+    }
+    // A rider must never cost half of what a person costs. It is the invariant
+    // behind the two numbers above and the one that will actually be violated
+    // first, because a carriage-local offset is the cheapest thing to describe
+    // on this whole wire and any growth in it means somebody has put a *world*
+    // quantity in the wrong section.
+    if (ABOARD_BYTES * 2 > PLAYER_BYTES) {
+      failures.push(
+        `A rider is ${ABOARD_BYTES} B against a player's ${PLAYER_BYTES}. A position inside a ` +
+          `3 x 20 m box must not cost half of a position in a 60 km disc.`,
+      );
+    }
+    // The packed byte, at every field's top value: ten lines in four bits,
+    // direction 1, carriage 7. Getting the shifts wrong here puts a passenger on
+    // the train going the other way, which renders perfectly.
+    {
+      const round: SnapshotAboard = { id: 1, line: 15, dir: 1, tripLow: 200, car: 7, x: 0, y: 0, z: 0 };
+      const back = decodeSnapshot(encodeSnapshot(0, 0, [], [], [], [round]), createSnapshot());
+      const got = back?.aboard[0];
+      if (!got || got.car !== 7 || got.dir !== 1 || got.line !== 15 || got.tripLow !== 200) {
+        failures.push(
+          'The aboard record cannot carry carriage 7 of line 15 on direction 1. Four bits of line, ' +
+            'one of direction and three of carriage is the documented layout.',
+        );
+      }
+    }
+
     // And the invariant behind it: a football must never cost more to describe
     // than a person. Sixteen players is a bounded roster and the balls are not,
     // so the moment a ball is the more expensive record the section is the thing
