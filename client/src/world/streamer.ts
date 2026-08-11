@@ -1796,6 +1796,31 @@ export class TileStreamer implements LampSource {
    * mesh is the one child of a tile group that this changes, everything else in
    * the tile was draped by the pipeline and is untouched.
    */
+  /**
+   * Who to tell about a tile's carriageways as they arrive.
+   *
+   * Deliberately a callback and not a field of a type this file imports: what
+   * consumes it is `world/envelope.ClearanceEnvelope`, which the server builds
+   * too, and the streamer is a browser object. See the call site.
+   */
+  private roadSink:
+    | ((
+        key: string,
+        ways: ReadonlyArray<{ halfWidth: number; count: number; x: Float32Array; y: Float32Array; z: Float32Array }>,
+        bounds: readonly number[],
+      ) => void)
+    | null = null;
+
+  setRoadSink(
+    sink: (
+      key: string,
+      ways: ReadonlyArray<{ halfWidth: number; count: number; x: Float32Array; y: Float32Array; z: Float32Array }>,
+      bounds: readonly number[],
+    ) => void,
+  ): void {
+    this.roadSink = sink;
+  }
+
   setRailCut(cut: RailCut | null): void {
     this.railCut = cut;
     if (cut === null || this.loaded.size === 0) return;
@@ -3238,6 +3263,13 @@ export class TileStreamer implements LampSource {
       if (lanes !== null) {
         this.traffic?.adopt(entry.key, lanes);
         this.pedestrians?.adopt(entry.key, lanes);
+        // And the carriageways, to whoever is keeping them clear -- which for
+        // now is nobody. The hook is here because the ways block is the only
+        // description of a road either end of the wire holds that carries a
+        // width and a height, which is what `world/envelope.ClearanceEnvelope`
+        // wants; `server/world.ts` records why the road half of that rule is not
+        // switched on yet, and both ends must make the same choice.
+        this.roadSink?.(entry.key, lanes.ways, entry.bounds);
       }
 
       // And the parked cars, to whoever is drawing the near ones as models. The

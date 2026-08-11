@@ -96,7 +96,7 @@ const AIR_FRICTION = 1.5;
 export const GRAVITY = -22.5;
 const JUMP_VELOCITY = 7.1;
 /** Steps up to this height are climbed rather than blocked -- kerbs, mostly. */
-const STEP_HEIGHT = 0.42;
+export const STEP_HEIGHT = 0.42;
 const MAX_PITCH = Math.PI / 2 - 0.02;
 
 export function createPlayerState(x = 0, z = 0): PlayerState {

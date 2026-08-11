@@ -116,6 +116,9 @@ import type { Place } from '../client/src/game/teleport.ts';
 import type { CombatWorld } from '../client/src/game/combat.ts';
 import { decodeRail, verifyRail, type RailBake } from '../client/src/game/rail.ts';
 import { RailCut } from '../client/src/world/rail-cut.ts';
+import { ClearanceEnvelope } from '../client/src/world/envelope.ts';
+import { SPAN_TUNNEL } from '../client/src/game/rail.ts';
+
 import { buildPlatforms, type PlatformField } from '../client/src/game/riding.ts';
 
 // --- Hex-lazy collision ---------------------------------------------------------
@@ -966,6 +969,33 @@ export class HexResidency {
           // and no second decode -- `PedestrianField.adopt` derives its bands
           // from the ways block the routes were built beside.
           peds.adopt(key, decoded);
+          // ---------------------------------------------------------------
+          // **And deliberately NOT a third: the carriageways.**
+          //
+          // The user's rule is about both -- *"no building should EVER cover a
+          // road nor a railroad"* -- and `ClearanceEnvelope.addRoads` exists and
+          // works. It is not called here, and the reason is a measurement.
+          //
+          // A road corridor is only known when its tile's lane sidecar lands,
+          // which on this process is per hexagon, in an order the browser does
+          // not share. Making the two ends agree therefore means **re-offering
+          // prisms that are already resident** every time a hexagon of
+          // carriageways arrives -- and that is an unbounded step in the middle
+          // of a serial boot. Measured: the whole-disc load went from 34 s to
+          // over ten minutes, and a standalone server never answered `/health`
+          // in 300 s. The box's unit allows 20 seconds and 560 MB.
+          //
+          // The railway has none of that problem: `rail.bin` is one file read
+          // before the first prism is resident, so every tile is carved once on
+          // the way in and nothing is ever re-offered. So the rail envelope
+          // ships and the road envelope does not, on both ends, together --
+          // because a hole one end has opened and the other has not is a player
+          // walking through a wall the server pushes them back out of.
+          //
+          // The road half belongs where `elevated.py` already does this cut, at
+          // bake time, where the whole road graph is in hand at once and the
+          // result is bytes rather than a boot step. `ROAD_CLEARANCE_M` and
+          // `addRoads` are kept and self-checked against that day.
           let routePoints = 0;
           for (const route of decoded.routes) routePoints += route.count;
           let wayPoints = 0;
@@ -1705,6 +1735,16 @@ export async function loadWorld(
   }
 
   const collision = new CollisionWorld();
+  /**
+   * The corridors nothing may stand in. See `world/envelope.ts`.
+   *
+   * Constructed before the residency because the `lanes` layer feeds it as each
+   * hexagon's carriageways land, and adopted by `collision` once the rail bake
+   * is read, a hundred lines down. Empty until then, which carves nothing, which
+   * is the honest answer for a process that has not been told where the railway
+   * is yet.
+   */
+  const envelope = new ClearanceEnvelope();
   const traffic = new TrafficField();
   const peds = new PedestrianField();
   const segments = new HexResidency(root, rootIndex, collision, capBytes, traffic, peds, laneCapBytes);
@@ -1866,6 +1906,26 @@ export async function loadWorld(
   // at a station where the client's is 9.4, and the four metres of difference is
   // exactly the strip the access stairs stand in.
   if (world.railCut && world.platforms) world.railCut.setStations(world.platforms.sites);
+
+  // **And the volume nothing may stand in**, which this process needs for the
+  // same reason it needs the carve: a building standing across the railway is a
+  // wall on one end of the wire and a tunnel on the other, and a client walking
+  // through a hole the server has not opened is a client the server drags back.
+  //
+  // The railway goes in here, at boot, before a single prism is resident, so
+  // every tile this process ever loads is carved on the way in. The roads go in
+  // per hexagon with the lane sidecar -- see the `lanes` layer's `apply` -- and
+  // re-offer the prisms that are already there. `ClearanceEnvelope` is additive
+  // and `carve` is idempotent, so the two orders converge.
+  if (world.rail) {
+    envelope.addRail(world.rail, SPAN_TUNNEL);
+    collision.setEnvelope(envelope);
+    console.log(
+      `[envelope] ${envelope.count.toLocaleString()} rail corridors; ` +
+        `${collision.carved.cut.toLocaleString()} prisms given an undercroft ` +
+        `(${collision.carved.pieces.toLocaleString()} pieces, ${collision.carved.dropped} slivers dropped)`,
+    );
+  }
 
   // --- The bikes, and the one walk over every hexagon this boot makes ---------
   //

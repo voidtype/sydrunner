@@ -127,6 +127,18 @@ export interface Prism {
    * millisecond, and this runs fifteen times a second next to a frame.
    */
   seen: number;
+  /**
+   * The envelope version this record was last cut against. See
+   * `world/envelope.ClearanceEnvelope.cellVersion`.
+   *
+   * Corridors arrive over a session -- the railway at boot, the carriageways
+   * with each hexagon of lane graph -- so `setEnvelope` runs again and again
+   * over a world that is mostly already carved. This is what makes the second
+   * and every later pass free: a prism whose cells have gained no corridor
+   * since it was cut is skipped for four map lookups instead of five polygon
+   * clips per corridor in reach.
+   */
+  carveStamp: number;
 }
 
 /**
@@ -149,6 +161,18 @@ export interface Prism {
 export const BODY_HEIGHT_M = 1.8;
 
 /**
+ * The coarse cell a *tile* is filed under, metres. See `tileCells`.
+ *
+ * A tile is 500 m on this build, so one cell holds four of them and a re-carve
+ * over a hexagon of carriageways visits a handful rather than the city.
+ */
+const TILE_CELL_M = 1024;
+
+function tileCellKey(cx: number, cz: number): number {
+  return (cx & 0xfffff) * 0x100000 + (cz & 0xfffff);
+}
+
+/**
  * The one method a body being *moved* needs from a world, as an interface.
  *
  * `CollisionWorld` satisfies it structurally and every existing caller is
@@ -165,6 +189,32 @@ export const BODY_HEIGHT_M = 1.8;
  * and `game/combat.pickRespawn` still takes the real class for exactly that
  * reason: choosing a respawn point inside a moving train is not a thing.
  */
+/**
+ * What a `CollisionWorld` needs from `world/envelope.ClearanceEnvelope`.
+ *
+ * A structural type rather than the class, so this file keeps importing nothing:
+ * it is the shared authority every other module depends on, and a cycle through
+ * the envelope -- which the server, the browser and three checks all construct
+ * differently -- would be a cycle through half the world.
+ */
+export interface PrismCarver {
+  /** The newest corridor over this plan box. See `Prism.carveStamp`. */
+  stampFor(minX: number, minZ: number, maxX: number, maxZ: number): number;
+  carve(
+    solid: { points: Float32Array; height: number; base: number; structural: boolean },
+    tally?: CarveCount,
+  ): Array<{ points: Float32Array; height: number; base: number; structural: boolean }> | null;
+}
+
+/** Running total of what the envelope has taken out of a world. */
+export interface CarveCount {
+  tested: number;
+  cut: number;
+  pieces: number;
+  dropped: number;
+  emptied: number;
+}
+
 export interface MoveResolver {
   resolve(
     fromX: number,
@@ -182,6 +232,30 @@ export class CollisionWorld implements MoveResolver {
   private readonly cells = new Map<string, Prism[]>();
   private readonly cellSize: number;
   /**
+   * The corridors nothing may stand in, or `null` where nothing has said.
+   *
+   * **The one rule this class enforces that is not about a body.** A building
+   * whose footprint covers a railway or a carriageway is a wall across a route
+   * that has to stay open, and the fix the user asked for is not to delete it:
+   *
+   *   > *"no building should EVER cover a road nor a railroad. put a tunnel thru
+   *   > any building like that at the very least."*
+   *
+   * So a prism arriving over a corridor is **split** -- see
+   * `world/envelope.ClearanceEnvelope.carve` -- into the part either side, still
+   * grounded, and the part over it, carried on a raised `base` exactly as a
+   * viaduct deck is. Nothing else in this file changes: the raised piece is
+   * `structural`, and `solidFor` has honoured a soffit since the walk-under
+   * round.
+   *
+   * Held rather than applied once because the corridors arrive over a session:
+   * the railway is in the bake at boot, the roads come with the lane sidecars
+   * per hexagon. See `recarve`.
+   */
+  private envelope: PrismCarver | null = null;
+  /** What the envelope has done to this world, cumulative. For the log. */
+  readonly carved: CarveCount = { tested: 0, cut: 0, pieces: 0, dropped: 0, emptied: 0 };
+  /**
    * Every resident tile, and the prisms it put in the grid.
    *
    * A `Map` rather than the `Set` this was, and the list is the whole reason:
@@ -197,6 +271,26 @@ export class CollisionWorld implements MoveResolver {
    * `Set` with a payload nobody reads.
    */
   private readonly tiles = new Map<string, Prism[]>();
+  /**
+   * Each tile's plan bounding box, so a bounded re-carve can skip it for four
+   * compares instead of walking its prisms.
+   *
+   * Cached rather than derived, and it is the difference between a boot that
+   * finishes and one that does not: the server adopts a hexagon of carriageways
+   * fourteen thousand times, each of them re-offering the tiles that overlap it,
+   * and recomputing a box from seventy-five polygons every time is a million
+   * point reads per hexagon. See `setEnvelope`.
+   */
+  private readonly tileBox = new Map<string, [number, number, number, number]>();
+  /**
+   * Tiles by coarse cell, so a bounded re-carve visits the handful it overlaps.
+   *
+   * A second index over the same fourteen thousand keys, and it is the
+   * difference between a server boot of half a minute and one that never
+   * finishes: without it every hexagon of arriving carriageways walked the whole
+   * resident set to reject it, which is fourteen thousand squared.
+   */
+  private readonly tileCells = new Map<number, Set<string>>();
   private count = 0;
   /** `prismsWithin`'s query counter. See `Prism.seen`. */
   private visit = 0;
@@ -289,13 +383,155 @@ export class CollisionWorld implements MoveResolver {
         maxZ,
         structural: i < structuralCount,
         seen: 0,
+        carveStamp: 0,
       };
-      this.insert(prism);
-      mine.push(prism);
-      added++;
-      this.count++;
+      // The undercroft, before anything is indexed: a building over the railway
+      // arrives here as one solid and goes into the grid as a tunnel through
+      // itself. See `envelope`.
+      for (const piece of this.split(prism)) {
+        this.insert(piece);
+        mine.push(piece);
+        added++;
+        this.count++;
+      }
     }
+    this.rebox(key, mine);
     return added;
+  }
+
+  /**
+   * One prism, as the envelope leaves it. The identity when nothing is set.
+   *
+   * Allocation-free in the common case -- `carve` answers `null` for anything
+   * whose bounding box no corridor reaches, which is every building in the city
+   * bar a few hundred -- and the single-element array is only built for the ones
+   * that were actually cut.
+   */
+  private split(prism: Prism): Prism[] {
+    if (this.envelope === null) return [prism];
+    const stamp = this.envelope.stampFor(prism.minX, prism.minZ, prism.maxX, prism.maxZ);
+    prism.carveStamp = stamp;
+    const pieces = this.envelope.carve(prism, this.carved);
+    if (pieces === null) return [prism];
+    const out: Prism[] = [];
+    for (const piece of pieces) out.push(recordFor(piece, stamp));
+    return out;
+  }
+
+  /**
+   * Adopt the corridor set, and cut it out of everything already resident.
+   *
+   * Idempotent under repetition and under order: carving a piece by a corridor
+   * it is already clear of answers `null`, so calling this again when a hexagon
+   * of lane graph lands does the new corridors and leaves the old work alone.
+   * That is what lets the browser and the server -- which learn about the same
+   * road at different moments -- converge on the same holes.
+   *
+   * `bounds` narrows the sweep to a plan box, which is what an arriving hexagon
+   * has; without it every resident tile is re-examined, which is a boot-time
+   * cost on the server and never a per-frame one.
+   */
+  setEnvelope(envelope: PrismCarver, bounds?: readonly [number, number, number, number]): number {
+    this.envelope = envelope;
+    let changed = 0;
+    for (const key of this.tilesIn(bounds)) {
+      const mine = this.tiles.get(key);
+      if (mine === undefined) continue;
+      let any = false;
+      const next: Prism[] = [];
+      for (const prism of mine) {
+        // Nothing new anywhere over this footprint since it was last cut. See
+        // `Prism.carveStamp` -- this is the clause that makes the fourteen
+        // thousandth hexagon cost the same as the first.
+        const stamp = this.envelope.stampFor(prism.minX, prism.minZ, prism.maxX, prism.maxZ);
+        if (prism.carveStamp >= stamp) {
+          next.push(prism);
+          continue;
+        }
+        prism.carveStamp = stamp;
+        const pieces = this.envelope.carve(prism, this.carved);
+        if (pieces === null) {
+          next.push(prism);
+          continue;
+        }
+        any = true;
+        for (const piece of pieces) next.push(recordFor(piece, stamp));
+      }
+      if (!any) continue;
+      changed++;
+      // Out of the grid and back in. The tile's own list is the only record of
+      // what it put there, which is exactly what `removeTile` relies on.
+      this.removeTile(key);
+      this.tiles.set(key, next);
+      for (const prism of next) {
+        this.insert(prism);
+        this.count++;
+      }
+      this.rebox(key, next);
+    }
+    return changed;
+  }
+
+  /** Remember a tile's plan extent, and file it. See `tileBox` and `tileCells`. */
+  private rebox(key: string, mine: readonly Prism[]): void {
+    this.unbox(key);
+    if (mine.length === 0) return;
+    let minX = Infinity;
+    let minZ = Infinity;
+    let maxX = -Infinity;
+    let maxZ = -Infinity;
+    for (const p of mine) {
+      if (p.minX < minX) minX = p.minX;
+      if (p.maxX > maxX) maxX = p.maxX;
+      if (p.minZ < minZ) minZ = p.minZ;
+      if (p.maxZ > maxZ) maxZ = p.maxZ;
+    }
+    this.tileBox.set(key, [minX, minZ, maxX, maxZ]);
+    for (let cx = Math.floor(minX / TILE_CELL_M); cx <= Math.floor(maxX / TILE_CELL_M); cx++) {
+      for (let cz = Math.floor(minZ / TILE_CELL_M); cz <= Math.floor(maxZ / TILE_CELL_M); cz++) {
+        const k = tileCellKey(cx, cz);
+        const set = this.tileCells.get(k);
+        if (set) set.add(key);
+        else this.tileCells.set(k, new Set([key]));
+      }
+    }
+  }
+
+  private unbox(key: string): void {
+    const box = this.tileBox.get(key);
+    if (box === undefined) return;
+    this.tileBox.delete(key);
+    for (let cx = Math.floor(box[0] / TILE_CELL_M); cx <= Math.floor(box[2] / TILE_CELL_M); cx++) {
+      for (let cz = Math.floor(box[1] / TILE_CELL_M); cz <= Math.floor(box[3] / TILE_CELL_M); cz++) {
+        const k = tileCellKey(cx, cz);
+        const set = this.tileCells.get(k);
+        if (set === undefined) continue;
+        set.delete(key);
+        if (set.size === 0) this.tileCells.delete(k);
+      }
+    }
+  }
+
+  /** Which tiles overlap this plan box. Every tile, when there is no box. */
+  private tilesIn(bounds?: readonly [number, number, number, number]): string[] {
+    if (bounds === undefined) return [...this.tiles.keys()];
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (let cx = Math.floor(bounds[0] / TILE_CELL_M); cx <= Math.floor(bounds[2] / TILE_CELL_M); cx++) {
+      for (let cz = Math.floor(bounds[1] / TILE_CELL_M); cz <= Math.floor(bounds[3] / TILE_CELL_M); cz++) {
+        const set = this.tileCells.get(tileCellKey(cx, cz));
+        if (set === undefined) continue;
+        for (const key of set) {
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const box = this.tileBox.get(key);
+          if (box === undefined) continue;
+          if (box[0] > bounds[2] || box[2] < bounds[0] || box[1] > bounds[3] || box[3] < bounds[1]) continue;
+          out.push(key);
+        }
+      }
+    }
+    return out;
   }
 
   /**
@@ -331,6 +567,7 @@ export class CollisionWorld implements MoveResolver {
     const mine = this.tiles.get(key);
     if (mine === undefined) return 0;
     this.tiles.delete(key);
+    this.unbox(key);
     const c = this.cellSize;
     for (const prism of mine) {
       for (let cx = Math.floor(prism.minX / c); cx <= Math.floor(prism.maxX / c); cx++) {
@@ -409,11 +646,19 @@ export class CollisionWorld implements MoveResolver {
         // counting a viaduct as a building.
         structural: true,
         seen: 0,
+        carveStamp: 0,
       };
+      // Deliberately **not** carved. Everything on this path is the railway's own
+      // solids -- a viaduct deck, a platform, a stair -- and the envelope is the
+      // railway's own volume, so cutting a corridor out of a platform would take
+      // the station apart to make room for the train it serves. `rail-geo.ts`
+      // consults the envelope itself, at the one place it matters: which side of
+      // a formation a platform may stand on. See `writePlatforms`.
       this.insert(prism);
       mine.push(prism);
       this.count++;
     }
+    this.rebox(key, mine);
     return mine.length;
   }
 
@@ -769,6 +1014,38 @@ export class CollisionWorld implements MoveResolver {
     }
     return best;
   }
+}
+
+/** A carved piece, as a grid record. Bounds recomputed; the polygon changed. */
+function recordFor(
+  piece: { points: Float32Array; height: number; base: number; structural: boolean },
+  stamp: number,
+): Prism {
+  let minX = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxZ = -Infinity;
+  for (let v = 0; v < piece.points.length; v += 2) {
+    const x = piece.points[v];
+    const z = piece.points[v + 1];
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (z < minZ) minZ = z;
+    if (z > maxZ) maxZ = z;
+  }
+  return {
+    points: piece.points,
+    height: piece.height,
+    base: piece.base,
+    top: piece.base + piece.height,
+    minX,
+    minZ,
+    maxX,
+    maxZ,
+    structural: piece.structural,
+    seen: 0,
+    carveStamp: stamp,
+  };
 }
 
 /**

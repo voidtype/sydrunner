@@ -1683,6 +1683,13 @@ async function main(): Promise<void> {
   say('');
   await checkRailCutting();
 
+  // --- 34b. And whether anything is standing *in* the railway. The carve is
+  // about the ground; this is about the solids -- the buildings, the platforms
+  // and the station houses that the seven reported defects were all instances
+  // of one solid or another inside the loading gauge. See `checkClearance`.
+  say('');
+  await checkClearance();
+
   // --- 35. And whether any of it can be *heard*. The announcements are a
   // second reading of the same `dir.arrivals` the doors are driven from, so the
   // failure mode is not silence -- it is a train saying "Erskineville" while the
@@ -19920,4 +19927,207 @@ async function checkBigMapAtScale(): Promise<void> {
       cdn.setLocalAssetSource(null);
     }
   }
+}
+
+/**
+ * The clearance envelope: nothing may stand in the railway, and the railway may
+ * not stand in the ground.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS CHECK EXISTS AND WHAT IT IS ACTUALLY ASSERTING.
+ *
+ * A player walked the railway and reported seven things, and six of them were
+ * one thing: some solid was inside the volume a train and a passenger need kept
+ * clear. A building over the track at Roseville, terrain over the rails at
+ * Eveleigh, a trench wall with a gap at its edge, a platform with a running line
+ * through it. `world/envelope.ts` is the rule; this is the assertion that it is
+ * enforced, over the real bake and the real collision payload, on the process
+ * that is authoritative for all of it.
+ *
+ * **Every claim here has a negative control beside it**, because each one is the
+ * kind that passes vacuously. "No grounded prism is inside the envelope" is true
+ * of a world with no buildings; "the carve fires wherever the ground is over the
+ * rail" is true of a railway entirely on embankment. So each assertion is paired
+ * with a count that must be *non*-zero, and the pair is what means something.
+ */
+async function checkClearance(): Promise<void> {
+  say('--- The loading gauge: nothing standing in the railway');
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const bakePath =
+    process.env.SYDNEY_RAIL ??
+    new URL('../data/scratch/rail/rail.bin', import.meta.url).pathname;
+  if (!(await Bun.file(bakePath).exists())) {
+    say(`    no rail bake at ${bakePath}. Skipped.`);
+    return;
+  }
+
+  const envHere = new URL('../client/src/world/envelope.ts', import.meta.url).pathname;
+  const env = (await import(envHere)) as typeof import('../client/src/world/envelope.ts');
+
+  // 1. The module's own self-check, which carries the negative controls for the
+  //    geometry: a building beside the line is not cut, a deck already over the
+  //    envelope is not cut again, and a basement under it is not cut at all.
+  const selfCheck = env.verifyEnvelope();
+  check(
+    selfCheck.length === 0,
+    `world/envelope.ts passes its own self-check -- a 20 m building straddling a line comes ` +
+      `out as two grounded remnants and one raised span at the envelope ceiling, and a building ` +
+      `6 m clear of the centreline, a deck over the ceiling and a basement under the floor are ` +
+      `all left alone${selfCheck.length ? `: ${selfCheck[0]}` : ''}`,
+  );
+
+  // 2. Bit-exact across two module instances, on `checkRail`'s terms: the
+  //    browser and this process each evaluate their own copy, and a carve that
+  //    differed between them is a hole one end has and the other has not.
+  const two = (await import(`${envHere}?instance=2`)) as typeof import('../client/src/world/envelope.ts');
+  {
+    const a = new env.ClearanceEnvelope();
+    const b = new two.ClearanceEnvelope();
+    const corridor = {
+      ax: -50, az: 0, ay: 10, bx: 50, bz: 0, by: 10,
+      half: env.RAIL_HALF_M, below: env.RAIL_BELOW_M, above: env.RAIL_ABOVE_M, rail: true,
+    };
+    a.add({ ...corridor });
+    b.add({ ...corridor });
+    const points = new Float32Array([-9, -7, 11, -7, 11, 8, -9, 8]);
+    const one = a.carve({ points, height: 12, base: 9, structural: false });
+    const other = b.carve({ points, height: 12, base: 9, structural: false });
+    let same = one !== null && other !== null && one.length === other.length;
+    if (one !== null && other !== null && same) {
+      for (let i = 0; i < one.length; i++) {
+        if (!Object.is(one[i].base, other[i].base) || !Object.is(one[i].height, other[i].height)) same = false;
+        if (one[i].points.length !== other[i].points.length) same = false;
+        else for (let v = 0; v < one[i].points.length; v++) {
+          if (!Object.is(one[i].points[v], other[i].points[v])) same = false;
+        }
+      }
+    }
+    check(
+      same,
+      `two separately-evaluated copies of the envelope carve one building into the identical ` +
+        `pieces, vertex for vertex, compared with Object.is and not an epsilon. The browser and ` +
+        `this process each hold their own, and a hole one of them has opened and the other has ` +
+        `not is a player walking through a wall the server pushes them back out of`,
+    );
+  }
+
+  // --- Now against the real world -------------------------------------------
+  const world = await loadWholeWorld(root);
+  const bake = world.rail;
+  if (!bake) {
+    say('    the world carries no rail bake. Skipped.');
+    return;
+  }
+
+  const tally = world.collision.carved;
+  // 3. THE NEGATIVE CONTROL FOR EVERYTHING BELOW. If the carve took nothing,
+  //    "no prism is inside the envelope" is a claim about a world in which the
+  //    rule never ran.
+  check(
+    tally.cut > 100,
+    `${tally.cut} prisms were given an undercroft where they crossed the railway, over ` +
+      `${tally.tested.toLocaleString()} tested, leaving ${tally.pieces.toLocaleString()} pieces ` +
+      `and dropping ${tally.dropped.toLocaleString()} slivers. A zero here would make every ` +
+      `assertion below vacuous`,
+  );
+
+  // 4. ...and the cap on the other side. This rule cuts holes in buildings, and
+  //    a version of it that cut holes in *terraces* would be worse than the bug
+  //    it fixes. 61,068 buildings are in the extract; a few hundred genuinely
+  //    span a railway.
+  check(
+    tally.cut < 5000,
+    `...and it is ${tally.cut}, not thousands. The rule is meant to open Eveleigh's workshops, ` +
+      `Westfield Hurstville and the Chatswood interchange -- the structures that really do span a ` +
+      `corridor -- and a count in the thousands would mean it had started cutting tunnels through ` +
+      `ordinary terraces`,
+  );
+
+  check(
+    tally.emptied < 200,
+    `${tally.emptied} prisms would have been cut away to nothing and were kept whole instead. ` +
+      `A carve never deletes a structure: elevated.py's own repair ladder ends on the same rung, ` +
+      `and a building that vanishes cannot be found again by looking at the picture`,
+  );
+
+  // 5. THE ASSERTION. Walk every open rail vertex and ask what stands in the
+  //    gauge over it. Nothing grounded may.
+  const envelope = new env.ClearanceEnvelope();
+  envelope.addRail(bake, spanTunnelFlag());
+  let sampled = 0;
+  let intruders = 0;
+  let worst = '';
+  const p = bake.vertices;
+  const vf = bake.vertexFlags;
+  for (const line of bake.lines) {
+    for (const dir of line.dirs) {
+      for (let i = dir.vertexOff; i < dir.vertexOff + dir.vertexCount; i += 3) {
+        if ((vf[i] & spanTunnelFlag()) !== 0) continue;
+        const x = p[i * 3];
+        const y = p[i * 3 + 1];
+        const z = p[i * 3 + 2];
+        sampled++;
+        // A body's worth of the gauge: the railhead and a metre over it, which
+        // is where a train's own body is and where a wall would stop it.
+        for (const probe of [y + 0.5, y + 2.0, y + 4.0]) {
+          let hit = false;
+          for (const prism of world.collision.prismsWithin(x, z, 8)) {
+            // The raised span of an undercroft sits at the envelope ceiling,
+            // which is 5.9 m over the railhead, so it is above every probe here
+            // by construction. Nothing needs to special-case it: that is the
+            // whole point of putting the span there.
+            if (probe < prism.base || probe >= prism.top) continue;
+            if (!pointInsidePolygon(prism.points, x, z)) continue;
+            hit = true;
+            break;
+          }
+          if (hit) {
+            intruders++;
+            if (worst === '') worst = `${x.toFixed(0)}, ${z.toFixed(0)} at ${probe.toFixed(1)} m`;
+            break;
+          }
+        }
+      }
+    }
+  }
+  check(
+    intruders * 200 < sampled,
+    `${intruders} of ${sampled.toLocaleString()} sampled points on the centreline of open ` +
+      `railway have a solid standing on the rail head itself (cap 0.5%` +
+      (worst ? `, first at ${worst}` : '') +
+      `). Before the envelope the Eveleigh carriage workshops, the Chatswood interchange and ` +
+      `Roseville's own station building were all solid across the track`,
+  );
+
+  say(
+    `    ${envelope.count.toLocaleString()} rail corridors; gauge ${env.RAIL_HALF_M} m each side, ` +
+      `${env.RAIL_BELOW_M} m under the railhead to ${env.RAIL_ABOVE_M} m over it`,
+  );
+}
+
+/**
+ * `game/rail.SPAN_TUNNEL`, restated so a check cannot be fooled by a re-export.
+ *
+ * A **function** and not a `const`: `main()` is awaited from the middle of this
+ * file and everything appended after it is still in its temporal dead zone when
+ * the checks run, so a `const` here throws `Cannot access before initialization`
+ * the moment the check reaches it. A declaration is hoisted; a binding is not.
+ */
+function spanTunnelFlag(): number {
+  return 1;
+}
+
+/** `player/collision.pointInPolygon`, which is not exported. Even-odd crossing. */
+function pointInsidePolygon(points: Float32Array, x: number, z: number): boolean {
+  let inside = false;
+  const n = points.length / 2;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = points[i * 2];
+    const zi = points[i * 2 + 1];
+    const xj = points[j * 2];
+    const zj = points[j * 2 + 1];
+    if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+  }
+  return inside;
 }

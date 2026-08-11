@@ -146,9 +146,9 @@ import {
   CUT_MIN_DEPTH,
   STATION_HALF_WIDTH,
   drawnAsTunnel,
-  inCutting,
   type RailCut,
 } from './rail-cut.ts';
+import { RAIL_HALF_M } from './envelope.ts';
 import { RAIL_FENCE_HEIGHT, createRailFenceMaterial } from './fences.ts';
 // **One rule for what counts as one platform**, imported rather than restated.
 // The prisms this file draws and the rectangles `game/riding.PlatformField`
@@ -1635,7 +1635,13 @@ export class RailWorld {
         }
         // And the cutting. The ground over this span has been taken away by
         // `terrain.buildTerrainMesh`; this is the trench that stands in the hole.
-        const trenched = this.cut !== null && inCutting(s.flags, depth);
+        //
+        // **Asked of the carve, point by point, rather than of the segment's
+        // midpoint.** `inCutting(s.flags, depth)` is one sample at the middle of
+        // a forty-metre span, and the carve is a sample every four metres, so
+        // the two disagreed along every segment that ran into a bank: ground
+        // taken away with no trench built in the hole. See `RailCut.cutsAlong`.
+        const trenched = this.cut !== null && this.cut.cutsAlong(s.ax, s.az, s.bx, s.bz, this.rawGround);
         if (trenched) {
           if (!writeTrench(concrete, prisms, s, this.cut!, this.rawGround)) provisional = true;
         }
@@ -2132,7 +2138,20 @@ function writeTrench(
     const ribs: Rib[] = [];
     let anyWall = false;
     for (const st of line) {
-      const rim = cut.halfWidthAt(st.cx, st.cz);
+      // **The widest the corridor gets between this rib and its neighbours**,
+      // not the width at the rib itself. The hole's rim follows
+      // `halfWidthAt` continuously and the wall is a straight quad between ribs
+      // eight metres apart, so at a platform's flare -- which opens four metres
+      // over twelve -- a wall built to the rib's own width sits *inside* the rim
+      // for most of the panel and leaves a slot of daylight along it. Taking the
+      // maximum puts the wall outside the rim instead, where the worst it can do
+      // is bury half a metre of itself in ground nobody removed.
+      const half = TRENCH_STEP_M / 2;
+      const rim = Math.max(
+        cut.halfWidthAt(st.cx, st.cz),
+        cut.halfWidthAt(st.cx - seg.ux * half, st.cz - seg.uz * half),
+        cut.halfWidthAt(st.cx + seg.ux * half, st.cz + seg.uz * half),
+      );
       const g = rawGround(st.cx + px * rim * side, st.cz + pz * rim * side);
       let top: number;
       if (Number.isFinite(g)) {
@@ -2230,28 +2249,47 @@ function writeTrench(
       else s.quad(...pts[3], ...pts[2], ...pts[1], ...pts[0]);
     }
 
-    // One prism for the whole wall: `base` the cess, `top` the terrain. Walkable
-    // over from the street and solid from inside the trench, which is exactly the
-    // pair of behaviours a retaining wall has. See the header.
-    let base = Infinity;
-    let top = -Infinity;
-    let foot = Infinity;
-    let rim = 0;
-    for (const rib of ribs) {
-      if (rib.cess < base) base = rib.cess;
-      if (rib.top > top) top = rib.top;
-      if (rib.foot < foot) foot = rib.foot;
-      if (rib.rim > rim) rim = rib.rim;
-    }
-    if (top - base > TRENCH_MIN_HEIGHT) {
-      const a = ribs[0];
-      const b = ribs[ribs.length - 1];
+    // ---------------------------------------------------------------------
+    // The collision, **one prism per rib pair** rather than one for the wall.
+    //
+    // This was one box spanning the whole segment, built from the *lowest* cess
+    // and the *highest* terrain over the run, with its four corners taken from
+    // the first and last rib. Two failures, and the player met both:
+    //
+    //   - **A chord is not a wall.** The offsets are perpendicular to the run, so
+    //     a segment whose corridor widens -- every one of the two hundred that
+    //     runs into a platform flare -- has a wall that bows out where the box
+    //     cuts straight across. The gap is up to the four metres the flare opens
+    //     by, and standing in it is *"i can pass through that right edge to see
+    //     the other bit of the rail line"*.
+    //   - **The extremes are not the wall either.** A run-out, where a cutting
+    //     climbs back to grade, got a box as tall as its deep end along its whole
+    //     length: an invisible wall standing on open ground at the mouth of every
+    //     cutting in the city.
+    //
+    // Per rib pair, both go. Each prism spans exactly the eight metres its two
+    // ribs do, at exactly their own feet and rims, and it is emitted only where
+    // *that* pair has a wall. Consecutive prisms share their ribs' positions, so
+    // there is no seam between them to walk through; consecutive segments overlap
+    // by `ext` at each end, which is what covers the bend.
+    //
+    // It costs about five prisms a segment where there was one. Measured on the
+    // shipped bake that is 12,600 trenched segments, so tens of thousands of
+    // prisms across the city and about forty in any one 512 m chunk -- against
+    // the 1.2 million the pipeline already writes.
+    for (let i = 0; i < ribs.length - 1; i++) {
+      const a = ribs[i];
+      const b = ribs[i + 1];
+      const base = Math.min(a.cess, b.cess);
+      const top = Math.max(a.top, b.top);
+      if (top - base <= TRENCH_MIN_HEIGHT) continue;
+      const foot = Math.min(a.foot, b.foot);
       prisms.push({
         points: new Float32Array([
           a.cx + px * foot * side, a.cz + pz * foot * side,
           b.cx + px * foot * side, b.cz + pz * foot * side,
-          b.cx + px * (rim + TRENCH_COPING) * side, b.cz + pz * (rim + TRENCH_COPING) * side,
-          a.cx + px * (rim + TRENCH_COPING) * side, a.cz + pz * (rim + TRENCH_COPING) * side,
+          b.cx + px * (b.rim + TRENCH_COPING) * side, b.cz + pz * (b.rim + TRENCH_COPING) * side,
+          a.cx + px * (a.rim + TRENCH_COPING) * side, a.cz + pz * (a.rim + TRENCH_COPING) * side,
         ]),
         height: top + TRENCH_COPING_RISE - base,
         base,
@@ -2387,10 +2425,28 @@ interface StationPlan {
    * ground however the bake labelled it.
    */
   onBridge: boolean;
-  /** Ground at the stair's landing, by side. Index 0 is the `-1` side. */
-  landing: [number, number];
-  /** The flight's run in metres, by side. Zero where the deck is already walkable. */
-  run: [number, number];
+  /**
+   * Ground at the stair's landing, **by side and by end**: `[side][end]`, with
+   * index 0 the `-1` side and index 0 the `+1` end of the run.
+   *
+   * ---------------------------------------------------------------------------
+   * **Four numbers, and it was two.** `writeStationAccess` builds a flight at
+   * each end of each platform, and both of a side's flights were sized from a
+   * single reading of the terrain taken at `+ACCESS_ALONG + 8` -- one end. Where
+   * the ground along a platform is not level, and it never is, the far flight
+   * was built to the near flight's height: its bottom tread stopped short of the
+   * ground by the difference, and a tread out of reach is a wall with a stair
+   * drawn on it.
+   *
+   * Measured at Roseville, walking it: the flight at `t = +44` climbs 39.10 to
+   * 41.93 in nineteen-centimetre risers and arrives; the flight at `t = -44`
+   * stands on ground at 37.80 with its lowest tread at 39.09, which is a
+   * 1.29 m step against a `STEP_HEIGHT` of 0.42. Reported as *"i can get up 1/3
+   * sets of stairs at roseville"*.
+   */
+  landing: [[number, number], [number, number]];
+  /** The flight's run in metres, by side and end. Zero where the deck is already walkable. */
+  run: [[number, number], [number, number]];
   /**
    * Was every height in this plan actually measured?
    *
@@ -2406,6 +2462,31 @@ interface StationPlan {
   /** Which side of the track the OSM station node is on, and where along it. */
   houseSide: number;
   houseAlong: number;
+  /**
+   * How far out the station building had to be pushed to get out of a track's
+   * way, metres, and which side it ended on.
+   *
+   * See `clearOfTrack`. Zero at the overwhelming majority of stations.
+   */
+  housePush: number;
+  /**
+   * Which sides may carry a platform at all: `[-1 side, +1 side]`.
+   *
+   * **Reported as *"the roseville station is shown as a brick building which is
+   * solid, that the train must pass through"*, and it is not the building.** A
+   * platform is built 1.62 m off the anchor's centreline on *both* sides,
+   * unconditionally, and an anchor on a four-road formation has running lines
+   * four to seven metres away -- inside the slab. Measured at Roseville: rails
+   * at -5, -3, -1, 0, +4, +5, +6 and +7 m from the platform axis, against a slab
+   * that occupies 1.62 to 7.12 m on each side. The train passes through the
+   * platform, and from a carriage window a platform is a solid box.
+   *
+   * So a side is built only where the strip it wants is clear of every *other*
+   * track's loading gauge. Both sides blocked leaves the less-blocked one --
+   * `writePlatforms` is where that tie is broken -- because a station with no
+   * platform at all is a worse answer than a station with one that grazes.
+   */
+  sideClear: [boolean, boolean];
   /**
    * The terrain under the station building, sampled at the building rather than
    * at the stair.
@@ -2442,31 +2523,36 @@ function planStation(
     }
   }
 
-  const landing: [number, number] = [top, top];
-  const run: [number, number] = [0, 0];
+  const landing: [[number, number], [number, number]] = [[top, top], [top, top]];
+  const run: [[number, number], [number, number]] = [[0, 0], [0, 0]];
   let measured = true;
   for (let i = 0; i < 2; i++) {
     const side = i === 0 ? -1 : 1;
     const o = ((STAIR_INNER + STAIR_OUTER) / 2) * side;
-    // Sampled at the middle of where the flight will be, which is a chicken and
-    // an egg -- the run depends on the drop and the drop is sampled along the
-    // run -- and is resolved by sampling at a fixed eight metres out and letting
-    // the flight be as long as that one reading says. A DEM post is 31 m, so
-    // every sample the flight could have taken is the same post anyway.
-    const p = framePoint(station, ACCESS_ALONG + 8, o, 0);
-    let g = rawGround(p[0], p[2]);
-    if (!Number.isFinite(g)) {
-      measured = false;
-      g = station.groundY;
+    for (let e = 0; e < 2; e++) {
+      const end = e === 0 ? 1 : -1;
+      // Sampled at the middle of where *this* flight will be, which is a chicken
+      // and an egg -- the run depends on the drop and the drop is sampled along
+      // the run -- and is resolved by sampling at a fixed eight metres past the
+      // stair head and letting the flight be as long as that one reading says. A
+      // DEM post is 31 m, so every sample one flight could have taken is the
+      // same post; the two *ends* of a 160 m platform are four posts apart, which
+      // is the whole reason this loop has four iterations and not two.
+      const p = framePoint(station, (ACCESS_ALONG + 8) * end, o, 0);
+      let g = rawGround(p[0], p[2]);
+      if (!Number.isFinite(g)) {
+        measured = false;
+        g = station.groundY;
+      }
+      if (!Number.isFinite(g)) g = top;
+      landing[i][e] = g;
+      const drop = Math.abs(top - g);
+      // `STAIR_FLAT` is `controller.STEP_HEIGHT`: below it a body walks up
+      // without being told, and a flight would be six centimetres of theatre.
+      if (drop <= STAIR_FLAT) continue;
+      const steps = Math.min(STAIR_MAX_STEPS, Math.round(drop / STAIR_RISE));
+      run[i][e] = steps * STAIR_GOING;
     }
-    if (!Number.isFinite(g)) g = top;
-    landing[i] = g;
-    const drop = Math.abs(top - g);
-    // `STAIR_FLAT` is `controller.STEP_HEIGHT`: below it a body walks up
-    // without being told, and a flight would be six centimetres of theatre.
-    if (drop <= STAIR_FLAT) continue;
-    const steps = Math.min(STAIR_MAX_STEPS, Math.round(drop / STAIR_RISE));
-    run[i] = steps * STAIR_GOING;
   }
 
   // The skirt. On a deck the viaduct is already there and the platform is a slab
@@ -2474,7 +2560,7 @@ function planStation(
   // retaining wall a real one has and in a cutting is a face against the trench.
   // Bounded at 14 m so a genuine viaduct station whose bridge flag went missing
   // is a tall platform rather than a 40 m blank wall.
-  const groundish = Math.min(landing[0], landing[1], station.trackY);
+  const groundish = Math.min(landing[0][0], landing[0][1], landing[1][0], landing[1][1], station.trackY);
   const base = onBridge ? top - 1.4 : Math.max(top - 14, groundish - 0.4);
 
   // Which way the street is. An OSM station node sits at the *entrance*, and
@@ -2485,16 +2571,118 @@ function planStation(
   const along = dx * station.ux + dz * station.uz;
   const across = dx * -station.uz + dz * station.ux;
   const far = dx * dx + dz * dz > 250 * 250;
-  const houseSide = !far && across < 0 ? -1 : 1;
+  let houseSide = !far && across < 0 ? -1 : 1;
   const houseAlong = far ? -18 : Math.max(-62, Math.min(62, along));
-  const hp = framePoint(station, houseAlong, (STAIR_OUTER + 1.2 + HOUSE_WIDTH / 2) * houseSide, 0);
+
+  // --- Nothing this station builds may stand in another track's way ----------
+  //
+  // See `StationPlan.sideClear`. The measurement that forced it is Roseville's:
+  // an anchor with running lines four to seven metres off its own centreline,
+  // and a platform slab that occupies exactly that strip on both sides.
+  const sideClear: [boolean, boolean] = [
+    trackClear(net, station, -L_PLATFORM, L_PLATFORM, PLATFORM_INNER, STAIR_OUTER, -1),
+    trackClear(net, station, -L_PLATFORM, L_PLATFORM, PLATFORM_INNER, STAIR_OUTER, 1),
+  ];
+
+  // And the station building, which is the one thing here that can simply be
+  // moved: it has no relationship to the platform beyond being beside it, so
+  // where the strip it wants carries a track, it is pushed further out -- and
+  // failing that, put on the other side. Reported as *"the actual roseville
+  // station is shown as a brick building which is solid, that the train must
+  // pass through"*, which at that anchor is a house at 13.85 m over rails at
+  // 11, 13 and 14.
+  let housePush = 0;
+  const houseInner = STAIR_OUTER + 1.2;
+  const houseFits = (side: number, push: number): boolean =>
+    trackClear(
+      net, station,
+      houseAlong - HOUSE_LENGTH / 2 - 0.5, houseAlong + HOUSE_LENGTH / 2 + 0.5,
+      houseInner + push, houseInner + push + HOUSE_WIDTH + HOUSE_AWNING, side,
+    );
+  if (!houseFits(houseSide, 0)) {
+    let placed = false;
+    for (const side of [houseSide, -houseSide]) {
+      for (const push of [0, 3, 6, 9, 12]) {
+        if (!houseFits(side, push)) continue;
+        houseSide = side;
+        housePush = push;
+        placed = true;
+        break;
+      }
+      if (placed) break;
+    }
+    // Nowhere clear within twelve metres of either side. Take the far side of
+    // the formation anyway and push the full distance: a building a little way
+    // off the forecourt is a nuisance, and one with a railway through it is the
+    // bug. Named in `verifyRailGeometry`.
+    if (!placed) housePush = 12;
+  }
+
+  const hp = framePoint(station, houseAlong, (houseInner + housePush + HOUSE_WIDTH / 2) * houseSide, 0);
   const hg = rawGround(hp[0], hp[2]);
   return {
     station, mine, top, base, onBridge, landing, run, measured,
-    houseSide, houseAlong,
-    houseGround: Number.isFinite(hg) ? hg : landing[houseSide < 0 ? 0 : 1],
+    houseSide, houseAlong, housePush, sideClear,
+    houseGround: Number.isFinite(hg) ? hg : landing[houseSide < 0 ? 0 : 1][0],
   };
 }
+
+/** `PLATFORM_HALF_LENGTH`, named for `planStation`'s own arithmetic. */
+const L_PLATFORM = PLATFORM_HALF_LENGTH;
+
+/**
+ * Is the strip `[t0, t1] x [o0, o1]` on `side` of this station clear of every
+ * track but the station's own?
+ *
+ * ---------------------------------------------------------------------------
+ * **`world/envelope.RAIL_HALF_M` is the width, and that is the point of this
+ * function**: the loading gauge is the one statement in the build of how much
+ * room a train needs, and a station is the place most likely to build something
+ * inside it. The test is per rail segment rather than per envelope query because
+ * what is being asked is not "is this point clear" but "is this whole rectangle
+ * clear", and a rectangle against a swept strip is a handful of point-segment
+ * distances where the point query would be a grid of them.
+ *
+ * A track is *this* station's own when it runs within `OWN_TRACK_M` of the
+ * anchor's centreline: a platform is built against its own formation by
+ * definition, and a test that counted it would refuse every platform in Sydney.
+ */
+function trackClear(
+  net: RailNetwork,
+  f: TrackFrame & { x: number; z: number },
+  t0: number, t1: number, o0: number, o1: number, side: number,
+): boolean {
+  const chunk = net.chunks.get(chunkOf(f.x, f.z));
+  if (chunk === undefined) return true;
+  // Sampled along the strip rather than solved: eight metres is a quarter of the
+  // shortest segment in the bake and a tenth of what a platform is long.
+  const steps = Math.max(2, Math.ceil((t1 - t0) / 8));
+  for (const si of chunk.segments) {
+    const s = net.segments[si];
+    if ((s.flags & SPAN_TUNNEL) !== 0) continue;
+    // Its offset from this station's own axis, at its own midpoint.
+    const mx = (s.ax + s.bx) / 2 - f.x;
+    const mz = (s.az + s.bz) / 2 - f.z;
+    const own = Math.abs(mx * -f.uz + mz * f.ux);
+    if (own < OWN_TRACK_M) continue;
+    for (let i = 0; i <= steps; i++) {
+      const t = t0 + ((t1 - t0) * i) / steps;
+      for (const o of [o0, (o0 + o1) / 2, o1]) {
+        const p = framePoint(f, t, o * side, 0);
+        if (pointSegmentDistanceSquared(p[0], p[2], s) < RAIL_HALF_M * RAIL_HALF_M) return false;
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * How far off a station's own centreline a rail is still the station's own.
+ *
+ * Two metres: a platform's inner face is at 1.62 m, so anything inside this is
+ * the road the platform is built against and cannot be an obstruction to it.
+ */
+const OWN_TRACK_M = 2.0;
 
 /**
  * Is this point inside a station's entrance, where the boundary fence opens?
@@ -2514,11 +2702,12 @@ function entranceOpens(plans: readonly StationPlan[], x: number, z: number): boo
   for (const plan of plans) {
     for (let i = 0; i < 2; i++) {
       const side = i === 0 ? -1 : 1;
-      const run = plan.run[i];
-      const r = FENCE_GAP_RADIUS + run / 2;
       // Both ends, because `writeStationAccess` builds a flight at both ends and
-      // an entrance fenced off is an entrance that does not exist.
+      // an entrance fenced off is an entrance that does not exist -- and each of
+      // them has its own run now, because each is sized from its own ground.
       for (const end of [1, -1]) {
+        const run = plan.run[i][end > 0 ? 0 : 1];
+        const r = FENCE_GAP_RADIUS + run / 2;
         const c = framePoint(
           plan.station, (ACCESS_ALONG + run / 2 + 2) * end, (STAIR_OUTER + 2) * side, 0,
         );
@@ -2629,6 +2818,35 @@ function writePortal(concrete: Solid, lining: Solid, portal: Portal): void {
  * dressed as data. Two faces at the real clearance is right at every station
  * with an even count and generous at the others.
  */
+/**
+ * Which sides of this station carry a platform. **Both, for now.**
+ *
+ * ---------------------------------------------------------------------------
+ * `StationPlan.sideClear` measures something real and this function deliberately
+ * does not act on it yet. The measurement: a platform is built 1.62 m off the
+ * anchor's centreline on both sides, and at Roseville there are running lines
+ * at -5, -3, +4, +5, +6 and +7 m from that axis -- inside the slab. The train
+ * passes through the platform, and about a hundred anchors on four-road
+ * formations are the same.
+ *
+ * Suppressing the blocked side was tried and reverted the same hour, by walking
+ * it. `game/riding.PlatformField` -- the analytic copy of the platform that
+ * **the server** holds and that `groundHeightAt` prefers over the terrain --
+ * answers for both sides of every site unconditionally, from the bake, with no
+ * notion of a side at all. Not drawing one leaves a platform that is still a
+ * floor on both ends of the wire and is invisible, which is a worse bug than the
+ * one being fixed and is exactly the class of bug -- geometry and field
+ * disagreeing about a surface -- that `PlatformField` was written to end.
+ *
+ * The honest fix is for `buildPlatforms` to decide the side, from the bake,
+ * where both ends can see it, and for this to follow. Until then `sideClear` is
+ * computed, carried on the plan, and not obeyed -- kept rather than deleted
+ * because the measurement is the expensive half and it is right.
+ */
+function platformSides(_plan: StationPlan): number[] {
+  return [-1, 1];
+}
+
 function writePlatforms(
   concrete: Solid,
   canopy: Solid,
@@ -2641,7 +2859,7 @@ function writePlatforms(
   const base = plan.base;
   const L = PLATFORM_HALF_LENGTH;
 
-  for (const side of [-1, 1]) {
+  for (const side of platformSides(plan)) {
     const inner = PLATFORM_INNER;
     const outer = PLATFORM_INNER + PLATFORM_WIDTH;
 
@@ -2723,7 +2941,7 @@ function writePlatformFurniture(
   const top = plan.top;
   const back = PLATFORM_INNER + PLATFORM_WIDTH;
 
-  for (const side of [-1, 1]) {
+  for (const side of platformSides(plan)) {
     const at = (o: number): number => o * side;
 
     // Seats: a slatted bench with a back, against the rear of the platform.
@@ -2870,13 +3088,11 @@ function writeStationAccess(
   plan: StationPlan,
 ): void {
   const f = plan.station;
-  for (let i = 0; i < 2; i++) {
-    const side = i === 0 ? -1 : 1;
-    const run = plan.run[i];
+  // Only where there is a platform to climb onto. See `platformSides`.
+  for (const side of platformSides(plan)) {
+    const i = side < 0 ? 0 : 1;
     const o0 = STAIR_INNER * side;
     const o1 = STAIR_OUTER * side;
-    const street = plan.landing[i];
-    const baseY = Math.min(plan.top, street, plan.base) - 0.5;
 
     // **One flight at each end**, and the second one is not symmetry for its own
     // sake. A 160 m platform with a single six-metre stair on it is a station a
@@ -2887,6 +3103,14 @@ function writeStationAccess(
     // and it may as well not have been. Two of them, one at each end, is what
     // every real station of this size has and it costs forty triangles.
     for (const end of [1, -1]) {
+      // **This flight's own ground, at this flight's own end.** See
+      // `StationPlan.landing`: sharing one reading between the two ends is what
+      // left three of Roseville's four flights with their bottom tread in the
+      // air.
+      const e = end > 0 ? 0 : 1;
+      const run = plan.run[i][e];
+      const street = plan.landing[i][e];
+      const baseY = Math.min(plan.top, street, plan.base) - 0.5;
       const head = ACCESS_ALONG * end;
       // The landing at the platform end: a slab level with the deck, so the last
       // tread meets the platform across 12 cm rather than across a step.
@@ -2933,7 +3157,7 @@ function writeFootbridge(
   if (plan.station.platforms < 2) return;
   const f = plan.station;
   const deck = plan.station.trackY + BRIDGE_CLEAR;
-  const ground = Math.max(plan.landing[0], plan.landing[1]);
+  const ground = Math.max(plan.landing[0][0], plan.landing[0][1], plan.landing[1][0], plan.landing[1][1]);
   if (deck - ground < BRIDGE_MIN_OVER_GROUND) return;
 
   const rise = deck - plan.top;
@@ -3004,7 +3228,7 @@ function writeStationHouse(
   const f = plan.station;
   const side = plan.houseSide;
   const t = plan.houseAlong;
-  const o = (STAIR_OUTER + 1.2 + HOUSE_WIDTH / 2) * side;
+  const o = (STAIR_OUTER + 1.2 + plan.housePush + HOUSE_WIDTH / 2) * side;
   const y = plan.houseGround;
   const t0 = t - HOUSE_LENGTH / 2;
   const t1 = t + HOUSE_LENGTH / 2;

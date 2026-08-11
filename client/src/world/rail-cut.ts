@@ -128,12 +128,24 @@ const STATION_FLARE_M = 12;
 /**
  * How far under the terrain a track has to be before the ground is cut at all.
  *
- * One metre is about the point at which a heightfield disagreeing with a track
- * stops being noise in a 31 m DEM and starts being a cutting. Below it the
- * railway is at grade as far as anybody can see and the right amount of
- * geometry to spend on the question is none.
+ * **This was one metre, and one metre is what the player was standing in.** The
+ * report is *"some places intersect with ground"*, at Eveleigh, with the track
+ * buried in dirt behind the palisade; the number behind it is that **77,467 of
+ * the 181,448 sampled points on open railway in this city have terrain above the
+ * railhead**, and at a one-metre floor the carve fired at 27,785 of them. Fifty
+ * thousand samples of track were inside the ground with the rule saying that was
+ * fine.
+ *
+ * A quarter of a metre is where `world/envelope.ts` puts the question instead:
+ * the loading gauge's floor is the railhead, `RAIL_BELOW_M` is the ballast under
+ * it, and terrain standing a quarter-metre over the rail has swallowed the
+ * sleepers. Below that the ballast shoulder and the verge cover the difference
+ * and a trench would be a kerb nobody can see.
+ *
+ * It roughly doubles the carve -- 27,785 samples to 54,091 -- and every one of
+ * the new ones is a point where the rail was under the dirt.
  */
-export const CUT_MIN_DEPTH = 1.0;
+export const CUT_MIN_DEPTH = 0.25;
 
 /**
  * How far down a `cutting`-tagged way has to be before a trench is dug.
@@ -144,7 +156,7 @@ export const CUT_MIN_DEPTH = 1.0;
  * grade. It moves eleven spans -- 0.7 km -- and every one of them is a cutting
  * the grid had flattened.
  */
-export const CUT_TAGGED_MIN_DEPTH = 0.5;
+export const CUT_TAGGED_MIN_DEPTH = 0.15;
 
 /**
  * Is this span drawn as a tunnel bore rather than as open railway?
@@ -365,6 +377,47 @@ export class RailCut {
       if (!(railY <= best)) best = railY;
     }
     return best;
+  }
+
+  /**
+   * Does the carve fire **anywhere** along this stretch of track?
+   *
+   * ---------------------------------------------------------------------------
+   * **The one question `rail-geo.buildChunk` was asking wrong, and the bug it
+   * produced is the reported one.** The carve decides cut-or-keep per sub-quad,
+   * four metres at a time, against that quad's own interpolated ground. The
+   * trench decided per *segment*, from a single sample of the ground at the
+   * segment's **midpoint**. A forty-metre segment that runs into a bank at one
+   * end has a midpoint at grade, so the ground was taken away along its far half
+   * and nothing was built in the hole: a slot of daylight beside the track with
+   * no wall in it, which is exactly *"i can pass through that right edge to see
+   * the other bit of the rail line"*, and no cess either, which is exactly
+   * *"there should always be rocks under the tracks"*.
+   *
+   * So the two now ask the identical function about the identical points. A
+   * segment is trenched if any point along it is cut, the wall then goes to
+   * nothing wherever the ground is below the cess -- `writeTrench` already
+   * clamps for that -- and a hole without a wall in it is no longer
+   * representable.
+   *
+   * Sampled every four metres, which is the carve's own sub-quad pitch: finer
+   * buys nothing the terrain mesh can express, coarser is the bug again.
+   */
+  cutsAlong(
+    ax: number, az: number, bx: number, bz: number,
+    groundAt: (x: number, z: number) => number,
+  ): boolean {
+    const len = Math.hypot(bx - ax, bz - az);
+    const steps = Math.max(1, Math.ceil(len / 4));
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = ax + (bx - ax) * t;
+      const z = az + (bz - az) * t;
+      const g = groundAt(x, z);
+      if (!Number.isFinite(g)) continue;
+      if (Number.isFinite(this.cutAt(x, z, g))) return true;
+    }
+    return false;
   }
 
   /**

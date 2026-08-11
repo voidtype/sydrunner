@@ -91,6 +91,7 @@ import { CollisionWorld } from './player/collision.ts';
 import {
   EYE_HEIGHT,
   PLAYER_RADIUS,
+  STEP_HEIGHT,
   applyToCamera,
   verifyMovementBasis,
 } from './player/controller.ts';
@@ -347,6 +348,7 @@ import {
   verifyRailAudio,
 } from './game/rail-audio.ts';
 import { RailCut } from './world/rail-cut.ts';
+import { ClearanceEnvelope, verifyEnvelope } from './world/envelope.ts';
 // The street factions -- meth heads and drunks -- on the same split again:
 // `game/streetlife.ts` is the shared simulation the server runs and
 // `world/streetlife.ts` is the renderer. See either header.
@@ -1327,6 +1329,17 @@ async function main(): Promise<void> {
   const railAssets = new RailAssets();
   /** Station platforms as rectangles, for `groundHeightAt`. Null with no bake. */
   let platforms: PlatformField | null = null;
+  /**
+   * The volume nothing may stand in: the railway's loading gauge and every
+   * carriageway's headroom, in one object.
+   *
+   * Declared here because it is filled from two places at two times -- the rail
+   * corridors from the bake a few lines down, the roads from each tile's lane
+   * sidecar as the streamer lands it -- and consumed by a third, `collision`,
+   * which does not exist yet. See `world/envelope.ts`, and
+   * `CollisionWorld.setEnvelope` for why arriving late is safe.
+   */
+  const envelope = new ClearanceEnvelope();
   const railBake = await withDeadline(loadRailBake(), RAIL_BAKE_DEADLINE_MS, 'the rail bake');
   let railNetwork: RailNetwork | null = null;
   /** The rail corridor, for the terrain carve and the trench. See below. */
@@ -1386,6 +1399,18 @@ async function main(): Promise<void> {
       railCut = new RailCut(railBake);
       railCut.setStations(railNetwork.stations);
       streamer.setRailCut(railCut);
+      // **And the volume nothing may stand in.** The same corridor read the
+      // other way round: `RailCut` says where the *ground* must not be, and
+      // `ClearanceEnvelope` says where a *solid* must not be. A building over
+      // the railway is not deleted -- it is given the undercroft it has in real
+      // life, which is `CollisionWorld.setEnvelope`'s whole job. The roads are
+      // added to the same envelope as their lane sidecars land; see
+      // `adoptRoadCorridors`.
+      envelope.addRail(railBake, SPAN_TUNNEL);
+      const envFailures = verifyEnvelope();
+      if (envFailures.length) {
+        console.warn('[rail] clearance envelope self-check:\n  - ' + envFailures.join('\n  - '));
+      }
       const geometryFailures = verifyRailGeometry(railNetwork);
       if (geometryFailures.length) {
         console.warn('[rail] derived network self-check:\n  - ' + geometryFailures.join('\n  - '));
@@ -1894,6 +1919,25 @@ async function main(): Promise<void> {
   // turned your back on is still ground you are standing on.
   const collision = new CollisionWorld();
   const collisionPending = new Set<string>();
+
+  // **The undercroft rule, adopted.** From here on every prism that arrives is
+  // offered to the envelope first, and a building standing across the railway or
+  // a carriageway goes into the grid as a tunnel through itself rather than as a
+  // wall across a route. Nothing is resident yet, so this pass carves nothing;
+  // it is the *adoption* that matters, and the count below is what the roads add
+  // to it over the session.
+  collision.setEnvelope(envelope);
+  console.debug(`[envelope] ${envelope.count.toLocaleString()} rail corridors adopted before the first tile`);
+  // **The carriageways are deliberately not added to it**, and the two ends have
+  // to agree about that or a hole one of them has opened is a wall the other
+  // pushes the player out of. `server/world.ts`'s `lanes` layer carries the
+  // argument in full: a road corridor is only known when its tile's sidecar
+  // lands, so honouring it means re-offering prisms that are already resident,
+  // and on the server that turned a 34-second boot into one that never answered
+  // `/health`. The railway has no such problem -- one file, read before the
+  // first prism -- so the rail envelope ships and the road half waits for
+  // `elevated.py`, which already does this cut where the whole road graph is in
+  // hand at once.
 
   // What an ibis spawn is checked against, expressed as two predicates so that
   // `world/birds.ts` never has to import the collision format -- see
@@ -4794,6 +4838,91 @@ async function main(): Promise<void> {
    * of hunting for one.
    */
   const railHarness = {
+    /**
+     * **Walk a body from A to B through the real collision world, and say what
+     * happened to its feet.**
+     *
+     * ---------------------------------------------------------------------------
+     * WHY THIS EXISTS RATHER THAN A LIST OF PRISMS.
+     *
+     * Every solidity bug the player reported is a claim about a *body*: "i can
+     * pass through that right edge", "i cant actually go up these stairs", "i
+     * fall through the platform". None of them is answerable by looking at the
+     * prism list, because the prisms were all there and all correct-looking --
+     * what was wrong was what a body meets when it tries to move through them.
+     * A wall with a two-metre gap at a bend has a prism; a stair blocked by a
+     * balustrade has a prism for the stair *and* one for the thing in the way.
+     *
+     * So this drives the identical `CollisionWorld.resolve` and the identical
+     * `groundHeightAt` the player's own integrator uses, in a straight line, in
+     * 0.2 m steps, and reports:
+     *
+     *   - `gotM`     how far it actually travelled before it stopped;
+     *   - `blocked`  whether something refused the move;
+     *   - `climbed`  the biggest single step up it took (a stair is a series of
+     *                these; a wall is one it could not take);
+     *   - `fell`     the biggest single drop, which is what a hole in a platform
+     *                looks like from inside a walk;
+     *   - `feet`     the height profile, so a flight reads as a ramp and a
+     *                fall-through reads as a cliff.
+     *
+     * It steps rather than integrates deliberately: what is being tested is the
+     * *world*, not the controller, and a body with momentum bounces off a
+     * corner in ways that are about the integrator. `STEP_HEIGHT` is honoured
+     * because that is the whole of what makes a stair a stair.
+     */
+    walk: (
+      from: readonly [number, number],
+      to: readonly [number, number],
+      opts: { step?: number; radius?: number; feetY?: number } = {},
+    ) => {
+      const step = opts.step ?? 0.2;
+      const radius = opts.radius ?? PLAYER_RADIUS;
+      const dx = to[0] - from[0];
+      const dz = to[1] - from[1];
+      const total = Math.hypot(dx, dz);
+      const n = Math.max(1, Math.ceil(total / step));
+      let x = from[0];
+      let z = from[1];
+      let feet = opts.feetY ?? groundHeightAt(x, z, Infinity);
+      const feetLog: number[] = [+feet.toFixed(2)];
+      let blocked = false;
+      let climbed = 0;
+      let fell = 0;
+      let travelled = 0;
+      for (let i = 1; i <= n; i++) {
+        const tx = from[0] + (dx * i) / n;
+        const tz = from[1] + (dz * i) / n;
+        // `feet + STEP_HEIGHT` is exactly what `controller.step` probes with, so
+        // a kerb is climbed here for the same reason it is climbed in the game.
+        const moved = collision.resolve(x, z, tx, tz, radius, feet + STEP_HEIGHT);
+        const gained = Math.hypot(moved.x - x, moved.z - z);
+        if (gained < step * 0.5) {
+          blocked = true;
+          break;
+        }
+        travelled += gained;
+        x = moved.x;
+        z = moved.z;
+        const ground = groundHeightAt(x, z, feet);
+        const delta = ground - feet;
+        if (delta > climbed) climbed = delta;
+        if (-delta > fell) fell = -delta;
+        feet = ground;
+        feetLog.push(+feet.toFixed(2));
+      }
+      return {
+        gotM: +travelled.toFixed(2),
+        ofM: +total.toFixed(2),
+        blocked,
+        arrived: !blocked && travelled > total - 0.5,
+        climbed: +climbed.toFixed(2),
+        fell: +fell.toFixed(2),
+        at: [+x.toFixed(1), +feet.toFixed(2), +z.toFixed(1)],
+        feet: feetLog,
+      };
+    },
+
     stations: (query = '') =>
       (railNetwork?.stations ?? [])
         .filter((s) => s.name.toLowerCase().includes(query.toLowerCase()))
@@ -7514,6 +7643,17 @@ async function main(): Promise<void> {
       // --- The rail harness. See `railHarness` for what these are and why the
       //     board/alight pair presses the same button the player does.
       stations: railHarness.stations,
+      /** Drive a body through the collision world. See `railHarness.walk`. */
+      walk: railHarness.walk,
+      /**
+       * What the envelope has taken out of the world, for the console.
+       *
+       * `cut` is the number of buildings given an undercroft where they cross
+       * the railway; `emptied` is the number the rule declined to cut because
+       * there would have been nothing left, which is the count to watch -- see
+       * `world/envelope.carve`.
+       */
+      envelope: () => ({ corridors: envelope.count, ...collision.carved }),
       when: railHarness.when,
       goto: railHarness.goto,
       catch: railHarness.goto,

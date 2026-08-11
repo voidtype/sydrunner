@@ -323,6 +323,79 @@ function mergeParts(parts: BufferGeometry[], name: string): BufferGeometry {
 }
 
 /**
+ * Is a material that says `alphaMode: BLEND` **actually** see-through?
+ *
+ * It has to be asked, because one of the two shipped models gets it wrong and
+ * the cost of believing it is the whole interior. `metropolis.glb` declares its
+ * `interior` material -- 36,179 triangles of grab poles, hanging straps, seats,
+ * moquette and floor -- as `BLEND`, and its base-colour atlas is 94.6% fully
+ * opaque: 14,117 of 262,144 texels have any alpha at all and the lowest is 73.
+ * Those are anti-aliased decal edges in the atlas, not glass. `tangara.glb` has
+ * the same interior as `OPAQUE`, which is the whole of why the Tangara never
+ * showed the defect and the Metro did.
+ *
+ * Believing the flag put every one of those triangles in the transparent pass
+ * with `depthWrite = false`, and the transparent pass sorts *objects*, not
+ * triangles. The interior is one merged draw per material, so with no depth to
+ * arbitrate, visibility inside the carriage fell to index order: the far end of
+ * the train, drawn later in the buffer, painted over the seat and the pole a
+ * metre from the player's face. Which is exactly what it looked like -- fittings
+ * that swelled and vanished as you approached, refused to move against the
+ * world outside the way their distance said they should, and let the ground show
+ * through them.
+ *
+ * So the flag is checked against the texture rather than taken: the base colour
+ * is drawn into a canvas of at most `ALPHA_PROBE` a side and its alpha counted,
+ * and the material is only blended if most of what comes back is soft. The
+ * downscale is **nearest-neighbour and nothing else** -- the default smoothing
+ * bleeds one soft texel across every neighbour it lands between, which is how a
+ * 5% atlas measures 40% and the fix undoes itself. Real glazing is not a near
+ * miss at that threshold: `Glass` and all three Tangara window atlases are 100.0%
+ * soft against the Metropolis interior's 5.4%, so the halfway line has an order
+ * of magnitude of daylight either side of it.
+ *
+ * Unmeasurable is unchanged: no map, no 2D context, or a readback that throws
+ * all fall back to believing the file, because the only material in either model
+ * with no base-colour texture is `interior_light`, which is `OPAQUE` anyway.
+ */
+const SOFT_ALPHA = 250;
+const TRANSLUCENT_SHARE = 0.5;
+const ALPHA_PROBE = 256;
+
+const translucentCache = new WeakMap<Texture, boolean>();
+
+function isReallyTranslucent(map: Texture): boolean {
+  const cached = translucentCache.get(map);
+  if (cached !== undefined) return cached;
+  let answer = true;
+  const image = map.image as (CanvasImageSource & { width?: number; height?: number }) | null;
+  const w = image?.width ?? 0;
+  const h = image?.height ?? 0;
+  if (image && w > 0 && h > 0) {
+    try {
+      const cw = Math.min(w, ALPHA_PROBE);
+      const ch = Math.min(h, ALPHA_PROBE);
+      const canvas = document.createElement('canvas');
+      canvas.width = cw;
+      canvas.height = ch;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (ctx) {
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(image, 0, 0, cw, ch);
+        const data = ctx.getImageData(0, 0, cw, ch).data;
+        let soft = 0;
+        for (let i = 3; i < data.length; i += 4) if (data[i] < SOFT_ALPHA) soft++;
+        answer = soft > TRANSLUCENT_SHARE * cw * ch;
+      }
+    } catch {
+      answer = true;
+    }
+  }
+  translucentCache.set(map, answer);
+  return answer;
+}
+
+/**
  * The GLB's own material, as a `MeshStandardNodeMaterial`.
  *
  * Converted explicitly rather than handed to the renderer's automatic path,
@@ -367,11 +440,20 @@ function convertMaterial(source: Material, label: string): MeshStandardNodeMater
   if (src.emissive) m.emissive = src.emissive.clone();
   m.roughness = src.roughness ?? 0.7;
   m.metalness = src.metalness ?? 0.1;
-  m.transparent = !!src.transparent;
   m.opacity = src.opacity ?? 1;
   if (src.alphaTest) m.alphaTest = src.alphaTest;
+  // `BLEND` is a claim, not a measurement. A material the file calls blended is
+  // only treated as blended if it is either uniformly faded (`opacity`, which is
+  // the author saying so in a way no texture can contradict) or its base colour
+  // is mostly soft. See `isReallyTranslucent` for the model that gets this wrong
+  // and for what believing it cost.
+  m.transparent =
+    !!src.transparent && (m.opacity < 1 || !src.map || isReallyTranslucent(src.map));
   // Glazing: written into the depth buffer it would hide the interior behind it,
-  // and this is the one asset in the game with a modelled interior to hide.
+  // and this is the one asset in the game with a modelled interior to hide. It
+  // is also the reason the test above has to be narrow -- the interior is what
+  // the glazing is being kept out of the way *of*, so misclassifying it as
+  // glazing deletes the thing the rule exists to protect.
   if (m.transparent) m.depthWrite = false;
   m.side = m.transparent ? DoubleSide : FrontSide;
   materialCache.set(source, m);
