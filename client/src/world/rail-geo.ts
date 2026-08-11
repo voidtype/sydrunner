@@ -142,11 +142,22 @@ import {
   type RailStation,
 } from '../game/rail.ts';
 import {
+  CUT_HALF_WIDTH,
   CUT_MIN_DEPTH,
+  STATION_HALF_WIDTH,
   drawnAsTunnel,
   inCutting,
   type RailCut,
 } from './rail-cut.ts';
+import { RAIL_FENCE_HEIGHT, createRailFenceMaterial } from './fences.ts';
+// **One rule for what counts as one platform**, imported rather than restated.
+// The prisms this file draws and the rectangles `game/riding.PlatformField`
+// stands bodies on have to be the same set -- that is the whole reason the field
+// is built from the bake instead of from the geometry -- and two copies of a
+// merge rule is exactly the shape of drift that put an M1 at Epping on the T9
+// platform's paperwork and no platform of its own. `riding.ts` imports nothing
+// but `rail.ts`, so this drags no renderer anywhere it should not go.
+import { samePlatform } from '../game/riding.ts';
 
 // --- Where the bake comes from ------------------------------------------------
 
@@ -273,6 +284,117 @@ const BOARD_WIDTH = 4.2;
 const BOARD_HEIGHT = 1.1;
 const BOARD_Y = 3.4;
 
+// --- The corridor, past the ballast -------------------------------------------
+//
+// Everything between the track and the street, which before this round was
+// nothing at all: the railway stopped at the toe of its own ballast and the
+// suburb started, with no edge between them. Reported in those words -- *"rails
+// painted on a car park"* -- and `RAIL-VERTICAL.md` section 6 names the fence as
+// the mitigation for the one case no measurement can recover.
+
+/** The boundary fence, from the track centre, where nothing else decides. */
+const FENCE_OFFSET = 6.4;
+/** ...and how far outside a carved corridor rim it stands where there is one. */
+const FENCE_CLEAR = 0.9;
+/**
+ * A parallel track within this distance, on a side, means that side is **inside
+ * the corridor** and gets no fence and no verge.
+ *
+ * The bake's polylines are one per *track*, not one per corridor: the up and
+ * down roads of a double-track railway are separate OSM ways four metres apart
+ * and `buildNetwork` deliberately does not merge them (see section 2). So a
+ * naive fence per segment would run a fence **between the running lines** of
+ * every double-track railway in Sydney, four metres from each rail, which is
+ * both absurd and twice the geometry. `markCorridorEdges` decides once, at load,
+ * which sides of which segments are the outside of the corridor.
+ *
+ * 8.2 m rather than `FENCE_OFFSET`: it must exceed the offset the fence would
+ * have been built at, or a four-road corridor fences its two middle roads.
+ */
+const CORRIDOR_NEIGHBOUR = 8.2;
+/** How often the fence and the verge re-read the ground. `TRENCH_STEP_M`'s twin. */
+const VERGE_STEP_M = 8;
+/** The verge never climbs or falls further than this from the formation. */
+const VERGE_RELIEF = 2.4;
+/** Where the ballast's toe ends and the cess begins, from the track centre. */
+const CESS_INNER = BALLAST_BASE_HALF - 0.15;
+/** The fence panel's own height. Must be `fences.RAIL_FENCE_HEIGHT`. */
+const FENCE_HEIGHT = RAIL_FENCE_HEIGHT;
+
+// --- Access, which is generated and never looked up ----------------------------
+//
+// `RAIL-VERTICAL.md` section 4, in one sentence: **a station cannot lack access,
+// because the same number that made it need access generates it.** Two reports
+// -- *"im at roseville and cant get up to the platform"* and a player on the
+// Chatswood plaza reading "doors 23 m away" with no way down to them -- are the
+// same defect, and it is the defect of treating a staircase as content.
+//
+// So there is no lookup here and no OSM tag consulted. There is a measured drop
+// from the ground beside a platform to the top of it, and a flight of steps
+// whose length is that drop divided by a gradient.
+
+/** Riser and going. The gradient is 0.61, which is a public stair. */
+const STAIR_RISE = 0.19;
+const STAIR_GOING = 0.31;
+/**
+ * A drop smaller than this is walked, not climbed, and no flight is built.
+ *
+ * **It is `controller.STEP_HEIGHT` and it has to be.** That constant is what
+ * decides whether a body walks up a kerb or into it, so a station whose platform
+ * stands 0.5 m over the ground is a station nobody can board while a stair
+ * threshold set by eye at 0.8 m would have called it "at grade" and built
+ * nothing. Duplicated rather than imported for `game/rail.ts`'s reason -- this
+ * module must build in a process with no player in it -- and the integration
+ * check is where the two are proved equal.
+ */
+const STAIR_FLAT = 0.42;
+/** Bounded, because a 40 m shaft is a switchback and this builder has no turn. */
+const STAIR_MAX_STEPS = 170;
+/**
+ * The flight's band, from the track centre: outside the platform's own face and
+ * in to the rim of the carved corridor.
+ *
+ * The platform's outer face is at `PLATFORM_INNER + PLATFORM_WIDTH` = 7.12 m and
+ * `rail-cut.STATION_HALF_WIDTH` is 9.4 m, so this is exactly the strip the carve
+ * already opens at every platform site and nothing else wants. In a cutting the
+ * flight is therefore *cut into the trench wall*, which is section 4's own
+ * instruction and is also where a real one is; at grade and on an embankment it
+ * is a free-standing stair against the platform's flank.
+ */
+const STAIR_INNER = PLATFORM_INNER + PLATFORM_WIDTH + 0.12;
+const STAIR_OUTER = STATION_HALF_WIDTH;
+/** Where the flight meets the platform, along it. Clear of the canopy. */
+const ACCESS_ALONG = 44;
+/** How far the boundary fence opens at an entrance. See `writeVerge`. */
+const FENCE_GAP_RADIUS = 10;
+
+/**
+ * The footbridge deck, above the rail head.
+ *
+ * Over the overhead line and over the masts that carry it: `MAST_HEIGHT` is
+ * 7.4 m and the messenger is at 6.35, so a soffit at 8.05 is the first height
+ * that clears the electrification rather than passing through it.
+ */
+const BRIDGE_CLEAR = 8.4;
+const BRIDGE_DECK = 0.35;
+const BRIDGE_ALONG = -50;
+const BRIDGE_RUN = 2.6;
+const BRIDGE_RAIL_H = 1.15;
+/** Below this clearance over the ground the bridge is not built. See `writeFootbridge`. */
+const BRIDGE_MIN_OVER_GROUND = 2.5;
+
+/** The station building at the street end: a brick box with an awning. */
+const HOUSE_LENGTH = 11;
+const HOUSE_WIDTH = 6.5;
+const HOUSE_HEIGHT = 3.9;
+const HOUSE_AWNING = 1.6;
+
+/** Platform edge: the tactile strip and the coping it sits behind. */
+const TACTILE_INSET = 0.11;
+const TACTILE_WIDTH = 0.42;
+/** How far the coping stands over the deck, so it takes a light and drops a line. */
+const COPING_RISE = 0.025;
+
 // --- Chunking -------------------------------------------------------------------
 
 const CHUNK_M = 512;
@@ -346,6 +468,62 @@ const LINING: Rgb = [0.085, 0.084, 0.082];
 const CANOPY: Rgb = [0.145, 0.152, 0.156];
 /** Mast and gantry steel: hot-dip galvanised, gone matt grey. */
 const MAST_STEEL: Rgb = [0.096, 0.1, 0.104];
+/**
+ * The cess and the verge: the compacted strip between the ballast toe and the
+ * boundary fence.
+ *
+ * **The one tone in this file chosen against its neighbours rather than for
+ * itself**, because its whole job is to be a *break*. It sits between blue metal
+ * at rho 0.055 and whatever the pipeline put down beyond the fence -- which at
+ * Lindfield is the tan ground the complaint is about -- and it has to be clearly
+ * neither. Warm grey, a shade of dried clay and fines with ballast walked into
+ * it, at rho 0.135: sun rgb(151,146,138) Y' 147, shade rgb(80,75,69) Y' 76.
+ *
+ * That is 63 code values above the ballast in sun and 34 in shade, which is a
+ * hard edge at the ballast toe, and about 25 below the pale dirt beside it,
+ * which is a soft one at the fence line. The hard edge is the corridor and the
+ * soft one is the boundary, which is the right way round: a railway's ballast
+ * shoulder is the sharpest line in it and its fence line is not.
+ */
+const CESS: Rgb = [0.135, 0.128, 0.118];
+/**
+ * The platform edge's tactile strip, and it is the only saturated colour the
+ * railway has.
+ *
+ * Australian Standard 1428.4 tactile ground surface indicators, in the safety
+ * yellow every platform in NSW carries: rho 0.52 in red, 0.40 in green, 0.045 in
+ * blue. It is deliberately *not* toned down for the tone curve -- the whole
+ * point of the object is that it is the one thing on a grey platform your eye
+ * goes to, and every photograph of a Sydney platform is a grey slab with a
+ * yellow line down it.
+ *
+ * Through the chain on an up-facing surface at 3 pm: rgb(250, 226, 108). Half a
+ * metre wide at 160 m long, so from the far end of the platform it is a
+ * one-pixel yellow rule, which is exactly what it is in life.
+ */
+const TACTILE: Rgb = [0.52, 0.4, 0.045];
+/**
+ * Station brick: the dark red the Public Works Department built the whole North
+ * Shore line out of between 1890 and 1930, and Lindfield with it.
+ *
+ * rho 0.105, warm and low: sun rgb(163, 113, 94) Y' 126, shade rgb(88, 57, 46)
+ * Y' 65. Below the concrete beside it by 30 code values and *hue-separated* from
+ * it, which is what makes a station building read as a building rather than as
+ * another piece of railway infrastructure.
+ */
+const STATION_BRICK: Rgb = [0.105, 0.05, 0.036];
+/**
+ * Painted steel at platform scale: seats, bins, lamp columns, shelter frames and
+ * footbridge balustrades.
+ *
+ * One material for all of them, and that is a budget decision made in the open:
+ * each is worth having and none is worth a pipeline. CityRail's own
+ * mid-blue-grey, which every piece of platform furniture in Sydney has been
+ * painted since the eighties -- rho 0.075, cool: sun rgb(139, 145, 151) Y' 143,
+ * shade rgb(75, 78, 82) Y' 77. Read against the platform's warm concrete it is
+ * the temperature difference that separates them rather than the value.
+ */
+const FURNITURE_STEEL: Rgb = [0.072, 0.078, 0.086];
 
 // --- A tiny mesh builder -----------------------------------------------------------
 
@@ -472,6 +650,23 @@ export class RailAssets {
   readonly sign: MeshBasicNodeMaterial;
   /** The far corridor ribbon: the same blue metal, but never shadowed. */
   readonly corridor = standard('rail_corridor', BALLAST, 0.97, 0.0, true);
+  /** The cess and the verge either side of the ballast. */
+  readonly cess = standard('rail_cess', CESS, 0.96, 0.0, true);
+  /** The tactile strip at the platform edge. */
+  readonly tactile = standard('rail_tactile', TACTILE, 0.82, 0.0, true);
+  /** The station building. */
+  readonly brick = standard('rail_brick', STATION_BRICK, 0.9, 0.0, true);
+  /** Seats, bins, lamp columns, shelter frames, balustrades. */
+  readonly furniture = standard('rail_furniture', FURNITURE_STEEL, 0.55, 0.35, true);
+  /**
+   * The corridor boundary fence, and **the one material here this file does not
+   * build**: it is `fences.createRailFenceMaterial`, which is
+   * `createFenceOpenMaterial` over a rail style, so 300 km of corridor fencing
+   * runs the identical alpha-tested bar mask the city's front fences do rather
+   * than a second one written from scratch. See that file's header for why the
+   * mask lives in `colorNode.a` and nowhere else.
+   */
+  readonly fence = createRailFenceMaterial();
 
   readonly sleeperGeometry: BufferGeometry;
   readonly cantileverGeometry: BufferGeometry;
@@ -576,6 +771,7 @@ export class RailAssets {
     return [
       this.ballast, this.rail, this.concrete, this.canopy, this.sleeper,
       this.mast, this.lining, this.wire, this.sign, this.corridor,
+      this.cess, this.tactile, this.brick, this.furniture, this.fence,
     ];
   }
 }
@@ -605,6 +801,23 @@ export function railWarmupParts(assets: RailAssets): WarmupPart[] {
     lit(assets.canopy, true),
     lit(assets.lining, false),
     lit(assets.corridor, false),
+    lit(assets.cess, false),
+    lit(assets.tactile, false),
+    lit(assets.brick, true),
+    lit(assets.furniture, true),
+    // The boundary fence, which casts nothing. `fences.ts`' header works out at
+    // length what a 0.9 m palisade's shadow is worth at a 10.7 cm shadow texel
+    // and the answer for a 1.8 m mesh fence at 300 km of it is the same one with
+    // twice the cost: the mask goes solid in the depth pass, so what a corridor
+    // fence would throw is a continuous soft bar down both sides of every
+    // railway in Sydney. That is not what a see-through fence does, and paying
+    // the whole network's depth-pass cost for it would be paying to be wrong.
+    {
+      geometry: warmupGeometry({ normal: true, uv: true }),
+      material: assets.fence,
+      owned: true,
+      casts: false,
+    },
     {
       geometry: warmupGeometry({ normal: true, uv: true }),
       material: assets.wire,
@@ -684,6 +897,15 @@ interface Segment {
   /** Plan length, and the unit plan direction. Computed once. */
   len: number;
   ux: number; uz: number;
+  /**
+   * Is this side of this segment the **outside of the corridor**?
+   *
+   * `open[0]` is the `-1` side and `open[1]` the `+1` side, in the same
+   * `(px, pz) = (-uz, ux)` frame every writer here uses. Set once by
+   * `markCorridorEdges` and read only by `writeVerge`. See `CORRIDOR_NEIGHBOUR`
+   * for what a false answer here would build.
+   */
+  open: [boolean, boolean];
 }
 
 /** A tunnel mouth: where the flags flip between one vertex and the next. */
@@ -692,6 +914,23 @@ interface Portal {
   /** Unit plan direction, pointing **into** the tunnel. */
   ux: number; uz: number;
 }
+
+/**
+ * A station as this file draws it: the bake's record, moved to where the trains
+ * actually stop, with the track heading there and **the OSM node it came from**.
+ *
+ * `x, z` is the routed stopping anchor and `nodeX, nodeZ` is the station node,
+ * and the two are as much as 248 m apart -- see `buildNetwork`, which spends a
+ * page on why the platform goes at the first and not the second. `nodeX, nodeZ`
+ * is kept because it is the only thing in the bake that says where the *street*
+ * side of a station is: an OSM station node sits at the entrance, not on the
+ * track, so the vector from the anchor to the node is the direction a passenger
+ * arrives from. `writeStationHouse` is its one reader.
+ */
+export type PlacedStation = RailStation & {
+  ux: number; uz: number;
+  nodeX: number; nodeZ: number;
+};
 
 interface Chunk {
   segments: number[];
@@ -706,7 +945,7 @@ export interface RailNetwork {
   segments: Segment[];
   portals: Portal[];
   /** Stations that sit on the heavy-rail network, with the track heading at each. */
-  stations: Array<RailStation & { ux: number; uz: number }>;
+  stations: PlacedStation[];
   chunks: Map<string, Chunk>;
   /** What the deduplication actually saved. Printed at boot. */
   directedSegments: number;
@@ -784,10 +1023,13 @@ export function buildNetwork(bake: RailBake): RailNetwork {
           len,
           ux: dx / len,
           uz: dz / len,
+          open: [true, true],
         });
       }
     }
   }
+
+  markCorridorEdges(segments);
 
   // --- Portals: a flag transition along a direction's own polyline.
   const portals: Portal[] = [];
@@ -880,18 +1122,17 @@ export function buildNetwork(bake: RailBake): RailNetwork {
       for (const stop of dir.stops) {
         if (!stop.calls) continue;
         const at = anchorAt(dir, stop.s);
-        // Merge with an anchor of the same name already within a platform's
-        // length: the up and down roads of one station are two ways a few metres
-        // apart and their arc lengths land within a carriage of each other, so
-        // they are one platform pair. What must *not* merge is a station whose
-        // two directions the router anchored hundreds of metres apart -- and the
-        // bake has those: Meadowbank's two are 471 m up the corridor from each
-        // other. Merging those would put one direction's trains half a kilometre
-        // from their own platform, which is the defect this whole block exists
-        // to prevent, so they become two platform sites under one name.
-        const near = anchors.find(
-          (a) => a.name === stop.name && Math.hypot(a.x - at.x, a.z - at.z) < PLATFORM_HALF_LENGTH,
-        );
+        // Merge with an anchor of the same name whose platform this stop already
+        // stands at: the up and down roads of one station are two ways a few
+        // metres apart and their arc lengths land within a carriage of each
+        // other, so they are one platform pair. What must *not* merge is a
+        // station whose two directions the router anchored hundreds of metres
+        // apart -- and the bake has those: Meadowbank's two are 471 m up the
+        // corridor from each other -- nor two platforms of a big station lying
+        // side by side across the formation, which a plain radius could not tell
+        // from the first case at all. `riding.samePlatform` is the test and its
+        // header is the argument; both readers of the bake use it.
+        const near = anchors.find((a) => a.name === stop.name && samePlatform(a, at));
         if (near) continue;
         anchors.push({ name: stop.name, ...at });
       }
@@ -899,14 +1140,18 @@ export function buildNetwork(bake: RailBake): RailNetwork {
   }
 
   const byName = new Map(bake.stations.map((s) => [s.name, s]));
-  const stations: Array<RailStation & { ux: number; uz: number }> = [];
+  const stations: PlacedStation[] = [];
   const served = new Set<string>();
   for (const a of anchors) {
     const record = byName.get(a.name);
     if (!record) continue;
     served.add(a.name);
     const index = stations.length;
-    stations.push({ ...record, x: a.x, z: a.z, trackY: a.y, ux: a.ux, uz: a.uz });
+    stations.push({
+      ...record,
+      x: a.x, z: a.z, trackY: a.y, ux: a.ux, uz: a.uz,
+      nodeX: record.x, nodeZ: record.z,
+    });
     bucket(chunks, chunkOf(a.x, a.z)).stations.push(index);
   }
 
@@ -935,11 +1180,108 @@ export function buildNetwork(bake: RailBake): RailNetwork {
     }
     if (best < 0) continue;
     const index = stations.length;
-    stations.push({ ...station, ux: segments[best].ux, uz: segments[best].uz });
+    stations.push({
+      ...station,
+      ux: segments[best].ux, uz: segments[best].uz,
+      nodeX: station.x, nodeZ: station.z,
+    });
     bucket(chunks, chunkOf(station.x, station.z)).stations.push(index);
   }
 
   return { bake, segments, portals, stations, chunks, directedSegments: directed };
+}
+
+/**
+ * Decide, once, which sides of which segments are the outside of the corridor.
+ *
+ * ---------------------------------------------------------------------------
+ * **The problem, which is not obvious until a fence exists.** The bake carries
+ * one polyline per *track*: the up and down roads of a double-track railway are
+ * two OSM ways four metres apart and `buildNetwork` deliberately keeps them
+ * apart, because both are really there. Nothing before this round cared -- a
+ * ballast prism per road is correct, and two of them 4 m apart simply overlap
+ * into one formation, which is what a formation looks like. A *fence* per road
+ * is not correct. It is a fence down the six-foot of every double-track railway
+ * in Sydney, four metres from each rail, and a four-road corridor gets three of
+ * them.
+ *
+ * So a side is fenced only when there is no other running rail on it within
+ * `CORRIDOR_NEIGHBOUR`. Three samples per segment rather than one, because a
+ * 40 m segment routinely has a neighbour beside half of it -- a loop, a turnout,
+ * a platform road -- and the union is the safe direction: a side wrongly called
+ * closed loses a fence, a side wrongly called open builds one in the six-foot.
+ *
+ * ---------------------------------------------------------------------------
+ * The broad phase is a 16 m grid, and the containment argument is the one thing
+ * in it worth stating: a segment is filed into every cell its plan bounding box
+ * **grown by `CORRIDOR_NEIGHBOUR`** touches, so any segment within that distance
+ * of a query point is filed in that point's own cell, and the query reads one
+ * cell rather than nine. Same construction as `rail-cut.RailCut`'s broad phase
+ * and for the same reason.
+ *
+ * One pass over 19,319 segments at load: about 230k cell insertions and 19,319
+ * queries of a few dozen candidates each. Measured at 34 ms in the browser,
+ * beside the 60 ms `buildNetwork` already spent, and it happens once.
+ */
+function markCorridorEdges(segments: Segment[]): void {
+  const CELL = 16;
+  const cells = new Map<number, number[]>();
+  const key = (cx: number, cz: number): number => (cx & 0xfffff) * 0x100000 + (cz & 0xfffff);
+
+  for (let i = 0; i < segments.length; i++) {
+    const s = segments[i];
+    // A bore has no surface expression and cannot close a side: the North Shore
+    // line running into a tunnel beside an open cutting must not unfence it.
+    if ((s.flags & SPAN_TUNNEL) !== 0) continue;
+    const x0 = Math.floor((Math.min(s.ax, s.bx) - CORRIDOR_NEIGHBOUR) / CELL);
+    const x1 = Math.floor((Math.max(s.ax, s.bx) + CORRIDOR_NEIGHBOUR) / CELL);
+    const z0 = Math.floor((Math.min(s.az, s.bz) - CORRIDOR_NEIGHBOUR) / CELL);
+    const z1 = Math.floor((Math.max(s.az, s.bz) + CORRIDOR_NEIGHBOUR) / CELL);
+    for (let cx = x0; cx <= x1; cx++) {
+      for (let cz = z0; cz <= z1; cz++) {
+        const k = key(cx, cz);
+        const list = cells.get(k);
+        if (list) list.push(i);
+        else cells.set(k, [i]);
+      }
+    }
+  }
+
+  for (let i = 0; i < segments.length; i++) {
+    const s = segments[i];
+    if ((s.flags & SPAN_TUNNEL) !== 0) continue;
+    const px = -s.uz;
+    const pz = s.ux;
+    for (const t of [0.15, 0.5, 0.85]) {
+      const qx = s.ax + (s.bx - s.ax) * t;
+      const qz = s.az + (s.bz - s.az) * t;
+      const list = cells.get(key(Math.floor(qx / CELL), Math.floor(qz / CELL)));
+      if (list === undefined) continue;
+      for (const j of list) {
+        if (j === i) continue;
+        const o = segments[j];
+        // Parallel, or it is a junction crossing rather than a second road, and
+        // a crossing must not unfence the corridor it crosses.
+        if (Math.abs(s.ux * o.ux + s.uz * o.uz) < 0.9) continue;
+        // The neighbour's nearest point, and which side of us it is on.
+        const ex = o.bx - o.ax;
+        const ez = o.bz - o.az;
+        const len2 = ex * ex + ez * ez;
+        let u = 0;
+        if (len2 > 1e-9) {
+          u = ((qx - o.ax) * ex + (qz - o.az) * ez) / len2;
+          u = u < 0 ? 0 : u > 1 ? 1 : u;
+        }
+        const lateral = (o.ax + ex * u - qx) * px + (o.az + ez * u - qz) * pz;
+        // Half a metre of dead band, so a segment's own duplicate-in-all-but-
+        // quantisation -- a bend where two chains meet at a shared vertex -- does
+        // not read as a second road lying on top of this one.
+        const a = Math.abs(lateral);
+        if (a < 0.5 || a > CORRIDOR_NEIGHBOUR) continue;
+        s.open[lateral < 0 ? 0 : 1] = false;
+      }
+    }
+  }
 }
 
 function pointSegmentDistanceSquared(x: number, z: number, s: Segment): number {
@@ -1030,6 +1372,8 @@ export class RailWorld {
   private readonly gantryMesh: InstancedMesh;
   private lastChunk = '';
   private lastSleeperCell = '';
+  /** Frames since the last idle re-plan. See `update`. */
+  private idleFrames = 0;
 
   constructor(
     private readonly net: RailNetwork,
@@ -1133,6 +1477,23 @@ export class RailWorld {
       // A chunk that has just arrived may be the one the player is standing on.
       this.lastSleeperCell = '';
     }
+    // **And the chunks that were built blind get another look while standing
+    // still.** `retryProvisional` used to run only from `reshapeRing`, which is
+    // a chunk transition -- so a player who arrives somewhere and *stops* keeps
+    // whatever the ring decided in the half-second before their terrain landed,
+    // for as long as they stand there. That was survivable while the only thing
+    // at stake was a trench wall's height. It is not survivable now that the
+    // access stairs are sized from the same measurement: a station planned blind
+    // gets a flight that stops short of the ground, and standing at the bottom
+    // of it looking up is exactly the report this round exists to answer.
+    //
+    // Once a second, and `PROVISIONAL_ATTEMPTS` still bounds it, so a chunk over
+    // the harbour asks four times and then stops asking forever.
+    if (this.pending.length === 0 && ++this.idleFrames >= 60) {
+      this.idleFrames = 0;
+      this.retryProvisional(x, z);
+      this.countDraws();
+    }
     // Sleepers move on their own, much smaller cell: 165 m of near field
     // re-derived every 512 m would leave the player walking out of their own
     // sleepers for three hundred metres.
@@ -1210,7 +1571,32 @@ export class RailWorld {
     const lining = new Solid();
     const canopy = new Solid();
     const signs = new Solid();
+    const cess = new Solid();
+    const fence = new Solid();
+    const tactile = new Solid();
+    const brick = new Solid();
+    const furniture = new Solid();
     const sleepers: number[] = [];
+
+    // --- Every station whose entrance could reach into this chunk, measured
+    //     once, before anything is drawn.
+    //
+    // Nine chunks rather than one, and that is not caution: a station's stair,
+    // its forecourt and the hole it opens in the boundary fence reach about
+    // ninety metres from the platform anchor, so a station just over a chunk
+    // boundary has to be able to open this chunk's fence. Cheap, because 321
+    // stations over 785 chunks means the loop below finds nothing at all in the
+    // overwhelming majority of builds.
+    const plans: StationPlan[] = [];
+    for (let ox = -1; ox <= 1; ox++) {
+      for (let oz = -1; oz <= 1; oz++) {
+        const near = this.net.chunks.get(chunkKey(cx + ox, cz + oz));
+        if (near === undefined) continue;
+        for (const si of near.stations) {
+          plans.push(planStation(this.net, this.net.stations[si], this.rawGround, ox === 0 && oz === 0));
+        }
+      }
+    }
 
     let wireSpans = 0;
     /** See `BuiltChunk.provisional`: any depth this chunk could not measure. */
@@ -1249,8 +1635,15 @@ export class RailWorld {
         }
         // And the cutting. The ground over this span has been taken away by
         // `terrain.buildTerrainMesh`; this is the trench that stands in the hole.
-        if (this.cut !== null && inCutting(s.flags, depth)) {
-          if (!writeTrench(concrete, prisms, s, this.cut, this.rawGround)) provisional = true;
+        const trenched = this.cut !== null && inCutting(s.flags, depth);
+        if (trenched) {
+          if (!writeTrench(concrete, prisms, s, this.cut!, this.rawGround)) provisional = true;
+        }
+        // ...and the corridor either side of it: the cess and verge where the
+        // track is at grade, and the boundary fence everywhere. See `writeVerge`
+        // for why a bridge span gets neither.
+        if (!bridge) {
+          writeVerge(cess, fence, s, this.cut, this.rawGround, trenched, plans);
         }
       }
       if (!tunnel) writeRails(rails, s);
@@ -1259,12 +1652,26 @@ export class RailWorld {
 
     for (const pi of chunk.portals) writePortal(concrete, lining, this.net.portals[pi]);
 
-    for (const si of chunk.stations) {
-      const station = this.net.stations[si];
+    for (const plan of plans) {
+      if (!plan.mine) continue;
+      // A station planned before its terrain arrived is a station whose stairs
+      // are the wrong length. See `StationPlan.measured`.
+      if (!plan.measured) provisional = true;
+      const station = plan.station;
       if (station.vertical === 'underground') {
         writeUndergroundStation(concrete, lining, prisms, station);
       } else {
-        writePlatforms(concrete, canopy, prisms, station);
+        writePlatforms(concrete, canopy, tactile, prisms, plan);
+        // **The access, and it is generated rather than looked up.**
+        // `RAIL-VERTICAL.md` section 4: the same measurement that made this
+        // station need steps is the one that builds them, so a station cannot
+        // be left unreachable by an OSM tag nobody wrote. Reported twice --
+        // "im at roseville and cant get up to the platform", and a player on
+        // the Chatswood plaza reading "doors 23 m away" with no way down.
+        writePlatformFurniture(canopy, furniture, plan);
+        writeStationAccess(concrete, furniture, prisms, plan);
+        writeFootbridge(concrete, furniture, prisms, plan);
+        writeStationHouse(brick, canopy, prisms, plan);
       }
       const uv = this.assets.signUv(station.name);
       if (uv) {
@@ -1338,10 +1745,19 @@ export class RailWorld {
     };
 
     add(ballast.build(`rail_ballast_${key}`), this.assets.ballast, 'ballast', false, true);
+    add(cess.build(`rail_cess_${key}`), this.assets.cess, 'cess', false, true);
     add(rails.build(`rail_steel_${key}`), this.assets.rail, 'rails', false, true);
     add(concrete.build(`rail_concrete_${key}`), this.assets.concrete, 'concrete', true, true);
     add(lining.build(`rail_lining_${key}`), this.assets.lining, 'lining', false, false);
     add(canopy.build(`rail_canopy_${key}`), this.assets.canopy, 'canopy', true, true);
+    add(tactile.build(`rail_tactile_${key}`), this.assets.tactile, 'tactile', false, true);
+    add(brick.build(`rail_brick_${key}`), this.assets.brick, 'house', true, true);
+    add(furniture.build(`rail_furniture_${key}`), this.assets.furniture, 'furniture', true, true);
+    // The boundary fence, with UVs, because the whole object is a mask on them:
+    // `u` is metres along the run and `v` metres up the panel, which is exactly
+    // what `fences.createFenceOpenMaterial` reads. It casts nothing -- see
+    // `railWarmupParts` for the arithmetic behind that.
+    add(fence.build(`rail_fence_${key}`, true), this.assets.fence, 'fence', false, true);
     add(signs.build(`rail_sign_${key}`, true), this.assets.sign, 'signs', false, false);
     add(wire, this.assets.wire, 'wire', false, false);
 
@@ -1858,6 +2274,267 @@ function ring(
   ]);
 }
 
+// --- Working in the track's own frame -------------------------------------------
+//
+// Everything from here down is written in `(t, o, y)`: metres **along** the run,
+// metres **across** it, and metres up. The map into the world is a rotation
+// about Y, which preserves handedness, so a box emitted here has exactly the
+// winding `Solid.box` gives an axis-aligned one -- and that matters, because a
+// `FrontSide` material culls by winding and the one thing this file has already
+// shipped as a bug is a mirrored frame quietly reversing it. See `writeTrench`'s
+// `face`, which is the same hazard solved the other way for strips.
+
+type Prisms = Array<{ points: Float32Array; height: number; base: number }>;
+
+/** Anything with a position and a unit heading: a station, or a segment's end. */
+interface TrackFrame {
+  x: number; z: number; ux: number; uz: number;
+}
+
+function framePoint(f: TrackFrame, t: number, o: number, y: number): [number, number, number] {
+  return [f.x + f.ux * t - f.uz * o, y, f.z + f.uz * t + f.ux * o];
+}
+
+/** The plan rectangle of a frame box, as the ring `addPrisms` wants. */
+function framePlan(f: TrackFrame, t0: number, t1: number, o0: number, o1: number): Float32Array {
+  const a = framePoint(f, t0, o0, 0);
+  const b = framePoint(f, t1, o0, 0);
+  const c = framePoint(f, t1, o1, 0);
+  const d = framePoint(f, t0, o1, 0);
+  return new Float32Array([a[0], a[2], b[0], b[2], c[0], c[2], d[0], d[2]]);
+}
+
+/**
+ * A bar of rectangular section swept along the run, whose underside may slope.
+ *
+ * The one primitive the whole station kit is built from: a step is a bar with a
+ * flat underside, a balustrade is a bar with a sloping one, and a seat, a bin, a
+ * lamp column and a brick wall are all bars that happen not to slope. Six quads,
+ * wound exactly as `Solid.box` winds them, with the extents sorted first so a
+ * caller passing a mirrored side cannot turn the object inside out.
+ */
+function frameBar(
+  s: Solid, f: TrackFrame,
+  t0: number, t1: number,
+  o0: number, o1: number,
+  /** Underside at `t0` and at `t1`, and how thick the bar is above it. */
+  yA: number, yB: number, thick: number,
+): void {
+  if (t0 > t1) {
+    [t0, t1] = [t1, t0];
+    [yA, yB] = [yB, yA];
+  }
+  if (o0 > o1) [o0, o1] = [o1, o0];
+  if (thick < 0) {
+    yA += thick;
+    yB += thick;
+    thick = -thick;
+  }
+  const c = (t: number, o: number, up: boolean): [number, number, number] =>
+    framePoint(f, t, o, (t === t0 ? yA : yB) + (up ? thick : 0));
+  s.quad(...c(t0, o0, true), ...c(t0, o1, true), ...c(t1, o1, true), ...c(t1, o0, true));
+  s.quad(...c(t0, o0, false), ...c(t1, o0, false), ...c(t1, o1, false), ...c(t0, o1, false));
+  s.quad(...c(t0, o1, false), ...c(t1, o1, false), ...c(t1, o1, true), ...c(t0, o1, true));
+  s.quad(...c(t1, o0, false), ...c(t0, o0, false), ...c(t0, o0, true), ...c(t1, o0, true));
+  s.quad(...c(t1, o1, false), ...c(t1, o0, false), ...c(t1, o0, true), ...c(t1, o1, true));
+  s.quad(...c(t0, o0, false), ...c(t0, o1, false), ...c(t0, o1, true), ...c(t0, o0, true));
+}
+
+/** A box in the track frame, between two corners. */
+function frameBox(
+  s: Solid, f: TrackFrame,
+  t0: number, t1: number, o0: number, o1: number, y0: number, y1: number,
+): void {
+  frameBar(s, f, t0, t1, o0, o1, Math.min(y0, y1), Math.min(y0, y1), Math.abs(y1 - y0));
+}
+
+/** A box, and the prism that makes it solid. Base semantics are section 4's. */
+function frameSolid(
+  s: Solid, prisms: Prisms, f: TrackFrame,
+  t0: number, t1: number, o0: number, o1: number, y0: number, y1: number,
+): void {
+  frameBox(s, f, t0, t1, o0, o1, y0, y1);
+  const base = Math.min(y0, y1);
+  prisms.push({ points: framePlan(f, t0, t1, o0, o1), height: Math.abs(y1 - y0), base });
+}
+
+// --- What a station is, measured ---------------------------------------------------
+
+/**
+ * A station reduced to the numbers the geometry needs, **all of them measured**.
+ *
+ * `RAIL-VERTICAL.md` sections 1 and 4, applied: nothing below reads
+ * `station.vertical` except to tell a bore from open air, because the label has
+ * been wrong at every station anybody has complained about -- Chatswood is
+ * `elevated` with its track 6.9 m *under* the terrain, and the geometry that
+ * believed it built a platform slab floating in a hole with no legs and no way
+ * in. What is read instead is `rawGround` beside the platform, on each side
+ * separately, because the two sides of a corridor are routinely at different
+ * levels and a single number per station cannot say so.
+ */
+interface StationPlan {
+  station: PlacedStation;
+  /** Built into this chunk, rather than only consulted for its fence opening. */
+  mine: boolean;
+  /** The platform deck. */
+  top: number;
+  /** What the platform's skirt stands on. */
+  base: number;
+  /**
+   * Is the track carried on a deck here? **Measured off the spans**, not off
+   * `vertical`: a station whose own segments carry `SPAN_BRIDGE` stands on a
+   * viaduct that is already built, and one that does not needs a skirt to the
+   * ground however the bake labelled it.
+   */
+  onBridge: boolean;
+  /** Ground at the stair's landing, by side. Index 0 is the `-1` side. */
+  landing: [number, number];
+  /** The flight's run in metres, by side. Zero where the deck is already walkable. */
+  run: [number, number];
+  /**
+   * Was every height in this plan actually measured?
+   *
+   * False where `rawGround` had no tile under the landing and the plan fell back
+   * to the bake's own `groundY`. It matters more here than anywhere else in this
+   * file: a station planned blind gets a flight sized from a height taken at the
+   * OSM node, which at Roseville is 2.9 m out, and the result is a staircase
+   * that stops short of the ground -- a station that is drawn as reachable and
+   * is not. `buildChunk` turns this into `BuiltChunk.provisional` and the chunk
+   * is planned again once its tiles land.
+   */
+  measured: boolean;
+  /** Which side of the track the OSM station node is on, and where along it. */
+  houseSide: number;
+  houseAlong: number;
+  /**
+   * The terrain under the station building, sampled at the building rather than
+   * at the stair.
+   *
+   * A separate reading and not `landing`, because it was one first and the
+   * building hung in the air at Roseville: the landing is forty metres up the
+   * platform and three metres in from the building, and on an embankment those
+   * are different heights. Anything that stands on the ground has to have asked
+   * the ground where it is.
+   */
+  houseGround: number;
+}
+
+function planStation(
+  net: RailNetwork,
+  station: PlacedStation,
+  rawGround: GroundAt,
+  mine: boolean,
+): StationPlan {
+  const top = station.trackY + PLATFORM_HEIGHT;
+
+  // Is there a deck under this? The station's own chunk holds every segment
+  // whose midpoint is in it, which at 512 m is every span of the approach.
+  let onBridge = false;
+  const own = net.chunks.get(chunkOf(station.x, station.z));
+  if (own) {
+    for (const si of own.segments) {
+      const s = net.segments[si];
+      if ((s.flags & SPAN_BRIDGE) === 0) continue;
+      if (pointSegmentDistanceSquared(station.x, station.z, s) < 45 * 45) {
+        onBridge = true;
+        break;
+      }
+    }
+  }
+
+  const landing: [number, number] = [top, top];
+  const run: [number, number] = [0, 0];
+  let measured = true;
+  for (let i = 0; i < 2; i++) {
+    const side = i === 0 ? -1 : 1;
+    const o = ((STAIR_INNER + STAIR_OUTER) / 2) * side;
+    // Sampled at the middle of where the flight will be, which is a chicken and
+    // an egg -- the run depends on the drop and the drop is sampled along the
+    // run -- and is resolved by sampling at a fixed eight metres out and letting
+    // the flight be as long as that one reading says. A DEM post is 31 m, so
+    // every sample the flight could have taken is the same post anyway.
+    const p = framePoint(station, ACCESS_ALONG + 8, o, 0);
+    let g = rawGround(p[0], p[2]);
+    if (!Number.isFinite(g)) {
+      measured = false;
+      g = station.groundY;
+    }
+    if (!Number.isFinite(g)) g = top;
+    landing[i] = g;
+    const drop = Math.abs(top - g);
+    // `STAIR_FLAT` is `controller.STEP_HEIGHT`: below it a body walks up
+    // without being told, and a flight would be six centimetres of theatre.
+    if (drop <= STAIR_FLAT) continue;
+    const steps = Math.min(STAIR_MAX_STEPS, Math.round(drop / STAIR_RISE));
+    run[i] = steps * STAIR_GOING;
+  }
+
+  // The skirt. On a deck the viaduct is already there and the platform is a slab
+  // on top of it; otherwise it runs to the ground, which on an embankment is the
+  // retaining wall a real one has and in a cutting is a face against the trench.
+  // Bounded at 14 m so a genuine viaduct station whose bridge flag went missing
+  // is a tall platform rather than a 40 m blank wall.
+  const groundish = Math.min(landing[0], landing[1], station.trackY);
+  const base = onBridge ? top - 1.4 : Math.max(top - 14, groundish - 0.4);
+
+  // Which way the street is. An OSM station node sits at the *entrance*, and
+  // `buildNetwork` moved the platform to the stopping anchor without throwing
+  // the node away for exactly this.
+  const dx = station.nodeX - station.x;
+  const dz = station.nodeZ - station.z;
+  const along = dx * station.ux + dz * station.uz;
+  const across = dx * -station.uz + dz * station.ux;
+  const far = dx * dx + dz * dz > 250 * 250;
+  const houseSide = !far && across < 0 ? -1 : 1;
+  const houseAlong = far ? -18 : Math.max(-62, Math.min(62, along));
+  const hp = framePoint(station, houseAlong, (STAIR_OUTER + 1.2 + HOUSE_WIDTH / 2) * houseSide, 0);
+  const hg = rawGround(hp[0], hp[2]);
+  return {
+    station, mine, top, base, onBridge, landing, run, measured,
+    houseSide, houseAlong,
+    houseGround: Number.isFinite(hg) ? hg : landing[houseSide < 0 ? 0 : 1],
+  };
+}
+
+/**
+ * Is this point inside a station's entrance, where the boundary fence opens?
+ *
+ * `RAIL-VERTICAL.md` section 4's middle band -- *"a gap in the boundary fence:
+ * do not fence a player out of the entrance"* -- and it is the one piece of the
+ * access story that is a **subtraction** rather than a structure. A station at
+ * grade needs no steps and would still be unreachable behind an unbroken
+ * 1.8 m fence, which is the failure mode fencing 300 km of corridor introduces
+ * and which nothing else here would have caught.
+ *
+ * The opening is as long as the flight it serves plus a forecourt, so a deep
+ * station with a thirty-metre stair does not have its own stair fenced off
+ * halfway down.
+ */
+function entranceOpens(plans: readonly StationPlan[], x: number, z: number): boolean {
+  for (const plan of plans) {
+    for (let i = 0; i < 2; i++) {
+      const side = i === 0 ? -1 : 1;
+      const run = plan.run[i];
+      const r = FENCE_GAP_RADIUS + run / 2;
+      // Both ends, because `writeStationAccess` builds a flight at both ends and
+      // an entrance fenced off is an entrance that does not exist.
+      for (const end of [1, -1]) {
+        const c = framePoint(
+          plan.station, (ACCESS_ALONG + run / 2 + 2) * end, (STAIR_OUTER + 2) * side, 0,
+        );
+        const dx = x - c[0];
+        const dz = z - c[2];
+        if (dx * dx + dz * dz < r * r) return true;
+      }
+    }
+    const h = framePoint(plan.station, plan.houseAlong, (STAIR_OUTER + 2) * plan.houseSide, 0);
+    const hx = x - h[0];
+    const hz = z - h[2];
+    if (hx * hx + hz * hz < (HOUSE_LENGTH / 2 + 6) * (HOUSE_LENGTH / 2 + 6)) return true;
+  }
+  return false;
+}
+
 /**
  * A tunnel: a lining tube around the track and **nothing else**.
  *
@@ -1937,7 +2614,7 @@ function writePortal(concrete: Solid, lining: Solid, portal: Portal): void {
   const stub: Segment = {
     ax: portal.x - ux * 1.5, ay: portal.y, az: portal.z - uz * 1.5,
     bx: portal.x + ux * 14, by: portal.y, bz: portal.z + uz * 14,
-    flags: SPAN_TUNNEL, len: 15.5, ux, uz,
+    flags: SPAN_TUNNEL, len: 15.5, ux, uz, open: [false, false],
   };
   writeTunnel(lining, stub);
 }
@@ -1955,60 +2632,530 @@ function writePortal(concrete: Solid, lining: Solid, portal: Portal): void {
 function writePlatforms(
   concrete: Solid,
   canopy: Solid,
-  prisms: Array<{ points: Float32Array; height: number; base: number }>,
-  station: RailStation & { ux: number; uz: number },
+  tactile: Solid,
+  prisms: Prisms,
+  plan: StationPlan,
 ): void {
-  const ux = station.ux;
-  const uz = station.uz;
-  const px = -uz;
-  const pz = ux;
-  const y = station.trackY;
-  const top = y + PLATFORM_HEIGHT;
-  // Elevated stations stand on their own viaduct, which the bridge spans have
-  // already built; a surface station's platform runs to the ground.
-  const base = station.vertical === 'elevated' ? top - 1.4 : Math.min(station.groundY, y) - 0.4;
+  const f = plan.station;
+  const top = plan.top;
+  const base = plan.base;
+  const L = PLATFORM_HALF_LENGTH;
 
   for (const side of [-1, 1]) {
-    const inner = PLATFORM_INNER * side;
-    const outer = (PLATFORM_INNER + PLATFORM_WIDTH) * side;
-    const corner = (t: number, o: number, cy: number): [number, number, number] => [
-      station.x + ux * t + px * o, cy, station.z + uz * t + pz * o,
-    ];
-    const L = PLATFORM_HALF_LENGTH;
-    concrete.quad(...corner(-L, inner, top), ...corner(L, inner, top), ...corner(L, outer, top), ...corner(-L, outer, top));
-    // The platform face, which is the one surface of a station a passenger ever
-    // looks straight at.
-    concrete.quad(...corner(-L, inner, base), ...corner(L, inner, base), ...corner(L, inner, top), ...corner(-L, inner, top));
-    concrete.quad(...corner(L, outer, base), ...corner(-L, outer, base), ...corner(-L, outer, top), ...corner(L, outer, top));
-    concrete.quad(...corner(L, inner, base), ...corner(L, outer, base), ...corner(L, outer, top), ...corner(L, inner, top));
-    concrete.quad(...corner(-L, outer, base), ...corner(-L, inner, base), ...corner(-L, inner, top), ...corner(-L, outer, top));
+    const inner = PLATFORM_INNER;
+    const outer = PLATFORM_INNER + PLATFORM_WIDTH;
 
-    prisms.push({
-      points: new Float32Array([
-        station.x + ux * -L + px * inner, station.z + uz * -L + pz * inner,
-        station.x + ux * L + px * inner, station.z + uz * L + pz * inner,
-        station.x + ux * L + px * outer, station.z + uz * L + pz * outer,
-        station.x + ux * -L + px * outer, station.z + uz * -L + pz * outer,
-      ]),
-      height: top - base,
-      base,
-    });
+    // The deck, as one solid box rather than five loose quads.
+    //
+    // **This also fixes a face that was culled.** The five quads it replaces
+    // were emitted in one winding for both sides of the track, and a mirrored
+    // frame reverses handedness -- `writeTrench` spends a paragraph on exactly
+    // this hazard and solves it for strips. So the platform *face*, described in
+    // the line it replaced as "the one surface of a station a passenger ever
+    // looks straight at", was invisible on one of the two platforms at every
+    // station in Sydney. `frameBar` sorts its extents, so it cannot happen here.
+    frameSolid(concrete, prisms, f, -L, L, inner * side, outer * side, base, top);
+
+    // The coping: a 25 mm lip along the platform edge.
+    //
+    // It is the smallest object in this file and it earns its six quads for the
+    // reason `fences.COPING` gives about a garden wall -- what makes an edge
+    // read at distance is a light line with a dark one under it, and without it
+    // a platform and the ballast beside it are two grey rectangles that meet.
+    frameBox(concrete, f, -L, L, inner * side, (inner + 0.14) * side, top, top + COPING_RISE);
+
+    // ...and the tactile strip, which is the thing everybody actually looks at.
+    //
+    // A 6 mm lid rather than a coplanar inlay: two surfaces at the same height
+    // is a z-fight down 160 m of platform, and six millimetres is under the
+    // depth buffer's argument and over its precision. AS 1428.4's real strip
+    // starts one tile back from the edge, which is what `TACTILE_INSET` is.
+    frameBox(
+      tactile, f, -L, L,
+      (inner + TACTILE_INSET) * side, (inner + TACTILE_INSET + TACTILE_WIDTH) * side,
+      top, top + 0.006,
+    );
 
     // Canopy: a flat roof on four posts over the middle third. Enough to say
     // "station" from the train and cheap enough to build at all 195 of them.
     const C = CANOPY_HALF_LENGTH;
     const rise = top + CANOPY_HEIGHT;
-    const cIn = inner - CANOPY_OVERHANG * side;
-    const cOut = outer + CANOPY_OVERHANG * side;
-    canopy.quad(...corner(-C, cIn, rise), ...corner(C, cIn, rise), ...corner(C, cOut, rise), ...corner(-C, cOut, rise));
-    canopy.quad(...corner(-C, cOut, rise - 0.28), ...corner(C, cOut, rise - 0.28), ...corner(C, cIn, rise - 0.28), ...corner(-C, cIn, rise - 0.28));
-    canopy.quad(...corner(-C, cIn, rise - 0.28), ...corner(C, cIn, rise - 0.28), ...corner(C, cIn, rise), ...corner(-C, cIn, rise));
-    canopy.quad(...corner(C, cOut, rise - 0.28), ...corner(-C, cOut, rise - 0.28), ...corner(-C, cOut, rise), ...corner(C, cOut, rise));
+    frameBox(
+      canopy, f, -C, C,
+      (inner - CANOPY_OVERHANG) * side, (outer + CANOPY_OVERHANG) * side,
+      rise - 0.28, rise,
+    );
     for (const t of [-C + 3, -C / 3, C / 3, C - 3]) {
-      const o = (inner + outer) / 2;
-      const cx = station.x + ux * t + px * o;
-      const cz = station.z + uz * t + pz * o;
-      canopy.box(cx - 0.11, top, cz - 0.11, cx + 0.11, rise - 0.28, cz + 0.11);
+      const o = ((inner + outer) / 2) * side;
+      frameBox(canopy, f, t - 0.11, t + 0.11, o - 0.11, o + 0.11, top, rise - 0.28);
+    }
+  }
+}
+
+/**
+ * What a platform has on it, which before this round was nothing at all.
+ *
+ * Reported as *"is this how you imagined your stations to be like ... the train
+ * just going through some platform"*, and the honest answer was that a platform
+ * was a slab with a roof over the middle of it. Four things, all of them on one
+ * material, and each chosen because it is a *silhouette* at the distance a
+ * platform is seen from rather than because it is furniture: seats break the
+ * long horizontal, a shelter breaks the roofline, lamp columns put verticals at
+ * a regular pitch, and a bin is the one small object at human scale that says
+ * the space is used.
+ *
+ * `world/furniture.ts` is the city's own bin and blade kit and is deliberately
+ * **not** reused here, which is worth stating because the brief asked for it.
+ * Everything in that file is an `InstancedMesh` filled from a per-tile bake --
+ * `FurnitureAssets` takes `TileFurniture`, the pipeline decides every position,
+ * and three keys an instanced draw on `object.uuid`. Borrowing it would mean
+ * either a second world-wide instanced set refilled on the chunk transition for
+ * about forty objects, or a per-chunk one, which `warmup.ts` is the file that
+ * explains the cost of. Merged geometry on a material the chunk already draws is
+ * both cheaper and simpler: these cost no draw call at all.
+ */
+function writePlatformFurniture(
+  canopy: Solid,
+  furniture: Solid,
+  plan: StationPlan,
+): void {
+  const f = plan.station;
+  const top = plan.top;
+  const back = PLATFORM_INNER + PLATFORM_WIDTH;
+
+  for (const side of [-1, 1]) {
+    const at = (o: number): number => o * side;
+
+    // Seats: a slatted bench with a back, against the rear of the platform.
+    for (const t of [-62, -21, 21, 62]) {
+      const o = back - 1.5;
+      frameBox(furniture, f, t - 0.9, t + 0.9, at(o - 0.26), at(o + 0.26), top + 0.42, top + 0.5);
+      frameBox(furniture, f, t - 0.9, t + 0.9, at(o + 0.26), at(o + 0.34), top + 0.5, top + 0.92);
+      for (const e of [-0.72, 0.72]) {
+        frameBox(furniture, f, t + e - 0.05, t + e + 0.05, at(o - 0.24), at(o + 0.3), top, top + 0.42);
+      }
+    }
+
+    // Bins.
+    for (const t of [-38, 38]) {
+      const o = back - 1.1;
+      frameBox(furniture, f, t - 0.26, t + 0.26, at(o - 0.26), at(o + 0.26), top, top + 0.92);
+      frameBox(furniture, f, t - 0.3, t + 0.3, at(o - 0.3), at(o + 0.3), top + 0.92, top + 1.0);
+    }
+
+    // Lamp columns. Geometry only -- the lamps themselves are
+    // `world/nightlights.ts`'s business and this round does not light anything.
+    for (const t of [-72, -46, 46, 72]) {
+      const o = back - 0.7;
+      frameBox(furniture, f, t - 0.09, t + 0.09, at(o - 0.09), at(o + 0.09), top, top + 4.0);
+      frameBox(furniture, f, t - 0.28, t + 0.28, at(o - 0.28), at(o + 0.28), top + 4.0, top + 4.22);
+    }
+
+    // A shelter past the end of the canopy, where the roofline would otherwise
+    // simply stop. Three walls and a roof: the open face is toward the track,
+    // which is what every waiting shelter in the state does.
+    const s0 = -CANOPY_HALF_LENGTH - 15;
+    const s1 = -CANOPY_HALF_LENGTH - 5;
+    const wIn = PLATFORM_INNER + 1.2;
+    frameBox(canopy, f, s0 - 0.4, s1 + 0.4, at(wIn - 0.4), at(back + 0.2), top + 2.35, top + 2.6);
+    frameBox(furniture, f, s0, s0 + 0.1, at(wIn), at(back), top, top + 2.35);
+    frameBox(furniture, f, s1 - 0.1, s1, at(wIn), at(back), top, top + 2.35);
+    frameBox(furniture, f, s0, s1, at(back - 0.1), at(back), top, top + 2.35);
+    frameBox(furniture, f, s0 + 0.6, s1 - 0.6, at(wIn), at(back - 0.6), top + 0.42, top + 0.5);
+  }
+}
+
+/**
+ * A flight of steps between two points on the run, and the collision that makes
+ * it climbable rather than decorative.
+ *
+ * **The riser is the whole design.** `player/controller.STEP_HEIGHT` is 0.42 m
+ * and is what decides whether a body walks up a kerb or into it, so a step
+ * taller than that is a wall with a tread on it: a staircase you can see and
+ * cannot use, which the coordinator's brief is right to call worse than no
+ * staircase at all. 0.19 m is comfortably inside it and is also simply what a
+ * public stair is.
+ *
+ * Each tread is its own prism with its `base` under the ground, so
+ * `CollisionWorld.solidFor` treats it as a kerb -- `feetY >= top - 0.05` clears
+ * it, and `controller.step` passes `feet + STEP_HEIGHT`, which is exactly the
+ * mechanism every kerb in the city is climbed by. Nothing new was needed in the
+ * collision world for this and nothing was added to it.
+ *
+ * Works in both directions without a sign anywhere: the tread of a span is the
+ * higher of its two ends, so a flight down into a cutting and a flight up an
+ * embankment are the same loop.
+ */
+function writeStairs(
+  s: Solid,
+  prisms: Prisms,
+  f: TrackFrame,
+  o0: number, o1: number,
+  tA: number, yA: number,
+  tB: number, yB: number,
+  baseY: number,
+): number {
+  const drop = Math.abs(yB - yA);
+  if (drop <= STAIR_FLAT) return 0;
+  const n = Math.min(STAIR_MAX_STEPS, Math.max(2, Math.round(drop / STAIR_RISE)));
+  const dt = (tB - tA) / n;
+  const dy = (yB - yA) / n;
+  for (let k = 0; k < n; k++) {
+    const t0 = tA + dt * k;
+    const t1 = tA + dt * (k + 1);
+    const tread = Math.max(yA + dy * k, yA + dy * (k + 1));
+    frameSolid(s, prisms, f, t0, t1, o0, o1, baseY, tread);
+  }
+  return n;
+}
+
+/** A balustrade following a flight or a deck: a rail on a solid kerb. */
+function writeBalustrade(
+  s: Solid, f: TrackFrame,
+  tA: number, yA: number, tB: number, yB: number,
+  o: number, height: number,
+): void {
+  // A 0.1 m kerb the whole way, so nothing shows daylight under the rail, and
+  // the rail itself at the top. Two swept bars, which is twelve quads for the
+  // one thing that stops a staircase reading as a ramp with steps drawn on it.
+  frameBar(s, f, tA, tB, o - 0.05, o + 0.05, yA, yB, height);
+  frameBar(s, f, tA, tB, o - 0.09, o + 0.09, yA + height - 0.1, yB + height - 0.1, 0.1);
+}
+
+/**
+ * **The way in.** Steps from the ground beside a platform up or down onto it,
+ * at every station, generated from the measured drop and never looked up.
+ *
+ * ---------------------------------------------------------------------------
+ * Two reports, one defect. *"im at roseville and cant get up to the platform"*
+ * -- Roseville's track is 2.5 m over the terrain, so its platform stood 3.55 m
+ * up behind a retaining wall with nothing anywhere to climb. And a player on the
+ * Chatswood plaza, with the boarding prompt reading "doors 23 m away, walk to
+ * them", 6.9 m above a platform there was no route down to. Both stations were
+ * drawn correctly and both were sealed.
+ *
+ * `RAIL-VERTICAL.md` section 4 is the rule this implements and the important
+ * word in it is *generated*: there is no tag consulted here, no OSM way, no
+ * footbridge looked up. There is `plan.landing`, which is the terrain beside
+ * this platform on this side, and `plan.top`, which is the deck, and a flight
+ * between them whose length is the difference. A station physically cannot be
+ * left sealed, because the number that would make it sealed is the number that
+ * builds the stair.
+ *
+ * ---------------------------------------------------------------------------
+ * **Where the flight goes, and why there is only one place it can.** The band is
+ * `STAIR_INNER` to `STAIR_OUTER`, which is from the platform's outer face out to
+ * `rail-cut.STATION_HALF_WIDTH` -- the strip the terrain carve already opens at
+ * every platform site and that nothing else in this file wants. That one choice
+ * makes the same code right in all three vertical cases:
+ *
+ *   - **in a cutting** the flight is cut into the trench wall, because the band
+ *     *is* the trench wall's footprint, and being solid down to the cess it
+ *     hides the wall behind it exactly as a real stair does;
+ *   - **on an embankment** it is a free-standing stair against the platform's
+ *     flank, standing on the same ground the skirt does;
+ *   - **at grade** the drop is the platform's own 1.05 m and the flight is six
+ *     steps -- which is still needed, because 1.05 m is two and a half times
+ *     `STEP_HEIGHT` and an at-grade platform was every bit as unclimbable as
+ *     Roseville's.
+ *
+ * It runs **along** the track rather than out from it, and that is forced: at
+ * 0.61 gradient a 7 m drop is 11 m of run, and there is 2.2 m of width to play
+ * with across the corridor and eighty metres along it.
+ */
+function writeStationAccess(
+  concrete: Solid,
+  furniture: Solid,
+  prisms: Prisms,
+  plan: StationPlan,
+): void {
+  const f = plan.station;
+  for (let i = 0; i < 2; i++) {
+    const side = i === 0 ? -1 : 1;
+    const run = plan.run[i];
+    const o0 = STAIR_INNER * side;
+    const o1 = STAIR_OUTER * side;
+    const street = plan.landing[i];
+    const baseY = Math.min(plan.top, street, plan.base) - 0.5;
+
+    // **One flight at each end**, and the second one is not symmetry for its own
+    // sake. A 160 m platform with a single six-metre stair on it is a station a
+    // player can walk the whole length of without finding the way in -- which is
+    // what a reconnaissance pass reported at Roseville *after* the first flight
+    // was built: "a 2.5 m retaining wall with palisade and no gate, stair or
+    // ramp anywhere along it". The flight was there. It was 44 m up the platform
+    // and it may as well not have been. Two of them, one at each end, is what
+    // every real station of this size has and it costs forty triangles.
+    for (const end of [1, -1]) {
+      const head = ACCESS_ALONG * end;
+      // The landing at the platform end: a slab level with the deck, so the last
+      // tread meets the platform across 12 cm rather than across a step.
+      frameSolid(concrete, prisms, f, head, head - 2.6 * end, o0, o1, baseY, plan.top);
+      if (run <= 0) continue;
+
+      const foot = head + run * end;
+      writeStairs(concrete, prisms, f, o0, o1, head, plan.top, foot, street, baseY);
+      // And a landing at the foot, so the bottom tread lands on something flat
+      // even where the terrain under it is not.
+      frameSolid(concrete, prisms, f, foot, foot + 2.6 * end, o0, o1, baseY, street);
+      for (const o of [o0, o1]) {
+        writeBalustrade(furniture, f, head, plan.top, foot, street, o, 1.05);
+      }
+    }
+  }
+}
+
+/**
+ * A footbridge over the track, joining the two platforms.
+ *
+ * *"a platform you cannot get to the other side of reads as broken"*, and OSM
+ * maps an overbridge at a minority of these stations, so this is generated on
+ * the same terms as the stairs are: where one is mapped its position would be
+ * better and where none is, one plain bridge is better than none.
+ *
+ * **It clears the overhead line rather than passing through it**, which is the
+ * one dimension in it that is not free: `MAST_HEIGHT` is 7.4 m over the rail and
+ * the messenger wire is at 6.35, so a soffit under 8 m is a bridge with a
+ * catenary mast growing through the deck. `BRIDGE_CLEAR` is set from that and
+ * the flights are as long as the height makes them.
+ *
+ * Not built where the deck would stand less than `BRIDGE_MIN_OVER_GROUND` over
+ * the surrounding terrain, which is the cutting case: there the street is
+ * already above the track, both platforms already have their own stairs up to
+ * it, and a "bridge" would be a handrail lying on the footpath.
+ */
+function writeFootbridge(
+  concrete: Solid,
+  furniture: Solid,
+  prisms: Prisms,
+  plan: StationPlan,
+): void {
+  if (plan.station.platforms < 2) return;
+  const f = plan.station;
+  const deck = plan.station.trackY + BRIDGE_CLEAR;
+  const ground = Math.max(plan.landing[0], plan.landing[1]);
+  if (deck - ground < BRIDGE_MIN_OVER_GROUND) return;
+
+  const rise = deck - plan.top;
+  if (rise <= STAIR_FLAT) return;
+  const run = Math.min(STAIR_MAX_STEPS, Math.round(rise / STAIR_RISE)) * STAIR_GOING;
+  // The flights stand on the platforms, which is where a real one's do -- and
+  // they stand at the **back** of them. Put in front, against the tactile, they
+  // read as a wall along the platform edge and leave a passenger walking round
+  // the yellow line to get past, which is the one place on a platform nobody
+  // should be sent. Behind, the whole 3.1 m of platform in front of them is
+  // clear the length of the station.
+  const s1 = PLATFORM_INNER + PLATFORM_WIDTH - 0.4;
+  const s0 = s1 - 2.0;
+
+  // The deck, spanning between the two stair heads. `base` is its soffit, so a
+  // body under it is under it -- `player/collision.ts` has honoured that since
+  // the walk-under round and it is what makes a viaduct a viaduct.
+  frameBox(concrete, f, BRIDGE_ALONG, BRIDGE_ALONG + BRIDGE_RUN, -s1, s1, deck - BRIDGE_DECK, deck);
+  prisms.push({
+    points: framePlan(f, BRIDGE_ALONG, BRIDGE_ALONG + BRIDGE_RUN, -s1, s1),
+    height: BRIDGE_DECK + 0.6,
+    base: deck - BRIDGE_DECK,
+  });
+  for (const t of [BRIDGE_ALONG, BRIDGE_ALONG + BRIDGE_RUN]) {
+    frameBox(furniture, f, t - 0.05, t + 0.05, -s1, s1, deck, deck + BRIDGE_RAIL_H);
+  }
+
+  for (const side of [-1, 1]) {
+    const o0 = s0 * side;
+    const o1 = s1 * side;
+    writeStairs(
+      concrete, prisms, f, o0, o1,
+      BRIDGE_ALONG, deck, BRIDGE_ALONG - run, plan.top,
+      plan.top - 0.2,
+    );
+    for (const o of [o0, o1]) {
+      writeBalustrade(furniture, f, BRIDGE_ALONG, deck, BRIDGE_ALONG - run, plan.top, o, BRIDGE_RAIL_H);
+    }
+  }
+}
+
+/**
+ * The station building: a brick box with an awning, at the street end.
+ *
+ * *"a modest brick-and-awning box ... it does not need to be architecturally
+ * accurate; it needs to exist so a station is a place rather than a slab"*, and
+ * that is exactly the ambition. It is four boxes.
+ *
+ * Placed at the **OSM station node**, which is the one fact in the bake about
+ * where the street side of a station is: a station node sits at the entrance
+ * rather than on the track, so the vector from the routed stopping anchor to the
+ * node says which side a passenger arrives from and how far along. See
+ * `PlacedStation.nodeX`. Where the node is more than 250 m away -- the bake has
+ * those, and `buildNetwork` explains why -- it says nothing useful and the
+ * building goes at the far end of the platform from the stairs instead.
+ *
+ * **It is solid and has no interior**, which is a stated limitation: there is no
+ * door and you walk round it. The access it fronts is the stair beside it, and
+ * putting a walkable concourse inside a box that would have to agree with the
+ * platform below it is a round on its own.
+ */
+function writeStationHouse(
+  brick: Solid,
+  canopy: Solid,
+  prisms: Prisms,
+  plan: StationPlan,
+): void {
+  const f = plan.station;
+  const side = plan.houseSide;
+  const t = plan.houseAlong;
+  const o = (STAIR_OUTER + 1.2 + HOUSE_WIDTH / 2) * side;
+  const y = plan.houseGround;
+  const t0 = t - HOUSE_LENGTH / 2;
+  const t1 = t + HOUSE_LENGTH / 2;
+  const o0 = o - (HOUSE_WIDTH / 2) * side;
+  const o1 = o + (HOUSE_WIDTH / 2) * side;
+
+  frameSolid(brick, prisms, f, t0, t1, o0, o1, y - 2.5, y + HOUSE_HEIGHT);
+  // A parapet, which is what a 1920s station building has instead of eaves.
+  frameBox(brick, f, t0 - 0.2, t1 + 0.2, o0 - 0.2 * side, o1 + 0.2 * side, y + HOUSE_HEIGHT, y + HOUSE_HEIGHT + 0.35);
+  // The awning over the footpath, on the street face. The one thing that makes
+  // this read as a station entrance rather than as a substation.
+  frameBox(
+    canopy, f, t0 - 0.5, t1 + 0.5,
+    o1, o1 + HOUSE_AWNING * side,
+    y + 2.85, y + 3.05,
+  );
+  for (const e of [t0 + 0.4, t1 - 0.4]) {
+    frameBox(canopy, f, e - 0.06, e + 0.06, o1 + (HOUSE_AWNING - 0.15) * side, o1 + HOUSE_AWNING * side, y, y + 2.85);
+  }
+}
+
+/**
+ * The cess, the verge and the boundary fence: everything between the ballast
+ * toe and the street.
+ *
+ * ---------------------------------------------------------------------------
+ * **This is the answer to "rails painted on a car park", and the fence is most
+ * of it.** Every metre of running line in Sydney is fenced; the ballast, the
+ * rail, the sleepers and the catenary were all already correct at Lindfield and
+ * the frame still read as a yard, because there was no edge in it anywhere. A
+ * 1.8 m vertical along both sides is the cheapest object in this file per unit
+ * of recognition and `RAIL-VERTICAL.md` section 6 names it as the mitigation for
+ * the one case -- a cutting narrower than a DEM post -- that no measurement can
+ * recover.
+ *
+ * Three things, at one quad per eight metres each:
+ *
+ *   - **the verge**, from the ballast's toe out to the fence line, sloping from
+ *     the formation to the ground. It is what gives the ballast prism something
+ *     to sit *in*: a dark trapezoid on a pale strip on the suburb's own ground
+ *     is a cross-section, and the same trapezoid lying straight on the suburb is
+ *     a heap of gravel. Only where the track is at grade -- in a cutting
+ *     `writeTrench` has already drawn the cess and the wall, and a second strip
+ *     would slice through both.
+ *   - **the fence**, always, at the corridor rim where there is one and at
+ *     `FENCE_OFFSET` where there is not, standing on the ground rather than on
+ *     the formation, so at a cutting it is the guard fence along the top and not
+ *     a fence at the bottom of a hole.
+ *   - **nothing at all**, over a station entrance. See `entranceOpens`.
+ *
+ * Neither is drawn on a viaduct: a bridge has parapets, which `writeViaduct`
+ * builds, and a fence on a deck 12 m up would be a fence inside a parapet.
+ *
+ * ---------------------------------------------------------------------------
+ * The `u` coordinate is **cumulative metres along the fence line**, accumulated
+ * rib by rib rather than taken from the segment's own arc length, because the
+ * fence line is longer than the centreline on the outside of every curve and the
+ * mask's post pitch is measured in real metres. `v` is metres up the panel.
+ * Together they are the whole of what `fences.createFenceOpenMaterial` reads.
+ */
+function writeVerge(
+  cess: Solid,
+  fence: Solid,
+  seg: Segment,
+  cut: RailCut | null,
+  rawGround: GroundAt,
+  trenched: boolean,
+  plans: readonly StationPlan[],
+): void {
+  const px = -seg.uz;
+  const pz = seg.ux;
+  const steps = Math.max(1, Math.round(seg.len / VERGE_STEP_M));
+  const ext = 0.4;
+
+  for (const side of [-1, 1]) {
+    if (!seg.open[side < 0 ? 0 : 1]) continue;
+    interface Rib {
+      cx: number; cz: number; fx: number; fz: number;
+      o: number; formation: number; verge: number; foot: number;
+      u: number; open: boolean;
+    }
+    const ribs: Rib[] = [];
+    let u = 0;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const along = -ext + t * (seg.len + 2 * ext);
+      const cx = seg.ax + seg.ux * along;
+      const cz = seg.az + seg.uz * along;
+      const rail = seg.ay + (seg.by - seg.ay) * t;
+      const formation = rail - BALLAST_TOP_DROP - BALLAST_DEPTH;
+      const half = cut !== null ? cut.halfWidthAt(cx, cz) : CUT_HALF_WIDTH;
+      const o = Math.max(FENCE_OFFSET, half + FENCE_CLEAR);
+      const fx = cx + px * o * side;
+      const fz = cz + pz * o * side;
+      const g = rawGround(fx, fz);
+      // The fence stands on the ground, whatever the ground is doing: at a
+      // cutting that is the street ten metres over the formation, which is
+      // where a corridor fence goes and is the whole reason this is not
+      // measured from the rail. Bounded either way, so one wild DEM post cannot
+      // put a fence panel thirty metres in the air.
+      const real = Number.isFinite(g) ? g : formation;
+      const foot = Math.max(formation - 6, Math.min(formation + 26, real));
+      // The verge is bounded far more tightly, because it is a *surface* joining
+      // the formation to the ground and a steep one reads as a fault rather than
+      // as a batter.
+      const verge = Math.max(formation - VERGE_RELIEF, Math.min(formation + VERGE_RELIEF, real));
+      if (i > 0) {
+        const p = ribs[i - 1];
+        u += Math.hypot(fx - p.fx, fz - p.fz);
+      }
+      ribs.push({ cx, cz, fx, fz, o, formation, verge, foot, u, open: entranceOpens(plans, fx, fz) });
+    }
+
+    // `writeTrench`'s own hazard, in its own words: `px * o * side` mirrors the
+    // frame, a mirror reverses handedness, and the same four corners in the same
+    // order give one side its normal and the other side the opposite of it. The
+    // verge is a `FrontSide` strip and would be culled on one whole side of
+    // every railway in Sydney without this.
+    const at = (rib: Rib, o: number, y: number): [number, number, number] => [
+      rib.cx + px * o * side, y, rib.cz + pz * o * side,
+    ];
+    const face = (
+      p0: [number, number, number], p1: [number, number, number],
+      p2: [number, number, number], p3: [number, number, number],
+    ): void => {
+      if (side > 0) cess.quad(...p3, ...p2, ...p1, ...p0);
+      else cess.quad(...p0, ...p1, ...p2, ...p3);
+    };
+
+    for (let i = 0; i < ribs.length - 1; i++) {
+      const a = ribs[i];
+      const b = ribs[i + 1];
+      if (!trenched) {
+        face(
+          at(a, CESS_INNER, a.formation),
+          at(b, CESS_INNER, b.formation),
+          at(b, b.o, b.verge),
+          at(a, a.o, a.verge),
+        );
+      }
+      if (a.open && b.open) continue;
+      // The fence panel. Double-sided, so the winding above does not apply and
+      // is not repeated: see `fences.createRailFenceMaterial`.
+      const p0 = at(a, a.o, a.foot);
+      const p1 = at(b, b.o, b.foot);
+      const p2 = at(b, b.o, b.foot + FENCE_HEIGHT);
+      const p3 = at(a, a.o, a.foot + FENCE_HEIGHT);
+      fence.quad(
+        ...p0, ...p1, ...p2, ...p3,
+        [a.u, 0, b.u, 0, b.u, FENCE_HEIGHT, a.u, FENCE_HEIGHT],
+      );
     }
   }
 }
@@ -2403,6 +3550,72 @@ export function verifyRailGeometry(net: RailNetwork): string[] {
       );
     }
   }
+  // --- **Every station a player can reach has a way onto its platform.**
+  //
+  // `RAIL-VERTICAL.md` section 5's first invariant, as much of it as can be
+  // proved without a terrain tile: a full pathfind needs the heightfield and
+  // this runs at boot before a single tile is resident, so what is asserted here
+  // is the *generator* rather than one instance of its output.
+  //
+  // That is deliberately not a weaker claim than it sounds. The two reports were
+  // "im at roseville and cant get up to the platform" and a player on the
+  // Chatswood plaza with no route down, and neither was a station where the
+  // stair was too steep -- both were stations where **no stair existed at all**,
+  // because the thing that decided to build one read `vertical`. So the property
+  // that would have caught them is: for every drop a station can present, the
+  // planner emits a flight, and every riser in it is inside the height a body
+  // can climb. Checked over the whole range the bake contains, from the 0.43 m a
+  // platform at grade presents to the deepest station in the city.
+  {
+    let worstRise = 0;
+    let worstAt = 0;
+    let unbuilt = 0;
+    for (let drop = 0.43; drop < 26; drop += 0.13) {
+      const steps = Math.min(STAIR_MAX_STEPS, Math.round(drop / STAIR_RISE));
+      if (steps < 1) {
+        unbuilt++;
+        continue;
+      }
+      const rise = drop / steps;
+      if (rise > worstRise) {
+        worstRise = rise;
+        worstAt = drop;
+      }
+    }
+    if (unbuilt > 0) {
+      bad.push(`${unbuilt} reachable drops above the walk-up height generate no flight at all`);
+    }
+    // `player/controller.STEP_HEIGHT`. A riser over it is a stair a body walks
+    // into rather than up, which is the one failure worse than no stair.
+    if (worstRise > 0.42) {
+      bad.push(
+        `a ${worstAt.toFixed(2)} m drop generates a ${worstRise.toFixed(2)} m riser, over the ` +
+          '0.42 m a body can climb: that staircase would look usable and would not be',
+      );
+    }
+    // The negative control, and it is what stops the two lines above being
+    // vacuous: the platform lip **on its own** is over the climb height, so a
+    // station at grade with no flight is a station nobody can board. If this
+    // ever stops being true, "at grade needs no stair" becomes correct and the
+    // whole of `writeStationAccess`'s at-grade case is dead code.
+    if (PLATFORM_HEIGHT <= STAIR_FLAT) {
+      bad.push(
+        `a platform is ${PLATFORM_HEIGHT} m over the formation and a body climbs ${STAIR_FLAT} m, ` +
+          'so the access generator is answering a question nobody asked',
+      );
+    }
+    // And that the flight fits where it is put. The band is 2.16 m wide and the
+    // run is along the platform, so the only thing that can overflow is the
+    // platform's own half-length.
+    const longest = STAIR_MAX_STEPS * STAIR_GOING;
+    if (ACCESS_ALONG + longest > PLATFORM_HALF_LENGTH + BOX_HALF_LENGTH) {
+      bad.push(`the deepest flight runs ${(ACCESS_ALONG + longest).toFixed(0)} m past the platform centre`);
+    }
+    if (STAIR_INNER < PLATFORM_INNER + PLATFORM_WIDTH || STAIR_OUTER > STATION_HALF_WIDTH) {
+      bad.push('the access flight is not inside the strip the terrain carve opens at a platform');
+    }
+  }
+
   for (const s of net.stations) {
     if (Math.abs(s.ux * s.ux + s.uz * s.uz - 1) > 1e-3) {
       bad.push(`${s.name} has a heading that is not a unit vector`);

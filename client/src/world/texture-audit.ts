@@ -421,8 +421,38 @@ function placeholderImage(texture: MaybeTexture): unknown {
   return onePixelCanvas();
 }
 
-function onePixelCanvas(): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
+/**
+ * `document` and the canvas shape, reached structurally.
+ *
+ * This module is imported -- transitively, through the render guard -- by code
+ * the SERVER compiles, and `server/tsconfig.json` deliberately omits the DOM
+ * lib so that nothing under `server/` can accidentally reach for a browser API
+ * at runtime. Naming `HTMLCanvasElement` or `document` here therefore fails the
+ * build the moment anything on the server's side of the graph pulls this file
+ * in, which is exactly what happened. The same trick `cdn.ts` uses for `window`
+ * and `invisible-walls.ts` uses for its hatch pattern: describe the shape that
+ * is actually used, and reach the global through `globalThis`.
+ *
+ * It stays honest because the shape is the real one -- a width, a height and a
+ * 2D context -- so a browser that stopped providing them would still fail here,
+ * just at the call rather than at the type.
+ */
+interface AuditCanvas {
+  width: number;
+  height: number;
+  getContext(id: '2d'): {
+    fillStyle: string;
+    fillRect(x: number, y: number, w: number, h: number): void;
+    clearRect(x: number, y: number, w: number, h: number): void;
+  } | null;
+}
+
+const domScope = globalThis as unknown as {
+  document?: { createElement(tag: string): AuditCanvas };
+};
+
+function onePixelCanvas(): AuditCanvas {
+  const canvas = domScope.document!.createElement('canvas');
   canvas.width = 1;
   canvas.height = 1;
   const ctx = canvas.getContext('2d');

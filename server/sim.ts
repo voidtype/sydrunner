@@ -178,6 +178,7 @@ import {
   interiorOfCar,
   isAboard,
   nextCall,
+  RIDER_CARRIAGE_SPAN_M,
   localToWorld,
   spanFlagsAt,
   stopPlatform,
@@ -919,6 +920,29 @@ export class Simulation {
       const x = c.body.position.x;
       const z = c.body.position.z;
       p.history.bounds(b);
+      // **A PASSENGER'S REWOUND POSITION IS NOT INSIDE THEIR OWN HISTORY.**
+      //
+      // The box over the ring is a proof for everybody who walks: every position
+      // `sampleAt` can return was written at the end of some earlier tick and is
+      // inside it. `reframeRider` breaks that on purpose -- it takes the
+      // historical sample, strips the train's motion out of it and puts it back
+      // through the carriage's frame *now*, which is the whole reason a swing on
+      // a moving train can land at all. The answer is therefore up to
+      // `speed * viewTicks` **in front of** everything the ring recorded: eleven
+      // metres on T1's 44 m/s express.
+      //
+      // So the broadphase dropped riders it must not, and it did it as a
+      // function of where in the box the query happened to land -- a swing on a
+      // train that missed about one time in seventy, always at line speed, and
+      // never reproducibly. Widening the box for a body that is aboard restores
+      // the superset the candidate set is supposed to be: the reframed answer is
+      // `frame(now) . local(then)`, and `local(then)` is inside the carriage, so
+      // the answer is inside the carriage **now** -- which is inside this box by
+      // `RIDER_CARRIAGE_SPAN_M`, no matter how fast the train is going.
+      //
+      // It costs a rider a few more cells in an index that is rebuilt from
+      // scratch every tick, and nothing at all to anybody on foot.
+      const span = isAboard(c.aboard) ? RIDER_CARRIAGE_SPAN_M : 0;
       if (b.valid) {
         // Unioned with the live position rather than taken bare. A seeded ring
         // already contains it, and every participant's is seeded -- `join`
@@ -927,9 +951,11 @@ export class Simulation {
         // live body when a history is missing.
         this.rewindIndex.insertBox(
           c, x, z,
-          Math.min(b.minX, x), Math.min(b.minZ, z),
-          Math.max(b.maxX, x), Math.max(b.maxZ, z),
+          Math.min(b.minX, x - span), Math.min(b.minZ, z - span),
+          Math.max(b.maxX, x + span), Math.max(b.maxZ, z + span),
         );
+      } else if (span > 0) {
+        this.rewindIndex.insertBox(c, x, z, x - span, z - span, x + span, z + span);
       } else {
         this.rewindIndex.insert(c, x, z);
       }

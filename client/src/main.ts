@@ -2425,6 +2425,23 @@ async function main(): Promise<void> {
     const platform = platforms === null ? -Infinity : platforms.heightAt(x, z, feetY);
     const roof = collision.roofHeight(x, z, feetY);
     if (platform > -Infinity) return Math.max(platform, roof);
+    // **Inside a carved cutting the terrain is not there**, and until this line
+    // nothing on either end of the wire knew it. `terrain.buildTerrainMesh`
+    // drops the sub-quads the corridor crosses and `world/rail-geo.ts` builds a
+    // trench in the hole, but `TerrainField.height` samples the **uncarved**
+    // DEM, so a body over a cutting stood on an invisible sheet across a
+    // visible railway. `PlatformField` covered it up wherever a platform
+    // happened to be under the asker and nowhere else.
+    //
+    // It is also what made a station in a cutting unenterable, which is the
+    // reason it is being fixed now: the access stairs
+    // `rail-geo.writeStationAccess` cuts into the trench wall are *below* the
+    // DEM by construction, so walking down them was walking along the top of
+    // the hole. `server/world.groundFor` carries the identical clause over the
+    // identical `RailCut`, because a client that walks down a staircase the
+    // server thinks is solid ground is a client the server drags back up.
+    const cutFloor = railCut === null ? Number.NaN : railCut.cutAt(x, z, sampled);
+    if (Number.isFinite(cutFloor)) return Math.max(cutFloor, roof);
     return Math.max(lastGround, roof);
   };
 

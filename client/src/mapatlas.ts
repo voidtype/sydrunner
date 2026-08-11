@@ -43,6 +43,30 @@
  * again.
  *
  * ---------------------------------------------------------------------------
+ * EVERY NUMBER ABOVE IS FROM THE 19.3 KM WORLD, and the world is 60 km.
+ *
+ * They are left as written because they are the *design*, and because the gap
+ * between them and what the build now holds is the whole story of this file's
+ * last pass. What the same three sentences describe today:
+ *
+ *   * the whole-world bundle is **7.37 MB**, not 475 kB -- and is not fetched at
+ *     all on a segmented world, whose names arrive per hexagon (`ensureHexNames`);
+ *   * the fallback behind it is **14,815 sidecars**, not 357, which is why it is
+ *     now capped (`MAX_FALLBACK_TILES`);
+ *   * the street network is **234,094 runs and 742,230 points**, not 18,788 and
+ *     47,666, which is why the queries go through a grid (`CELL_M`) and the
+ *     chaining is incremental (`ensureLabelLines`);
+ *   * the harbour is **282,567 triangles**, not 3,564 -- and building a path out
+ *     of it with a `closePath` per triangle is the 150 seconds that froze a
+ *     player's laptop on the first press of `M` (`buildWaterPlan`).
+ *
+ * The pattern is one thing four times: an operation that is linear-and-small at
+ * 19.3 km, written down as a measurement, and never asked again. Anything added
+ * here should be indifferent to the next doubling by construction, and
+ * `server/integration-check.ts` holds the four above to that against the world
+ * that actually ships.
+ *
+ * ---------------------------------------------------------------------------
  * The street network is also the *geometry*, which is why there is no second
  * source for the roads.
  *
@@ -247,6 +271,270 @@ const JOIN_EPS = 0.5;
  */
 const STRAIGHT_TOL = (8 * Math.PI) / 180;
 
+/**
+ * How many tile sidecars the fallback path will ever ask for.
+ *
+ * The fallback fetches one `.names.bin` per tile with a street on it, and the
+ * comment on `CONCURRENCY` above is written against the 357 tiles that was when
+ * the bundle shipped. **It is 14,815 tiles at 60 km**, and the condition that
+ * reaches it is one failed fetch of `street-names.bin` -- a CDN blip on a world
+ * that has the block. Fifteen thousand requests on a key press is not a slow
+ * map, it is a browser that stops answering and a radio that never sleeps.
+ *
+ * So the fan-out is capped at the number the path was designed for, rounded up,
+ * and the tiles kept are the ones nearest the world origin. That is a
+ * deliberately dumb rule and it is the right one here: this path only runs on a
+ * world with no bundle (which is a world from before the 19.3 km build, where
+ * 400 tiles *is* the city) or on a bundled world whose bundle failed (where the
+ * honest outcome is a partial map that says so through `stats().failures`,
+ * rather than a locked-up tab). `progress` still reports against what was
+ * actually asked for, so the shimmer does not lie about a load it has finished.
+ */
+const MAX_FALLBACK_TILES = 400;
+
+// --- The spatial index --------------------------------------------------------
+//
+// WHY THERE IS ONE NOW, when `roadsWithin` used to argue at length that there
+// must not be. The argument was: at the city zoom the box is the whole build so
+// an index rejects nothing, and at the closest zoom the scan is four compares
+// apiece for 11,893 runs. Both halves were true of a 19.3 km world and both
+// have been overtaken by a 60 km one, where the same scan is 234,094 runs and
+// 101,981 label lines -- **4.1 ms and 10.9 ms measured, every redraw**, and the
+// map redraws on open, on zoom, on pan and on every hexagon that lands. Fifteen
+// milliseconds of a 33 ms budget, spent deciding what not to draw.
+//
+// The grid below is sized so the next doubling changes nothing: the query cost
+// is the number of cells the *view box* covers, which is a property of the zoom
+// ladder and not of the world, plus whatever is in them. Measured against the
+// whole 60 km city held at once -- 234,094 runs, 101,993 label lines:
+//
+//     rung             runs walked    drawn   lines walked   lettered
+//     neighbourhood          2,313      543            702         91
+//     district               9,362    4,875          1,916        803
+//     city                  36,040   31,078          8,128      6,232
+//     region               119,506  113,312         29,703     27,251
+//
+// The two close rungs are where the map opens and where it letters, and they
+// now walk thousands rather than a third of a million: the district redraw's
+// two queries went from **14.96 ms to 0.21 ms**. The wide rungs walk a lot
+// because they genuinely draw a lot -- the overdraw there is 1.05x, which is
+// the index working rather than failing, and `server/integration-check.ts`
+// asserts the ratio rather than the count for exactly that reason.
+
+/**
+ * The cell edge of both indexes, metres.
+ *
+ * 512 rather than the 500 m tile, and not because the arithmetic is faster --
+ * because the thing being indexed is a *run*, which is 53 m at the median and
+ * 177 m at the ninth decile after decimation. A cell comfortably wider than the
+ * items in it is what keeps `reach` (below) at one cell, and `reach` is what
+ * the query pays for.
+ */
+const CELL_M = 512;
+
+/**
+ * How many cells an item may span before it is held apart from the grid.
+ *
+ * A loose grid files each item in the cell of its **minimum corner** and widens
+ * every query by the largest span it has ever accepted, which is what lets it
+ * skip the deduplication a multi-cell insert would need. The whole scheme rests
+ * on that span staying small, and one motorway-long label line -- `straight` is
+ * kilometres on the Warringah Freeway -- would widen every query in the map by
+ * twenty cells each way and give back exactly the linear scan this replaces.
+ *
+ * So anything wider than this goes in `oversize`, which *is* scanned linearly.
+ * That is not a hole in the bound, it is where the bound is stated: `oversize`
+ * is the arterial skeleton, it is a fraction of a percent of the items, and
+ * `server/integration-check.ts` asserts its size against the real world so a
+ * build that made it the common case fails rather than gets slow.
+ */
+const MAX_SPAN_CELLS = 2;
+
+/**
+ * Cells either side of the origin a key can address: +/- 2,097 km at `CELL_M`.
+ *
+ * A key is `(cx + BIAS) * STRIDE + (cz + BIAS)`, which stays under 2^26 and
+ * therefore stays a small integer in V8 -- a `Map` of small integers is a very
+ * different thing from a `Map` of strings, and the string version of this was
+ * measurably slower than the scan it replaced. Coordinates outside the range
+ * are clamped rather than rejected: two far-flung items sharing the edge cell
+ * is a false positive the exact test below rejects, where a wrapped key would
+ * be a run drawn in the wrong place.
+ */
+const CELL_BIAS = 4096;
+const CELL_STRIDE = CELL_BIAS * 2;
+
+function cellOf(v: number): number {
+  const c = Math.floor(v / CELL_M);
+  if (c < -CELL_BIAS) return -CELL_BIAS;
+  if (c > CELL_BIAS - 1) return CELL_BIAS - 1;
+  return c;
+}
+
+/** What an index is holding and what the last query cost. See `indexStats`. */
+export interface GridStats {
+  items: number;
+  cells: number;
+  /** Items too wide to file in a cell, scanned on every query. See `MAX_SPAN_CELLS`. */
+  oversize: number;
+  /** Cells the widest accepted item reaches past the one it is filed in. */
+  reach: number;
+  /** Items the most recent query walked. The number the whole index exists to bound. */
+  lastWalked: number;
+}
+
+/**
+ * A loose uniform grid: insert by box, query by box, no allocation per query.
+ *
+ * Deliberately not a quadtree or an R-tree. What this indexes is a city, which
+ * is *uniformly* dense at the scale of a street -- there is no empty quadrant to
+ * subdivide away and no clustering for a tree to exploit -- and a grid over a
+ * uniform field is the structure with the least per-item overhead and no
+ * rebalancing. It is also the only one whose worst case can be written down in
+ * a sentence, which is what the check asserts against.
+ */
+class LooseGrid<T> {
+  private readonly cells = new Map<number, T[]>();
+  private readonly oversize: T[] = [];
+  private reach = 0;
+  private count = 0;
+  private walked = 0;
+  /** The occupied extent, so a query wider than the world walks the world. */
+  private minCX = Infinity;
+  private minCZ = Infinity;
+  private maxCX = -Infinity;
+  private maxCZ = -Infinity;
+
+  get size(): number {
+    return this.count;
+  }
+
+  stats(): GridStats {
+    return {
+      items: this.count,
+      cells: this.cells.size,
+      oversize: this.oversize.length,
+      reach: this.reach,
+      lastWalked: this.walked,
+    };
+  }
+
+  insert(item: T, minX: number, minZ: number, maxX: number, maxZ: number): void {
+    this.count++;
+    const cx = cellOf(minX);
+    const cz = cellOf(minZ);
+    const spanX = cellOf(maxX) - cx;
+    const spanZ = cellOf(maxZ) - cz;
+    const span = spanX > spanZ ? spanX : spanZ;
+    if (span > MAX_SPAN_CELLS) {
+      this.oversize.push(item);
+      return;
+    }
+    if (span > this.reach) this.reach = span;
+    if (cx < this.minCX) this.minCX = cx;
+    if (cz < this.minCZ) this.minCZ = cz;
+    if (cx > this.maxCX) this.maxCX = cx;
+    if (cz > this.maxCZ) this.maxCZ = cz;
+    const key = (cx + CELL_BIAS) * CELL_STRIDE + (cz + CELL_BIAS);
+    const bucket = this.cells.get(key);
+    if (bucket === undefined) this.cells.set(key, [item]);
+    else bucket.push(item);
+  }
+
+  /**
+   * Take an item back out. Only the label lines need this -- a name whose runs
+   * changed is re-chained and its old lines are no longer anywhere -- and it is
+   * exact rather than a tombstone because a map that accumulated dead lines
+   * would drift back toward the linear scan one hexagon at a time.
+   *
+   * The box must be the one it went in with, which is why both sides compute it
+   * from the item's own geometry rather than caching it.
+   */
+  remove(item: T, minX: number, minZ: number, maxX: number, maxZ: number): void {
+    const cx = cellOf(minX);
+    const cz = cellOf(minZ);
+    const spanX = cellOf(maxX) - cx;
+    const spanZ = cellOf(maxZ) - cz;
+    const span = spanX > spanZ ? spanX : spanZ;
+    const bucket =
+      span > MAX_SPAN_CELLS
+        ? this.oversize
+        : this.cells.get((cx + CELL_BIAS) * CELL_STRIDE + (cz + CELL_BIAS));
+    if (bucket === undefined) return;
+    const at = bucket.indexOf(item);
+    if (at < 0) return;
+    // Swap-remove: order inside a cell is not meaningful to any caller, and the
+    // alternative is a splice down a bucket that can hold a whole suburb.
+    bucket[at] = bucket[bucket.length - 1];
+    bucket.pop();
+    this.count--;
+  }
+
+  /**
+   * Visit everything whose box *might* meet this one. The caller does the exact
+   * test; this only promises not to miss anything.
+   *
+   * Two ways round the cells, and the cheaper one wins. Walking the coordinate
+   * range is what makes a view query cost the view rather than the world -- but
+   * `verifyBigMap` and the label pass both ask boxes of +/- 1e9, where the
+   * coordinate range is 8,192 cells square and the map is 234. So when the box
+   * covers more cells than the grid *has*, the occupied cells are iterated
+   * directly and the query is bounded by the index rather than by the request.
+   */
+  query(minX: number, minZ: number, maxX: number, maxZ: number, visit: (item: T) => void): void {
+    let walked = this.oversize.length;
+    for (let i = 0; i < this.oversize.length; i++) visit(this.oversize[i]);
+    if (this.cells.size === 0) {
+      this.walked = walked;
+      return;
+    }
+    const x0 = Math.max(cellOf(minX) - this.reach, this.minCX);
+    const z0 = Math.max(cellOf(minZ) - this.reach, this.minCZ);
+    const x1 = Math.min(cellOf(maxX), this.maxCX);
+    const z1 = Math.min(cellOf(maxZ), this.maxCZ);
+    if (x1 < x0 || z1 < z0) {
+      this.walked = walked;
+      return;
+    }
+    const spanned = (x1 - x0 + 1) * (z1 - z0 + 1);
+    if (spanned > this.cells.size) {
+      for (const bucket of this.cells.values()) {
+        for (let i = 0; i < bucket.length; i++) {
+          walked++;
+          visit(bucket[i]);
+        }
+      }
+      this.walked = walked;
+      return;
+    }
+    for (let cx = x0; cx <= x1; cx++) {
+      const base = (cx + CELL_BIAS) * CELL_STRIDE + CELL_BIAS;
+      for (let cz = z0; cz <= z1; cz++) {
+        const bucket = this.cells.get(base + cz);
+        if (bucket === undefined) continue;
+        for (let i = 0; i < bucket.length; i++) {
+          walked++;
+          visit(bucket[i]);
+        }
+      }
+    }
+    this.walked = walked;
+  }
+}
+
+/** The box a label line reserves: its anchor, widened by half its own text. */
+function lineBox(line: LabelLine): [number, number, number, number] {
+  const r = line.straight / 2;
+  return [line.x - r, line.z - r, line.x + r, line.z + r];
+}
+
+/** Squared metres from the world origin to a tile's centre. The fallback's rank. */
+function tileOriginDistance(tile: MapIndexTile): number {
+  const x = (tile.bounds[0] + tile.bounds[2]) / 2;
+  const z = (tile.bounds[1] + tile.bounds[3]) / 2;
+  return x * x + z * z;
+}
+
 export class MapAtlas {
   private readonly index: MapIndex;
   private readonly baseUrl: string;
@@ -254,6 +542,10 @@ export class MapAtlas {
 
   /** Every run in the build, in the order the tiles happened to arrive. */
   private readonly runs: RoadRun[] = [];
+  /** The same runs, filed by where they are. See `LooseGrid` and `roadsWithin`. */
+  private readonly runGrid = new LooseGrid<RoadRun>();
+  /** The same runs again, filed by name. The chaining pass's input. */
+  private readonly runsByName = new Map<number, RoadRun[]>();
   /** The name table. `nameId` indexes all three of these in lockstep. */
   private readonly names: string[] = [];
   private readonly labels: string[] = [];
@@ -261,9 +553,24 @@ export class MapAtlas {
   private readonly totals: number[] = [];
   private readonly nameIds = new Map<string, number>();
 
-  /** Built from `runs` on demand, and rebuilt when more of the city lands. */
-  private lines: LabelLine[] = [];
-  private linesRevision = -1;
+  /**
+   * Where a name can be lettered, by name and by place. Built per *name*, on
+   * demand, and rebuilt for a name only when that name's runs change -- see
+   * `ensureLabelLines`.
+   */
+  private readonly linesByName = new Map<number, LabelLine[]>();
+  private readonly lineGrid = new LooseGrid<LabelLine>();
+  /** Names whose runs changed since they were last chained. */
+  private readonly dirtyNames = new Set<number>();
+  /**
+   * Names the last `ensureLabelLines` actually re-chained.
+   *
+   * The one number that says whether the pass is incremental, and it is a
+   * *count* rather than a duration because that is what can be asserted in CI:
+   * a delivery must re-chain the names it carried, and never the 35,268 the
+   * atlas is holding. See `server/integration-check.ts`.
+   */
+  private lastRechained = 0;
 
   private suburbNodes: SuburbNode[] = [];
   private landmarkNodes: MapLandmark[] = [];
@@ -287,6 +594,16 @@ export class MapAtlas {
    */
   private waterShape: Path2D | null = null;
   private waterTriangleCount = 0;
+  /**
+   * Canvas path operations the harbour cost to build. Three a triangle, and the
+   * reason that is a counter rather than a comment is in `buildWaterPlan`.
+   */
+  private waterPathOps = 0;
+  /**
+   * Tile sidecars the fallback refused to fetch. See `MAX_FALLBACK_TILES`.
+   * Non-zero means the map is missing streets and is not going to get them.
+   */
+  private fallbackDropped = 0;
 
   private started = false;
   /** The street load has finished, however few tiles it turned out to be. */
@@ -430,12 +747,10 @@ export class MapAtlas {
    * argument -- this is called on every rebuild and the caller owns one array for
    * the life of the panel.
    *
-   * A linear scan over all 11,893 runs with a box reject, and no spatial index,
-   * which is a deliberate refusal rather than an omission: at the city zoom the
-   * box is the whole build and an index would reject nothing, and at the closest
-   * zoom the scan is four compares apiece for 11,800 of them. Measured against a
-   * rebuild that then strokes 30,000 points and rasterises fifty labels, the
-   * scan is not the part worth indexing.
+   * Through the grid rather than over every run, which is a reversal of what
+   * this comment used to say and the note above `CELL_M` is why. The exact test
+   * is unchanged and still the run's own bounds against the box -- the index
+   * only decides which runs get asked.
    */
   roadsWithin(
     minX: number,
@@ -446,13 +761,12 @@ export class MapAtlas {
     out: RoadRun[],
   ): RoadRun[] {
     out.length = 0;
-    const runs = this.runs;
-    for (let i = 0; i < runs.length; i++) {
-      const r = runs[i];
-      if (r.maxX < minX || r.minX > maxX || r.maxZ < minZ || r.minZ > maxZ) continue;
-      if (minImportance > 0 && this.totals[r.nameId] < minImportance) continue;
+    const totals = this.totals;
+    this.runGrid.query(minX, minZ, maxX, maxZ, (r) => {
+      if (r.maxX < minX || r.minX > maxX || r.maxZ < minZ || r.minZ > maxZ) return;
+      if (minImportance > 0 && totals[r.nameId] < minImportance) return;
       out.push(r);
-    }
+    });
     return out;
   }
 
@@ -480,14 +794,13 @@ export class MapAtlas {
   ): LabelLine[] {
     this.ensureLabelLines();
     out.length = 0;
-    for (const line of this.lines) {
-      if (minImportance > 0 && this.totals[line.nameId] < minImportance) continue;
+    const totals = this.totals;
+    this.lineGrid.query(minX, minZ, maxX, maxZ, (line) => {
+      if (minImportance > 0 && totals[line.nameId] < minImportance) return;
       const r = line.straight / 2;
-      if (line.x + r < minX || line.x - r > maxX || line.z + r < minZ || line.z - r > maxZ) {
-        continue;
-      }
+      if (line.x + r < minX || line.x - r > maxX || line.z + r < minZ || line.z - r > maxZ) return;
       out.push(line);
-    }
+    });
     return out;
   }
 
@@ -565,104 +878,82 @@ export class MapAtlas {
    *     to be bit-identical to the sidecars precisely so the map cannot move.
    *
    * So the chaining stays here, on the client, over runs that are the same bits
-   * either path delivered them by. If the 46 ms ever needs to go, the answer is
-   * to chain incrementally or off-thread, not to move it into a file.
+   * either path delivered them by.
+   *
+   * ---------------------------------------------------------------------------
+   * IT IS INCREMENTAL, and that is what the 60 km world forced.
+   *
+   * This used to rebuild every chain in the atlas whenever `revision` moved, on
+   * the 46 ms measured over 18,788 runs. The world is 234,094 runs now and the
+   * same pass is **1,287 ms measured** -- and `revision` moves once per hexagon
+   * that lands, so running across the city with the map open paid it again and
+   * again. That is the shape of the whole failure: a number that was a dropped
+   * frame at 19.3 km is a locked-up second at 60 km, and nothing about the code
+   * changed in between.
+   *
+   * What makes it incremental is that **chaining is per name and names do not
+   * interact**. A join is an endpoint shared by two runs *of the same name*, so
+   * the chains of Botany Road are a pure function of the runs called Botany
+   * Road; a hexagon landing with 2,994 names in it invalidates those 2,994 and
+   * nothing else. So the runs are filed by name as they arrive (`runsByName`),
+   * the names touched are marked (`dirtyNames`), and this re-chains those and
+   * leaves the rest of the city alone. The cost is proportional to the delivery
+   * rather than to the accumulation, which is the property that survives the
+   * next doubling.
+   *
+   * The output is identical to the whole-atlas pass, not merely equivalent: a
+   * dirty name is re-chained over **all** of its runs, old and new, in the order
+   * they arrived, by the same code. What changes is only which names are asked.
+   * Measured both ways over the same eight hexagons -- 73,989 runs -- the two
+   * produce the same 28,118 label lines with every anchor identical, and:
+   *
+   *     per delivery, ms   1    2    3    4    5    6    7    8   total  worst
+   *     whole atlas      114  377  345  360  399  416  489  407   2,907    489
+   *     per name         290  118  130  125  169  116   54  275   1,277    290
+   *
+   * The totals matter less than the shapes. The old row climbs, because every
+   * delivery redoes every one before it; the new row is flat, because a delivery
+   * costs what it delivered. At 86 hexagons the old row is quadratic in the
+   * number of hexagons a session walks through, which is what a player running
+   * across Sydney with the map open was paying.
    */
   private ensureLabelLines(): void {
-    if (this.linesRevision === this.revisionCounter) return;
-    this.linesRevision = this.revisionCounter;
-    const lines: LabelLine[] = [];
-
-    const byName = new Map<number, RoadRun[]>();
-    for (const run of this.runs) {
-      const list = byName.get(run.nameId);
-      if (list === undefined) byName.set(run.nameId, [run]);
-      else list.push(run);
-    }
-
-    for (const [nameId, runs] of byName) {
-      // Endpoint index, over this name's runs only.
-      const ends = new Map<string, number[]>();
-      const add = (key: string, i: number): void => {
-        const list = ends.get(key);
-        if (list === undefined) ends.set(key, [i]);
-        else list.push(i);
-      };
-      const keysFor = (x: number, z: number): string[] => {
-        const qx = x / JOIN_EPS;
-        const qz = z / JOIN_EPS;
-        const fx = Math.floor(qx);
-        const fz = Math.floor(qz);
-        // The four cells the point could have rounded into. See the header.
-        return [`${fx},${fz}`, `${fx + 1},${fz}`, `${fx},${fz + 1}`, `${fx + 1},${fz + 1}`];
-      };
-      for (let i = 0; i < runs.length; i++) {
-        const p = runs[i].points;
-        for (const k of keysFor(p[0], p[1])) add(k, i);
-        for (const k of keysFor(p[p.length - 2], p[p.length - 1])) add(k, i);
-      }
-
-      const used = new Uint8Array(runs.length);
-      for (let seed = 0; seed < runs.length; seed++) {
-        if (used[seed]) continue;
-        used[seed] = 1;
-        // The chain, as a growing flat list of x, z. Built from the seed
-        // outward: forward off the tail, then backward off the head.
-        const chain: number[] = Array.from(runs[seed].points);
-        for (let direction = 0; direction < 2; direction++) {
-          for (;;) {
-            const tail = direction === 0;
-            const ex = tail ? chain[chain.length - 2] : chain[0];
-            const ez = tail ? chain[chain.length - 1] : chain[1];
-            let found = -1;
-            let flip = false;
-            for (const key of keysFor(ex, ez)) {
-              const list = ends.get(key);
-              if (list === undefined) continue;
-              for (const j of list) {
-                if (used[j]) continue;
-                const p = runs[j].points;
-                if (near(p[0], p[1], ex, ez)) {
-                  found = j;
-                  flip = false;
-                  break;
-                }
-                if (near(p[p.length - 2], p[p.length - 1], ex, ez)) {
-                  found = j;
-                  flip = true;
-                  break;
-                }
-              }
-              if (found >= 0) break;
-            }
-            if (found < 0) break;
-            used[found] = 1;
-            const p = runs[found].points;
-            const n = p.length;
-            // Skip the shared endpoint itself, or the chain gets a zero-length
-            // segment at every join and the straightness walk trips over it.
-            if (tail) {
-              if (flip) for (let i = n - 4; i >= 0; i -= 2) chain.push(p[i], p[i + 1]);
-              else for (let i = 2; i < n; i += 2) chain.push(p[i], p[i + 1]);
-            } else {
-              // Both branches collect the new piece **far end first**, which is
-              // the order that leaves the chain contiguous once it is prepended:
-              // the point nearest the old head ends up immediately before it.
-              // `flip` says the incoming run already runs toward the head, so it
-              // is taken as it lies, minus its last point; otherwise it runs away
-              // from the head and is taken backwards, minus its first.
-              const head: number[] = [];
-              if (flip) for (let i = 0; i < n - 2; i += 2) head.push(p[i], p[i + 1]);
-              else for (let i = n - 2; i >= 2; i -= 2) head.push(p[i], p[i + 1]);
-              chain.unshift(...head);
-            }
-          }
+    this.lastRechained = this.dirtyNames.size;
+    if (this.dirtyNames.size === 0) return;
+    for (const nameId of this.dirtyNames) {
+      const previous = this.linesByName.get(nameId);
+      if (previous !== undefined) {
+        for (const line of previous) {
+          const box = lineBox(line);
+          this.lineGrid.remove(line, box[0], box[1], box[2], box[3]);
         }
-        const line = longestStraight(Float32Array.from(chain), nameId);
-        if (line !== null) lines.push(line);
+      }
+      const runs = this.runsByName.get(nameId);
+      const built = runs === undefined ? [] : chainName(nameId, runs);
+      this.linesByName.set(nameId, built);
+      for (const line of built) {
+        const box = lineBox(line);
+        this.lineGrid.insert(line, box[0], box[1], box[2], box[3]);
       }
     }
-    this.lines = lines;
+    this.dirtyNames.clear();
+  }
+
+  /**
+   * One run into the index, and into both of the things that are asked about it.
+   *
+   * The single door every delivery path goes through -- the whole-world bundle,
+   * a per-hexagon bundle, a tile sidecar and the self-check's literals -- so
+   * there is one place that decides what an arriving run costs. See `foldBundle`
+   * for why the three fetch paths have to stay indistinguishable.
+   */
+  private addRun(run: RoadRun): void {
+    this.runs.push(run);
+    this.runGrid.insert(run, run.minX, run.minZ, run.maxX, run.maxZ);
+    const byName = this.runsByName.get(run.nameId);
+    if (byName === undefined) this.runsByName.set(run.nameId, [run]);
+    else byName.push(run);
+    this.dirtyNames.add(run.nameId);
   }
 
   /** What was loaded and what it cost, for `window.sydney.bigmap`. */
@@ -692,6 +983,10 @@ export class MapAtlas {
      * in the pipeline instead.
      */
     labelLines: number;
+    /** Canvas operations the harbour path cost. Three a triangle -- `buildWaterPlan`. */
+    waterPathOps: number;
+    /** Sidecars the capped fallback refused. See `MAX_FALLBACK_TILES`. */
+    fallbackDropped: number;
     loadMs: number;
     bytesApprox: number;
   } {
@@ -712,11 +1007,31 @@ export class MapAtlas {
       suburbs: this.suburbNodes.length,
       landmarks: this.landmarkNodes.length,
       waterTriangles: this.waterTriangleCount,
-      labelLines: this.lines.length,
+      labelLines: this.lineGrid.size,
+      waterPathOps: this.waterPathOps,
+      fallbackDropped: this.fallbackDropped,
       loadMs: Math.round(this.finishedMs),
       // What this is holding, near enough: the centreline points, plus what the
       // harbour's path is carrying (six floats a triangle, once).
       bytesApprox: points * 8 + this.waterTriangleCount * 24,
+    };
+  }
+
+  /**
+   * What the two spatial indexes hold and what the last query walked.
+   *
+   * Separate from `stats()` because it is about the *shape* of the index rather
+   * than about the map, and because it is what `server/integration-check.ts`
+   * asserts against the real shipped world: the whole claim of this file is that
+   * opening the map costs the view rather than the city, and `lastWalked` is
+   * where that claim is either true or is not. A number nobody can read is a
+   * bound nobody can hold.
+   */
+  indexStats(): { runs: GridStats; lines: GridStats; rechained: number } {
+    return {
+      runs: this.runGrid.stats(),
+      lines: this.lineGrid.stats(),
+      rechained: this.lastRechained,
     };
   }
 
@@ -763,9 +1078,11 @@ export class MapAtlas {
    * `far-water.bin` rather than the streamer's per-tile plans, and the reason is
    * the whole reason this map exists: the streamed sheets cover the tiles the
    * player is standing in, and the question the big map answers is about the
-   * nine kilometres they are not. The far sheet is the entire harbour in 98 kB
-   * and 3,564 triangles, already in world metres -- `world/water.ts` builds it
-   * into the scene from the same buffer without an offset.
+   * nine kilometres they are not. The far sheet is the entire harbour, already in
+   * world metres -- `world/water.ts` builds it into the scene from the same
+   * buffer without an offset. It was 98 kB and 3,564 triangles when this was
+   * written and it is **9.7 MB and 282,567 triangles** at 60 km, which is the
+   * number every sentence below now has to survive.
    *
    * De-indexed straight into a `Path2D` in world metres -- see `waterShape` for
    * the 25 ms that buys, and note that the index is walked exactly once ever
@@ -793,25 +1110,10 @@ export class MapAtlas {
         return;
       }
       const shape = new Path2D();
-      let triangles = 0;
-      for (const sheet of data.sheets) {
-        const idx = sheet.indices;
-        const v = sheet.vertices;
-        for (let i = 0; i + 2 < idx.length; i += 3) {
-          // Vertices are interleaved (x, z, depth) -- see `WaterSheet`. The y is
-          // the sheet's own surface and this is a plan, so it is dropped here.
-          const a = idx[i] * 3;
-          const b = idx[i + 1] * 3;
-          const c = idx[i + 2] * 3;
-          shape.moveTo(v[a], v[a + 1]);
-          shape.lineTo(v[b], v[b + 1]);
-          shape.lineTo(v[c], v[c + 1]);
-          shape.closePath();
-          triangles++;
-        }
-      }
+      const built = buildWaterPlan(data.sheets, shape);
       this.waterShape = shape;
-      this.waterTriangleCount = triangles;
+      this.waterTriangleCount = built.triangles;
+      this.waterPathOps = built.ops;
       this.revisionCounter++;
     } catch {
       this.failures++;
@@ -826,6 +1128,10 @@ export class MapAtlas {
    * down mid-session and move the `built` stamp, and a map that mixed this
    * session's stamp with next build's tile list would ask for URLs that are
    * either 404s or -- worse -- a different city. One index, one stamp, one map.
+   *
+   * And the fan-out is capped, because the tile list is the thing that grows
+   * with the world: it was 357 tiles when this was written and is 14,815 at
+   * 60 km. See `MAX_FALLBACK_TILES`.
    */
   private async loadNames(): Promise<void> {
     if (await this.loadNameBundle()) {
@@ -834,7 +1140,22 @@ export class MapAtlas {
       this.revisionCounter++;
       return;
     }
-    const tiles = this.index.tiles.filter((t) => (t.sn ?? 0) > 0);
+    // `?? []` rather than trusting the field: a segmented world boots from
+    // `root.json`, which carries no tile list at all, and reaching this line
+    // with one would be a `TypeError` inside an un-awaited promise -- a map
+    // that silently never loads.
+    const named = (this.index.tiles ?? []).filter((t) => (t.sn ?? 0) > 0);
+    let tiles = named;
+    if (named.length > MAX_FALLBACK_TILES) {
+      // Nearest the world origin, which is the centre of the build and the only
+      // position this class knows. Sorted on a copy: `index.tiles` belongs to
+      // the streamer and the spawn search reads it in tile-key order.
+      tiles = named
+        .slice()
+        .sort((a, b) => tileOriginDistance(a) - tileOriginDistance(b))
+        .slice(0, MAX_FALLBACK_TILES);
+      this.fallbackDropped = named.length - tiles.length;
+    }
     this.tilesWanted = tiles.length;
     if (tiles.length === 0) {
       this.namesDone = true;
@@ -1022,7 +1343,7 @@ export class MapAtlas {
       const id = this.intern(decoded.names[run.nameIdx]);
       const length = polylineLength(run.points);
       this.totals[id] += length;
-      this.runs.push({
+      this.addRun({
         nameId: id,
         points: run.points,
         minX: run.minX,
@@ -1069,7 +1390,7 @@ export class MapAtlas {
         const id = this.intern(seg.name);
         const length = polylineLength(seg.points);
         this.totals[id] += length;
-        this.runs.push({
+        this.addRun({
           nameId: id,
           points: seg.points,
           minX: seg.minX,
@@ -1132,7 +1453,7 @@ export class MapAtlas {
       const id = this.intern(seg.name);
       const length = polylineLength(seg.points);
       this.totals[id] += length;
-      this.runs.push({
+      this.addRun({
         nameId: id,
         points: seg.points,
         minX: seg.minX,
@@ -1180,6 +1501,180 @@ export class MapAtlas {
     }
     this.landmarkNodes = out;
   }
+}
+
+// --- The harbour plan ---------------------------------------------------------
+
+/**
+ * Whatever a triangle can be written into. `Path2D` is one; the check is another.
+ *
+ * Structural rather than `Path2D`, and not for taste: `server/integration-check.ts`
+ * runs in Bun, where there is no canvas at all, and the thing that has to be
+ * asserted about this walk is *how many operations it issues*. A sink it can
+ * implement is the only way to assert that against the real `far-water.bin`
+ * rather than against a description of it.
+ */
+export interface PlanSink {
+  moveTo(x: number, y: number): void;
+  lineTo(x: number, y: number): void;
+}
+
+/** One de-indexed water sheet: interleaved `x, z, depth` and a triangle list. */
+export interface PlanSheet {
+  readonly vertices: Float32Array;
+  readonly indices: Uint32Array | Uint16Array;
+}
+
+/**
+ * De-index the harbour into a fill path. Returns what it drew and what it cost.
+ *
+ * ---------------------------------------------------------------------------
+ * THERE IS NO `closePath` HERE, AND THAT IS THE WHOLE POINT.
+ *
+ * This walk used to end each triangle with `shape.closePath()`, which is the
+ * obvious thing to write and is semantically free -- `fill` closes every subpath
+ * implicitly, so the path with the calls and the path without them rasterise to
+ * the same pixels. It is not free at all. **Chrome's canvas path builder is
+ * quadratic in the number of closed subpaths**, measured on the real thing:
+ *
+ *     triangles     with closePath      without
+ *        25,000         1,193 ms          ~1 ms
+ *        50,000         4,672 ms          ~3 ms
+ *       200,000                            ~8 ms
+ *
+ * Four times the work for twice the triangles is a clean n^2, and 282,567
+ * triangles extrapolates to **about 150 seconds of unbroken main thread**. That
+ * is what pressing `M` did on a 60 km world: `start()` fetched 9.7 MB of harbour
+ * and then wedged the tab -- and, on a laptop, the machine -- for two and a half
+ * minutes building a path that draws the same picture in eight milliseconds. The
+ * shape was 3,564 triangles when the call was written, where the same defect is
+ * 24 ms and invisible.
+ *
+ * So the rule this file now holds, and the one the check asserts: **three
+ * operations a triangle, a move and two lines, and nothing else.** `ops` is
+ * returned so that is a number somebody can test rather than a comment somebody
+ * can delete.
+ *
+ * (The same trap is live anywhere a per-item `closePath` meets a payload that
+ * grew: `bigmap.ts`'s footprint fill closes per prism, which is hundreds and
+ * therefore fine, and `minimap.ts` does the same. Neither is near the knee. This
+ * one was three hundred thousand.)
+ */
+export function buildWaterPlan(
+  sheets: ReadonlyArray<PlanSheet>,
+  sink: PlanSink,
+): { triangles: number; ops: number } {
+  let triangles = 0;
+  let ops = 0;
+  for (const sheet of sheets) {
+    const idx = sheet.indices;
+    const v = sheet.vertices;
+    for (let i = 0; i + 2 < idx.length; i += 3) {
+      // Vertices are interleaved (x, z, depth) -- see `WaterSheet`. The y is
+      // the sheet's own surface and this is a plan, so it is dropped here.
+      const a = idx[i] * 3;
+      const b = idx[i + 1] * 3;
+      const c = idx[i + 2] * 3;
+      sink.moveTo(v[a], v[a + 1]);
+      sink.lineTo(v[b], v[b + 1]);
+      sink.lineTo(v[c], v[c + 1]);
+      ops += 3;
+      triangles++;
+    }
+  }
+  return { triangles, ops };
+}
+
+/**
+ * Every place one street name can be lettered, from that name's runs alone.
+ *
+ * Lifted out of `ensureLabelLines` unchanged so it can be called for one name
+ * at a time; `MapAtlas.ensureLabelLines` documents the join, the straightness
+ * walk and why the pass is per name in the first place.
+ */
+function chainName(nameId: number, runs: readonly RoadRun[]): LabelLine[] {
+  const lines: LabelLine[] = [];
+  // Endpoint index, over this name's runs only.
+  const ends = new Map<string, number[]>();
+  const add = (key: string, i: number): void => {
+    const list = ends.get(key);
+    if (list === undefined) ends.set(key, [i]);
+    else list.push(i);
+  };
+  const keysFor = (x: number, z: number): string[] => {
+    const qx = x / JOIN_EPS;
+    const qz = z / JOIN_EPS;
+    const fx = Math.floor(qx);
+    const fz = Math.floor(qz);
+    // The four cells the point could have rounded into. See the header.
+    return [`${fx},${fz}`, `${fx + 1},${fz}`, `${fx},${fz + 1}`, `${fx + 1},${fz + 1}`];
+  };
+  for (let i = 0; i < runs.length; i++) {
+    const p = runs[i].points;
+    for (const k of keysFor(p[0], p[1])) add(k, i);
+    for (const k of keysFor(p[p.length - 2], p[p.length - 1])) add(k, i);
+  }
+
+  const used = new Uint8Array(runs.length);
+  for (let seed = 0; seed < runs.length; seed++) {
+    if (used[seed]) continue;
+    used[seed] = 1;
+    // The chain, as a growing flat list of x, z. Built from the seed
+    // outward: forward off the tail, then backward off the head.
+    const chain: number[] = Array.from(runs[seed].points);
+    for (let direction = 0; direction < 2; direction++) {
+      for (;;) {
+        const tail = direction === 0;
+        const ex = tail ? chain[chain.length - 2] : chain[0];
+        const ez = tail ? chain[chain.length - 1] : chain[1];
+        let found = -1;
+        let flip = false;
+        for (const key of keysFor(ex, ez)) {
+          const list = ends.get(key);
+          if (list === undefined) continue;
+          for (const j of list) {
+            if (used[j]) continue;
+            const p = runs[j].points;
+            if (near(p[0], p[1], ex, ez)) {
+              found = j;
+              flip = false;
+              break;
+            }
+            if (near(p[p.length - 2], p[p.length - 1], ex, ez)) {
+              found = j;
+              flip = true;
+              break;
+            }
+          }
+          if (found >= 0) break;
+        }
+        if (found < 0) break;
+        used[found] = 1;
+        const p = runs[found].points;
+        const n = p.length;
+        // Skip the shared endpoint itself, or the chain gets a zero-length
+        // segment at every join and the straightness walk trips over it.
+        if (tail) {
+          if (flip) for (let i = n - 4; i >= 0; i -= 2) chain.push(p[i], p[i + 1]);
+          else for (let i = 2; i < n; i += 2) chain.push(p[i], p[i + 1]);
+        } else {
+          // Both branches collect the new piece **far end first**, which is
+          // the order that leaves the chain contiguous once it is prepended:
+          // the point nearest the old head ends up immediately before it.
+          // `flip` says the incoming run already runs toward the head, so it
+          // is taken as it lies, minus its last point; otherwise it runs away
+          // from the head and is taken backwards, minus its first.
+          const head: number[] = [];
+          if (flip) for (let i = 0; i < n - 2; i += 2) head.push(p[i], p[i + 1]);
+          else for (let i = n - 2; i >= 2; i -= 2) head.push(p[i], p[i + 1]);
+          chain.unshift(...head);
+        }
+      }
+    }
+    const line = longestStraight(Float32Array.from(chain), nameId);
+    if (line !== null) lines.push(line);
+  }
+  return lines;
 }
 
 /** Are two points the same junction, to `JOIN_EPS`? Squared, so no root. */

@@ -115,6 +115,7 @@ import { bikePlan, placeBike, type BikeGround, type BikeSpot } from '../client/s
 import type { Place } from '../client/src/game/teleport.ts';
 import type { CombatWorld } from '../client/src/game/combat.ts';
 import { decodeRail, verifyRail, type RailBake } from '../client/src/game/rail.ts';
+import { RailCut } from '../client/src/world/rail-cut.ts';
 import { buildPlatforms, type PlatformField } from '../client/src/game/riding.ts';
 
 // --- Hex-lazy collision ---------------------------------------------------------
@@ -1644,6 +1645,16 @@ export interface ServerWorld {
    * had them.
    */
   platforms?: PlatformField | null;
+  /**
+   * The rail corridor, so `groundFor` knows where the ground **is not**.
+   *
+   * `world/rail-cut.ts`'s header names this process as its second caller and
+   * gives the reason it imports nothing but the flag constants: *"`server/world.ts`
+   * needs the same corridor to answer 'how high is the ground' for a player
+   * standing in a cutting"*. It was written for this and never wired up, and the
+   * gap is a real one -- see `groundFor`.
+   */
+  railCut?: RailCut | null;
 }
 
 /**
@@ -1842,8 +1853,19 @@ export async function loadWorld(
     segments: segments.enabled ? segments : undefined,
     rail: await loadRail(root),
     platforms: null,
+    railCut: null,
   };
   world.platforms = world.rail ? buildPlatforms(world.rail) : null;
+  world.railCut = world.rail ? new RailCut(world.rail) : null;
+  // The corridor opens out at a platform, and both ends have to agree about
+  // where. `main.ts` hands `RailCut` the routed stopping anchors out of
+  // `rail-geo.buildNetwork`; this process cannot import that module -- it draws
+  // things -- but `riding.buildPlatforms` resolves the *same* anchors from the
+  // same bake, which is what makes the two answers the same number rather than
+  // two numbers that agree today. Without it the server's corridor is 5.4 m wide
+  // at a station where the client's is 9.4, and the four metres of difference is
+  // exactly the strip the access stairs stand in.
+  if (world.railCut && world.platforms) world.railCut.setStations(world.platforms.sites);
 
   // --- The bikes, and the one walk over every hexagon this boot makes ---------
   //
@@ -2087,6 +2109,7 @@ async function readOptional(path: string): Promise<ArrayBuffer | null> {
 export function groundFor(world: ServerWorld): CombatWorld {
   let lastGround = 0;
   const platforms = world.platforms ?? null;
+  const cut = world.railCut ?? null;
   return {
     collision: world.collision,
     groundHeight(x: number, z: number, feetY: number): number {
@@ -2111,6 +2134,26 @@ export function groundFor(world: ServerWorld): CombatWorld {
       const platform = platforms === null ? -Infinity : platforms.heightAt(x, z, feetY);
       const roof = world.collision.roofHeight(x, z, feetY);
       if (platform > -Infinity) return Math.max(platform, roof);
+      // **Inside a carved cutting the terrain is not there**, and until this
+      // line nothing on either end knew it. `terrain.buildTerrainMesh` drops the
+      // sub-quads the corridor crosses and `world/rail-geo.ts` builds a trench
+      // in the hole, but `TerrainField.height` still samples the *uncarved* DEM
+      // -- so a body over a cutting was held on an invisible sheet across a
+      // visible railway. `PlatformField` hid it wherever a platform happened to
+      // be under the asker and nowhere else.
+      //
+      // It is also what made a station in a cutting unenterable. The access
+      // stairs `rail-geo.writeStationAccess` cuts into the trench wall are
+      // *below* the DEM by construction, so a descending walk was a walk along
+      // the top of the hole: reported at Chatswood as a plaza with the doors
+      // 23 m away and no way down to them.
+      //
+      // `cutAt` answers with the rail head, and it is the identical function the
+      // carve and the trench both call -- see `rail-cut.ts` on why none of the
+      // three owns the answer -- so the floor a body stands on here is the same
+      // surface the ballast is drawn on, on both ends of the wire.
+      const floor = cut === null ? Number.NaN : cut.cutAt(x, z, sampled);
+      if (Number.isFinite(floor)) return Math.max(floor, roof);
       return Math.max(lastGround, roof);
     },
     // Shared rather than per combatant, unlike the ground above it: this one

@@ -1013,6 +1013,15 @@ export class BigMap implements MarkerSink {
    * The query radius is the half-extent's diagonal, so the corners of a square
    * view are not empty -- and it is capped at the ring the prisms actually cover,
    * because asking for more does not produce more.
+   *
+   * **The `closePath` per prism below is safe only because there are hundreds of
+   * them.** Chrome's path builder is quadratic in closed subpaths -- 25,000 of
+   * them is 1.2 s and 50,000 is 4.7 s, measured -- and `fill` closes a subpath
+   * implicitly, so the call buys nothing here either. It stays because it is
+   * honest about the shape and because the collision ring is 420 m and cannot
+   * grow with the world. Anything drawn from a payload that *does* grow must not
+   * copy this; see `mapatlas.ts`'s `buildWaterPlan`, where the same three lines
+   * over 282,567 triangles froze a player's machine for two and a half minutes.
    */
   private drawBuildings(ctx: CanvasRenderingContext2D, view: MapView): void {
     const half = ZOOMS[this.zoomIndex].halfM;

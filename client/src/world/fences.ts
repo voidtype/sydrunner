@@ -103,7 +103,7 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
-import { MeshStandardNodeMaterial } from 'three/webgpu';
+import { DoubleSide, MeshStandardNodeMaterial } from 'three/webgpu';
 
 import { resolves, softLine } from './facade.ts';
 
@@ -210,6 +210,31 @@ interface OpenStyle {
   readonly barVariation: number;
   readonly roughness: number;
   readonly metalness: number;
+  /**
+   * Line posts, as a **second period in the same mask** -- optional, and absent
+   * on both of the garden styles, whose posts arrive as geometry the pipeline
+   * emits into the `POST_U` band.
+   *
+   * It exists for the rail boundary fence, which is the one caller that builds
+   * its own strip: 300 km of corridor fencing is affordable at *one quad per
+   * eight metres per side* and is not affordable at one box per post. A post
+   * every 2.8 m over a 19,000-segment network is a hundred thousand boxes; the
+   * same rhythm as a solid band in `u` is free, because the fragment already
+   * knows where along the fence it is.
+   *
+   * Guarded rather than defaulted, so the two garden styles generate exactly the
+   * node graph they generated before this field existed. A different graph is a
+   * different pipeline, and `world/warmup.ts` is the file that explains at
+   * length what that costs.
+   */
+  readonly post?: { readonly pitch: number; readonly width: number };
+  /**
+   * What is behind this fence, for the far-field convergence, when it is not a
+   * front garden. See `BEHIND`: the value is the area-weighted remainder a solid
+   * strip has to converge on, and behind a rail fence is ballast and cess rather
+   * than foliage and mulch.
+   */
+  readonly behind?: readonly [number, number, number];
 }
 
 /**
@@ -390,7 +415,20 @@ export function createFenceOpenMaterial(style: OpenStyle): MeshStandardNodeMater
     // a post is narrower than one picket pitch, so without this the gate posts
     // -- the two pieces of this object that say "this gap is a way in" -- come
     // out as a pair of shredded slivers.
-    const post = step(co.x, float(POST_U));
+    //
+    // A style with `post` set folds its line posts in here, for the same reason
+    // and with the same consequence: a post is solid, and it keeps its own paint
+    // all the way out instead of being averaged with what is behind the fence.
+    const geometryPost = step(co.x, float(POST_U));
+    const post = style.post
+      ? max(
+          geometryPost,
+          step(
+            abs(fract(co.x.div(style.post.pitch)).sub(0.5)),
+            float(style.post.width / style.post.pitch / 2),
+          ),
+        )
+      : geometryPost;
 
     const drawn = max(max(max(bar, rails), buried), post).clamp();
 
@@ -409,7 +447,7 @@ export function createFenceOpenMaterial(style: OpenStyle): MeshStandardNodeMater
     // paint would have done.
     const perBar = hash21(vec2(barIndex, 3.7)).sub(0.5).mul(style.barVariation).add(1.0);
     const near = tone.mul(perBar);
-    const far = mix(vec3(...BEHIND), tone, float(style.duty));
+    const far = mix(vec3(...(style.behind ?? BEHIND)), tone, float(style.duty));
     // A post is exempt from the convergence as well as from the mask: it really
     // is solid paint, so it should keep its own colour all the way out rather
     // than being averaged with a garden that is not behind it.
@@ -430,6 +468,98 @@ export function createFenceOpenMaterial(style: OpenStyle): MeshStandardNodeMater
 
 export const FENCE_IRON = IRON;
 export const FENCE_TIMBER = TIMBER;
+
+/* ===========================================================================
+ * The rail corridor boundary fence
+ * ======================================================================== */
+
+/**
+ * What is behind a rail fence, which is not a garden.
+ *
+ * Ballast, cess and the shadowed side of a formation, area-averaged: darker and
+ * far less saturated than `BEHIND`, because there is nothing green in a rail
+ * corridor and the dominant surface in it is crushed basalt at rho 0.055. Using
+ * the garden's remainder here would make every corridor in the city converge on
+ * a warm olive band at 150 m, which is the one thing a railway is not.
+ */
+const RAIL_BEHIND: readonly [number, number, number] = [0.075, 0.076, 0.078];
+
+/**
+ * The corridor boundary fence: 1.8 m of galvanised weldmesh on line posts.
+ *
+ * ---------------------------------------------------------------------------
+ * **The absence of this object is most of why a Sydney rail corridor rendered
+ * as a car park.** Every metre of running line in this city is fenced -- it is a
+ * legal requirement, not a stylistic one -- and the fence is the single edge
+ * that says "the ground stops here and a railway begins". Ballast without it is
+ * a gravel yard; ballast with it is a railway, at any distance you can resolve
+ * a 1.8 m vertical from.
+ *
+ * It is a **weldmesh** rather than the garden palisade, and the three constants
+ * that make it one are the pitch, the duty and the height. Sydney's corridor
+ * fence is a 2.4 m bay of 50 x 200 mm mesh between galvanised posts; at 65 mm
+ * on a 200 mm pitch the verticals are over-scale on the palisade's own argument
+ * -- a 5 mm wire is nothing at any distance a corridor is looked at from -- and
+ * the 32% duty is what keeps the silhouette mostly see-through, which is what a
+ * mesh fence does and a hoarding does not.
+ *
+ * Galvanising, not paint: rho 0.34 at a roughness that is neither a mirror nor a
+ * matte, weathered to the flat pale grey every one of them goes within a year.
+ * Through `sky/calibration.ts`'s chain at 3 pm on 15 February, on a vertical
+ * wire square-on to the sun, sunlit rgb(208, 211, 213) Y' 210 and shaded
+ * rgb(121, 118, 118) Y' 119 -- which is *lighter than the ballast behind it by
+ * 150 code values*, and that contrast is the whole of the read. The two tones
+ * differ by six values and are the same tone, on `IRON`'s argument.
+ *
+ * The rails sit at 0.12 and 0.95 rather than at the garden fence's proportions,
+ * because a corridor fence has one mid rail and a top rail and the top rail is
+ * the line the eye follows for a kilometre.
+ */
+const RAIL_FENCE: OpenStyle = {
+  slot: 'fence_rail',
+  pitch: 0.2,
+  duty: 0.32,
+  height: 1.8,
+  railLow: [0.1, 0.17],
+  railHigh: [1.68, 1.78],
+  // Square-topped. A corridor fence's mesh runs to the top rail and stops; the
+  // barbed outriggers that sit above it at depots are a different object and are
+  // not what runs past a suburban platform.
+  finialDuty: 1.0,
+  paint: [
+    [0.335, 0.342, 0.345],
+    [0.312, 0.315, 0.322],
+  ],
+  // Half the palisade's. Galvanising weathers evenly -- it is one dip, not
+  // eighty separately painted boards -- so wire-to-wire scatter is small, and a
+  // large one on a 200 mm pitch reads as noise rather than as wire.
+  barVariation: 0.06,
+  roughness: 0.58,
+  // Matte-grey zinc rather than a conductor, on `IRON`'s argument: a metallic
+  // fence takes a specular lobe off the sun and 300 km of it flares like chrome.
+  metalness: 0.0,
+  post: { pitch: 2.8, width: 0.11 },
+  behind: RAIL_BEHIND,
+};
+
+/**
+ * The corridor fence material, and the one thing it does that the garden fences
+ * do not: it is **double-sided**.
+ *
+ * `world/rail-geo.ts` builds this strip itself, one quad per eight metres, and a
+ * player walks along both sides of a railway. The pipeline's garden fences are
+ * emitted as two back-to-back faces by `fences.py`, which is the cheaper answer
+ * when the geometry is baked; a runtime builder that did the same would double
+ * the corridor's quad count for a surface nobody can see two of at once.
+ */
+export function createRailFenceMaterial(): MeshStandardNodeMaterial {
+  const material = createFenceOpenMaterial(RAIL_FENCE);
+  material.side = DoubleSide;
+  return material;
+}
+
+/** The fence's own height, so the builder and the mask cannot disagree. */
+export const RAIL_FENCE_HEIGHT = RAIL_FENCE.height;
 
 /* ===========================================================================
  * The masonry fence

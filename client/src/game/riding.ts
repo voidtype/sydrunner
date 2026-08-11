@@ -527,6 +527,30 @@ const INTERIORS: readonly CarriageInterior[] = [
   },
 ];
 
+/**
+ * How far a rewound passenger can be from where their history says they were.
+ *
+ * The diagonal of the longest carriage in `INTERIORS`, which is the bound
+ * `server/sim.buildRewindIndex` needs and the reason it can be a *constant*
+ * rather than a function of the train's speed. A reframed rider is
+ * `frame(now) . local(then)` and `local(then)` is inside the carriage, so the
+ * answer is inside that carriage now -- and so is the rider's live position, so
+ * the two are at most one carriage apart however fast the railway is moving
+ * underneath them. See `sim.reframeRider` for what the reframe is and
+ * `buildRewindIndex` for the broadphase it broke.
+ *
+ * Derived from the table rather than typed in, so a longer carriage cannot make
+ * it wrong by being added.
+ */
+export const RIDER_CARRIAGE_SPAN_M = /*#__PURE__*/ (() => {
+  let worst = 0;
+  for (const it of INTERIORS) {
+    const span = Math.hypot(it.xMax - it.xMin, it.halfWidth * 2);
+    if (span > worst) worst = span;
+  }
+  return Math.ceil(worst);
+})();
+
 const INTERIOR_BY_KEY = /*#__PURE__*/ (() => {
   const m = new Map<string, CarriageInterior>();
   for (const it of INTERIORS) m.set(it.key, it);
@@ -756,6 +780,55 @@ export interface PlatformSite {
 }
 
 /**
+ * Are these two calling stops served by **one** platform pair?
+ *
+ * ---------------------------------------------------------------------------
+ * THIS WAS A CIRCLE, AND A PLATFORM IS NOT ROUND.
+ *
+ * The rule used to be "the same name within `PLATFORM_HALF_LENGTH_M`", measured
+ * as a plain radius, and the reason it was wrong is the shape of the thing it
+ * was deciding about. A platform is 160 m long and 5.5 m wide: two anchors 30 m
+ * apart **along** the track are one platform, and two anchors 30 m apart
+ * **across** the formation are two platforms with three other tracks between
+ * them. A radius cannot tell those apart, so it merged them, and the second
+ * service then had no platform anywhere in the field.
+ *
+ * Measured on this bake: `surfaceAt` answered `-Infinity` for a rider stepping
+ * off an M1 at Epping (its own anchor 26 m across from the T9 anchor that
+ * swallowed it), a T8 at St James (22 m from T2's), an M1 at Chatswood (8 m
+ * from T1's) and a T5 at Canley Vale (6 m from T2's, and *inside* its inner
+ * face rather than outside its outer one). `alightPlatform` then silently left
+ * the body at the carriage's own rail level and `groundFor` fell through to the
+ * terrain -- the paddock over the cutting -- which is what
+ * "the platform field puts a surface at -Infinity" was reporting.
+ *
+ * So the test is the platform's own frame: `along` inside its length, and
+ * `across` inside its outer face. That reads as one sentence -- *this stop
+ * stands at a platform we have already built* -- and it keeps the merge the
+ * radius was there for. The up and down roads of a double-track station are
+ * 4-5 m apart and still merge into the one island `writePlatforms` draws
+ * between them; Meadowbank's two anchors 471 m up the corridor still do not.
+ *
+ * `world/rail-geo.ts` builds its drawn prisms from the identical predicate, so
+ * the rectangles a body stands on and the rectangles a body sees are the same
+ * set by construction rather than by two rules somebody has to keep in step.
+ */
+export function samePlatform(
+  other: { x: number; z: number; ux: number; uz: number },
+  site: { x: number; z: number },
+): boolean {
+  const dx = site.x - other.x;
+  const dz = site.z - other.z;
+  const along = dx * other.ux + dz * other.uz;
+  const across = dx * -other.uz + dz * other.ux;
+  return (
+    along > -PLATFORM_HALF_LENGTH_M && along < PLATFORM_HALF_LENGTH_M &&
+    across > -(PLATFORM_INNER_M + PLATFORM_WIDTH_M) &&
+    across < PLATFORM_INNER_M + PLATFORM_WIDTH_M
+  );
+}
+
+/**
  * Every platform in Sydney, as a grid of rectangles, and what height each is.
  *
  * ---------------------------------------------------------------------------
@@ -785,10 +858,11 @@ export interface PlatformSite {
  * A site is a *calling stop*, not a station node. `dir.stops[k].s` is the arc
  * length the service stands at, so `sampleAlong` gives the position, the rail
  * height and the heading in one call with nothing to search and nothing to
- * match up. Sites of the same name within half a platform of each other are one
- * platform pair -- the merge `rail-geo.ts` performs for the same reason, since
- * a station whose services stop at two ends of a long platform is one platform
- * and not two.
+ * match up. Sites of the same name that stand at the same platform are one site
+ * -- `samePlatform` above is that test and `rail-geo.ts` merges its drawn
+ * prisms with the same one, since a station whose services stop at two ends of a
+ * long platform is one platform and not two, and a station whose services stop
+ * on tracks thirty metres apart is not.
  */
 export class PlatformField {
   private readonly cells = new Map<number, PlatformSite[]>();
@@ -805,9 +879,7 @@ export class PlatformField {
   add(site: PlatformSite): void {
     for (const other of this.sites) {
       if (other.name !== site.name) continue;
-      const dx = other.x - site.x;
-      const dz = other.z - site.z;
-      if (dx * dx + dz * dz < PLATFORM_HALF_LENGTH_M * PLATFORM_HALF_LENGTH_M) return;
+      if (samePlatform(other, site)) return;
     }
     this.sites.push(site);
     // Filed into every cell the platform's own 160 x 14 m footprint can touch,
@@ -855,6 +927,82 @@ export class PlatformField {
       if (top > best) best = top;
     }
     return best;
+  }
+
+  /**
+   * Slide a point onto the nearest platform within `reach`, and answer its top.
+   *
+   * ---------------------------------------------------------------------------
+   * WHY A DISEMBARK MAY NOT SIMPLY *ASK* WHETHER IT LANDED ON A PLATFORM.
+   *
+   * `alightPlatform` composes where a rider steps out in the **carriage's**
+   * frame -- 2.97 m off its own centreline, level with a door bay -- and then
+   * asks `surfaceAt` how high the platform there is. Those are two different
+   * frames, and on a curve they are not the same frame: a carriage can be 76 m
+   * from the stop's own anchor, and 76 m of a curving railway rotates the
+   * carriage's "sideways" out of the platform's by more than the 1.35 m of
+   * margin the composition has. Measured on this bake, a rider stepping off a T1
+   * at Central lands 1.59 m from the platform's axis against a 1.62 m inner
+   * face: **three centimetres inside it**, which the rectangle test answers with
+   * `-Infinity` exactly as it answers a rider in the harbour.
+   *
+   * The old code then did nothing at all -- it kept the height it had composed
+   * from the carriage -- so three centimetres of curve was the difference
+   * between standing on Central's platform and standing on whatever the terrain
+   * grid says is over the top of it. That is a *silent* fall-through, and it is
+   * the shape of failure this whole class exists to remove.
+   *
+   * So the disembark asks the harder question: not "is there a platform under
+   * this point" but "where is the platform, and put me on it". Clamping into the
+   * rectangle in its own frame is total -- every point within `reach` of a site
+   * has an answer -- and both ends run the identical arithmetic over the
+   * identical field, so it stays a teleport the two ends agree about.
+   *
+   * Writes the clamped position into `out` and returns the surface, or leaves
+   * `out` alone and returns `-Infinity` when there is no platform within reach.
+   */
+  placeOn(x: number, z: number, reach: number, out: Vec3Out): number {
+    const list = this.cells.get(
+      PlatformField.key(Math.floor(x / PlatformField.CELL), Math.floor(z / PlatformField.CELL)),
+    );
+    if (list === undefined) return -Infinity;
+    // A hand's breadth inside the faces, so the point the caller is handed is
+    // one `surfaceAt` would answer for rather than one sitting exactly on the
+    // boundary the comparison uses.
+    const INSET = 0.1;
+    const lo = PLATFORM_INNER_M + INSET;
+    const hi = PLATFORM_INNER_M + PLATFORM_WIDTH_M - INSET;
+    const end = PLATFORM_HALF_LENGTH_M - INSET;
+    let bestMove = reach;
+    let bestX = 0;
+    let bestZ = 0;
+    let bestTop = -Infinity;
+    for (const site of list) {
+      const dx = x - site.x;
+      const dz = z - site.z;
+      let along = dx * site.ux + dz * site.uz;
+      let across = dx * -site.uz + dz * site.ux;
+      const side = across < 0 ? -1 : 1;
+      let mag = across < 0 ? -across : across;
+      if (along < -end) along = -end;
+      else if (along > end) along = end;
+      if (mag < lo) mag = lo;
+      else if (mag > hi) mag = hi;
+      across = side * mag;
+      // Back out into world, and how far the body had to move to get there.
+      const px = site.x + site.ux * along + -site.uz * across;
+      const pz = site.z + site.uz * along + site.ux * across;
+      const move = Math.hypot(px - x, pz - z);
+      if (move >= bestMove) continue;
+      bestMove = move;
+      bestX = px;
+      bestZ = pz;
+      bestTop = site.y + PLATFORM_TOP_M;
+    }
+    if (bestTop === -Infinity) return -Infinity;
+    out.x = bestX;
+    out.z = bestZ;
+    return bestTop;
   }
 
   /**
@@ -1635,6 +1783,60 @@ export interface Dwell {
 }
 
 /**
+ * When this service's doors are actually open at its `call`-th calling stop --
+ * as ages into the trip -- or null where it does not stand there at all.
+ *
+ * ---------------------------------------------------------------------------
+ * **`dir.arrivals[k]` IS NOT THE START OF A DWELL, AND AT TWO OF THEM IT IS THE
+ * OPPOSITE OF ONE.** That assumption is the whole of a bug that put players on
+ * platforms beside trains that had already left.
+ *
+ * `arrivals[k]` is when the curve *reaches* stop `k`. At every intermediate
+ * stop the curve then holds still for `physics.dwell` -- a phase with `v0 = 0`
+ * and `a = 0`, which is the only representation of a stop there is -- and
+ * `poseTrain` opens the doors for exactly that phase. But:
+ *
+ *   - **at the origin `arrivals[0] = 0`, and phase 0 is `(v0 = 0, a = +1)`**:
+ *     the train departs at age zero and there is no stand in front of it. A
+ *     solver that added `dwell` to it claimed a fifteen-second dwell that the
+ *     railway never has, and by fifteen seconds in the train is 110 m up the
+ *     track doing 53 km/h.
+ *   - at the terminus `arrivals[n-1] = duration`, and the trip ends there.
+ *
+ * So the window is read off the curve rather than assumed from the arrival: the
+ * phase containing the arrival must be a *stationary* one, and a later phase
+ * must exist for the train to leave in. Then `nextDwell` can only ever offer a
+ * dwell `poseTrain` agrees is one, which is the property the whole boarding
+ * path rests on -- `findBoarding` gates on `pose.doorsOpen` and nothing else.
+ *
+ * The same lookup `poseTrain` and `dwellElapsed` do, over the same table.
+ */
+export function stopDwell(
+  bake: RailBake, dir: RailDirection, call: number,
+): { opens: number; closes: number } | null {
+  if (call < 0 || call >= dir.arrivals.length) return null;
+  const age = dir.arrivals[call];
+  const phases = bake.phases;
+  const off = dir.phaseOff;
+  let lo = 0;
+  let hi = dir.phaseCount - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (phases[(off + mid) * 4] <= age) lo = mid;
+    else hi = mid - 1;
+  }
+  const base = (off + lo) * 4;
+  // Moving through it, or accelerating away from it. Not a stop.
+  if (phases[base + 2] !== 0 || phases[base + 3] !== 0) return null;
+  // Standing at the buffers with nothing after it: the trip is over, and
+  // `poseTrain` refuses `age > duration` anyway.
+  if (lo + 1 >= dir.phaseCount) return null;
+  const opens = phases[base];
+  const closes = phases[(off + lo + 1) * 4];
+  return closes > opens ? { opens, closes } : null;
+}
+
+/**
  * The next time a train has its doors open at `station`, or null.
  *
  * `lineId` filters to one service where a station has several -- Central has
@@ -1703,8 +1905,13 @@ export function nextDwell(
         }
         if (after < 0) continue;
       }
-      const dwell = bake.physics.dwell;
-      const base = dir.offset + dir.arrivals[call];
+      // **Off the curve, not off `arrivals[call] + physics.dwell`.** See
+      // `stopDwell`: the origin of every direction has an arrival with no stand
+      // behind it, and offering one puts a boarder beside a departed train.
+      const window = stopDwell(bake, dir, call);
+      if (window === null) continue;
+      const dwell = window.closes - window.opens;
+      const base = dir.offset + window.opens;
       // The first window whose *end* is still ahead of us, so a train already
       // standing at the platform is the answer rather than the one after it.
       const n = Math.ceil((t - base - dwell) / line.period);
@@ -1815,9 +2022,14 @@ export function dwellAt(
     if (dir.stops[k].name === station) { call = c; break; }
     c++;
   }
-  if (call < 0 || call >= dir.arrivals.length) return null;
-  const opensAt = dir.offset + ref.trip * dir.line.period + dir.arrivals[call];
-  return { opensAt, closesAt: opensAt + bake.physics.dwell };
+  // `stopDwell` and not `arrivals[call] + physics.dwell`, for the reason it
+  // gives: an arrival is not a dwell, and at the two ends of a run it is the
+  // opposite of one. Getting off where the train does not stop is the same
+  // defect as getting on there.
+  const window = stopDwell(bake, dir, call);
+  if (window === null) return null;
+  const opensAt = dir.offset + ref.trip * dir.line.period + window.opens;
+  return { opensAt, closesAt: opensAt + (window.closes - window.opens) };
 }
 
 /** Every station this trip still calls at, in order, from arc length `s`. */
@@ -1891,8 +2103,30 @@ export function alightPlatform(
   // what is underfoot, and the banded version would answer "nothing here" for a
   // body that has not been placed yet. See both of their headers.
   const top = platforms.surfaceAt(out.x, out.z);
-  if (top > -Infinity) out.y = top + RIDER_EYE_HEIGHT;
+  if (top > -Infinity) {
+    out.y = top + RIDER_EYE_HEIGHT;
+    return;
+  }
+  // Off the rectangle: a curve has rotated the carriage's "sideways" out of the
+  // platform's, or an end carriage is hanging past the ramp. **Slide onto the
+  // platform rather than being put down beside it** -- see `placeOn`, which is
+  // where the whole argument for that lives. `ALIGHT_SNAP_M` bounds it to the
+  // width of the station, so a stop that genuinely has no platform in the field
+  // still falls back to the carriage's own rail level and does not get dragged
+  // across the yard to the next one.
+  const snapped = platforms.placeOn(out.x, out.z, ALIGHT_SNAP_M, out);
+  if (snapped > -Infinity) out.y = snapped + RIDER_EYE_HEIGHT;
 }
+
+/**
+ * How far a disembark may be slid to land on a platform. See `alightPlatform`.
+ *
+ * A platform is 5.5 m wide and its face is 1.62 m off the track centre, so
+ * everything this is meant to correct -- a few centimetres of curve, a carriage
+ * end hanging past the 160 m -- is inside ten metres. Wider than the station is
+ * a different bug and should look like one.
+ */
+export const ALIGHT_SNAP_M = 12;
 
 /**
  * Where a rider ends up when they jump out between stations: beside the track.

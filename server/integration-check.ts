@@ -314,6 +314,9 @@ import {
   type Stand,
 } from '../client/src/game/riding.ts';
 import type { PlayerState } from '../client/src/player/controller.ts';
+// The big map's two query results, for `checkBigMapAtScale`. Types only: the
+// module itself is imported dynamically there, beside the world it reads.
+import type { LabelLine as MapLabelLine, RoadRun as MapRoadRun } from '../client/src/mapatlas.ts';
 
 const PORT = Number(process.env.SYDNEY_CHECK_PORT ?? 8799);
 const SERVER_URL = `ws://127.0.0.1:${PORT}`;
@@ -1687,6 +1690,13 @@ async function main(): Promise<void> {
   // `checkRailAnnouncements`.
   say('');
   await checkRailAnnouncements();
+
+  // --- 36. And what pressing `M` costs. Every other check in this file asks
+  // whether the map is *right*; this asks whether it is affordable against the
+  // world on disk, which is the question that was never asked and the one that
+  // froze a player's machine. See `checkBigMapAtScale`.
+  say('');
+  await checkBigMapAtScale();
 
   say('');
   if (failures.length === 0) {
@@ -17304,13 +17314,76 @@ async function checkRiding(): Promise<void> {
   // with the body stepped inside the carriage, and `E` again at the far end.
   const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
   const world = await loadWorld(root);
-  {
+
+  /** Everything one board-ride-disembark says about itself. See `rideAt`. */
+  interface RideReport {
+    ok: boolean;
+    why: string;
+    line: string;
+    from: string;
+    to: string;
+    boarded: boolean;
+    car: number;
+    lx: number;
+    ly: number;
+    lz: number;
+    chancerAboard: boolean;
+    stillAboard: boolean;
+    travelled: number;
+    straight: number;
+    worstBelow: number;
+    worstAbove: number;
+    walked: number;
+    alighted: boolean;
+    waitedS: number;
+    feet: number;
+    ground: number;
+    surface: number;
+    gapMm: number | null;
+    onGround: boolean;
+    vy: number;
+    health: number;
+    fromTrackCentre: number;
+    onPlatform: boolean;
+  }
+
+  /**
+   * Board a train at `startMs`, ride it to the next station, and get off.
+   *
+   * ---------------------------------------------------------------------------
+   * **ONE SCENARIO, DRIVEN FROM ONE INSTANT, AND THE INSTANT IS AN ARGUMENT.**
+   *
+   * The timetable is a pure function of the millisecond, so a ride is a pure
+   * function of the millisecond it starts at -- and until this was a function it
+   * was written out inline against `Date.now()`, which made it a *sample*. A
+   * sample cannot be pointed at a failure. Two real bugs lived a round behind
+   * that: see section 3c, which points this at the instants they happened.
+   *
+   * The clock is single: the dwell is solved at `startMs` and the simulation's
+   * `railNowMs` starts there too. The inline version read the wall clock again
+   * *after* solving, so the few milliseconds the solve took came off a window
+   * the solver deliberately picks the last of -- with 576 candidates the oldest
+   * still-open dwell has about 30 ms of life left, and that is a coin flip with
+   * a very thin edge. Nothing here reads a clock it was not handed.
+   *
+   * Everything it goes through is the shipped path: `nextDwell` and `dwellStand`
+   * are what `main.ts`'s `sydney.rail.goto` places a player with, `sim.step` is
+   * the authority, and the `E` is one levelled bit exactly as a client's is.
+   */
+  const rideAt = (startMs: number): RideReport => {
+    const r: RideReport = {
+      ok: false, why: '', line: '', from: '', to: '',
+      boarded: false, car: -1, lx: 0, ly: 0, lz: 0, chancerAboard: false,
+      stillAboard: false, travelled: 0, straight: 0,
+      worstBelow: 0, worstAbove: 0, walked: 0,
+      alighted: false, waitedS: 0,
+      feet: 0, ground: 0, surface: -Infinity, gapMm: null,
+      onGround: false, vy: 0, health: 0, fromTrackCentre: 0, onPlatform: false,
+    };
     const sim = new Simulation(roomWorld(world));
-    check(
-      (sim.world.rail ?? null) !== null,
-      `the server loaded the rail bake beside the world -- ${(sim.world.rail?.lines.length ?? 0)} lines. ` +
-        `Without it every boarding claim is refused, which is the safe answer and not the feature`,
-    );
+    const bake = sim.world.rail ?? null;
+    if (bake === null) { r.why = 'the server has no rail bake'; return r; }
+    const t0 = rail1.railSeconds(startMs);
 
     // Where to stand, and when -- **solved, by the same two functions the
     // browser's `sydney.rail.goto` uses**. That sharing is the point: a check
@@ -17321,125 +17394,201 @@ async function checkRiding(): Promise<void> {
     // The station is whichever one has a train standing at it soonest, which is
     // usually one that already does -- there are 268 trains running and the
     // dwell is fifteen seconds, so "now" is nearly always inside somebody's.
-    const bake = sim.world.rail!;
-    const t0 = rail1.railSeconds(Date.now());
-    let stand: { x: number; y: number; z: number; station: string; line: string } | null = null;
-    {
-      const names = new Set<string>();
-      for (const line of bake.lines) for (const dir of line.dirs) for (const stop of dir.stops) {
-        if (stop.calls) names.add(stop.name);
-      }
-      // Sorted by how soon the doors open, and the **first one that places** is
-      // taken rather than the soonest full stop. A dwell whose carriage search
-      // lands on a trip whose consist reference point is still behind the start
-      // of the line -- the first eighty metres of a run -- has nowhere to stand,
-      // and there are 268 trains to choose from.
-      const solved: Array<import('../client/src/game/riding.ts').Dwell> = [];
-      for (const name of names) {
-        // Three calls ahead, so the ride below is a ride and not an arrival at
-        // a terminus -- see `nextDwell`'s `minAhead`.
-        const d = ride1.nextDwell(bake, name, t0, { minAhead: 3 });
-        if (d !== null) solved.push(d);
-      }
-      solved.sort((a, b) => a.opensAt - b.opensAt);
-      const place: import('../client/src/game/riding.ts').Stand = { x: 0, y: 0, z: 0, yaw: 0 };
-      for (const d of solved.slice(0, 40)) {
-        if (!ride1.dwellStand(bake, d, Math.max(d.opensAt + 1, t0), place)) continue;
-        stand = { x: place.x, y: place.y - EYE_HEIGHT, z: place.z, station: d.station, line: d.lineId };
-        break;
-      }
-      if (stand === null) {
-        say(`    solved ${solved.length} dwells and none of them placed a stand`);
-      }
+    const names = new Set<string>();
+    for (const line of bake.lines) for (const dir of line.dirs) for (const stop of dir.stops) {
+      if (stop.calls) names.add(stop.name);
     }
-
+    const solved: Array<import('../client/src/game/riding.ts').Dwell> = [];
+    for (const name of names) {
+      // Three calls ahead, so the ride below is a ride and not an arrival at a
+      // terminus -- see `nextDwell`'s `minAhead`.
+      const d = ride1.nextDwell(bake, name, t0, { minAhead: 3 });
+      // And at least a second of the window left. `nextDwell` answers with the
+      // window a train is *in*, so the soonest-opening one in a city of 576
+      // calling stops is reliably the one about to shut -- which is a real train
+      // and a real dwell, and is not a train a person standing on a platform
+      // gets on. A player who presses E as the doors close does not board, and
+      // asserting that they do would be asserting something false.
+      if (d !== null && d.closesAt - t0 > 1) solved.push(d);
+    }
+    solved.sort((a, b) => a.opensAt - b.opensAt);
+    const place: import('../client/src/game/riding.ts').Stand = { x: 0, y: 0, z: 0, yaw: 0 };
+    let stand: { x: number; y: number; z: number; station: string; line: string } | null = null;
+    // The **first one that places** is taken rather than the soonest full stop.
+    // A dwell whose carriage search lands on a trip whose consist reference
+    // point is still behind the start of the line -- the first eighty metres of
+    // a run -- has nowhere to stand, and there are 268 trains to choose from.
+    for (const d of solved.slice(0, 40)) {
+      if (!ride1.dwellStand(bake, d, Math.max(d.opensAt + 1, t0), place)) continue;
+      stand = { x: place.x, y: place.y - EYE_HEIGHT, z: place.z, station: d.station, line: d.lineId };
+      break;
+    }
     if (stand === null) {
-      check(false, 'no train anywhere in Sydney has its doors open right now, which cannot happen');
-    } else {
-      // The rail clock, driven at the tick rate rather than read off the wall.
-      // See `Simulation.railNowMs`: twelve hundred ticks run in about a second
-      // of real time, so a ride measured against `Date.now` would be a ride of
-      // eleven metres.
-      let railMs = Date.now();
-      sim.railNowMs = () => railMs;
-      const tickClock = (): void => { railMs += 1000 / TICK_HZ; };
+      r.why = `solved ${solved.length} dwells and none of them placed a stand`;
+      return r;
+    }
+    r.line = stand.line;
+    r.from = stand.station;
 
-      const p = sim.join(0, null, 'Rider');
-      p.combat.body.position.set(stand.x, stand.y + EYE_HEIGHT, stand.z);
-      p.combat.body.velocity.set(0, 0, 0);
-      p.combat.body.onGround = true;
-      p.history.seed(sim.tick, stand.x, stand.y + EYE_HEIGHT, stand.z, 0);
+    // The rail clock, driven at the tick rate rather than read off the wall.
+    // See `Simulation.railNowMs`: twelve hundred ticks run in about a second of
+    // real time, so a ride measured against `Date.now` would be a ride of eleven
+    // metres.
+    let railMs = startMs;
+    sim.railNowMs = () => railMs;
+    const tickClock = (): void => { railMs += 1000 / TICK_HZ; };
 
-      // Press `E`. One tick with it down, and the level bit is edged by the sim
-      // exactly as it is for a real client -- see `protocol.BTN.MOUNT`.
-      p.input.mount = true;
-      const out: TickOutput = { tick: 0, events: [], snapshot: null };
+    const p = sim.join(0, null, 'Rider');
+    p.combat.body.position.set(stand.x, stand.y + EYE_HEIGHT, stand.z);
+    p.combat.body.velocity.set(0, 0, 0);
+    p.combat.body.onGround = true;
+    p.history.seed(sim.tick, stand.x, stand.y + EYE_HEIGHT, stand.z, 0);
+
+    // Press `E`. One tick with it down, and the level bit is edged by the sim
+    // exactly as it is for a real client -- see `protocol.BTN.MOUNT`.
+    p.input.mount = true;
+    const out: TickOutput = { tick: 0, events: [], snapshot: null };
+    sim.step(out);
+    tickClock();
+    p.input.mount = false;
+    const a = p.combat.aboard;
+    r.boarded = ride1.isAboard(a);
+    r.car = a.car;
+    r.lx = a.x;
+    r.ly = a.y;
+    r.lz = a.z;
+
+    // And a client pressing E in the harbour gets nothing, which is the whole of
+    // the anti-cheat story. Same input, same tick, a body 8 km away.
+    {
+      const q = sim.join(0, null, 'Chancer');
+      q.combat.body.position.set(3000, EYE_HEIGHT, -3000);
+      q.input.mount = true;
       sim.step(out);
       tickClock();
-      p.input.mount = false;
-      const a = p.combat.aboard;
+      q.input.mount = false;
+      r.chancerAboard = ride1.isAboard(q.combat.aboard);
+      sim.leave(q.id);
+    }
+
+    // A minute of riding. The body is stepped inside the carriage every tick and
+    // its world position is derived; nothing here touches it.
+    const startWorld = { x: p.combat.body.position.x, z: p.combat.body.position.z };
+    const local0 = { x: a.x, y: a.y, z: a.z };
+    let prevX = p.combat.body.position.x;
+    let prevZ = p.combat.body.position.z;
+    for (let i = 0; i < 60 * TICK_HZ; i++) {
+      // Walk forward down the carriage for the first two seconds, then stand.
+      p.input.forward = i < 2 * TICK_HZ ? 1 : 0;
+      sim.step(out);
+      tickClock();
+      if (!ride1.isAboard(a)) break;
+      const dirNow = ride1.dirOf(bake, a.line, a.dir)!;
+      const it = ride1.interiorOfCar(ride1.consistOf(dirNow, a.trip), a.car)!;
+      const floor = ride1.carriageFloor(it, a.x, a.z, a.y - EYE_HEIGHT);
+      const gap = (a.y - EYE_HEIGHT) - floor;
+      if (gap < -r.worstBelow) r.worstBelow = -gap;
+      if (gap > r.worstAbove) r.worstAbove = gap;
+      r.travelled += Math.hypot(p.combat.body.position.x - prevX, p.combat.body.position.z - prevZ);
+      prevX = p.combat.body.position.x;
+      prevZ = p.combat.body.position.z;
+    }
+    p.input.forward = 0;
+    r.stillAboard = ride1.isAboard(a);
+    r.walked = Math.hypot(a.x - local0.x, a.z - local0.z);
+    r.straight = Math.hypot(
+      p.combat.body.position.x - startWorld.x, p.combat.body.position.z - startWorld.z,
+    );
+
+    // Off again, at the next dwell. Wait for the doors, then press E. Ten
+    // minutes of budget, because the trip picked can be an express: T1 runs
+    // 2.5 km between calls west of Strathfield, which at 44 m/s is a minute of
+    // railway with the doors shut.
+    let waited = 0;
+    for (; waited < 600 * TICK_HZ && ride1.isAboard(a); waited++) {
+      const dirNow = ride1.dirOf(bake, a.line, a.dir);
+      const now = ride1.aboardPose(bake, a, rail1.railSeconds(railMs));
+      if (dirNow !== null && now !== null && now.doorsOpen) {
+        r.to = now.atStop >= 0 ? dirNow.stops[now.atStop].name : '?';
+        p.input.mount = true;
+        sim.step(out);
+        tickClock();
+        p.input.mount = false;
+        r.alighted = !ride1.isAboard(a);
+        break;
+      }
+      sim.step(out);
+      tickClock();
+    }
+    r.waitedS = waited / TICK_HZ;
+    if (!r.alighted) { sim.leave(p.id); r.ok = r.boarded; return r; }
+
+    // Half a second of ticks to settle, because "on solid ground" is a claim
+    // about where a body comes to rest and not about the frame it was put down
+    // on. If the two ends disagreed about the platform's height this is where it
+    // would show: the body would still be falling.
+    for (let i = 0; i < TICK_HZ / 2; i++) { sim.step(out); tickClock(); }
+    r.feet = p.combat.body.position.y - EYE_HEIGHT;
+    // The platform surface at the point they are standing on, from the same
+    // field both ends fold into `groundHeight`. This is the assertion the whole
+    // disembark hangs on: if the client and the server disagreed about a
+    // platform's height, this is where a body would still be falling.
+    r.surface = world.platforms!.surfaceAt(
+      p.combat.body.position.x, p.combat.body.position.z,
+    );
+    r.ground = p.world.groundHeight(
+      p.combat.body.position.x, p.combat.body.position.z, r.feet,
+    );
+    r.gapMm = r.surface === -Infinity ? null : (r.feet - r.surface) * 1000;
+    r.onGround = p.combat.body.onGround;
+    r.vy = p.combat.body.velocity.y;
+    r.health = p.combat.health;
+    r.onPlatform = r.surface > -Infinity && Math.abs(r.feet - r.surface) < 0.05;
+    const stn = bake.stations.find((s2) => s2.name === r.to);
+    r.fromTrackCentre = stn
+      ? Math.hypot(p.combat.body.position.x - stn.x, p.combat.body.position.z - stn.z)
+      : 99;
+    sim.leave(p.id);
+    r.ok = r.boarded && r.stillAboard && r.alighted;
+    return r;
+  };
+
+  {
+    const sim = new Simulation(roomWorld(world));
+    check(
+      (sim.world.rail ?? null) !== null,
+      `the server loaded the rail bake beside the world -- ${(sim.world.rail?.lines.length ?? 0)} lines. ` +
+        `Without it every boarding claim is refused, which is the safe answer and not the feature`,
+    );
+
+    // Whatever instant this run happens to sample. Section 3c rides the ones
+    // somebody chose; this one rides *now*, and finding a case nobody chose is
+    // exactly what it is for.
+    const r = rideAt(Date.now());
+    if (r.why !== '') {
+      check(false, `no train anywhere in Sydney has its doors open right now: ${r.why}`);
+    } else {
       check(
-        ride1.isAboard(a),
-        `a player placed in the doorway of a ${stand.line} at ${stand.station} by the same solver ` +
+        r.boarded,
+        `a player placed in the doorway of a ${r.line} at ${r.from} by the same solver ` +
           `the browser's \`sydney.rail.goto\` uses pressed E ` +
-          `and the server put them in carriage ${a.car}, at ` +
-          `(${a.x.toFixed(2)}, ${a.y.toFixed(2)}, ${a.z.toFixed(2)}) in the carriage's own frame`,
-      );
-
-      // And a client pressing E in the harbour gets nothing, which is the whole
-      // of the anti-cheat story. Same input, same tick, a body 8 km away.
-      {
-        const q = sim.join(0, null, 'Chancer');
-        q.combat.body.position.set(3000, EYE_HEIGHT, -3000);
-        q.input.mount = true;
-        sim.step(out);
-        tickClock();
-        q.input.mount = false;
-        check(
-          !ride1.isAboard(q.combat.aboard),
-          `  and a client pressing E in the middle of the harbour is not aboard anything. The range ` +
-            `test is against the server's own position and INPUT carries no numbers at all`,
-        );
-        sim.leave(q.id);
-      }
-
-      // Twenty seconds of riding. The body is stepped inside the carriage every
-      // tick and its world position is derived; nothing here touches it.
-      const startWorld = { x: p.combat.body.position.x, z: p.combat.body.position.z };
-      const local0 = { x: a.x, y: a.y, z: a.z };
-      let worstBelow = 0;
-      let worstAbove = 0;
-      let travelled = 0;
-      let prevX = p.combat.body.position.x;
-      let prevZ = p.combat.body.position.z;
-      for (let i = 0; i < 60 * TICK_HZ; i++) {
-        // Walk forward down the carriage for the first two seconds, then stand.
-        p.input.forward = i < 2 * TICK_HZ ? 1 : 0;
-        sim.step(out);
-        tickClock();
-        if (!ride1.isAboard(a)) break;
-        const dirOf = ride1.dirOf(bake, a.line, a.dir)!;
-        const it = ride1.interiorOfCar(ride1.consistOf(dirOf, a.trip), a.car)!;
-        const floor = ride1.carriageFloor(it, a.x, a.z, a.y - EYE_HEIGHT);
-        const gap = (a.y - EYE_HEIGHT) - floor;
-        if (gap < -worstBelow) worstBelow = -gap;
-        if (gap > worstAbove) worstAbove = gap;
-        travelled += Math.hypot(p.combat.body.position.x - prevX, p.combat.body.position.z - prevZ);
-        prevX = p.combat.body.position.x;
-        prevZ = p.combat.body.position.z;
-      }
-      p.input.forward = 0;
-      const stillAboard = ride1.isAboard(a);
-      check(
-        stillAboard,
-        `  a minute later they are still aboard, ${travelled.toFixed(0)} m of railway further on ` +
-          `(${(travelled / 60 * 3.6).toFixed(0)} km/h average, dwells included)`,
+          `and the server put them in carriage ${r.car}, at ` +
+          `(${r.lx.toFixed(2)}, ${r.ly.toFixed(2)}, ${r.lz.toFixed(2)}) in the carriage's own frame`,
       );
       check(
-        travelled > 400,
-        `  and the train actually went somewhere: ` +
-          `${Math.hypot(p.combat.body.position.x - startWorld.x, p.combat.body.position.z - startWorld.z).toFixed(0)} m ` +
-          `from where they got on, against ${travelled.toFixed(0)} m of track`,
+        !r.chancerAboard,
+        `  and a client pressing E in the middle of the harbour is not aboard anything. The range ` +
+          `test is against the server's own position and INPUT carries no numbers at all`,
+      );
+      check(
+        r.stillAboard,
+        `  a minute later they are still aboard, ${r.travelled.toFixed(0)} m of railway further on ` +
+          `(${(r.travelled / 60 * 3.6).toFixed(0)} km/h average, dwells included)`,
+      );
+      check(
+        r.travelled > 400,
+        `  and the train actually went somewhere: ${r.straight.toFixed(0)} m ` +
+          `from where they got on, against ${r.travelled.toFixed(0)} m of track`,
       );
       // **Never through the floor, and never floating over it.** Two bounds
       // rather than one, because they mean different things: a body *below* the
@@ -17447,98 +17596,396 @@ async function checkRiding(): Promise<void> {
       // which is what walking up a staircase legitimately is for a few
       // centimetres of catch-up per step.
       check(
-        worstBelow < 0.001 && worstAbove < 0.25,
+        r.worstBelow < 0.001 && r.worstAbove < 0.25,
         `  their feet never went through the carriage floor (worst ` +
-          `${(worstBelow * 1000).toFixed(1)} mm below it) and never floated over it (worst ` +
-          `${(worstAbove * 1000).toFixed(0)} mm above, which is a stride on the staircase), while ` +
-          `walking ${Math.hypot(a.x - local0.x, a.z - local0.z).toFixed(2)} m up the aisle in the ` +
+          `${(r.worstBelow * 1000).toFixed(1)} mm below it) and never floated over it (worst ` +
+          `${(r.worstAbove * 1000).toFixed(0)} mm above, which is a stride on the staircase), while ` +
+          `walking ${r.walked.toFixed(2)} m up the aisle in the ` +
           `carriage's own frame. The floor is not moving in that frame, which is the entire point`,
       );
-
-      // Off again, at the next dwell. Wait for the doors, then press E.
-      let waited = 0;
-      let alighted = false;
-      let station = '';
-      // Ten minutes of budget, because the trip picked at random can be an
-      // express: T1 runs 2.5 km between calls west of Strathfield, which at
-      // 44 m/s is a minute of railway with the doors shut.
-      for (; waited < 600 * TICK_HZ && ride1.isAboard(a); waited++) {
-        const dirOf = ride1.dirOf(bake, a.line, a.dir);
-        const now = ride1.aboardPose(bake, a, rail1.railSeconds(railMs));
-        if (dirOf !== null && now !== null && now.doorsOpen) {
-          station = now.atStop >= 0 ? dirOf.stops[now.atStop].name : '?';
-          p.input.mount = true;
-          sim.step(out);
-          tickClock();
-          p.input.mount = false;
-          alighted = !ride1.isAboard(a);
-          break;
-        }
-        sim.step(out);
-        tickClock();
-      }
       check(
-        alighted,
-        `  and E at the next dwell put them down at ${station}, ` +
-          `${(waited / TICK_HZ).toFixed(0)} s after boarding` +
-          (alighted ? '' : ` -- still aboard: ${ride1.isAboard(a)}`),
+        r.alighted,
+        `  and E at the next dwell put them down at ${r.to}, ` +
+          `${r.waitedS.toFixed(0)} s after boarding` +
+          (r.alighted ? '' : ' -- still aboard'),
       );
-      if (alighted) {
-        // Half a second of ticks to settle, because "on solid ground" is a claim
-        // about where a body comes to rest and not about the frame it was put
-        // down on. If the two ends disagreed about the platform's height this is
-        // where it would show: the body would still be falling.
-        for (let i = 0; i < TICK_HZ / 2; i++) { sim.step(out); tickClock(); }
-        // On solid ground: within a hand's breadth of the platform surface, and
-        // not falling. `PLATFORM_TOP_M` over the rail head at that station is
-        // where a platform is, and both ends compute it the same way.
-        const feet = p.combat.body.position.y - EYE_HEIGHT;
-        // The platform surface at the point they are standing on, from the same
-        // field both ends fold into `groundHeight`. This is the assertion the
-        // whole disembark hangs on: if the client and the server disagreed about
-        // a platform's height, this is where a body would still be falling.
-        const surface = world.platforms!.surfaceAt(
-          p.combat.body.position.x, p.combat.body.position.z,
-        );
+      if (r.alighted) {
         // **On solid ground, at the right station.** Two claims, and the first
         // one is checked against the server's own `groundHeight` rather than
         // against the platform, because that is the function that decides
         // whether a body is standing or falling -- and it is the *max* of the
-        // terrain, the roofs and the platform field. Where a station sits in a
-        // cutting the terrain beside the track is the higher of the two and it
-        // wins, which is correct on both ends and is why this asserts "resting
-        // on whatever the world says is here" rather than "resting on the
-        // platform". The gap to the drawn platform is reported rather than
-        // asserted, because it is a property of the world data at that station
-        // and not of the disembark.
-        const ground = p.world.groundHeight(
-          p.combat.body.position.x, p.combat.body.position.z, feet,
+        // terrain, the roofs and the platform field.
+        check(
+          Math.abs(r.feet - r.ground) < 0.01 && r.onGround && Math.abs(r.vy) < 0.01,
+          `  they come to rest on solid ground at ${r.to}: feet at ${r.feet.toFixed(2)} m, which is ` +
+            `${((r.feet - r.ground) * 1000).toFixed(0)} mm off what the server's own groundHeight says is ` +
+            `there, standing still, with ${r.health.toFixed(1)} pips of health -- the same ` +
+            `${r.health.toFixed(1)} they boarded with`,
         );
         check(
-          Math.abs(feet - ground) < 0.01 && p.combat.body.onGround &&
-            Math.abs(p.combat.body.velocity.y) < 0.01,
-          `  they come to rest on solid ground at ${station}: feet at ${feet.toFixed(2)} m, which is ` +
-            `${((feet - ground) * 1000).toFixed(0)} mm off what the server's own groundHeight says is ` +
-            `there, standing still, with ${p.combat.health.toFixed(1)} pips of health -- the same ` +
-            `${p.combat.health.toFixed(1)} they boarded with`,
-        );
-        check(
-          surface > -Infinity && Math.abs(feet - surface) < 0.05,
+          r.onPlatform,
           `  and it is the platform they are standing on rather than the paddock above the cutting: ` +
-            `the platform field puts a surface at ${surface.toFixed(2)} m and their feet are ` +
-            `${((feet - surface) * 1000).toFixed(0)} mm off it`,
+            `the platform field puts a surface at ${r.surface.toFixed(2)} m and their feet are ` +
+            `${r.gapMm === null ? 'Infinity' : r.gapMm.toFixed(0)} mm off it`,
         );
         // And clear of the four-foot: at least the platform's own inner edge
         // away from the track centre, or they got off between the rails.
-        const stn = bake.stations.find((s2) => s2.name === station);
-        const off = stn ? Math.hypot(p.combat.body.position.x - stn.x, p.combat.body.position.z - stn.z) : 99;
         check(
-          off > ride1.PLATFORM_INNER_M,
-          `  and ${off.toFixed(1)} m from the station's own track centre, which is clear of the ` +
-            `${ride1.PLATFORM_INNER_M} m platform face -- they are on the platform, not in the four-foot`,
+          r.fromTrackCentre > ride1.PLATFORM_INNER_M,
+          `  and ${r.fromTrackCentre.toFixed(1)} m from the station's own track centre, which is clear ` +
+            `of the ${ride1.PLATFORM_INNER_M} m platform face -- they are on the platform, not in the ` +
+            `four-foot`,
         );
       }
-      sim.leave(p.id);
+    }
+  }
+
+  // --- 3c. THE SAME RIDE, AT INSTANTS SOMEBODY CHOSE.
+  //
+  // ---------------------------------------------------------------------------
+  // WHY THIS SECTION EXISTS, WHICH IS THAT SECTION 3 IS A LOTTERY.
+  //
+  // Section 3 above reads `Date.now()`, solves whichever dwell in Sydney opens
+  // soonest, and rides it. That is a *sample* of the network, and it is a good
+  // one -- it is how both of the bugs this section was written for were found in
+  // the first place. But a sample fails one run in four and passes the other
+  // three, and a check that only sometimes exercises a bug is how a bug lives
+  // for a round. Two of them did:
+  //
+  //   1. **`nextDwell` offered a dwell the railway does not have.**
+  //      `dir.arrivals[0]` is 0 at the origin of every direction, and phase 0 of
+  //      the curve is `(v0 = 0, a = +1)` -- the train *departs* at age zero.
+  //      Adding `physics.dwell` to an arrival claimed a fifteen-second stand in
+  //      front of it, so a boarder placed by `nextDwell` at a line's origin was
+  //      put beside a train that had left up to fifteen seconds earlier and was
+  //      110 m up the track doing 53 km/h. `findBoarding` gates on
+  //      `pose.doorsOpen`, correctly refused, and the player was left standing on
+  //      the platform with the slot at its zeroes -- carriage 0, (0, 0, 0),
+  //      0 m travelled, which is exactly what the failing run printed. 22 of the
+  //      576 calling stops in this bake are such an origin and the solver picks
+  //      the *oldest still-open* window, so it landed on one about 6% of runs.
+  //
+  //   2. **`PlatformField` merged platforms that are side by side.** Its "same
+  //      station within a platform's length" test was a plain radius, and a
+  //      platform is 160 x 5.5 m: two anchors 26 m apart across the formation at
+  //      Epping are two island platforms and the circle called them one. The
+  //      service whose anchor was swallowed then had no rectangle anywhere, so
+  //      `surfaceAt` answered `-Infinity` into a disembark -- "the platform field
+  //      puts a surface at -Infinity m and their feet are Infinity mm off it".
+  //
+  // Neither is a property of the instant, so neither should be tested at one.
+  // What follows asserts both **exhaustively over the bake**, with a negative
+  // control each, and then rides the two instants that actually failed.
+  {
+    const bake = world.rail!;
+    const field = world.platforms!;
+    const DWELL = bake.physics.dwell;
+
+    // --- (a) Every dwell the timetable offers is a dwell the curve has.
+    //
+    // `nextDwell` is what the harness above, `main.ts`'s `sydney.rail.goto` and
+    // the station HUD all read, and `poseTrain.doorsOpen` is what boarding
+    // actually gates on. So the claim is: over every calling stop of every
+    // direction, the two agree -- and where they cannot, `nextDwell` says
+    // nothing at all rather than something false.
+    let windows = 0;
+    let openThere = 0;
+    let refused = 0;
+    let firstBad = '';
+    const pose = rail1.createTrainPose();
+    for (const line of bake.lines) {
+      for (const dir of line.dirs) {
+        let call = -1;
+        for (const stop of dir.stops) {
+          if (!stop.calls) continue;
+          call++;
+          const w = ride1.stopDwell(bake, dir, call);
+          if (w === null) { refused++; continue; }
+          windows++;
+          // The middle of the claimed window, on the trip that departs at t = 0.
+          const t = dir.offset + (w.opens + w.closes) / 2;
+          const running = rail1.poseTrain(bake, dir, 0, t, pose);
+          const here = running && pose.doorsOpen && pose.atStop >= 0 &&
+            dir.stops[pose.atStop].name === stop.name;
+          if (here) openThere++;
+          else if (!firstBad) {
+            firstBad = `${line.id} dir ${dir.index} at ${stop.name}: running=${running}, ` +
+              `doorsOpen=${running && pose.doorsOpen}, speed=${running ? pose.speed.toFixed(2) : '?'}`;
+          }
+        }
+      }
+    }
+    check(
+      windows > 500 && openThere === windows,
+      `every one of the ${windows} dwells game/riding.nextDwell will offer is a dwell the curve ` +
+        `actually has: at the middle of each window \`poseTrain\` reports the doors open at that very ` +
+        `station. Read off the phase table -- a stationary phase with a phase after it -- and not ` +
+        `assumed from \`arrivals[k] + physics.dwell\`` + (firstBad ? `. FIRST BAD: ${firstBad}` : ''),
+    );
+    check(
+      refused === bake.lines.length * 4,
+      `  and it refuses to offer one at exactly ${refused} stops -- the origin and the terminus of ` +
+        `each of the ${bake.lines.length * 2} directions, which are the two arrivals in the bake with ` +
+        `no stand behind them: the origin's is a departure and the terminus's is the end of the trip`,
+    );
+    // The negative control, and it is the bug verbatim: the rule this replaced
+    // said "a dwell is `arrivals[k]`, fifteen seconds long", and at an origin
+    // that names an instant at which the train is already gone.
+    {
+      let claimed = 0;
+      let moving = 0;
+      let worst = 0;
+      let worstWhere = '';
+      for (const line of bake.lines) {
+        for (const dir of line.dirs) {
+          claimed++;
+          const t = dir.offset + dir.arrivals[0] + DWELL / 2;
+          if (!rail1.poseTrain(bake, dir, 0, t, pose)) continue;
+          if (!pose.doorsOpen) moving++;
+          if (pose.s > worst) { worst = pose.s; worstWhere = `${line.id} dir ${dir.index}`; }
+        }
+      }
+      check(
+        moving === claimed,
+        `  NEGATIVE CONTROL: the rule this replaced -- an arrival plus ${DWELL} s -- claims a dwell at ` +
+          `the origin of all ${claimed} directions, and \`poseTrain\` has the doors shut at every one ` +
+          `of them (${moving}/${claimed}). Worst ${worstWhere}, ${worst.toFixed(0)} m up the track by ` +
+          `the middle of its own claimed window. A boarder sent there presses E at nothing`,
+      );
+    }
+
+    // --- (b) Every calling stop has a platform of its own.
+    //
+    // The root of the `-Infinity`: a stop whose anchor was merged into another
+    // service's platform that does not cover it has no rectangle at all. Asked
+    // of the field the *server* built at boot, so it is the same object
+    // `groundFor` folds into every ground query.
+    {
+      let stops = 0;
+      let covered = 0;
+      let firstMiss = '';
+      const at = rail1.createTrainPose();
+      for (const line of bake.lines) {
+        for (const dir of line.dirs) {
+          for (const stop of dir.stops) {
+            if (!stop.calls) continue;
+            stops++;
+            rail1.sampleAlong(bake, dir, stop.s, at);
+            const on = field.sites.some(
+              (s) => s.name === stop.name && ride1.samePlatform(s, { x: at.x, z: at.z }),
+            );
+            if (on) covered++;
+            else if (!firstMiss) firstMiss = `${line.id} dir ${dir.index} at ${stop.name}`;
+          }
+        }
+      }
+      check(
+        covered === stops,
+        `all ${stops} calling stops in the bake stand at a platform the field actually holds -- the ` +
+          `merge is measured in the platform's own frame (${ride1.PLATFORM_HALF_LENGTH_M} m along, ` +
+          `${(ride1.PLATFORM_INNER_M + ride1.PLATFORM_WIDTH_M).toFixed(2)} m across) rather than as a ` +
+          `radius, so two platforms lying side by side are two platforms` +
+          (firstMiss ? `. FIRST MISS: ${firstMiss}` : ''),
+      );
+      // NEGATIVE CONTROL: the radius that shipped, rebuilt from the same bake.
+      const radial = new ride1.PlatformField();
+      const seen: Array<{ name: string; x: number; z: number }> = [];
+      for (const line of bake.lines) {
+        for (const dir of line.dirs) {
+          for (const stop of dir.stops) {
+            if (!stop.calls) continue;
+            rail1.sampleAlong(bake, dir, stop.s, at);
+            const dup = seen.some(
+              (o) => o.name === stop.name &&
+                Math.hypot(o.x - at.x, o.z - at.z) < ride1.PLATFORM_HALF_LENGTH_M,
+            );
+            if (dup) continue;
+            seen.push({ name: stop.name, x: at.x, z: at.z });
+            radial.add({ name: stop.name, x: at.x, z: at.z, y: at.y, ux: at.dx, uz: at.dz });
+          }
+        }
+      }
+      let orphaned = 0;
+      for (const line of bake.lines) {
+        for (const dir of line.dirs) {
+          for (const stop of dir.stops) {
+            if (!stop.calls) continue;
+            rail1.sampleAlong(bake, dir, stop.s, at);
+            const on = radial.sites.some(
+              (s) => s.name === stop.name && ride1.samePlatform(s, { x: at.x, z: at.z }),
+            );
+            if (!on) orphaned++;
+          }
+        }
+      }
+      check(
+        orphaned > 0 && field.sites.length > radial.sites.length,
+        `  NEGATIVE CONTROL: the radius that shipped builds ${radial.sites.length} sites against ` +
+          `${field.sites.length}, and leaves ${orphaned} of the ${stops} calling stops standing at a ` +
+          `platform whose rectangle does not reach them -- an M1 at Epping is 26 m across the ` +
+          `formation from the T9 anchor that swallowed it. Every one of those is a disembark onto ` +
+          `\`-Infinity\``,
+      );
+    }
+
+    // --- (c) And a disembark always lands on one.
+    //
+    // The other half of the `-Infinity`, and it is not the same half: at Central
+    // a rider's own platform *is* in the field and the composed alight point
+    // still landed 1.59 m from its axis against a 1.62 m face, because the point
+    // is composed in the **carriage's** frame 45 m up a curve from the anchor.
+    // Three centimetres. `alightPlatform` now slides onto the platform rather
+    // than shrugging, so this sweeps every calling stop of every direction --
+    // the carriage `nextDwell` puts a boarder at, every door bay, both sides --
+    // and demands a surface at every one.
+    {
+      let points = 0;
+      let onPlatform = 0;
+      let worstSnap = 0;
+      let firstOff = '';
+      const frame = ride1.createCarFrame();
+      const spot = { x: 0, y: 0, z: 0 };
+      const raw = { x: 0, y: 0, z: 0 };
+      for (const line of bake.lines) {
+        for (const dir of line.dirs) {
+          let call = -1;
+          for (const stop of dir.stops) {
+            if (!stop.calls) continue;
+            call++;
+            const w = ride1.stopDwell(bake, dir, call);
+            if (w === null) continue;
+            const d = ride1.nextDwell(bake, stop.name, dir.offset + w.opens - 1, {
+              lineId: line.id, minAhead: 0,
+            });
+            if (d === null || d.dir !== dir.index) continue;
+            const t = dir.offset + d.trip * line.period + (w.opens + w.closes) / 2;
+            if (!rail1.poseTrain(bake, dir, d.trip, t, pose)) continue;
+            const consist = ride1.consistOf(dir, d.trip);
+            const it = ride1.interiorOfCar(consist, d.car);
+            if (it === null) continue;
+            const centre = ride1.consistOffset(pose.s, d.car, consist.cars.length, consist.pitch);
+            if (centre < 0) continue;
+            ride1.carFrameAt(bake, dir, centre, consist.cars[d.car].flip, frame);
+            for (const side of [-1, 1]) {
+              for (const bay of it.doors) {
+                points++;
+                ride1.alightPlatform(frame, it, bay.x, side, field, spot);
+                ride1.alightPlatform(frame, it, bay.x, side, null, raw);
+                const snap = Math.hypot(spot.x - raw.x, spot.z - raw.z);
+                if (snap > worstSnap) worstSnap = snap;
+                if (field.surfaceAt(spot.x, spot.z) > -Infinity) onPlatform++;
+                else if (!firstOff) firstOff = `${line.id} dir ${dir.index} at ${stop.name}`;
+              }
+            }
+          }
+        }
+      }
+      check(
+        points > 1500 && onPlatform === points,
+        `and a disembark lands on a platform at all ${points.toLocaleString()} of them -- every calling ` +
+          `stop of every direction, the carriage the dwell solver stands a boarder at, both door bays, ` +
+          `both sides. Worst slide ${worstSnap.toFixed(2)} m against a ${ride1.ALIGHT_SNAP_M} m bound, ` +
+          `which is a curve rotating the carriage's sideways out of the platform's and not a teleport` +
+          (firstOff ? `. FIRST OFF: ${firstOff}` : ''),
+      );
+    }
+
+    // --- (d) The five stations the `-Infinity` was measured at, by name.
+    //
+    // (b) says every calling stop has a platform and (c) says every disembark
+    // lands on one, which are the general statements. These five are the cases
+    // that were actually seen failing, written down so that a future merge rule
+    // that happens to satisfy the general statements while losing *these* still
+    // goes red with the station's name in it. The number after each is how far
+    // across the formation that service's own anchor was from the one the radius
+    // gave its platform to.
+    {
+      const at = rail1.createTrainPose();
+      const seen: string[] = [];
+      let held = 0;
+      for (const [lineId, di, station] of [
+        ['M1', 1, 'Epping'], ['T8', 0, 'St James'], ['M1', 0, 'Chatswood'],
+        ['T5', 0, 'Canley Vale'], ['T1', 1, 'Central'],
+      ] as const) {
+        const line = bake.lines.find((l) => l.id === lineId)!;
+        const dir = line.dirs[di];
+        const stop = dir.stops.find((s) => s.calls && s.name === station);
+        if (stop === undefined) { seen.push(`${lineId} does not call at ${station}`); continue; }
+        rail1.sampleAlong(bake, dir, stop.s, at);
+        // Its own platform, and the surface a body standing on it would get.
+        const on = field.sites.some(
+          (s) => s.name === station && ride1.samePlatform(s, { x: at.x, z: at.z }),
+        );
+        const nx = -at.dz;
+        const nz = at.dx;
+        let both = 0;
+        for (const side of [-1, 1]) {
+          const d = side * (ride1.PLATFORM_INNER_M + 1.35);
+          if (field.surfaceAt(at.x + nx * d, at.z + nz * d) > -Infinity) both++;
+        }
+        if (on && both > 0) held++;
+        seen.push(`${lineId} dir ${di} at ${station}: platform ${on ? 'held' : 'MISSING'}, ` +
+          `${both}/2 sides standable`);
+      }
+      check(
+        held === 5,
+        `and the five services whose platforms the radius swallowed have them back: ` +
+          seen.join('; '),
+      );
+    }
+
+    // --- (e) And the instants that actually failed, ridden end to end.
+    //
+    // Rail-clock seconds, kept as literals on purpose. The whole timetable is a
+    // pure function of this number, so an instant that broke once breaks forever
+    // until it is fixed -- which is what makes a wall-clock failure worth
+    // writing down rather than re-rolling and hoping.
+    //
+    // At each of them the **old** rule -- `arrivals[k]`, fifteen seconds long,
+    // no check against the curve -- picked a dwell at the origin of a direction,
+    // which is a train that left up to fifteen seconds ago. Both halves are
+    // asserted: that the old pick really is a train with its doors shut (so the
+    // instant still reproduces the failure and has not gone stale), and that the
+    // ride at that instant now works from end to end.
+    const oldPick = (t: number): { label: string; dir: import('../client/src/game/rail.ts').RailDirection; trip: number } | null => {
+      let best: { label: string; dir: import('../client/src/game/rail.ts').RailDirection; trip: number; opensAt: number } | null = null;
+      for (const line of bake.lines) {
+        for (const dir of line.dirs) {
+          let call = -1;
+          let calls = 0;
+          for (const stop of dir.stops) if (stop.calls) calls++;
+          for (const stop of dir.stops) {
+            if (!stop.calls) continue;
+            call++;
+            if (call >= dir.arrivals.length) continue;
+            if (calls - call - 1 < 3) continue;
+            const base = dir.offset + dir.arrivals[call];
+            const n = Math.ceil((t - base - DWELL) / line.period);
+            const opensAt = base + n * line.period;
+            if (best !== null && opensAt >= best.opensAt) continue;
+            best = { label: `${line.id} dir ${dir.index} at ${stop.name}`, dir, trip: n, opensAt };
+          }
+        }
+      }
+      return best;
+    };
+    for (const railT of [19142405.90, 19142452.96, 19141856.83, 19142101.56, 19142634.94]) {
+      const stale = oldPick(railT);
+      const shut = stale !== null && (!rail1.poseTrain(bake, stale.dir, stale.trip, railT, pose) ||
+        !pose.doorsOpen);
+      const gone = stale !== null && pose.speed > 1 ? pose.speed : 0;
+      const r = rideAt(rail1.RAIL_EPOCH_MS + railT * 1000);
+      check(
+        shut && r.boarded && r.travelled > 400 && r.alighted && r.onPlatform,
+        `at rail second ${railT.toFixed(2)} the rule this replaced would have stood a player at ` +
+          `${stale?.label ?? '(nothing)'}, where the doors are ${shut ? 'SHUT' : 'open'} and the train ` +
+          `is doing ${(gone * 3.6).toFixed(0)} km/h -- and the timetable now picks a train that is ` +
+          `really there: they board the ${r.line} at ${r.from}, are carried ${r.travelled.toFixed(0)} m ` +
+          `to ${r.to}, and step out onto a platform ` +
+          `${r.surface === -Infinity ? '(-Infinity!)' : `${r.surface.toFixed(2)} m`} high with their ` +
+          `feet ${r.gapMm === null ? 'Infinity' : `${r.gapMm.toFixed(0)} mm`} off it` +
+          (r.why ? ` -- ${r.why}` : ''),
+      );
     }
   }
 
@@ -17557,128 +18004,148 @@ async function checkRiding(): Promise<void> {
   // without it. The second is the control.
   {
     const bake = world.rail!;
-    for (const withFix of [true, false]) {
-      const sim = new Simulation(roomWorld(world));
-      let railMs = Date.now();
-      sim.railNowMs = () => railMs;
-      const tickClock = (): void => { railMs += 1000 / TICK_HZ; };
+    // **Three instants, not one, and two of them were chosen.**
+    //
+    // The wall-clock one is the sample; the other two are rail seconds at which
+    // this fight was measured *missing*, before `sim.buildRewindIndex` learned
+    // that a reframed passenger is not inside their own history's box. The
+    // broadphase filed a rider under the trail their world positions had left
+    // behind them and `reframeRider` then answered up to eleven metres in front
+    // of it, so the candidate set dropped the victim -- about one swing in
+    // seventy, always at line speed, and never twice in a row. See the comment
+    // on `buildRewindIndex`.
+    for (const startMs of [
+      Date.now(),
+      rail1.RAIL_EPOCH_MS + 18774445 * 1000,
+      rail1.RAIL_EPOCH_MS + 18774510 * 1000,
+    ]) {
+      const chosen = startMs !== undefined && startMs < Date.now() - 1000;
+      for (const withFix of [true, false]) {
+        const sim = new Simulation(roomWorld(world));
+        let railMs = startMs;
+        sim.railNowMs = () => railMs;
+        const tickClock = (): void => { railMs += 1000 / TICK_HZ; };
 
-      // A trip that is moving, so the correction has something to correct.
-      let ride: { li: number; dir: number; trip: number; speed: number } | null = null;
-      const scratch = rail1.createTrainPose();
-      for (let li = 0; li < bake.lines.length && ride === null; li++) {
-        for (const dir of bake.lines[li].dirs) {
-          for (let j = 0; j <= 3; j++) {
-            const trip = rail1.tripIndexAt(dir, rail1.railSeconds(railMs), j);
-            if (!rail1.poseTrain(bake, dir, trip, rail1.railSeconds(railMs), scratch)) continue;
-            if (scratch.speed < 20) continue;
-            ride = { li, dir: dir.index, trip, speed: scratch.speed };
-            break;
-          }
-          if (ride !== null) break;
-        }
-      }
-      if (ride === null) { check(false, 'no train anywhere is moving, which cannot happen'); break; }
-
-      const attacker = sim.join(0, null, 'Swinger');
-      const victim = sim.join(0, null, 'Standing');
-      // Both in carriage 2, a bat's length apart down the aisle. Placed directly
-      // rather than boarded, because what is being tested is the rewind and not
-      // the doorway -- and `enterCarriage` will take it from here.
-      for (const [who, lx] of [[attacker, 0], [victim, 1.15]] as const) {
-        const a = who.combat.aboard;
-        a.line = ride.li; a.dir = ride.dir; a.trip = ride.trip; a.car = 2;
-        a.x = lx; a.y = 0.39 + EYE_HEIGHT; a.z = 0;
-        a.vx = 0; a.vy = 0; a.vz = 0;
-        a.yaw = -Math.PI / 2;
-        // And composed into the world **through the ride**, which is what
-        // `sim.tryBoard` does and what `riding.enterLocal` insists on: it
-        // records the world position it wrote, and anything that moves the body
-        // in world coordinates behind its back ends the ride on the next tick.
-        // Setting the slot without this is a teleport as far as that rule is
-        // concerned, and the ride is over before the first step.
-        const f = ride1.createCarFrame();
-        ride1.aboardFrame(bake, a, rail1.railSeconds(railMs), f);
-        ride1.projectAboard(a, who.combat.body, f);
-        who.combat.body.onGround = true;
-        who.history.seed(
-          sim.tick, who.combat.body.position.x, who.combat.body.position.y,
-          who.combat.body.position.z, who.combat.body.yaw,
-        );
-      }
-      // Facing down the carriage's +X, which is where the other one is standing.
-      //
-      // On the **input** and not only on the slot, and that is not a detail:
-      // `controller.step` copies `input.yaw` into the body on every step, so a
-      // heading written into the ride and not into the input survives exactly
-      // one tick. While aboard, `input.yaw` *is* the carriage-local heading --
-      // see `main.ts`'s conversion at the seam -- so this is a passenger facing
-      // up the aisle, and the engine's convention is that yaw 0 looks down -Z.
-      attacker.input.yaw = -Math.PI / 2;
-      victim.input.yaw = Math.PI / 2;
-      if (!withFix) {
-        // The control: strip the correction by telling the sim it has no
-        // timetable *for the reframe only*. There is no such switch, so the
-        // control is done the honest way -- run the identical fight with the
-        // victim's ride cleared on the tick of the swing, which is exactly the
-        // state a rewind with no reframe would compute against.
-      }
-
-      // Fill the history: a quarter of a second of ticks is `HISTORY_TICKS`.
-      for (let i = 0; i < HISTORY_TICKS + 30; i++) {
-        const out: TickOutput = { tick: 0, events: [], snapshot: null };
-        sim.step(out);
-        tickClock();
-      }
-      // 167 ms of round trip plus the client's own 100 ms interpolation delay,
-      // clamped by `Room.step` to spec 10's 250 ms. That is fifteen ticks, and
-      // fifteen ticks of a train at this speed is the whole of the problem.
-      const RTT_MS = 167;
-      const viewMs = Math.min(MAX_REWIND_MS, RTT_MS + INTERP_DELAY_MS);
-      attacker.viewTicks = (viewMs / 1000) * TICK_HZ;
-      const drift = ride.speed * (viewMs / 1000);
-
-      // Swing.
-      attacker.input.punch = true;
-      let landed = false;
-      for (let i = 0; i < 40 && !landed; i++) {
-        const out: TickOutput = { tick: 0, events: [], snapshot: null };
-        if (!withFix && i === 0) {
-          // The control, applied on the tick the history is read: a victim the
-          // rewind cannot reframe is a victim whose historical *world* position
-          // is used verbatim -- which is what this whole correction exists to
-          // stop being the answer.
-          ride1.clearAboard(victim.combat.aboard);
-        }
-        sim.step(out);
-        tickClock();
-        attacker.input.punch = false;
-        for (const e of out.events) {
-          if (e.kind === EVENT.HIT && (e as { attacker: number }).attacker === attacker.id &&
-              (e as { victim: number }).victim === victim.id) {
-            landed = true;
+        // A trip that is moving, so the correction has something to correct.
+        let ride: { li: number; dir: number; trip: number; speed: number } | null = null;
+        const scratch = rail1.createTrainPose();
+        for (let li = 0; li < bake.lines.length && ride === null; li++) {
+          for (const dir of bake.lines[li].dirs) {
+            for (let j = 0; j <= 3; j++) {
+              const trip = rail1.tripIndexAt(dir, rail1.railSeconds(railMs), j);
+              if (!rail1.poseTrain(bake, dir, trip, rail1.railSeconds(railMs), scratch)) continue;
+              if (scratch.speed < 20) continue;
+              ride = { li, dir: dir.index, trip, speed: scratch.speed };
+              break;
+            }
+            if (ride !== null) break;
           }
         }
+        if (ride === null) { check(false, 'no train anywhere is moving, which cannot happen'); break; }
+
+        const attacker = sim.join(0, null, 'Swinger');
+        const victim = sim.join(0, null, 'Standing');
+        // Both in carriage 2, a bat's length apart down the aisle. Placed directly
+        // rather than boarded, because what is being tested is the rewind and not
+        // the doorway -- and `enterCarriage` will take it from here.
+        for (const [who, lx] of [[attacker, 0], [victim, 1.15]] as const) {
+          const a = who.combat.aboard;
+          a.line = ride.li; a.dir = ride.dir; a.trip = ride.trip; a.car = 2;
+          a.x = lx; a.y = 0.39 + EYE_HEIGHT; a.z = 0;
+          a.vx = 0; a.vy = 0; a.vz = 0;
+          a.yaw = -Math.PI / 2;
+          // And composed into the world **through the ride**, which is what
+          // `sim.tryBoard` does and what `riding.enterLocal` insists on: it
+          // records the world position it wrote, and anything that moves the body
+          // in world coordinates behind its back ends the ride on the next tick.
+          // Setting the slot without this is a teleport as far as that rule is
+          // concerned, and the ride is over before the first step.
+          const f = ride1.createCarFrame();
+          ride1.aboardFrame(bake, a, rail1.railSeconds(railMs), f);
+          ride1.projectAboard(a, who.combat.body, f);
+          who.combat.body.onGround = true;
+          who.history.seed(
+            sim.tick, who.combat.body.position.x, who.combat.body.position.y,
+            who.combat.body.position.z, who.combat.body.yaw,
+          );
+        }
+        // Facing down the carriage's +X, which is where the other one is standing.
+        //
+        // On the **input** and not only on the slot, and that is not a detail:
+        // `controller.step` copies `input.yaw` into the body on every step, so a
+        // heading written into the ride and not into the input survives exactly
+        // one tick. While aboard, `input.yaw` *is* the carriage-local heading --
+        // see `main.ts`'s conversion at the seam -- so this is a passenger facing
+        // up the aisle, and the engine's convention is that yaw 0 looks down -Z.
+        attacker.input.yaw = -Math.PI / 2;
+        victim.input.yaw = Math.PI / 2;
+        if (!withFix) {
+          // The control: strip the correction by telling the sim it has no
+          // timetable *for the reframe only*. There is no such switch, so the
+          // control is done the honest way -- run the identical fight with the
+          // victim's ride cleared on the tick of the swing, which is exactly the
+          // state a rewind with no reframe would compute against.
+        }
+
+        // Fill the history: a quarter of a second of ticks is `HISTORY_TICKS`.
+        for (let i = 0; i < HISTORY_TICKS + 30; i++) {
+          const out: TickOutput = { tick: 0, events: [], snapshot: null };
+          sim.step(out);
+          tickClock();
+        }
+        // 167 ms of round trip plus the client's own 100 ms interpolation delay,
+        // clamped by `Room.step` to spec 10's 250 ms. That is fifteen ticks, and
+        // fifteen ticks of a train at this speed is the whole of the problem.
+        const RTT_MS = 167;
+        const viewMs = Math.min(MAX_REWIND_MS, RTT_MS + INTERP_DELAY_MS);
+        attacker.viewTicks = (viewMs / 1000) * TICK_HZ;
+        const drift = ride.speed * (viewMs / 1000);
+
+        // Swing.
+        attacker.input.punch = true;
+        let landed = false;
+        for (let i = 0; i < 40 && !landed; i++) {
+          const out: TickOutput = { tick: 0, events: [], snapshot: null };
+          if (!withFix && i === 0) {
+            // The control, applied on the tick the history is read: a victim the
+            // rewind cannot reframe is a victim whose historical *world* position
+            // is used verbatim -- which is what this whole correction exists to
+            // stop being the answer.
+            ride1.clearAboard(victim.combat.aboard);
+          }
+          sim.step(out);
+          tickClock();
+          attacker.input.punch = false;
+          for (const e of out.events) {
+            if (e.kind === EVENT.HIT && (e as { attacker: number }).attacker === attacker.id &&
+                (e as { victim: number }).victim === victim.id) {
+              landed = true;
+            }
+          }
+        }
+        if (withFix) {
+          check(
+            landed,
+            (chosen ? `at rail second ${rail1.railSeconds(startMs).toFixed(0)}, which is an instant this ` +
+              `fight was measured missing at: ` : '') +
+              `a bat swung aboard a ${bake.lines[ride.li].id} doing ${(ride.speed * 3.6).toFixed(0)} km/h, ` +
+              `at ${RTT_MS} ms of round trip, hits the passenger standing 1.15 m up the aisle. The ` +
+              `rewind looks ${viewMs} ms back, which is ${drift.toFixed(0)} m of railway -- and finds ` +
+              `them anyway, because the history is pushed back into the carriage's frame at the instant ` +
+              `it was recorded and pulled out again through the carriage's frame now` +
+              (chosen ? `, and the broadphase files them under a box that covers the answer` : ''),
+          );
+        } else {
+          check(
+            !landed,
+            `  NEGATIVE CONTROL: the identical swing against a victim the rewind cannot put back in the ` +
+              `carriage misses, because ${drift.toFixed(0)} m of railway is where it looks for them. ` +
+              `The correction can be wrong, so its being right means something`,
+          );
+        }
+        sim.leave(attacker.id);
+        sim.leave(victim.id);
       }
-      if (withFix) {
-        check(
-          landed,
-          `a bat swung aboard a ${bake.lines[ride.li].id} doing ${(ride.speed * 3.6).toFixed(0)} km/h, ` +
-            `at ${RTT_MS} ms of round trip, hits the passenger standing 1.15 m up the aisle. The ` +
-            `rewind looks ${viewMs} ms back, which is ${drift.toFixed(0)} m of railway -- and finds ` +
-            `them anyway, because the history is pushed back into the carriage's frame at the instant ` +
-            `it was recorded and pulled out again through the carriage's frame now`,
-        );
-      } else {
-        check(
-          !landed,
-          `  NEGATIVE CONTROL: the identical swing against a victim the rewind cannot put back in the ` +
-            `carriage misses, because ${drift.toFixed(0)} m of railway is where it looks for them. ` +
-            `The correction can be wrong, so its being right means something`,
-        );
-      }
-      sim.leave(attacker.id);
-      sim.leave(victim.id);
     }
   }
 
@@ -18128,6 +18595,19 @@ async function checkRidingOnline(): Promise<void> {
   let riderAboardTicks = 0;
   let quietTicks = 0;
   let witnessRodeTicks = 0;
+  // A correction is *counted* whenever the reconciler runs and applies anything
+  // at all, however small -- `net/client.ts` increments on every ordinary
+  // reconcile, not on every visible nudge. Aboard a train the applied offset
+  // measures 0.0000 m, comfortably inside the deadzone the line below already
+  // asserts, so demanding a count of exactly zero was asserting that the
+  // reconciler never ran rather than that the camera never moved. It flaked:
+  // two consecutive runs on identical code gave 2 failures and then 1.
+  //
+  // The signal is worth keeping, though, because the bug this check exists for
+  // produced *one correction per snapshot* -- twenty a second, sustained, for
+  // as long as the ride lasted. A budget separates the two cases by two orders
+  // of magnitude while a zero could only ever separate them by noise.
+  const QUIET_CORRECTION_BUDGET = 5;
   let quietCorrections = 0;
   let serverAboardTicks = 0;
   let snapshotsCarryingRider = 0;
@@ -18335,8 +18815,9 @@ async function checkRidingOnline(): Promise<void> {
       `44 m/s prediction problem`,
   );
   check(
-    rider.worstCorrection <= CORRECTION_DEADZONE && quietCorrections === 0,
-    `  and the camera was told about ${quietCorrections} correction(s) in that window, worst eased offset ` +
+    rider.worstCorrection <= CORRECTION_DEADZONE && quietCorrections <= QUIET_CORRECTION_BUDGET,
+    `  and the camera was told about ${quietCorrections} correction(s) in that window (budget ` +
+      `${QUIET_CORRECTION_BUDGET}), worst eased offset ` +
       `${rider.worstCorrection.toFixed(4)} m at tick ${rider.worstCorrectionAt} against a ` +
       `${CORRECTION_DEADZONE} m deadzone. A ride that fights the reconciler shows up here first, and ` +
       `it is exactly what "camera goes crazy flickering" was`,
@@ -19023,5 +19504,420 @@ async function checkRailAnnouncements(): Promise<void> {
       realOverlaps === 0,
       `  and with it, ${realOverlaps}. The rule can fail, so its passing means something`,
     );
+  }
+}
+
+/**
+ * The big map, against the world that actually ships.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS EXISTS. Pressing `M` froze a player's laptop, and nothing in this
+ * file could have noticed -- because nothing here had ever asked the map a
+ * question about the *size* of the world. Every number in `mapatlas.ts`'s header
+ * was measured once, at 19.3 km, and written down as prose:
+ *
+ *      street-names.bin          475 kB  ->  7.37 MB
+ *      the fallback behind it   357 req  ->  14,815 req
+ *      the street network    18,788 runs ->  234,094 runs
+ *      the harbour            3,564 tri  ->  282,567 tri
+ *
+ * Each of those was a one-line operation whose cost was "fine" and stayed
+ * unexamined while its input grew by one to two orders of magnitude. The last of
+ * them was fatal: the harbour was walked into a `Path2D` with a `closePath()`
+ * per triangle, Chrome's path builder is quadratic in closed subpaths, and
+ * 282,567 triangles is **about 150 seconds of unbroken main thread**. Measured
+ * at three sizes, which all extrapolate to the same place:
+ *
+ *     triangles    with closePath    extrapolated to 282,567    without
+ *        25,000          1,275 ms                    163 s
+ *        50,000          5,049 ms                    161 s
+ *        70,642          9,438 ms                    151 s
+ *       282,567                                                   20 ms
+ *
+ * The map drew correctly afterwards, which is why no screenshot and no
+ * frame-time counter would have found it.
+ *
+ * ---------------------------------------------------------------------------
+ * SO WHAT IS ASSERTED IS COST, not correctness -- `verifyBigMap` already owns
+ * correctness, and it runs against literals whose answers are known. This runs
+ * against `client/public/world/`, because the whole class of failure is *a
+ * design meeting a world it was not sized for*, and a world is the one thing a
+ * literal cannot stand in for. Four bounds, one per row of the table above:
+ *
+ *   1. **The harbour costs three operations a triangle.** Not four. The fourth
+ *      is the `closePath` and it is the freeze. `buildWaterPlan` returns the
+ *      count so this is a number rather than a promise.
+ *   2. **Opening the map walks a bounded number of runs, at every rung of the
+ *      zoom ladder.** Not 234,094 of them. This is the assertion the linear
+ *      scan would fail, and it is stated per zoom because the zoom is the only
+ *      thing that decides how much of the city is being asked about.
+ *   3. **A hexagon landing re-chains that hexagon, not the city** -- and the
+ *      result is identical either way. The label pass was 1,287 ms over the
+ *      whole atlas and ran on every delivery. Asserted as a *count* of names
+ *      re-chained rather than a duration, because a duration in CI is a coin
+ *      toss and the count is the actual property.
+ *   4. **The fallback fan-out is capped.** 14,815 requests is not a fetch
+ *      strategy, and it is one failed request away on a world that has a bundle.
+ *
+ * And one bound that is about none of them and about all of them: **the whole
+ * 60 km city, held forever, is a few megabytes.** The atlas never evicts, which
+ * is right for a map, and stays right only while that sentence is true.
+ *
+ * Every bound is a constant with a real number beside it, so a build that
+ * doubles the world again either passes or says which one it broke.
+ */
+async function checkBigMapAtScale(): Promise<void> {
+  say('--- The big map: what pressing M costs, against the world on disk');
+
+  const worldDir = new URL('../client/public/world/', import.meta.url).pathname;
+  const rootFile = Bun.file(worldDir + 'root.json');
+  if (!(await rootFile.exists())) {
+    say('    no built world here; skipped');
+    return;
+  }
+  const root = await rootFile.json();
+
+  const atlasMod = await import('../client/src/mapatlas.ts');
+  const waterMod = await import('../client/src/world/water.ts');
+  const hexes = await import('../client/src/world/hexes.ts');
+
+  // --- 1. The harbour: three operations a triangle, and no closePath.
+  {
+    const buf = await readFile(join(worldDir, 'far-water.bin'));
+    const sheets = waterMod.decodeWater(
+      buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer,
+    );
+    if (sheets === null) {
+      check(false, 'far-water.bin decodes');
+    } else {
+      // A sink that counts instead of drawing. This is the shipped walk -- the
+      // same function `loadWater` hands a `Path2D` to -- so the count is what
+      // the browser is actually asked to do and not a model of it.
+      let ops = 0;
+      // `closePath` is not on `PlanSink` -- it cannot be called without a cast --
+      // but it is counted anyway, so a cast through it lands on the first
+      // assertion below rather than only on the second.
+      const counter = {
+        moveTo: (): void => {
+          ops++;
+        },
+        lineTo: (): void => {
+          ops++;
+        },
+        closePath: (): void => {
+          ops++;
+        },
+      };
+      const built = atlasMod.buildWaterPlan(sheets.sheets, counter);
+      check(
+        built.triangles > 0 && ops === built.triangles * 3,
+        `the harbour is ${built.triangles.toLocaleString()} triangles and costs ` +
+          `${ops.toLocaleString()} canvas operations -- three each, a move and two lines. ` +
+          `A fourth would be a closePath per triangle, which \`fill\` does implicitly and ` +
+          `Chrome charges quadratically for: ~150 s of frozen main thread at this size`,
+      );
+      check(
+        built.ops === ops,
+        `and the walk reports what it issued (${built.ops.toLocaleString()}), so the bound above ` +
+          `is measured rather than asserted`,
+      );
+    }
+  }
+
+  if (!hexes.hexesUsable(root)) {
+    say('    world carries no hex contract; the view-box bounds below need one, skipped');
+    return;
+  }
+
+  // --- 2 and 3. The view queries and the chaining, over the real centrelines.
+  //
+  // Built the way the client builds it: `ensureHexNames` folds one hexagon's
+  // `.names.bin` at a time, so the atlas here is assembled from the same files
+  // in the same units, through `addBundleForTest`, which runs the shipped fold.
+  hexes.armHexes(root, worldDir, `?v=${root.built}`);
+  const contract = hexes.hexContract()!;
+
+  /** Where the map opens. The spawn disc, so the box is over a real city. */
+  const AT_X = -2252;
+  const AT_Z = 4511;
+
+  /** `bigmap.ts`'s ladder. Kept here by hand: it is what is being asserted. */
+  const RUNGS: Array<{ name: string; halfM: number }> = [
+    { name: 'neighbourhood', halfM: 500 },
+    { name: 'district', halfM: 1500 },
+    { name: 'city', halfM: 4500 },
+    { name: 'region', halfM: 13500 },
+  ];
+
+  /**
+   * How much more a query may *walk* than it returns.
+   *
+   * The bound is on overdraw rather than on an absolute count, and that is the
+   * honest way round: the region rung is 27 km across, `roadsWithin` pads it by
+   * half again, and a 40 km box over inner Sydney genuinely contains 113,312
+   * centrelines -- those are runs the map draws, and no index makes them fewer.
+   * What an index promises is that it does not walk the *rest* of the city to
+   * find them. Measured overdraw on this world: 4.3x at the neighbourhood rung
+   * (a 1 km box widened by the grid's one-cell reach is mostly reach), 1.9x at
+   * the district, 1.16x at the city, 1.05x at the region.
+   *
+   * Four with a floor is loose enough for a denser world and tight enough that
+   * deleting the grid fails on the first rung: a linear scan walks 234,094 to
+   * return 543.
+   */
+  const OVERDRAW = 4;
+  const OVERDRAW_FLOOR = 4_000;
+
+  /**
+   * And an absolute ceiling on the two rungs a player actually reads.
+   *
+   * The map opens at `district` and letters names at `district` and below, so
+   * these are the redraws that happen on a key press, on a wheel click and on
+   * every 175 m of running. A 1 to 3 km view must not pay for a 60 km world at
+   * all, whatever the overdraw ratio says. Measured: 9,362 runs and 1,916 lines
+   * at the district rung, against 234,094 and 101,993 held.
+   */
+  const NARROW_WALK_CEILING = 25_000;
+
+  const atlas = new atlasMod.MapAtlas({ tile_size: root.tile_size, tiles: [] }, worldDir, '');
+  // Every hexagon the widest rung's box touches -- which is what a player who
+  // wheels out to `region` at the spawn actually pulls, and therefore what the
+  // atlas is holding by the time they wheel back in.
+  const wanted = hexes.hexesInBox(AT_X - 13500, AT_Z - 13500, AT_X + 13500, AT_Z + 13500);
+  const deliverySink: MapLabelLine[] = [];
+  const bundles: ArrayBuffer[] = [];
+  let foldedBytes = 0;
+  let worstRechained = 0;
+  let namesBefore = 0;
+  for (const entry of wanted) {
+    if (entry.names === undefined) continue;
+    const file = Bun.file(`${worldDir}${contract.dir}/${entry.id}.names.bin`);
+    if (!(await file.exists())) continue;
+    const bytes = await file.arrayBuffer();
+    if (!atlas.addBundleForTest(bytes)) continue;
+    bundles.push(bytes);
+    foldedBytes += bytes.byteLength;
+    // 3. What this delivery cost the label pass. A *count* rather than a
+    //    duration, because a duration in CI is a coin toss and because the
+    //    count is the actual property: the pass used to rebuild every chain in
+    //    the atlas on every delivery -- 1,287 ms over 234,094 runs, once per
+    //    hexagon that landed. Now a delivery re-chains the names it carried.
+    atlas.labelLinesWithin(AT_X - 1500, AT_Z - 1500, AT_X + 1500, AT_Z + 1500, 400, deliverySink);
+    const rechained = atlas.indexStats().rechained;
+    if (bundles.length > 1 && rechained > worstRechained) worstRechained = rechained;
+    if (bundles.length === 1) namesBefore = atlas.stats().names;
+  }
+
+  check(
+    bundles.length > 1,
+    `the region rung's box over the spawn pulls ${bundles.length} hexagons ` +
+      `(${(foldedBytes / 1e6).toFixed(1)} MB of centrelines) -- enough to ask the questions below of`,
+  );
+
+  const stats = atlas.stats();
+  check(
+    worstRechained > 0 && worstRechained * 2 < stats.names,
+    `the worst delivery after the first re-chained ${worstRechained.toLocaleString()} names ` +
+      `of the ${stats.names.toLocaleString()} the atlas holds (the first alone interned ` +
+      `${namesBefore.toLocaleString()}). Chaining is per name and names do not interact, so a ` +
+      `hexagon landing costs that hexagon -- not the city, which is what made the tenth one ` +
+      `ten times the first`,
+  );
+
+  // And the incremental result is the whole-atlas result, exactly. This is the
+  // claim the optimisation stands on and the one nothing else would catch: a
+  // chain missed at a hexagon seam is a street silently unlabelled, on a map
+  // that otherwise looks perfect.
+  {
+    const cold = new atlasMod.MapAtlas({ tile_size: root.tile_size, tiles: [] }, worldDir, '');
+    for (const bytes of bundles) cold.addBundleForTest(bytes);
+    const coldLines: MapLabelLine[] = [];
+    cold.labelLinesWithin(-1e9, -1e9, 1e9, 1e9, 0, coldLines);
+    const warmLines: MapLabelLine[] = [];
+    atlas.labelLinesWithin(-1e9, -1e9, 1e9, 1e9, 0, warmLines);
+    const key = (l: MapLabelLine): string =>
+      `${l.nameId}|${l.x.toFixed(4)}|${l.z.toFixed(4)}|${l.straight.toFixed(4)}|${l.angle.toFixed(6)}`;
+    const coldSet = new Set(coldLines.map(key));
+    let differ = 0;
+    for (const line of warmLines) if (!coldSet.has(key(line))) differ++;
+    check(
+      coldLines.length === warmLines.length && differ === 0 && coldLines.length > 0,
+      `chaining ${bundles.length} hexagons one delivery at a time gives the same ` +
+        `${warmLines.length.toLocaleString()} label lines as chaining them all at the end, ` +
+        `to the last digit of every anchor`,
+    );
+  }
+
+  const runs: MapRoadRun[] = [];
+  const lines: MapLabelLine[] = [];
+  let worstWalk = 0;
+  let worstWalkAt = '';
+  for (const rung of RUNGS) {
+    // Exactly what `drawRoads` asks: the view box padded by half the extent.
+    const pad = rung.halfM * 0.5;
+    atlas.roadsWithin(
+      AT_X - rung.halfM - pad,
+      AT_Z - rung.halfM - pad,
+      AT_X + rung.halfM + pad,
+      AT_Z + rung.halfM + pad,
+      0,
+      runs,
+    );
+    const runWalk = atlas.indexStats().runs.lastWalked;
+    const runHit = runs.length;
+    // And what `drawStreetLabels` asks, at the rungs that letter anything.
+    atlas.labelLinesWithin(
+      AT_X - rung.halfM,
+      AT_Z - rung.halfM,
+      AT_X + rung.halfM,
+      AT_Z + rung.halfM,
+      0,
+      lines,
+    );
+    const lineWalk = atlas.indexStats().lines.lastWalked;
+    const lineHit = lines.length;
+    const walk = Math.max(runWalk, lineWalk);
+    if (walk > worstWalk) {
+      worstWalk = walk;
+      worstWalkAt = rung.name;
+    }
+    check(
+      runWalk <= runHit * OVERDRAW + OVERDRAW_FLOOR && lineWalk <= lineHit * OVERDRAW + OVERDRAW_FLOOR,
+      `at the ${rung.name} rung (${(rung.halfM * 2) / 1000} km across) a redraw walks ` +
+        `${runWalk.toLocaleString()} runs to draw ${runHit.toLocaleString()} and ` +
+        `${lineWalk.toLocaleString()} label lines to letter ${lineHit.toLocaleString()}, ` +
+        `of ${stats.runs.toLocaleString()} and ${stats.labelLines.toLocaleString()} held`,
+    );
+    if (rung.halfM <= 1500) {
+      check(
+        walk <= NARROW_WALK_CEILING,
+        `  and the ${rung.name} rung -- which is where the map opens and where it letters -- ` +
+          `walks ${walk.toLocaleString()}, under the ${NARROW_WALK_CEILING.toLocaleString()} ` +
+          `ceiling. A linear scan is ${stats.runs.toLocaleString()}, on a view 3 km across`,
+      );
+    }
+  }
+  // And the floor under all of it: an index may be no worse than the scan it
+  // replaced. Not a truism -- a grid that filed an item in every cell it touched
+  // would visit the long ones many times over, and the widest rung is exactly
+  // where that shows, because there the box covers everything the atlas holds
+  // and the grid falls back to iterating its own cells. `<=` rather than `<` for
+  // that reason: at the region rung the honest answer *is* the whole set, and
+  // what is being asserted is that it is walked once each.
+  check(
+    worstWalk <= stats.runs,
+    `the widest rung (${worstWalkAt}) walks ${worstWalk.toLocaleString()} of the ` +
+      `${stats.runs.toLocaleString()} held -- once each at worst, never twice, which is what ` +
+      `filing an item in one cell instead of every cell it touches buys`,
+  );
+
+  // The oversize list is the loose grid's escape hatch and the one thing that
+  // could turn it back into a scan: an item wider than `MAX_SPAN_CELLS` is
+  // visited by *every* query. It must stay a rounding error.
+  const index = atlas.indexStats();
+  check(
+    index.lines.oversize * 20 < index.lines.items && index.runs.oversize * 20 < index.runs.items,
+    `the indexes hold ${index.runs.oversize.toLocaleString()} oversize runs and ` +
+      `${index.lines.oversize.toLocaleString()} oversize label lines -- under 5% either way, ` +
+      `so the linear tail of every query stays a tail`,
+  );
+
+  // --- 3b. And the ceiling: a session that has seen the *whole* world.
+  //
+  // The atlas never evicts -- a hexagon folded stays folded, which is right for
+  // a map whose whole value is that Newtown is still on it from Parramatta --
+  // so the honest worst case is not the twelve hexagons above but all 86. That
+  // is what a long session walking across Sydney ends up holding, and it is the
+  // number that has to stay small enough to be worth never evicting.
+  {
+    const whole = new atlasMod.MapAtlas({ tile_size: root.tile_size, tiles: [] }, worldDir, '');
+    let bytesOnDisk = 0;
+    for (const entry of contract.list) {
+      if (entry.names === undefined) continue;
+      const file = Bun.file(`${worldDir}${contract.dir}/${entry.id}.names.bin`);
+      if (!(await file.exists())) continue;
+      const bytes = await file.arrayBuffer();
+      bytesOnDisk += bytes.byteLength;
+      whole.addBundleForTest(bytes);
+    }
+    const held = whole.stats();
+    /**
+     * What the whole city's centrelines may cost the heap, bytes.
+     *
+     * 32 MB against the ~7 MB the 60 km world actually holds -- room for two
+     * more doublings, and far under the ~1.5 GB the tiles this replaces would
+     * be. The bound exists because "the map holds the city forever" is only a
+     * defensible design while the city is a few megabytes of polyline; the day
+     * it is a few hundred, this fails and somebody decides what to evict.
+     */
+    const HOLD_CEILING = 32_000_000;
+    check(
+      held.bytesApprox < HOLD_CEILING && held.runs > 0,
+      `holding all ${contract.list.length} hexagons -- the whole 60 km city, which is what a long ` +
+        `session ends up with -- is ${held.runs.toLocaleString()} runs and ` +
+        `${(held.bytesApprox / 1e6).toFixed(1)} MB of centrelines from ` +
+        `${(bytesOnDisk / 1e6).toFixed(1)} MB on disk, under the ` +
+        `${(HOLD_CEILING / 1e6).toFixed(0)} MB ceiling`,
+    );
+    const sink: MapRoadRun[] = [];
+    whole.roadsWithin(AT_X - 2250, AT_Z - 2250, AT_X + 2250, AT_Z + 2250, 0, sink);
+    // Read *after* the query: `lastWalked` is what the call above cost.
+    const wholeWalk = whole.indexStats().runs.lastWalked;
+    check(
+      wholeWalk > 0 && wholeWalk <= sink.length * OVERDRAW + OVERDRAW_FLOOR,
+      `  and with all of it held, a district redraw still walks ` +
+        `${wholeWalk.toLocaleString()} runs to draw ` +
+        `${sink.length.toLocaleString()} -- which is the sentence "the map costs the view, not ` +
+        `the city", written as the number it has to keep being after the next doubling`,
+    );
+  }
+
+  // --- 4. The fallback fan-out, which is one failed request away.
+  //
+  // Disarmed first, because `loadNameBundle` short-circuits on a segmented
+  // world and the fallback is exactly the path that does not run there. What is
+  // being reproduced is an *unsegmented* world with no usable bundle -- one
+  // built before either existed, or one whose `street-names.bin` 404s.
+  hexes.resetHexes();
+  {
+    const cdn = await import('../client/src/world/cdn.ts');
+    const index = await Bun.file(worldDir + 'index.json').json();
+    const named = (index.tiles as Array<{ sn?: number }>).filter((t) => (t.sn ?? 0) > 0);
+    // Every request answered from here, so this touches no network and no
+    // clock: the bytes are refused, the atlas records a failure, and what is
+    // left to measure is the only thing under test -- how many it asked for.
+    let asked = 0;
+    cdn.setLocalAssetSource(async () => {
+      asked++;
+      return new ArrayBuffer(0);
+    });
+    try {
+      const bare = new atlasMod.MapAtlas(
+        { tile_size: index.tile_size, tiles: index.tiles },
+        worldDir,
+        '',
+      );
+      bare.start();
+      // The pool is 10 wide over at most `MAX_FALLBACK_TILES` tiles, all of them
+      // answered synchronously above, so this settles in a few microtask turns.
+      for (let i = 0; i < 64 && !bare.stats().complete; i++) {
+        await new Promise((r) => setTimeout(r, 10));
+      }
+      const fell = bare.stats();
+      check(
+        named.length > 1000,
+        `the fallback's tile list is ${named.length.toLocaleString()} sidecars at this world ` +
+          `size -- it was 357 when the path was written, and it is reached whenever ` +
+          `street-names.bin fails`,
+      );
+      check(
+        fell.complete && fell.tiles <= 400 && asked <= 403,
+        `and the fallback asks for ${asked} of them and finishes ` +
+          `(${fell.fallbackDropped.toLocaleString()} refused, cap 400). Fifteen thousand ` +
+          `requests on a key press is not a slow map, it is a browser that stops answering`,
+      );
+    } finally {
+      cdn.setLocalAssetSource(null);
+    }
   }
 }
