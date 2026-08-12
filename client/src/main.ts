@@ -353,6 +353,15 @@ import { RailCut } from './world/rail-cut.ts';
 import { RoadDeck, verifyRoadDeck } from './world/road-deck.ts';
 import { ClearanceEnvelope, verifyEnvelope } from './world/envelope.ts';
 import { verifyUndercroft } from './world/undercroft.ts';
+// Phase 1 of `STATIONS.md`: the vessel primitive and its manifold invariant.
+// Nothing in the build reads a vessel yet -- `vesselsEnabled()` is off and no
+// call site consults it -- so this import brings in the self-check and nothing
+// else. It is here because a self-check nothing runs is a self-check that rots,
+// and the browser is not in CI.
+import { setVesselsEnabled, verifyVessels, vesselsEnabled } from './world/vessel.ts';
+import { verifySeam } from './world/seam.ts';
+import { buildCorridor, corridorCut } from './world/corridor.ts';
+import type { VesselField } from './world/vessel-field.ts';
 // The street factions -- meth heads and drunks -- on the same split again:
 // `game/streetlife.ts` is the shared simulation the server runs and
 // `world/streetlife.ts` is the renderer. See either header.
@@ -1413,6 +1422,15 @@ async function main(): Promise<void> {
   let railNetwork: RailNetwork | null = null;
   /** The rail corridor, for the terrain carve and the trench. See below. */
   let railCut: RailCut | null = null;
+  /**
+   * The railway as closed solids, and the ground query over them. Phase 2a.
+   *
+   * Null unless `?vessels=1`. Rebuilt as terrain arrives, because the sweep
+   * needs the DEM at the rim on both sides and a browser gets that a tile at a
+   * time -- see `refreshVessels`. `server/world.ts` builds the identical thing
+   * from the identical module in one go, because every grid is resident there.
+   */
+  let vesselField: VesselField | null = null;
   {
     // The riding module's own self-check, at boot, on `verifyRail`'s terms: a
     // self-check nothing runs is a self-check that rots, and the browser is not
@@ -1460,13 +1478,37 @@ async function main(): Promise<void> {
       // that both halves of the fix read: the streamer stops drawing ground
       // inside it, and `RailWorld` builds the trench that stands in the hole.
       //
-      // The platform sites are handed over separately because only `buildNetwork`
-      // knows them: `bake.stations[].x, z` is the OSM node, which at Meadowbank
-      // is 471 m from where a train stops, and the corridor has to open out where
-      // the platforms actually are or half of every cutting station is buried in
-      // its own retaining wall.
+      // The platform sites are handed over separately because `bake.stations[].x,
+      // z` is the OSM node, which at Meadowbank is 471 m from where a train
+      // stops, and the corridor has to open out where the platforms actually are
+      // or half of every cutting station is buried in its own retaining wall.
+      //
+      // **`riding.buildPlatforms` and not `railNetwork.stations`, which is a fix
+      // shipping today.** `server/world.ts` says of its own `setStations` that
+      // `buildPlatforms` resolves *"the same anchors from the same bake, which is
+      // what makes the two answers the same number rather than two numbers that
+      // agree today"*. They were not the same list. `buildNetwork.stations` adds
+      // a fallback for stations *nothing calls at* -- a rail within 60 m of a
+      // platform the modelled network never reaches -- so this end had 361 sites
+      // against the server's 358, and sampled every 6 m along every platform in
+      // the city **87 of 29,479 points got a different half-width, by up to the
+      // full 4.00 m of the flare**. A carve on one end and a ground query on the
+      // other, disagreeing about where the ground is by four metres.
+      //
+      // Phase 2a found this and fixed it for the vessel path only, in
+      // `world/corridor.ts`, because the flag being off had to change nothing.
+      // The flag is still off and this is the old path, so it is fixed here too:
+      // one rule in three places instead of two. The three uncalled stations
+      // stop flaring on the client, which is what the server has always done and
+      // therefore what the ground under a player's feet has always said.
+      //
+      // The analytic platforms, built here rather than sixty lines down because
+      // this is the first line that needs them. See `game/riding.PlatformField`:
+      // built from the bake rather than from the network for the reason the
+      // server needs them at all -- this is the copy that exists on both ends.
+      platforms = buildPlatforms(railBake);
       railCut = new RailCut(railBake);
-      railCut.setStations(railNetwork.stations);
+      railCut.setStations(platforms.sites);
       // **And the roads, which is where the carve stops.** The corridor is the
       // reason the ground comes away and a carriageway is the reason it stays;
       // one object answers both, so the terrain mesh, the trench, the ground
@@ -1501,16 +1543,33 @@ async function main(): Promise<void> {
       if (drawnFailures.length) {
         console.warn('[rail] drawn undercroft self-check:\n  - ' + drawnFailures.join('\n  - '));
       }
+      // And the primitive that will eventually replace all three of the above.
+      // It builds nothing here and draws nothing: it asserts that a closed
+      // vessel comes out closed, that the four dispositions are four profiles
+      // through one code path, that a corridor turning tighter than it is wide
+      // is refused rather than folded, and -- the half that matters -- that
+      // `checkManifold` still screams at a punched hole, a flipped face, an
+      // unwelded vertex and a collapsed triangle. See `world/vessel.ts`.
+      const vesselFailures = verifyVessels();
+      if (vesselFailures.length) {
+        console.warn('[rail] vessel self-check:\n  - ' + vesselFailures.join('\n  - '));
+      }
+      // ...and the terrain's half of the seam, which is the other end of the
+      // wire and where an epsilon would have crept back in. Asserted by area:
+      // the ground the cells keep plus the ground the rim encloses must add up
+      // to the ground there was, including where two corridors overlap -- which
+      // at Erskineville is 61.5% of the cells the railway claims. See
+      // `world/seam.ts`.
+      const seamFailures = verifySeam();
+      if (seamFailures.length) {
+        console.warn('[rail] terrain seam self-check:\n  - ' + seamFailures.join('\n  - '));
+      }
+      if (new URLSearchParams(location.search).get('vessels') === '1') setVesselsEnabled(true);
       const geometryFailures = verifyRailGeometry(railNetwork);
       if (geometryFailures.length) {
         console.warn('[rail] derived network self-check:\n  - ' + geometryFailures.join('\n  - '));
       }
       railAssets.prepareSigns(railNetwork.stations.map((s) => s.name));
-      // The analytic platforms, for `groundHeightAt`. Built from the bake rather
-      // than from the network for the reason the server needs them at all: this
-      // is the copy of the platform that exists on both ends. See
-      // `game/riding.PlatformField`.
-      platforms = buildPlatforms(railBake);
       // ...and the volume a body may be *inside*. Third question, third field,
       // and the one that was missing: `PlatformField` answers within a step of
       // a 5.5 m deck and `RailCut.cutAt` declines on a bore by design, so one
@@ -2604,6 +2663,21 @@ async function main(): Promise<void> {
     // the hole. `server/world.groundFor` carries the identical clause over the
     // identical `RailCut`, because a client that walks down a staircase the
     // server thinks is solid ground is a client the server drags back up.
+    // **And the vessel, which is the clause above said exactly.** `cutAt` below
+    // answers with a rail head wherever a strip's disc of half-width reaches;
+    // this answers with the surface of a solid whose footprint is the very rim
+    // the terrain was triangulated to, so the ground and the answer about the
+    // ground have one outline between them instead of two. Replaces the terrain
+    // for a stronger reason than the platform does: inside the rim the terrain
+    // is not lower, it **is not there**. `server/world.groundFor` carries the
+    // identical clause in the identical position over a field built by the
+    // identical module.
+    //
+    // Off unless `?vessels=1`, so with the flag down this is a null check.
+    if (vesselField !== null) {
+      const deck = vesselField.heightAt(x, z, feetY);
+      if (deck > -Infinity) return Math.max(deck, roof);
+    }
     const cutFloor = railCut === null ? Number.NaN : railCut.cutAt(x, z, sampled);
     if (Number.isFinite(cutFloor)) return Math.max(cutFloor, roof);
     return Math.max(lastGround, roof);
@@ -2650,6 +2724,69 @@ async function main(): Promise<void> {
    * the exact failure the paragraph above describes, in a third place.
    */
   const rawGroundAt = (x: number, z: number): number => streamer.ground?.height(x, z) ?? NO_GROUND;
+
+  /**
+   * Sweep the corridor near the player, and hand the rim to the ground.
+   *
+   * ---------------------------------------------------------------------------
+   * **Why this is a rebuild and not a one-off, and why it is not free-running.**
+   *
+   * A vessel needs the DEM at its rim on *both* sides, and a browser has the DEM
+   * a tile at a time. `spineForRun` refuses a run with an unresident post rather
+   * than guessing a depth -- a vessel built on a guess is a hole with a
+   * plausible shape -- so the corridor a client can build grows as tiles land,
+   * where the server builds all of it at boot from grids it read off disk.
+   *
+   * So: rebuilt when the resident tile count changes, and only then. The count
+   * is the cheapest signal that the *answer could differ*, and it is exactly
+   * right rather than a heuristic -- `TerrainField` never evicts a grid, so the
+   * set only grows and a new grid is the only thing that can turn a refused run
+   * into a built one.
+   *
+   * Bounded to the tiles the player can reach, because the sweep is 5 s over the
+   * whole 340 km network and this is a frame budget rather than a boot one.
+   */
+  /**
+   * How far from the player the corridor is swept, metres.
+   *
+   * The collision radius (`tile-lifecycle.COLLISION_KEEP_RADIUS_M` is 420 m)
+   * plus a tile, so the corridor is always built further out than the ground
+   * query can reach and a body never walks off the end of the swept region into
+   * a footprint that has not been built. Half a kilometre of railway is about
+   * ten runs and a couple of milliseconds; the whole 340 km is five seconds, and
+   * this runs on a frame.
+   */
+  const VESSEL_RADIUS_M = 900;
+  let vesselTiles = -1;
+  const refreshVessels = (): void => {
+    if (!vesselsEnabled() || railBake === null || streamer.ground === null) return;
+    const resident = streamer.ground.loadedTiles;
+    if (resident === vesselTiles) return;
+    vesselTiles = resident;
+    const tileSize = streamer.tileSize;
+    if (!(tileSize > 0)) return;
+    const t0 = performance.now();
+    const built = buildCorridor(
+      railBake,
+      vesselCut ?? (vesselCut = corridorCut(railBake)),
+      rawGroundAt,
+      { pitch: tileSize / streamer.terrain.grid / 8 },
+      { at: { x: player.position.x, z: player.position.z }, radius: VESSEL_RADIUS_M },
+    );
+    vesselField = built.field;
+    streamer.setSeam(built.seam, [
+      player.position.x - VESSEL_RADIUS_M, player.position.z - VESSEL_RADIUS_M,
+      player.position.x + VESSEL_RADIUS_M, player.position.z + VESSEL_RADIUS_M,
+    ]);
+    console.debug(
+      `[vessels] ${built.tracks} tracks grouped into ${built.runs.length} formations, ` +
+        `${built.triangles.toLocaleString()} triangles, ${built.refused.length} refused, ` +
+        `${built.noTerrain} without terrain, ${built.doubleCells} of ` +
+        `${built.claimedCells.toLocaleString()} claimed cells claimed twice, ` +
+        `${(performance.now() - t0).toFixed(0)} ms`,
+    );
+  };
+  let vesselCut: RailCut | null = null;
 
   /**
    * The railway in the scene, built here because this is the first line at which
@@ -7249,6 +7386,11 @@ async function main(): Promise<void> {
     if (collisionClock > 0.5) {
       collisionClock = 0;
       void ensureGround(player.position.x, player.position.z);
+      // On the same half-second and behind the same reasoning: the corridor can
+      // only be swept where the DEM is, and the DEM arrives a tile at a time.
+      // A no-op unless `?vessels=1`, and a no-op after that unless a grid has
+      // landed since the last one. See `refreshVessels`.
+      refreshVessels();
     }
 
     // --- The nameplates, last, because they are the only thing in the frame

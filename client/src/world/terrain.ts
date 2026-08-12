@@ -43,6 +43,8 @@
 import { BufferAttribute, BufferGeometry, Mesh, type Material } from 'three/webgpu';
 import { fetchWorldAsset } from './cdn.ts';
 import { DECK_THICKNESS_M } from './road-deck.ts';
+import { CELL_CROSSED, CELL_OUTSIDE, type SeamField } from './seam.ts';
+import { earClip } from './vessel.ts';
 
 /**
  * The rail corridor, as much of it as this module needs: where to stop drawing
@@ -78,6 +80,44 @@ export interface TileCut {
    * underside -- see `DECK_THICKNESS_M` and the soffit block below.
    */
   deckedAt(x: number, z: number, groundY: number): number;
+}
+
+/**
+ * The rim of the railway, as the terrain must meet it.
+ *
+ * ---------------------------------------------------------------------------
+ * **The other half of `STATIONS.md`' seam rule, and the half Phase 1 could not
+ * build because nothing emitted a ring yet.**
+ *
+ * `TileCut` above is the old arrangement and it is a *carve*: the terrain asks
+ * "is this sub-quad's centre inside the corridor", drops it if so, and leaves a
+ * 3.9 m staircase for `rail-geo.writeTrench` to lap half a metre of coping over
+ * -- a lap that exists purely to hide the fact that two modules hold separate
+ * opinions about where the rim is.
+ *
+ * This is not that. The vessel emits its rim as an ordered ring of **its own
+ * vertices**, and the terrain is triangulated *to those vertices*: inside the
+ * ring it draws nothing, across the ring it draws the part outside and stops
+ * exactly on the ring's points. There is no lap because there is no
+ * disagreement, and there is no epsilon anywhere in the path -- see
+ * `world/seam.ts`, which also says why the tile boundary does not reopen the
+ * question one level down.
+ *
+ * Supplied alongside `TileCut` rather than instead of it, and the interaction is
+ * narrow and stated: **where a seam is given, the seam decides the corridor and
+ * `cutAt` is not consulted at all.** `deckedAt` still is, because a street over
+ * a cutting holds the ground up and that is true whichever module drew the
+ * cutting. What is deliberately *not* handled in Phase 2a is the disposition
+ * changing under a road -- trench to bore and back -- which is `STATIONS.md`'
+ * third strain and is a change of topology mid-sweep, not a terrain question.
+ */
+export interface TileSeam {
+  /** World X of this tile's local origin: its south-west corner, as `TileCut`. */
+  originX: number;
+  /** World Z of the same corner. */
+  originZ: number;
+  /** The footprints. */
+  field: SeamField;
 }
 
 /**
@@ -404,6 +444,7 @@ export function buildTerrainMesh(
   tileSize: number,
   material: Material,
   cut: TileCut | null = null,
+  seam: TileSeam | null = null,
 ): Mesh {
   const stride = gridN + 1;
   const posts = stride * stride;
@@ -495,6 +536,17 @@ export function buildTerrainMesh(
   const lerp4 = (a: number, b: number, c2: number, d: number, fc: number, fr: number): number =>
     (a + (b - a) * fc) * (1 - fr) + (c2 + (d - c2) * fc) * fr;
 
+  /**
+   * Where this tile's local frame sits in the world.
+   *
+   * Taken from whichever of the two corridor hooks is present, and asserted to
+   * agree when both are: a seam and a carve that disagreed by a tile would each
+   * be answering about a different piece of Sydney, and nothing on either end
+   * would say so.
+   */
+  const originX = cut?.originX ?? seam?.originX ?? 0;
+  const originZ = cut?.originZ ?? seam?.originZ ?? 0;
+
   /** How much of this tile's ground the corridor took, in square metres. */
   let cutArea = 0;
   /**
@@ -506,6 +558,10 @@ export function buildTerrainMesh(
    * that a rule inside a mesh builder ran.
    */
   let deckArea = 0;
+  /** Cells the rim crossed that could not be traced, and why. See `TileSeam`. */
+  let seamRefused = 0;
+  let seamTriangles = 0;
+  const seamFaults: string[] = [];
   const sub = CUT_SUBDIVISION;
   // Half the diagonal of a quad: the radius that finds a corridor touching any
   // part of it from its centre.
@@ -569,13 +625,19 @@ export function buildTerrainMesh(
       const plain = (): void => {
         indices.push(inw, ise, ine, inw, isw, ise);
       };
-      if (cut === null) {
+      if (cut === null && seam === null) {
         plain();
         continue;
       }
-      const wx0 = cut.originX + c * spacing;
-      const wz0 = cut.originZ + r * spacing - tileSize;
-      if (!cut.near(wx0 + spacing / 2, wz0 + spacing / 2, quadReach)) {
+      const wx0 = originX + c * spacing;
+      const wz0 = originZ + r * spacing - tileSize;
+      const nearCut = cut !== null && cut.near(wx0 + spacing / 2, wz0 + spacing / 2, quadReach);
+      // The seam's broad phase is a box rather than a radius, because a
+      // footprint is an arbitrary polygon and the only cheap thing true of it is
+      // which lattice cells it spans.
+      const nearSeam =
+        seam !== null && seam.field.nearBox(wx0, wz0, wx0 + spacing, wz0 + spacing, 0);
+      if (!nearCut && !nearSeam) {
         plain();
         continue;
       }
@@ -586,6 +648,16 @@ export function buildTerrainMesh(
       const se = grid[ise];
       let dropped = 0;
       let decked = 0;
+      let conformed = 0;
+      // Which lattice cell this quad's north-west sub-post is. The lattice is
+      // global -- every tile's bounds are a multiple of `tile_size` and
+      // `tile_size` is a whole number of sub-quads -- so `m` and `n` mean the
+      // same cell in every tile that can see it, which is the whole reason two
+      // tiles cannot disagree about a crossing. `checkSeam` asserts the
+      // divisibility rather than trusting this paragraph.
+      const pitch = spacing / sub;
+      const m0 = Math.round(wx0 / pitch);
+      const n0 = Math.round(wz0 / pitch);
       for (let sr = 0; sr < sub; sr++) {
         for (let sc = 0; sc < sub; sc++) {
           const fc = (sc + 0.5) / sub;
@@ -593,12 +665,36 @@ export function buildTerrainMesh(
           const h = subHeight(nw, ne, sw, se, fc, fr);
           const wx = wx0 + fc * spacing;
           const wz = wz0 + fr * spacing;
-          const gone = Number.isFinite(cut.cutAt(wx, wz, h));
+          if (seam !== null) {
+            // **The seam decides the corridor outright.** `cutAt` is not asked,
+            // because two rules for where the ground stops is the defect, not
+            // the belt and braces. `deckedAt` still is: a street over a cutting
+            // holds the ground up whoever drew the cutting under it.
+            const st = seam.field.state(m0 + sc, n0 + sr);
+            if (st === CELL_OUTSIDE) {
+              state[sr * sub + sc] = 0;
+              keep[sr * sub + sc] = 1;
+              continue;
+            }
+            if (st === CELL_CROSSED) {
+              state[sr * sub + sc] = 3;
+              keep[sr * sub + sc] = 0;
+              conformed++;
+              continue;
+            }
+            const paved = cut !== null && Number.isFinite(cut.deckedAt(wx, wz, h));
+            state[sr * sub + sc] = paved ? 2 : 1;
+            keep[sr * sub + sc] = paved ? 1 : 0;
+            if (paved) decked++;
+            else dropped++;
+            continue;
+          }
+          const gone = cut !== null && Number.isFinite(cut.cutAt(wx, wz, h));
           // Exclusive by construction -- `RailCut.deckedAt` answers only where
           // `cutAt` declined *because of a road* -- so the branch is an ordering
           // and not a precedence. Asked second because it is the rarer answer and
           // the more expensive one.
-          const road = !gone && Number.isFinite(cut.deckedAt(wx, wz, h));
+          const road = !gone && cut !== null && Number.isFinite(cut.deckedAt(wx, wz, h));
           state[sr * sub + sc] = gone ? 1 : road ? 2 : 0;
           keep[sr * sub + sc] = gone ? 0 : 1;
           if (gone) dropped++;
@@ -613,7 +709,7 @@ export function buildTerrainMesh(
       // nothing built it an underside. It happens where a road runs *along* a
       // cutting rather than across one, which in this extract is a few dozen
       // quads.
-      if (dropped === 0 && decked === 0) {
+      if (dropped === 0 && decked === 0 && conformed === 0) {
         // The corridor is near this quad but takes nothing from it. The common
         // case beside a railway at grade, and it must cost two triangles.
         plain();
@@ -633,9 +729,9 @@ export function buildTerrainMesh(
           const at = position.length / 3;
           lattice[sr * (sub + 1) + sc] = at;
           position.push(
-            wx0 - cut.originX + fc * spacing,
+            wx0 - originX + fc * spacing,
             subHeight(nw, ne, sw, se, fc, fr),
-            wz0 - cut.originZ + fr * spacing,
+            wz0 - originZ + fr * spacing,
           );
           // The corner normals, interpolated. Along a shared edge this is linear
           // between the two posts' own normals, which is exactly what the
@@ -656,6 +752,73 @@ export function buildTerrainMesh(
           const d = lattice[(sr + 1) * (sub + 1) + sc];
           const e = d + 1;
           indices.push(a, e, b, a, d, e);
+        }
+      }
+
+      // ---------------------------------------------------------------------
+      // THE CONFORMED CELLS: where the ground stops being a lattice and becomes
+      // the vessel's own rim.
+      //
+      // **This is the seam rule, discharged.** A cell the rim crosses is not
+      // dropped and not kept: the part outside the ring is traced by
+      // `world/seam.ts` and triangulated here, and every boundary vertex of it
+      // is either a lattice sub-post this loop has already emitted or **a vertex
+      // of the vessel, at the vessel's own coordinates**. Not a vertex near one.
+      // The same one, carried through from `Vessel.position` without being
+      // recomputed, which is why there is no tolerance anywhere on this path and
+      // why `writeTrench`' half-metre coping lap has nothing left to hide.
+      //
+      // Wound the opposite way to the trace, because a loop that is counter-
+      // clockwise in `(x, z)` is a face pointing *down*: the ground's own quads
+      // are `(nw, se, ne)`, which is clockwise in plan and up in world. Getting
+      // that backwards draws a hole that is only visible from underneath.
+      if (conformed > 0 && seam !== null) {
+        for (let sr = 0; sr < sub; sr++) {
+          for (let sc = 0; sc < sub; sc++) {
+            if (state[sr * sub + sc] !== 3) continue;
+            const loops = seam.field.conform(m0 + sc, n0 + sr, seamFaults);
+            if (loops === null) {
+              seamRefused++;
+              continue;
+            }
+            for (const loop of loops) {
+              const ids: number[] = [];
+              for (const node of loop) {
+                if (node.corner >= 0) {
+                  const cr = node.corner === 0 || node.corner === 1 ? sr : sr + 1;
+                  const cc = node.corner === 0 || node.corner === 3 ? sc : sc + 1;
+                  ids.push(lattice[cr * (sub + 1) + cc]);
+                  continue;
+                }
+                const fc = (node.x - wx0) / spacing;
+                const fr = (node.z - wz0) / spacing;
+                const nx = lerp4(normal[inw * 3], normal[ine * 3], normal[isw * 3], normal[ise * 3], fc, fr);
+                const ny = lerp4(normal[inw * 3 + 1], normal[ine * 3 + 1], normal[isw * 3 + 1], normal[ise * 3 + 1], fc, fr);
+                const nz = lerp4(normal[inw * 3 + 2], normal[ine * 3 + 2], normal[isw * 3 + 2], normal[ise * 3 + 2], fc, fr);
+                const len = Math.hypot(nx, ny, nz) || 1;
+                ids.push(pushVertex(
+                  node.x - originX, node.y, node.z - originZ,
+                  nx / len, ny / len, nz / len,
+                  (c + fc) / gridN, (r + fr) / gridN,
+                ));
+              }
+              const flat = new Float64Array(loop.length * 2);
+              for (let k = 0; k < loop.length; k++) {
+                flat[k * 2] = loop[k].x;
+                flat[k * 2 + 1] = loop[k].z;
+              }
+              const tri = earClip(flat);
+              if (tri === null) {
+                seamRefused++;
+                seamFaults.push(`cell ${m0 + sc},${n0 + sr}: the kept ground could not be triangulated`);
+                continue;
+              }
+              for (let t = 0; t < tri.length; t += 3) {
+                indices.push(ids[tri[t]], ids[tri[t + 2]], ids[tri[t + 1]]);
+                seamTriangles++;
+              }
+            }
+          }
         }
       }
 
@@ -685,9 +848,9 @@ export function buildTerrainMesh(
           const fc = sc / sub;
           const fr = sr / sub;
           under[sr * (sub + 1) + sc] = pushVertex(
-            wx0 - cut.originX + fc * spacing,
+            wx0 - originX + fc * spacing,
             subHeight(nw, ne, sw, se, fc, fr) - DECK_THICKNESS_M,
-            wz0 - cut.originZ + fr * spacing,
+            wz0 - originZ + fr * spacing,
             0, -1, 0,
             (c + fc) / gridN,
             (r + fr) / gridN,
@@ -805,15 +968,25 @@ export function buildTerrainMesh(
       // crosses a tile boundary -- which on the inner west is every 500 m, and
       // is the one artefact that would make the carve look like a bug rather
       // than like a railway.
-      if (cut !== null) {
+      if (cut !== null || seam !== null) {
         const a = rail[k];
         const b = rail[k + 1];
-        const mx = cut.originX + (position[a * 3] + position[b * 3]) / 2;
-        const mz = cut.originZ + (position[a * 3 + 2] + position[b * 3 + 2]) / 2;
+        const mx = originX + (position[a * 3] + position[b * 3]) / 2;
+        const mz = originZ + (position[a * 3 + 2] + position[b * 3 + 2]) / 2;
         // Linear between two posts along a grid line, which is exactly what the
         // quad's own edge is, so the skirt and the sheet make the same decision.
         const mh = (position[a * 3 + 1] + position[b * 3 + 1]) / 2;
-        if (Number.isFinite(cut.cutAt(mx, mz, mh))) continue;
+        if (seam !== null) {
+          // The apron stops wherever the corridor reaches the tile edge, on the
+          // cell the sheet itself stopped on. A skirt across the mouth of a
+          // cutting is the one artefact that would make this look like a bug
+          // rather than like a railway -- `CUT_SUBDIVISION`'s note says the same
+          // about the carve.
+          const p = spacing / sub;
+          if (seam.field.state(Math.floor(mx / p), Math.floor(mz / p)) !== CELL_OUTSIDE) continue;
+        } else if (cut !== null && Number.isFinite(cut.cutAt(mx, mz, mh))) {
+          continue;
+        }
       }
       indices.push(rail[k], rail[k + 1], bottom[k + 1]);
       indices.push(rail[k], bottom[k + 1], bottom[k]);
@@ -849,6 +1022,14 @@ export function buildTerrainMesh(
   // `streamer.recutGround` compares it to decide whether a re-cut changed
   // anything worth swapping a mesh for.
   mesh.userData.deckArea = deckArea;
+  // And the seam: how many triangles were built *to the vessel's rim* and how
+  // many cells the trace refused. `integration-check` asserts the first is
+  // non-zero and the second is exactly zero over a real corridor, which is the
+  // only cheap way to prove from outside that the conformer ran and got a clean
+  // answer everywhere it ran.
+  mesh.userData.seamTriangles = seamTriangles;
+  mesh.userData.seamRefused = seamRefused;
+  mesh.userData.seamFaults = seamFaults;
   mesh.frustumCulled = false; // culled with its tile, like every other primitive
   return mesh;
 }

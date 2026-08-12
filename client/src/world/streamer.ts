@@ -219,7 +219,8 @@ import {
   type TileDecodeRequest,
   type TileDecodeResult,
 } from './tile-decode.ts';
-import { TerrainField, buildTerrainMesh, sampleTileGrid, type TileCut } from './terrain.ts';
+import { TerrainField, buildTerrainMesh, sampleTileGrid, type TileCut, type TileSeam } from './terrain.ts';
+import type { SeamField } from './seam.ts';
 import type { RailCut } from './rail-cut.ts';
 import {
   carveUndercroft,
@@ -1135,6 +1136,8 @@ export class TileStreamer implements LampSource {
    * as the DEM left it", which is every world built before the railway was.
    */
   private railCut: RailCut | null = null;
+  /** The vessel rim the ground is triangulated to, or null. See `setSeam`. */
+  private seam: SeamField | null = null;
 
   constructor(
     scene: Scene,
@@ -1811,6 +1814,11 @@ export class TileStreamer implements LampSource {
   }
 
   /** The ground contract, defaulted for an index written before terrain existed. */
+  /** The tile pitch in metres, or 0 before the index lands. For the seam lattice. */
+  get tileSize(): number {
+    return this.index?.tile_size ?? 0;
+  }
+
   get terrain(): TerrainContract {
     return this.index?.terrain ?? TERRAIN_DEFAULTS;
   }
@@ -1890,6 +1898,29 @@ export class TileStreamer implements LampSource {
   }
 
   /**
+   * The rim the ground must be triangulated to. Phase 2a of `STATIONS.md`.
+   *
+   * Null unless `?vessels=1`, and null is the world that shipped. Where it is
+   * set, it **replaces** the carve inside the corridor rather than adding to it
+   * -- see `terrain.TileSeam`: two rules for where the ground stops is the
+   * defect this is here to end, not the belt and braces.
+   *
+   * Re-cuts on the way in exactly as `setRailCut` does, and for the same reason:
+   * a corridor that arrives after a tile is a tile drawing ground across a
+   * railway until something asks it not to.
+   */
+  setSeam(seam: SeamField | null, box: readonly [number, number, number, number] | null = null): void {
+    this.seam = seam;
+    // Bounded to the corridor's own plan box where the caller knows it, on
+    // `recutGround`'s own argument: a seam that covers 900 m of railway cannot
+    // change the ground of a tile ten kilometres away, and rebuilding every
+    // resident tile's mesh to find that out is the expensive half of a cheap
+    // operation. `main.ts` refreshes this every time a terrain grid lands.
+    const recut = this.recutGround(box);
+    if (recut > 0) console.debug(`[terrain] re-cut ${recut} resident tiles for the vessel rim`);
+  }
+
+  /**
    * Rebuild the ground of resident tiles whose carve may have changed.
    *
    * `box` is a plan bounding box to limit the sweep to, or `null` for every
@@ -1928,9 +1959,11 @@ export class TileStreamer implements LampSource {
         tileSize,
         this.groundMaterial,
         this.tileCut(tile.entry),
+        this.tileSeam(tile.entry),
       );
       const cutArea = fresh.userData.cutArea as number;
       const deckArea = fresh.userData.deckArea as number;
+      const seamTriangles = fresh.userData.seamTriangles as number;
       // Nothing to swap for: either the corridor neither took ground from this
       // tile nor kept any under a road, or the fresh mesh made the identical two
       // decisions the standing one did.
@@ -1940,9 +1973,10 @@ export class TileStreamer implements LampSource {
       // `cutArea` is zero and `deckArea` is not -- and testing only the first
       // would refuse to give it the soffit it needs.
       if (
-        (cutArea <= 0 && deckArea <= 0) ||
+        (cutArea <= 0 && deckArea <= 0 && seamTriangles <= 0) ||
         (cutArea === (old.userData.cutArea as number) &&
-          deckArea === (old.userData.deckArea as number))
+          deckArea === (old.userData.deckArea as number) &&
+          seamTriangles === ((old.userData.seamTriangles as number) ?? 0))
       ) {
         fresh.geometry.dispose();
         continue;
@@ -1960,6 +1994,16 @@ export class TileStreamer implements LampSource {
    * local frame sits in the world. Null when there is no bake, which is a world
    * with an uncut ground and is exactly the world that shipped.
    */
+  /** This tile's view of the rim, or null with no seam. See `setSeam`. */
+  private tileSeam(entry: TileEntry): TileSeam | null {
+    if (this.seam === null || this.index === null) return null;
+    return {
+      originX: entry.bounds[0],
+      originZ: entry.bounds[1] + this.index.tile_size,
+      field: this.seam,
+    };
+  }
+
   private tileCut(entry: TileEntry): TileCut | null {
     const cut = this.railCut;
     if (cut === null || this.index === null) return null;
@@ -2972,6 +3016,7 @@ export class TileStreamer implements LampSource {
             tileSize,
             this.groundMaterial,
             this.tileCut(entry),
+            this.tileSeam(entry),
           ),
         );
       }

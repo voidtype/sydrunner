@@ -116,6 +116,9 @@ import type { Place } from '../client/src/game/teleport.ts';
 import type { CombatWorld } from '../client/src/game/combat.ts';
 import { decodeRail, verifyRail, type RailBake } from '../client/src/game/rail.ts';
 import { RailCut } from '../client/src/world/rail-cut.ts';
+import { buildCorridor, corridorCut } from '../client/src/world/corridor.ts';
+import type { VesselField } from '../client/src/world/vessel-field.ts';
+import { setVesselsEnabled, vesselsEnabled } from '../client/src/world/vessel.ts';
 import { RoadDeck } from '../client/src/world/road-deck.ts';
 import { ClearanceEnvelope } from '../client/src/world/envelope.ts';
 import { SPAN_TUNNEL } from '../client/src/game/rail.ts';
@@ -1708,6 +1711,22 @@ export interface ServerWorld {
    */
   railCut?: RailCut | null;
   /**
+   * The railway as closed solids, and the ground query over them. Null unless
+   * `SYDNEY_VESSELS=1`.
+   *
+   * **Phase 2a of `STATIONS.md`, behind its flag.** Where this answers, it
+   * *replaces* the terrain rather than competing with it, for a stronger reason
+   * than `PlatformField`'s: inside a vessel's rim ring the terrain is not merely
+   * lower, it **is not there** -- `world/seam.ts` withheld it and the mesh is
+   * triangulated to that very ring. The DEM over a cutting is a sheet across a
+   * hole and always was; this is the first thing on either end that knows the
+   * hole's exact outline rather than a 3.9 m staircase approximation of it.
+   *
+   * Built from `world/corridor.ts`, which `main.ts` also calls, so the two ends
+   * are running one assembly rather than two that agree.
+   */
+  vessels?: VesselField | null;
+  /**
    * Every carriageway resident on this process, as the ground the carve stops at.
    *
    * The fix for the report *"train at St Peters STILL covers the road at king
@@ -1953,6 +1972,7 @@ export async function loadWorld(
     railCut: null,
     roads,
     stationBoxes: null,
+    vessels: null,
   };
   world.platforms = world.rail ? buildPlatforms(world.rail) : null;
   world.railCut = world.rail ? new RailCut(world.rail) : null;
@@ -1964,14 +1984,46 @@ export async function loadWorld(
   // that agree, one rule asked twice. See `world/road-deck.ts`.
   world.railCut?.setRoads(roads);
   // The corridor opens out at a platform, and both ends have to agree about
-  // where. `main.ts` hands `RailCut` the routed stopping anchors out of
-  // `rail-geo.buildNetwork`; this process cannot import that module -- it draws
-  // things -- but `riding.buildPlatforms` resolves the *same* anchors from the
-  // same bake, which is what makes the two answers the same number rather than
-  // two numbers that agree today. Without it the server's corridor is 5.4 m wide
-  // at a station where the client's is 9.4, and the four metres of difference is
-  // exactly the strip the access stairs stand in.
+  // where. This process cannot import `rail-geo` -- it draws things -- so the
+  // anchors come from `riding.buildPlatforms`, and `main.ts` now reads the
+  // **same** call, which is what makes the two answers the same number rather
+  // than two numbers that agree today. Without it the server's corridor is 5.4 m
+  // wide at a station where the client's is 9.4, and the four metres of
+  // difference is exactly the strip the access stairs stand in.
+  //
+  // **This comment used to claim that and be wrong**, which Phase 2a measured
+  // and Phase 3 fixed. `main.ts` handed `RailCut` the anchors out of
+  // `rail-geo.buildNetwork().stations`, which adds a fallback for stations
+  // *nothing calls at* -- 361 sites against this end's 358 -- and sampled every
+  // 6 m along every platform, 87 of 29,479 points came out with a different
+  // half-width, by up to the full 4.00 m of the flare. Two processes disagreeing
+  // about where the ground is. Both ends now call this function.
   if (world.railCut && world.platforms) world.railCut.setStations(world.platforms.sites);
+
+  // **The vessel path, off unless asked for.** Phase 2a: nothing here runs, and
+  // nothing about the world changes, unless `SYDNEY_VESSELS=1`. The sweep needs
+  // the DEM resident, which on this process it is -- every grid is read off disk
+  // at boot and never evicted -- so this is the one end that can build the whole
+  // corridor in one go and is where the walks in `checkVesselSeam` are made.
+  if (process.env.SYDNEY_VESSELS === '1') setVesselsEnabled(true);
+  if (vesselsEnabled() && world.rail) {
+    const cut = corridorCut(world.rail);
+    const lattice = { pitch: index.tile_size / index.terrain.grid / 8 };
+    const built = buildCorridor(
+      world.rail,
+      cut,
+      (x, z) => world.terrain.height(x, z),
+      lattice,
+    );
+    world.vessels = built.field;
+    console.log(
+      `[vessels] ${built.tracks} tracks grouped into ${built.runs.length} formations, ` +
+        `${built.triangles.toLocaleString()} triangles, ${built.refused.length} refused, ` +
+        `${built.noTerrain} without terrain; ${built.doubleCells} of ` +
+        `${built.claimedCells.toLocaleString()} claimed cells claimed twice ` +
+        `(${built.crossings.length} grade separations)`,
+    );
+  }
 
   // **And the volume nothing may stand in**, which this process needs for the
   // same reason it needs the carve: a building standing across the railway is a
@@ -1986,11 +2038,13 @@ export async function loadWorld(
   if (world.rail) {
     envelope.addRail(world.rail, SPAN_TUNNEL);
     collision.setEnvelope(envelope);
-    console.log(
-      `[envelope] ${envelope.count.toLocaleString()} rail corridors; ` +
-        `${collision.carved.cut.toLocaleString()} prisms given an undercroft ` +
-        `(${collision.carved.pieces.toLocaleString()} pieces, ${collision.carved.dropped} slivers dropped)`,
-    );
+    // Corridors only. The carve tally belongs to the hexagons, not to boot:
+    // this line runs before a single prism is resident, as the paragraph above
+    // says, so `collision.carved` is necessarily zero here. It used to be
+    // printed anyway, and a permanent `0 prisms given an undercroft` reads as
+    // "the rule never runs" -- it cost a whole investigation. A number that can
+    // only ever be zero is worse than no number.
+    console.log(`[envelope] ${envelope.count.toLocaleString()} rail corridors adopted before the first prism`);
   }
 
   // --- The bikes, and the one walk over every hexagon this boot makes ---------
@@ -2237,6 +2291,7 @@ export function groundFor(world: ServerWorld): CombatWorld {
   const platforms = world.platforms ?? null;
   const boxes = world.stationBoxes ?? null;
   const cut = world.railCut ?? null;
+  const vessels = world.vessels ?? null;
   return {
     collision: world.collision,
     groundHeight(x: number, z: number, feetY: number): number {
@@ -2298,6 +2353,20 @@ export function groundFor(world: ServerWorld): CombatWorld {
       // is what it did, on both ends, until `RailCut.setRoads`. Folding the road
       // in at the corridor rather than beside it is the whole design: a second
       // clause here would be a second rule for the client to fail to copy.
+      // **And the vessel, which is the same clause said exactly.** `cutAt` below
+      // answers with the rail head wherever a strip's *disc* of half-width
+      // covers the point; this answers with the surface of an actual solid,
+      // whose footprint is the rim the terrain was triangulated to. Asked first
+      // because where both answer the vessel is the one the ground was withheld
+      // for, and asked in the same position as `cutAt` -- replacing the terrain,
+      // not competing with it -- for the reason the paragraph below gives.
+      //
+      // Off unless `SYDNEY_VESSELS=1`, so with the flag down this line is a null
+      // check and the world is byte for byte the one that shipped.
+      if (vessels !== null) {
+        const deck = vessels.heightAt(x, z, feetY);
+        if (deck > -Infinity) return Math.max(deck, roof);
+      }
       const floor = cut === null ? Number.NaN : cut.cutAt(x, z, sampled);
       if (Number.isFinite(floor)) return Math.max(floor, roof);
       return Math.max(lastGround, roof);

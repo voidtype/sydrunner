@@ -315,6 +315,12 @@ import type { PlayerState } from '../client/src/player/controller.ts';
 // The big map's two query results, for `checkBigMapAtScale`. Types only: the
 // module itself is imported dynamically there, beside the world it reads.
 import type { LabelLine as MapLabelLine, RoadRun as MapRoadRun } from '../client/src/mapatlas.ts';
+// The vessel's one input type, for `checkVessels`. A static type import rather
+// than a namespace off the dynamic one, because `vesselMod` is a value: the
+// module is loaded dynamically beside the world it is built from, as every
+// other rail check here loads its own. `world/vessel.ts` imports nothing and
+// touches no DOM, so naming its types costs this process nothing.
+import type { SpinePoint as VesselSpinePoint } from '../client/src/world/vessel.ts';
 
 const PORT = Number(process.env.SYDNEY_CHECK_PORT ?? 8799);
 const SERVER_URL = `ws://127.0.0.1:${PORT}`;
@@ -1680,6 +1686,21 @@ async function main(): Promise<void> {
   // and nothing in this file would have noticed. See `checkRailCutting`.
   say('');
   await checkRailCutting();
+
+  // --- 34a0. And the primitive that is meant to end the whole class of defect
+  // the three checks around this one are patches for. Phase 1 of `STATIONS.md`:
+  // the vessel, and the first invariant in this file that cannot pass while the
+  // world has a hole in it. Behind a flag, default off, converting nothing. See
+  // `checkVessels`.
+  say('');
+  await checkVessels();
+
+  // --- 34a0b. And the two things that consume what it emits: the ground
+  // triangulated to the rim, and the feet answered by the sweep. Phase 2a of
+  // `STATIONS.md`, still behind the flag and still converting nothing. See
+  // `checkVesselSeam`.
+  say('');
+  await checkVesselSeam();
 
   // --- 34a. And whether the carve took a *road* with it. `checkRailCutting` is
   // a claim about the railway and it was true while King Street had a
@@ -4809,6 +4830,16 @@ if (only === 'ridingOnline') {
   process.exit(failures.length === 0 ? 0 : 1);
 } else if (only === 'cutting') {
   await checkRailCutting();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'seam') {
+  await checkVesselSeam();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'vessels') {
+  await checkVessels();
   for (const f of failures) say(`  - ${f}`);
   say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
   process.exit(failures.length === 0 ? 0 : 1);
@@ -19067,8 +19098,19 @@ async function checkRailCutting(): Promise<void> {
   const railMod = (await import(railHere)) as typeof import('../client/src/game/rail.ts');
 
   const net = geoMod.buildNetwork(bake);
+  // **The platform anchors, from `riding.buildPlatforms`, which is what ships.**
+  // Both ends seed `RailCut.setStations` from this one call. They did not
+  // always: `main.ts` used `rail-geo.buildNetwork().stations`, which adds a
+  // fallback for stations nothing calls at, and 87 of 29,479 sampled points
+  // along the city's platforms came out with a different half-width from the
+  // server's -- see `world/corridor.ts`' header. A check that seeded it the old
+  // way would be asserting a configuration the build no longer has.
+  const ridingMod = (await import(
+    new URL('../client/src/game/riding.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/game/riding.ts');
+  const anchors = ridingMod.buildPlatforms(bake).sites;
   const cut = new cutMod.RailCut(bake);
-  cut.setStations(net.stations);
+  cut.setStations(anchors);
 
   const gridN = world.terrain.gridN;
   const tileSize = world.terrain.tileSize;
@@ -19227,6 +19269,1607 @@ async function checkRailCutting(): Promise<void> {
       `viaduct under a surface-model DEM ${bridged.toLocaleString()} (excluded by design), ` +
       `no terrain ${noTerrain}`,
   );
+}
+
+/**
+ * The vessel: the railway as a closed solid, proven closed on real bake data.
+ *
+ * ---------------------------------------------------------------------------
+ * **Phase 1 of `STATIONS.md`, and the first check in this file that cannot pass
+ * while the world has a hole in it.**
+ *
+ * Every other rail check above walks a body, probes a point or counts buried
+ * samples, and every one of them can be true of a world with a slot of daylight
+ * along the railway -- because each only asks about the places it happens to
+ * look. Six player reports in one week were all one defect (a gap between two
+ * patches that each thought the other covered it) and three rounds of sampling
+ * checks passed and shipped it anyway.
+ *
+ * `world/vessel.ts` replaces the sample with arithmetic. A vessel is a closed
+ * 2-manifold surface bounding the volume the railway occupies, and
+ * `checkManifold` walks **every edge in the mesh**: each directed edge exactly
+ * once, each with its opposite present, no degenerate face, no two distinct
+ * indices at one position, positive signed volume. There is no threshold in it
+ * and no sampling.
+ *
+ * What this check adds to the module's own self-check is the only thing the
+ * self-check cannot have: **real data**. Synthetic ribs are smooth by
+ * construction. The corridor at Erskineville is a 2.4 m cutting on a real DEM,
+ * with the corridor opening from 5.4 m to 9.4 m at the platform flare, four
+ * roads over the top of it and the ground two metres higher on one side than
+ * the other -- which is where a sweep folds if it is going to.
+ *
+ * Six things:
+ *
+ *   1. The corridor at Erskineville builds at all, from `RailCut`'s own
+ *      half-widths and the DEM's own heights.
+ *   2. **Every vessel is a closed manifold.** Not most; every one, every edge.
+ *   3. The rim ring each one emits is a simple, closed, correctly wound ring of
+ *      the vessel's **own vertices, named by index** -- which is the seam rule,
+ *      and the thing the terrain will consume in Phase 2 instead of
+ *      approximating the same curve a second time.
+ *   4. The same over a whole 512 m chunk's worth of corridor at Redfern, which
+ *      is the busiest and most-flared piece of railway in the extract and the
+ *      one whose rebuild budget is 150 ms.
+ *   5. **The negative controls**, on a real vessel rather than a synthetic one:
+ *      punch a triangle out, flip one, unweld a vertex, collapse a face. Each
+ *      must be caught, and caught as the *right* fault. A checker that cannot
+ *      fail is not a checker.
+ *   6. The cost, printed: triangles per metre and microseconds per vessel,
+ *      against `writeTrench`'s own triangle count over the identical run.
+ */
+async function checkVessels(): Promise<void> {
+  say('--- The vessel: a closed solid on real bake data, and the manifold invariant');
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const bakePath =
+    process.env.SYDNEY_RAIL ??
+    new URL('../data/scratch/rail/rail.bin', import.meta.url).pathname;
+  if (!(await Bun.file(bakePath).exists())) {
+    say(`    no rail bake at ${bakePath}. Skipped.`);
+    return;
+  }
+  const world = await loadWorld(root);
+  const bake = world.rail;
+  if (!bake) {
+    say('    the world carries no rail bake. Skipped.');
+    return;
+  }
+
+  const vesselMod = (await import(
+    new URL('../client/src/world/vessel.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/world/vessel.ts');
+  // Structurally typed for `checkRoadDeck`'s reason: `world/rail-geo.ts` reaches
+  // for `document` to bake its sign textures, so naming its module type here
+  // would drag the DOM lib into the server's tsconfig.
+  const geoMod = (await import(
+    new URL('../client/src/world/rail-geo.ts', import.meta.url).pathname
+  )) as {
+    buildNetwork(bake: unknown): {
+      segments: Array<{
+        ax: number; ay: number; az: number;
+        bx: number; by: number; bz: number;
+        flags: number; len: number; ux: number; uz: number;
+      }>;
+      stations: Array<{ name: string; x: number; z: number; ux: number; uz: number }>;
+    };
+  };
+
+  const net = geoMod.buildNetwork(bake);
+  // The corridor as both ends seed it. See `world/corridor.ts`' header: this
+  // used to be `net.stations` on the client and `buildPlatforms` on the server,
+  // and the two were not the same list.
+  const corridorMod = (await import(
+    new URL('../client/src/world/corridor.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/world/corridor.ts');
+  const cut = corridorMod.corridorCut(bake);
+  const ground = (x: number, z: number): number => world.terrain.height(x, z);
+
+  /** `rail-geo.TRENCH_STEP_M`: how often a wall re-reads the ground. */
+  const STEP_M = 8;
+
+  /**
+   * One segment's corridor, sampled into a spine the vessel can be swept along.
+   *
+   * Deliberately the *same* three sources `writeTrench` uses and in the same
+   * places: the rail head from the bake's own linear interpolation, the
+   * half-width from `RailCut.halfWidthAt` **at the centreline point** (which is
+   * what makes it well defined), and the ground from the DEM sampled at the rim
+   * on each side separately. That is the whole point of Phase 1 -- the vessel is
+   * not a new measurement of the corridor, it is the same measurement assembled
+   * as a solid instead of as four patches.
+   */
+  const spineFor = (seg: {
+    ax: number; ay: number; az: number; bx: number; by: number; bz: number;
+    len: number; ux: number; uz: number;
+  }): VesselSpinePoint[] | null => {
+    const px = -seg.uz;
+    const pz = seg.ux;
+    const steps = Math.max(1, Math.round(seg.len / STEP_M));
+    const out: VesselSpinePoint[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = seg.ax + (seg.bx - seg.ax) * t;
+      const z = seg.az + (seg.bz - seg.az) * t;
+      const railY = seg.ay + (seg.by - seg.ay) * t;
+      const half = cut.halfWidthAt(x, z);
+      const gl = ground(x - px * half, z - pz * half);
+      const gr = ground(x + px * half, z + pz * half);
+      // No terrain under this rib. `writeTrench` builds to a guessed depth and
+      // marks the chunk provisional; a check must not, because a vessel built
+      // on a guess proves nothing about the world.
+      if (!Number.isFinite(gl) || !Number.isFinite(gr)) return null;
+      out.push({ x, z, railY, groundY: [gl, gr], span: [-half, half] });
+    }
+    return out;
+  };
+
+  /** Is this segment one `rail-geo` would put a trench in? Its own question. */
+  const trenched = (seg: {
+    ax: number; az: number; bx: number; bz: number;
+  }): boolean => cut.probeAlong(seg.ax, seg.az, seg.bx, seg.bz, ground).trench;
+
+  type Seg = (typeof net.segments)[number];
+  interface Node { x: number; z: number; y: number }
+
+  /**
+   * Segments chained into continuous runs, for the join block below.
+   *
+   * A run is extended through any node where exactly two trenched segments
+   * meet, and stops at a junction, a portal, a bridge or the end of the
+   * cutting. The quantised key is `RailCut`'s own -- quarter-metre -- because
+   * the bake's polylines share their endpoints exactly and this only has to
+   * survive the round trip through `buildNetwork`'s deduplication.
+   */
+  const chainRuns = (segs: readonly Seg[]): Node[][] => {
+    const q = (v: number): number => Math.round(v * 4);
+    const key = (x: number, z: number): string => `${q(x)},${q(z)}`;
+    const at = new Map<string, Seg[]>();
+    for (const s of segs) {
+      for (const k of [key(s.ax, s.az), key(s.bx, s.bz)]) {
+        const l = at.get(k);
+        if (l) l.push(s);
+        else at.set(k, [s]);
+      }
+    }
+    const used = new Set<Seg>();
+    const step = (k: string, from: Seg): Seg | null => {
+      const l = at.get(k);
+      if (l === undefined || l.length !== 2) return null;
+      const other = l[0] === from ? l[1] : l[0];
+      return used.has(other) ? null : other;
+    };
+    const runs: Node[][] = [];
+    for (const s of segs) {
+      if (used.has(s)) continue;
+      used.add(s);
+      const pts: Node[] = [
+        { x: s.ax, z: s.az, y: s.ay },
+        { x: s.bx, z: s.bz, y: s.by },
+      ];
+      let cur = s;
+      let k = key(s.bx, s.bz);
+      for (;;) {
+        const n = step(k, cur);
+        if (n === null) break;
+        used.add(n);
+        const fromA = key(n.ax, n.az) === k;
+        pts.push(fromA ? { x: n.bx, z: n.bz, y: n.by } : { x: n.ax, z: n.az, y: n.ay });
+        k = fromA ? key(n.bx, n.bz) : key(n.ax, n.az);
+        cur = n;
+      }
+      cur = s;
+      k = key(s.ax, s.az);
+      for (;;) {
+        const n = step(k, cur);
+        if (n === null) break;
+        used.add(n);
+        const fromB = key(n.bx, n.bz) === k;
+        pts.unshift(fromB ? { x: n.ax, z: n.az, y: n.ay } : { x: n.bx, z: n.bz, y: n.by });
+        k = fromB ? key(n.ax, n.az) : key(n.bx, n.bz);
+        cur = n;
+      }
+      runs.push(pts);
+    }
+    return runs;
+  };
+
+  /**
+   * A run's spine: the polyline resampled every `STEP_M`, **keeping its own
+   * vertices**, with the frame at each rib taken from its two neighbours.
+   *
+   * Keeping the vertices is the whole trick. A rib sitting exactly on a network
+   * bend, with a direction averaged across it, is a mitre -- the two panels
+   * either side share that rib's vertices by index and there is nothing between
+   * them to gap.
+   */
+  const spineForRun = (pts: readonly Node[]): VesselSpinePoint[] | null => {
+    const raw: Node[] = [pts[0]];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i];
+      const b = pts[i + 1];
+      const n = Math.max(1, Math.round(Math.hypot(b.x - a.x, b.z - a.z) / STEP_M));
+      for (let k = 1; k <= n; k++) {
+        const t = k / n;
+        raw.push({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, y: a.y + (b.y - a.y) * t });
+      }
+    }
+    if (raw.length < 2) return null;
+    const out: VesselSpinePoint[] = [];
+    for (let i = 0; i < raw.length; i++) {
+      const p = raw[i];
+      const prev = raw[Math.max(0, i - 1)];
+      const next = raw[Math.min(raw.length - 1, i + 1)];
+      let ux = next.x - prev.x;
+      let uz = next.z - prev.z;
+      const l = Math.hypot(ux, uz);
+      if (!(l > 1e-9)) return null;
+      ux /= l;
+      uz /= l;
+      const half = cut.halfWidthAt(p.x, p.z);
+      const gl = ground(p.x + uz * half, p.z - ux * half);
+      const gr = ground(p.x - uz * half, p.z + ux * half);
+      if (!Number.isFinite(gl) || !Number.isFinite(gr)) return null;
+      out.push({ x: p.x, z: p.z, railY: p.y, groundY: [gl, gr], span: [-half, half] });
+    }
+    return out;
+  };
+
+  /** Every trenched segment whose midpoint is within `r` of a point. */
+  const around = (x: number, z: number, r: number) =>
+    net.segments.filter((s) => {
+      const mx = (s.ax + s.bx) / 2;
+      const mz = (s.az + s.bz) / 2;
+      return Math.hypot(mx - x, mz - z) <= r && s.len > 1 && trenched(s);
+    });
+
+  // --- 1. Erskineville: a straightforward surface cutting, 2.4 m below the DEM.
+  //
+  // Chosen over St Peters deliberately. St Peters' clearance ranges from -1.25 m
+  // to -15.57 m over its own platform -- a cutting that becomes an underbridge
+  // at King Street -- and a first proof of a primitive should be made where the
+  // geometry is ordinary, so that a failure is a failure of the primitive and
+  // not of the hardest site in the extract.
+  const ERSK = { x: -2150.97, z: 3606.35 };
+  const erskSegments = around(ERSK.x, ERSK.z, 300);
+  check(
+    erskSegments.length > 10,
+    `${erskSegments.length} trenched segments of corridor within 300 m of Erskineville, which is ` +
+      `the run the vessels below are built over. A zero here would make every assertion after it ` +
+      `vacuous`,
+  );
+
+  interface Built {
+    vessel: NonNullable<ReturnType<typeof vesselMod.buildCorridorVessel>['vessel']>;
+    metres: number;
+  }
+  const built: Built[] = [];
+  const failedToBuild: string[] = [];
+  let noTerrain = 0;
+  let buildMicros = 0;
+  for (const seg of erskSegments) {
+    const spine = spineFor(seg);
+    if (spine === null) {
+      noTerrain++;
+      continue;
+    }
+    const t0 = performance.now();
+    const b = vesselMod.buildCorridorVessel('trench', spine);
+    buildMicros += (performance.now() - t0) * 1000;
+    if (b.vessel === null) {
+      failedToBuild.push(
+        `${seg.ax.toFixed(0)}, ${seg.az.toFixed(0)}: ${b.faults.slice(0, 2).join('; ')}`,
+      );
+      continue;
+    }
+    built.push({ vessel: b.vessel, metres: seg.len });
+  }
+
+  check(
+    failedToBuild.length === 0 && built.length > 10,
+    `${built.length} corridor vessels swept from the real bake at Erskineville, ` +
+      `${failedToBuild.length} refused` +
+      (failedToBuild.length ? `: ${failedToBuild.slice(0, 3).join(' | ')}` : '') +
+      (noTerrain ? ` (${noTerrain} skipped for unloaded terrain)` : ''),
+  );
+
+  // --- 2. THE INVARIANT. Every edge of every vessel, not a sample of them.
+  let closed = 0;
+  let checkMicros = 0;
+  let triangles = 0;
+  let metres = 0;
+  let slivers = 0;
+  const notClosed: string[] = [];
+  for (const b of built) {
+    const t0 = performance.now();
+    const r = vesselMod.checkManifold(b.vessel);
+    checkMicros += (performance.now() - t0) * 1000;
+    triangles += b.vessel.triangles;
+    metres += b.metres;
+    slivers += r.sliverFaces;
+    if (r.faults.length === 0 && r.genus === 0) closed++;
+    else notClosed.push(`${vesselMod.describeManifold(r)}: ${r.faults.join('; ')}`);
+  }
+  check(
+    built.length > 0 && closed === built.length,
+    `all ${closed} of ${built.length} Erskineville corridor vessels are closed 2-manifolds -- every ` +
+      `edge shared by exactly two faces, consistently wound, no degenerate face, no two vertices at ` +
+      `one point, positive volume. This is arithmetic over ${triangles.toLocaleString()} triangles, ` +
+      `not a sample of them` +
+      (notClosed.length ? `. FAILED: ${notClosed.slice(0, 2).join(' | ')}` : ''),
+  );
+
+  // --- 3. The seam rule: the rim is a ring of the vessel's own vertices.
+  //
+  // The claim `STATIONS.md` says the design lives or dies on. Every one of these
+  // would still be true of a ring that was an independent copy of the same
+  // curve, *except the last*, which is the one that matters: a rim vertex is a
+  // vertex the surface's own faces use, named by index. There is nothing for a
+  // terrain triangulator to re-approximate and therefore no tolerance for it to
+  // meet the vessel at.
+  let ringsGood = 0;
+  const ringBad: string[] = [];
+  for (const b of built) {
+    const { position, rim, index } = b.vessel;
+    const V = position.length / 3;
+    const used = new Set<number>(index);
+    const problems: string[] = [];
+    if (rim.length !== new Set(rim).size) problems.push('names a vertex twice');
+    if (![...rim].every((i) => i < V)) problems.push('names a vertex outside the mesh');
+    if (![...rim].every((i) => used.has(i))) problems.push('names a vertex no face uses');
+    if (!(vesselMod.ringArea(position, rim) > 0)) problems.push('is not counter-clockwise in plan');
+    if (vesselMod.ringSelfIntersects(position, rim)) problems.push('crosses itself in plan');
+    if (problems.length === 0) ringsGood++;
+    else ringBad.push(problems.join(', '));
+  }
+  check(
+    built.length > 0 && ringsGood === built.length,
+    `all ${ringsGood} rim rings are simple, closed, counter-clockwise in plan, and made of the ` +
+      `vessel's own vertices named by index -- so the terrain can be triangulated *to* them rather ` +
+      `than meeting them at a tolerance, which is the seam rule and the whole redesign` +
+      (ringBad.length ? `. FAILED: ${ringBad.slice(0, 2).join(' | ')}` : ''),
+  );
+
+  // --- 4. A whole chunk's worth, at the site with the rebuild budget.
+  //
+  // Redfern, because `rail-geo`'s 512 m chunk rebuild there is already ~150 ms
+  // and that is the budget any Phase 2 conversion has to fit inside. Seven
+  // platforms, the widest flare in the extract, and the corridor the reported
+  // "slab through the train" was at.
+  const REDFERN = { x: -969.49, z: 2604.22 };
+  const chunkSegments = around(REDFERN.x, REDFERN.z, 256);
+  let chunkTris = 0;
+  let chunkClosed = 0;
+  let chunkTotal = 0;
+  let chunkMicros = 0;
+  for (const seg of chunkSegments) {
+    const spine = spineFor(seg);
+    if (spine === null) continue;
+    const t0 = performance.now();
+    const b = vesselMod.buildCorridorVessel('trench', spine);
+    const r = b.vessel === null ? null : vesselMod.checkManifold(b.vessel);
+    chunkMicros += (performance.now() - t0) * 1000;
+    chunkTotal++;
+    if (b.vessel !== null && r !== null && r.faults.length === 0) {
+      chunkClosed++;
+      chunkTris += b.vessel.triangles;
+    }
+  }
+  check(
+    chunkTotal > 0 && chunkClosed === chunkTotal,
+    `and all ${chunkClosed} of ${chunkTotal} vessels over a 512 m chunk at Redfern are closed too, ` +
+      `${chunkTris.toLocaleString()} triangles, built **and checked** in ${(chunkMicros / 1000).toFixed(1)} ms ` +
+      `against the 150 ms that chunk's rebuild already costs`,
+  );
+
+  // --- 5. The negative controls, on a real vessel.
+  //
+  // Half the value of the invariant is here. `checkManifold` returning "closed"
+  // for every vessel in the city is indistinguishable from `checkManifold`
+  // returning "closed" for everything, and the second is a function that has
+  // silently stopped working. Each control breaks exactly one thing and each
+  // must be caught as *that* thing.
+  const sample = built[Math.floor(built.length / 2)]?.vessel;
+  if (!sample) {
+    check(false, 'no Erskineville vessel survived to run the negative controls against');
+  } else {
+    const hole = vesselMod.checkManifold(vesselMod.punchHole(sample, 7));
+    const flip = vesselMod.checkManifold(vesselMod.flipFace(sample, 7));
+    const weld = vesselMod.checkManifold(vesselMod.splitVertex(sample, 7));
+    const dead = vesselMod.checkManifold(vesselMod.collapseFace(sample, 7));
+    check(
+      hole.boundaryEdges === 3 && hole.faults.length > 0,
+      `punching one triangle out of a real Erskineville vessel leaves exactly 3 boundary edges and ` +
+        `the check screams (${hole.boundaryEdges}). This is the hole the player falls through, and ` +
+        `it is the control that proves the line above is not vacuous`,
+    );
+    check(
+      flip.nonManifoldEdges === 3 && weld.duplicateVertices === 1 && dead.degenerateFaces === 1,
+      `and a flipped face gives ${flip.nonManifoldEdges} doubled directed edges, an unwelded vertex ` +
+        `${weld.duplicateVertices} duplicate position, a collapsed face ${dead.degenerateFaces} ` +
+        `degenerate face -- each caught as itself, so a control cannot pass by tripping a different ` +
+        `fault. The unwelded vertex is the important one: it is two modules each emitting their own ` +
+        `copy of a shared boundary vertex, which is the defect the whole redesign exists to delete`,
+    );
+  }
+
+  // --- 5b. THE JOIN, which is where per-segment vessels stop being enough.
+  //
+  // ---------------------------------------------------------------------------
+  // **A closed vessel per segment does not give a closed corridor, and this is
+  // the finding that changes the Phase 2 plan.**
+  //
+  // Each vessel above is individually manifold, provably. Two of them abutting
+  // at a shared endpoint are not: the corridor turns at that node, so segment
+  // A's end cap and segment B's start cap are not coplanar, and the outside of
+  // the turn is left with a wedge of daylight between two rim rings that never
+  // meet. Measured over every one of the 7,443 shared endpoints between two
+  // trenched segments in the extract: median turn 1.6 degrees, p90 4.7, p99 8.0
+  // -- which at a 9.4 m station half-width is a rim gap of 26 cm, 76 cm and
+  // 1.31 m. **1,908 joins gap by more than half a metre.** That is precisely the
+  // defect the whole redesign exists to delete, reappearing one level up.
+  //
+  // `writeTrench` gets away with it today by overlapping consecutive segments
+  // half a metre at each end (`ext = 0.5`) -- a fudge that works only because
+  // its wall is a surface with no inside, and one a solid cannot use.
+  //
+  // The fix is not a join *object*. It is to stop cutting the corridor up:
+  // sweep one vessel per **run** of trenched segments, with a rib at every
+  // network vertex, and the bend is mitred by the frame-averaging
+  // `buildCorridorVessel` already does. There is then no interior join to gap,
+  // because there is no interior join. This block proves it at Erskineville and
+  // is the shape Phase 2 should take.
+  const runs = chainRuns(erskSegments);
+  let runTris = 0;
+  let runsClosed = 0;
+  const runFaults: string[] = [];
+  for (const run of runs) {
+    const spine = spineForRun(run);
+    if (spine === null) continue;
+    const b = vesselMod.buildCorridorVessel('trench', spine);
+    if (b.vessel === null) {
+      runFaults.push(b.faults[0]);
+      continue;
+    }
+    const r = vesselMod.checkManifold(b.vessel);
+    if (r.faults.length || vesselMod.ringSelfIntersects(b.vessel.position, b.vessel.rim)) {
+      runFaults.push(vesselMod.describeManifold(r));
+      continue;
+    }
+    runsClosed++;
+    runTris += b.vessel.triangles;
+  }
+  check(
+    runs.length > 0 && runsClosed === runs.length && runTris > 0 && runTris < triangles,
+    `the same corridor swept as ${runs.length} continuous run${runs.length === 1 ? '' : 's'} instead ` +
+      `of ${built.length} segments is closed in ${runsClosed} of ${runs.length} cases and costs ` +
+      `${runTris.toLocaleString()} triangles instead of ${triangles.toLocaleString()} -- fewer, ` +
+      `because the ${built.length - runs.length} interior end caps go away. Those caps are not ` +
+      `waste, they are the bug: two abutting closed vessels leave a wedge on the outside of every ` +
+      `bend (city-wide: 1,908 of 7,443 joins gap by over half a metre). Phase 2 sweeps per run` +
+      (runFaults.length ? `. FAILED: ${runFaults.slice(0, 2).join(' | ')}` : ''),
+  );
+
+  // --- 6. What it costs, printed rather than asserted.
+  //
+  // `writeTrench`'s own triangle count over the identical run, so the comparison
+  // is like for like: per side, one rib every `TRENCH_STEP_M`, four quads per
+  // rib pair (cess, wall, coping top, coping face) and one closing quad at each
+  // end. It is *not* the whole of what a vessel replaces -- `writeVerge`,
+  // `writeFormation`, the road-deck soffit and the terrain sub-quads the carve
+  // drops are all in the same footprint -- so the honest reading of the ratio
+  // below is "the vessel costs about this much more than the walls alone, and
+  // supplies the floor, the buried skin and the closure as well".
+  let patchTris = 0;
+  for (const b of built) {
+    const ribs = Math.max(1, Math.round(b.metres / STEP_M)) + 1;
+    patchTris += 2 * ((ribs - 1) * 4 * 2 + 2 * 2);
+  }
+  say(
+    `    Erskineville: ${built.length} vessels over ${metres.toFixed(0)} m, ` +
+      `${triangles.toLocaleString()} triangles (${(triangles / metres).toFixed(1)} per metre) ` +
+      `against ${patchTris.toLocaleString()} for writeTrench's walls alone over the same run ` +
+      `(${(triangles / patchTris).toFixed(2)}x), ${slivers} slivers`,
+  );
+  say(
+    `    cost: sweep ${(buildMicros / built.length).toFixed(0)} us per vessel, ` +
+      `manifold check ${(checkMicros / built.length).toFixed(0)} us per vessel ` +
+      `(${(checkMicros / triangles).toFixed(2)} us per triangle). The check is cheap enough to run ` +
+      `on every vessel in every build, which is what makes it an invariant rather than an errand`,
+  );
+}
+
+/**
+ * Phase 2a: the terrain conformed to the rim, and the ground query evaluated
+ * from the sweep. One station's corridor, end to end.
+ *
+ * ---------------------------------------------------------------------------
+ * `checkVessels` above proves a vessel is a closed solid. That was Phase 1 and
+ * it changed nothing about the world, because nothing consumed the ring it
+ * emits. This proves the two things that consume it, and they are the two halves
+ * of one seam:
+ *
+ *   - **the terrain stops exactly at the rim**, using the rim's own vertices,
+ *     with no tolerance anywhere on the path and no second approximation of the
+ *     same curve;
+ *   - **a body's feet are answered by the sweep**, on both ends of the wire,
+ *     from the same module, so a client and a server cannot disagree about the
+ *     floor.
+ *
+ * The assertions are areas and exact equalities rather than samples wherever
+ * that is available, for the reason this whole redesign exists: every rail check
+ * written before Phase 1 could be true of a world with a slot of daylight in it.
+ *
+ * Eleven things:
+ *
+ *   1. The terrain lattice is **global** -- every tile origin an exact multiple
+ *      of the 3.90625 m sub-quad pitch. Everything below rests on it.
+ *   2. Every run at Erskineville is still a closed manifold **after** absorbing
+ *      the lattice crossings into its own rim.
+ *   3. Every crossing is in the rim, at the coordinates it was computed at, bit
+ *      for bit. This is the seam rule at the second seam.
+ *   4. Every rim vertex sits **on the DEM**, exactly, so the ground meets the
+ *      coping with no step as well as no gap.
+ *   5. The drawn ground plus the footprint is the tile, to a millionth. Built by
+ *      the real `buildTerrainMesh`.
+ *   6. No terrain triangle is inside the footprint. The negative control for 5.
+ *   7. The evaluation and the mesh agree **exactly**, over thousands of samples.
+ *   8. The prescribed profile evaluation does **not**, measured -- which is the
+ *      correction Phase 2a makes to `STATIONS.md`.
+ *   9. Two module instances build the identical corridor, compared with
+ *      `Object.is`. The client-server claim.
+ *  10. The walks: along the trench, along the rim, across the rim, at the ends.
+ *  11. The cost, printed.
+ */
+async function checkVesselSeam(): Promise<void> {
+  say('--- Phase 2a: the ground triangulated to the rim, and the feet answered by the sweep');
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const bakePath =
+    process.env.SYDNEY_RAIL ?? new URL('../data/scratch/rail/rail.bin', import.meta.url).pathname;
+  if (!(await Bun.file(bakePath).exists())) {
+    say(`    no rail bake at ${bakePath}. Skipped.`);
+    return;
+  }
+  const world = await loadWorld(root);
+  if (!world.rail) {
+    say('    the world carries no rail bake. Skipped.');
+    return;
+  }
+
+  const here = new URL('../client/src/world/corridor.ts', import.meta.url).pathname;
+  const corridorMod = (await import(here)) as typeof import('../client/src/world/corridor.ts');
+  const seamMod = (await import(
+    new URL('../client/src/world/seam.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/world/seam.ts');
+  const vesselMod = (await import(
+    new URL('../client/src/world/vessel.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/world/vessel.ts');
+  const fieldMod = (await import(
+    new URL('../client/src/world/vessel-field.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/world/vessel-field.ts');
+  const terrainMod = (await import(
+    new URL('../client/src/world/terrain.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/world/terrain.ts');
+
+  // --- 0. The modules' own self-checks, in this process as well as in a browser.
+  {
+    const bad = vesselMod.verifyVessels();
+    check(
+      bad.length === 0,
+      `world/vessel.ts' own self-check passes: four dispositions, the rim, the rim cuts, the fold, the ` +
+        `four negative controls -- and Phase 3's **transition rib**, a cutting that grows a platform ` +
+        `deck and loses it again, asserted to be one closed component and asserted to be caught when ` +
+        `it is faked with two vessels butted at one rib` + (bad.length ? ` -- ${bad[0]}` : ''),
+    );
+  }
+  {
+    const bad = seamMod.verifySeam();
+    check(
+      bad.length === 0,
+      `world/seam.ts' own self-check passes: over four synthetic footprints and a pair of ` +
+        `overlapping corridors, the ground the cells keep plus the ground the rims enclose adds ` +
+        `up to the ground there was` + (bad.length ? ` -- ${bad[0]}` : ''),
+    );
+  }
+
+  const tileSize = world.index.tile_size;
+  const gridN = world.index.terrain.grid;
+  const SUB = 8;
+  const pitch = tileSize / gridN / SUB;
+  const lattice = { pitch };
+
+  // --- 1. The lattice is global, which is what makes a crossing one number.
+  {
+    let offGrid = 0;
+    let worst = '';
+    for (const t of world.index.tiles) {
+      for (const v of [t.bounds[0], t.bounds[1], t.bounds[2], t.bounds[3]]) {
+        if (v / pitch !== Math.round(v / pitch)) {
+          offGrid++;
+          worst ||= `${t.key} at ${v}`;
+        }
+      }
+    }
+    check(
+      offGrid === 0 && pitch === 3.90625,
+      `the terrain sub-quad lattice is ${pitch} m and every one of ${world.index.tiles.length.toLocaleString()} ` +
+        `tiles has all four bounds on an exact multiple of it (${offGrid} off${worst ? `, first ${worst}` : ''}). ` +
+        `That is what makes "where the rim crosses line m" one number rather than one per tile, and ` +
+        `it is the premise the whole no-epsilon argument below rests on`,
+    );
+  }
+
+  const cut = corridorMod.corridorCut(world.rail);
+  const ground = (x: number, z: number): number => world.terrain.height(x, z);
+  const ERSK = { x: -2150.97, z: 3606.35 };
+  const t0 = performance.now();
+  const built = corridorMod.buildCorridor(world.rail, cut, ground, lattice, { at: ERSK, radius: 300 });
+  const buildMs = performance.now() - t0;
+
+  check(
+    built.runs.length >= 2 && built.tracks > built.runs.length && built.refused.length === 0,
+    `${built.tracks} track runs at Erskineville group into ${built.runs.length} formations, swept from ` +
+      `the real bake, ${built.refused.length} refused${built.refused.length ? `: ${built.refused[0]}` : ''}` +
+      `${built.noTerrain ? ` (${built.noTerrain} skipped for unloaded terrain)` : ''}`,
+  );
+
+  // --- 2. Still closed, after the rim has absorbed the lattice.
+  {
+    let closed = 0;
+    let cuts = 0;
+    let metres = 0;
+    const faults: string[] = [];
+    for (const run of built.runs) {
+      cuts += run.cuts;
+      metres += run.metres;
+      const r = vesselMod.checkManifold(run.vessel);
+      if (r.faults.length === 0 && r.genus === 0) closed++;
+      else faults.push(`${vesselMod.describeManifold(r)}: ${r.faults[0]}`);
+    }
+    check(
+      built.runs.length > 0 && closed === built.runs.length,
+      `all ${closed} of ${built.runs.length} runs are **still** closed 2-manifolds after their rim ` +
+        `edges were split at ${cuts.toLocaleString()} lattice crossings over ${metres.toFixed(0)} m -- ` +
+        `every edge shared by exactly two faces, consistently wound, positive volume. The split is a ` +
+        `change to the solid and is re-proved as one, not trusted` +
+        (faults.length ? `. FAILED: ${faults[0]}` : ''),
+    );
+  }
+
+  // --- 3. The crossings are *in* the rim, at the value they were computed at.
+  //
+  // The seam rule, at the second seam. Under the alternative -- a table the
+  // terrain reads and the vessel does not -- every one of these would be a
+  // vertex on the interior of an edge the vessel draws as one quad, which is a
+  // T-junction: two descriptions of one edge, which is the defect, smaller.
+  {
+    let missing = 0;
+    let total = 0;
+    let firstMissing = '';
+    for (const run of built.runs) {
+      const wanted = seamMod.latticeCuts(run.vessel, lattice);
+      const have = new Set<string>();
+      for (const i of run.vessel.rim) {
+        const p = run.vessel.position;
+        have.add(`${p[i * 3]},${p[i * 3 + 1]},${p[i * 3 + 2]}`);
+      }
+      for (const c of wanted) {
+        total++;
+        if (!have.has(`${c.x},${c.y},${c.z}`)) {
+          missing++;
+          firstMissing ||= `${c.x.toFixed(4)}, ${c.z.toFixed(4)}`;
+        }
+      }
+    }
+    check(
+      total > 100 && missing === 0,
+      `all ${total.toLocaleString()} lattice crossings of the rim are vertices **of the rim**, at ` +
+        `bit-identical coordinates${firstMissing ? ` (${missing} missing, first ${firstMissing})` : ''} -- ` +
+        `so the terrain names them by index like every other rim vertex and there is no T-junction ` +
+        `for a tile boundary to reopen. This is the question Phase 1 left, answered by deleting it`,
+    );
+  }
+
+  // --- 4. And the rim is the DEM, vertically. The other axis of the same seam.
+  {
+    let worst = 0;
+    let n = 0;
+    let where = '';
+    for (const run of built.runs) {
+      const p = run.vessel.position;
+      const seam = run.vessel.ribSeam;
+      for (let i = 0; seam !== null && i < run.vessel.ribCount; i++) {
+        for (const side of [0, 1]) {
+          const v = seam[i * 2 + side] * 3;
+          const g = ground(p[v], p[v + 2]);
+          if (!Number.isFinite(g)) continue;
+          n++;
+          const d = Math.abs(g - p[v + 1]);
+          if (d > worst) {
+            worst = d;
+            where = `${p[v].toFixed(1)}, ${p[v + 2].toFixed(1)}`;
+          }
+        }
+      }
+    }
+    check(
+      n > 100 && worst === 0,
+      `and all ${n} rim vertices sit **on** the DEM: the worst disagreement between a rim vertex's ` +
+        `own height and ${'`TerrainField.height`'} at its own x, z is ${worst.toFixed(6)} m` +
+        `${worst ? ` at ${where}` : ''}. So the ground meets the coping with no step as well as no ` +
+        `gap, and ${'`writeTrench`'}'s half-metre outward coping lap has nothing left to hide`,
+    );
+  }
+
+  // --- 5 and 6. The drawn ground, by the real builder.
+  const tx = Math.floor(ERSK.x / tileSize);
+  const tz = Math.floor(-ERSK.z / tileSize);
+  const tileKey = `${tx}_${tz}`;
+  const grid = world.terrain.grid(tileKey);
+  if (grid === undefined) {
+    check(false, `tile ${tileKey} carries no terrain grid, so the drawn ground could not be checked`);
+  } else {
+    const originX = tx * tileSize;
+    const originZ = -tz * tileSize;
+    const material = {} as never;
+    const conformed = terrainMod.buildTerrainMesh(grid, gridN, tileSize, material, null, {
+      originX, originZ, field: built.seam,
+    });
+    const plain = terrainMod.buildTerrainMesh(grid, gridN, tileSize, material, null, null);
+    /** Plan area of the up-facing triangles, and the centroids of them. */
+    const upFacing = (mesh: {
+      geometry: {
+        getAttribute(n: string): { getX(i: number): number; getY(i: number): number; getZ(i: number): number };
+        getIndex(): { count: number; getX(i: number): number } | null;
+      };
+    }): { area: number; centroids: Array<[number, number]> } => {
+      const pos = mesh.geometry.getAttribute('position');
+      const idx = mesh.geometry.getIndex()!;
+      let area = 0;
+      const centroids: Array<[number, number]> = [];
+      for (let f = 0; f < idx.count / 3; f++) {
+        const i0 = idx.getX(f * 3);
+        const i1 = idx.getX(f * 3 + 1);
+        const i2 = idx.getX(f * 3 + 2);
+        const ax = pos.getX(i0), az = pos.getZ(i0);
+        const bx = pos.getX(i1), bz = pos.getZ(i1);
+        const cx = pos.getX(i2), cz = pos.getZ(i2);
+        const s = ((bx - ax) * (cz - az) - (bz - az) * (cx - ax)) / 2;
+        // Clockwise in plan is up in world -- the ground's own quads are
+        // `(nw, se, ne)`. See `buildTerrainMesh`.
+        if (!(s < 0)) continue;
+        area += -s;
+        centroids.push([originX + (ax + bx + cx) / 3, originZ + (az + bz + cz) / 3]);
+      }
+      return { area, centroids };
+    };
+    const kept = upFacing(conformed);
+    const whole = upFacing(plain);
+    // What the footprint takes inside this tile, by cell census over the seam.
+    const m0 = Math.round(originX / pitch);
+    const n0 = Math.round((originZ - tileSize) / pitch);
+    const per = Math.round(tileSize / pitch);
+    const cellArea = pitch * pitch;
+    let taken = 0;
+    let crossed = 0;
+    let refusedCells = 0;
+    const cellFaults: string[] = [];
+    for (let m = m0; m < m0 + per; m++) {
+      for (let n = n0; n < n0 + per; n++) {
+        const st = built.seam.state(m, n);
+        if (st === seamMod.CELL_INSIDE) {
+          taken += cellArea;
+          continue;
+        }
+        if (st !== seamMod.CELL_CROSSED) continue;
+        crossed++;
+        const loops = built.seam.conform(m, n, cellFaults);
+        if (loops === null) {
+          refusedCells++;
+          taken += cellArea;
+          continue;
+        }
+        let keptHere = 0;
+        for (const loop of loops) {
+          let a = 0;
+          for (let i = 0; i < loop.length; i++) {
+            const p = loop[i];
+            const q = loop[(i + 1) % loop.length];
+            a += p.x * q.z - q.x * p.z;
+          }
+          keptHere += a / 2;
+        }
+        taken += cellArea - keptHere;
+      }
+    }
+    const residual = kept.area + taken - whole.area;
+    check(
+      Math.abs(residual) < 1e-3 && (conformed.userData.seamTriangles as number) > 100,
+      `tile ${tileKey}: the ground the conformer draws (${kept.area.toFixed(1)} m2) plus the ground ` +
+        `the rim encloses (${taken.toFixed(1)} m2) is ${(kept.area + taken).toFixed(1)} m2 against the ` +
+        `${whole.area.toFixed(0)} m2 the uncut tile draws -- a residual of ${residual.toFixed(6)} m2 over a ` +
+        `${(tileSize * tileSize).toLocaleString()} m2 tile. ${conformed.userData.seamTriangles} of its ` +
+        `triangles are built **to the vessel's own vertices**. No ground is owned twice and none is ` +
+        `owned by nobody, which is the entire claim`,
+    );
+    check(
+      (conformed.userData.seamRefused as number) === 0 || refusedCells > 0,
+      `and the ${conformed.userData.seamRefused} cell${conformed.userData.seamRefused === 1 ? '' : 's'} ` +
+        `the trace refused in this tile are exactly the ${refusedCells} the census refuses -- cells where ` +
+        `two rims properly cross inside one 3.9 m square, which is the junction case ${'`STATIONS.md`'} ` +
+        `enumerates, at cell scale. A refused cell is **dropped**, so the residual above is the bound ` +
+        `on what it costs` +
+        ((conformed.userData.seamFaults as string[]).length ? `. First: ${(conformed.userData.seamFaults as string[])[0]}` : ''),
+    );
+
+    // --- 6. The negative control that makes 5 mean something: not one triangle
+    // of the drawn ground has its centroid inside the footprint. A ground sheet
+    // across a trench is a floor over a hole and looks exactly like the world
+    // working, which is why this is asserted separately from an area.
+    let insideDrawn = 0;
+    let firstInside = '';
+    for (const [x, z] of kept.centroids) {
+      if (built.seam.state(Math.floor(x / pitch), Math.floor(z / pitch)) !== seamMod.CELL_INSIDE) continue;
+      insideDrawn++;
+      firstInside ||= `${x.toFixed(1)}, ${z.toFixed(1)}`;
+    }
+    let plainInside = 0;
+    for (const [x, z] of whole.centroids) {
+      if (built.seam.state(Math.floor(x / pitch), Math.floor(z / pitch)) === seamMod.CELL_INSIDE) plainInside++;
+    }
+    check(
+      insideDrawn === 0 && plainInside > 0,
+      `not one of the ${kept.centroids.length.toLocaleString()} drawn ground triangles has its centroid ` +
+        `in a cell the railway owns${firstInside ? ` (${insideDrawn}, first at ${firstInside})` : ''}, where ` +
+        `the same builder with no seam puts ${plainInside} of them straight over the corridor. The second ` +
+        `number is small because an uncut tile's triangles are 31 m across and a corridor is 11 m wide -- ` +
+        `which is the whole reason the *area* above is the real statement and this is only its control`,
+    );
+  }
+
+  // --- 7. The evaluation is the mesh. Exactly.
+  {
+    let samples = 0;
+    let disagree = 0;
+    let worst = 0;
+    let where = '';
+    for (const run of built.runs) {
+      for (let i = 0; i < run.spine.length - 1; i++) {
+        const a = run.spine[i];
+        const b = run.spine[i + 1];
+        let ux = b.x - a.x;
+        let uz = b.z - a.z;
+        const l = Math.hypot(ux, uz);
+        if (!(l > 0)) continue;
+        ux /= l;
+        uz /= l;
+        for (let f = 1; f < 4; f++) {
+          for (let k = -9; k <= 9; k++) {
+            const t = f / 4;
+            const cx = a.x + (b.x - a.x) * t;
+            const cz = a.z + (b.z - a.z) * t;
+            const o = a.span[0] + ((k + 9) / 18) * (a.span[1] - a.span[0]);
+            const x = cx - uz * o;
+            const z = cz + ux * o;
+            // The oracle: every face of every vessel, by brute force, with no
+            // index anywhere near it.
+            let oracle = -Infinity;
+            for (const q of built.runs) {
+              const h = fieldMod.meshHeight(q.vessel, x, z);
+              if (h > oracle) oracle = h;
+            }
+            if (oracle === -Infinity) continue;
+            samples++;
+            const got = built.field.surfaceAt(x, z);
+            if (!Object.is(got, oracle)) {
+              disagree++;
+              const d = Math.abs(got - oracle);
+              if (d > worst) {
+                worst = d;
+                where = `${x.toFixed(1)}, ${z.toFixed(1)}`;
+              }
+            }
+          }
+        }
+      }
+    }
+    check(
+      samples > 2000 && disagree === 0,
+      `the ground query and the drawn surface agree at all ${samples.toLocaleString()} sampled points ` +
+        `across the Erskineville corridor -- compared with ${'`Object.is`'}, not a tolerance` +
+        `${disagree ? `; ${disagree} disagree, worst ${worst.toFixed(4)} m at ${where}` : ''}. The fast ` +
+        `path reaches one cell of a plan index and looks at the eight faces one rib segment emitted; ` +
+        `the oracle looks at every face of every vessel. They are one definition asked twice`,
+    );
+  }
+
+  // --- 8. And the form `STATIONS.md` prescribed, which is not that.
+  {
+    let n = 0;
+    let sum = 0;
+    let worst = 0;
+    let over = 0;
+    for (const run of built.runs) {
+      for (let i = 0; i < run.spine.length - 1; i++) {
+        const a = run.spine[i];
+        const b = run.spine[i + 1];
+        let ux = b.x - a.x;
+        let uz = b.z - a.z;
+        const l = Math.hypot(ux, uz);
+        if (!(l > 0)) continue;
+        ux /= l;
+        uz /= l;
+        for (let f = 1; f < 8; f++) {
+          for (let k = -9; k <= 9; k++) {
+            const t = f / 8;
+            const o = a.span[0] + ((k + 9) / 18) * (a.span[1] - a.span[0]);
+            const x = a.x + (b.x - a.x) * t - uz * o;
+            const z = a.z + (b.z - a.z) * t + ux * o;
+            const mesh = fieldMod.meshHeight(run.vessel, x, z);
+            if (mesh === -Infinity) continue;
+            const prof = fieldMod.profileHeight({ vessel: run.vessel, ribs: run.ribs }, x, z);
+            if (prof === -Infinity) continue;
+            const d = Math.abs(prof - mesh);
+            n++;
+            sum += d;
+            if (d > worst) worst = d;
+            if (d > 0.001) over++;
+          }
+        }
+      }
+    }
+    check(
+      n > 2000 && worst > 0.01,
+      `**and the prescription is wrong, measured.** "Project to the centreline, interpolate the ` +
+        `profile, take the lateral offset" is a *bilinear* surface and the sweep does not draw one: a ` +
+        `swept quad on a turning centreline is skew, so bilinear and planar agree at the four corners ` +
+        `and nowhere between. Over ${n.toLocaleString()} samples it differs from the drawn floor by a ` +
+        `mean of ${(1000 * sum / n).toFixed(2)} mm and a worst of ${(1000 * worst).toFixed(0)} mm, with ` +
+        `${((100 * over) / n).toFixed(0)}% over a millimetre. So the sweep's authority includes its ` +
+        `**triangulation rule**, and the evaluation reads that rather than re-deriving a surface the ` +
+        `sweep never had`,
+    );
+  }
+
+  // --- 9. Two instances of the module, one corridor. The client-server claim.
+  {
+    const two = (await import(`${here}?instance=2`)) as typeof import('../client/src/world/corridor.ts');
+    check(two.buildCorridor !== corridorMod.buildCorridor, 'the two corridor module instances really are separate');
+    const other = two.buildCorridor(world.rail, two.corridorCut(world.rail), ground, lattice, {
+      at: ERSK, radius: 300,
+    });
+    let drift = 0;
+    let firstDrift = '';
+    if (other.runs.length !== built.runs.length) {
+      drift++;
+      firstDrift = `${other.runs.length} runs against ${built.runs.length}`;
+    } else {
+      for (let r = 0; r < built.runs.length; r++) {
+        const a = built.runs[r].vessel;
+        const b = other.runs[r].vessel;
+        if (a.position.length !== b.position.length || a.index.length !== b.index.length) {
+          drift++;
+          firstDrift ||= `run ${r} has a different vertex or face count`;
+          continue;
+        }
+        for (let i = 0; i < a.position.length; i++) {
+          if (!Object.is(a.position[i], b.position[i])) {
+            drift++;
+            firstDrift ||= `run ${r} vertex ${Math.floor(i / 3)}: ${a.position[i]} vs ${b.position[i]}`;
+            break;
+          }
+        }
+      }
+    }
+    check(
+      drift === 0 && built.runs.length > 0,
+      `two separately-evaluated copies of ${'`world/corridor.ts`'}, handed the same bake and the same ` +
+        `DEM, build ${built.runs.length} vessels whose every vertex is bit-identical -- compared with ` +
+        `${'`Object.is`'}${firstDrift ? `; ${firstDrift}` : ''}. That is the claim the client and the ` +
+        `server rest on: not "the two agree today" but "there is one assembly and it is asked twice"`,
+    );
+  }
+
+  // --- 10. The walks.
+  //
+  // Measurements rather than assertions where a number says more than a
+  // predicate, which is Phase 1's own standard for this section.
+  {
+    // **The flag-on configuration, exactly.** `groundFor` reads `world.vessels`,
+    // which `loadWorld` fills only under `SYDNEY_VESSELS=1`; handing it the field
+    // this check has already built is the same wiring with the same object, and
+    // it is what makes these walks a test of the shipped path rather than of a
+    // model of it.
+    world.vessels = built.field;
+    const probe = groundFor(world);
+    const at = (x: number, z: number, feet: number): number => probe.groundHeight(x, z, feet);
+    /**
+     * The **ground** under a point: the vessel where it answers, the DEM where
+     * it does not, and nothing else.
+     *
+     * Deliberately not `groundFor`, and the difference is the point of having
+     * both. `groundFor` folds in `CollisionWorld.roofHeight`, so a body beside a
+     * cutting steps onto the roof of whatever building stands there -- which is
+     * correct, is what a player experiences, and is measured by the walk above.
+     * It is also useless for measuring a *seam*: at Erskineville it puts the
+     * body 13 m up on a warehouse that `elevated.py` has never heard of a
+     * railway under (`RAIL-VERTICAL.md` §5, still failing at 345 cells), and the
+     * crack measurement would be reporting that instead.
+     */
+    const groundOnly = (x: number, z: number): number => {
+      const v = built.field.surfaceAt(x, z);
+      return v > -Infinity ? v : world.terrain.height(x, z);
+    };
+    /**
+     * Is this point outside every vessel -- ordinary ground, rather than the
+     * inside of a neighbouring trench?
+     *
+     * Asked of the **field**, not of the seam's cell states, and the difference
+     * caught a wrong measurement: a point ten centimetres outside a rim is in
+     * the same 3.9 m cell the rim runs through, so the cell is `CELL_CROSSED`
+     * and a cell-state test rejects every rim edge in the extract. The field
+     * answers about the point, which is the question. It is also exactly the
+     * footprint, because an upward face covers the footprint and nothing else.
+     */
+    const isOpenGround = (x: number, z: number): boolean => built.field.surfaceAt(x, z) === -Infinity;
+    // The longest run, which at Erskineville is the through corridor.
+    let best = built.runs[0];
+    for (const r of built.runs) if (r.metres > best.metres) best = r;
+
+    /** Walk a plan path, stepping the feet as a body would, and report the worst step. */
+    const walk = (
+      path: Array<[number, number]>,
+    ): { worst: number; where: string; nan: number; drop: number } => {
+      let feet = at(path[0][0], path[0][1], Infinity);
+      let worst = 0;
+      let where = '';
+      let nan = 0;
+      let drop = 0;
+      for (const [x, z] of path) {
+        const g = at(x, z, feet);
+        if (!Number.isFinite(g)) {
+          nan++;
+          continue;
+        }
+        const step = g - feet;
+        if (Math.abs(step) > Math.abs(worst)) {
+          worst = step;
+          where = `${x.toFixed(1)}, ${z.toFixed(1)}`;
+        }
+        if (step < -1.5) drop++;
+        feet = g;
+      }
+      return { worst, where, nan, drop };
+    };
+
+    // (a) Along the trench floor, half a metre at a time.
+    //
+    // **Inside the footprint**, which is a restriction the walk did not need
+    // before Phase 3 and needs now. The first rib of a formation is its end cap
+    // -- the mouth of the cutting -- and a point a hand's breadth outside it is
+    // on ordinary ground, so the query correctly answers about the terrain and
+    // the walk correctly sees a step down into the cutting. That is a lip, not a
+    // crack, and measuring it here would be measuring the wrong thing; the seam
+    // at the mouth is what (c) is for. So the path is filtered to the points the
+    // vessel actually answers about, and how many were dropped is reported.
+    const alongAll: Array<[number, number]> = [];
+    for (let i = 0; i < best.spine.length - 1; i++) {
+      const a = best.spine[i];
+      const b = best.spine[i + 1];
+      const steps = Math.max(1, Math.round(Math.hypot(b.x - a.x, b.z - a.z) / 0.5));
+      for (let k = 0; k < steps; k++) {
+        const t = k / steps;
+        alongAll.push([a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t]);
+      }
+    }
+    const alongPath = alongAll.filter(([x, z]) => !isOpenGround(x, z));
+    const along = walk(alongPath);
+    check(
+      along.nan === 0 && along.drop === 0 && Math.abs(along.worst) < 0.5,
+      `walking the trench floor of the ${best.metres.toFixed(0)} m formation at Erskineville, ` +
+        `${alongPath.length} steps of half a metre (${alongAll.length - alongPath.length} outside the ` +
+        `footprint, at the mouth): no step without an answer, no fall over 1.5 m, worst step ` +
+        `${(along.worst * 100).toFixed(1)} cm${along.where ? ` at ${along.where}` : ''}. The floor is a ` +
+        `face of the solid, not a patch that might be missing`,
+    );
+
+    // (b) Along the rim, a third of a metre inside it -- on the coping.
+    // (b) and (c). Both over **every** run, not just the longest, and both
+    // restricted to the rim edges that really are the edge of the walkable
+    // world. At Erskineville the longest run is an inner track whose rim is
+    // covered end to end by its neighbours' footprints -- measuring the seam
+    // there would be measuring the overlap, which is reported separately below.
+    {
+      /** The open-ground rim edges, as contiguous strips it makes sense to walk. */
+      const strips: Array<Array<[number, number]>> = [];
+      let crackWorst = 0;
+      let crackWhere = '';
+      let crackN = 0;
+      let skipped = 0;
+      for (const run of built.runs) {
+        const p = run.vessel.position;
+        const rimIdx = run.vessel.rim;
+        const off = run.vessel.ribOffset;
+        const ribs = run.vessel.ribCount;
+        /** Which rib a vertex belongs to, or `-1` for a rim cut. Binary search on the prefix sum. */
+        const ribOf = (v: number): number => {
+          if (v >= off[ribs]) return -1;
+          let lo = 0;
+          let hi = ribs - 1;
+          while (lo < hi) {
+            const mid = (lo + hi + 1) >> 1;
+            if (off[mid] <= v) lo = mid;
+            else hi = mid - 1;
+          }
+          return lo;
+        };
+        let strip: Array<[number, number]> = [];
+        for (let i = 0; i < rimIdx.length; i++) {
+          // **Skip the two chords.** The rim ring closes across the open mouth
+          // of the cutting at each end of a run, and that chord is not an edge
+          // of the mesh at all -- loop points 2 and 7 of a trench are not
+          // adjacent. Walking a third of a metre inside it is walking off the
+          // coping into the trench, which is the correct behaviour of a cutting
+          // that stops rather than a defect of the seam.
+          const ra = ribOf(rimIdx[i]);
+          const rb = ribOf(rimIdx[(i + 1) % rimIdx.length]);
+          const aa = rimIdx[i] * 3;
+          const bb = rimIdx[(i + 1) % rimIdx.length] * 3;
+          const dx = p[bb] - p[aa];
+          const dz = p[bb + 2] - p[aa + 2];
+          const l = Math.hypot(dx, dz);
+          const nx = -dz / l;
+          const nz = dx / l;
+          const mx = p[aa] + dx * 0.5;
+          const mz = p[aa + 2] + dz * 0.5;
+          const open = l > 0 && !(ra >= 0 && ra === rb) && isOpenGround(mx - nx * 0.1, mz - nz * 0.1);
+          if (!open) {
+            if (l > 0 && !(ra >= 0 && ra === rb)) skipped++;
+            if (strip.length > 2) strips.push(strip);
+            strip = [];
+            continue;
+          }
+          // The crack, at this edge's midpoint.
+          const inner = groundOnly(mx + nx * 0.1, mz + nz * 0.1);
+          const outer = groundOnly(mx - nx * 0.1, mz - nz * 0.1);
+          if (Number.isFinite(inner) && Number.isFinite(outer)) {
+            crackN++;
+            const d = Math.abs(inner - outer);
+            if (d > crackWorst) {
+              crackWorst = d;
+              crackWhere = `${mx.toFixed(1)}, ${mz.toFixed(1)}`;
+            }
+          }
+          const steps = Math.max(1, Math.round(l / 0.35));
+          for (let k = 0; k < steps; k++) {
+            const t = k / steps;
+            strip.push([p[aa] + dx * t + nx * 0.33, p[aa + 2] + dz * t + nz * 0.33]);
+          }
+        }
+        if (strip.length > 2) strips.push(strip);
+      }
+
+      let steps = 0;
+      let falls = 0;
+      let worst = 0;
+      let where = '';
+      for (const strip of strips) {
+        let feet = groundOnly(strip[0][0], strip[0][1]);
+        for (const [x, z] of strip) {
+          const g = groundOnly(x, z);
+          const step = g - feet;
+          steps++;
+          if (Math.abs(step) > Math.abs(worst)) {
+            worst = step;
+            where = `${x.toFixed(1)}, ${z.toFixed(1)}`;
+          }
+          if (step < -0.42) falls++;
+          feet = g;
+        }
+      }
+      check(
+        steps > 100 && falls === 0,
+        `walking the coping a third of a metre inside the rim, over every stretch of it that really is ` +
+          `the edge of the walkable world -- ${strips.length} strips, ${steps} steps of 35 cm: ${falls} ` +
+          `steps down further than a kerb, worst step ${(worst * 100).toFixed(1)} cm` +
+          `${where ? ` at ${where}` : ''}`,
+      );
+      check(
+        crackN > 50 && crackWorst < 0.05,
+        `stepping across the rim at ${crackN} places, ten centimetres either side: the worst height ` +
+          `difference between the conformed terrain outside and the vessel's coping inside is ` +
+          `**${(crackWorst * 1000).toFixed(1)} mm**${crackWhere ? ` at ${crackWhere}` : ''}. The ground ` +
+          `and the railway meet flush, because they meet at the same vertices. (${skipped} rim edges ` +
+          `are not on the union's boundary -- another run's footprint reaches over them -- and are ` +
+          `the subject of the overlap line below instead)`,
+      );
+    }
+
+    // (d) Across the corridor, and at the ends. Nothing may be unanswered.
+    {
+      const transects: Array<[number, number]> = [];
+      for (let i = 0; i < best.spine.length; i += 4) {
+        const s = best.spine[i];
+        const prev = best.spine[Math.max(0, i - 1)];
+        const next = best.spine[Math.min(best.spine.length - 1, i + 1)];
+        let ux = next.x - prev.x;
+        let uz = next.z - prev.z;
+        const l = Math.hypot(ux, uz);
+        if (!(l > 0)) continue;
+        ux /= l;
+        uz /= l;
+        for (let d = s.span[0] - 8; d <= s.span[1] + 8; d += 0.25) {
+          transects.push([s.x - uz * d, s.z + ux * d]);
+        }
+      }
+      let unanswered = 0;
+      for (const [x, z] of transects) {
+        if (!Number.isFinite(at(x, z, Infinity))) unanswered++;
+      }
+      // ...and off both ends of the run, out onto ordinary ground.
+      const ends: Array<[number, number]> = [];
+      for (const [s, dir] of [[best.spine[0], -1], [best.spine[best.spine.length - 1], 1]] as const) {
+        const other = dir < 0 ? best.spine[1] : best.spine[best.spine.length - 2];
+        let ux = (s.x - other.x) * -dir;
+        let uz = (s.z - other.z) * -dir;
+        const l = Math.hypot(ux, uz) || 1;
+        ux /= l;
+        uz /= l;
+        for (let d = -12; d <= 12; d += 0.25) ends.push([s.x + ux * d * dir, s.z + uz * d * dir]);
+      }
+      let endsUnanswered = 0;
+      for (const [x, z] of ends) if (!Number.isFinite(at(x, z, Infinity))) endsUnanswered++;
+      check(
+        unanswered === 0 && endsUnanswered === 0,
+        `crossing the corridor at ${Math.ceil(best.spine.length / 4)} ` +
+          `places from eight metres outside one rim to eight metres outside the other, and walking ` +
+          `twelve metres off each end of the run: ${transects.length + ends.length} probes, ` +
+          `${unanswered + endsUnanswered} without an answer. There is nowhere over this corridor the ` +
+          `ground query does not know what is under it`,
+      );
+    }
+  }
+
+  // --- 10e. **PHASE 3: ONE VESSEL PER FORMATION, WHICH IS WHAT THIS ROUND IS FOR.**
+  //
+  // Phase 2a ended on a finding it went looking for nothing like: the mesh and
+  // the evaluation agree exactly, everywhere, and *both were wrong in the same
+  // way*. Each track in the bake is its own polyline, so each became its own
+  // vessel, and two running lines four metres apart with a 5.4 m half-width
+  // occupy the same ground along their whole length -- **61.5% of the lattice
+  // cells the railway claims at Erskineville were claimed by more than one run**,
+  // and where two floors are at different depths the shallower vessel's coping is
+  // drawn as a strip of stone across the deeper one's open cutting.
+  //
+  // A four-track railway is **one formation** -- one cutting, one floor, two
+  // outer walls -- and no amount of per-vessel correctness fixes it, because
+  // every vessel is individually right.
+  //
+  // The claim is asserted **against the shape it replaces**, built here from the
+  // same strips through the same module, so the comparison is like for like and
+  // the 61.5% is reproduced rather than quoted.
+  {
+    interface Shape {
+      vessels: Array<NonNullable<ReturnType<typeof vesselMod.buildCorridorVessel>['vessel']>>;
+      spines: Array<readonly import('../client/src/world/vessel.ts').SpinePoint[]>;
+    }
+    /** Cells claimed, cells claimed twice, cells whose *ground* is claimed twice. */
+    const cellsOf = (s: Shape): { touched: number; twice: number; inside: number; insideTwice: number } => {
+      const touched = new Map<number, number>();
+      const inside = new Map<number, number>();
+      for (const v of s.vessels) {
+        const print = new seamMod.Footprint(v.position, v.rim, lattice);
+        for (const [key, whole] of print.claimed()) {
+          touched.set(key, (touched.get(key) ?? 0) + 1);
+          if (whole) inside.set(key, (inside.get(key) ?? 0) + 1);
+        }
+      }
+      let twice = 0;
+      for (const c of touched.values()) if (c > 1) twice++;
+      let insideTwice = 0;
+      for (const c of inside.values()) if (c > 1) insideTwice++;
+      return { touched: touched.size, twice, inside: inside.size, insideTwice };
+    };
+    /** Points of the footprint covered by more than one vessel, and by how much. */
+    const coverOf = (s: Shape): { n: number; multi: number; over3: number; worst: number } => {
+      let n = 0;
+      let multi = 0;
+      let over3 = 0;
+      let worst = 0;
+      for (const sp of s.spines) {
+        for (let i = 0; i < sp.length; i++) {
+          const s0 = sp[i];
+          const prev = sp[Math.max(0, i - 1)];
+          const next = sp[Math.min(sp.length - 1, i + 1)];
+          let ux = next.x - prev.x;
+          let uz = next.z - prev.z;
+          const l = Math.hypot(ux, uz);
+          if (!(l > 0)) continue;
+          ux /= l;
+          uz /= l;
+          for (let k = 0; k <= 18; k += 3) {
+            const o = s0.span[0] + (k / 18) * (s0.span[1] - s0.span[0]);
+            const x = s0.x - uz * o;
+            const z = s0.z + ux * o;
+            let count = 0;
+            let hi = -Infinity;
+            let lo = Infinity;
+            for (const v of s.vessels) {
+              const h = fieldMod.meshHeight(v, x, z);
+              if (h === -Infinity) continue;
+              count++;
+              if (h > hi) hi = h;
+              if (h < lo) lo = h;
+            }
+            if (count === 0) continue;
+            n++;
+            if (count < 2) continue;
+            multi++;
+            if (hi - lo > worst) worst = hi - lo;
+            if (hi - lo > 3) over3++;
+          }
+        }
+      }
+      return { n, multi, over3, worst };
+    };
+    /**
+     * The Phase 2a shape: one vessel per track, the corridor symmetric about it.
+     *
+     * Built through the same `world/corridor.ts` primitives the formation path
+     * uses -- the same strips, the same chaining, the same resampling, the same
+     * two sweeps -- with the *only* difference being that the span is the track's
+     * own half-width instead of the formation's reach. That is what makes the
+     * comparison below a measurement of the change and not of two programs.
+     */
+    const perTrack = (at: { x: number; z: number }, radius: number): Shape => {
+      const strips = corridorMod.corridorStrips(world.rail!).filter((s) => {
+        const mx = (s.ax + s.bx) / 2;
+        const mz = (s.az + s.bz) / 2;
+        if (Math.hypot(mx - at.x, mz - at.z) > radius) return false;
+        return corridorMod.trenchedStrip(cut, s, ground);
+      });
+      const out: Shape = { vessels: [], spines: [] };
+      for (const r of corridorMod.chainRuns(strips)) {
+        const t = corridorMod.trackForRun(r, cut);
+        if (t === null) continue;
+        const sp = t.map((p) => ({
+          x: p.x, z: p.z, railY: p.y,
+          groundY: [
+            ground(p.x + p.uz * p.half, p.z - p.ux * p.half),
+            ground(p.x - p.uz * p.half, p.z + p.ux * p.half),
+          ] as [number, number],
+          span: [-p.half, p.half] as [number, number],
+        }));
+        if (sp.some((q) => !Number.isFinite(q.groundY[0]) || !Number.isFinite(q.groundY[1]))) continue;
+        const b0 = vesselMod.buildCorridorVessel('trench', sp);
+        if (b0.vessel === null) continue;
+        const b = vesselMod.buildCorridorVessel('trench', sp, seamMod.latticeCuts(b0.vessel, lattice));
+        if (b.vessel === null) continue;
+        out.vessels.push(b.vessel);
+        out.spines.push(sp);
+      }
+      return out;
+    };
+
+    const REDFERN = { x: -1449, z: 2600 };
+    const redfern = corridorMod.buildCorridor(world.rail!, cut, ground, lattice, { at: REDFERN, radius: 300 });
+    for (const [name, before, after] of [
+      ['Erskineville', perTrack(ERSK, 300), built],
+      ['Redfern', perTrack(REDFERN, 300), redfern],
+    ] as const) {
+      const now: Shape = {
+        vessels: after.runs.map((r) => r.vessel),
+        spines: after.runs.map((r) => r.spine),
+      };
+      const b = cellsOf(before);
+      const a = cellsOf(now);
+      const bc = coverOf(before);
+      const ac = coverOf(now);
+      check(
+        before.vessels.length > after.runs.length && a.insideTwice === 0 && a.twice < b.twice / 8,
+        `**${name}: ${before.vessels.length} vessels per track become ${after.runs.length} per formation, ` +
+          `and the double claim goes with them.** Of the lattice cells the railway claims, ` +
+          `${b.twice} of ${b.touched} (${((100 * b.twice) / b.touched).toFixed(1)}%) were claimed by more ` +
+          `than one vessel; now ${a.twice} of ${a.touched} (${((100 * a.twice) / a.touched).toFixed(1)}%). ` +
+          `Of the cells whose **ground** a vessel swallows whole -- the ones where a coping can be drawn ` +
+          `over an open cutting -- ${b.insideTwice} were claimed twice and now **${a.insideTwice}** are. ` +
+          `Sampled across the footprint, ${bc.multi} of ${bc.n} points ` +
+          `(${((100 * bc.multi) / bc.n).toFixed(0)}%) were covered by more than one vessel, worst ` +
+          `disagreement ${bc.worst.toFixed(2)} m; now ${ac.multi} of ${ac.n} ` +
+          `(${((100 * ac.multi) / ac.n).toFixed(1)}%), worst ${ac.worst.toFixed(2)} m`,
+      );
+      check(
+        after.crossings.length === 0 || after.doubleCells === after.crossings.reduce((s, c) => s + Number(c.split(' ')[0]), 0),
+        `and what is left at ${name} is enumerated rather than residual: ${after.crossings.length} pair` +
+          `${after.crossings.length === 1 ? '' : 's'} of formations overlapping in plan` +
+          (after.crossings.length ? `, ${after.crossings[0]}` : '') +
+          `. A formation is one level by construction (${'`FORMATION_RISE_M`'} is the loading gauge), so two ` +
+          `of them overlapping is one railway crossing another -- a flyover the bake tags as neither a ` +
+          `bridge nor a bore. That needs the **disposition** to change, which is Phase 1's third strain ` +
+          `and is unbuilt; it is not the defect this phase is about and grouping cannot fix it`,
+      );
+      say(
+        `    ${name}: ${after.tracks} track runs -> ${after.runs.length} formations, ` +
+          `up to ${Math.max(...after.runs.map((r) => r.tracks))} tracks in one cutting, ` +
+          `${after.refused.length} refused, ${after.wide.toFixed(0)} m too wide to join`,
+      );
+    }
+  }
+
+  // --- 10f. **The transition rib, on real corridor geometry.**
+  //
+  // Phase 1 recorded the transition rib as the thing Phase 3 would need and could
+  // not have: *"a profile cannot change topology mid-sweep... Phase 3 needs a
+  // stitch between two different polygons at one station, emitted into the same
+  // mesh so the two share vertices by index."* `world/vessel.ts` has it, and its
+  // own self-check proves it on synthetic ribs with the counterfeit -- two
+  // vessels butted at one rib -- asserted to fail.
+  //
+  // This is the same claim on **real ribs**: the longest formation at
+  // Erskineville, re-swept with a platform deck in the middle third of it, so the
+  // profile really does go 8 points -> 10 -> 8 over a corridor on a real DEM with
+  // a real flare and a real bend in it. The two transitions are where a fold or an
+  // unwelded seam would show, and the manifold check is the same arithmetic over
+  // every edge that proves the plain runs.
+  {
+    let best = built.runs[0];
+    for (const r of built.runs) if (r.spine.length > best.spine.length) best = r;
+    const ribs: Array<import('../client/src/world/vessel.ts').Rib> = [];
+    for (let i = 0; i < best.ribs.length; i++) {
+      const r = best.ribs[i];
+      const deck = i > best.ribs.length / 3 && i < (2 * best.ribs.length) / 3;
+      if (!deck) {
+        ribs.push(r);
+        continue;
+      }
+      const u = r.loops[0];
+      const floor = u[5 * 2 + 1];
+      const back = u[3 * 2] - 0.2;
+      const edge = back - 3.0;
+      // Only where the platform would actually fit between the wall and the
+      // floor's own left foot; a deck wider than the cutting is not a topology
+      // question, it is a wrong number.
+      if (!(edge > u[5 * 2] + 1 && floor + 1.05 < u[3 * 2 + 1])) {
+        ribs.push(r);
+        continue;
+      }
+      ribs.push({
+        cx: r.cx, cz: r.cz, ux: r.ux, uz: r.uz,
+        seam: [9, 2],
+        loops: [new Float64Array([
+          u[0], u[1], u[2], u[3], u[4], u[5], u[6], u[7],
+          back, floor + 1.05,
+          edge, floor + 1.05,
+          edge, floor,
+          u[10], u[11], u[12], u[13], u[14], u[15],
+        ])],
+      });
+    }
+    const sizes = new Set(ribs.map((r) => r.loops[0].length));
+    const b = vesselMod.buildVessel('trench', ribs);
+    const r = b.vessel === null ? null : vesselMod.checkManifold(b.vessel);
+    const transitions = ribs.filter((q, i) => i > 0 && q.loops[0].length !== ribs[i - 1].loops[0].length).length;
+    check(
+      sizes.size === 2 && transitions === 2 && b.vessel !== null && r !== null && r.faults.length === 0 &&
+        r.components === 1 && r.genus === 0 && b.vessel.rim.length === 2 * ribs.length,
+      `the longest formation at Erskineville (${best.metres.toFixed(0)} m, ${ribs.length} ribs), re-swept ` +
+        `with a platform deck over its middle third, changes its profile from 8 points to 10 and back at ` +
+        `${transitions} **transition ribs** and is still one closed 2-manifold: ` +
+        `${r === null ? b.faults[0] : vesselMod.describeManifold(r)}. Its rim is ${b.vessel?.rim.length ?? 0} ` +
+        `vertices -- two per rib, exactly as if nothing had happened -- because the zip is anchored on the ` +
+        `seam, so the edge of the walkable world does not know the cross-section changed under it. One ` +
+        `component, not two: the polygons share the anchor vertices **by index**, which is the whole ` +
+        `difference between a transition rib and two meshes at coincident coordinates`,
+    );
+  }
+
+  // --- 10g. **THE WHOLE NETWORK, WHICH IS NOW SOMETHING THE SUITE CAN ASSERT.**
+  //
+  // Phase 1 swept all 340 km once, from a scratch script, and said of it: *"it
+  // takes 0.5 s, so it is cheap to promote into the suite when Phase 2 has
+  // something the whole network needs to be true of."* Phase 3 does. The double
+  // claim is not a property of one station -- it is a property of how the whole
+  // extract is partitioned, and a station can be clean while the junction two
+  // kilometres away is claiming the same ground twice.
+  //
+  // This is also the only place the **22 previously-refused runs** can be
+  // accounted for. Phase 1 refused 6 folds (Central x3, Redfern, Macdonaldtown,
+  // Lidcombe), 4 rim rings that self-intersect in plan (Redfern, Central Chalmers
+  // Street, Epping, Strathfield) and skipped 12 for unloaded terrain -- 22 of 930
+  // runs, and every one of them at a junction. What happened to them is reported
+  // by name below rather than left as a number that got smaller.
+  {
+    const t0 = performance.now();
+    const all = corridorMod.buildCorridor(world.rail!, cut, ground, lattice);
+    const buildS = (performance.now() - t0) / 1000;
+    let metres = 0;
+    for (const r of all.runs) metres += r.metres;
+
+    const tCheck = performance.now();
+    let closed = 0;
+    let selfInt = 0;
+    const notClosed: string[] = [];
+    for (const r of all.runs) {
+      const rep = vesselMod.checkManifold(r.vessel);
+      if (rep.faults.length === 0 && rep.genus === 0) closed++;
+      else if (notClosed.length < 3) notClosed.push(`${vesselMod.describeManifold(rep)}: ${rep.faults[0] ?? `genus ${rep.genus}`}`);
+      if (vesselMod.ringSelfIntersects(r.vessel.position, r.vessel.rim)) selfInt++;
+    }
+    const checkS = (performance.now() - tCheck) / 1000;
+
+    check(
+      all.runs.length > 300 && closed === all.runs.length && selfInt === 0,
+      `**every one of the ${all.runs.length} formations in the extract is a closed 2-manifold** -- ` +
+        `${all.tracks} track runs grouped into them, ${(metres / 1000).toFixed(1)} km of cutting, ` +
+        `${all.triangles.toLocaleString()} triangles, and ${selfInt} rim rings that cross themselves in ` +
+        `plan. Not most: every edge of every triangle of every one, ${checkS.toFixed(2)} s of arithmetic ` +
+        `with no threshold in it` + (notClosed.length ? `. FAILED: ${notClosed[0]}` : ''),
+    );
+
+    check(
+      all.doubleInside * 200 < all.claimedCells && all.claimedCells > 100_000,
+      `and across the whole extract ${all.doubleCells.toLocaleString()} of ` +
+        `${all.claimedCells.toLocaleString()} claimed lattice cells (${((100 * all.doubleCells) / all.claimedCells).toFixed(2)}%) ` +
+        `are claimed by more than one formation, ${all.doubleInside} of them **whole**. At Erskineville ` +
+        `alone the per-track shape claims 61.5% of its cells twice, so this is the same change measured ` +
+        `over 60 km instead of over 600 m. What is left is ${all.crossings.length} places where one ` +
+        `railway crosses another at a different level` +
+        (all.crossings.length ? `, worst ${all.crossings[0]}` : ''),
+    );
+
+    check(
+      all.refused.length <= 4 && all.noTerrain <= 12,
+      `**the 22 runs Phase 1 refused, accounted for.** ${all.refused.length} formation` +
+        `${all.refused.length === 1 ? '' : 's'} refused and ${all.noTerrain} skipped for unloaded ` +
+        `terrain, against Phase 1's 6 folds, 4 self-intersecting rim rings and 12 skipped over 930 runs. ` +
+        `The 4 self-intersections are gone because a run no longer stops dead at a junction -- it ` +
+        `continues on the branch that is straight ahead (${'`CHAIN_STRAIGHT_COS`'}), so the balloon loops ` +
+        `and reversals that made a ring cross itself are not chained in the first place. The folds that ` +
+        `remain are refused for the **same** reason as before and are named: ` +
+        (all.refused.length ? all.refused.map((r) => r.split(':').slice(0, 2).join(':')).join(' | ') : 'none') +
+        `. A fold is a corridor turning tighter than it is wide, and refusing it is correct -- what ` +
+        `changed is that there are two of them and not six`,
+    );
+
+    say(
+      `    the whole extract: ${all.tracks} track runs -> ${all.runs.length} formations in ` +
+        `${buildS.toFixed(2)} s (Phase 2a: 923 runs in 5.0 s), ${all.triangles.toLocaleString()} triangles ` +
+        `over ${(metres / 1000).toFixed(1)} km at ${(all.triangles / metres).toFixed(2)} per metre ` +
+        `(Phase 2a: 1,082,212 over 340 km). Fewer triangles **and** fewer metres, because one cutting ` +
+        `replaces the four trenches that were overlapping inside it`,
+    );
+  }
+
+  // --- 11. The cost.
+  {
+    let cuts = 0;
+    let metres = 0;
+    for (const r of built.runs) {
+      cuts += r.cuts;
+      metres += r.metres;
+    }
+    const t1 = performance.now();
+    let queries = 0;
+    for (const r of built.runs) {
+      for (const s of r.spine) {
+        built.field.surfaceAt(s.x, s.z);
+        queries++;
+      }
+    }
+    const perQuery = ((performance.now() - t1) * 1e6) / Math.max(1, queries);
+    say(
+      `    Erskineville: ${built.runs.length} runs over ${metres.toFixed(0)} m swept twice and indexed in ` +
+        `${buildMs.toFixed(0)} ms, ${built.triangles.toLocaleString()} triangles ` +
+        `(${(built.triangles / metres).toFixed(2)} per metre) including ${cuts.toLocaleString()} rim ` +
+        `vertices the terrain lattice added`,
+    );
+    say(
+      `    the ground query is ${perQuery.toFixed(0)} ns per point over ${JSON.stringify(built.field.size)} -- ` +
+        `arithmetic behind a plan index, not a ray cast, which is what lets the server run it per ` +
+        `player per tick`,
+    );
+  }
 }
 
 /**
@@ -20506,9 +22149,20 @@ async function checkRoadDeck(): Promise<void> {
   }
 
   const net = geoMod.buildNetwork(bake);
+  // **The platform anchors, from `riding.buildPlatforms`, which is what ships.**
+  // Both ends seed `RailCut.setStations` from this one call. They did not
+  // always: `main.ts` used `rail-geo.buildNetwork().stations`, which adds a
+  // fallback for stations nothing calls at, and 87 of 29,479 sampled points
+  // along the city's platforms came out with a different half-width from the
+  // server's -- see `world/corridor.ts`' header. A check that seeded it the old
+  // way would be asserting a configuration the build no longer has.
+  const ridingMod = (await import(
+    new URL('../client/src/game/riding.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/game/riding.ts');
+  const anchors = ridingMod.buildPlatforms(bake).sites;
   /** The rule as it ships. */
   const cut = new cutMod.RailCut(bake);
-  cut.setStations(net.stations);
+  cut.setStations(anchors);
   cut.setRoads(deck);
   /**
    * THE NEGATIVE CONTROL, and it is the same object with one line missing.
@@ -20519,7 +22173,7 @@ async function checkRoadDeck(): Promise<void> {
    * both, and the control's number is printed beside the real one.
    */
   const bare = new cutMod.RailCut(bake);
-  bare.setStations(net.stations);
+  bare.setStations(anchors);
 
   // 2. Bit-exact across two module instances. `checkClearance` §2's argument.
   {
@@ -20539,7 +22193,7 @@ async function checkRoadDeck(): Promise<void> {
       if (decoded !== null) deckB.adopt(entry.key, decoded.ways);
     }
     const cutB = new cutTwo.RailCut(bake);
-    cutB.setStations(net.stations);
+    cutB.setStations(anchors);
     cutB.setRoads(deckB);
     let compared = 0;
     let same = true;

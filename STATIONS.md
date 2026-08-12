@@ -198,7 +198,9 @@ someone's lounge room.
   structure, a manifold check, and the trench case, proven at one station.
   Nothing ships until the invariant holds.
 - **Phase 2 — corridor vessels** replacing carve-and-patch along the line.
-- **Phase 3 — station vessels**, Central outward, gated per station.
+- **Phase 3 — one vessel per formation. Built 2026-08-13; see below.** The
+  station vessels this slot used to hold move to Phase 3b: nothing can be built
+  at a station until the corridor through it is one object.
 - **Phase 4 — plots and generated buildings.** The only part needing a world
   rebuild, so it batches with the other pending pipeline work (bushland ground,
   `elevated.py` and railways, the road-spanning prisms).
@@ -883,3 +885,293 @@ Leightonfield, Pendle Hill, Point Clare, Yennora — 90–120 m apart, which is 
 wrong-side-of-the-track error. Treat those eight as unresolved rather than
 accepted. Two methods disagreeing is the cross-check doing its job; it is also
 the reminder that a residual is evidence about a fit, not proof of one.
+
+## Phase 3, built: one vessel per formation, and the premise that was wrong
+
+Written 2026-08-13. `client/src/world/corridor.ts` (the grouping), the
+transition rib and the asymmetric profile in `world/vessel.ts`, `ribSeam` in
+`world/seam.ts` and `world/vessel-field.ts`, and sections 10e–10g of
+`checkVesselSeam`. **Still behind `vesselsEnabled()`, still default off** —
+`?vessels=1`, `SYDNEY_VESSELS=1`. Suite 1019 → **1028**, all passing.
+`RailCut`, `PlatformField`, `RoadDeck`, `writeTrench` and `writeVerge` are
+untouched.
+
+### The headline
+
+Phase 2a's third finding was that each track in the bake is its own polyline, so
+each became its own vessel, and parallel tracks overlap along their whole
+length. A four-track railway is **one formation** — one cutting, one floor, two
+outer walls — and no amount of per-vessel correctness fixes it because every
+vessel is individually right.
+
+Measured against the shape it replaces, built from the same strips through the
+same module so the comparison is the change and not two programs:
+
+| | Erskineville | Redfern |
+|---|---|---|
+| vessels | 4 per track → **3 per formation** | 12 → **3** |
+| lattice cells claimed by more than one | 61.5% → **2.4%** | 53.6% → **0.0%** |
+| cells whose **ground** more than one swallows whole | 146 → **0** | 75 → **0** |
+| footprint points covered by more than one vessel | 66% → **3.2%** | 62% → **0.0%** |
+| worst surface disagreement between them | 8.54 m → 8.50 m | 3.29 m → **0.00 m** |
+
+The 61.5% is *reproduced* by the check rather than quoted from Phase 2a, which
+is what makes the row a measurement. **The middle row is the one that matters**:
+a cell a vessel swallows whole is a cell where a coping can be drawn over an
+open cutting, and there are none left anywhere — 0 at both stations, and across
+the whole extract 454 of 226,671, every one of them at a place named below.
+
+Over the whole extract: 8,093 trenched strips → 851 track runs → **420
+formations**, 145.7 km of cutting, and 1,907 of 226,671 claimed cells (0.84%)
+claimed by more than one formation.
+
+### The premise that was wrong: a formation does not need a transition rib
+
+The phase was scoped on this:
+
+> A formation gains and loses tracks at throats and junctions... The profile
+> must be able to change along the sweep. Build the transition rib here. It is
+> the mechanism that makes a formation possible at all.
+
+The profile must change along the sweep, and it does. But **the change is
+dimensional, not topological.** A formation that gains a fourth track gets a rim
+four metres further out; the cross-section is the same eight-point `U` it was,
+and the sweep has been moving a rim like that since Phase 1 — that is what the
+platform flare is. Nothing in the grouping needs two polygons stitched together.
+
+What a formation needed instead was that the profile stop being **symmetric**.
+Phase 2a's `SpinePoint` carried one `half`, because a vessel was one track and
+the corridor was symmetric about the thing that defined it. A formation's
+centreline is one of its tracks — the longest — so its rim runs 5.4 m out on one
+side and twenty-five on the other, and there is no half-width that says that.
+`SpinePoint.span` is now `[left, right]` and `trenchProfile` takes both. That is
+the change that made a formation possible, and it is four lines of arithmetic,
+not forty.
+
+**The transition rib is built anyway, and it works.** `Rib` may now carry a
+different number of outer-loop points from its neighbour, and the strip between
+them is a zip: the two polygons' arcs merged on their own normalised profile arc
+length, anchored at the seam points. The windings are *derived* from the uniform
+quad strip rather than guessed — with equal counts the zip reproduces
+`sideQuad`'s two triangles exactly — and rim cuts landing on a transition's own
+seam edge go in by splitting the two faces that share it, since a cross edge of
+a zip cannot be merged into the walk the way an along edge can.
+
+Proven on real ribs, not only synthetic ones: the longest formation at
+Erskineville (441 m, 56 ribs) re-swept with a platform deck over its middle
+third goes 8 points → 10 → 8 at two transitions and comes out **V 486, E 1452,
+F 968, one component, χ 2, genus 0, volume 9846.1 m³, closed**. Its rim is 112
+vertices — two per rib, exactly as if nothing had happened — because the zip is
+anchored on the seam, so the edge of the walkable world does not know the
+cross-section changed under it.
+
+And the counterfeit is asserted to fail. Two vessels butted at one rib look
+identical from outside and are two surfaces at coincident coordinates;
+`checkManifold` reports the duplicated positions, so *"they share vertices by
+index"* is a distinction the check can draw rather than a sentence in a comment.
+
+Phase 3b needs it for the platform deck. What it still cannot do is change the
+number of **loops**: a trench becoming a bore is a disk becoming an annulus, and
+a formation dividing at a junction is one polygon becoming two. A zip between
+two closed polylines does neither. The second is a pair of pants and is
+constructible — cut the single loop at two pinch points and zip each arc to one
+of the two loops, closing the crotch with two triangles — and it is perhaps
+eighty lines with a real design question in it (where the crotch goes). It was
+not needed here and is not written.
+
+### The rule that makes the footprints disjoint
+
+**A track joins the formation beside it exactly where its corridor overlaps the
+formation's.** Not "where it is near" and not "where it is parallel" — those are
+heuristics with a residue nobody could bound. Overlap is what the double claim
+*is*, so making it the membership test makes the claim disjoint by
+construction: two formations that both claimed a piece of ground would have had
+to be one formation.
+
+It is transitive, which is what makes a six-road corridor one object rather than
+three pairs. A track that overlaps for part of its length is **split**, not
+rejected: the covered part joins, the rest goes back in the pool. That
+terminates, because every split strictly shortens something.
+
+Four things had to be right about it, and each was found by measuring rather
+than by reasoning:
+
+- **The cone belongs inside the fixpoint.** The span is dilated so a member
+  starting mid-formation opens the rim out over tens of metres instead of in one
+  rib. Applied *after* membership was settled, it reaches ground that was never
+  offered to the overlap test — which put two Redfern formations' rims a quarter
+  of a metre inside each other along their whole length, 7% of the claimed
+  cells, for a reason nobody could have found by reading the membership rule.
+- **The split needs daylight, not a zero.** Taken literally, the rule puts the
+  boundary between two formations exactly where two rims stop touching, which is
+  the least stable place in the construction: a formation is sampled every 8 m,
+  so a point is filed against a rib up to 4 m away along the run, and the cone
+  then widens both spans. `FORMATION_MARGIN_M` is 5 m, and absorbing slightly
+  more than overlaps is always safe because the rim spans whatever it absorbs.
+  At Redfern it is the difference between 1.2% and **none**.
+- **A formation is one level, and the number is derived.** Without a vertical
+  test, "absorb whatever overlaps in plan" pulled tracks **6.14 m** apart into
+  one cutting at the Erskineville throat — that is the Illawarra flying over the
+  Main South, and one floor under both puts the upper track's ballast six metres
+  in the air. `FORMATION_RISE_M` is `envelope.RAIL_ABOVE_M`, 5.9 m: two tracks
+  closer than a train's own clearance **cannot** be one over the other, so they
+  are side by side however uneven the cone solve left them. Deriving it mattered
+  — at the 1.5 m a cess and a cant suggest, Redfern's own roads come apart (the
+  bake puts one of them 3 m above its neighbours) and two formations overlap
+  where there is one flat station: 11.1% of the cells, against 0%.
+- **A cap set to what looks reasonable generates the defect it is guarding
+  against.** `FORMATION_MAX_SPAN_M` bounds the transitivity. At 60 m — Redfern
+  is the widest railway in Sydney, so 60 m looked generous — it refused 15.3 km
+  of track into formations of their own, which then overlapped the ones that had
+  refused them. Measured, the widest formation the rule produces is **89.8 m**
+  (Central's throat, which really is that wide) with a p99 of 58.7 m, so the cap
+  is set at 100 m where it never fires: 0 m refused on this bake. A guard, not a
+  knob.
+
+The spine is also **re-centred** on the formation after grouping. That moves no
+rim vertex — the rim is the same ground either way — but a profile offset thirty
+metres from a curving centreline reverses on a radius three times larger than
+one offset fifteen, and a reversed sweep is a `FOLD` and a refusal.
+
+### A run no longer stops dead at a junction
+
+Phase 2a chained a run only through a node where **exactly two** trenched strips
+met. That is safe, and it is where the 22 refused runs came from — and, less
+visibly, where a good deal of the residual came from: at Erskineville the
+corridor is *one* cutting and the network breaks it at every throat, so eight
+runs came out where there is one railway, and where two of them met end to end
+their footprints overlapped around the shared node. Grouping cannot fix that,
+because the formation rule is about tracks running *beside* each other and these
+run into each other.
+
+So a run now continues through a node onto whichever unused strip is most nearly
+straight ahead, gated at `CHAIN_STRAIGHT_COS` (0.85, about 32°). That is what a
+railway does — the main line runs through, the branch diverges — and the gate is
+what keeps it from being the bug Phase 1 found, where the deduplicated network
+chained a run through a crossover and reversed it. A reversal is a turn of 180°
+and is refused by the same test that lets a two-degree bend through.
+
+### The 22 refused runs, accounted for
+
+Phase 1 refused 6 folds (Central ×3, Redfern, Macdonaldtown, Lidcombe), found 4
+rim rings self-intersecting in plan (Redfern, Central Chalmers Street, Epping,
+Strathfield) and skipped 12 for unloaded terrain, over 930 runs.
+
+Now, over 420 formations: **2 folds, 0 self-intersections, 6 skipped.**
+
+- **The 4 self-intersections are gone, and for a stated reason**: they were
+  balloon loops and reversals the old chaining produced by walking into whatever
+  strip happened to be there. A run that only continues straight ahead does not
+  chain them in the first place.
+- **The 2 folds are refused for the same reason as before**, named and located:
+  a 497 m two-track formation at −14159, −453 and a 243 m one at −1090, −3316.
+  A fold is a corridor turning tighter than it is wide, and refusing it is
+  correct; what changed is that there are two and not six.
+
+### What is left, and it is a different defect
+
+76 places in the extract where two formations overlap in plan. A formation is
+one level by construction, so two of them overlapping is **one railway crossing
+another** — a flyover or a dive that the bake tags as neither a bridge nor a
+bore. Erskineville has two (11 cells near −2093, 3390, the two formations 3.6 m
+apart in height); Redfern has none; the worst is 267 cells near −14171, −213 at
+4.7 m.
+
+That is not the defect this phase is about and grouping cannot fix it: it needs
+the **disposition** to change, which is Phase 1's third strain, and the loop
+count change the transition rib deliberately does not do. It is `RAIL-VERTICAL.md`
+§3 and §6 in one place — OSM is the authority on what the structure is, and here
+OSM does not say.
+
+### The walks, at Erskineville
+
+The Phase 2a measurements, re-made over formations. Every one is better, and the
+first is better by an order of magnitude because the walk is now down the middle
+of one cutting instead of down one track of four:
+
+- **The trench floor**, 873 steps of half a metre along a 441 m formation: worst
+  step **−3.1 cm**, no fall, nothing unanswered. Phase 2a: −37.9 cm over 242 m.
+  (One step of the path is outside the footprint — the mouth of the cutting,
+  where stepping down into it is a lip and not a crack — and is excluded by
+  asking the field, not by a tolerance.)
+- **The coping**, 7 strips, 2,728 steps of 35 cm: 0 steps down further than a
+  kerb, worst **−1.5 cm**.
+- **Across the rim** at 424 places, ten centimetres either side: worst height
+  difference between the conformed terrain outside and the coping inside
+  **15.5 mm** — the DEM's own slope over 20 cm.
+- **Across the corridor and off both ends**, 2,326 probes: **0** without an
+  answer.
+- 128 rim vertices, all sitting on the DEM to **0.000000 m**; 321 lattice
+  crossings absorbed into the rim, all bit-identical in the ring; tile −5_−8
+  closes to **+0.000134 m² over 250,000 m²** with **0 cells refused** (Phase 2a
+  refused 1); the ground query and the drawn mesh agree at all 3,328 sampled
+  points by `Object.is`.
+
+### The cost, and one number that reads the wrong way until you divide it
+
+| | Phase 2a, per track | Phase 3, per formation |
+|---|---|---|
+| objects | 923 runs | **420 formations** |
+| centreline | 340 km | **145.7 km** |
+| triangles | 1,082,212 | **486,508** |
+| per metre | 3.18 (3.39 at Erskineville) | 3.34 |
+| build, whole network | 5.0 s | **1.72 s** |
+| manifold check, all of them | — | 0.76 s, **420/420 closed** |
+
+**A formation is not cheaper per metre**, and it should not be: it is the same
+eight-point cross-section with the same lattice cuts in its rim, so 3.34/m
+against 3.39/m at Erskineville is the same number. What collapses is the
+*metres* — 340 km of track centreline is 145.7 km of cutting, because four
+overlapping trenches were four times as much railway as there is. Total
+triangles are **45%** of Phase 2a's and the build is **a third of the time**,
+and both come from the same place: there is less of it, because there was never
+that much of it.
+
+The manifold invariant is now asserted over **every formation in the extract**
+in the suite, not measured once from a scratch script. Phase 1 said of the
+whole-network sweep that it was *"cheap to promote into the suite when Phase 2
+has something the whole network needs to be true of"*. Phase 3 does: the double
+claim is a property of how the extract is partitioned, and a station can be
+clean while the junction two kilometres away claims the same ground twice.
+
+### And the divergence that was shipping, fixed in the old path too
+
+Phase 2a found that `RailCut.setStations` was seeded from different lists on the
+two ends — 358 sites on the server against 361 on the client, because
+`buildNetwork` adds a fallback for stations nothing calls at — giving 87 of
+29,479 sampled points a different half-width by up to the full 4.00 m of the
+flare, while `server/world.ts`'s comment asserted the two were the same anchors.
+`corridor.ts` fixed it for the vessel path only, because the flag being off had
+to change nothing.
+
+**The old path is fixed now.** `main.ts` seeds from `riding.buildPlatforms`,
+which is the call the server has always made, so both ends resolve the anchors
+from one function instead of two. The three uncalled stations stop flaring on
+the client, which is what the server's ground query has always said, so this
+removes a disagreement rather than creating one. `buildPlatforms` was already
+being called sixty lines further down and is now called once. The comment in
+`server/world.ts` that claimed the two were the same list now says what it was
+and how it was measured. And the three checks that modelled the old path
+(`checkRailCutting`, `checkRoadDeck`, `checkVessels`) seed the same way, because
+a check that set it up the old way would be asserting a configuration the build
+no longer has.
+
+### Where Phase 3b will strain
+
+1. **The platform deck is a transition rib and is now buildable.** The mechanism
+   is proven on real corridor geometry; what is not written is the rule that
+   says where the deck goes, which is what the CAD corpus is for.
+2. **The road lid is still not buildable**, and it is the loop-count change the
+   zip cannot do. A trench becoming a bore is a disk becoming an annulus. This
+   is unchanged from Phase 1's third strain and is now the *only* thing in the
+   four dispositions that a sweep cannot express.
+3. **A formation dividing at a junction** is the other loop-count change — one
+   polygon becoming two — and it is what the 76 crossings would need if the
+   diverging branch were at the same level rather than over it. The construction
+   is sketched above; the design question is where the crotch goes.
+4. **Nothing draws a formation yet.** The vessel path answers the ground query
+   and withholds the terrain; the mesh is built and checked and thrown away. The
+   ballast, the rails, the fence and the platform are still `rail-geo`'s, drawn
+   per track, and a track's ballast sitting on a formation floor at the lowest
+   member's level is the next visible thing to be wrong. The floor is flat and
+   the tracks are not, by up to `FORMATION_RISE_M`.
