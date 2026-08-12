@@ -1175,3 +1175,251 @@ no longer has.
    per track, and a track's ballast sitting on a formation floor at the lowest
    member's level is the next visible thing to be wrong. The floor is flat and
    the tracks are not, by up to `FORMATION_RISE_M`.
+
+## Phase 3a, built: the formation drawn, and two premises corrected
+
+Written 2026-08-13. `world/vessel.ts` (`Vessel.faceEdge`, `TRENCH_EDGE`,
+`TRENCH_POINT`), `world/rail-geo.ts` (`RailWorld.setVessels`,
+`writeVesselShell`, `writeVesselFence`, `writeVesselWalls`, and the four old
+writers standing down), `main.ts` (`sydney.rail.vessels()` and the re-centre
+rule), and section 10h of `checkVesselSeam`. **Still behind `vesselsEnabled()`,
+still default off** — `?vessels=1`, `SYDNEY_VESSELS=1`. Suite 1028 → **1034**,
+all passing with the flag down *and* with `SYDNEY_VESSELS=1`. `RailCut`,
+`PlatformField` and `RoadDeck` are untouched: platforms are 3b.
+
+### The headline
+
+Phase 3 ended with *"nothing draws a formation yet. The mesh is built and checked
+and thrown away."* It is drawn now, and **it is the same triangles** — the
+renderer sorts the vessel's own faces into materials and adds no geometry of its
+own. Nothing here re-measures a half-width, re-reads the DEM or decides where an
+edge is, which is exactly what `writeTrench` and `writeVerge` each do
+independently and is why the two of them disagree about the rim by half a metre
+and paper over it with an outward lap.
+
+| | flag off | flag on |
+|---|---|---|
+| the trench wall | `writeTrench`, per track, rim re-measured from `halfWidthAt` | a face of the solid, at the rim the terrain was triangulated to |
+| the coping | 0.5 m lapped **outward** over standing ground | 0.5 m **inward** from the rim, meeting the ground flush |
+| the floor | `writeFormation`, per track, at *that track's* level | one floor per formation, `cess`, under the lowest rail it carries |
+| the ballast | 0.55 m under every track, whatever is beneath it | bedded down to the drawn floor: `max(0.55, railhead − floor)` |
+| the fence | `FENCE_OFFSET` from a **track centreline** | the rim ring, which *is* the edge of the walkable world |
+| the barrier | a box per rib pair from a re-measured rim | a box per rib pair from the vessel's own `FOOT`/`RIM` vertices |
+
+### What the pictures show, and they are the acceptance
+
+Eight cameras, identical world coordinates and identical sky phase, flag off
+against flag on, in `client/.shots/P3A-*-{ON,OFF}.png`. Taken through
+`sydney.look` so the two runs are the same camera and not two similar ones.
+
+- **`e1_street`** (Erskineville, from the footpath). Off: **three overlapping
+  fence lines** fanning across the ground in front of the corridor — one per
+  track, exactly the player's point 4 — with a grey slab lapping between them.
+  On: one fence, on the rim.
+- **`e2_trench`** (down in the cutting, looking up at the wall). Off: an
+  untextured grey slab with **no coping and no fence on top**, a catenary mast
+  standing in the middle of the formation, and bare terrain between the ballast
+  and the wall. On: a battered retaining wall, a coping, the boundary fence along
+  the top of it, and a `cess` floor under the whole formation.
+- **`e3_up`** (on the floor, looking along the cutting). Off: two pale slabs and
+  no corridor between them. On: the wall with its fence, the ballast, a train,
+  and the overhead line.
+- **`r2_over`** (Redfern, over the formation). Off: **four parallel fences
+  running down the middle of the station**, across platforms and tracks. On:
+  none — a formation has no interior for a fence to be in.
+- `e4_air`, `e5_station`, `r1_street`, `r4_air` are context and are unremarkable
+  either way, which is itself worth having.
+- `e2b_train_in_cutting` has no pair and is not evidence of a difference: it is
+  a T4 set running through the cutting past the wall, kept because it is the
+  frame that says what the whole phase was for.
+
+**Where it is not better, said plainly.** The wall is one flat colour over its
+whole height and reads as a slab close up — it has a coping and a fence now,
+which is most of the recognition, but no string course, no buttress and no
+change of tone with depth. And the shots are 960×540 through a first-person
+camera with a cricket bat in the lower right; they are evidence, not photography.
+
+**What was not looked at.** A screenshot pair on an **at-grade stretch away from
+a station** was asked for and is not in the set: the corridor near the loaded
+tiles is in cutting almost everywhere it is trenched at all, and a teleport to a
+genuinely at-grade stretch (Lindfield) needed more streaming than the harness
+could drive. The claim that at-grade is unchanged is therefore *structural* — every
+suppression is gated on `vesselled()`, which is `false` wherever no footprint
+covers the point, and the whole flag-off suite passes — but it is not a picture,
+and it should be one before anyone flips the flag.
+
+### Correction 1: "exactly zero" is not true at 30 km from the origin
+
+Phase 2a's `Vessel.sideFace` says an end cap *"lies in the rib's own cross-plane,
+which contains the Y axis, so its normal has **zero** Y exactly and it can never
+be a surface anything stands on"*, and `world/vessel-field.ts` rests its whole
+up/wall/down classification on the same sentence. Geometrically it is true. **In
+doubles it is not**, and the reason is a fact about where Sydney is rather than
+about the sweep: `n.y` is `uz*vx − ux*vz` over *world* coordinates, and out past
+Penrith those two products are ~1e9 with ~1e-7 between representable neighbours,
+so their difference only sometimes cancels to zero.
+
+Measured over the whole extract: **98,051 of 172,766 vertical faces (56.8%) have
+a non-zero plan normal and 49,280 of them are positive** — which `faceHeight`'s
+`ny > 0` reads as *a surface you can stand on*. It is unreachable rather than
+lucky, and the bound is the same arithmetic: a face that near-vertical has at
+most **1.4e-10 m²** of plan area, so a point query would have to land inside a
+tenth of a square nanometre to be answered by one, and the answer would be a
+height on the wall between the floor and the rim. Nobody can reach it. But it was
+a sentence doing argumentative work it could not do, in a file whose whole
+premise is that there are no epsilons on the path — so both headers now say what
+is true, and the numbers are asserted in the suite rather than left in a comment.
+
+### Correction 2: the tile count is not enough to re-sweep on
+
+`refreshVessels` rebuilt the corridor only when the resident tile count changed,
+on the argument that a new grid is the only thing that can turn a refused run
+into a built one. True, and incomplete: the sweep is centred on the **player**,
+so a player crossing a suburb whose tiles are all resident — every teleport, and
+every long walk in a session that has been running a while — walks off the end of
+the swept region into a corridor that was never built, and the ground query falls
+through to the DEM over an open cutting. Found by teleporting between
+Erskineville and Redfern to take these screenshots and getting a corridor that
+stayed at Erskineville. `VESSEL_RECENTRE_M` is 300 m against the 900 m radius, so
+the swept region always reaches at least 600 m past the player — comfortably
+outside `COLLISION_KEEP_RADIUS_M`, which is as far as the ground query can be
+asked.
+
+### The face provenance, and why it is emitted rather than recovered
+
+A drawer has to know which face is the floor and which is the coping. It must not
+work that out from the geometry — *"the flattish ones are floor"* is a second
+description of the cross-section and this design exists to abolish those — so
+`Vessel.faceEdge` carries the profile edge each triangle was swept from, written
+where the triangle is written. `sideQuad` is *called* with the edge it is
+drawing; the answer is free.
+
+It is then checked from the outside, over all 486,508 triangles: the normal is
+recomputed from the positions and compared against what the label claims, and the
+four bands come out **disjoint**, which is what makes the provenance recoverable
+rather than decorative. Measured: the flattest walking surface is n.y **0.379**
+(a floor triangle on a tight bend, where a skew quad's two halves tilt
+differently), the steepest wall **0.1644** against the `VESSEL_BATTER` of 0.1667
+it is built to, the most upward-facing underside **0.086**, and every vertical
+face inside 2.6e-8 of zero.
+
+### What is drawn, and what is dropped
+
+**282,278 of the 486,508 triangles are drawn — 58%, 1.94 per metre of cutting.**
+The other 42% is the buried half of the shell: the underside and the two outer
+skins, which exist so the surface closes and which the terrain is triangulated
+*over*. That they are unreachable is asserted rather than argued, in the form
+that matters: over 1,308 points across the footprints of every twentieth
+formation, **the highest upward-facing face is a drawn one at every single
+point**, with the negative control (drop the floor as well) failing at 1,284 of
+the same 1,308.
+
+The solid is unchanged. `Vessel.triangles` is still 486,508 and the manifold
+invariant is still proved over all of it — those are two different numbers about
+one object and reporting either as the other is how a budget starts lying.
+
+### The numbers, against Phase 2b's
+
+| | Phase 2b | Phase 3a |
+|---|---|---|
+| formations | 420 | **420** |
+| closed 2-manifolds, after decoration | 420/420 | **420/420** |
+| triangles in the solid | 486,508 | **486,508** |
+| triangles drawn | 0 | **282,278** |
+| whole-network sweep | 1.72 s | **1.08 s** |
+| manifold check, all of them | 0.76 s | 0.40 s |
+
+The sweep and the check are the *same code* — `corridor.ts` is untouched — so
+read 1.08 s against 1.72 s as machine load and not as a change. What is new is
+the last row of the middle: the same 486,508 triangles now have a rendering, and
+58% of them reach a screen.
+
+Per chunk, with the flag on and measured in a browser at Erskineville: **24.9 ms**
+to build a 512 m chunk carrying the shell, the rim fence and the barrier prisms,
+against the 150 ms that chunk's rebuild already costs.
+
+### The cost nobody has paid yet: the ring is dropped on every re-sweep
+
+`setVessels` throws away every built rail chunk when the corridor changes, because
+a chunk decides once and for all what it draws. It is guarded by a signature
+(formation count and triangle count) so an identical re-sweep costs nothing, but
+a genuine change — a new tile near the railway, or 300 m of walking — drops the
+whole ring and rebuilds it at two chunks a frame. At 24.9 ms a chunk over ~18
+chunks that is about **450 ms of rebuild spread over nine frames**, with the
+railway visibly absent while it happens. Acceptable behind a flag and not
+acceptable in a shipped world; the fix is a per-chunk signature over the
+formations that overlap it, which is real work and is not done.
+
+### What is now redundant under the flag, and what was left standing
+
+Inside a formation's footprint, with `?vessels=1`, these no longer emit
+**anything** — not geometry and not collision:
+
+- `writeTrench` — the wall, the coping, the cess strip and the wall prisms;
+- `writeFormation` — the whole slab;
+- `writeVerge` — the verge batter and the boundary fence.
+
+They are left in place, because outside the footprint and with the flag down they
+still build the world, and the condition is one predicate asked at the track
+centreline: `VesselField.surfaceAt(x, z) > -Infinity`. That is exact rather than
+a radius — inside the rim ring the field answers with the surface of a solid and
+outside it answers `-Infinity` — so it is the membership rule read back out.
+
+What deliberately did **not** stand down: the rails, the sleepers, the ballast and
+everything at a station. The ballast is rebased rather than replaced, which is
+`STATIONS.md`'s own *"next visible thing to be wrong"*: a formation's floor is
+under the **lowest** rail it carries, so a track four metres above it had four
+metres of daylight under half a metre of blue metal. `writeBallast` now takes its
+depth from `VesselField.surfaceAt` — the same answer the ground query gives and
+the same surface the shell draws — so the toe lands on the floor by construction.
+
+### Two things that had to be built rather than moved
+
+- **A barrier.** The ground query evaluates the sweep's faces and answers *how
+  high*; it does not answer *you may not pass*, and `CollisionWorld` knows about
+  prisms. Suppressing `writeTrench` therefore had to put something back or a
+  player could walk down the batter into 145 km of cutting. `writeVesselWalls`
+  emits one box per rib pair per side — **35,193 over 18,252 rib pairs, none
+  refused** — and its four corners are the vessel's own `FOOT` and `RIM`
+  vertices read **by index**, so it cannot be a second opinion about where the
+  wall is. `STATIONS.md`'s refusal of a prism decomposition is about the
+  *surface*, and the surface is still evaluated from the sweep.
+- **A rule for the fence's two end edges.** The rim ring runs down one seam and
+  back the other, so it closes across the mouth of the cutting, and a panel there
+  would be a fence across the railway. They are identified out of `ribSeam` — an
+  edge whose two ends are the two seam vertices of one rib — rather than by
+  looking for a long edge, because *long* is a threshold and this is a fact. The
+  suite then asserts the whole property the player complained about: over all 420
+  formations, **840 rim edges have their two ends on opposite sides of the
+  corridor and all 840 of them are those two caps.**
+
+### Masts: decided against the formation, seated on the floor
+
+`refillMasts` offsets a stanchion `MAST_OFFSET` from **its own track**, which is
+where a mast goes beside a single line and is not where the ground is in a
+cutting: beside a track four metres above the formation floor, its base plate
+stood four metres in the air. It is now seated on the drawn surface —
+`vesselFloorAt` at the mast's own position, and **only ever lowered**, because
+raising one would stand it on the coping over its own track while the wire it
+carries has not moved.
+
+What was *not* done, and the reason is worth stating because it looks like the
+obvious move: the mast is **not** moved laterally to the formation edge. Real
+practice puts cantilevers outside the outer tracks and gantries across the rest,
+but the instanced cantilever geometry reaches exactly `MAST_OFFSET` to its own
+wire, so a mast at the rim of a thirty-metre formation would be a bracket
+reaching at nothing. Moving them properly means the mast set becoming a function
+of the formation rather than of the bake's stanchion list, which is a bigger
+change than this phase.
+
+### Where Phase 3b will strain
+
+1. **The platform is still `rail-geo`'s**, drawn per station over a floor that
+   now belongs to the vessel. The transition rib is built and proven; what is
+   missing is the rule that says where the deck goes.
+2. **The wall is one tone from foot to coping.** It reads as a retaining wall
+   because of the coping and the fence, not because of the wall.
+3. **The chunk ring is dropped whole on every re-sweep** (above). A per-chunk
+   signature is the fix.
+4. **The road lid is unchanged** — still the loop-count change the zip cannot do,
+   still the only one of the four dispositions a sweep cannot express.

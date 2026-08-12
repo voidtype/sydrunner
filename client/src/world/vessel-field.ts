@@ -67,8 +67,20 @@
  *
  *   - a face whose normal has **positive Y** is something you can stand on;
  *   - one with zero Y is a wall -- the outer faces and both end caps, which lie
- *     in a plane containing the Y axis and therefore have *exactly* zero;
+ *     in a plane containing the Y axis;
  *   - one with negative Y is the underside, which is inside the earth.
+ *
+ * **That middle line used to end "and therefore have *exactly* zero", and Phase
+ * 3a measured it and it is not true.** `n.y` is `uz*vx - ux*vz` over world
+ * coordinates; at 30 km from the origin those products are ~1e9 with 1e-7
+ * between representable doubles, so the cancellation is only sometimes exact.
+ * Over the extract 98,051 of 172,766 vertical faces are non-zero and **49,280
+ * are positive**, which the `ny > 0` below therefore calls standable. It is
+ * unreachable rather than lucky: a face that near-vertical has at most 1.4e-10
+ * m² of plan area, so the barycentric test below cannot be satisfied by any
+ * point a body could occupy, and the height it would return is on the wall
+ * between the floor and the rim. Asserted, with those numbers, in
+ * `checkVesselSeam` section 10h.
  *
  * So the answer at a point is the **highest upward-facing face over it**, and on
  * a trench that is unambiguous: the coping, the batter and the floor tile the

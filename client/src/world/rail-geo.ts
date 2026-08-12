@@ -152,6 +152,14 @@ import {
 import { DECK_THICKNESS_M } from './road-deck.ts';
 import { RAIL_HALF_M } from './envelope.ts';
 import { RAIL_FENCE_HEIGHT, createRailFenceMaterial } from './fences.ts';
+// Phase 3a of `STATIONS.md`: the corridor vessel, drawn. A type and two
+// constants -- `TRENCH_EDGE` says which face of the sweep is the floor and which
+// is the coping, and it lives beside `trenchProfile` because that is a statement
+// about the cross-section rather than about how it is painted. Nothing here
+// *builds* a vessel; `world/corridor.ts` does, on both ends, and this file is
+// handed the result. See `RailWorld.setVessels`.
+import { TRENCH_EDGE, TRENCH_POINT, type Vessel } from './vessel.ts';
+import type { CorridorBuild } from './corridor.ts';
 // **One rule for what counts as one platform**, imported rather than restated.
 // The prisms this file draws and the rectangles `game/riding.PlatformField`
 // stands bodies on have to be the same set -- that is the whole reason the field
@@ -580,6 +588,46 @@ class Solid {
     if (uvs) this.uv.push(...uvs);
     else this.uv.push(0, 0, 1, 0, 1, 1, 0, 1);
     this.index.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
+
+  /**
+   * One triangle, wound `a -> b -> c`, with the normal from its own plane.
+   *
+   * Added in Phase 3a for `writeVesselShell`, which files a *solid's* own
+   * triangles into materials and so has triangles rather than quads to write.
+   * The obvious shorthand -- `quad` with the third corner passed twice -- is
+   * wrong in a way that costs rather than breaks: `quad` always emits four
+   * vertices and **two** triangles, so the second one is degenerate, and the
+   * drawn corridor would carry a quarter of a million zero-area faces through
+   * the vertex shader to rasterise nothing.
+   */
+  tri(
+    ax: number, ay: number, az: number,
+    bx: number, by: number, bz: number,
+    cx: number, cy: number, cz: number,
+  ): void {
+    const ux = bx - ax;
+    const uy = by - ay;
+    const uz = bz - az;
+    const vx = cx - ax;
+    const vy = cy - ay;
+    const vz = cz - az;
+    let nx = uy * vz - uz * vy;
+    let ny = uz * vx - ux * vz;
+    let nz = ux * vy - uy * vx;
+    const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+    if (len > 1e-9) {
+      nx /= len;
+      ny /= len;
+      nz /= len;
+    } else {
+      ny = 1;
+    }
+    const base = this.position.length / 3;
+    this.position.push(ax, ay, az, bx, by, bz, cx, cy, cz);
+    for (let i = 0; i < 3; i++) this.normal.push(nx, ny, nz);
+    this.uv.push(0, 0, 1, 0, 1, 1);
+    this.index.push(base, base + 1, base + 2);
   }
 
   /** An axis-aligned box between two corners. Six quads, outward-facing. */
@@ -1376,6 +1424,12 @@ export class RailWorld {
   private lastSleeperCell = '';
   /** Frames since the last idle re-plan. See `update`. */
   private idleFrames = 0;
+  /**
+   * The corridor as closed solids, or null with the flag down. See `setVessels`.
+   */
+  private vessels: CorridorBuild | null = null;
+  /** What the last drawn corridor was, so an identical re-sweep costs nothing. */
+  private vesselSignature = '';
 
   constructor(
     private readonly net: RailNetwork,
@@ -1600,6 +1654,18 @@ export class RailWorld {
       }
     }
 
+    // --- The corridor as closed solids, if there is one. See `setVessels`.
+    //
+    // Two closures, both null with the flag down, so the loop below reads as one
+    // question -- *is a formation drawn here?* -- asked at the track centreline
+    // and answered by the footprint itself.
+    const floorAt = this.vessels === null
+      ? null
+      : (x: number, z: number): number => this.vesselFloorAt(x, z);
+    const vesselled = floorAt === null
+      ? () => false
+      : (x: number, z: number): boolean => Number.isFinite(floorAt(x, z));
+
     let wireSpans = 0;
     /** See `BuiltChunk.provisional`: any depth this chunk could not measure. */
     let provisional = false;
@@ -1624,7 +1690,7 @@ export class RailWorld {
       if (tunnel) {
         writeTunnel(lining, s);
       } else {
-        writeBallast(ballast, s, bridge);
+        writeBallast(ballast, s, bridge, floorAt);
         if ((s.flags & SPAN_ELECTRIFIED) !== 0) wireSpans++;
         for (let t = 0; t < s.len; t += SLEEPER_PITCH) {
           const f = t / s.len;
@@ -1659,15 +1725,22 @@ export class RailWorld {
         // surface between the ballast toe and the rim -- and without it the
         // corridor at Erskineville is a slot into the void with two rails over
         // the top of it. See `writeFormation`.
-        if (carved) writeFormation(ballast, s, this.cut!, this.rawGround);
+        //
+        // **Unless a vessel is drawn here**, in which case all three of these
+        // stand down and the formation supplies the floor, the walls, the coping
+        // and the fence as faces of one solid. See `setVessels` for why it is
+        // all or nothing per point rather than a blend.
+        if (carved) writeFormation(ballast, s, this.cut!, this.rawGround, vesselled);
         if (trenched) {
-          if (!writeTrench(concrete, prisms, s, this.cut!, this.rawGround)) provisional = true;
+          if (!writeTrench(concrete, prisms, s, this.cut!, this.rawGround, vesselled)) {
+            provisional = true;
+          }
         }
         // ...and the corridor either side of it: the cess and verge where the
         // track is at grade, and the boundary fence everywhere. See `writeVerge`
         // for why a bridge span gets neither.
         if (!bridge) {
-          writeVerge(cess, fence, s, this.cut, this.rawGround, trenched, plans);
+          writeVerge(cess, fence, s, this.cut, this.rawGround, trenched, plans, vesselled);
         }
       }
       if (!tunnel) writeRails(rails, s);
@@ -1707,6 +1780,43 @@ export class RailWorld {
         // answer to it -- it is 45 cm tall, it is under the canopy, and at a
         // station in a cutting it is metres below the footpath.
         writeStationBoard(signs, concrete, station, uv);
+      }
+    }
+
+    // --- And the formations, drawn. Phase 3a; nothing here runs with the flag
+    //     down, because `setVessels` is never called with a build.
+    //
+    // Filed by triangle centroid and by panel midpoint rather than clipped, so a
+    // 4 km formation crossing eight chunks puts each of its faces in exactly one
+    // of them: no triangle is cut, nothing is drawn twice, and there is no seam
+    // between two chunks to leak. The test is a half-open box, which is what
+    // makes "exactly one" true on the boundary as well as inside.
+    if (this.vessels !== null) {
+      const x0 = cx * CHUNK_M;
+      const z0 = cz * CHUNK_M;
+      const inChunk = (x: number, z: number): boolean =>
+        x >= x0 && x < x0 + CHUNK_M && z >= z0 && z < z0 + CHUNK_M;
+      for (const run of this.vessels.runs) {
+        // A cheap reject on the run's own ribs, widened by the widest a
+        // formation's rim gets from its centreline (`FORMATION_MAX_SPAN_M` is
+        // 100 m, so half of it plus slack). Without it every chunk build walks
+        // every triangle of every formation in the radius.
+        let rx0 = Infinity;
+        let rx1 = -Infinity;
+        let rz0 = Infinity;
+        let rz1 = -Infinity;
+        for (const rib of run.ribs) {
+          if (rib.cx < rx0) rx0 = rib.cx;
+          if (rib.cx > rx1) rx1 = rib.cx;
+          if (rib.cz < rz0) rz0 = rib.cz;
+          if (rib.cz > rz1) rz1 = rib.cz;
+        }
+        const pad = 60;
+        if (rx1 + pad < x0 || rx0 - pad > x0 + CHUNK_M) continue;
+        if (rz1 + pad < z0 || rz0 - pad > z0 + CHUNK_M) continue;
+        writeVesselShell(concrete, cess, run.vessel, inChunk);
+        writeVesselFence(fence, run.vessel, inChunk, this.cut, plans);
+        writeVesselWalls(prisms, run.vessel, inChunk);
       }
     }
 
@@ -1804,6 +1914,74 @@ export class RailWorld {
       cx,
       cz,
     };
+  }
+
+  /**
+   * The corridor as closed solids, to draw and to defer to.
+   *
+   * ---------------------------------------------------------------------------
+   * **PHASE 3A: WHAT THE VESSEL TAKES OVER, AND WHY IT IS ALL OR NOTHING PER
+   * POINT.**
+   *
+   * With `?vessels=1` the railway inside a formation's footprint is drawn from
+   * the vessel and **only** from the vessel: `writeTrench`, `writeFormation` and
+   * `writeVerge`'s cess and fence all stand down there. That is not tidiness. A
+   * formation floor and a `writeFormation` slab are two surfaces at two heights
+   * over the same ground -- the vessel's floor is under the *lowest* rail the
+   * formation carries and the slab is under *this track's* -- so drawing both is
+   * the double description this whole redesign is about, with a z-fight to
+   * announce it.
+   *
+   * The question asked is `VesselField.surfaceAt` **at the track centreline**,
+   * and it is exact rather than a radius: inside the rim ring the field answers
+   * with the surface of a solid and outside it answers `-Infinity`, because the
+   * footprint is the rim and the rim is a ring of vertices. A track that is a
+   * member of a formation has its centreline inside that formation by
+   * construction, so the test is the membership rule read back out.
+   *
+   * What does **not** stand down: the rails, the sleepers, the ballast and the
+   * platforms. The ballast is rebased onto the vessel's own floor instead (see
+   * `writeBallast`) -- a track four metres above the formation floor needs four
+   * metres of blue metal under it, not half a metre and a drop -- and the
+   * platform is Phase 3b.
+   *
+   * Chunks already built are dropped, because a chunk decides once and for all
+   * what it draws and the vessel arrives as the DEM does. Same mechanism, same
+   * bound, and the same reason as `invalidate`.
+   */
+  setVessels(build: CorridorBuild | null): void {
+    this.vessels = build;
+    // **Only when the answer could have changed**, which is not the same as
+    // "whenever a tile lands". The corridor is re-swept every time the resident
+    // tile count moves -- that is `refreshVessels`' own trigger -- and most of
+    // those sweeps produce the identical formations, because the tile that
+    // landed is nowhere near the railway. Dropping every rail chunk on each of
+    // them is the whole ring rebuilt at two chunks a frame, over and over, with
+    // the railway visibly going away and coming back while it happens.
+    //
+    // The signature is what the drawn geometry is a function of: how many
+    // formations there are and how many triangles they carry. A sweep that adds
+    // a formation or lengthens one changes it; a sweep that reproduces the same
+    // corridor does not.
+    const signature = build === null ? '' : `${build.runs.length}:${build.triangles}`;
+    if (signature === this.vesselSignature) return;
+    this.vesselSignature = signature;
+    for (const [key, chunk] of [...this.built]) this.disposeChunk(key, chunk);
+    this.lastChunk = '';
+    this.lastSleeperCell = '';
+  }
+
+  /**
+   * Is a formation drawn over this point, and what is its surface?
+   *
+   * `NaN` where no vessel covers it, which is the whole footprint question in
+   * one number: the field answers `-Infinity` outside every rim ring, and there
+   * is nothing to compare and no radius to choose.
+   */
+  private vesselFloorAt(x: number, z: number): number {
+    if (this.vessels === null) return Number.NaN;
+    const y = this.vessels.field.surfaceAt(x, z);
+    return y > -Infinity ? y : Number.NaN;
   }
 
   /**
@@ -1948,11 +2126,32 @@ export class RailWorld {
             ? Number.NaN
             : this.cut.deckSurfaceAt(mx + -uz * offset, mz + ux * offset);
         if (Number.isFinite(deck) && my - 0.25 + MAST_HEIGHT > deck - DECK_THICKNESS_M) continue;
+        // --- And **on the formation**, not on its own track. Phase 3a.
+        //
+        // The bake puts a stanchion on a track centreline and this offsets it
+        // `MAST_OFFSET` to one side, which is where a mast goes beside a single
+        // line and is not where the ground is in a cutting. A formation's floor
+        // is under the **lowest** rail it carries, so a mast beside a track four
+        // metres up stands with its base plate four metres in the air: the same
+        // defect as the ballast, one object over.
+        //
+        // Asked of the drawn surface, so the foot lands on whatever the player
+        // is standing on -- the floor, or a coping if the stanchion sits at the
+        // rim. `-1.0` is where the shaft's own base plate is in the instanced
+        // geometry (see `buildMast`), so this puts *that* on the surface.
+        //
+        // **Only ever lowered.** Raising a mast to a surface above it would be
+        // standing it on the coping over its own track, and the wire it carries
+        // has not moved; what is being fixed is a mast in mid-air, which is the
+        // only direction the error goes.
+        let my2 = my - 0.25;
+        const floor = this.vesselFloorAt(mx + -uz * offset, mz + ux * offset);
+        if (Number.isFinite(floor) && floor + 1.0 < my2) my2 = floor + 1.0;
         // Local +X along the track and +Z toward the track, so a Y rotation of
         // `atan2` puts the geometry on the rails and the `side` scale hands it.
         const yaw = Math.atan2(-uz, ux) + (kind === 1 ? Math.PI : 0);
         _matrix.makeRotationY(yaw);
-        _matrix.setPosition(mx + -uz * offset, my - 0.25, mz + ux * offset);
+        _matrix.setPosition(mx + -uz * offset, my2, mz + ux * offset);
         if (kind === 2) {
           if (gantries >= GANTRY_CAPACITY) {
             this.overflows++;
@@ -1999,7 +2198,36 @@ function chunkDistance(cx: number, cz: number, x: number, z: number): number {
  * alternative, a mitred chain, would have to survive junctions where four
  * segments meet at a point and there is no mitre that is right for all of them.
  */
-function writeBallast(s: Solid, seg: Segment, bridge: boolean): void {
+function writeBallast(
+  s: Solid,
+  seg: Segment,
+  bridge: boolean,
+  /**
+   * The formation floor under this track, or `NaN` where no vessel covers it.
+   *
+   * ---------------------------------------------------------------------------
+   * **PHASE 3A, AND IT IS THE THING `STATIONS.md` NAMED AS NEXT TO BE WRONG.**
+   *
+   * *"a track's ballast sitting on a formation floor at the lowest member's
+   * level is the next visible thing to be wrong. The floor is flat and the
+   * tracks are not, by up to `FORMATION_RISE_M`."* A formation is one cutting
+   * with one floor under the **lowest** rail it carries, so a track four metres
+   * above that floor gets four metres of daylight under its half-metre of blue
+   * metal -- the rails on a plinth of nothing.
+   *
+   * What a railway actually does there is put more ballast under it, and that is
+   * all this is: the prism's base is the drawn floor rather than a constant, so
+   * the blue metal reaches whatever surface is under it. The depth is still at
+   * *least* `BALLAST_DEPTH`, because the floor is 0.75 m under the lowest rail
+   * head and a track at that level must not end up with 20 cm of stone.
+   *
+   * The floor is read from `VesselField.surfaceAt`, which is the same answer the
+   * ground query gives and the same surface the shell draws -- so the ballast
+   * toe lands on the floor the player is standing on, by construction rather
+   * than by two modules agreeing.
+   */
+  floorAt: ((x: number, z: number) => number) | null,
+): void {
   const ext = BALLAST_TOP_HALF;
   const ax = seg.ax - seg.ux * ext;
   const az = seg.az - seg.uz * ext;
@@ -2013,7 +2241,15 @@ function writeBallast(s: Solid, seg: Segment, bridge: boolean): void {
   // On a viaduct the shoulders sit on the deck rather than running away to
   // ground, so the prism is a shallow plinth with no batter to speak of.
   const baseHalf = bridge ? BALLAST_TOP_HALF + 0.25 : BALLAST_BASE_HALF;
-  const depth = bridge ? 0.4 : BALLAST_DEPTH;
+  const flat = bridge ? 0.4 : BALLAST_DEPTH;
+  /** How far down the stone goes at one end of the segment. */
+  const deep = (x: number, z: number, top: number): number => {
+    if (bridge || floorAt === null) return flat;
+    const floor = floorAt(x, z);
+    return Number.isFinite(floor) ? Math.max(flat, top - floor) : flat;
+  };
+  const depthA = deep(seg.ax, seg.az, ay);
+  const depthB = deep(seg.bx, seg.bz, by);
 
   const p = (x: number, y: number, z: number, o: number, dy: number): [number, number, number] => [
     x + px * o,
@@ -2024,10 +2260,10 @@ function writeBallast(s: Solid, seg: Segment, bridge: boolean): void {
   const a2 = p(ax, ay, az, topHalf, 0);
   const b1 = p(bx, by, bz, -topHalf, 0);
   const b2 = p(bx, by, bz, topHalf, 0);
-  const a3 = p(ax, ay, az, -baseHalf, -depth);
-  const a4 = p(ax, ay, az, baseHalf, -depth);
-  const b3 = p(bx, by, bz, -baseHalf, -depth);
-  const b4 = p(bx, by, bz, baseHalf, -depth);
+  const a3 = p(ax, ay, az, -baseHalf, -depthA);
+  const a4 = p(ax, ay, az, baseHalf, -depthA);
+  const b3 = p(bx, by, bz, -baseHalf, -depthB);
+  const b4 = p(bx, by, bz, baseHalf, -depthB);
   // Top, then the two shoulders. No underside and no ends: the underside is
   // buried and the ends are inside the next segment's overlap.
   s.quad(...a1, ...b1, ...b2, ...a2);
@@ -2070,7 +2306,14 @@ function writeBallast(s: Solid, seg: Segment, bridge: boolean): void {
  * One quad per rib pair, on `TRENCH_STEP_M`'s own pitch: five quads on a
  * forty-metre span, against the hundred and forty the trench costs.
  */
-function writeFormation(s: Solid, seg: Segment, cut: RailCut, rawGround: GroundAt): void {
+function writeFormation(
+  s: Solid,
+  seg: Segment,
+  cut: RailCut,
+  rawGround: GroundAt,
+  /** Is a formation vessel drawn over this point? Then it is the floor. */
+  vesselled: (x: number, z: number) => boolean,
+): void {
   const px = -seg.uz;
   const pz = seg.ux;
   const steps = Math.max(1, Math.round(seg.len / TRENCH_STEP_M));
@@ -2098,7 +2341,11 @@ function writeFormation(s: Solid, seg: Segment, cut: RailCut, rawGround: GroundA
       cx, cz,
       y: rail - BALLAST_TOP_DROP - BALLAST_DEPTH - 0.02,
       half: cut.halfWidthAt(cx, cz),
-      cut: Number.isFinite(g) && g - rail > CUT_MIN_DEPTH,
+      // A vessel's floor is this slab's job done properly -- one floor under the
+      // whole formation at the level one floor can be at -- so where there is
+      // one this rib draws nothing rather than a second slab
+      // `FORMATION_RISE_M` above or below it.
+      cut: Number.isFinite(g) && g - rail > CUT_MIN_DEPTH && !vesselled(cx, cz),
     });
   }
   const at = (rib: Rib, o: number): [number, number, number] => [
@@ -2267,6 +2514,20 @@ function writeTrench(
   seg: Segment,
   cut: RailCut,
   rawGround: GroundAt,
+  /**
+   * Is a formation vessel drawn over this point?
+   *
+   * Then this function draws **nothing at all** there -- not the wall, not the
+   * coping, not the cess and not the collision box. The vessel's own wall is
+   * drawn from its own rim and its own barrier comes off the same vertices; a
+   * `writeTrench` wall beside it would be a second wall at a re-measured rim,
+   * which is the arrangement Phase 1 opened by describing.
+   *
+   * Asked at the **centreline**, once per rib, because that is where a track's
+   * membership of a formation is decided. A rib at the mouth of a cutting, where
+   * the formation has ended and this track runs on, still gets its old wall.
+   */
+  vesselled: (x: number, z: number) => boolean,
 ): boolean {
   const px = -seg.uz;
   const pz = seg.ux;
@@ -2278,7 +2539,7 @@ function writeTrench(
   let complete = true;
 
   // One pass to measure, so the two sides can be built as strips.
-  interface Station { cx: number; cz: number; rail: number; cess: number }
+  interface Station { cx: number; cz: number; rail: number; cess: number; vessel: boolean }
   const line: Station[] = [];
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
@@ -2286,11 +2547,17 @@ function writeTrench(
     const cx = seg.ax + seg.ux * along;
     const cz = seg.az + seg.uz * along;
     const rail = seg.ay + (seg.by - seg.ay) * t;
-    line.push({ cx, cz, rail, cess: rail - BALLAST_TOP_DROP - BALLAST_DEPTH });
+    line.push({
+      cx, cz, rail,
+      cess: rail - BALLAST_TOP_DROP - BALLAST_DEPTH,
+      vessel: vesselled(cx, cz),
+    });
   }
 
   for (const side of [-1, 1]) {
-    interface Rib { rim: number; foot: number; top: number; cess: number; cx: number; cz: number }
+    interface Rib {
+      rim: number; foot: number; top: number; cess: number; cx: number; cz: number; vessel: boolean;
+    }
     const ribs: Rib[] = [];
     let anyWall = false;
     for (const st of line) {
@@ -2339,9 +2606,9 @@ function writeTrench(
       // wall goes to nothing rather than turning inside out.
       if (top < st.cess) top = st.cess;
       const height = top - st.cess;
-      if (height > TRENCH_MIN_HEIGHT) anyWall = true;
+      if (height > TRENCH_MIN_HEIGHT && !st.vessel) anyWall = true;
       const foot = Math.max(TRENCH_FOOT_MIN, rim - TRENCH_BATTER * height);
-      ribs.push({ rim, foot, top, cess: st.cess, cx: st.cx, cz: st.cz });
+      ribs.push({ rim, foot, top, cess: st.cess, cx: st.cx, cz: st.cz, vessel: st.vessel });
     }
     if (!anyWall) continue;
 
@@ -2372,6 +2639,7 @@ function writeTrench(
     for (let i = 0; i < ribs.length - 1; i++) {
       const a = ribs[i];
       const b = ribs[i + 1];
+      if (a.vessel || b.vessel) continue;
       // The cess: the walking strip from the ballast toe out to the wall foot.
       // It is what stops the hole showing between the ballast's batter and the
       // wall, and it is the surface a cutting is recognised by from a train.
@@ -2408,7 +2676,7 @@ function writeTrench(
     // where a cutting runs out to grade, and there a wall that simply stopped
     // would show its own back face to the street.
     for (const [rib, flip] of [[ribs[0], true], [ribs[ribs.length - 1], false]] as const) {
-      if (rib.top - rib.cess <= TRENCH_MIN_HEIGHT) continue;
+      if (rib.top - rib.cess <= TRENCH_MIN_HEIGHT || rib.vessel) continue;
       const corners: Array<[number, number]> = [
         [rib.foot, rib.cess],
         [rib.rim, rib.top + TRENCH_COPING_RISE],
@@ -2453,6 +2721,7 @@ function writeTrench(
     for (let i = 0; i < ribs.length - 1; i++) {
       const a = ribs[i];
       const b = ribs[i + 1];
+      if (a.vessel || b.vessel) continue;
       const base = Math.min(a.cess, b.cess);
       const top = Math.max(a.top, b.top);
       if (top - base <= TRENCH_MIN_HEIGHT) continue;
@@ -3490,6 +3759,17 @@ function writeVerge(
   rawGround: GroundAt,
   trenched: boolean,
   plans: readonly StationPlan[],
+  /**
+   * Is a formation vessel drawn over this point?
+   *
+   * Then neither the verge nor the fence is drawn here, and the fence is the
+   * interesting half. **This is the player's point 4 being answered by
+   * deletion.** The fence line below is measured out from a *track centreline*,
+   * which is why it marches across carriageways and fences the six-foot; the
+   * vessel's fence rides the rim, which is by definition the edge of the
+   * walkable world. See `writeVesselFence`. Two fences would be two fences.
+   */
+  vesselled: (x: number, z: number) => boolean,
 ): void {
   const px = -seg.uz;
   const pz = seg.ux;
@@ -3501,7 +3781,7 @@ function writeVerge(
     interface Rib {
       cx: number; cz: number; fx: number; fz: number;
       o: number; formation: number; verge: number; foot: number;
-      u: number; open: boolean;
+      u: number; open: boolean; vessel: boolean;
     }
     const ribs: Rib[] = [];
     let u = 0;
@@ -3549,9 +3829,11 @@ function writeVerge(
       // ground the road is drawn on.
       const deckY = cut === null ? Number.NaN : cut.deckSurfaceAt(fx, fz);
       const decked = Number.isFinite(deckY) && foot + FENCE_HEIGHT > deckY - DECK_THICKNESS_M;
+      const vessel = vesselled(cx, cz);
       ribs.push({
         cx, cz, fx, fz, o, formation, verge, foot, u,
-        open: decked || entranceOpens(plans, fx, fz),
+        open: decked || entranceOpens(plans, fx, fz) || vessel,
+        vessel,
       });
     }
 
@@ -3574,7 +3856,7 @@ function writeVerge(
     for (let i = 0; i < ribs.length - 1; i++) {
       const a = ribs[i];
       const b = ribs[i + 1];
-      if (!trenched) {
+      if (!trenched && !a.vessel && !b.vessel) {
         face(
           at(a, CESS_INNER, a.formation),
           at(b, CESS_INNER, b.formation),
@@ -3595,6 +3877,255 @@ function writeVerge(
       );
     }
   }
+}
+
+// --- The vessel, drawn ----------------------------------------------------------
+//
+// Phase 3a of `STATIONS.md`. Everything below is behind `?vessels=1` and is
+// reached only from `RailWorld.setVessels`; with the flag down not one line of it
+// runs and the world is the one that shipped.
+//
+// The rule the three writers share, and it is the reason they are three short
+// functions rather than a rewrite of the four above: **they add no geometry of
+// their own.** The shell is the vessel's own triangles, sorted into materials by
+// the vessel's own record of which profile edge it swept each one from. The
+// barrier is the vessel's own rim and wall-foot vertices. The fence is the rim
+// ring, walked in order. Nothing here re-measures a half-width, re-reads the DEM
+// or decides where an edge is -- which is what `writeTrench` and `writeVerge`
+// each do independently, and is why the two of them disagree about the rim by
+// half a metre and paper over it with a lap.
+
+/**
+ * Is this face one anybody ever sees?
+ *
+ * The buried half of the shell -- the underside and the two outer skins -- exists
+ * so the surface closes, and the terrain is triangulated to the rim, so the
+ * ground meets the *outer edge of the coping* and everything below that is
+ * earth. Dropping them from the drawn mesh is not an optimisation that trades
+ * correctness for triangles: it is 42% of the sweep's faces that cannot be
+ * reached by a camera without first being underground.
+ */
+function vesselFaceDrawn(edge: number): boolean {
+  return (
+    edge !== TRENCH_EDGE.UNDERSIDE &&
+    edge !== TRENCH_EDGE.SKIN_LEFT &&
+    edge !== TRENCH_EDGE.SKIN_RIGHT
+  );
+}
+
+/**
+ * How many of a vessel's triangles are drawn, against how many it has.
+ *
+ * The budget line for Phase 3a, and the reason it is a function here rather than
+ * a number in a comment: *the solid is unchanged*. `Vessel.triangles` is what
+ * the manifold invariant is proved over and what `STATIONS.md` costs the sweep
+ * at; this is the subset a camera can reach. The two are different numbers about
+ * the same object and reporting one as the other is how a budget starts lying.
+ */
+export function drawnTriangles(vessel: Vessel): number {
+  let n = 0;
+  for (let f = 0; f < vessel.triangles; f++) if (vesselFaceDrawn(vessel.faceEdge[f])) n++;
+  return n;
+}
+
+/**
+ * The vessel's own faces, sorted into the two materials a cutting is made of.
+ *
+ * **The floor is `cess` and not `ballast`**, which is a change from
+ * `writeFormation` and is the point of drawing the two things separately. A
+ * formation floor is the pale compacted strip a track worker walks on; the blue
+ * metal is the ballast prism sitting *on* it under each track, and
+ * `writeBallast` now carries that prism all the way down to this surface. Draw
+ * the whole floor in blue metal, as `writeFormation` did, and a six-road cutting
+ * is one dark trough with rails on top of it -- which is what the frame at
+ * Erskineville looked like, and is why the report said "rails painted on a car
+ * park" about the flat version of the same mistake.
+ *
+ * Faces are filed by their **own centroid**, so a formation four kilometres long
+ * lands in the chunks it crosses, one triangle in exactly one chunk. That is a
+ * partition and not a clip: nothing is drawn twice and there is no seam between
+ * two chunks, because no triangle is cut.
+ */
+function writeVesselShell(
+  concrete: Solid,
+  cess: Solid,
+  vessel: Vessel,
+  inChunk: (x: number, z: number) => boolean,
+): void {
+  const p = vessel.position;
+  const ix = vessel.index;
+  for (let f = 0; f < vessel.triangles; f++) {
+    const edge = vessel.faceEdge[f];
+    if (!vesselFaceDrawn(edge)) continue;
+    const a = ix[f * 3] * 3;
+    const b = ix[f * 3 + 1] * 3;
+    const c = ix[f * 3 + 2] * 3;
+    if (!inChunk((p[a] + p[b] + p[c]) / 3, (p[a + 2] + p[b + 2] + p[c + 2]) / 3)) continue;
+    // One triangle, with the face normal of its own plane, which is what every
+    // other writer in this file emits and what the flat-shaded materials expect.
+    const into = edge === TRENCH_EDGE.FLOOR ? cess : concrete;
+    into.tri(
+      p[a], p[a + 1], p[a + 2],
+      p[b], p[b + 1], p[b + 2],
+      p[c], p[c + 1], p[c + 2],
+    );
+  }
+}
+
+/**
+ * The boundary fence, on the rim.
+ *
+ * ---------------------------------------------------------------------------
+ * **THIS IS THE PLAYER'S POINT 4, AND IT FALLS OUT RATHER THAN BEING SOLVED.**
+ *
+ * *"overpass dont have fence along line, but fence along path or road edge"*.
+ * `writeVerge` runs the fence at `max(FENCE_OFFSET, halfWidth + FENCE_CLEAR)`
+ * from **a track centreline**, so it knows about rails and nothing else: it
+ * marches across every carriageway in the city, it fences the six-foot of a
+ * four-road formation unless `markCorridorEdges` talks it out of it, and at a
+ * flyover it fences the buried line rather than the deck.
+ *
+ * A vessel's rim *is* the edge of the walkable world -- that is what the seam
+ * rule makes it, and the terrain is triangulated to these very vertices -- so a
+ * fence that rides the rim is in the right place by construction. It needs no
+ * `open` flags, no `CORRIDOR_NEIGHBOUR` and no notion of a track. Where a road
+ * crosses over, the corridor is decked, the rim runs under the deck, and the two
+ * tests below are the only thing the fence has left to know.
+ *
+ * The ring is walked whole, so `u` -- metres along the fence, which is what the
+ * bar mask is drawn in -- is continuous across a chunk boundary; only the panels
+ * whose midpoint is in this chunk are emitted. The two **end** edges of the ring
+ * are skipped: the ring runs down one seam and back the other, so it closes
+ * across the mouth of the cutting, and a panel there would be a fence across the
+ * railway. They are identified from `ribSeam` -- an edge whose ends are the two
+ * seam vertices of one rib -- rather than by looking for a long edge, because
+ * "long" is a threshold and this is a fact.
+ */
+function writeVesselFence(
+  fence: Solid,
+  vessel: Vessel,
+  inChunk: (x: number, z: number) => boolean,
+  cut: RailCut | null,
+  plans: readonly StationPlan[],
+): void {
+  const rim = vessel.rim;
+  const seam = vessel.ribSeam;
+  if (rim.length < 3 || seam === null) return;
+  /** The two vertices that close the ring across a rib, as `a * 2^21 + b` keys. */
+  const ends = new Set<number>();
+  const pair = (a: number, b: number): number => Math.min(a, b) * 0x200000 + Math.max(a, b);
+  ends.add(pair(seam[0], seam[1]));
+  ends.add(pair(seam[(vessel.ribCount - 1) * 2], seam[(vessel.ribCount - 1) * 2 + 1]));
+  const p = vessel.position;
+  let u = 0;
+  for (let i = 0; i < rim.length; i++) {
+    const va = rim[i];
+    const vb = rim[(i + 1) % rim.length];
+    const ax = p[va * 3];
+    const ay = p[va * 3 + 1];
+    const az = p[va * 3 + 2];
+    const bx = p[vb * 3];
+    const by = p[vb * 3 + 1];
+    const bz = p[vb * 3 + 2];
+    const ua = u;
+    u += Math.hypot(bx - ax, bz - az);
+    if (ends.has(pair(va, vb))) continue;
+    const mx = (ax + bx) / 2;
+    const mz = (az + bz) / 2;
+    if (!inChunk(mx, mz)) continue;
+    // **The deck, on `writeVerge`'s own test and for its own reason**: a road
+    // bridge over the corridor keeps its ground, the rim runs under it, and a
+    // panel whose head would come through the carriageway is the frame the
+    // player photographed. A road *viaduct* ten metres up is a deck too and the
+    // fence under it is a real fence, which is why this is the panel's head
+    // against the soffit rather than "is there a road overhead".
+    const deck = cut === null ? Number.NaN : cut.deckSurfaceAt(mx, mz);
+    if (Number.isFinite(deck) && Math.max(ay, by) + FENCE_HEIGHT > deck - DECK_THICKNESS_M) continue;
+    // And a station entrance, which is the one place a boundary fence is
+    // deliberately open. `writeVerge`'s rule, unchanged.
+    if (entranceOpens(plans, mx, mz)) continue;
+    // Double-sided, like every other fence panel here, so no winding argument
+    // applies. See `fences.createRailFenceMaterial`.
+    fence.quad(
+      ax, ay, az,
+      bx, by, bz,
+      bx, by + FENCE_HEIGHT, bz,
+      ax, ay + FENCE_HEIGHT, az,
+      [ua, 0, u, 0, u, FENCE_HEIGHT, ua, FENCE_HEIGHT],
+    );
+  }
+}
+
+/**
+ * The thing that stops you walking into the cutting, from the rim that knows
+ * where the cutting is.
+ *
+ * ---------------------------------------------------------------------------
+ * **WHY THIS IS NOT THE PRISM DECOMPOSITION `STATIONS.md` REFUSED.**
+ *
+ * That refusal is about the *surface*: decomposing a vessel into prisms so a
+ * body can be stood on it would be a third description of a boundary that
+ * already has two consumers, kept in step by diligence. The ground query does
+ * not do that -- `world/vessel-field.ts` evaluates the sweep's own faces.
+ *
+ * A **barrier** is a different question, and nothing in the design answers it.
+ * `CollisionWorld` knows about prisms; a retaining wall has to be one or a
+ * player walks through it. What matters is that the prism is not a *second
+ * opinion about where the wall is*: its four corners are the vessel's own rim
+ * and wall-foot vertices, read by index, so it cannot drift from the wall that
+ * is drawn. `writeTrench` pushes the same box from its own re-measured rim, and
+ * that is exactly the arrangement this replaces.
+ *
+ * One box per rib pair per side, which is `writeTrench`'s own bound and for its
+ * own two reasons: a chord is not a wall where the corridor flares, and a run-out
+ * must not get a box as tall as its deep end.
+ */
+export function writeVesselWalls(
+  prisms: Array<{ points: Float32Array; height: number; base: number }>,
+  vessel: Vessel,
+  inChunk: (x: number, z: number) => boolean,
+): number {
+  const p = vessel.position;
+  let refused = 0;
+  for (let i = 0; i < vessel.ribCount - 1; i++) {
+    // Only the eight-point `U`. A transition rib re-numbers the profile, so a
+    // point read by index there would be some other part of the cross-section --
+    // refused and counted rather than guessed at. No formation transitions
+    // today; the platform deck in Phase 3b will.
+    if (vessel.ribOffset[i + 1] - vessel.ribOffset[i] !== 8 ||
+        vessel.ribOffset[i + 2] - vessel.ribOffset[i + 1] !== 8) {
+      refused++;
+      continue;
+    }
+    for (const [foot, rimPt] of [
+      [TRENCH_POINT.FOOT_RIGHT, TRENCH_POINT.RIM_RIGHT],
+      [TRENCH_POINT.FOOT_LEFT, TRENCH_POINT.RIM_LEFT],
+    ] as const) {
+      const f0 = (vessel.ribOffset[i] + foot) * 3;
+      const f1 = (vessel.ribOffset[i + 1] + foot) * 3;
+      const r0 = (vessel.ribOffset[i] + rimPt) * 3;
+      const r1 = (vessel.ribOffset[i + 1] + rimPt) * 3;
+      const mx = (p[f0] + p[f1] + p[r0] + p[r1]) / 4;
+      const mz = (p[f0 + 2] + p[f1 + 2] + p[r0 + 2] + p[r1 + 2]) / 4;
+      if (!inChunk(mx, mz)) continue;
+      const base = Math.min(p[f0 + 1], p[f1 + 1]);
+      const top = Math.max(p[r0 + 1], p[r1 + 1]);
+      // A wall shorter than a kerb is a run-out, not a wall. `writeTrench`'s own
+      // threshold, so the two paths agree about where a cutting stops.
+      if (top - base <= TRENCH_MIN_HEIGHT) continue;
+      prisms.push({
+        points: new Float32Array([
+          p[f0], p[f0 + 2],
+          p[f1], p[f1 + 2],
+          p[r1], p[r1 + 2],
+          p[r0], p[r0 + 2],
+        ]),
+        height: top - base,
+        base,
+      });
+    }
+  }
+  return refused;
 }
 
 /**

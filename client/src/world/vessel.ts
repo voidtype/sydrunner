@@ -325,8 +325,19 @@ export interface Vessel {
    * `[sideFace[i], sideFace[i + 1])` are the faces swept between rib `i` and rib
    * `i + 1`, and `sideFace[ribCount - 1]` is where the side ends and the two end
    * caps begin. The caps are excluded from it deliberately: a cap lies in the
-   * rib's own cross-plane, which contains the Y axis, so its normal has **zero**
-   * Y exactly and it can never be a surface anything stands on.
+   * rib's own cross-plane, which contains the Y axis, so it can never be a
+   * surface anything stands on.
+   *
+   * **It used to say "so its normal has zero Y *exactly*", and that is false.**
+   * Corrected in Phase 3a, measured over the whole extract: `n.y` is
+   * `uz*vx - ux*vz` over *world* coordinates, and 30 km from the origin those
+   * two products are around 1e9 with 1e-7 between representable doubles, so
+   * their difference only sometimes cancels to zero. **98,051 of 172,766
+   * vertical faces (56.8%) come out non-zero and 49,280 of those positive**,
+   * which `world/vessel-field.ts` reads as upward-facing. What saves it is not
+   * the sign but the *area*: a face that near-vertical has at most 1.4e-10 m² in
+   * plan, so no point query can land on one. The distinction matters because
+   * "exactly" was doing argumentative work it could not do.
    *
    * This exists so `world/vessel-field.ts` can index the sweep's own faces off
    * the centreline. It is the ranges, not a copy of the faces -- there is one
@@ -334,9 +345,82 @@ export interface Vessel {
    * file for why an analytic profile evaluation is *not* the same answer.
    */
   sideFace: Uint32Array;
+  /**
+   * Which edge of the outer profile each triangle was swept from.
+   *
+   * One entry per triangle, holding the outer-loop point index `j` of the edge
+   * `j -> j+1` the face lies on, or `FACE_CAP` for an end cap and `FACE_OTHER`
+   * for a hole's wall or a transition zip.
+   *
+   * ---------------------------------------------------------------------------
+   * **Emitted by the sweep rather than recovered from the mesh, and that is the
+   * whole reason it is here.** Phase 3a draws the vessel, and a drawer needs to
+   * know which faces are the floor, which are the coping and which are the
+   * buried skin nobody ever sees -- it cannot ask the geometry, because "the
+   * flattish ones are floor" is a second description of the cross-section and
+   * this file exists to abolish those. The emitter knows the answer exactly, for
+   * nothing, at the moment it writes the triangle: `sideQuad` is *called* with
+   * the profile edge it is drawing.
+   *
+   * `world/rail-geo.ts` maps these to materials through `TRENCH_EDGE`, which is
+   * declared beside `trenchProfile` for the same reason: what point 4 means is a
+   * statement about the cross-section, so it belongs with the cross-section.
+   */
+  faceEdge: Int16Array;
   /** Triangle count, for the budget line. `index.length / 3`. */
   triangles: number;
 }
+
+/** `Vessel.faceEdge` for an end cap: it lies in a rib's own cross-plane. */
+export const FACE_CAP = -2;
+/** `Vessel.faceEdge` for a face no profile edge names: a hole wall, or a zip. */
+export const FACE_OTHER = -1;
+
+/**
+ * What each edge of `trenchProfile`'s eight-point `U` is, by name.
+ *
+ * The index is the loop point the edge **starts** at, so `COPING_RIGHT` is the
+ * edge from point 2 (the right rim) to point 3 (the inner edge of the right
+ * coping). Kept here rather than in the renderer because it is the meaning of
+ * the profile and not a fact about how it is drawn -- see `Vessel.faceEdge`.
+ *
+ * `UNDERSIDE`, `SKIN_RIGHT` and `SKIN_LEFT` are the buried half of the shell.
+ * They exist so the surface closes and **nothing ever sees them**: the terrain
+ * is triangulated to the rim, so the ground meets the outer edge of the coping
+ * and everything below that is earth. A renderer is right to drop them, and
+ * `checkManifold` is right to insist they are there.
+ */
+export const TRENCH_EDGE = {
+  UNDERSIDE: 0,
+  SKIN_RIGHT: 1,
+  COPING_RIGHT: 2,
+  WALL_RIGHT: 3,
+  FLOOR: 4,
+  WALL_LEFT: 5,
+  COPING_LEFT: 6,
+  SKIN_LEFT: 7,
+} as const;
+
+/**
+ * The eight **points** of the same profile, by name.
+ *
+ * A separate table from `TRENCH_EDGE` because a consumer that wants the corner
+ * where the right wall meets the floor wants a point, and reaching it as "the
+ * start of edge 4" is the kind of off-by-one that reads as correct in a diff.
+ * Rib `i`'s point `j` is vertex `ribOffset[i] + j` -- see `Vessel.ribOffset`,
+ * which publishes exactly that -- but **only while the rib carries eight
+ * points**, which a transition rib does not. Check the stride before indexing.
+ */
+export const TRENCH_POINT = {
+  BASE_LEFT: 0,
+  BASE_RIGHT: 1,
+  RIM_RIGHT: 2,
+  COPING_RIGHT: 3,
+  FOOT_RIGHT: 4,
+  FOOT_LEFT: 5,
+  COPING_LEFT: 6,
+  RIM_LEFT: 7,
+} as const;
 
 /** A vessel that was built, or the reasons it was not. */
 export interface VesselBuild {
@@ -1161,6 +1245,27 @@ export function buildVessel(
 
   // --- The faces.
   const index: number[] = [];
+  /**
+   * One profile edge per triangle, in step with `index`. See `Vessel.faceEdge`.
+   *
+   * Written where the triangle is written, never derived afterwards, and
+   * asserted to be the same length as `index / 3` before the vessel is returned
+   * -- a provenance array that has drifted from the faces it names is worse than
+   * none, because a renderer would silently paint the floor as coping.
+   */
+  const edge: number[] = [];
+  /**
+   * Name every triangle emitted since the last call.
+   *
+   * A pad rather than a push per triangle, because the emitters below write two,
+   * three or a zip's worth of faces from one call and each of those calls knows
+   * exactly one answer for all of them. There is nowhere for the two arrays to
+   * get out of step: this is called immediately after each emitter and brings
+   * `edge` back up to length, whatever the emitter chose to write.
+   */
+  const named = (what: number): void => {
+    while (edge.length < index.length / 3) edge.push(what);
+  };
   /** Which seam a rib's outer-loop point is, or `-1`. */
   const sideOf = (i: number, j: number): number => {
     const s = ribs[i].seam;
@@ -1257,6 +1362,8 @@ export function buildVessel(
   const splitEdge = (fromFace: number, a: number, b: number, chain: readonly number[]): boolean => {
     if (chain.length === 0) return true;
     const tail: number[] = [];
+    /** The faces' provenance, rebuilt in step with them. See `Vessel.faceEdge`. */
+    const tailEdge: number[] = [];
     let hits = 0;
     for (let f = fromFace; f < index.length / 3; f++) {
       const t0 = index[f * 3];
@@ -1271,15 +1378,23 @@ export function buildVessel(
       }
       if (rot < 0) {
         tail.push(t0, t1, t2);
+        tailEdge.push(edge[f]);
         continue;
       }
       hits++;
       const apex = tri[(rot + 2) % 3];
       const seq = forward ? [a, ...chain, b] : [b, ...[...chain].reverse(), a];
-      for (let s = 0; s < seq.length - 1; s++) tail.push(seq[s], seq[s + 1], apex);
+      for (let s = 0; s < seq.length - 1; s++) {
+        tail.push(seq[s], seq[s + 1], apex);
+        // A fan replaces one face with several **of the same face**: the surface
+        // is unchanged and so is what the surface is.
+        tailEdge.push(edge[f]);
+      }
     }
     index.length = fromFace * 3;
     for (const v of tail) index.push(v);
+    edge.length = fromFace;
+    for (const v of tailEdge) edge.push(v);
     return hits === 2;
   };
 
@@ -1289,11 +1404,21 @@ export function buildVessel(
     const zip = zips[i];
     if (zip === null) {
       for (let k = 0; k < loopCount; k++) {
-        for (let j = 0; j < counts[i][k]; j++) sideQuad(i, k, j, k > 0);
+        for (let j = 0; j < counts[i][k]; j++) {
+          sideQuad(i, k, j, k > 0);
+          // The outer loop's faces carry the profile edge they were swept from;
+          // a hole's wall is named `FACE_OTHER`, because a bore's inner surface
+          // is a different cross-section and `TRENCH_EDGE` says nothing about it.
+          named(k === 0 ? j : FACE_OTHER);
+        }
       }
       continue;
     }
     for (const v of zip.tris) index.push(v);
+    // A zip's triangles span an *arc* of two different profiles rather than one
+    // edge of one, so there is no single profile edge to name them by. Said
+    // rather than approximated: a renderer gets `FACE_OTHER` and can decide.
+    named(FACE_OTHER);
     for (const side of [0, 1] as const) {
       const chain = cutVerts.get(i * 2 + side);
       if (chain === undefined || ribSeam === null) continue;
@@ -1354,8 +1479,20 @@ export function buildVessel(
     return true;
   };
   if (!capAt(0, false)) faults.push('PROFILE: the start cap could not be triangulated');
+  named(FACE_CAP);
   if (!capAt(ribs.length - 1, true)) faults.push('PROFILE: the end cap could not be triangulated');
+  named(FACE_CAP);
   if (faults.length) return { vessel: null, faults, ribs };
+  // The one thing that could go wrong with a parallel array, asserted rather
+  // than assumed. It cannot fire unless an emitter is added above without a
+  // `named` after it, which is exactly the mistake worth catching here rather
+  // than as a mis-painted floor a fortnight later.
+  if (edge.length !== index.length / 3) {
+    faults.push(
+      `SHAPE: ${edge.length} face provenances for ${index.length / 3} faces. An emitter did not name its triangles`,
+    );
+    return { vessel: null, faults, ribs };
+  }
 
   // --- The rim, which is the whole point.
   //
@@ -1402,6 +1539,7 @@ export function buildVessel(
     ribCount: ribs.length,
     ribOffset,
     sideFace,
+    faceEdge: Int16Array.from(edge),
     triangles: index.length / 3,
   };
   return { vessel, faults, ribs };

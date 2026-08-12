@@ -292,6 +292,7 @@ import {
   RailAssets,
   RailWorld,
   buildNetwork,
+  drawnTriangles,
   loadRailBake,
   railWarmupParts,
   verifyRailGeometry,
@@ -360,7 +361,7 @@ import { verifyUndercroft } from './world/undercroft.ts';
 // and the browser is not in CI.
 import { setVesselsEnabled, verifyVessels, vesselsEnabled } from './world/vessel.ts';
 import { verifySeam } from './world/seam.ts';
-import { buildCorridor, corridorCut } from './world/corridor.ts';
+import { buildCorridor, corridorCut, type CorridorBuild } from './world/corridor.ts';
 import type { VesselField } from './world/vessel-field.ts';
 // The street factions -- meth heads and drunks -- on the same split again:
 // `game/streetlife.ts` is the shared simulation the server runs and
@@ -2758,11 +2759,35 @@ async function main(): Promise<void> {
    */
   const VESSEL_RADIUS_M = 900;
   let vesselTiles = -1;
+  /** The last corridor swept, for `sydney.rail.vessels()`. Null with the flag down. */
+  let vesselBuild: CorridorBuild | null = null;
+  let vesselMs = 0;
+  /**
+   * How far the player may get from where the corridor was last swept, metres.
+   *
+   * **The tile count is not enough on its own, and a screenshot found it.** The
+   * only trigger used to be "a grid has landed", on the argument that a new grid
+   * is the only thing that can turn a refused run into a built one. True, and
+   * incomplete: the sweep is centred on the *player*, so a player crossing a
+   * suburb whose tiles are all resident -- which is every teleport, and every
+   * long walk in a session that has been running a while -- walks straight off
+   * the end of the swept region into a corridor that was never built. The ground
+   * query then falls through to the DEM over an open cutting, which is the
+   * original bug wearing the new architecture.
+   *
+   * 300 m against a 900 m radius, so the swept region always reaches at least
+   * 600 m past the player -- comfortably outside `COLLISION_KEEP_RADIUS_M`, which
+   * is the distance the ground query can actually be asked at.
+   */
+  const VESSEL_RECENTRE_M = 300;
+  let vesselAt = { x: Infinity, z: Infinity };
   const refreshVessels = (): void => {
     if (!vesselsEnabled() || railBake === null || streamer.ground === null) return;
     const resident = streamer.ground.loadedTiles;
-    if (resident === vesselTiles) return;
+    const moved = Math.hypot(player.position.x - vesselAt.x, player.position.z - vesselAt.z);
+    if (resident === vesselTiles && moved < VESSEL_RECENTRE_M) return;
     vesselTiles = resident;
+    vesselAt = { x: player.position.x, z: player.position.z };
     const tileSize = streamer.tileSize;
     if (!(tileSize > 0)) return;
     const t0 = performance.now();
@@ -2774,10 +2799,21 @@ async function main(): Promise<void> {
       { at: { x: player.position.x, z: player.position.z }, radius: VESSEL_RADIUS_M },
     );
     vesselField = built.field;
+    vesselBuild = built;
+    vesselMs = performance.now() - t0;
     streamer.setSeam(built.seam, [
       player.position.x - VESSEL_RADIUS_M, player.position.z - VESSEL_RADIUS_M,
       player.position.x + VESSEL_RADIUS_M, player.position.z + VESSEL_RADIUS_M,
     ]);
+    // **And the same build is what draws it.** Phase 3a of `STATIONS.md`: until
+    // now the mesh was built, checked and thrown away, and the visible railway
+    // was still `writeTrench`'s. `RailWorld` sorts the vessel's own faces into
+    // its own materials, rides the boundary fence on the rim and takes the
+    // ballast down to the drawn floor -- and stands the three old writers down
+    // inside the footprint, so nothing is drawn twice. One build, one field, one
+    // set of triangles: the ground query, the withheld terrain and the picture
+    // are three consumers of one object rather than three opinions.
+    railWorld?.setVessels(built);
     console.debug(
       `[vessels] ${built.tracks} tracks grouped into ${built.runs.length} formations, ` +
         `${built.triangles.toLocaleString()} triangles, ${built.refused.length} refused, ` +
@@ -7926,6 +7962,33 @@ async function main(): Promise<void> {
       ride: railHarness.ride,
       state: railHarness.state,
       keys: () => ({ down: [...keys], mountHeld }),
+      /**
+       * The corridor as closed solids: what was swept, and what is under a point.
+       *
+       * `STATIONS.md`'s Phase 3a. Off unless `?vessels=1`, and the one handle
+       * from which the three consumers can be compared from outside: `surfaceAt`
+       * is the number the ground query answers with, the same number the ballast
+       * is bedded onto and the same faces that are drawn. A point where it says
+       * `null` is a point no formation covers, which is a statement about the
+       * footprint rather than about the ground.
+       */
+      vessels: (x = player.position.x, z = player.position.z) => {
+        if (vesselBuild === null) return 'no vessels -- boot with ?vessels=1';
+        const y = vesselBuild.field.surfaceAt(x, z);
+        return {
+          formations: vesselBuild.runs.length,
+          fromTrackRuns: vesselBuild.tracks,
+          triangles: vesselBuild.triangles,
+          drawn: vesselBuild.runs.reduce((n, r) => n + drawnTriangles(r.vessel), 0),
+          metres: Math.round(vesselBuild.runs.reduce((m, r) => m + r.metres, 0)),
+          refused: vesselBuild.refused,
+          noTerrain: vesselBuild.noTerrain,
+          doubleCells: vesselBuild.doubleCells,
+          claimedCells: vesselBuild.claimedCells,
+          sweepMs: +vesselMs.toFixed(1),
+          at: { x: +x.toFixed(1), z: +z.toFixed(1), surfaceY: y > -Infinity ? +y.toFixed(3) : null },
+        };
+      },
       /**
        * Stand on the platform at a station, facing across the track.
        *

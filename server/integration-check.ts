@@ -20841,6 +20841,378 @@ async function checkVesselSeam(): Promise<void> {
     );
   }
 
+  // --- 10h. **PHASE 3A: THE VESSEL, DRAWN.**
+  //
+  // Until this round the mesh was built, proved closed and thrown away, and the
+  // visible railway was still `writeTrench`'s. What is asserted here is not "it
+  // looks right" -- a screenshot is the acceptance for that and there are eight
+  // of them -- but the three things a screenshot cannot check over 145 km:
+  //
+  //   1. the sweep's record of *which face is which* names what the geometry
+  //      actually is, at every triangle of every formation;
+  //   2. the faces the renderer drops are exactly the ones nothing can see, in
+  //      the only form that matters -- from above, the drawn subset still
+  //      answers everywhere the whole solid does;
+  //   3. the rim, which the boundary fence now rides, never crosses the railway
+  //      -- which is the player's own report, and the one thing the old fence
+  //      could not be talked out of.
+  {
+    const geoMod = (await import(
+      new URL('../client/src/world/rail-geo.ts', import.meta.url).pathname
+    )) as {
+      drawnTriangles(v: unknown): number;
+      writeVesselWalls(
+        prisms: Array<{ points: Float32Array; height: number; base: number }>,
+        vessel: unknown,
+        inChunk: (x: number, z: number) => boolean,
+      ): number;
+    };
+    const all = corridorMod.buildCorridor(world.rail!, cut, ground, lattice);
+
+    // --- 1. The provenance is the geometry, measured face by face.
+    //
+    // `Vessel.faceEdge` is written by the emitter, which knows the answer for
+    // free. That makes it cheap and it also makes it unfalsifiable from the
+    // inside, so it is checked from the *outside*: the normal of every triangle
+    // is computed here, from the positions, and compared against what its label
+    // claims it is. A floor is horizontal and up, a coping is horizontal and up,
+    // a battered wall leans, an outer skin and an end cap are vertical to
+    // **exactly** zero -- they lie in a plane containing the Y axis, so no
+    // threshold decides it -- and the underside faces down.
+    {
+      let faces = 0;
+      let wrong = 0;
+      const first: string[] = [];
+      /**
+       * How far a **vertical** face's plan normal may be from zero.
+       *
+       * ---------------------------------------------------------------------
+       * **A PREMISE OF PHASE 2A, CORRECTED, AND IT IS ABOUT ARITHMETIC RATHER
+       * THAN GEOMETRY.**
+       *
+       * `Vessel.sideFace` says of an end cap that it *"lies in the rib's own
+       * cross-plane, which contains the Y axis, so its normal has **zero** Y
+       * exactly"*, and `world/vessel-field.ts` rests its whole up/down/wall
+       * classification on the same sentence. Geometrically it is true. In
+       * doubles it is **not**, and the difference is a fact about how far
+       * Sydney is from the origin, not about the sweep: `n.y` is
+       * `uz*vx - ux*vz` over world coordinates, and at 30 km out those two
+       * products are ~1e9 with ~1e-7 of spacing between representable
+       * neighbours, so their difference cancels to something that is only
+       * sometimes exactly zero.
+       *
+       * Measured over the whole extract: **98,051 of 172,766 vertical faces
+       * (56.8%) have a non-zero plan normal, 49,280 of them positive**, so
+       * `faceHeight`'s `ny > 0` calls fifty thousand walls "a surface you can
+       * stand on". What that costs is bounded by the same arithmetic: the plan
+       * area of such a face is at most **1.4e-10 m²**, so a point query would
+       * have to land inside a tenth of a square nanometre to be answered by
+       * one, and the answer would be a height on the wall between the floor and
+       * the rim. It is not a defect anybody can reach; it is a *sentence in two
+       * headers that is not true*, which in this codebase is the thing worth
+       * catching. The bound below is 1e-6, four orders above the worst.
+       */
+      const VERTICAL_TOLERANCE = 1e-6;
+      let worstVertical = 0;
+      let positiveVertical = 0;
+      /** The worst each band gets, so the numbers are reported and not assumed. */
+      const band = { walk: Infinity, wall: -Infinity, under: -Infinity };
+      const NAME = ['underside', 'skin right', 'coping right', 'wall right', 'floor', 'wall left', 'coping left', 'skin left'];
+      for (const run of all.runs) {
+        const v = run.vessel;
+        if (v.faceEdge.length !== v.triangles) {
+          wrong++;
+          if (first.length < 3) first.push(`${v.faceEdge.length} provenances for ${v.triangles} faces`);
+          continue;
+        }
+        const p = v.position;
+        for (let f = 0; f < v.triangles; f++) {
+          const a = v.index[f * 3] * 3;
+          const b = v.index[f * 3 + 1] * 3;
+          const c = v.index[f * 3 + 2] * 3;
+          const ux = p[b] - p[a];
+          const uy = p[b + 1] - p[a + 1];
+          const uz = p[b + 2] - p[a + 2];
+          const vx = p[c] - p[a];
+          const vy = p[c + 1] - p[a + 1];
+          const vz = p[c + 2] - p[a + 2];
+          const nx = uy * vz - uz * vy;
+          const nyRaw = uz * vx - ux * vz;
+          const nz = ux * vy - uy * vx;
+          const len = Math.hypot(nx, nyRaw, nz);
+          const ny = len > 0 ? nyRaw / len : 0;
+          const e = v.faceEdge[f];
+          faces++;
+          let ok: boolean;
+          // The four bands, which are **disjoint** -- that is the whole claim.
+          // A walking surface is above 0.3, a battered wall is at the 1:6 the
+          // profile builds and never above it, a vertical face is zero to the
+          // limits of double arithmetic, and the underside never turns up. If
+          // the provenance were decorative these would overlap.
+          if (e === vesselMod.TRENCH_EDGE.FLOOR || e === vesselMod.TRENCH_EDGE.COPING_LEFT || e === vesselMod.TRENCH_EDGE.COPING_RIGHT) {
+            if (ny < band.walk) band.walk = ny;
+            ok = ny > 0.3;
+          } else if (e === vesselMod.TRENCH_EDGE.WALL_LEFT || e === vesselMod.TRENCH_EDGE.WALL_RIGHT) {
+            if (ny > band.wall) band.wall = ny;
+            ok = ny > 0 && ny <= vesselMod.VESSEL_BATTER + 1e-9;
+          } else if (e === vesselMod.TRENCH_EDGE.SKIN_LEFT || e === vesselMod.TRENCH_EDGE.SKIN_RIGHT || e === vesselMod.FACE_CAP) {
+            if (Math.abs(ny) > worstVertical) worstVertical = Math.abs(ny);
+            if (ny > 0) positiveVertical++;
+            ok = Math.abs(ny) < VERTICAL_TOLERANCE;
+          } else if (e === vesselMod.TRENCH_EDGE.UNDERSIDE) {
+            if (ny > band.under) band.under = ny;
+            ok = ny < 0.15;
+          } else ok = false;
+          if (!ok) {
+            wrong++;
+            if (first.length < 3) first.push(`${NAME[e] ?? e} at ${p[a].toFixed(0)}, ${p[a + 2].toFixed(0)} has n.y ${ny.toFixed(4)}`);
+          }
+        }
+      }
+      check(
+        faces > 100_000 && wrong === 0,
+        `**every one of ${faces.toLocaleString()} triangles in the extract is the face its provenance ` +
+          `says it is.** ${'`Vessel.faceEdge`'} is written by the emitter -- ${'`sideQuad`'} is *called* ` +
+          `with the profile edge it is drawing -- and is checked here against the normal computed from ` +
+          `the positions: a floor and a coping upward-facing, a battered wall leaning at ` +
+          `1:6, an outer skin and an end cap vertical, the underside pointing down -- and the four bands ` +
+          `are **disjoint**, which is what makes the provenance recoverable rather than decorative. ` +
+          `${wrong} disagree${wrong === 1 ? 's' : ''}. Measured: the flattest walking surface is ` +
+          `n.y ${band.walk.toFixed(3)} (a floor triangle on a tight bend, where a skew quad's two halves ` +
+          `tilt differently), the steepest wall ${band.wall.toFixed(4)} against the ` +
+          `${'`VESSEL_BATTER`'} of ${(1 / 6).toFixed(4)} it is built to, and the most upward-facing ` +
+          `underside ${band.under.toFixed(3)}. Without this the renderer paints a cutting's floor in ` +
+          `coping and nothing but a picture would say so` +
+          (first.length ? `. FAILED: ${first[0]}` : ''),
+      );
+      check(
+        worstVertical < 1e-6,
+        `**and "exactly zero" is not true at 30 km from the origin.** ${'`Vessel.sideFace`'} and ` +
+          `${'`world/vessel-field.ts`'} both say an end cap's normal has zero Y *exactly*, because the ` +
+          `face lies in a plane containing the Y axis. Geometrically yes; in doubles no -- ${'`n.y`'} is ` +
+          `${'`uz*vx - ux*vz`'} over world coordinates, and out at Penrith those products are ~1e9 with ` +
+          `1e-7 between representable neighbours. Measured: the worst vertical face is ` +
+          `${worstVertical.toExponential(2)} off zero and ${positiveVertical.toLocaleString()} of them come ` +
+          `out **positive**, which ${'`faceHeight`'} reads as "a surface you can stand on". It is ` +
+          `unreachable rather than harmless-by-luck: such a face has at most 1.4e-10 m² of plan area, so ` +
+          `a query would have to land inside a tenth of a square nanometre to get one, and the answer ` +
+          `would be a point on the wall between the floor and the rim. The two headers now say this`,
+      );
+    }
+
+    // --- 2. What the renderer drops is what nobody can see.
+    //
+    // The underside and the two outer skins are 42% of the sweep's faces and the
+    // ground is triangulated to the rim above them, so they are buried by
+    // construction. "Buried" is asserted rather than argued, in the form that
+    // matters: sample the footprint and ask the **drawn subset** for the highest
+    // upward face over each point, then ask the whole solid. If a dropped face
+    // were ever the answer, a player would be looking through the corridor.
+    {
+      let probes = 0;
+      let missing = 0;
+      let control = 0;
+      let worst = '';
+      const highest = (v: typeof all.runs[0]['vessel'], x: number, z: number, skip: (e: number) => boolean): number => {
+        const p = v.position;
+        let best = -Infinity;
+        for (let f = 0; f < v.triangles; f++) {
+          if (skip(v.faceEdge[f])) continue;
+          const a = v.index[f * 3] * 3;
+          const b = v.index[f * 3 + 1] * 3;
+          const c = v.index[f * 3 + 2] * 3;
+          const ux = p[b] - p[a];
+          const uz = p[b + 2] - p[a + 2];
+          const vx = p[c] - p[a];
+          const vz = p[c + 2] - p[a + 2];
+          const ny = uz * vx - ux * vz;
+          if (!(ny > 0)) continue;
+          const twice = ux * vz - uz * vx;
+          const px = x - p[a];
+          const pz = z - p[a + 2];
+          const l2 = (px * vz - pz * vx) / twice;
+          if (l2 < 0) continue;
+          const l3 = (pz * ux - px * uz) / twice;
+          if (l3 < 0) continue;
+          const l1 = 1 - l2 - l3;
+          if (l1 < 0) continue;
+          const y = l1 * p[a + 1] + l2 * p[b + 1] + l3 * p[c + 1];
+          if (y > best) best = y;
+        }
+        return best;
+      };
+      const buried = (e: number): boolean =>
+        e === vesselMod.TRENCH_EDGE.UNDERSIDE ||
+        e === vesselMod.TRENCH_EDGE.SKIN_LEFT ||
+        e === vesselMod.TRENCH_EDGE.SKIN_RIGHT;
+      // Every twentieth formation, sampled across its own profile at every
+      // eighth rib: enough to be a sweep of the network rather than of one
+      // station, cheap enough to run every build.
+      for (let i = 0; i < all.runs.length; i += 20) {
+        const run = all.runs[i];
+        for (let r = 0; r < run.ribs.length; r += 8) {
+          const rib = run.ribs[r];
+          const loop = rib.loops[0];
+          const lo = loop[vesselMod.TRENCH_POINT.FOOT_LEFT * 2];
+          const hi = loop[vesselMod.TRENCH_POINT.FOOT_RIGHT * 2];
+          for (let k = 1; k < 8; k++) {
+            const o = lo + ((hi - lo) * k) / 8;
+            const x = rib.cx + -rib.uz * o;
+            const z = rib.cz + rib.ux * o;
+            const whole = highest(run.vessel, x, z, () => false);
+            if (whole === -Infinity) continue;
+            probes++;
+            if (highest(run.vessel, x, z, buried) !== whole) {
+              missing++;
+              worst ||= `${x.toFixed(0)}, ${z.toFixed(0)}`;
+            }
+            // The control: drop the floor as well, and the answer must change.
+            // Without it "the drawn subset is enough" is a sentence that passes
+            // for any subset that happens to include the coping.
+            if (highest(run.vessel, x, z, (e) => buried(e) || e === vesselMod.TRENCH_EDGE.FLOOR) === whole) control++;
+          }
+        }
+      }
+      check(
+        probes > 500 && missing === 0 && control * 20 < probes,
+        `and the **drawn subset answers everywhere the solid does**: over ${probes.toLocaleString()} points ` +
+          `across the footprints of every twentieth formation, the highest upward face is a drawn one ` +
+          `${probes - missing} times of ${probes.toLocaleString()}` +
+          (worst ? ` (first miss ${worst})` : '') +
+          `. So the underside and the two outer skins can be dropped -- 42% of the sweep -- without a ` +
+          `camera ever reaching the hole. NEGATIVE CONTROL: drop the floor too and ${control} of ` +
+          `${probes.toLocaleString()} points still answer, so the test can fail`,
+      );
+    }
+
+    // --- 3. The rim does not cross the railway, which is the player's point 4.
+    //
+    // *"overpass dont have fence along line, but fence along path or road
+    // edge"*. `writeVerge` runs its fence out from a **track centreline**, so it
+    // marches across carriageways and fences the six-foot; the vessel's fence
+    // rides the rim. That is only an improvement if the rim is what it claims to
+    // be, so: walk every rim edge of every formation and count the ones whose two
+    // ends are on **opposite sides** of the corridor. The ring runs down one seam
+    // and back the other, so there must be exactly two -- the caps at each end --
+    // and `writeVesselFence` skips exactly those two, identified from `ribSeam`
+    // rather than by looking for a long edge.
+    {
+      let crossing = 0;
+      let ends = 0;
+      let bad = 0;
+      let where = '';
+      for (const run of all.runs) {
+        const v = run.vessel;
+        const seam = v.ribSeam;
+        if (seam === null) continue;
+        const endPair = new Set<string>([
+          [seam[0], seam[1]].sort((a, b) => a - b).join(':'),
+          [seam[(v.ribCount - 1) * 2], seam[(v.ribCount - 1) * 2 + 1]].sort((a, b) => a - b).join(':'),
+        ]);
+        let mine = 0;
+        for (let i = 0; i < v.rim.length; i++) {
+          const va = v.rim[i];
+          const vb = v.rim[(i + 1) % v.rim.length];
+          const ax = v.position[va * 3];
+          const az = v.position[va * 3 + 2];
+          const bx = v.position[vb * 3];
+          const bz = v.position[vb * 3 + 2];
+          // Which side of the corridor each end is on, in the frame of the rib
+          // nearest the edge's midpoint. A sign, not a distance.
+          const mx = (ax + bx) / 2;
+          const mz = (az + bz) / 2;
+          let best = 0;
+          let bestD = Infinity;
+          for (let r = 0; r < run.ribs.length; r++) {
+            const d = (run.ribs[r].cx - mx) ** 2 + (run.ribs[r].cz - mz) ** 2;
+            if (d < bestD) {
+              bestD = d;
+              best = r;
+            }
+          }
+          const rib = run.ribs[best];
+          const sa = (ax - rib.cx) * -rib.uz + (az - rib.cz) * rib.ux;
+          const sb = (bx - rib.cx) * -rib.uz + (bz - rib.cz) * rib.ux;
+          if (sa * sb >= 0) continue;
+          mine++;
+          crossing++;
+          const key = [va, vb].sort((a, b) => a - b).join(':');
+          if (endPair.has(key)) ends++;
+          else {
+            bad++;
+            where ||= `${mx.toFixed(0)}, ${mz.toFixed(0)}`;
+          }
+        }
+        if (mine !== 2) {
+          bad++;
+          where ||= `a formation at ${run.ribs[0].cx.toFixed(0)}, ${run.ribs[0].cz.toFixed(0)} has ${mine} crossing edges`;
+        }
+      }
+      check(
+        crossing > 0 && bad === 0 && ends === crossing,
+        `**not one of the rim edges the boundary fence rides crosses the railway.** Over all ` +
+          `${all.runs.length} formations, ${crossing} rim edges have their two ends on opposite sides of ` +
+          `the corridor and **all ${ends} of them are the two end caps** -- two per formation, exactly ` +
+          `where the ring turns from one seam to the other -- which is the pair ` +
+          `${'`writeVesselFence`'} skips by name out of ${'`ribSeam`'}. The old fence line is measured ` +
+          `out from a track centreline and has no such property; this one has it by construction, ` +
+          `because the rim *is* the edge of the walkable world` +
+          (where ? `. FAILED at ${where}` : ''),
+      );
+    }
+
+    // --- 4. And you still cannot walk into the cutting.
+    //
+    // The ground query evaluates the sweep's faces and answers *how high*; it
+    // does not answer *you may not pass*, and `CollisionWorld` knows about
+    // prisms. Suppressing `writeTrench` inside the footprint therefore has to
+    // put something back, and what it puts back is read out of the vessel's own
+    // rim and wall-foot vertices by index -- so it cannot be a second opinion
+    // about where the wall is. Asserted as coverage: a barrier per rib pair per
+    // side, over every formation, with its top at a rim vertex.
+    {
+      const prisms: Array<{ points: Float32Array; height: number; base: number }> = [];
+      let refused = 0;
+      let ribPairs = 0;
+      for (const run of all.runs) {
+        refused += geoMod.writeVesselWalls(prisms, run.vessel, () => true);
+        ribPairs += run.vessel.ribCount - 1;
+      }
+      let short = 0;
+      for (const p of prisms) if (!(p.height > 0.45)) short++;
+      check(
+        prisms.length > ribPairs && refused === 0 && short === 0,
+        `and the barrier that replaces ${'`writeTrench`'}'s: ${prisms.length.toLocaleString()} prisms over ` +
+          `${ribPairs.toLocaleString()} rib pairs -- two per pair wherever the wall is taller than a kerb ` +
+          `-- with ${refused} rib pairs refused for a profile the eight-point ${'`U`'} does not name and ` +
+          `${short} shorter than ${'`TRENCH_MIN_HEIGHT`'}. Its four corners are the vessel's own ` +
+          `${'`FOOT`'} and ${'`RIM`'} vertices read by index, which is why it cannot drift from the wall ` +
+          `that is drawn; ${'`STATIONS.md`'}'s refusal of a prism decomposition is about the *surface*, ` +
+          `and the ground query still evaluates the sweep`,
+      );
+    }
+
+    // --- 5. What it costs to draw.
+    {
+      let drawn = 0;
+      let metres = 0;
+      for (const run of all.runs) {
+        drawn += geoMod.drawnTriangles(run.vessel);
+        metres += run.metres;
+      }
+      check(
+        drawn > 0 && drawn < all.triangles,
+        `**${drawn.toLocaleString()} of the ${all.triangles.toLocaleString()} triangles in the extract ` +
+          `are drawn** (${((100 * drawn) / all.triangles).toFixed(0)}%, ${(drawn / metres).toFixed(2)} per ` +
+          `metre of cutting over ${(metres / 1000).toFixed(1)} km). The solid is unchanged -- the ` +
+          `manifold invariant above is proved over all ${all.triangles.toLocaleString()} -- and this is ` +
+          `the subset a camera can reach. Against it the old path draws ${'`writeTrench`'}'s two walls, ` +
+          `${'`writeFormation`'}'s floor and ${'`writeVerge`'}'s cess and fence over the same ground, ` +
+          `all of which stand down inside the footprint`,
+      );
+    }
+  }
+
   // --- 11. The cost.
   {
     let cuts = 0;
