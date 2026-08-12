@@ -148,6 +148,39 @@ TUNNEL_COVER_M = 7.5
 # surprise.
 ROAD_OVER_RAIL_M = 6.9
 
+# And the mirror of it: how far *over* a carriageway a railhead has to sit when
+# the railway is the structure.
+#
+# `world/envelope.ROAD_CLEARANCE_M` (5.4) -- the volume a truck sweeps over the
+# asphalt -- plus `envelope.RAIL_BELOW_M` (0.9) for the formation hanging under
+# the railhead, plus `decks.GIRDER_DEPTH_M` (1.0) for the span that carries it.
+# The same three-term shape as `ROAD_OVER_RAIL_M` read from the other side, and
+# like it a **build target and not a test**: `ENVELOPE_CLASH_M` below is what the
+# audit measures, and the metre between them is deliberate margin.
+#
+# **It has to be margin and not equality, and that is not a style preference.**
+# The first build of the lift set this to 5.4 + 0.9 = 6.3, which is exactly the
+# number section 3c checks, so a railway lifted precisely to its floor landed on
+# the boundary and 280 of 372 residual failures were viaducts sitting a
+# ten-thousandth of a metre under a threshold they had been raised to meet. A
+# constraint built to the tolerance it is measured at is not built.
+RAIL_OVER_ROAD_M = 7.3
+
+# The separation at which the two drawn volumes stop overlapping, metres.
+#
+# `world/envelope.RAIL_ABOVE_M` (5.9) plus `envelope.ROAD_BELOW_M` (0.4): the
+# clearance envelope over a moving train, and how far under the asphalt the road's
+# own envelope reaches. Below this the prism a train sweeps and the prism a car
+# sweeps are the same prism, which is the picture the player photographed at King
+# Street.
+#
+# **Deliberately not `ROAD_OVER_RAIL_M`, and deliberately smaller.** 6.9 is what
+# the constraint *builds* to; 6.3 is what the audit *checks*. Setting the check to
+# the constraint's own number would make section 3c a restatement of the solver
+# rather than a measurement of it, and the 0.6 m between them is the margin that
+# lets the check fail for a real reason.
+ENVELOPE_CLASH_M = 6.3
+
 # The shortest run of tunnel-tagged track that is treated as a bore, metres.
 #
 # Not every `tunnel=yes` in OSM is a tunnel. A 40 m way under a footbridge, a
@@ -164,6 +197,33 @@ ROAD_OVER_RAIL_M = 6.9
 # longest is 38 km -- so the threshold is a judgement about what a tunnel *is*
 # rather than a gap the data handed over. It is stated here, printed by name in
 # the bake log, and listed by `rail-audit` for exactly that reason.
+#
+# --- What this number is NOT allowed to decide, which is the 2026-08-12 fix ----
+#
+# A player photographed St Peters with the track, the masts and the platform
+# passing straight through King Street, and the chain that produced it ran through
+# here: four tunnel-tagged runs totalling 171 m were demoted, the track solved as
+# surface track 0.99 m under the road, and the crossing classifier -- which asked
+# only whether the track was *already* a metre down -- filed it as a level
+# crossing and did nothing. The tempting fix was to make this threshold ask what
+# is above the run. That would have been the wrong repair, because it puts two
+# rules on one node and lets them disagree.
+#
+# The right factoring is that these are **two questions, not one**:
+#
+#   * `MIN_BORE_M` decides *bore or not a bore* -- whether `TUNNEL_COVER_M` of
+#     earth is owed over this track and whether `rail-cut.ts` draws a lining. A
+#     47 m way under a road is not a bore, and this still says so.
+#   * `road_crossings` decides *grade-separated or not* -- whether the track
+#     clears the carriageway drawn over it. That question is about a road, and it
+#     is asked of every metre of track in the extract whether or not it ever
+#     carried a tunnel tag.
+#
+# So a demoted run under King Street is surface track -- and then an open cutting
+# under a road deck, dug by the crossing rule, with no lining and no earth cover.
+# Which is what a road overbridge at St Peters is. The two rules cannot disagree
+# because they answer different questions, and `rail-audit` section 3c reports,
+# per demoted run, whether a road crosses it.
 MIN_BORE_M = 60.0
 
 # Overhead wiring. Sydney's 1500 V DC catenary is on masts at roughly this
@@ -288,6 +348,12 @@ class RailStation:
     bridge_share: float = 0.0
     ground_y: float = 0.0
     track_y: float = 0.0
+    # The same measurement taken on `RailGraph.anchor_y` -- the profile before
+    # the crossing corrections. `track_y` answers "where does this station's
+    # track finally sit"; this one answers "which of the parallel railways here
+    # is *this station's*", and only the anchor tie-break may read it. See
+    # THE ORDERING INVARIANT above `anchor_bias`.
+    anchor_track_y: float = 0.0
     # Metres of terrain over the platform. See `classify_vertical`.
     depth: float = 0.0
     # --- RAIL-VERTICAL.md's measurement, and the thing `vertical` is derived
@@ -752,6 +818,13 @@ class RailGraph:
     # and why constraining a tunnel against the wrong one puts the train back
     # through the ground somewhere else.
     surface: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    # (N,) the solved profile **as it stands before the crossing corrections**:
+    # `solve_heights`' answer, with no viaduct lift and no underbridge or bore
+    # dig applied to it. Exactly one consumer -- `anchor_bias` and
+    # `choose_anchor`'s level tie-break -- and the reason it exists is
+    # THE ORDERING INVARIANT below `anchor_bias`. Do not read it anywhere else,
+    # and do not draw it: `y` is where the track sits.
+    anchor_y: np.ndarray = field(default_factory=lambda: np.zeros(0))
 
     @property
     def n_nodes(self) -> int:
@@ -834,6 +907,10 @@ def build_graph(ways: Sequence[RailWay]) -> RailGraph:
     g = RailGraph(
         xy=np.column_stack([np.array(xs), np.array(ys)]),
         y=np.zeros(len(xs)),
+        # Sized here rather than left empty so no consumer ever has to ask
+        # "has this been filled in?" and quietly fall back to `y` -- a silent
+        # fallback is precisely the feedback loop the invariant forbids.
+        anchor_y=np.zeros(len(xs)),
         edges=np.column_stack([np.array(eu, dtype=np.int64), np.array(ev, dtype=np.int64)]),
         length=np.array(el),
         way_of=np.array(ew, dtype=np.int64),
@@ -1217,8 +1294,610 @@ def _census_tally(census: Sequence[dict]) -> dict[str, int]:
     return out
 
 
+# --- The level-crossing register, and why guessing was never going to work -------
+#
+# The census used to *infer* a level crossing: a road near the corridor, neither
+# side tagged, the track not already a metre down, therefore rails in the road.
+# It found 1,941 of them and reported them as the group the bake cannot fix.
+#
+# Transport for NSW publishes the answer. ALCAM -- the Australian Level Crossing
+# Assessment Model -- is the register every level crossing on a public road in
+# NSW is on, with its position, its road, its line section, its rail kilometre and
+# how it is controlled. Inside 60 km of the origin it holds **fourteen**. The
+# nearest one to Town Hall is Military Road at Yennora, 21.8 km out. St Peters,
+# Sydenham, Erskineville, Redfern and the whole inner city have none, because
+# every rail/road intersection there is grade separated and has been for a
+# century.
+#
+# So the rule inverts, and stops being a guess:
+#
+#   > A rail/road intersection that is not in the register is **not** a level
+#   > crossing. It is a bridge or a tunnel, and the bake has to make it one.
+#
+# **The match is not close, it is exact.** Measured over the extract, each of the
+# fourteen register points lands within **6.0 m** of the plan intersection our own
+# OSM geometry produces -- worst case Mulgrave Road, best case 0.3 m at Bandon
+# Road -- and all fourteen `ROAD_NAME`s match the OSM name of the road they land
+# on. The count of matched intersections is *flat at 51* for every tolerance from
+# 10 m to 80 m and only moves at 120 m, so `REGISTER_TOLERANCE_M` is not a tuned
+# number: anything in that range gives the identical answer and the value below
+# sits in the middle of the plateau. (Fifty-one and not fourteen because a road
+# crosses a four-track corridor as four separate OSM ways, and each is its own
+# intersection.)
+#
+# The independent check that this is right rather than merely consistent: among
+# every mainline-x-public-road intersection in the extract with no bridge, tunnel
+# or layer tag on either side -- the ones OSM itself declines to grade separate --
+# the register matches **all of them and nothing else**. Two sources that have
+# never met agree on the same fourteen places.
+REGISTER_TOLERANCE_M = 40.0
+
+# Where the register lives, and what happens when it does not.
+#
+# Downloaded, not fetched at bake time: it is a 1.3 MB static register that
+# changes when a crossing is built or closed, which in Sydney is roughly never.
+# `data/cache/` is the pipeline's word for "source data, kept".
+LEVEL_CROSSING_PATH = config.CACHE_DIR / "nsw-level-crossings.geojson"
+
+# **If it is missing the bake does not stop, and the audit does.** Stated here
+# rather than left to be discovered:
+#
+#   * `rail-bake` logs the absence loudly and proceeds with an *empty* register.
+#     An empty register means nothing is registered, which means every crossing
+#     is treated as a grade separation and dug. That is the strict direction --
+#     the failure mode is fourteen rural crossings trenched that should not be,
+#     not a train left in a road -- and a bake that refuses to run leaves the
+#     client shipping whatever stale `rail.bin` it had.
+#   * `rail-audit` **fails** on the absence, by name, because an audit that
+#     cannot see its authority is not an audit that passed.
+LEVEL_CROSSING_ATTRIBUTION = (
+    "NSW level crossings on public roads, Transport for NSW, CC-BY, "
+    "effective 2024-08-26 "
+    "(https://opendata.transport.nsw.gov.au/data/dataset/nsw-level-crossings-on-public-roads)"
+)
+
+
+@dataclass
+class LevelCrossingRegister:
+    """Every registered level crossing inside the extract, in ENU metres."""
+
+    east: np.ndarray
+    north: np.ndarray
+    road_name: list[str]
+    suburb: list[str]
+    line_section: list[str]
+    control: list[str]
+    number: list[str]
+    owner: list[str]
+    # Provenance, carried with the data so the log and the audit print the same
+    # sentence and neither has to restate it.
+    path: str
+    present: bool
+    features_total: int
+    # How many of `count` sit inside the extract proper rather than in the 2 km
+    # buffer beyond it. The buffer exists so a crossing just outside the radius
+    # can still claim an intersection just inside it; the audit's "did we find
+    # them all" check is against this narrower number, because a register point
+    # 61 km out has no rail in our graph to match and its absence is not a miss.
+    in_radius: int = 0
+    attribution: str = LEVEL_CROSSING_ATTRIBUTION
+
+    @property
+    def count(self) -> int:
+        return int(self.east.shape[0])
+
+
+def read_level_crossings(
+    radius_m: float, path: Path | None = None
+) -> LevelCrossingRegister:
+    """The ALCAM register, projected and clipped to the extract. See above."""
+    p = Path(path) if path is not None else LEVEL_CROSSING_PATH
+    empty = LevelCrossingRegister(
+        east=np.zeros(0), north=np.zeros(0), road_name=[], suburb=[],
+        line_section=[], control=[], number=[], owner=[],
+        path=str(p), present=False, features_total=0,
+    )
+    if not p.exists():
+        return empty
+    with p.open() as fh:
+        doc = json.load(fh)
+    feats = [
+        f for f in doc.get("features", ())
+        if (f.get("geometry") or {}).get("type") == "Point"
+    ]
+    if not feats:
+        return empty
+    lon = np.array([f["geometry"]["coordinates"][0] for f in feats], dtype=np.float64)
+    lat = np.array([f["geometry"]["coordinates"][1] for f in feats], dtype=np.float64)
+    east, north = geo.lonlat_to_enu(lon, lat)
+    east = np.asarray(east, dtype=np.float64)
+    north = np.asarray(north, dtype=np.float64)
+    # A touch beyond the extract, because a crossing 60.1 km out can still be the
+    # nearest thing to an intersection 59.9 km out.
+    keep = np.flatnonzero(np.hypot(east, north) <= radius_m + 2000.0)
+
+    def col(name: str) -> list[str]:
+        return [str(feats[i]["properties"].get(name) or "") for i in keep]
+
+    return LevelCrossingRegister(
+        east=east[keep], north=north[keep],
+        road_name=col("ROAD_NAME"), suburb=col("SUBURB"),
+        line_section=col("LINE_SECTION"), control=col("CONTROL_TYPE"),
+        number=col("CROSSING_NUMBER"), owner=col("RAIL_OWNER"),
+        path=str(p), present=True, features_total=len(feats),
+        in_radius=int((np.hypot(east[keep], north[keep]) <= radius_m).sum()),
+    )
+
+
+# --- The tunnel register, and exactly how far it can be trusted ------------------
+#
+# nswrail.net keeps an inventory of NSW rail tunnels: 110 rows, 74 in use, each
+# with a type, a status, a length, a rail kilometre and the two places it runs
+# between. It is a hobbyist compilation and is treated as **corroboration, never
+# as an authority** -- which is not a hedge, it is a measurement. Queried for the
+# inner city it returns exactly two rows:
+#
+#     Engine Dive      In Use   1.2 km   Central Goods Junction and Redfern
+#     Illawarra Dive   In Use   1.7 km   Illawarra Junction and Erskineville
+#
+# and **nothing else**. No City Circle. No Eastern Suburbs Railway. No Airport
+# Line, no Epping-Chatswood, no Metro. Those bores certainly exist -- we ride
+# through them -- so the register's silence about a tunnel is worth nothing at
+# all, and any check written the other way round ("we draw a bore the register
+# does not list, therefore it is suspect") would condemn most of underground
+# Sydney. `rail-audit` reports the comparison and draws no conclusion from the
+# unmatched side, which is the honest reading of a source with this coverage.
+#
+# What it *is* good for is the positive direction, and that is worth a lot:
+#
+#   * **It settles St Peters.** There is no tunnel at St Peters and none at
+#     Sydenham. The short tunnel-tagged runs `MIN_BORE_M` demotes there are not
+#     bores, the demotion is correct, and the fix belongs downstream in
+#     `road_crossings` -- which is where it now is.
+#   * **It names two real ones near the same place**, so a future tweak to
+#     `MIN_BORE_M` cannot quietly flatten the Engine Dive and the Illawarra Dive
+#     the way the last round quietly flattened St Peters' grade separation.
+#     Section 3d asserts both by name.
+NSWRAIL_TUNNEL_PATH = config.CACHE_DIR / "nswrail-tunnels.json"
+NSWRAIL_ATTRIBUTION = (
+    "NSW rail tunnel inventory, nswrail.net (https://www.nswrail.net/infrastructure/tunnel.php), "
+    "an unofficial third-party compilation"
+)
+
+
+@dataclass
+class TunnelRegister:
+    """nswrail.net's tunnel rows, parsed. `length_m` is None where unstated."""
+
+    rows: list[dict]
+    path: str
+    present: bool
+    attribution: str = NSWRAIL_ATTRIBUTION
+
+    def in_use(self) -> list[dict]:
+        return [r for r in self.rows if r["status"] == "In Use"]
+
+
+def read_rail_tunnels(path: Path | None = None) -> TunnelRegister:
+    """The nswrail.net inventory. Row 0 of the cached array is its header."""
+    p = Path(path) if path is not None else NSWRAIL_TUNNEL_PATH
+    if not p.exists():
+        return TunnelRegister(rows=[], path=str(p), present=False)
+    with p.open() as fh:
+        raw = json.load(fh)
+    rows: list[dict] = []
+    for r in raw:
+        if not isinstance(r, list) or len(r) < 7 or r[0] == "Location":
+            continue
+        metres: float | None = None
+        text = str(r[3] or "").strip().rstrip("m")
+        try:
+            metres = float(text) if text else None
+        except ValueError:
+            metres = None
+        rows.append(
+            {
+                "location": str(r[0] or ""),
+                "type": str(r[1] or ""),
+                "status": str(r[2] or ""),
+                "length_m": metres,
+                "distance": str(r[5] or ""),
+                "between": str(r[6] or ""),
+            }
+        )
+    return TunnelRegister(rows=rows, path=str(p), present=True)
+
+
+def bore_runs(g: RailGraph) -> list[dict]:
+    """Connected runs of surviving tunnel-tagged edges, with span and centroid.
+
+    The same components `demote_short_bores` computes, read *after* it has run, so
+    this is the inventory of what the bake actually draws as a bore rather than
+    what the extract asked for. Used by section 3d's register cross-check and by
+    the Engine Dive / Illawarra Dive assertion.
+    """
+    parent = list(range(g.n_edges))
+
+    def find(a: int) -> int:
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    tunnel = np.array(
+        [bool(g.ways[int(g.way_of[ei])].tunnel) for ei in range(g.n_edges)], dtype=bool
+    )
+    for n in range(g.n_nodes):
+        here = [ei for ei in g.adj[n] if tunnel[ei]]
+        for ei in here[1:]:
+            ra, rb = find(here[0]), find(ei)
+            if ra != rb:
+                parent[ra] = rb
+    groups: dict[int, list[int]] = defaultdict(list)
+    for ei in range(g.n_edges):
+        if tunnel[ei]:
+            groups[find(ei)].append(ei)
+    out: list[dict] = []
+    for members in groups.values():
+        pts = np.array([g.xy[int(g.edges[ei, 0])] for ei in members], dtype=np.float64)
+        out.append(
+            {
+                "metres": float(sum(float(g.length[ei]) for ei in members)),
+                "edges": len(members),
+                "east": float(pts[:, 0].mean()),
+                "north": float(pts[:, 1].mean()),
+                "subway": all(g.ways[int(g.way_of[ei])].kind == "subway" for ei in members),
+                "ways": sorted({g.ways[int(g.way_of[ei])].osm_id for ei in members}),
+            }
+        )
+    out.sort(key=lambda r: -r["metres"])
+    return out
+
+
+# --- What counts as a railway that may cross a road on the flat ------------------
+#
+# ALCAM's own scope is the title of the dataset: level crossings **on public
+# roads**. It does not register the road across the middle of Delec, or the
+# access track through Chullora, and it is right not to -- inside a yard, track
+# and roadway cross on the flat as a matter of how a yard works, at walking pace,
+# with nobody signalling anything. Trenching those would be inventing
+# infrastructure to satisfy a register that never claimed to cover them, and it
+# would drag the running lines they connect to down the ramp with them.
+#
+# So the exemption is by *railway* class and is stated rather than inferred:
+# 454 of the extract's intersections are yard track, and they are counted and
+# named in the census under `yard-crossing`, never folded into a total.
+#
+# **It is not extended to the road side.** A `highway=service` driveway across a
+# running line is not a yard, it is an occupation crossing or a bridge, and 284
+# of those are resolved like any other. The line is drawn where the register
+# draws it.
+YARD_SERVICES = frozenset({"yard", "siding", "spur", "crossover"})
+
+
+def _is_yard_rail(w: RailWay) -> bool:
+    return bool(w.service in YARD_SERVICES or w.usage == "industrial")
+
+
+def _segment_cross(p, q, r, s) -> float | None:
+    """Where `pq` crosses `rs`, as a fraction along `pq`, or None. Plan only."""
+    d1x, d1y = q[0] - p[0], q[1] - p[1]
+    d2x, d2y = s[0] - r[0], s[1] - r[1]
+    den = d1x * d2y - d1y * d2x
+    if abs(den) < 1e-12:  # parallel, including collinear: not a crossing
+        return None
+    dpx, dpy = r[0] - p[0], r[1] - p[1]
+    t = (dpx * d2y - dpy * d2x) / den
+    u = (dpx * d1y - dpy * d1x) / den
+    if 0.0 <= t <= 1.0 and 0.0 <= u <= 1.0:
+        return float(t)
+    return None
+
+
+# --- The crossing census, rebuilt as intersections rather than proximity ---------
+#
+# The old sweep asked "is there a road *vertex* within 12 m of a rail node", which
+# is two mistakes stacked. It counted a road running **alongside** the corridor as
+# a crossing -- 793 of the 1,156 nodes it filed as level crossings had no road
+# crossing them in plan at all, they had a road beside them -- and it emitted one
+# row per road vertex, so 1,156 nodes became 1,941 rows and the headline number
+# was inflated by duplicates on top of being wrong about the rest. Meanwhile it
+# *missed* real crossings, because a road can cross a railway without putting a
+# vertex within 12 m of a rail node.
+#
+# What is measured here instead is the thing itself: **a rail edge and a road
+# segment that intersect in plan**, one row each, 4,196 of them over the extract.
+#
+# --- And where the carriageway *is*, which took two wrong answers to get right --
+#
+# The old census put the road at `DEM + 5.4` when it carried a bridge tag and at
+# the DEM otherwise. Both halves were wrong and in opposite directions.
+#
+# `decks.solve` floors every free deck node at `ground + streets.CARRIAGEWAY_Y`
+# and only rises where a harmonic interpolation between its pinned at-grade ends
+# beats the floor. Over a rail corridor the DEM does not dip -- a 31 m post cannot
+# see a 15 m cutting, which is the entire reason `rail-cut.ts` exists -- so a road
+# bridge over a railway is drawn essentially *on the ground*, and 5.4 m of lift
+# was a deck the pipeline never builds. Measured over the extract: at road-bridge
+# crossings the DEM sits **1.22 m** above the corridor 200 m away, not 5.4.
+#
+# But reading the DEM at the intersection is wrong too, and worse. Terrarium is a
+# *surface* model: where a **railway** is on a viaduct, the DEM at the crossing is
+# the viaduct, so "the road is at the DEM" puts the carriageway up on the rail
+# bridge, reads a clearance of zero, and digs a tagged viaduct into a trench. That
+# is what the first run of this rule did, 523 times.
+#
+# So the deck is sampled from the **road's own profile**: the DEM at points along
+# the road either side of the crossing, far enough out to be off whatever the
+# railway is standing on, and interpolated back. This is the same idea
+# `roadgrade._robust_profile` uses on a 40 m disc, restated at the one place that
+# needs it, and it is right in both directions -- a road on a long viaduct samples
+# its own viaduct, a road at grade under a rail bridge samples its own asphalt.
+DECK_PROBE_M = (15.0, 30.0, 45.0)
+
+
+def _road_deck(
+    line: np.ndarray, seg: int, t_seg: float, terrain: Any, fallback: float
+) -> float:
+    """The carriageway height where a road crosses the railway. See above.
+
+    Walks the road polyline out to `DECK_PROBE_M` each way, samples the DEM
+    there, and takes the mean of the two sides' medians -- the linear
+    interpolation back to the crossing. Falls back to the DEM at the crossing
+    itself when the way is too short to escape whatever is over it, which is the
+    old behaviour and is reported as such by the count in section 3c.
+    """
+    if terrain is None:
+        return fallback
+    here = np.array(
+        [
+            line[seg, 0] + t_seg * (line[seg + 1, 0] - line[seg, 0]),
+            line[seg, 1] + t_seg * (line[seg + 1, 1] - line[seg, 1]),
+        ]
+    )
+    sides: list[float] = []
+    for direction in (1, -1):
+        pts: list[np.ndarray] = []
+        want = list(DECK_PROBE_M)
+        # March along the polyline from the crossing, accumulating arc length.
+        i = seg if direction > 0 else seg
+        pos = here.copy()
+        run = 0.0
+        while want:
+            nxt = i + 1 if direction > 0 else i
+            if nxt < 0 or nxt >= line.shape[0]:
+                break
+            target = line[nxt]
+            step = float(np.hypot(*(target - pos)))
+            while want and run + step >= want[0]:
+                need = want.pop(0) - run
+                frac = need / step if step > 1e-9 else 0.0
+                pts.append(pos + frac * (target - pos))
+            run += step
+            pos = target
+            i += direction
+        if pts:
+            arr = np.asarray(pts)
+            got = np.asarray(terrain.sample(arr[:, 0], arr[:, 1]), dtype=np.float64)
+            sides.append(float(np.median(got)))
+    if not sides:
+        return fallback
+    return float(np.mean(sides))
+
+
+def road_crossings(
+    g: RailGraph,
+    y: np.ndarray,
+    ground: np.ndarray,
+    roads: Sequence[Any],
+    register: LevelCrossingRegister,
+    terrain: Any = None,
+    y_ref: np.ndarray | None = None,
+) -> list[dict]:
+    """Every place a railway and a road cross in plan, and what happens there.
+
+    One row per (rail edge, road) pair. `kind` is the verdict:
+
+    | kind | what it is | what the bake does |
+    |---|---|---|
+    | `level-crossing` | in the ALCAM register | nothing; it is real |
+    | `yard-crossing` | yard/siding track | nothing; that is what a yard is |
+    | `road-in-tunnel` | road tagged `tunnel` | nothing; `lanes.py` never draws it |
+    | `rail-over` | railhead already clears `RAIL_OVER_ROAD_M` | nothing |
+    | `rail-under` | already clears `ROAD_OVER_RAIL_M` under the deck | nothing |
+    | `resolve-under` | neither: the two volumes overlap | **capped**, dug under |
+
+    The cap is written onto *both* endpoints of the crossed edge rather than the
+    nearer one. The height along an edge is the linear interpolation of its ends,
+    so bounding both bounds every point between them -- including the intersection,
+    which is generally not at a node. Bounding only the nearer end would leave the
+    crossing itself up to `MAX_GRADIENT * length` above the bound, which on this
+    graph's 120 m longest edge is four metres of train still in the road. The cost
+    is over-digging the far end by at most the same amount, which is nothing beside
+    the 209 m ramp the ruling gradient already requires either side.
+    """
+    census: list[dict] = []
+    if not roads:
+        return census
+
+    # Road segments on a lattice, so each rail edge tests a handful rather than a
+    # million. 60 m is comfortably over the longest rail edge (120 m is the
+    # densification cap, so an edge spans at most three cells a side).
+    cell = 60.0
+    index: dict[tuple[int, int], list[tuple[int, int]]] = defaultdict(list)
+    for ri, r in enumerate(roads):
+        if getattr(r, "is_foot", False):
+            continue
+        line = r.line
+        for i in range(line.shape[0] - 1):
+            ax, az, bx, bz = line[i, 0], line[i, 1], line[i + 1, 0], line[i + 1, 1]
+            c0, c1 = sorted((int(math.floor(ax / cell)), int(math.floor(bx / cell))))
+            r0, r1 = sorted((int(math.floor(az / cell)), int(math.floor(bz / cell))))
+            if (c1 - c0) > 40 or (r1 - r0) > 40:  # a degenerate way; skip, reported by count
+                continue
+            for cx in range(c0, c1 + 1):
+                for cz in range(r0, r1 + 1):
+                    index[(cx, cz)].append((ri, i))
+
+    for ei in range(g.n_edges):
+        u, v = int(g.edges[ei, 0]), int(g.edges[ei, 1])
+        p = (float(g.xy[u, 0]), float(g.xy[u, 1]))
+        q = (float(g.xy[v, 0]), float(g.xy[v, 1]))
+        c0, c1 = sorted((int(math.floor(p[0] / cell)), int(math.floor(q[0] / cell))))
+        r0, r1 = sorted((int(math.floor(p[1] / cell)), int(math.floor(q[1] / cell))))
+        seen: set[tuple[int, int]] = set()
+        for cx in range(c0, c1 + 1):
+            for cz in range(r0, r1 + 1):
+                seen.update(index.get((cx, cz), ()))
+        # One row per road, not per road segment: a road that zig-zags across the
+        # corridor in three segments is one crossing of it.
+        best: dict[int, tuple[float, int, float]] = {}
+        for ri, i in seen:
+            line = roads[ri].line
+            t = _segment_cross(
+                p, q, (line[i, 0], line[i, 1]), (line[i + 1, 0], line[i + 1, 1])
+            )
+            if t is None:
+                continue
+            if ri in best:
+                continue
+            # Where along the road's own segment the crossing sits, for the deck
+            # probe to march out from.
+            ax, az = float(line[i, 0]), float(line[i, 1])
+            bx, bz = float(line[i + 1, 0]), float(line[i + 1, 1])
+            ex, en = p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])
+            seglen2 = (bx - ax) ** 2 + (bz - az) ** 2
+            u_seg = (
+                ((ex - ax) * (bx - ax) + (en - az) * (bz - az)) / seglen2
+                if seglen2 > 1e-12 else 0.0
+            )
+            best[ri] = (t, i, min(1.0, max(0.0, u_seg)))
+        if not best:
+            continue
+        w = g.ways[int(g.way_of[ei])]
+        for ri, (t, seg, u_seg) in best.items():
+            r = roads[ri]
+            east = p[0] + t * (q[0] - p[0])
+            north = p[1] + t * (q[1] - p[1])
+            # The DEM and the solved railhead at the intersection, interpolated
+            # along the edge rather than read off the nearer node: the whole point
+            # of finding the intersection was to stop measuring somewhere else.
+            grd = float((1.0 - t) * ground[u] + t * ground[v])
+            head = float((1.0 - t) * y[u] + t * y[v])
+            # The carriageway, from the road's own profile rather than from the
+            # DEM at a point the railway may be standing on. See `_road_deck`.
+            deck = _road_deck(r.line, seg, u_seg, terrain, grd) + 0.02
+            row = {
+                "edge": ei,
+                "u": u,
+                "v": v,
+                "t": t,
+                "east": east,
+                "north": north,
+                "km": math.hypot(east, north) / 1000.0,
+                "rail_way": w.osm_id,
+                "rail_name": w.name or "",
+                "road_id": getattr(r, "osm_id", ""),
+                "road_name": getattr(r, "name", None) or "",
+                "highway": getattr(r, "highway", ""),
+                "deck": deck,
+                "head": head,
+                "gap": deck - head,
+            }
+            # --- The decision, in the order the evidence deserves.
+            #
+            # 1. The road is not drawn. `lanes.py` builds its surface from
+            #    `[r for r in roads if not r.is_foot and not r.tunnel]`, so a road
+            #    in a tunnel has no carriageway anywhere near the railway and
+            #    there is nothing for a train to pass through.
+            if getattr(r, "tunnel", False):
+                row["kind"] = "road-in-tunnel"
+                row["why"] = "the road is tagged tunnel and `lanes.py` draws no carriageway"
+            # 2. The register. The one authority, and it outranks the geometry:
+            #    a registered crossing stays at grade however the DEM reads.
+            elif _register_hit(register, east, north) >= 0:
+                k = _register_hit(register, east, north)
+                row["kind"] = "level-crossing"
+                row["register"] = k
+                row["why"] = (
+                    f"ALCAM {register.number[k] or '?'}: {register.road_name[k]}, "
+                    f"{register.suburb[k]}, {register.line_section[k]}"
+                )
+            # 3. Yard track. Outside the register's scope by the register's own
+            #    definition; see `YARD_SERVICES`.
+            elif _is_yard_rail(w):
+                row["kind"] = "yard-crossing"
+                row["why"] = f"railway service={w.service or w.usage}: a yard crosses on the flat"
+            # 4. Already resolved, either way up.
+            elif head - deck >= RAIL_OVER_ROAD_M:
+                row["kind"] = "rail-over"
+                row["why"] = "the railhead already clears the road's own envelope"
+            elif deck - head >= ROAD_OVER_RAIL_M:
+                row["kind"] = "rail-under"
+                row["why"] = "already under the carriageway by a train and a girder"
+            # 5. Everything left is a grade separation the geometry has not made
+            #    yet, and the only remaining question is **which way up**.
+            #
+            #    The first version of this rule sent all of them down, on the
+            #    argument that the bake can lower track and cannot lift a road.
+            #    The measurement refused it. The deepest twenty digs it produced
+            #    were every one of them a railway *bridge already standing over
+            #    the road* -- George Street under the Darling Harbour goods line
+            #    at 6.2 m of clearance, dug 13.0 m to put it underneath; the M2 at
+            #    Cowpasture Road; Neild Avenue under the Eastern Suburbs viaduct
+            #    -- and it took Circular Quay's viaduct down with it, which
+            #    `rail-audit` section 4 caught by name. A rule that turns viaducts
+            #    into trenches to satisfy a clearance is not resolving the
+            #    crossing, it is inverting it.
+            #
+            #    So the direction is chosen, from the two things that know:
+            #    **the OSM structure tag, and which side of the asphalt the track
+            #    was on before any constraint touched it.** Both are stable inputs
+            #    -- `y_ref` is the unconstrained projection and never moves -- so
+            #    a crossing's direction is decided once and cannot flip between
+            #    passes, which is what makes `solve_crossings` terminate.
+            else:
+                ref = float((1.0 - t) * y_ref[u] + t * y_ref[v]) if y_ref is not None else head
+                if w.tunnel or w.layer < 0 or w.cutting:
+                    row["kind"] = "resolve-under"
+                    row["why"] = "rail tagged tunnel/cutting/layer- : an underbridge"
+                elif w.bridge or w.layer > 0:
+                    row["kind"] = "resolve-over"
+                    row["why"] = "rail tagged bridge/layer+ : the railway is the structure"
+                elif getattr(r, "bridge", False) or getattr(r, "layer", 0) > 0:
+                    row["kind"] = "resolve-under"
+                    row["why"] = "road tagged bridge/layer+ : the road is the structure"
+                elif ref > deck:
+                    row["kind"] = "resolve-over"
+                    row["why"] = "no tag either side; the track was above the asphalt: fallback"
+                    row["fallback"] = True
+                else:
+                    row["kind"] = "resolve-under"
+                    row["why"] = "no tag either side; the track was below the asphalt: fallback"
+                    row["fallback"] = True
+            census.append(row)
+    return census
+
+
+def _register_hit(reg: LevelCrossingRegister, east: float, north: float) -> int:
+    """The register entry within `REGISTER_TOLERANCE_M`, or -1. Nearest wins."""
+    if reg.count == 0:
+        return -1
+    d2 = (reg.east - east) ** 2 + (reg.north - north) ** 2
+    k = int(np.argmin(d2))
+    return k if d2[k] <= REGISTER_TOLERANCE_M**2 else -1
+
+
 def cover_caps(
-    g: RailGraph, y: np.ndarray, ground: np.ndarray, roads: Sequence[Any] | None = None
+    g: RailGraph,
+    y: np.ndarray,
+    ground: np.ndarray,
+    roads: Sequence[Any] | None = None,
+    register: LevelCrossingRegister | None = None,
+    floor: np.ndarray | None = None,
+    terrain: Any = None,
+    surface: np.ndarray | None = None,
+    y_ref: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray, list[dict]]:
     """Every upper bound on track height, and the road-crossing census beside it.
 
@@ -1226,78 +1905,183 @@ def cover_caps(
 
       1. **Cover over a bore**, `TUNNEL_COVER_M` under `visible_surface`. This is
          the player's absolute rule and it is why this function exists.
-      2. **A road crossing over track that is already below the road**, at
-         `ROAD_OVER_RAIL_M`. A road is drawn on the ground -- `roadgrade.conform`
-         pulls the terrain lattice onto the solved street surface, so the DEM at
-         a carriageway *is* the carriageway -- and a railway whose head is inside
-         6.9 m of it is a train through a road surface. Folding it into the same
-         cap array is not tidiness: a crossing 40 m from a portal and a bore
-         500 m away are two bounds on one profile, and solving them separately
-         would let the second undo the first.
+      2. **Every rail/road plan crossing the register does not vouch for**, at
+         `ROAD_OVER_RAIL_M` under the carriageway. See `road_crossings` for what a
+         crossing is now measured to be and why the register decides. Folding it
+         into the same cap array is not tidiness: a crossing 40 m from a portal
+         and a bore 500 m away are two bounds on one profile, and solving them
+         separately would let the second undo the first.
 
     What this deliberately does **not** do is lift the road. That was the obvious
     reading of *"if its an underpass there should be a safe height it passes at"*
     and it is out of reach here for a concrete reason: the carriageway is drawn
-    from the tile bake, and moving it is a world build. Where the railway is at
-    grade and the road is at grade, the honest description is a **level
-    crossing**; those are counted and named in the census and nothing is done to
-    them, because pretending otherwise by trenching every level crossing in the
-    extent would rebuild the network around a picture nobody asked for.
+    from the tile bake, and moving it is a world build. So the railway goes under
+    it, everywhere the register does not say the two are supposed to meet.
     """
-    cap = np.full(g.n_nodes, np.inf)
-    surf = visible_surface(g, ground, y)
+    cap = np.full(g.n_nodes, np.inf) if floor is None else np.asarray(floor, dtype=np.float64).copy()
+    # --- The visible surface is an input, not a running total.
+    #
+    # `visible_surface` lowers the DEM wherever a *drawn trench* passes over a
+    # point, and a trench is "ground minus track over a metre". Recomputing it
+    # from a profile this function has itself just lowered is a positive feedback
+    # loop, and it is not theoretical: measured on the first iterating build, the
+    # Eastern Suburbs bore at Kings Cross went **17.8 m** deeper than the single-
+    # pass answer, because each dig made more corridor read as trench, which
+    # lowered the surface over the bore, which lowered the bore's cover cap, which
+    # dug it. The surface a player sees is a fact about the *incumbent* world, so
+    # `solve_crossings` measures it once from the unconstrained profile and hands
+    # the same array to every pass.
+    surf = (
+        visible_surface(g, ground, y) if surface is None
+        else np.asarray(surface, dtype=np.float64)
+    )
     inside = bore_nodes(g)
-    cap[inside] = surf[inside] - TUNNEL_COVER_M
+    cap[inside] = np.minimum(cap[inside], surf[inside] - TUNNEL_COVER_M)
 
-    census: list[dict] = []
-    if roads:
-        # Only where a road actually crosses the corridor in plan, so the sweep
-        # is over road *vertices* near a rail node rather than a segment
-        # intersection test over two networks of a hundred thousand pieces each.
-        cell = 24.0
-        index = _grid_index(g.xy, cell)
-        for r in roads:
-            if getattr(r, "is_foot", False):
-                continue
-            line = r.line
-            for i in range(line.shape[0]):
-                x, north = float(line[i, 0]), float(line[i, 1])
-                for n in _near(index, cell, x, north, 12.0):
-                    dx = float(g.xy[n, 0]) - x
-                    dn = float(g.xy[n, 1]) - north
-                    if dx * dx + dn * dn > 144.0:
-                        continue
-                    # The road deck. A bridge or a positive layer is carried over
-                    # whatever is under it and the DEM beneath is not its surface;
-                    # everything else is drawn on the ground.
-                    if r.bridge or r.layer > 0:
-                        kind = "road-over"
-                    elif r.tunnel or r.layer < 0:
-                        kind = "road-under"
-                    else:
-                        kind = "at-grade"
-                    # `elevated.ROAD_CLEARANCE_M`, restated: what the pipeline
-                    # lifts a road deck to when it carries it over something.
-                    deck = float(ground[n]) + (5.4 if kind == "road-over" else 0.0)
-                    head = float(y[n])
-                    if head > deck + 1.0:
-                        census.append({"kind": "rail-over", "node": n, "gap": head - deck})
-                        break
-                    if kind == "road-under":
-                        census.append({"kind": "road-under-rail", "node": n, "gap": deck - head})
-                        break
-                    if inside[n] or deck - head >= ROAD_OVER_RAIL_M:
-                        census.append({"kind": "rail-under", "node": n, "gap": deck - head})
-                        break
-                    if deck - head > 1.0:
-                        # In a cutting, but not deep enough: the one group this
-                        # can fix from the rail bake alone.
-                        cap[n] = min(cap[n], deck - ROAD_OVER_RAIL_M)
-                        census.append({"kind": "rail-under-shallow", "node": n, "gap": deck - head})
-                        break
-                    census.append({"kind": "level-crossing", "node": n, "gap": deck - head})
-                    break
+    reg = register if register is not None else read_level_crossings(0.0, Path("/nonexistent"))
+    census = road_crossings(g, y, ground, roads or (), reg, terrain, y_ref)
+    for row in census:
+        if row["kind"] != "resolve-under":
+            continue
+        bound = row["deck"] - ROAD_OVER_RAIL_M
+        cap[row["u"]] = min(cap[row["u"]], bound)
+        cap[row["v"]] = min(cap[row["v"]], bound)
     return cap, surf, census
+
+
+def apply_lift(g: RailGraph, y: np.ndarray, floor: np.ndarray) -> tuple[np.ndarray, dict]:
+    """`apply_cover` in the mirror: a *lower* bound, on the ruling gradient.
+
+    The cover cone's feasibility argument is a theorem about `_cone(y, +1)` and it
+    holds identically for `_cone(y, -1)` with every inequality reversed -- the
+    upper envelope is the smallest grade-legal profile everywhere `>= y0`, so
+    feeding it `max(y, floor)` returns a profile that respects every floor by
+    construction, is unchanged outside a floor's reach, and climbs away from one
+    at exactly the ruling gradient. Same six lines, same theorem, opposite sign.
+
+    It exists because the first version of the crossing rule had only the cover
+    cone and therefore only one answer to every crossing -- *dig* -- and dug
+    thirteen metres under George Street to put a viaduct beneath the road it has
+    stood over since 1922. A bake that can only lower track cannot resolve a
+    railway bridge, so this is the other half.
+    """
+    floored = np.isfinite(floor)
+    stats: dict[str, Any] = {
+        "floored_nodes": int(floored.sum()),
+        "short_before": int((floored & (y < floor - 1e-9)).sum()),
+        "highest_lift_m": 0.0,
+        "lifted_other_nodes": 0,
+        "lifted_other_max_m": 0.0,
+    }
+    if not floored.any():
+        return y, stats
+    y2 = _cone(g, np.where(floored, np.maximum(y, floor), y), -1.0)
+    moved = y2 - y
+    stats["highest_lift_m"] = float(moved.max())
+    other = (moved > 0.05) & ~floored
+    stats["lifted_other_nodes"] = int(other.sum())
+    stats["lifted_other_max_m"] = float(moved[other].max()) if other.any() else 0.0
+    stats["short_after"] = int((floored & (y2 < floor - 1e-6)).sum())
+    return y2, stats
+
+
+# --- The order of the two cones, and why the loop provably stops -----------------
+#
+# Three things have to happen and only one order works.
+#
+#   1. **Lift, once.** Every crossing the evidence says is a railway bridge gets a
+#      floor at `deck + RAIL_OVER_ROAD_M`, and one upper cone puts the profile
+#      over all of them. First, because a lift is the constraint that can be
+#      *given up on* -- if a bore's cover fights a viaduct's floor, the bore wins,
+#      and the loser is reported rather than silently re-fought.
+#   2. **Cap, to a fixed point.** Bore cover and every crossing the evidence says
+#      is an underbridge. Not once, because the census classifies against a
+#      profile and the solve then moves it: a crossing with eight metres of
+#      clearance can be dragged into the road by the ramp off a dig four hundred
+#      metres away, and a single pass never looks again. Measured on the first
+#      build of this rule: thirty-eight crossings that were clear when classified
+#      were not clear when drawn, the Cahill Expressway offramp among them.
+#   3. **Report what the caps took back from the floors**, which section 3c does.
+#
+# **Why the loop terminates**, which is the part that has to be an argument and
+# not a hope. A crossing's *direction* is fixed on the first pass, from its OSM
+# tags and from `y_ref` -- the unconstrained projection, which never moves -- so
+# no crossing can flip from lift to dig or back between passes. Given that:
+#
+#   * floors are set once and never added to;
+#   * caps accumulate by `min` over a finite node set, so the cap array is
+#     monotonically non-increasing and bounded below by the deepest single bound;
+#   * and every pass re-solves from the same `y1`, so the profile is a function of
+#     the cap set alone and cannot drift downward on its own.
+#
+# A pass that adds no cap ends it. The bound below is a guard against a pathology
+# rather than an expected exit, and `rail-audit` section 3c measures the *shipped*
+# profile rather than this function's belief about it, so a guard that ever bit
+# would show up as a failure and not as a quiet approximation.
+CROSSING_PASSES = 6
+
+
+def solve_crossings(
+    g: RailGraph,
+    y0: np.ndarray,
+    ground: np.ndarray,
+    roads: Sequence[Any] | None,
+    register: LevelCrossingRegister | None,
+    terrain: Any = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[dict], dict]:
+    """Lift, then cover to a fixed point. Returns y, surf, cap, census, stats."""
+    y0 = np.asarray(y0, dtype=np.float64)
+    # Measured once, from the profile before any constraint touched it. See the
+    # `surface` block in `cover_caps` for the 17.8 m at Kings Cross that says why.
+    surf = visible_surface(g, ground, y0)
+    reg = register if register is not None else read_level_crossings(0.0, Path("/nonexistent"))
+
+    # `-inf` floors nothing and `+inf` caps nothing; both operators test
+    # `np.isfinite`, so an untouched node is untouched by construction.
+    floor = np.full(g.n_nodes, -np.inf)
+    cap: np.ndarray | None = None
+    y = y0
+    census: list[dict] = []
+    stats: dict[str, Any] = {}
+    lstats: dict[str, Any] = {}
+    passes = 0
+    for passes in range(1, CROSSING_PASSES + 1):
+        nxt, _s, census = cover_caps(g, y, ground, roads, reg, cap, terrain, surf, y0)
+        before = floor.copy()
+        for row in census:
+            if row["kind"] != "resolve-over":
+                continue
+            bound = row["deck"] + RAIL_OVER_ROAD_M
+            floor[row["u"]] = max(floor[row["u"]], bound)
+            floor[row["v"]] = max(floor[row["v"]], bound)
+        settled = (
+            cap is not None
+            and bool(np.all(np.isclose(np.nan_to_num(nxt, posinf=0.0),
+                                       np.nan_to_num(cap, posinf=0.0), atol=1e-6)))
+            and bool(np.all(np.isclose(np.nan_to_num(floor, neginf=0.0),
+                                       np.nan_to_num(before, neginf=0.0), atol=1e-6)))
+        )
+        cap = nxt
+        # Lift, then cover, both from the untouched projection, so the answer is a
+        # function of the two bound sets alone and the passes cannot ratchet.
+        # **Cover last, and that is the precedence, not the order of writing.**
+        # Where a viaduct's floor and a bore's cover want the same node -- which is
+        # Chatswood, where the Metro tunnel and the North Shore viaduct share graph
+        # nodes -- the bore wins, because *"a rail tunnel should never result in the
+        # train assets being above the surface"* is the player's absolute rule and
+        # a bridge tag is not. Section 3c counts what the covers took back.
+        y1, lstats = apply_lift(g, y0, floor)
+        y, stats = apply_cover(g, y1, cap)
+        if settled:
+            break
+    stats["crossing_passes"] = passes
+    stats.update(lstats)
+    # The post-lift, pre-cover profile, kept so `rail-audit` can tell the two
+    # kinds of residual apart: a viaduct that was lifted and then overridden by a
+    # cover the bake ranks higher, versus one the lift never reached at all. The
+    # first is a stated precedence; the second would be a bug.
+    stats["lifted_y"] = y1
+    return y, surf, (cap if cap is not None else np.full(g.n_nodes, np.inf)), census, stats
 
 
 # Bit flags in `Direction.flags`, mirrored in `client/src/game/rail.ts`.
@@ -1955,6 +2739,43 @@ def _candidates(
     return [int(cand[i]) for i in order[:ANCHOR_CANDIDATES]]
 
 
+# --- THE ORDERING INVARIANT ------------------------------------------------------
+#
+#     solve base heights -> choose anchors and routes
+#                        -> apply cover and crossing constraints
+#                        -> derive `vertical`
+#
+# Written down because this round produced the same bug twice in different
+# clothes, and both times the shape was **a correction computed late fed back
+# into a decision taken earlier**. Once as the Kings Cross bore, where
+# re-measuring `visible_surface` each pass drove it 17.8 m deeper than the
+# single-pass answer (fixed by measuring it once, from the unconstrained
+# profile). And once here, where the crossing digs moved 91 stations' `track_y`
+# by up to 17.8 m, that moved which of several parallel platforms a service
+# anchored to, that moved T2 onto T1's pair through the inner west, and
+# `solve_phases` came back with no assignment at all -- 28,141 separation
+# violations from a road bridge half a kilometre away.
+#
+# So the two profiles below are **not two competing answers to one question**,
+# which is the arrangement RAIL-VERTICAL.md would rightly be suspicious of. They
+# are the correct inputs to two different questions:
+#
+#   * `g.anchor_y` / `st.anchor_track_y` -- the profile before the crossing
+#     corrections -- answers **which platform is this station's**. That is a
+#     question about the station's identity and the network's topology: is this
+#     candidate the suburban platform, or the Eastern Suburbs tube 16 m under
+#     it? Nothing a road does to the track's final height may change the answer.
+#   * `g.y` / `st.track_y` -- the shipped profile -- answers **where does the
+#     track finally sit**, and `vertical`, `clearance`, the carve and every
+#     metre of drawn geometry are derived from it, exactly as before.
+#
+# A crossing dig or a viaduct lift is a *geometric correction to where the track
+# sits*. It is not evidence about which railway a platform belongs to, and a
+# road bridge 500 m away has no business re-routing T2.
+#
+# **Do not "simplify" this to one profile.** Pointing the anchor tie-break at
+# `g.y` reintroduces the loop, and `rail-audit` section 5c fails on it by name --
+# with a negative control, so the check is known to have teeth.
 def anchor_bias(g: RailGraph, stop: Stop, node: int) -> float:
     """What a candidate platform costs for *not being at the station*, metres.
 
@@ -1971,10 +2792,14 @@ def anchor_bias(g: RailGraph, stop: Stop, node: int) -> float:
     dn = float(g.xy[node, 1]) - st.north
     bias = ANCHOR_PULL * math.hypot(dx, dn)
     # `ways_near` is `classify_vertical`'s footprint: zero means it has not run
-    # and `track_y` is a default rather than a measurement, so the level term
-    # stays out of it rather than pulling every anchor towards y = 0.
+    # and `anchor_track_y` is a default rather than a measurement, so the level
+    # term stays out of it rather than pulling every anchor towards y = 0.
+    #
+    # `anchor_y`, not `y`: this term is asking which of the parallel railways at
+    # this station the candidate is on, and the answer must not depend on how
+    # deep a road crossing later dug the track. See THE ORDERING INVARIANT above.
     if st.ways_near > 0:
-        dy = abs(float(g.y[node]) - st.track_y)
+        dy = abs(float(g.anchor_y[node]) - st.anchor_track_y)
         if dy > ANCHOR_LEVEL_BAND_M:
             bias += ANCHOR_LEVEL_PENALTY * (dy - ANCHOR_LEVEL_BAND_M)
     return bias
@@ -1998,8 +2823,11 @@ def choose_anchor(
          anchored in the `layer=-3` main-line tunnel that dives under the station
          at -55 m, while the other five services stood on the surface platforms
          at -41 m, so one of the largest surface stations in Sydney had a site
-         16 m underground. `track_y` is measured at the station node, so this is
-         the measurement deciding, not a tag.
+         16 m underground. `anchor_track_y` is measured at the station node, so
+         this is the measurement deciding, not a tag -- and it is measured on
+         the profile *before* the crossing corrections, because which platform
+         belongs to a station is not something a road bridge gets a vote on.
+         See THE ORDERING INVARIANT above `anchor_bias`.
       3. **What does it cost**, plus `anchor_bias` for the last few metres.
 
     Key 2 is gated on `ANCHOR_LEVEL_DETOUR_M`, and the gate is what keeps it
@@ -2022,7 +2850,13 @@ def choose_anchor(
             plan = math.hypot(float(g.xy[t, 0]) - st.east, float(g.xy[t, 1]) - st.north)
             near = 0 if plan <= ANCHOR_NEAR_M else 1
             if st.ways_near > 0:
-                off_level = abs(float(g.y[t]) - st.track_y) > ANCHOR_LEVEL_BAND_M
+                # `anchor_y` and not `y`, for the reason set out in THE ORDERING
+                # INVARIANT above `anchor_bias`: this key asks which platform is
+                # this station's, and a crossing correction is an answer to a
+                # different question -- where the track finally sits.
+                off_level = (
+                    abs(float(g.anchor_y[t]) - st.anchor_track_y) > ANCHOR_LEVEL_BAND_M
+                )
                 affordable = d <= floor + ANCHOR_LEVEL_DETOUR_M
                 level = 0 if (not off_level and affordable) else 1
         key = (near, level, d + anchor_bias(g, stop, t))
@@ -3432,6 +4266,14 @@ def classify_vertical(
         near = min(idx, key=lambda e: (mid[e][0] - st.east) ** 2 + (mid[e][1] - st.north) ** 2)
         st.track_y = float(0.5 * (g.y[int(g.edges[near, 0])] + g.y[int(g.edges[near, 1])]))
         st.depth = st.ground_y - st.track_y
+        # The same rail, on the profile before the crossing corrections. Same
+        # edge, same average, different array -- so the two numbers can only
+        # differ by what a dig or a lift did, which is the whole point. It is
+        # read by the anchor tie-break and by nothing else; see THE ORDERING
+        # INVARIANT above `anchor_bias`.
+        st.anchor_track_y = float(
+            0.5 * (g.anchor_y[int(g.edges[near, 0])] + g.anchor_y[int(g.edges[near, 1])])
+        )
 
         # --- The measurement, over the platform rather than at one point.
         #
@@ -3505,6 +4347,7 @@ def classify_vertical(
         ):
             st.vertical = "unknown"
             st.track_y = st.ground_y
+            st.anchor_track_y = st.ground_y
             st.depth = 0.0
             st.clearance = st.clearance_lo = st.clearance_hi = 0.0
             st.structure = "open"
@@ -4242,6 +5085,20 @@ def build_all(radius_m: float, log=print, terrain=True) -> dict:
             f"shortest {demoted[-1]['metres']:.0f} m)")
     y_raw, ground = raw_heights(g, field)
     y0, hstats = solve_heights(g, y_raw)
+    # --- Step one of THE ORDERING INVARIANT (see above `anchor_bias`):
+    #
+    #     solve base heights -> choose anchors and routes
+    #                        -> apply cover and crossing constraints
+    #                        -> derive `vertical`
+    #
+    # The base heights are frozen *here*, before anything a road or a bore does
+    # to them, and this copy is what the anchor tie-break reads. The three steps
+    # after it do not run in that textual order below -- the corrections and
+    # `classify_vertical` come first, because the label has to be measured on the
+    # shipped profile and `build_lines` needs `ways_near` -- but the *dependency*
+    # order is exactly the one above, and this copy is what enforces it. Which
+    # platform a station's services call at is settled by the base heights alone.
+    g.anchor_y = np.array(y0, dtype=np.float64, copy=True)
     # --- And then the constraint the symmetric solve cannot express: a bore is
     # under the ground. See the `TUNNEL_COVER_M` block and the cone header for
     # why this is a second projection rather than a correction applied to the
@@ -4254,12 +5111,32 @@ def build_all(radius_m: float, log=print, terrain=True) -> dict:
             roads = _osm.read_roads(radius_m)
         except Exception as exc:  # noqa: BLE001 -- reported, not swallowed
             log(f"  roads: unavailable for the crossing census ({exc.__class__.__name__})")
-    cap, surf, census = cover_caps(g, y0, ground, roads)
-    g.y, cstats = apply_cover(g, y0, cap)
+    # --- The two registers. See `REGISTER_TOLERANCE_M` for why ALCAM decides what
+    # a level crossing is, and `NSWRAIL_TUNNEL_PATH` for how far the tunnel
+    # inventory can be trusted (corroboration, one direction only).
+    register = read_level_crossings(radius_m)
+    if register.present:
+        log(f"  level crossings: {register.count} registered inside the extract "
+            f"of {register.features_total} in NSW -- {register.attribution}")
+    else:
+        log(f"  level crossings: REGISTER MISSING at {register.path}. Every rail/road "
+            "crossing will be treated as a grade separation and dug; the fourteen real "
+            "ones will be trenched too. `rail-audit` fails on this by name.")
+    tunnels = read_rail_tunnels()
+    if tunnels.present:
+        log(f"  tunnel register: {len(tunnels.rows)} rows, {len(tunnels.in_use())} in use "
+            f"-- {tunnels.attribution}")
+    else:
+        log(f"  tunnel register: absent at {tunnels.path}; section 3d has nothing to "
+            "corroborate the bore inventory against and says so.")
+    g.y, surf, cap, census, cstats = solve_crossings(g, y0, ground, roads, register, field)
     hstats["cover"] = cstats
     hstats["cover"]["demoted_runs"] = demoted[:40]
     hstats["cover"]["demoted_count"] = len(demoted)
     hstats["cover"]["crossings"] = _census_tally(census)
+    hstats["cover"]["census"] = census
+    hstats["cover"]["register"] = register
+    hstats["cover"]["tunnels"] = tunnels
     hstats["worst_grade_after"] = cstats.get("worst_grade_after", hstats["worst_grade_after"])
     hstats["moved_p95_m"] = float(np.percentile(np.abs(g.y - y_raw), 95)) if g.n_nodes else 0.0
     hstats["moved_max_m"] = float(np.max(np.abs(g.y - y_raw))) if g.n_nodes else 0.0
@@ -4279,7 +5156,8 @@ def build_all(radius_m: float, log=print, terrain=True) -> dict:
         f"(worst {cstats['worst_violation_m']:.2f} m), "
         f"{cstats.get('violating_after', 0)} after; deepest dig "
         f"{cstats['deepest_dig_m']:.2f} m, and {cstats['moved_other_nodes']} "
-        f"unbounded nodes came with it (worst {cstats['moved_other_max_m']:.2f} m)")
+        f"unbounded nodes came with it (worst {cstats['moved_other_max_m']:.2f} m); "
+        f"{cstats.get('crossing_passes', 1)} pass(es) to a fixed point")
     if census:
         tally = hstats["cover"]["crossings"]
         log("  road crossings: " + ", ".join(f"{k} {v}" for k, v in sorted(tally.items())))
@@ -4287,10 +5165,16 @@ def build_all(radius_m: float, log=print, terrain=True) -> dict:
     # --- The vertical is measured **before** the lines are routed, and the
     # ordering is load-bearing rather than tidy. `anchor_bias` needs to know
     # which level a station's platforms are at in order to refuse a candidate at
-    # a different one, and that number is `st.track_y`, which this fills in. Run
-    # after the routing -- where it used to be -- it could only describe the
-    # mistake: Redfern came out `surface` in the table with T4 standing 16 m
+    # a different one, and that number is `st.anchor_track_y`, which this fills
+    # in. Run after the routing -- where it used to be -- it could only describe
+    # the mistake: Redfern came out `surface` in the table with T4 standing 16 m
     # under it in the Eastern Suburbs tunnel, and nothing compared the two.
+    #
+    # This one call fills in both measurements at once -- `track_y` off the
+    # shipped profile for the label, `anchor_track_y` off `g.anchor_y` for the
+    # anchor -- from the same nearest edge, so the only thing that can separate
+    # them is a dig or a lift. THE ORDERING INVARIANT above `anchor_bias` says
+    # why they must be separable.
     classify_vertical(g, stations, field)
     _classify_platforms(g, platforms, stations)
     islands = sum(1 for p in platforms if p.island and p.station >= 0)
@@ -4336,6 +5220,9 @@ def build_all(radius_m: float, log=print, terrain=True) -> dict:
         "heights": hstats,
         "ground_note": ground_note,
         "ways": ways,
+        # Kept so `rail-audit` section 5c can re-route without re-reading the
+        # extract. Routing is the only consumer; nothing else needs it.
+        "corridors": corridors,
         "seconds": time.time() - t0,
     }
 
@@ -4734,17 +5621,285 @@ def audit(radius_m: float, built: dict | None = None, log=print) -> int:
         )
         for r in rows[:5]:
             log(f"    {r['metres']:5.0f} m, {r['edges']:3d} edges, ways {','.join(r['ways'][:3])}")
-    cross = cov.get("crossings", {})
-    if cross:
-        log("  road crossings, by what happens where the two networks meet:")
-        for k in sorted(cross):
-            log(f"    {k:22s} {cross[k]:6,d}")
-        log(
-            "    `level-crossing` is the group this bake cannot fix: the road is drawn from the "
-            "tile build and lifting it is a world build, so those are counted and left. "
-            "`rail-under-shallow` is the group it can, and did -- capped at "
-            f"{ROAD_OVER_RAIL_M:.1f} m, which is `envelope.RAIL_ABOVE_M` plus `decks.GIRDER_DEPTH_M`."
+
+    # --- 3c. Where a railway and a road cross -----------------------------------
+    #
+    # The section that exists because of a photograph: the T4 at St Peters with
+    # the track, the masts and the platform passing through King Street at grade,
+    # in a place where King Street has bridged over the Illawarra line since 1884.
+    #
+    # The old census called it a `level-crossing` and the old audit called that
+    # group unfixable, so it was counted and left -- along with 1,940 others.
+    # Transport for NSW's ALCAM register says there are **fourteen** level
+    # crossings inside 60 km of the origin and the nearest one to the city is
+    # 21.8 km out at Yennora. So the category was not a hard problem; it was a
+    # wrong answer with a large denominator. See `REGISTER_TOLERANCE_M`.
+    log("")
+    log("--- 3c. Rail meets road: the register decides, and the rest are separated")
+    census = list(cov.get("census", ()))
+    reg = cov.get("register")
+    tally = cov.get("crossings", {})
+    check(
+        bool(reg is not None and reg.present),
+        f"the ALCAM level-crossing register is present at {getattr(reg, 'path', '?')} "
+        f"({getattr(reg, 'count', 0)} inside the extract of "
+        f"{getattr(reg, 'features_total', 0)} in NSW)"
+        if reg is not None and reg.present
+        else f"the ALCAM register is MISSING at {getattr(reg, 'path', '?')} -- every crossing "
+        "was treated as a grade separation, including the real ones. Download it before "
+        "trusting this bake; see `LEVEL_CROSSING_PATH`",
+    )
+    if reg is not None and reg.present:
+        log(f"  source: {reg.attribution}")
+    if census:
+        log(f"  {len(census):,} rail-edge x road plan intersections, by verdict:")
+        for k in sorted(tally):
+            log(f"    {k:18s} {tally[k]:6,d}")
+        matched = [r for r in census if r["kind"] == "level-crossing"]
+        places = sorted({r.get("why", "") for r in matched})
+        # Fifty-one intersections and fourteen register points, because a road
+        # crosses a four-track corridor as four separate OSM ways. It is the
+        # *places* that must come to fourteen, and the check is on the places.
+        want = getattr(reg, "in_radius", -1)
+        check(
+            len(places) == want,
+            f"every one of the {want} registered crossings inside the extract was found in "
+            f"our own geometry, and no intersection matched anything else: {len(matched)} "
+            f"intersections over {len(places)} register entries (a road crosses a multi-track "
+            f"corridor once per track). {getattr(reg, 'count', 0) - want} more sit in the 2 km "
+            "buffer beyond the radius and have no rail here to match",
         )
+        for p in places:
+            log(f"    matched  {p}")
+        # --- The invariant, and the one number it is measured with.
+        #
+        # `ENVELOPE_CLASH_M` (6.3) and not `ROAD_OVER_RAIL_M` (6.9): the solver
+        # builds to 6.9, this measures 6.3, and the 0.6 m between them is what
+        # makes this a check rather than a restatement. See both constants.
+        def clash(r: dict) -> bool:
+            sep = r["head"] - r["deck"]
+            return -ENVELOPE_CLASH_M < sep < ENVELOPE_CLASH_M
+
+        solved = np.asarray(g.y, dtype=np.float64)
+        live = []
+        for r in census:
+            head = float(
+                (1.0 - r["t"]) * solved[r["u"]] + r["t"] * solved[r["v"]]
+            )
+            live.append({**r, "head": head})
+        allowed = {"level-crossing", "yard-crossing", "road-in-tunnel"}
+        separated = [r for r in live if r["kind"] not in allowed]
+        bad = [r for r in separated if clash(r)]
+        # --- Two kinds of residual, and only one of them is a defect.
+        #
+        # The bake has two operators and a stated precedence between them: a
+        # viaduct is lifted over a road, a bore is dug under the ground, and where
+        # the two want the same track **the cover wins**, because *"a rail tunnel
+        # should never result in the train assets being above the surface"* is the
+        # player's rule and a bridge tag is not. A crossing that was lifted clear
+        # and then pulled back by a cover is that precedence being exercised, and
+        # `solve_crossings` hands over the post-lift profile so this can say so
+        # with evidence rather than by assertion.
+        #
+        # A crossing that clashes and was *never lifted clear* is something else
+        # entirely -- the lift failed, or the direction was chosen wrongly -- and
+        # that is what this asserts to zero. The check can fail: put back the
+        # 6.3 m `RAIL_OVER_ROAD_M` that made the lift land on the audit's own
+        # threshold and 280 crossings move from the first bucket to the second.
+        lifted = cov.get("lifted_y")
+        overridden: list[dict] = []
+        unexplained: list[dict] = []
+        for r in bad:
+            if lifted is None or r["kind"] != "resolve-over":
+                unexplained.append(r)
+                continue
+            was = float((1.0 - r["t"]) * lifted[r["u"]] + r["t"] * lifted[r["v"]])
+            (overridden if was - r["deck"] >= RAIL_OVER_ROAD_M - 1e-6
+             else unexplained).append(r)
+        check(
+            not unexplained,
+            f"no drawn track shares a carriageway volume with a drawn road anywhere the "
+            f"register does not say it should, except where a cover the bake ranks higher "
+            f"took a lifted viaduct back: {len(unexplained)} unexplained of {len(bad)} "
+            f"clashes over {len(separated):,} separated crossings, measured at "
+            f"{ENVELOPE_CLASH_M:.1f} m (`envelope.RAIL_ABOVE_M` + `envelope.ROAD_BELOW_M`)"
+            + ("" if not unexplained else "; worst: " + ", ".join(
+                f"{r['road_name'] or r['highway']} x rail {r['rail_way']} at "
+                f"{r['km']:.1f} km, {r['head'] - r['deck']:+.2f} m"
+                for r in sorted(unexplained, key=lambda r: abs(r["head"] - r["deck"]))[:6]
+            )),
+        )
+        # The class the player's report is in, called out on its own line because
+        # it is the one the round exists for and it is at zero.
+        under_bad = [r for r in bad if r["kind"] in ("resolve-under", "rail-under")]
+        check(
+            not under_bad,
+            f"every crossing resolved as an underbridge clears the carriageway: "
+            f"{len(under_bad)} of "
+            f"{sum(1 for r in separated if r['kind'] in ('resolve-under', 'rail-under')):,} "
+            "are still inside the asphalt. This is St Peters' class",
+        )
+        if overridden:
+            log(f"  {len(overridden)} lifted viaduct(s) were taken back below "
+                f"{ENVELOPE_CLASH_M:.1f} m by a cover the bake ranks higher -- a bore's own "
+                "cover, or another crossing's dig that the ruling gradient cannot climb out "
+                "of in the distance available. Reported, not hidden; the worst five:")
+            for r in sorted(overridden, key=lambda r: abs(r["head"] - r["deck"]))[:5]:
+                log(f"    {r['km']:6.2f} km  {r['road_name'] or r['highway']:24s} "
+                    f"rail {r['rail_way']:>12}  {r['head'] - r['deck']:+6.2f} m")
+        # The negative control. The check has to be able to fail, and the thing it
+        # has to catch is precisely the photograph: a train in a road.
+        if live:
+            probe = [dict(r) for r in live]
+            # A victim the check is currently *happy* with, so the control adds
+            # exactly one failure and is measured as a delta. Picking any old row
+            # would prove nothing on a build where the check is already failing.
+            victim = next(
+                (r for r in probe if r["kind"] not in allowed and not clash(r)), None
+            )
+            if victim is not None:
+                victim["head"] = victim["deck"] - 0.3
+                caught = [r for r in probe if clash(r) and r["kind"] not in allowed]
+                check(
+                    len(caught) == len(bad) + 1,
+                    "  NEGATIVE CONTROL: one cleanly separated crossing put back 0.30 m under "
+                    "the asphalt -- the St Peters picture exactly -- is caught, and it is the "
+                    f"only new one ({len(bad)} real failure(s) became {len(caught)})",
+                )
+        # --- Resolved by evidence, or by fallback. The coordinator asked for the
+        # split and it is the honest measure of how much of this is inference.
+        res = [r for r in census if r["kind"] == "resolve-under"]
+        if res:
+            by_why: dict[str, int] = {}
+            for r in res:
+                by_why[r["why"]] = by_why.get(r["why"], 0) + 1
+            fallback = sum(1 for r in res if r.get("fallback"))
+            against = sum(1 for r in res if r.get("against_tag"))
+            log(f"  {len(res):,} intersections were resolved by digging the rail under the "
+                f"carriageway, capped at {ROAD_OVER_RAIL_M:.1f} m "
+                "(`envelope.RAIL_ABOVE_M` + `decks.GIRDER_DEPTH_M`):")
+            for why in sorted(by_why, key=lambda k: -by_why[k]):
+                log(f"    {by_why[why]:5,d}  {why}")
+            log(f"    {len(res) - fallback:,} of {len(res):,} were resolved by evidence on one "
+                f"side or the other; {fallback:,} by the fallback, and {against:,} against an "
+                "OSM rail bridge tag the DEM does not support (RAIL-VERTICAL.md section 3.2: "
+                "OSM says what the structure is, the DEM says where the ground is)")
+        # --- Every tunnel-tagged run either has a structure above it or was
+        # demoted for a stated reason. The other half of the brief.
+        dem_rows = cov.get("demoted_runs", [])
+        if dem_rows:
+            crossed_ways = {r["rail_way"] for r in census}
+            with_road = [r for r in dem_rows if set(r["ways"]) & crossed_ways]
+            log(f"  of the {len(dem_rows)} longest demoted runs listed, {len(with_road)} have a "
+                f"road crossing them in plan -- those are road underbridges and section 3c dug "
+                f"them; the other {len(dem_rows) - len(with_road)} have nothing above them and "
+                "are the footbridge and concourse cases the threshold was written for")
+        # --- The two worked examples the brief names.
+        for place, east, north in (
+            ("St Peters", -2572.9, -4314.5), ("Sydenham", -3904.7, -5165.4),
+        ):
+            near = sorted(
+                (r for r in live
+                 if math.hypot(r["east"] - east, r["north"] - north) <= 300.0),
+                key=lambda r: math.hypot(r["east"] - east, r["north"] - north),
+            )
+            kinds: dict[str, int] = {}
+            for r in near:
+                kinds[r["kind"]] = kinds.get(r["kind"], 0) + 1
+            worst = min((abs(r["head"] - r["deck"]) for r in near
+                         if r["kind"] not in allowed), default=float("nan"))
+            log(f"  {place}: {len(near)} crossings within 300 m -- "
+                + (", ".join(f"{k} {v}" for k, v in sorted(kinds.items())) or "none")
+                + (f"; the tightest separated one clears the asphalt by {worst:.2f} m, "
+                   f"against the {ENVELOPE_CLASH_M:.1f} m the two drawn volumes need"
+                   if near and worst == worst else ""))
+            for r in near[:4]:
+                log(f"    {r['road_name'] or '(unnamed)':22s} {r['highway']:14s} "
+                    f"{r['kind']:16s} rail {r['rail_way']:>12}  "
+                    f"deck {r['deck']:8.2f}  head {r['head']:8.2f}  "
+                    f"clear {r['deck'] - r['head']:6.2f}")
+
+    # --- 3d. The bore inventory, against a register that only half covers it -----
+    log("")
+    log("--- 3d. Bores, cross-checked against nswrail.net -- one direction only")
+    treg = cov.get("tunnels")
+    runs = bore_runs(g)
+    log(f"  the bake draws {len(runs):,} bore runs after demotion "
+        f"({sum(1 for r in runs if r['subway']):,} of them Metro/subway), "
+        f"longest {runs[0]['metres'] / 1000:.2f} km, shortest "
+        f"{runs[-1]['metres']:.0f} m" if runs else "  the bake draws no bores at all")
+    if treg is None or not treg.present:
+        notes.append(
+            f"nswrail.net's tunnel inventory is absent at {getattr(treg, 'path', '?')}; "
+            "the bore cross-check did not run"
+        )
+        log("  the tunnel register is absent, so there is nothing to corroborate against")
+    else:
+        in_use = treg.in_use()
+        log(f"  the register lists {len(treg.rows)} NSW tunnels, {len(in_use)} in use. "
+            f"{treg.attribution}")
+        # Which register entries name a station we can place? That is the only
+        # handle the "Between" column gives, and it is the only matching this
+        # deserves given the source.
+        by_station = {s.name.lower(): s for s in stations}
+        placeable = []
+        for row in in_use:
+            hits = [
+                by_station[nm] for nm in by_station
+                if len(nm) > 4 and nm in row["between"].lower()
+            ]
+            if hits:
+                placeable.append((row, hits))
+        found = 0
+        for row, hits in placeable:
+            ax = float(np.mean([h.east for h in hits]))
+            an = float(np.mean([h.north for h in hits]))
+            near = [r for r in runs
+                    if math.hypot(r["east"] - ax, r["north"] - an) <= 1500.0]
+            if near:
+                found += 1
+        log(f"  {len(placeable)} of the {len(in_use)} in-use rows name a station inside our "
+            f"extract; {found} of those have a bore of ours within 1.5 km of it")
+        # **And no conclusion is drawn from the other side of the comparison**,
+        # because the register does not list the City Circle, the Eastern Suburbs
+        # Railway, the Airport Line, the Epping-Chatswood link or a single Metro
+        # bore -- all of which exist and all of which we ride through. A bore we
+        # draw that the register omits is evidence about the register.
+        city = [
+            r for r in treg.rows
+            if any(w in r["between"].lower()
+                   for w in ("redfern", "erskineville", "central", "town hall", "wynyard",
+                             "museum", "st james", "martin place", "kings cross", "bondi",
+                             "chatswood", "epping", "airport", "mascot"))
+        ]
+        log(f"  the register's entire inner-Sydney coverage is {len(city)} row(s): "
+            + "; ".join(f"{r['location']} ({r['status']}, {r['between']})" for r in city))
+        log("  so the unmatched direction is not reported as a defect: the register lists no "
+            "City Circle, no Eastern Suburbs Railway, no Airport Line, no Metro bore, and "
+            "those certainly exist. Its silence about a tunnel means nothing.")
+        # --- And the assertion the brief asks for by name. The last round removed
+        # St Peters' grade separation with a length threshold; these two are real
+        # tunnels within two kilometres of it, and no future tweak gets to take
+        # them out quietly.
+        for name, anchor in (("Engine Dive", "Redfern"), ("Illawarra Dive", "Erskineville")):
+            row = next((r for r in treg.rows if r["location"] == name), None)
+            st = next((s for s in stations if s.name == anchor), None)
+            if row is None or st is None:
+                check(False, f"{name}: not in the register, or {anchor} is not in the extract")
+                continue
+            near = [
+                r for r in runs
+                if math.hypot(r["east"] - st.east, r["north"] - st.north) <= 1200.0
+                and not r["subway"]
+            ]
+            best = max((r["metres"] for r in near), default=0.0)
+            check(
+                bool(near),
+                f"{name} ({row['status']}, {row['between']}) survives: {len(near)} heavy-rail "
+                f"bore run(s) within 1.2 km of {anchor}, longest {best:.0f} m. This is the "
+                f"assertion that stops a future {MIN_BORE_M:.0f} m threshold from flattening a "
+                "real tunnel the way the last round flattened St Peters' separation",
+            )
 
     log("")
     log("--- 4. Vertical profile, measured, for every station on a line")
@@ -5016,6 +6171,107 @@ def audit(radius_m: float, built: dict | None = None, log=print) -> int:
         f"{viol} violation(s); the closest any two trains came to sharing a rail was "
         f"{closest:.1f} s against a {SEP_S:.0f} s rule",
     )
+
+    # --- 5c. THE ORDERING INVARIANT, asserted rather than believed.
+    #
+    # The check that would have caught the regression this section was written
+    # for, immediately and by name. The round that moved road/rail crossings onto
+    # the ALCAM register also deepened the digs, which moved 91 stations'
+    # `track_y` by up to 17.8 m, which moved which of several parallel platforms
+    # a service anchored to, which put T2 on T1's pair through the inner west --
+    # and `solve_phases` came back with no assignment at all. Every offset fell to
+    # zero and section 5 counted 28,141 separation violations. Nothing in the
+    # suite connected any of that to a road bridge, because nothing was watching
+    # the one link in the chain that had no business existing.
+    #
+    # So: **the anchors must not move when the crossing corrections are turned
+    # off.** "Turned off" is exact rather than approximate -- with no floors and
+    # no caps, `apply_lift` and `apply_cover` are both the identity (each returns
+    # early on an empty bound set), so the profile with digs and lifts disabled
+    # *is* `g.anchor_y`. Routing against it, and against the shipped `g.y`, must
+    # choose the same platform at every stop of every direction.
+    #
+    # The negative control re-runs the same comparison with the anchor tie-break
+    # pointed back at the shipped profile -- which is the bug, exactly as it was
+    # written -- and requires that the anchors then *do* move. Without it this
+    # check could pass by being unable to tell anything apart.
+    log("")
+    log("--- 5c. Anchoring is invariant to the crossing corrections")
+    corridors = b.get("corridors")
+    if corridors is None:
+        notes.append("5c: the build did not carry its corridors, so the anchor "
+                     "invariant was not checked")
+    else:
+        quiet = lambda *_a, **_k: None  # noqa: E731
+
+        def anchors_of(built_lines: Sequence[Line]) -> dict[tuple[str, int, int], int]:
+            return {
+                (ln.id, d.index, i): int(s.node)
+                for ln in built_lines for d in ln.dirs
+                for i, s in enumerate(d.stops)
+            }
+
+        def route_with(
+            y: np.ndarray, ty: dict[str, float],
+            ay: np.ndarray, aty: dict[str, float],
+        ) -> dict[tuple[str, int, int], int]:
+            """Re-route with the four height inputs set to whatever we like.
+
+            `build_lines` is a pure function of the graph and the stations, so
+            swapping the arrays and putting them back is the whole of it. The
+            split is the invariant made operable: `y`/`track_y` are where the
+            track sits, `anchor_y`/`anchor_track_y` are which platform is the
+            station's, and this lets the audit vary one without the other.
+            """
+            keep = (g.y, g.anchor_y,
+                    {s.name: (s.track_y, s.anchor_track_y) for s in stations})
+            try:
+                g.y, g.anchor_y = y, ay
+                for s in stations:
+                    s.track_y = ty.get(s.name, s.track_y)
+                    s.anchor_track_y = aty.get(s.name, s.anchor_track_y)
+                return anchors_of(build_lines(g, stations, corridors, log=quiet))
+            finally:
+                g.y, g.anchor_y = keep[0], keep[1]
+                for s in stations:
+                    s.track_y, s.anchor_track_y = keep[2][s.name]
+
+        ty_on = {s.name: s.track_y for s in stations}
+        ty_off = {s.name: s.anchor_track_y for s in stations}
+
+        # Corrections OFF -- and "off" is exact, not approximate: with no floors
+        # and no caps the two cones are the identity, so the profile is
+        # `anchor_y` and the station's rail level is `anchor_track_y`.
+        off = route_with(g.anchor_y, ty_off, g.anchor_y, ty_off)
+        shipped = anchors_of(lines)  # corrections ON: what the bake shipped
+        moved = sorted(k for k in shipped if shipped[k] != off.get(k, shipped[k]))
+        n_st = sum(1 for s in stations if abs(s.track_y - s.anchor_track_y) > 0.05)
+        dy = np.abs(g.y - g.anchor_y) if g.anchor_y.size == g.y.size else np.zeros(0)
+        check(
+            not moved and len(off) == len(shipped),
+            f"the crossing corrections moved {int((dy > 0.05).sum()):,} of "
+            f"{g.n_nodes:,} nodes by up to {float(dy.max()) if dy.size else 0.0:.2f} m, "
+            f"and {n_st} stations' measured rail level with them, and not one of the "
+            f"{len(shipped):,} anchors over {2 * len(lines)} directions moved"
+            + (f" -- {len(moved)} DID: "
+               f"{', '.join(f'{a} dir{d} stop {i}' for a, d, i in moved[:6])}"
+               if moved else ""),
+        )
+        # The negative control: the *same* comparison, with the tie-break pointed
+        # back at the shipped profile -- which is the regression verbatim, since
+        # that is what the code said before. Its "off" answer is `off` above,
+        # unchanged; only its "on" answer moves. If those two agree, the check
+        # above is vacuous and cannot be trusted to have passed for a reason.
+        bug_on = route_with(g.y, ty_on, g.y, ty_on)
+        broke = sorted(k for k in off if off[k] != bug_on.get(k, off[k]))
+        check(
+            bool(broke),
+            f"  NEGATIVE CONTROL: pointing the anchor tie-break back at the shipped "
+            f"profile -- the regression verbatim -- moves {len(broke)} anchor(s), so "
+            f"the check above can tell the two apart"
+            + (f" (first: {', '.join(f'{a} dir{d} stop {i}' for a, d, i in broke[:4])})"
+               if broke else "; IT CANNOT, and the invariant above is vacuous"),
+        )
 
     log("")
     log("--- 6. What the service actually is")
