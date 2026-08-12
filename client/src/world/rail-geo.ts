@@ -149,6 +149,7 @@ import {
   drawnAsTunnel,
   type RailCut,
 } from './rail-cut.ts';
+import { DECK_THICKNESS_M } from './road-deck.ts';
 import { RAIL_HALF_M } from './envelope.ts';
 import { RAIL_FENCE_HEIGHT, createRailFenceMaterial } from './fences.ts';
 // **One rule for what counts as one platform**, imported rather than restated.
@@ -1806,6 +1807,45 @@ export class RailWorld {
   }
 
   /**
+   * Throw away built chunks over a plan box, so they are built again.
+   *
+   * **For the roads, and only the roads.** A chunk decides once and for all
+   * where its fence panels stand and how high its retaining walls go, and both
+   * of those now depend on `RailCut.deckSurfaceAt` -- which is empty until the
+   * tile carrying that street has streamed in. A chunk built first keeps a
+   * palisade across the carriageway and a wall coming up through the asphalt,
+   * which is the frame the player photographed and reported twice.
+   *
+   * The counterpart of `streamer.recutGround`, and bounded the same way: a way
+   * span is clipped to its own tile, so a tile's roads reach at most the four
+   * chunks its 500 m box overlaps, and the caller only asks at all when one of
+   * those roads is actually near a corridor. `reshapeRing` rebuilds whatever is
+   * inside the radius on the next update, two a frame, exactly as it does for a
+   * chunk the player has just walked towards.
+   *
+   * Returns how many were dropped, for the log.
+   */
+  invalidate(box: readonly [number, number, number, number]): number {
+    let dropped = 0;
+    for (const [key, chunk] of [...this.built]) {
+      const x0 = chunk.cx * CHUNK_M;
+      const z0 = chunk.cz * CHUNK_M;
+      if (x0 > box[2] || x0 + CHUNK_M < box[0] || z0 > box[3] || z0 + CHUNK_M < box[1]) continue;
+      // `disposeChunk` deletes from `built` itself.
+      this.disposeChunk(key, chunk);
+      dropped++;
+    }
+    if (dropped > 0) {
+      // The ring is re-planned from scratch on the next update rather than left
+      // to the chunk-transition test, which only fires when the player crosses
+      // a 512 m line and would otherwise leave the hole open until they did.
+      this.lastChunk = '';
+      this.lastSleeperCell = '';
+    }
+    return dropped;
+  }
+
+  /**
    * Build again the chunks that were built blind.
    *
    * The window this closes: a chunk 900 m away is inside `BUILD_RADIUS` and its
@@ -1887,6 +1927,27 @@ export class RailWorld {
         const uz = st[mi * 5 + 4];
         const side = kind === 1 ? -1 : 1;
         const offset = kind === 2 ? 0 : MAST_OFFSET * side;
+        // **No mast up through a roadway**, and this one really was in the
+        // picture: the portal gantry at (-2501, 4285) stands 7.4 m over a
+        // railhead that clears King Street by 7.0 m, so its head and its
+        // cross-beam came out of the asphalt with the road drawn round them.
+        // `MAST_HEIGHT` is within half a metre of the tightest road clearance on
+        // the network, so this is not a rare coincidence -- it is what happens
+        // wherever the bake wanted a mast at a crossing.
+        //
+        // **The test is the mast's own head against the soffit, not "is there a
+        // road overhead"**, and the difference is measurable: at St Peters the
+        // Metro bore passes 16 m under King Street and carries two masts of its
+        // own, and a plain "under a deck" rule deleted those too -- 2 of the 7
+        // masts in that one crossing, neither of which was anywhere near the
+        // road. A catenary structure with headroom under a bridge is real and
+        // stays; one that would come through the deck is carried on the soffit
+        // in reality and is simply not drawn.
+        const deck =
+          this.cut === null
+            ? Number.NaN
+            : this.cut.deckSurfaceAt(mx + -uz * offset, mz + ux * offset);
+        if (Number.isFinite(deck) && my - 0.25 + MAST_HEIGHT > deck - DECK_THICKNESS_M) continue;
         // Local +X along the track and +Z toward the track, so a Y rotation of
         // `atan2` puts the geometry on the rails and the `side` scale hands it.
         const yaw = Math.atan2(-uz, ux) + (kind === 1 ? Math.PI : 0);
@@ -2262,6 +2323,18 @@ function writeTrench(
         complete = false;
         top = st.rail + TRENCH_MIN_DEPTH;
       }
+      // **And never up through a road**, which is the abutment case and is what
+      // the player was looking at: at King Street, St Peters the retaining wall's
+      // own prism stood at -52.5 m -- road level -- with a coping lapping onto
+      // the asphalt, so the ground was gone from under the carriageway *and*
+      // there were two walls across it. `RailCut` has already declined to carve
+      // here, so there is no hole for a wall to retain above the deck; what the
+      // wall is now is the thing holding the deck up, and it stops at the soffit.
+      // The deck's own underside is drawn by `terrain.buildTerrainMesh`, which is
+      // where the kept ground's heights are, so the two meet at one number and
+      // that number is `DECK_THICKNESS_M` under the paved surface.
+      const deck = cut.deckSurfaceAt(st.cx + px * rim * side, st.cz + pz * rim * side);
+      if (Number.isFinite(deck) && deck - DECK_THICKNESS_M < top) top = deck - DECK_THICKNESS_M;
       // Never below the cess: at the taper where a cutting runs out to grade the
       // wall goes to nothing rather than turning inside out.
       if (top < st.cess) top = st.cess;
@@ -3439,7 +3512,27 @@ function writeVerge(
         const p = ribs[i - 1];
         u += Math.hypot(fx - p.fx, fz - p.fz);
       }
-      ribs.push({ cx, cz, fx, fz, o, formation, verge, foot, u, open: entranceOpens(plans, fx, fz) });
+      // **A fence panel standing in a roadway is the report, in those words**:
+      // *"if i do jump onto the fenced section of road, i can fall through down
+      // into the railroad"*. The fence line runs `FENCE_OFFSET` out from the
+      // centreline and knows nothing about streets, so at every crossing in the
+      // city it marched straight across the carriageway. A boundary fence stops
+      // at a road bridge -- that is what the parapet is for -- and the mechanism
+      // for stopping it already exists here: a rib that is `open` gets no panel.
+      // Same rule, second reason, exactly as the carve itself.
+      //
+      // **Gated on the panel's own head against the soffit**, on `refillMasts`'
+      // terms and for the same measured reason: a road *viaduct* ten metres over
+      // a corridor is a deck too, and a fence standing on the ground under one is
+      // a real fence with real headroom. What must go is the panel that would
+      // come through the carriageway, which is the one whose foot is the kept
+      // ground the road is drawn on.
+      const deckY = cut === null ? Number.NaN : cut.deckSurfaceAt(fx, fz);
+      const decked = Number.isFinite(deckY) && foot + FENCE_HEIGHT > deckY - DECK_THICKNESS_M;
+      ribs.push({
+        cx, cz, fx, fz, o, formation, verge, foot, u,
+        open: decked || entranceOpens(plans, fx, fz),
+      });
     }
 
     // `writeTrench`'s own hazard, in its own words: `px * o * side` mirrors the

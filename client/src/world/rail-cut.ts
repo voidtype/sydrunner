@@ -82,11 +82,36 @@
  * A bridge is never a trench whatever the grid says; see `inCutting`.
  *
  * ---------------------------------------------------------------------------
+ * AND THE ONE THING THE CARVE DECLINES ON THAT IS NOT A RAILWAY: A ROAD.
+ *
+ * The rule above says nothing about roads and that is the bug the player kept
+ * reporting: *"train at St Peters STILL covers the road at king st ... Roads
+ * should be uninterrupted everywhere"*, and *"if i do jump onto the fenced
+ * section of road, i can fall through down into the railroad"*. Lowering the
+ * Illawarra pair under King Street was right -- it clears by 6.90 m and 7.59 m --
+ * but the carve then took the ground out from under the road as well, so the
+ * asphalt was drawn over a trench with nothing solid in it. Measured before the
+ * fix: a body walked across the crossing fell 7.1-7.6 m at every offset over the
+ * 24 m of carriageway.
+ *
+ * So `cutAt` now declines inside a road's paved footprint, **exactly as it
+ * already declines on a `SPAN_TUNNEL` strip** -- same shape of rule, new reason.
+ * The ground stays, the road is drawn on it and solid, and the trench is carved
+ * either side. See `world/road-deck.ts` for where the footprint comes from and
+ * why the two ends of the wire cannot disagree about it.
+ *
+ * The road is consulted **only after a cut has already been decided**, which is
+ * both the cheap ordering and the honest one: a point outside the corridor never
+ * asks about roads at all, and the question being answered is not "is there a
+ * road here" but "is the ground I was about to remove carrying one".
+ *
+ * ---------------------------------------------------------------------------
  * **This file imports nothing but the flag constants.** No three.js, on
  * `game/rail.ts`'s own terms: `server/world.ts` needs the same corridor to
  * answer "how high is the ground" for a player standing in a cutting, and a
  * `Vector3` reaching here would drag the renderer into a process that draws
- * nothing.
+ * nothing. `RoadCover` below is structural for the same reason `terrain.TileCut`
+ * is: the roads live in their own module and this one only asks them a question.
  */
 
 import { SPAN_BRIDGE, SPAN_CUTTING, SPAN_TUNNEL, type RailBake } from '../game/rail.ts';
@@ -261,6 +286,51 @@ export function inTrench(flags: number, depth: number): boolean {
   return depth > floor;
 }
 
+/**
+ * How far under a road's paved surface the railhead has to be before the road is
+ * treated as carrying the ground over it, metres. Negative, and deliberately so.
+ *
+ * The question this answers is "which of these two is on top", and the honest
+ * reading is *the road wins unless the rail is plainly above it*. A level
+ * crossing measures zero here and the road must still keep its ground -- that is
+ * the case where the asphalt runs between the rails and the ballast is
+ * legitimately buried in it. What the tolerance excludes is the opposite
+ * geometry: a road passing *under* a railway on a bridge, where the deck is
+ * metres below the railhead and keeping the terrain up at the road would put a
+ * lid across the underbridge.
+ *
+ * `inCutting` has already refused every bridge span before this is reached, and
+ * it also requires the terrain to be no more than `CUT_MIN_DEPTH` (0.3 m) below
+ * the railhead -- so anything that gets this far has the *ground* at rail level
+ * whatever the road is doing, and a road far below that ground is a road in its
+ * own cutting passing under an at-grade railway. That is the only geometry this
+ * excludes and it is right to exclude it.
+ *
+ * **A metre, and half a metre is measurably too tight.** At -0.5 m the
+ * extent-wide audit left a residual of 34 m2 of carved carriageway in four
+ * clusters, and every sample in all four measured the road surface 0.50 to
+ * 0.52 m under the railhead with the terrain 0.27 to 0.29 m under it -- level
+ * crossings, where the road is draped a gutter's depth below a track that is
+ * standing on its own ballast. A crossing 12 m wide has that much crown-to-
+ * channel fall in it. A metre puts the boundary outside the noise and is still
+ * four times too small to admit a road underbridge, which needs 4.5 m of
+ * headroom before anybody would build one.
+ */
+const DECK_UNDER_RAIL_TOLERANCE_M = -1.0;
+
+/**
+ * What `RailCut` needs from `world/road-deck.RoadDeck`.
+ *
+ * One method, structurally typed, so this file keeps importing nothing: the
+ * browser and `server/world.ts` each build their own deck from the identical
+ * `.lanes.bin` bytes and hand it to their own `RailCut`, and the two agree
+ * because they ask the same function rather than because they share an object.
+ */
+export interface RoadCover {
+  /** The paved surface over this point, or `NaN` where nothing is paved. */
+  deckAt(x: number, z: number): number;
+}
+
 /** The grid cell the broad phase files strips into, metres. */
 const CELL_M = 64;
 
@@ -284,6 +354,16 @@ export class RailCut {
   private sites = new Float64Array(0);
   /** Those sites' offsets, filed by cell. See `setStations`. */
   private readonly siteCells = new Map<number, number[]>();
+  /**
+   * The roads, or null on a process that has not been given any.
+   *
+   * Null is a working configuration and not a broken one -- it is the world that
+   * shipped, with the ground carved straight through every crossing -- so
+   * everything below is written to behave exactly as it did before when this is
+   * unset. The checks rely on that: the negative control for the whole rule is a
+   * second `RailCut` over the same bake with no roads in it.
+   */
+  private roads: RoadCover | null = null;
 
   constructor(bake: RailBake) {
     const p = bake.vertices;
@@ -409,6 +489,19 @@ export class RailCut {
   }
 
   /**
+   * The carriageways, so the carve stops at a road. See the header.
+   *
+   * Set from outside rather than built here, on `setStations`' terms: the roads
+   * arrive per tile over a session, from a decoder this file may not import, and
+   * both ends of the wire fill their own. Late is safe and late is normal --
+   * every query is answered from whatever is registered at the moment it is
+   * asked, and nothing here caches a road decision.
+   */
+  setRoads(roads: RoadCover | null): void {
+    this.roads = roads;
+  }
+
+  /**
    * How wide the corridor is at a point **on the track centreline**.
    *
    * On the centreline specifically, and that is what makes it well defined: if
@@ -460,6 +553,46 @@ export class RailCut {
    * mid-air over it.
    */
   cutAt(x: number, z: number, groundY: number): number {
+    const railY = this.railCutAt(x, z, groundY);
+    if (!Number.isFinite(railY)) return Number.NaN;
+    // **And the road, last.** See the header: a road is not a reason to cut and
+    // never asked about until a cut has already been decided, so a point with no
+    // railway near it pays nothing for this rule at all.
+    return this.decked(x, z, railY) ? Number.NaN : railY;
+  }
+
+  /**
+   * The rail head a **road** is holding the ground up over, or `NaN`.
+   *
+   * The exact complement of `cutAt` on the corridor: finite here means the carve
+   * wanted this point and a carriageway kept it. Nothing about the ground query
+   * needs it -- the ground is simply still there -- but the *picture* does, and
+   * so does the trench. `world/terrain.buildTerrainMesh` gives every sub-quad
+   * this answers for a soffit and a fascia, because a kept sub-quad over an open
+   * trench is a slab with no underside, and `rail-geo.writeTrench` stops its
+   * retaining wall at that soffit rather than bringing it up through the road.
+   */
+  deckedAt(x: number, z: number, groundY: number): number {
+    const railY = this.railCutAt(x, z, groundY);
+    if (!Number.isFinite(railY)) return Number.NaN;
+    return this.decked(x, z, railY) ? railY : Number.NaN;
+  }
+
+  /**
+   * The paved surface over this point, or `NaN`. `RoadCover.deckAt`, forwarded.
+   *
+   * Forwarded rather than left to callers to hold their own reference, because
+   * the whole design here is that there is one object that knows where the road
+   * is and one object every consumer already has a handle on. `rail-geo` gets a
+   * `RailCut` and nothing else; giving it a second field to plumb through six
+   * call sites is how the two end up asking different decks.
+   */
+  deckSurfaceAt(x: number, z: number): number {
+    return this.roads === null ? Number.NaN : this.roads.deckAt(x, z);
+  }
+
+  /** The corridor's own answer, before the road rule. See `cutAt`. */
+  private railCutAt(x: number, z: number, groundY: number): number {
     const list = this.cells.get(cellKey(Math.floor(x / CELL_M), Math.floor(z / CELL_M)));
     if (list === undefined) return Number.NaN;
     let best = Number.NaN;
@@ -470,6 +603,13 @@ export class RailCut {
       if (!(railY <= best)) best = railY;
     }
     return best;
+  }
+
+  /** Is a paved surface carrying the ground over this railhead? */
+  private decked(x: number, z: number, railY: number): boolean {
+    if (this.roads === null) return false;
+    const deckY = this.roads.deckAt(x, z);
+    return Number.isFinite(deckY) && deckY - railY > DECK_UNDER_RAIL_TOLERANCE_M;
   }
 
   /**
@@ -529,10 +669,24 @@ export class RailCut {
       if (!Number.isFinite(g)) continue;
       const list = this.cells.get(cellKey(Math.floor(x / CELL_M), Math.floor(z / CELL_M)));
       if (list === undefined) continue;
+      // **The road rule applies here too, and it has to.** `cutAt` is the
+      // ground and this is the wall that stands in the hole it leaves, so a
+      // point the road saved must read as "not cut" to both or the invariant
+      // this function exists to hold -- a hole is never without a wall, a wall
+      // is never without a hole -- is broken in the second direction. A segment
+      // that runs entirely under a wide road gets no trench, which is right:
+      // there is no hole there to retain.
+      //
+      // Sampled once per point rather than once per strip, which matters: this
+      // is the hottest loop in a chunk build and a four-road corridor asks about
+      // three or four strips at every one of its points.
+      const deckY = this.roads === null ? Number.NaN : this.roads.deckAt(x, z);
+      const paved = Number.isFinite(deckY);
       for (const s of list) {
         const railY = this.railYOn(s, x, z);
         if (!Number.isFinite(railY)) continue;
         const depth = g - railY;
+        if (paved && deckY - railY > DECK_UNDER_RAIL_TOLERANCE_M) continue;
         // A trench implies a cut -- `inTrench` says so -- so the deep answer
         // ends the walk and the shallow one only records.
         if (inTrench(this.flags[s], depth)) return { cut: true, trench: true };

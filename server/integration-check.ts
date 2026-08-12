@@ -1681,6 +1681,13 @@ async function main(): Promise<void> {
   say('');
   await checkRailCutting();
 
+  // --- 34a. And whether the carve took a *road* with it. `checkRailCutting` is
+  // a claim about the railway and it was true while King Street had a
+  // seven-metre hole in it, because nothing asserted the other half: a road is
+  // uninterrupted everywhere. See `checkRoadDeck`.
+  say('');
+  await checkRoadDeck();
+
   // --- 34b. And whether anything is standing *in* the railway. The carve is
   // about the ground; this is about the solids -- the buildings, the platforms
   // and the station houses that the seven reported defects were all instances
@@ -4794,6 +4801,16 @@ if (only === 'ridingOnline') {
   process.exit(failures.length === 0 ? 0 : 1);
 } else if (only === 'cutting') {
   await checkRailCutting();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'segments') {
+  await checkServerSegments();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'roads') {
+  await checkRoadDeck();
   for (const f of failures) say(`  - ${f}`);
   say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
   process.exit(failures.length === 0 ? 0 : 1);
@@ -20343,4 +20360,595 @@ function pointInsidePolygon(points: Float32Array, x: number, z: number): boolean
     if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
   }
   return inside;
+}
+
+/**
+ * The roads over the railway: a carriageway is never interrupted, and no rail
+ * asset stands in one.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT FAILED, AND WHY NOTHING IN THIS FILE CAUGHT IT.
+ *
+ * `checkRailCutting` proves the corridor is carved -- that no drawn track sits
+ * under a terrain sheet nobody cut. It is a claim about the *railway*, and it
+ * was true. What nobody asserted is the claim about the **road**:
+ *
+ *   > *"train at St Peters STILL covers the road at king st, it goes
+ *   > underground but the assets still go onto the road and block it. Roads
+ *   > should be uninterrupted everywhere."*
+ *   > *"if i do jump onto the fenced section of road, i can fall through down
+ *   > into the railroad, not good"*
+ *
+ * The carve had no idea roads existed, so at every grade separation in the city
+ * it took the ground out from under the street -- and the trench walls, the
+ * boundary fence and the catenary gantry it then built came up through the
+ * asphalt. Measured on the shipped build at King Street, St Peters: a body
+ * walking the crossing fell 7.1 to 7.6 m at every one of seven offsets across
+ * the 24 m of carriageway and was then stopped by a retaining wall whose prism
+ * stood at road level.
+ *
+ * Four things, and the third is the one that would have caught it:
+ *
+ *   1. `world/road-deck.ts`'s own self-check, which carries the geometry's
+ *      negative controls: a point past the paved band is *not* decked, and a
+ *      dropped tile really gives the ground back.
+ *   2. **Bit-exact across two module instances.** `checkClearance`'s claim, for
+ *      the same reason: the browser and this process each build their own deck
+ *      from the same `.lanes.bin`, and a ground height that differed between
+ *      them is a player falling on one end and not the other.
+ *   3. **Extent-wide: how much drawn road surface the carve removes.** Target
+ *      zero, over every paved square metre in the build.
+ *   4. **Extent-wide: what stands in a carriageway.** Masts, boundary fence and
+ *      trench coping, with the explained/unexplained split -- explained being a
+ *      railway that is genuinely *above* the road it crosses, where its own
+ *      furniture standing over the deck is a viaduct and not a defect.
+ *
+ * Every one of them carries a negative control in the same shape: a second
+ * `RailCut` over the same bake and the same terrain with **no roads attached**,
+ * which is the world exactly as it shipped. If that one does not fail loudly,
+ * the rule under test is not doing anything and nothing above means a thing.
+ */
+async function checkRoadDeck(): Promise<void> {
+  say('--- Roads over the railway: uninterrupted everywhere');
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const bakePath =
+    process.env.SYDNEY_RAIL ??
+    new URL('../data/scratch/rail/rail.bin', import.meta.url).pathname;
+  if (!(await Bun.file(bakePath).exists())) {
+    say(`    no rail bake at ${bakePath}. Skipped.`);
+    return;
+  }
+
+  const deckHere = new URL('../client/src/world/road-deck.ts', import.meta.url).pathname;
+  const cutHere = new URL('../client/src/world/rail-cut.ts', import.meta.url).pathname;
+  const geoHere = new URL('../client/src/world/rail-geo.ts', import.meta.url).pathname;
+  const deckMod = (await import(deckHere)) as typeof import('../client/src/world/road-deck.ts');
+  const cutMod = (await import(cutHere)) as typeof import('../client/src/world/rail-cut.ts');
+  const trafficMod = (await import(
+    new URL('../client/src/game/traffic.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/game/traffic.ts');
+  const worldMod = (await import(new URL('./world.ts', import.meta.url).pathname)) as typeof import('./world.ts');
+  /** One file off the disk as a plain `ArrayBuffer`, or null. `readOptional`'s twin. */
+  const readBytes = async (path: string): Promise<ArrayBuffer | null> => {
+    const buf = await readFile(path).catch(() => null);
+    if (buf === null) return null;
+    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+  };
+  const geoMod = (await import(geoHere)) as {
+    buildNetwork(bake: unknown): {
+      segments: Array<{
+        ax: number; ay: number; az: number;
+        bx: number; by: number; bz: number;
+        ux: number; uz: number; len: number; flags: number;
+        open: [boolean, boolean];
+      }>;
+      stations: Array<{ x: number; z: number; ux: number; uz: number }>;
+    };
+  };
+
+  // 1. The module's own self-check.
+  const selfCheck = deckMod.verifyRoadDeck();
+  check(
+    selfCheck.length === 0,
+    `world/road-deck.ts passes its own self-check -- a point on a 6 + 2 m road is decked at the ` +
+      `way's own solved height, a point 9 m off its centreline is not, dropping a tile gives the ` +
+      `ground back, and two adoption orders give the identical float` +
+      (selfCheck.length ? `: ${selfCheck[0]}` : ''),
+  );
+
+  const world = await loadWorld(root);
+  const bake = world.rail;
+  if (!bake) {
+    say('    the world carries no rail bake. Skipped.');
+    return;
+  }
+
+  // --- Every carriageway in the build, read off the disk -----------------------
+  //
+  // Read here rather than taken from `world.roads`, and it is not duplication:
+  // this process loads lanes **per hexagon on demand**, so `world.roads` holds
+  // whatever the spawn happens to need, and the claim being tested is about the
+  // whole extent. It also means the audit walks the same decoder the game does,
+  // over the same bytes, which is the only way the numbers below are about the
+  // shipped world rather than about a fixture.
+  const deck = new deckMod.RoadDeck();
+  const ways: Array<{
+    halfWidth: number; footpathWidth: number;
+    count: number; x: Float32Array; y: Float32Array; z: Float32Array;
+  }> = [];
+  let laneTiles = 0;
+  for (const entry of world.index.tiles) {
+    const bytes = await readBytes(join(root, 'tiles', `${entry.key}.lanes.bin`));
+    if (bytes === null) continue;
+    const decoded = trafficMod.decodeLanes(bytes, entry.bounds[0], entry.bounds[1] + world.index.tile_size);
+    if (decoded === null) continue;
+    laneTiles++;
+    deck.adopt(entry.key, decoded.ways);
+    for (const w of decoded.ways) ways.push(w);
+  }
+  if (deck.count === 0) {
+    say('    this build emits no lane sidecars. Skipped.');
+    return;
+  }
+
+  const net = geoMod.buildNetwork(bake);
+  /** The rule as it ships. */
+  const cut = new cutMod.RailCut(bake);
+  cut.setStations(net.stations);
+  cut.setRoads(deck);
+  /**
+   * THE NEGATIVE CONTROL, and it is the same object with one line missing.
+   *
+   * Not a flag, not an environment variable and not a second code path: the
+   * road rule *is* `setRoads`, so a `RailCut` that was never given one is the
+   * world exactly as it shipped last round. Every assertion below is run against
+   * both, and the control's number is printed beside the real one.
+   */
+  const bare = new cutMod.RailCut(bake);
+  bare.setStations(net.stations);
+
+  // 2. Bit-exact across two module instances. `checkClearance` §2's argument.
+  {
+    const two = (await import(`${deckHere}?instance=2`)) as typeof import('../client/src/world/road-deck.ts');
+    const cutTwo = (await import(`${cutHere}?instance=2`)) as typeof import('../client/src/world/rail-cut.ts');
+    const deckB = new two.RoadDeck();
+    // Adopted in the *reverse* order, which is the browser's problem in
+    // miniature: tiles land in whatever order the network produces and the two
+    // ends never see the same one.
+    const keys: string[] = [];
+    for (const entry of world.index.tiles) keys.push(entry.key);
+    for (let i = keys.length - 1; i >= 0; i--) {
+      const entry = world.index.tiles.find((t) => t.key === keys[i])!;
+      const bytes = await readBytes(join(root, 'tiles', `${entry.key}.lanes.bin`));
+      if (bytes === null) continue;
+      const decoded = trafficMod.decodeLanes(bytes, entry.bounds[0], entry.bounds[1] + world.index.tile_size);
+      if (decoded !== null) deckB.adopt(entry.key, decoded.ways);
+    }
+    const cutB = new cutTwo.RailCut(bake);
+    cutB.setStations(net.stations);
+    cutB.setRoads(deckB);
+    let compared = 0;
+    let same = true;
+    let firstBad = '';
+    for (const w of ways) {
+      for (let i = 0; i < w.count && compared < 40_000; i++) {
+        const x = w.x[i];
+        const z = w.z[i];
+        const g = world.terrain.height(x, z);
+        if (!Number.isFinite(g)) continue;
+        compared++;
+        const a = cut.cutAt(x, z, g);
+        const b = cutB.cutAt(x, z, g);
+        if (!Object.is(a, b)) {
+          same = false;
+          if (firstBad === '') firstBad = `${x.toFixed(0)}, ${z.toFixed(0)}: ${a} vs ${b}`;
+        }
+      }
+      if (compared >= 40_000) break;
+    }
+    check(
+      same && compared > 10_000,
+      `two separately-evaluated copies of the deck and the carve, filled from the same sidecars in ` +
+        `opposite tile order, answer "is the ground here" identically at ${compared.toLocaleString()} ` +
+        `points on the road network, compared with Object.is and not an epsilon` +
+        (firstBad ? ` -- first disagreement at ${firstBad}` : ''),
+    );
+  }
+
+  // --- 3. How much drawn road surface the carve removes ------------------------
+  //
+  // Sampled on a one-metre lattice over each way's **paved** band, which is the
+  // surface `streets.py` actually draws: `centreline.buffer(halfWidth +
+  // footpathWidth)`. Each sample stands for a square metre.
+  const SAMPLE_M = 1;
+  /**
+   * How far a platform deck stands over its railhead. `riding.PLATFORM_TOP_M`,
+   * restated for `checkRailCutting`'s reason: a check that imported the number
+   * could not notice the module changing it.
+   */
+  const PLATFORM_TOP_OVER_RAIL = 1.05;
+  /**
+   * How far a platform may stand over the road it meets and still be beside it.
+   *
+   * A kerb. `streets.KERB_WIDTH`'s vertical twin -- the 13 cm step plus the
+   * slack a 31 m heightfield leaves between two surfaces that are level in
+   * reality -- rounded up to the step height a body can walk up without
+   * noticing. See the use.
+   */
+  const PLATFORM_KERB_M = 0.45;
+  let platformsIn = 0;
+  let platformsExplained = 0;
+  let platformsAbutting = 0;
+  let pavedSamples = 0;
+  let pavedTotal = 0;
+  let lostNow = 0;
+  let lostBefore = 0;
+  let worstAt = '';
+  let worstDrop = 0;
+  for (const w of ways) {
+    const half = Math.max(1.5, w.halfWidth) + Math.max(0, w.footpathWidth);
+    for (let i = 0; i + 1 < w.count; i++) {
+      const ax = w.x[i];
+      const az = w.z[i];
+      const bx = w.x[i + 1];
+      const bz = w.z[i + 1];
+      const len = Math.hypot(bx - ax, bz - az);
+      if (len < 0.05) continue;
+      pavedTotal += Math.round(len) * Math.round(2 * half);
+      // **The broad phase, and it is what makes this an extent-wide claim rather
+      // than an overnight job.** A road with no railway anywhere near it cannot
+      // have its ground taken by the corridor carve -- the carve is the only
+      // thing that removes any -- so the 99% of Sydney's street network that
+      // never meets a track is rejected on one query against the *bare* cut, the
+      // control that knows nothing about roads. What is left is every paved
+      // square metre the rule could possibly touch.
+      if (!bare.near((ax + bx) / 2, (az + bz) / 2, len / 2 + half)) continue;
+      const along = Math.max(1, Math.round(len / SAMPLE_M));
+      const across = Math.max(1, Math.round((2 * half) / SAMPLE_M));
+      const px = -(bz - az) / len;
+      const pz = (bx - ax) / len;
+      for (let s = 0; s < along; s++) {
+        const t = (s + 0.5) / along;
+        const cx = ax + (bx - ax) * t;
+        const cz = az + (bz - az) * t;
+        for (let o = 0; o < across; o++) {
+          const off = -half + ((o + 0.5) / across) * 2 * half;
+          const x = cx + px * off;
+          const z = cz + pz * off;
+          const g = world.terrain.height(x, z);
+          if (!Number.isFinite(g)) continue;
+          pavedSamples++;
+          if (Number.isFinite(bare.cutAt(x, z, g))) lostBefore++;
+          const railY = cut.cutAt(x, z, g);
+          if (Number.isFinite(railY)) {
+            lostNow++;
+            const drop = g - railY;
+            if (drop > worstDrop) {
+              worstDrop = drop;
+              worstAt = `${x.toFixed(0)}, ${z.toFixed(0)}`;
+            }
+          }
+          // **And the fourth asset class, which is free here because the walk is
+          // already at the right point.** The coordinator asked whether platform
+          // decks stand in a carriageway as well as the fence and the masts.
+          // `PlatformField.heightAt` is the authority on where a deck is -- it is
+          // what the ground query itself consults -- and asking it at the road's
+          // own surface is exactly "is there a platform standing in this road".
+          const surface = deck.deckAt(x, z);
+          if (Number.isFinite(surface) && world.platforms !== null && world.platforms !== undefined) {
+            const top = world.platforms.heightAt(x, z, surface);
+            if (top > surface - 0.05) {
+              // Two explanations, and the second is the one the measurement
+              // produced. **A viaduct**: the railhead is over the road, so its
+              // platform is a station on a bridge. **A forecourt**: the deck is
+              // within a kerb of the road it meets, which is a platform standing
+              // *beside* a car park and not over a carriageway. All 282 samples
+              // this found are the second kind -- fifteen clusters, every one of
+              // them 18 to 85 m from a station and 0.42 m or less over the road,
+              // where `PlatformField`'s 176 m rectangle overruns the platform end
+              // onto the station approach. A surface flush with the road is not
+              // an obstruction; a wall or a mast at road level is, which is why
+              // the other three classes get no such allowance.
+              if (top - PLATFORM_TOP_OVER_RAIL > surface) platformsExplained++;
+              else if (top - surface <= PLATFORM_KERB_M) platformsAbutting++;
+              else platformsIn++;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // THE NEGATIVE CONTROL for everything about the ground. If the rule off takes
+  // nothing either, then "the carve removes no road" is a claim about a city
+  // whose railway never meets a street, and this one's does 4,600 times.
+  check(
+    lostBefore > 2_000,
+    `with the road rule off, the carve removes ${lostBefore.toLocaleString()} m2 of drawn ` +
+      `carriageway across the build. That is the world as it shipped and it is what the player ` +
+      `fell through; a zero here would make the assertion below vacuous`,
+  );
+
+  check(
+    lostNow === 0,
+    `and with it on, ${lostNow.toLocaleString()} m2 of the ${pavedSamples.toLocaleString()} m2 of paved ` +
+      `surface within reach of a rail corridor is removed by the carve` +
+      (worstAt ? `, worst ${worstDrop.toFixed(1)} m at ${worstAt}` : '') +
+      `. The rule the player has stated twice is that a road is uninterrupted everywhere, so the ` +
+      `target is zero and not a percentage`,
+  );
+
+  // --- 4. What stands in a carriageway -----------------------------------------
+  //
+  // The volume is "at or above the paved surface, inside the paved footprint".
+  // Anything under the soffit is under a bridge and is not in the road.
+  //
+  // The three constants below are `world/rail-geo.ts`'s and are **restated
+  // rather than imported**, on `checkRailCutting`'s own terms: a check that read
+  // the number out of the module it is checking could not notice the module
+  // changing it.
+  const MAST_HEIGHT = 7.4;
+  const MAST_BASE_DROP = 0.25;
+  const MAST_OFFSET = 3.15;
+  const FENCE_OFFSET = 6.4;
+  const FENCE_CLEAR = 0.9;
+  const FENCE_HEIGHT = 1.8;
+  const TRENCH_COPING_RISE = 0.12;
+  const DECK_THICKNESS = deckMod.DECK_THICKNESS_M;
+
+  /** Is `y` inside the carriageway volume over this point? */
+  const inRoadVolume = (x: number, z: number, y: number): number | null => {
+    const surface = deck.deckAt(x, z);
+    if (!Number.isFinite(surface)) return null;
+    return y > surface - 0.05 ? surface : null;
+  };
+
+  interface Tally { now: number; before: number; explained: number; first: string }
+  const tally = (): Tally => ({ now: 0, before: 0, explained: 0, first: '' });
+  const masts = tally();
+  const fences = tally();
+  const walls = tally();
+
+  // 4a. The catenary masts, straight off the bake -- `rail-geo.refillMasts`
+  //     draws one per stanchion and the position arithmetic is copied here.
+  {
+    const st = bake.stanchions;
+    const kinds = bake.stanchionKinds;
+    for (let i = 0; i < kinds.length; i++) {
+      const mx = st[i * 5];
+      const my = st[i * 5 + 1];
+      const mz = st[i * 5 + 2];
+      const ux = st[i * 5 + 3];
+      const uz = st[i * 5 + 4];
+      const kind = kinds[i];
+      const offset = kind === 2 ? 0 : MAST_OFFSET * (kind === 1 ? -1 : 1);
+      const x = mx + -uz * offset;
+      const z = mz + ux * offset;
+      const top = my - MAST_BASE_DROP + MAST_HEIGHT;
+      const surface = inRoadVolume(x, z, top);
+      if (surface === null) continue;
+      masts.before++;
+      // Explained: the track itself is over the road here, which is a railway
+      // bridge and not a defect -- its masts belong above the deck.
+      if (my > surface) {
+        masts.explained++;
+        continue;
+      }
+      // The shipped rule: a mast whose head would reach the soffit is not drawn.
+      if (top > surface - DECK_THICKNESS) continue;
+      masts.now++;
+      if (masts.first === '') masts.first = `${x.toFixed(0)}, ${z.toFixed(0)}`;
+    }
+  }
+
+  // 4b. The boundary fence and the trench coping, per segment rib -- the same
+  //     walk `rail-geo.writeVerge` and `writeTrench` make, at their own steps.
+  for (const seg of net.segments) {
+    if (cutMod.drawnAsTunnel(seg.flags)) continue;
+    const px = -seg.uz;
+    const pz = seg.ux;
+    const steps = Math.max(1, Math.round(seg.len / 8));
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const cx = seg.ax + seg.ux * (t * seg.len);
+      const cz = seg.az + seg.uz * (t * seg.len);
+      const rail = seg.ay + (seg.by - seg.ay) * t;
+      const g = world.terrain.height(cx, cz);
+      if (!Number.isFinite(g)) continue;
+      for (const side of [-1, 1]) {
+        // The fence line.
+        const fo = Math.max(FENCE_OFFSET, bare.halfWidthAt(cx, cz) + FENCE_CLEAR);
+        const fx = cx + px * fo * side;
+        const fz = cz + pz * fo * side;
+        const fg = world.terrain.height(fx, fz);
+        if (Number.isFinite(fg)) {
+          const surface = inRoadVolume(fx, fz, fg + FENCE_HEIGHT);
+          if (surface !== null) {
+            fences.before++;
+            if (rail > surface) {
+              fences.explained++;
+            } else if (!Number.isFinite(cut.deckSurfaceAt(fx, fz))) {
+              // The shipped rule opens the fence where `RailCut` knows about a
+              // road over the post -- so what this counts is a panel standing in
+              // a carriageway the *deck* does not know is there. That is the
+              // failure it can actually catch: `setRoads` not wired up on one
+              // end, a deck dropped and never re-adopted, or a paved band
+              // narrower than the road it is drawn from.
+              fences.now++;
+              if (fences.first === '') fences.first = `${fx.toFixed(0)}, ${fz.toFixed(0)}`;
+            }
+          }
+        }
+        // The trench wall's coping, at the rim.
+        const rim = bare.halfWidthAt(cx, cz);
+        const wx = cx + px * rim * side;
+        const wz = cz + pz * rim * side;
+        const wg = world.terrain.height(wx, wz);
+        if (!Number.isFinite(wg)) continue;
+        if (!cutMod.inTrench(seg.flags, g - rail)) continue;
+        const surface = inRoadVolume(wx, wz, wg + TRENCH_COPING_RISE);
+        if (surface === null) continue;
+        walls.before++;
+        if (rail > surface) {
+          walls.explained++;
+          continue;
+        }
+        // Shipped: the wall top is clamped to the soffit.
+        const top = Math.min(wg, surface - DECK_THICKNESS);
+        if (top + TRENCH_COPING_RISE <= surface - 0.05) continue;
+        walls.now++;
+        if (walls.first === '') walls.first = `${wx.toFixed(0)}, ${wz.toFixed(0)}`;
+      }
+    }
+  }
+
+  const intrudersNow = masts.now + fences.now + walls.now;
+  const intrudersBefore =
+    masts.before - masts.explained + (fences.before - fences.explained) + (walls.before - walls.explained);
+  const explained = masts.explained + fences.explained + walls.explained;
+
+  check(
+    intrudersBefore > 100,
+    `with the road rule off, ${intrudersBefore.toLocaleString()} drawn rail assets stand inside a ` +
+      `carriageway -- ${masts.before - masts.explained} catenary masts, ` +
+      `${fences.before - fences.explained} boundary-fence ribs and ` +
+      `${walls.before - walls.explained} trench copings. The negative control for the line below`,
+  );
+
+  check(
+    platformsIn === 0,
+    `${platformsIn} m2 of platform deck stands over a carriageway, with ${platformsExplained} m2 ` +
+      `explained as a station on a viaduct and ${platformsAbutting} m2 as a platform abutting a ` +
+      `station forecourt within a kerb of it. The fourth asset class, and it is answered by ` +
+      `PlatformField.heightAt -- the same field groundFor stands a passenger on -- rather than by a ` +
+      `second model of where a platform is`,
+  );
+
+  check(
+    intrudersNow === 0,
+    `and with it on, ${intrudersNow} do (${masts.now} masts, ${fences.now} fence ribs, ` +
+      `${walls.now} copings)` +
+      (masts.first ? `, first mast at ${masts.first}` : '') +
+      (fences.first ? `, first fence at ${fences.first}` : '') +
+      (walls.first ? `, first coping at ${walls.first}` : '') +
+      `. ${explained} more are explained and excluded: the railway is above the road it crosses ` +
+      `there, which is a viaduct, and its furniture belongs over the deck`,
+  );
+
+  // --- 5. The deck actually exists where the report is -------------------------
+  //
+  // Two named crossings, because an extent-wide zero can be reached by a rule
+  // that never fires and this file has shipped several of those. King Street at
+  // St Peters is the reported one; Gleeson Avenue at Sydenham is the second the
+  // coordinator named.
+  for (const [name, x, z] of [
+    ['King Street, St Peters', -2495, 4283],
+    ['Gleeson Avenue, Sydenham', -3925, 5187],
+  ] as const) {
+    const g = world.terrain.height(x, z);
+    const before = bare.cutAt(x, z, g);
+    const after = cut.cutAt(x, z, g);
+    const surface = deck.deckAt(x, z);
+    check(
+      Number.isFinite(before) && !Number.isFinite(after) && Number.isFinite(surface),
+      `${name}: the carve wanted this point (rail head ${before.toFixed(2)} m, ` +
+        `${(g - before).toFixed(2)} m under the ground) and the carriageway keeps it -- ` +
+        `paved surface ${surface.toFixed(2)} m, soffit ${(surface - DECK_THICKNESS).toFixed(2)} m, ` +
+        `${(surface - DECK_THICKNESS - before).toFixed(2)} m of headroom over the rail`,
+    );
+  }
+
+  // --- 5b. And the mesh that is actually drawn has an underside ----------------
+  //
+  // **The one assertion here about geometry rather than about a predicate**, and
+  // it is the one the previous three rounds of this bug did not have: every
+  // number above is a claim about what a rule *would* decide, and the reported
+  // defect was always what got drawn. `terrain.buildTerrainMesh` imports nothing
+  // from three but `BufferGeometry` and `Mesh`, so this process can build the
+  // real tile and count its triangles.
+  //
+  // Two things, and the second is the negative control: the tile carrying King
+  // Street keeps ground it would otherwise have lost, and it grows a sheet of
+  // **downward-facing** triangles under it -- the soffit. Hand the same builder
+  // a cut that never reports a deck and both go to zero.
+  {
+    const terrainHere = new URL('../client/src/world/terrain.ts', import.meta.url).pathname;
+    const terrainMod = (await import(terrainHere)) as typeof import('../client/src/world/terrain.ts');
+    const tileSize = world.index.tile_size;
+    const gridN = world.index.terrain.grid;
+    const tx = Math.floor(-2495 / tileSize);
+    const tz = Math.floor(-4283 / tileSize);
+    const key = `${tx}_${tz}`;
+    const grid = world.terrain.grid(key);
+    if (grid === undefined) {
+      say(`    tile ${key} carries no terrain grid; the drawn-mesh check is skipped.`);
+    } else {
+      const tile = (c: typeof cut): import('../client/src/world/terrain.ts').TileCut => ({
+        originX: tx * tileSize,
+        originZ: -tz * tileSize,
+        near: (x, z, pad) => c.near(x, z, pad),
+        cutAt: (x, z, g) => c.cutAt(x, z, g),
+        deckedAt: (x, z, g) => c.deckedAt(x, z, g),
+      });
+      // A material is a required argument and is never read by the builder; the
+      // geometry is all this looks at.
+      const material = {} as never;
+      const withRoads = terrainMod.buildTerrainMesh(grid, gridN, tileSize, material, tile(cut));
+      const without = terrainMod.buildTerrainMesh(grid, gridN, tileSize, material, tile(bare));
+      const downFacing = (mesh: { geometry: { getAttribute(n: string): { count: number; getY(i: number): number } } }): number => {
+        const n = mesh.geometry.getAttribute('normal');
+        let down = 0;
+        for (let i = 0; i < n.count; i++) if (n.getY(i) < -0.5) down++;
+        return down;
+      };
+      const deckArea = withRoads.userData.deckArea as number;
+      const soffit = downFacing(withRoads);
+      check(
+        deckArea > 100 && soffit > 100,
+        `the drawn ground of tile ${key} keeps ${deckArea.toFixed(0)} m2 of corridor under King ` +
+          `Street and grows ${soffit} downward-facing vertices under it -- the soffit a player in ` +
+          `the cutting looks up at. Built by the real ${'`buildTerrainMesh`'}, not by a model of it`,
+      );
+      check(
+        (without.userData.deckArea as number) === 0 && downFacing(without) === 0,
+        `and the identical builder handed a carve with no roads in it keeps ` +
+          `${(without.userData.deckArea as number).toFixed(0)} m2 and draws ${downFacing(without)} of ` +
+          `them, which is the mesh that shipped: a hole in the street and nothing overhead. The ` +
+          `negative control for the line above, and it is the same function with one field changed`,
+      );
+    }
+  }
+
+  // --- 6. Both ends hold the road wherever a body can be -----------------------
+  //
+  // The deck is filled from a residency on each end and the two are different
+  // residencies: the browser drops a tile's roads with its geometry, this
+  // process drops a hexagon's with its lane layer. They do not have to hold the
+  // *same* set -- they have to both hold everything near a player, or one of
+  // them carves ground the other keeps and the player is corrected through the
+  // floor. `1800` is `streamer.StreamerOptions.loadRadius`'s default, restated
+  // so that widening it shows up here rather than as a report.
+  const CLIENT_TILE_RADIUS_M = 1800;
+  check(
+    worldMod.LANES_NEED_MARGIN_M >= CLIENT_TILE_RADIUS_M,
+    `the server holds a hexagon's carriageways to ${worldMod.LANES_NEED_MARGIN_M} m from any player and the ` +
+      `browser holds a tile's to ${CLIENT_TILE_RADIUS_M} m from its own camera, so the authoritative ` +
+      `set is a superset of the predicted one everywhere a body can stand. Both ends then ask the ` +
+      `same RailCut.cutAt over their own deck, which is why there is no second rule to keep in step`,
+  );
+
+  check(
+    world.railCut !== null && world.roads !== undefined,
+    `and this process wires its own: loadWorld builds a RoadDeck, the lane layer fills it per ` +
+      `hexagon, and world.railCut.setRoads points groundFor at it -- the same two lines main.ts ` +
+      `writes after it builds its own RailCut`,
+  );
+
+  say(
+    `    ${deck.count.toLocaleString()} paved strips over ${laneTiles.toLocaleString()} tiles, ` +
+      `${pavedTotal.toLocaleString()} m2 of paved surface in the build; deck ${DECK_THICKNESS} m thick; ` +
+      `${pavedSamples.toLocaleString()} m2 of it is within reach of a rail corridor and was sampled ` +
+      `at one metre`,
+  );
 }

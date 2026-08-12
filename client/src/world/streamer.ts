@@ -772,6 +772,41 @@ export interface CollisionSink {
 }
 
 /**
+ * Who holds the carriageways. `world/road-deck.RoadDeck`, structurally.
+ *
+ * `adopt` returns the plan box of what it took, grown by the margin asked for,
+ * or `null` when the tile had no road on it -- which is what tells the streamer
+ * how far to re-cut the ground for a road that arrived after its neighbours were
+ * already standing.
+ */
+export interface RoadSink {
+  adopt(
+    key: string,
+    ways: ReadonlyArray<{
+      halfWidth: number;
+      footpathWidth: number;
+      count: number;
+      x: Float32Array;
+      y: Float32Array;
+      z: Float32Array;
+    }>,
+    margin?: number,
+  ): [number, number, number, number] | null;
+  drop(key: string): void;
+}
+
+/**
+ * How far past a new tile's roads the ground is re-cut, metres.
+ *
+ * A road is clipped to its own tile, so the only ground it can newly keep is
+ * within its own paved half-width of itself -- and the widest carriageway in the
+ * extract is `streets.MAX_ROAD_WIDTH` plus a footpath band, comfortably under
+ * this. It is a bounding box grown by a constant rather than an exact reach
+ * because the sweep it feeds costs one rectangle test per resident tile.
+ */
+const ROAD_RECUT_MARGIN_M = 24;
+
+/**
  * Extra concurrent fetches a tile may have when its collision is already
  * resident.
  *
@@ -1803,27 +1838,22 @@ export class TileStreamer implements LampSource {
    * the tile was draped by the pipeline and is untouched.
    */
   /**
-   * Who to tell about a tile's carriageways as they arrive.
+   * Who to tell about a tile's carriageways as they arrive and as they leave.
    *
-   * Deliberately a callback and not a field of a type this file imports: what
-   * consumes it is `world/envelope.ClearanceEnvelope`, which the server builds
-   * too, and the streamer is a browser object. See the call site.
+   * Deliberately structural and not a type this file imports: what consumes it
+   * is `world/road-deck.RoadDeck`, which `server/world.ts` builds too, and the
+   * streamer is a browser object.
+   *
+   * **Both halves, and the second one is not symmetry for its own sake.** A
+   * deck that was adopted and never dropped is a lid over the railway at a place
+   * the player left an hour ago, and -- worse -- it is a lid the *server* does
+   * not have, because the server's lane layer drops a hexagon when it goes out
+   * of range. Two authorities disagreeing about where the ground is, which is
+   * the whole class of bug this pairing exists to close.
    */
-  private roadSink:
-    | ((
-        key: string,
-        ways: ReadonlyArray<{ halfWidth: number; count: number; x: Float32Array; y: Float32Array; z: Float32Array }>,
-        bounds: readonly number[],
-      ) => void)
-    | null = null;
+  private roadSink: RoadSink | null = null;
 
-  setRoadSink(
-    sink: (
-      key: string,
-      ways: ReadonlyArray<{ halfWidth: number; count: number; x: Float32Array; y: Float32Array; z: Float32Array }>,
-      bounds: readonly number[],
-    ) => void,
-  ): void {
+  setRoadSink(sink: RoadSink | null): void {
     this.roadSink = sink;
   }
 
@@ -1854,11 +1884,40 @@ export class TileStreamer implements LampSource {
 
   setRailCut(cut: RailCut | null): void {
     this.railCut = cut;
-    if (cut === null || this.loaded.size === 0) return;
+    if (cut === null) return;
+    const recut = this.recutGround(null);
+    if (recut > 0) console.debug(`[terrain] re-cut ${recut} resident tiles for the railway`);
+  }
+
+  /**
+   * Rebuild the ground of resident tiles whose carve may have changed.
+   *
+   * `box` is a plan bounding box to limit the sweep to, or `null` for every
+   * resident tile. The terrain mesh is the one child of a tile group this may
+   * replace -- everything else in a tile was draped by the pipeline and is
+   * untouched.
+   *
+   * **Bounded, and that is the difference between this and the road half of
+   * `world/envelope.ts`.** `server/world.ts` records at length why the roads were
+   * never fed to the clearance envelope: a corridor arriving late means
+   * re-offering every prism already resident near it, which took the whole-disc
+   * load from 34 s to over ten minutes. Nothing of that applies here. A tile's
+   * ways are clipped to its own tile, so a late road can only change the ground
+   * of that tile and the eight around it; a terrain mesh is 512 triangles built
+   * from a grid already in memory; and the swap is refused outright unless the
+   * fresh mesh actually differs. The expensive thing was re-carving *solids*, and
+   * no solid is touched here.
+   */
+  private recutGround(box: readonly [number, number, number, number] | null): number {
+    if (this.railCut === null || this.loaded.size === 0) return 0;
     const tileSize = this.index?.tile_size ?? 0;
-    if (tileSize <= 0 || this.terrainField === null) return;
+    if (tileSize <= 0 || this.terrainField === null) return 0;
     let recut = 0;
     for (const tile of this.loaded.values()) {
+      const b = tile.entry.bounds;
+      if (box !== null && (b[2] < box[0] || b[0] > box[2] || b[3] < box[1] || b[1] > box[3])) {
+        continue;
+      }
       const grid = this.terrainField.grid(tile.entry.key);
       if (!grid) continue;
       const old = tile.group.children.find((c) => c.name === 'terrain');
@@ -1870,7 +1929,21 @@ export class TileStreamer implements LampSource {
         this.groundMaterial,
         this.tileCut(tile.entry),
       );
-      if ((fresh.userData.cutArea as number) <= 0) {
+      const cutArea = fresh.userData.cutArea as number;
+      const deckArea = fresh.userData.deckArea as number;
+      // Nothing to swap for: either the corridor neither took ground from this
+      // tile nor kept any under a road, or the fresh mesh made the identical two
+      // decisions the standing one did.
+      //
+      // **Both areas, not just the carved one.** A tile where a wide street
+      // roofs the corridor along its whole length loses no sub-quad at all --
+      // `cutArea` is zero and `deckArea` is not -- and testing only the first
+      // would refuse to give it the soffit it needs.
+      if (
+        (cutArea <= 0 && deckArea <= 0) ||
+        (cutArea === (old.userData.cutArea as number) &&
+          deckArea === (old.userData.deckArea as number))
+      ) {
         fresh.geometry.dispose();
         continue;
       }
@@ -1879,7 +1952,7 @@ export class TileStreamer implements LampSource {
       tile.group.add(fresh);
       recut++;
     }
-    if (recut > 0) console.debug(`[terrain] re-cut ${recut} resident tiles for the railway`);
+    return recut;
   }
 
   /**
@@ -1896,6 +1969,7 @@ export class TileStreamer implements LampSource {
       originZ: entry.bounds[1] + tileSize,
       near: (x, z, pad) => cut.near(x, z, pad),
       cutAt: (x, z, groundY) => cut.cutAt(x, z, groundY),
+      deckedAt: (x, z, groundY) => cut.deckedAt(x, z, groundY),
     };
   }
 
@@ -2854,6 +2928,32 @@ export class TileStreamer implements LampSource {
       // extent.
       group.position.set(minX, 0, minZ + tileSize);
 
+      // --- The lane sidecar, decoded **before the ground**, which is the one
+      // ordering constraint in this whole function.
+      //
+      // The ways block is where the carriageways are, and `world/rail-cut.ts`
+      // declines to carve the ground under one. A tile is built once and nothing
+      // ever comes back for it, so a terrain mesh built before its own roads were
+      // registered would have a hole in King Street for the life of the session.
+      // The routes block is still adopted at the commit step below, with
+      // everything else that outlives the tile -- this is the same decoded object
+      // handed to a consumer that has to be told earlier, not a second decode.
+      //
+      // 0.07 ms a tile, measured, and it happens either way; all that changed is
+      // where in the generator it happens.
+      let lanes: ReturnType<typeof decodeLanes> = null;
+      /** Where this tile's roads are, for the neighbour re-cut at the commit. */
+      let roadBox: [number, number, number, number] | null = null;
+      if (lanesBuffer !== null) {
+        lanes = safeDecode(() =>
+          decodeLanes(lanesBuffer, entry.bounds[0], entry.bounds[1] + tileSize),
+        );
+        if (lanes !== null) {
+          roadBox = this.roadSink?.adopt(entry.key, lanes.ways, ROAD_RECUT_MARGIN_M) ?? null;
+        }
+        yield;
+      }
+
       // --- The ground, first, so it is the first thing drawn and the thing
       // every other primitive in the tile was placed against. Its heights are
       // already baked into the pipeline's geometry -- walls, roads and grass all
@@ -3131,13 +3231,11 @@ export class TileStreamer implements LampSource {
       // network; one fetch, one decode, two consumers, and no second sidecar --
       // which is what `tiles.write_lanes` designed the ways block for. See
       // `game/pedestrians.buildBands`.
-      let lanes: ReturnType<typeof decodeLanes> = null;
-      if (lanesBuffer !== null) {
-        lanes = safeDecode(() =>
-          decodeLanes(lanesBuffer, entry.bounds[0], entry.bounds[1] + tileSize),
-        );
-        yield;
-      }
+      //
+      // **Decoded up at the top of this function now**, before the ground, and
+      // the reason is written down there: the ways block is also where the
+      // carriageways are, and the terrain carve has to know about them before it
+      // cuts. Still one decode and still one object.
 
       // --- And the third consumer of that ways block: the street lights on the
       // streets that have no power pole to hang one from.
@@ -3241,6 +3339,10 @@ export class TileStreamer implements LampSource {
         // 1.6 MB every two minutes to build nothing again would be the retry
         // machinery doing damage. Counted with the 404s, where it belongs.
         this.ledger.notePermanent(entry.key, 'built nothing');
+        // The roads were adopted before the ground was built and this tile is
+        // now never going to be `dispose`d, because it was never loaded. Give
+        // them back here or the deck holds a tile nothing will ever drop.
+        this.roadSink?.drop(entry.key);
         return;
       }
 
@@ -3313,13 +3415,13 @@ export class TileStreamer implements LampSource {
       if (lanes !== null) {
         this.traffic?.adopt(entry.key, lanes);
         this.pedestrians?.adopt(entry.key, lanes);
-        // And the carriageways, to whoever is keeping them clear -- which for
-        // now is nobody. The hook is here because the ways block is the only
-        // description of a road either end of the wire holds that carries a
-        // width and a height, which is what `world/envelope.ClearanceEnvelope`
-        // wants; `server/world.ts` records why the road half of that rule is not
-        // switched on yet, and both ends must make the same choice.
-        this.roadSink?.(entry.key, lanes.ways, entry.bounds);
+        // And the ground of whatever was already standing when these roads
+        // arrived. The deck itself was adopted at the top of this function, in
+        // time for this tile's own carve; what could not be done then is the
+        // *neighbours*, because a tile is built once and a tile built an hour ago
+        // has a hole in it where this tile's street crosses the seam. Bounded to
+        // the box the roads actually occupy -- see `recutGround`.
+        if (roadBox !== null) this.recutGround(roadBox);
       }
 
       // And the parked cars, to whoever is drawing the near ones as models. The
@@ -3957,6 +4059,12 @@ export class TileStreamer implements LampSource {
     // rather than by tile precisely so that somebody you clobbered stays down
     // while the tile they are lying on streams out and back. See `PedDown`.
     this.pedestrians?.drop(key);
+    // And the carriageways, on exactly the same argument: a road is a fact about
+    // this tile's bytes and nothing about it survives the tile. Dropped rather
+    // than kept because a deck nobody drops is a lid over a railway a thousand
+    // metres behind the player -- and one the server, whose lane layer *does*
+    // drop, would not have. See `RoadSink`.
+    this.roadSink?.drop(key);
     this.atlas.release(key);
     this.loaded.delete(key);
 

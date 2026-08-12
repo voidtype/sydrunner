@@ -42,6 +42,7 @@
 
 import { BufferAttribute, BufferGeometry, Mesh, type Material } from 'three/webgpu';
 import { fetchWorldAsset } from './cdn.ts';
+import { DECK_THICKNESS_M } from './road-deck.ts';
 
 /**
  * The rail corridor, as much of it as this module needs: where to stop drawing
@@ -69,6 +70,14 @@ export interface TileCut {
    * test is made against the sheet being cut and not a second opinion.
    */
   cutAt(x: number, z: number, groundY: number): number;
+  /**
+   * The rail head a **road** is holding the ground up over, or `NaN`.
+   *
+   * `cutAt` and this are exclusive: a point in a corridor is either carved or
+   * decked, never both. Where this answers, the ground is kept and needs an
+   * underside -- see `DECK_THICKNESS_M` and the soffit block below.
+   */
+  deckedAt(x: number, z: number, groundY: number): number;
 }
 
 /**
@@ -488,12 +497,66 @@ export function buildTerrainMesh(
 
   /** How much of this tile's ground the corridor took, in square metres. */
   let cutArea = 0;
+  /**
+   * ...and how much of it a road kept, in square metres.
+   *
+   * The number that says the road rule fired at all. `integration-check` asserts
+   * it is non-zero over a tile whose railway is known to run under a street, on
+   * exactly `cutArea`'s terms: it is the only cheap way to prove from outside
+   * that a rule inside a mesh builder ran.
+   */
+  let deckArea = 0;
   const sub = CUT_SUBDIVISION;
   // Half the diagonal of a quad: the radius that finds a corridor touching any
   // part of it from its centre.
   const quadReach = spacing * Math.SQRT1_2;
+  /** Per sub-quad: 0 kept as ordinary ground, 1 carved away, 2 kept by a road. */
+  const state = new Uint8Array(sub * sub);
   const keep = new Uint8Array(sub * sub);
   const lattice = new Int32Array((sub + 1) * (sub + 1));
+  /** The soffit's own posts, allocated only in a quad a road crosses. */
+  const under = new Int32Array((sub + 1) * (sub + 1));
+
+  /**
+   * Is the sub-quad at these **tile-wide** sub-indices one the corridor took?
+   *
+   * The neighbour test the soffit's fascia needs, and it has to work across a
+   * quad boundary: a road deck's edge lands wherever the road's kerb does, which
+   * is almost never on a 31 m grid line. Outside the tile it answers `false` --
+   * the neighbouring tile's grid is not in hand here, and a missing fascia at a
+   * tile seam is a hairline where a wrong one would be a wall.
+   *
+   * Replays `buildTerrainMesh`'s own decision rather than approximating it: same
+   * `subHeight`, same sub-quad centre, same `cutAt`. It is called only for the
+   * four neighbours of a decked sub-quad, which over the whole city is a few
+   * thousand calls.
+   */
+  const droppedAtSub = (gr: number, gc: number): boolean => {
+    if (cut === null) return false;
+    if (gr < 0 || gc < 0 || gr >= gridN * sub || gc >= gridN * sub) return false;
+    const r = Math.floor(gr / sub);
+    const c = Math.floor(gc / sub);
+    const i = r * stride + c;
+    const fc = ((gc - c * sub) + 0.5) / sub;
+    const fr = ((gr - r * sub) + 0.5) / sub;
+    const h = subHeight(grid[i], grid[i + 1], grid[i + stride], grid[i + stride + 1], fc, fr);
+    const wx = cut.originX + (c + fc) * spacing;
+    const wz = cut.originZ + (r + fr) * spacing - tileSize;
+    return Number.isFinite(cut.cutAt(wx, wz, h));
+  };
+
+  /** One vertex, with its own normal. Returns its index. */
+  const pushVertex = (
+    x: number, y: number, z: number,
+    nx: number, ny: number, nz: number,
+    u: number, v: number,
+  ): number => {
+    const at = position.length / 3;
+    position.push(x, y, z);
+    normal.push(nx, ny, nz);
+    uv.push(u, v);
+    return at;
+  };
 
   for (let r = 0; r < gridN; r++) {
     for (let c = 0; c < gridN; c++) {
@@ -522,25 +585,42 @@ export function buildTerrainMesh(
       const sw = grid[isw];
       const se = grid[ise];
       let dropped = 0;
+      let decked = 0;
       for (let sr = 0; sr < sub; sr++) {
         for (let sc = 0; sc < sub; sc++) {
           const fc = (sc + 0.5) / sub;
           const fr = (sr + 0.5) / sub;
           const h = subHeight(nw, ne, sw, se, fc, fr);
-          const gone = Number.isFinite(
-            cut.cutAt(wx0 + fc * spacing, wz0 + fr * spacing, h),
-          );
+          const wx = wx0 + fc * spacing;
+          const wz = wz0 + fr * spacing;
+          const gone = Number.isFinite(cut.cutAt(wx, wz, h));
+          // Exclusive by construction -- `RailCut.deckedAt` answers only where
+          // `cutAt` declined *because of a road* -- so the branch is an ordering
+          // and not a precedence. Asked second because it is the rarer answer and
+          // the more expensive one.
+          const road = !gone && Number.isFinite(cut.deckedAt(wx, wz, h));
+          state[sr * sub + sc] = gone ? 1 : road ? 2 : 0;
           keep[sr * sub + sc] = gone ? 0 : 1;
           if (gone) dropped++;
+          else if (road) decked++;
         }
       }
-      if (dropped === 0) {
+      // **`decked` is in the test as well as `dropped`, and that is the road
+      // rule's only cost to a quad that keeps all its ground**: a quad wholly
+      // under a street that roofs the corridor loses no sub-quad at all, so the
+      // old test sent it down the two-triangle path -- and then a player in the
+      // trench looks up through King Street and out of the world, because
+      // nothing built it an underside. It happens where a road runs *along* a
+      // cutting rather than across one, which in this extract is a few dozen
+      // quads.
+      if (dropped === 0 && decked === 0) {
         // The corridor is near this quad but takes nothing from it. The common
         // case beside a railway at grade, and it must cost two triangles.
         plain();
         continue;
       }
       cutArea += (dropped / (sub * sub)) * spacing * spacing;
+      deckArea += (decked / (sub * sub)) * spacing * spacing;
       if (dropped === sub * sub) continue; // wholly inside the corridor
 
       // Refine. Every sub-post is emitted, kept quads index into them; the
@@ -576,6 +656,114 @@ export function buildTerrainMesh(
           const d = lattice[(sr + 1) * (sub + 1) + sc];
           const e = d + 1;
           indices.push(a, e, b, a, d, e);
+        }
+      }
+
+      // ---------------------------------------------------------------------
+      // THE SOFFIT, and why a kept sub-quad over a trench is not finished.
+      //
+      // The road rule keeps the ground under a carriageway, which is the whole
+      // fix -- but the terrain sheet is a single-sided upward surface, so from
+      // down in the cutting the deck it makes is *invisible*: a `FrontSide`
+      // material culls it and the player looks up through King Street at the
+      // sky. What is drawn instead is a slab: the kept ground on top, a second
+      // sheet `DECK_THICKNESS_M` below it facing down, and a fascia closing the
+      // gap on every edge where the neighbouring sub-quad was carved away.
+      //
+      // Deliberately built here rather than in `world/rail-geo.ts`, where the
+      // rest of the corridor's structure lives, and the reason is the one this
+      // whole module exists for: the soffit has to follow the kept ground
+      // exactly, and the only place the kept ground's own interpolated heights
+      // are in hand is inside the loop that computed them. A second module
+      // re-deriving them would be the seam `rail-cut.ts`' header spends a page
+      // refusing. It is the ground's own underside, not an invented structure --
+      // no piers and no parapet, which are `elevated.py`'s job and a world
+      // rebuild.
+      if (decked === 0) continue;
+      for (let sr = 0; sr <= sub; sr++) {
+        for (let sc = 0; sc <= sub; sc++) {
+          const fc = sc / sub;
+          const fr = sr / sub;
+          under[sr * (sub + 1) + sc] = pushVertex(
+            wx0 - cut.originX + fc * spacing,
+            subHeight(nw, ne, sw, se, fc, fr) - DECK_THICKNESS_M,
+            wz0 - cut.originZ + fr * spacing,
+            0, -1, 0,
+            (c + fc) / gridN,
+            (r + fr) / gridN,
+          );
+        }
+      }
+      for (let sr = 0; sr < sub; sr++) {
+        for (let sc = 0; sc < sub; sc++) {
+          if (state[sr * sub + sc] !== 2) continue;
+          const a = under[sr * (sub + 1) + sc];
+          const b = a + 1;
+          const d = under[(sr + 1) * (sub + 1) + sc];
+          const e = d + 1;
+          // The top's winding, reversed: this face looks down.
+          indices.push(a, b, e, a, e, d);
+
+          // The fascia. Only against a hole -- an edge shared with another
+          // decked sub-quad is inside the deck, and one shared with ordinary
+          // ground is inside the ground.
+          const gr = r * sub + sr;
+          const gc = c * sub + sc;
+          const holeAt = (dr: number, dc: number): boolean => {
+            const nr = sr + dr;
+            const nc = sc + dc;
+            if (nr >= 0 && nr < sub && nc >= 0 && nc < sub) return state[nr * sub + nc] === 1;
+            return droppedAtSub(gr + dr, gc + dc);
+          };
+          const topAt = (sr2: number, sc2: number): number => lattice[sr2 * (sub + 1) + sc2];
+          const underAt = (sr2: number, sc2: number): number => under[sr2 * (sub + 1) + sc2];
+          /**
+           * One fascia quad, given its four corners **in perimeter order** --
+           * two along the top, then the two beneath them coming back.
+           *
+           * Its own vertices rather than the lattice posts, because those carry
+           * the ground's up normal and the soffit's down normal: a vertical face
+           * shaded off either of them reads as a smear of the surface it came
+           * from rather than as the edge of a deck. Four vertices a quad, and
+           * there are a handful of quads at each crossing in the city.
+           *
+           * Perimeter order is what makes the two triangles agree, and the order
+           * for each of the four sides is derived below rather than guessed --
+           * see `rail-geo.writeTrench`'s `face` for the same hazard stated at
+           * length. A fascia facing the wrong way is invisible from the trench
+           * and visible from inside the ground, which is the worse of the two.
+           */
+          const fascia = (
+            a: number, b: number, cc: number, dd: number,
+            nx: number, nz: number,
+          ): void => {
+            const at = (src: number): number => pushVertex(
+              position[src * 3], position[src * 3 + 1], position[src * 3 + 2],
+              nx, 0, nz,
+              uv[src * 2], uv[src * 2 + 1],
+            );
+            const p0 = at(a);
+            const p1 = at(b);
+            const p2 = at(cc);
+            const p3 = at(dd);
+            indices.push(p0, p1, p2, p0, p2, p3);
+          };
+          if (holeAt(-1, 0)) {
+            // North, facing -Z: west to east along the top, back underneath.
+            fascia(topAt(sr, sc), topAt(sr, sc + 1), underAt(sr, sc + 1), underAt(sr, sc), 0, -1);
+          }
+          if (holeAt(1, 0)) {
+            // South, facing +Z: the mirror, east to west.
+            fascia(topAt(sr + 1, sc + 1), topAt(sr + 1, sc), underAt(sr + 1, sc), underAt(sr + 1, sc + 1), 0, 1);
+          }
+          if (holeAt(0, -1)) {
+            // West, facing -X: south to north along the top.
+            fascia(topAt(sr + 1, sc), topAt(sr, sc), underAt(sr, sc), underAt(sr + 1, sc), -1, 0);
+          }
+          if (holeAt(0, 1)) {
+            // East, facing +X: north to south.
+            fascia(topAt(sr, sc + 1), topAt(sr + 1, sc + 1), underAt(sr + 1, sc + 1), underAt(sr, sc + 1), 1, 0);
+          }
         }
       }
     }
@@ -655,6 +843,12 @@ export function buildTerrainMesh(
   // over a tile whose railway is known to be in a cutting, which is the only
   // cheap way to prove from outside that the carve ran at all.
   mesh.userData.cutArea = cutArea;
+  // And how much of the corridor a carriageway kept, in square metres. The one
+  // number that says the road rule fired in this tile at all; `integration-check`
+  // asserts it over a tile whose railway is known to run under a street, and
+  // `streamer.recutGround` compares it to decide whether a re-cut changed
+  // anything worth swapping a mesh for.
+  mesh.userData.deckArea = deckArea;
   mesh.frustumCulled = false; // culled with its tile, like every other primitive
   return mesh;
 }

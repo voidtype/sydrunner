@@ -116,6 +116,7 @@ import type { Place } from '../client/src/game/teleport.ts';
 import type { CombatWorld } from '../client/src/game/combat.ts';
 import { decodeRail, verifyRail, type RailBake } from '../client/src/game/rail.ts';
 import { RailCut } from '../client/src/world/rail-cut.ts';
+import { RoadDeck } from '../client/src/world/road-deck.ts';
 import { ClearanceEnvelope } from '../client/src/world/envelope.ts';
 import { SPAN_TUNNEL } from '../client/src/game/rail.ts';
 
@@ -925,6 +926,14 @@ export class HexResidency {
     traffic: TrafficField,
     peds: PedestrianField,
     lanesCapBytes: number,
+    /**
+     * The carriageways, which come out of the same sidecar as the traffic.
+     *
+     * A constructor argument rather than something the caller wires up
+     * afterwards, because the lane layer's `apply` closure is built in here and
+     * a deck attached later would miss every hexagon that had already landed.
+     */
+    roads: RoadDeck,
   ) {
     this.root = root;
     this.rootIndex = rootIndex;
@@ -975,32 +984,36 @@ export class HexResidency {
           // from the ways block the routes were built beside.
           peds.adopt(key, decoded);
           // ---------------------------------------------------------------
-          // **And deliberately NOT a third: the carriageways.**
+          // **And a third: the carriageways, as the ground the carve may not
+          // take.** See `world/road-deck.ts`, and `groundFor` for what reads it.
           //
-          // The user's rule is about both -- *"no building should EVER cover a
-          // road nor a railroad"* -- and `ClearanceEnvelope.addRoads` exists and
-          // works. It is not called here, and the reason is a measurement.
+          // This is the cheap half of the road rule and it is worth being exact
+          // about why, because the *other* half is still switched off two
+          // paragraphs down and the two look alike from a distance.
           //
-          // A road corridor is only known when its tile's lane sidecar lands,
-          // which on this process is per hexagon, in an order the browser does
-          // not share. Making the two ends agree therefore means **re-offering
-          // prisms that are already resident** every time a hexagon of
-          // carriageways arrives -- and that is an unbounded step in the middle
-          // of a serial boot. Measured: the whole-disc load went from 34 s to
-          // over ten minutes, and a standalone server never answered `/health`
-          // in 300 s. The box's unit allows 20 seconds and 560 MB.
+          // A deck is only ever **queried**, never applied to anything that is
+          // already resident. `RailCut.cutAt` asks it at the moment somebody
+          // wants a ground height, so a hexagon of roads landing late costs one
+          // `Map.set` per strip and changes every future answer for free. The
+          // browser does the identical thing per tile in `streamer.buildTile`,
+          // off the identical bytes, so the two ends agree about where King
+          // Street is without a byte on the wire.
           //
-          // The railway has none of that problem: `rail.bin` is one file read
-          // before the first prism is resident, so every tile is carved once on
-          // the way in and nothing is ever re-offered. So the rail envelope
-          // ships and the road envelope does not, on both ends, together --
-          // because a hole one end has opened and the other has not is a player
-          // walking through a wall the server pushes them back out of.
+          // **What is still not done here is `ClearanceEnvelope.addRoads`**, and
+          // the reason is a measurement rather than an oversight. A corridor
+          // added to the envelope means **re-offering prisms that are already
+          // resident** -- a building carved once has to be carved again when a
+          // road it straddles arrives -- and that is an unbounded step in the
+          // middle of a serial boot. Measured: the whole-disc load went from 34 s
+          // to over ten minutes, and a standalone server never answered
+          // `/health` in 300 s. The box's unit allows 20 seconds and 560 MB. That
+          // is a fact about carving *solids* and none of it applies to a lookup.
           //
-          // The road half belongs where `elevated.py` already does this cut, at
-          // bake time, where the whole road graph is in hand at once and the
+          // The road envelope belongs where `elevated.py` already does this cut,
+          // at bake time, where the whole road graph is in hand at once and the
           // result is bytes rather than a boot step. `ROAD_CLEARANCE_M` and
           // `addRoads` are kept and self-checked against that day.
+          roads.adopt(key, decoded.ways);
           let routePoints = 0;
           for (const route of decoded.routes) routePoints += route.count;
           let wayPoints = 0;
@@ -1013,6 +1026,10 @@ export class HexResidency {
         remove: (key) => {
           traffic.drop(key);
           peds.drop(key);
+          // And the deck, so a hexagon out of range is not still holding a lid
+          // over a railway. `streamer.dispose` drops it on exactly the same
+          // argument at the other end of the wire.
+          roads.drop(key);
         },
       },
       root,
@@ -1691,6 +1708,17 @@ export interface ServerWorld {
    */
   railCut?: RailCut | null;
   /**
+   * Every carriageway resident on this process, as the ground the carve stops at.
+   *
+   * The fix for the report *"train at St Peters STILL covers the road at king
+   * st ... Roads should be uninterrupted everywhere"*. Handed to `railCut` at
+   * boot and filled per hexagon thereafter by the lane layer; `groundFor` never
+   * touches it directly, because the whole point is that there is **one**
+   * function that answers "is the ground here" and the road is folded into it.
+   * See `world/road-deck.ts`.
+   */
+  roads?: RoadDeck;
+  /**
    * The underground stations, as the volumes a body may be inside. Null with no bake.
    *
    * The third of the three fields `groundFor` consults, and the one that was
@@ -1763,7 +1791,16 @@ export async function loadWorld(
   const envelope = new ClearanceEnvelope();
   const traffic = new TrafficField();
   const peds = new PedestrianField();
-  const segments = new HexResidency(root, rootIndex, collision, capBytes, traffic, peds, laneCapBytes);
+  /**
+   * Where the ground stays whatever the railway wants. See `world/road-deck.ts`.
+   *
+   * Constructed here, beside `envelope`, for the same reason: the lane layer
+   * fills it as each hexagon's carriageways land, so it has to exist before the
+   * residency does. Empty until then, which keeps nothing, which is the honest
+   * answer for a process that has not read a street yet.
+   */
+  const roads = new RoadDeck();
+  const segments = new HexResidency(root, rootIndex, collision, capBytes, traffic, peds, laneCapBytes, roads);
   const terrain = new TerrainField(index.terrain.grid, index.tile_size, root);
   const powerups = new PowerupField();
   const tileOf = new Map<string, { tileX: number; tileZ: number }>();
@@ -1876,6 +1913,10 @@ export async function loadWorld(
           // and no second decode -- `PedestrianField.adopt` derives its bands
           // from the ways block the routes were built beside.
           peds.adopt(entry.key, decoded);
+          // ...and the third: the carriageways the terrain carve must not take.
+          // The lane layer does the identical line for a segmented world; this
+          // branch is the unsegmented one, where every tile is read at boot.
+          roads.adopt(entry.key, decoded.ways);
         }
       }
     }),
@@ -1910,11 +1951,18 @@ export async function loadWorld(
     rail: await loadRail(root),
     platforms: null,
     railCut: null,
+    roads,
     stationBoxes: null,
   };
   world.platforms = world.rail ? buildPlatforms(world.rail) : null;
   world.railCut = world.rail ? new RailCut(world.rail) : null;
   world.stationBoxes = world.rail ? buildStationBoxes(world.rail) : null;
+  // **And the roads, which is where the carve stops.** `main.ts` writes the
+  // identical line one statement after it builds its own `RailCut`, over a deck
+  // built from the identical `.lanes.bin` bytes by the identical decoder. That
+  // is the whole of what makes King Street solid on both ends: not two rules
+  // that agree, one rule asked twice. See `world/road-deck.ts`.
+  world.railCut?.setRoads(roads);
   // The corridor opens out at a platform, and both ends have to agree about
   // where. `main.ts` hands `RailCut` the routed stopping anchors out of
   // `rail-geo.buildNetwork`; this process cannot import that module -- it draws
@@ -2242,6 +2290,14 @@ export function groundFor(world: ServerWorld): CombatWorld {
       // carve and the trench both call -- see `rail-cut.ts` on why none of the
       // three owns the answer -- so the floor a body stands on here is the same
       // surface the ballast is drawn on, on both ends of the wire.
+      //
+      // **And it is where the road rule lives too**, which is why there is no
+      // fourth clause here for it. A point under a carriageway is one `cutAt`
+      // declines on, so this falls through to the terrain and the body stands on
+      // King Street instead of dropping 7.4 m into the Illawarra cutting -- which
+      // is what it did, on both ends, until `RailCut.setRoads`. Folding the road
+      // in at the corridor rather than beside it is the whole design: a second
+      // clause here would be a second rule for the client to fail to copy.
       const floor = cut === null ? Number.NaN : cut.cutAt(x, z, sampled);
       if (Number.isFinite(floor)) return Math.max(floor, roof);
       return Math.max(lastGround, roof);

@@ -350,6 +350,7 @@ import {
   verifyRailAudio,
 } from './game/rail-audio.ts';
 import { RailCut } from './world/rail-cut.ts';
+import { RoadDeck, verifyRoadDeck } from './world/road-deck.ts';
 import { ClearanceEnvelope, verifyEnvelope } from './world/envelope.ts';
 import { verifyUndercroft } from './world/undercroft.ts';
 // The street factions -- meth heads and drunks -- on the same split again:
@@ -1352,6 +1353,62 @@ async function main(): Promise<void> {
    * `CollisionWorld.setEnvelope` for why arriving late is safe.
    */
   const envelope = new ClearanceEnvelope();
+  /**
+   * Every carriageway in the city, filling in as the tiles land.
+   *
+   * The other half of `envelope`, and not the same object: `ClearanceEnvelope`
+   * says where a *solid* must not be, and this says where the *ground* must
+   * stay. The railway needs both -- a building over a corridor gets an
+   * undercroft, and a road over a corridor keeps its ground -- and they are
+   * separate because they are consumed by different things at different times.
+   *
+   * Handed to the streamer immediately, before any tile can be built, and to
+   * `RailCut` the moment there is one. Both are safe to fill late; nothing
+   * caches a road decision. See `world/road-deck.ts`.
+   */
+  const roadDeck = new RoadDeck();
+  /**
+   * The chunk ring, once there is one, for the road sink below to invalidate.
+   *
+   * A forward `let` rather than a reference to `railWorld`, which is a `const`
+   * two thousand lines down: tiles stream during boot, so this closure really
+   * can run before that binding is initialised, and a `const` in its temporal
+   * dead zone throws rather than reading `undefined`. Null until then, which
+   * means "no chunks to invalidate yet", which is true.
+   */
+  let railChunks: RailWorld | null = null;
+  /**
+   * Where the deck is filled from, and the one thing that has to happen beside
+   * filling it.
+   *
+   * `streamer.recutGround` already rebuilds a neighbouring tile's ground when a
+   * street arrives after it. The rail chunk ring needs the same treatment for
+   * the same reason and cannot get it from inside the streamer, which has no
+   * `RailWorld`: a chunk decides once where its boundary fence and its retaining
+   * walls go, and a chunk built before the street landed keeps a palisade
+   * standing in the carriageway. That is the exact frame the player photographed.
+   *
+   * Gated on the road actually being near a corridor, because a chunk rebuild is
+   * the same work as a first build and the city has three thousand tiles of
+   * street against a few dozen that cross a railway. See `RoadDeck.anyStrip`.
+   */
+  streamer.setRoadSink({
+    adopt: (key, ways, margin) => {
+      const box = roadDeck.adopt(key, ways, margin);
+      const chunks = railChunks;
+      if (box === null || railCut === null || chunks === null) return box;
+      const cut = railCut;
+      if (roadDeck.anyStrip(key, (x, z, half) => cut.near(x, z, half))) chunks.invalidate(box);
+      return box;
+    },
+    drop: (key) => roadDeck.drop(key),
+  });
+  {
+    const deckFailures = verifyRoadDeck();
+    if (deckFailures.length) {
+      console.warn('[rail] road deck self-check:\n  - ' + deckFailures.join('\n  - '));
+    }
+  }
   const railBake = await withDeadline(loadRailBake(), RAIL_BAKE_DEADLINE_MS, 'the rail bake');
   let railNetwork: RailNetwork | null = null;
   /** The rail corridor, for the terrain carve and the trench. See below. */
@@ -1410,6 +1467,13 @@ async function main(): Promise<void> {
       // its own retaining wall.
       railCut = new RailCut(railBake);
       railCut.setStations(railNetwork.stations);
+      // **And the roads, which is where the carve stops.** The corridor is the
+      // reason the ground comes away and a carriageway is the reason it stays;
+      // one object answers both, so the terrain mesh, the trench, the ground
+      // query in `groundHeightAt` and `server/world.groundFor` cannot hold four
+      // opinions about it. `server/world.ts` does the identical two lines over a
+      // deck built from the identical `.lanes.bin` bytes.
+      railCut.setRoads(roadDeck);
       streamer.setRailCut(railCut);
       // **And the volume nothing may stand in.** The same corridor read the
       // other way round: `RailCut` says where the *ground* must not be, and
@@ -2605,6 +2669,8 @@ async function main(): Promise<void> {
       ? null
       : new RailWorld(railNetwork, railAssets, wildGround, collision, railCut, rawGroundAt);
   if (railWorld) scene.add(railWorld.group);
+  // And the road sink's forward handle on it. See `railChunks`.
+  railChunks = railWorld;
 
   /**
    * Is there a building standing here? The rave crowd's own rejection test.
