@@ -54,6 +54,13 @@ neither ships in the build; what ships is the geometry they produced.
   names the two real inner-city dives, but it lists no City Circle, Eastern
   Suburbs, Airport or Metro bore, so its silence about a tunnel is not evidence
   and `rail-audit` section 3d draws no conclusion from it.
+- **Station CAD Drawings** — Transport for NSW, licensed
+  [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/), drawings dated
+  2016, via [Open Data Hub](https://opendata.transport.nsw.gov.au). Vector PDF
+  plan sheets for 273 stations, downloaded to `data/cache/station-cad/` and
+  parsed to structured JSON under `data/scratch/stationcad/` by
+  `scripts/stationcad.py`. Neither the PDFs nor the extracted JSON ship in the
+  build; what ships, eventually, is geometry built from them.
 
 ## Rolling stock
 
