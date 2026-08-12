@@ -302,6 +302,7 @@ import {
   aboardFrame,
   aboardPose,
   buildPlatforms,
+  buildStationBoxes,
   callsAhead,
   dwellAt,
   dwellStand,
@@ -337,6 +338,7 @@ import {
   type CarriageInterior,
   type PlatformField,
   type Stand,
+  type StationBoxField,
 } from './game/riding.ts';
 import { SPAN_TUNNEL, railSeconds, verifyRail } from './game/rail.ts';
 // What the train is saying, which is a lookup on the same timetable the train
@@ -349,6 +351,7 @@ import {
 } from './game/rail-audio.ts';
 import { RailCut } from './world/rail-cut.ts';
 import { ClearanceEnvelope, verifyEnvelope } from './world/envelope.ts';
+import { verifyUndercroft } from './world/undercroft.ts';
 // The street factions -- meth heads and drunks -- on the same split again:
 // `game/streetlife.ts` is the shared simulation the server runs and
 // `world/streetlife.ts` is the renderer. See either header.
@@ -1330,6 +1333,15 @@ async function main(): Promise<void> {
   /** Station platforms as rectangles, for `groundHeightAt`. Null with no bake. */
   let platforms: PlatformField | null = null;
   /**
+   * The underground stations, as the volumes a body may legitimately be inside.
+   *
+   * Beside `platforms` and asked in the same breath, because the two answer
+   * halves of one question: `platforms` is "am I standing on the deck" and this
+   * is "am I in the station at all". Without it the concourse is not a place --
+   * see `game/riding.StationBoxField` for the whole of the report it fixes.
+   */
+  let stationBoxes: StationBoxField | null = null;
+  /**
    * The volume nothing may stand in: the railway's loading gauge and every
    * carriageway's headroom, in one object.
    *
@@ -1407,9 +1419,23 @@ async function main(): Promise<void> {
       // added to the same envelope as their lane sidecars land; see
       // `adoptRoadCorridors`.
       envelope.addRail(railBake, SPAN_TUNNEL);
+      // **And the same envelope decides what is *drawn*, not only what is
+      // solid.** The carve has cut a tunnel through 792 buildings since last
+      // round and every one of them still drew a wall across it, which is the
+      // report *"i still pass through solid buildings on the train"*. Handed to
+      // the streamer here, one line after the corridors exist and long before
+      // the first tile is built, so no tile is ever built without it. See
+      // `world/undercroft.ts`.
+      streamer.setUndercroftEnvelope(envelope);
       const envFailures = verifyEnvelope();
       if (envFailures.length) {
         console.warn('[rail] clearance envelope self-check:\n  - ' + envFailures.join('\n  - '));
+      }
+      // The same case seen from the other side: the envelope's check proves the
+      // *collision* comes out as a tunnel, and this one proves the picture does.
+      const drawnFailures = verifyUndercroft();
+      if (drawnFailures.length) {
+        console.warn('[rail] drawn undercroft self-check:\n  - ' + drawnFailures.join('\n  - '));
       }
       const geometryFailures = verifyRailGeometry(railNetwork);
       if (geometryFailures.length) {
@@ -1421,6 +1447,14 @@ async function main(): Promise<void> {
       // is the copy of the platform that exists on both ends. See
       // `game/riding.PlatformField`.
       platforms = buildPlatforms(railBake);
+      // ...and the volume a body may be *inside*. Third question, third field,
+      // and the one that was missing: `PlatformField` answers within a step of
+      // a 5.5 m deck and `RailCut.cutAt` declines on a bore by design, so one
+      // pace off the platform at Town Hall the ground query fell through to the
+      // DEM twenty metres overhead and put the player's feet on it. That is
+      // *"moving anywhere on foot underground tps me to surface"*, and it is a
+      // ground answer rather than a teleport. See `game/riding.StationBoxField`.
+      stationBoxes = buildStationBoxes(railBake);
       console.debug(
         `[rail] ${railNetwork.segments.length} unique segments from ` +
           `${railNetwork.directedSegments} directed (${(
@@ -1928,6 +1962,13 @@ async function main(): Promise<void> {
   // to it over the session.
   collision.setEnvelope(envelope);
   console.debug(`[envelope] ${envelope.count.toLocaleString()} rail corridors adopted before the first tile`);
+  // **And the trains, which are the only solid thing in the world that moves.**
+  // Reported as *"i also passed through another train at one point, not good"*.
+  // The fleet rebuilds one key of prisms per frame from the same `poseTrain` the
+  // server rides on, bounded to the carriages near enough to touch, and drops
+  // the consist the player is standing inside so a rider is never in a wall.
+  // See `world/trains.TrainFleet.setSolids`.
+  trains.setSolids(collision);
   // **The carriageways are deliberately not added to it**, and the two ends have
   // to agree about that or a hole one of them has opened is a wall the other
   // pushes the player out of. `server/world.ts`'s `lanes` layer carries the
@@ -2469,6 +2510,21 @@ async function main(): Promise<void> {
     const platform = platforms === null ? -Infinity : platforms.heightAt(x, z, feetY);
     const roof = collision.roofHeight(x, z, feetY);
     if (platform > -Infinity) return Math.max(platform, roof);
+    // **And the rest of the station, which is most of it.**
+    //
+    // A platform is 5.5 m wide and a station box is thirty, so one pace off the
+    // deck at Town Hall the line above stops answering -- and `cutAt` below
+    // *declines by design* on a bore, because a tunnel has no surface
+    // expression to carve. Between the two, the concourse fell through to the
+    // DEM twenty metres overhead and the controller stood the player on it,
+    // every frame: *"moving anywhere on foot underground tps me to surface"*.
+    //
+    // Replaces the terrain rather than competing with it, for the identical
+    // reason the platform above does, and `StationBoxField.floorAt` is a band
+    // for the identical reason too: an answer means "you are inside the
+    // station", and George Street over the top of it is not inside anything.
+    const boxFloor = stationBoxes === null ? -Infinity : stationBoxes.floorAt(x, z, feetY);
+    if (boxFloor > -Infinity) return Math.max(boxFloor, roof);
     // **Inside a carved cutting the terrain is not there**, and until this line
     // nothing on either end of the wire knew it. `terrain.buildTerrainMesh`
     // drops the sub-quads the corridor crosses and `world/rail-geo.ts` builds a

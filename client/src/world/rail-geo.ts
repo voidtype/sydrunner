@@ -145,6 +145,7 @@ import {
   CUT_HALF_WIDTH,
   CUT_MIN_DEPTH,
   STATION_HALF_WIDTH,
+  TRENCH_MIN_DEPTH,
   drawnAsTunnel,
   type RailCut,
 } from './rail-cut.ts';
@@ -1641,7 +1642,23 @@ export class RailWorld {
         // a forty-metre span, and the carve is a sample every four metres, so
         // the two disagreed along every segment that ran into a bank: ground
         // taken away with no trench built in the hole. See `RailCut.cutsAlong`.
-        const trenched = this.cut !== null && this.cut.cutsAlong(s.ax, s.az, s.bx, s.bz, this.rawGround);
+        //
+        // **Two questions now, and they are asked of the same points.** `cut`
+        // is where the ground has come away; `trenched` is where that hole is
+        // deep enough to want walls. See `rail-cut.TRENCH_MIN_DEPTH` -- the
+        // first fires along most of the at-grade network after this round and
+        // the second must not, or every 512 m of walking is a hitch.
+        const probe = this.cut === null
+          ? { cut: false, trench: false }
+          : this.cut.probeAlong(s.ax, s.az, s.bx, s.bz, this.rawGround);
+        const carved = probe.cut;
+        const trenched = probe.trench;
+        // The floor of the hole, before anything is built in it. Where the
+        // ground has come away and no trench wall reaches, this is the only
+        // surface between the ballast toe and the rim -- and without it the
+        // corridor at Erskineville is a slot into the void with two rails over
+        // the top of it. See `writeFormation`.
+        if (carved) writeFormation(ballast, s, this.cut!, this.rawGround);
         if (trenched) {
           if (!writeTrench(concrete, prisms, s, this.cut!, this.rawGround)) provisional = true;
         }
@@ -1957,6 +1974,84 @@ function writeBallast(s: Solid, seg: Segment, bridge: boolean): void {
   s.quad(...a2, ...b2, ...b4, ...a4);
 }
 
+/**
+ * The floor of the hole: blue metal across the whole carved corridor.
+ *
+ * ---------------------------------------------------------------------------
+ * **The answer to "there should always be rocks under the tracks", and it is a
+ * floor rather than a fatter ballast prism for one reason: the hole is wider
+ * than any one track's ballast and there may be no track in the middle of it.**
+ * `rail-cut.CUT_HALF_WIDTH` opens 5.4 m each side of every centreline (9.4 m at
+ * a platform) and `writeBallast` fills 3.3 m of that. Between the two, and
+ * between the ballast toes of two parallel roads more than 6.6 m apart, the
+ * terrain has been taken away and nothing was ever put back -- so the frame the
+ * player reported at Erskineville has the rails hanging over a slot with the
+ * sky-coloured void behind it. Four hundred metres of that is one report.
+ *
+ * `writeTrench` draws a cess from the ballast toe out to the wall foot and
+ * `writeVerge` draws a batter from the toe out to the fence, but neither is
+ * unconditional: the trench's runs only where the drop earns walls, the verge's
+ * only on a side `markCorridorEdges` called the *outside* of the corridor. The
+ * inside of a six-road corridor is neither, and that is exactly the middle of
+ * Redfern, Eveleigh, Erskineville and Central.
+ *
+ * So this is the one piece that is drawn wherever the ground has come away, from
+ * the same `halfWidthAt` the hole's own rim is measured with, and everything
+ * else laps over the top of it. Two centimetres under the cess deliberately --
+ * the trench's own cess strip sits at exactly the formation and two coplanar
+ * opaque surfaces are a z-fight along every cutting in the city.
+ *
+ * ---------------------------------------------------------------------------
+ * **Only where the ground has actually gone.** Asked per rib rather than per
+ * segment, because a floor drawn under standing ground is a slab poking out of
+ * the grass at every point where a cutting runs out to grade.
+ *
+ * One quad per rib pair, on `TRENCH_STEP_M`'s own pitch: five quads on a
+ * forty-metre span, against the hundred and forty the trench costs.
+ */
+function writeFormation(s: Solid, seg: Segment, cut: RailCut, rawGround: GroundAt): void {
+  const px = -seg.uz;
+  const pz = seg.ux;
+  const steps = Math.max(1, Math.round(seg.len / TRENCH_STEP_M));
+  const ext = 0.5;
+  interface Rib { cx: number; cz: number; y: number; half: number; cut: boolean }
+  const ribs: Rib[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const along = -ext + t * (seg.len + 2 * ext);
+    const cx = seg.ax + seg.ux * along;
+    const cz = seg.az + seg.uz * along;
+    const rail = seg.ay + (seg.by - seg.ay) * t;
+    const g = rawGround(cx, cz);
+    // **This segment's own strip, not `cutAt`'s maximum over every strip that
+    // covers the point.** `cutAt` is a cell lookup plus a `railYOn` per strip,
+    // and asking it five times a segment over five hundred segments is tens of
+    // milliseconds of a chunk build for a distinction nobody can see: where a
+    // *neighbouring* road's corridor is cut and this one's is not, that road's
+    // own formation floor covers the same ground. One subtraction instead.
+    //
+    // A rib whose ground is not loaded reads as uncut: the caller's own depth
+    // test marks the chunk provisional and it is built again, and the
+    // conservative direction is to draw nothing rather than a slab.
+    ribs.push({
+      cx, cz,
+      y: rail - BALLAST_TOP_DROP - BALLAST_DEPTH - 0.02,
+      half: cut.halfWidthAt(cx, cz),
+      cut: Number.isFinite(g) && g - rail > CUT_MIN_DEPTH,
+    });
+  }
+  const at = (rib: Rib, o: number): [number, number, number] => [
+    rib.cx + px * o, rib.y, rib.cz + pz * o,
+  ];
+  for (let i = 0; i < ribs.length - 1; i++) {
+    const a = ribs[i];
+    const b = ribs[i + 1];
+    if (!a.cut && !b.cut) continue;
+    // Wound to face up, which is the only side of it anybody ever sees.
+    s.quad(...at(a, -a.half), ...at(b, -b.half), ...at(b, b.half), ...at(a, a.half));
+  }
+}
+
 /** Two rails, as thin boxes standing on the ballast with their heads at `y`. */
 function writeRails(s: Solid, seg: Segment): void {
   const px = -seg.uz;
@@ -2159,8 +2254,13 @@ function writeTrench(
       } else {
         // Not loaded. Build to the depth the *track* says, so the chunk still
         // draws something coherent, and tell the caller it was a guess.
+        // `TRENCH_MIN_DEPTH` rather than `CUT_MIN_DEPTH` since the two parted
+        // company: this function only runs on a span that has already been
+        // judged trenched, so the shallowest wall it could honestly be asked for
+        // is the one at the trench floor, and the cut floor is now negative --
+        // guessing with it would build every unmeasured wall to nothing.
         complete = false;
-        top = st.rail + CUT_MIN_DEPTH;
+        top = st.rail + TRENCH_MIN_DEPTH;
       }
       // Never below the cess: at the taper where a cutting runs out to grade the
       // wall goes to nothing rather than turning inside out.

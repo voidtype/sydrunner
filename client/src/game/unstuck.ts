@@ -69,6 +69,35 @@
  * a tile whose terrain has not arrived offline, or a road over a tunnel.
  *
  * ---------------------------------------------------------------------------
+ * ## THIS MODULE NEVER FIRES ON ITS OWN, AND ONE REPORT TURNED ON THAT
+ *
+ * *"moving anywhere on foot underground tps me to surface"* was filed against
+ * this file, on the reading that something here notices a body below the
+ * terrain and rescues it. **Nothing here fires unless a player types the
+ * command.** The only two callers are `server/chat.ts`, which intercepts the
+ * typed line, and `main.ts`'s `unstuckLocally`, which the same typed line
+ * reaches offline; there is no tick, no watchdog and no automatic path, and a
+ * grep for `unstuckDestination` finds exactly those two.
+ *
+ * What actually moved the player was the **ground query** -- `main.ts`'s
+ * `groundHeightAt` and `server/world.groundFor` -- which asked
+ * `PlatformField.heightAt`, then `RailCut.cutAt`, and then fell through to the
+ * DEM. Inside a station box the first answers only within a step of a 5.5 m
+ * deck and the second declines by design (a bore has no surface expression to
+ * carve), so the concourse was answered by the terrain twenty metres overhead
+ * and the controller stood the body on it. The fix is a third field,
+ * `game/riding.StationBoxField`, consulted between the two.
+ *
+ * This module still has to be right about the same world, though, and the way
+ * it is right is by construction: **every destination is validated through
+ * `isSpawnable` against the caller's own `SpawnWorld`**, which is the same
+ * ground query. So a body inside a station box is not "below the terrain" to
+ * anything here -- it is standing on a floor the world reports -- and the
+ * ground fallback rings outward from that floor rather than up to the street.
+ * `verifyUnstuck` case 8 asserts exactly that, because it is the property the
+ * report would have needed and the one nothing was checking.
+ *
+ * ---------------------------------------------------------------------------
  * ## NO DEATH IS RECORDED, and that is a deliberate reading of the request
  *
  * The user said "kill my toon". What they *asked for* is in the next clause --
@@ -691,6 +720,53 @@ export function verifyUnstuck(): string[] {
     }
     if (!unstuckWaitNotice(1).includes('1 s to go')) {
       failures.push(`a millisecond of cooldown should read as 1 s to go; got ${JSON.stringify(unstuckWaitNotice(1))}.`);
+    }
+  }
+
+  // --- 8. A body inside an underground station is not rescued to the street.
+  //
+  // The report this file was blamed for. Nothing here fires on its own -- see
+  // the header -- but the property it *would* have needed is real and was
+  // unasserted: this module's whole notion of "where can somebody stand" is the
+  // caller's `SpawnWorld.groundHeight`, so a world that knows about station
+  // boxes must produce answers **at the station floor** and never at the
+  // terrain over it.
+  //
+  // The world below is Town Hall's numbers: platform surface at -36.6, George
+  // Street 19 m over it at -17.3. A ground query that had not heard of the box
+  // would answer -17.3 everywhere and the fallback would place a body there,
+  // which is precisely "tps me to surface"; one that has answers -36.6 inside
+  // the box, and the rescue keeps the player in the station they were in.
+  {
+    const FLOOR = -36.6;
+    const STREET = -17.3;
+    const station: SpawnWorld = {
+      collision: null,
+      // Inside the box (feet under the street) the floor is the station's; a
+      // body up at street level gets the street. Exactly `groundHeightAt`'s
+      // banded shape, in eight characters of arithmetic.
+      groundHeight: (_x, _z, feet) => (feet < STREET - 1.5 ? FLOOR : STREET),
+    };
+    const spot = nearestOpenGround(0, 0, station, rand);
+    if (!spot) {
+      failures.push('a body inside a station box found nowhere to stand at all.');
+    } else if (Math.abs(spot.y - FLOOR) > 1e-6) {
+      failures.push(
+        `the ground fallback put a body standing on a station floor at y ${spot.y} ` +
+        `rather than ${FLOOR}; it was rescued ${(spot.y - FLOOR).toFixed(1)} m up to the surface.`,
+      );
+    }
+    // And the control: the same rescue in a world with no station box answers
+    // the street, so the assertion above is about the box and not about the
+    // arithmetic. Without this the case passes on a stub that returns FLOOR
+    // unconditionally, which is the shape of check that proves nothing.
+    const bare: SpawnWorld = { collision: null, groundHeight: () => STREET };
+    const control = nearestOpenGround(0, 0, bare, rand);
+    if (!control || Math.abs(control.y - STREET) > 1e-6) {
+      failures.push(
+        'NEGATIVE CONTROL: a world with no station box under the body did not answer the street; ' +
+        'the case above is not measuring the box.',
+      );
     }
   }
 

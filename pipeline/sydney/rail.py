@@ -88,11 +88,83 @@ SEP_JUNCTION_S = 8.0  # ...or this, through a junction block
 
 MAX_GRADIENT = 0.033  # the ruling gradient a Sydney railway is built to
 
+# --- The platform, as `client/src/game/riding.ts` builds it ----------------------
+#
+# Restated here rather than left to the client, because the invariant this round
+# adds -- *both directions of a service stand at one platform* -- is only
+# meaningful against the same rectangle the client will draw. A platform is
+# 160 m long and 5.5 m wide with its inner face 1.62 m off the track centre, and
+# its surface is 1.05 m over the rail head. If these ever disagree with
+# `riding.ts` the audit is asserting something about a platform nobody has.
+PLATFORM_HALF_LENGTH_M = 80.0
+PLATFORM_INNER_M = 1.62
+PLATFORM_WIDTH_M = 5.5
+PLATFORM_TOP_M = 1.05
+
 # Vertical offsets applied to the terrain before the grade projection, metres.
 TUNNEL_DEPTH = 16.0
 BRIDGE_RISE = 7.0
 CUTTING_DROP = 4.0
 EMBANKMENT_RISE = 4.0
+
+# --- Tunnel cover: how far under the surface a bore has to be --------------------
+#
+# The player's rule, in their words: *"a rail tunnel should never result in the
+# train assets being above the surface, regardless of road"*, and then the size
+# of it: *"needs to be more than the train height, you have wires and stuff.
+# should be a good 6m at least. probably 7 or 8"*.
+#
+# They are right, and they are right about the arithmetic too. **This is not the
+# clearance envelope.** `world/envelope.RAIL_ABOVE_M` is 5.9 m and answers a
+# different question -- what volume beside and over a moving train has to be free
+# of obstacles -- and the two must stay separate constants or the next person to
+# "simplify" them into one reintroduces exactly this bug. Cover has more in it,
+# because a tunnel is a *structure* and the ground over it is *ground*:
+#
+#     carriage roof                4.4 m   a double-deck Tangara
+#     contact wire over it         0.6 m   1500 V overhead, ~5.0 m over the rail
+#     crown clearance              0.5 m   air between the wire and the lining
+#     lining                       0.6 m   the tunnel is a thing with thickness
+#     earth cover                  1.0 m   so the surface is not the tunnel roof
+#     ----------------------------------
+#     rail head to visible surface 7.1 m, called 7.5
+#
+# which is also roughly what Sydney's own bores measure rail-to-crown before any
+# cover at all, and the Metro's are deeper still.
+#
+# **Deliberately not applied to a cutting.** An open cutting has no cover by
+# definition and the train in it is *supposed* to be visible from the street --
+# that is half of what makes Newtown and Erskineville look like themselves. The
+# constraint below is gated on the tunnel flag and nothing else.
+TUNNEL_COVER_M = 7.5
+
+# And how far under a road deck a railway that passes beneath one has to sit.
+#
+# `world/envelope.RAIL_ABOVE_M` (5.9) plus `decks.GIRDER_DEPTH_M` (1.0): the
+# volume a train sweeps, and then the thickness of the thing over it. Restated
+# rather than imported for the reason every other cross-module constant in this
+# file is -- `rail-bake` must not drag the deck solver's dependencies in -- and
+# `audit` asserts the pair against `decks` so a drift is a failure and not a
+# surprise.
+ROAD_OVER_RAIL_M = 6.9
+
+# The shortest run of tunnel-tagged track that is treated as a bore, metres.
+#
+# Not every `tunnel=yes` in OSM is a tunnel. A 40 m way under a footbridge, a
+# covered way through a station concourse, a mapping error where a bridge was
+# tagged from the wrong side: digging 7.5 m of cover for any of those produces a
+# hole no train could climb out of inside the ruling gradient, which is a worse
+# picture than the one being fixed. Runs shorter than this keep their tag in the
+# extract and lose it here -- they are reported by name in the bake log and by
+# `rail-audit`, and they draw as surface track, which is what they are.
+#
+# Sixty metres is two carriages. Measured over the 60 km extract there are 195
+# runs of tunnel-tagged track: 59 fall under this line and are demoted, and the
+# distribution has no cliff near it -- the shortest kept run is 60 m and the
+# longest is 38 km -- so the threshold is a judgement about what a tunnel *is*
+# rather than a gap the data handed over. It is stated here, printed by name in
+# the bake log, and listed by `rail-audit` for exactly that reason.
+MIN_BORE_M = 60.0
 
 # Overhead wiring. Sydney's 1500 V DC catenary is on masts at roughly this
 # spacing; a portal gantry replaces the cantilever where the corridor is wide.
@@ -106,9 +178,14 @@ PARALLEL_TRACK_M = 12.0  # how far sideways to look for a neighbouring track
 RAIL_EPOCH_MS = 1767225600000
 
 # 2: the `vertexClearance` buffer and the derived `vertical` (RAIL-VERTICAL.md).
-# The decoder checks this exactly, which is deliberate -- a stale rail.bin in a
-# browser cache would otherwise read the new station fields off an old file.
-BAKE_VERSION = 2
+# 3: a station is one place. Every station record now carries where its trains
+#    actually stand (`siteX/siteZ/siteY`), the platform decks OSM surveyed with
+#    their numbers and their island/side verdict, and the access a body needs to
+#    reach the platform -- entrance position, shaft depth, and the fact of being
+#    below grade. The decoder checks this exactly, which is deliberate: a stale
+#    rail.bin in a browser cache would otherwise read the new station fields off
+#    an old file and put every underground entrance at the datum.
+BAKE_VERSION = 3
 RAIL_MAGIC = 0x4C494152  # 'RAIL' little-endian
 
 OUT_DIR = config.DATA_ROOT / "scratch" / "rail"
@@ -143,6 +220,47 @@ class RailWay:
 
 
 @dataclass
+class RailPlatform:
+    """One `railway=platform` polygon, as a rectangle with a number on it.
+
+    The extract carries 655 of these and until now this module counted them and
+    threw the geometry away. That was the expensive mistake: a platform polygon
+    is *surveyed* -- a real position, a real length, a real orientation -- and
+    `ref` is the number on the sign at the end of it. Guessing any of the four
+    from a routed centreline is guessing something OSM already knows.
+
+    `refs` is a tuple because an island platform is mapped as **one** polygon
+    with `ref=16;17`: one deck, two faces, one number per face. That is the
+    island/side distinction arriving for free from the tagging, and it agrees
+    with the geometric test (`_classify_platforms`) 90% of the time -- where they
+    disagree the geometry wins, because a tag is a claim about track nobody
+    re-measured.
+    """
+
+    osm_id: str
+    east: float
+    north: float
+    # Unit principal axis in ENU, from the minimum-area rotated rectangle. The
+    # platform runs along it.
+    ux: float
+    un: float
+    half_length: float
+    half_width: float
+    area: float
+    refs: tuple[int, ...]
+    ref_text: str
+    name: str
+    level: float | None
+    modes: tuple[str, ...]  # 'train' | 'subway' | 'light_rail', from the tags
+    station: int = -1  # index into `stations`, -1 when nothing claimed it
+    # Filled in by `_classify_platforms`: how much track runs along each side of
+    # the deck. Both sides loaded means an island.
+    tracks_left: int = 0
+    tracks_right: int = 0
+    island: bool = False
+
+
+@dataclass
 class RailStation:
     """A station, from a node or a closed way, with its platforms attached."""
 
@@ -153,6 +271,16 @@ class RailStation:
     kind: str  # 'subway' | 'light_rail' | '' (heavy rail)
     platforms: int = 0
     platform_area: float = 0.0
+    # --- What OSM's own platform polygons say, rather than what a centreline
+    # guessed. Indices into the platform list, the union of every `ref` on them,
+    # and the island/side split. See `RailPlatform`.
+    faces: list[int] = field(default_factory=list)
+    refs: tuple[int, ...] = ()
+    islands: int = 0
+    sides: int = 0
+    # The longest platform deck attached here, metres. A station's box has to be
+    # at least this long or it is not a box around this station.
+    platform_length: float = 0.0
     # Filled in by `classify_vertical`.
     vertical: str = "unknown"  # 'surface' | 'elevated' | 'underground'
     ways_near: int = 0
@@ -183,6 +311,42 @@ class RailStation:
     promoted: bool = False
     # A light-rail stop whose nearest track was somebody else's tunnel.
     orphaned: bool = False
+    # --- Where the trains actually stand, filled in by `bind_sites`.
+    #
+    # The station *node* is where a mapper put a dot; the site is the mean of
+    # the arc-length anchors every calling service resolved to, which is the
+    # thing a player walks to. They differ by 30-100 m routinely and the
+    # difference is why `RailCut` takes its platform sites from the router
+    # rather than from `bake.stations[].x`.
+    site_east: float = 0.0
+    site_north: float = 0.0
+    site_y: float = 0.0  # rail level at the site
+    site_ground: float = 0.0
+    # Unit heading of the track at the site, **world** frame (dx, dz). The
+    # platform, and the station box around it, run along this.
+    site_dx: float = 1.0
+    site_dz: float = 0.0
+    # How far apart the furthest two calling anchors of this station are, and how
+    # many distinct platform faces they resolved to. `rail-audit` fails on a
+    # station whose services stand more than a platform apart -- that is the
+    # Erskineville report, where the two directions became two places.
+    site_spread: float = 0.0
+    site_faces: int = 0
+    # Which directions call here at all: 0, 1 or both. A station served in one
+    # direction only is either a terminus or the bug.
+    served_dirs: tuple[int, ...] = ()
+    calling_lines: tuple[str, ...] = ()
+    # --- Access, generated from the clearance profile. RAIL-VERTICAL.md §4.
+    entrance_east: float = 0.0
+    entrance_north: float = 0.0
+    entrance_y: float = 0.0
+    entrance_source: str = "none"  # 'osm' | 'generated'
+    # Is the platform surface under the ground over it? The one fact the
+    # geometry round cannot get wrong without the station being unenterable.
+    below_grade: bool = False
+    # Positive when the platform is under the ground at the entrance: the depth
+    # a shaft has to drop. Zero at grade, negative where steps go *up*.
+    shaft_depth: float = 0.0
 
 
 # `railway=platform` also appears on the `lines` layer as an open way; only the
@@ -246,9 +410,20 @@ def read_rail(radius_m: float, path: Path = PBF_PATH, kinds: tuple[str, ...] = (
                 )
             )
 
+    entrances: list[tuple[float, float, str]] = []  # east, north, name
     geoms, attrs = _read_layer(path, "points", bbox)
     for geom, a in zip(geoms, attrs):
-        if a.get("railway") != "station":
+        rw = a.get("railway")
+        # `railway=subway_entrance` is the one entrance tag that means *this
+        # station*. `entrance=yes` is on four thousand front doors in this
+        # extract and matching those to stations by distance would put a
+        # station's stair inside a terrace house in Erskineville.
+        if rw == "subway_entrance":
+            p = _project(geom)
+            if _within_radius(p, radius_m):
+                entrances.append((float(p.x), float(p.y), (a.get("name") or "").strip()))
+            continue
+        if rw != "station":
             continue
         p = _project(geom)
         if not _within_radius(p, radius_m):
@@ -260,7 +435,7 @@ def read_rail(radius_m: float, path: Path = PBF_PATH, kinds: tuple[str, ...] = (
             (str(a.get("osm_id") or ""), name, float(p.x), float(p.y), str(a.get("station") or ""))
         )
 
-    platforms: list[tuple[float, float, float]] = []  # east, north, area
+    platforms: list[RailPlatform] = []
     geoms, attrs = _read_layer(path, "multipolygons", bbox)
     for geom, a in zip(geoms, attrs):
         rw = a.get("railway")
@@ -292,11 +467,92 @@ def read_rail(radius_m: float, path: Path = PBF_PATH, kinds: tuple[str, ...] = (
         c = proj.centroid
         if not _within_radius(c, radius_m):
             continue
-        platforms.append((float(c.x), float(c.y), float(proj.area)))
+        ux, un, half_len, half_wid = _platform_axis(proj)
+        platforms.append(
+            RailPlatform(
+                osm_id=str(a.get("osm_way_id") or a.get("osm_id") or ""),
+                east=float(c.x),
+                north=float(c.y),
+                ux=ux,
+                un=un,
+                half_length=half_len,
+                half_width=half_wid,
+                area=float(proj.area),
+                refs=_platform_refs(a.get("ref")),
+                ref_text=str(a.get("ref") or ""),
+                name=(a.get("name") or "").strip(),
+                level=_as_float(a.get("level")),
+                modes=tuple(
+                    m for m in ("train", "subway", "light_rail", "tram")
+                    if str(a.get(m) or "").lower() in ("yes", "true", "1")
+                ),
+            )
+        )
 
     stations = _dedupe_stations(station_rows)
     _attach_platforms(stations, platforms)
-    return ways, stations, platforms
+    return ways, stations, platforms, entrances
+
+
+def _as_float(v: Any) -> float | None:
+    try:
+        return float(str(v).split(";")[0].strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _platform_refs(v: Any) -> tuple[int, ...]:
+    """The numbers on the signs at the ends of this deck.
+
+    `ref=16;17` is an island platform: one deck, two faces, one number each, and
+    that is exactly the sentence the tagging is making. Non-numeric refs happen
+    (`ref=A`, light rail's letters) and come back empty rather than invented --
+    a station with lettered platforms still has faces, it just has no integers
+    for the audit table to add up.
+    """
+    if v is None:
+        return ()
+    out: list[int] = []
+    for part in str(v).replace(",", ";").split(";"):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            n = int(part)
+        except ValueError:
+            continue
+        if 0 < n <= 40 and n not in out:
+            out.append(n)
+    return tuple(sorted(out))
+
+
+def _platform_axis(poly) -> tuple[float, float, float, float]:
+    """Unit long axis, half-length and half-width of a platform polygon.
+
+    From the minimum-area rotated rectangle rather than from a bounding box: a
+    platform on a railway running north-east is a 160 x 6 m deck whose *axis
+    aligned* box is 113 m square, and every number that box yields about it --
+    length, width, orientation -- is wrong. The rotated rectangle is the shape
+    OSM drew, measured in the frame it was drawn in.
+    """
+    try:
+        rect = poly.minimum_rotated_rectangle
+        pts = np.asarray(rect.exterior.coords, dtype=np.float64)[:4]
+    except Exception:  # noqa: BLE001 -- degenerate ring; fall back to the bbox
+        x0, y0, x1, y1 = poly.bounds
+        return 1.0, 0.0, max(1.0, (x1 - x0) / 2), max(0.5, (y1 - y0) / 2)
+    e0 = pts[1] - pts[0]
+    e1 = pts[2] - pts[1]
+    l0 = float(math.hypot(e0[0], e0[1]))
+    l1 = float(math.hypot(e1[0], e1[1]))
+    long_e, long_l, short_l = (e0, l0, l1) if l0 >= l1 else (e1, l1, l0)
+    n = long_l or 1.0
+    return (
+        float(long_e[0] / n),
+        float(long_e[1] / n),
+        max(0.5, long_l / 2.0),
+        max(0.5, short_l / 2.0),
+    )
 
 
 def _small_int(v: Any, default: int) -> int:
@@ -349,19 +605,120 @@ def _dedupe_stations(rows: Sequence[tuple[str, str, float, float, str]]) -> list
 PLATFORM_RADIUS_M = 260.0
 
 
-def _attach_platforms(stations: list[RailStation], platforms: Sequence[tuple[float, float, float]]):
+def _attach_platforms(stations: list[RailStation], platforms: Sequence[RailPlatform]):
+    """Give every platform polygon to its station, both ways.
+
+    The count and the area are what this always did. What is new is that the
+    *deck* goes with them -- index, orientation, length, and the number on the
+    sign -- because the station is what the brief calls one place, and a place
+    with three faces and no idea which is which cannot be built.
+
+    Nearest station wins, capped at `PLATFORM_RADIUS_M`. That is deliberately
+    the same rule as before: it is the station a passenger would say the
+    platform belongs to, and the pathological case -- Central's platform 1 being
+    nearer to Central than to Redfern -- is not close.
+    """
     if not stations or not platforms:
         return
     from scipy.spatial import cKDTree
 
     tree = cKDTree(np.array([[s.east, s.north] for s in stations]))
-    pts = np.array([[p[0], p[1]] for p in platforms])
+    pts = np.array([[p.east, p.north] for p in platforms])
     d, i = tree.query(pts, distance_upper_bound=PLATFORM_RADIUS_M)
     for k, (dist, idx) in enumerate(zip(d, i)):
         if not np.isfinite(dist):
             continue
-        stations[idx].platforms += 1
-        stations[idx].platform_area += platforms[k][2]
+        # A light-rail deck is not a face of a railway station, and at Circular
+        # Quay it was three of the five: the Alfred Street stops are 80 m long
+        # and 2-3 m wide against the railway's own 171 m by 4.6 m, so counting
+        # them made a two-platform station read as five. `train`/`subway` is the
+        # mode this bake carries track for; a deck with no mode tag at all is
+        # kept, because a missing tag is not a claim.
+        modes = set(platforms[k].modes)
+        if modes and not (modes & {"train", "subway"}):
+            continue
+        st = stations[int(idx)]
+        platforms[k].station = int(idx)
+        st.platforms += 1
+        st.platform_area += platforms[k].area
+        st.faces.append(k)
+        st.platform_length = max(st.platform_length, 2.0 * platforms[k].half_length)
+    for st in stations:
+        refs: list[int] = []
+        for k in st.faces:
+            for r in platforms[k].refs:
+                if r not in refs:
+                    refs.append(r)
+        st.refs = tuple(sorted(refs))
+
+
+# How far across from a platform's own axis a rail edge counts as "the track
+# this face serves". A Sydney platform is 5.5-8 m wide and the track sits about
+# 1.6 m off its edge, so the loaded side of a side platform is 4-8 m out and the
+# unloaded side is the concourse. 11 m reaches the track and stops short of the
+# next road over on a four-track formation, which is ~12 m away.
+PLATFORM_TRACK_M = 11.0
+# ...and how far along the deck a rail edge has to run before it is this
+# platform's track rather than a crossover clipping the end of it.
+PLATFORM_ALONG_FRAC = 0.75
+
+
+def _classify_platforms(
+    g: RailGraph, platforms: Sequence[RailPlatform],
+    stations: Sequence[RailStation] = (),
+) -> None:
+    """Island or side, measured off the track rather than read off a tag.
+
+    A deck with running rails along *both* long sides is an island; a deck with
+    rails along one is a side platform. That is what the words mean, and it is a
+    question the graph can answer directly -- so it is answered directly, and
+    the `ref=16;17` tagging is used only as the tie-break where the geometry has
+    nothing to say (a platform with no edge inside `PLATFORM_TRACK_M`, which
+    happens at the light-rail decks this bake reads no track for).
+
+    RAIL-VERTICAL.md's rule, one layer down: OSM is the authority on what the
+    structure is, the measurement is the authority on what is there, and neither
+    answers the other's question.
+    """
+    if not platforms or g.n_edges == 0:
+        return
+    from scipy.spatial import cKDTree
+
+    mid = 0.5 * (g.xy[g.edges[:, 0]] + g.xy[g.edges[:, 1]])
+    tree = cKDTree(mid)
+    for p in platforms:
+        reach = p.half_length + PLATFORM_TRACK_M
+        left = right = 0.0
+        for ei in tree.query_ball_point([p.east, p.north], reach):
+            dx = float(mid[ei][0] - p.east)
+            dn = float(mid[ei][1] - p.north)
+            along = dx * p.ux + dn * p.un
+            across = dx * -p.un + dn * p.ux
+            if abs(along) > p.half_length * PLATFORM_ALONG_FRAC:
+                continue
+            if abs(across) > PLATFORM_TRACK_M or abs(across) < p.half_width * 0.5:
+                continue
+            if across < 0:
+                left += float(g.length[ei])
+            else:
+                right += float(g.length[ei])
+        p.tracks_left = int(left)
+        p.tracks_right = int(right)
+        # A quarter of the deck's length of rail is a track running beside it;
+        # anything less is a turnout clipping the corner.
+        bar = max(8.0, p.half_length * 0.5)
+        loaded = (left >= bar) + (right >= bar)
+        if loaded == 2:
+            p.island = True
+        elif loaded == 1:
+            p.island = False
+        else:
+            # Nothing measurable: fall back to what the sign says. Two numbers
+            # on one deck is an island by definition.
+            p.island = len(p.refs) >= 2
+    for st in stations:
+        st.islands = sum(1 for k in st.faces if platforms[k].island)
+        st.sides = len(st.faces) - st.islands
 
 
 # --- The graph ------------------------------------------------------------------
@@ -389,6 +746,12 @@ class RailGraph:
     # makes geometry's only input and re-sampling it downstream would be
     # sampling a different surface and calling it the same one.
     ground: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    # (N,) the surface a player actually *sees* over each node, which over a bore
+    # running under a cutting is the trench floor and not the DEM. Filled by
+    # `cover_caps`; see `visible_surface` for why the two are different numbers
+    # and why constraining a tunnel against the wrong one puts the train back
+    # through the ground somewhere else.
+    surface: np.ndarray = field(default_factory=lambda: np.zeros(0))
 
     @property
     def n_nodes(self) -> int:
@@ -602,6 +965,339 @@ def solve_heights(g: RailGraph, y_raw: np.ndarray) -> tuple[np.ndarray, dict]:
         "moved_max_m": float(np.max(np.abs(y - y_raw))) if g.n_nodes else 0.0,
         "iterations": 2,
     }
+
+
+# --- The cover constraint, and why it is a second cone rather than a nudge -------
+#
+# `solve_heights` above knows about the terrain and about the ruling gradient and
+# about nothing else. In particular it does not know that some of the track it is
+# projecting is supposed to be **underground**, and the averaging is what breaks
+# it: the lower envelope drives a bore down and the upper envelope, which only
+# fills, drags it straight back up toward the surface track on either side. The
+# midpoint of the two is grade-legal and beautiful and, at 432 of the extent's
+# 3,689 bore segments, above the ground. Eighty of them are above the *drawn*
+# surface outright -- a tube of tunnel lining standing proud of Sydney Harbour at
+# Barangaroo, and, 330 m from the spawn, the St Peters bore poking up through
+# Sydney Park Road with the parked cars beside it apparently sunk into the hill
+# that has grown over them. That last one is the report this exists for.
+#
+# The fix is a **constraint**, not a correction. Give every bore node an upper
+# bound of `visible surface - TUNNEL_COVER_M`, and re-run the same cone.
+#
+# **Why one lower cone is exactly the right operator**, which is the whole reason
+# this is six lines and not an iterative solver. `_cone(y0, +1)` returns the
+# largest grade-legal profile that is everywhere `<= y0`. Feed it `min(y, cap)`
+# and, because the incumbent `y` is already grade-legal:
+#
+#     result[n] = min( y[n], min over capped m of ( cap[m] + c * dist(m, n) ) )
+#
+# -- the second term is achieved at `m = n` for every uncapped node, so the
+# profile is *unchanged* outside the reach of a cap, and inside it descends at
+# exactly the ruling gradient and comes back up the same way. There is no dip a
+# train cannot follow, there is no iteration to converge, and the result respects
+# every cap by construction because it is `<= min(y, cap) <= cap`. Feasibility is
+# not tested afterwards; it is a theorem about the operator.
+#
+# Two consequences that have to be reported rather than hidden, and are:
+#
+#   * **The ramp is not free.** Lowering a bore by `d` metres reaches `d / 0.033`
+#     metres along the graph in every direction, and what it reaches includes
+#     surface track, station platforms and viaduct decks. `apply_cover` counts
+#     how much non-bore track moved and by how much, and the audit prints it.
+#   * **A portal is not capped.** A node with a surface edge on it is where the
+#     tunnel meets daylight and must stay at daylight; the cone produces the
+#     approach ramp on its own. So the first ~230 m inside a portal genuinely has
+#     less than full cover, which is true of real railways and is why the check
+#     downstream measures capped nodes rather than every tunnel-flagged one.
+
+
+def _grid_index(xy: np.ndarray, cell: float) -> dict[tuple[int, int], list[int]]:
+    """Points bucketed on a square lattice. For the two radius queries below."""
+    out: dict[tuple[int, int], list[int]] = {}
+    if xy.shape[0] == 0:
+        return out
+    keys = np.floor(xy / cell).astype(np.int64)
+    for i in range(xy.shape[0]):
+        out.setdefault((int(keys[i, 0]), int(keys[i, 1])), []).append(i)
+    return out
+
+
+def _near(index, cell: float, x: float, n: float, reach: float):
+    """Every indexed point within `reach` of `(x, n)`, as indices. Approximate
+    in the cheap direction: it returns whole cells, and the caller measures."""
+    c0 = math.floor((x - reach) / cell)
+    c1 = math.floor((x + reach) / cell)
+    r0 = math.floor((n - reach) / cell)
+    r1 = math.floor((n + reach) / cell)
+    for cx in range(c0, c1 + 1):
+        for cz in range(r0, r1 + 1):
+            hit = index.get((cx, cz))
+            if hit:
+                yield from hit
+
+
+def demote_short_bores(g: RailGraph) -> list[dict]:
+    """Strip the tunnel tag from runs of it too short to be a tunnel.
+
+    See `MIN_BORE_M`. Runs are connected components of tunnel-tagged *edges*, so
+    a bore mapped as nine consecutive ways is one run and is kept; a lone 40 m
+    way under a footbridge is one run and is not.
+
+    **Mutates `RailWay.tunnel` in place**, before `raw_heights` reads it, so the
+    demotion is visible to the offset table, to `span_flags`, to `rail-cut.ts`'s
+    bore test and to the cover constraint alike -- one decision, taken once, that
+    every consumer downstream inherits. Returns a row per demoted run for the log
+    and for the audit; nothing here is silent.
+    """
+    parent = list(range(g.n_edges))
+
+    def find(a: int) -> int:
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    tunnel = np.array(
+        [bool(g.ways[int(g.way_of[ei])].tunnel) for ei in range(g.n_edges)], dtype=bool
+    )
+    for n in range(g.n_nodes):
+        here = [ei for ei in g.adj[n] if tunnel[ei]]
+        for ei in here[1:]:
+            ra, rb = find(here[0]), find(ei)
+            if ra != rb:
+                parent[ra] = rb
+
+    runs: dict[int, list[int]] = defaultdict(list)
+    for ei in range(g.n_edges):
+        if tunnel[ei]:
+            runs[find(ei)].append(ei)
+
+    demoted: list[dict] = []
+    for members in runs.values():
+        span = float(sum(float(g.length[ei]) for ei in members))
+        if span >= MIN_BORE_M:
+            continue
+        ways = {int(g.way_of[ei]) for ei in members}
+        mid = g.xy[g.edges[members[0], 0]]
+        for wi in ways:
+            g.ways[wi].tunnel = False
+        demoted.append(
+            {
+                "metres": span,
+                "edges": len(members),
+                "ways": sorted(g.ways[wi].osm_id for wi in ways),
+                "east": float(mid[0]),
+                "north": float(mid[1]),
+            }
+        )
+    demoted.sort(key=lambda r: -r["metres"])
+    return demoted
+
+
+def bore_nodes(g: RailGraph) -> np.ndarray:
+    """Nodes that are inside a bore rather than at the mouth of one.
+
+    Every edge on the node is tunnel-tagged. A portal node touches one tunnel
+    edge and one surface edge and is deliberately excluded -- see the section
+    header: a portal is at daylight by definition, and capping it would ask the
+    railway to be seven and a half metres under a surface it is standing on.
+    """
+    inside = np.zeros(g.n_nodes, dtype=bool)
+    for n in range(g.n_nodes):
+        ei = g.adj[n]
+        if ei and all(g.ways[int(g.way_of[e])].tunnel for e in ei):
+            inside[n] = True
+    return inside
+
+
+def visible_surface(g: RailGraph, ground: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """The surface a player actually sees over each node.
+
+    **Not the raw DEM**, and the difference is the whole of why an earlier round
+    of this failed. `client/src/world/rail-cut.ts` cuts the terrain sheet away
+    along every corridor drawn as a trench and `rail-geo.ts` builds the trench in
+    the hole, so over a cutting the visible ground is the *other* railway's rail
+    head and not the heightfield above it. Sydenham is exactly that stack -- a
+    Metro bore under the Bankstown line's cutting -- and constraining the bore
+    against a DEM that is not drawn there would bury it 7.5 m under a surface
+    seven metres over the one a player can see, which is the same bug in a new
+    place.
+
+    So: the DEM, lowered wherever a carved corridor passes over the point.
+    `CUT_HALF_WIDTH` and the 1 m trench threshold are `rail-cut.ts`' own, restated
+    on this file's usual terms.
+
+    Station platforms *raise* the surface and are deliberately not folded in: a
+    higher surface is a weaker constraint, and this errs strict.
+    """
+    surf = ground.astype(np.float64).copy()
+    if g.n_nodes == 0:
+        return surf
+    # `rail-cut.CUT_HALF_WIDTH`, and its "anything else deeper than 1 m" rung.
+    half = 5.4
+    trench_m = 1.0
+    trenched = [
+        n
+        for n in range(g.n_nodes)
+        if g.adj[n]
+        and ground[n] - y[n] > trench_m
+        and not any(g.ways[int(g.way_of[e])].tunnel for e in g.adj[n])
+        and not all(g.ways[int(g.way_of[e])].bridge for e in g.adj[n])
+    ]
+    if not trenched:
+        return surf
+    cell = 2.0 * half
+    index = _grid_index(g.xy[trenched], cell)
+    pts = g.xy[trenched]
+    for n in range(g.n_nodes):
+        x, north = float(g.xy[n, 0]), float(g.xy[n, 1])
+        for k in _near(index, cell, x, north, half):
+            if (pts[k, 0] - x) ** 2 + (pts[k, 1] - north) ** 2 > half * half:
+                continue
+            surf[n] = min(surf[n], float(y[trenched[k]]))
+    return surf
+
+
+def apply_cover(g: RailGraph, y: np.ndarray, cap: np.ndarray) -> tuple[np.ndarray, dict]:
+    """Re-solve `y` under an upper bound, on the ruling gradient. See the header.
+
+    `cap` is `+inf` at every node nothing bounds. Returns the new profile and the
+    table the log and `rail-audit` section 3b print: how many nodes were bounded,
+    how many were short of their bound before, the deepest single dig, and -- the
+    number that is the *cost* rather than the fix -- how much unbounded track came
+    down with the ramps.
+    """
+    capped = np.isfinite(cap)
+    stats: dict[str, Any] = {
+        "capped_nodes": int(capped.sum()),
+        "violating_before": int((capped & (y > cap + 1e-9)).sum()),
+        "worst_violation_m": 0.0,
+        "deepest_dig_m": 0.0,
+        "moved_nodes": 0,
+        "moved_other_nodes": 0,
+        "moved_other_max_m": 0.0,
+    }
+    if not capped.any():
+        stats["worst_grade_after"] = (
+            float(
+                (
+                    np.abs(y[g.edges[:, 0]] - y[g.edges[:, 1]])
+                    / np.maximum(g.length, 1e-6)
+                ).max()
+            )
+            if g.n_edges
+            else 0.0
+        )
+        return y, stats
+    stats["worst_violation_m"] = float(np.where(capped, y - cap, 0.0).max())
+    y2 = _cone(g, np.where(capped, np.minimum(y, cap), y), 1.0)
+    moved = y - y2
+    stats["deepest_dig_m"] = float(moved.max())
+    stats["moved_nodes"] = int((moved > 0.05).sum())
+    other = moved > 0.05
+    other &= ~capped
+    stats["moved_other_nodes"] = int(other.sum())
+    stats["moved_other_max_m"] = float(moved[other].max()) if other.any() else 0.0
+    stats["violating_after"] = int((capped & (y2 > cap + 1e-6)).sum())
+    stats["worst_grade_after"] = (
+        float(
+            (np.abs(y2[g.edges[:, 0]] - y2[g.edges[:, 1]]) / np.maximum(g.length, 1e-6)).max()
+        )
+        if g.n_edges
+        else 0.0
+    )
+    return y2, stats
+
+
+def _census_tally(census: Sequence[dict]) -> dict[str, int]:
+    """The crossing census as counts by kind. What the coordinator asked for."""
+    out: dict[str, int] = {}
+    for row in census:
+        out[row["kind"]] = out.get(row["kind"], 0) + 1
+    return out
+
+
+def cover_caps(
+    g: RailGraph, y: np.ndarray, ground: np.ndarray, roads: Sequence[Any] | None = None
+) -> tuple[np.ndarray, np.ndarray, list[dict]]:
+    """Every upper bound on track height, and the road-crossing census beside it.
+
+    Two sources, one array, one solve:
+
+      1. **Cover over a bore**, `TUNNEL_COVER_M` under `visible_surface`. This is
+         the player's absolute rule and it is why this function exists.
+      2. **A road crossing over track that is already below the road**, at
+         `ROAD_OVER_RAIL_M`. A road is drawn on the ground -- `roadgrade.conform`
+         pulls the terrain lattice onto the solved street surface, so the DEM at
+         a carriageway *is* the carriageway -- and a railway whose head is inside
+         6.9 m of it is a train through a road surface. Folding it into the same
+         cap array is not tidiness: a crossing 40 m from a portal and a bore
+         500 m away are two bounds on one profile, and solving them separately
+         would let the second undo the first.
+
+    What this deliberately does **not** do is lift the road. That was the obvious
+    reading of *"if its an underpass there should be a safe height it passes at"*
+    and it is out of reach here for a concrete reason: the carriageway is drawn
+    from the tile bake, and moving it is a world build. Where the railway is at
+    grade and the road is at grade, the honest description is a **level
+    crossing**; those are counted and named in the census and nothing is done to
+    them, because pretending otherwise by trenching every level crossing in the
+    extent would rebuild the network around a picture nobody asked for.
+    """
+    cap = np.full(g.n_nodes, np.inf)
+    surf = visible_surface(g, ground, y)
+    inside = bore_nodes(g)
+    cap[inside] = surf[inside] - TUNNEL_COVER_M
+
+    census: list[dict] = []
+    if roads:
+        # Only where a road actually crosses the corridor in plan, so the sweep
+        # is over road *vertices* near a rail node rather than a segment
+        # intersection test over two networks of a hundred thousand pieces each.
+        cell = 24.0
+        index = _grid_index(g.xy, cell)
+        for r in roads:
+            if getattr(r, "is_foot", False):
+                continue
+            line = r.line
+            for i in range(line.shape[0]):
+                x, north = float(line[i, 0]), float(line[i, 1])
+                for n in _near(index, cell, x, north, 12.0):
+                    dx = float(g.xy[n, 0]) - x
+                    dn = float(g.xy[n, 1]) - north
+                    if dx * dx + dn * dn > 144.0:
+                        continue
+                    # The road deck. A bridge or a positive layer is carried over
+                    # whatever is under it and the DEM beneath is not its surface;
+                    # everything else is drawn on the ground.
+                    if r.bridge or r.layer > 0:
+                        kind = "road-over"
+                    elif r.tunnel or r.layer < 0:
+                        kind = "road-under"
+                    else:
+                        kind = "at-grade"
+                    # `elevated.ROAD_CLEARANCE_M`, restated: what the pipeline
+                    # lifts a road deck to when it carries it over something.
+                    deck = float(ground[n]) + (5.4 if kind == "road-over" else 0.0)
+                    head = float(y[n])
+                    if head > deck + 1.0:
+                        census.append({"kind": "rail-over", "node": n, "gap": head - deck})
+                        break
+                    if kind == "road-under":
+                        census.append({"kind": "road-under-rail", "node": n, "gap": deck - head})
+                        break
+                    if inside[n] or deck - head >= ROAD_OVER_RAIL_M:
+                        census.append({"kind": "rail-under", "node": n, "gap": deck - head})
+                        break
+                    if deck - head > 1.0:
+                        # In a cutting, but not deep enough: the one group this
+                        # can fix from the rail bake alone.
+                        cap[n] = min(cap[n], deck - ROAD_OVER_RAIL_M)
+                        census.append({"kind": "rail-under-shallow", "node": n, "gap": deck - head})
+                        break
+                    census.append({"kind": "level-crossing", "node": n, "gap": deck - head})
+                    break
+    return cap, surf, census
 
 
 # Bit flags in `Direction.flags`, mirrored in `client/src/game/rail.ts`.
@@ -1111,6 +1807,70 @@ WRONG_NETWORK_PENALTY = 50.0
 ANCHOR_RADIUS_M = 400.0  # how far from a station centre to look for its track
 ANCHOR_CANDIDATES = 24  # how many of them to keep as alternatives
 
+# --- Why a station is one place, and what it cost not to say so -------------------
+#
+# `route_direction` chooses each stop's platform by taking the **cheapest
+# reachable** candidate, and cheapest means *nearest along the way*. So the down
+# service anchored at the node 400 m before the station on its approach and the
+# up service, arriving from the other end, anchored 400 m before it on the
+# other side -- and the two stood up to 800 m apart under one name. Measured on
+# the shipped bake: **184 of 190 served station names resolved to more than one
+# platform site**, Meadowbank's two 471 m apart, Erskineville's 180 m apart,
+# which is over `riding.PLATFORM_HALF_LENGTH_M` and therefore two platforms.
+# That is the report -- *"at erko only north bound trains stop, or there seem to
+# be like 2 separate stations one for each direction"* -- and it was never about
+# Erskineville. It was every station in Sydney.
+#
+# The fix is to say what a station is. `dist` still decides **which track** and
+# whether it is reachable at all; these two terms decide **where along it**:
+#
+#   * `ANCHOR_PULL` prices a metre of plan distance from the station node at
+#     three metres of path. The competing effect is worth one metre per metre --
+#     stopping early is exactly as cheap as the distance saved -- so anything
+#     over 1.0 flips it and 3.0 flips it with room. It is not a detour budget:
+#     two parallel platform roads are within a metre of each other's distance
+#     from the station node, so this never chooses between them.
+#   * `ANCHOR_LEVEL_PENALTY` prices standing at the wrong *level*. This is
+#     Redfern: T4 anchored in the Eastern Suburbs tunnel 16 m under the ground
+#     and the other five services stood on the surface platforms 40 m away, so
+#     one of the largest surface stations in Sydney had an underground platform
+#     site. A station's `track_y` is the rail at the station node, measured; a
+#     candidate more than `ANCHOR_LEVEL_BAND_M` off it is a different railway at
+#     a different depth, and the band is wide enough that the up and down roads
+#     of a graded station never trip it.
+#
+# Neither can beat a real detour, which is what keeps the Metro out of Chatswood
+# T1 and the suburban tracks out of M1: `WRONG_NETWORK_PENALTY` multiplies the
+# whole path by 50 and no bias here is worth a hundred metres.
+ANCHOR_PULL = 3.0
+ANCHOR_LEVEL_BAND_M = 4.0
+ANCHOR_LEVEL_PENALTY = 60.0
+# ...and the one thing a price cannot express: **a platform is either at this
+# station or it is not**, and no path saving buys a platform somewhere else.
+#
+# A price alone left four stations split after the pull went in -- Museum, whose
+# up City Circle service anchored 225 m round the loop rather than pay the
+# opposite-direction penalty on the shared tube, and Canley Vale, Birrong and
+# Lidcombe for the same shape of reason. Those are not cheaper platforms; they
+# are not platforms. So the choice is lexicographic: **among the candidates
+# inside a platform length of the station, the cheapest wins; only if there are
+# none does anything further out get considered at all.**
+#
+# One platform length (2 x `PLATFORM_HALF_LENGTH_M`) rather than a round number,
+# because that is the distance at which `riding.samePlatform` stops calling two
+# anchors one platform -- which is to say, the exact distance at which a station
+# becomes two. Lidcombe's T7 bay platform is 133 m from the station node and
+# stays; Birrong's 246 m anchor is a different place and goes.
+ANCHOR_NEAR_M = 2.0 * PLATFORM_HALF_LENGTH_M
+# How much extra path a service may take to reach a platform at the station's own
+# level before the preference stops applying. See `choose_anchor` key 2: without
+# a ceiling, "prefer the right level" outranks every cost and drags a Metro
+# service at Central up onto the suburban platforms by way of Sydenham. Two and a
+# half kilometres is far more than any real platform-to-platform detour inside
+# one station and nothing at all next to the six-figure cost of crossing between
+# two networks that only touch at the far end of the city.
+ANCHOR_LEVEL_DETOUR_M = 2500.0
+
 
 def _edge_costs(
     g: RailGraph,
@@ -1195,6 +1955,82 @@ def _candidates(
     return [int(cand[i]) for i in order[:ANCHOR_CANDIDATES]]
 
 
+def anchor_bias(g: RailGraph, stop: Stop, node: int) -> float:
+    """What a candidate platform costs for *not being at the station*, metres.
+
+    Added to the Dijkstra distance, never to the edge weights: this is a
+    tie-break between the platforms of one station and it must not reach into
+    the path between two of them. See the constants above for the whole
+    argument -- and for the two reports it exists to answer, Erskineville's two
+    stations and Redfern's underground one.
+    """
+    st = stop.station
+    if st is None:
+        return 0.0
+    dx = float(g.xy[node, 0]) - st.east
+    dn = float(g.xy[node, 1]) - st.north
+    bias = ANCHOR_PULL * math.hypot(dx, dn)
+    # `ways_near` is `classify_vertical`'s footprint: zero means it has not run
+    # and `track_y` is a default rather than a measurement, so the level term
+    # stays out of it rather than pulling every anchor towards y = 0.
+    if st.ways_near > 0:
+        dy = abs(float(g.y[node]) - st.track_y)
+        if dy > ANCHOR_LEVEL_BAND_M:
+            bias += ANCHOR_LEVEL_PENALTY * (dy - ANCHOR_LEVEL_BAND_M)
+    return bias
+
+
+def choose_anchor(
+    g: RailGraph, stop: Stop, cands: Sequence[int], dist: np.ndarray,
+) -> tuple[tuple[int, int, float], int] | None:
+    """Which platform this service calls at, of the ones it can reach.
+
+    Three keys, in this order, and each of them is a sentence about what a
+    station is:
+
+      1. **Is it at the station?** A plan distance and nothing else, so it asks
+         the same question of a Metro platform and a suburban one and cannot be
+         bent by a network penalty. Inside a platform length of the station node
+         beats anything outside it at any price -- a cheaper platform 250 m up
+         the corridor is not a cheaper platform, it is a different place, and
+         that is what made Museum, Birrong and Canley Vale two stations each.
+      2. **Is it at the station's own level?** Redfern's defect, exactly: T4
+         anchored in the `layer=-3` main-line tunnel that dives under the station
+         at -55 m, while the other five services stood on the surface platforms
+         at -41 m, so one of the largest surface stations in Sydney had a site
+         16 m underground. `track_y` is measured at the station node, so this is
+         the measurement deciding, not a tag.
+      3. **What does it cost**, plus `anchor_bias` for the last few metres.
+
+    Key 2 is gated on `ANCHOR_LEVEL_DETOUR_M`, and the gate is what keeps it
+    safe: a platform at the station's own level is preferred, but never bought
+    with a detour. Without it a Metro service at Central -- whose platforms are
+    genuinely 11 m below the suburban ones -- would be dragged up onto the
+    train shed by way of a ten-kilometre path through Sydenham, because a level
+    match with no price ceiling outranks any cost at all.
+    """
+    st = stop.station
+    rows = [(int(t), float(dist[t])) for t in cands if np.isfinite(dist[t])]
+    if not rows:
+        return None
+    floor = min(d for _, d in rows)
+    best: tuple[tuple[int, int, float], int] | None = None
+    for t, d in rows:
+        near = 0
+        level = 0
+        if st is not None:
+            plan = math.hypot(float(g.xy[t, 0]) - st.east, float(g.xy[t, 1]) - st.north)
+            near = 0 if plan <= ANCHOR_NEAR_M else 1
+            if st.ways_near > 0:
+                off_level = abs(float(g.y[t]) - st.track_y) > ANCHOR_LEVEL_BAND_M
+                affordable = d <= floor + ANCHOR_LEVEL_DETOUR_M
+                level = 0 if (not off_level and affordable) else 1
+        key = (near, level, d + anchor_bias(g, stop, t))
+        if best is None or key < best[0]:
+            best = (key, t)
+    return best
+
+
 def route_direction(
     g: RailGraph,
     stops: list[Stop],
@@ -1207,6 +2043,11 @@ def route_direction(
     *reachable* candidate at the next station wins. Choosing the platform during
     the walk rather than before it is what keeps the route inside one connected
     component without ever having to reason about components.
+
+    "Cheapest" is the path cost **plus `anchor_bias`**, and that addition is the
+    whole of the one-station fix: without it the cheapest candidate is the one
+    the train reaches first, which is 400 m short of the platform on whichever
+    side this direction happens to approach from.
     """
     from scipy.sparse.csgraph import dijkstra
 
@@ -1225,12 +2066,15 @@ def route_direction(
         best = None
         for c in stops[0].cands:
             dist = dijkstra(csr, indices=c)
-            reach = [(dist[t], t) for t in stops[1].cands if np.isfinite(dist[t])]
-            if not reach:
+            ahead = choose_anchor(g, stops[1], stops[1].cands, dist)
+            if ahead is None:
                 continue
-            cheap = min(reach)[0]
-            if best is None or cheap < best[0]:
-                best = (cheap, c)
+            # The terminus is judged on its own account too, or a line that
+            # starts at Emu Plains starts 400 m down the track from Emu Plains.
+            here = choose_anchor(g, stops[0], [c], np.zeros(g.n_nodes))
+            key = (here[0] if here else (1, 1, 0.0), ahead[0])
+            if best is None or key < best[0]:
+                best = (key, c)
         if best is not None:
             start = best[1]
     stops[0].node = start
@@ -1242,8 +2086,8 @@ def route_direction(
 
     for k in range(1, len(stops)):
         dist, pred = dijkstra(csr, indices=cur, return_predecessors=True)
-        reach = [(float(dist[t]), int(t)) for t in stops[k].cands if np.isfinite(dist[t])]
-        if not reach:
+        pick = choose_anchor(g, stops[k], stops[k].cands, dist)
+        if pick is None:
             gaps.append(f"{stops[k-1].name}->{stops[k].name}: no path from any platform")
             target = stops[k].cands[0]
             stops[k].node = target
@@ -1251,7 +2095,7 @@ def route_direction(
             edge_seq.append(-1)
             cur = target
             continue
-        target = min(reach)[1]
+        target = pick[1]
         stops[k].node = target
         chain = [target]
         walk = target
@@ -1305,6 +2149,129 @@ def _clearance(g: RailGraph, nodes: Sequence[int]) -> np.ndarray:
     if idx.size == 0 or g.ground.size != g.y.size or g.ground.size == 0:
         return np.zeros(idx.size, dtype=np.float32)
     return np.asarray(g.y[idx] - g.ground[idx], dtype=np.float32)
+
+
+# How far either side of the anchor the snap below is allowed to look, metres.
+#
+# Wider than `ANCHOR_RADIUS_M` would let a City Circle service that passes
+# Central twice snap its first call onto its second pass; narrower than the
+# anchor radius would leave the snap unable to reach the station the anchor was
+# allowed to be 400 m from. 450 m is the first and the City Circle's two passes
+# of Central are 4.5 km of arc apart, so there is nothing close about it.
+STOP_SNAP_WINDOW_M = 450.0
+# The least arc length between two consecutive calls after the snap. Two stops
+# that resolve to the same metre are a zero-length leg, a zero-duration phase and
+# a division the curve does not survive.
+STOP_MIN_GAP_M = 5.0
+
+
+def _snap_stops(
+    seq: Sequence[Stop], nodes: Sequence[int], xyz: np.ndarray, cum: np.ndarray,
+) -> list[float]:
+    """Where along this polyline each stop stands: at its own station, not near it.
+
+    ---------------------------------------------------------------------------
+    THIS IS THE HALF OF THE ONE-STATION FIX THE ROUTER CANNOT DO.
+
+    `anchor_bias` picks the right *track*, and the anchor is then whichever
+    graph node on that track happened to be nearest -- which is a node, so it is
+    wherever OSM split the way, up to a hundred metres from the platform. Two
+    directions on two roads of the same railway split at different places, so
+    their anchors land 30-80 m apart along the corridor and `samePlatform` has
+    to decide whether that is one platform. Sometimes it is. At Erskineville it
+    was not.
+
+    So the arc length is not the anchor's. It is the **foot of the perpendicular
+    from the station's own position onto this direction's own polyline**, which
+    is the same cross-section of the same station for every service that calls
+    there, differing only by the width of the formation. That is the brief's
+    rule verbatim: *prefer the OSM station node's own position as the truth and
+    bind both to it*.
+
+    Searched inside `STOP_SNAP_WINDOW_M` of the anchor so a route that passes a
+    station twice keeps its two calls apart, and forced strictly increasing so
+    the curve never sees a backwards leg.
+    """
+    n = int(xyz.shape[0])
+    if n < 2:
+        return [0.0 for _ in seq]
+    total = float(cum[-1])
+
+    ax = xyz[:-1, 0]
+    az = xyz[:-1, 2]
+    ex = xyz[1:, 0] - ax
+    ez = xyz[1:, 2] - az
+    len2 = ex * ex + ez * ez
+
+    out: list[float] = []
+    cursor = 0
+    prev_s = -math.inf
+    for st in seq:
+        # The anchor, exactly as before: the first occurrence of this stop's node
+        # at or after the previous stop's, so a route that loops resolves in the
+        # order it was walked.
+        found = -1
+        for j in range(cursor, n):
+            if nodes[j] == st.node:
+                found = j
+                break
+        if found < 0:
+            found = min(cursor, n - 1)
+        cursor = found
+        s = float(cum[found])
+
+        if st.station is not None:
+            sx, sz = geo.enu_to_world(
+                np.array([st.station.east]), np.array([st.station.north])
+            )
+            qx, qz = float(sx[0]), float(sz[0])
+            lo = np.searchsorted(cum, s - STOP_SNAP_WINDOW_M, side="left")
+            hi = np.searchsorted(cum, s + STOP_SNAP_WINDOW_M, side="right")
+            lo = max(0, int(lo) - 1)
+            hi = min(n - 1, int(hi))
+            if hi > lo:
+                sl = slice(lo, hi)
+                t = np.where(
+                    len2[sl] > 1e-9,
+                    ((qx - ax[sl]) * ex[sl] + (qz - az[sl]) * ez[sl]) / np.maximum(len2[sl], 1e-9),
+                    0.0,
+                )
+                np.clip(t, 0.0, 1.0, out=t)
+                dx = qx - (ax[sl] + ex[sl] * t)
+                dz = qz - (az[sl] + ez[sl] * t)
+                k = int(np.argmin(dx * dx + dz * dz))
+                seg = lo + k
+                s = float(cum[seg] + (cum[seg + 1] - cum[seg]) * float(t[k]))
+
+        # Strictly increasing, and never off either end of the polyline.
+        s = min(max(s, 0.0), total)
+        if s <= prev_s:
+            s = min(prev_s + STOP_MIN_GAP_M, total)
+        prev_s = s
+        out.append(s)
+
+    # --- The two stops the snap may not touch, and it cost a check to find out.
+    #
+    # `build_curve` runs the distance-time curve over the **whole polyline**:
+    # its first boundary is 0 and its last is `total`, so the first call rests
+    # at the start of the path and the last rests at the end, whatever their own
+    # `s` says. It does that deliberately -- see the note there about absorbing
+    # the run-in and run-out -- and `game/rail.verifyRail` asserts it, because a
+    # curve that stops short of its polyline is a train that never reaches the
+    # buffers.
+    #
+    # So a snapped terminus is a platform the train does not stand at. The
+    # platform site comes from `stop.s` and the train comes from the curve, and
+    # moving one without the other put a rider stepping out at the end of a line
+    # into open air beside the platform -- which is what
+    # `PlatformField.surfaceAt` reporting `-Infinity` after a disembark was.
+    calling = [i for i, st in enumerate(seq) if st.stops] or [0, len(seq) - 1]
+    out[calling[0]] = 0.0
+    out[calling[-1]] = total
+    for i in range(1, len(out)):
+        if out[i] <= out[i - 1]:
+            out[i] = min(out[i - 1] + STOP_MIN_GAP_M, total)
+    return out
 
 
 def build_lines(
@@ -1380,22 +2347,9 @@ def build_lines(
                     if direction == 0:
                         used0[ei] = True
             xyz, cum = _polyline(g, nodes)
-            # Where each stop lands along the path. The anchor node appears in
-            # `nodes` at least once; the *last* occurrence for the leg that
-            # arrives there is the right one on a route that loops (the City
-            # Circle passes Central twice).
-            stop_s: list[float] = []
-            cursor = 0
-            for st in seq:
-                found = -1
-                for j in range(cursor, len(nodes)):
-                    if nodes[j] == st.node:
-                        found = j
-                        break
-                if found < 0:
-                    found = min(cursor, len(nodes) - 1)
-                cursor = found
-                stop_s.append(float(cum[found]))
+            # Where each stop lands along the path: at the station, not at the
+            # graph node the router happened to anchor on. See `_snap_stops`.
+            stop_s = _snap_stops(seq, nodes, xyz, cum)
             out_stops = [
                 Stop(name=st.name, stops=st.stops, station=st.station, node=st.node, s=s)
                 for st, s in zip(seq, stop_s)
@@ -2620,6 +3574,222 @@ def classify_vertical(
             st.promoted = True
 
 
+# --- One station, one place --------------------------------------------------------
+
+
+def _sample_along(d: Direction, s: float) -> tuple[float, float, float, float, float]:
+    """(x, y, z, dx, dz) at arc length `s`. `game/rail.sampleAlong`, in Python."""
+    cum = d.cum
+    n = int(d.xyz.shape[0])
+    if n < 2:
+        return 0.0, 0.0, 0.0, 1.0, 0.0
+    i = int(np.searchsorted(cum, s, side="right") - 1)
+    i = max(0, min(i, n - 2))
+    span = float(cum[i + 1] - cum[i])
+    u = 0.0 if span <= 0 else (s - float(cum[i])) / span
+    a, b = d.xyz[i], d.xyz[i + 1]
+    p = a + (b - a) * u
+    hx, hz = float(b[0] - a[0]), float(b[2] - a[2])
+    n2 = math.hypot(hx, hz) or 1.0
+    return float(p[0]), float(p[1]), float(p[2]), hx / n2, hz / n2
+
+
+def _same_platform(
+    other: tuple[float, float, float, float], x: float, z: float
+) -> bool:
+    """`riding.samePlatform`, restated. A platform is a rectangle, not a circle."""
+    ox, oz, ux, uz = other
+    dx, dz = x - ox, z - oz
+    along = dx * ux + dz * uz
+    across = dx * -uz + dz * ux
+    return (
+        -PLATFORM_HALF_LENGTH_M < along < PLATFORM_HALF_LENGTH_M
+        and -(PLATFORM_INNER_M + PLATFORM_WIDTH_M) < across < PLATFORM_INNER_M + PLATFORM_WIDTH_M
+    )
+
+
+def bind_sites(
+    stations: Sequence[RailStation], lines: Sequence[Line], g: RailGraph, terrain=None
+) -> None:
+    """Bind every calling service of a station to that one station.
+
+    The station node is where a mapper put a dot and the *site* is where the
+    trains stand -- and until this round nothing in the bake ever compared them,
+    which is how a station could quietly become two. So this measures the thing
+    the report is about:
+
+      * `site_*` -- the mean of every calling anchor, which is the place;
+      * `site_spread` -- how far the two furthest calling anchors of one name
+        are apart, which is the number Erskineville failed at (180 m against a
+        160 m platform, so `PlatformField` built two platforms and each direction
+        got one of them);
+      * `site_faces` -- how many `samePlatform` rectangles those anchors need,
+        which is the same fact stated the way the client will see it;
+      * `served_dirs` -- which directions call at all, because "one station"
+        means a train each way and not two stations one way each.
+    """
+    calls: dict[str, list[tuple[str, int, float, float, float, float, float]]] = defaultdict(list)
+    for ln in lines:
+        for d in ln.dirs:
+            for stop in d.stops:
+                if not stop.stops:
+                    continue
+                x, y, z, ux, uz = _sample_along(d, stop.s)
+                calls[stop.name].append((ln.id, d.index, x, y, z, ux, uz))
+
+    for st in stations:
+        rows = calls.get(st.name)
+        if not rows:
+            st.served_dirs = ()
+            st.calling_lines = ()
+            st.site_spread = 0.0
+            st.site_faces = 0
+            # No service: the site is the station node, at the rail beside it.
+            st.site_east, st.site_north = st.east, st.north
+            st.site_y = st.track_y
+            st.site_ground = st.ground_y
+            # A face OSM surveyed still gives the heading; a station with
+            # neither service nor platform polygon keeps the default.
+            if st.faces:
+                st.site_dx, st.site_dz = 1.0, 0.0
+            continue
+        xs = [r[2] for r in rows]
+        ys = [r[3] for r in rows]
+        zs = [r[4] for r in rows]
+        st.site_east = float(np.mean(xs))
+        st.site_north = -float(np.mean(zs))  # world z is -north; `geo.enu_to_world`
+        st.site_y = float(np.median(ys))
+        st.site_ground = (
+            float(terrain.sample(st.site_east, st.site_north)) if terrain is not None
+            else st.ground_y
+        )
+        st.site_spread = max(
+            (math.hypot(a[2] - b[2], a[4] - b[4]) for a in rows for b in rows), default=0.0
+        )
+        faces: list[tuple[float, float, float, float]] = []
+        for r in rows:
+            for f in faces:
+                if _same_platform(f, r[2], r[4]):
+                    break
+            else:
+                faces.append((r[2], r[4], r[5], r[6]))
+        st.site_faces = len(faces)
+        st.served_dirs = tuple(sorted({r[1] for r in rows}))
+        st.calling_lines = tuple(sorted({r[0] for r in rows}))
+        # The heading, taken with the sign folded out: the two directions of one
+        # railway point opposite ways along the same platform, and averaging them
+        # raw cancels to nothing. Aligned to the first anchor's heading first.
+        h0x, h0z = rows[0][5], rows[0][6]
+        hx = sum(r[5] * (1.0 if r[5] * h0x + r[6] * h0z >= 0 else -1.0) for r in rows)
+        hz = sum(r[6] * (1.0 if r[5] * h0x + r[6] * h0z >= 0 else -1.0) for r in rows)
+        n = math.hypot(hx, hz)
+        if n > 1e-6:
+            st.site_dx, st.site_dz = hx / n, hz / n
+
+
+# --- Access, generated rather than looked up (RAIL-VERTICAL.md section 4) ----------
+#
+# "Access is not content. It is a function of the clearance profile, generated
+# for every station by construction." So every station gets an entrance and a
+# shaft depth here, whether OSM mapped one or not, and the geometry round is
+# handed a position and a drop rather than being asked to find one.
+#
+# Where OSM *has* mapped it -- `railway=subway_entrance`, 171 of them, all on the
+# Metro and the ESR -- the mapped position wins, because a real doorway on a real
+# footpath beats a point this file invented. Where it has not, the entrance goes
+# at the end of the platform, offset clear of the formation, on the ground: the
+# concourse end of a Sydney suburban station, which is where the stairs are.
+ENTRANCE_MATCH_M = 220.0
+ENTRANCE_OFFSET_M = 14.0
+# How far the platform surface has to sit under the ground at the entrance
+# before the access is *steps down* rather than a gap in a fence.
+#
+# Two metres, and the number is set by what "at grade" measures rather than by
+# what sounds deep. A platform is `PLATFORM_TOP_M` = 1.05 m *above* its rail, so
+# a station genuinely at grade reads a shaft depth near -1 m: the platform is
+# over the ground, not under it. Anything past +2 m is a metre of real drop past
+# that, which is a flight of stairs and not a kerb -- and it is the same
+# boundary RAIL-VERTICAL.md's table draws at `clearance < -1.0 m`, moved up by
+# the platform's own height so the two agree about the same station.
+STATION_BELOW_GRADE_M = 2.0
+
+# --- The station box, which is the volume a body may legitimately be inside ------
+#
+# Not a drawn thing -- `world/rail-geo.ts` owns the drawing -- but the *extent*
+# of one, because two entirely separate consumers need to agree about it and
+# neither can derive it: the geometry round has to build a box that reaches from
+# the platform to the street, and both ends' ground query has to know that a body
+# standing 20 m under the terrain at Town Hall is standing on a floor rather than
+# buried in the world. Emitted once, here, so they cannot disagree.
+#
+# The length is the platform's own (which OSM surveyed) plus a margin for the
+# concourse at each end; the half width covers an island platform, both running
+# tunnels and the walls -- `STATION_HALF_WIDTH` in `rail-cut.ts` is 9.4 m for the
+# *carve*, and a box has to be wider than the hole it is in.
+STATION_BOX_MARGIN_M = 20.0
+STATION_BOX_HALF_WIDTH_M = 16.0
+
+
+def generate_access(
+    stations: Sequence[RailStation],
+    entrances: Sequence[tuple[float, float, str]],
+    terrain=None,
+) -> None:
+    """Give every station a doorway and say how far it is from there to the platform.
+
+    `shaft_depth` is the signed drop -- **positive down**, so it is the number of
+    metres of stair a body has to descend from the street to reach the platform,
+    and it is negative at Circular Quay, where the stairs go up. It is measured
+    between the ground at the entrance and the platform surface, which is the
+    only pair of heights a stair actually connects; `clearance` is a claim about
+    the *track* and is a metre and a bit lower.
+    """
+    for st in stations:
+        # The site is where the trains stand, so it is where the platform is and
+        # therefore what an entrance has to reach.
+        px, pn = (st.site_east, st.site_north) if st.site_faces else (st.east, st.north)
+        best = -1
+        best_d = ENTRANCE_MATCH_M
+        # `railway=subway_entrance` is a claim about an *underground* station, so
+        # it is only read at one. Without the guard Central takes a Metro
+        # entrance -- Central's Metro platforms are 15 m down and its suburban
+        # ones are at grade -- and the shaft depth for the great train shed comes
+        # out at five metres of stair that does not exist.
+        if st.vertical == "underground":
+            for i, (ex, en, _nm) in enumerate(entrances):
+                d = math.hypot(ex - px, en - pn)
+                if d < best_d:
+                    best_d, best = d, i
+        if best >= 0:
+            st.entrance_east, st.entrance_north = entrances[best][0], entrances[best][1]
+            st.entrance_source = "osm"
+        else:
+            # The concourse end: along the platform, then out clear of the track.
+            # No heading is stored on the station, so the offset is taken across
+            # the line from the node to the site where there is one, which is the
+            # track's own direction, and due east where there is not.
+            dx = st.site_east - st.east
+            dn = st.site_north - st.north
+            n = math.hypot(dx, dn)
+            if n < 1.0:
+                dx, dn, n = 1.0, 0.0, 1.0
+            st.entrance_east = px + (-dn / n) * ENTRANCE_OFFSET_M
+            st.entrance_north = pn + (dx / n) * ENTRANCE_OFFSET_M
+            st.entrance_source = "generated"
+        st.entrance_y = (
+            float(terrain.sample(st.entrance_east, st.entrance_north))
+            if terrain is not None else st.ground_y
+        )
+        platform_surface = (st.site_y if st.site_faces else st.track_y) + PLATFORM_TOP_M
+        st.shaft_depth = st.entrance_y - platform_surface
+        # **Below grade is measured at the station, not at the doorway.** The
+        # entrance can be 200 m away up a hill, and a shaft depth taken from
+        # there is a fact about the walk rather than about the railway. The
+        # ground *over the platform* is the number RAIL-VERTICAL.md's whole
+        # argument is about, and it is the one geometry has to carve against.
+        st.below_grade = (st.site_ground - platform_surface) > STATION_BELOW_GRADE_M
+
+
 # --- Overhead power, staged for the geometry round ---------------------------------
 
 
@@ -2714,6 +3884,7 @@ def write_bake(
     g: RailGraph,
     lines: Sequence[Line],
     stations: Sequence[RailStation],
+    platforms: Sequence[RailPlatform],
     blocks: BlockSet,
     stanchions: Sequence[Stanchion],
     solve: dict,
@@ -2800,11 +3971,51 @@ def write_bake(
     ).reshape(-1)
     st_kind = np.asarray([s.kind for s in stanchions], dtype=np.uint8)
 
-    jstations = [
-        {
+    def _world(east: float, north: float) -> tuple[float, float]:
+        x, z = geo.enu_to_world(np.array([east]), np.array([north]))
+        return float(x[0]), float(z[0])
+
+    def _faces(s: RailStation) -> list[dict]:
+        """OSM's own platform decks, in the frame the geometry round draws in.
+
+        Positions and headings go out in **world** metres so nothing downstream
+        has to know about ENU or about which way `z` points; `ref` is the number
+        on the sign; `island` is measured off the track by `_classify_platforms`
+        and only falls back to the `ref=16;17` tagging where there is no track to
+        measure. This is the answer to "the models inside the actual station need
+        to be quite accurate": these are surveyed rectangles, not guesses off a
+        centreline.
+        """
+        out = []
+        for k in s.faces:
+            p = platforms[k]
+            x, z = _world(p.east, p.north)
+            ux, uz = _world(p.ux, p.un)
+            out.append({
+                "x": round(x, 2),
+                "z": round(z, 2),
+                "ux": round(ux, 5),
+                "uz": round(uz, 5),
+                "halfLength": round(p.half_length, 2),
+                "halfWidth": round(p.half_width, 2),
+                "refs": list(p.refs),
+                "island": bool(p.island),
+                "level": p.level,
+                "osmId": p.osm_id,
+            })
+        out.sort(key=lambda f: (f["refs"] or [99], f["x"]))
+        return out
+
+    jstations = []
+    for s in stations:
+        sx, sz = _world(s.east, s.north)
+        site_x, site_z = _world(s.site_east, s.site_north)
+        ent_x, ent_z = _world(s.entrance_east, s.entrance_north)
+        faces = _faces(s)
+        jstations.append({
             "name": s.name,
-            "x": float(geo.enu_to_world(np.array([s.east]), np.array([s.north]))[0][0]),
-            "z": float(geo.enu_to_world(np.array([s.east]), np.array([s.north]))[1][0]),
+            "x": sx,
+            "z": sz,
             "trackY": float(s.track_y),
             "groundY": float(s.ground_y),
             "vertical": s.vertical,
@@ -2825,9 +4036,53 @@ def write_bake(
             "platforms": int(s.platforms),
             "tunnelShare": round(float(s.tunnel_share), 4),
             "bridgeShare": round(float(s.bridge_share), 4),
-        }
-        for s in stations
-    ]
+            # --- Where the trains actually stand. `x, z` above is the OSM node,
+            # which at some stations is a hundred metres from the platform;
+            # this is the mean of every calling anchor, and it is what a station
+            # box, a stair or a name board should be built around.
+            "siteX": round(site_x, 2),
+            "siteZ": round(site_z, 2),
+            "siteDx": round(float(s.site_dx), 5),
+            "siteDz": round(float(s.site_dz), 5),
+            "siteY": round(float(s.site_y), 3),
+            "siteGroundY": round(float(s.site_ground), 3),
+            # How far apart the furthest two calling anchors are and how many
+            # `samePlatform` rectangles they need. One station is one place: a
+            # spread over a platform length is the Erskineville bug, and
+            # `rail-audit` section 4c fails on it by name.
+            "siteSpread": round(float(s.site_spread), 1),
+            "siteFaces": int(s.site_faces),
+            "servedDirs": list(s.served_dirs),
+            "lines": list(s.calling_lines),
+            # --- The platform decks OSM surveyed, and what is written on them.
+            "faces": faces,
+            "refs": list(s.refs),
+            "islands": sum(1 for f in faces if f["island"]),
+            "sides": sum(1 for f in faces if not f["island"]),
+            "platformLength": round(float(s.platform_length), 1),
+            # --- Access, generated from the clearance profile. RAIL-VERTICAL.md
+            # section 4: a station cannot lack access, because the same number
+            # that made it need access generates it. `shaftDepth` is positive
+            # *down* -- metres of stair from the street to the platform surface.
+            "entranceX": round(ent_x, 2),
+            "entranceZ": round(ent_z, 2),
+            "entranceY": round(float(s.entrance_y), 3),
+            "entranceSource": s.entrance_source,
+            "shaftDepth": round(float(s.shaft_depth), 3),
+            # The one bit geometry cannot get wrong: is the platform under the
+            # ground the player is standing on? Derived from the same measured
+            # clearance `vertical` is, so it can never contradict it.
+            "belowGrade": bool(s.below_grade),
+            # The floor and the lid of a station box, in absolute metres, for
+            # the one query that makes an underground station usable: is this
+            # body inside the station rather than lost under the terrain? See
+            # `game/riding.StationBoxField` -- it is the whole of the fix for
+            # *"moving anywhere on foot underground tps me to surface"*.
+            "boxFloorY": round(float(s.site_y) + PLATFORM_TOP_M, 3),
+            "boxCeilY": round(float(s.site_ground), 3),
+            "boxHalfLength": round(float(max(s.platform_length, 2.0 * PLATFORM_HALF_LENGTH_M) / 2.0 + STATION_BOX_MARGIN_M), 2),
+            "boxHalfWidth": round(float(STATION_BOX_HALF_WIDTH_M), 2),
+        })
 
     header = {
         "version": BAKE_VERSION,
@@ -2941,11 +4196,12 @@ def write_bake(
 def build_all(radius_m: float, log=print, terrain=True) -> dict:
     """Read, graph, route, curve, block, solve, stanchion. Everything but writing."""
     t0 = time.time()
-    ways, stations, platforms = read_rail(radius_m)
+    ways, stations, platforms, entrances = read_rail(radius_m)
     corridors = read_corridors(radius_m)
     log(
         f"  read {len(ways)} rail/subway ways, {len(stations)} stations, "
-        f"{len(platforms)} platform polygons, {len(corridors)} route relations "
+        f"{len(platforms)} platform polygons ({sum(1 for p in platforms if p.refs)} numbered), "
+        f"{len(entrances)} mapped entrances, {len(corridors)} route relations "
         f"({time.time() - t0:.1f}s)"
     )
 
@@ -2975,20 +4231,85 @@ def build_all(radius_m: float, log=print, terrain=True) -> dict:
         except Exception as exc:  # noqa: BLE001 -- reported, not swallowed
             ground_note = f"terrain unavailable ({exc.__class__.__name__}: {exc})"
             log(f"  terrain: {ground_note}")
+    # Before any height is computed: a tunnel tag on 40 m of track is not a
+    # tunnel, and every consumer from the offset table down has to inherit that
+    # one decision rather than each re-deriving it. See `MIN_BORE_M`.
+    demoted = demote_short_bores(g)
+    if demoted:
+        log(f"  bores: {len(demoted)} tunnel-tagged runs shorter than "
+            f"{MIN_BORE_M:.0f} m demoted to surface track "
+            f"(longest {demoted[0]['metres']:.0f} m, "
+            f"shortest {demoted[-1]['metres']:.0f} m)")
     y_raw, ground = raw_heights(g, field)
-    g.y, hstats = solve_heights(g, y_raw)
+    y0, hstats = solve_heights(g, y_raw)
+    # --- And then the constraint the symmetric solve cannot express: a bore is
+    # under the ground. See the `TUNNEL_COVER_M` block and the cone header for
+    # why this is a second projection rather than a correction applied to the
+    # first, and why it is provably feasible.
+    roads: list[Any] = []
+    if field is not None:
+        try:
+            from .sources import osm as _osm
+
+            roads = _osm.read_roads(radius_m)
+        except Exception as exc:  # noqa: BLE001 -- reported, not swallowed
+            log(f"  roads: unavailable for the crossing census ({exc.__class__.__name__})")
+    cap, surf, census = cover_caps(g, y0, ground, roads)
+    g.y, cstats = apply_cover(g, y0, cap)
+    hstats["cover"] = cstats
+    hstats["cover"]["demoted_runs"] = demoted[:40]
+    hstats["cover"]["demoted_count"] = len(demoted)
+    hstats["cover"]["crossings"] = _census_tally(census)
+    hstats["worst_grade_after"] = cstats.get("worst_grade_after", hstats["worst_grade_after"])
+    hstats["moved_p95_m"] = float(np.percentile(np.abs(g.y - y_raw), 95)) if g.n_nodes else 0.0
+    hstats["moved_max_m"] = float(np.max(np.abs(g.y - y_raw))) if g.n_nodes else 0.0
     # RAIL-VERTICAL.md section 1: keep the ground beside the solved track so
     # `clearance = y - ground` is one subtraction, and not a second sampling of
     # a surface that might have been loaded with different options.
     g.ground = np.asarray(ground, dtype=np.float64)
+    # The surface a player sees, which over a bore under a cutting is not the
+    # DEM. Held so the audit measures cover against the same surface the
+    # constraint was written against rather than re-deriving a second one.
+    g.surface = np.asarray(surf, dtype=np.float64)
     log(f"  heights: worst grade {100 * hstats['worst_grade_before']:.1f}% raw -> "
         f"{100 * hstats['worst_grade_after']:.2f}% after the envelope solve, "
         f"moved p95 {hstats['moved_p95_m']:.2f} m")
+    log(f"  cover: {cstats['capped_nodes']} bounded nodes, "
+        f"{cstats['violating_before']} short of {TUNNEL_COVER_M:.1f} m before "
+        f"(worst {cstats['worst_violation_m']:.2f} m), "
+        f"{cstats.get('violating_after', 0)} after; deepest dig "
+        f"{cstats['deepest_dig_m']:.2f} m, and {cstats['moved_other_nodes']} "
+        f"unbounded nodes came with it (worst {cstats['moved_other_max_m']:.2f} m)")
+    if census:
+        tally = hstats["cover"]["crossings"]
+        log("  road crossings: " + ", ".join(f"{k} {v}" for k, v in sorted(tally.items())))
+
+    # --- The vertical is measured **before** the lines are routed, and the
+    # ordering is load-bearing rather than tidy. `anchor_bias` needs to know
+    # which level a station's platforms are at in order to refuse a candidate at
+    # a different one, and that number is `st.track_y`, which this fills in. Run
+    # after the routing -- where it used to be -- it could only describe the
+    # mistake: Redfern came out `surface` in the table with T4 standing 16 m
+    # under it in the Eastern Suburbs tunnel, and nothing compared the two.
+    classify_vertical(g, stations, field)
+    _classify_platforms(g, platforms, stations)
+    islands = sum(1 for p in platforms if p.island and p.station >= 0)
+    attached = sum(1 for p in platforms if p.station >= 0)
+    log(f"  platforms: {attached} of {len(platforms)} polygons attached to a station, "
+        f"{islands} island / {attached - islands} side, measured off the track")
 
     lines = build_lines(g, stations, corridors, log=log)
     for ln in lines:
         for d in ln.dirs:
             build_curve(d)
+    bind_sites(stations, lines, g, field)
+    split = [s for s in stations if s.site_spread > 2 * PLATFORM_HALF_LENGTH_M]
+    log(f"  stations: {sum(1 for s in stations if s.served_dirs)} served, "
+        f"worst spread between two calling anchors of one station "
+        f"{max((s.site_spread for s in stations), default=0.0):.0f} m, "
+        f"{len(split)} over a platform length"
+        + (f" ({', '.join(s.name for s in split[:4])})" if split else ""))
+    generate_access(stations, entrances, field)
     blocks = cut_blocks(g, lines)
     for ln in lines:
         for d in ln.dirs:
@@ -3000,7 +4321,6 @@ def build_all(radius_m: float, log=print, terrain=True) -> dict:
         f"{wide} of them wider than a pair")
 
     solve = solve_phases(lines, blocks, log=log)
-    classify_vertical(g, stations, field)
     stanchions = place_stanchions(g, blocks)
     log(f"  overhead: {len(stanchions)} stanchions "
         f"({sum(1 for s in stanchions if s.kind == 2)} portal gantries)")
@@ -3204,6 +4524,75 @@ def label_disagreements(stations: Sequence[RailStation]) -> list[str]:
     return bad
 
 
+# The stations the brief asks to be sanity-checked against the real world, plus
+# the two the reports are about. Printed in full by section 4d so the table can
+# be read against a timetable rather than believed.
+RAIL_CROSS_CHECK: tuple[str, ...] = (
+    "Central", "Redfern", "Town Hall", "Erskineville", "Chatswood", "Sydenham",
+    "Wynyard", "Museum", "St James", "Martin Place", "Circular Quay", "Meadowbank",
+)
+
+
+def split_stations(stations: Sequence[RailStation]) -> list[str]:
+    """Stations whose own services stand somewhere else, and how far away.
+
+    The Erskineville invariant, stated once. A station is one place, so every
+    service that calls there stands within one platform of every other service
+    that calls there -- `riding.samePlatform`'s own rectangle, measured by
+    `bind_sites`. Over the shipped bake this returned 184 of 190 names; the two
+    at Erskineville were 180 m apart, which is 20 m past the length of the
+    platform that would have to hold both, so `PlatformField` built two and the
+    player standing on one saw one direction of trains.
+
+    Named exceptions rather than a wider tolerance: a real bay platform is a
+    real second place, and pretending otherwise would be tuning the check until
+    it stopped finding things.
+    """
+    bad: list[str] = []
+    for st in stations:
+        if not st.served_dirs or st.name in SITE_SPREAD_EXCEPTIONS:
+            continue
+        if st.site_spread > 2.0 * PLATFORM_HALF_LENGTH_M:
+            bad.append(
+                f"{st.name}'s calling services stand {st.site_spread:.0f} m apart over "
+                f"{st.site_faces} platform(s) -- more than the {2 * PLATFORM_HALF_LENGTH_M:.0f} m "
+                f"platform that would have to hold them, so this is two places under one name"
+            )
+    return bad
+
+
+# A station whose services genuinely stand more than a platform apart, with the
+# reason. One entry, and it is a bay platform: Lidcombe's platform 0 is the
+# Olympic Park branch's own dock at the up end of the station, 150 m from the
+# through platforms, and a T7 train standing in it is standing at Lidcombe.
+SITE_SPREAD_EXCEPTIONS: dict[str, str] = {
+    "Lidcombe": "T7 stands in the Olympic Park bay at the up end, 150 m from the "
+                "through platforms; a dock platform is a real second place",
+}
+
+
+def one_way_stations(stations: Sequence[RailStation], lines: Sequence[Line]) -> list[str]:
+    """Stations served in one direction only, which is the report in its own words.
+
+    *"at erko only north bound trains stop"*. A station on a two-way railway
+    with calls in one direction is either a terminus -- where the same platform
+    is the end of one direction and the start of the other, and both are
+    recorded -- or the bug. There is no third case, so there are no exceptions
+    and this check has none.
+    """
+    bad: list[str] = []
+    for st in stations:
+        if not st.served_dirs:
+            continue
+        if len(st.served_dirs) < 2:
+            way = "down" if st.served_dirs[0] == 0 else "up"
+            bad.append(
+                f"{st.name} is called at by {', '.join(st.calling_lines)} in the {way} "
+                f"direction only -- a station is one place with a train each way"
+            )
+    return bad
+
+
 def audit(radius_m: float, built: dict | None = None, log=print) -> int:
     """Continuity, gradient, the vertical-profile table, and the separation sweep."""
     failures: list[str] = []
@@ -3260,6 +4649,102 @@ def audit(radius_m: float, built: dict | None = None, log=print) -> int:
         f"and the projection moved the track a median-of-the-tail {b['heights']['moved_p95_m']:.2f} m",
     )
     log(f"  note: ground came from {b['ground_note']}")
+
+    # --- 3b. The player's absolute rule about bores.
+    #
+    # *"a rail tunnel should never result in the train assets being above the
+    # surface, regardless of road"*, and then *"should be a good 6m at least.
+    # probably 7 or 8"*. `TUNNEL_COVER_M` is 7.5 and the block there derives it.
+    #
+    # Measured against `g.surface` -- what a player *sees* -- and not against the
+    # DEM, because over a bore that runs under somebody else's cutting they are
+    # different surfaces and only one of them is drawn. See `visible_surface`.
+    #
+    # Portal nodes are excluded, by measuring exactly the set the constraint
+    # bounded: a node with a surface edge on it is at daylight by definition, and
+    # the ramp away from it is the ruling gradient's business.
+    log("")
+    log("--- 3b. Cover: a bore is under the ground, by a train and its wires")
+    # The one constant this file restates from elsewhere, asserted rather than
+    # trusted. `ROAD_OVER_RAIL_M` claims to be the clearance envelope plus a deck
+    # girder, and a restated number that has drifted is worse than no number:
+    # the bake would cap the track at a clearance the deck solver no longer
+    # builds to, and the two would disagree silently for a whole release.
+    try:
+        from .decks import GIRDER_DEPTH_M as _girder
+
+        # `client/src/world/envelope.RAIL_ABOVE_M`. Restated on this file's usual
+        # terms -- a Python module cannot import a TypeScript one -- and the
+        # renderer's own copy is what `server/integration-check.checkClearance`
+        # holds to.
+        _rail_above = 5.9
+        check(
+            abs(ROAD_OVER_RAIL_M - (_rail_above + _girder)) < 1e-9,
+            f"the rail-under-a-road bound is {ROAD_OVER_RAIL_M:.1f} m, which is still "
+            f"`envelope.RAIL_ABOVE_M` ({_rail_above:.1f}) plus `decks.GIRDER_DEPTH_M` "
+            f"({_girder:.1f}) -- restated here, so the drift has to be caught here",
+        )
+    except ImportError as exc:  # reported, not swallowed
+        log(f"  note: could not read `decks.GIRDER_DEPTH_M` to check the pair ({exc})")
+    cov = b["heights"].get("cover", {})
+    inside = bore_nodes(g)
+    surface = g.surface if g.surface.size == g.n_nodes else g.ground
+    cover = surface - g.y
+    bounded = inside & np.isfinite(np.asarray(cover, dtype=np.float64))
+    short_n = int((bounded & (cover < TUNNEL_COVER_M - 1e-3)).sum())
+    check(
+        short_n == 0,
+        f"all {int(bounded.sum()):,} nodes inside a bore sit at least {TUNNEL_COVER_M:.1f} m "
+        f"under the surface a player sees (worst "
+        f"{float(cover[bounded].min()) if bounded.any() else 0.0:.2f} m); before the constraint "
+        f"{cov.get('violating_before', 0)} were short of it and the worst was "
+        f"{cov.get('worst_violation_m', 0.0):.2f} m *above* its own surface",
+    )
+    # The negative control the rest of this file insists on: the check has to be
+    # able to fail. Lift one bore node to a hand's breadth under the ground and
+    # confirm the same expression catches it.
+    if bounded.any():
+        probe = np.asarray(cover, dtype=np.float64).copy()
+        victim = int(np.argmax(bounded))
+        probe[victim] = 0.2
+        check(
+            int((bounded & (probe < TUNNEL_COVER_M - 1e-3)).sum()) == 1,
+            "  NEGATIVE CONTROL: a bore node lifted to 0.20 m of cover is caught -- "
+            "which is the picture being fixed, a tunnel drawn through the surface",
+        )
+    check(
+        float(cov.get("worst_grade_after", worst)) <= MAX_GRADIENT + 1e-6,
+        f"the cover constraint left the profile inside the ruling gradient: "
+        f"{100 * float(cov.get('worst_grade_after', worst)):.3f}% after re-solving, "
+        f"{cov.get('capped_nodes', 0):,} nodes bounded, deepest dig "
+        f"{cov.get('deepest_dig_m', 0.0):.2f} m",
+    )
+    log(
+        f"  {cov.get('moved_other_nodes', 0):,} unbounded node(s) came down with the ramps, "
+        f"worst {cov.get('moved_other_max_m', 0.0):.2f} m -- the cost of doing this inside "
+        f"{100 * MAX_GRADIENT:.1f}% rather than with a dip no train could follow"
+    )
+    if cov.get("demoted_count"):
+        rows = cov.get("demoted_runs", [])
+        log(
+            f"  {cov['demoted_count']} tunnel-tagged run(s) shorter than {MIN_BORE_M:.0f} m were "
+            "demoted to surface track before any height was solved -- a 40 m `tunnel=yes` under a "
+            "footbridge is not a bore, and digging 7.5 m of cover for one is a hole no train "
+            "climbs out of. The longest five:"
+        )
+        for r in rows[:5]:
+            log(f"    {r['metres']:5.0f} m, {r['edges']:3d} edges, ways {','.join(r['ways'][:3])}")
+    cross = cov.get("crossings", {})
+    if cross:
+        log("  road crossings, by what happens where the two networks meet:")
+        for k in sorted(cross):
+            log(f"    {k:22s} {cross[k]:6,d}")
+        log(
+            "    `level-crossing` is the group this bake cannot fix: the road is drawn from the "
+            "tile build and lifting it is a world build, so those are counted and left. "
+            "`rail-under-shallow` is the group it can, and did -- capped at "
+            f"{ROAD_OVER_RAIL_M:.1f} m, which is `envelope.RAIL_ABOVE_M` plus `decks.GIRDER_DEPTH_M`."
+        )
 
     log("")
     log("--- 4. Vertical profile, measured, for every station on a line")
@@ -3413,6 +4898,108 @@ def audit(radius_m: float, built: dict | None = None, log=print) -> int:
         f"past a platform is never the reason a platform has no train"
         + (f". STRANDED: {', '.join(orphaned_pass)}" if orphaned_pass else ""),
     )
+
+    # --- 4c ------------------------------------------------------------------
+    #
+    # The reported bug, as two assertions and a table. Everything above this
+    # point is about where the *railway* is; this is about whether a station is
+    # a place a person can stand and catch a train in either direction.
+    log("")
+    log("--- 4c. A station is one place, with a train each way")
+    split = split_stations(stations)
+    for line_ in split:
+        log(f"    {line_}")
+    served = [s for s in stations if s.served_dirs]
+    check(
+        not split,
+        f"all {len(served)} served stations have every calling service standing inside one "
+        f"{2 * PLATFORM_HALF_LENGTH_M:.0f} m platform of every other -- the shipped bake had "
+        f"184 of 190 split, Meadowbank's two anchors 471 m apart and Erskineville's 180 m, "
+        f"which is what made each direction its own station"
+        + (f". FIRST: {split[0]}" if split else ""),
+    )
+    ctrl_split = RailStation(osm_id="", name="CONTROL", east=0.0, north=0.0, kind="")
+    ctrl_split.served_dirs = (0, 1)
+    ctrl_split.site_spread = 471.0
+    ctrl_split.site_faces = 2
+    caught_split = split_stations([ctrl_split])
+    check(
+        len(caught_split) == 1,
+        f"  NEGATIVE CONTROL: a station with Meadowbank's own 471 m between its two "
+        f"anchors is caught -- {caught_split[0] if caught_split else 'IT WAS NOT'}",
+    )
+
+    one_way = one_way_stations(stations, lines)
+    for line_ in one_way:
+        log(f"    {line_}")
+    check(
+        not one_way,
+        f"every one of those {len(served)} is called at in both directions, which is the "
+        f"report in its own words -- at Erskineville only one direction stopped, because "
+        f"the two directions had become two stations"
+        + (f". FIRST: {one_way[0]}" if one_way else ""),
+    )
+    ctrl_one = RailStation(osm_id="", name="CONTROL", east=0.0, north=0.0, kind="")
+    ctrl_one.served_dirs = (0,)
+    ctrl_one.calling_lines = ("T4",)
+    caught_one = one_way_stations([ctrl_one], lines)
+    check(
+        len(caught_one) == 1,
+        f"  NEGATIVE CONTROL: a station served in the down direction only is caught -- "
+        f"{caught_one[0] if caught_one else 'IT WAS NOT'}",
+    )
+    for nm, why in sorted(SITE_SPREAD_EXCEPTIONS.items()):
+        st = by_name.get(nm)
+        log(f"  exception: {nm} at {st.site_spread:.0f} m -- {why}" if st else f"  exception: {nm} -- {why}")
+
+    # --- 4d ------------------------------------------------------------------
+    #
+    # *"The models inside the actual station need to be quite accurate so strive
+    # hard for good info here."* This is the good info, and it is OSM's own
+    # survey rather than anything this file invented: `railway=platform` polygons
+    # with their real length, real width and the number on the sign, plus the
+    # island/side verdict measured off the track by `_classify_platforms`.
+    log("")
+    log("--- 4d. What is actually inside the station, from OSM's own platform polygons")
+    log(f"  {'station':<20} {'vertical':<12} {'decks':>5} {'island':>6} {'side':>4} "
+        f"{'longest':>7} {'below':>5} {'shaft':>6} {'entrance':<10} {'platform numbers'}")
+    for nm in RAIL_CROSS_CHECK:
+        st = by_name.get(nm)
+        if st is None:
+            check(False, f"{nm}: not in the extract at all")
+            continue
+        refs = ",".join(str(r) for r in st.refs) or "-"
+        log(f"  {nm:<20} {st.vertical:<12} {len(st.faces):5d} {st.islands:6d} {st.sides:4d} "
+            f"{st.platform_length:7.0f} {st.below_grade!s:>5} {st.shaft_depth:6.1f} "
+            f"{st.entrance_source:<10} {refs}")
+    unnumbered = [s for s in served if s.faces and not s.refs]
+    log(f"  {sum(len(s.faces) for s in stations)} platform decks attached to "
+        f"{sum(1 for s in stations if s.faces)} stations, "
+        f"{sum(s.islands for s in stations)} island and {sum(s.sides for s in stations)} side; "
+        f"{len(unnumbered)} served station(s) have decks with no number on them")
+
+    # --- 4e ------------------------------------------------------------------
+    log("")
+    log("--- 4e. Access exists at every station, by construction (RAIL-VERTICAL section 4)")
+    no_access = [s.name for s in served if s.entrance_source == "none"]
+    check(
+        not no_access,
+        f"all {len(served)} served stations have an entrance position and a shaft depth: "
+        f"{sum(1 for s in served if s.entrance_source == 'osm')} from a mapped "
+        f"`railway=subway_entrance` and the rest generated at the concourse end, "
+        f"because a station cannot lack access"
+        + (f". MISSING: {', '.join(no_access[:4])}" if no_access else ""),
+    )
+    below = [s for s in served if s.below_grade]
+    deep = sorted(below, key=lambda s: -s.shaft_depth)[:8]
+    log(f"  {len(below)} served station(s) have their platform under the ground over it and "
+        f"therefore need steps down. The deepest:")
+    for s in deep:
+        log(f"    {s.name:<22} {s.shaft_depth:6.1f} m of stair, platform at {s.site_y + PLATFORM_TOP_M:7.1f}, "
+            f"ground {s.site_ground:7.1f}, entrance {s.entrance_source}")
+    up = [s for s in served if s.shaft_depth < -STATION_BELOW_GRADE_M]
+    log(f"  ...and {len(up)} where the steps go up instead: "
+        f"{', '.join(sorted(s.name for s in up)[:6])}")
 
     log("")
     log("--- 5. The full-cycle separation sweep, simulated at 10 Hz")
@@ -3575,8 +5162,8 @@ def cmd_rail_bake(args: argparse.Namespace) -> int:
     print(f"rail-bake: {radius / 1000:.0f} km, writing to {out}")
     b = build_all(radius, terrain=not getattr(args, "no_terrain", False))
     info = write_bake(
-        out, b["graph"], b["lines"], b["stations"], b["blocks"], b["stanchions"],
-        b["solve"],
+        out, b["graph"], b["lines"], b["stations"], b["platforms"], b["blocks"],
+        b["stanchions"], b["solve"],
         {"radius_m": radius, "ground": b["ground_note"], "seconds": round(b["seconds"], 1)},
     )
     total = sum(p.stat().st_size for p in out.glob("*") if p.is_file())

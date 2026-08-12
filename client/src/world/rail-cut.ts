@@ -67,9 +67,17 @@
  * railway at grade.
  *
  *   - tagged `tunnel`                            -> bore, at any depth
- *   - tagged `cutting`, deeper than 0.5 m        -> trench, and the ground is cut
- *   - anything else deeper than 1 m              -> trench, and the ground is cut
+ *   - ground over the ballast crown              -> the ground is cut (`inCutting`)
+ *   - tagged `cutting`, deeper than 0.15 m       -> ...and walls too (`inTrench`)
+ *   - anything else deeper than 0.6 m            -> ...and walls too
  *   - anything else                              -> at grade, and nothing happens
+ *
+ * **Two floors, not one, and the second one is this round's fix.** The ground
+ * has to come away wherever it would bury the drawn formation -- which at
+ * Erskineville is where the DEM reads the track as being at grade to within
+ * fifteen centimetres -- but a *wall* is only worth building where the drop
+ * reads as a wall. See `CUT_MIN_DEPTH` for the measurement and
+ * `TRENCH_MIN_DEPTH` for what putting both on one number would have cost.
  *
  * A bridge is never a trench whatever the grid says; see `inCutting`.
  *
@@ -126,31 +134,70 @@ const STATION_HALF_LENGTH = 88;
 const STATION_FLARE_M = 12;
 
 /**
- * How far under the terrain a track has to be before the ground is cut at all.
+ * How far the terrain has to stand over the **ballast crown** before the ground
+ * is cut, metres. Negative, and the sign is the whole of this round's fix.
  *
- * **This was one metre, and one metre is what the player was standing in.** The
- * report is *"some places intersect with ground"*, at Eveleigh, with the track
- * buried in dirt behind the palisade; the number behind it is that **77,467 of
- * the 181,448 sampled points on open railway in this city have terrain above the
- * railhead**, and at a one-metre floor the carve fired at 27,785 of them. Fifty
- * thousand samples of track were inside the ground with the rule saying that was
- * fine.
+ * ---------------------------------------------------------------------------
+ * **This was +0.25 m, measured from the railhead, and Erskineville is what that
+ * costs.** The report is *"still has weird void under tracks (tracks should ship
+ * with at least the stones they normally sit on!)"*, and the measurement behind
+ * it, sampled off the running client along the segment north of the platform:
  *
- * A quarter of a metre is where `world/envelope.ts` puts the question instead:
- * the loading gauge's floor is the railhead, `RAIL_BELOW_M` is the ballast under
- * it, and terrain standing a quarter-metre over the rail has swallowed the
- * sleepers. Below that the ballast shoulder and the verge cover the difference
- * and a trench would be a kerb nobody can see.
+ *     t     railhead   DEM      DEM - railhead
+ *     0.0   -52.93    -52.88     +0.05
+ *     0.3   -53.41    -53.42     -0.01
+ *     0.6   -53.89    -53.95     -0.06
+ *     1.0   -54.53    -54.67     -0.14
  *
- * It roughly doubles the carve -- 27,785 samples to 54,091 -- and every one of
- * the new ones is a point where the rail was under the dirt.
+ * The track is *at grade* on the DEM's own reading, to within fifteen
+ * centimetres, so at a +0.25 m floor nothing was cut anywhere near it. But
+ * `rail-geo` draws the ballast **under** the railhead -- crown at
+ * `BALLAST_TOP_DROP` (0.2 m) down, toe at 0.75 m down -- so the entire formation
+ * was inside the terrain sheet and what the player saw was two hairlines of rail
+ * head lying on bare dirt. Not a void: the opposite of one. The ground had
+ * swallowed the stones.
+ *
+ * So the question is not "is the railhead under the ground" -- which is what a
+ * positive floor asks -- but **"would the ground bury the formation"**, and the
+ * formation's top is the ballast crown 0.2 m under the railhead. Half a metre
+ * further down would be arguing about the shoulder; ten centimetres of slack
+ * under the crown is what keeps a coplanar terrain post out of a z-fight with
+ * the ballast top rather than leaving it to the depth buffer.
+ *
+ * At Lindfield -- the reference at-grade case, ballast standing 0.9 m proud of
+ * the suburb on its own embankment -- the depth is -0.9 m, which is below this
+ * floor, nothing is cut, and the verge still runs the formation down to the
+ * ground exactly as it did. That is the case this must not touch and does not.
  */
-export const CUT_MIN_DEPTH = 0.25;
+export const CUT_MIN_DEPTH = -0.3;
+
+/**
+ * How deep a cutting has to be before **walls** are built in the hole.
+ *
+ * **A second question, and the reason it is a second constant is the cost.**
+ * `CUT_MIN_DEPTH` decides where the ground comes away; this decides where
+ * `rail-geo.writeTrench` stands battered retaining walls, a coping and five
+ * collision prisms per eight metres of run in the hole it leaves. Those are what
+ * a 512 m chunk rebuild is made of, and firing them along every metre of
+ * at-grade railway in Sydney -- which the new floor above would do if one number
+ * answered both questions -- is a hitch every time the player walks half a
+ * kilometre.
+ *
+ * Nothing is lost by the split, because a shallow hole already has something
+ * standing in it: `rail-geo.writeVerge` draws its at-grade strip from the
+ * ballast toe at 3.15 m out to the fence line at 6.4 m, which crosses the rim of
+ * a `CUT_HALF_WIDTH` hole at 5.4 m with a metre to spare, and
+ * `rail-geo.writeFormation` floors the corridor between the two. A wall is only
+ * worth its triangles once the drop is deep enough to read as a wall --
+ * `rail-geo.TRENCH_MIN_HEIGHT` is 0.45 m measured from the cess, which is 0.6 m
+ * measured from the railhead, and that is this number.
+ */
+export const TRENCH_MIN_DEPTH = 0.6;
 
 /**
  * How far down a `cutting`-tagged way has to be before a trench is dug.
  *
- * Lower than `CUT_MIN_DEPTH` because the tag is independent evidence: OSM has
+ * Lower than `TRENCH_MIN_DEPTH` because the tag is independent evidence: OSM has
  * said there is a cutting here, so a DEM that only reads half a metre of it is a
  * 31 m heightfield smoothing a 15 m-wide feature away rather than a railway at
  * grade. It moves eleven spans -- 0.7 km -- and every one of them is a cutting
@@ -193,8 +240,24 @@ export function inCutting(flags: number, depth: number): boolean {
   if ((flags & SPAN_BRIDGE) !== 0) return false;
   if (drawnAsTunnel(flags)) return false;
   if (!Number.isFinite(depth)) return false;
+  // One floor, and no tag branch: the tag exists to say "the grid has smoothed a
+  // cutting away", and this floor is already below the grid's own noise. See
+  // `CUT_MIN_DEPTH`, and `inTrench` for where the tag is still spent.
+  return depth > CUT_MIN_DEPTH;
+}
+
+/**
+ * Is this span deep enough to be worth **building a trench in**?
+ *
+ * The narrower of the two questions, and it is asked of the same points by the
+ * same sampler -- see `TRENCH_MIN_DEPTH` for why the two are separate at all.
+ * Every span this answers `true` for is one `inCutting` also answers `true` for,
+ * so a trench can never be built where the ground was left standing.
+ */
+export function inTrench(flags: number, depth: number): boolean {
+  if (!inCutting(flags, depth)) return false;
   // The tag lowers the bar. See `CUT_TAGGED_MIN_DEPTH`.
-  const floor = (flags & SPAN_CUTTING) !== 0 ? CUT_TAGGED_MIN_DEPTH : CUT_MIN_DEPTH;
+  const floor = (flags & SPAN_CUTTING) !== 0 ? CUT_TAGGED_MIN_DEPTH : TRENCH_MIN_DEPTH;
   return depth > floor;
 }
 
@@ -219,6 +282,8 @@ export class RailCut {
   readonly count: number;
   /** `x, z, ux, uz` per platform site. See `setStations`. */
   private sites = new Float64Array(0);
+  /** Those sites' offsets, filed by cell. See `setStations`. */
+  private readonly siteCells = new Map<number, number[]>();
 
   constructor(bake: RailBake) {
     const p = bake.vertices;
@@ -317,6 +382,30 @@ export class RailCut {
       out[i * 4 + 3] = sites[i].uz;
     }
     this.sites = out;
+    // **Filed, because `halfWidthAt` is the hottest function in a chunk build.**
+    // It is asked once per rib per side by the trench, once more by the verge and
+    // once more by the formation floor -- call it twenty times per segment, five
+    // hundred segments in a 512 m chunk -- and a linear scan of 461 platform
+    // sites makes that four and a half million distance tests for an answer that
+    // is `CUT_HALF_WIDTH` every time bar the two hundred metres either side of a
+    // station. Measured: filing them took the Redfern chunk ring from 358 ms
+    // back to 205, which is most of the cost this round added.
+    this.siteCells.clear();
+    const reach = STATION_HALF_LENGTH + 8;
+    for (let i = 0; i < sites.length; i++) {
+      const x0 = Math.floor((sites[i].x - reach) / CELL_M);
+      const x1 = Math.floor((sites[i].x + reach) / CELL_M);
+      const z0 = Math.floor((sites[i].z - reach) / CELL_M);
+      const z1 = Math.floor((sites[i].z + reach) / CELL_M);
+      for (let cx = x0; cx <= x1; cx++) {
+        for (let cz = z0; cz <= z1; cz++) {
+          const k = cellKey(cx, cz);
+          const list = this.siteCells.get(k);
+          if (list) list.push(i * 4);
+          else this.siteCells.set(k, [i * 4]);
+        }
+      }
+    }
   }
 
   /**
@@ -330,8 +419,12 @@ export class RailCut {
    * `rail-geo.writeTrench` put the wall top exactly on the rim of the hole.
    */
   halfWidthAt(x: number, z: number): number {
+    const list = this.siteCells.get(cellKey(Math.floor(x / CELL_M), Math.floor(z / CELL_M)));
+    // The answer everywhere but within ninety metres of a platform, for the cost
+    // of one map miss. See `setStations`.
+    if (list === undefined) return CUT_HALF_WIDTH;
     let half = CUT_HALF_WIDTH;
-    for (let i = 0; i < this.sites.length; i += 4) {
+    for (const i of list) {
       const dx = x - this.sites[i];
       const dz = z - this.sites[i + 1];
       if (dx * dx + dz * dz > (STATION_HALF_LENGTH + 8) * (STATION_HALF_LENGTH + 8)) continue;
@@ -407,17 +500,46 @@ export class RailCut {
     ax: number, az: number, bx: number, bz: number,
     groundAt: (x: number, z: number) => number,
   ): boolean {
+    return this.probeAlong(ax, az, bx, bz, groundAt).cut;
+  }
+
+  /**
+   * Both answers about this stretch of track, from **one** walk of it.
+   *
+   * `cut` is where the ground has come away; `trench` is where that hole is deep
+   * enough to want retaining walls. See `TRENCH_MIN_DEPTH` for why they are two
+   * questions, and this signature for why they are one pass: the sampler is four
+   * metres apart over a forty-metre span, each sample is a cell lookup and a
+   * `railYOn` per strip that touches it, and at Redfern that is the single
+   * hottest loop in a chunk build. Asking it twice cost 50 ms on a 512 m hop and
+   * bought nothing -- every point either test looks at, the other looks at too.
+   */
+  probeAlong(
+    ax: number, az: number, bx: number, bz: number,
+    groundAt: (x: number, z: number) => number,
+  ): { cut: boolean; trench: boolean } {
     const len = Math.hypot(bx - ax, bz - az);
     const steps = Math.max(1, Math.ceil(len / 4));
+    let cut = false;
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
       const x = ax + (bx - ax) * t;
       const z = az + (bz - az) * t;
       const g = groundAt(x, z);
       if (!Number.isFinite(g)) continue;
-      if (Number.isFinite(this.cutAt(x, z, g))) return true;
+      const list = this.cells.get(cellKey(Math.floor(x / CELL_M), Math.floor(z / CELL_M)));
+      if (list === undefined) continue;
+      for (const s of list) {
+        const railY = this.railYOn(s, x, z);
+        if (!Number.isFinite(railY)) continue;
+        const depth = g - railY;
+        // A trench implies a cut -- `inTrench` says so -- so the deep answer
+        // ends the walk and the shallow one only records.
+        if (inTrench(this.flags[s], depth)) return { cut: true, trench: true };
+        if (inCutting(this.flags[s], depth)) cut = true;
+      }
     }
-    return false;
+    return { cut, trench: false };
   }
 
   /**

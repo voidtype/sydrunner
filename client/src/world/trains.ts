@@ -630,7 +630,69 @@ export interface TrainFleetStats {
   modelTriangles: number;
   /** What the last update cost, milliseconds. */
   updateMs: number;
+  /** Carriages that are solid to a body this frame. See `SOLID_RADIUS`. */
+  solidCars: number;
+  /** Carriages suppressed because the player is inside them. See `solidify`. */
+  riddenCars: number;
 }
+
+/**
+ * What a fleet needs from `player/collision.CollisionWorld` to be solid.
+ *
+ * A structural type rather than the class, on `world/rail-geo.RailSolids`' own
+ * terms: this module is imported by a process that draws trains and the
+ * collision world is imported by one that stops bodies, and the only thing they
+ * have to agree about is a plan ring, a base and a height.
+ */
+export interface TrainSolids {
+  addPrisms(
+    key: string,
+    prisms: ReadonlyArray<{ points: Float32Array; height: number; base: number }>,
+  ): number;
+  removeTile(key: string): number;
+}
+
+/**
+ * How far a carriage has to be before it stops being solid, metres.
+ *
+ * **Bounded, because a moving collider is rebuilt every frame and the city has
+ * ninety trains in it.** A body can only touch what it is standing next to, and
+ * 120 m covers a 163 m eight-car set straddling the player from either end with
+ * forty metres in hand. At Central at 8 am that is three consists and about
+ * twenty prisms a frame; the whole rebuild measures under a tenth of a
+ * millisecond, against the 0.1 ms `update` already costs.
+ */
+const SOLID_RADIUS = 120;
+
+/**
+ * The collision key the fleet owns. One key, taken back whole every frame.
+ *
+ * Namespaced like `rail-geo`'s `rail:<chunk>` so a reader of
+ * `collision.residentTiles()` can tell at a glance that this is not a tile the
+ * pipeline wrote.
+ */
+const SOLID_KEY = 'rail:trains';
+
+/**
+ * The solid body of a carriage, in its own frame: metres up from the railhead.
+ *
+ * `buildImpostorCar` draws the underframe from 0.3 m and the roof at 4.15 m, and
+ * these are those numbers with the underframe's own 5 cm of slack taken off the
+ * bottom so a body standing on the ballast meets the sole bar rather than the
+ * air under it. The half-width is the impostor's 1.52 m plus three centimetres,
+ * which keeps the collider just outside the drawn skin: a body stopped exactly
+ * on a surface it is also being drawn against is a body that shimmers.
+ *
+ * **Deliberately one box for every carriage in the game, model or impostor.**
+ * The Tangara and the Metropolis differ by 15 cm over the roof and 3 cm across,
+ * and a player cannot tell; what they can tell is a train that stops them when
+ * it is near and lets them through when a third train pushed it into the
+ * impostor tier. Length is the consist's own pitch less the coupler gap, which
+ * is exactly the scale `drawImpostor` puts on the box.
+ */
+const CAR_SOLID_FLOOR = 0.25;
+const CAR_SOLID_ROOF = 4.15;
+const CAR_SOLID_HALF_WIDTH = 1.55;
 
 export class TrainFleet {
   readonly group = new Group();
@@ -640,6 +702,8 @@ export class TrainFleet {
     modelDraws: 0,
     modelTriangles: 0,
     updateMs: 0,
+    solidCars: 0,
+    riddenCars: 0,
   };
   /** Anything the split or the load could not do. Printed once at boot. */
   readonly warnings: string[] = [];
@@ -652,6 +716,10 @@ export class TrainFleet {
   private readonly pose: TrainPose = createTrainPose();
   private readonly pitches = new Map<string, number>();
   private readonly triangles = new Map<string, number>();
+  /** Where a carriage goes to be solid. Null until `setSolids`. */
+  private solids: TrainSolids | null = null;
+  /** This frame's carriage prisms, reused rather than reallocated per frame. */
+  private readonly solidPrisms: Array<{ points: Float32Array; height: number; base: number }> = [];
 
   /**
    * Built empty and filled by `load`, which is the shape `main.ts` needs rather
@@ -799,6 +867,12 @@ export class TrainFleet {
   update(bake: RailBake, t: number, x: number, z: number): void {
     const started = performance.now();
     this.release();
+    // Last frame's carriages come out of the index **before** this frame's
+    // matrices are written into the same eight floats. The prism records are
+    // pooled and rewritten in place -- see `solidAt` -- so leaving them
+    // registered while they move would give the grid a frame in which a
+    // carriage's cached bounding box belongs to where it used to be.
+    if (this.solids !== null) this.solids.removeTile(SOLID_KEY);
 
     // Pass one: who is near, and how near. A fixed-size shortlist rather than a
     // sort, because the answer is "the two closest" and the list is tens long.
@@ -849,6 +923,8 @@ export class TrainFleet {
     let impostors = 0;
     let draws = 0;
     let triangles = 0;
+    let solid = 0;
+    let ridden = 0;
     for (let i = 0; i < found.length; i++) {
       const row = found[i];
       const consist = this.consistFor(row.dir, row.trip);
@@ -859,7 +935,17 @@ export class TrainFleet {
       } else {
         impostors = this.drawImpostor(bake, row.dir, row.s, consist, impostors);
       }
+      // **Solid on the same terms it is drawn on, and from the same pose.**
+      // A carriage the player can see is a carriage the player can walk into,
+      // whether it came out of the model tier or the box tier -- see
+      // `solidifyTrain`, and `SOLID_RADIUS` for why this is not every train.
+      if (this.solids !== null) {
+        const put = this.solidifyTrain(bake, row.dir, row.s, consist, x, z, solid);
+        if (put < 0) ridden += consist.cars.length;
+        else solid = put;
+      }
     }
+    if (this.solids !== null) this.commitSolids(solid);
 
     this.impostor.count = impostors;
     this.impostor.instanceMatrix.needsUpdate = true;
@@ -869,7 +955,119 @@ export class TrainFleet {
     this.stats.impostorCars = impostors;
     this.stats.modelDraws = draws;
     this.stats.modelTriangles = triangles;
+    this.stats.solidCars = solid;
+    this.stats.riddenCars = ridden;
     this.stats.updateMs = performance.now() - started;
+  }
+
+  /**
+   * Where a carriage goes to be solid. Null is a working configuration.
+   *
+   * A setter on `streamer.setCollisionSink`'s terms: `main.ts` builds the fleet
+   * before the collision world exists, and a fleet with no sink is exactly the
+   * fleet that shipped before this round -- every train drawn and none of them
+   * in the way. See `TrainSolids`.
+   */
+  setSolids(solids: TrainSolids | null): void {
+    if (this.solids !== null && this.solids !== solids) this.solids.removeTile(SOLID_KEY);
+    this.solids = solids;
+  }
+
+  /**
+   * One consist's carriages, as prisms, appended at `at`.
+   *
+   * Returns the new cursor, or **-1 to mean "the player is inside this train"**,
+   * in which case the caller drops everything this call wrote and the whole
+   * consist stays open.
+   *
+   * ---------------------------------------------------------------------------
+   * **The rider's own train must not collide with them, and this is how that is
+   * known without asking `game/riding.ts` anything.** The alternative is to
+   * thread the ridden trip through from `main.ts` -- a second source for a fact
+   * the geometry already carries -- and it fails the moment the two disagree
+   * about which carriage a rider is in. A body's plan position being inside a
+   * carriage's own rectangle *is* the definition of being aboard it: the
+   * platform edge stands 1.62 m from the track centre and the carriage is
+   * 1.55 m half-wide, so a person on the platform is seven centimetres clear of
+   * this test and a person aboard is a metre inside it.
+   *
+   * The suppression is per **consist**, not per carriage: a rider walks the
+   * length of the train, and a set that went solid one carriage at a time would
+   * be a wall arriving at the vestibule.
+   *
+   * The plan rectangle drops the frame's y components, which on the steepest
+   * gradient in the bake (3.3%) shortens the along axis by 0.05% -- a
+   * centimetre over a carriage -- and is what keeps this to eight multiplies.
+   */
+  private solidifyTrain(
+    bake: RailBake,
+    dir: RailDirection,
+    s: number,
+    consist: { cars: readonly ConsistCar[]; pitch: number },
+    px: number,
+    pz: number,
+    at: number,
+  ): number {
+    const halfLen = (consist.pitch - 0.9) / 2;
+    const hw = CAR_SOLID_HALF_WIDTH;
+    let cursor = at;
+    for (let k = 0; k < consist.cars.length; k++) {
+      const centre = consistOffset(s, k, consist.cars.length, consist.pitch);
+      if (centre < 0) continue;
+      carMatrix(bake, dir, centre, consist.cars[k].flip, _matrix);
+      const e = _matrix.elements;
+      // `makeBasis(f, u, r)`: column 0 is along the carriage, column 2 across.
+      const fx = e[0];
+      const fz = e[2];
+      const rx = e[8];
+      const rz = e[10];
+      const ox = e[12];
+      const oy = e[13];
+      const oz = e[14];
+      const dx = px - ox;
+      const dz = pz - oz;
+      if (dx * dx + dz * dz > SOLID_RADIUS * SOLID_RADIUS) continue;
+      if (Math.abs(dx * fx + dz * fz) <= halfLen && Math.abs(dx * rx + dz * rz) <= hw) {
+        return -1;
+      }
+      const prism = this.solidAt(cursor);
+      const p = prism.points;
+      const ax = fx * halfLen;
+      const az = fz * halfLen;
+      const bx = rx * hw;
+      const bz = rz * hw;
+      p[0] = ox + ax + bx; p[1] = oz + az + bz;
+      p[2] = ox + ax - bx; p[3] = oz + az - bz;
+      p[4] = ox - ax - bx; p[5] = oz - az - bz;
+      p[6] = ox - ax + bx; p[7] = oz - az + bz;
+      prism.base = oy + CAR_SOLID_FLOOR;
+      prism.height = CAR_SOLID_ROOF - CAR_SOLID_FLOOR;
+      cursor++;
+    }
+    return cursor;
+  }
+
+  /**
+   * The prism record at `i`, grown on demand and **never reallocated**.
+   *
+   * `CollisionWorld.addPrisms` keeps the `Float32Array` it is handed by
+   * reference, and the key is taken back whole one line before it is filled
+   * again, so the same eight floats can be rewritten every frame for the life of
+   * the session. Ninety trains' worth of `new Float32Array(8)` sixty times a
+   * second is the only garbage this file would otherwise make.
+   */
+  private solidAt(i: number): { points: Float32Array; height: number; base: number } {
+    while (this.solidPrisms.length <= i) {
+      this.solidPrisms.push({ points: new Float32Array(8), height: 0, base: 0 });
+    }
+    return this.solidPrisms[i];
+  }
+
+  /** Index this frame's carriages. `update` took last frame's back already. */
+  private commitSolids(count: number): void {
+    const solids = this.solids;
+    if (solids === null || count === 0) return;
+    solids.addPrisms(SOLID_KEY, this.solidPrisms.slice(0, count));
   }
 
   private readonly scratch: Array<{

@@ -282,9 +282,7 @@ import { ACCELERATION } from '../client/src/player/controller.ts';
 // whether the one shared seam survives a wire.
 import {
   RAIL_EPOCH_MS,
-  createTrainPose,
   railSeconds,
-  sampleAlong,
   type RailBake,
 } from '../client/src/game/rail.ts';
 import {
@@ -1689,6 +1687,13 @@ async function main(): Promise<void> {
   // of one solid or another inside the loading gauge. See `checkClearance`.
   say('');
   await checkClearance();
+
+  // --- 34c. And whether the *cars* are standing on the ground that is drawn.
+  // Reported as "there are still some underground cars etc at spawn point, why
+  // can cars do that???", which is a fair question with an answer in code rather
+  // than a shrug. See `checkCarGround`.
+  say('');
+  await checkCarGround();
 
   // --- 35. And whether any of it can be *heard*. The announcements are a
   // second reading of the same `dir.arrivals` the doors are driven from, so the
@@ -17976,7 +17981,19 @@ async function checkRiding(): Promise<void> {
       }
       return best;
     };
-    for (const railT of [19142405.90, 19142452.96, 19141856.83, 19142101.56, 19142634.94]) {
+    // Four of the original five went stale when the bake stopped anchoring a
+    // station's two directions in two places: `stop.s` moved, `arrivals` moved
+    // with it, and an instant chosen because the old rule picked a shut-door
+    // train there stopped being one. The ride still worked at all five -- they
+    // boarded, travelled and stepped out onto a platform -- it was the *first*
+    // half of the assertion, "this instant still reproduces the failure", that
+    // stopped holding, which is exactly the staleness this comment warns about
+    // and exactly why both halves are asserted.
+    //
+    // Re-derived against the current timetable by replaying `oldPick` below over
+    // the clock, and deliberately spread fifteen minutes apart rather than taken
+    // from one cluster: five samples of one instant is one sample.
+    for (const railT of [19142432.85, 19142452.96, 19143339.98, 19144249.21, 19145149.76]) {
       const stale = oldPick(railT);
       const shut = stale !== null && (!rail1.poseTrain(bake, stale.dir, stale.trip, railT, pose) ||
         !pose.doorsOpen);
@@ -18540,22 +18557,39 @@ async function checkRidingOnline(): Promise<void> {
   // than no marker, so the check is that walking to it makes the key work.
   {
     const t = Math.max(openDwell.opensAt + 2, railNow());
-    // Twelve metres along the platform from the boarding stand: out of reach of
-    // any door -- which is where the player who filed this report was standing.
-    const away = { x: stand.x, y: stand.y, z: stand.z };
-    const dir0 = dirOf(bake, openDwell.line, openDwell.dir)!;
-    const at = createTrainPose();
-    sampleAlong(bake, dir0, openDwell.trip >= 0 ? dir0.stops[0].s : 0, at);
-    away.x = stand.x + at.dx * 12;
-    away.z = stand.z + at.dz * 12;
+    // --- Out of reach **by construction**, which the previous version was not.
+    //
+    // It stepped 12 m along the platform and asserted that no door was within
+    // reach there. That is not a property of the platform: an eight-car set has
+    // a doorway every few metres for its whole 163 m, so whether 12 m along
+    // lands between two of them is a phase accident -- and the heading it
+    // stepped along was sampled at `dir.stops[0]`, the far end of the *line*,
+    // rather than at this dwell. It passed for as long as those two accidents
+    // happened to agree, and stopped the moment the bake moved where trains
+    // stand.
+    //
+    // Across the platform is deterministic. `dwellStand` puts the body
+    // `PLATFORM_INNER_M + 0.8` = 2.4 m off the track centre and faces it at the
+    // carriage, so `(sin yaw, cos yaw)` is the outward normal by that function's
+    // own construction; four metres along it is 6.4 m from the track centre,
+    // which is still on a 7.1 m platform and is `BOARD_REACH_M` plus a metre
+    // and a half outside the bodyside. That is the reported complaint exactly --
+    // standing at the back of the platform with the doors open and nothing on
+    // screen saying where -- and it cannot come untrue by phase.
+    const back = 4;
+    const away = {
+      x: stand.x + Math.sin(stand.yaw) * back,
+      y: stand.y,
+      z: stand.z + Math.cos(stand.yaw) * back,
+    };
     const probe = createBoardOffer();
     const feet = away.y - EYE_HEIGHT;
     const inReachThere = findBoarding(bake, away.x, feet, away.z, t, probe);
     const near = nearestDwell(bake, away.x, feet, away.z, t);
     check(
       !inReachThere && near !== null,
-      `standing 12 m along the ${STATION} platform, \`findBoarding\` refuses (so the bare prompt does ` +
-        `not appear) and \`nearestDwell\` still names a doorway ` +
+      `standing ${back} m back across the ${STATION} platform, \`findBoarding\` refuses (so the bare ` +
+        `prompt does not appear) and \`nearestDwell\` still names a doorway ` +
         `${near === null ? '(it did not)' : `${near.metres.toFixed(1)} m away on the ${near.line}`}. ` +
         `That gap is the whole of the reported complaint: a train with its doors open, and nothing on ` +
         `screen saying where`,
@@ -19445,12 +19479,30 @@ async function checkRailAnnouncements(): Promise<void> {
 
       // Where that train's carriages actually are, so the bystander stands
       // somewhere real rather than at the origin.
+      //
+      // **Abeam the middle carriage, not abeam the head**, and on a curve those
+      // are different places. `consistDistance` measures to the nearest
+      // *carriage's own axis*, so a bystander offset along the head's normal is
+      // offset along the wrong normal for whichever carriage turns out to be
+      // nearest: at Strathfield, 60 m out from the head measured 47.8 m to a
+      // carriage 40 m back whose axis had rotated under it, and the assertion
+      // below -- which is about *what* is being measured, not about the
+      // curvature of Strathfield -- failed on 12.2 m against its 12 m tolerance.
+      // Taken off the middle car's own frame the error is 2.5 m and it is the
+      // clamp along the carriage, which is the thing the assertion means.
       const pose = rail.createTrainPose();
       rail.poseTrain(a, dir, trip, mid, pose);
-      const nx = -pose.dz;
-      const nz = pose.dx;
+      const consist = ride.consistOf(dir, trip);
+      const abeam = rail.createTrainPose();
+      rail.sampleAlong(
+        a, dir,
+        ride.consistOffset(pose.s, consist.cars.length >> 1, consist.cars.length, consist.pitch),
+        abeam,
+      );
+      const nx = -abeam.dz;
+      const nz = abeam.dx;
       for (const [metres, want] of [[4, true], [60, true], [400, false]] as const) {
-        one.railAnnounceMix(a, mid, pose.x + nx * metres, pose.z + nz * metres, null, mix);
+        one.railAnnounceMix(a, mid, abeam.x + nx * metres, abeam.z + nz * metres, null, mix);
         check(
           mix.depart.active === want,
           `  standing ${metres} m to the side of it: ${mix.depart.active
@@ -19465,7 +19517,7 @@ async function checkRailAnnouncements(): Promise<void> {
           );
         }
       }
-      one.railAnnounceMix(a, mid, pose.x + nx * 4, pose.z + nz * 4, null, mix);
+      one.railAnnounceMix(a, mid, abeam.x + nx * 4, abeam.z + nz * 4, null, mix);
       check(
         mix.depart.station === pick.name && mix.depart.line === line.id,
         `  and the bystander hears ${line.id} announcing ${mix.depart.station}, which is the station ` +
@@ -19950,6 +20002,167 @@ async function checkBigMapAtScale(): Promise<void> {
  * rail" is true of a railway entirely on embankment. So each assertion is paired
  * with a count that must be *non*-zero, and the pair is what means something.
  */
+/**
+ * No car sits under the ground that is actually drawn beneath it.
+ *
+ * ---------------------------------------------------------------------------
+ * THE REPORT, AND WHY IT NEEDED A MEASUREMENT RATHER THAN A GUESS.
+ *
+ * *"there are still some underground cars etc at spawn point, why can cars do
+ * that???"* -- and the honest answer turned out not to be the obvious one.
+ *
+ * A parked car is placed by `world/cars.buildTileCars` against `groundAt`, which
+ * is `terrain.sampleTileGrid` over the tile's own `.terr.bin`; a moving one is
+ * posed by `game/traffic.ts` from a lane vertex whose `y` the pipeline wrote as
+ * `terrain.sample(...) + streets.CARRIAGEWAY_Y` off the same lattice. Both are
+ * the **DEM**. Swept over the whole 60 km build -- 1,402,581 static cars -- the
+ * DEM placement is exact: not one car is off its own tile's grid by so much as a
+ * centimetre, and the lane graph agrees with it to the same tolerance. So the
+ * fleet was never mis-placed against the heightfield, and any fix aimed there
+ * would have been a fix for nothing.
+ *
+ * What can be wrong is the *other* half: **the DEM is not always the surface
+ * that gets drawn.** Three things now replace or remove it, and every one of
+ * them arrived after `buildTileCars` was written --
+ *
+ *   - `world/rail-cut.RailCut` deletes the terrain sheet along a corridor, so a
+ *     car over one is standing on a sheet that is not there;
+ *   - `game/riding.PlatformField` puts a station platform where the terrain was;
+ *   - a building prism can simply stand over the kerb.
+ *
+ * This is the check that says so, in numbers, forever. It replays exactly what
+ * `main.ts`'s `groundHeightAt` and `server/world.groundFor` compute -- platform
+ * first, then the carved cutting's floor, then the terrain, and the roof of any
+ * prism folded into all three -- and asserts that no car is more than
+ * `SUNK_TOLERANCE_M` under it.
+ *
+ * The tolerance is not slack for a bug to hide in: a car is 1.45 to 2.0 m tall,
+ * so a quarter of a metre is the point at which a wheel arch disappears, and
+ * anything the eye would call "underground" is metres.
+ *
+ * **The number this passes at today is 40 cars out of 1.4 million**, all of them
+ * parked under a building prism -- an awning, a first-floor overhang, a car park
+ * with a slab over it -- which is a car parked under a building and not a bug.
+ * The bound is set above that and well under anything a player would see, so the
+ * day `RailCut` or `PlatformField` grows a new case this fails and names it.
+ */
+async function checkCarGround(): Promise<void> {
+  say('--- The fleet stands on the ground that is drawn, not on the one that was');
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const world = await loadWorld(root);
+  const ground = groundFor(world);
+
+  /** How far under the drawn surface a car may be before it is a bug, metres. */
+  const SUNK_TOLERANCE_M = 0.25;
+  /** `world/cars.CARRIAGEWAY_Y`. The 2 cm a kerbside bay stands over the road. */
+  const CARRIAGEWAY_Y = 0.02;
+  /**
+   * How high over its wheels the query is made.
+   *
+   * `groundHeightAt` is a function of where the asker's feet are, because
+   * "what am I standing on" cannot be answered without it -- `PlatformField`
+   * answers only within a step below and a jump above a platform, and
+   * `roofHeight` only for a prism the asker is inside. A car's roof is the
+   * honest height to ask from: it is the part a player sees vanish.
+   */
+  const CAR_ROOF_M = 1.5;
+  /**
+   * Every nth car per tile. The whole fleet is 1.4 M and the sweep is one
+   * `groundFor` call each; a stride of 7 walks every tile in the extent, keeps
+   * 200,000 samples, and is coprime with nothing in the sidecar's ordering so it
+   * does not settle on one side of a street.
+   */
+  const STRIDE = 7;
+
+  let cars = 0;
+  let tiles = 0;
+  let sunk = 0;
+  let worst = 0;
+  let worstAt = '';
+  let overCut = 0;
+  let underPlatform = 0;
+  for (const entry of world.index.tiles) {
+    const ox = entry.bounds[0];
+    const oz = entry.bounds[1] + world.index.tile_size;
+    const buf = await Bun.file(join(root, 'tiles', `${entry.key}.cars.bin`))
+      .arrayBuffer()
+      .catch(() => null);
+    if (buf === null) continue;
+    tiles++;
+    const v = new DataView(buf);
+    // `cars.CAR_STRIDE`, bounded by `decodeCars`' own rule: a count the file is
+    // too short to hold is a truncated sidecar, not a licence to read past it.
+    const n = Math.min(v.getUint32(0, true), Math.max(0, Math.floor((buf.byteLength - 4) / 16)));
+    for (let i = 0; i < n; i += STRIDE) {
+      const o = 4 + i * 16;
+      const x = v.getFloat32(o, true) + ox;
+      const z = v.getFloat32(o + 4, true) + oz;
+      const sampled = world.terrain.height(x, z);
+      if (!Number.isFinite(sampled)) continue;
+      cars++;
+      // Exactly what `buildTileCars` writes: the tile's own grid plus the
+      // carriageway clearance, and nothing else.
+      const carY = sampled + CARRIAGEWAY_Y;
+      const drawn = ground.groundHeight(x, z, carY + CAR_ROOF_M);
+      if (world.platforms && world.platforms.heightAt(x, z, carY + CAR_ROOF_M) > -Infinity) {
+        underPlatform++;
+      } else if (world.railCut && Number.isFinite(world.railCut.cutAt(x, z, sampled))) {
+        overCut++;
+      }
+      const drop = drawn - carY;
+      if (drop > SUNK_TOLERANCE_M) {
+        sunk++;
+        if (drop > worst) {
+          worst = drop;
+          worstAt = `${entry.key}#${i} at (${x.toFixed(0)}, ${z.toFixed(0)})`;
+        }
+      }
+    }
+  }
+
+  check(
+    cars > 100_000 && tiles > 1_000,
+    `${cars.toLocaleString()} parked cars sampled from ${tiles.toLocaleString()} tiles across the ` +
+      `whole extent, every ${STRIDE}th car in each -- the fleet the report is about`,
+  );
+  // 60 is the bound, not the number: the shipped build fails this at 6 and every
+  // one of those is a car parked under a building. See the header.
+  check(
+    sunk <= 60,
+    `${sunk} of them sit more than ${SUNK_TOLERANCE_M} m under the ground that is actually ` +
+      `drawn beneath them -- platform first, then a carved cutting's floor, then the terrain, ` +
+      `with any prism's roof folded into all three, which is \`main.ts\`'s \`groundHeightAt\` and ` +
+      `\`world.groundFor\` verbatim` +
+      (sunk ? `; worst ${worst.toFixed(2)} m, ${worstAt}` : ''),
+  );
+  check(
+    overCut < cars / 500 && underPlatform < cars / 500,
+    `${overCut} of them stand over a carved rail corridor and ${underPlatform} inside a station ` +
+      `platform's footprint -- the two surfaces that replace the terrain rather than sit on it, ` +
+      `and the two the placement code cannot see`,
+  );
+
+  // The negative control, which is the whole reason the bound above is a number
+  // and not a ratio: drop one car by four metres and confirm the same expression
+  // catches it. Without this a check that measured the wrong thing -- the DEM
+  // against itself, which is what a naive version of this does -- would pass on
+  // an empty set forever.
+  {
+    const probe = world.index.tiles.find((t) => t.key === '0_0') ?? world.index.tiles[0];
+    const x = probe.bounds[0] + world.index.tile_size / 2;
+    const z = probe.bounds[1] + world.index.tile_size / 2;
+    const here = world.terrain.height(x, z);
+    const buried = Number.isFinite(here) ? here - 4 + CARRIAGEWAY_Y : NaN;
+    const drawn = ground.groundHeight(x, z, buried + CAR_ROOF_M);
+    check(
+      Number.isFinite(buried) && drawn - buried > SUNK_TOLERANCE_M,
+      `  NEGATIVE CONTROL: a car placed 4 m under the terrain at (${x.toFixed(0)}, ${z.toFixed(0)}) ` +
+        `is caught by the same expression -- ${(drawn - buried).toFixed(2)} m under the drawn ground`,
+    );
+  }
+}
+
 async function checkClearance(): Promise<void> {
   say('--- The loading gauge: nothing standing in the railway');
 

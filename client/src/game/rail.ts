@@ -61,8 +61,14 @@ export const RAIL_MAGIC = 0x4c494152;
  *
  * 2: the `vertexClearance` buffer, and `station.vertical` derived from the
  * measured clearance rather than from the OSM tags alone. See RAIL-VERTICAL.md.
+ * 3: a station is one place. Every record now carries where its trains actually
+ * stand (`siteX/siteZ/siteY` and the heading along the platform), the platform
+ * decks OSM surveyed with their numbers and their island/side verdict, and the
+ * access a body needs to reach the platform -- an entrance, a shaft depth, and
+ * the box the platform sits in. `game/riding.StationBoxField` is the reason the
+ * last of those exists.
  */
-export const RAIL_VERSION = 2;
+export const RAIL_VERSION = 3;
 
 /**
  * 2026-01-01T00:00:00Z. The same instant `traffic.ts` counts from.
@@ -158,6 +164,75 @@ export interface RailStation {
   platforms: number;
   tunnelShare: number;
   bridgeShare: number;
+
+  // --- Where the trains actually stand (bake version 3) ----------------------
+  //
+  // `x, z` above is the OSM station *node*, which is wherever a mapper put a
+  // dot -- 126 m from the platform at Central, and at Meadowbank it was the
+  // reason two directions became two stations. This is the mean of every
+  // calling anchor: the place a station box, a stair or a name board belongs.
+  siteX: number;
+  siteZ: number;
+  siteY: number;
+  /** The terrain over the site. `siteY` under this is a station in a hole. */
+  siteGroundY: number;
+  /** Unit heading of the track at the site. The platform runs along it. */
+  siteDx: number;
+  siteDz: number;
+  /** How far apart the furthest two calling anchors are, metres. */
+  siteSpread: number;
+  /** How many `samePlatform` rectangles those anchors need. */
+  siteFaces: number;
+  /** Which directions call here: [0], [1] or [0, 1]. */
+  servedDirs: number[];
+  lines: string[];
+
+  // --- What is inside the station, from OSM's own `railway=platform` polygons
+  faces: RailPlatformFace[];
+  /** Every platform number at this station, sorted. */
+  refs: number[];
+  islands: number;
+  sides: number;
+  platformLength: number;
+
+  // --- Access, generated from the clearance profile (RAIL-VERTICAL.md §4) ----
+  entranceX: number;
+  entranceZ: number;
+  entranceY: number;
+  entranceSource: 'osm' | 'generated' | 'none';
+  /** Metres of stair from the street to the platform surface. Positive down. */
+  shaftDepth: number;
+  /** Is the platform under the ground over it? Then it needs steps, by construction. */
+  belowGrade: boolean;
+  /** The platform surface, absolute metres: the floor of the station box. */
+  boxFloorY: number;
+  /** The terrain over it: the lid. */
+  boxCeilY: number;
+  boxHalfLength: number;
+  boxHalfWidth: number;
+}
+
+/**
+ * One platform deck, as OSM surveyed it.
+ *
+ * A real position, a real length and the number on the sign at the end of it --
+ * `pipeline/sydney/rail._platform_axis` takes the minimum-area rotated
+ * rectangle, so the length and heading are the shape that was drawn rather than
+ * an axis-aligned box's opinion of it. `refs` has two entries on an island
+ * platform (`ref=16;17` is one deck with a face and a number each way), and
+ * `island` is measured off the track rather than read off that tagging.
+ */
+export interface RailPlatformFace {
+  x: number;
+  z: number;
+  ux: number;
+  uz: number;
+  halfLength: number;
+  halfWidth: number;
+  refs: number[];
+  island: boolean;
+  level: number | null;
+  osmId: string;
 }
 
 export interface RailBake {
@@ -755,6 +830,41 @@ export function verifyRail(bake: RailBake): string[] {
   for (const st of bake.stations) {
     if (st.vertical === 'elevated' && !(st.clearance > 0)) {
       bad.push(`${st.name} is classed elevated with a measured clearance of ${st.clearance} m`);
+    }
+  }
+  // --- A station is one place, re-derived from this side of the file.
+  //
+  // `rail.split_stations` asserts the same thing in Python and `checkRail` runs
+  // this; two readers, no shared code, which is the rule TRAINS.md set for the
+  // separation proof and which applies here for the same reason. The shipped
+  // bake had 184 of 190 served station names resolving to more than one
+  // platform site and nothing on either end ever said so.
+  for (const st of bake.stations) {
+    if (!st.servedDirs || st.servedDirs.length === 0) continue;
+    if (st.servedDirs.length < 2) {
+      bad.push(
+        `${st.name} is served in ${st.servedDirs.length} direction of two -- ` +
+        `a station is one place with a train each way`,
+      );
+    }
+    // 160 m is `riding.PLATFORM_HALF_LENGTH_M` doubled: the length of the
+    // platform that would have to hold every one of those services at once.
+    // Lidcombe's Olympic Park bay is a real second place and is the one name
+    // the pipeline excepts; 240 m leaves it alone and still catches
+    // Meadowbank's 471 m.
+    if (st.siteSpread > 240) {
+      bad.push(
+        `${st.name}'s calling services stand ${st.siteSpread.toFixed(0)} m apart, ` +
+        `which is two stations under one name`,
+      );
+    }
+    // The box has to contain the platform it is a box around, or a body inside
+    // it is standing on a floor that is not there.
+    if (st.belowGrade && !(st.boxCeilY > st.boxFloorY)) {
+      bad.push(
+        `${st.name} is below grade with its box lid at ${st.boxCeilY} m and its floor at ` +
+        `${st.boxFloorY} m, which is inside out`,
+      );
     }
   }
   return bad;

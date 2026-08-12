@@ -119,7 +119,12 @@ import { RailCut } from '../client/src/world/rail-cut.ts';
 import { ClearanceEnvelope } from '../client/src/world/envelope.ts';
 import { SPAN_TUNNEL } from '../client/src/game/rail.ts';
 
-import { buildPlatforms, type PlatformField } from '../client/src/game/riding.ts';
+import {
+  buildPlatforms,
+  buildStationBoxes,
+  type PlatformField,
+  type StationBoxField,
+} from '../client/src/game/riding.ts';
 
 // --- Hex-lazy collision ---------------------------------------------------------
 
@@ -1685,6 +1690,17 @@ export interface ServerWorld {
    * gap is a real one -- see `groundFor`.
    */
   railCut?: RailCut | null;
+  /**
+   * The underground stations, as the volumes a body may be inside. Null with no bake.
+   *
+   * The third of the three fields `groundFor` consults, and the one that was
+   * missing: a platform is 5.5 m wide, a cutting is open to the sky and
+   * `RailCut.cutAt` declines on a bore, so the inside of a station box was
+   * answered by the DEM twenty metres over the top of it. A client walking
+   * across the Town Hall concourse was a client this process dragged up into
+   * George Street at the correction rate. See `game/riding.StationBoxField`.
+   */
+  stationBoxes?: StationBoxField | null;
 }
 
 /**
@@ -1894,9 +1910,11 @@ export async function loadWorld(
     rail: await loadRail(root),
     platforms: null,
     railCut: null,
+    stationBoxes: null,
   };
   world.platforms = world.rail ? buildPlatforms(world.rail) : null;
   world.railCut = world.rail ? new RailCut(world.rail) : null;
+  world.stationBoxes = world.rail ? buildStationBoxes(world.rail) : null;
   // The corridor opens out at a platform, and both ends have to agree about
   // where. `main.ts` hands `RailCut` the routed stopping anchors out of
   // `rail-geo.buildNetwork`; this process cannot import that module -- it draws
@@ -2169,6 +2187,7 @@ async function readOptional(path: string): Promise<ArrayBuffer | null> {
 export function groundFor(world: ServerWorld): CombatWorld {
   let lastGround = 0;
   const platforms = world.platforms ?? null;
+  const boxes = world.stationBoxes ?? null;
   const cut = world.railCut ?? null;
   return {
     collision: world.collision,
@@ -2194,6 +2213,17 @@ export function groundFor(world: ServerWorld): CombatWorld {
       const platform = platforms === null ? -Infinity : platforms.heightAt(x, z, feetY);
       const roof = world.collision.roofHeight(x, z, feetY);
       if (platform > -Infinity) return Math.max(platform, roof);
+      // **And the rest of the station.** `main.ts`'s `groundHeightAt` carries
+      // the identical clause in the identical position, and this one is not a
+      // second opinion: both call `StationBoxField.floorAt` over a field both
+      // built from the same bake. Without it the concourse at Town Hall, Museum
+      // and every other box in the city was answered by the DEM twenty metres
+      // overhead, and a player who walked off the platform was corrected up into
+      // the street -- reported as *"moving anywhere on foot underground tps me
+      // to surface"*. `cutAt` below cannot cover it: a bore is deliberately not
+      // carved, because a tunnel has no surface expression to carve.
+      const boxFloor = boxes === null ? -Infinity : boxes.floorAt(x, z, feetY);
+      if (boxFloor > -Infinity) return Math.max(boxFloor, roof);
       // **Inside a carved cutting the terrain is not there**, and until this
       // line nothing on either end knew it. `terrain.buildTerrainMesh` drops the
       // sub-quads the corridor crosses and `world/rail-geo.ts` builds a trench

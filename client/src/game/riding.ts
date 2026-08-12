@@ -1089,6 +1089,216 @@ export function buildPlatforms(bake: RailBake): PlatformField {
   return field;
 }
 
+// --- Inside the station, which until now was nowhere ---------------------------------
+
+/**
+ * How much headroom under the terrain still counts as being inside the box.
+ *
+ * A body at Town Hall stands 20 m under George Street and a body *on* George
+ * Street stands on George Street, and the two must never be confused. So the
+ * box answers only below its own lid less this: at the lid you are in the
+ * street, a metre and a half under it you are in the station.
+ */
+export const BOX_HEADROOM_M = 1.5;
+
+/**
+ * The least a box may be from floor to lid before it is not a room.
+ *
+ * `BOX_HEADROOM_M` already takes 1.5 m off the top and `PLATFORM_STEP_M` gives
+ * 0.42 m under the floor, so a box shallower than this answers over a band
+ * narrower than a stride -- which is not a station, it is a tripwire. Four
+ * metres is a platform, a person and the wires over them.
+ */
+export const BOX_MIN_HEIGHT_M = 4;
+
+/**
+ * The volume a body may legitimately be inside, per station.
+ *
+ * ---------------------------------------------------------------------------
+ * THE BUG THIS EXISTS FOR, IN THE PLAYER'S OWN WORDS.
+ *
+ * *"moving anywhere on foot underground tps me to surface"*.
+ *
+ * It is not a teleport and nothing rescues anybody: it is the **ground query**,
+ * and it was right about everything it knew. `main.ts`'s `groundHeightAt` and
+ * `server/world.groundFor` ask three things in order -- am I on a platform
+ * (`PlatformField`), am I in a carved cutting (`RailCut.cutAt`), otherwise the
+ * terrain. Inside an underground station box the first answers only within a
+ * step of the platform edge, and the second **declines by design**: `cutAt`
+ * refuses on a `SPAN_TUNNEL` strip, because a bore has no surface expression
+ * and carving a hole down to it would open the city to the sky. So one pace off
+ * the platform, the answer fell through to the DEM -- twenty metres up -- and
+ * the controller put the body's feet on it, every frame, on both ends of the
+ * wire at once. Walking off a platform at Town Hall was walking up a lift
+ * shaft.
+ *
+ * Neither of the two existing fields can answer it. A platform is 5.5 m wide
+ * and a station box is thirty; a cutting is open to the sky and a box is not.
+ * This is the third question -- **am I inside the station** -- and it is the one
+ * that makes the other two mean what they say.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY IT IS AN ORIENTED BOX AND NOT A RADIUS.
+ *
+ * `PlatformField` learned this the expensive way (see `samePlatform`): a
+ * station is 160-360 m long and thirty wide, so a radius that reaches the far
+ * end of the platform also reaches the street two blocks over, and a radius
+ * that does not reach the street does not reach the platform either. The bake
+ * emits the site, the heading along the track and the two half-extents; this
+ * tests `along` and `across` in the station's own frame, which is the same
+ * shape and the same arithmetic the platform test uses.
+ *
+ * Built from `bake.stations` rather than from geometry, on `PlatformField`'s
+ * own argument: the server has no renderer and must reach the identical answer,
+ * or a client that walks across a concourse is a client the server drags back
+ * up through the roof.
+ */
+export interface StationBox {
+  name: string;
+  x: number;
+  z: number;
+  ux: number;
+  uz: number;
+  halfLength: number;
+  halfWidth: number;
+  /** The platform surface: the floor a body inside stands on. */
+  floorY: number;
+  /** The terrain over the box: its lid. */
+  ceilY: number;
+}
+
+export class StationBoxField {
+  private readonly cells = new Map<number, StationBox[]>();
+  readonly boxes: StationBox[] = [];
+  /** Grid pitch. A box is at most ~400 m long, so a query touches a few cells. */
+  private static readonly CELL = 128;
+
+  private static key(cx: number, cz: number): number {
+    return (cx & 0xffff) * 65536 + (cz & 0xffff);
+  }
+
+  add(box: StationBox): void {
+    this.boxes.push(box);
+    const r = box.halfLength + box.halfWidth;
+    const x0 = Math.floor((box.x - r) / StationBoxField.CELL);
+    const x1 = Math.floor((box.x + r) / StationBoxField.CELL);
+    const z0 = Math.floor((box.z - r) / StationBoxField.CELL);
+    const z1 = Math.floor((box.z + r) / StationBoxField.CELL);
+    for (let cx = x0; cx <= x1; cx++) {
+      for (let cz = z0; cz <= z1; cz++) {
+        const k = StationBoxField.key(cx, cz);
+        const list = this.cells.get(k);
+        if (list) list.push(box);
+        else this.cells.set(k, [box]);
+      }
+    }
+  }
+
+  /**
+   * The floor under a body that is inside a station box, or `-Infinity`.
+   *
+   * **`feetY` is a band, exactly as `PlatformField.heightAt`'s is**, and for the
+   * identical reason stated one level up: an answer here means "you are in the
+   * station", never "there is a station somewhere under you". Above
+   * `ceilY - BOX_HEADROOM_M` you are in the street over Town Hall and this must
+   * say nothing at all, or every pedestrian in the CBD falls through the
+   * pavement. Below the floor by more than a step you are under the station,
+   * which is not a place, and the terrain can have you back.
+   *
+   * The caller treats an answer as **replacing** the terrain rather than
+   * competing with it -- the same rule `PlatformField`'s answer gets, and the
+   * same reason: the terrain grid here is the city twenty metres overhead.
+   */
+  floorAt(x: number, z: number, feetY: number): number {
+    const list = this.cells.get(
+      StationBoxField.key(
+        Math.floor(x / StationBoxField.CELL), Math.floor(z / StationBoxField.CELL),
+      ),
+    );
+    if (list === undefined) return -Infinity;
+    let best = -Infinity;
+    for (const box of list) {
+      const dx = x - box.x;
+      const dz = z - box.z;
+      const along = dx * box.ux + dz * box.uz;
+      if (along < -box.halfLength || along > box.halfLength) continue;
+      const across = dx * -box.uz + dz * box.ux;
+      if (across < -box.halfWidth || across > box.halfWidth) continue;
+      if (feetY < box.floorY - PLATFORM_STEP_M) continue;
+      if (feetY > box.ceilY - BOX_HEADROOM_M) continue;
+      if (box.floorY > best) best = box.floorY;
+    }
+    return best;
+  }
+
+  /**
+   * Is this body legitimately inside a station, rather than stuck in the world?
+   *
+   * The question `/unstuck` has to ask before it rescues anybody. Same
+   * rectangle and the same band as `floorAt`, expressed as a predicate so a
+   * caller that does not want a height does not have to compare one against
+   * `-Infinity` and get the sense of the test backwards.
+   */
+  contains(x: number, z: number, feetY: number): boolean {
+    return this.floorAt(x, z, feetY) > -Infinity;
+  }
+}
+
+/**
+ * Build the station boxes from the bake. Once, at boot, on both ends.
+ *
+ * ---------------------------------------------------------------------------
+ * **A BORE GETS A BOX. A CUTTING DOES NOT**, and the difference is the whole of
+ * the selection rule.
+ *
+ * RAIL-VERTICAL.md's table draws it: a `tunnel` station is *"a station box and a
+ * shaft"* and a cutting is *"carve the terrain, trench walls"*. The carve is
+ * already built and `RailCut.cutAt` already answers inside it, down to the rail
+ * head -- which is the right answer there, because a cutting is open to the sky
+ * and the ballast between the rails is a place a body can stand on.
+ *
+ * A box laid over a cutting would take that answer away. It replaces the ground
+ * across its whole footprint, so a body in the four-foot at Sydenham would be
+ * stood 1.05 m up in the air on a floor that only exists where the platform is.
+ * Sydenham, Chatswood and Kingsgrove are all `belowGrade` and all wrong for a
+ * box; the two conditions are kept together in the test so the distinction is
+ * visible rather than implied.
+ *
+ * A station at grade and one on a viaduct get nothing here either: the terrain
+ * and `PlatformField` respectively already answer, and a lid over open sky
+ * would have `floorAt` answering for bodies standing in the car park.
+ */
+export function buildStationBoxes(bake: RailBake): StationBoxField {
+  const field = new StationBoxField();
+  for (const st of bake.stations) {
+    if (st.vertical !== 'underground' || !st.belowGrade) continue;
+    // **And a service calls there**, which is what makes the site a site. A
+    // station with no calling train has no routed anchor, so the bake falls
+    // back to the OSM node and the "box" is a guess around a dot -- and the
+    // stations that fall into it are the CBD light-rail stops that sit over the
+    // Metro bore, Chinatown and Capitol Square among them, which are pavement
+    // rather than concourse. `PlatformField` is built from calling stops for
+    // the same reason and this keeps the two describing the same set.
+    if (!st.servedDirs || st.servedDirs.length === 0) continue;
+    if (!Number.isFinite(st.boxFloorY) || !Number.isFinite(st.boxCeilY)) continue;
+    // A box has to be tall enough to stand up in, or it is a slab that only
+    // catches bodies in a one-metre band and reads as a hole in the ground.
+    if (!(st.boxCeilY - st.boxFloorY >= BOX_MIN_HEIGHT_M)) continue;
+    field.add({
+      name: st.name,
+      x: st.siteX,
+      z: st.siteZ,
+      ux: st.siteDx,
+      uz: st.siteDz,
+      halfLength: st.boxHalfLength,
+      halfWidth: st.boxHalfWidth,
+      floorY: st.boxFloorY,
+      ceilY: st.boxCeilY,
+    });
+  }
+  return field;
+}
+
 // --- Who is aboard what --------------------------------------------------------------
 
 /**
@@ -2391,6 +2601,80 @@ export function verifyRiding(eyeHeight: number, radius: number): string[] {
   if (bailoutDamage(0) !== 0) bad.push('a bail-out at a stand hurts');
   if (bailoutDamage(36) < 1.5 || bailoutDamage(36) > 3.5) {
     bad.push(`a 36 m/s bail-out costs ${bailoutDamage(36).toFixed(1)} pips, which is not a lesson`);
+  }
+
+  // --- The station box, on Town Hall's own numbers.
+  //
+  // Four claims, and each of them is a way the reported bug comes back:
+  //
+  //   * a body **on the platform floor** gets the floor -- without this the
+  //     concourse falls through to the DEM and the player is stood on George
+  //     Street, which is *"moving anywhere on foot underground tps me to
+  //     surface"* verbatim;
+  //   * a body **in the street over the top of it** gets nothing, or every
+  //     pedestrian in the CBD drops twenty metres through the pavement;
+  //   * a body **beside the station** gets nothing, because a box is a
+  //     rectangle in the station's own frame and not a radius --
+  //     `samePlatform`'s lesson, and the reason this is not a circle;
+  //   * a body **under the floor** gets nothing, because below a station is not
+  //     inside one.
+  {
+    const field = new StationBoxField();
+    const FLOOR = -36.6;
+    const CEIL = -17.3;
+    field.add({
+      name: 'CONTROL', x: 0, z: 0, ux: 1, uz: 0,
+      halfLength: 100, halfWidth: 16, floorY: FLOOR, ceilY: CEIL,
+    });
+    const cases: [string, number, number, number, number][] = [
+      ['standing on the platform', 0, 0, FLOOR, FLOOR],
+      ['at the far end of the box', 95, 0, FLOOR, FLOOR],
+      ['across the concourse', 0, 14, FLOOR, FLOOR],
+      ['in the street over the top', 0, 0, CEIL, -Infinity],
+      ['past the end of the box', 140, 0, FLOOR, -Infinity],
+      ['beside the box, off to the side', 0, 30, FLOOR, -Infinity],
+      ['under the floor', 0, 0, FLOOR - 4, -Infinity],
+    ];
+    for (const [what, x, z, feet, want] of cases) {
+      const got = field.floorAt(x, z, feet);
+      if (got !== want) {
+        bad.push(
+          `a body ${what} of a station box got a floor of ${got} m, expected ${want} m`,
+        );
+      }
+    }
+    // And the selection rule, both halves of it. A surface station has no box
+    // at all -- a lid over open sky, with `floorAt` answering for bodies in the
+    // car park -- and neither does a station in a *cutting*, which is
+    // `belowGrade` and is Sydenham: the carve has already opened it and
+    // `RailCut.cutAt` answers the rail head there, which is a place a body can
+    // stand and a box would take away.
+    const bad0 = buildStationBoxes({
+      stations: [
+        { name: 'AT GRADE', vertical: 'surface', belowGrade: false, servedDirs: [0, 1], boxFloorY: -1, boxCeilY: 5 },
+        { name: 'IN A CUTTING', vertical: 'surface', belowGrade: true, servedDirs: [0, 1], boxFloorY: -8, boxCeilY: -1 },
+        // ...and a bore nobody's train calls at: a box round a dot.
+        { name: 'NO SERVICE', vertical: 'underground', belowGrade: true, servedDirs: [], boxFloorY: -20, boxCeilY: -1 },
+      ],
+    } as unknown as RailBake);
+    if (bad0.boxes.length !== 0) {
+      bad.push(
+        `a surface station, a cutting and an unserved bore were given ${bad0.boxes.length} station ` +
+        `box(es) between them; only a served bore gets one`,
+      );
+    }
+    const bore = buildStationBoxes({
+      stations: [{
+        name: 'A BORE', vertical: 'underground', belowGrade: true, servedDirs: [0, 1],
+        siteX: 0, siteZ: 0, siteDx: 1, siteDz: 0,
+        boxHalfLength: 100, boxHalfWidth: 16, boxFloorY: FLOOR, boxCeilY: CEIL,
+      }],
+    } as unknown as RailBake);
+    if (bore.boxes.length !== 1) {
+      bad.push(`an underground station got ${bore.boxes.length} station boxes, expected 1`);
+    } else if (bore.floorAt(0, 0, FLOOR) !== FLOOR) {
+      bad.push(`the box built for an underground station does not answer its own floor`);
+    }
   }
   return bad;
 }

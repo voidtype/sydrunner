@@ -222,6 +222,12 @@ import {
 import { TerrainField, buildTerrainMesh, sampleTileGrid, type TileCut } from './terrain.ts';
 import type { RailCut } from './rail-cut.ts';
 import {
+  carveUndercroft,
+  emptyUndercroftTally,
+  type UndercroftEnvelope,
+  type UndercroftTally,
+} from './undercroft.ts';
+import {
   TileFetchError,
   TileRetryLedger,
   classifyTileFailure,
@@ -1821,6 +1827,31 @@ export class TileStreamer implements LampSource {
     this.roadSink = sink;
   }
 
+  /**
+   * The clearance envelope, so a building can be drawn with the tunnel its
+   * collision already has.
+   *
+   * **This is not a collision question and the distinction is the whole reason
+   * it is allowed here.** This file's own rule -- *"the streamer must not be
+   * able to ask a collision question"* -- exists because collision and geometry
+   * are loaded on different radii by different modules, so a build that consults
+   * one produces a picture that depends on the other's lifecycle. The envelope
+   * is not that: it is built once from the rail bake before the first tile is
+   * fetched, it never changes for the life of the session, and it says where the
+   * *railway* is rather than what is solid. Asking it during a build is the same
+   * kind of question `setRailCut` already answers for the ground.
+   *
+   * Null is a working configuration and is exactly the build that shipped last
+   * round: every building drawn whole, and a tunnel through some of them that
+   * only the collision knows about. See `world/undercroft.ts`.
+   */
+  private undercroft: UndercroftEnvelope | null = null;
+  readonly undercroftTally: UndercroftTally = emptyUndercroftTally();
+
+  setUndercroftEnvelope(env: UndercroftEnvelope | null): void {
+    this.undercroft = env;
+  }
+
   setRailCut(cut: RailCut | null): void {
     this.railCut = cut;
     if (cut === null || this.loaded.size === 0) return;
@@ -2872,9 +2903,28 @@ export class TileStreamer implements LampSource {
       let awningTriangles = 0;
       const primitives = decoded.glb.primitives;
       for (let i = 0; i < primitives.length; i++) {
-        const prim = primitives[i];
+        let prim = primitives[i];
         const slot = resolveMaterialName(prim.material);
         const surface = isSurfaceMaterial(slot);
+        // **The undercroft, before the geometry is built rather than after.**
+        // A building standing across the railway has had a tunnel cut in its
+        // collision since last round and has been drawn whole ever since, which
+        // is the report *"i still pass through solid buildings on the train"*.
+        // Surfaces are exempt: a road, a footpath and the contact shadow lie on
+        // the ground, they are not what the train hits, and `world/rail-cut.ts`
+        // is already the one rule for what happens to the ground under a
+        // corridor. See `world/undercroft.ts` for the route and for why this is
+        // not the collision question this class refuses to ask.
+        if (this.undercroft !== null && !surface) {
+          const opened = carveUndercroft(
+            prim,
+            group.position.x,
+            group.position.z,
+            this.undercroft,
+            this.undercroftTally,
+          );
+          if (opened !== null) prim = opened;
+        }
         if (slot === 'awning_fascia') {
           const attr = prim.attributes.find((a) => a.name === 'position');
           // Float32 and three-component, tested rather than assumed. The tiles
