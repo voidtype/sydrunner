@@ -133,6 +133,13 @@ import {
   type RailDirection,
   type TrainPose,
 } from './rail.ts';
+// **The one import this file makes outside `rail.ts`, and it is a number.**
+// `world/rail-cut.ts` imports nothing but the same span flags this file's
+// neighbour does -- no three, no renderer -- so it is safe here on exactly the
+// terms section 2 sets out. It is imported rather than restated because the
+// deck's outer edge and the rim of the terrain carve have to be *the same
+// number*: see `PLATFORM_OUTER_M`, where their difference was the bug.
+import { STATION_HALF_WIDTH } from '../world/rail-cut.ts';
 
 // --- The two constants that belong to the controller ---------------------------------
 
@@ -761,6 +768,53 @@ export const PLATFORM_HALF_LENGTH_M = 80;
 export const PLATFORM_WIDTH_M = 5.5;
 
 /**
+ * How far the deck a body stands on reaches from the track centre, metres.
+ *
+ * ---------------------------------------------------------------------------
+ * **THE RING TRENCH, WHICH IS WHY YOU COULD NEVER GET ONTO A PLATFORM.**
+ *
+ *   > *"i also cant seem to stand on top of ANY platforms"* -- *"its been broke
+ *   > since the beginning of platforms"*
+ *
+ * Standing on a platform was never the broken half. Measured with a body driven
+ * through `player/controller.step` with real collision, dropped onto the deck at
+ * ten stations of four different vertical classes: every one of them settled
+ * exactly on the deck and walked forty metres along it without leaving it. What
+ * failed was **arriving**, and the reason is a two-metre slot that ran the whole
+ * length of every platform in the city.
+ *
+ * `rail-cut.STATION_HALF_WIDTH` opens the terrain carve out to 9.4 m either side
+ * of the track at a platform site, because the stairs and the fence line need
+ * that band. The deck stopped at `PLATFORM_INNER_M + PLATFORM_WIDTH_M` = 7.12 m.
+ * Nothing floored the 2.28 m between them, so the ground there was the *rail
+ * head* -- 1.05 m under the deck in the flat case and up to sixteen metres under
+ * it in a cutting. Measured across the shipped bake: **304 of 358 platform sites
+ * had an un-steppable drop off their outer face, 221,658 m2 of it.**
+ *
+ * A player walking up to a platform therefore fell into the slot, and could not
+ * get out of it: the deck face is a 1.05 m wall against a `controller.STEP_HEIGHT`
+ * of 0.42 m, and the trench wall is behind them. Walking in from eight metres
+ * out reached the deck at **two of ten** stations tried, and at seven of the ten
+ * it did not help to jump. The four generated stair flights were islands in the
+ * slot rather than a way across it.
+ *
+ * So the deck reaches **exactly the rim of the carve** -- not 7.12 m with a
+ * trench behind it, and not 9.4 m with a margin the carve does not open, which
+ * would put the far edge of the platform inside the retaining wall. One number
+ * for both, imported rather than restated, because two numbers here is precisely
+ * the slot: the width of the hole is their difference, and a difference that
+ * cannot be written down cannot be nonzero. It is also what a cutting station
+ * really is -- the platform runs back to the retaining wall, and the stair comes
+ * down onto it rather than into a pit beside it.
+ *
+ * `PLATFORM_WIDTH_M` stays 5.5 and is still the platform's *own* width: the
+ * coping, the tactile strip, the canopy and `samePlatform`'s merge are all about
+ * the passenger platform and none of them changes. This is the surface, which is
+ * a different question and now has its own name.
+ */
+export const PLATFORM_OUTER_M = STATION_HALF_WIDTH;
+
+/**
  * One platform site: where a train stops, and which way the platform runs.
  *
  * Derived from `dir.stops[k].s` -- the arc length at which that service stands --
@@ -885,7 +939,7 @@ export class PlatformField {
     // Filed into every cell the platform's own 160 x 14 m footprint can touch,
     // which is a box rather than a point: a site indexed only by its centre
     // would be missed by a query 70 m along the platform from it.
-    const r = PLATFORM_HALF_LENGTH_M + PLATFORM_INNER_M + PLATFORM_WIDTH_M;
+    const r = PLATFORM_HALF_LENGTH_M + PLATFORM_OUTER_M;
     const x0 = Math.floor((site.x - r) / PlatformField.CELL);
     const x1 = Math.floor((site.x + r) / PlatformField.CELL);
     const z0 = Math.floor((site.z - r) / PlatformField.CELL);
@@ -922,7 +976,7 @@ export class PlatformField {
       const along = dx * site.ux + dz * site.uz;
       if (along < -PLATFORM_HALF_LENGTH_M || along > PLATFORM_HALF_LENGTH_M) continue;
       const across = Math.abs(dx * -site.uz + dz * site.ux);
-      if (across < PLATFORM_INNER_M || across > PLATFORM_INNER_M + PLATFORM_WIDTH_M) continue;
+      if (across < PLATFORM_INNER_M || across > PLATFORM_OUTER_M) continue;
       const top = site.y + PLATFORM_TOP_M;
       if (top > best) best = top;
     }
@@ -1046,7 +1100,7 @@ export class PlatformField {
       if (along < -PLATFORM_HALF_LENGTH_M || along > PLATFORM_HALF_LENGTH_M) continue;
       // The plan normal. Both platforms of a pair, so the sign is dropped.
       const across = Math.abs(dx * -site.uz + dz * site.ux);
-      if (across < PLATFORM_INNER_M || across > PLATFORM_INNER_M + PLATFORM_WIDTH_M) continue;
+      if (across < PLATFORM_INNER_M || across > PLATFORM_OUTER_M) continue;
       const top = site.y + PLATFORM_TOP_M;
       if (feetY < top - PLATFORM_STEP_M || feetY > top + PLATFORM_REACH_M) continue;
       if (top > best) best = top;

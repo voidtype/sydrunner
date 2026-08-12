@@ -159,7 +159,7 @@ import { RAIL_FENCE_HEIGHT, createRailFenceMaterial } from './fences.ts';
 // merge rule is exactly the shape of drift that put an M1 at Epping on the T9
 // platform's paperwork and no platform of its own. `riding.ts` imports nothing
 // but `rail.ts`, so this drags no renderer anywhere it should not go.
-import { samePlatform } from '../game/riding.ts';
+import { PLATFORM_OUTER_M, samePlatform } from '../game/riding.ts';
 
 // --- Where the bake comes from ------------------------------------------------
 
@@ -3035,6 +3035,23 @@ function writePlatforms(
   for (const side of platformSides(plan)) {
     const inner = PLATFORM_INNER;
     const outer = PLATFORM_INNER + PLATFORM_WIDTH;
+    /**
+     * How far the *drawn* deck reaches, which is further than the platform is.
+     *
+     * `game/riding.PLATFORM_OUTER_M` and the whole of the report
+     * *"i also cant seem to stand on top of ANY platforms"*: the terrain carve
+     * opens to `STATION_HALF_WIDTH` at a platform site and the deck stopped at
+     * `outer`, leaving 2.28 m of open trench down the back of every platform in
+     * the city -- 304 of 358 sites, 221,658 m2, up to 16 m deep. A body walking
+     * at a platform fell into it and could not climb the 1.05 m face out again.
+     *
+     * Drawn to the same number the field stands bodies on, which is the same
+     * number the carve opens, because any two of those three being different is
+     * the slot again. Everything below -- coping, tactile, canopy -- stays on
+     * `outer`, because those are about the platform a passenger uses and this is
+     * about the ground under their feet.
+     */
+    const deckOuter = PLATFORM_OUTER_M;
 
     // The deck, as one solid box rather than five loose quads.
     //
@@ -3045,7 +3062,7 @@ function writePlatforms(
     // the line it replaced as "the one surface of a station a passenger ever
     // looks straight at", was invisible on one of the two platforms at every
     // station in Sydney. `frameBar` sorts its extents, so it cannot happen here.
-    frameSolid(concrete, prisms, f, -L, L, inner * side, outer * side, base, top);
+    frameSolid(concrete, prisms, f, -L, L, inner * side, deckOuter * side, base, top);
 
     // The coping: a 25 mm lip along the platform edge.
     //
@@ -3285,9 +3302,12 @@ function writeStationAccess(
       const street = plan.landing[i][e];
       const baseY = Math.min(plan.top, street, plan.base) - 0.5;
       const head = ACCESS_ALONG * end;
-      // The landing at the platform end: a slab level with the deck, so the last
-      // tread meets the platform across 12 cm rather than across a step.
-      frameSolid(concrete, prisms, f, head, head - 2.6 * end, o0, o1, baseY, plan.top);
+      // **The landing at the platform end used to be built here and is now the
+      // deck itself.** `writePlatforms` draws to `PLATFORM_OUTER_M`, which is
+      // `STAIR_OUTER`, so the slab this used to add is coplanar with the deck
+      // over its whole footprint -- the same top over the same 2.16 x 2.6 m, four
+      // times a station, which is a z-fight and not a landing. What it was for is
+      // still true and is still there; it is simply no longer a separate box.
       if (run <= 0) continue;
 
       const foot = head + run * end;

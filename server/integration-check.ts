@@ -1688,6 +1688,14 @@ async function main(): Promise<void> {
   say('');
   await checkRoadDeck();
 
+  // --- 34a2. And whether a body can get onto a platform at all. Every platform
+  // assertion above this line asks `PlatformField` a question; this one walks a
+  // body, which is the difference between a model that is right and a game that
+  // works. Reported as "i also cant seem to stand on top of ANY platforms".
+  // See `checkPlatformStanding`.
+  say('');
+  await checkPlatformStanding();
+
   // --- 34b. And whether anything is standing *in* the railway. The carve is
   // about the ground; this is about the solids -- the buildings, the platforms
   // and the station houses that the seven reported defects were all instances
@@ -4806,6 +4814,11 @@ if (only === 'ridingOnline') {
   process.exit(failures.length === 0 ? 0 : 1);
 } else if (only === 'segments') {
   await checkServerSegments();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'platforms') {
+  await checkPlatformStanding();
   for (const f of failures) say(`  - ${f}`);
   say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
   process.exit(failures.length === 0 ? 0 : 1);
@@ -20950,5 +20963,371 @@ async function checkRoadDeck(): Promise<void> {
       `${pavedTotal.toLocaleString()} m2 of paved surface in the build; deck ${DECK_THICKNESS} m thick; ` +
       `${pavedSamples.toLocaleString()} m2 of it is within reach of a rail corridor and was sampled ` +
       `at one metre`,
+  );
+}
+
+/**
+ * A body, driven by the real controller, standing on a station platform.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS CHECK EXISTS, AND WHY 989 CHECKS PASSED WHILE IT WAS FALSE.
+ *
+ *   > *"i also cant seem to stand on top of ANY platforms"* -- and, asked how
+ *   > long: *"its been broke since the beginning of platforms"*.
+ *
+ * Every platform assertion in this file before this one interrogates
+ * `game/riding.PlatformField`: it calls `surfaceAt` or `heightAt` and compares
+ * the number against the bake. Not one of them ever put a **body** on a
+ * platform. The field can be exactly right -- and it was; a body dropped onto a
+ * deck at ten stations of four vertical classes settled on it to the centimetre
+ * every time -- while getting onto one is impossible, and no amount of asking
+ * the model would say so. That is this project's recurring failure written out
+ * in one sentence: *the check tests the model instead of the experience.*
+ *
+ * What was actually wrong is `riding.PLATFORM_OUTER_M`'s whole comment. The
+ * terrain carve opens to `rail-cut.STATION_HALF_WIDTH` at a platform and the
+ * deck stopped 2.28 m short of it, so a slot at rail level ran the length of
+ * every platform in the city -- 304 of 358 sites, 221,658 m2, up to 16 m deep.
+ * A player walking at a platform fell in and could not climb the 1.05 m face
+ * back out, and the four generated stair flights were islands in it.
+ *
+ * So this check walks. Two routes at four stations of different vertical class:
+ *
+ *   1. **The stair.** From the street beside a generated flight, walk at the
+ *      middle of the deck for twenty-five seconds. This is the route the design
+ *      intends and the one a player takes.
+ *   2. **Standing, and staying.** Placed on the deck, walk forty metres along
+ *      it and never leave it -- the claim the player's own words make.
+ *
+ * Driven through `player/controller.step` with `CollisionWorld` and the exact
+ * `groundHeightAt` composition `main.ts` uses, over a `RailWorld` whose prisms
+ * are in the collision world, which is a browser's world and not a server's.
+ *
+ * **The negative control** is the geometry as it shipped: a second field whose
+ * rectangles stop at the old 7.12 m face. If walking in still works against
+ * that, the rule under test is doing nothing and neither number above means
+ * anything.
+ */
+async function checkPlatformStanding(): Promise<void> {
+  say('--- Platforms: a body walks onto one and stays on it');
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const ridingMod = (await import(
+    new URL('../client/src/game/riding.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/game/riding.ts');
+  const ctrlMod = (await import(
+    new URL('../client/src/player/controller.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/player/controller.ts');
+  /**
+   * Structurally typed, exactly as `checkRoadDeck` types the same module and for
+   * the same reason: `world/rail-geo.ts` reaches for `document` to bake its sign
+   * textures, so a `typeof import` of it drags the DOM lib into this process's
+   * `tsconfig` and `npm run typecheck` fails on a file that runs fine under bun.
+   */
+  const geoMod = (await import(
+    new URL('../client/src/world/rail-geo.ts', import.meta.url).pathname
+  )) as {
+    buildNetwork(bake: unknown): { stations: Array<{ name: string; x: number; z: number }> };
+    RailAssets: new () => unknown;
+    RailWorld: new (
+      net: unknown, assets: unknown, ground: (x: number, z: number) => number,
+      solids: unknown, cut: unknown, rawGround: (x: number, z: number) => number,
+    ) => { update(x: number, z: number): void };
+  };
+  const cutMod = (await import(
+    new URL('../client/src/world/rail-cut.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/world/rail-cut.ts');
+
+  const world = await loadWorld(root);
+  if (!world.rail || !world.platforms) {
+    say('    this build carries no rail bake. Skipped.');
+    return;
+  }
+  const field = world.platforms;
+  const boxes = world.stationBoxes ?? null;
+  const cut = world.railCut ?? null;
+
+  const {
+    PLATFORM_TOP_M, PLATFORM_INNER_M, PLATFORM_WIDTH_M, PLATFORM_OUTER_M, PLATFORM_HALF_LENGTH_M,
+  } = ridingMod;
+  const { EYE_HEIGHT, createPlayerState, step } = ctrlMod;
+
+  // **The one number the whole fix is**, asserted rather than assumed: the deck
+  // a body stands on ends exactly where the carve that took the ground away
+  // begins. Their difference is the width of the slot, so a difference of zero
+  // is the claim, and it is checked here rather than left to two constants that
+  // happen to agree today.
+  check(
+    PLATFORM_OUTER_M === cutMod.STATION_HALF_WIDTH,
+    `the platform deck reaches ${PLATFORM_OUTER_M} m from the track centre and the terrain carve ` +
+      `opens to ${cutMod.STATION_HALF_WIDTH} m -- the same number, which is what leaves no slot ` +
+      `between the two. It was 7.12 against 9.4, and the 2.28 m difference was the trench a player ` +
+      `walking at a platform fell into`,
+  );
+
+  // --- The client's world: rail prisms in the collision world -----------------
+  const net = geoMod.buildNetwork(world.rail);
+  const assets = new geoMod.RailAssets();
+  const rawGround = (x: number, z: number): number => world.terrain.height(x, z);
+  const rail = new geoMod.RailWorld(
+    net, assets, rawGround, world.collision as never, cut, rawGround,
+  );
+
+  /** `main.ts`'s `groundHeightAt`, to the line. See `groundFor` for the pair. */
+  let lastGround = 0;
+  const groundHeightAt = (x: number, z: number, feetY: number): number => {
+    const sampled = world.terrain.height(x, z);
+    if (Number.isFinite(sampled)) lastGround = sampled;
+    const platform = field.heightAt(x, z, feetY);
+    const roof = world.collision.roofHeight(x, z, feetY);
+    if (platform > -Infinity) return Math.max(platform, roof);
+    const boxFloor = boxes === null ? -Infinity : boxes.floorAt(x, z, feetY);
+    if (boxFloor > -Infinity) return Math.max(boxFloor, roof);
+    const cutFloor = cut === null ? Number.NaN : cut.cutAt(x, z, sampled);
+    if (Number.isFinite(cutFloor)) return Math.max(cutFloor, roof);
+    return Math.max(lastGround, roof);
+  };
+
+  /** Walk from `(sx, sz)` toward `(tx, tz)` for `secs`, and answer where it ended. */
+  const walk = (
+    sx: number, sz: number, sy: number, tx: number, tz: number, secs: number,
+    ground: (x: number, z: number, feetY: number) => number,
+  ): { x: number; z: number; feet: number } => {
+    const s = createPlayerState(sx, sz);
+    s.position.y = sy + EYE_HEIGHT;
+    for (let i = 0; i < secs * 60; i++) {
+      const yaw = Math.atan2(-(tx - s.position.x), -(tz - s.position.z));
+      step(s, { forward: 1, right: 0, jump: false, sprint: false, yaw, pitch: 0 }, 1 / 60, world.collision, ground);
+    }
+    return { x: s.position.x, z: s.position.z, feet: s.position.y - EYE_HEIGHT };
+  };
+
+  /** Is this body standing on this platform's deck? Its own frame, its own height. */
+  const onDeck = (
+    site: { x: number; z: number; ux: number; uz: number; y: number },
+    p: { x: number; z: number; feet: number },
+    outer: number,
+  ): boolean => {
+    const dx = p.x - site.x;
+    const dz = p.z - site.z;
+    const along = dx * site.ux + dz * site.uz;
+    const across = Math.abs(dx * -site.uz + dz * site.ux);
+    return (
+      Math.abs(along) <= PLATFORM_HALF_LENGTH_M &&
+      across >= PLATFORM_INNER_M && across <= outer &&
+      Math.abs(p.feet - (site.y + PLATFORM_TOP_M)) < 0.5
+    );
+  };
+
+  // `rail-geo.STAIR_INNER`/`STAIR_OUTER`/`ACCESS_ALONG`, restated on
+  // `checkRailCutting`'s terms: a check that imported them could not notice the
+  // module moving its own stairs.
+  const STAIR_MID = (PLATFORM_INNER_M + PLATFORM_WIDTH_M + 0.12 + PLATFORM_OUTER_M) / 2;
+  const ACCESS_ALONG = 44;
+  const DECK_MID = PLATFORM_INNER_M + PLATFORM_WIDTH_M / 2;
+
+  /**
+   * Four stations, four vertical classes, named rather than sampled.
+   *
+   * Named because the classes are the thing being covered and a random six
+   * would be six surface stations most runs: Erskineville is at grade in a
+   * shallow carve, Sydenham is a deep cutting, Macdonaldtown is an embankment,
+   * Central is a terminus under a concourse, and **Newtown and Roseville were
+   * sealed outright** -- no body could reach either deck from any of their four
+   * flights, which is what makes those two the ones that give this assertion its
+   * teeth rather than six that happened to work already.
+   *
+   * Chatswood is deliberately not here and is the named residual: its bake says
+   * `elevated` with the deck seven metres *under* the terrain -- RAIL-VERTICAL.md's
+   * own opening row -- so it is sealed for a reason this round does not touch.
+   */
+  const NAMED = ['Erskineville', 'Sydenham', 'Macdonaldtown', 'Central', 'Newtown', 'Roseville'];
+  let reachable = 0;
+  let tried = 0;
+  let stayed = 0;
+  const sealed: string[] = [];
+  const slipped: string[] = [];
+  const roofed: string[] = [];
+  for (const name of NAMED) {
+    const site = field.sites.find((s) => s.name === name);
+    if (site === undefined) continue;
+    tried++;
+    rail.update(site.x, site.z);
+    const top = site.y + PLATFORM_TOP_M;
+    const nx = -site.uz;
+    const nz = site.ux;
+
+    // 1. In off the street, by one of the four generated flights.
+    let got = false;
+    for (const side of [-1, 1]) {
+      for (const end of [1, -1]) {
+        if (got) continue;
+        const o = STAIR_MID * side;
+        const along = (ACCESS_ALONG + 22) * end;
+        const sx = site.x + site.ux * along + nx * o;
+        const sz = site.z + site.uz * along + nz * o;
+        const sg = groundHeightAt(sx, sz, Infinity);
+        const at = walk(
+          sx, sz, sg + 0.1,
+          site.x + nx * DECK_MID * side, site.z + nz * DECK_MID * side,
+          25, groundHeightAt,
+        );
+        if (onDeck(site, at, PLATFORM_OUTER_M)) got = true;
+      }
+    }
+    if (got) reachable++;
+    else sealed.push(name);
+
+    // 2. On the deck, walking its length, and still on it forty metres later.
+    const startX = site.x + site.ux * -40 + nx * DECK_MID;
+    const startZ = site.z + site.uz * -40 + nz * DECK_MID;
+    const along = walk(
+      startX, startZ, top + 0.1,
+      site.x + site.ux * 40 + nx * DECK_MID, site.z + site.uz * 40 + nz * DECK_MID,
+      12, groundHeightAt,
+    );
+    if (onDeck(site, along, PLATFORM_OUTER_M)) {
+      stayed++;
+    } else if (along.feet > top + 0.5 && world.collision.roofHeight(along.x, along.z, along.feet) >= along.feet - 0.05) {
+      // **Held up rather than dropped, and it is a different defect.** At
+      // Newtown a station building stands over the platform and its prism was
+      // never given an undercroft, so `groundHeightAt`'s `max(platform, roof)`
+      // puts the body on its roof 8.9 m up. That is a solid over the railway --
+      // `checkClearance`'s subject, and `world/envelope.addRail`'s -- and not a
+      // hole in the deck, so it is counted and named here rather than folded
+      // into an assertion about falling.
+      roofed.push(`${name} (${(along.feet - top).toFixed(1)} m up, on a roof)`);
+    } else {
+      slipped.push(`${name} (${(along.feet - top).toFixed(2)} m off the deck)`);
+    }
+  }
+
+  check(
+    slipped.length === 0,
+    `a body placed on the deck at ${tried} named stations and walked eighty metres along it never ` +
+      `leaves it downwards: ${stayed} finished on the deck` +
+      (roofed.length ? ` and ${roofed.length} was lifted onto a solid standing over it -- ${roofed.join('; ')}` : '') +
+      `, and ${slipped.length} fell off or through` +
+      (slipped.length ? ` -- ${slipped.join('; ')}` : '') +
+      `. Driven through controller.step with collision rather than by asking the field`,
+  );
+
+  check(
+    reachable === tried,
+    `and a body that starts on the street beside a generated stair walks onto the deck at ` +
+      `${reachable} of ${tried} of them` +
+      (sealed.length ? ` -- sealed: ${sealed.join(', ')}` : '') +
+      `. This is the check the suite never had: every platform assertion before it asked ` +
+      `PlatformField a question instead of walking a body`,
+  );
+
+  // --- THE NEGATIVE CONTROL ----------------------------------------------------
+  //
+  // The geometry exactly as it shipped: the deck stops at the passenger
+  // platform's own outer face and the 2.28 m behind it is the carve's floor,
+  // which is the rail head. Built as a second field rather than as a flag,
+  // on `checkRoadDeck`'s terms -- the rule *is* the width, so a field with the
+  // old width is the old world and there is no second code path to keep honest.
+  {
+    const narrow = new ridingMod.PlatformField();
+    for (const s of field.sites) narrow.add(s);
+    const OLD_OUTER = PLATFORM_INNER_M + PLATFORM_WIDTH_M;
+    /** The shipped ground query, with the shipped rectangle. */
+    const oldGround = (x: number, z: number, feetY: number): number => {
+      const sampled = world.terrain.height(x, z);
+      if (Number.isFinite(sampled)) lastGround = sampled;
+      // The old rectangle, evaluated here rather than in the field: `heightAt`
+      // now answers to `PLATFORM_OUTER_M`, so the control has to narrow it back.
+      let platform = -Infinity;
+      for (const site of narrow.sites) {
+        const dx = x - site.x;
+        const dz = z - site.z;
+        if (Math.abs(dx * site.ux + dz * site.uz) > PLATFORM_HALF_LENGTH_M) continue;
+        const across = Math.abs(dx * -site.uz + dz * site.ux);
+        if (across < PLATFORM_INNER_M || across > OLD_OUTER) continue;
+        const t = site.y + PLATFORM_TOP_M;
+        if (feetY < t - ridingMod.PLATFORM_STEP_M || feetY > t + ridingMod.PLATFORM_REACH_M) continue;
+        if (t > platform) platform = t;
+      }
+      const roof = world.collision.roofHeight(x, z, feetY);
+      if (platform > -Infinity) return Math.max(platform, roof);
+      const boxFloor = boxes === null ? -Infinity : boxes.floorAt(x, z, feetY);
+      if (boxFloor > -Infinity) return Math.max(boxFloor, roof);
+      const cutFloor = cut === null ? Number.NaN : cut.cutAt(x, z, sampled);
+      if (Number.isFinite(cutFloor)) return Math.max(cutFloor, roof);
+      return Math.max(lastGround, roof);
+    };
+
+    // The slot itself, measured: how much of the band behind the old face was a
+    // drop a body cannot step up. Zero here would make everything above vacuous.
+    let slotArea = 0;
+    let deepest = 0;
+    for (const site of field.sites) {
+      const top = site.y + PLATFORM_TOP_M;
+      const nx = -site.uz;
+      const nz = site.ux;
+      for (let along = -76; along <= 76; along += 4) {
+        const cx = site.x + site.ux * along;
+        const cz = site.z + site.uz * along;
+        for (const side of [-1, 1]) {
+          for (let a = OLD_OUTER + 0.25; a <= PLATFORM_OUTER_M; a += 0.5) {
+            const x = cx + nx * a * side;
+            const z = cz + nz * a * side;
+            const terr = world.terrain.height(x, z);
+            if (!Number.isFinite(terr)) continue;
+            const g = oldGround(x, z, top);
+            const drop = top - g;
+            if (drop <= ridingMod.PLATFORM_STEP_M) continue;
+            slotArea += 0.5 * 4;
+            if (drop > deepest) deepest = drop;
+          }
+        }
+      }
+    }
+    check(
+      slotArea > 50_000,
+      `THE NEGATIVE CONTROL: with the deck at its shipped ${OLD_OUTER} m face, ` +
+        `${Math.round(slotArea).toLocaleString()} m2 of the band behind it is a drop of more than ` +
+        `${ridingMod.PLATFORM_STEP_M} m -- worst ${deepest.toFixed(1)} m -- which is the trench the ` +
+        `player could not climb out of. A zero here would mean the widening fixed nothing`,
+    );
+
+    // And the same measurement with the rule on. This is the assertion.
+    let openNow = 0;
+    let worstNow = 0;
+    for (const site of field.sites) {
+      const top = site.y + PLATFORM_TOP_M;
+      const nx = -site.uz;
+      const nz = site.ux;
+      for (let along = -76; along <= 76; along += 4) {
+        const cx = site.x + site.ux * along;
+        const cz = site.z + site.uz * along;
+        for (const side of [-1, 1]) {
+          for (let a = OLD_OUTER + 0.25; a <= PLATFORM_OUTER_M; a += 0.5) {
+            const x = cx + nx * a * side;
+            const z = cz + nz * a * side;
+            if (!Number.isFinite(world.terrain.height(x, z))) continue;
+            const drop = top - groundHeightAt(x, z, top);
+            if (drop <= ridingMod.PLATFORM_STEP_M) continue;
+            openNow += 0.5 * 4;
+            if (drop > worstNow) worstNow = drop;
+          }
+        }
+      }
+    }
+    check(
+      openNow === 0,
+      `and with it on, ${Math.round(openNow).toLocaleString()} m2` +
+        (worstNow > 0 ? ` (worst ${worstNow.toFixed(1)} m)` : '') +
+        `. The deck floors the whole band the carve opens, so there is nowhere behind a platform ` +
+        `a body can fall into and not climb out of`,
+    );
+  }
+
+  say(
+    `    ${field.sites.length} platform sites; deck ${PLATFORM_INNER_M} to ${PLATFORM_OUTER_M} m off ` +
+      `the track centre, ${PLATFORM_TOP_M} m over the rail; walked with the real controller over a ` +
+      `RailWorld whose prisms are in the collision world, which is a browser's world and not this ` +
+      `process's`,
   );
 }
