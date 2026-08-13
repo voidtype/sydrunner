@@ -67,8 +67,14 @@ export const RAIL_MAGIC = 0x4c494152;
  * access a body needs to reach the platform -- an entrance, a shaft depth, and
  * the box the platform sits in. `game/riding.StationBoxField` is the reason the
  * last of those exists.
+ * 4: the `paving` buffer -- the foot paving near a corridor, as plan strips with
+ * no height, so `world/road-deck.RoadDeck` can keep the ground under a footway
+ * the way it already keeps it under a carriageway. See `rail.corridor_paving`
+ * for why a strip carries no height and `RoadDeck.adoptPaving` for what reads
+ * it. Exact, like every version before it: a cached rail.bin from before this
+ * would decode as carrying no paving, which is the defect, silently.
  */
-export const RAIL_VERSION = 3;
+export const RAIL_VERSION = 4;
 
 /**
  * 2026-01-01T00:00:00Z. The same instant `traffic.ts` counts from.
@@ -268,6 +274,17 @@ export interface RailBake {
    * a deck and the rest is in a cutting", which is what Chatswood is.
    */
   vertexClearance: Float32Array;
+  /**
+   * The foot paving near a corridor, five floats a strip: `ax, az, bx, bz, half`
+   * in world metres. **No height, deliberately** -- see `rail.corridor_paving`.
+   *
+   * `streets.py` draws standalone foot paving and `lanes.py` excludes it from the
+   * ways block, so `world/road-deck.RoadDeck` -- which is built from that block --
+   * never learned it existed, and the corridor carve took the ground out from
+   * under every footway it crossed. This is that footprint, computed from the
+   * same OSM extract by the one pass that already knows where the corridors are.
+   */
+  paving: Float32Array;
   physics: {
     accel: number; brake: number; vLocal: number; vExpress: number;
     expressMinM: number; dwell: number;
@@ -303,7 +320,7 @@ export function railKey(block: number, slot: number): number {
  */
 const BUFFER_ORDER = [
   'vertices', 'cum', 'phases', 'stanchions', 'stanchionKinds', 'vertexFlags',
-  'vertexClearance',
+  'vertexClearance', 'paving',
 ] as const;
 
 /**
@@ -409,6 +426,7 @@ export function decodeRail(buffer: ArrayBuffer): RailBake {
     stanchionKinds: arrays.stanchionKinds as Uint8Array,
     vertexFlags: arrays.vertexFlags as Uint8Array,
     vertexClearance: arrays.vertexClearance as Float32Array,
+    paving: arrays.paving as Float32Array,
     physics: meta.physics,
     notes: meta.notes ?? [],
     degraded: meta.degraded ?? {},
@@ -821,6 +839,15 @@ export function verifyRail(bake: RailBake): string[] {
     bad.push(
       `${bake.stanchions.length / 5} stanchion positions against ${bake.stanchionKinds.length} kinds`,
     );
+  }
+  // Five floats a strip, and **more than none of them**. An empty paving buffer
+  // decodes cleanly and reads as "this city has no footway anywhere near a
+  // railway", which is the shipped defect wearing the new format's clothes --
+  // `rail.corridor_paving` returns exactly that when it is run with no roads.
+  if (bake.paving.length % 5 !== 0) {
+    bad.push(`${bake.paving.length} paving floats is not a whole number of 5-float strips`);
+  } else if (bake.paving.length === 0) {
+    bad.push('the bake carries no corridor paving at all; see rail.corridor_paving');
   }
   // RAIL-VERTICAL.md section 2, re-derived from the third reader. `elevated` is
   // the claim that a structure holds the track over the ground; a station whose

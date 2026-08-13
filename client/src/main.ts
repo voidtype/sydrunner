@@ -298,6 +298,9 @@ import {
   verifyRailGeometry,
   type RailNetwork,
 } from './world/rail-geo.ts';
+// The arithmetic half of the railway, which the server evaluates too. See
+// `world/rail-solids.ts` for why the definition lives outside the renderer.
+import { RailSolidField } from './world/rail-solids.ts';
 import { TrainFleet } from './world/trains.ts';
 import {
   aboardFrame,
@@ -1516,6 +1519,16 @@ async function main(): Promise<void> {
       // query in `groundHeightAt` and `server/world.groundFor` cannot hold four
       // opinions about it. `server/world.ts` does the identical two lines over a
       // deck built from the identical `.lanes.bin` bytes.
+      //
+      // **And the foot paving, which is the third report from King Street.**
+      // `.lanes.bin` carries no footway -- `lanes.py` excludes the whole class --
+      // so the deck could not know about the plaza, the bridge cycleway or the
+      // crossings the player kept falling through. That footprint rides in the
+      // rail bake and goes into the *same* deck, before the first terrain tile
+      // can be carved and before the first rail chunk can decide where its fence
+      // goes, so neither of the timing repairs below has anything to repair.
+      // `server/world.ts` does the identical call over the identical bytes.
+      roadDeck.adoptPaving(railBake.paving);
       railCut.setRoads(roadDeck);
       streamer.setRailCut(railCut);
       // **And the volume nothing may stand in.** The same corridor read the
@@ -2609,6 +2622,21 @@ async function main(): Promise<void> {
    * never will be until something renders water.
    */
   let lastGround = 0;
+  /**
+   * The railway's own solids, arithmetically. See `world/rail-solids.ts`.
+   *
+   * Assigned below, once `railNetwork` and `railCut` both exist, and read here
+   * because it has to be in the ground query. **This is the same field
+   * `server/world.groundFor` folds into the identical clause**, over the same
+   * `buildNetwork`, the same `RailCut` and the same terrain -- which is what
+   * makes a coping, a stair tread and a station roof the same height on both
+   * ends of the wire instead of a surface on this one and thin air on that one.
+   *
+   * It is not a second opinion about the prisms `railWorld` puts in `collision`:
+   * they are enumerated by the same call, so where a chunk is built the two
+   * agree to the bit, and where it is not this one still answers.
+   */
+  let railSolidField: RailSolidField | null = null;
   const groundHeightAt = (x: number, z: number, feetY: number): number => {
     const sampled = streamer.ground?.height(x, z) ?? NO_GROUND;
     if (Number.isFinite(sampled)) lastGround = sampled;
@@ -2632,7 +2660,15 @@ async function main(): Promise<void> {
     // cutting station the terrain grid is metres above the surface the train's
     // doors open onto.
     const platform = platforms === null ? -Infinity : platforms.heightAt(x, z, feetY);
-    const roof = collision.roofHeight(x, z, feetY);
+    // The pipeline's prisms, and the railway's own solids beside them. See
+    // `railSolidField`: with a chunk built the second term repeats the first and
+    // the max is free; outside `BUILD_RADIUS`, and in the window before two
+    // chunks a frame have caught up, it is the only one that answers -- and it
+    // is the term the server has.
+    const roof = Math.max(
+      collision.roofHeight(x, z, feetY),
+      railSolidField === null ? -Infinity : railSolidField.roofHeight(x, z, feetY),
+    );
     if (platform > -Infinity) return Math.max(platform, roof);
     // **And the rest of the station, which is most of it.**
     //
@@ -2799,6 +2835,9 @@ async function main(): Promise<void> {
       { at: { x: player.position.x, z: player.position.z }, radius: VESSEL_RADIUS_M },
     );
     vesselField = built.field;
+    // The corridor moved, so every trench solid the arithmetic field cached is
+    // a wall `writeTrench` may no longer draw. See `invalidateCorridor`.
+    railSolidField?.invalidateCorridor();
     vesselBuild = built;
     vesselMs = performance.now() - t0;
     streamer.setSeam(built.seam, [
@@ -2842,6 +2881,23 @@ async function main(): Promise<void> {
       ? null
       : new RailWorld(railNetwork, railAssets, wildGround, collision, railCut, rawGroundAt);
   if (railWorld) scene.add(railWorld.group);
+  // The arithmetic half of the same railway, for the ground query. Built from
+  // the identical network, the identical carve and the identical two ground
+  // readings `railWorld` above is given, because a field seeded any other way
+  // would be a second description of the thing this exists to stop being two
+  // things. See `railSolidField`.
+  if (railNetwork !== null) {
+    railSolidField = new RailSolidField(
+      railNetwork, railCut, rawGroundAt, wildGround,
+      // `buildChunk`'s own `vesselled`, read at query time rather than captured,
+      // because `vesselField` is reseated every time the corridor is re-swept.
+      // Inside a formation `writeTrench` draws and registers nothing, so a field
+      // that still answered with a wall there would put the flag's world and the
+      // ground query back out of step. `server/world.ts` carries the same
+      // closure over the same field.
+      (x, z) => vesselField !== null && vesselField.surfaceAt(x, z) > -Infinity,
+    );
+  }
   // And the road sink's forward handle on it. See `railChunks`.
   railChunks = railWorld;
 

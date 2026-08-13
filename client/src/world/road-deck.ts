@@ -98,6 +98,50 @@
 export const DECK_THICKNESS_M = 0.45;
 
 /**
+ * How far over the ground foot paving is drawn, metres. `streets.FOOTPATH_Y`.
+ *
+ * ---------------------------------------------------------------------------
+ * THE SECOND HALF OF THE SAME DEFECT, AND WHY IT NEEDED A DIFFERENT SHAPE.
+ *
+ * The player reported the same three symptoms a third time, standing at
+ * -33.907002, 151.181545 -- world (-2492.54, 4281.58), on the King Street
+ * overbridge at St Peters:
+ *
+ *   > *"still a fence blocking the road on king st, i still fall through the
+ *   > road and can still see rail components penetrating thru the road"*
+ *
+ * The carriageway rule above was working there: measured over the shipped build,
+ * **0 m2 of King Street's carriageway is carved**. What was carved was the
+ * *footway* -- 120 m2 of it within 60 m of that point, dropping up to 7.94 m --
+ * because `streets.py:642` draws standalone foot paving and `lanes.py:602`
+ * excludes exactly that class from the ways block this file is filled from. The
+ * deck could not know it was there. Four ways: St Peter's Plaza (97 m2), the
+ * **King Street Railway Bridge Path** (19 m2 -- the cycleway on the deck the
+ * player was standing on), and two Sydney Park Road crossings (6 m2).
+ *
+ * The footprint now rides in `rail.bin`; see `RoadDeck.adoptPaving`.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY A PAVING STRIP CARRIES NO HEIGHT, AND THIS CONSTANT DOES.
+ *
+ * A carriageway has a height of its own -- `roadgrade.py` solves it and a bridge
+ * deck stands above the ground -- so `.lanes.bin` carries one per point and
+ * `deckAt` interpolates it. **Foot paving has no height of its own.**
+ * `streets.py` drapes it: every square metre is `terrain.sample(x, z) +
+ * FOOTPATH_Y`, so its surface *is* the ground plus this constant, and the only
+ * processes that know the ground exactly are the two that load the terrain
+ * sidecars -- this browser and `server/world.ts`.
+ *
+ * That is why `deckAt` takes a `groundY`. The alternative was to bake a height in
+ * the pipeline, and it was measured and rejected: `rail.build_all` loads the DEM
+ * **unconformed**, and against the shipped `.terr.bin` lattice at 15,149 foot
+ * paving vertices near a corridor that surface differs by a median of 0.56 m and
+ * a maximum of 29.66 m. A height from there would be a second opinion about the
+ * ground inside the one file whose whole purpose is that there is only one.
+ */
+export const PAVING_RISE_M = 0.15;
+
+/**
  * The narrowest a carriageway is taken to be, half-width in metres.
  *
  * `world/envelope.addRoads`' own floor, restated because it is the same
@@ -108,6 +152,17 @@ export const DECK_THICKNESS_M = 0.45;
  * catches a way whose sidecar predates that.
  */
 const MIN_HALF_M = 1.5;
+
+/**
+ * And the same floor for a strip of foot paving, half-width in metres.
+ *
+ * Lower than `MIN_HALF_M` because the thing being described really is that
+ * narrow: `streets.FOOTWAY_HALF_WIDTH` is 1.0 m, a two-metre ribbon, and
+ * rounding a footway out to three would put a deck over a metre of open trench
+ * either side of every path in the city. This only catches a bake that emitted
+ * something narrower still.
+ */
+const MIN_PAVING_HALF_M = 1.0;
 
 /** The grid cell strips are filed into, metres. `rail-cut.CELL_M`'s twin. */
 const CELL_M = 64;
@@ -131,6 +186,16 @@ interface Strip {
   bz: number;
   by: number;
   half: number;
+  /**
+   * True where the surface is the ground plus `PAVING_RISE_M` rather than `ay`
+   * and `by`, which are then unused. See `PAVING_RISE_M` and `adoptPaving`.
+   *
+   * A flag on the same record in the same list rather than a second collection,
+   * and that is the whole point: `deckAt` stays one query over one set, so
+   * `RailCut.cutAt` still asks exactly one question and there is no second
+   * predicate that can disagree with the first.
+   */
+  draped: boolean;
 }
 
 /** What this module needs from `game/traffic.LaneWay`. Structural, as ever. */
@@ -204,7 +269,7 @@ export class RoadDeck {
         // undefined, and the pipeline emits a few wherever two OSM nodes
         // coincide.
         if (Math.hypot(bx - ax, bz - az) < 0.05) continue;
-        strips.push({ ax, az, ay: way.y[i], bx, bz, by: way.y[i + 1], half });
+        strips.push({ ax, az, ay: way.y[i], bx, bz, by: way.y[i + 1], half, draped: false });
         if (ax - half < minX) minX = ax - half;
         if (bx - half < minX) minX = bx - half;
         if (ax + half > maxX) maxX = ax + half;
@@ -221,6 +286,53 @@ export class RoadDeck {
     if (strips.length === 0) return null;
     for (const strip of strips) this.file(strip, true);
     return [minX - margin, minZ - margin, maxX + margin, maxZ + margin];
+  }
+
+  /**
+   * Adopt the corridor's foot paving, straight out of `rail.bin`. Five floats a
+   * strip: `ax, az, bx, bz, half`. Returns how many strips were taken.
+   *
+   * ---------------------------------------------------------------------------
+   * WHY THIS IS ONE CALL AT BOOT AND NOT A TILE LAYER.
+   *
+   * Everything else here arrives and leaves with a tile, because `.lanes.bin` is
+   * a per-tile sidecar and a deck that never dropped would be a slow leak of the
+   * whole extent. This does not: it is 12,161 strips for the entire 60 km build,
+   * 238 kB, filed once from a file both ends already load in full, and it is
+   * resident for the same reason `RailCut` itself is.
+   *
+   * That is not only a size argument, it is a **correctness** one. The bug this
+   * fixes has a timing half: a `rail-geo` chunk decides once where its fence
+   * panels go, so a chunk built before its street landed keeps a palisade across
+   * the carriageway -- which is what `anyStrip` and `main.ts`' road sink exist to
+   * repair. Paving that is present before the first chunk is built can never have
+   * that problem, so there is nothing to repair.
+   *
+   * Filed under a fixed key so `adopt`'s idempotence covers it too: calling this
+   * twice on one deck is a no-op rather than a double-filed strip list.
+   */
+  adoptPaving(paving: Float32Array): number {
+    const key = 'rail:paving';
+    if (this.byKey.has(key)) return 0;
+    const strips: Strip[] = [];
+    for (let i = 0; i + 4 < paving.length; i += 5) {
+      const ax = paving[i];
+      const az = paving[i + 1];
+      const bx = paving[i + 2];
+      const bz = paving[i + 3];
+      // `adopt`'s 5 cm floor, for `adopt`'s reason. The pipeline drops these too;
+      // this is the decoder refusing to trust that it did.
+      if (Math.hypot(bx - ax, bz - az) < 0.05) continue;
+      const half = Math.max(MIN_PAVING_HALF_M, paving[i + 4]);
+      // `ay`/`by` are never read on a draped strip -- `deckAt` takes the ground
+      // instead -- and are set to NaN rather than to zero so that anything that
+      // did read them would produce an obviously wrong answer rather than a
+      // plausible one at the datum.
+      strips.push({ ax, az, ay: Number.NaN, bx, bz, by: Number.NaN, half, draped: true });
+    }
+    this.byKey.set(key, strips);
+    for (const strip of strips) this.file(strip, true);
+    return strips.length;
   }
 
   /**
@@ -299,12 +411,33 @@ export class RoadDeck {
    * is the flyover, and the ground has to be kept up at the top of the stack or
    * the deck of the thing on top has a hole in it. Order-independent, which is
    * the property this whole file is arranged around -- see the header.
+   *
+   * ---------------------------------------------------------------------------
+   * `groundY` IS AN ARGUMENT, AND IT IS REQUIRED. Both halves are deliberate.
+   *
+   * Foot paving is *draped*: `streets.py` puts it at `terrain.sample(x, z) +
+   * FOOTPATH_Y`, so its surface is not a number this file can hold -- it is a
+   * number the caller is already holding, and `world/rail-cut.ts`' header spends
+   * a page on why the caller's own value is the only correct one to use ("not
+   * against a second opinion sampled somewhere else, or the hole and the sheet it
+   * is cut in disagree at the rim"). See `PAVING_RISE_M`.
+   *
+   * Required rather than defaulted to `NaN`, because a default is how a call site
+   * that forgot it would quietly go on answering the carriageway question
+   * correctly and the footway question wrongly -- which is the exact failure this
+   * round is fixing, and it went unnoticed for three reports. With no default the
+   * compiler finds every one of them. Passing `NaN` on purpose is still allowed
+   * and still means "I do not know the ground here": draped strips then
+   * contribute nothing and the answer degrades to the carriageways alone.
    */
-  deckAt(x: number, z: number): number {
+  deckAt(x: number, z: number, groundY: number): number {
     const list = this.cells.get(cellKey(Math.floor(x / CELL_M), Math.floor(z / CELL_M)));
     if (list === undefined) return Number.NaN;
+    const draped = groundY + PAVING_RISE_M;
+    const drapedKnown = Number.isFinite(draped);
     let best = Number.NaN;
     for (const s of list) {
+      if (s.draped && !drapedKnown) continue;
       const ex = s.bx - s.ax;
       const ez = s.bz - s.az;
       const len2 = ex * ex + ez * ez;
@@ -316,7 +449,7 @@ export class RoadDeck {
       const dx = x - (s.ax + ex * t);
       const dz = z - (s.az + ez * t);
       if (dx * dx + dz * dz > s.half * s.half) continue;
-      const y = s.ay + (s.by - s.ay) * t;
+      const y = s.draped ? draped : s.ay + (s.by - s.ay) * t;
       if (!(y <= best)) best = y;
     }
     return best;
@@ -392,21 +525,24 @@ export function verifyRoadDeck(): string[] {
     z: new Float32Array([0, 0]),
   };
   deck.adopt('t', [way]);
+  // The ground, for the calls below. A carriageway's answer must not depend on
+  // it at all, which is asserted directly at the end of §6.
+  const G = 3;
 
-  const mid = deck.deckAt(50, 0);
+  const mid = deck.deckAt(50, 0, G);
   if (!(Math.abs(mid - 15) < 1e-4)) out.push(`centreline midpoint reads ${mid}, expected 15`);
-  if (!Number.isFinite(deck.deckAt(50, 7.5))) {
+  if (!Number.isFinite(deck.deckAt(50, 7.5, G))) {
     out.push('a point 7.5 m off the centreline of a 6 + 2 m road is not covered');
   }
-  if (Number.isFinite(deck.deckAt(50, 9))) {
+  if (Number.isFinite(deck.deckAt(50, 9, G))) {
     out.push('a point 9 m off the centreline of a 6 + 2 m road is covered and must not be');
   }
-  if (Number.isFinite(deck.deckAt(-20, 0))) {
+  if (Number.isFinite(deck.deckAt(-20, 0, G))) {
     out.push('a point 20 m off the end of a 100 m way is covered and must not be');
   }
   if (!deck.near(50, 12, 5)) out.push('near() misses a road 4 m outside the pad');
   deck.drop('t');
-  if (Number.isFinite(deck.deckAt(50, 0))) out.push('drop() left the deck standing');
+  if (Number.isFinite(deck.deckAt(50, 0, G))) out.push('drop() left the deck standing');
   if (deck.count !== 0 || deck.tiles !== 0) out.push('drop() left strips filed');
 
   // 5. Two tiles adopted in either order give the same answer. The header's
@@ -418,8 +554,59 @@ export function verifyRoadDeck(): string[] {
   const b = new RoadDeck();
   b.adopt('hi', [upper]);
   b.adopt('lo', [way]);
-  if (!Object.is(a.deckAt(50, 0), b.deckAt(50, 0))) {
-    out.push(`two adoption orders give ${a.deckAt(50, 0)} and ${b.deckAt(50, 0)}`);
+  if (!Object.is(a.deckAt(50, 0, G), b.deckAt(50, 0, G))) {
+    out.push(`two adoption orders give ${a.deckAt(50, 0, G)} and ${b.deckAt(50, 0, G)}`);
+  }
+
+  // 6. THE PAVING, and each of these is a way the draped strip could be wrong
+  //    without looking wrong.
+  //
+  //    The geometry is the same negative-control shape as §1-§4: on the ribbon,
+  //    off the ribbon, past the end. What is new is the *height*, and it has two
+  //    properties nothing above can catch -- a draped surface tracks the ground
+  //    it is given rather than any number stored here, and it vanishes rather
+  //    than inventing a height when the ground is unknown. The second one is what
+  //    keeps a chunk built before its terrain landed from claiming a deck at the
+  //    datum, twenty metres under the city.
+  const p = new RoadDeck();
+  const took = p.adoptPaving(new Float32Array([0, 0, 40, 0, 1]));
+  if (took !== 1) out.push(`adoptPaving took ${took} strips from a one-strip array`);
+  if (p.adoptPaving(new Float32Array([0, 0, 40, 0, 1])) !== 0) {
+    out.push('adoptPaving is not idempotent; a second call filed the strips again');
+  }
+  const on = p.deckAt(20, 0, 7);
+  if (!(Math.abs(on - (7 + PAVING_RISE_M)) < 1e-6)) {
+    out.push(`a draped strip over ground 7 reads ${on}, expected ${7 + PAVING_RISE_M}`);
+  }
+  const moved = p.deckAt(20, 0, -50);
+  if (!(Math.abs(moved - (-50 + PAVING_RISE_M)) < 1e-6)) {
+    out.push(`a draped strip does not follow its ground: reads ${moved} over -50`);
+  }
+  if (Number.isFinite(p.deckAt(20, 0, Number.NaN))) {
+    out.push('a draped strip claims a surface where the ground is unknown');
+  }
+  if (Number.isFinite(p.deckAt(20, 1.5, 7))) {
+    out.push('a point 1.5 m off the centreline of a 1 m half-width footway is covered');
+  }
+  if (Number.isFinite(p.deckAt(-10, 0, 7))) {
+    out.push('a point 10 m off the end of a 40 m footway is covered');
+  }
+  //    ...and the two kinds in one deck: the carriageway wins where it is higher,
+  //    the answer is still order-independent, and the road's own height is not
+  //    disturbed by the ground it is asked about.
+  const both = new RoadDeck();
+  both.adopt('t', [way]);
+  both.adoptPaving(new Float32Array([0, 0, 100, 0, 1]));
+  const over = both.deckAt(50, 0, 0);
+  if (!(Math.abs(over - 15) < 1e-4)) {
+    out.push(`a road at 15 m under a footway draped on ground 0 reads ${over}, expected 15`);
+  }
+  const under = both.deckAt(50, 0, 100);
+  if (!(Math.abs(under - (100 + PAVING_RISE_M)) < 1e-4)) {
+    out.push(`a footway draped on ground 100 over a road at 15 reads ${under}`);
+  }
+  if (!Object.is(both.deckAt(50, 8, 0), 15)) {
+    out.push(`the carriageway band answers ${both.deckAt(50, 8, 0)} where no paving reaches it`);
   }
   return out;
 }

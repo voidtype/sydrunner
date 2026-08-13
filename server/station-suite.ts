@@ -856,6 +856,14 @@ export async function runStationSuite(
   // its own, which is what the two processes actually have.
   const rails = new RailPrisms(world);
   const platforms = field;
+  /**
+   * `ServerWorld.railSolids`, which both ground queries read.
+   *
+   * Taken off the loaded world rather than rebuilt, because a second
+   * construction here would be a third description of the boxes and this suite
+   * exists to catch exactly that.
+   */
+  const railSolids = world.railSolids ?? null;
 
   /**
    * `main.ts`'s `groundHeightAt`, to the line, with its three sources as
@@ -871,13 +879,30 @@ export async function runStationSuite(
   const makeGround = (
     withPlatforms: typeof platforms | null,
     withCut: typeof cut,
+    /**
+     * The railway's own solids, or `null` for the world this process had before
+     * them. See `RailSolidField`: without it the server answers the ground query
+     * with no trench wall, no viaduct deck, no stair and no station building
+     * anywhere, which is what it did until this round and is the control below.
+     */
+    withRailSolids: typeof railSolids,
   ): ((x: number, z: number, feetY: number) => number) => {
     let lastGround = 0;
     return (x: number, z: number, feetY: number): number => {
       const sampled = world.terrain.height(x, z);
       if (Number.isFinite(sampled)) lastGround = sampled;
       const platform = withPlatforms === null ? -Infinity : withPlatforms.heightAt(x, z, feetY);
-      const roof = world.collision.roofHeight(x, z, feetY);
+      // **Both ends now fold the railway's own solids in here**, which is what
+      // this restatement is a restatement of: `main.ts` maxes
+      // `collision.roofHeight` with `RailSolidField.roofHeight` and
+      // `server/world.groundFor` carries the identical line. The difference the
+      // two closures below still model is the *prisms*: the client has them
+      // because a browser drew them, this process does not, and the field is
+      // what makes that stop mattering. See `world/rail-solids.ts`.
+      const roof = Math.max(
+        world.collision.roofHeight(x, z, feetY),
+        withRailSolids === null ? -Infinity : withRailSolids.roofHeight(x, z, feetY),
+      );
       if (platform > -Infinity) return Math.max(platform, roof);
       const boxFloor = boxesField === null ? -Infinity : boxesField.floorAt(x, z, feetY);
       if (boxFloor > -Infinity) return Math.max(boxFloor, roof);
@@ -887,9 +912,19 @@ export async function runStationSuite(
     };
   };
   /** The browser's, over a collision world the railway's solids are in. */
-  const clientGround = makeGround(platforms, cut);
+  const clientGround = makeGround(platforms, cut, railSolids);
   /** This process's, over the same collision world with them taken back out. */
-  const serverGround = makeGround(platforms, cut);
+  const serverGround = makeGround(platforms, cut, railSolids);
+  /**
+   * **And this process as it was before `world/rail-solids.ts`**, which is the
+   * negative control for the assertion at the foot of this function.
+   *
+   * A check that reports zero divergence and has never been able to report
+   * anything else is not a check. This closure is the same three sources with
+   * the rail solids taken back out, evaluated at the same points in the same
+   * pass, and the count it produces is the divergence this round removed.
+   */
+  const serverBefore = makeGround(platforms, cut, null);
 
   const net = geoMod.buildNetwork(bake);
   const assets = new geoMod.RailAssets();
@@ -1024,6 +1059,16 @@ export async function runStationSuite(
   let clientServerSplits = 0;
   let worstSplit = 0;
   let worstSplitAt = '';
+  /**
+   * The same comparison against the server **as it was**, which is the negative
+   * control for the assertion above it.
+   *
+   * Counted in the same loop over the same points rather than in a second sweep,
+   * so it is the same evidence read twice and cannot drift from it.
+   */
+  let splitsBefore = 0;
+  let worstSplitBefore = 0;
+  let worstSplitBeforeAt = '';
 
   const builtRadius2 = world.index.radius_m * world.index.radius_m;
   const tileKeys = new Set(world.index.tiles.map((t) => t.key));
@@ -1281,6 +1326,17 @@ export async function runStationSuite(
       rails.detach();
       for (let i = 0, k = 0; i < spots.length; i += 3, k++) {
         const sg = serverGround(spots[i], spots[i + 1], spots[i + 2] + 0.1);
+        // The control, at the same point in the same pass: what this process
+        // would have answered without `world/rail-solids.ts`.
+        const before = serverBefore(spots[i], spots[i + 1], spots[i + 2] + 0.1);
+        if (!Object.is(clientY[k], before)) {
+          splitsBefore++;
+          const wasGap = Math.abs(clientY[k] - before);
+          if (wasGap > worstSplitBefore) {
+            worstSplitBefore = wasGap;
+            worstSplitBeforeAt = `${station.name} at ${spots[i].toFixed(0)},${spots[i + 1].toFixed(0)}`;
+          }
+        }
         clientServerSamples++;
         if (Object.is(clientY[k], sg)) continue;
         const gap = Math.abs(clientY[k] - sg);
@@ -1741,18 +1797,22 @@ export async function runStationSuite(
       const nx = -site.uz;
       const nz = site.ux;
 
-      // 1. reach, in the world this *server* has: no platform field in the
-      //    ground query and no rail geometry in the collision world.
+      // 1. reach, in the world this server **used to have**: no platform field
+      //    in the ground query, no rail geometry in the collision world and no
+      //    rail solids in the arithmetic.
       //
-      //    Both have to go, and the first version of this control took only the
-      //    first and did not fail. That was the control earning its keep before
-      //    it ever ran green: `rail-geo` registers the platform deck as a
-      //    **prism** as well, so `roofHeight` still stood the body on it and one
-      //    of the four flights still worked. There are two independent
-      //    statements in the client that a platform is a surface, which is worth
-      //    knowing on its own -- and it is the same two the server has neither
-      //    of. See the client/server assertion at the foot of this function.
-      const noDeck = makeGround(null, cut);
+      //    All three have to go, and each one that was added caught something.
+      //    The first version took only the platform field away and did not fail:
+      //    `rail-geo` registers the platform deck as a **prism** as well, so
+      //    `roofHeight` still stood the body on it and one of the four flights
+      //    still worked -- two independent statements in the client that a
+      //    platform is a surface. The third was added this round, because
+      //    `world/rail-solids.ts` is now a *fourth* statement and, unlike the
+      //    prisms, the server has it: with the field left in, all four flights
+      //    reach the deck and the control goes green for the right reason. That
+      //    is the round working, and a control that cannot tell the two apart is
+      //    not measuring the walk.
+      const noDeck = makeGround(null, cut, null);
       let reachedWithout = 0;
       rails.detach();
       for (const side of [-1, 1]) {
@@ -1768,8 +1828,9 @@ export async function runStationSuite(
       rails.attach();
       emit(
         reachedWithout === 0,
-        `CONTROL: in the world this process has -- no platform field in the ground query and no ` +
-          `rail geometry in the collision world -- no body reaches the deck at ${control.name} from ` +
+        `CONTROL: in the world this process had before rail-solids -- no platform field in the ` +
+          `ground query, no rail geometry in the collision world and no rail solids in the ` +
+          `arithmetic -- no body reaches the deck at ${control.name} from ` +
           `any of its four generated flights (${reachedWithout} did). A pass here would mean the ` +
           `reachability check is not driving anything`,
       );
@@ -1790,7 +1851,7 @@ export async function runStationSuite(
       )) as typeof import('../client/src/world/rail-cut.ts');
       const bare = new cutMod.RailCut(bake);
       bare.setStations(platforms.sites);
-      const bareGround = makeGround(platforms, bare);
+      const bareGround = makeGround(platforms, bare, railSolids);
       // Walked at the corridor from a carriageway, which is where the report
       // was: King Street, St Peters. Every station is tried until one has a
       // road over its corridor, because not every station has one.
@@ -1929,6 +1990,18 @@ export async function runStationSuite(
       `${(clientServerSamples - clientServerSplits).toLocaleString()} of ${clientServerSamples.toLocaleString()} ` +
       `lattice samples over every station envelope, compared with Object.is` +
       (clientServerSplits > 0 ? ` -- worst ${worstSplit.toFixed(1)} m at ${worstSplitAt}` : ''),
+  );
+  // ...and the control for it, because zero is the answer a broken check gives
+  // too. `serverBefore` is this same process with `RailSolidField` taken back
+  // out -- the world before this round, in which the railway's trench walls,
+  // viaduct decks, footbridges, station buildings, stairs and shafts are prisms
+  // only a browser ever builds.
+  emit(
+    splitsBefore > 0,
+    `CONTROL: with the rail solids taken back out of the server's ground query, the same lattice ` +
+      `splits at ${splitsBefore.toLocaleString()} of ${clientServerSamples.toLocaleString()} samples` +
+      (splitsBefore > 0 ? ` (worst ${worstSplitBefore.toFixed(1)} m at ${worstSplitBeforeAt})` : '') +
+      `. A pass above with nothing here would mean the comparison cannot see a divergence`,
   );
 
   emit(

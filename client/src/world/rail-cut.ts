@@ -105,6 +105,21 @@
  * asks about roads at all, and the question being answered is not "is there a
  * road here" but "is the ground I was about to remove carrying one".
  *
+ * **AND THEN THE PLAYER REPORTED IT A THIRD TIME, FROM THE SAME BRIDGE.** The
+ * carriageway rule was working -- 0 m2 of King Street's asphalt is carved -- but
+ * `streets.py` also draws *foot* paving, and `lanes.py` excludes exactly that
+ * class from the sidecar the deck is built from. So the footway beside the road,
+ * the cycleway on the bridge deck and the station plaza were all drawn over a
+ * trench with nothing in it: 120 m2 within sixty metres of where they stood,
+ * falling up to 7.94 m. That footprint now rides in `rail.bin` and is adopted
+ * into the same `RoadDeck`, so nothing below changed shape -- there is still one
+ * object that knows where paving is and one question asked of it.
+ *
+ * The one visible consequence is that `deckSurfaceAt` and `RoadCover.deckAt` take
+ * a `groundY` now: foot paving is *draped*, its surface is the ground plus
+ * `road-deck.PAVING_RISE_M`, and the caller's own ground is the only correct one
+ * to use here for the same reason it is the only correct one for `cutAt`.
+ *
  * ---------------------------------------------------------------------------
  * **This file imports nothing but the flag constants.** No three.js, on
  * `game/rail.ts`'s own terms: `server/world.ts` needs the same corridor to
@@ -327,8 +342,18 @@ const DECK_UNDER_RAIL_TOLERANCE_M = -1.0;
  * because they ask the same function rather than because they share an object.
  */
 export interface RoadCover {
-  /** The paved surface over this point, or `NaN` where nothing is paved. */
-  deckAt(x: number, z: number): number;
+  /**
+   * The paved surface over this point, or `NaN` where nothing is paved.
+   *
+   * `groundY` is the terrain height the caller is about to use, for the reason
+   * `cutAt` takes one: **foot paving has no height of its own.** `streets.py`
+   * drapes it on the terrain, so its surface is the caller's own ground plus
+   * `road-deck.PAVING_RISE_M`, and a second opinion sampled somewhere else is
+   * how the hole and the sheet it is cut in come to disagree at the rim. A
+   * carriageway ignores it and answers from `.lanes.bin`'s solved height, which
+   * is what a bridge deck needs. Pass `NaN` and only the carriageways answer.
+   */
+  deckAt(x: number, z: number, groundY: number): number;
 }
 
 /** The grid cell the broad phase files strips into, metres. */
@@ -489,6 +514,39 @@ export class RailCut {
   }
 
   /**
+   * Every platform site whose kit could reach this point, in the frame each one
+   * stands in.
+   *
+   * ---------------------------------------------------------------------------
+   * **This class already holds the only copy of that list on either end**, which
+   * is the whole reason the accessor is here. `setStations` is seeded from
+   * `riding.buildPlatforms().sites` in `main.ts`, in `server/world.ts` and in
+   * `world/corridor.ts` -- `STATIONS.md`'s Phase 2a Correction 3 is the round
+   * that made those three one list -- so a reader that took its sites from
+   * anywhere else would be reintroducing exactly the divergence that correction
+   * closed.
+   *
+   * What the sites *mean* is deliberately not decided here. This file knows a
+   * platform site as the thing the corridor flares around and nothing more; how
+   * wide a deck is and how far along it runs are `world/rail-solids.ts`'s
+   * constants, and they stay there. See `trenchProfile`, the one caller: it asks
+   * how far a retaining wall's foot may lean in before it is standing over the
+   * deck behind it, and it answers that with its own rectangle over this list.
+   *
+   * A visitor rather than an array, because this runs once per rib per side of
+   * every trenched segment near a station and returning a slice would allocate
+   * on the hot path `setStations` spent a paragraph making cheap.
+   */
+  eachSiteNear(
+    x: number, z: number,
+    visit: (sx: number, sz: number, sux: number, suz: number) => void,
+  ): void {
+    const list = this.siteCells.get(cellKey(Math.floor(x / CELL_M), Math.floor(z / CELL_M)));
+    if (list === undefined) return;
+    for (const i of list) visit(this.sites[i], this.sites[i + 1], this.sites[i + 2], this.sites[i + 3]);
+  }
+
+  /**
    * The carriageways, so the carve stops at a road. See the header.
    *
    * Set from outside rather than built here, on `setStations`' terms: the roads
@@ -558,7 +616,7 @@ export class RailCut {
     // **And the road, last.** See the header: a road is not a reason to cut and
     // never asked about until a cut has already been decided, so a point with no
     // railway near it pays nothing for this rule at all.
-    return this.decked(x, z, railY) ? Number.NaN : railY;
+    return this.decked(x, z, railY, groundY) ? Number.NaN : railY;
   }
 
   /**
@@ -575,7 +633,7 @@ export class RailCut {
   deckedAt(x: number, z: number, groundY: number): number {
     const railY = this.railCutAt(x, z, groundY);
     if (!Number.isFinite(railY)) return Number.NaN;
-    return this.decked(x, z, railY) ? railY : Number.NaN;
+    return this.decked(x, z, railY, groundY) ? railY : Number.NaN;
   }
 
   /**
@@ -587,8 +645,8 @@ export class RailCut {
    * `RailCut` and nothing else; giving it a second field to plumb through six
    * call sites is how the two end up asking different decks.
    */
-  deckSurfaceAt(x: number, z: number): number {
-    return this.roads === null ? Number.NaN : this.roads.deckAt(x, z);
+  deckSurfaceAt(x: number, z: number, groundY: number): number {
+    return this.roads === null ? Number.NaN : this.roads.deckAt(x, z, groundY);
   }
 
   /** The corridor's own answer, before the road rule. See `cutAt`. */
@@ -606,9 +664,9 @@ export class RailCut {
   }
 
   /** Is a paved surface carrying the ground over this railhead? */
-  private decked(x: number, z: number, railY: number): boolean {
+  private decked(x: number, z: number, railY: number, groundY: number): boolean {
     if (this.roads === null) return false;
-    const deckY = this.roads.deckAt(x, z);
+    const deckY = this.roads.deckAt(x, z, groundY);
     return Number.isFinite(deckY) && deckY - railY > DECK_UNDER_RAIL_TOLERANCE_M;
   }
 
@@ -680,7 +738,7 @@ export class RailCut {
       // Sampled once per point rather than once per strip, which matters: this
       // is the hottest loop in a chunk build and a four-road corridor asks about
       // three or four strips at every one of its points.
-      const deckY = this.roads === null ? Number.NaN : this.roads.deckAt(x, z);
+      const deckY = this.roads === null ? Number.NaN : this.roads.deckAt(x, z, g);
       const paved = Number.isFinite(deckY);
       for (const s of list) {
         const railY = this.railYOn(s, x, z);

@@ -1423,3 +1423,438 @@ change than this phase.
    signature is the fix.
 4. **The road lid is unchanged** — still the loop-count change the zip cannot do,
    still the only one of the four dispositions a sweep cannot express.
+
+## One definition of the ground, built 2026-08-13
+
+`client/src/world/rail-solids.ts` (new), `world/rail-geo.ts` (split),
+`player/collision.ts` (`pointInPolygon` exported), `main.ts`, `server/world.ts`
+and `server/station-suite.ts`. **Not behind a flag** — this one is the shipping
+path, and `vesselsEnabled()` is untouched either way.
+
+### The defect, and it was the last unread half of this document's own rule
+
+The document ends: *"a boundary may have many renderings and exactly one
+definition"*, and names the shape of the answer:
+
+> This is not a new pattern here — it is what `PlatformField` already does, and
+> for the same stated reason: the drawn prisms exist only in a browser and only
+> near the player, so the arithmetic version is the one the server can answer
+> from. That worked. Generalise it rather than inventing something.
+
+Nothing had been generalised. `PlatformField` was the only rail structure with
+an arithmetic form; the trench wall, its coping, the viaduct deck, the piers, the
+footbridge, the station building, the access flights and the head of a subway
+shaft existed **only** as `CollisionWorld` prisms written by
+`rail-geo.buildChunk`, which runs in a browser inside `BUILD_RADIUS`. Every one
+of them is ground a player stands on, and the server had none of them.
+
+Measured over the station suite's full lattice — 670,437 samples across all 267
+station envelopes, the client's `groundHeightAt` against the server's
+`groundFor`, compared with `Object.is`:
+
+| | samples that disagree | worst |
+|---|---:|---:|
+| before | **54,293** of 670,437 | 14.0 m, Ourimbah |
+| after | **0** of 670,437 | — |
+
+Where the two disagree the server wins, so the player is corrected into or out of
+geometry they can see. That is *falling through*, *being dragged back*, *standing
+on nothing* and *teleporting to the surface*, in one mechanism.
+
+**What was actually causing it**, measured by suppressing each writer's input and
+re-running the same lattice rather than by reading the code:
+
+| suppressed | splits remaining | that writer's share |
+|---|---:|---:|
+| nothing | 54,293 | — |
+| the stations | 11,008 | **43,285 (80%)** |
+| the trench | 46,268 | 8,025 (15%) |
+| the viaducts | 56,410 | negative — see below |
+
+The station kit is four fifths of it, which is not what the brief for this round
+assumed and is worth stating: the platform deck alone is most of that, because
+`rail-geo` registers the deck as a prism *as well as* `PlatformField` answering
+for it, and the prism answers at feet heights the field refuses. Suppressing the
+viaducts *raises* the count, because `SPAN_BRIDGE` is also read by `inCutting`,
+so a bake with no bridges trenches things that are not trenched — the row is
+evidence that viaducts are a rounding error here, not that they help.
+
+### The design: the definition moves out of the renderer
+
+`rail-geo.ts` imports `three/webgpu` at module scope, so a server that imported
+it would pay for a renderer to ask where the ground is. The arithmetic half is
+therefore now a module of its own, and `rail-geo` is one of its two consumers:
+
+- **moved unchanged** — the dimensions of a railway, `buildNetwork` and the
+  network index, `planStation`, `trackClear`, and the `TrackFrame` helpers;
+- **new** — `stationSolids`, `trenchProfile`/`trenchPrisms` and `viaductSolids`,
+  which are the *box* arithmetic lifted out of the writers, and
+  `RailSolidField`, which evaluates them.
+
+The primitive is a `FrameSolid`: a box between `t0..t1` along a frame, `o0..o1`
+across it and `y0..y1` in world y. That is what `frameBar` has always drawn and
+what `framePlan` has always turned into a prism ring, so making it the record
+rather than an argument list is the whole trick. `buildChunk` now enumerates a
+station's boxes once, registers them with `CollisionWorld`, and hands the same
+list to the writers to draw. `writeTrench` measures its ribs by calling
+`trenchProfile` — the same call `RailSolidField` makes — and emits its collision
+through `trenchPrisms`.
+
+**`frameSolid` is gone and its absence is the point.** Drawing a box and
+registering it in one call is the shape that guaranteed the divergence: the
+registration only ever happened where a browser had just drawn something.
+
+Two smaller things fall out of the same rule:
+
+- `player/collision.pointInPolygon` is **exported** rather than restated. The
+  field's answer and the prism's answer are compared with `Object.is`, so a
+  second even-odd implementation, however faithful, is a place for a boundary tie
+  to land one way here and the other way there.
+- The field evaluates the **prisms**, not the boxes: `framePrism` derives the
+  same eight floats `CollisionWorld` is given, and `RailSolidField.roofHeight` is
+  `collision.roofHeight`'s three clauses in its order. There is nothing for the
+  two to disagree about because there is nothing they each decide.
+
+### Lazy, and refusing to cache a guess
+
+Two rules, for two different reasons, and both are measured.
+
+**Nothing is built until it is asked for**, which is the memory rule.
+`STATIONS.md`'s own constraint is that an arithmetic form is cheap and a prism
+set is not: 22,390 segments at ten prisms each is six figures of `Float32Array`
+if it is all built at boot. Built where somebody stands, the whole 267-station
+sweep holds 5,344 segments and 17,996 corridor prisms; a query pass covering
+1.2 × 0.8 km around *every* station — far more ground than a session walks —
+holds 16,289 segments and 60,753. Station solids are materialised on first touch
+and are 34,784 prisms for the whole city.
+
+**An answer measured against missing terrain is never cached**, which is the
+correctness rule and is `RailWorld.retryProvisional`'s rule in one line.
+`StationPlan.measured` and `TrenchProfile.complete` already say which answers are
+guesses; the field simply declines to keep those. On the server every tile is
+resident so it never fires; in a browser it fires constantly, and caching it
+would freeze a guessed wall in place for the session.
+
+### The cost, measured
+
+| | before | after |
+|---|---:|---:|
+| server boot | 4.3–5.4 s | 4.3–5.4 s, of which **0.37 s** is `buildNetwork` (0.22) and the field's two grids (0.15) |
+| server steady heap, 39 station visits | 996–1,018 MB | 1,015–1,028 MB |
+| ground query | ~0 | **0.85 µs** per call, whole-city warm |
+| retained at the ceiling | — | 95,537 prisms ≈ 3.1 MB of `Float32Array` payload plus per-record overhead; ~20–25 MB all in, of which ~7 MB is paid at boot |
+| the station suite (670,437 lattice samples, ~9 M body-step ground calls) | 54.3 s | **63.3 s** |
+
+Heap is quoted as a band because `heapUsed` on this process does not resolve
+anything under about ten megabytes against a gigabyte of world — three runs each
+way, gated on and off, give 996/1,004/1,018 MB against 1,015/1,027/1,028 MB. The
+accounted figure is the honest one and it is the row above it.
+
+The first version of `roofHeight` cost **3.5 µs** because it ran the polygon test
+on every box in the cell, and the suite went from 54 s to 138 s on it. It now
+carries the four plan bounds `CollisionWorld.Prism` carries, for the reason
+`CollisionWorld` carries them, and that is the 4× — the one number here that was
+tuned rather than derived, and it changes no answer, because a point outside a
+box's bounds is outside its polygon.
+
+### The gates, and the one that is not green
+
+Typecheck and build clean. The station suite goes 10 failures to 9: the
+divergence assertion turns green and everything else is unchanged.
+
+The default suite is **1,043 PASS**, against a baseline of 1,042 PASS / 0 FAIL
+measured in a worktree at `1a8f53e` carrying the other round's in-flight files
+and none of this one's, which is the comparison that isolates this change. The
+extra check is this round's negative control.
+
+**One check now fails about one run in three, and it is the change working.**
+`checkRiding`'s Epping instant rides a body from Eastwood, alights it, and
+asserts its feet are within 5 cm of `PlatformField.surfaceAt`. The ride is
+**nondeterministic at the metre in the baseline too** — four baseline runs
+carried the body 1448, 1450, 1456 and 1450 m — so where it puts the body down is
+a sample of Epping's platform, not a fixed point. It always passed because the
+server had nothing on that platform to be lifted by. It now sometimes fails,
+because **8,166 of 101,751 points over Epping's platform rectangles (8.0%) are
+covered by a corridor solid standing over the deck**, by up to 5.13 m, and the
+browser has always had every one of them:
+
+> `writeTrench` builds a wall from `foot` to `rim + TRENCH_COPING` measured from
+> **its own track's** centreline, and at a platform `rim` is `STATION_HALF_WIDTH`
+> — the same 9.4 m the deck reaches. `foot` is `rim − height/6`, so a five-metre
+> wall's batter covers the back 0.83 m of the deck beside it, and every *other*
+> track's wall in the same formation crosses the whole thing.
+
+That is `STATIONS.md`'s own Phase 2a Correction 2 — *"each track in the bake is
+its own polyline, so each becomes its own run, and two running lines four metres
+apart with a 5.4 m half-width occupy the same ground along their whole length"* —
+in the flag-down path, where the vessel work has not reached. Nine runs of the
+check gave three failures; the other four instants pass every time.
+
+**It was not fixed here, and the reason is stated rather than assumed.** The
+narrow fix is to stop the wall's *prism* inboard of the deck — and that alone
+opens a walk-through, because the wall's drawn face would still be there with
+nothing behind it. Making the drawn wall stop there too is a change to shipped
+geometry that wants a screenshot pair and a rim walk, not a line at the end of a
+round about the ground query. It is the first item on the list below.
+
+Two things did have to change in `server/integration-check.ts`, both in
+`checkVesselSeam`, and both because the walk down a formation's floor now meets
+the station the formation runs through:
+
+- `world.railSolids?.invalidateCorridor()` beside the check's own
+  `world.vessels = built.field`, which is the same call `main.ts` makes on every
+  re-sweep: with the flag on, `writeTrench` stands down inside a formation, so a
+  wall cached before the field was reseated is a wall nothing draws.
+- The floor walk skips the points under a station deck, counted and reported
+  beside the mouth exclusion it already had, and restarts the body **on the
+  vessel's own surface** across each gap rather than carrying its feet over one.
+  With both, the worst step is back to **−3.1 cm**, which is the number this
+  document has recorded for that walk since Phase 3.
+
+### The premise that was wrong: this is not what decides `holes`
+
+The round was briefed on the expectation that the divergence was the dominant
+cause of the `holes` column. **It is not, and it cannot be**, and the suite says
+so in its own comment:
+
+> The client/server split is reported and does **not** decide the cell.
+
+`holes` is decided by four sub-checks — `drawnUnsupported`, `droppedThrough`,
+`invisibleSheet` and `fellIn` — and every one of them is evaluated **entirely on
+the client's side of the wire**: the analytic pass reads `clientGround`, the
+bodies are driven through `controller.step` against the client's collision world.
+No fix to the server's ground query can move any of them. Measured rather than
+argued: `holes` is **220 failures before and 220 after**, with every other column
+and every control unchanged, and the only two lines that moved in the whole
+scorecard are the divergence assertion going green and its new control going red
+on demand. The scorecard was diffed line for line to check that, not summarised.
+
+Two controls were run before the fix was written, because "the check cannot see
+it" and "the check is right and the fix is small" look identical from the
+outside:
+
+- **The suite's railway is not starved.** `RailWorld.update` builds two chunks a
+  call and the suite calls it once a station, leaving 1,231 chunks pending across
+  267 stations — so the obvious suspicion is that the bodies fall through walls
+  that were never built. Pumped to empty, `holes` goes 219 → 219 and `fellIn` 192
+  → 193. The two chunks built are the two under the station; the rest is scenery.
+- **The client's answers do not change either.** With the field folded into
+  `clientGround` as well — so a body stands on a station structure anywhere,
+  built chunk or not — no verdict moves.
+
+### The `holes` queue, from evidence
+
+What each sub-check is actually finding, over the same 267 stations. This is the
+next round's work list and none of it is server divergence.
+
+**`fellIn` — 192 stations, 516 probes, the dominant term.** A body on the ground
+twelve metres out is walked at the centreline and must not end up in the
+corridor. Classified by where it started and where it stopped:
+
+| | probes |
+|---|---:|
+| started on terrain, ended in the carve | **182** |
+| started on a **rail solid** (a station-building roof, mostly), ended on terrain | 113 |
+| started on something else, ended on terrain | 88 |
+| started on a rail solid, ended in the carve | 60 |
+| the rest | 73 |
+
+The 173 that start on a rail solid are the check spawning a body on the roof of
+the station building and calling the walk off it a fall into the railway: the
+probe is at 12 m out and `writeStationHouse` puts an 11 × 6.5 m box spanning
+10.6–17.1 m out. **That is the check not asking its own question** — its comment
+says *"a body on the ground twelve metres out"* — and it is a change to
+`station-suite.ts`, deliberately not made in this round, because moving the
+instrument in the same round as the fix makes the fix unreadable. The 182 that
+start on terrain and end in the carve are the real defect and are where the next
+round should go.
+
+**`droppedThrough` — 96 stations, 383 bodies.** A body started at the surface the
+ground query itself answered, which then does not hold it. By the clause that
+answered:
+
+| | bodies |
+|---|---:|
+| the terrain answered, the body left it | 149 |
+| `RailCut.cutAt` answered, the body left it | 133 |
+| a roof answered | 74 |
+| `StationBoxField` answered | 21 |
+| `PlatformField` answered | 6 |
+
+**`drawnUnsupported` — 72 stations, 6,602 samples.** Terrain is drawn and the
+ground query answers more than half a metre below it. Overwhelmingly
+`StationBoxField.floorAt` (4,810) — a concourse floor answering under ground the
+DEM still draws — then a roof (1,066) and `PlatformField` (726). This is the
+`StationBoxField` band, not the railway's solids.
+
+**`invisibleSheet` — 73 stations, 404 samples.** All 404 are a **rail solid**
+whose roof sits at terrain height over a carved corridor: the coping of a trench
+wall, standing where the DEM sheet used to be. That is the wall doing its job at
+the rim and the check reading the rim as a lid; it wants a rule that excuses the
+coping band, or a coping that is not flush.
+
+**And above all of them, the one the gate section names.** A per-track trench
+wall's prism stands over the platform deck beside it and over every other track
+in its formation — 8.0% of the points over Epping's platforms, by up to 5.13 m.
+It is the mechanism behind the `stand` column's *"lifted onto a solid standing
+over it"*, it is what makes `checkRiding`'s Epping instant flaky, and it is the
+flag-down half of the defect Phase 2a Correction 2 measured and Phase 3 fixed for
+vessels. Both ends now agree about it, which is this round; neither should.
+
+### What can still differ, and it is bounded
+
+A browser whose terrain has not arrived answers this field from the terrain it
+has, and the server answers from the terrain it has. That window governs
+`rail-geo`'s own provisional chunks and has always been there; it is bounded by
+`PROVISIONAL_ATTEMPTS` and by the streamer, and the field's refusal to cache an
+unmeasured answer is what stops it outliving the streaming. What is gone is the
+*permanent* disagreement: two processes with the same terrain now compute the
+same solids, which was true of nothing above `PlatformField` before this file.
+
+The one input that can change under a running field is `vesselled` — with
+`?vessels=1` the corridor is re-swept as the player moves and `writeTrench`
+stands down inside a formation — so `invalidateCorridor` is called wherever
+`vesselField` is reseated, on both ends.
+
+
+## The formation's edge, flag down: whose wall it is
+
+Built 2026-08-13, immediately after the ground-parity round above, and it closes
+that round's own first open item. `client/src/world/rail-solids.ts`'s
+`trenchProfile`, `client/src/world/rail-cut.ts`'s `eachSiteNear`, three lines of
+`world/rail-geo.writeTrench`, and `checkFormationEdge` in
+`server/integration-check.ts`.
+
+The defect is the one the section above ends on and Phase 2b states in general:
+*"a four-track railway is one cutting carrying four tracks, not four trenches
+that overlap; modelling it as four is why a coping is drawn across an open
+trench, and no amount of per-vessel correctness fixes it because each vessel is
+individually right."* The bake carries one polyline per track, `writeTrench`
+built a battered retaining wall on **both** sides of every one, and a four-road
+formation therefore stood eight walls — six of them inside the cutting they were
+supposed to retain, across the other roads and across the platform decks between
+them. Measured over every platform rectangle in the city, on the shipping path:
+
+| | before | after |
+|---|---:|---:|
+| points over a platform deck covered by a corridor solid standing over it | **557,885** of 7,354,752 | **77,879** |
+| ...of those, on deck that is **inside its own carve** | — | **3,094** |
+| stations affected | 109 of 190 | 101 of 190 |
+| worst lift | 13.18 m | 13.18 m |
+| at Epping, whose platform `checkRiding` samples | 5,452 of 61,632 | **805**, worst 1.87 m |
+
+### The test is not "which tracks are one formation"
+
+Two groupings were available and both were rejected, and the reason is the same
+one this document keeps recording: a second, subtly different notion of
+membership is the bug, not the fix.
+
+- **`markCorridorEdges`' `seg.open[k]`**, the flag the boundary fence is placed
+  by, is a fixed `CORRIDOR_NEIGHBOUR` of 8.2 m. A platform flares the corridor to
+  9.4 m, so two roads *fourteen* metres apart at a station — one formation by any
+  reading — are "open" to each other and each builds a wall across the other's
+  platform. Measured: gating on `open[k]` alone left **138,414** points covered,
+  and the buckets at 12–20 m of lateral separation were 54,000 of them. It is
+  also wrong the other way: a cutting beside an embankment six metres off is
+  called closed, and a cutting with no wall is a hole.
+- **`world/corridor.buildFormations`**, the vessel path's grouping, has the right
+  rule — a track joins the formation where *its corridor overlaps the
+  formation's* — but it is a whole-network sweep over `corridorStrips`, a
+  different segment set, needing a ground-sampled spine. `RailSolidField` is lazy
+  per segment by design and `buildChunk` builds a 512 m ring; hanging either on a
+  global formation build undoes both.
+
+What both are proxies for is available exactly, at the point the question is
+asked: **`RailCut`**. `buildFormations`' own rule *is* `RailCut.cutAt` evaluated
+at a point, and `rim` on the line above is already `cut.halfWidthAt`. So each rib
+asks the carve whether the ground **outside its own coping** is still standing.
+Standing, and the rib is at the formation's edge whatever else is in the
+formation: build the wall. Taken away, and the rib is looking across the corridor
+it stands in, over a floor `writeFormation` already draws: build nothing. No
+grouping is derived, nothing can drift, and the answer is at rib resolution
+rather than per segment, which is what a formation that gains and loses roads at
+a throat needs.
+
+Two clamps go with it, both on the foot:
+
+- **Never inboard of a platform deck.** The batter is what puts a wall's foot
+  inboard of its top, and at a platform the rim *is* the deck's outer face —
+  `PLATFORM_OUTER_M` and `STATION_HALF_WIDTH` are one constant — so a five-metre
+  wall took the back 0.83 m of the deck it was built behind. That is on the
+  *outermost* road, where the rule above cannot help. Clamped by `deckEdgeAlong`
+  over `RailCut.eachSiteNear`, the wall is vertical for the length of the
+  platform and battered again the moment the deck ends.
+- **Never outboard of the corridor's own edge at that rib.** `rim` is the widest
+  of three samples so that a panel never sits inside its own hole; the difference
+  between that and `halfWidthAt` at the rib is a shoulder of ground the carve
+  never took. A vertical wall no longer covers that shoulder with its batter, so
+  a body climbs it and walks over the coping — three of 110 did before the clamp.
+
+### No walk-through was traded for the lift, and it is measured rather than argued
+
+`checkFormationEdge` builds the wall **twice** off the identical ribs — once as
+shipped, once with `stood` forced true and the batter unclamped, which is the
+per-track wall this round replaced — puts both prism sets into the collision
+world in turn, and drives the same 1,040 bodies out of the cutting through
+`player/controller.step`. **25 get out now; 30 got out before.** The panel rule
+was decided the same way: keeping a panel when *either* rib stands puts another
+11,196 points of corridor solid over the platforms and lets 26 out, requiring
+both lets 25 out, so it requires both. Arithmetically, 11,422 of the 11,609
+dropped panels have carved corridor a metre outside their coping at both ribs;
+the other 187 are a sliver of standing ground between two cuttings.
+
+### The residue, split rather than totalled
+
+Of the 77,879 points still covered, **74,785 are deck drawn over ground the carve
+never took away.** A platform is a straight 160 m rectangle and a railway curves,
+so at the ends of a curved platform the deck swings outside its own corridor and
+is buried in the hillside — and a retaining wall on that hillside is standing on
+real earth. Half the total (38,638 at the first measurement) is a **viaduct
+deck**, not a trench wall: `DECK_HALF_WIDTH` is 3.9 m and a viaduct road at a
+higher level beside a platform puts its deck box over it. Both are different
+defects with different fixes — the deck, and the viaduct — and they are counted
+apart here so neither can hide behind the other.
+
+### What it costs, measured
+
+Both new questions are per rib per side, and the carve query is the expensive
+one. Timed over the busiest chunk in the network -- Redfern's 512 m square, 189
+trenched segments, 1,772 ribs -- `trenchProfile` goes from about **1.0 ms to
+4.84 ms**, of which `stood` is 3.19 and `deckEdgeAlong` is 0.64. A typical chunk
+is nowhere near that: Epping's own square has 29 trenched segments and pays
+0.72 ms for the lot. At `BUILDS_PER_FRAME` of 2 the worst case is two Redfern-class
+chunks in one frame, which is the case to watch if a hitch is ever reported near
+Redfern or Central.
+
+There is no cheap trim available and that was checked rather than assumed: 0% of
+Redfern's ribs are at grade, so skipping the query where no wall could stand buys
+nothing, and only 31% are inside a station flare, so skipping `deckEdgeAlong`
+outside one saves 0.4 ms. What would actually pay is a coarser "is any other
+road's corridor near this point" index, which is a structure and therefore a
+round.
+
+### The gates
+
+Typecheck and build clean. Default suite: eleven runs, of which **ten consecutive
+are green** at 1,048 PASS / 0 FAIL, and `checkRiding`'s Epping instant reports
+**0 mm** off the platform in all eleven — the ride is still nondeterministic at
+the metre (1,447 to 1,456 m carried) and the landing is no longer.
+
+**The eleventh run was red on two checks and neither is this.** `four identical
+/unstuck commands in a row were all served (3 of 4)` — `game/unstuck.ts` picks *"a
+random road within 200 m"* with `Math.random`, so one relocation in a few hundred
+lands under the one-metre bar. And section 3's ride-*now*, which its own comment
+calls a lottery, put a body down at Westmead where `PlatformField.surfaceAt`
+answers `-Infinity`; sections 3b and 3c, which assert that every calling stop has
+a platform and every *composed* disembark lands on one, passed in that same run.
+Written down rather than re-rolled: **the default suite is not deterministic**, and
+a ten-run gate is worth having precisely because of that.
+
+`SYDNEY_CHECK_ONLY=stations` goes 9 failures to 9, with `stand` **159 → 162** and
+`holes` **220 → 218**, client/server ground divergence still **0 of 670,437**, and
+its negative control still red on demand at 49,810. `rail.py` was not touched, so
+no re-bake.
+
+**`holes` moved, and only just.** The previous round named this defect as sitting
+above all four hole mechanisms; on the measurement it is worth two stations, not
+two hundred. That is reported as it came out.

@@ -1687,6 +1687,14 @@ async function main(): Promise<void> {
   say('');
   await checkRailCutting();
 
+  // --- 34a. And whose wall the thing at the edge of it is. A cutting carrying
+  // four tracks is one cutting, and building it as four put six retaining walls
+  // inside it -- across the other roads and across the platforms between them.
+  // See `checkFormationEdge`, which asserts both halves: the walls that should
+  // not be there are gone, and the ones that should be there still stop a body.
+  say('');
+  await checkFormationEdge();
+
   // --- 34a0. And the primitive that is meant to end the whole class of defect
   // the three checks around this one are patches for. Phase 1 of `STATIONS.md`:
   // the vessel, and the first invariant in this file that cannot pass while the
@@ -4833,6 +4841,11 @@ if (only === 'ridingOnline') {
   for (const f of failures) say(`  - ${f}`);
   say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
   process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'formation') {
+  await checkFormationEdge();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
 } else if (only === 'seam') {
   await checkVesselSeam();
   for (const f of failures) say(`  - ${f}`);
@@ -4850,6 +4863,18 @@ if (only === 'ridingOnline') {
   process.exit(failures.length === 0 ? 0 : 1);
 } else if (only === 'platforms') {
   await checkPlatformStanding();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'stations') {
+  // The per-station suite. **One branch and a dynamic import**, deliberately:
+  // `server/station-suite.ts` owns every line of it, so the foot-paving round
+  // editing this file and the station round writing that one never touch the
+  // same hunk. See that file's header for what the seven checks are, why it is
+  // not in the default `main()` run yet, and how to drive one station.
+  const suite = await import('./station-suite.ts');
+  suite.runControls(check);
+  await suite.runStationSuite(check, say);
   for (const f of failures) say(`  - ${f}`);
   say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
   process.exit(failures.length === 0 ? 0 : 1);
@@ -19272,6 +19297,351 @@ async function checkRailCutting(): Promise<void> {
 }
 
 /**
+ * The formation's edge: whose wall it is, and that it is still a wall.
+ *
+ * ---------------------------------------------------------------------------
+ * **What this exists to catch.** `STATIONS.md` Phase 2b: *"a four-track railway
+ * is one cutting carrying four tracks, not four trenches that overlap."* The
+ * bake carries one polyline per track and `writeTrench` built a battered
+ * retaining wall on both sides of every one of them, so a four-road formation
+ * stood eight walls -- six of them inside the cutting, over the other roads and
+ * over the platform decks between them. Measured over every platform rectangle
+ * in the city, on the shipping path, before `trenchProfile` learned the rule:
+ * **557,885 of 7,354,752** sampled points were covered by a corridor solid
+ * standing over the deck, at 109 of 190 stations, worst 13.18 m. That is what
+ * `checkRiding`'s Epping instant kept landing on.
+ *
+ * Two claims, and they pull in opposite directions on purpose. The first is that
+ * the walls that should not be there are gone. The second is that the ones that
+ * should be there still are -- because the cheap way to pass the first is to
+ * stop building walls, and a cutting with no wall is a hole, which is a worse
+ * defect than the one being fixed.
+ *
+ * ---------------------------------------------------------------------------
+ * **Why the residue is split by the carve rather than reported as one number.**
+ * A platform deck is a straight 160 m rectangle and a railway curves, so at the
+ * ends of a platform on a curve the drawn deck swings *outside* the corridor it
+ * belongs to and is buried in standing ground. A retaining wall on that standing
+ * ground is not a wall over a platform; it is a platform drawn into a hillside,
+ * which is a different defect with a different fix (the deck, not the wall). The
+ * two are counted separately so that neither can hide behind the other.
+ */
+async function checkFormationEdge(): Promise<void> {
+  say('--- The formation edge: one cutting carrying N tracks, not N trenches');
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const bakePath =
+    process.env.SYDNEY_RAIL ??
+    new URL('../data/scratch/rail/rail.bin', import.meta.url).pathname;
+  if (!(await Bun.file(bakePath).exists())) {
+    say(`    no rail bake at ${bakePath}. Skipped.`);
+    return;
+  }
+  const world = await loadWorld(root);
+  const bake = world.rail;
+  const platforms = world.platforms ?? null;
+  const cut = world.railCut ?? null;
+  const solids = world.railSolids ?? null;
+  if (!bake || !platforms || !cut || !solids) {
+    say('    the world carries no rail bake. Skipped.');
+    return;
+  }
+
+  const ride = (await import(
+    new URL('../client/src/game/riding.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/game/riding.ts');
+  const solidMod = (await import(
+    new URL('../client/src/world/rail-solids.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/world/rail-solids.ts');
+  const cutMod = (await import(
+    new URL('../client/src/world/rail-cut.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/world/rail-cut.ts');
+  const rawGround = (x: number, z: number): number => world.terrain.height(x, z);
+
+  // --- 1. Nothing of the corridor stands over a platform ---------------------------
+  //
+  // The lattice is the platform's own frame -- half a metre along, a quarter
+  // across, over `PLATFORM_INNER_M..PLATFORM_OUTER_M` on both sides, which is
+  // exactly the rectangle `PlatformField.surfaceAt` answers for and exactly the
+  // one `checkRiding` puts a rider down on. `feetY` is the deck top rather than
+  // `Infinity`, because a solid whose soffit is *above* the deck is a bridge over
+  // the platform and not something standing on it.
+  let points = 0;
+  let covered = 0;
+  let inCarve = 0;
+  let outside = 0;
+  let worst = 0;
+  let worstAt = '';
+  let stations = 0;
+  const hitNames = new Set<string>();
+  for (const site of platforms.sites) {
+    stations++;
+    const top = site.y + ride.PLATFORM_TOP_M;
+    for (let a = -ride.PLATFORM_HALF_LENGTH_M; a <= ride.PLATFORM_HALF_LENGTH_M; a += 0.5) {
+      for (const sd of [-1, 1]) {
+        for (let c = ride.PLATFORM_INNER_M; c <= ride.PLATFORM_OUTER_M; c += 0.25) {
+          const x = site.x + site.ux * a - site.uz * c * sd;
+          const z = site.z + site.uz * a + site.ux * c * sd;
+          points++;
+          const roof = solids.corridorRoofAt(x, z, top);
+          if (roof <= top + 1e-9) continue;
+          covered++;
+          hitNames.add(site.name);
+          if (roof - top > worst) {
+            worst = roof - top;
+            worstAt = `${site.name} at ${x.toFixed(0)},${z.toFixed(0)}`;
+          }
+          // Is this square of deck even inside the corridor it belongs to?
+          if (Number.isFinite(cut.cutAt(x, z, rawGround(x, z)))) inCarve++;
+          else outside++;
+        }
+      }
+    }
+  }
+
+  check(
+    inCarve < 4_000,
+    `${inCarve.toLocaleString()} of ${points.toLocaleString()} sampled points over a platform deck ` +
+      `that is inside its own carve are covered by a corridor solid standing over it. Before the ` +
+      `formation rule landed in rail-solids.trenchProfile the whole figure was 557,885, at 109 of ` +
+      `190 stations, worst 13.18 m -- a battered retaining wall per *track*, standing across every ` +
+      `other track of its own formation and across the platforms between them`,
+  );
+  check(
+    covered < 120_000,
+    `  ${covered.toLocaleString()} in total (${((covered / points) * 100).toFixed(2)}%) at ` +
+      `${hitNames.size} of ${stations} platform sites, worst ${worst.toFixed(2)} m at ${worstAt}. ` +
+      `The other ${outside.toLocaleString()} are deck drawn over ground the carve never took away: ` +
+      `a platform is a straight 160 m rectangle and a railway curves, so at the ends of a curved ` +
+      `platform the deck is buried in the hillside and the wall beside it is standing on real earth. ` +
+      `That is the deck's defect and not the wall's, and it is counted apart so neither hides in the other`,
+  );
+  // --- 2. And the walls that remain are still walls --------------------------------
+  //
+  // The cheap way to pass section 1 is to stop building walls, so this is the
+  // half that must fail if the rule is too greedy. Every rib of every trenched
+  // segment near a platform is classified: `stood` says the carve has *not* taken
+  // the ground away outside this rib's own coping, which is the whole of the new
+  // rule, and a rib that stands is a rib that must carry a wall.
+  //
+  // The falsifiable claim is about the panels it *drops*. A dropped panel is
+  // supposed to be looking across the corridor it stands in, at another road of
+  // the same formation, over a floor `writeFormation` draws and `RailCut.cutAt`
+  // answers. So a metre further out, at both its ribs, the ground must still be
+  // carved. Where it is not, the rule has deleted a wall with the street behind
+  // it, which is the walk-through this round was told not to trade for a lift.
+  const net = solidMod.buildNetwork(bake);
+  let panels = 0;
+  let kept = 0;
+  let dropped = 0;
+  let orphaned = 0;
+  let firstOrphan = '';
+  const near = new Set<number>();
+  for (const site of platforms.sites) {
+    for (let i = 0; i < net.segments.length; i++) {
+      const s = net.segments[i];
+      if (Math.hypot((s.ax + s.bx) / 2 - site.x, (s.az + s.bz) / 2 - site.z) > 200) continue;
+      near.add(i);
+    }
+  }
+  /** Is the ground still standing `out` metres off this rib's centreline point? */
+  const standingAt = (
+    rib: { cx: number; cz: number }, px: number, pz: number, out: number,
+  ): boolean => {
+    const ox = rib.cx + px * out;
+    const oz = rib.cz + pz * out;
+    return !Number.isFinite(cut.cutAt(ox, oz, rawGround(ox, oz)));
+  };
+  for (const i of near) {
+    const s = net.segments[i];
+    if (cutMod.drawnAsTunnel(s.flags)) continue;
+    if (!cut.probeAlong(s.ax, s.az, s.bx, s.bz, rawGround).trench) continue;
+    const profile = solidMod.trenchProfile(s, cut, rawGround, () => false);
+    for (let k = 0; k < 2; k++) {
+      const side = k === 0 ? -1 : 1;
+      const px = -s.uz * side;
+      const pz = s.ux * side;
+      const ribList = profile.sides[k];
+      for (let r = 0; r + 1 < ribList.length; r++) {
+        const a = ribList[r];
+        const b = ribList[r + 1];
+        if (Math.max(a.top, b.top) - Math.min(a.cess, b.cess) <= solidMod.TRENCH_MIN_HEIGHT) continue;
+        panels++;
+        if (a.stood && b.stood) { kept++; continue; }
+        dropped++;
+        // A dropped panel is supposed to open onto the corridor it stands in.
+        // Probed a metre outside its own coping at **both** ribs -- a metre,
+        // because the rule itself looked at the coping's own outer edge and the
+        // question here is whether the carve genuinely continues rather than
+        // ending on the exact millimetre the rule tested; both ribs, because a
+        // panel with standing ground at one end and carved corridor at the other
+        // has a road of its own formation beside it and is not orphaned.
+        const out = solidMod.TRENCH_COPING + 1;
+        if (!standingAt(a, px, pz, a.rim + out) || !standingAt(b, px, pz, b.rim + out)) continue;
+        orphaned++;
+        firstOrphan ||= `${a.cx.toFixed(0)},${a.cz.toFixed(0)}`;
+      }
+    }
+  }
+  check(
+    dropped > 1_000,
+    `  ${dropped.toLocaleString()} of ${panels.toLocaleString()} wall panels within 200 m of a platform ` +
+      `are dropped because the carve has already taken the ground away outside both their ribs' ` +
+      `copings, and ${kept.toLocaleString()} still stand. Both numbers have to be large: all-dropped ` +
+      `is a railway with no walls and all-kept is the defect`,
+  );
+  check(
+    kept * 3 > panels,
+    `  ...and the ones that stand are ${((kept / panels) * 100).toFixed(0)}% of all of them, against ` +
+      `a bar of a third, which is what stops "no wall stands over a platform" being passed by ` +
+      `building no walls`,
+  );
+  check(
+    orphaned * 50 < dropped,
+    `  ${dropped - orphaned} of the ${dropped.toLocaleString()} dropped panels open onto the formation ` +
+      `and not onto the street: a metre outside their own coping the ground is still carved corridor ` +
+      `at both ribs. The other ${orphaned}` +
+      (orphaned ? ` (first at ${firstOrphan}) ` : ' ') +
+      `are where the neighbouring road's carve ends within a metre of this one's coping, so what is ` +
+      `behind them is a sliver of standing ground between two cuttings rather than the street. The ` +
+      `bar is 2%, and the assertion that a body cannot get out of the corridor is the next one -- ` +
+      `this is the arithmetic sanity check on it`,
+  );
+
+  // --- 3. A body, driven at the edge from inside -----------------------------------
+  //
+  // The arithmetic above says a kept wall exists. This says a player cannot get
+  // through one. The corridor's own prisms are put into the collision world by
+  // the same enumeration `rail-geo.buildChunk` registers -- `trenchPrisms` over
+  // `trenchProfile` -- and a body is started on the formation floor and driven
+  // *outward* at the wall for two seconds. It must not end up on the street.
+  //
+  // Outward rather than inward on purpose: walking in from the street crosses a
+  // half-metre coping and then falls, wall or no wall, which is what the station
+  // suite's `fellIn` column measures. Getting *out* of a cutting is the thing a
+  // retaining wall is for.
+  // The control is the wall **as the per-track rule built it**, and it is built
+  // by undoing the two clauses on the ribs this profile already measured rather
+  // than by re-deriving a wall: `stood` back to true everywhere, and the foot
+  // back to its unclamped batter. Nothing else about the rib changes, so the two
+  // prism sets differ in exactly what this round changed and in nothing else.
+  const shipped: Array<{ points: Float32Array; height: number; base: number }> = [];
+  const before: Array<{ points: Float32Array; height: number; base: number }> = [];
+  const walls: Array<{ cx: number; cz: number; px: number; pz: number; rim: number; cess: number; top: number }> = [];
+  for (const i of near) {
+    const s = net.segments[i];
+    if (cutMod.drawnAsTunnel(s.flags)) continue;
+    if (!cut.probeAlong(s.ax, s.az, s.bx, s.bz, rawGround).trench) continue;
+    const profile = solidMod.trenchProfile(s, cut, rawGround, () => false);
+    solidMod.trenchPrisms(s, profile, (p) => shipped.push(p));
+    solidMod.trenchPrisms(
+      s,
+      {
+        complete: profile.complete,
+        anyWall: [
+          profile.sides[0].some((r) => !r.vessel && r.top - r.cess > solidMod.TRENCH_MIN_HEIGHT),
+          profile.sides[1].some((r) => !r.vessel && r.top - r.cess > solidMod.TRENCH_MIN_HEIGHT),
+        ],
+        sides: [0, 1].map((k) => profile.sides[k].map((r) => ({
+          ...r,
+          stood: true,
+          foot: Math.max(solidMod.TRENCH_FOOT_MIN, r.rim - solidMod.TRENCH_BATTER * (r.top - r.cess)),
+        }))) as [typeof profile.sides[0], typeof profile.sides[1]],
+      },
+      (p) => before.push(p),
+    );
+    for (let k = 0; k < 2; k++) {
+      if (!profile.anyWall[k]) continue;
+      const side = k === 0 ? -1 : 1;
+      const ribList = profile.sides[k];
+      for (let r = 1; r + 2 < ribList.length; r++) {
+        // A wall worth driving a body at: two metres of it, standing, with a
+        // built panel on **both** sides of the rib so the body is aimed at the
+        // middle of a wall rather than at the end of one. A run that ends is
+        // where the cutting runs out to grade and there is nothing to hold.
+        const rib = ribList[r];
+        if (!rib.stood || rib.top - rib.cess < 2) continue;
+        // ...and standing on the corridor floor. A rib whose own foot is not
+        // inside the carve is at the taper of a station flare, where the ground
+        // inboard of the wall was never taken away and a body walks up it rather
+        // than at it: that is the carve's per-point width against the wall's
+        // three-sample maximum, and it is not what this section is asking about.
+        const gx = rib.cx - s.uz * side * (rib.foot - 0.6);
+        const gz = rib.cz + s.ux * side * (rib.foot - 0.6);
+        if (!Number.isFinite(cut.cutAt(gx, gz, rawGround(gx, gz)))) continue;
+        walls.push({
+          cx: rib.cx, cz: rib.cz, px: -s.uz * side, pz: s.ux * side,
+          rim: rib.rim, cess: rib.cess, top: rib.top,
+        });
+      }
+    }
+  }
+  let lastGround = 0;
+  const ground = (x: number, z: number, feetY: number): number => {
+    const sampled = world.terrain.height(x, z);
+    if (Number.isFinite(sampled)) lastGround = sampled;
+    const roof = Math.max(world.collision.roofHeight(x, z, feetY), solids.roofHeight(x, z, feetY));
+    const platform = platforms.heightAt(x, z, feetY);
+    if (platform > -Infinity) return Math.max(platform, roof);
+    const floor = cut.cutAt(x, z, sampled);
+    if (Number.isFinite(floor)) return Math.max(floor, roof);
+    return Math.max(lastGround, roof);
+  };
+  /**
+   * Drive one body per sampled wall, out of the cutting, and count the ones that
+   * get out. Every third, which is a stride rather than one place: it lands on
+   * ribs of different sides of different segments of different stations.
+   */
+  const driveAll = (
+    into: ReadonlyArray<{ points: Float32Array; height: number; base: number }>,
+  ): { driven: number; escaped: number; first: string } => {
+    world.collision.addPrisms('formation-edge-check', into);
+    let driven = 0;
+    let escaped = 0;
+    let first = '';
+    for (let w = 0; w < walls.length; w += 3) {
+      const wall = walls[w];
+      // On the formation floor, at the ballast toe, aimed at the rim.
+      const start = solidMod.TRENCH_FOOT_MIN - PLAYER_RADIUS - 0.5;
+      const state = createPlayerState(wall.cx + wall.px * start, wall.cz + wall.pz * start);
+      state.position.y = wall.cess + EYE_HEIGHT + 0.1;
+      const tx = wall.cx + wall.px * (wall.rim + 8);
+      const tz = wall.cz + wall.pz * (wall.rim + 8);
+      for (let t = 0; t < 120; t++) {
+        const yaw = Math.atan2(-(tx - state.position.x), -(tz - state.position.z));
+        step(state, { forward: 1, right: 0, jump: false, sprint: false, yaw, pitch: 0 },
+          1 / 60, world.collision, ground);
+      }
+      driven++;
+      const out = (state.position.x - wall.cx) * wall.px + (state.position.z - wall.cz) * wall.pz;
+      if (out <= wall.rim + solidMod.TRENCH_COPING) continue;
+      escaped++;
+      first ||= `${wall.cx.toFixed(0)},${wall.cz.toFixed(0)} reached ${out.toFixed(2)} m of ` +
+        `${(wall.rim + solidMod.TRENCH_COPING).toFixed(2)}`;
+    }
+    world.collision.removeTile('formation-edge-check');
+    return { driven, escaped, first };
+  };
+  const now = driveAll(shipped);
+  const was = driveAll(before);
+  check(
+    now.driven > 200 && now.escaped <= was.escaped + Math.ceil(now.driven / 100),
+    `  ${now.driven} bodies started on the formation floor and driven at a standing wall for two ` +
+      `seconds through player/controller.step: ${now.driven - now.escaped} were stopped inboard of ` +
+      `its coping and ${now.escaped} got out. Against the **per-track wall this round replaced**, ` +
+      `built off the identical ribs with \`stood\` forced true and the batter unclamped, the same ` +
+      `${was.driven} bodies got out ${was.escaped} times. This round may not make that worse by more ` +
+      `than one body in a hundred, because the cheap way to stop a wall standing over a platform is ` +
+      `to stop building the wall. The margin is not slack: it is the flare taper, where the carve's ` +
+      `per-point width is narrower than the wall's three-sample rim and a shoulder of un-carved ` +
+      `ground stands inboard of the coping. A vertical wall no longer covers that shoulder with its ` +
+      `batter, so a body can climb it -- pre-existing geometry, newly reachable, and named here ` +
+      `rather than absorbed` +
+      (now.escaped ? `. First out now: ${now.first}` : ''),
+  );
+}
+
+/**
  * The vessel: the railway as a closed solid, proven closed on real bake data.
  *
  * ---------------------------------------------------------------------------
@@ -20282,6 +20652,11 @@ async function checkVesselSeam(): Promise<void> {
     // it is what makes these walks a test of the shipped path rather than of a
     // model of it.
     world.vessels = built.field;
+    // Reseating `world.vessels` changes what `world/rail-solids.ts` should say
+    // about the corridor -- inside a formation `writeTrench` stands down, so a
+    // trench wall it cached before this line is a wall nothing draws. Same call
+    // `main.ts` makes on every re-sweep. See `RailSolidField.invalidateCorridor`.
+    world.railSolids?.invalidateCorridor();
     const probe = groundFor(world);
     const at = (x: number, z: number, feet: number): number => probe.groundHeight(x, z, feet);
     /**
@@ -20326,7 +20701,20 @@ async function checkVesselSeam(): Promise<void> {
       let where = '';
       let nan = 0;
       let drop = 0;
+      let prevX = path[0][0];
+      let prevZ = path[0][1];
       for (const [x, z] of path) {
+        // **A filtered-out stretch is not a step.** The path drops the points at
+        // the mouth and the points under a station deck, so consecutive entries
+        // are not always consecutive ground: carrying `feet` across a
+        // three-hundred-point gap and calling the difference a step measures the
+        // teleport, not the floor. The pitch is half a metre, so anything over a
+        // metre is a gap, and the body is put back on the **vessel's own
+        // surface** there -- not on `Infinity`, which would hand it the highest
+        // roof in the suburb and measure the fall off that instead.
+        if (Math.hypot(x - prevX, z - prevZ) > 1) feet = built.field.surfaceAt(x, z);
+        prevX = x;
+        prevZ = z;
         const g = at(x, z, feet);
         if (!Number.isFinite(g)) {
           nan++;
@@ -20363,13 +20751,24 @@ async function checkVesselSeam(): Promise<void> {
         alongAll.push([a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t]);
       }
     }
-    const alongPath = alongAll.filter(([x, z]) => !isOpenGround(x, z));
+    // **And not under a station**, which is new and is the same argument one
+    // paragraph up. A platform deck is built *over* the formation floor -- at
+    // Erskineville it spans it -- and since `world/rail-solids.ts` the ground
+    // query knows that on this end as well as in a browser. So a walk down the
+    // spine steps up onto the deck and off it again, and measuring that here
+    // would be measuring the station rather than the floor. `stationRoofAt` is
+    // the same enumeration `groundHeight` folds in, asked for the station half
+    // only; how many points it removed is reported beside the mouth.
+    const underStation = (x: number, z: number): boolean =>
+      (world.railSolids?.stationRoofAt(x, z, Infinity) ?? -Infinity) > -Infinity;
+    const alongPath = alongAll.filter(([x, z]) => !isOpenGround(x, z) && !underStation(x, z));
     const along = walk(alongPath);
     check(
       along.nan === 0 && along.drop === 0 && Math.abs(along.worst) < 0.5,
       `walking the trench floor of the ${best.metres.toFixed(0)} m formation at Erskineville, ` +
         `${alongPath.length} steps of half a metre (${alongAll.length - alongPath.length} outside the ` +
-        `footprint, at the mouth): no step without an answer, no fall over 1.5 m, worst step ` +
+        `footprint at the mouth or under the station deck): no step without an answer, no fall over ` +
+        `1.5 m, worst step ` +
         `${(along.worst * 100).toFixed(1)} cm${along.where ? ` at ${along.where}` : ''}. The floor is a ` +
         `face of the solid, not a patch that might be missing`,
     );
@@ -22435,6 +22834,34 @@ function pointInsidePolygon(points: Float32Array, x: number, z: number): boolean
  * `RailCut` over the same bake and the same terrain with **no roads attached**,
  * which is the world exactly as it shipped. If that one does not fail loudly,
  * the rule under test is not doing anything and nothing above means a thing.
+ *
+ * ---------------------------------------------------------------------------
+ * AND THEN ALL OF IT PASSED, AND THE PLAYER FELL THROUGH THE SAME BRIDGE AGAIN.
+ *
+ *   > *"still a fence blocking the road on king st, i still fall through the
+ *   > road and can still see rail components penetrating thru the road"*
+ *
+ * Third report, same three symptoms, and every check above green. **The defect
+ * was in the definition of "road".** Points 3 and 4 walk the ways in
+ * `.lanes.bin`, and `lanes.py:602` builds that file from
+ * `[r for r in roads if not r.is_foot and not r.tunnel]` -- so a footway, a set
+ * of steps, a plaza, a cycleway and a `bridge=yes` foot bridge are none of them
+ * a sample here, while `streets.py:642` draws every one of them. The check could
+ * not see the surface the player was standing on. "0 m2 of road removed" was
+ * true and vacuous, and it signed off a hole he then fell into twice more.
+ *
+ * So the sweep is over the **wide** definition now: every square metre of paving
+ * `streets.py` draws near a corridor, carriageway and footway alike. The footway
+ * half comes from `bake.paving`, which is the footprint `rail.corridor_paving`
+ * computes from the same OSM extract with the same widths and the same
+ * simplification tolerance `streets.StreetNetwork` uses.
+ *
+ * **The honest limit of that, stated rather than glossed:** for the footway half,
+ * the thing sampled and the thing that fixes it are derived from one array, so
+ * this cannot catch a footprint that is wrong in the pipeline -- only a carve
+ * that eats a footprint the deck was given. The carriageway half stays
+ * independent (`.lanes.bin` against the bake), and §6 is anchored on a
+ * coordinate the player reported rather than on anything either file computed.
  */
 async function checkRoadDeck(): Promise<void> {
   say('--- Roads over the railway: uninterrupted everywhere');
@@ -22532,7 +22959,23 @@ async function checkRoadDeck(): Promise<void> {
     new URL('../client/src/game/riding.ts', import.meta.url).pathname
   )) as typeof import('../client/src/game/riding.ts');
   const anchors = ridingMod.buildPlatforms(bake).sites;
-  /** The rule as it ships. */
+
+  // --- ...and every square metre of foot paving near a corridor ---------------
+  //
+  // The half of "paved" that `.lanes.bin` does not carry and that the player
+  // fell through three times. Adopted into the **same** deck as the ways above,
+  // which is the property the whole road rule is built on: one object knows
+  // where paving is, and `cutAt` asks it exactly one question.
+  const pavingStrips = deck.adoptPaving(bake.paving);
+  check(
+    pavingStrips > 1_000,
+    `the rail bake carries ${pavingStrips.toLocaleString()} strips of corridor foot paving ` +
+      `(${(bake.paving.length * 4 / 1024).toFixed(0)} kB), adopted into the same RoadDeck as the ` +
+      `${laneTiles.toLocaleString()} tiles of lane sidecar. A zero here is a bake from before ` +
+      `rail.corridor_paving existed and makes every footway assertion below vacuous`,
+  );
+
+  /** The rule as it ships **after this round**: carriageways and foot paving. */
   const cut = new cutMod.RailCut(bake);
   cut.setStations(anchors);
   cut.setRoads(deck);
@@ -22546,6 +22989,55 @@ async function checkRoadDeck(): Promise<void> {
    */
   const bare = new cutMod.RailCut(bake);
   bare.setStations(anchors);
+  /**
+   * THE SECOND NEGATIVE CONTROL, and it is the one this round exists for.
+   *
+   * A deck built from `.lanes.bin` and **nothing else** -- which is the world as
+   * it shipped at the commit the player filed his third report against, with the
+   * carriageway rule fully working. Its number is printed beside every footway
+   * assertion below, and §6 asserts outright that it fails at the coordinate he
+   * gave. Without it "0 m2 of paving removed" would be the same green light this
+   * file already gave twice: true of the surface it happened to sample, and
+   * silent about the one he was standing on.
+   */
+  const lanesOnly = new deckMod.RoadDeck();
+  for (const entry of world.index.tiles) {
+    const bytes = await readBytes(join(root, 'tiles', `${entry.key}.lanes.bin`));
+    if (bytes === null) continue;
+    const decoded = trafficMod.decodeLanes(bytes, entry.bounds[0], entry.bounds[1] + world.index.tile_size);
+    if (decoded !== null) lanesOnly.adopt(entry.key, decoded.ways);
+  }
+  const shipped = new cutMod.RailCut(bake);
+  shipped.setStations(anchors);
+  shipped.setRoads(lanesOnly);
+
+  /**
+   * Every strip of drawn paving, as one flat list the sweep and §6 both walk.
+   *
+   * `half` is the outer edge of everything drawn: for a way it is
+   * `halfWidth + footpathWidth`, which is the band `streets.py` buffers; for a
+   * footway it is the bake's own half. `draped` says which -- a footway's surface
+   * is the ground plus `PAVING_RISE_M` and a carriageway's is its own solved
+   * height, and the sweep has to know in order to state the drop honestly.
+   */
+  interface Paved { ax: number; az: number; bx: number; bz: number; half: number; draped: boolean }
+  const paved: Paved[] = [];
+  for (const w of ways) {
+    const half = Math.max(1.5, w.halfWidth) + Math.max(0, w.footpathWidth);
+    for (let i = 0; i + 1 < w.count; i++) {
+      paved.push({
+        ax: w.x[i], az: w.z[i], bx: w.x[i + 1], bz: w.z[i + 1], half, draped: false,
+      });
+    }
+  }
+  const carriagewayStrips = paved.length;
+  for (let i = 0; i + 4 < bake.paving.length; i += 5) {
+    paved.push({
+      ax: bake.paving[i], az: bake.paving[i + 1],
+      bx: bake.paving[i + 2], bz: bake.paving[i + 3],
+      half: bake.paving[i + 4], draped: true,
+    });
+  }
 
   // 2. Bit-exact across two module instances. `checkClearance` §2's argument.
   {
@@ -22564,16 +23056,19 @@ async function checkRoadDeck(): Promise<void> {
       const decoded = trafficMod.decodeLanes(bytes, entry.bounds[0], entry.bounds[1] + world.index.tile_size);
       if (decoded !== null) deckB.adopt(entry.key, decoded.ways);
     }
+    // The paving too, and adopted **last** here where the first deck took it
+    // first: it has to be true that the two orders give the identical float, and
+    // the paving is exactly the kind of late arrival that could break it.
+    deckB.adoptPaving(bake.paving);
     const cutB = new cutTwo.RailCut(bake);
     cutB.setStations(anchors);
     cutB.setRoads(deckB);
     let compared = 0;
     let same = true;
     let firstBad = '';
-    for (const w of ways) {
-      for (let i = 0; i < w.count && compared < 40_000; i++) {
-        const x = w.x[i];
-        const z = w.z[i];
+    for (const p of paved) {
+      if (compared >= 40_000) break;
+      for (const [x, z] of [[p.ax, p.az], [p.bx, p.bz]] as const) {
         const g = world.terrain.height(x, z);
         if (!Number.isFinite(g)) continue;
         compared++;
@@ -22583,23 +23078,37 @@ async function checkRoadDeck(): Promise<void> {
           same = false;
           if (firstBad === '') firstBad = `${x.toFixed(0)}, ${z.toFixed(0)}: ${a} vs ${b}`;
         }
+        // And the *surface*, which is the number the draped strips introduced
+        // and the one a wrong `groundY` would show up in first.
+        const sa = cut.deckSurfaceAt(x, z, g);
+        const sb = cutB.deckSurfaceAt(x, z, g);
+        if (!Object.is(sa, sb)) {
+          same = false;
+          if (firstBad === '') firstBad = `${x.toFixed(0)}, ${z.toFixed(0)}: surface ${sa} vs ${sb}`;
+        }
       }
-      if (compared >= 40_000) break;
     }
     check(
       same && compared > 10_000,
       `two separately-evaluated copies of the deck and the carve, filled from the same sidecars in ` +
-        `opposite tile order, answer "is the ground here" identically at ${compared.toLocaleString()} ` +
-        `points on the road network, compared with Object.is and not an epsilon` +
+        `opposite tile order and the paving adopted at opposite ends of that, answer "is the ground ` +
+        `here" and "how high is the paving" identically at ${compared.toLocaleString()} points on the ` +
+        `paved network, compared with Object.is and not an epsilon` +
         (firstBad ? ` -- first disagreement at ${firstBad}` : ''),
     );
   }
 
-  // --- 3. How much drawn road surface the carve removes ------------------------
+  // --- 3. How much drawn paving the carve removes ------------------------------
   //
-  // Sampled on a one-metre lattice over each way's **paved** band, which is the
-  // surface `streets.py` actually draws: `centreline.buffer(halfWidth +
-  // footpathWidth)`. Each sample stands for a square metre.
+  // Sampled on a one-metre lattice over **everything `streets.py` draws** near a
+  // corridor. Each sample stands for a square metre. Two populations, and the
+  // second one is this round's whole point:
+  //
+  //   - a carriageway's band, `centreline.buffer(halfWidth + footpathWidth)`,
+  //     from `.lanes.bin`;
+  //   - a footway's ribbon, `centreline.buffer(FOOTWAY_HALF_WIDTH)`, from
+  //     `bake.paving` -- footways, steps, plazas, cycleways and foot bridges, the
+  //     class `lanes.py:602` excludes and this check could not previously see.
   const SAMPLE_M = 1;
   /**
    * How far a platform deck stands over its railhead. `riding.PLATFORM_TOP_M`,
@@ -22623,15 +23132,19 @@ async function checkRoadDeck(): Promise<void> {
   let pavedTotal = 0;
   let lostNow = 0;
   let lostBefore = 0;
+  let lostShipped = 0;
+  let lostShippedFoot = 0;
   let worstAt = '';
   let worstDrop = 0;
-  for (const w of ways) {
-    const half = Math.max(1.5, w.halfWidth) + Math.max(0, w.footpathWidth);
-    for (let i = 0; i + 1 < w.count; i++) {
-      const ax = w.x[i];
-      const az = w.z[i];
-      const bx = w.x[i + 1];
-      const bz = w.z[i + 1];
+  /** Every residual, so a non-zero answer can be named instead of counted. */
+  const residual: Array<{ x: number; z: number; drop: number; draped: boolean }> = [];
+  for (const p of paved) {
+    {
+      const ax = p.ax;
+      const az = p.az;
+      const bx = p.bx;
+      const bz = p.bz;
+      const half = p.half;
       const len = Math.hypot(bx - ax, bz - az);
       if (len < 0.05) continue;
       pavedTotal += Math.round(len) * Math.round(2 * half);
@@ -22659,10 +23172,17 @@ async function checkRoadDeck(): Promise<void> {
           if (!Number.isFinite(g)) continue;
           pavedSamples++;
           if (Number.isFinite(bare.cutAt(x, z, g))) lostBefore++;
+          // The world as it shipped when the player filed his third report: the
+          // carriageway rule on, the footway rule absent.
+          if (Number.isFinite(shipped.cutAt(x, z, g))) {
+            lostShipped++;
+            if (p.draped) lostShippedFoot++;
+          }
           const railY = cut.cutAt(x, z, g);
           if (Number.isFinite(railY)) {
             lostNow++;
             const drop = g - railY;
+            if (residual.length < 4_000) residual.push({ x, z, drop, draped: p.draped });
             if (drop > worstDrop) {
               worstDrop = drop;
               worstAt = `${x.toFixed(0)}, ${z.toFixed(0)}`;
@@ -22674,7 +23194,7 @@ async function checkRoadDeck(): Promise<void> {
           // `PlatformField.heightAt` is the authority on where a deck is -- it is
           // what the ground query itself consults -- and asking it at the road's
           // own surface is exactly "is there a platform standing in this road".
-          const surface = deck.deckAt(x, z);
+          const surface = deck.deckAt(x, z, g);
           if (Number.isFinite(surface) && world.platforms !== null && world.platforms !== undefined) {
             const top = world.platforms.heightAt(x, z, surface);
             if (top > surface - 0.05) {
@@ -22704,19 +23224,44 @@ async function checkRoadDeck(): Promise<void> {
   // whose railway never meets a street, and this one's does 4,600 times.
   check(
     lostBefore > 2_000,
-    `with the road rule off, the carve removes ${lostBefore.toLocaleString()} m2 of drawn ` +
-      `carriageway across the build. That is the world as it shipped and it is what the player ` +
-      `fell through; a zero here would make the assertion below vacuous`,
+    `with the road rule off entirely, the carve removes ${lostBefore.toLocaleString()} m2 of drawn ` +
+      `paving across the build. That is the world before any of this existed; a zero here would ` +
+      `make everything below vacuous`,
   );
 
+  // THE SECOND NEGATIVE CONTROL, and it is the one that proves this check can
+  // see the defect it missed twice. The carriageway rule on and nothing else --
+  // the code exactly as it shipped when the player filed his third report.
   check(
-    lostNow === 0,
-    `and with it on, ${lostNow.toLocaleString()} m2 of the ${pavedSamples.toLocaleString()} m2 of paved ` +
-      `surface within reach of a rail corridor is removed by the carve` +
-      (worstAt ? `, worst ${worstDrop.toFixed(1)} m at ${worstAt}` : '') +
-      `. The rule the player has stated twice is that a road is uninterrupted everywhere, so the ` +
-      `target is zero and not a percentage`,
+    lostShippedFoot > 100,
+    `with the carriageway rule on and the footway rule off -- the code as it shipped when the ` +
+      `player reported this the third time -- ${lostShipped.toLocaleString()} m2 is still removed, ` +
+      `${lostShippedFoot.toLocaleString()} m2 of it drawn FOOT paving. That is the surface the old ` +
+      `sweep could not sample -- it walked ${carriagewayStrips.toLocaleString()} carriageway strips ` +
+      `and none of the ${(paved.length - carriagewayStrips).toLocaleString()} footway strips beside ` +
+      `them -- so it reported "0 m2 of road removed" and was right and useless`,
   );
+
+  {
+    // Named, not counted. A residual is only acceptable if somebody has looked
+    // at what it is, and a bare integer is how the last two rounds got signed
+    // off -- so the failure message carries the clusters themselves.
+    const foot = residual.filter((r) => r.draped).length;
+    const named = residual
+      .slice(0, 4)
+      .map((r) => `${r.draped ? 'footway' : 'carriageway'} at ${r.x.toFixed(0)}, ${r.z.toFixed(0)} ` +
+        `dropping ${r.drop.toFixed(1)} m`)
+      .join('; ');
+    check(
+      lostNow === 0,
+      `and with both on, ${lostNow.toLocaleString()} m2 of the ${pavedSamples.toLocaleString()} m2 of ` +
+        `drawn paving within reach of a corridor is removed by the carve (${foot} of it footway)` +
+        (worstAt ? `, worst ${worstDrop.toFixed(1)} m at ${worstAt}` : '') +
+        (named ? ` -- ${named}` : '') +
+        `. The rule the player has now stated three times is that a surface you can stand on is ` +
+        `uninterrupted everywhere, so the target is zero and not a percentage`,
+    );
+  }
 
   // --- 4. What stands in a carriageway -----------------------------------------
   //
@@ -22736,15 +23281,23 @@ async function checkRoadDeck(): Promise<void> {
   const TRENCH_COPING_RISE = 0.12;
   const DECK_THICKNESS = deckMod.DECK_THICKNESS_M;
 
-  /** Is `y` inside the carriageway volume over this point? */
+  /**
+   * Is `y` inside the paved volume over this point? Returns the surface, or null.
+   *
+   * The **wide** definition, like §3: a footway is a surface a body stands on
+   * and a fence panel through one is the same defect as a fence panel through a
+   * carriageway. The ground is sampled here rather than passed in because every
+   * caller below is already at a world position and none of them has a reason to
+   * hold a second copy -- and it is the same `world.terrain` both ends read.
+   */
   const inRoadVolume = (x: number, z: number, y: number): number | null => {
-    const surface = deck.deckAt(x, z);
+    const surface = deck.deckAt(x, z, world.terrain.height(x, z));
     if (!Number.isFinite(surface)) return null;
     return y > surface - 0.05 ? surface : null;
   };
 
-  interface Tally { now: number; before: number; explained: number; first: string }
-  const tally = (): Tally => ({ now: 0, before: 0, explained: 0, first: '' });
+  interface Tally { now: number; before: number; shipped: number; explained: number; first: string }
+  const tally = (): Tally => ({ now: 0, before: 0, shipped: 0, explained: 0, first: '' });
   const masts = tally();
   const fences = tally();
   const walls = tally();
@@ -22807,15 +23360,21 @@ async function checkRoadDeck(): Promise<void> {
             fences.before++;
             if (rail > surface) {
               fences.explained++;
-            } else if (!Number.isFinite(cut.deckSurfaceAt(fx, fz))) {
-              // The shipped rule opens the fence where `RailCut` knows about a
-              // road over the post -- so what this counts is a panel standing in
-              // a carriageway the *deck* does not know is there. That is the
-              // failure it can actually catch: `setRoads` not wired up on one
-              // end, a deck dropped and never re-adopted, or a paved band
-              // narrower than the road it is drawn from.
+            } else if (!Number.isFinite(cut.deckSurfaceAt(fx, fz, fg))) {
+              // The shipped rule opens the fence where `RailCut` knows about
+              // paving over the post -- so what this counts is a panel standing
+              // in a paved surface the *deck* does not know is there. That is
+              // the failure it can actually catch, and it is the failure that
+              // shipped: `setRoads` not wired up on one end, a deck dropped and
+              // never re-adopted, a paved band narrower than the surface drawn
+              // from it, or -- the player's third report -- a whole class of
+              // paving that never reached the deck at all.
               fences.now++;
               if (fences.first === '') fences.first = `${fx.toFixed(0)}, ${fz.toFixed(0)}`;
+            }
+            // The same question of the deck as it shipped, as the control.
+            if (rail <= surface && !Number.isFinite(shipped.deckSurfaceAt(fx, fz, fg))) {
+              fences.shipped++;
             }
           }
         }
@@ -22850,9 +23409,19 @@ async function checkRoadDeck(): Promise<void> {
   check(
     intrudersBefore > 100,
     `with the road rule off, ${intrudersBefore.toLocaleString()} drawn rail assets stand inside a ` +
-      `carriageway -- ${masts.before - masts.explained} catenary masts, ` +
+      `paved surface -- ${masts.before - masts.explained} catenary masts, ` +
       `${fences.before - fences.explained} boundary-fence ribs and ` +
       `${walls.before - walls.explained} trench copings. The negative control for the line below`,
+  );
+
+  // And the control that matters this round: with the carriageway rule on and
+  // the footway rule off, the fence still crosses paving. This is the *"still a
+  // fence blocking the road on king st"* half of the report, counted.
+  check(
+    fences.shipped > 20,
+    `with the carriageway rule on and the footway rule off -- the code as it shipped -- ` +
+      `${fences.shipped} boundary-fence ribs still stand in drawn paving, because the deck it asks ` +
+      `has never heard of a footway`,
   );
 
   check(
@@ -22888,13 +23457,255 @@ async function checkRoadDeck(): Promise<void> {
     const g = world.terrain.height(x, z);
     const before = bare.cutAt(x, z, g);
     const after = cut.cutAt(x, z, g);
-    const surface = deck.deckAt(x, z);
+    const surface = deck.deckAt(x, z, g);
     check(
       Number.isFinite(before) && !Number.isFinite(after) && Number.isFinite(surface),
       `${name}: the carve wanted this point (rail head ${before.toFixed(2)} m, ` +
         `${(g - before).toFixed(2)} m under the ground) and the carriageway keeps it -- ` +
         `paved surface ${surface.toFixed(2)} m, soffit ${(surface - DECK_THICKNESS).toFixed(2)} m, ` +
         `${(surface - DECK_THICKNESS - before).toFixed(2)} m of headroom over the rail`,
+    );
+  }
+
+  // --- 6. ST PETERS, WALKED --------------------------------------------------
+  //
+  // **The player's own coordinate, and the reason this section exists.**
+  //
+  //   -33.907002, 151.181545  ->  world (-2492.54, 4281.58)
+  //
+  // He gave that lat/lon standing on the King Street overbridge at St Peters,
+  // 87 m from the station, reporting the same three symptoms for the third time,
+  // and said *"this should really be a test case"*. So it is one, permanently and
+  // by name rather than as a sample that happens to fall nearby.
+  //
+  // **Four things it does that a point probe does not, because a point probe is
+  // what signed this off twice.**
+  //
+  //   - It *walks*. Six traverses of 60 m at 0.25 m a step -- across the bridge
+  //     both ways, along King Street both ways, and both diagonals -- because a
+  //     body falls through while walking and the hole at this crossing is 12 to
+  //     20 m from the point he named. §5's probe at (-2495, 4283) sits squarely
+  //     in the carriageway, passes, and always did.
+  //   - It asserts all three symptoms, not one. They share a cause and could be
+  //     fixed apart by accident: the ground is continuous, no rail furniture
+  //     stands in the paving, and no fence panel crosses it.
+  //   - Every one of them is asserted against `shipped` as well -- the deck with
+  //     carriageways and no footways, which is the code at the commit he reported
+  //     against. If that column comes out clean the check has stopped being able
+  //     to see the defect and says so instead of passing.
+  //   - It sweeps outward to 400 m afterwards, so "St Peters is fixed and the
+  //     same paving 200 m up the street is not" is reported here rather than
+  //     discovered by the player next week.
+  {
+    const PLAYER_X = -2492.54;
+    const PLAYER_Z = 4281.58;
+    const STEP_M = 0.25;
+    const REACH_M = 30;
+
+    interface Walk { name: string; dx: number; dz: number }
+    const walks: Walk[] = [
+      { name: 'across the bridge, west to east', dx: 1, dz: 0 },
+      { name: 'across the bridge, east to west', dx: -1, dz: 0 },
+      { name: 'along King Street, north to south', dx: 0, dz: 1 },
+      { name: 'along King Street, south to north', dx: 0, dz: -1 },
+      { name: 'the NE-SW diagonal', dx: Math.SQRT1_2, dz: Math.SQRT1_2 },
+      { name: 'the NW-SE diagonal', dx: -Math.SQRT1_2, dz: Math.SQRT1_2 },
+    ];
+
+    /**
+     * One traverse. Counts the paved steps and the ones that fall through.
+     *
+     * "Paved" is `deckAt` over the wide definition -- the surface the player is
+     * actually walking on -- and "falls" is the carve taking the ground from
+     * under a step that has paving drawn on it. That pairing is the report: the
+     * paving is drawn either way, so a step is only a hole if both are true.
+     */
+    const walk = (c: { cutAt(x: number, z: number, g: number): number },
+                  d: { deckAt(x: number, z: number, g: number): number },
+                  w: Walk) => {
+      let onPaving = 0;
+      let falls = 0;
+      let worst = 0;
+      let firstAt = '';
+      for (let s = -REACH_M; s <= REACH_M; s += STEP_M) {
+        const x = PLAYER_X + w.dx * s;
+        const z = PLAYER_Z + w.dz * s;
+        const g = world.terrain.height(x, z);
+        if (!Number.isFinite(g)) continue;
+        if (!Number.isFinite(d.deckAt(x, z, g))) continue;
+        onPaving++;
+        const railY = c.cutAt(x, z, g);
+        if (!Number.isFinite(railY)) continue;
+        falls++;
+        const drop = g - railY;
+        if (drop > worst) {
+          worst = drop;
+          firstAt = `${x.toFixed(1)}, ${z.toFixed(1)}`;
+        }
+      }
+      return { onPaving, falls, worst, firstAt };
+    };
+
+    let fellNow = 0;
+    let fellShipped = 0;
+    let pavedSteps = 0;
+    const worstNow: string[] = [];
+    for (const w of walks) {
+      const now = walk(cut, deck, w);
+      const was = walk(shipped, deck, w);
+      pavedSteps += now.onPaving;
+      fellNow += now.falls;
+      fellShipped += was.falls;
+      if (now.falls > 0) {
+        worstNow.push(`${w.name}: ${now.falls} of ${now.onPaving} steps fall, worst ` +
+          `${now.worst.toFixed(2)} m at ${now.firstAt}`);
+      }
+    }
+
+    check(
+      fellShipped > 0,
+      `St Peters, walked: with the carriageway rule on and the footway rule off -- the code as it ` +
+        `shipped when the player reported this the third time -- a body crossing ` +
+        `(${PLAYER_X}, ${PLAYER_Z}) falls through the drawn paving at ${fellShipped} of ` +
+        `${pavedSteps} paved steps over six 60 m traverses. THIS IS THE REGRESSION, and if it ever ` +
+        `reads zero the assertion below has stopped being a test of anything`,
+    );
+
+    check(
+      fellNow === 0 && pavedSteps > 800,
+      `and with both rules on, ${fellNow} of ${pavedSteps} paved steps fall` +
+        (worstNow.length ? ` -- ${worstNow.join('; ')}` : '') +
+        `. Six traverses at ${STEP_M} m across the bridge, along King Street and both diagonals, ` +
+        `centred on -33.907002, 151.181545, which is where the player was standing`,
+    );
+
+    // --- The second and third symptoms, at the same place.
+    //
+    // *"i can still see rail components penetrating thru the road"* and *"still a
+    // fence blocking the road on king st"*. Counted over every mast, fence rib
+    // and coping within 60 m, on §4's own tests -- so a fix that closed the hole
+    // and left the palisade standing across it would fail here.
+    let nearAssets = 0;
+    let inPavingNow = 0;
+    let inPavingShipped = 0;
+    let fenceNow = 0;
+    let fenceShipped = 0;
+    const near = (x: number, z: number) => Math.hypot(x - PLAYER_X, z - PLAYER_Z) <= 60;
+    {
+      const st = bake.stanchions;
+      const kinds = bake.stanchionKinds;
+      for (let i = 0; i < kinds.length; i++) {
+        const kind = kinds[i];
+        const offset = kind === 2 ? 0 : MAST_OFFSET * (kind === 1 ? -1 : 1);
+        const x = st[i * 5] + -st[i * 5 + 4] * offset;
+        const z = st[i * 5 + 2] + st[i * 5 + 3] * offset;
+        if (!near(x, z)) continue;
+        const my = st[i * 5 + 1];
+        const top = my - MAST_BASE_DROP + MAST_HEIGHT;
+        const g = world.terrain.height(x, z);
+        nearAssets++;
+        for (const [d, into] of [[deck, 'now'], [lanesOnly, 'was']] as const) {
+          const surface = d.deckAt(x, z, g);
+          if (!Number.isFinite(surface) || top <= surface - 0.05) continue;
+          if (my > surface) continue; // a viaduct: its masts belong over the deck
+          if (top > surface - DECK_THICKNESS) continue; // the shipped rule drops it
+          if (into === 'now') inPavingNow++;
+          else inPavingShipped++;
+        }
+      }
+    }
+    for (const seg of net.segments) {
+      if (cutMod.drawnAsTunnel(seg.flags)) continue;
+      const px = -seg.uz;
+      const pz = seg.ux;
+      const steps = Math.max(1, Math.round(seg.len / 4));
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const cx = seg.ax + seg.ux * (t * seg.len);
+        const cz = seg.az + seg.uz * (t * seg.len);
+        if (!near(cx, cz)) continue;
+        const rail = seg.ay + (seg.by - seg.ay) * t;
+        for (const side of [-1, 1]) {
+          const fo = Math.max(FENCE_OFFSET, bare.halfWidthAt(cx, cz) + FENCE_CLEAR);
+          const fx = cx + px * fo * side;
+          const fz = cz + pz * fo * side;
+          const fg = world.terrain.height(fx, fz);
+          if (!Number.isFinite(fg)) continue;
+          const surface = deck.deckAt(fx, fz, fg);
+          if (!Number.isFinite(surface)) continue;
+          if (fg + FENCE_HEIGHT <= surface - 0.05) continue;
+          nearAssets++;
+          if (rail > surface) continue; // the railway is above: a viaduct parapet
+          if (!Number.isFinite(cut.deckSurfaceAt(fx, fz, fg))) fenceNow++;
+          if (!Number.isFinite(shipped.deckSurfaceAt(fx, fz, fg))) fenceShipped++;
+        }
+      }
+    }
+
+    check(
+      inPavingShipped + fenceShipped > 0,
+      `St Peters, furniture: with the footway rule off, ${inPavingShipped} catenary masts and ` +
+        `${fenceShipped} fence ribs stand in drawn paving within 60 m of the player, out of ` +
+        `${nearAssets} assets over paving there. The other half of the report, and the control ` +
+        `for the line below`,
+    );
+
+    check(
+      inPavingNow === 0 && fenceNow === 0,
+      `and with it on, ${inPavingNow} masts and ${fenceNow} fence ribs do. *"still a fence ` +
+        `blocking the road on king st ... i can still see rail components penetrating thru the ` +
+        `road"* -- the same three symptoms share one cause, so all three are asserted at the one ` +
+        `place rather than trusting that closing the hole closed the rest`,
+    );
+
+    // --- How far the fix reaches. Not an assertion about a number somebody
+    //     picked: the same sweep §3 makes, restricted to rings around the player,
+    //     so "clean here, broken 200 m up the street" is a line of output.
+    const rings = [50, 100, 200, 400];
+    const lost = new Array<number>(rings.length).fill(0);
+    const lostWas = new Array<number>(rings.length).fill(0);
+    const total = new Array<number>(rings.length).fill(0);
+    for (const p of paved) {
+      const len = Math.hypot(p.bx - p.ax, p.bz - p.az);
+      if (len < 0.05) continue;
+      if (Math.hypot((p.ax + p.bx) / 2 - PLAYER_X, (p.az + p.bz) / 2 - PLAYER_Z) > 400 + len) continue;
+      const along = Math.max(1, Math.round(len));
+      const across = Math.max(1, Math.round(2 * p.half));
+      const ux = -(p.bz - p.az) / len;
+      const uz = (p.bx - p.ax) / len;
+      for (let s = 0; s < along; s++) {
+        const t = (s + 0.5) / along;
+        for (let o = 0; o < across; o++) {
+          const off = -p.half + ((o + 0.5) / across) * 2 * p.half;
+          const x = p.ax + (p.bx - p.ax) * t + ux * off;
+          const z = p.az + (p.bz - p.az) * t + uz * off;
+          const r = Math.hypot(x - PLAYER_X, z - PLAYER_Z);
+          const g = world.terrain.height(x, z);
+          if (!Number.isFinite(g)) continue;
+          for (let k = 0; k < rings.length; k++) {
+            if (r > rings[k]) continue;
+            total[k]++;
+            if (Number.isFinite(cut.cutAt(x, z, g))) lost[k]++;
+            if (Number.isFinite(shipped.cutAt(x, z, g))) lostWas[k]++;
+            break;
+          }
+        }
+      }
+    }
+    let cum = 0;
+    let cumWas = 0;
+    let cumTotal = 0;
+    const reach: string[] = [];
+    for (let k = 0; k < rings.length; k++) {
+      cum += lost[k];
+      cumWas += lostWas[k];
+      cumTotal += total[k];
+      reach.push(`within ${rings[k]} m: ${cum}/${cumTotal} m2 lost (was ${cumWas})`);
+    }
+    check(
+      cum === 0,
+      `and outward from the player: ${reach.join(', ')}. The fix is not a patch at one crossing, ` +
+        `so the same sweep is reported in rings rather than asserted only at the point he named`,
     );
   }
 
@@ -22985,8 +23796,10 @@ async function checkRoadDeck(): Promise<void> {
   );
 
   say(
-    `    ${deck.count.toLocaleString()} paved strips over ${laneTiles.toLocaleString()} tiles, ` +
-      `${pavedTotal.toLocaleString()} m2 of paved surface in the build; deck ${DECK_THICKNESS} m thick; ` +
+    `    ${deck.count.toLocaleString()} paved strips -- ${carriagewayStrips.toLocaleString()} carriageway ` +
+      `over ${laneTiles.toLocaleString()} tiles of .lanes.bin and ${pavingStrips.toLocaleString()} footway ` +
+      `out of rail.bin -- ${pavedTotal.toLocaleString()} m2 of drawn paving; deck ${DECK_THICKNESS} m ` +
+      `thick, footway draped at ${deckMod.PAVING_RISE_M} m over the ground; ` +
       `${pavedSamples.toLocaleString()} m2 of it is within reach of a rail corridor and was sampled ` +
       `at one metre`,
   );

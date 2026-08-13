@@ -1163,8 +1163,16 @@ function segmentThroughPrism(
   return false;
 }
 
-/** Standard ray-crossing test. */
-function pointInPolygon(points: Float32Array, x: number, z: number): boolean {
+/**
+ * Standard ray-crossing test.
+ *
+ * **Exported because `world/rail-solids.ts` has to ask the identical question.**
+ * The rail solids are evaluated arithmetically on the server and registered as
+ * prisms on the client, and the two answers are compared with `Object.is` -- so
+ * a second even-odd implementation, however faithful, is a place for the two
+ * ends to disagree on a boundary tie. One function, both callers.
+ */
+export function pointInPolygon(points: Float32Array, x: number, z: number): boolean {
   let inside = false;
   const n = points.length / 2;
   for (let i = 0, j = n - 1; i < n; j = i++) {

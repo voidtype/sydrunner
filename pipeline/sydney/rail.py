@@ -245,7 +245,12 @@ RAIL_EPOCH_MS = 1767225600000
 #    below grade. The decoder checks this exactly, which is deliberate: a stale
 #    rail.bin in a browser cache would otherwise read the new station fields off
 #    an old file and put every underground entrance at the datum.
-BAKE_VERSION = 3
+# 4: the `paving` buffer -- the foot paving near a corridor, as plan strips with
+#    no height. `world/road-deck.RoadDeck` adopts it so that `RailCut.cutAt`
+#    declines over a footway exactly as it already declines over a carriageway.
+#    Exact, again, and for the reason 3 is: a browser holding an old rail.bin
+#    would read the paving count off a file that has no paving in it.
+BAKE_VERSION = 4
 RAIL_MAGIC = 0x4C494152  # 'RAIL' little-endian
 
 OUT_DIR = config.DATA_ROOT / "scratch" / "rail"
@@ -4704,6 +4709,201 @@ def place_stanchions(g: RailGraph, blocks: BlockSet) -> list[Stanchion]:
     return out
 
 
+# --- The paving the carve must not take -------------------------------------------
+#
+# THE DEFECT THIS EXISTS FOR, IN THE PLAYER'S WORDS, REPORTED THREE TIMES.
+#
+#   > *"still a fence blocking the road on king st, i still fall through the road
+#   > and can still see rail components penetrating thru the road"*
+#
+# reported standing at -33.907002, 151.181545 -- world (-2492.54, 4281.58), on the
+# King Street overbridge at St Peters.
+#
+# `world/road-deck.RoadDeck` already keeps the ground under a **carriageway**, and
+# at that exact point it works: measured over the shipped build, 0 m2 of King
+# Street's carriageway is carved. What is carved is the *footway*, and it is
+# carved because of one line in each of two files:
+#
+#   - `streets.py:642` **draws** standalone foot paving -- `if is_foot:
+#     bands.append(self._ribbon(i))` -- for footways, steps, plazas, cycleways
+#     and `bridge=yes` foot bridges alike, all of it draped on the terrain.
+#   - `lanes.py:602` **excludes** exactly that set from the ways block:
+#     `[r for r in roads if not r.is_foot and not r.tunnel]`.
+#
+# `RoadDeck` is built from the ways block, so it never learns the foot paving
+# exists; `RailCut.cutAt` does not decline there; the carve removes the ground the
+# paving is drawn on; and `rail-geo.writeVerge` keeps its fence panels because
+# there is no deck to open them for. One cause, all three of the player's
+# symptoms. Measured within 60 m of the point above, on the shipped build: 120 m2
+# of drawn foot paving removed, worst drop 7.94 m, in four ways --
+# St Peter's Plaza (97 m2), the King Street Railway Bridge Path (19 m2, the
+# cycleway on the bridge deck the player is standing on), and two Sydney Park Road
+# crossings (6 m2).
+#
+# ---------------------------------------------------------------------------
+# WHY IT IS FIXED HERE, IN THE RAIL BAKE, AND NOT IN `lanes.py`.
+#
+# Widening `lanes.py:602` is the obvious fix and it is a **world rebuild** --
+# every tile sidecar in the extent re-emitted to add a class of way that draws no
+# traffic. This module already reads the identical OSM extract `streets.py` reads,
+# already knows where every corridor is to the centimetre, and already ships a
+# file both ends load and decode from the same bytes. So the footprint is computed
+# here and rides in `rail.bin`, and `RoadDeck` adopts it into the same strip list
+# the lane sidecars fill. **One deck, one predicate**: `cutAt` still asks exactly
+# one question about exactly one object, which is the property the whole road rule
+# is arranged around.
+#
+# ---------------------------------------------------------------------------
+# AND WHY THERE IS NO HEIGHT IN THIS ARRAY.
+#
+# A carriageway has a height of its own -- `roadgrade.py` solves it, a bridge deck
+# stands above the ground -- so `.lanes.bin` carries one and `RoadDeck` uses it.
+# **Foot paving has no height of its own.** `streets.py` drapes it: every square
+# metre of it is `terrain.sample(x, z) + FOOTPATH_Y`, so its surface *is* the
+# ground, and the only processes that know the ground exactly are the two that
+# load the terrain sidecars.
+#
+# That is not a theoretical preference; it was measured. This module loads the DEM
+# **unconformed** (`build_all`: `Terrain.load(..., conform_roads=False,
+# conform_water=False)`), because the rail solve has to see the ground before
+# `roadgrade.py` moved it. Against the shipped `.terr.bin` lattice, at 15,149 foot
+# paving vertices within 40 m of a corridor, that surface differs by a median of
+# 0.56 m, a p90 of 3.26 m and a maximum of 29.66 m -- and 69% of it by more than
+# the 0.30 m that `rail-geo.writeTrench`'s coping clamp can absorb before a
+# retaining wall comes up through the footpath. Baking a height from it would have
+# put a second, wrong opinion about the ground into a file whose entire purpose is
+# that there is only one. Loading a *conformed* lattice here instead costs a full
+# `roadgrade.solve` -- 13 minutes against 5.7 seconds for the unconformed one --
+# to recompute a number both consumers already hold.
+#
+# So the array is plan geometry only, and `RoadDeck` resolves the surface from the
+# `groundY` its caller is already holding. See `world/road-deck.PAVING_RISE_M`.
+
+# How far from a track centreline paving has to be before the corridor can never
+# touch it, metres.
+#
+# The corridor is at most `rail-cut.STATION_HALF_WIDTH` (9.4 m) wide, and the
+# outermost thing the rule has to answer for is the boundary fence, which
+# `rail-geo.writeVerge` puts at `max(FENCE_OFFSET 6.4, halfWidthAt + FENCE_CLEAR
+# 0.9)` -- 10.3 m at its widest. 14 m clears that with room for the sampling slack
+# below, and keeps the array to the few thousand ways that actually meet a railway
+# instead of the 410,405 in the extract.
+PAVING_REACH_M = 14.0
+
+# `streets.FOOTWAY_HALF_WIDTH`, restated on this module's usual terms: a constant
+# imported from the module under description could not be noticed changing.
+PAVING_HALF_M = 1.0
+
+# `streets.SIMPLIFY_FOOTWAY`. The centreline is simplified with the identical
+# tolerance `StreetNetwork.__init__` uses, so the swept capsules below are a
+# superset of the drawn ribbon rather than a differently-wrong approximation of
+# it: same vertices, round joins instead of `quad_segs=2` chords, round caps
+# instead of flat ones. A superset is the safe direction -- it keeps a little more
+# ground than is paved, and keeping ground is never the defect.
+PAVING_SIMPLIFY_M = 0.40
+
+# How finely the corridor is sampled into the point cloud the reach test queries,
+# and the slack that buys. A point every 4 m is at most 2 m from the true nearest
+# point on the centreline, so the test below adds 2 m and cannot reject a way the
+# corridor reaches.
+PAVING_CLOUD_STEP_M = 4.0
+PAVING_CLOUD_SLACK_M = 2.0
+
+
+def corridor_paving(lines: Sequence[Line], roads: Sequence[Any], log=print) -> np.ndarray:
+    """The foot paving near a rail corridor, as swept plan strips.
+
+    `(N, 5)` float32 in **world** metres -- `ax, az, bx, bz, half` -- which is
+    `world/road-deck.Strip` with the two heights taken out. See the header.
+
+    The corridor is taken from `lines` rather than from the graph, because
+    `world/rail-cut.RailCut` is built from the direction polylines in the bake and
+    from nothing else: sampling the graph would file paving against track the
+    client never carves, and worse, could miss track it does. Spans drawn as a
+    tunnel or a bridge are skipped for the same fidelity -- `inCutting` refuses
+    both outright, so paving over them can never be taken.
+    """
+    if not roads:
+        # `build_all` only reads the extract's roads when it has a terrain, so
+        # `--no-terrain` reaches here. Said out loud rather than returning an
+        # empty array quietly: a bake with no paving in it is a bake that ships
+        # the defect back, and the count below is the only place that shows.
+        log("  paving: NO ROADS were read, so the bake carries none and the carve "
+            "will take the ground out from under every footway it crosses")
+        return np.zeros((0, 5), dtype=np.float32)
+
+    from scipy.spatial import cKDTree
+    from shapely.geometry import LineString
+
+    # --- The corridor, densified. Flags are unioned over the segment exactly as
+    #     `RailCut`'s constructor unions them, so "can this be carved" is asked
+    #     here the same way it is asked there.
+    cloud: list[tuple[float, float]] = []
+    for ln in lines:
+        for d in ln.dirs:
+            xyz = np.asarray(d.xyz, dtype=np.float64)
+            fl = np.asarray(d.flags, dtype=np.uint8)
+            if fl.size != xyz.shape[0]:
+                fl = np.zeros(xyz.shape[0], dtype=np.uint8)
+            for i in range(xyz.shape[0] - 1):
+                if (int(fl[i]) | int(fl[i + 1])) & (SPAN_TUNNEL | SPAN_BRIDGE):
+                    continue
+                ax, az = float(xyz[i, 0]), float(xyz[i, 2])
+                bx, bz = float(xyz[i + 1, 0]), float(xyz[i + 1, 2])
+                steps = max(1, int(math.hypot(bx - ax, bz - az) / PAVING_CLOUD_STEP_M))
+                for k in range(steps + 1):
+                    t = k / steps
+                    cloud.append((ax + (bx - ax) * t, az + (bz - az) * t))
+    if not cloud:
+        return np.zeros((0, 5), dtype=np.float32)
+    tree = cKDTree(np.asarray(cloud, dtype=np.float64))
+
+    reach = PAVING_REACH_M + PAVING_HALF_M + PAVING_CLOUD_SLACK_M
+
+    # --- A cheap bbox reject before any buffering. Simplifying and testing all
+    #     410,405 ways costs minutes; the corridor's own bounding box throws away
+    #     everything but a few thousand of them in one vectorised pass.
+    corridor = np.asarray(cloud, dtype=np.float64)
+    x0, x1 = float(corridor[:, 0].min()) - reach, float(corridor[:, 0].max()) + reach
+    z0, z1 = float(corridor[:, 1].min()) - reach, float(corridor[:, 1].max()) + reach
+
+    out: list[tuple[float, float, float, float, float]] = []
+    considered = 0
+    for r in roads:
+        if not getattr(r, "is_foot", False):
+            continue
+        # ENU east/north to world x/z. `geo.enu_to_world` is the identity on east
+        # and negates north; done inline because this is the only place in the
+        # module that needs a road in the client's frame.
+        ex = r.line[:, 0]
+        ez = -r.line[:, 1]
+        if ex.max() < x0 or ex.min() > x1 or ez.max() < z0 or ez.min() > z1:
+            continue
+        considered += 1
+        pts = np.asarray(
+            LineString(np.column_stack((ex, ez))).simplify(PAVING_SIMPLIFY_M).coords,
+            dtype=np.float64,
+        )
+        if pts.shape[0] < 2:
+            continue
+        a = pts[:-1]
+        b = pts[1:]
+        seg = np.hypot(b[:, 0] - a[:, 0], b[:, 1] - a[:, 1])
+        mid = (a + b) * 0.5
+        dist, _ = tree.query(mid)
+        keep = (seg >= 0.05) & (dist <= reach + seg * 0.5)
+        for i in np.nonzero(keep)[0]:
+            out.append(
+                (float(a[i, 0]), float(a[i, 1]), float(b[i, 0]), float(b[i, 1]), PAVING_HALF_M)
+            )
+
+    arr = np.asarray(out, dtype=np.float32).reshape(-1, 5)
+    log(f"  paving: {arr.shape[0]:,} foot strips within {PAVING_REACH_M:.0f} m of a "
+        f"carvable corridor, from {considered:,} of {len(roads):,} ways "
+        f"({arr.nbytes / 1024:.0f} kB)")
+    return arr
+
+
 # --- The bake ---------------------------------------------------------------------
 #
 # One file, `rail.bin`: a header, a JSON block that describes the structure, and
@@ -4732,6 +4932,7 @@ def write_bake(
     stanchions: Sequence[Stanchion],
     solve: dict,
     meta: dict,
+    paving: np.ndarray | None = None,
 ) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -4813,6 +5014,11 @@ def write_bake(
         [[s.x, s.y, s.z, s.dx, s.dz] for s in stanchions], dtype=np.float32
     ).reshape(-1)
     st_kind = np.asarray([s.kind for s in stanchions], dtype=np.uint8)
+    pav_arr = (
+        np.zeros(0, dtype=np.float32)
+        if paving is None
+        else np.asarray(paving, dtype=np.float32).reshape(-1)
+    )
 
     def _world(east: float, north: float) -> tuple[float, float]:
         x, z = geo.enu_to_world(np.array([east]), np.array([north]))
@@ -4977,6 +5183,10 @@ def write_bake(
         # are derived by walking this tuple, so inserting one anywhere else
         # silently moves every array after it.
         ("vertexClearance", clear_arr),
+        # `ax, az, bx, bz, half` per strip of foot paving near a corridor, world
+        # metres, no height. See `corridor_paving` for why there is no height and
+        # `world/road-deck.RoadDeck.adoptPaving` for what reads it.
+        ("paving", pav_arr),
     )
     header["buffers"] = {
         name: {"count": int(arr.size), "itemBytes": int(arr.itemsize)}
@@ -5209,9 +5419,15 @@ def build_all(radius_m: float, log=print, terrain=True) -> dict:
     log(f"  overhead: {len(stanchions)} stanchions "
         f"({sum(1 for s in stanchions if s.kind == 2)} portal gantries)")
 
+    # The foot paving the carve must not take. After the lines, because it is
+    # filed against the routed polylines `world/rail-cut.RailCut` is built from
+    # and not against the graph -- see `corridor_paving`.
+    paving = corridor_paving(lines, roads, log=log)
+
     return {
         "graph": g,
         "lines": lines,
+        "paving": paving,
         "stations": stations,
         "platforms": platforms,
         "blocks": blocks,
@@ -6421,6 +6637,7 @@ def cmd_rail_bake(args: argparse.Namespace) -> int:
         out, b["graph"], b["lines"], b["stations"], b["platforms"], b["blocks"],
         b["stanchions"], b["solve"],
         {"radius_m": radius, "ground": b["ground_note"], "seconds": round(b["seconds"], 1)},
+        paving=b.get("paving"),
     )
     total = sum(p.stat().st_size for p in out.glob("*") if p.is_file())
     print(f"  wrote {info['bytes'] / 1024:.1f} kB of rail.bin "

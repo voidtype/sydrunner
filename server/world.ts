@@ -116,6 +116,13 @@ import type { Place } from '../client/src/game/teleport.ts';
 import type { CombatWorld } from '../client/src/game/combat.ts';
 import { decodeRail, verifyRail, type RailBake } from '../client/src/game/rail.ts';
 import { RailCut } from '../client/src/world/rail-cut.ts';
+// **The railway's solids, as arithmetic.** See `world/rail-solids.ts`: this
+// process has never had `rail-geo`'s prisms -- trench walls, viaduct decks and
+// piers, footbridges, station buildings, access stairs, subway shaft heads --
+// because they are drawn per chunk in a browser, and every one of them is
+// ground a player stands on. `RailSolidField` is the definition those prisms are
+// now *also* derived from, so the two ends compute one number.
+import { RailSolidField, buildNetwork } from '../client/src/world/rail-solids.ts';
 import { buildCorridor, corridorCut } from '../client/src/world/corridor.ts';
 import type { VesselField } from '../client/src/world/vessel-field.ts';
 import { setVesselsEnabled, vesselsEnabled } from '../client/src/world/vessel.ts';
@@ -1701,6 +1708,17 @@ export interface ServerWorld {
    */
   platforms?: PlatformField | null;
   /**
+   * The railway's own solids, evaluated. See `world/rail-solids.ts`.
+   *
+   * `platforms` above is the same idea, one structure wide, and its header says
+   * why it exists: the drawn prisms are a browser's and this process has none.
+   * This is the rest of the railway -- the trench wall a body walks the coping
+   * of, the viaduct deck it stands on, the flight it climbs, the station
+   * building it walks round -- answered from the same enumeration `rail-geo`
+   * hands `CollisionWorld`, rather than not answered at all.
+   */
+  railSolids?: RailSolidField | null;
+  /**
    * The rail corridor, so `groundFor` knows where the ground **is not**.
    *
    * `world/rail-cut.ts`'s header names this process as its second caller and
@@ -1970,6 +1988,7 @@ export async function loadWorld(
     rail: await loadRail(root),
     platforms: null,
     railCut: null,
+    railSolids: null,
     roads,
     stationBoxes: null,
     vessels: null,
@@ -1982,6 +2001,12 @@ export async function loadWorld(
   // built from the identical `.lanes.bin` bytes by the identical decoder. That
   // is the whole of what makes King Street solid on both ends: not two rules
   // that agree, one rule asked twice. See `world/road-deck.ts`.
+  //
+  // **And the foot paving out of the bake, for the same reason.** `.lanes.bin`
+  // carries no footway, so the deck alone cannot keep the ground under the
+  // plaza, the bridge cycleway or the crossings the player fell through at King
+  // Street. `main.ts` makes this identical call over the identical bytes.
+  if (world.rail) roads.adoptPaving(world.rail.paving);
   world.railCut?.setRoads(roads);
   // The corridor opens out at a platform, and both ends have to agree about
   // where. This process cannot import `rail-geo` -- it draws things -- so the
@@ -1999,6 +2024,50 @@ export async function loadWorld(
   // half-width, by up to the full 4.00 m of the flare. Two processes disagreeing
   // about where the ground is. Both ends now call this function.
   if (world.railCut && world.platforms) world.railCut.setStations(world.platforms.sites);
+
+  // **And the rest of the railway, which this process has never had at all.**
+  //
+  // `railCut` above says where the ground is *not*; `platforms` says where one
+  // of the things standing in the hole is. Everything else `world/rail-geo.ts`
+  // builds -- the trench wall and its coping, the viaduct deck and its piers,
+  // the footbridge, the station building, the access flights, the head of a
+  // subway shaft -- existed only as a `CollisionWorld` prism written by a
+  // browser inside `BUILD_RADIUS`, so this end answered the ground query without
+  // any of it. Measured over every station envelope in the bake before this
+  // line: the two ends disagreed at **54,293 of 670,437** lattice samples, worst
+  // 14.0 m, and where they disagree the server wins and the player is corrected
+  // into or out of geometry they can see.
+  //
+  // Built here, after `setStations`, because a trench wall's rim is
+  // `RailCut.halfWidthAt` and the flare is what that call just installed. It is
+  // lazy -- see `RailSolidField` -- so this line costs a segment grid and a
+  // station grid and nothing else at boot.
+  if (world.rail) {
+    const net = buildNetwork(world.rail);
+    const rawGround = (x: number, z: number): number => world.terrain.height(x, z);
+    // `RailWorld`'s `ground` argument, which `main.ts` fills with
+    // `groundHeightAt(x, z, -Infinity)` and which only a pier's foot reads.
+    // Asking the ground query at `-Infinity` feet makes every roof clause --
+    // this field's included -- answer `-Infinity`, so there is no circularity
+    // here and no order to get wrong.
+    let lastGround = 0;
+    const wildGround = (x: number, z: number): number => {
+      const sampled = world.terrain.height(x, z);
+      if (Number.isFinite(sampled)) lastGround = sampled;
+      const boxFloor = world.stationBoxes?.floorAt(x, z, -Infinity) ?? -Infinity;
+      if (boxFloor > -Infinity) return boxFloor;
+      const floor = world.railCut?.cutAt(x, z, sampled) ?? Number.NaN;
+      return Number.isFinite(floor) ? floor : lastGround;
+    };
+    // `buildChunk`'s `vesselled`, which is `() => false` with the flag down and
+    // is `VesselField.surfaceAt` with it up. It has to be here as well as there:
+    // inside a formation's footprint `writeTrench` draws and registers nothing,
+    // so a field that still answered with a wall would be the divergence this
+    // file removes, reintroduced by the flag. See `RailWorld.vesselFloorAt`.
+    const vesselled = (x: number, z: number): boolean =>
+      world.vessels !== null && world.vessels !== undefined && world.vessels.surfaceAt(x, z) > -Infinity;
+    world.railSolids = new RailSolidField(net, world.railCut ?? null, rawGround, wildGround, vesselled);
+  }
 
   // **The vessel path, off unless asked for.** Phase 2a: nothing here runs, and
   // nothing about the world changes, unless `SYDNEY_VESSELS=1`. The sweep needs
@@ -2292,6 +2361,7 @@ export function groundFor(world: ServerWorld): CombatWorld {
   const boxes = world.stationBoxes ?? null;
   const cut = world.railCut ?? null;
   const vessels = world.vessels ?? null;
+  const rails = world.railSolids ?? null;
   return {
     collision: world.collision,
     groundHeight(x: number, z: number, feetY: number): number {
@@ -2314,7 +2384,21 @@ export function groundFor(world: ServerWorld): CombatWorld {
       // -- the heightfield does not model the cutting -- and a max would put a
       // passenger who had just stepped off the train up on the paddock.
       const platform = platforms === null ? -Infinity : platforms.heightAt(x, z, feetY);
-      const roof = world.collision.roofHeight(x, z, feetY);
+      // **The roof, and it is two sources on this end because it is two sources
+      // on the other one.** `collision.roofHeight` is the pipeline's prisms --
+      // buildings, decks, landmark podia -- and `RailSolidField.roofHeight` is
+      // the railway's own solids, which this process has no renderer to build
+      // and which `main.ts` gets from `world/rail-geo.ts` for free. The two are
+      // `Math.max`ed rather than ordered because `roofHeight` already is a max
+      // over everything a body could be standing on, and a rail solid is not a
+      // different kind of answer -- it is more of the same answer.
+      //
+      // With no rail bake `railSolids` is null and this is the line that
+      // shipped.
+      const roof = Math.max(
+        world.collision.roofHeight(x, z, feetY),
+        rails === null ? -Infinity : rails.roofHeight(x, z, feetY),
+      );
       if (platform > -Infinity) return Math.max(platform, roof);
       // **And the rest of the station.** `main.ts`'s `groundHeightAt` carries
       // the identical clause in the identical position, and this one is not a
