@@ -1885,6 +1885,8 @@ export class TileStreamer implements LampSource {
    */
   private undercroft: UndercroftEnvelope | null = null;
   readonly undercroftTally: UndercroftTally = emptyUndercroftTally();
+  /** Lane sidecars the decoder refused this session. See the null branch at the decode. */
+  lanesRefused = 0;
 
   setUndercroftEnvelope(env: UndercroftEnvelope | null): void {
     this.undercroft = env;
@@ -2994,6 +2996,26 @@ export class TileStreamer implements LampSource {
         );
         if (lanes !== null) {
           roadBox = this.roadSink?.adopt(entry.key, lanes.ways, ROAD_RECUT_MARGIN_M) ?? null;
+        } else {
+          // **A refused sidecar is a world-integrity event, not a shrug.** The
+          // decoder returns null on a version it does not read, and for one
+          // production incident every lane sidecar in the session was a stale
+          // v1 out of an edge-pinned region bundle -- 56 nulls in a row, in
+          // silence. With no lanes there is no road deck; with no road deck the
+          // rail carve eats the streets and the boundary fence marches across
+          // them, which the player reported five times while every local check
+          // stayed green. The cause was `cdnAssetUrl` dropping the `?v=`
+          // suffix; this warning exists so the *next* systemic refusal is one
+          // console line instead of a week. Counted, and shouted once at three
+          // -- one null can be a corrupt fetch, three is a pattern.
+          this.lanesRefused += 1;
+          if (this.lanesRefused === 3) {
+            console.warn(
+              `[streaming] ${this.lanesRefused} lane sidecars refused by the decoder so far ` +
+                `(latest ${entry.key}) -- likely a stale world cache serving an old LANES version. ` +
+                `Roads will be missing from the deck and the rail carve will not spare them.`,
+            );
+          }
         }
         yield;
       }

@@ -287,10 +287,27 @@ export function armCdn(index: CdnIndex | null | undefined): void {
  * The CDN URL for one asset, or null when there is no CDN to speak of. A plain
  * concatenation, because the data repo is a git tree that kept the world's own
  * paths -- no flattening, no name mangling, no second encoding to keep in sync.
+ *
+ * **The `version` suffix goes on the custom-domain branch, and its absence was
+ * a production incident, not an optimisation.** This module's own header
+ * promises every asset but the two pivots carries `?v=<built>` -- and this
+ * function did not append it, while the bucket serves
+ * `cache-control: immutable, max-age=31536000`. So every republish left every
+ * player's edge pinned to the previous world at an unchanging URL, for a year.
+ * Concretely: the August 9 bake moved the lane sidecars to LANES v2, clients
+ * kept receiving the August 8 region bundles, `decodeLanes` silently refused
+ * v1, the road deck came up empty, the carve took King Street out from under
+ * the player and the boundary fence marched across the road -- and no reload,
+ * hard reload or hand-typed query string could fix it, because the busting
+ * applied to the origin and the world does not come from the origin. Five
+ * reports, four wrong fixes, this line.
+ *
+ * The jsDelivr branch stays bare on purpose: `repo@ref` is content-addressed,
+ * so the ref *is* the version and a suffix would only fragment its cache.
  */
-export function cdnAssetUrl(path: string): string | null {
+export function cdnAssetUrl(path: string, version = ''): string | null {
   const clean = path.replace(/^\/+/, '');
-  if (base) return `${base}/${clean}`;
+  if (base) return `${base}/${clean}${version}`;
   if (!ref || !repo) return null;
   return `${JSDELIVR}/${repo}@${ref}/${clean}`;
 }
@@ -353,8 +370,8 @@ function strike(): void {
  * the entire error channel, because every distinguishable failure has the same
  * remedy.
  */
-async function tryCdn(path: string, init?: RequestInit): Promise<ArrayBuffer | null> {
-  const url = cdnAssetUrl(path);
+async function tryCdn(path: string, version: string, init?: RequestInit): Promise<ArrayBuffer | null> {
+  const url = cdnAssetUrl(path, version);
   if (!url) return null;
   try {
     const resp = await fetch(url, init);
@@ -437,7 +454,7 @@ export async function fetchWorldAsset(
     }
   }
   if (stats.enabled && (await ensureProbe()) && stats.enabled) {
-    const buf = await tryCdn(path, init);
+    const buf = await tryCdn(path, version, init);
     if (buf) return new Response(buf, { status: 200 });
     stats.fallbacks += 1;
   } else {
@@ -501,6 +518,26 @@ export function verifyCdn(): string[] {
   if (cdnAssetUrl('/tiles/1_1.glb') !== `${JSDELIVR}/${repo}@${ref}/tiles/1_1.glb`) {
     failures.push('cdnAssetUrl kept a leading slash');
   }
+
+  // --- 2b. The custom-domain branch carries the version, and this assertion is
+  // a production incident written down. Without the suffix, an R2 bucket that
+  // serves `immutable, max-age=31536000` pins every asset at an unchanging URL
+  // across republishes -- players received the previous world for five straight
+  // bug reports while every local check read current files off disk. The
+  // negative control below is the bug itself: the version-less call *must*
+  // produce the pinnable URL, so that if someone "simplifies" the parameter
+  // away, this check is the thing that names what they reintroduced.
+  base = 'https://world.example';
+  if (cdnAssetUrl('tiles/1_1.glb', '?v=123') !== 'https://world.example/tiles/1_1.glb?v=123') {
+    failures.push('cdnAssetUrl dropped the version on the custom-domain branch');
+  }
+  if (cdnAssetUrl('/tiles/1_1.glb', '?v=123') !== 'https://world.example/tiles/1_1.glb?v=123') {
+    failures.push('cdnAssetUrl mishandled a leading slash with a version');
+  }
+  if (cdnAssetUrl('tiles/1_1.glb') !== 'https://world.example/tiles/1_1.glb') {
+    failures.push('NEGATIVE CONTROL: the version-less form should be the pinnable URL, verbatim');
+  }
+  base = '';
 
   // --- 3. No ref means no CDN, rather than a URL with `undefined` in it. This
   // is the pre-CDN world, which `version.ts` promises still loads.
