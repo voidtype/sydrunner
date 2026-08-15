@@ -114,6 +114,7 @@ import {
   type LaneWay,
   type TileLanes,
 } from './traffic.ts';
+import { UNIFORM_CROWD, crowdMultiplier } from './density.ts';
 
 // --- The pipeline's own numbers ------------------------------------------------
 
@@ -283,7 +284,16 @@ export interface PedBand {
   ux: Float32Array;
   uz: Float32Array;
   length: number;
-  /** How many walkers this band schedules. See `SLOT_DENSITY`. */
+  /**
+   * How many walkers this band schedules. See `SLOT_DENSITY`.
+   *
+   * **May be zero, and a zero-slot band is still a band.** See `buildBand`: a
+   * footpath in Dural is a footpath that nobody happens to be walking on, and
+   * every consumer that reads this field to mean "is there a footpath here" --
+   * the police lattice, the drunks outside a pub, the wildlife nests -- has to
+   * keep seeing it. Only `forEachPedestrianNear` and the walker count care about
+   * the number itself, and both handle zero by iterating nothing.
+   */
   slots: number;
   /** Plan bounds, for the broadphase. */
   minX: number;
@@ -412,12 +422,27 @@ export const MAX_SLOTS = 40;
  * keeps the band continuous through a bend at the cost of narrowing it very
  * slightly on the inside of a tight corner.
  */
-export function buildBands(tile: TileLanes): PedBand[] {
+export function buildBands(
+  tile: TileLanes,
+  /**
+   * How busy this part of Sydney is. Defaulted; every caller outside a
+   * self-check takes the default. See `density.UNIFORM_CROWD`.
+   */
+  crowd: (x: number, z: number) => number = crowdMultiplier,
+): PedBand[] {
   const out: PedBand[] = [];
   for (const way of tile.ways) {
     if (!(way.footpathWidth > 0)) continue;
-    const density = SLOT_DENSITY[way.klass] ?? 0;
-    if (!(density > 0)) continue;
+    const base = SLOT_DENSITY[way.klass] ?? 0;
+    if (!(base > 0)) continue;
+    // How busy this part of Sydney is, from the census. One grid read per way,
+    // at tile-decode time, and it is the same read on the client and on the
+    // server because `game/density.ts` is a pure function of a baked table --
+    // see that module's header for why the scaling lives here rather than in
+    // the bake. The way's middle vertex is the sample point: a way span is
+    // clipped to a 500 m tile, so any vertex on it is inside the same cell or
+    // its neighbour, and the field is interpolated anyway.
+    const density = base * crowd(way.x[way.count >> 1], way.z[way.count >> 1]);
     // One band or two. See `NARROW_FOOTPATH_M`.
     const sides = way.footpathWidth < NARROW_FOOTPATH_M ? 1 : 2;
     const offset = way.halfWidth + KERB_WIDTH + way.footpathWidth * 0.5;
@@ -522,8 +547,54 @@ function buildBand(way: LaneWay, side: number, offset: number, density: number):
   }
   if (!(total >= MIN_BAND_M)) return null;
 
-  let slots = Math.floor(total * density + 0.5);
-  if (slots <= 0) return null;
+  const seed = bandSeed(way.osmId, side, x[0], z[0]);
+  // Rounded **stochastically**, on the band's own seed, rather than to nearest.
+  //
+  // Before `density.ts` this was `floor(want + 0.5)` and the arithmetic never
+  // came near a half: the residential rate over a 300 m band is 3.3 slots, and
+  // whether that lands on 3 is a detail. Once the census multiplier is in it,
+  // Dural's residential bands want 0.17 of a walker each, and to-nearest turns
+  // every one of them into exactly zero -- so the suburb is not quiet, it is
+  // *sterile*, which is a worse lie and the one the brief is actually
+  // complaining about in the other direction. Carrying the fraction as a
+  // probability puts one walker on about one Dural band in six and leaves the
+  // expected density exactly where the multiplier put it.
+  //
+  // The draw is `unit(carHash(seed, ...))`, so it is a pure function of the
+  // band and the client and the server agree about which bands got the walker
+  // without exchanging anything -- the same property `bandSeed` exists for.
+  const want = total * density;
+  let slots = Math.floor(want + unit(carHash(seed, 0x5107)));
+  // **A band with nobody on it is still a band**, and dropping it here is the
+  // one thing the census round got wrong.
+  //
+  // `slots <= 0 -> return null` predates `density.ts` and almost never fired:
+  // under the uniform rates the only bands that rounded to zero were the very
+  // shortest, so "the field holds a band" and "the field holds a walker" were
+  // the same statement and four other features quietly came to rely on it.
+  // `PedestrianField` is not only the ambient crowd -- it is **the only
+  // description of where the footpaths are** that either end of the wire has,
+  // and `factions.patrolBands`, `factions.catchmentBands`,
+  // `streetlife.anchorBands` and the wildlife nest scan all read it as one.
+  //
+  // With the census multiplier in, the drop fired everywhere. Measured over a
+  // 407-tile sample of the shipped world: 10,428 footpaths of buildable length,
+  // 7,630 bands under the uniform rates, and **3,838 under the census** -- so
+  // more than half the footpaths in Sydney disappeared from the field, and with
+  // them the police lattice's guarantee ("a pair on every stretch of footpath",
+  // task 62) and a fifth of the middle-ring pubs' frontage. Both showed up as
+  // faction checks going red, and neither is a statement about how many people
+  // live in the suburb.
+  //
+  // So the geometric gate above -- `total >= MIN_BAND_M` -- is the only thing
+  // that decides whether a band exists, and the census decides only how many
+  // walkers stand on it. The walkers are unchanged by this line: the sample's
+  // slot total stays 5,453 against the uniform world's 15,874, which is the
+  // density feature doing exactly what it was asked to do. What it costs is
+  // band *records*: 10,428 against the 7,630 the uniform world shipped with,
+  // +37% of the cheap half while the expensive half -- posed, drawn, hit-tested
+  // walkers -- falls by two thirds.
+  if (slots < 0) slots = 0;
   if (slots > MAX_SLOTS) slots = MAX_SLOTS;
 
   let minX = Infinity;
@@ -541,7 +612,7 @@ function buildBand(way: LaneWay, side: number, offset: number, density: number):
     osmId: way.osmId,
     side,
     klass: way.klass,
-    seed: bandSeed(way.osmId, side, x[0], z[0]),
+    seed,
     count: n,
     x, y, z, s, ux, uz,
     length: total,
@@ -894,6 +965,29 @@ export function downSeconds(key: number, tick: number): number {
  * No transcendental anywhere in it. The band lookup is a binary search over
  * precomputed arc lengths and a lerp, which is `traffic.poseCar`'s shape and is
  * the same argument: subtract, divide, multiply, add, and nothing else.
+ *
+ * ---------------------------------------------------------------------------
+ * **`onDuty` removes the dwell, and it is the difference between a passer-by
+ * and a patrol.**
+ *
+ * The dwell is what makes an ambient crowd a crowd: a walker exists for one
+ * traversal, vanishes for ten to thirty seconds, and comes back the other way.
+ * Nobody watches one person, so nobody sees them go.
+ *
+ * A police pair is watched, and worse, is *counted*. `factions.patrolPairs`
+ * promises `PATROL_BASE_PAIRS` on every stretch of footpath in every cell, and
+ * a pair that spends a third of its cycle not existing does not deliver that
+ * promise a third of the time -- measured at the spawn, 3 sample instants in
+ * 240 had **no officer at all** within a cell's width, which is the shape of
+ * task 62's original complaint ("I never saw any police") returning as a
+ * flicker. It is also just wrong to look at: two officers on a beat walk to the
+ * end of the block and walk back, they do not evaporate outside the pub.
+ *
+ * So a duty walker's period is the traversal alone. Same speed, same phase,
+ * same alternating direction, same arithmetic on both ends -- one term dropped.
+ * `factions.ts` is the only caller that passes it, and it passes it for both
+ * the station beats and the lattice, because "on duty" is the same statement
+ * about both.
  */
 export function posePedestrian(
   band: PedBand,
@@ -901,6 +995,7 @@ export function posePedestrian(
   now: number,
   down: PedDown | undefined,
   out: PedPose,
+  onDuty = false,
 ): boolean {
   const key = pedKey(band.osmId, band.side, slot);
   let at = now;
@@ -925,7 +1020,11 @@ export function posePedestrian(
   const h = carHash(band.seed, slot);
   const speed = WALK_SPEED_MIN + WALK_SPEED_SPAN * unit(h);
   const trip = band.length / speed;
-  const dwell = DWELL_MIN + DWELL_SPAN * unit(carHash(h, 0x51a3));
+  // The dwell, and the one term `onDuty` drops. The phase is still taken over
+  // the *same* period either way -- a duty walker's phase is a fraction of a
+  // trip rather than of a trip and a stand -- and everything downstream of `u`
+  // is untouched, which is what keeps the two schedules one function.
+  const dwell = onDuty ? 0 : DWELL_MIN + DWELL_SPAN * unit(carHash(h, 0x51a3));
   const period = trip + dwell;
   const age = at - unit(carHash(h, 0x9e37)) * period;
   const cycle = Math.floor(age / period);
@@ -1350,7 +1449,10 @@ export function verifyPedestrians(
     failures.push('verifyPedestrians could not round-trip its own synthetic lane sidecar.');
     return failures;
   }
-  const bands = buildBands(tile);
+  // `UNIFORM_CROWD` throughout the geometry checks: they are about which side
+  // of the kerb a band lands on and whether two decodes agree, and none of them
+  // has an opinion about Dural. The census scaling has its own section below.
+  const bands = buildBands(tile, UNIFORM_CROWD);
   if (bands.length !== 2) {
     failures.push(`A two-way street with a 3 m footpath produced ${bands.length} bands; it must produce two.`);
     return failures;
@@ -1420,7 +1522,7 @@ export function verifyPedestrians(
   // --- DETERMINISM. The same tick, twice, through two decodes of the same bytes.
   {
     const other = syntheticTile(HALF, FOOT, WAY_Y, 10);
-    const otherBands = other === null ? [] : buildBands(other);
+    const otherBands = other === null ? [] : buildBands(other, UNIFORM_CROWD);
     if (otherBands.length !== bands.length) {
       failures.push('Two decodes of one sidecar produced different numbers of bands.');
     } else {
@@ -1480,10 +1582,67 @@ export function verifyPedestrians(
     }
   }
 
+  // --- THE CENSUS. The same eight-street grid, built at Redfern and again at
+  // Dural, through the real `crowdMultiplier` rather than `UNIFORM_CROWD`.
+  //
+  // This is the negative control for the whole "weight people by density"
+  // brief, and it is here rather than in `verifyDensity` because it tests the
+  // *wiring*: a field that varies beautifully and a `buildBands` that forgot to
+  // multiply by it produce a perfectly healthy `verifyDensity` and a city where
+  // Dural still feels like Redfern. The two failures it separates are
+  //
+  //   - no scaling at all, which comes out as two identical slot totals, and
+  //   - scaling so hard the fringe is sterile, which comes out as zero.
+  //
+  // Zero is a real risk and not a theoretical one: Dural's multiplier is 0.05,
+  // a residential band wants 0.011 slots a metre, and a 300 m street therefore
+  // wants 0.17 of a walker. Rounded to nearest that is nobody, on every street
+  // in the suburb, forever. `buildBand` rounds stochastically on the band seed
+  // instead, which is what this section is really guarding -- see there.
+  {
+    const REDFERN_X = -440.5;
+    const REDFERN_Z = 2703.8;
+    const DURAL_X = -15230.7;
+    const DURAL_Z = -20051.7;
+    const slotsAt = (x: number, z: number): number => {
+      const g = syntheticGrid(x, z);
+      if (g === null) return -1;
+      let n = 0;
+      for (const b of buildBands(g)) n += b.slots;
+      return n;
+    };
+    const inner = slotsAt(REDFERN_X, REDFERN_Z);
+    const fringe = slotsAt(DURAL_X, DURAL_Z);
+    const flat = slotsAt(0, 0);
+    if (inner < 0 || fringe < 0) {
+      failures.push('verifyPedestrians could not build its synthetic grid at a named place.');
+    } else {
+      if (!(inner > fringe * 4)) {
+        failures.push(
+          `The same eight streets schedule ${inner} walkers at Redfern and ${fringe} at Dural. The ` +
+            'census multiplier is not reaching `buildBands` -- the whole city is still uniform.',
+        );
+      }
+      if (fringe === 0) {
+        failures.push(
+          'Eight streets at Dural schedule nobody at all. 0.05x is meant to be quiet, not sterile; ' +
+            "`buildBand`'s stochastic rounding is what stops the fringe rounding to zero and it is " +
+            'not working.',
+        );
+      }
+      if (flat === inner && flat === fringe) {
+        failures.push('The grid schedules the same walkers at Redfern, Dural and Town Hall.');
+      }
+    }
+  }
+
   // --- DENSITY, against a synthetic grid rather than an assertion about one
   // band. Eight streets 200 m long on a 100 m pitch is roughly a CBD block
   // structure, and what is checked is the brief's own number: lively, not
-  // crowded, inside 120 m.
+  // crowded, inside 120 m. It sits at the world origin, which is Town Hall, so
+  // the figure it reports is the CBD's -- the census multiplier applies here
+  // like anywhere else, and the brief's "10-25 inside 120 m" was always a
+  // statement about the inner city.
   {
     const grid = syntheticGrid();
     if (grid === null) failures.push('verifyPedestrians could not build its synthetic street grid.');
@@ -1663,13 +1822,13 @@ function syntheticTile(half: number, foot: number, wayY: number, points: number)
 }
 
 /** Eight 200 m streets on a 100 m pitch: four running north, four running east. */
-function syntheticGrid(): TileLanes | null {
+function syntheticGrid(originX = 0, originZ = 0): TileLanes | null {
   const ways: SyntheticWay[] = [];
   for (let i = 0; i < 4; i++) {
     ways.push({ x: i * 100, z: 0, dz: -300, half: 3.75, foot: 3, y: 0, points: 4, klass: 10 });
     ways.push({ x: 0, z: -i * 100, dx: 300, half: 3.75, foot: 3, y: 0, points: 4, klass: 10 });
   }
-  return encodeWays(ways);
+  return encodeWays(ways, originX, originZ);
 }
 
 interface SyntheticWay {
@@ -1691,7 +1850,7 @@ interface SyntheticWay {
  * suburb with no traffic scheduled on it is common -- see `streamer.TileEntry`)
  * and is exactly the block this feature reads.
  */
-function encodeWays(ways: SyntheticWay[]): TileLanes | null {
+function encodeWays(ways: SyntheticWay[], originX = 0, originZ = 0): TileLanes | null {
   let bytes = 16;
   for (const w of ways) bytes += 16 + w.points * 12;
   const buffer = new ArrayBuffer(bytes);
@@ -1722,7 +1881,10 @@ function encodeWays(ways: SyntheticWay[]): TileLanes | null {
       o += 12;
     }
   }
-  const tile = decodeLanes(buffer, 0, 0);
+  // The routes block is empty, so the crowd function is never consulted here --
+  // the origin is what moves this street to Redfern or to Dural, and it is the
+  // ways it moves. See the census section in `verifyPedestrians`.
+  const tile = decodeLanes(buffer, originX, originZ);
   if (tile === null || tile.ways.length !== ways.length) return null;
   return tile;
 }

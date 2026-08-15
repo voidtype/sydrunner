@@ -72,10 +72,51 @@ from .sources.osm import PBF_PATH, _as_layer, _project, _read_layer, _within_rad
 # repeated in `client/src/game/rail.ts` only as a cross-check; the baked curve is
 # the contract, not these.
 
-ACCEL = 1.0  # m/s^2, close to real EMU tractive performance
-BRAKE = 1.1  # m/s^2, service brake rather than emergency
-V_LOCAL = 36.1  # m/s = 130 km/h between adjacent stops
-V_EXPRESS = 44.4  # m/s = 160 km/h where the run between stops earns it
+# --- Faster trains, and exactly how much faster the solver would take -----------
+#
+# The coordinator asked for trains 50% faster. The **line speeds** below are
+# raised by exactly that -- 130 -> 195 km/h and 160 -> 240 km/h. The
+# acceleration is raised by 25% rather than 50%, and that number is measured
+# rather than chosen: see the bracket at the foot of this comment.
+#
+# WHY THE CEILING ALONE WAS NOT THE ASK.
+#
+# A train at ACCEL 1.0 reaches 36 m/s after 36 s and 650 m of track, so on the
+# median Sydney station spacing the *old* ceiling was already never touched and
+# a higher one is a number the train never sees. Measured: raising V_LOCAL and
+# V_EXPRESS 50% and leaving ACCEL alone cut the whole-network run times by
+# **3-6%** -- T1 79.3 -> 76.7 min, CCN 64.4 -> 60.3, M1 53.2 -> 51.3. That is a
+# 50% raise a passenger cannot feel, because the leg time of an accel-limited
+# run is `2 * sqrt(d / a)` and has no `v` in it at all.
+#
+# WHERE THE SOLVER BREAKS, WITH THE NUMBERS.
+#
+# The phase solver and the 10 Hz separation sweep are the constraint, and they
+# fail hard rather than gracefully:
+#
+#   V x1.5, ACCEL 1.0  -> solves. Cycle 360 s, 0 violations, closest 8.8 s.
+#                         8 lines degraded. Runs 3-6% shorter.
+#   V x1.5, ACCEL 1.25 -> solves. Cycle 360 s, 0 violations, closest 8.4 s.
+#                         **7** lines degraded -- T8 recovers to 120 s, because
+#                         a faster run changes the gap at which it revisits
+#                         block 732 and it clears itself again. Runs 10-14%
+#                         shorter. **This is what is set below.**
+#   V x1.5, ACCEL 1.5  -> **fails outright.** Not degraded: unsolved. Every line
+#                         is left at period 120 s with offset 0, `attempts` is
+#                         empty because `next_period` can find no rung on the
+#                         ladder any line self-clears at, and the independent
+#                         sweep finds **30,532 violations** over 468,247 sampled
+#                         occupancies, with two trains sharing a rail at 0.0 s
+#                         against a 20 s rule.
+#
+# So the honest answer to "50% faster" is: 50% on the ceiling, 25% on the
+# tractive effort, ~12% off the journey, and one line handed back its 2-minute
+# headway. Pushing the last 25% of acceleration does not buy a faster railway,
+# it buys no railway at all.
+ACCEL = 1.25  # m/s^2, raised 25%; 1.0 was close to real EMU tractive performance
+BRAKE = 1.375  # m/s^2, raised with the accel so a faster train still stops in a platform
+V_LOCAL = 54.15  # m/s = 195 km/h between adjacent stops (was 36.1 = 130 km/h)
+V_EXPRESS = 66.6  # m/s = 240 km/h where the run between stops earns it (was 44.4 = 160)
 EXPRESS_MIN_M = 2500.0  # a leg shorter than this never reaches express speed anyway
 DWELL_S = 15.0  # doors open the whole of it -- the user's "15 sec"
 

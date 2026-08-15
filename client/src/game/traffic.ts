@@ -172,6 +172,7 @@ import {
   type CombatantState,
 } from './combat.ts';
 import { EYE_HEIGHT } from '../player/controller.ts';
+import { UNIFORM_CROWD, trafficMultiplier, verifyDensity } from './density.ts';
 
 // --- The sidecar contract ------------------------------------------------------
 
@@ -694,6 +695,12 @@ export function decodeLanes(
   buffer: ArrayBuffer,
   originX: number,
   originZ: number,
+  /**
+   * How busy this part of Sydney is, per route. Defaulted, and every caller
+   * outside a self-check takes the default -- see `density.UNIFORM_CROWD` for
+   * why the seam exists at all.
+   */
+  crowd: (x: number, z: number, klass: number) => number = trafficMultiplier,
 ): TileLanes | null {
   if (buffer.byteLength < 16) return null;
   const v = new DataView(buffer);
@@ -773,8 +780,9 @@ export function decodeLanes(
     // rather than clamped: a car in the wrong place is a bug you can see, and a
     // hang is not.
     if (!(headway > 0) || !(t[n - 1] > 0)) continue;
+    const scaled = scaleHeadway(headway, klass, x, z, t, n, minX, maxX, minZ, maxZ, crowd);
     const route: LaneRoute = {
-      rid, klass, headway, phase, duration: t[n - 1], count: n, x, y, z, t, minX, maxX, minZ, maxZ,
+      rid, klass, headway: scaled, phase, duration: t[n - 1], count: n, x, y, z, t, minX, maxX, minZ, maxZ,
       // Filled by `buildParkPhases` below. Zeroed rather than left undefined so
       // a route that somehow escaped that pass is a car with no park stages --
       // a cruise from end to end -- rather than a NaN in a hit box.
@@ -793,6 +801,106 @@ export function decodeLanes(
   for (const route of routes) buildParkPhases(route);
   return { ways, routes };
 }
+
+/**
+ * Stretch or squeeze a baked timetable to match how busy this part of Sydney is.
+ *
+ * The whole of the "weight cars by density" brief lands in this one function,
+ * and it lands here rather than in the bake for the reason `game/density.ts`'s
+ * header gives: this decoder is a pure function of the same bytes on the client
+ * and on the Bun server, so a change made here is consistent across the wire for
+ * free and needed nothing rebuilt. A `.lanes.bin` from the shipped world now
+ * produces a busy Parramatta Road and a nearly empty Old Northern Road out of
+ * the identical file.
+ *
+ * **The headway is the dial, and it is the only safe one.** A route's cars are
+ * one timetable offset by `headway`, so lengthening the headway removes cars and
+ * shortening it adds them without touching a single coordinate. Dropping whole
+ * routes instead would empty streets rather than quieten them, and thinning
+ * slots would fight `liveSlots`, which derives the live set from the headway
+ * arithmetic in the first place.
+ *
+ * ---------------------------------------------------------------------------
+ * THE FLOOR, AND WHY IT IS MEASURED HERE RATHER THAN TRUSTED
+ *
+ * `lanes._headway` guarantees a headway strictly greater than the longest dwell
+ * on the route, and the header's collision-free claim is exactly that: two cars
+ * on one timetable can only meet where the timetable is constant, and no dwell
+ * is long enough to hold both. Lengthening a headway cannot break that.
+ * *Shortening* one can, and `trafficMultiplier` goes to 1.2 in the inner city,
+ * which is a headway multiplied by 0.833.
+ *
+ * So the longest dwell is **measured off the route's own timetable** rather than
+ * inferred from the pipeline's 1.5 s margin: a dwell is a run of consecutive
+ * samples at the same point, and its length is the gap in `t` across that run.
+ * That is the exact quantity the proof needs, it costs one pass over an array
+ * the decoder has just finished writing, and it means a rebake that retunes
+ * `lanes.HEADWAY` cannot silently invalidate the squeeze.
+ *
+ * The parking dwells need no such care: `buildParkPhases` derives `dwellCap0`
+ * and `dwellCap1` *from* `r.headway`, and it runs after this, so the bay
+ * invariant `dwellCap + ramp + PARK_BAY_GAP <= headway` is re-established
+ * against the new number rather than inherited from the old one.
+ * `verifyTraffic` asserts it either way.
+ */
+function scaleHeadway(
+  headway: number,
+  klass: number,
+  x: Float32Array,
+  z: Float32Array,
+  t: Float32Array,
+  n: number,
+  minX: number,
+  maxX: number,
+  minZ: number,
+  maxZ: number,
+  crowd: (x: number, z: number, klass: number) => number,
+): number {
+  const mul = crowd((minX + maxX) * 0.5, (minZ + maxZ) * 0.5, klass);
+  if (!(mul > 0)) return headway;
+  const want = headway / mul;
+  if (want >= headway) return want;
+
+  // Squeezing. Find the longest stretch of route-time the car spends stationary
+  // and refuse to go under it.
+  let longest = 0;
+  let runStart = 0;
+  for (let i = 1; i < n; i++) {
+    const dx = x[i] - x[runStart];
+    const dz = z[i] - z[runStart];
+    if (dx * dx + dz * dz > STATIONARY_EPS_SQ) {
+      runStart = i;
+      continue;
+    }
+    const held = t[i] - t[runStart];
+    if (held > longest) longest = held;
+  }
+  const floor = longest + HEADWAY_SQUEEZE_MARGIN;
+  if (want < floor) return headway < floor ? headway : floor;
+  return want;
+}
+
+/**
+ * How far apart two timetable samples must be to count as the car having moved.
+ *
+ * `lanes._dedupe` already collapses exactly-repeated points, so a dwell arrives
+ * here as two samples at coordinates that agree to the f32 they were written as.
+ * A centimetre squared is comfortably above that quantisation and comfortably
+ * below any real motion -- the slowest a moving car goes is `lanes.MIN_SPEED`,
+ * which covers a centimetre in well under a tick.
+ */
+const STATIONARY_EPS_SQ = 1e-4;
+
+/**
+ * Kept between the longest dwell and the shortest headway a squeeze may reach.
+ *
+ * `lanes._headway` uses 1.5 s for the same job and this is not a copy of it:
+ * that margin is a bake-time choice about how much air to leave, this is the
+ * runtime's refusal to spend the last of it. Half a second at 60 Hz is thirty
+ * ticks of clearance between the tail of one car's dwell and the nose of the
+ * next, which is more than the rewind window can move either of them.
+ */
+const HEADWAY_SQUEEZE_MARGIN = 0.5;
 
 // --- Parking the ends of a route -----------------------------------------------
 
@@ -1858,6 +1966,14 @@ export function verifyTraffic(
 ): string[] {
   const failures: string[] = [];
 
+  // --- The crowd field this decoder now reads, checked here rather than from a
+  // call site of its own. `decodeLanes` cannot produce a correct timetable
+  // against a broken field, so a build that runs `verifyTraffic` and not
+  // `verifyDensity` would be checking the arithmetic on top of an unchecked
+  // input. `LANE_CLASSES.length` is handed over because `density.ts` must not
+  // import this file -- the dependency runs the other way.
+  for (const f of verifyDensity(LANE_CLASSES.length)) failures.push(f);
+
   // --- The drawn car and the car that hits you are the same car.
   if (renderSizes) {
     if (renderSizes.length !== CAR_BODY_SIZE.length) {
@@ -1930,6 +2046,71 @@ export function verifyTraffic(
       `${sampled - onTheLeft} of ${sampled} sampled positions were on the RIGHT of the direction of ` +
         'travel. This is Australia; the lane offset sign is inverted.',
     );
+  }
+
+  // --- THE CENSUS, through the real default rather than through `UNIFORM_CROWD`.
+  //
+  // One sidecar, decoded four times: as a residential street at Redfern and at
+  // Dural, and as a motorway at both. The whole "weight cars by density" brief
+  // is these four numbers, and the two failures worth catching are opposite:
+  //
+  //   - the scaling is inert (a blank field, a dropped multiply, a `crowd`
+  //     argument that never reaches `scaleHeadway`), in which case all four
+  //     headways are 14 and Dural drives like Redfern, which is the bug that
+  //     was reported;
+  //   - the scaling is total (the class floor lost, or applied as a factor
+  //     instead of a floor), in which case the fringe motorways empty out and
+  //     the M2 at Dural runs one car a minute.
+  //
+  // Nothing else in this file would notice either. `verifyDensity`'s own
+  // sections cover the field; this covers the wiring between it and the decoder.
+  {
+    const REDFERN_X = -440.5;
+    const REDFERN_Z = 2703.8;
+    const DURAL_X = -15230.7;
+    const DURAL_Z = -20051.7;
+    const local = (x: number, z: number) => syntheticTile(NORTH_LANE_OFFSET, x, z, trafficMultiplier).routes[0].headway;
+    // The same bytes read as a motorway, by overriding the class the crowd
+    // function is asked about. The route's own class byte stays residential --
+    // what is being tested is `trafficMultiplier`'s floor reaching the decoder,
+    // not the pipeline's classification.
+    const asMotorway = (x: number, z: number) =>
+      syntheticTile(NORTH_LANE_OFFSET, x, z, (px, pz) => trafficMultiplier(px, pz, 0)).routes[0].headway;
+
+    const inner = local(REDFERN_X, REDFERN_Z);
+    const fringe = local(DURAL_X, DURAL_Z);
+    if (!(fringe > inner * 4)) {
+      failures.push(
+        `A residential street runs a ${inner.toFixed(1)} s headway at Redfern and ${fringe.toFixed(1)} s ` +
+          'at Dural. The census multiplier is not reaching the decoder -- the two should differ by ' +
+          'the better part of an order of magnitude, and traffic is still uniform across the city.',
+      );
+    }
+    if (!(inner < SYNTHETIC_HEADWAY)) {
+      failures.push(
+        `A residential street at Redfern runs a ${inner.toFixed(1)} s headway against the baked ` +
+          `${SYNTHETIC_HEADWAY} s. The inner city is meant to be busier than the bake, not quieter.`,
+      );
+    }
+    const fringeMotorway = asMotorway(DURAL_X, DURAL_Z);
+    if (!(fringeMotorway < fringe * 0.2)) {
+      failures.push(
+        `A motorway at Dural runs a ${fringeMotorway.toFixed(1)} s headway against the residential ` +
+          `street's ${fringe.toFixed(1)} s. A motorway through an empty suburb is still a motorway; ` +
+          '`CLASS_FLOOR` is not being applied.',
+      );
+    }
+    // And the squeeze never eats the red light. This synthetic route holds its
+    // car still for `SYNTHETIC_DWELL`, and a headway under that is two cars in
+    // one place -- the one thing `scaleHeadway`'s floor exists to prevent.
+    for (const h of [inner, fringe, fringeMotorway, asMotorway(REDFERN_X, REDFERN_Z)]) {
+      if (!(h > SYNTHETIC_DWELL)) {
+        failures.push(
+          `A squeezed headway came out at ${h.toFixed(2)} s against a ${SYNTHETIC_DWELL} s dwell on ` +
+            'the same route. Two cars would occupy the same three metres of road.',
+        );
+      }
+    }
   }
 
   // --- Determinism. The same tick, twice, through two decodes of the same bytes.
@@ -2419,7 +2600,12 @@ const SYNTHETIC_PARKED_TICK = Math.round((SYNTHETIC_HEADWAY - 1) * 60);
  * same street the route's lane is offset from, at the residential width
  * `parking.py` builds its bays against.
  */
-function syntheticTile(offset: number): TileLanes {
+function syntheticTile(
+  offset: number,
+  originX = 0,
+  originZ = 0,
+  crowd: (x: number, z: number, klass: number) => number = UNIFORM_CROWD,
+): TileLanes {
   // Five vertices, the middle one doubled for a red light. World axes: north is
   // -Z, so the lane runs from z = 0 to z = -200, and the left of that is -X.
   const pts: Array<[number, number, number, number]> = [];
@@ -2491,7 +2677,10 @@ function syntheticTile(offset: number): TileLanes {
     v.setFloat32(o + 12, at, true);
     o += 16;
   }
-  const tile = decodeLanes(bytes, 0, 0);
+  // `UNIFORM_CROWD`, so every assertion above goes on testing the format rather
+  // than the census -- see that constant. The census scaling has its own
+  // section, which decodes these same bytes at two real places.
+  const tile = decodeLanes(bytes, originX, originZ, crowd);
   if (tile === null || tile.routes.length !== 1 || tile.ways.length !== 1) {
     // Impossible unless the encoder above and the decoder have diverged, which
     // is exactly the thing this construction exists to catch. A throw here is

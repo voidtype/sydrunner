@@ -2,12 +2,19 @@
  * The city after dark: a torch in the player's hand, a lamp on every second
  * power pole, and headlights on the traffic.
  *
- * `N` sets the clock to 21:30 and until this file existed that was the whole of
- * night: the sun goes under the horizon, `solarRig` takes the beam and the
- * bounce to zero, and what is left is `HEMISPHERE_NIGHT` -- 0.064 of luminance
- * on a wall, which is a silhouette. The windows in `facade.ts` light up and the
- * skyline reads beautifully from a distance, and then you try to walk down a
- * street and there is nothing there.
+ * Until this file existed, night was one thing: the sun goes under the horizon,
+ * `solarRig` takes the beam and the bounce to zero, and what is left is
+ * `HEMISPHERE_NIGHT` -- 0.064 of luminance on a wall at the time, which is a
+ * silhouette. The windows in `facade.ts` light up and the skyline reads
+ * beautifully from a distance, and then you try to walk down a street and there
+ * is nothing there.
+ *
+ * (That floor is 0.243 now -- 3.5x, on the same player's second report -- and
+ * `sky/calibration.HEMISPHERE_NIGHT` carries the derivation and what it cost.
+ * Every ratio quoted in this file has been restated against it. The clock the
+ * whole thing is a function of is the *server's* as of protocol v11, and the
+ * `N` key that used to be the way to see any of this is gone with it; the
+ * console handle is `sydney.sky.scrubTo(0)`.)
  *
  * ---------------------------------------------------------------------------
  * WHAT IS REAL AND WHAT IS NOT, AND WHY THE LINE IS WHERE IT IS.
@@ -104,6 +111,7 @@ import {
   Color,
   FrontSide,
   InstancedMesh,
+  LinearSRGBColorSpace,
   Matrix4,
   MeshBasicNodeMaterial,
   MeshStandardNodeMaterial,
@@ -2557,7 +2565,138 @@ export const TRAIN_END_CAPACITY = 320;
  * [1, 0.48, 0.11] and `LAMP_LED_COLOUR` [1, 0.7, 0.44]; this sits on the other
  * side of white from both of them.
  */
-const SALOON_COLOUR: Rgb = [0.78, 0.87, 1.0];
+export const SALOON_COLOUR: Rgb = [0.78, 0.87, 1.0];
+
+/**
+ * **The ceiling panels themselves, as `emissiveIntensity` on the carriage's own
+ * luminaire material.** See `world/trains.paintSaloonPanels`, which is the only
+ * caller and which owns the question of *which* material that is.
+ *
+ * *"The train has these white panels that irl have fluorescent light in them, if
+ * u could make those luminos that would be amazing."* Half of that shipped by
+ * accident and half of it did not, which is worth writing down because the
+ * screenshot that came with the report showed one panel glowing:
+ *
+ * ```
+ *   tangara.glb    interior_emission        emissiveFactor [1,1,1] + a map   glows
+ *                  interior_emission.001    no emissiveFactor at all         white plastic
+ *   metropolis.glb interior_light           emissiveFactor [1,1,1], no map   glows
+ * ```
+ *
+ * The two Tangara **driving cars** carry `interior_emission` and the two
+ * **middle cars** carry `interior_emission.001`, so on an eight-car set the
+ * panels light up at the two ends and are dead through the middle -- which is
+ * exactly one blooming panel from a platform at Hurstville, and is a property of
+ * how somebody exported a Sketchfab model rather than a decision anybody made.
+ *
+ * So this level is applied to all three, and the ends and the middle of a train
+ * agree for the first time. 1.35 rather than the file's implicit 1.0, and the
+ * number is set by what a diffuser has to be: **the brightest thing in the
+ * carriage, by a clear margin, without being flat white.** Through `EXPOSURE`
+ * and the Neutral curve, 1.35 against `SALOON_COLOUR` lands a bare panel at
+ * roughly rgb(211, 225, 234) -- a cool white that is plainly a source, with the
+ * blue channel nearly clipped and the red two dozen values below it so the tube
+ * still has a colour rather than being a hole in the image. At 1.0 it renders
+ * 206 neutral, which reads as a white ceiling in a bright room; past about 1.6
+ * all three channels clip and the panel becomes a flat cut-out with no shape.
+ *
+ * **Where the model ships an `emissiveMap`, that map multiplies through and
+ * wins the hue**, and it is left to. The Tangara's driving cars have one and it
+ * is a warm yellow-green, so their tubes render as an aged fluorescent rather
+ * than as this cool white -- which is a fair picture of a Tangara and is not
+ * worth overriding, because the same map is what gives the tube its *shape*: it
+ * separates the lit diffuser from the frame around it, and no constant here can
+ * invent that mask for the carriages that lack one. The level is what this
+ * controls on every panel; the colour is what it controls on the panels that
+ * have nothing else to say.
+ *
+ * **Not gated on `nightLevel`, and that is deliberate.** Everything else in this
+ * file is a function of the sun because everything else in this file is
+ * outdoors; a saloon light is on at noon, in a bore, in a cutting and at
+ * Hurstville, which is `SALOON_INTENSITY`'s argument one constant over and the
+ * reason both live here rather than in `sky/calibration.ts`. It is also free:
+ * `emissiveIntensity` is a uniform, the material is built once per GLB at load,
+ * and `warm()` compiles it with everything else before the first frame.
+ */
+export const SALOON_PANEL_LEVEL = 1.35;
+
+/**
+ * Which of a train GLB's materials is a **saloon ceiling luminaire**, and the
+ * one rule in the night rig that is a list of names rather than a measurement.
+ *
+ * Both models are Sketchfab exports and both name the fluorescent panels after
+ * what they are, which is the only reason this can be done by name at all:
+ *
+ * ```
+ *   tangara.glb      interior_emission        the two driving cars
+ *                    interior_emission.001    the two middle cars
+ *   metropolis.glb   interior_light           all three interiors
+ * ```
+ *
+ * `.001` and any further duplicate suffix are matched, because that is what
+ * Blender does to a material that got copied when a mesh was, and the copy is
+ * the same object on a different carriage. Deliberately **not** matched:
+ * `train_all_lights` and `light`, which are the head and tail lamps on the
+ * outside of the nose -- those already read correctly, this file hangs additive
+ * sprites on them, and pushing them a third brighter would put a blown-out
+ * marker on every train in the city.
+ *
+ * A name list is a weak rule and its failure mode is *silence*: a future model
+ * whose panels are called something else simply stays dull, which is
+ * indistinguishable from a taste decision. So `world/trains.load` counts what
+ * this matched in each file and warns when a model yields none, and
+ * `server/integration-check.ts` reads the shipped glTF and asserts the names are
+ * still there. Those are the checks; this regex is not one.
+ */
+export const SALOON_PANEL_RE = /^(interior_emission|interior_light)(\.\d+)?$/;
+
+/**
+ * The little of a three material this rule touches, so the rule can be called
+ * and checked without a renderer.
+ *
+ * Structural rather than `MeshStandardNodeMaterial`, and it buys something real:
+ * `world/trains.ts` reaches for `document` to measure texture alpha, so a
+ * headless process that imported it for this one function would be dragging a
+ * DOM in behind it. Typing the two fields the function writes lets the rule live
+ * here, beside the level it applies and the colour it applies, and lets
+ * `server/integration-check.ts` exercise it for real.
+ */
+export interface PanelMaterial {
+  emissive: { setRGB(r: number, g: number, b: number, colorSpace?: unknown): void };
+  emissiveIntensity: number;
+}
+
+/**
+ * Make a ceiling panel a light rather than a white surface near one. Returns
+ * whether this material was one.
+ *
+ * The whole of it is two writes and both are uniforms, so this costs one
+ * material construction at GLB load and nothing per frame. The level is
+ * `SALOON_PANEL_LEVEL`, which carries the derivation and the screenshot the
+ * request came with; the colour is `SALOON_COLOUR` -- the *same* cool white the
+ * window sprites and the real saloon light already use. That last part is the
+ * half nobody asked for and is what makes it read: before, a carriage's panels
+ * were neutral white plastic while its own windows glowed blue at the platform,
+ * so the inside and the outside of one train disagreed about what colour its
+ * lighting was.
+ *
+ * `emissiveIntensity` rather than a colour scaled past 1, because three reads
+ * `emissive` as a colour *reference* and a `Color` is not the place to put a
+ * radiometric multiplier; the intensity is a float uniform and is exactly what
+ * glTF's own `KHR_materials_emissive_strength` is. Any `emissiveMap` the file
+ * has is left alone and multiplies through -- it is what separates the tube from
+ * its frame on the Tangara's driving cars, and inventing that mask for the
+ * models that lack one would be inventing geometry.
+ */
+export function paintSaloonPanels(m: PanelMaterial, sourceName: string): boolean {
+  if (!SALOON_PANEL_RE.test(sourceName)) return false;
+  // Written in the working colour space explicitly. These are radiometric, not
+  // a swatch, and a future change to the working space must not silently invert
+  // them -- the same statement `sky.ts` makes at every `setRGB` it does.
+  m.emissive.setRGB(SALOON_COLOUR[0], SALOON_COLOUR[1], SALOON_COLOUR[2], LinearSRGBColorSpace);
+  m.emissiveIntensity = SALOON_PANEL_LEVEL;
+  return true;
+}
 
 /** Half the bodyside, and how far outside it the window sprites hang. */
 const TRAIN_HALF_WIDTH = 1.52;
@@ -3253,6 +3392,41 @@ export class NightLights {
   private mountKind = -1;
 
   /**
+   * Whether the player is holding the torch out. `F`; see `toggleTorch`.
+   *
+   * **Starts true, and the default is the decision.** The torch has been
+   * automatic since it existed -- on with the street lamps, off with the sun --
+   * and a player who never learns the key must get exactly that, because the
+   * request that arrived beside this one was "i cant see shit at night rn" and
+   * shipping a night that starts with the torch in your pocket would answer it
+   * backwards. What the key adds is the ability to *put it away*: to look at a
+   * lit street with nothing of your own in the frame, to stand in a rave without
+   * a beam across it, and to take a screenshot of the city rather than of a wall
+   * with a hole burnt in it.
+   */
+  private torchWanted = true;
+
+  /** Whether the beam is out. False only after the player pressed `F`. */
+  get torchOn(): boolean {
+    return this.torchWanted;
+  }
+
+  /**
+   * Put the torch away, or take it out. Returns the new state, so the caller can
+   * say which one happened without asking again.
+   *
+   * Nothing is written here but a boolean: the light is *never* touched outside
+   * `update`, so a press cannot land between the intensity being set and the
+   * frame being drawn, and there is exactly one line in this file that decides
+   * how bright the beam is. See that line for why it is intensity and not
+   * `visible`.
+   */
+  toggleTorch(): boolean {
+    this.torchWanted = !this.torchWanted;
+    return this.torchWanted;
+  }
+
+  /**
    * `scene` is typed as the `Object3D` it is used as rather than as `Scene`, so
    * that `verifyNightLights` can build a throwaway rig against a bare group and
    * assert the light invariants without a renderer anywhere near it. Everything
@@ -3453,7 +3627,26 @@ export class NightLights {
       this.torch.position.z + this.beam.z * 30,
     );
     this.torch.target.updateMatrixWorld();
-    this.torch.intensity = rig.torchIntensity * sway.gain * (riding ? BIKE_BEAM_GAIN : 1);
+    /* And the switch, which is the *only* thing `F` does to this light.
+     *
+     * **Intensity, never `visible`.** The whole architecture of this file is the
+     * paragraph at the top: hiding a light takes it off three's render list,
+     * which changes `LightsNode.customCacheKey`, which recompiles every pipeline
+     * in the scene inside the frame it happened. A torch bound to a key is
+     * therefore the single most dangerous possible way to have got that wrong --
+     * a player tapping `F` would have been a player stuttering the whole game
+     * once per press. Zero intensity costs the same `N.L` it costs at noon.
+     *
+     * **A bike headlight is not switched by it**, and that is the mount argument
+     * stated from the other end: this light does three jobs, and mounting is an
+     * *exchange* of the torch for a lamp bolted to a head tube. A rider is not
+     * holding the torch -- both hands are on the bars and `verifyCharacterRig`
+     * asserts it -- so there is nothing in their hand for the key to put away,
+     * and a rider who had pressed `F` on foot would otherwise get on a bike at
+     * midnight and find its headlight dead for a reason nothing on screen could
+     * explain. Getting off hands the torch back in whatever state it was left. */
+    const held = riding ? BIKE_BEAM_GAIN : this.torchWanted ? 1 : 0;
+    this.torch.intensity = rig.torchIntensity * sway.gain * held;
 
     // --- The real lamps.
     //
@@ -3577,7 +3770,7 @@ export function verifyNightLights(): string[] {
     );
   }
   // 0.05 degrees of altitude is about 12 seconds of Sydney clock in February, so
-  // this bounds the fade rate at something no keystroke can jump: `[` and `]`
+  // this bounds the fade rate at something no scrub can jump: `sydney.sky.advance(30)`
   // move the clock 30 minutes, which is under a quarter of the ramp.
   if (biggestStep > 0.02) {
     failures.push(
@@ -4209,6 +4402,63 @@ export function verifyNightLights(): string[] {
         `reuses this light rather than adding a fourth.`,
     );
   }
+  /* --- The `F` switch, and it is checked here rather than believed because it
+   * is now the one thing in this file a *player* can do to a light thirty times
+   * a second if they want to.
+   *
+   * Three claims: pressing it takes the beam to exactly zero, it leaves the
+   * light on the render list (the recompile invariant, which is the whole file),
+   * and it does not reach a bike headlight -- see the switch in `update`. The
+   * last of those is the one that would ship: a rider whose lamp is dark because
+   * they put a torch away on foot ten minutes ago has no way at all to find out
+   * why. */
+  probe2.update(1 / 60, camera, -20, 0, null, null);
+  const beamOn = probe2.torch.intensity;
+  if (!(beamOn > 0) || probe2.torchOn !== true) {
+    failures.push(
+      `The torch is not lit at midnight before anybody has touched the key: intensity ${beamOn}, ` +
+        `torchOn ${probe2.torchOn}. It must default to on -- it has been automatic since it ` +
+        `existed, and the request the key arrived beside was "i cant see shit at night rn".`,
+    );
+  }
+  probe2.toggleTorch();
+  probe2.update(1 / 60, camera, -20, 0, null, null);
+  if (probe2.torch.intensity !== 0) {
+    failures.push(
+      `Switching the torch off left it at ${probe2.torch.intensity} of intensity rather than ` +
+        `exactly zero. The sway's flicker gain multiplies this line, so a switch written as a ` +
+        `subtraction or a fade floor leaves a beam nobody asked for.`,
+    );
+  }
+  if (probe2.torch.visible !== true || identity(probe2) !== before) {
+    failures.push(
+      `Switching the torch off changed the set of real lights to "${identity(probe2)}" (visible ` +
+        `${probe2.torch.visible}). An off torch must be a light at zero intensity and never a ` +
+        `hidden one: _projectObject skips an invisible object, so hiding it takes it off the ` +
+        `render list, changes LightsNode.customCacheKey and recompiles every pipeline in the ` +
+        `scene -- once per keypress, on a key a player can hold down.`,
+    );
+  }
+  torchBikeMount(mount, 100, 0, 200, 0);
+  probe2.update(1 / 60, camera, -20, 8, null, mount);
+  if (!(probe2.torch.intensity > 0)) {
+    failures.push(
+      `A bike headlight is dark (${probe2.torch.intensity}) because the rider had put their torch ` +
+        `away on foot. Mounting is an *exchange* of one light for another -- both hands are on ` +
+        `the bars, so there is nothing in the hand for the key to have switched -- and a rider ` +
+        `riding blind at 26 m/s for a reason nothing on screen explains is the worst failure this ` +
+        `key can have. See the switch in \`update\`.`,
+    );
+  }
+  probe2.toggleTorch();
+  probe2.update(1 / 60, camera, -20, 0, null, null);
+  if (!(probe2.torch.intensity > 0) || probe2.torchOn !== true) {
+    failures.push(
+      `The torch did not come back on when switched back on: intensity ${probe2.torch.intensity}, ` +
+        `torchOn ${probe2.torchOn}.`,
+    );
+  }
+
   // The sprites are meshes and may be hidden freely; the *lights* may not, and
   // the two are one keystroke apart in this file. So: on at midnight, off at
   // three in the afternoon, and the light set unchanged either way.

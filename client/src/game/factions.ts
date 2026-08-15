@@ -1433,7 +1433,28 @@ const PATROL_SPAN = PATROL_REACH + PATROL_BAND_MAX / 2;
  */
 export const PATROL_INFLUENCE = 1400;
 
-/** Pairs in a cell with no station near it. The floor, and the point of the lattice. */
+/**
+ * Pairs in a cell with no station near it. The floor, and the point of the lattice.
+ *
+ * **A floor on presence, and it is not the same quantity as the crowd.** Two
+ * rounds have now bent it into one by accident, and both read as task 62's
+ * original complaint coming back:
+ *
+ *   - The census multiplier thinned `PedestrianField` and took the *footpaths*
+ *     with it, because `buildBand` dropped any band that scheduled no walker --
+ *     more than half of them city-wide. The lattice draws its beats from that
+ *     field, so a suburb with few residents lost its police as well as its
+ *     pedestrians. Fixed where it happened: a band with zero slots is still a
+ *     band. See `pedestrians.buildBand`.
+ *   - And a posed pair spent a third of its cycle in `posePedestrian`'s dwell,
+ *     which for an ambient walker is the whole design and for a guaranteed pair
+ *     is the guarantee lapsing. Fixed with `onDuty`; see there.
+ *
+ * Neither is a number that should be tuned to compensate for the other. How many
+ * people live here decides how many people are on the street; this decides how
+ * many police a player can find, and it is 1 per cell everywhere inside the
+ * built extent whatever the census says.
+ */
 export const PATROL_BASE_PAIRS = 1;
 /** And in a cell the CBD's commands all overlap. */
 export const PATROL_MAX_PAIRS = 3;
@@ -1753,7 +1774,11 @@ export function forEachPatrolNear(
       for (let p = 0; p < pairs; p++) {
         const band = pool[carHash(seed, p) % pool.length];
         const slot = PATROL_SLOT_BASE + ((offset + p) % PATROL_SLOT_SPAN);
-        if (!posePedestrian(band, slot, now, undefined, ped)) continue;
+        // `onDuty`: a patrol does not stand in a doorway for twenty seconds and
+        // cease to exist. See `pedestrians.posePedestrian` -- the dwell is what
+        // made `patrolPairs`' "a pair on every stretch of footpath" a promise
+        // that lapsed a third of the time.
+        if (!posePedestrian(band, slot, now, undefined, ped, true)) continue;
         const key = pedKey(band.osmId, band.side, slot);
         for (let partner = 0; partner < 2; partner++) {
           const off = partner === 0 ? 0 : PAIR_OFFSET;
@@ -1825,8 +1850,11 @@ export function forEachPoliceNear(
       if (band === null) continue;
       const slot = POLICE_SLOT_BASE + (carHash(stationSeed(station), beat ^ 0x5f3a) % POLICE_SLOT_SPAN);
       // No down record: an officer's health is the faction's business and the
-      // pedestrian registry must never put one of them on the ground.
-      if (!posePedestrian(band, slot, now, undefined, ped)) continue;
+      // pedestrian registry must never put one of them on the ground. And
+      // `onDuty` for the lattice's reason, said about a beat: a station's own
+      // pair is the answer a player standing outside a police station expects,
+      // and an answer that is absent a third of the time is not one.
+      if (!posePedestrian(band, slot, now, undefined, ped, true)) continue;
       const key = pedKey(band.osmId, band.side, slot);
       for (let partner = 0; partner < 2; partner++) {
         // Left of the heading is `(dz, -dx)` in renderer axes -- the statement

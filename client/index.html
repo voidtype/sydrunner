@@ -75,13 +75,35 @@
          column headings use. It is a label for the block above it, not another
          line of it. */
       #help .more { color: #7f95ab; }
+      /* The one line in this block that must never be cut.
+         Every other line clips with an ellipsis because losing the tail of
+         "wheel zoom out · v third person" costs a control nobody was reading;
+         losing the tail of this one deletes "report a bug", which is the only
+         place in the game that says how. It is 363 px at 13px and the cap is
+         `min(390px, 44vw)`, so it fits until the window is under about 825 px
+         wide -- and under that it wraps to two right-aligned rows rather than
+         going quiet about the half that matters. The 44vw is not negotiable
+         and is why this wraps instead: `#vitals` is three times the size it
+         was (see `--vitals-boost`) and the two blocks must still never meet. */
+      #help .wrap { white-space: normal; }
       /* Hidden while the full list is up: they are the same information in the
-         same corner, and the compact block is the one with less of it. */
+         same corner, and the compact block is the one with less of it.
+
+         "On at all times" was asked for and this rule and `body.suggesting` are
+         the only two things that take the Escape line off the screen -- so it is
+         worth writing down why neither could be dropped. Both are *panels at
+         `right: 14px; bottom: 16px`*, the same two numbers this block is at, and
+         a line of text under a .72-alpha blurred panel is not a line a player
+         reads, it is one they think is a rendering fault. Tried and looked at:
+         `#helpfull` is 780 px tall on an 800 px window and covers this corner
+         whatever it is given. So instead each panel names Escape itself -- see
+         the `suggestions` section of `#helpfull` below -- and the compact line
+         is on screen every other moment of the session. */
       #help.hidden { opacity: 0; }
       /* A window shorter than this is a laptop with the dev tools open across
          the bottom half. This is the lowest-priority element on the screen, so
-         it gives up the two control lines and keeps the key that brings all of
-         them back. */
+         it gives up the two control lines and keeps the keys that bring all of
+         them back -- both `.more` lines survive. */
       @media (max-height: 460px) { #help .keys { display: none; } }
 
       /* The full list, toggled by `H`.
@@ -523,26 +545,62 @@
          tall, and `#chat` sits on that number.
 
          The one thing that does not scale is the 16 px anchor: the four corners
-         of this HUD share two margins and the gutter is not part of the widget. */
+         of this HUD share two margins and the gutter is not part of the widget.
+
+         ---------------------------------------------------------------------
+         THE BOOST, AND WHY IT MULTIPLIES THE RUNG RATHER THAN REPLACING IT.
+
+         The cluster was drawn for a 14" laptop and reported as too small to
+         read mid-fight -- *"make the bottom left HUD stuff much bigger, at
+         least 3x"*. The ladder above was already running, so "3x" had to be
+         resolved against a question it does not answer on its own: three times
+         *what*? Three times the base numbers would be 3.00x on the laptop and
+         only 2.61x of what a 1920x1080 player is actually looking at, and
+         1.67x of a 4K one's -- the bigger the screen, the less of the asked-for
+         change they would get, which is backwards and is the same mistake
+         scaling on DPR would have been.
+
+         So the rung and the boost are separate knobs and `--vitals-scale` is
+         their product. Every player gets three times the cluster they had,
+         whichever rung they are on:
+
+               <1700x950   1.00 x 3 = 3.00   pips 78x36 px
+              >=1700x950   1.15 x 3 = 3.45
+             >=2200x1150   1.35 x 3 = 4.05
+             >=2900x1500   1.55 x 3 = 4.65
+             >=3500x1900   1.80 x 3 = 5.40   pips 140x65 px on a 3840 px screen
+
+         `#chat`'s reserve is written against `--vitals-scale`, so it tracks the
+         product with no second edit -- see the arithmetic there. */
       :root {
-        --vitals-scale: 1;
+        /* The viewport ladder. Read the table above for the rungs. */
+        --vitals-rung: 1;
+        /* How much bigger than the size this cluster was drawn at. One number,
+           one reason, and the only thing to touch if "3x" is ever "4x". */
+        --vitals-boost: 3;
+        --vitals-scale: calc(var(--vitals-rung) * var(--vitals-boost));
         /* Stepped, never multiplied. See the rim comment on `#minimap`: a hairline
            at .34 over a bright sky is already marginal, and on a viewport wide
            enough for the top two rungs a device pixel is physically half what it
-           was. 2 px there is that same fix, and an integer either way. */
-        --vitals-line: 1px;
+           was. 2 px there is that same fix, and an integer either way.
+
+           2 px at the bottom rung now rather than 1: an empty pip is *nothing
+           but* its border, and a hairline round a 78x36 px block reads as a
+           drawing artefact where the same hairline round the 26x12 px block
+           this replaced read as a line. Still an integer, still stepped. */
+        --vitals-line: 2px;
       }
       @media (min-width: 1700px) and (min-height: 950px) {
-        :root { --vitals-scale: 1.15; }
+        :root { --vitals-rung: 1.15; }
       }
       @media (min-width: 2200px) and (min-height: 1150px) {
-        :root { --vitals-scale: 1.35; }
+        :root { --vitals-rung: 1.35; }
       }
       @media (min-width: 2900px) and (min-height: 1500px) {
-        :root { --vitals-scale: 1.55; --vitals-line: 2px; }
+        :root { --vitals-rung: 1.55; --vitals-line: 3px; }
       }
       @media (min-width: 3500px) and (min-height: 1900px) {
-        :root { --vitals-scale: 1.8; --vitals-line: 2px; }
+        :root { --vitals-rung: 1.8; --vitals-line: 3px; }
       }
 
       #vitals {
@@ -864,7 +922,9 @@
       #suggestions.shown { display: flex; }
       /* The compact control block lives in this exact corner. While the box is
          open it is behind it, so it goes -- through the body class rather than
-         through `#help.hidden`, which `hud.setHelp` owns and would fight over. */
+         through `#help.hidden`, which `hud.setHelp` owns and would fight over.
+         The Escape line goes with it, for the reason written out there: this is
+         the box that line names, and it is open. */
       body.suggesting #help { opacity: 0; }
       /* The tab strip, in the `<h1>`'s exact type: 9px, .38em tracking, upper
          case, #7f95ab. It is the same label the panel always had, three times,
@@ -1194,8 +1254,28 @@
            to the wheel is a control people try before they read a list, so the
            one line that says the wheel does something has to be on the screen.
            See `main.ts`'s wheel listener. -->
-      <div class="keys">wheel zoom out · v third person</div>
-      <div class="more">h — all controls · esc — suggestions</div>
+      <!-- `f` is on the always-visible block for the wheel's reason one line
+           up: it is a control every player uses every night, it is where every
+           game since Half-Life has put a torch, and it was asked for by name.
+           Sharing this line rather than taking its own, because the camera
+           bindings beside it are the same kind of thing — something in your
+           hand rather than a panel. See `main.ts`'s keydown listener. -->
+      <div class="keys">wheel zoom out · v third person · f torch</div>
+      <div class="more">h — all controls</div>
+      <!-- The box behind Escape grew two more tabs — what's new, and report a
+           bug — and this line still said "suggestions", so the one panel in the
+           game a player can file a bug from was named after a third of itself.
+           It was reported as exactly that: "make bug tooltip on at all times say
+           esc - suggestions / bug reports".
+
+           Its own line, because on the end of `h — all controls` it is 62
+           characters at 13px and `#help`'s 390px cap ellipsises the last third
+           of it — which is where "report a bug" is, so the one word the report
+           was about would have been the one word cut. Alone it is 44 characters
+           and 363px, and it fits. See `client/src/suggestions.ts` for the three
+           tabs it names and `#help.hidden` above for the two moments in a
+           session it is not on the screen. -->
+      <div class="more wrap">esc — suggestions · what's new · report a bug</div>
     </div>
 
     <div id="helpfull">
@@ -1235,6 +1315,16 @@
         <div><kbd>left click</kbd>swing the bat</div>
         <div><kbd>right click</kbd>throw a footy</div>
       </section>
+      <!-- Its own section rather than a line under `interface`, because it is a
+           thing in your hand rather than a panel — and because the second line
+           is the part nobody would guess: the beam is automatic, so the key is
+           for putting it *away*. See `world/nightlights.NightLights.torchOn`. -->
+      <section>
+        <h2>torch</h2>
+        <div><kbd>f</kbd>torch on / off</div>
+        <div>it comes on by itself at dusk — the key is for putting it away</div>
+        <div>on a bike it is the headlight, and stays on</div>
+      </section>
       <!-- Its own section rather than a line under `interface`, on `lime bikes`'
            argument: chat is a topic somebody looks up ("how do I talk to
            people"), not another panel key. The second line is the part that is
@@ -1266,6 +1356,11 @@
       <section>
         <h2>suggestions</h2>
         <div><kbd>esc</kbd>open the box</div>
+        <!-- Named here as well as on the compact block, because this panel is
+             one of the two things that covers that block — see `#help.hidden`.
+             A player who opens the controls looking for "how do I report this"
+             has to find it here or nowhere. -->
+        <div>three tabs: suggestions, what's new, report a bug</div>
         <div>4 votes a week, one per suggestion</div>
         <div>the top one each week gets built</div>
       </section>
@@ -1286,15 +1381,18 @@
         <div><kbd>`</kbd>diagnostics</div>
         <div><kbd>- =</kbd>render scale</div>
       </section>
+      <!-- The four time keys — `[`, `]`, `n` and `t` — are gone, and the
+           section is kept with nothing to press in it on purpose: they were on
+           this list for months and a player who reaches for one deserves to be
+           told what happened rather than to find a hole. The clock is the
+           server's now (protocol v11), so everybody on a host is in the same
+           evening; see `client/src/sky/cycle.ts` and `main.ts`'s keydown
+           listener. The console handles still exist for developers. -->
       <section>
         <h2>time</h2>
-        <!-- The clock runs on its own now and is the same for every player --
-             one real hour is one Sydney day, thirty minutes of it light. These
-             four scrub *your own* sky and nobody else's; see
-             `client/src/sky/cycle.ts`. -->
-        <div><kbd>[ ]</kbd>±30 minutes</div>
-        <div><kbd>n</kbd>midnight</div>
-        <div><kbd>t</kbd>noon</div>
+        <div>one real hour is one Sydney day — thirty minutes of it light</div>
+        <div>the server keeps it, so everyone here is in the same evening</div>
+        <div>the old <kbd>[ ] n t</kbd> keys are gone — they only moved your own sky</div>
       </section>
       <!-- The fallbacks, grouped rather than scattered through the two above,
            because they are one situation rather than four bindings: a browser
@@ -1304,7 +1402,10 @@
         <h2>no pointer lock</h2>
         <div><kbd>drag</kbd>look</div>
         <div><kbd>arrows</kbd>look</div>
-        <div><kbd>f</kbd>swing the bat</div>
+        <!-- `k` rather than `f`, which is the torch now. The two weapons are
+             adjacent under the right hand for the first time; see `main.ts`'s
+             keydown listener for why the torch won the key. -->
+        <div><kbd>k</kbd>swing the bat</div>
         <div><kbd>l</kbd>throw a footy</div>
       </section>
       <div style="flex:0 0 100%;color:#7f95ab"><a href="/credits.html" target="_blank" style="color:inherit;text-decoration:none">credits</a></div>

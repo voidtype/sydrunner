@@ -736,6 +736,20 @@ export class Room {
         y: p.combat.body.position.y,
         z: p.combat.body.position.z,
         yaw: p.combat.body.yaw,
+        /* **The clock the sky runs on, and this host is the only thing entitled
+         * to answer it.** v11; see `protocol.PROTOCOL_VERSION`.
+         *
+         * Read here, on the line that sends it, rather than sampled once per
+         * tick or held on the room -- so the number a joiner is handed is this
+         * instant and the only error in it is how long the packet takes to
+         * arrive. That is milliseconds against a one-hour cycle.
+         *
+         * `Date.now()` and not `sim.tick`: the tick counts 60 Hz steps since
+         * this room started, so two rooms on one host have different ticks and a
+         * restarted room has a tick of zero under a sun that did not move. The
+         * time of day is a property of the *host*, and every room on it shows
+         * the same sky. */
+        clockMs: Date.now(),
       }),
     );
     // Spec 8.3's currently-taken points, so a joiner's icons match everybody

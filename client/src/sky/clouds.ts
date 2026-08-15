@@ -147,7 +147,7 @@ import {
 } from 'three/tsl';
 import { Vector3 } from 'three/webgpu';
 
-import { luminance, solarRig, warmthAt, type Rgb } from './calibration.ts';
+import { HEMISPHERE_DAY, luminance, solarRig, warmthAt, type Rgb } from './calibration.ts';
 
 /* ===========================================================================
  * How bright a cloud is, from the rig that already decides how bright
@@ -315,8 +315,33 @@ export function cloudRig(altitudeDeg: number, cover = 0): CloudRig {
    */
   const under = warmthAt(altitudeDeg);
   const day = clamp01((altitudeDeg + 6) / 12);
+  /* The strength of that skylight, and **the one place a cloud must not read
+   * `rig.hemisphereIntensity`.**
+   *
+   * The hemisphere is the light the *ground* gets, and after dark that is no
+   * longer a measurement of anything: `HEMISPHERE_NIGHT` is an artistic floor
+   * chosen so a player can walk down an unlit street, and it went to 3.5x its
+   * old value the day one of them said "i cant see shit at night rn". A cloud
+   * five hundred metres up is not standing in that street. Wired to the same
+   * number, the deck came up 3.5x with the road and a moonless overcast midnight
+   * in the Blue Mountains grew a glowing grey lid over it -- lit by nothing, from
+   * a constant about footpaths. `verifyCloudRig`'s night case caught it, which is
+   * exactly the job it was written for.
+   *
+   * So the night endpoint is stated here, separately, at the 0.33 the whole cloud
+   * rig was calibrated against, and it is *not* going to follow the ground's
+   * floor again. Everything the sun is up for is untouched to the last bit: the
+   * ramp is the same `day`, and at `day = 1` this is `HEMISPHERE_DAY` exactly
+   * (the `a(1-t) + bt` form, for `calibration.solarRig`'s reason).
+   *
+   * What legitimately lights a cloud at night is in this file already and has a
+   * direction and a cause: `setGlow`, the city's own upward light landing on the
+   * underside of the deck. That is the orange lid over Sydney, and it is the
+   * reason a night cloud does not need the hemisphere to be visible at all. */
+  const CLOUD_NIGHT_SKYLIGHT = 0.33;
+  const skylight = CLOUD_NIGHT_SKYLIGHT * (1 - day) + HEMISPHERE_DAY * day;
   const fill = rig.skyColour.map(
-    (s, i) => (s + (rig.sunColour[i] - s) * under * day) * rig.hemisphereIntensity,
+    (s, i) => (s + (rig.sunColour[i] - s) * under * day) * skylight,
   ) as Rgb;
 
   const beam = beamRig.sunColour.map((c) => c * beamRig.sunIntensity) as Rgb;

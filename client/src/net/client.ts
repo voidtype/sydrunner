@@ -563,6 +563,31 @@ export class NetClient {
   private serverTick = 0;
   private tickSynced = false;
 
+  /**
+   * `serverNow - localNow`, milliseconds. The **time of day**, which the host
+   * owns; see the write in the `WELCOME` branch.
+   *
+   * Zero until a welcome arrives, which is the correct fallback rather than a
+   * placeholder: with no server to ask, the client's own clock *is* the best
+   * available answer and is what the cycle ran on for its whole life before v11.
+   * `clockSynced` is what lets a caller tell "the host and I agree exactly" from
+   * "nobody has told me anything" -- a distinction `sydney.nightsky.now()`
+   * reports and the renderer does not care about, because a zero offset draws
+   * the same sky either way.
+   */
+  private clockSkewMs = 0;
+  private clockSynced = false;
+
+  /** Add this to `Date.now()` to get the host's wall clock. See `clockSkewMs`. */
+  get clockSkew(): number {
+    return this.clockSkewMs;
+  }
+
+  /** Whether a `WELCOME` has been seen and the skew above is the host's. */
+  get clockFromServer(): boolean {
+    return this.clockSynced;
+  }
+
   /** The eased position correction still owed to the camera, metres. */
   private readonly correction = new Vector3();
 
@@ -950,6 +975,23 @@ export class NetClient {
         this.room = w.room;
         this.serverTick = w.tick;
         this.tickSynced = true;
+        /* **How far this machine's wall clock is from the host's**, in ms, as
+         * `serverNow - localNow`. v11; see `protocol.Welcome.clockMs`.
+         *
+         * Sampled here, at the instant the frame is read, so the only error is
+         * the one-way trip -- tens of milliseconds against the 3,600,000 ms
+         * day/night cycle the number exists to drive. Deliberately a *difference*
+         * and not a stored timestamp: the client's clock keeps running, so an
+         * offset stays correct for the whole session while an absolute instant
+         * would be stale a frame later and would need its own tick.
+         *
+         * Nothing in the simulation reads this and nothing should. It is the
+         * time of *day*, which is the sky, the street lights and everything that
+         * behaves differently after dark; the simulation's clock is `serverTick`
+         * above and the two answer different questions.
+         */
+        this.clockSkewMs = w.clockMs - Date.now();
+        this.clockSynced = true;
         this.welcome = w;
         this.setStatus('online', `id ${w.id} in room ${w.room}`);
         return;

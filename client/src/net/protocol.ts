@@ -68,20 +68,37 @@
  * set in a 128-player room is single digits.
  *
  * **Footballs are on top of that**, at 18 B each, and they are the one part of
- * this record not paid per player. A ball lives about 1.5 s in practice -- three
- * bounces goes quickly -- and the supply bar returns one every 4 s, so the
- * *sustained* count is roughly a quarter of a ball per player: about two in the
- * air at six players, 36 B, and the stream stays at 28 kbit/s. A **burst**, six
- * players emptying three-ball bars at once, is eighteen balls for a second and a
- * half and takes it to 74 kbit/s.
+ * this record not paid per player. **The two numbers behind the sum below both
+ * moved** when the player asked for a ball that lasts ten times as long and a
+ * supply that returns two and a half times faster, and the arithmetic is
+ * restated rather than left as it was.
  *
- * That burst is over the budget and is stated rather than smoothed away. It is
- * accepted for two reasons: it is transient by construction -- the bar cannot
- * refill fast enough to sustain it -- and the same delta encoding in the note
- * below closes it more cheaply than it closes the players, because a ball's
- * position moves a predictable 1.4 m a snapshot along a known velocity, so the
- * residual against a *ballistic* prediction is centimetres. `verifyNet` asserts
- * the sustained case and that a ball never costs more than a person.
+ * It used to read: a ball lives about 1.5 s in practice -- three bounces goes
+ * quickly -- and the supply returns one every 4 s, so the sustained count is
+ * roughly a quarter of a ball per player, about two in the air at six players.
+ *
+ * A ball now lives about 11 s -- it settles and rolls rather than being deleted
+ * mid-bounce; see `footy.ROLL_DECEL` -- and `combat.BALL_RECHARGE` is 1.6 s. So
+ * the sustained count is nearer *seven* balls per player, and six players in one
+ * street is forty balls, 800 B, rather than two and 36 B.
+ *
+ * Three things keep that from being forty balls in everyone's stream. The
+ * `InterestIndex` filters balls **by the ball's own position** against
+ * `AOI_LEAVE_RADIUS`, and a ball that has rolled two streets away is out of it.
+ * The delta encoding in the note below closes a ball more cheaply than it
+ * closes a player, because a ball's position moves a predictable distance along
+ * a known velocity and the residual against a *ballistic* prediction is
+ * centimetres -- and a *rolling* ball is the easiest case that encoding has,
+ * since it is travelling in nearly a straight line at nearly constant speed.
+ * And the tail of a ball's life is the cheap part by construction: it is slow,
+ * it is predictable, and `footy.ARM_SPEED_SQ` means it is not even a hit test
+ * any more.
+ *
+ * What is left is real and is stated rather than smoothed away: a sixteen-player
+ * brawl in one street costs more than it did. It is the thing that was asked for
+ * -- the balls stay in play -- and it is the one situation where a player wants
+ * every one of them drawn. `verifyNet` asserts the sustained case and that a
+ * ball never costs more than a person.
  *
  * **Faction actors are on top of that too**, at 18 B each -- see `NPC_BYTES` --
  * and they are the one section here that is neither per-player nor transient.
@@ -368,7 +385,39 @@ export const MSG = {
  * that never learned what a train is keep working unchanged. What the section
  * buys is exactness -- see `ABOARD_BYTES`.
  */
-export const PROTOCOL_VERSION = 10;
+/*
+ * v11 adds **the server's wall clock** to `WELCOME`, and it is the smallest
+ * possible field for the largest possible reason.
+ *
+ * The day/night cycle has always been a pure function of `Date.now()`, and
+ * `sky/cycle.ts` spent a paragraph arguing that this was better than a protocol
+ * field: two machines whose clocks agree to a second agree about the sky to
+ * within a fortieth of a game-minute, with nothing on the wire and a sky that is
+ * already right before the socket opens. Both halves of that are still true and
+ * neither was the problem. **The problem is the word "agree".** Nothing anywhere
+ * made two clients agree -- a laptop whose clock is four minutes fast has been
+ * playing a different time of day from everybody else in the room, and the
+ * client could additionally scrub its own by pressing `T` or `N`. Street lights
+ * on for one player and off for the next is not a cosmetic disagreement in a
+ * game where the police, the raves and the traffic all behave differently after
+ * dark, and it is the same disease as the `?vessels=1` link that outlived its
+ * server flag: a fact with two owners and no way to notice they had diverged.
+ *
+ * So the server publishes its clock -- here, once, at join, and on `/health`
+ * beside `vessels` for the same reason `vessels` is there -- and the client
+ * renders it. What crosses the wire is one `f64` of epoch milliseconds and
+ * nothing else: no phase, no time of day, no night level. The *cycle* is still
+ * exactly the pure function it was, still evaluated on the client, still
+ * identical arithmetic on both ends; all that has changed is which wall clock it
+ * is handed. A field that carried the phase instead would have to be re-sent
+ * forever and would put the sky on the snapshot path, which is the design this
+ * one is specifically avoiding.
+ *
+ * The field is 8 bytes because a clock is not a `u32` of anything: epoch
+ * milliseconds passed 2^32 in 1970 and a `f64` holds them exactly (integers to
+ * 2^53), so there is no quantisation and no epoch to agree on separately.
+ */
+export const PROTOCOL_VERSION = 11;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
@@ -916,7 +965,7 @@ export function quantisePing(ms: number): number {
 // --- Server -> client ---------------------------------------------------------
 
 /**
- * The join reply, 27 bytes.
+ * The join reply, 35 bytes.
  *
  *     u8   type = MSG.WELCOME
  *     u16  protocol version
@@ -927,6 +976,27 @@ export function quantisePing(ms: number): number {
  *     u32  server tick
  *     i32  spawn x mm, y mm, z mm  (the eye, as `PlayerState.position` is)
  *     u16  spawn yaw
+ *     f64  the server's wall clock v11: new
+ *
+ * **The clock is the sky's, and it is not the tick.** `tick` is the simulation's
+ * count of 60 Hz steps since this *room* started and says nothing about what
+ * time of day it is; the clock is epoch milliseconds, on the server's own
+ * `Date.now()`, and it is what `sky/cycle.skyClock` is evaluated against so that
+ * every client in a room has the street lights on together. See
+ * `PROTOCOL_VERSION`'s v11 note for why a raw clock rather than a phase.
+ *
+ * It is written as late as possible -- in `encodeWelcome` itself would be later
+ * still, and is not done, because a message you cannot construct twice and
+ * compare is a message with no round-trip test. `server/room.welcome` reads the
+ * clock on the line above the call.
+ *
+ * **One-way latency is the whole of the error and it does not matter.** The
+ * client stamps its own `Date.now()` when the frame arrives, so the offset it
+ * derives is out by however long the packet took -- call it 10 to 100 ms. A
+ * cycle is 3,600,000 ms, so 100 ms is 0.003% of a day: a fortieth of a game
+ * second. There is deliberately no clock-sync loop, no round-trip correction and
+ * no drift tracking, because the thing being fixed was clients disagreeing by
+ * *minutes* and anything that measures in milliseconds is already exact enough.
  *
  * The spawn is in here rather than left to the first snapshot because the client
  * has to place its own predicted body *before* it can predict anything, and a
@@ -942,7 +1012,7 @@ export function quantisePing(ms: number): number {
  * reason: so the "invite a friend" link it builds names the room it is actually
  * standing in. See `server/index.ts`'s `/rooms`.
  */
-export const WELCOME_BYTES = 27;
+export const WELCOME_BYTES = 35;
 
 export interface Welcome {
   version: number;
@@ -956,6 +1026,13 @@ export interface Welcome {
   y: number;
   z: number;
   yaw: number;
+  /**
+   * The server's `Date.now()` when this was written, epoch ms. v11.
+   *
+   * **The one clock the day/night cycle is allowed to run on.** See the layout
+   * note above and `PROTOCOL_VERSION`'s v11 paragraph.
+   */
+  clockMs: number;
 }
 
 export function encodeWelcome(w: Welcome): ArrayBuffer {
@@ -972,6 +1049,12 @@ export function encodeWelcome(w: Welcome): ArrayBuffer {
   v.setInt32(17, quantisePos(w.y), true);
   v.setInt32(21, quantisePos(w.z), true);
   v.setUint16(25, quantiseYaw(w.yaw), true);
+  // Not quantised and not offset from an epoch. A `f64` holds every integer
+  // millisecond exactly out to 2^53, which is the year 287396, so the honest
+  // encoding is also the cheapest one -- and any narrower field would need an
+  // epoch constant that both ends have to keep agreeing about, which is the
+  // class of bug this field exists to remove rather than to add.
+  v.setFloat64(27, w.clockMs, true);
   return buffer;
 }
 
@@ -990,6 +1073,7 @@ export function decodeWelcome(buffer: ArrayBuffer): Welcome | null {
     y: dequantisePos(v.getInt32(17, true)),
     z: dequantisePos(v.getInt32(21, true)),
     yaw: dequantiseYaw(v.getUint16(25, true)),
+    clockMs: v.getFloat64(27, true),
   };
 }
 
@@ -1112,7 +1196,7 @@ export const PLAYER_BYTES = 22;
  *     u16  thrower             the combatant id, for "is this mine" and the audio
  *     i32  x, y, z             millimetres, as every position on this wire is
  *     i8   vx, vy, vz          half-metres a second
- *     u8   bounces             0..3
+ *     u8   bounces             0..`footy.MAX_BOUNCES`, which is 30 and still a byte
  *
  * **Why the velocity is on the wire at all**, when a player's is not: a ball
  * moves 1.4 m between snapshots where a sprinting player moves 0.4 m, so the two
@@ -3162,10 +3246,36 @@ export function verifyNet(): string[] {
 
   // --- Welcome, pong and bye.
   {
-    const w: Welcome = { version: PROTOCOL_VERSION, id: 3, colourway: 5, snapshotHz: SNAPSHOT_HZ, room: 7, tick: 4000000000, x: -812.34, y: 15.5, z: 1420.99, yaw: 4.2 };
+    const w: Welcome = { version: PROTOCOL_VERSION, id: 3, colourway: 5, snapshotHz: SNAPSHOT_HZ, room: 7, tick: 4000000000, x: -812.34, y: 15.5, z: 1420.99, yaw: 4.2, clockMs: 1_800_000_123_456 };
     const got = decodeWelcome(encodeWelcome(w));
     if (!got || got.id !== 3 || got.tick !== 4000000000 || Math.abs(got.x - w.x) > 0.01 || Math.abs(got.z - w.z) > 0.01) {
       failures.push('A WELCOME did not round-trip. A tick over 2^31 is the usual cause -- it is a u32.');
+    }
+    /* v11's clock, and it is checked for **exactness** rather than for a
+     * tolerance, which is the whole reason it is an `f64`.
+     *
+     * A clock that came back a millisecond out would still produce a perfectly
+     * plausible sky -- 1 ms of a 3,600,000 ms cycle is nothing anybody could see
+     * -- so a tolerant check here would pass on a field that had been quietly
+     * narrowed to a `u32` and was wrapping every 49.7 days. The failure that
+     * causes is a room where the sun is in the wrong place for six weeks and
+     * then correct again, which nobody would ever trace to this line. Epoch
+     * milliseconds are integers well inside 2^53, so exact is the correct test.
+     */
+    if (!got || got.clockMs !== w.clockMs) {
+      failures.push(
+        `A WELCOME's clock came back as ${got?.clockMs} rather than ${w.clockMs}. It must be exact: ` +
+          `it is the wall clock the whole day/night cycle is evaluated against, and every narrower ` +
+          `encoding of an epoch millisecond either wraps or needs a second epoch constant both ends ` +
+          `have to agree about -- which is the disagreement this field exists to remove.`,
+      );
+    }
+    const late = decodeWelcome(encodeWelcome({ ...w, clockMs: 4_102_444_800_000 }));
+    if (!late || late.clockMs !== 4_102_444_800_000) {
+      failures.push(
+        `A WELCOME clock in the year 2100 came back as ${late?.clockMs}. The field is an f64 and must ` +
+          `stay one; a u32 of milliseconds ran out in 1970.`,
+      );
     }
     if (got && got.room !== 7) {
       failures.push(`A WELCOME's room came back as ${got.room}, not 7. A client would build the wrong invite link.`);

@@ -18,23 +18,46 @@
  * `world/footyball.ts` repeats it about the ball: there is no asset pipeline for
  * a downloaded mesh to enter, and a `.glb` would be the only thing in the
  * repository whose triangle budget, pivot and up-axis were decided somewhere
- * else. A cricket bat is a tapered box on a stick. It is 128 triangles of loft.
+ * else. A cricket bat is a box with square shoulders on a thin stick. It is 188
+ * triangles of loft.
  *
  * ---------------------------------------------------------------------------
- * The shape, and the two details that make it a *cricket* bat rather than a club.
+ * The shape, and the five details that make it a *cricket* bat rather than a
+ * paddle.
  *
- * A baseball bat is a solid of revolution and a cricket bat is not, and the
- * difference is the whole silhouette:
+ * The first version of this model was reported as *"the cricket bat looks like a
+ * paddle"*, and the report was right. Nothing was wrong with the cross-section;
+ * everything was wrong with the outline. A table-tennis bat and a cricket bat
+ * have the same *parts* -- a handle, a join, a flat face -- and are told apart
+ * entirely by how those parts meet. What was drawn was a blade that flared
+ * smoothly out of a thick handle over 70 mm and narrowed again at the end, which
+ * is a paddle's profile exactly, wearing a cricket bat's cross-section.
  *
- *   - **A flat face and a V spine.** The blade's hitting face is a plane; the
- *     back is a shallow roof rising from two thin edges to a central ridge.
- *     Seen end-on that is a seven-sided profile, and it is what says "cricket"
- *     from any angle where the bat is not exactly edge-on. The edges are
- *     chamfered into the face rather than meeting it square, because a square
- *     corner under `flatShading` reads as a dead black line.
- *   - **A cylindrical rubber grip**, dark, on a handle a bit under half the
- *     bat's length, with the pale splice showing where it meets the blade.
- *     Two materials' worth of contrast in one vertex-colour buffer.
+ * So, in the order the eye uses them:
+ *
+ *   - **Square shoulders.** The blade is at full width 30 mm below the shoulder,
+ *     not 70, and it starts that ramp at 40% width rather than 55. What a viewer
+ *     sees is a pair of corners where the handle meets the blade. See
+ *     `SHOULDER_FULL_Y`, which is the single number this whole pass is about.
+ *   - **A handle a third of the blade's width.** 42 mm against 125 -- a real
+ *     bat's 3.4 ratio, near enough -- where it used to be 60 against 125. A
+ *     handle that is half as wide as the blade gives the shoulder corner nothing
+ *     to be a corner of.
+ *   - **A squared toe.** Full width to the very end, losing only its depth over
+ *     the last 45 mm, so the blade ends in a flat rectangle. It used to narrow to
+ *     90% of its width, and a blade that narrows at the tip is a paddle.
+ *   - **A flat face and a spine that swells.** The blade's hitting face is a
+ *     plane; the back is a shallow roof rising from two thin edges to a central
+ *     ridge, and that ridge is 6% deeper over the middle of the blade than at
+ *     either end -- the bulge of wood you see side-on. Seen end-on the profile
+ *     is seven-sided, and the edges are chamfered into the face rather than
+ *     meeting it square, because a square corner under `flatShading` reads as a
+ *     dead black line.
+ *   - **A bound handle.** A dark rubber grip that *stops* above the shoulder, a
+ *     pale binding collar proud of the cane at the bottom of it, and bare splice
+ *     below that. Three materials' worth of contrast in one vertex-colour
+ *     buffer, and their job is to show the viewer the join: a join you cannot
+ *     see is read as one tapered object, which is the paddle again.
  *
  * The proportions are a real bat's, scaled to this figure. A Law 5 bat is 0.965 m
  * overall with a 0.559 m blade, on a person of about 1.80 m: 54% of their height,
@@ -129,11 +152,17 @@
  * looks at for 95% of the session is held to the cone.
  *
  * ---------------------------------------------------------------------------
- * Cost. 128 triangles and 237 vertices, one geometry and one material for the
+ * Cost. 188 triangles and 357 vertices, one geometry and one material for the
  * entire game, against `CharacterAssets`'s 440 triangles a figure. Sixteen
- * players with bats is 2,048 triangles in sixteen draws, which is a rounding
+ * players with bats is 3,008 triangles in sixteen draws, which is a rounding
  * error beside the 483 k of trees in the spawn frame. The viewmodel is one draw
  * more.
+ *
+ * The 60 triangles the shoulder, the spine swell and the squared toe cost over
+ * the paddle they replaced are two extra rings on the blade and one on the
+ * handle. The answer to "it looks like a paddle" was proportion, not detail:
+ * there is no new *feature* on this bat, only the same features in the places a
+ * cricket bat has them.
  */
 
 import {
@@ -159,8 +188,26 @@ import { CharacterActor, CharacterAssets, SELF_SHADOW_LAYER } from './character.
 
 /** Top of the rubber grip cap, above the attachment point. */
 const GRIP_CAP_Y = 0.028;
-/** Where the handle ends and the splice begins. */
+/** Where the rubber grip stops and the bare cane of the splice shows. */
+const GRIP_END_Y = -0.235;
+/** Where the handle ends and the blade begins. The shoulder. */
 const SHOULDER_Y = -0.315;
+/**
+ * Where the blade is at full width, and the single most important number in
+ * this file for whether it reads as a bat.
+ *
+ * 30 mm below the shoulder. A cricket bat's blade does not *grow* out of its
+ * handle -- the splice is let into a blade that is already 108 mm across, so the
+ * transition is a pair of near-square corners with about a 50-degree ramp under
+ * them, and the eye reads that corner as "cricket" before it reads anything
+ * else. This used to be 70 mm of smooth flare from 55% width, which is the same
+ * curve a table-tennis bat has between its handle and its face, and it is why
+ * the model came back as *"the cricket bat looks like a paddle"*. Everything
+ * else in this pass is second to this one.
+ */
+const SHOULDER_FULL_Y = -0.345;
+/** Where the toe's back bevel starts. The last 45 mm lose depth, not width. */
+const TOE_BEVEL_Y = -0.755;
 /** The toe. Overall length is `GRIP_CAP_Y - TOE_Y`. */
 const TOE_Y = -0.8;
 
@@ -171,11 +218,37 @@ export const BLADE_LENGTH = SHOULDER_Y - TOE_Y;
 /** Blade half-width at the edges, metres. A Law 5 bat is 0.108 m across. */
 const BLADE_HALF_WIDTH = 0.0625;
 
-/** Handle radii: the grip cap, the shaft, and the flare into the splice. */
-const GRIP_CAP_R = 0.03;
-const GRIP_TOP_R = 0.0245;
-const GRIP_WAIST_R = 0.0225;
-const GRIP_BASE_R = 0.03;
+/**
+ * Handle radii: the grip cap, the shaft, and the collar at the bottom of the
+ * rubber.
+ *
+ * **A third thinner than they were**, and this is the other half of the paddle
+ * fix. A cricket bat's handle is about 32 mm across against a 108 mm blade -- a
+ * ratio of 3.4 -- and a paddle's is barely half its face. These used to reach
+ * 60 mm against a 125 mm blade, a ratio of 2.1, which put the handle's silhouette
+ * inside the same family as the blade's and left nothing for the shoulder corner
+ * to be a corner *of*. At 42 mm the ratio is 3.0, and the grip now reads as a
+ * stick the blade is mounted on rather than as the narrow end of one object.
+ */
+const GRIP_CAP_R = 0.021;
+const GRIP_TOP_R = 0.0175;
+const GRIP_WAIST_R = 0.0158;
+const GRIP_END_R = 0.0182;
+
+/**
+ * The splice: bare cane between the rubber and the shoulder, with a proud
+ * binding collar at the top of it.
+ *
+ * Pale against a near-black grip and a mid-tone blade, so the eye is given the
+ * *join* -- which is where a cricket bat's handle visibly stops and a paddle's
+ * never does. The collar is 5 mm proud of the cane under it, which at this scale
+ * is one clear step in the silhouette rather than a stripe that only exists in
+ * the colour buffer.
+ */
+const COLLAR_Y = -0.252;
+const COLLAR_R = 0.0232;
+const SPLICE_R = 0.0225;
+const SPLICE_BASE_R = 0.0242;
 
 /** Sides on the handle. Eight, which is `character.ts`'s `LIMB_SIDES` and reads round enough at arm's length. */
 const HANDLE_SIDES = 8;
@@ -415,46 +488,71 @@ export class BatAssets {
     const spliceColours = [SPLICE];
 
     // --- The handle: a rubber grip, capped at the top so the bat is not a pipe
-    // seen end-on when it is shouldered and the toe is pointing at the sky.
+    // seen end-on when it is shouldered and the toe is pointing at the sky. It
+    // stops above the shoulder now -- see `GRIP_END_Y` -- because a grip that ran
+    // all the way into the blade is a paddle's handle.
     p.loft(
       round,
       [
         { y: GRIP_CAP_Y, sx: GRIP_CAP_R, sz: GRIP_CAP_R },
         { y: 0, sx: GRIP_TOP_R, sz: GRIP_TOP_R },
-        { y: -0.2, sx: GRIP_WAIST_R, sz: GRIP_WAIST_R },
-        { y: SHOULDER_Y, sx: GRIP_BASE_R, sz: GRIP_BASE_R },
+        { y: -0.14, sx: GRIP_WAIST_R, sz: GRIP_WAIST_R },
+        { y: GRIP_END_Y, sx: GRIP_END_R, sz: GRIP_END_R },
       ],
       roundColours,
       GRIP,
       { bottom: false, top: true },
     );
 
-    // --- The twine binding over the splice. Two rings and sixteen triangles, and
-    // it is the one piece of the bat that is pure signal: a pale collar at the
-    // join is what tells a viewer where the handle stops, which on a dark grip
-    // against a dark blade back is otherwise a guess.
+    // --- The splice: the bound collar at the bottom of the rubber and the bare
+    // cane below it, down to the shoulder. Pure signal, on the same argument the
+    // twine ring this replaces made and one step further: a pale *step* at the
+    // join tells a viewer where the handle stops, which on a dark grip against a
+    // dark blade back is otherwise a guess -- and the guess a viewer makes when
+    // they cannot see the join is "one tapered object", which is a paddle.
     p.loft(
       round,
       [
-        { y: -0.255, sx: 0.0305, sz: 0.0305 },
-        { y: -0.3, sx: 0.0335, sz: 0.0335 },
+        { y: GRIP_END_Y, sx: GRIP_END_R, sz: GRIP_END_R },
+        { y: COLLAR_Y, sx: COLLAR_R, sz: COLLAR_R },
+        { y: -0.3, sx: SPLICE_R, sz: SPLICE_R },
+        { y: SHOULDER_Y, sx: SPLICE_BASE_R, sz: SPLICE_BASE_R },
       ],
       spliceColours,
       SPLICE,
       { bottom: false, top: false },
     );
 
-    // --- The blade. Narrowed and thinned at the shoulder where it takes the
-    // splice, full section through the middle, and tapered at the toe -- a real
-    // blade loses most of its depth in the last 100 mm, which is the taper that
-    // makes the toe read as a toe rather than as a sawn-off end.
+    // --- The blade. Square shoulders, a spine that swells low, and a toe that
+    // is cut off square.
+    //
+    // Six rings, and every one of them is a silhouette decision:
+    //
+    //   `SHOULDER_Y`      40% wide -- the neck the splice is let into, barely
+    //                     wider than the cane above it.
+    //   `SHOULDER_FULL_Y` 100% wide, 30 mm later. **The corner.** See the
+    //                     constant; this is the line between a bat and a paddle.
+    //   -0.50             full section.
+    //   -0.62             106% deep -- the spine swells over the middle of the
+    //                     blade, which is where a real bat carries its wood and
+    //                     is the bulge you see side-on. Width is untouched: the
+    //                     back is a roof, and a roof gets taller, not wider.
+    //   `TOE_BEVEL_Y`     the depth starts to go.
+    //   `TOE_Y`           98.5% wide and 42% deep. **A squared toe.** The blade
+    //                     keeps its width to the very end and loses only its
+    //                     back, so the end cap is a flat rectangle. It used to
+    //                     narrow to 90% and that is a rounded paddle tip -- the
+    //                     one place a viewer looks to decide what shape a thing
+    //                     on the end of a stick is.
     p.loft(
       BLADE_PROFILE,
       [
-        { y: SHOULDER_Y, sx: 0.55, sz: 0.72 },
-        { y: -0.385, sx: 1, sz: 1 },
-        { y: -0.62, sx: 1, sz: 1 },
-        { y: TOE_Y, sx: 0.9, sz: 0.55 },
+        { y: SHOULDER_Y, sx: 0.4, sz: 0.5 },
+        { y: SHOULDER_FULL_Y, sx: 1, sz: 0.88 },
+        { y: -0.5, sx: 1, sz: 1 },
+        { y: -0.62, sx: 1, sz: 1.06 },
+        { y: TOE_BEVEL_Y, sx: 1, sz: 0.86 },
+        { y: TOE_Y, sx: 0.985, sz: 0.42 },
       ],
       BLADE_COLOURS,
       WILLOW_FACE,
@@ -1057,6 +1155,89 @@ export function verifyBat(): string[] {
       `The blade is ${(width * 1000).toFixed(0)} mm across; a Law 5 bat is 108 mm and this one is ` +
         `meant to be ${(BLADE_HALF_WIDTH * 2000).toFixed(0)}.`,
     );
+  }
+
+  // --- Silhouette: the three measurements that separate a bat from a paddle.
+  //
+  // Every one of these was *false* in the model that shipped and was reported as
+  // "the cricket bat looks like a paddle", and none of them shows in any check
+  // that already existed: the length was right, the width was right, the
+  // cross-section was right, the winding was right, the reach was right. What
+  // was wrong was the outline, which is the one property of a low-poly prop that
+  // decides what a player thinks they are holding.
+  //
+  // Measured off the vertex buffer in horizontal bands rather than read off the
+  // constants above, on `BatParts`'s own argument about the winding test: a check
+  // that compares a constant with itself through two lines of the same file is
+  // not a check.
+  {
+    const spanAt = (y0: number, y1: number): number => {
+      let widest = 0;
+      for (let i = 0; i < position.count; i++) {
+        const y = position.getY(i);
+        if (y < y0 || y > y1) continue;
+        const x = Math.abs(position.getX(i));
+        if (x > widest) widest = x;
+      }
+      return widest * 2;
+    };
+    const full = BLADE_HALF_WIDTH * 2;
+
+    // 1. Square shoulders. Full width within 40 mm of where the blade starts --
+    //    the corner a viewer reads as "cricket" before anything else.
+    const atShoulderFull = spanAt(SHOULDER_FULL_Y - 0.002, SHOULDER_FULL_Y + 0.002);
+    if (SHOULDER_Y - SHOULDER_FULL_Y > 0.04 || atShoulderFull < full * 0.95) {
+      failures.push(
+        `The blade takes ${((SHOULDER_Y - SHOULDER_FULL_Y) * 1000).toFixed(0)} mm to reach ` +
+          `${(atShoulderFull * 1000).toFixed(0)} mm of its ${(full * 1000).toFixed(0)} mm width. ` +
+          `Square shoulders are full width inside 40 mm; a longer flare than that is the taper a ` +
+          `table-tennis bat has between its handle and its face.`,
+      );
+    }
+
+    // 2. A handle a third of the blade. Measured over the whole grip and splice,
+    //    so a fat collar counts against it too.
+    const handle = spanAt(SHOULDER_Y + 0.001, GRIP_CAP_Y);
+    if (handle > full * 0.45) {
+      failures.push(
+        `The handle is ${(handle * 1000).toFixed(0)} mm across against a ${(full * 1000).toFixed(0)} mm ` +
+          `blade -- ${(handle / full).toFixed(2)} of it, where a cricket bat is under 0.35 and a ` +
+          `paddle is about a half. A handle this thick leaves the shoulder nothing to be a corner of.`,
+      );
+    }
+
+    // 3. A squared toe. The last 5 mm of the blade keep their width; a blade that
+    //    narrows at the tip is the shape of a paddle's face.
+    const toe = spanAt(TOE_Y - 0.001, TOE_Y + 0.005);
+    if (toe < full * 0.95) {
+      failures.push(
+        `The toe is ${(toe * 1000).toFixed(0)} mm across against a ${(full * 1000).toFixed(0)} mm ` +
+          `blade. A cricket bat's toe is cut off square and loses its depth, not its width.`,
+      );
+    }
+
+    // 4. And the spine swells. The back is deepest over the middle of the blade
+    //    rather than being a constant-section plank, which is the bulge the eye
+    //    reads side-on and the only part of the cross-section that varies.
+    const depthAt = (y0: number, y1: number): number => {
+      let back = -Infinity;
+      for (let i = 0; i < position.count; i++) {
+        const y = position.getY(i);
+        if (y < y0 || y > y1) continue;
+        const z = position.getZ(i);
+        if (z > back) back = z;
+      }
+      return back;
+    };
+    const middle = depthAt(-0.63, -0.61);
+    const nearToe = depthAt(TOE_BEVEL_Y - 0.002, TOE_BEVEL_Y + 0.002);
+    if (!(middle > nearToe * 1.05)) {
+      failures.push(
+        `The spine stands ${(middle * 1000).toFixed(1)} mm proud over the middle of the blade ` +
+          `against ${(nearToe * 1000).toFixed(1)} mm near the toe. A blade of constant section is ` +
+          `a plank, and a plank on a stick is a paddle.`,
+      );
+    }
   }
 
   // --- In the hand, and on the right bone.

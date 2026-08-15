@@ -416,7 +416,34 @@ export class StarField extends Mesh {
     material.transparent = true;
     material.blending = AdditiveBlending;
     material.depthWrite = false;
-    material.depthTest = false;
+    /**
+     * **Depth-tested, and it was not, and that is the whole of "for some reason
+     * stars are visible thru roofs".**
+     *
+     * The old pairing was `depthWrite = false, depthTest = false`, with a comment
+     * arguing that `renderOrder = -1` put this after the sky dome and before
+     * anything else transparent -- which is true, and is *not* what decides
+     * whether a roof hides a star. Three sorts the render list into an opaque
+     * pass and then a transparent one, and `renderOrder` only orders **within**
+     * a pass. A transparent material is therefore always drawn after every
+     * opaque triangle in the frame, so with the test off the field is painted
+     * over the finished picture: the roof, the awning, the inside of a station
+     * concourse, the tunnel lining. Stars through the ceiling, every night.
+     *
+     * Turning the test on is the whole fix and it costs nothing:
+     *
+     *   - The sky dome cannot eat them. `SkyMesh` ships `depthWrite = false`, so
+     *     the far field is still the cleared depth of 1.0 and this sphere at
+     *     15 km is comfortably in front of it. (`main.ts`'s far plane is 24 km,
+     *     which is what makes 15 km a real depth rather than a clipped one.)
+     *   - Nothing about the *look* moves anywhere the sky is actually visible: a
+     *     star only fails the test where geometry is already in front of it, and
+     *     where geometry is in front of it the star was wrong.
+     *   - `depthWrite` stays **false**. This is still an additive layer and it
+     *     must not write; the moon at 14 km is drawn after it and would start
+     *     failing a test against stars it is supposed to sit among.
+     */
+    material.depthTest = true;
     // The dome is not fogged and neither is this, for `sky.ts`'s reason: at
     // 15 km the range fog would resolve to exactly 1 and replace every star with
     // the fog colour.
@@ -426,8 +453,10 @@ export class StarField extends Mesh {
     this.directionAttr = direction;
     this.dataAttr = data;
     this.frustumCulled = false;
-    // After the sky dome, before anything else transparent. The dome writes no
-    // depth either, so this is ordering rather than occlusion.
+    // First of the transparents, so the moon and every additive night sprite
+    // composite over the field rather than under it. Ordering only: what decides
+    // whether a roof hides a star is the depth test above, and confusing the two
+    // is what put stars through every ceiling in the game.
     this.renderOrder = -1;
 
     const altitude = varying(float(0), 'starAltitude');

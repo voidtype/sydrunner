@@ -246,20 +246,34 @@ export const STAMINA_RECOVERY = 2.0;
  * nobody has to think about; that argument is right about the *melee*, where
  * every swing that reaches its window connects or misses by aim alone. A thrown
  * ball can miss by a metre for reasons the thrower could not have known -- a
- * target that changed direction during the 0.8 s of flight -- and a whole-bar
- * rule would punish that with four seconds of being unarmed at range. One ball
- * back every four seconds means a miss costs four seconds and a burst of three
- * costs twelve, which is the same total scarcity with the penalty in proportion
+ * target that changed direction during the flight -- and a whole-bar rule would
+ * punish that with the full refill of being unarmed at range. One ball back
+ * every `BALL_RECHARGE` means a miss costs one recharge and a burst of three
+ * costs three, which is the same total scarcity with the penalty in proportion
  * to what was actually spent.
  *
- * The 0.55 s floor between throws is what stops the whole bar going in one
- * frame. It is short enough to burst all three at a closing opponent, which is
- * the play the arc is meant to make available.
+ * **Both numbers were divided by 2.5**, which is the player's "restore 2.5x
+ * faster", and the floor went with the recharge rather than staying put. Two
+ * reasons for moving it as well. It is the same request -- "restore" is the bar
+ * coming back, and a bar that refills two and a half times faster behind a
+ * floor that did not move is a bar whose *burst* is unchanged, which is the
+ * half a player actually feels. And the two are related by construction: three
+ * balls at a 0.22 s floor puts the third 0.44 s after the first, still well
+ * inside one 1.6 s recharge, so the "burst three at a closing opponent, then
+ * pay for it" shape the bar was built around survives intact at the new rate.
+ *
+ * The floor is what stops the whole bar going in one frame. At 0.22 s it is
+ * thirteen ticks, which is comfortably enough for the input to be a decision
+ * rather than a mash -- but it is now **shorter** than the viewmodel's own
+ * recovery, which was 0.34 s and assumed the opposite. That is deliberate and
+ * argued at `footyball.THROW_SECONDS`: a burst of three now reads as three
+ * releases back to back rather than as the ball flickering in and out of the
+ * hand between them.
  */
 export const BALL_CHARGES = 3;
 /** Seconds per ball returned, counted from the last throw. See above. */
-export const BALL_RECHARGE = 4.0;
-export const BALL_COOLDOWN = 0.55;
+export const BALL_RECHARGE = 1.6;
+export const BALL_COOLDOWN = 0.22;
 
 /**
  * How long being hit takes control away, in seconds.
@@ -1731,18 +1745,40 @@ export function verifyCombat(): string[] {
     if (refused === 0) {
       failures.push('Holding the throw button never refused a ball. The supply bar does nothing.');
     }
-    // Three balls at a 0.55 s floor puts the third 1.10 s after the first, which
-    // is thrown on tick 0.
+    // The whole bar goes at the floor: three balls at `BALL_COOLDOWN` puts the
+    // third two floors after the first, which is thrown on tick 0.
     if (Math.abs(thirdAt - BALL_COOLDOWN * 2) > 0.05) {
       failures.push(
         `The third ball came ${thirdAt.toFixed(2)} s after the first; a ${BALL_COOLDOWN} s floor ` +
           `between throws makes that ${(BALL_COOLDOWN * 2).toFixed(2)} s.`,
       );
     }
-    // Ten seconds of held button is 600 ticks. The floor alone would allow
-    // eighteen; the bar plus the 4 s-per-ball refill caps it near five.
-    if (thrown > 7) {
-      failures.push(`Holding the throw button for 10 s threw ${thrown} balls. The bar is not limiting anything.`);
+    // Ten seconds of held button, against what the two constants predict rather
+    // than against a literal. The burst empties the bar, and everything after
+    // it arrives at one ball per `BALL_RECHARGE` -- so the count is the bar plus
+    // the refills that fit in what is left of the ten seconds, and the band is
+    // one either side for where the burst lands relative to a tick.
+    //
+    // Stated as arithmetic because both numbers just moved: at the old 4 s
+    // recharge this was five balls and the literal ceiling was seven, and at
+    // 1.6 s it is eight. A literal would have had to be re-guessed, and the
+    // failure it exists to catch -- a floor that does nothing, which at a 0.22 s
+    // cooldown is forty-five balls -- is caught by either. What a derived bound
+    // adds is the *other* side: a refill that silently stopped working comes out
+    // at three and a literal ceiling would never notice.
+    const burst = BALL_CHARGES;
+    const refills = Math.floor((10 - BALL_COOLDOWN * (BALL_CHARGES - 1)) / BALL_RECHARGE);
+    if (thrown > burst + refills + 1) {
+      failures.push(
+        `Holding the throw button for 10 s threw ${thrown} balls; a ${BALL_CHARGES}-ball bar ` +
+          `refilling every ${BALL_RECHARGE} s allows ${burst + refills}. The bar is not limiting anything.`,
+      );
+    }
+    if (thrown < burst + refills - 1) {
+      failures.push(
+        `Holding the throw button for 10 s threw only ${thrown} balls; a ${BALL_CHARGES}-ball bar ` +
+          `refilling every ${BALL_RECHARGE} s should give ${burst + refills}. The refill is not firing.`,
+      );
     }
 
     // The refill, from a known-empty bar, and the thing that distinguishes it

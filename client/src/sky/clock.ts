@@ -287,7 +287,7 @@ function setFillOpacity(el: SVGElement | null, value: number): void {
  * Constructed once by `main.ts` and fed the `SkyClock` the sky already computed
  * for the frame, rather than reading the wall clock itself. That is not a
  * micro-optimisation: it is what makes the HUD agree with the window while a
- * developer is scrubbing with `[` and `]`, which a clock with its own
+ * developer is scrubbing from a console, which a clock with its own
  * `Date.now()` would not.
  */
 export class SkyClockHud {

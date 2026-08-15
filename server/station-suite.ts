@@ -46,6 +46,12 @@
  *                     clearance, no drawn non-tunnel track sits under the
  *                     visible surface without a trench, and the deck stands the
  *                     right height over its own railhead.
+ *   8. **drawn**   -- **the solid and the picture are the same object.** Two
+ *                     claims, and gap 1 below is the hole they close: a body
+ *                     stopped by the railway with nothing the railway draws in
+ *                     front of it is an *invisible wall*, and a rail surface
+ *                     drawn with no ground answer under it is a *void*. See
+ *                     `DrawnField` and the block in the per-station loop.
  *
  * ---------------------------------------------------------------------------
  * WHAT IT RUNS AGAINST
@@ -168,7 +174,7 @@ import type { PedBand } from '../client/src/game/pedestrians.ts';
  * this writes to disk, and a second list of names beside it is a second list to
  * keep in step.
  */
-const CHECKS = ['reach', 'stand', 'holes', 'clear', 'ttt', 'tworld', 'vert'] as const;
+const CHECKS = ['reach', 'stand', 'holes', 'clear', 'ttt', 'tworld', 'vert', 'drawn'] as const;
 type CheckId = (typeof CHECKS)[number];
 
 /**
@@ -775,6 +781,280 @@ function carPlanProbes(b: CarBox, out: number[]): void {
   }
 }
 
+// --- Check 8's instrument: what the railway actually draws ---------------------------
+
+/**
+ * The top of everything `world/rail-geo.ts` draws, per square of ground.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS EXISTS.
+ *
+ * This file's own header names it as gap 1 and as *"the next thing this file
+ * should grow"*: `rail-geo` draws a great deal that registers no collision
+ * prism, and registers prisms whose shape is not the shape it drew, and neither
+ * direction of that mismatch was visible to any of the first seven checks. The
+ * player's report is the second direction in four words -- *"random invisible
+ * walls that slow me down a lot, i have no pattern to give you"* -- and a defect
+ * with no pattern is exactly the kind that has to be swept for rather than
+ * walked into.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY IT IS A RASTER AND NOT A QUERY, AND WHY IT KEEPS EDGES.
+ *
+ * `RailWorld.group` is a `Group` of `Mesh`es with real `BufferGeometry` on this
+ * process -- `rail-geo` runs headless under bun and the suite already builds one
+ * -- so the drawn world is available as triangles and nothing has to be
+ * re-derived. What is *not* available is a "what is drawn at (x, z)" function,
+ * and the naive one is wrong in the one case that matters: a **vertical** face
+ * has zero plan area, so a point-in-triangle test finds no trench wall, no
+ * platform riser, no parapet and no station wall anywhere in the city. A raster
+ * with the three edges walked into it as well as the interior filled records a
+ * vertical face in the columns it stands in, which is what a walking body meets.
+ *
+ * Half-metre cells, which is inside `PLAYER_RADIUS` (0.34 m) doubled: a wall the
+ * body's cylinder can touch is a wall in one of the cells the query reads.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT IT DELIBERATELY DOES NOT CONTAIN, SAID OUT LOUD.
+ *
+ * **The city.** Buildings are `tiles/<key>.glb`, which this process never loads
+ * and has no decoder for, so a body stopped by a building would read as stopped
+ * by nothing. That is why check 8 does not ask "was the body stopped" but "was
+ * the body stopped **by the railway**" -- the walk is run twice, once with
+ * `RailPrisms` attached and once with it detached, and only a stop that clears
+ * when the railway comes out is attributed here. A building can therefore never
+ * be blamed on the railway, at the cost of check 8 saying nothing at all about
+ * buildings. Measured at Rockdale: 232 bodies stopped, 80 of them by the
+ * railway. The other 152 are the city and are somebody else's round.
+ */
+class DrawnField {
+  private readonly top: Float64Array;
+  /**
+   * The highest **near-level** drawn surface per cell, which is a different
+   * question from `top` and the reason there are two grids.
+   *
+   * `top` answers "what would stop a body walking into this square", so a
+   * vertical face has to be in it and is put there by the edge walk. `level`
+   * answers "what could a body be *standing* on here", and a boundary fence is
+   * emphatically not that: it is 1.8 m of vertical panel whose top the edge walk
+   * records, and reading `top` for check 8b reported every fence post in Sydney
+   * as a floor over a 1.8 m void. Measured before this split: 2,994 voids at
+   * Rockdale, essentially all of them fence and parapet.
+   *
+   * Filled from the triangle interior only, and only where the face is within
+   * about 45 degrees of level -- which is the same slope a body can walk up.
+   */
+  private readonly level: Float64Array;
+  private readonly n: number;
+  private readonly x0: number;
+  private readonly z0: number;
+
+  constructor(
+    centreX: number,
+    centreZ: number,
+    private readonly reach: number,
+    private readonly cell: number,
+  ) {
+    this.n = Math.ceil((2 * reach) / cell);
+    this.x0 = centreX - reach;
+    this.z0 = centreZ - reach;
+    this.top = new Float64Array(this.n * this.n).fill(-Infinity);
+    this.level = new Float64Array(this.n * this.n).fill(-Infinity);
+  }
+
+  private mark(x: number, z: number, y: number, walkable: boolean): void {
+    const ix = Math.floor((x - this.x0) / this.cell);
+    const iz = Math.floor((z - this.z0) / this.cell);
+    if (ix < 0 || iz < 0 || ix >= this.n || iz >= this.n) return;
+    const c = iz * this.n + ix;
+    if (y > this.top[c]) this.top[c] = y;
+    if (walkable && y > this.level[c]) this.level[c] = y;
+  }
+
+  /** Walk a `THREE.Object3D` tree and burn every triangle into the grid. */
+  add(obj: SceneNode): number {
+    let count = 0;
+    const geom = obj.geometry;
+    // Instanced sets -- sleepers, masts -- carry one geometry and a transform
+    // buffer this never reads. They are also never what stops anybody: a
+    // sleeper is 0.2 m tall and inside the ballast, and a mast is a 0.14 m post
+    // with a prism nobody registers. Skipped rather than mis-placed at the
+    // origin, which is what reading their untransformed buffer would do.
+    if (obj.isMesh === true && obj.isInstancedMesh !== true && geom !== undefined) {
+      const pos = geom.getAttribute('position');
+      const idx = geom.getIndex();
+      const total = idx === null || idx === undefined ? pos.count : idx.count;
+      for (let i = 0; i + 2 < total; i += 3) {
+        const i0 = idx ? idx.getX(i) : i;
+        const i1 = idx ? idx.getX(i + 1) : i + 1;
+        const i2 = idx ? idx.getX(i + 2) : i + 2;
+        const ax = pos.getX(i0), ay = pos.getY(i0), az = pos.getZ(i0);
+        const bx = pos.getX(i1), by = pos.getY(i1), bz = pos.getZ(i1);
+        const cx = pos.getX(i2), cy = pos.getY(i2), cz = pos.getZ(i2);
+        if (
+          Math.abs((ax + bx + cx) / 3 - (this.x0 + this.reach)) > this.reach ||
+          Math.abs((az + bz + cz) / 3 - (this.z0 + this.reach)) > this.reach
+        ) continue;
+        count++;
+        this.tri(ax, ay, az, bx, by, bz, cx, cy, cz);
+      }
+    }
+    for (const child of obj.children ?? []) count += this.add(child);
+    return count;
+  }
+
+  private tri(
+    ax: number, ay: number, az: number,
+    bx: number, by: number, bz: number,
+    cx: number, cy: number, cz: number,
+  ): void {
+    const lx = Math.min(ax, bx, cx), hx = Math.max(ax, bx, cx);
+    const lz = Math.min(az, bz, cz), hz = Math.max(az, bz, cz);
+    const d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+    // Is this a face a body could stand on? The plan area over the true area,
+    // which is `|ny|` of the unit normal without normalising anything: `d` is
+    // twice the signed plan area and the cross product's length is twice the
+    // true area. 0.7 is about 45 degrees, which is also roughly the slope
+    // `controller.step` stops walking up.
+    const ux1 = bx - ax, uy1 = by - ay, uz1 = bz - az;
+    const vx1 = cx - ax, vy1 = cy - ay, vz1 = cz - az;
+    const nX = uy1 * vz1 - uz1 * vy1;
+    const nY = uz1 * vx1 - ux1 * vz1;
+    const nZ = ux1 * vy1 - uy1 * vx1;
+    const nLen = Math.hypot(nX, nY, nZ);
+    const walkable = nLen > 1e-9 && Math.abs(nY) / nLen >= 0.7;
+    // The interior, sampled on the grid. Skipped for a triangle whose plan is a
+    // sliver -- `d` near zero is a vertical face and the edge walk below is the
+    // whole of it -- and for an absurdly large one, which nothing in `rail-geo`
+    // emits but a corrupt buffer would.
+    if (Math.abs(d) > 1e-9 && (hx - lx) * (hz - lz) < 40_000) {
+      for (let z = Math.floor(lz / this.cell) * this.cell; z <= hz + this.cell; z += this.cell) {
+        for (let x = Math.floor(lx / this.cell) * this.cell; x <= hx + this.cell; x += this.cell) {
+          const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d;
+          if (l1 < -0.02 || l1 > 1.02) continue;
+          const l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d;
+          if (l2 < -0.02 || l2 > 1.02) continue;
+          const l3 = 1 - l1 - l2;
+          if (l3 < -0.02 || l3 > 1.02) continue;
+          this.mark(x, z, l1 * ay + l2 * by + l3 * cy, walkable);
+        }
+      }
+    }
+    // ...and the three edges, at half a cell, carrying the *higher* of their two
+    // ends. A wall is what a walker has to climb, and the height they have to
+    // climb to is its top.
+    for (let e = 0; e < 3; e++) {
+      const px0 = e === 0 ? ax : e === 1 ? bx : cx;
+      const py0 = e === 0 ? ay : e === 1 ? by : cy;
+      const pz0 = e === 0 ? az : e === 1 ? bz : cz;
+      const px1 = e === 0 ? bx : e === 1 ? cx : ax;
+      const py1 = e === 0 ? by : e === 1 ? cy : ay;
+      const pz1 = e === 0 ? bz : e === 1 ? cz : az;
+      const len = Math.hypot(px1 - px0, pz1 - pz0);
+      const steps = Math.max(1, Math.ceil(len / (this.cell * 0.5)));
+      const hi = Math.max(py0, py1);
+      for (let k = 0; k <= steps; k++) {
+        const t = k / steps;
+        // Edges never mark `level`: an edge is a line, not a floor.
+        this.mark(px0 + (px1 - px0) * t, pz0 + (pz1 - pz0) * t, hi, false);
+      }
+    }
+  }
+
+  /** The highest thing the railway draws within `r` of a point, or -Infinity. */
+  highestWithin(x: number, z: number, r: number): number {
+    const span = Math.ceil(r / this.cell);
+    const cx = Math.floor((x - this.x0) / this.cell);
+    const cz = Math.floor((z - this.z0) / this.cell);
+    let best = -Infinity;
+    for (let dz = -span; dz <= span; dz++) {
+      const iz = cz + dz;
+      if (iz < 0 || iz >= this.n) continue;
+      for (let dx = -span; dx <= span; dx++) {
+        const ix = cx + dx;
+        if (ix < 0 || ix >= this.n) continue;
+        const v = this.top[iz * this.n + ix];
+        if (v > best) best = v;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * The highest surface a body could **stand** on at a point, or `-Infinity`.
+   *
+   * `level` rather than `top`: check 8b asks whether a drawn floor has ground
+   * under it, and a fence panel is not a floor. See the field's own comment.
+   */
+  walkableAt(x: number, z: number): number {
+    const ix = Math.floor((x - this.x0) / this.cell);
+    const iz = Math.floor((z - this.z0) / this.cell);
+    if (ix < 0 || iz < 0 || ix >= this.n || iz >= this.n) return -Infinity;
+    return this.level[iz * this.n + ix];
+  }
+}
+
+/**
+ * The slice of `THREE.Object3D` `DrawnField` reads.
+ *
+ * Structural for `checkPlatformStanding`'s reason, restated once more: a
+ * `typeof import` of `three` drags the DOM lib into `server/tsconfig.json`.
+ */
+interface SceneNode {
+  isMesh?: boolean;
+  isInstancedMesh?: boolean;
+  children?: readonly SceneNode[];
+  geometry?: {
+    getAttribute(name: 'position'): { count: number; getX(i: number): number; getY(i: number): number; getZ(i: number): number };
+    getIndex(): { count: number; getX(i: number): number } | null;
+  };
+}
+
+/** How high a step a body takes without jumping. `player/controller.STEP_HEIGHT`. */
+const BODY_STEP_M = 0.42;
+
+/**
+ * How far a body has to fall short of a free walk before it counts as stopped.
+ *
+ * Six tenths, and it is a *fraction* rather than a distance because the player's
+ * report is about being **slowed**, not blocked: *"random invisible walls that
+ * slow me down a lot"*. A body sliding along a wall it should not have met makes
+ * good perhaps half its distance, and a threshold set at "did not move at all"
+ * would score every one of those as fine.
+ */
+const STOPPED_SHARE = 0.6;
+
+/**
+ * How far out check 8 rasterises, metres.
+ *
+ * The station envelope (`PLATFORM_HALF_LENGTH_M + 40` along, 45 across) plus
+ * enough that a body walked to the edge of it still has drawn geometry in front
+ * of it to be judged against. A raster that stopped at the envelope would call
+ * the far side of its own boundary undrawn.
+ */
+const DRAWN_REACH_M = 150;
+
+/**
+ * How far across the corridor check 8b looks for a void, metres.
+ *
+ * The trench, its cess, both platforms and the verge are inside twenty metres of
+ * the centreline. Past that the drawn surfaces are the boundary fence and the
+ * station house, and a fence panel is not a floor.
+ */
+const VOID_ACROSS_M = 20;
+
+/**
+ * How far either side of the rail head check 8b counts a surface as the floor
+ * of the railway, metres.
+ *
+ * Two, which holds the ballast top (0.2 m under the rail), the cess and the
+ * formation floor (a little under it), the trench floor, and the platform deck
+ * at `PLATFORM_TOP_M` 1.05 m over it. The canopy at 3.9 m over the deck, the
+ * footbridge at `BRIDGE_CLEAR` 8.4 m and the station house roof are all outside
+ * it, which is the point: those are roofs and a roof over air is a roof.
+ */
+const RAIL_PLANE_M = 2.0;
+
 // --- The suite ---------------------------------------------------------------------
 
 export interface StationSuiteResult {
@@ -844,7 +1124,11 @@ export async function runStationSuite(
       solids: unknown,
       cut: unknown,
       rawGround: (x: number, z: number) => number,
-    ) => { update(x: number, z: number): void };
+    ) => {
+      /** The drawn railway, for check 8. See `DrawnField`. */
+      group: SceneNode;
+      update(x: number, z: number): void;
+    };
   };
 
   // --- The two ground queries -----------------------------------------------------
@@ -946,6 +1230,38 @@ export async function runStationSuite(
       step(s, { forward: 1, right: 0, jump: false, sprint: false, yaw, pitch: 0 }, 1 / 60, world.collision, ground);
     }
     return { x: s.position.x, z: s.position.z, feet: s.position.y - EYE_HEIGHT };
+  };
+
+  /**
+   * Walk on a fixed heading for `secs` and report how far was made good.
+   *
+   * `walk` above steers at a target every tick, which is right for "can this
+   * body reach the deck" and wrong for check 8: a body that steers round an
+   * obstacle still arrives, and what check 8 measures is *being obstructed*. A
+   * constant heading makes distance made good the observable.
+   *
+   * One settling tick before the clock starts, with no input, so the run begins
+   * from where the body actually stands rather than from where it was dropped --
+   * otherwise the first frames are a fall and every body reads as slowed.
+   */
+  const walkYaw = (
+    sx0: number, sz0: number, sy: number, yaw: number, secs: number,
+  ): { x: number; z: number; feet: number; made: number } => {
+    const s = createPlayerState(sx0, sz0);
+    s.position.y = sy + EYE_HEIGHT;
+    const still = { forward: 0, right: 0, jump: false, sprint: false, yaw, pitch: 0 };
+    step(s, still, 1 / 60, world.collision, clientGround);
+    const bx = s.position.x;
+    const bz = s.position.z;
+    const steps = Math.round(secs * 60);
+    const go = { forward: 1, right: 0, jump: false, sprint: false, yaw, pitch: 0 };
+    for (let i = 0; i < steps; i++) step(s, go, 1 / 60, world.collision, clientGround);
+    return {
+      x: s.position.x,
+      z: s.position.z,
+      feet: s.position.y - EYE_HEIGHT,
+      made: Math.hypot(s.position.x - bx, s.position.z - bz),
+    };
   };
 
   /** Stand still and let gravity have its say. Where does the body come to rest? */
@@ -1069,6 +1385,12 @@ export async function runStationSuite(
   let splitsBefore = 0;
   let worstSplitBefore = 0;
   let worstSplitBeforeAt = '';
+  /** Check 8's whole-city totals. See the assertions at the foot of this file. */
+  let drawnTriangles = 0;
+  let drawnStops = 0;
+  let drawnRailStops = 0;
+  let drawnInvisible = 0;
+  let drawnVoids = 0;
 
   const builtRadius2 = world.index.radius_m * world.index.radius_m;
   const tileKeys = new Set(world.index.tiles.map((t) => t.key));
@@ -1092,7 +1414,7 @@ export async function runStationSuite(
       name: station.name,
       dist,
       served: station.servedDirs.length > 0,
-      verdicts: { reach: 'n/a', stand: 'n/a', holes: 'n/a', clear: 'n/a', ttt: 'n/a', tworld: 'n/a', vert: 'n/a' },
+      verdicts: { reach: 'n/a', stand: 'n/a', holes: 'n/a', clear: 'n/a', ttt: 'n/a', tworld: 'n/a', vert: 'n/a', drawn: 'n/a' },
       notes: {},
     };
     rows.push(row);
@@ -1769,6 +2091,178 @@ export async function runStationSuite(
       row.verdicts.vert = bits.length === 0 ? 'PASS' : 'FAIL';
       if (bits.length > 0) row.notes.vert = bits.join('; ');
     }
+
+    // === 8. drawn =====================================================================
+    //
+    // The solid and the picture, held against each other. See `DrawnField` for
+    // why this is a raster, why it keeps triangle edges, and why the city is
+    // deliberately not in it.
+    {
+      const field = new DrawnField(sx, sz, DRAWN_REACH_M, opts.deep ? 0.5 : 0.75);
+      const triangles = field.add(rail.group);
+      const ux = station.siteDx || 1;
+      const uz = station.siteDz || 0;
+      const nx = -uz;
+      const nz = ux;
+
+      // --- 8a. A body the railway stops, with nothing the railway draws in
+      //     front of it.
+      //
+      //     Two sweeps of the same bodies, `RailPrisms` apart, and only the
+      //     difference is attributed. The second sweep is run over the bodies
+      //     that stopped rather than over the whole lattice: at Rockdale that is
+      //     232 walks rather than 2,624, which is the difference between this
+      //     check costing a second a station and costing ten.
+      const ALONG8 = PLATFORM_HALF_LENGTH_M + 40;
+      const ACROSS8 = 45;
+      const grid = opts.deep ? 6 : 10;
+      const headings = opts.deep ? 4 : 2;
+      const SECS = 1.2;
+      const free = 4.4 * SECS * STOPPED_SHARE;
+
+      interface Attempt { x0: number; z0: number; y0: number; yaw: number; endX: number; endZ: number; feet: number }
+      const stops: Attempt[] = [];
+      let walked = 0;
+      for (let a = -ALONG8; a <= ALONG8; a += grid) {
+        for (let c = -ACROSS8; c <= ACROSS8; c += grid) {
+          const x0 = sx + ux * a + nx * c;
+          const z0 = sz + uz * a + nz * c;
+          const terr = world.terrain.height(x0, z0);
+          if (!Number.isFinite(terr)) continue;
+          const g0 = clientGround(x0, z0, terr + 0.1);
+          if (!Number.isFinite(g0)) continue;
+          for (let h = 0; h < headings; h++) {
+            const yaw = (h * 2 * Math.PI) / headings;
+            walked++;
+            const p = walkYaw(x0, z0, g0 + 0.05, yaw, SECS);
+            if (p.made > free) continue;
+            stops.push({ x0, z0, y0: g0 + 0.05, yaw, endX: p.x, endZ: p.z, feet: p.feet });
+          }
+        }
+      }
+
+      // The same bodies, with the railway out of the collision world.
+      rails.detach();
+      const railsFault: Attempt[] = [];
+      for (const s of stops) {
+        const p = walkYaw(s.x0, s.z0, s.y0, s.yaw, SECS);
+        if (p.made > free) railsFault.push(s);
+      }
+      rails.attach();
+
+      let invisible = 0;
+      let firstWall = '';
+      for (const s of railsFault) {
+        // What does the railway draw just ahead of where this body came to
+        // rest? A metre out along its own heading, and a metre's radius round
+        // that -- `PLAYER_RADIUS` is 0.34 m, so the wall it hit is inside that
+        // disc if it was drawn at all.
+        const ahead = field.highestWithin(
+          s.endX + -Math.sin(s.yaw) * 0.9,
+          s.endZ + -Math.cos(s.yaw) * 0.9,
+          1.0,
+        );
+        if (ahead > s.feet + BODY_STEP_M) continue;
+        invisible++;
+        if (firstWall === '') firstWall = `${s.endX.toFixed(0)},${s.endZ.toFixed(0)}`;
+      }
+
+      // --- 8b. A rail surface drawn with no ground under it: the void.
+      //
+      //     *"still have gaping void under the tracks at times"*, and
+      //     *"my train was floating in rockdale station, no platform in site"*.
+      //     Asked of the drawn raster rather than of `rail-geo`'s intentions: a
+      //     cell where the railway drew a near-level surface and the ground
+      //     query answers more than a step below it is a floor a body falls
+      //     through, whatever was meant to hold it up.
+      //
+      //     **Restricted to the rail plane**, and the restriction is measured
+      //     rather than tidy. Without it this counted 2,202 of 2,541 samples at
+      //     Rockdale, because `rail-geo` draws a great many level surfaces that
+      //     are roofs rather than floors -- the canopy 3.9 m over the deck, the
+      //     shelter, the station house, the lid of every bin and the cap of
+      //     every lamp column -- and the ground query correctly declines under
+      //     all of them. A roof over open air is a roof.
+      //
+      //     What the three reports are about is the surface the train and the
+      //     passengers are on: the ballast, the cess, the formation floor and
+      //     the platform deck, all of which sit inside two metres of the rail
+      //     head. That band is the filter, and `railNear` is the rail head.
+      const nearSegs = net.segments.filter(
+        (s2) => !drawnAsTunnel(s2.flags) &&
+          Math.hypot((s2.ax + s2.bx) / 2 - sx, (s2.az + s2.bz) / 2 - sz) < 300,
+      );
+      /** The rail head over a point, or NaN where no track is near enough. */
+      const railNear = (x: number, z: number): number => {
+        let best = Number.NaN;
+        let bestD = 30 * 30;
+        for (const s2 of nearSegs) {
+          // The closest point of the segment, clamped to its own ends.
+          const t = Math.max(0, Math.min(s2.len, (x - s2.ax) * s2.ux + (z - s2.az) * s2.uz));
+          const px2 = s2.ax + s2.ux * t;
+          const pz2 = s2.az + s2.uz * t;
+          const d = (px2 - x) ** 2 + (pz2 - z) ** 2;
+          if (d >= bestD) continue;
+          bestD = d;
+          best = s2.ay + ((s2.by - s2.ay) * t) / Math.max(1e-6, s2.len);
+        }
+        return best;
+      };
+
+      let voids = 0;
+      let voidSamples = 0;
+      let worstVoid = 0;
+      let worstVoidAt = '';
+      const vstep = opts.deep ? 1.0 : 2.0;
+      for (let a = -ALONG8; a <= ALONG8; a += vstep) {
+        for (let c = -VOID_ACROSS_M; c <= VOID_ACROSS_M; c += vstep) {
+          const x = sx + ux * a + nx * c;
+          const z = sz + uz * a + nz * c;
+          const drawnTop = field.walkableAt(x, z);
+          if (!Number.isFinite(drawnTop)) continue;
+          const terr = world.terrain.height(x, z);
+          if (!Number.isFinite(terr)) continue;
+          // The rail plane, and only it. See the paragraph above for what the
+          // other 87% of the samples turned out to be.
+          const rail0 = railNear(x, z);
+          if (!Number.isFinite(rail0)) continue;
+          if (drawnTop < rail0 - RAIL_PLANE_M || drawnTop > rail0 + RAIL_PLANE_M) continue;
+          voidSamples++;
+          const g = clientGround(x, z, drawnTop + 0.1);
+          const fall = drawnTop - g;
+          if (!(fall > 1.0)) continue;
+          voids++;
+          if (fall > worstVoid) {
+            worstVoid = fall;
+            worstVoidAt = `${x.toFixed(0)},${z.toFixed(0)}`;
+          }
+        }
+      }
+
+      const drawnFail = invisible > 0 || voids > 0;
+      row.verdicts.drawn = triangles === 0 ? 'n/a' : drawnFail ? 'FAIL' : 'PASS';
+      if (drawnFail) {
+        const bits2: string[] = [];
+        if (invisible > 0) {
+          bits2.push(
+            `${invisible} of ${railsFault.length} bodies the railway stopped had nothing it draws ` +
+              `in front of them (first at ${firstWall}); ${stops.length} of ${walked} walks stopped at all`,
+          );
+        }
+        if (voids > 0) {
+          bits2.push(
+            `${voids}/${voidSamples} drawn rail surfaces stand over no ground ` +
+              `(worst ${worstVoid.toFixed(1)} m at ${worstVoidAt})`,
+          );
+        }
+        row.notes.drawn = bits2.join('; ');
+      }
+      drawnTriangles += triangles;
+      drawnStops += stops.length;
+      drawnRailStops += railsFault.length;
+      drawnInvisible += invisible;
+      drawnVoids += voids;
+    }
   }
 
   // --- The negative controls, against the real world -------------------------------------
@@ -1977,7 +2471,7 @@ export async function runStationSuite(
   }
   emit(
     servedPerfect.length === served.length,
-    `${servedPerfect.length} of ${served.length} **served** stations pass all seven checks ` +
+    `${servedPerfect.length} of ${served.length} **served** stations pass all eight checks ` +
       `(${perfect.length} of ${judged.length} counting the ${judged.length - served.length} the ` +
       `timetable never reaches, which pass mostly by not being asked)`,
   );
@@ -2002,6 +2496,33 @@ export async function runStationSuite(
       `splits at ${splitsBefore.toLocaleString()} of ${clientServerSamples.toLocaleString()} samples` +
       (splitsBefore > 0 ? ` (worst ${worstSplitBefore.toFixed(1)} m at ${worstSplitBeforeAt})` : '') +
       `. A pass above with nothing here would mean the comparison cannot see a divergence`,
+  );
+
+  // Check 8's whole-city numbers, reported whatever the per-station verdicts
+  // said, because the ratio is the finding: how much of what stops a body in a
+  // station is the railway at all, and how much of *that* is drawn.
+  emit(
+    drawnInvisible === 0,
+    `nothing solid the railway puts in a body's way is undrawn: over every station envelope, ` +
+      `${drawnStops.toLocaleString()} bodies were stopped, ${drawnRailStops.toLocaleString()} of them by the ` +
+      `railway rather than by the city, and ${drawnInvisible.toLocaleString()} of those had nothing ` +
+      `\`rail-geo\` draws within a metre of where they stopped`,
+  );
+  emit(
+    drawnVoids === 0,
+    `nothing the railway draws in the corridor stands over open air: ${drawnVoids.toLocaleString()} ` +
+      `drawn surfaces the ground query answers more than a metre below`,
+  );
+  // ...and the control, because zero above is also what a raster that read no
+  // geometry would say. If `rail-geo` ever stops building under bun -- a DOM
+  // reach in a constructor is all it would take -- `add` returns nothing, every
+  // body reads as walking into an invisible wall, and this line is what says so
+  // before the two above are believed either way.
+  emit(
+    drawnTriangles > 0,
+    `CONTROL: check 8's raster read ${drawnTriangles.toLocaleString()} drawn triangles out of ` +
+      `\`RailWorld.group\`. A zero here makes both claims above vacuous: nothing is drawn anywhere, ` +
+      `so every solid is an invisible wall and no drawn surface can be over a void`,
   );
 
   emit(
@@ -2072,7 +2593,7 @@ function renderCard(
       'and it is worked from the top.',
   );
   out.push('');
-  out.push('Columns are the seven checks. `n/a` means the station has no platform to ask about');
+  out.push('Columns are the eight checks. `n/a` means the station has no platform to ask about');
   out.push('(nothing calls there); `skip` means it is outside the built extent.');
   out.push('');
   out.push('| # | station | km | served | ' + CHECKS.join(' | ') + ' |');
@@ -2109,12 +2630,12 @@ function renderCard(
   out.push('|---|---:|---:|---:|');
   for (const c of CHECKS) out.push(`| ${c} | ${counts[c].pass} | ${counts[c].fail} | ${counts[c].na} |`);
   out.push('');
-  out.push(`**${servedPerfect} of ${served} served stations pass all seven.**`);
+  out.push(`**${servedPerfect} of ${served} served stations pass all eight.**`);
   out.push('');
   out.push(
     `${perfect} of ${rows.length} pass counting the ${rows.length - served} stations the timetable ` +
       'never reaches -- but those have no platform to walk onto and no train to hit anything, so ' +
-      'five of their seven columns are `n/a` and they pass by not being asked. The served number ' +
+      'five of their eight columns are `n/a` and they pass by not being asked. The served number ' +
       'is the one to work from.',
   );
   out.push('');
@@ -2215,4 +2736,76 @@ export function runControls(emit: (ok: boolean, line: string) => void): void {
   const square = new Float32Array([-5, -5, 5, -5, 5, 5, -5, 5]);
   emit(pointInsidePolygon(square, 0, 0), 'CONTROL: a point inside a square reads as inside it');
   emit(!pointInsidePolygon(square, 9, 0), 'CONTROL: and a point outside it does not');
+
+  // 4. `DrawnField`, and specifically the one property check 8 stands or falls
+  //    on: **a vertical face is found**.
+  //
+  //    A wall drawn as two triangles in a single plane has zero plan area, so
+  //    the obvious rasteriser -- fill the interior, point in triangle -- records
+  //    nothing for it anywhere. Every trench wall, platform riser, parapet and
+  //    station wall in the city is exactly that shape, and a check built on the
+  //    obvious rasteriser would report all of them as invisible and be believed,
+  //    because they *are* solid and it *would* find nothing drawn. The edge walk
+  //    in `DrawnField.tri` is the answer and this is the proof of it.
+  {
+    const field = new DrawnField(0, 0, 40, 0.5);
+    // A wall 10 m long and 3 m tall standing on the z = 0 line, as two
+    // triangles, in the x/y plane. Nothing about it has any plan extent.
+    const wall = meshOf([
+      0, 0, 0, 10, 0, 0, 10, 3, 0,
+      0, 0, 0, 10, 3, 0, 0, 3, 0,
+    ]);
+    const read = field.add(wall);
+    emit(read === 2, `CONTROL: the drawn raster read ${read} triangles of a two-triangle wall`);
+    emit(
+      field.highestWithin(5, 0, 1.0) >= 2.9,
+      `CONTROL: a vertical wall 3 m tall is found by the drawn raster at its own foot ` +
+        `(${field.highestWithin(5, 0, 1.0).toFixed(2)} m). A rasteriser that only filled triangle ` +
+        `interiors would answer -Infinity here and report every retaining wall in Sydney as invisible`,
+    );
+    emit(
+      !Number.isFinite(field.highestWithin(5, 20, 1.0)),
+      'CONTROL: ...and twenty metres away from it, nothing is drawn. A raster that answered ' +
+        'everywhere could never report an invisible wall at all',
+    );
+    // ...and the same wall is **not** a floor. This is the split between the
+    // two grids, and it is worth a control because collapsing them is the
+    // obvious simplification and it is wrong by 2,994 samples at Rockdale
+    // alone: check 8b would read the top of every fence panel and parapet in
+    // the city as a walkable surface standing over a void.
+    emit(
+      !Number.isFinite(field.walkableAt(5, 0)),
+      `CONTROL: ...and that wall is not a floor -- \`walkableAt\` answers ` +
+        `${field.walkableAt(5, 0)} at its foot. A fence is drawn and is not something to stand on`,
+    );
+    // And the horizontal case, which is check 8b's half: a slab is found over
+    // its own area rather than only along its edges.
+    const slab = meshOf([
+      20, 5, 20, 30, 5, 20, 30, 5, 30,
+      20, 5, 20, 30, 5, 30, 20, 5, 30,
+    ]);
+    field.add(slab);
+    emit(
+      Math.abs(field.walkableAt(25, 25) - 5) < 0.01,
+      `CONTROL: a level slab at 5 m reads as 5 m in the middle of itself (${field.walkableAt(25, 25).toFixed(2)})`,
+    );
+  }
+}
+
+/** A `SceneNode` over a flat triangle list, for the controls above. */
+function meshOf(xyz: readonly number[]): SceneNode {
+  const a = Float32Array.from(xyz);
+  return {
+    isMesh: true,
+    children: [],
+    geometry: {
+      getAttribute: () => ({
+        count: a.length / 3,
+        getX: (i: number) => a[i * 3],
+        getY: (i: number) => a[i * 3 + 1],
+        getZ: (i: number) => a[i * 3 + 2],
+      }),
+      getIndex: () => null,
+    },
+  };
 }

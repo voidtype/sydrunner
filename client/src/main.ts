@@ -3868,6 +3868,19 @@ async function main(): Promise<void> {
       // but the dither inside it is drawn per join and the server's draw is the
       // one that counts -- a client that kept its own would spend its first
       // snapshot being corrected across a hundred metres of park.
+      /* **The host's clock, adopted before anything is drawn.** Protocol v11.
+       *
+       * Outside the `if (w)` below because it is not about the spawn: a welcome
+       * that somehow carried no position still carries a clock, and the sky is
+       * on screen either way. `clockSkew` is `serverNow - localNow`, so a
+       * machine whose own clock is right gets a number in the tens of
+       * milliseconds and one that is four minutes fast gets -240,000 -- which
+       * used to be four minutes of private evening nobody could see.
+       *
+       * Here rather than in the frame loop, and once rather than every frame:
+       * the skew is a difference between two running clocks and stays correct
+       * for the session. See `net/client.clockSkewMs`. */
+      sky.setServerClock(client.clockSkew);
       const w = client.welcome;
       if (w) {
         dev.boot = 'ground at server spawn';
@@ -4638,17 +4651,46 @@ async function main(): Promise<void> {
     if (hud.typing) return;
     const held = keys.has(e.code);
     keys.add(e.code);
-    // The keyboard swing, for the path where pointer lock was refused and the
-    // left button is busy turning the camera. `held` makes it edge-triggered:
-    // key repeat would otherwise empty the stamina bar on one press.
+    /* **`F` is the torch, and what it displaced went one key along.**
+     *
+     * A player asked for the flashlight on `F`, which is where every game since
+     * Half-Life has put it, and `F` was already the keyboard swing -- the
+     * fallback for a browser that refuses pointer lock and leaves the left
+     * button busy turning the camera. Of the two claims on the key the torch's
+     * is much the stronger: the swing is a *fallback path* that most players
+     * never take, and the torch is a control every player uses every night.
+     *
+     * The swing is now `K`, which is not an arbitrary free letter. Its partner
+     * -- the footy throw -- has always been `L`, and the two have never been
+     * near each other; `K` and `L` are adjacent under the right hand while WASD
+     * is under the left, so the no-pointer-lock path finally has its two weapons
+     * side by side instead of one at each end of the keyboard. `index.html`'s
+     * `no pointer lock` section says so, and is the only place a player finds
+     * out either of them exists.
+     *
+     * Edge-triggered on `held`, like every toggle in this listener: key repeat
+     * would flip the torch at the repeat rate and would empty the stamina bar on
+     * one press of the swing.
+     */
     if (e.code === 'KeyF' && !held) {
+      // No audio unlock here, deliberately: this is the one binding in this
+      // block that makes no sound, and `enableAudio` on it would have the first
+      // press of the session cost a context resume for nothing.
+      const on = nightLights.toggleTorch();
+      // Said out loud, because the answer is invisible in daylight -- the beam
+      // is already at zero intensity above +2 degrees of solar altitude, so a
+      // player who presses this at noon gets no feedback at all and concludes
+      // the key is broken. See `nightLevel`.
+      hud.notice(on ? 'torch on' : 'torch off');
+    }
+    // `K` for the swing and `L` for the throw: the fallback path for a browser
+    // that refuses pointer lock, where a weapon bound only to a mouse button is
+    // a weapon that does not exist. Edge-triggered, or key repeat empties the
+    // stamina bar on one press.
+    if (e.code === 'KeyK' && !held) {
       punchBuffer = PUNCH_BUFFER;
       enableAudio();
     }
-    // `L` for the throw, on exactly `F`'s argument: pointer lock can be refused,
-    // and a weapon bound only to a mouse button is a weapon that does not exist
-    // on that path. Edge-triggered, because key repeat would empty the bar on
-    // one press.
     if (e.code === 'KeyL' && !held) {
       throwBuffer = PUNCH_BUFFER;
       enableAudio();
@@ -4673,17 +4715,33 @@ async function main(): Promise<void> {
     // level to `simulate`, and this only fires the audio unlock, because the
     // mount itself has to happen inside a fixed step to be predicted at all.
     if (e.code === 'KeyE' && !held) enableAudio();
-    // The four sky scrubs. The time of day now runs on its own and is the same
-    // for every player (see `sky/cycle.ts`), so these no longer *set* a time --
-    // they move an offset on the shared clock, which keeps running underneath.
-    // `T` is solar noon and `N` is the dead of night, both expressed as points
-    // on the cycle rather than as wall-clock times, because the cycle is what
-    // the sky is a function of. A player holding these disagrees with the server
-    // about the sky and about nothing else; `cycle.ts` says why that is safe.
-    if (e.code === 'BracketLeft') sky.advance(-30);
-    if (e.code === 'BracketRight') sky.advance(30);
-    if (e.code === 'KeyT') sky.scrubTo(0.5);
-    if (e.code === 'KeyN') sky.scrubTo(0.0);
+    /* **There are no sky scrubs on this keyboard any more, and the absence is
+     * the feature.**
+     *
+     * `[`, `]`, `T` and `N` used to move an offset on the time of day. Every one
+     * of them is gone, and what replaced them is that the *server* now says what
+     * time it is -- the `sky.setServerClock` call in the connect path above,
+     * off protocol v11's `WELCOME`.
+     *
+     * The reason is not that the scrub was expensive; it is that the sky is a
+     * **shared** fact and a client that can set its own is a client that
+     * disagrees with every other client about whether the street lights are on.
+     * The police and the raves both read `SkyClock.night`, so "it is only
+     * appearance" was already stretching. And this project has paid for exactly
+     * this shape of bug once: a `?vessels=1` link that outlived the server flag
+     * it was handed out with, where each end was individually correct and the
+     * player fell through solid roads. `/health` publishes `vessels` now so the
+     * two cannot silently differ, and it publishes the clock beside it for the
+     * same reason.
+     *
+     * The handles still exist for developers -- `sydney.sky.advance(30)`,
+     * `sydney.sky.scrubTo(0.75)`, `sydney.nightsky.moon(1)` -- on a console,
+     * which is a deliberate act rather than a letter next to WASD, and anybody
+     * who uses one is announced: `sky.tick` warns to the console on every change
+     * and `sydney.nightsky.now()` reports `desyncMinutes` until the page is
+     * reloaded. Not the HUD -- that belongs to the player and a developer-only
+     * state has no business on it. See `sky/sky.ts`'s `scrubMs`.
+     */
     if (e.code === 'Minus' || e.code === 'Equal') {
       renderScale = Math.max(0.5, Math.min(1.0, renderScale + (e.code === 'Equal' ? 0.05 : -0.05)));
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * renderScale);
@@ -4780,8 +4838,9 @@ async function main(): Promise<void> {
     // the control list has always had, it cannot be changed from script, and for
     // this panel it is the right sequence anyway: the box has buttons in it and
     // needs the cursor, so the press that frees the pointer is not a wasted one.
-    // `index.html`'s `#help` block says "esc — suggestions" so the first press is
-    // not a mystery.
+    // `index.html`'s `#help` block says "esc — suggestions · what's new · report
+    // a bug" -- all three tabs, on its own line and on screen at all times -- so
+    // the first press is not a mystery.
     //
     // The chat composer and the name prompt never reach this line: while either
     // has the keyboard `hud.typing` is true and this listener returned at its
@@ -6924,7 +6983,7 @@ async function main(): Promise<void> {
     sky.update(camera);
     // The clock, fed the sky's own instant rather than reading `Date.now()` for
     // itself -- which is what makes the HUD agree with the window while somebody
-    // is scrubbing with `[` and `]`. Cheap by construction: it compares four
+    // is scrubbing from a console. Cheap by construction: it compares four
     // numbers and touches the DOM only when the marker has moved a third of a
     // pixel or the game minute has rolled over. See `sky/clock.ts`.
     clockHud.update(sky.now);
@@ -8007,10 +8066,21 @@ async function main(): Promise<void> {
      *     sydney.nightsky.moon(1)          scrub to a night with a full moon up
      *     sydney.nightsky.moon(0.15, 0.78) a thin crescent just after sunset
      *     sydney.nightsky.cover(1)         force overcast; null hands it back
+     *     sydney.sky.scrubTo(0)            midnight -- what `N` used to be
+     *     sydney.sky.advance(30)           half an hour on -- what `]` used to be
+     *
+     * **The last two are here because they are not keys anywhere else any
+     * more.** The time of day is the server's as of protocol v11 and no
+     * keystroke moves it; these are the developer path, reachable only by
+     * opening a console, and anything that uses one puts a non-zero
+     * `desyncMinutes` in `now()` and a warning in the console until the page is
+     * reloaded. See `sky/sky.ts`'s `scrubMs` for the argument and `?vessels=1`
+     * for the precedent.
      *
      * `moon` is a *search*, not an override: it walks the 2,160 moons the cycle
      * carries and scrubs to the one that matches, so what you end up looking at
-     * is a sky the shipped game genuinely produces on some evening.
+     * is a sky the shipped game genuinely produces on some evening. It scrubs,
+     * so it desyncs, and it says so in `now()` like everything else here.
      *
      * `nightsky` rather than `night`, which is already taken by the street-lamp
      * rig -- and the two are genuinely different things: that one is what the
@@ -8019,6 +8089,15 @@ async function main(): Promise<void> {
     nightsky: {
       now: () => ({
         time: sky.now.label,
+        /* Whose clock this time is, and how far off it this client is.
+         *
+         * First two fields after the time on purpose: everything below is a
+         * measurement of the sky, and these two say whether the sky being
+         * measured is the one everybody else is looking at. `clockFromServer`
+         * false is offline (or a welcome that never came) and is legitimate;
+         * `desyncMinutes` non-zero means somebody in this tab scrubbed. */
+        clockFromServer: net?.clockFromServer ?? false,
+        desyncMinutes: Number((sky.desync / 60_000).toFixed(3)),
         cover: Number(sky.night.cover.toFixed(3)),
         urban: Number(sky.night.urban.toFixed(3)),
         skyglow: Number(sky.night.glow.toFixed(3)),

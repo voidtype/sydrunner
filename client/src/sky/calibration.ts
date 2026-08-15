@@ -147,32 +147,65 @@ export const HEMISPHERE_DAY = 3.4;
  * under a code value on a mid-grey surface -- so that the day/night pass changed
  * daylight only.
  *
- * **It is 0.33 now, and that ten per cent came from a player rather than from a
- * calculation.** Somebody who had played the night asked for the ground and the
- * building faces to come up "only like 10%", and the note is worth keeping
- * because it says exactly which term was meant: not the lamps, not the torch,
- * not the rave -- the *floor*, the light on everything that has no lamp near it,
- * which is what decides whether an unlit back street is a place or a wall. This
- * is the only number in the file that sets it.
+ * It was 0.33 for one pass after that, because somebody who had played the night
+ * asked for the ground and the building faces to come up "only like 10%". The
+ * note is worth keeping because it says exactly which term is meant: not the
+ * lamps, not the torch, not the rave -- the *floor*, the light on everything
+ * that has no lamp near it, which is what decides whether an unlit back street
+ * is a place or a wall. This is the only number in the file that sets it. Ten
+ * per cent was a seventh of a stop: `nightAmbientOnWall` went from 0.0631 to
+ * 0.0695 of luminance and a 0.25-albedo wall from a display value of 11 to 11.5.
+ * The paragraph that used to stand here said "the *next* ten per cent will feel
+ * just as small", and it was right.
  *
- * Ten per cent is a seventh of a stop and is deliberately below the threshold at
- * which anybody could name it in a screenshot. What it does is measurable rather
- * than visible: `nightAmbientOnWall` goes from 0.0631 to 0.0695 of luminance, so
- * a 0.25-albedo wall moves from a display value of about 12 to about 12.5. That
- * is the honest size of a ten per cent ask, and the reason to write it down is
- * that the *next* ten per cent will feel just as small. Every night term in the
- * second half of this file is quoted as a ratio to this floor, so four of these
- * in a row is a moonless street lit like an overcast afternoon with the lamps
- * contributing nothing anybody can see. `NIGHT_AMBIENT_FLOOR_MAX` is where that
- * stops being allowed to happen quietly.
+ * ---------------------------------------------------------------------------
+ * **IT IS 1.155 NOW: THE SAME PLAYER, BACK, WITH "I CANT SEE SHIT AT NIGHT RN"
+ * AND A NUMBER -- RAISE THE NIGHT AMBIENT BY 250 PER CENT.**
+ *
+ * 250% is 3.5x, taken literally, and the reason it survived being checked is
+ * that it lands almost exactly on the limit this file had already written down
+ * for itself. The floor goes 0.0695 -> 0.2431 of luminance on a shaded wall, and
+ * what that is worth on screen, through Lambert and `EXPOSURE`:
+ *
+ * ```
+ *                                  albedo 0.25 wall   asphalt 0.08   under a lamp
+ *   before  (floor 0.0695)                11               4              32
+ *   after   (floor 0.2431)                29              12              36
+ * ```
+ *
+ * A wall at 11 is a silhouette and 4 on the road is black -- which is the report,
+ * stated in display values. At 29 and 12 you can see a kerb, a parked car and a
+ * front fence with no lamp anywhere near you, and the sky above them is still
+ * black, which is what keeps it night. Nothing about the *sources* moved: the
+ * lamp pool is still 36 against the 12 beside it, the torch still blows out a
+ * wall at arm's length, and the lit windows and the rave are where they were.
+ *
+ * **Why 3.5x and not more, in this file's own terms.** Every night term below is
+ * quoted as a ratio to this floor, and the tightest of them is the one
+ * `verifyLightRig` actually asserts: the torch must put **4x the ambient on a
+ * wall 10 m away**, which is what makes a dark street navigable by torch rather
+ * than merely lighter. That ratio was 15.2x and is now **4.34x**. So the player's
+ * number is, to within a few per cent, the exact distance the floor can travel
+ * before the torch stops being the thing that lights a street -- and past it the
+ * torch, the lamps and the headlights would all have to be re-derived rather
+ * than nudged. `NIGHT_AMBIENT_FLOOR_MAX` has moved with the floor and is what
+ * stops the *next* request being served the same way.
+ *
+ * The moon is still an event and that was checked rather than hoped: everything
+ * in `skyglow.ts` is a multiple of this constant, so a full moon overhead still
+ * lands at 2.2x the moonless floor -- a wall at 45 against 29 -- and a first
+ * quarter still at 9% of that (see `MOON_PHASE_POWER`).
  *
  * **Daylight is untouched and provably so.** `solarRig` blends this to
  * `HEMISPHERE_DAY` on the civil-twilight ramp, which reaches exactly 1 at and
  * above 6 degrees of altitude, so the hemisphere at the 57.11-degree reference
  * instant is `HEMISPHERE_DAY` and nothing else. `verifyLightRig` asserts that
- * from the other end rather than trusting the arithmetic here.
+ * from the other end rather than trusting the arithmetic here. What *does* move
+ * with this is the middle of civil twilight, where the ramp is half way: the
+ * fill there goes from 1.87 to 2.28, a fifth of a stop on a sky that is already
+ * changing faster than that. There is nothing calibrated at that altitude.
  */
-export const HEMISPHERE_NIGHT = 0.33;
+export const HEMISPHERE_NIGHT = 1.155;
 
 /**
  * The ceiling on the night ambient floor, as luminance on a shaded wall.
@@ -187,14 +220,53 @@ export const HEMISPHERE_NIGHT = 0.33;
  * the headlights down with it, because every one of them is quoted as a ratio to
  * this floor.
  *
- * 0.09 is 1.3x where the rig sits today and 1.43x the 0.0631 every night term
- * below was originally quoted against -- half a stop. Half a stop is the point
- * at which those ratios stop describing the night that is actually on screen:
- * the lamp's "4x the floor at 20 m" and the torch's "4x at 10 m" are the
- * sentences that decide whether the city is navigable, and they are arithmetic
- * about this number. Anything past here needs the night re-derived, not nudged.
+ * **It was 0.09 and it is 0.25, and the move is the point rather than a
+ * formality.** 0.09 was half a stop of headroom over a floor of 0.0695;
+ * `HEMISPHERE_NIGHT` has since gone to 3.5x on a player's number and the floor
+ * with it, to 0.2431, so a ceiling left at 0.09 would simply have failed the
+ * build on the change it was meant to be judging. Moving it is therefore not the
+ * guard being weakened -- it is the guard being **re-measured against the thing
+ * it actually guards**, which is the ratio of the sources to the floor.
+ *
+ * The new number is derived from the tightest of those ratios rather than picked
+ * as round headroom. `verifyLightRig` requires the torch to put 4x the ambient
+ * on a wall at 10 m, and the torch puts 1.056 there; 1.056 / 4 = **0.264 of
+ * floor is the arithmetic ceiling**, at which the torch is exactly as bright as
+ * the night and does nothing. 0.25 sits just inside it, which leaves the current
+ * 0.2431 with about 3% of room -- deliberately almost none. There is no further
+ * increment of this constant available: the next request for a brighter night
+ * has to raise the *sources* and re-derive the table under `TORCH_INTENSITY`,
+ * which is the work that was avoided this time and cannot be avoided twice.
+ *
+ * What is on the other side of it is unchanged and is why the bound exists at
+ * all: past this point the city stops being lit by its lamps and starts being
+ * lit by nothing at all -- a flat, sourceless grey that reads as a broken
+ * exposure rather than as night, taking the street lamps, the torch and the
+ * headlights down with it, because every one of them is quoted as a ratio to
+ * this floor.
  */
-export const NIGHT_AMBIENT_FLOOR_MAX = 0.09;
+export const NIGHT_AMBIENT_FLOOR_MAX = 0.25;
+
+/**
+ * And the other end of the same bound, which used to be a bare `0.05` inside
+ * `verifyLightRig` and is a named constant now because its job changed.
+ *
+ * 0.05 was the *absent* threshold: below it a street with no lamp on it has no
+ * silhouette at all, because a silhouette needs the thing in front of the sky to
+ * be lit by something. That sentence is still true and 0.05 is still where it
+ * stops being true -- but with the floor at 0.2431 it is five times away, which
+ * means it no longer guards anything anybody would actually do.
+ *
+ * What needs guarding now is the *player's request*. "i cant see shit at night"
+ * was answered with one constant, and one constant is exactly as easy to halve
+ * as it was to raise -- by somebody a year from now who thinks the night looks
+ * washed out in the one screenshot they are judging, which it will, because a
+ * night that is comfortable to play in always looks flat in a still. 0.2 is just
+ * under the shipped 0.2431, so the answer cannot be quietly undone; anybody who
+ * genuinely means to take the night back down has to move this line and read the
+ * paragraph attached to it.
+ */
+export const NIGHT_AMBIENT_FLOOR_MIN = 0.2;
 
 /**
  * Hemisphere sky colour, linear, day and night endpoints.
@@ -469,18 +541,21 @@ export const SHADE_WARMTH_MIN = 0.95;
  *
  * Everything above this line is the sun and what it bounced off, and every one
  * of those terms reaches exactly zero when the sun sets -- which was correct
- * right up until the point somebody pressed `N` and found a city that goes dark
- * and stays dark. What is left after dark is `HEMISPHERE_NIGHT` (0.33) against
- * `SKY_FILL_NIGHT`, which puts **0.070 of luminance** on a vertical wall and
- * 0.083 on a horizontal one. Through Lambert at a 0.25 albedo and `EXPOSURE`
- * that is a display value of about 12: a silhouette, correctly, and nothing you
- * can walk through.
+ * right up until the point somebody scrubbed to midnight and found a city that
+ * goes dark and stays dark. What is left after dark is `HEMISPHERE_NIGHT`
+ * against `SKY_FILL_NIGHT`, which puts **0.243 of luminance** on a vertical wall
+ * and 0.292 on a horizontal one. Through Lambert at a 0.25 albedo and `EXPOSURE`
+ * that is a display value of about 29: a street you can walk down under a sky
+ * that is still black.
  *
- * (Those two figures were 0.063 and 0.076 until a player who had spent an
- * evening in it asked for the ground and the walls to come up about ten per
- * cent. The ratios below are unchanged to two figures by that move and are still
- * the calibration; `HEMISPHERE_NIGHT` carries the reasoning and
- * `NIGHT_AMBIENT_FLOOR_MAX` carries the bound.)
+ * (Those two figures were 0.063 and 0.076 when this rig was written, 0.070 and
+ * 0.083 after a player asked for ten per cent, and are 3.5x the latter after the
+ * same player came back with "i cant see shit at night rn". **The ratios quoted
+ * below have moved with it and every one of them has been restated**; they are
+ * the calibration and a stale ratio here is a sentence that quietly stops being
+ * about the game. `HEMISPHERE_NIGHT` carries the reasoning and
+ * `NIGHT_AMBIENT_FLOOR_MAX` carries the bound, which is now within 3% of the
+ * arithmetic limit.)
  *
  * So the city needs its own light after dark, and the numbers below are all
  * expressed against that floor rather than against taste. It is the *only*
@@ -522,15 +597,15 @@ export const NIGHT_ON_ALTITUDE = 2;
  * definition of "dark" and is 20:12 on the reference day.
  *
  * The span between the two is 8 degrees of altitude, which at Sydney's February
- * declination is **37 minutes of wall clock**. That matters more here than it
- * would in a game with a running clock, because this one has none: time moves
- * only when somebody presses a key, so the ramp is seen almost entirely by
- * scrubbing with `[` and `]`. At their half-hour step it reads 0.00 at 19:30,
- * 0.83 at 20:00 and 1.00 at 20:30 -- an intermediate state on the way, which is
- * the practical difference between a fade and a threshold. `N` and `T` are jumps
- * by construction and always were; what this rules out is a *value* with a cliff
- * in it, which is what `verifyNightLights` bounds by sweeping the ramp at a
- * twentieth of a degree.
+ * declination is 37 minutes of Sydney clock -- and, through the cycle, **187
+ * real seconds**. This paragraph used to say the game had no running clock and
+ * that the ramp was seen only by pressing a key; both halves stopped being true
+ * when `sky/cycle.ts` landed and the last of it went when the scrub keys did.
+ * Three minutes of real time is the whole of it now: long enough that a player
+ * watching the sky sees the lamps *come up* rather than switch on, short enough
+ * that "is it night yet" is never an interesting question for long. What this
+ * span rules out is a *value* with a cliff in it, which is what
+ * `verifyNightLights` bounds by sweeping the ramp at a twentieth of a degree.
  */
 export const NIGHT_FULL_ALTITUDE = -6;
 
@@ -539,19 +614,29 @@ export const NIGHT_FULL_ALTITUDE = -6;
  * irradiance on a surface square-on to it is `intensity / distance^2`.
  *
  * Set by where a torch has to be *usable*, not by where it looks brightest.
- * Against the 0.064 ambient floor above, 110 puts:
+ * Against the 0.243 ambient floor above, 110 puts:
  *
- *     2 m    27.5    430x ambient   blown, as a torch on a wall at arm's length is
- *     5 m     4.4     69x ambient   display ~115 on a 0.25 albedo: reading light
- *    10 m     1.1     17x ambient   display ~66: you can see what you are walking into
- *    20 m     0.275    4.3x         display ~34: shapes, no detail
- *    35 m     0.09     1.4x         the edge of useful
+ *     2 m    27.5    113x ambient   blown, as a torch on a wall at arm's length is
+ *     5 m     4.4     18x ambient   display ~115 on a 0.25 albedo: reading light
+ *    10 m     1.1     4.3x ambient  display ~66 against 29: what you are walking into
+ *    20 m     0.275   1.1x          the beam and the night are level here
+ *    35 m     0.09    0.4x          under the ambient; the throw ends before the cone does
  *    60 m     0        -            `TORCH_DISTANCE` cuts it off entirely
  *
- * The 35 m line is the one that was actually chosen. A torch that ran out at
+ * The 35 m line is the one that was originally chosen: a torch that ran out at
  * 15 m makes an intersection unreadable and a player walk into the middle of the
  * road to find the far kerb; one that reached 100 m is a searchlight and takes
  * the night away, which is the whole thing being built.
+ *
+ * **The bottom two rows are new and they are the cost of the 3.5x ambient**, not
+ * a change to this constant -- the beam is exactly as bright as it was and the
+ * night behind it is brighter. The torch is now a 15 m instrument rather than a
+ * 35 m one, which is the correct thing to lose: what it was doing at 35 m was
+ * telling you where the far kerb was, and the ambient now does that for free.
+ * Inside 10 m -- doorways, a lane, the inside of a shed, which is what the key
+ * is pressed for -- it is unchanged and still dominant. `verifyLightRig` asserts
+ * the 10 m ratio at 4x and it lands at 4.34, so this is the row that decides how
+ * much further `HEMISPHERE_NIGHT` can ever go: not much.
  */
 export const TORCH_INTENSITY = 110;
 
@@ -644,9 +729,14 @@ export const LAMP_REAL_COUNT = 2;
  *
  * A luminaire hangs 8.6 m up (see `LAMP_HEIGHT_FRACTION` in
  * `world/nightlights.ts`), so 70 puts 0.95 of irradiance straight down on the
- * road under it -- 15x the ambient floor, which on asphalt at 0.08 albedo is a
- * display value of about 35 against the 12 the ambient alone gives. That is a
+ * road under it -- 3.9x the ambient floor, which on asphalt at 0.08 albedo is a
+ * display value of about 36 against the 12 the ambient alone gives. That is a
  * pool you can see the kerb line in and not a puddle of daylight.
+ *
+ * (That ratio was 15x against the old 0.0695 floor and the display values were
+ * 35 against 4. The *pool* has not moved by a code value; what changed is the
+ * road between two lamps, and the 3:1 contrast left is still an obvious pool
+ * rather than a wash. See `HEMISPHERE_NIGHT` for why the road came up.)
  *
  * On the *facade* beside it the same lamp is much more visible, because a wall
  * 6 m away takes 1.94 and renders painted render at about 100 -- which is the
@@ -950,7 +1040,19 @@ export function solarRig(altitudeDeg: number): LightRig {
   // Civil-twilight ramp for the fill, so the sky half fades to a dim blue-grey
   // rather than switching off with the sun.
   const day = Math.min(Math.max((altitudeDeg + 6) / 12, 0), 1);
-  const hemisphereIntensity = HEMISPHERE_NIGHT + (HEMISPHERE_DAY - HEMISPHERE_NIGHT) * day;
+  // Written as `a(1-t) + bt` rather than the usual `a + (b - a)t`, and the
+  // difference is one ULP that `verifyLightRig` checks for exactly.
+  //
+  // `a + (b - a) * t` is exact at `t = 0` and only *nearly* exact at `t = 1`:
+  // the subtraction rounds, the multiply rounds, and the sum lands a bit off `b`.
+  // With the old endpoints that happened to cancel (0.33 + 3.07 == 3.4); when
+  // HEMISPHERE_NIGHT went to 1.155 it stopped cancelling and the day reference
+  // came out 3.4000000000000004, which failed the "the night endpoint has leaked
+  // into daylight" assertion below. That assertion is right to be exact -- it is
+  // holding up a page of calibrated display values -- so the *arithmetic* is what
+  // moved. This form is exact at both ends by construction: at `t = 1` the first
+  // term is `a * 0` and the second is `b * 1`.
+  const hemisphereIntensity = HEMISPHERE_NIGHT * (1 - day) + HEMISPHERE_DAY * day;
   // Three endpoints, not two: night, day, and the dusk warmth laid over the top
   // of the day value by the same `warmth` the beam uses. `warmth * day` is what
   // makes it both start at the golden hour and die with the light -- see
@@ -1381,26 +1483,33 @@ export function verifyLightRig(rig = solarRig(REFERENCE_SOLAR.altitude)): string
   // player asks to have raised -- "make the ground a bit brighter at night" is
   // the most reasonable request in the game and the easiest one to over-serve,
   // because one constant lifts every surface at once and the result always
-  // looks better in the frame it was judged in. See `HEMISPHERE_NIGHT` and
-  // `NIGHT_AMBIENT_FLOOR_MAX`; the lower bound is the opposite failure, a night
-  // nobody can move in with the lamps carrying the whole city.
+  // looks better in the frame it was judged in. It has now been asked for twice
+  // and served twice, the second time at 3.5x, so **both** bounds are close: see
+  // `NIGHT_AMBIENT_FLOOR_MAX` (3% of headroom, and the arithmetic limit behind
+  // it) and `NIGHT_AMBIENT_FLOOR_MIN` (which is what stops the answer being
+  // quietly reverted by somebody judging a still).
   if (floor > NIGHT_AMBIENT_FLOOR_MAX) {
     failures.push(
       `The night ambient puts ${floor.toFixed(4)} of luminance on a shaded wall, over the ` +
-        `${NIGHT_AMBIENT_FLOOR_MAX} ceiling. That is half a stop past the 0.0631 every night term ` +
-        `in this file is quoted as a ratio to -- the torch's 4x at 10 m, the lamp's 4x at 20 m -- ` +
-        `so those sentences are no longer describing what is on screen. Raising ` +
-        `HEMISPHERE_NIGHT (${HEMISPHERE_NIGHT}) is always the cheapest way to make a dark scene ` +
-        `readable and past here it is the wrong one: a flat sourceless grey reads as a broken ` +
-        `exposure rather than as night, and it takes the lamps down with it.`,
+        `${NIGHT_AMBIENT_FLOOR_MAX} ceiling -- and that ceiling is 3% under the arithmetic limit ` +
+        `(0.264), which is where the torch's 4x at 10 m becomes 1x and the beam stops being ` +
+        `brighter than the night it is pointed into. Every night term in this file is quoted as a ` +
+        `ratio to this floor, so past here those sentences are no longer describing what is on ` +
+        `screen. Raising HEMISPHERE_NIGHT (${HEMISPHERE_NIGHT}) is always the cheapest way to make ` +
+        `a dark scene readable and it has already been spent: a further lift needs the sources ` +
+        `re-derived -- TORCH_INTENSITY's table and LAMP_INTENSITY -- rather than this constant ` +
+        `nudged, or the city stops being lit by its lamps and starts being lit by nothing at all.`,
     );
   }
-  if (floor < 0.05) {
+  if (floor < NIGHT_AMBIENT_FLOOR_MIN) {
     failures.push(
-      `The night ambient is ${floor.toFixed(4)} of luminance on a shaded wall, under the 0.05 ` +
-        `floor. Below this a street with no lamp on it is not dark, it is *absent* -- there is no ` +
-        `silhouette, because a silhouette needs the thing in front of the sky to be lit by ` +
-        `something. Check HEMISPHERE_NIGHT (${HEMISPHERE_NIGHT}) and SKY_FILL_NIGHT.`,
+      `The night ambient is ${floor.toFixed(4)} of luminance on a shaded wall, under the ` +
+        `${NIGHT_AMBIENT_FLOOR_MIN} floor. That bound is not the old "a street with no lamp is ` +
+        `*absent*" threshold (0.05, and still true); it is the player's own answer to "i cant see ` +
+        `shit at night rn", which was served by one constant and can be taken back by one. A night ` +
+        `that is comfortable to play in looks flat in the still somebody will judge it by. Check ` +
+        `HEMISPHERE_NIGHT (${HEMISPHERE_NIGHT}) and SKY_FILL_NIGHT, and read the paragraph on ` +
+        `NIGHT_AMBIENT_FLOOR_MIN before moving this.`,
     );
   }
   // Daylight is untouched by any of that, and it is asserted from the other end
@@ -1422,9 +1531,12 @@ export function verifyLightRig(rig = solarRig(REFERENCE_SOLAR.altitude)): string
   if (!(torchAt10 > floor * 4)) {
     failures.push(
       `The torch puts ${torchAt10.toFixed(3)} of irradiance on a wall 10 m away with the sun ` +
-        `20 degrees down, against an ambient floor of ${floor.toFixed(3)} -- under the 4x that ` +
-        `makes a dark street navigable rather than merely lighter. Check TORCH_INTENSITY ` +
-        `(${TORCH_INTENSITY}) and that nightLevel still reaches 1.`,
+        `20 degrees down, against an ambient floor of ${floor.toFixed(3)} -- ` +
+        `${(torchAt10 / floor).toFixed(2)}x, under the 4x that makes a dark street navigable rather ` +
+        `than merely lighter. **The likely cause is the ambient rather than the torch**: this ratio ` +
+        `sits at 4.34x as shipped, so HEMISPHERE_NIGHT (${HEMISPHERE_NIGHT}) is three per cent from ` +
+        `breaking it and TORCH_INTENSITY (${TORCH_INTENSITY}) is untouched since it was derived. ` +
+        `Also check that nightLevel still reaches 1.`,
     );
   }
 

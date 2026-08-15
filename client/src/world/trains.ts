@@ -113,6 +113,15 @@
  *     decides the train must not collide with them. A rider is aboard exactly
  *     when their plan position is inside a carriage, and hanging the light off
  *     that means there is no second source for the fact and nothing to drift.
+ *   - **And the ceiling panels are the source rather than the surface.** A
+ *     player asked for the white panels to be luminous and the honest answer was
+ *     that two of the Tangara's four already were, by accident of export -- the
+ *     driving cars' luminaire material has an `emissiveFactor` in the glTF and
+ *     the middle cars' does not, so an eight-car set glowed at the ends and was
+ *     dead through the middle. `paintSaloonPanels` and `SALOON_PANEL_RE` put the
+ *     same level on all of them, on both models. It is material state set once
+ *     at load and is the only part of the night in this file that is *not* a
+ *     function of the sun -- a saloon light is on at noon.
  *
  * ---------------------------------------------------------------------------
  * 6. THE RENDERER RULES. The impostor's `InstancedMesh` calls
@@ -172,9 +181,11 @@ import {
   type ConsistCar,
 } from '../game/riding.ts';
 import {
+  SALOON_PANEL_RE,
   TRAIN_END_CAPACITY,
   TRAIN_LIGHT_CAPACITY,
   nightLevelNow,
+  paintSaloonPanels,
   trainLights,
 } from './nightlights.ts';
 
@@ -506,8 +517,20 @@ function convertMaterial(source: Material, label: string): MeshStandardNodeMater
   // glazing deletes the thing the rule exists to protect.
   if (m.transparent) m.depthWrite = false;
   m.side = m.transparent ? DoubleSide : FrontSide;
+  // The saloon ceiling luminaires, made luminous. The rule and the level live
+  // in `nightlights.ts` with the rest of what a lit carriage looks like -- see
+  // section 5 of this file's header -- and this is the only thing that calls it.
+  if (paintSaloonPanels(m, source.name)) saloonPanelsPainted++;
   materialCache.set(source, m);
   return m;
+}
+
+/** How many luminaires `convertMaterial` has lit. See the count check in `load`. */
+let saloonPanelsPainted = 0;
+
+/** The running total, per process. See `nightlights.SALOON_PANEL_RE`. */
+export function saloonPanelCount(): number {
+  return saloonPanelsPainted;
 }
 
 /** `PropertyBinding.sanitizeNodeName`, matching what the loader did to the name. */
@@ -857,7 +880,26 @@ export class TrainFleet {
           const response = await fetch(`${baseUrl}${spec.file}`);
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const gltf = await loader.parseAsync(await response.arrayBuffer(), '');
+          // The saloon panels, counted across this file's own conversion. See
+          // `SALOON_PANEL_RE`: the rule that finds them is a list of material
+          // names, which is a weak rule whose failure is *silence* -- a model
+          // whose luminaires are called something else simply stays dull, and a
+          // dull ceiling is indistinguishable from a taste decision. This is the
+          // check, and it is here rather than in `verifyTrainLights` because
+          // that runs in the constructor, before a single byte of GLB has
+          // arrived, and could only ever have asserted zero.
+          const panelsBefore = saloonPanelCount();
           const templates = splitModel(gltf.scene, spec, this.warnings);
+          const panels = saloonPanelCount() - panelsBefore;
+          if (panels === 0) {
+            this.warnings.push(
+              `${spec.file}: no saloon ceiling luminaire found. Every material in it was converted ` +
+                `and none matched ${SALOON_PANEL_RE} -- so the fluorescent panels a player asked to ` +
+                `be made luminous are white plastic in this model, which looks like nobody did the ` +
+                `work rather than like a broken rule. Print the material names and extend the ` +
+                `pattern in trains.ts.`,
+            );
+          }
           const model = spec.file.replace(/\.glb$/, '');
           for (const [key, template] of templates) {
             this.templates.set(`${model}:${key}`, template);

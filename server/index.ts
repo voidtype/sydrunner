@@ -118,6 +118,12 @@ import { loadWorld } from './world.ts';
 // Published on `/health` so the client's `?vessels=1` cannot disagree with it.
 // See the field's comment there for the failure that made this necessary.
 import { vesselsEnabled } from '../client/src/world/vessel.ts';
+// And published beside it for the same reason: v11 made this process the one
+// owner of the time of day, and a fact with one owner should be readable from
+// outside without opening a socket. `cycle.ts` is pure arithmetic over `solar`
+// and `lunar` and drags no renderer in with it, which is why the server can
+// import it at all.
+import { cyclePhase } from '../client/src/sky/cycle.ts';
 
 const PORT = Number(process.env.SYDNEY_PORT ?? 8787);
 const WORLD_ROOT = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
@@ -376,6 +382,9 @@ const server = Bun.serve<Conn>({
     if (url.pathname === '/health') {
       let bots = 0;
       for (const r of host.rooms) bots += r.sim.participants.size - r.humans();
+      // One read, so the milliseconds and the phase below cannot straddle a
+      // tick and describe two different instants.
+      const clockMs = Date.now();
       return json({
         ok: true,
         players: host.players(),
@@ -397,6 +406,26 @@ const server = Bun.serve<Conn>({
         // A flag that can be half on is not a flag, it is a trap. `main.ts`
         // reads this before honouring its own.
         vessels: vesselsEnabled(),
+        /*
+         * **The clock the sky runs on, and the phase it is currently at.**
+         *
+         * Published for `vessels`' reason two fields up, arrived at from the
+         * same accident. The day/night cycle used to be a pure function of each
+         * client's own `Date.now()`, which is a fact with as many owners as
+         * there are laptops in the room: a machine four minutes fast played four
+         * minutes ahead of everybody else's street lights, and nothing anywhere
+         * could notice. v11's `WELCOME` gives it one owner -- this process -- and
+         * this is where a probe, a load test or a person with `curl` can read
+         * what that owner thinks the time is without opening a socket.
+         *
+         * `phase` is derived here rather than left to the reader for exactly the
+         * reason `spawn` is: both ends already compute it from the same pure
+         * function, and a probe that had to re-implement `cyclePhase` against
+         * `CYCLE_EPOCH_MS` would be a second derivation nobody keeps in step.
+         * 0.25 is sunrise, 0.5 solar noon, 0.75 sunset, 0 the dead of night.
+         */
+        clockMs,
+        cyclePhase: Number(cyclePhase(clockMs).toFixed(6)),
         rooms: host.listing(),
         stage: world.index.stage,
         protocol: PROTOCOL_VERSION,

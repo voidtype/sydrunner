@@ -273,7 +273,15 @@ export class MoonDisc extends Mesh {
     // over a twilight sky is a black disc with a bright edge.
     material.blending = AdditiveBlending;
     material.depthWrite = false;
-    material.depthTest = false;
+    // Depth-tested for `stars.ts`'s reason and with the same one-word history: a
+    // transparent material is drawn after every opaque triangle in the frame, so
+    // an untested one is painted over the roof rather than behind it. The moon
+    // was the same bug as the stars and was reported as the stars, because
+    // nobody is standing under a roof looking for the moon. It sits at 14 km,
+    // inside the 24 km far plane and in front of a sky dome that writes no
+    // depth, so nothing in the sky can occlude it and everything on the ground
+    // can. `depthWrite` stays false: this is still additive.
+    material.depthTest = true;
     material.fog = false;
 
     super(geometry, material);

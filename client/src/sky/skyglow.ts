@@ -372,12 +372,20 @@ export const NIGHT_SKY_FLOOR: Readonly<Rgb> = [0.0016, 0.0022, 0.0038];
  * out".
  *
  * So it is set by what it has to *do*: 1.2 puts a full moon at 2.2x the moonless
- * ambient, which takes `nightAmbientOnWall` from 0.0695 to 0.153 of luminance
- * and a 0.25-albedo wall from a display value of about 12 to about 25. Doubling
- * the code value of every unlit surface in the city is exactly the "you can see
- * without the torch" threshold: shapes resolve into buildings, a kerb reads as a
- * kerb, and the torch becomes a thing you point at doorways rather than a thing
- * you cannot walk without. The directional moon light below is what makes it
+ * ambient, which takes `nightAmbientOnWall` from 0.243 to 0.535 of luminance and
+ * a 0.25-albedo wall from a display value of about 29 to about 45.
+ *
+ * **A multiple of `HEMISPHERE_NIGHT` rather than an absolute level, and this is
+ * the pass that proved the choice.** That constant has since gone to 3.5x on a
+ * player's "i cant see shit at night rn", and because the moon is expressed as a
+ * multiple it came along by construction: the moonless night got brighter and
+ * the moon is still worth 2.2x of it, which is still the "you can see without
+ * the torch" step -- shapes resolve into buildings, a kerb reads as a kerb, and
+ * the torch becomes a thing you point at doorways. An absolute gain would have
+ * been silently swallowed by the raise and the moon would have stopped mattering
+ * on the frame that constant moved, with nothing anywhere saying so. (It was
+ * 0.0695 -> 0.153 and 12 -> 25 before the raise; the *ratio* is what was tuned
+ * and the ratio is unchanged.) The directional moon light below is what makes it
  * look like moonlight rather than like a raised exposure.
  *
  * Any higher and the moon stops being an event. `MOON_PHASE_POWER` is what keeps

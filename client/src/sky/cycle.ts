@@ -8,18 +8,46 @@
  * produces a *time of day*, and it has one property that decides its whole
  * shape:
  *
- *   **It is a pure function of the wall clock, so every player has the same
- *   sky without a single byte crossing the wire.**
+ *   **It is a pure function of an instant, so two processes handed the same
+ *   millisecond produce the same sky, bit for bit.**
  *
  * That is `game/traffic.ts`'s trick, deliberately reused. `TRAFFIC_EPOCH_MS`
- * makes the timetable a pure function of `Date.now()`, so a client that has
- * never spoken to the server still places every car where the server would --
- * and the same argument applies here with more force, because the sky is drawn
- * before the socket is open and would otherwise pop the moment a welcome
- * arrived. There is no protocol field for the time of day and there must not be
- * one: two machines whose clocks agree to a second agree about the sky to within
- * a fortieth of a game-minute, far tighter than anything a snapshot stream could
- * hold.
+ * makes the timetable a pure function of a clock, so a client that has never
+ * spoken to the server still places every car where the server would -- and the
+ * same argument applies here with more force, because the sky is drawn before
+ * the socket is open and would otherwise pop the moment a welcome arrived.
+ *
+ * ---------------------------------------------------------------------------
+ * **WHICH CLOCK -- AND WHY THIS PARAGRAPH USED TO SAY SOMETHING STRONGER.**
+ *
+ * It used to say: *there is no protocol field for the time of day and there must
+ * not be one, because two machines whose clocks agree to a second agree about
+ * the sky to within a fortieth of a game-minute.* Every clause of that is still
+ * true and it was still the wrong conclusion, because **nothing made two
+ * machines' clocks agree.** A laptop four minutes fast played four minutes into
+ * a different evening: its street lights came on first, its police turned
+ * nocturnal first, its rave list was an hour out -- and the only symptom
+ * available to anybody was two people in one street describing different skies.
+ * On top of that the client could move its own clock further still, with `T` and
+ * `N`, which were bare keys next to the movement ones.
+ *
+ * So as of **protocol v11 the server owns the instant** and this file owns
+ * everything downstream of it. `WELCOME` carries the host's `Date.now()` once;
+ * `net/client.ts` turns it into an offset that stays correct for the session;
+ * `sky/sky.ts` adds that offset and calls the functions below. What crosses the
+ * wire is one `f64`, at join, and never again -- no phase, no time of day, no
+ * night level, nothing on the snapshot path, which is the design the old
+ * paragraph was right to be protecting. The cycle is *exactly* as pure as it
+ * was and is evaluated identically on both ends; all that changed is which wall
+ * clock it is handed, and the fortieth of a game-minute is now a claim somebody
+ * can actually rely on. `server/index.ts` publishes the same clock on `/health`,
+ * for the reason it publishes `vessels`: a fact with one owner should be
+ * readable from outside, or nobody can tell when the two ends have drifted.
+ *
+ * Offline -- `?offline`, or a server that never answered -- the offset is zero
+ * and this is the local wall clock again. That is not a fallback so much as the
+ * honest answer with nobody to ask, and it is what shipped for the whole life of
+ * this file before v11.
  *
  * ---------------------------------------------------------------------------
  * THE MAPPING, in one paragraph.
@@ -494,16 +522,22 @@ export interface SkyClock {
  * that lets the debug scrub be one number added in one place rather than a
  * second clock running beside the first.
  *
- * **A scrubbing player disagrees with the server about the sky, and that is
- * fine.** Nothing in the simulation reads this. The light rig, the cloud rig,
- * the twilight grade, the fog, the lit windows (`globals.nightFactor`), the
- * street lamps and the torch are all client-side appearance, and there is no
- * server-side quantity anywhere that varies with the time of day -- no
- * night-time damage, no curfew, no spawn rule; `server/sim.ts` never asks. What
- * a scrubbing player gets is their own sky over everyone else's city, which is
- * exactly what a debug scrub should be. Anything that later wants the *shared*
- * time regardless of the scrub calls `skyClock()` with no second argument, and
- * this is the sentence to point at when it does.
+ * **A scrubbing developer disagrees with the server about the sky, and that is
+ * now the only way anybody can.** `server/sim.ts` still never asks what time it
+ * is -- there is no night-time damage, no curfew and no spawn rule -- so the
+ * light rig, the cloud rig, the twilight grade, the fog, the lit windows
+ * (`globals.nightFactor`), the street lamps and the torch remain client-side
+ * appearance, and a scrub is still safe in the narrow sense the old note meant.
+ * What changed is who is allowed to do it: `sky/sky.ts` reaches this only
+ * through console handles now, because "safe" was doing a lot of work in a game
+ * where the police and the raves both read `night`, and because two players
+ * standing in one street should never be able to disagree about whether the
+ * street lights are on. `sky.desync` publishes the offset when somebody does.
+ *
+ * `nowMs` defaults to `Date.now()` for the callers that legitimately have no
+ * server -- the self-checks below, `server/integration-check.ts`, and the client
+ * before its welcome arrives. Everything in a live session passes the host's
+ * clock explicitly.
  */
 export function skyClock(nowMs: number = Date.now(), scrubMs = 0): SkyClock {
   const at = nowMs + scrubMs;

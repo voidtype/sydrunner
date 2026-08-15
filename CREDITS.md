@@ -62,6 +62,28 @@ neither ships in the build; what ships is the geometry they produced.
   `scripts/stationcad.py`. Neither the PDFs nor the extracted JSON ship in the
   build; what ships, eventually, is geometry built from them.
 
+## Population
+
+How busy a street is — how many pedestrians walk it and how often a car comes
+down it — is weighted by resident density rather than being uniform across the
+60 km disc. The source is read once by `scripts/density.py` and does not ship;
+what ships is the 248×248 byte field it produces,
+`client/src/game/density-data.ts`, from which no count, boundary or record can
+be recovered.
+
+- **Census of Population and Housing 2021, table G01 (Selected Person
+  Characteristics) on ASGS 2021 Statistical Area Level 1 boundaries** —
+  Australian Bureau of Statistics, licensed
+  [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/), retrieved
+  2026-08-15 from the ABS ArcGIS service at
+  [geo.abs.gov.au](https://geo.abs.gov.au/arcgis/rest/services/Hosted/ABS_2021_Census_G01_SA1/FeatureServer)
+  (no login, no key). 12,105 SA1 polygons intersect the extent, carrying
+  `tot_p_p` — total persons — and `area_albers_sqkm`, cached to
+  `data/cache/abs-sa1-population.geojson`. NSW's own catalogue
+  (`data.nsw.gov.au`) republishes ABS aggregates by SA2 but publishes no
+  population-density layer of its own, so this goes to the ABS directly and to
+  the finest geography that ships the count and the boundary in one query.
+
 ## Rolling stock
 
 The two train models are third-party assets, not procedural like the rest of

@@ -37,6 +37,7 @@ import {
   MAX_NAME_CHARS,
   MSG,
   SNAPSHOT_HZ,
+  WELCOME_BYTES,
   createSnapshot,
   decodeEvents,
   decodeRoster,
@@ -57,6 +58,7 @@ import {
 import { EVENT, EVENT_FLAG } from '../client/src/net/protocol.ts';
 import {
   BALL_CHARGES,
+  BALL_COOLDOWN,
   BALL_RECHARGE,
   MAX_HEALTH,
   MAX_STAMINA,
@@ -490,6 +492,17 @@ class Probe {
   forward = 0;
   buttons = 0;
   welcomed = false;
+  /**
+   * The host's wall clock as this probe was told it, and this probe's own
+   * `Date.now()` at the instant the frame arrived. v11; see
+   * `protocol.Welcome.clockMs`.
+   *
+   * Both halves are kept rather than just the difference, because the check that
+   * matters is that two probes with **different local clocks** still land on the
+   * same sky -- which needs the two numbers separately to fake a skewed machine.
+   */
+  serverClockMs = 0;
+  localClockMs = 0;
 
   readonly seen = new Map<number, SnapshotPlayer>();
   /** First and last position seen for every id, to prove movement. */
@@ -509,7 +522,7 @@ class Probe {
   hits: Array<{ attacker: number; victim: number; ko: boolean; footy: boolean }> = [];
   joins: number[] = [];
   /** Every ball seen in a snapshot, by id: where it was first and last, and how far it flew. */
-  readonly balls = new Map<number, { thrower: number; first: [number, number, number]; last: [number, number, number]; path: number; bounces: number; samples: number; maxY: number }>();
+  readonly balls = new Map<number, { thrower: number; first: [number, number, number]; last: [number, number, number]; path: number; bounces: number; samples: number; maxY: number; drop: number }>();
 
   private readonly scratch = createSnapshot();
 
@@ -535,6 +548,8 @@ class Probe {
             this.id = w.id;
             this.colourway = w.colourway;
             this.yaw = w.yaw;
+            this.serverClockMs = w.clockMs;
+            this.localClockMs = Date.now();
             this.welcomed = true;
             resolve();
             return;
@@ -553,14 +568,21 @@ class Probe {
                   path: 0,
                   bounces: b.bounces,
                   samples: 1,
-                  // The apex, for the gravity test. See where it is read.
+                  // The running apex, and how far under it this ball has ever
+                  // been *since* reaching it. See where `drop` is read.
                   maxY: b.y,
+                  drop: 0,
                 });
               } else {
                 seen.path += Math.hypot(b.x - seen.last[0], b.y - seen.last[1], b.z - seen.last[2]);
                 seen.last = [b.x, b.y, b.z];
                 seen.bounces = Math.max(seen.bounces, b.bounces);
                 seen.maxY = Math.max(seen.maxY, b.y);
+                // Order matters here and nowhere else in this record: the apex
+                // is whatever the ball had reached *by this sample*, so a ball
+                // that later rolls higher than it ever flew cannot erase the
+                // fall it already took. See the gravity check.
+                if (seen.maxY - b.y > seen.drop) seen.drop = seen.maxY - b.y;
                 seen.samples++;
               }
             }
@@ -1015,7 +1037,7 @@ async function checkFooty(): Promise<void> {
     check(differing === 0, `the bounce hash agrees over all 1,530 (id, bounce, channel) triples`);
   }
 
-  // --- The supply bar: one ball back every 4 s, and never more than three.
+  // --- The supply bar: one ball back every `BALL_RECHARGE`, never more than three.
   //
   // Run through the real `advance` rather than by reading the constants, because
   // what is being checked is the *rule* -- a whole-bar refill would satisfy
@@ -1029,8 +1051,16 @@ async function checkFooty(): Promise<void> {
     };
     const throwing: CombatInput = { ...rest, throwBall: true };
     let burst = 0;
-    // Empty the bar as fast as it allows.
-    for (let i = 0; i < 60 * 3; i++) if (advance(c, throwing, 1 / 60, world).ballThrown) burst++;
+    // Empty the bar as fast as it allows, in a window that **cannot contain a
+    // refill**. Three seconds was that window when `BALL_RECHARGE` was 4 s; at
+    // 1.6 it is not, and the check reported four balls in a burst of three --
+    // which was the trickle working, sampled by a stopwatch that had not been
+    // told. The window is now the burst itself plus half a second of slack,
+    // floored under nine tenths of one recharge.
+    const burstWindow = Math.min(BALL_RECHARGE * 0.9, BALL_CHARGES * BALL_COOLDOWN + 0.5);
+    for (let i = 0; i < Math.round(burstWindow * 60); i++) {
+      if (advance(c, throwing, 1 / 60, world).ballThrown) burst++;
+    }
     check(burst === BALL_CHARGES, `a full bar throws exactly ${BALL_CHARGES} balls in a burst (threw ${burst})`);
     check(c.ballCharges === 0, `the bar is empty afterwards (${c.ballCharges} left)`);
 
@@ -1157,6 +1187,154 @@ async function main(): Promise<void> {
 
   check(a.id !== b.id, `the two clients were given different ids (${a.id}, ${b.id})`);
   check(a.colourway !== b.colourway, `the two clients were given different colourways (${a.colourway}, ${b.colourway})`);
+
+  /* =========================================================================
+   * 1c. **THE CLOCK: two clients, one evening.** Protocol v11.
+   *
+   * The day/night cycle used to be a pure function of each client's own
+   * `Date.now()`, and `sky/cycle.ts` argued at length that this was better than
+   * a protocol field because two machines whose clocks agree to a second agree
+   * about the sky to within a fortieth of a game-minute. The arithmetic was
+   * right and the premise was never checked by anything: **nothing made two
+   * machines' clocks agree.** A laptop four minutes fast played four minutes
+   * into a different evening -- its street lights on while everybody else's were
+   * off -- and no frame on either machine said so. That is the same shape as the
+   * `?vessels=1` link that outlived its server flag, which is why `/health`
+   * publishes the clock beside `vessels` now.
+   *
+   * So the server sends its wall clock in `WELCOME` and the client renders it.
+   * These are the checks that the sentence is true, and the last of them is the
+   * negative control -- the *old* behaviour, run deliberately, so that the
+   * passing case is measured against a failing one rather than against nothing.
+   * ======================================================================= */
+  {
+    const { CYCLE_MS, cyclePhase, skyClock } = await import('../client/src/sky/cycle.ts');
+    const { nightLevel } = await import('../client/src/sky/calibration.ts');
+
+    check(
+      a.serverClockMs > 0 && b.serverClockMs > 0,
+      `both clients were handed the host's wall clock at join (${a.serverClockMs}, ${b.serverClockMs}) ` +
+        `-- protocol ${PROTOCOL_VERSION}'s one new field, an f64 of epoch ms, sent once and never again`,
+    );
+    // Both probes are in this process, so the *only* difference between the
+    // clock they were told and their own is the socket round trip. Anything over
+    // a second means the field is being written somewhere other than at send.
+    const lagA = Math.abs(a.serverClockMs - a.localClockMs);
+    const lagB = Math.abs(b.serverClockMs - b.localClockMs);
+    check(
+      lagA < 1000 && lagB < 1000,
+      `  and it arrived within a second of each probe's own clock (${lagA} ms, ${lagB} ms). One-way ` +
+        `latency is the whole error in this field: 100 ms of a 3,600,000 ms cycle is a fortieth of a ` +
+        `game second, which is why there is no clock-sync loop anywhere`,
+    );
+
+    /* The two skewed machines. A's clock is four minutes fast and B's is ninety
+     * seconds slow -- both entirely ordinary for a laptop nobody has synced --
+     * and each derives the offset exactly as `net/client.ts` does, from the
+     * welcome it was actually sent. */
+    const SKEW_A = 240_000;
+    const SKEW_B = -90_000;
+    const offsetA = a.serverClockMs - (a.localClockMs + SKEW_A);
+    const offsetB = b.serverClockMs - (b.localClockMs + SKEW_B);
+
+    /* An instant where the answer is worth having: the middle of the lamp ramp,
+     * found by scanning the cycle rather than written down, so this keeps
+     * biting if `CYCLE_DATE`, the dwell or `nightLevel` ever move. What is wanted
+     * is a moment where 330 real seconds -- the gap between the two skewed
+     * clocks -- is the difference between a lit city and a dark one. */
+    let dusk = 0;
+    for (let i = 0; i < 3600 && dusk === 0; i++) {
+      const t = a.serverClockMs + i * 1000;
+      if (nightLevel(skyClock(t).solar.altitude) === 0 && nightLevel(skyClock(t + 330_000).solar.altitude) === 1) {
+        dusk = t;
+      }
+    }
+    check(dusk !== 0, `found an instant in the cycle where 5.5 real minutes is the whole of dusk`);
+
+    // What each client renders, at the same true instant, having adopted the
+    // server's offset. `localNow` is that machine's own idea of now, which is
+    // the true instant plus its own skew -- exactly the number `Date.now()`
+    // returns on it.
+    const renderedA = dusk + SKEW_A + offsetA;
+    const renderedB = dusk + SKEW_B + offsetB;
+    const disagreeMs = Math.abs(renderedA - renderedB);
+    /* **Within a quarter second, not bit-identical, and the difference is
+     * honest.** Two probes handed the *same* instant produce the same double --
+     * case 4 of `checkDayCycle` asserts exactly that and is where the bit-for-bit
+     * claim lives. These two were welcomed a few milliseconds apart and each
+     * derived its offset from its own welcome, so what survives is the spread in
+     * the two round trips. That is the entire residual error of the design, and
+     * 250 ms is three orders of magnitude under the disagreement it replaced. */
+    check(
+      disagreeMs < 250,
+      `**two clients four minutes and ninety seconds out of step with each other landed on the same ` +
+        `evening**, to within ${disagreeMs} ms, once both had adopted the host's clock -- ` +
+        `${(disagreeMs / 1000 * 24).toFixed(2)} game seconds of a thirty-minute day. This is the claim ` +
+        `the whole feature makes and the one failure a single player can never observe: two people in ` +
+        `one street looking at two different suns, with nothing in either frame to say so`,
+    );
+    const nightA = nightLevel(skyClock(renderedA).solar.altitude);
+    const nightB = nightLevel(skyClock(renderedB).solar.altitude);
+    check(
+      Math.abs(nightA - nightB) < 0.001,
+      `  and therefore agree about whether the street lights are on (${nightA.toFixed(4)} against ` +
+        `${nightB.toFixed(4)}), which is what the sky is *for* -- \`SkyClock.night\` is read by the ` +
+        `lamps, the torch, the lit windows, the police and the rave list, so a disagreement here is a ` +
+        `disagreement about the game and not about the view`,
+    );
+
+    /* --- The negative control: the same two machines, before v11.
+     *
+     * Each renders its own `Date.now()` and nothing else, which is precisely
+     * what shipped. If this *passed* -- if the two agreed anyway -- then the
+     * check above would be passing vacuously and the field would be buying
+     * nothing. */
+    const wasA = cyclePhase(dusk + SKEW_A);
+    const wasB = cyclePhase(dusk + SKEW_B);
+    const apartMinutes = (Math.abs(wasA - wasB) * CYCLE_MS) / 60_000;
+    check(
+      wasA !== wasB && Math.abs(apartMinutes - 5.5) < 0.01,
+      `negative control: on their own clocks the same two machines were ${apartMinutes.toFixed(2)} ` +
+        `real minutes apart in the cycle -- ${(apartMinutes * 24).toFixed(0)} game minutes -- so the ` +
+        `agreement above is the server's clock and not an accident of the arithmetic`,
+    );
+    check(
+      nightLevel(skyClock(dusk + SKEW_A).solar.altitude) !== nightLevel(skyClock(dusk + SKEW_B).solar.altitude),
+      `  and at this instant that is the difference between a lit city and a dark one: nightLevel ` +
+        `${nightLevel(skyClock(dusk + SKEW_A).solar.altitude)} against ` +
+        `${nightLevel(skyClock(dusk + SKEW_B).solar.altitude)}. One of them has the street lamps on ` +
+        `and the other is standing in the same street in daylight`,
+    );
+
+    /* --- And the same clock on `/health`, which is the `vessels` lesson applied
+     * to this field: a fact with one owner must be readable from outside, or
+     * nobody can tell when the two ends have come apart. */
+    const clockHealth = (await (await fetch(`http://127.0.0.1:${PORT}/health`)).json()) as {
+      clockMs?: number;
+      cyclePhase?: number;
+      protocol?: number;
+    };
+    const published = clockHealth.clockMs ?? 0;
+    check(
+      Math.abs(published - a.serverClockMs) < 5000,
+      `/health publishes the same clock the socket does (${published} against the welcome's ` +
+        `${a.serverClockMs}) -- so a probe, a load test or a person with curl can read what this host ` +
+        `thinks the time is without opening a socket, exactly as they can read \`vessels\``,
+    );
+    check(
+      clockHealth.cyclePhase !== undefined &&
+        Math.abs(clockHealth.cyclePhase - cyclePhase(published)) < 1e-5,
+      `  and the phase beside it is that clock's own (${clockHealth.cyclePhase}), derived by the ` +
+        `server from the same pure function the client uses rather than left for a reader to ` +
+        `re-implement against CYCLE_EPOCH_MS`,
+    );
+    check(
+      clockHealth.protocol === PROTOCOL_VERSION,
+      `  and /health agrees the protocol is ${PROTOCOL_VERSION}: the WELCOME grew eight bytes this ` +
+        `pass, and a version left at 10 is a browser tab open across a deploy misparsing the spawn`,
+    );
+  }
+  say('');
 
   // --- 1b: names, over the real socket and through the real encoder.
   check(a.rosters > 0 && b.rosters > 0, `both clients were sent a roster on joining (${a.rosters}, ${b.rosters})`);
@@ -1393,24 +1571,39 @@ async function main(): Promise<void> {
     const idsAtB = new Set([...b.balls.keys()]);
     const shared = [...idsAtA].filter((id) => idsAtB.has(id)).length;
     check(shared > 0, `A and B saw the same balls (${shared} ids in common)`);
-    // **Down from its apex**, not down from where it was thrown.
+    // **Down from its apex**, and the apex has to be read as the flight goes.
     //
-    // Comparing the last sample to the first asks whether the ground at the far
-    // end is lower, which is a question about Sydney rather than about gravity:
-    // a ball thrown up a rising street obeys the integrator perfectly and still
-    // lands above the hand that threw it, and a spawn dither that happens to put
-    // the two probes on a slope then fails a physics check. Observed once in
-    // nine runs as *"0 of 2"*.
+    // Two versions of this have now been wrong in the same way -- both compared
+    // two *endpoints* of a trajectory and so were really asking a question about
+    // the terrain under them:
     //
-    // The apex is the honest instrument. Every ball that flies has one, it does
-    // not care what the terrain does, and a ball that never came down from it is
-    // a ball the integrator is not pulling on.
-    const fell = ballsAtA.filter((x) => x.last[1] < x.maxY - 0.05);
+    //   1. `last - first` asks whether the ground at the far end is lower. A
+    //      ball thrown up a rising street obeys the integrator perfectly and
+    //      still lands above the hand that threw it. Observed once in nine runs
+    //      as *"0 of 2"*, and replaced by the apex.
+    //   2. `maxY - last` asks the same question again as soon as a ball outlives
+    //      its arc. `footy.ROLL_DECEL` made a ball settle and **roll** for about
+    //      eleven seconds instead of being deleted after three bounces, so
+    //      `maxY` stopped meaning "the top of the arc" and started meaning "the
+    //      highest ground it has rolled over". A ball that flew, landed, and
+    //      then rolled a hundred metres uphill has `last === maxY` and reports a
+    //      fall of exactly zero -- which is what *"0 of 3; falls of 0.00, 0.00,
+    //      0.00 m"* was, on a run where the physics was perfect. Reproduced on
+    //      demand by the spawn dither: the run before it fell 11.6 m.
+    //
+    // So the instrument is a **running** one: the deepest the ball has ever been
+    // under the highest it had reached by that moment. Order-aware, so a later
+    // uphill roll cannot erase a fall that already happened; endpoint-free, so
+    // the terrain has no vote; and still zero for the failure it exists to
+    // catch, because a ball the integrator is not pulling on never goes under
+    // its own running maximum at all.
+    const fell = ballsAtA.filter((x) => x.drop > 0.05);
     check(
       fell.length > 0,
       `at least one ball came back down from its apex, so gravity is on the wire ` +
-        `(${fell.length} of ${ballsAtA.length}; falls of ` +
-        `${ballsAtA.map((x) => (x.maxY - x.last[1]).toFixed(2)).join(', ')} m)`,
+        `(${fell.length} of ${ballsAtA.length}; deepest fall below the apex reached by that moment: ` +
+        `${ballsAtA.map((x) => x.drop.toFixed(2)).join(', ')} m, over launch-to-rest of ` +
+        `${ballsAtA.map((x) => `${x.first[1].toFixed(1)}->${x.last[1].toFixed(1)}`).join(', ')} m)`,
     );
     const bounced = ballsAtA.filter((x) => x.bounces > 0).length;
     const hitByFooty = a.hits.filter((h) => h.footy);
@@ -2763,12 +2956,23 @@ async function checkBikes(): Promise<void> {
     }
   }
 
-  // --- 9. Protocol 10, and the refusal behaviour a version bump exists for.
+  // --- 9. Protocol 11, and the refusal behaviour a version bump exists for.
   // v10 added the aboard section -- who is standing in which carriage of which
   // train, and where in it -- and moved the snapshot header out by a byte to
-  // hold its count, which is precisely the change a stale client misparses
-  // silently. See `protocol.PROTOCOL_VERSION` and `protocol.ABOARD_BYTES`.
-  check(PROTOCOL_VERSION === 10, `the protocol is at version ${PROTOCOL_VERSION}`);
+  // hold its count. v11 widened `WELCOME` by eight bytes to carry the host's
+  // wall clock, which is the field that stopped every client having its own
+  // private time of day. Either change is precisely the kind a stale client
+  // misparses *silently*: a v10 client reading a v11 welcome gets the right
+  // spawn and no clock, and a v11 client reading a v10 one reads eight bytes
+  // that are not there. See `protocol.PROTOCOL_VERSION`, `WELCOME_BYTES` and
+  // `ABOARD_BYTES`.
+  check(PROTOCOL_VERSION === 11, `the protocol is at version ${PROTOCOL_VERSION}`);
+  check(
+    WELCOME_BYTES === 35,
+    `  and a WELCOME is ${WELCOME_BYTES} bytes: 27 through v10, plus v11's f64 clock. A field added ` +
+      `without the version moving is a browser tab open across a deploy reading the spawn out of the ` +
+      `middle of a timestamp`,
+  );
   {
     // A protocol-5 hello -- which is what a browser tab left open across this
     // deploy sends -- must still decode far enough to be refused *by version*,
@@ -4864,6 +5068,11 @@ if (only === 'ridingOnline') {
   process.exit(failures.length === 0 ? 0 : 1);
 } else if (only === 'riding') {
   await checkRiding();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'announcements') {
+  await checkRailAnnouncements();
   for (const f of failures) say(`  - ${f}`);
   say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
   process.exit(failures.length === 0 ? 0 : 1);
@@ -9208,7 +9417,12 @@ async function checkBallBar(): Promise<void> {
   // straddle the tick it is about. Only the wire is read: the point of the
   // sample is what a client is *told*, not what the server privately knows.
   const seen = new Map<number, number>();
-  const marks = [4.2, 8.2, 12.2];
+  // Derived from `BALL_RECHARGE` rather than written out, because the recharge
+  // just went from 4 s to 1.6 and the literals `[4.2, 8.2, 12.2]` silently
+  // became "three samples all taken after the bar had already refilled". A
+  // check whose sample times do not follow the constant it is checking is a
+  // check that reports the *tester* drifting, which is exactly what it did.
+  const marks = [1, 2, 3].map((n) => Math.round((BALL_RECHARGE * n + 0.2) * 1000) / 1000);
   let t = 0;
   let next = 0;
   let harassed = 0;
@@ -15777,6 +15991,297 @@ async function checkDayCycle(): Promise<void> {
         `in calibration.ts, clouds.ts and facade.ts is provably untouched by any of this`,
     );
   }
+
+  /* =========================================================================
+   * 15. **THE NIGHT YOU CAN SEE IN.** *"i cant see shit at night rn"* --
+   *     the same player who had asked for ten per cent, back, with 250.
+   *
+   *     One constant answers it and one constant can undo it, which is the
+   *     whole reason this section exists rather than a comment: the ambient
+   *     floor is the cheapest way to make a dark scene readable and the easiest
+   *     thing in the build to over- or under-serve, because a night that is
+   *     comfortable to play in always looks washed out in the one still
+   *     somebody judges it by.
+   * ======================================================================= */
+  {
+    const {
+      EXPOSURE,
+      LAMP_INTENSITY,
+      NIGHT_AMBIENT_FLOOR_MAX,
+      NIGHT_AMBIENT_FLOOR_MIN,
+      TORCH_COLOUR,
+      TORCH_INTENSITY,
+      luminance: lum,
+      nightAmbientOnWall,
+    } = await import('../client/src/sky/calibration.ts');
+
+    /* The display value a surface of this albedo comes out at, which is the
+     * only unit any of this is worth arguing in -- "0.243 of luminance" is not
+     * a thing anybody can picture and "29 out of 255" is. Lambert, `EXPOSURE`,
+     * and the sRGB transfer; the Neutral tone curve is the identity this far
+     * down and is left out rather than approximated. Written here rather than
+     * imported because it is a *reader's* unit and the renderer has no use for
+     * it. */
+    const display = (irradiance: number, albedo: number): number => {
+      const linear = ((irradiance * albedo) / Math.PI) * EXPOSURE;
+      const encoded = linear <= 0.0031308 ? 12.92 * linear : 1.055 * Math.pow(linear, 1 / 2.4) - 0.055;
+      return Math.round(255 * encoded);
+    };
+
+    const floor = lum(nightAmbientOnWall(-20));
+    const wall = display(floor, 0.25);
+    const road = display(floor, 0.08);
+    check(
+      wall >= 26 && wall <= 34,
+      `a wall with no lamp anywhere near it renders at ${wall}/255 after dark (0.25 albedo, floor ` +
+        `${floor.toFixed(4)} of luminance) -- the number the player's "250%" was spent on. Below about ` +
+        `26 the report comes back`,
+    );
+    check(
+      road >= 10 && road <= 16,
+      `  and the road under it at ${road}/255 on 0.08-albedo asphalt, which is a surface you can see ` +
+        `the kerb line of rather than a black hole between two lamps`,
+    );
+
+    /* The negative control: what the same two surfaces were before the raise.
+     * The floor was 0.0695, which this recomputes rather than quotes so that a
+     * later change to SKY_FILL_NIGHT or the exposure moves both halves of the
+     * comparison together. */
+    const wasFloor = floor / 3.5;
+    check(
+      display(wasFloor, 0.25) <= 12 && display(wasFloor, 0.08) <= 5,
+      `negative control: at the pre-raise floor (${wasFloor.toFixed(4)}) the same wall was ` +
+        `${display(wasFloor, 0.25)}/255 and the same road ${display(wasFloor, 0.08)}/255 -- a ` +
+        `silhouette and a black hole, which is what "i cant see shit" is in display values`,
+    );
+
+    /* And the two bounds, which is where this stops being "make it brighter".
+     * The ceiling is derived from the torch rather than picked: every night term
+     * in the rig is a ratio to this floor, and the tightest is the torch's 4x at
+     * 10 m -- past that the beam is not brighter than the night it is pointed
+     * into and the city stops being lit by its own lamps. */
+    const torchAt10 = (TORCH_INTENSITY / 100) * lum([...TORCH_COLOUR] as [number, number, number]);
+    check(
+      torchAt10 / floor >= 4,
+      `the torch still beats the ambient ${(torchAt10 / floor).toFixed(2)}x on a wall 10 m away, over ` +
+        `the 4x that makes a dark street navigable by torch rather than merely lighter. That ratio was ` +
+        `15.2x before the raise, so the player's number landed within a few per cent of the exact ` +
+        `distance the floor could travel -- there is no second increment of this available`,
+    );
+    check(
+      floor <= NIGHT_AMBIENT_FLOOR_MAX && floor >= NIGHT_AMBIENT_FLOOR_MIN,
+      `  and it sits inside both bounds (${NIGHT_AMBIENT_FLOOR_MIN} to ${NIGHT_AMBIENT_FLOOR_MAX}). ` +
+        `The lower one is new and is not the old "a street with no lamp is *absent*" threshold: it is ` +
+        `there so the answer to a player's report cannot be quietly reverted by somebody judging a ` +
+        `screenshot, which is the failure this constant has actually had`,
+    );
+    check(
+      NIGHT_AMBIENT_FLOOR_MAX < torchAt10 / 4,
+      `  and the ceiling itself is under the arithmetic limit (${(torchAt10 / 4).toFixed(3)}), the ` +
+        `floor at which the torch and the night are exactly equal. A bound picked as round headroom ` +
+        `would have had no such property and would have let the next raise through`,
+    );
+
+    // The lamps did not move and are not supposed to have: what changed is the
+    // road *between* two of them. A pool that had come up with the floor would
+    // mean somebody had raised the sources too and the night was simply
+    // over-exposed.
+    const lampRoad = LAMP_INTENSITY / (8.98 * 8.98);
+    check(
+      display(floor + lampRoad, 0.08) - road >= 15,
+      `a street lamp's pool still reads ${display(floor + lampRoad, 0.08)}/255 against the ${road} ` +
+        `beside it -- the pool has not moved by a code value and the contrast is 3:1, so the city is ` +
+        `still lit by its lamps rather than by a raised exposure`,
+    );
+  }
+
+  /* =========================================================================
+   * 16. **THE CLOUDS DID NOT COME UP WITH THE ROAD.**
+   *
+   *     Caught by `verifyCloudRig` on the frame `HEMISPHERE_NIGHT` moved, which
+   *     is the best possible advertisement for that check: the cloud deck read
+   *     the *ground's* ambient, so a constant about whether a player can see a
+   *     footpath grew a glowing grey lid over a moonless midnight in the Blue
+   *     Mountains, lit by nothing at all.
+   * ======================================================================= */
+  {
+    const { cloudRig } = await import('../client/src/sky/clouds.ts');
+    const { HEMISPHERE_NIGHT: hn, luminance: lum, SKY_FILL_NIGHT } = await import(
+      '../client/src/sky/calibration.ts'
+    );
+    const night = lum(cloudRig(-8).flank);
+    check(
+      night < 0.05,
+      `a cumulus flank 8 degrees after sunset is at ${night.toFixed(4)} of linear radiance -- dark, ` +
+        `because what legitimately lights a cloud at night is the city's own glow on the underside of ` +
+        `the deck (\`CloudLayer.setGlow\`) and not the hemisphere the street is lit by`,
+    );
+    /* The negative control: what it would be if the deck were still wired to
+     * `rig.hemisphereIntensity`, which is exactly the line that was changed. */
+    const coupled = (night * hn) / 0.33;
+    check(
+      coupled > 0.05,
+      `negative control: wired to HEMISPHERE_NIGHT (${hn}) as it was, the same flank would be at ` +
+        `${coupled.toFixed(3)} -- over the 0.05 bound, and rising every time anybody answers a ` +
+        `request about the ground. The cloud's night endpoint is stated separately in clouds.ts for ` +
+        `that reason and must not follow this one again`,
+    );
+    check(
+      lum(SKY_FILL_NIGHT) > 0,
+      `  (the sky colour the two share is unchanged; only which *intensity* multiplies it moved)`,
+    );
+  }
+
+  /* =========================================================================
+   * 17. **NOTHING IN THE SKY IS DRAWN THROUGH A ROOF.**
+   *
+   *     *"for some reason stars are visible thru roofs"*. Both layers were
+   *     `depthTest = false` with a comment arguing that `renderOrder` put them
+   *     behind everything -- which it does not, because `renderOrder` sorts
+   *     within a pass and a transparent material is drawn after every opaque
+   *     triangle in the frame. Two words, two files, and it had been in the
+   *     build since the night sky was.
+   * ======================================================================= */
+  {
+    const { StarField } = await import('../client/src/sky/stars.ts');
+    const { MoonDisc } = await import('../client/src/sky/moon.ts');
+    for (const [what, object] of [
+      ['the star field', new StarField()],
+      ['the moon disc', new MoonDisc()],
+    ] as const) {
+      const material = object.material as { depthTest: boolean; depthWrite: boolean; transparent: boolean };
+      check(
+        material.depthTest === true,
+        `${what} is depth-tested, so a roof, an awning, a station concourse or a tunnel lining hides ` +
+          `it. It is 14-15 km out against a 24 km far plane and the sky dome writes no depth, so ` +
+          `nothing in the sky can occlude it and everything on the ground can`,
+      );
+      check(
+        material.depthWrite === false && material.transparent === true,
+        `  and still writes no depth (transparent ${material.transparent}) -- it is an additive layer, ` +
+          `and one that wrote depth would start occluding the other. Both halves have to be right: ` +
+          `test off is stars through ceilings, write on is a moon punching a hole in the star field`,
+      );
+      object.geometry.dispose();
+    }
+  }
+
+  /* =========================================================================
+   * 18. **THE TRAIN'S CEILING PANELS ARE THE LIGHT.**
+   *
+   *     *"The train has these white panels that irl have fluorescent light in
+   *     them, if u could make those luminos"*. Checked against the **shipped
+   *     GLBs** rather than against the code, because the interesting half of
+   *     this was a property of the assets: two of the Tangara's four luminaire
+   *     materials had an `emissiveFactor` and two did not, so an eight-car set
+   *     glowed at the ends and was dead through the middle -- which is exactly
+   *     the one blooming panel in the report's screenshot.
+   * ======================================================================= */
+  {
+    /* From `nightlights.ts` and deliberately **not** from `trains.ts`, which is
+     * where this rule lived for about an hour: that file reaches for `document`
+     * to measure a texture's alpha, so importing it here would have dragged a
+     * DOM into a headless check for the sake of one regex. The rule belongs
+     * beside the level and the colour it applies anyway -- see section 5 of
+     * `trains.ts`'s header, which has always said the night rig owns what a lit
+     * carriage looks like. */
+    const { SALOON_COLOUR, SALOON_PANEL_LEVEL, SALOON_PANEL_RE, paintSaloonPanels } = await import(
+      '../client/src/world/nightlights.ts'
+    );
+
+    /* A stand-in for a three material: the two fields the rule writes and
+     * nothing else, which is exactly what `PanelMaterial` types. Constructing a
+     * real `MeshStandardNodeMaterial` here is not possible from this directory
+     * -- `three` resolves out of `client/node_modules` and the server has no
+     * copy -- and would not check anything this does not. */
+    const panelStandIn = () => {
+      const rgb = { r: 0, g: 0, b: 0 };
+      return {
+        emissive: {
+          ...rgb,
+          setRGB(r: number, g: number, b: number) {
+            this.r = r;
+            this.g = g;
+            this.b = b;
+          },
+        },
+        emissiveIntensity: 1,
+      };
+    };
+
+    const trainDir = new URL('../client/public/trains', import.meta.url).pathname;
+    let totalPanels = 0;
+    let unlitInFile = 0;
+    for (const file of ['tangara.glb', 'metropolis.glb']) {
+      const bytes = await readFile(join(trainDir, file)).catch(() => null);
+      if (bytes === null) {
+        say(`  (no ${file}; the saloon panel checks need the models)`);
+        continue;
+      }
+      // The glTF JSON chunk: a 12-byte header, then a 4-byte length and a
+      // 4-byte type before the JSON itself. Read directly rather than through
+      // GLTFLoader, which wants a DOM to decode textures into.
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      const jsonLength = view.getUint32(12, true);
+      const gltf = JSON.parse(
+        new TextDecoder().decode(bytes.subarray(20, 20 + jsonLength)),
+      ) as { materials?: Array<{ name?: string; emissiveFactor?: number[] }> };
+      const panels = (gltf.materials ?? []).filter((m) => SALOON_PANEL_RE.test(m.name ?? ''));
+      totalPanels += panels.length;
+      unlitInFile += panels.filter((m) => !m.emissiveFactor).length;
+      check(
+        panels.length > 0,
+        `${file} carries ${panels.length} saloon luminaire material(s) matching ${SALOON_PANEL_RE} ` +
+          `(${panels.map((m) => m.name).join(', ')})`,
+      );
+    }
+    check(
+      totalPanels >= 3,
+      `${totalPanels} ceiling luminaire materials across the fleet, all of which now take the same ` +
+        `emissive level and the same cool white -- so the ends and the middle of a train agree for the ` +
+        `first time`,
+    );
+    /* The negative control, and it is a fact about the shipped file rather than
+     * a simulation of one: at least one of those materials has **no
+     * `emissiveFactor` at all** in the asset, so without `paintSaloonPanels`
+     * those panels render as unlit white plastic. If this ever reads zero the
+     * models have been re-exported and the rule may be doing nothing. */
+    check(
+      unlitInFile > 0,
+      `negative control: ${unlitInFile} of them ship with no emissiveFactor in the glTF, which is ` +
+        `what a dead white panel in the middle of a Tangara was. The code is the only thing lighting ` +
+        `those, so this check failing means either the models changed or the rule stopped mattering`,
+    );
+
+    // And the rule itself, through the real function, on the real names.
+    const lit = panelStandIn();
+    const litHit = paintSaloonPanels(lit, 'interior_emission.001');
+    check(
+      litHit &&
+        lit.emissiveIntensity === SALOON_PANEL_LEVEL &&
+        Math.abs(lit.emissive.b - SALOON_COLOUR[2]) < 1e-6 &&
+        Math.abs(lit.emissive.r - SALOON_COLOUR[0]) < 1e-6,
+      `a duplicate-suffixed luminaire ("interior_emission.001", which is what Blender calls a copied ` +
+        `material and is what the Tangara's two middle cars carry) is lit to ${lit.emissiveIntensity} ` +
+        `in SALOON_COLOUR -- the same cool white the window sprites and the real saloon light use, so ` +
+        `the inside and the outside of a carriage stop disagreeing about what colour its lighting is`,
+    );
+    const nose = panelStandIn();
+    const noseHit = paintSaloonPanels(nose, 'train_all_lights');
+    check(
+      !noseHit && nose.emissiveIntensity === 1 && nose.emissive.r === 0,
+      `  and the nose lamps ("train_all_lights", "light") are deliberately not touched -- they read ` +
+        `correctly already, nightlights.ts hangs additive sprites on them, and a third more emissive ` +
+        `there would be a blown marker on every train in the city`,
+    );
+    const interior = panelStandIn();
+    check(
+      !paintSaloonPanels(interior, 'interior') && !paintSaloonPanels(interior, 'interior.001'),
+      `  and neither does the *seats and grab poles* material, which is called "interior" and is one ` +
+        `underscore away from "interior_light". 36,000 triangles of glowing moquette is what a loose ` +
+        `pattern here would have produced`,
+    );
+  }
 }
 
 /**
@@ -17465,6 +17970,19 @@ async function checkRiding(): Promise<void> {
     walked: number;
     alighted: boolean;
     waitedS: number;
+    /**
+     * The platform under the point `alightPlatform` **chose**, before a single
+     * tick of physics has run on it.
+     *
+     * Separate from `surface` below, and the separation is the whole of what
+     * section 3c(c2) exists to say: the disembark's own claim is "I put you on
+     * a platform", and where a body ends up half a second later is additionally
+     * a claim about whether anything is standing there. Measuring the first at
+     * the second's location made this check a 1.7% lottery on somebody else's
+     * bug -- see (c2).
+     */
+    landSurface: number;
+    landedOnPlatform: boolean;
     feet: number;
     ground: number;
     surface: number;
@@ -17506,6 +18024,7 @@ async function checkRiding(): Promise<void> {
       stillAboard: false, travelled: 0, straight: 0,
       worstBelow: 0, worstAbove: 0, walked: 0,
       alighted: false, waitedS: 0,
+      landSurface: -Infinity, landedOnPlatform: false,
       feet: 0, ground: 0, surface: -Infinity, gapMm: null,
       onGround: false, vy: 0, health: 0, fromTrackCentre: 0, onPlatform: false,
     };
@@ -17639,6 +18158,25 @@ async function checkRiding(): Promise<void> {
       const now = ride1.aboardPose(bake, a, rail1.railSeconds(railMs));
       if (dirNow !== null && now !== null && now.doorsOpen) {
         r.to = now.atStop >= 0 ? dirNow.stops[now.atStop].name : '?';
+        // **Where the disembark puts them, computed before the tick that does
+        // it**, through the same three shipped calls `sim.alight` makes and at
+        // the same instant with the same carriage frame. `Simulation.landing`
+        // is private and this is not a second opinion about it: `aboardFrame`
+        // at `railT` is a pure function, `resolveMount` runs before `advance`,
+        // and the two were checked equal to the last digit at the instant this
+        // was written. See `RideReport.landSurface` for why it is worth having
+        // separately from where the body ends up.
+        {
+          const consist = ride1.consistOf(dirNow, a.trip);
+          const it = ride1.interiorOfCar(consist, a.car);
+          const f = ride1.createCarFrame();
+          const at = { x: 0, y: 0, z: 0 };
+          if (it !== null && ride1.aboardFrame(bake, a, rail1.railSeconds(railMs), f)) {
+            ride1.alightPlatform(f, it, a.x, a.z, world.platforms ?? null, at);
+            r.landSurface = world.platforms!.surfaceAt(at.x, at.z);
+            r.landedOnPlatform = r.landSurface > -Infinity;
+          }
+        }
         p.input.mount = true;
         sim.step(out);
         tickClock();
@@ -17751,11 +18289,26 @@ async function checkRiding(): Promise<void> {
             `there, standing still, with ${r.health.toFixed(1)} pips of health -- the same ` +
             `${r.health.toFixed(1)} they boarded with`,
         );
+        // **The disembark put them on a platform**, measured where the disembark
+        // put them.
+        //
+        // This used to be asserted at the settled position half a second later,
+        // and that made it two claims at once: `alightPlatform` chose a point on
+        // the platform, *and* nothing is standing on the platform at that point.
+        // The second is `checkClearance`'s subject, not this one's, and it is
+        // false at 35 of the 2,014 disembark points in this bake -- so this
+        // check was a 1.7% coin toss on somebody else's bug, and it came up at
+        // Hornsby. Section 3c(c2) below now asserts that half **exhaustively**,
+        // by name, which is strictly more than the toss ever did; this one is
+        // left saying only what riding owns. Both numbers are still printed.
         check(
-          r.onPlatform,
-          `  and it is the platform they are standing on rather than the paddock above the cutting: ` +
-            `the platform field puts a surface at ${r.surface.toFixed(2)} m and their feet are ` +
-            `${r.gapMm === null ? 'Infinity' : r.gapMm.toFixed(0)} mm off it`,
+          r.landedOnPlatform,
+          `  and the disembark put them on a platform rather than on the paddock above the cutting: ` +
+            `the platform field puts a surface at ${r.landSurface.toFixed(2)} m where ` +
+            `\`alightPlatform\` chose. Half a second later they are standing on ` +
+            `${r.onPlatform
+              ? `it, ${r.gapMm === null ? 'Infinity' : r.gapMm.toFixed(0)} mm off`
+              : `${r.surface === -Infinity ? 'no platform at all -- pushed off the deck by something standing on it; see (c2)' : `${r.surface.toFixed(2)} m`}`}`,
         );
         // And clear of the four-foot: at least the platform's own inner edge
         // away from the track centre, or they got off between the rails.
@@ -18019,6 +18572,118 @@ async function checkRiding(): Promise<void> {
       );
     }
 
+    // --- (c2) ...AND NOTHING IS STANDING WHERE IT LANDS THEM.
+    //
+    // ---------------------------------------------------------------------------
+    // WHY THIS IS A SEPARATE CLAIM, AND WHY IT IS A CEILING RATHER THAN A ZERO.
+    //
+    // (c) proves `alightPlatform` chooses a point with a platform under it, at
+    // all 2,014 of them. That is the whole of what riding owns, and it holds.
+    // It is *not* the whole of what a player experiences, because the very next
+    // thing that happens to the body is a tick of `controller.step`, and
+    // `CollisionWorld.resolve` will push it out of anything it has been put
+    // inside. At 35 of those 2,014 points it does exactly that -- up to 6.5 m
+    // sideways, which is off the deck entirely and onto the terrain over the
+    // cutting. The player gets off at Hornsby and is shoved into the car park.
+    //
+    // **That is a real defect and it is not riding's.** A footprint standing on
+    // a platform is `world/envelope.ClearanceEnvelope`'s subject -- the same
+    // *"no building should EVER cover a road nor a railroad"* rule -- and the
+    // envelope deliberately keeps only the loading gauge clear:
+    // `RAIL_HALF_M` is 3.6 m and a platform reaches 9.4 m, which its own header
+    // says in as many words. Measured over the whole bake at the time of
+    // writing: **17,132 of 111,696 platform-deck samples (15.3%) are inside a
+    // solid**, across 146 of the 358 sites. 9,391 of those are prisms whose base
+    // is over a standing head -- a building whose pad is at street level with a
+    // cutting under it, which `solidFor` treats as solid all the way down
+    // because a building normally has ground under it -- and 6,706 are
+    // structures that genuinely reach the deck, which is what a station building
+    // on a platform *is*. Two different fixes, neither of them a line in this
+    // file, and both of them wanting a screenshot rather than a number.
+    //
+    // So what this check is for is that the defect **stops being invisible and
+    // stops being a lottery**. Before it, the only thing in the suite that could
+    // notice was one ride at one instant asserting where a body settled, which
+    // sampled this 1.7% failure once a run and had been coming up green by luck
+    // -- until a re-derived instant landed on Hornsby and it read as a
+    // `PlatformField` bug, which it is not. Here it is enumerated, named by
+    // station, and fenced.
+    //
+    // The fence is today's measurement and not zero, and that is a ratchet
+    // rather than a tolerance: there was no check here at all before, nothing
+    // that was passing has been loosened, and 35 is what the shipped city
+    // actually is. It may not grow. When the envelope round lands it comes down
+    // to zero and the ceiling goes with it.
+    {
+      const STANDING_RESIDUAL = 35;
+      let points = 0;
+      let stayed = 0;
+      let worstPush = 0;
+      const off = new Map<string, number>();
+      const frame = ride1.createCarFrame();
+      const spot = { x: 0, y: 0, z: 0 };
+      for (const line of bake.lines) {
+        for (const dir of line.dirs) {
+          let call = -1;
+          for (const stop of dir.stops) {
+            if (!stop.calls) continue;
+            call++;
+            const w = ride1.stopDwell(bake, dir, call);
+            if (w === null) continue;
+            const d = ride1.nextDwell(bake, stop.name, dir.offset + w.opens - 1, {
+              lineId: line.id, minAhead: 0,
+            });
+            if (d === null || d.dir !== dir.index) continue;
+            const t = dir.offset + d.trip * line.period + (w.opens + w.closes) / 2;
+            if (!rail1.poseTrain(bake, dir, d.trip, t, pose)) continue;
+            const consist = ride1.consistOf(dir, d.trip);
+            const it = ride1.interiorOfCar(consist, d.car);
+            if (it === null) continue;
+            const centre = ride1.consistOffset(pose.s, d.car, consist.cars.length, consist.pitch);
+            if (centre < 0) continue;
+            ride1.carFrameAt(bake, dir, centre, consist.cars[d.car].flip, frame);
+            for (const side of [-1, 1]) {
+              for (const bay of it.doors) {
+                points++;
+                ride1.alightPlatform(frame, it, bay.x, side, field, spot);
+                const top = field.surfaceAt(spot.x, spot.z);
+                if (top === -Infinity) continue; // (c) owns this one, and it is zero.
+                // One depenetration, from the server's own collision world and
+                // at the feet height the disembark chose -- which is the first
+                // thing `advance` does to this body on the tick after it is put
+                // down. Not a walk: a body that is not inside anything does not
+                // move at all here, so a push is a body that was placed in a wall.
+                const res = world.collision.resolve(spot.x, spot.z, spot.x, spot.z, PLAYER_RADIUS, top);
+                const moved = Math.hypot(res.x - spot.x, res.z - spot.z);
+                if (moved > worstPush) worstPush = moved;
+                if (field.surfaceAt(res.x, res.z) > -Infinity) stayed++;
+                else off.set(stop.name, (off.get(stop.name) ?? 0) + 1);
+              }
+            }
+          }
+        }
+      }
+      const pushedOff = points - stayed;
+      // Read out of the rule rather than restated, so a round that widens the
+      // gauge to cover the deck makes this sentence stop being true out loud.
+      const env = (await import(
+        new URL('../client/src/world/envelope.ts', import.meta.url).pathname
+      )) as typeof import('../client/src/world/envelope.ts');
+      const named = [...off.entries()]
+        .sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1))
+        .map(([n, c]) => `${n} x${c}`)
+        .join(', ');
+      check(
+        points > 1500 && pushedOff <= STANDING_RESIDUAL,
+        `and at ${stayed.toLocaleString()} of those ${points.toLocaleString()} points a body put down ` +
+          `there is still on the platform after one depenetration against the server's own collision ` +
+          `world. ${pushedOff} are pushed off it (worst push ${worstPush.toFixed(2)} m), against a ` +
+          `standing residual of ${STANDING_RESIDUAL} -- a building footprint over a platform, which ` +
+          `world/envelope.ts keeps clear only to the ${env.RAIL_HALF_M} m loading gauge and not to the ` +
+          `${ride1.PLATFORM_OUTER_M} m deck` + (named ? `: ${named}` : ''),
+      );
+    }
+
     // --- (d) The five stations the `-Infinity` was measured at, by name.
     //
     // (b) says every calling stop has a platform and (c) says every disembark
@@ -18063,19 +18728,42 @@ async function checkRiding(): Promise<void> {
       );
     }
 
-    // --- (e) And the instants that actually failed, ridden end to end.
+    // --- (e) And instants where the old rule misfires, ridden end to end.
     //
-    // Rail-clock seconds, kept as literals on purpose. The whole timetable is a
-    // pure function of this number, so an instant that broke once breaks forever
-    // until it is fixed -- which is what makes a wall-clock failure worth
-    // writing down rather than re-rolling and hoping.
+    // ---------------------------------------------------------------------------
+    // THE INSTANTS ARE **SOLVED FOR**, NOT WRITTEN DOWN. THIS IS THE SECOND TIME.
     //
-    // At each of them the **old** rule -- `arrivals[k]`, fifteen seconds long,
-    // no check against the curve -- picked a dwell at the origin of a direction,
-    // which is a train that left up to fifteen seconds ago. Both halves are
-    // asserted: that the old pick really is a train with its doors shut (so the
-    // instant still reproduces the failure and has not gone stale), and that the
-    // ride at that instant now works from end to end.
+    // They used to be five rail-clock literals, kept as literals on the argument
+    // that the timetable is a pure function of the clock, so an instant that
+    // broke once breaks forever. That argument is right about the *world* and
+    // wrong about the *check*, and the file already recorded it failing once:
+    // four of the five went stale when the bake stopped anchoring a station's
+    // two directions in two places, and were re-derived by hand. They went stale
+    // again on the next round that touched the physics -- trains at 1.5x speed
+    // and 1.25x acceleration move every pose, so an instant chosen because the
+    // old rule picked a shut-door train there stops being one. The ride worked
+    // at all five both times; it was the first half of the assertion, "this
+    // instant still reproduces the failure", that rotted.
+    //
+    // A hand-picked instant is a literal fitted to one bake, and it will rot
+    // again on the next round that moves a train. So the search that a human ran
+    // twice is written down instead: walk the rail clock, and take the first
+    // instant in each of five widely separated windows at which the old rule
+    // really does name a train with its doors shut. Both halves are still
+    // asserted -- the instant must reproduce the failure, and the ride at it must
+    // work -- and the *first* half is now true by construction, which is the
+    // point: what this section tests is the ride, and the ride is what should be
+    // able to fail here.
+    //
+    // The base is the bake's own, not the wall clock: `dir.offset` is the last
+    // origin in the timetable, so an hour past it every line is running. Same
+    // number on every machine, on every run, for a given bake -- so a failure
+    // here is still reproducible from the printed rail second, which was the one
+    // good property the literals had.
+    //
+    // At each instant the **old** rule -- `arrivals[k]`, fifteen seconds long, no
+    // check against the curve -- picks a dwell at the origin of a direction,
+    // which is a train that left up to fifteen seconds ago.
     const oldPick = (t: number): { label: string; dir: import('../client/src/game/rail.ts').RailDirection; trip: number } | null => {
       let best: { label: string; dir: import('../client/src/game/rail.ts').RailDirection; trip: number; opensAt: number } | null = null;
       for (const line of bake.lines) {
@@ -18098,33 +18786,67 @@ async function checkRiding(): Promise<void> {
       }
       return best;
     };
-    // Four of the original five went stale when the bake stopped anchoring a
-    // station's two directions in two places: `stop.s` moved, `arrivals` moved
-    // with it, and an instant chosen because the old rule picked a shut-door
-    // train there stopped being one. The ride still worked at all five -- they
-    // boarded, travelled and stepped out onto a platform -- it was the *first*
-    // half of the assertion, "this instant still reproduces the failure", that
-    // stopped holding, which is exactly the staleness this comment warns about
-    // and exactly why both halves are asserted.
+    // The walk, and **two conditions on top of "the old rule misfires here"**,
+    // both of which are the sentence "five samples of one instant is one
+    // sample" made mechanical. The timetable is periodic in every line's own
+    // period, so instants spaced by a round number of seconds land on the same
+    // phase of the network and the first misfire in each window is the same
+    // misfire: taking the first instant of five 900 s windows gave three rides
+    // of one CCN out of Redfern and two of one M1 out of Macquarie University.
+    // So an instant is only accepted if the train the *old* rule names is one no
+    // accepted instant has named yet, which forces the five apart in the network
+    // as well as on the clock.
     //
-    // Re-derived against the current timetable by replaying `oldPick` below over
-    // the clock, and deliberately spread fifteen minutes apart rather than taken
-    // from one cluster: five samples of one instant is one sample.
-    for (const railT of [19142432.85, 19142452.96, 19143339.98, 19144249.21, 19145149.76]) {
+    // The step is 0.37 s -- not a divisor of any period in the bake, on
+    // `checkRail`'s prime-step argument -- so the walk does not sit on the same
+    // phase of every line.
+    const GAP_S = 900;
+    const STEP_S = 0.37;
+    const SEARCH_S = 40_000;
+    let base = 0;
+    for (const line of bake.lines) for (const d of line.dirs) if (d.offset > base) base = d.offset;
+    base += 3600;
+    const instants: number[] = [];
+    const staleSeen = new Set<string>();
+    for (let k = 0; k * STEP_S < SEARCH_S && instants.length < 5; k++) {
+      const t = base + k * STEP_S;
+      if (instants.length > 0 && t - instants[instants.length - 1] < GAP_S) continue;
+      const stale = oldPick(t);
+      if (stale === null) continue;
+      if (rail1.poseTrain(bake, stale.dir, stale.trip, t, pose) && pose.doorsOpen) continue;
+      if (staleSeen.has(stale.label)) continue;
+      staleSeen.add(stale.label);
+      instants.push(t);
+    }
+    check(
+      instants.length === 5,
+      `five instants at which the rule this replaced names a train with its doors shut, solved off ` +
+        `the bake rather than written down: ${instants.map((t) => t.toFixed(2)).join(', ')} ` +
+        `(rail seconds, from ${base.toFixed(0)}, at least ${GAP_S} s apart and each naming a ` +
+        `different train). ${instants.length} of 5 found in ${SEARCH_S} s of clock -- none at all ` +
+        `would mean the old rule had stopped being wrong, which is the day this whole section can be ` +
+        `deleted`,
+    );
+    for (const railT of instants) {
       const stale = oldPick(railT);
       const shut = stale !== null && (!rail1.poseTrain(bake, stale.dir, stale.trip, railT, pose) ||
         !pose.doorsOpen);
       const gone = stale !== null && pose.speed > 1 ? pose.speed : 0;
       const r = rideAt(rail1.RAIL_EPOCH_MS + railT * 1000);
+      // `landedOnPlatform` and not `onPlatform`, for (c2)'s reason: where the
+      // disembark puts them is this section's claim, and whether a building is
+      // standing there is (c2)'s, exhaustively and by name.
       check(
-        shut && r.boarded && r.travelled > 400 && r.alighted && r.onPlatform,
+        shut && r.boarded && r.travelled > 400 && r.alighted && r.landedOnPlatform,
         `at rail second ${railT.toFixed(2)} the rule this replaced would have stood a player at ` +
           `${stale?.label ?? '(nothing)'}, where the doors are ${shut ? 'SHUT' : 'open'} and the train ` +
           `is doing ${(gone * 3.6).toFixed(0)} km/h -- and the timetable now picks a train that is ` +
           `really there: they board the ${r.line} at ${r.from}, are carried ${r.travelled.toFixed(0)} m ` +
-          `to ${r.to}, and step out onto a platform ` +
-          `${r.surface === -Infinity ? '(-Infinity!)' : `${r.surface.toFixed(2)} m`} high with their ` +
-          `feet ${r.gapMm === null ? 'Infinity' : `${r.gapMm.toFixed(0)} mm`} off it` +
+          `to ${r.to}, and are set down on a platform ` +
+          `${r.landSurface === -Infinity ? '(-Infinity!)' : `${r.landSurface.toFixed(2)} m`} high` +
+          (r.onPlatform
+            ? `, still standing on it ${r.gapMm === null ? '' : `${r.gapMm.toFixed(0)} mm`} later`
+            : ` (and then pushed off the deck by something standing on it -- see (c2))`) +
           (r.why ? ` -- ${r.why}` : ''),
       );
     }
@@ -21878,13 +22600,139 @@ async function checkRailAnnouncements(): Promise<void> {
       const stop = one.callToStop(dir, c);
       calls.push({ call: c, stop, name: dir.stops[stop]?.name ?? '?' });
     }
-    // A station in the middle of the run, so both clips are present and neither
-    // is clipped by an end of the trip.
-    const pick = calls.find((c) => c.name === 'Erskineville') ?? calls[Math.floor(calls.length / 2)];
     const now = rail.railSeconds(Date.now());
-    // The next trip of this direction that has not yet reached that station.
-    let trip = rail.tripIndexAt(dir, now, 0);
-    while (dir.offset + trip * line.period + dir.arrivals[pick.call] < now) trip++;
+    /** The next trip of this direction that has not yet reached call `c`. */
+    const tripFor = (c: number): number => {
+      let t = rail.tripIndexAt(dir, now, 0);
+      while (dir.offset + t * line.period + dir.arrivals[c] < now) t++;
+      return t;
+    };
+
+    // ---------------------------------------------------------------------------
+    // WHICH CALL TO STAND BESIDE, **CHOSEN AGAINST THE GEOMETRY** RATHER THAN
+    // NAMED -- BECAUSE THE NAMED ONE WAS NOT ON THIS LINE.
+    //
+    // This used to read `calls.find(c => c.name === 'Erskineville') ?? calls[mid]`,
+    // and the T2 does not call at Erskineville at all: it is a T3/T8 station. So
+    // the fallback fired on every run since the line was written, and the
+    // example was silently worked at **Strathfield** -- which is the one station
+    // on the T2 where every assertion below measures a different train:
+    //
+    //   - `railAnnounceMix` takes the *nearest claimant* over the whole city,
+    //     correctly, and at Strathfield a T9 stands on the next platform 0.7 m
+    //     from the point this check computes. So the depart voice was the T9's
+    //     and the line assertion compared it against `T2`. Worse, the failure
+    //     message printed `${line.id}` -- the line this check *meant* -- so it
+    //     said "the bystander hears T2 announcing Strathfield" while failing on
+    //     exactly the fact that they were not hearing the T2.
+    //   - `consistDistance` measures to the nearest carriage's own axis, so a
+    //     bystander offset 60 m along the *middle carriage's* normal was 38.4 m
+    //     from a carriage of a train on a different alignment. That is the
+    //     `12 m` tolerance a previous round predicted in as many words: *"the
+    //     `< 12 m` band was fitted to a straight sample and will flip on any bake
+    //     that moves the timetable."*
+    //
+    // Neither is a fault in `rail-audio.ts` and neither is fixed by widening a
+    // tolerance. What is wrong is the *sample*, so the sample is now solved for,
+    // against two facts about the bake that this check establishes for itself
+    // without asking the audio module anything:
+    //
+    //   1. **The consist is straight** over its own length, so "60 m to the side
+    //      of it" is 60 m from the nearest carriage rather than 38 m from a
+    //      carriage whose axis has rotated under the offset.
+    //   2. **This train is alone**: no other service anywhere in the bake has an
+    //      announcement running with any part of its consist inside the audible
+    //      range of where the bystander will stand. So the nearest claimant is
+    //      necessarily this train, and the assertions below are about the train
+    //      the example is describing.
+    //
+    // Both are asserted and both are printed, so a bake that stops offering such
+    // a station says so instead of quietly working the example somewhere else.
+    const STRAIGHT_DEG = 1.5;
+    const posePick = rail.createTrainPose();
+    const abeamPick = rail.createTrainPose();
+    const endPick = rail.createTrainPose();
+    /** The consist's own length, from the same two numbers `world/trains.ts` draws it with. */
+    const consistLength = (c: import('../client/src/game/riding.ts').Consist): number =>
+      (c.cars.length - 1) * c.pitch + 25;
+    /**
+     * Is this call a clean place to work the example? Answers the abeam frame,
+     * or null with the reason it was refused.
+     */
+    const solve = (
+      c: { call: number; stop: number; name: string },
+    ): { trip: number; x: number; z: number; nx: number; nz: number; turn: number } | string => {
+      // Three calls clear of each end, so both clips exist and neither is
+      // clipped by the origin's departure or the terminus's arrival.
+      if (c.call < 3 || c.call > dir.arrivals.length - 4) return 'too near an end of the run';
+      const trip = tripFor(c.call);
+      const mid = dir.offset + trip * line.period + dir.arrivals[c.call] + 1;
+      if (!rail.poseTrain(a, dir, trip, mid, posePick)) return 'not running';
+      const consist = ride.consistOf(dir, trip);
+      const half = consistLength(consist) / 2;
+      const centre = ride.consistOffset(
+        posePick.s, consist.cars.length >> 1, consist.cars.length, consist.pitch,
+      );
+      if (centre < 0) return 'the consist reference point is behind the start of the line';
+      rail.sampleAlong(a, dir, centre, abeamPick);
+      // 1. Straightness, in degrees of heading swept between the two ends of the
+      // consist. Read off the bake's own curve, not off the audio module.
+      let turn = 0;
+      for (const end of [-half, half]) {
+        const at = centre + end;
+        if (at < 0 || at > dir.lengthM) return 'the consist overhangs the end of the line';
+        rail.sampleAlong(a, dir, at, endPick);
+        const dot = endPick.dx * abeamPick.dx + endPick.dz * abeamPick.dz;
+        const deg = Math.acos(Math.max(-1, Math.min(1, dot))) * 180 / Math.PI;
+        if (deg > turn) turn = deg;
+      }
+      if (turn > STRAIGHT_DEG) return `on a curve (${turn.toFixed(1)} deg over the consist)`;
+      // 2. Alone. Every other direction's live trips, at this instant, with an
+      // announcement of either kind running: the whole of its consist has to be
+      // clear of the audible range of the widest stand below (60 m out).
+      const nx = -abeamPick.dz;
+      const nz = abeamPick.dx;
+      const clear = one.ANNOUNCE_RANGE + consistLength(consist) + 60;
+      const other = rail.createTrainPose();
+      const ann = one.createRailAnnouncement();
+      for (const l2 of a.lines) {
+        for (const d2 of l2.dirs) {
+          const live = rail.liveTripCount(d2);
+          for (let j = 0; j <= live; j++) {
+            const t2 = rail.tripIndexAt(d2, mid, j);
+            if (d2 === dir && t2 === trip) continue;
+            if (!rail.poseTrain(a, d2, t2, mid, other)) continue;
+            let talking = false;
+            for (let kind = 0; kind < 2 && !talking; kind++) {
+              if (one.announcementAt(a, d2, other.age, kind, ann)) talking = true;
+            }
+            if (!talking) continue;
+            if (Math.hypot(other.x - abeamPick.x, other.z - abeamPick.z) < clear) {
+              return `a ${l2.id} is talking within ${clear.toFixed(0)} m of it`;
+            }
+          }
+        }
+      }
+      return { trip, x: abeamPick.x, z: abeamPick.z, nx, nz, turn };
+    };
+
+    let pick = calls[Math.floor(calls.length / 2)];
+    let stand: { trip: number; x: number; z: number; nx: number; nz: number; turn: number } | null = null;
+    const refused: string[] = [];
+    for (const c of calls) {
+      const got = solve(c);
+      if (typeof got === 'string') { refused.push(`${c.name}: ${got}`); continue; }
+      pick = c;
+      stand = got;
+      break;
+    }
+    check(
+      stand !== null,
+      `a call on the ${line.id} where the example can be worked cleanly: straight to within ` +
+        `${STRAIGHT_DEG} deg over the consist and with no other service talking inside the audible ` +
+        `range -- ${stand === null ? `none of ${calls.length} qualified: ${refused.slice(0, 4).join('; ')}` : `${pick.name}, ${stand.turn.toFixed(2)} deg, ${refused.length} calls refused before it`}`,
+    );
+    const trip = stand === null ? tripFor(pick.call) : stand.trip;
 
     const depart = dir.offset + trip * line.period;
     const opens = depart + dir.arrivals[pick.call];
@@ -21960,43 +22808,74 @@ async function checkRailAnnouncements(): Promise<void> {
       // *carriage's own axis*, so a bystander offset along the head's normal is
       // offset along the wrong normal for whichever carriage turns out to be
       // nearest: at Strathfield, 60 m out from the head measured 47.8 m to a
-      // carriage 40 m back whose axis had rotated under it, and the assertion
-      // below -- which is about *what* is being measured, not about the
-      // curvature of Strathfield -- failed on 12.2 m against its 12 m tolerance.
-      // Taken off the middle car's own frame the error is 2.5 m and it is the
-      // clamp along the carriage, which is the thing the assertion means.
-      const pose = rail.createTrainPose();
-      rail.poseTrain(a, dir, trip, mid, pose);
-      const consist = ride.consistOf(dir, trip);
-      const abeam = rail.createTrainPose();
-      rail.sampleAlong(
-        a, dir,
-        ride.consistOffset(pose.s, consist.cars.length >> 1, consist.cars.length, consist.pitch),
-        abeam,
-      );
-      const nx = -abeam.dz;
-      const nz = abeam.dx;
+      // carriage 40 m back whose axis had rotated under it. Taken off the middle
+      // car's own frame the residual is the clamp along the carriage, which is
+      // the thing the assertion means -- and the call this is worked at is now
+      // solved for straightness as well, so the residual is centimetres rather
+      // than being bounded by a tolerance somebody had to guess. See `solve`.
+      const abeam = { x: stand?.x ?? 0, z: stand?.z ?? 0, nx: stand?.nx ?? 0, nz: stand?.nz ?? 1 };
+      const stn = a.stations.find((s) => s.name === pick.name);
       for (const [metres, want] of [[4, true], [60, true], [400, false]] as const) {
-        one.railAnnounceMix(a, mid, abeam.x + nx * metres, abeam.z + nz * metres, null, mix);
+        const bx = abeam.x + abeam.nx * metres;
+        const bz = abeam.z + abeam.nz * metres;
+        one.railAnnounceMix(a, mid, bx, bz, null, mix);
         check(
           mix.depart.active === want,
           `  standing ${metres} m to the side of it: ${mix.depart.active
-            ? `heard at ${mix.depart.distance.toFixed(1)} m, inside=${mix.depart.inside}`
+            ? `heard at ${mix.depart.distance.toFixed(1)} m, inside=${mix.depart.inside}, from the ` +
+              `${mix.depart.line} at ${mix.depart.station}`
             : 'nothing'}, against a ${one.ANNOUNCE_RANGE} m range measured from the nearest carriage`,
         );
         if (mix.depart.active) {
+          // The distance has to be the offset the bystander was actually placed
+          // at, which is what "measured from the carriage" means. On a straight
+          // consist that is exact to the clamp along the carriage, so 2 m is a
+          // bound on the arithmetic rather than a fitted tolerance -- the 12 m
+          // this replaces was fitted to one sample, and a previous round wrote
+          // down that it would flip on any bake that moved the timetable before
+          // it did exactly that.
           check(
-            !mix.depart.inside && Math.abs(mix.depart.distance - metres) < 12,
+            !mix.depart.inside && Math.abs(mix.depart.distance - metres) < 2,
             `    and the distance is to the carriage (${mix.depart.distance.toFixed(1)} m against ` +
-              `${metres} m to the train's centreline), not to the station`,
+              `${metres} m to the train's centreline)`,
           );
         }
       }
-      one.railAnnounceMix(a, mid, abeam.x + nx * 4, abeam.z + nz * 4, null, mix);
+
+      // **And it is the carriage rather than the station**, which is a claim the
+      // three stands above cannot make: abeam the middle of the train they are
+      // beside the station anchor too, and at 60 m out the two answers converge
+      // to within a couple of metres whatever is being measured.
+      //
+      // So the discriminating stand is **along** the train rather than across
+      // it: 70 m up the platform from the anchor and four metres out. A range
+      // taken from the station says seventy; a range taken from the nearest
+      // carriage's own axis says four, because there is a carriage right there.
+      // That is the whole of what `ANNOUNCE_RANGE`'s "measured from the carriage
+      // rather than from the station" buys -- the far end of a 163 m consist
+      // sounds like a train, not like a distant one.
+      {
+        const tx = abeam.nz;
+        const tz = -abeam.nx;
+        const ALONG = 70;
+        const bx = abeam.x + tx * ALONG + abeam.nx * 4;
+        const bz = abeam.z + tz * ALONG + abeam.nz * 4;
+        one.railAnnounceMix(a, mid, bx, bz, null, mix);
+        const toStation = stn === undefined ? Infinity : Math.hypot(bx - stn.x, bz - stn.z);
+        check(
+          mix.depart.active && mix.depart.distance < 8 && toStation > 40,
+          `  standing ${ALONG} m along the platform and 4 m out -- beside the far carriage rather ` +
+            `than beside the station -- the announcement is ` +
+            `${mix.depart.active ? `${mix.depart.distance.toFixed(1)} m away` : 'not heard at all'}, ` +
+            `against ${toStation.toFixed(0)} m to the station's own anchor. The range is the ` +
+            `carriage's`,
+        );
+      }
+      one.railAnnounceMix(a, mid, abeam.x + abeam.nx * 4, abeam.z + abeam.nz * 4, null, mix);
       check(
         mix.depart.station === pick.name && mix.depart.line === line.id,
-        `  and the bystander hears ${line.id} announcing ${mix.depart.station}, which is the station ` +
-          `the HUD chip on that train reads`,
+        `  and the bystander hears the ${mix.depart.line} announcing ${mix.depart.station}, which is ` +
+          `the ${line.id} at ${pick.name} -- the line and station the HUD chip on that train reads`,
       );
     }
   }
@@ -22114,6 +22993,101 @@ async function checkBigMapAtScale(): Promise<void> {
   const atlasMod = await import('../client/src/mapatlas.ts');
   const waterMod = await import('../client/src/world/water.ts');
   const hexes = await import('../client/src/world/hexes.ts');
+
+  // --- 0. The suburb labels reach the rim of the disc.
+  //
+  // Reported as *"the suburb names on the minimap dont extend past west penant
+  // hills in that direction, even tho i can travel pretty far past there, same
+  // south"* -- which is the shape of a failure this world has had before in
+  // other files: something generated at one of the radii the build has grown
+  // through (5.3, 15.3, 19.3 km) and left there while the disc went to 60.
+  //
+  // It was not that this time -- `_emit_suburbs` reads at `stage.radius_m +
+  // SUBURB_MARGIN_M` and the file on disk reaches past the rim -- so what this
+  // asserts is the thing that was *checked by hand* and would otherwise stay
+  // checked by hand. Nothing else in the suite reads `suburbs.json` at all: the
+  // pipeline prints a count and a median spacing, and a count is exactly the
+  // number that stays healthy while a build silently stops at 19.3 km.
+  //
+  // Two claims, and they are different claims:
+  //
+  //   * **The outermost node is past the rim.** This is the one that catches a
+  //     stale radius, and it is cheap and absolute.
+  //   * **Every built tile has a node near it.** This is the one that catches a
+  //     *hole* -- an extract that reached 60 km but lost a quadrant, which the
+  //     max radius alone would sail straight past. Wherever a player can stand,
+  //     the readout under the minimap and the lettering on the big map both have
+  //     something to say, and the ceiling is what "near" is allowed to mean.
+  {
+    const nodes = (await Bun.file(worldDir + 'suburbs.json').json()) as Array<{
+      name: string;
+      x: number;
+      z: number;
+    }>;
+    // From `index.json` rather than `root.json`: the boot index deliberately
+    // dropped the tile list (see the split further down this file), and the tile
+    // list is the only description of *where a player can stand*.
+    const tiles =
+      ((await Bun.file(worldDir + 'index.json').json()) as {
+        tiles?: Array<{ bounds: [number, number, number, number] }>;
+      }).tiles ?? [];
+    const rim = Number(root.radius_m) || 0;
+
+    let outermost = 0;
+    for (const n of nodes) {
+      const r = Math.hypot(n.x, n.z);
+      if (r > outermost) outermost = r;
+    }
+    check(
+      nodes.length > 0 && outermost >= rim,
+      `the outermost suburb label node is ${(outermost / 1000).toFixed(1)} km out, past the ` +
+        `${(rim / 1000).toFixed(1)} km rim -- ${nodes.length.toLocaleString()} nodes read at the ` +
+        `world's own radius rather than at one of the radii it has grown through`,
+    );
+
+    /**
+     * How far a built tile may be from the nearest suburb label node, metres.
+     *
+     * 15 km against a measured worst of 11.3 km, which is an offshore tile on
+     * the southern rim with the Royal National Park inland of it -- genuinely
+     * empty ground, and the honest answer there is the name of the last place
+     * before the bush. The median is 1.2 km and the 99th percentile 7.6 km.
+     *
+     * The ceiling is loose because it is not measuring cartography, it is
+     * measuring *coverage*: a source built at 19.3 km leaves the outer tiles
+     * 30 km and more from the nearest node, and that is the failure being
+     * caught. Tightening this to the percentile would make it a churn magnet
+     * every time OSM moves a node.
+     */
+    const NEAREST_NODE_CEILING = 15_000;
+    let worst = 0;
+    let worstAt: [number, number] = [0, 0];
+    for (const t of tiles) {
+      const cx = (t.bounds[0] + t.bounds[2]) / 2;
+      const cz = (t.bounds[1] + t.bounds[3]) / 2;
+      let best = Infinity;
+      for (const n of nodes) {
+        const dx = n.x - cx;
+        const dz = n.z - cz;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < best) best = d2;
+      }
+      if (best > worst) {
+        worst = best;
+        worstAt = [cx, cz];
+      }
+    }
+    worst = Math.sqrt(worst);
+    check(
+      tiles.length > 0 && worst <= NEAREST_NODE_CEILING,
+      `and every one of the ${tiles.length.toLocaleString()} built tiles has a label node within ` +
+        `${(worst / 1000).toFixed(1)} km of it (worst at ${worstAt[0].toFixed(0)}, ` +
+        `${worstAt[1].toFixed(0)}, which is ` +
+        `${(Math.hypot(worstAt[0], worstAt[1]) / 1000).toFixed(1)} km out), under the ` +
+        `${(NEAREST_NODE_CEILING / 1000).toFixed(0)} km ceiling -- the whole disc is named, not ` +
+        `just the ring the build started as`,
+    );
+  }
 
   // --- 1. The harbour: three operations a triangle, and no closePath.
   {

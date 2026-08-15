@@ -141,18 +141,40 @@ const sweepScratch: CombatantState[] = [];
 /**
  * How fast it leaves the hand, m/s.
  *
- * 28 m/s is a hard drop punt and it is chosen for the *flight time* rather than
- * for realism: it puts 12 m at 0.43 s, which is long enough that a sprinting
- * target who changes direction is missed and short enough that a stationary one
- * is a fair shot.
+ * **42, up from 28 -- the player asked for "1.5x faster in throws and thus
+ * farther", and this is that number.** The rest of this comment is the argument
+ * that used to be here, kept because it is what the change had to be measured
+ * against, followed by what the measurement said.
  *
- * Faster than about 32 and the arc flattens into the beam this replaced -- the
- * whole balance argument in the header is that this weapon has a *trajectory*.
- * Slower than about 24 and the drop under `controller.GRAVITY`'s 22.5 m/s^2
- * takes the direct-fire envelope inside 10 m, at which point the bat already
- * covers everything the ball could.
+ * 28 m/s was a hard drop punt and it was chosen for the *flight time* rather
+ * than for realism: it put 12 m at 0.43 s, which was long enough that a
+ * sprinting target who changes direction is missed and short enough that a
+ * stationary one is a fair shot. The old note said faster than about 32 and the
+ * arc flattens into the beam this replaced.
+ *
+ * That prediction was wrong, and it is worth saying why rather than quietly
+ * deleting it: it was reasoning about *speed* when the thing that makes a
+ * trajectory readable is the **drop over the flight**, and drop goes as the
+ * square of the time. `controller.GRAVITY` is 22.5 m/s^2, so a level throw
+ * still falls 1.5 m in the 0.36 s it now takes to cross 15 m -- the ball is
+ * three quarters of a metre lower at 15 m than a straight line would put it,
+ * which is most of a person. Measured on the flat world:
+ *
+ *     28 m/s   first bounce at 13.9 m   direct-fire envelope 3-14 m
+ *     42 m/s   first bounce at 27.6 m   direct-fire envelope 3-24 m
+ *
+ * So it is twice the range for 1.5x the speed, which is what a parabola does,
+ * and the envelope is still contiguous from three metres -- `LAUNCH_RISE` is a
+ * bias on the view direction rather than a fixed elevation, so it did not need
+ * retuning and the dead zone it exists to prevent did not open.
+ *
+ * The ceiling that does exist is the wire: `protocol.BALL_BYTES` carries the
+ * velocity as an i8 of half-metres a second, so +/-63.5 m/s. 42 leaves room for
+ * the drop at the bottom of a fall off a tower and for `MAX_BOUNCES`' longer
+ * tail; the encoder clamps regardless, and `verifyFooty` checks a steep throw
+ * never gets near it.
  */
-export const LAUNCH_SPEED = 28;
+export const LAUNCH_SPEED = 42;
 
 /**
  * How much the throw is lofted above where the player is looking.
@@ -193,11 +215,36 @@ export const LAUNCH_SPEED = 28;
  * skip band alone.
  *
  * Past that the player has to **aim up**, and that is the skill gate the whole
- * design rests on rather than an accident of the number: pitching 10 degrees
- * above the horizon moves the envelope to 17-24 m and carries the first bounce
- * to 21 m, with the bounces taking it past 30.
+ * design rests on rather than an accident of the number.
+ *
+ * ---------------------------------------------------------------------------
+ * 0.08, BECAUSE `LAUNCH_SPEED` WENT TO 42 AND THIS HAD TO FOLLOW IT
+ *
+ * This is a bias in the *direction*, so it is a fixed angle in space and takes
+ * no account of how fast the ball leaves along it. The drop that it exists to
+ * cancel is not fixed at all: over a given distance the drop goes as the square
+ * of the flight time, so a 1.5x speed increase cuts it by 2.25. At 42 m/s with
+ * the old 0.10 the loft therefore *overwhelmed* the drop and opened exactly the
+ * dead zone this constant exists to prevent -- measured, a throw sailed over the
+ * head of anybody between 4 and 10 m and connected again at 12.
+ *
+ * The same sweep the original number came from, redone at 42 m/s, five ball ids,
+ * one throw per metre, looking level:
+ *
+ *     rise 0.10   connects  2-3 m,  then nothing until 12-24    DEAD ZONE
+ *     rise 0.08   connects  2-22 m                              contiguous
+ *     rise 0.06   connects  2-20 m
+ *     rise 0.05   connects  2-19 m
+ *     rise 0.04   connects  2-18 m
+ *     rise 0.02   connects  2-16 m
+ *
+ * 0.08 is the largest loft with no dead zone, which is the identical rule that
+ * chose 0.10 at 28 m/s, and it is also the one that reaches furthest. The
+ * envelope went from 3-14 m to 2-22 m and the first bounce from 13.9 m to
+ * 22.1 m: 1.5x the speed bought 1.6x the range, which is the "and thus farther"
+ * half of the request and is what a parabola does.
  */
-export const LAUNCH_RISE = 0.10;
+export const LAUNCH_RISE = 0.08;
 
 /**
  * The collision sphere, metres.
@@ -266,11 +313,155 @@ const BOUNCE_FRICTION = 0.72;
  */
 const DEFLECT_TAN_HALF = 0.282;
 
-/** After this many bounces the ball is dead. Three is a bounce, a skip and a settle. */
-export const MAX_BOUNCES = 3;
+/**
+ * Below this vertical speed at a ground contact the ball is not bouncing, it is
+ * settling. Metres a second.
+ *
+ * Set from what the bounce would look like rather than picked: a 1.2 m/s impact
+ * rebounds at `RESTITUTION` into 0.66 m/s, which under `GRAVITY`'s 22.5 m/s^2 is
+ * a one-centimetre hop lasting three ticks. There is no frame in which a
+ * one-centimetre hop is distinguishable from the ball lying on the road, and
+ * treating it as a bounce is what used to burn the budget and fire a thud a
+ * dozen times in a fifth of a second.
+ */
+const SETTLE_SPEED = 1.2;
 
-/** Seconds a ball may be in the air. A 5 s ball has travelled 100 m or stopped. */
-export const LIFETIME = 5.0;
+/**
+ * How fast a rolling ball sheds speed, m/s^2.
+ *
+ * Constant rather than proportional -- see the roll branch in `stepFooty` for
+ * why -- and **this is the number that was solved for rather than chosen**,
+ * because the coefficient for a tumbling oval on asphalt is not a figure anybody
+ * has and the request was not about friction anyway. The request was "10x
+ * longer". Measured over 48 ball ids on the flat world:
+ *
+ *     before this change   1.10 s, 24 m of total travel
+ *     0.60 m/s^2          12.54 s, 96 m
+ *     0.75 m/s^2          11.10 s, 90 m      <- 10.1x
+ *     0.90 m/s^2          10.01 s, 85 m
+ *
+ * 0.75 is the value at which a ball's life is ten times what it was, which is
+ * what was asked for, and it corresponds to a roll of about seven seconds and
+ * forty metres from the ~6 m/s of plan speed a ball has left when it settles.
+ *
+ * **Forty metres is the worst case by construction** and is worth being honest
+ * about rather than burying: the flat world is the one place in Sydney with no
+ * kerb, no parked car, no gutter and no terrace wall. `CollisionWorld.resolve`
+ * reflects the roll off all of those, and every reflection costs
+ * `restitutionFor` -- 0.41 to 0.69 of the speed -- so two walls take a rolling
+ * ball's remaining travel down by three quarters. On a real street the ball
+ * stops in the gutter, which is where footies stop. `verifyFooty` asserts the
+ * flat figure *and* that a ball loose in a boxed room still dies.
+ */
+const ROLL_DECEL = 0.75;
+
+/** Under this plan speed a rolling ball is at rest and is removed. m/s. */
+const REST_SPEED = 0.4;
+
+/**
+ * How fast the ball must be going to hit anybody, m/s, squared.
+ *
+ * 6 m/s. Under it the ball is still drawn, still rolls, still bounces off walls
+ * and is still the same object -- it simply does not knock people over. The
+ * number is the speed at which being hit by a leather ball stops being an event:
+ * `BALL_KNOCKBACK_SCALE` throws a victim 5.8 m along the flight, and a ball
+ * moving slower than a walking pace cannot credibly do that to anybody.
+ *
+ * It did not exist before because it could not matter: a ball died 1.1 s after
+ * release, at speed, and the slow tail is entirely new -- see the settle branch
+ * in `stepFooty`. Six is also comfortably under everything the weapon is *for*:
+ * a level throw is still doing 34 m/s at 20 m and 12 m/s after four bounces, so
+ * the whole direct-fire envelope and the skip band behind it are unaffected, and
+ * `verifyFooty`'s 2-22 m sweep is what says so.
+ */
+const ARM_SPEED_SQ = 6 * 6;
+
+/**
+ * `tan` of half the wander a rolling ball adds each tick.
+ *
+ * 0.0218 is `tan(1.25 degrees)`, so up to 2.5 degrees a tick either way, drawn
+ * out of `bounceHash` on channel 2 with the tick index as the second input --
+ * exact integer arithmetic on both ends, like every other draw in this file, so
+ * a ball rolling for nine seconds on the client is rolling down the same gutter
+ * on the server.
+ *
+ * **This is the answer to "does the sphere approximation matter now".** It does,
+ * and this is where. `BALL_RADIUS` is a sphere and `RESTITUTION_SPREAD` was
+ * always the stand-in for the oval -- one bounce sits up and the next shoots
+ * through. That was enough when a ball existed for a second and a half. A ball
+ * that now rolls for the better part of ten seconds spends most of its life in
+ * the one regime where a sphere is unmistakable: a sphere rolls in a straight
+ * line and a Sherrin does not, it wobbles off its long axis and hooks. A real
+ * ellipsoid would need an orientation on the wire and an orientation-dependent
+ * hit test, which the header rules out for a good reason -- a ball that hit
+ * differently depending on a cosmetic value would be the one unfair thing in the
+ * game. A per-tick heading wander is the same trick `RESTITUTION_SPREAD` plays,
+ * at the same price of nothing, and it puts the unpredictability in the place a
+ * player now actually looks at it.
+ *
+ * A random walk of 2.5 degrees a tick comes to about 11 degrees of accumulated
+ * heading over a second, which reads as a ball that will not run straight and
+ * not as a ball being steered.
+ */
+const ROLL_WOBBLE_TAN_HALF = 0.0218;
+
+/**
+ * After this many bounces the ball is dead.
+ *
+ * **Thirty, up from three.** The player asked for a ball that "persists and
+ * bounces around for 10x longer", and `LIFETIME` alone could not deliver that:
+ * three was the binding constraint, not five seconds. A drop punt on asphalt
+ * used up its whole budget in about a second and a half and was deleted in
+ * mid-air, still knee-high and still travelling -- which is why the old note
+ * called three "a bounce, a skip and a settle" and why the wire comment in
+ * `protocol.BALL_BYTES` says a ball lives about 1.5 s in practice.
+ *
+ * **The budget was never what a longer ball needed, though, and raising it alone
+ * bought half a second.** `RESTITUTION` is 0.55, so the rebound speed is more
+ * than halved every time and physics allows about six real bounces from any
+ * impact whatsoever; past those the rebound is under `GRAVITY * dt` and the old
+ * code spent the whole remaining budget consuming a "bounce" per tick while the
+ * ball sat still. What actually made the ball last is the settle-and-roll branch
+ * in `stepFooty`, and with that in place a level throw on flat ground uses three
+ * or four bounces and rolls out the rest.
+ *
+ * So thirty is a *ceiling nothing reaches* rather than a length anybody sits
+ * through, and it is doing the job three was: a ball that never dies is a hit
+ * test running forever over a city. What can still reach it is a ball loose
+ * among walls, where every reflection off a terrace counts -- which is exactly
+ * the case that needs a stop. `LIFETIME` stands behind it, and `verifyFooty`
+ * asserts both that a flat throw does *not* reach the ceiling and that a ball
+ * thrown at four pitches is gone under one guard or the other.
+ */
+export const MAX_BOUNCES = 30;
+
+/**
+ * Seconds a ball may be in the air.
+ *
+ * **Fifty, up from five**: the player's "10x longer" applied to the clock, with
+ * `MAX_BOUNCES` raised alongside it because the clock was never the binding
+ * constraint -- see there.
+ *
+ * It is a backstop rather than a lifetime. Nothing thrown on the flat gets near
+ * it: a level throw dies at 4.4 s and even a ball punted straight up off a
+ * rooftop is settling inside fifteen. What fifty buys is that a ball rolling
+ * down a hill, or trapped bouncing in a stairwell where every contact is nearly
+ * elastic, is eventually removed rather than being an object the server carries
+ * for the life of the room.
+ *
+ * **What it costs on the wire, checked rather than assumed.** Sixteen players on
+ * a 1.6 s recharge sustain ten throws a second, and a ball that averages eleven
+ * means of the order of a hundred in the air across the room at once, against
+ * the two the old numbers sustained. At `protocol.BALL_BYTES`' 20 B that would
+ * be 2 kB a snapshot if every player got every ball. They do not:
+ * `aoi.InterestIndex.selectBalls` filters balls **by the ball's own position**
+ * against `AOI_LEAVE_RADIUS`, so what a player is sent is the handful within
+ * interest of where they are standing, and a hundred balls spread over a 60 km
+ * disc is still a handful each. The cost lands on a brawl where sixteen people
+ * are throwing at each other in one street, which is the one situation where a
+ * player wants to see every ball.
+ */
+export const LIFETIME = 50.0;
 
 /** One pip, before spec 8.3's multipliers. The bat's damage exactly. See the header. */
 export const BALL_DAMAGE = 1.0;
@@ -465,7 +656,11 @@ export function bounceHash(id: number, bounce: number, channel: number): number 
  * Writes into `ball.vx`/`ball.vz`.
  */
 function deflect(ball: Footy, channel: number): void {
-  const t = (bounceHash(ball.id, ball.bounces, channel) * 2 - 1) * DEFLECT_TAN_HALF;
+  rotatePlan(ball, (bounceHash(ball.id, ball.bounces, channel) * 2 - 1) * DEFLECT_TAN_HALF);
+}
+
+/** The rotation itself, given `tan(theta/2)`. See `deflect` for the algebra. */
+function rotatePlan(ball: Footy, t: number): void {
   const d = 1 + t * t;
   const c = (1 - t * t) / d;
   const s = (2 * t) / d;
@@ -542,7 +737,17 @@ export function stepFooty(
   // consecutive positions -- a point test would let a ball pass clean through a
   // player about a third of the time, which is the exact bug that reads as
   // "hit detection is broken" and has no frame that says so.
-  {
+  //
+  // **And only while it is still travelling.** A ball now spends most of its
+  // life rolling -- see the settle branch below -- and a football trundling into
+  // your ankles at half a metre a second taking a pip off you and launching you
+  // 5.8 m along its heading is the single most absurd thing the longer lifetime
+  // could produce. `ARM_SPEED` is the line: over it the ball is a thrown object
+  // and hits, under it it is litter and a player walks through it. It is a
+  // check on the *ball*, so both ends draw the line in the same place from the
+  // same numbers, and it takes the sweep off the hot path for the eight seconds
+  // of tail that used not to exist.
+  if (ball.vx * ball.vx + ball.vy * ball.vy + ball.vz * ball.vz > ARM_SPEED_SQ) {
     const reach = BALL_RADIUS + CAPSULE_RADIUS;
     let best: CombatantState | null = null;
     let bestAlong = Infinity;
@@ -681,24 +886,67 @@ export function stepFooty(
   const surfaceY = world ? world.groundHeight(toX, toZ, toY - BALL_RADIUS) : 0;
   if (Number.isFinite(surfaceY) && toY - BALL_RADIUS <= surfaceY) {
     toY = surfaceY + BALL_RADIUS;
-    ball.bounces++;
-    out.bounced = true;
-    if (ball.bounces >= MAX_BOUNCES) {
-      ball.x = toX;
-      ball.y = toY;
-      ball.z = toZ;
-      ball.alive = false;
-      out.expired = true;
-      return out;
+    const vspeed = ball.vy < 0 ? -ball.vy : ball.vy;
+    if (vspeed < SETTLE_SPEED) {
+      // --- IT IS DOWN. IT ROLLS.
+      //
+      // This branch is the whole of "persist and bounce around for 10x longer",
+      // and it is here because the four numbers the request named could not
+      // deliver it on their own. Raising `LIFETIME` did nothing at all -- the
+      // clock was never what killed a ball -- and raising `MAX_BOUNCES` bought
+      // half a second, because `RESTITUTION` is 0.55 and physics allows about
+      // six real bounces from any impact whatsoever. Past those six the rebound
+      // is under `GRAVITY * dt` and the ball cannot clear the ground inside one
+      // tick, so the old code spent the rest of its budget consuming a "bounce"
+      // every tick while sitting still and then deleted itself. That chatter is
+      // the reason `protocol.BALL_BYTES` says a ball lives about 1.5 s.
+      //
+      // A footy that has stopped bouncing has not stopped: it rolls, and on an
+      // oval it rolls further than it flew. So a contact under `SETTLE_SPEED`
+      // is not a bounce, does not spend the budget, and does not fire the thud.
+      // The ball lies on the surface, sheds speed to rolling resistance, and is
+      // removed when it is genuinely at rest.
+      ball.vy = 0;
+      const plan = Math.sqrt(ball.vx * ball.vx + ball.vz * ball.vz);
+      if (plan <= REST_SPEED) {
+        ball.x = toX;
+        ball.y = toY;
+        ball.z = toZ;
+        ball.alive = false;
+        out.expired = true;
+        return out;
+      }
+      // Constant deceleration rather than a fraction of speed, because rolling
+      // resistance *is* roughly constant -- unlike `DRAG`, which is a fraction
+      // for the opposite reason. The practical difference is the tail: an
+      // exponential never quite arrives and would leave the ball creeping for
+      // the whole 50 s, where this one reaches `REST_SPEED` on a schedule.
+      const shed = ROLL_DECEL * dt;
+      const k = plan > shed ? (plan - shed) / plan : 0;
+      ball.vx *= k;
+      ball.vz *= k;
+      // And the wobble, which is the oval. See `ROLL_WOBBLE_TAN_HALF`.
+      rotatePlan(ball, (bounceHash(ball.id, Math.round(ball.age / dt), 2) * 2 - 1) * ROLL_WOBBLE_TAN_HALF);
+    } else {
+      ball.bounces++;
+      out.bounced = true;
+      if (ball.bounces >= MAX_BOUNCES) {
+        ball.x = toX;
+        ball.y = toY;
+        ball.z = toZ;
+        ball.alive = false;
+        out.expired = true;
+        return out;
+      }
+      const e = restitutionFor(ball);
+      // `Math.abs` rather than negation: a ball that arrived at the ground with
+      // an upward velocity -- which happens when a wall bounce this same tick
+      // has already flipped it -- must not be sent downward by this one.
+      ball.vy = Math.abs(ball.vy) * e;
+      ball.vx *= BOUNCE_FRICTION;
+      ball.vz *= BOUNCE_FRICTION;
+      deflect(ball, 0);
     }
-    const e = restitutionFor(ball);
-    // `-Math.abs` rather than negation: a ball that arrived at the ground with
-    // an upward velocity -- which happens when a wall bounce this same tick has
-    // already flipped it -- must not be sent downward by this one.
-    ball.vy = Math.abs(ball.vy) * e;
-    ball.vx *= BOUNCE_FRICTION;
-    ball.vz *= BOUNCE_FRICTION;
-    deflect(ball, 0);
   }
 
   ball.x = toX;
@@ -830,10 +1078,27 @@ export class FootyField {
   private readonly pool: Footy[] = [];
   private readonly step_ = createFootyStep();
   /**
-   * Wraps at 256 and skips 0, because the id is a byte on the wire and 0 is
-   * reserved for "no ball". Wrapping is safe at any realistic rate: a ball lives
-   * 5 s and sixteen players cannot throw 256 of them in that time -- the bar is
-   * three balls and one back every four seconds, so the ceiling is about 60.
+   * Wraps at 65,536 and skips 0, because 0 is reserved for "no ball".
+   *
+   * **It used to wrap at 256 and that is now a live bug rather than a stale
+   * comment**, which is why it moved with the rest of the change. The old note
+   * read: a ball lives 5 s and sixteen players cannot throw 256 in that time,
+   * the bar being three and one back every four seconds, so the ceiling is
+   * about 60. Both halves of that arithmetic just moved. Sixteen players on a
+   * 1.6 s recharge sustain ten throws a second and a ball now lives eleven, so
+   * about 110 are in the air at once and the counter comes all the way round in
+   * twenty-five seconds -- less than half a ball's life. Two live balls would
+   * share an id.
+   *
+   * What that produces is not subtle once you know to look for it and is
+   * impossible to find otherwise: `bounceHash` is keyed on the id, so the two
+   * would bounce identically, and `protocol` v8 widened this field to a u16
+   * precisely because a recycled id "puts a fresh ball on the interpolation
+   * history of one that just died, which draws a football teleporting across the
+   * street". The wire has had the room since v8; only this counter had not
+   * caught up.
+   *
+   * At 65,535 the same arithmetic gives six thousand seconds between reuses.
    */
   private nextId = 1;
 
@@ -841,7 +1106,7 @@ export class FootyField {
   add(thrower: CombatantState): Footy {
     const ball = this.pool.pop() ?? createFooty();
     spawnFooty(thrower, this.nextId, ball);
-    this.nextId = this.nextId >= 255 ? 1 : this.nextId + 1;
+    this.nextId = this.nextId >= 65535 ? 1 : this.nextId + 1;
     this.balls.push(ball);
     return ball;
   }
@@ -1073,10 +1338,17 @@ export function verifyFooty(): string[] {
     if (peakAt === 0) {
       failures.push('A level throw never rose at all. LAUNCH_RISE is not reaching the launch velocity.');
     }
-    // The first ground contact, and how far away it is. A level throw at 26 m/s
-    // lofted 9 degrees from 1.48 m should carry something like 20-40 m before
-    // it first touches down; anything approaching 100 m is a ball that is not
-    // falling and is the beam again.
+    // The first ground contact, and how far away it is. A level throw at 42 m/s
+    // lofted 4.6 degrees from 1.48 m carries 22.1 m before it first touches
+    // down; anything approaching 100 m is a ball that is not falling and is the
+    // beam again.
+    //
+    // The band moved with `LAUNCH_SPEED` and it had to: the previous one was
+    // 9-26 m against a measured 13.9, and a throw 1.5x faster travels 1.6x as
+    // far for the identical reason the drop is a parabola. What has *not*
+    // moved is what the band is for -- under the floor the weapon cannot reach
+    // past the bat, over the ceiling it has stopped arcing -- and both edges
+    // are still the same multiple of the measured value they were.
     let firstGround = -1;
     for (let i = 3; i < trace.length; i += 3) {
       if (trace[i + 1] <= BALL_RADIUS + 1e-6 && trace[i - 2] > BALL_RADIUS + 1e-6) {
@@ -1086,11 +1358,101 @@ export function verifyFooty(): string[] {
     }
     if (firstGround < 0) {
       failures.push('A level throw never reached the ground inside its lifetime. The ball is not falling.');
-    } else if (firstGround < 9 || firstGround > 26) {
+    } else if (firstGround < 15 || firstGround > 40) {
       failures.push(
-        `A level throw first landed ${firstGround.toFixed(1)} m away; measured, it is 13.9. Under ` +
-          `9 m the weapon cannot reach past the bat and over 26 it has stopped being an arc.`,
+        `A level throw first landed ${firstGround.toFixed(1)} m away; measured, it is 22.1. Under ` +
+          `15 m the weapon cannot reach past the bat and over 40 it has stopped being an arc.`,
       );
+    }
+  }
+
+  // --- IT LANDS, ROLLS, AND STOPS. The three-line summary of everything the
+  // "10x longer" request changed, and every one of the three fails silently.
+  //
+  //   - A ball that still chatters -- a `SETTLE_SPEED` of zero, or the settle
+  //     branch never reached -- spends `MAX_BOUNCES` on a fifth of a second of
+  //     buzzing and dies where it landed. That is what the request was about
+  //     and there is no frame that says so, because the ball looks fine right
+  //     up until it vanishes.
+  //   - A ball that rolls and never stops is a hit test running for the life of
+  //     the room, over a city, on both ends. `LIFETIME` catches it eventually
+  //     and eventually is fifty seconds.
+  //   - A ball that rolls *forever downhill on the flat* -- `ROLL_DECEL` lost,
+  //     or applied as a fraction rather than a deceleration -- reads as ice.
+  {
+    const t = traceFooty(5);
+    const life = t.path.length / 3 / 60;
+    const travel = Math.sqrt(
+      t.path[t.path.length - 3] * t.path[t.path.length - 3] +
+        t.path[t.path.length - 1] * t.path[t.path.length - 1],
+    );
+    if (t.ending !== 'expired') {
+      failures.push(`A level throw over empty ground ended as '${t.ending}'; it should roll to a stop.`);
+    }
+    if (life < 6) {
+      failures.push(
+        `A level throw was over in ${life.toFixed(1)} s. Measured it runs 11.1 s, which is the ten ` +
+          `times the 1.10 s it used to run that was asked for -- under 6 s the ball is being killed ` +
+          `by its bounce budget again rather than by friction, so the settle branch is not firing.`,
+      );
+    }
+    if (life > 20) {
+      failures.push(
+        `A level throw was still alive after ${life.toFixed(1)} s on flat ground. It is not losing ` +
+          `speed to ${ROLL_DECEL} m/s^2 of rolling resistance and will only die on the clock.`,
+      );
+    }
+    if (travel > 130) {
+      failures.push(
+        `A level throw finished ${travel.toFixed(0)} m from the thrower; measured it is 90 m on a ` +
+          `world with no kerb in it. Past 130 the roll is not decelerating.`,
+      );
+    }
+    // Most of that life is spent rolling rather than bouncing, which is the
+    // shape of the change: `MAX_BOUNCES` is now a ceiling nothing reaches.
+    if (t.bounces >= MAX_BOUNCES) {
+      failures.push(
+        `A level throw on flat ground used its whole ${MAX_BOUNCES}-bounce budget. Contacts below ` +
+          `${SETTLE_SPEED} m/s are meant to settle rather than bounce; the chatter is back.`,
+      );
+    }
+  }
+
+  // --- IT DOES NOT KNOCK PEOPLE OVER WHILE TRUNDLING. `ARM_SPEED_SQ`.
+  //
+  // The failure is quiet and ridiculous: a footy rolling into somebody's ankles
+  // at walking pace takes a pip off them and launches them 5.8 m. It could not
+  // happen before because a ball was never slow and alive at the same time.
+  {
+    const ball = createFooty();
+    spawnFooty(makeTarget(0, 0, 0), 13, ball);
+    const s = createFootyStep();
+    // Run it until it is rolling, then stand somebody in front of it.
+    let rolling = -1;
+    for (let i = 0; i < Math.round(LIFETIME / STEP_DT) && ball.alive; i++) {
+      stepFooty(ball, STEP_DT, FLAT, [], s);
+      const sp = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy + ball.vz * ball.vz);
+      if (sp < Math.sqrt(ARM_SPEED_SQ) * 0.5) {
+        rolling = i;
+        break;
+      }
+    }
+    if (rolling < 0) {
+      failures.push('A ball never slowed below half the arming speed; the roll is not shedding speed.');
+    } else {
+      // Directly in its path, one tick ahead.
+      const ahead = makeTarget(1, ball.x + ball.vx * STEP_DT, ball.z + ball.vz * STEP_DT);
+      ahead.body.position.y = BALL_RADIUS + EYE_HEIGHT;
+      for (let i = 0; i < 30 && ball.alive; i++) {
+        stepFooty(ball, STEP_DT, FLAT, [ahead], s);
+        if (s.victim !== null) {
+          failures.push(
+            'A football rolling at under 3 m/s knocked a standing player over. `ARM_SPEED_SQ` is ' +
+              'not gating the body sweep, and the longer lifetime has turned litter into a weapon.',
+          );
+          break;
+        }
+      }
     }
   }
 
@@ -1111,7 +1473,7 @@ export function verifyFooty(): string[] {
   {
     const misses: string[] = [];
     for (const id of [1, 7, 42, 200, 255]) {
-      for (const range of [3, 4, 6, 8, 10, 12, 14]) {
+      for (const range of [3, 4, 6, 8, 10, 12, 14, 17, 20, 22]) {
         if (traceFooty(id, FLAT, [makeTarget(1, 0, -range)]).victim !== 1) {
           misses.push(`${range} m (ball ${id})`);
         }
@@ -1120,8 +1482,44 @@ export function verifyFooty(): string[] {
     if (misses.length > 0) {
       failures.push(
         `A throw aimed level at a standing target missed at ${misses.join(', ')}. The direct-fire ` +
-          `envelope has to be contiguous from 3 m to 14 m; a gap in front of the thrower is a ` +
-          `dead zone at exactly the range this game is played at. See LAUNCH_RISE.`,
+          `envelope has to be contiguous from 3 m to 22 m; a gap in front of the thrower is a ` +
+          `dead zone at exactly the range this game is played at. See LAUNCH_RISE, whose table ` +
+          `is the sweep this assertion is the surviving edge of.`,
+      );
+    }
+  }
+
+  // --- THE WIRE. `protocol.BALL_BYTES` carries the velocity as an i8 of
+  // half-metres a second, so anything past 63.5 m/s clips and the renderer
+  // curves the interpolation the wrong way and points the tumble sideways.
+  //
+  // It was never close at 28 m/s and the note there says so. At 42, with a
+  // bounce budget that now lets a ball fall off a roof and keep going, it is
+  // worth being a check rather than a claim -- the failure is a ball that reads
+  // as skidding rather than flying and there is no other symptom.
+  {
+    let fastest = 0;
+    for (const pitch of [0, -1.2, -0.6, 0.9]) {
+      const ball = createFooty();
+      const thrower = makeTarget(0, 0, 0);
+      // Thrown off a 40 m rooftop, straight down, which is the worst case the
+      // city offers: the launch speed plus a full building of gravity.
+      thrower.body.position.y = 40;
+      thrower.body.pitch = pitch;
+      spawnFooty(thrower, 17, ball);
+      const s = createFootyStep();
+      for (let i = 0; i < Math.round(LIFETIME / STEP_DT) && ball.alive; i++) {
+        stepFooty(ball, STEP_DT, FLAT, [], s);
+        for (const v of [ball.vx, ball.vy, ball.vz]) {
+          const a = v < 0 ? -v : v;
+          if (a > fastest) fastest = a;
+        }
+      }
+    }
+    if (fastest > 60) {
+      failures.push(
+        `A ball reached ${fastest.toFixed(1)} m/s on one axis. The snapshot carries velocity as an ` +
+          `i8 of half-metres a second, so anything over 63.5 clips -- see protocol.BALL_BYTES.`,
       );
     }
   }
@@ -1231,7 +1629,10 @@ export function verifyFooty(): string[] {
     for (let i = 0; i < 5; i++) ids.add(field.add(thrower).id);
     if (ids.size !== 5) failures.push(`Five throws produced ${ids.size} distinct ball ids.`);
     if (field.balls.length !== 5) failures.push(`FootyField holds ${field.balls.length} balls after five throws.`);
-    for (let i = 0; i < 400 && field.balls.length > 0; i++) field.step(STEP_DT, FLAT, [], events);
+    // Long enough for the roll to finish: the budget is the clock, not a
+    // literal, because a ball now outlives any round number anybody would pick.
+    const forever = Math.round(LIFETIME / STEP_DT) + 4;
+    for (let i = 0; i < forever && field.balls.length > 0; i++) field.step(STEP_DT, FLAT, [], events);
     if (field.balls.length !== 0) {
       failures.push(`FootyField still holds ${field.balls.length} balls after every one of them died.`);
     }

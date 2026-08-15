@@ -307,6 +307,17 @@ const HALO_PX = 2.5;
 
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace';
 const SUBURB_PX = 11;
+/**
+ * Half the widest suburb name this map could ever set, in pixels: the cheap
+ * reject in `drawSuburbLabels` before a `measureText`.
+ *
+ * A bound, not a measurement, and it only has to be *generous*: a node rejected
+ * here is one whose name could not reach the page from where it stands, and a
+ * node that survives is measured properly a line later. At 11 px monospace with
+ * 0.22 em tracking a character is about 8.6 px, so 40 characters -- longer than
+ * any place name in the build, and longer than any in Australia -- is 344 px.
+ */
+const SUBURB_MAX_HALF_PX = 172;
 const STREET_PX = 9;
 const LANDMARK_PX = 9;
 const CHROME_PX = 10;
@@ -1109,6 +1120,24 @@ export class BigMap implements MarkerSink {
    * priority the whole map is built around: at nine kilometres the suburbs *are*
    * the map, and at one kilometre they are still what tells you which of the
    * forty streets on screen you should be reading.
+   *
+   * **The cull is the label's box, not its anchor**, and out past the inner ring
+   * that is the difference between a lettered map and a blank one. A suburb node
+   * is where a renderer writes the *name*, roughly the suburb's centre of mass --
+   * so the node for the suburb filling this view is very often just outside it,
+   * and an anchor cull threw that name away whole rather than drawing the part
+   * of it that reaches onto the page. Inner Sydney never noticed, because its
+   * nodes are 1-2 km apart and there is always another one on screen; the outer
+   * ring is 3-6 km apart and the discarded name is frequently the only one there
+   * was. A street directory prints the half of a name that fits at the fold, and
+   * so does this.
+   *
+   * The margin is the text's own half-width, taken from `measureText` rather
+   * than guessed, so a long name reaches further out than a short one by exactly
+   * the amount that puts its first letter on the page. See section 0 of
+   * `checkBigMapAtScale` in `server/integration-check.ts` for the other half of
+   * this: that the label *source* reaches the rim of the disc in the first
+   * place, and has no hole in it anywhere a player can stand.
    */
   private drawSuburbLabels(
     ctx: CanvasRenderingContext2D,
@@ -1125,12 +1154,21 @@ export class BigMap implements MarkerSink {
     ctx.lineWidth = HALO_PX;
     ctx.lineJoin = 'round';
     let drawn = 0;
+    // Half the type, vertically: `textBaseline` is `middle`, so this is all the
+    // room a line of it can need either side of the anchor.
+    const halfLine = SUBURB_PX / 2;
     for (const s of this.atlas.suburbs) {
       const sx = projectX(view, s.x);
       const sy = projectY(view, s.z);
-      if (sx < 0 || sx > this.size || sy < 0 || sy > this.size) continue;
+      // Cheap reject first, on the tallest thing a label can be. Only the names
+      // that survive it pay for a `measureText`, which is the expensive call in
+      // this loop and used to be behind the anchor cull.
+      if (sy + halfLine < 0 || sy - halfLine > this.size) continue;
+      if (sx + SUBURB_MAX_HALF_PX < 0 || sx - SUBURB_MAX_HALF_PX > this.size) continue;
       const text = s.name.toUpperCase();
-      const box = labelBox(sx, sy, ctx.measureText(text).width, SUBURB_PX, 0);
+      const width = ctx.measureText(text).width;
+      if (sx + width / 2 < 0 || sx - width / 2 > this.size) continue;
+      const box = labelBox(sx, sy, width, SUBURB_PX, 0);
       if (!claimLabel(placed, box)) continue;
       BigMap.halo(ctx, text, sx, sy);
       drawn++;

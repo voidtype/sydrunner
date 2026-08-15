@@ -31,8 +31,10 @@
  * two-press shape the control list has always had (see `main.ts`), it is
  * unavoidable from script, and it happens to be the right sequence anyway: this
  * panel needs the cursor, so the press that frees it is not a wasted one. The
- * `#help` block in `index.html` says "esc · suggestions" so the first press is
- * not a mystery.
+ * `#help` block in `index.html` says "esc — suggestions · what's new · report a
+ * bug" so the first press is not a mystery -- and it names all three tabs,
+ * because a line that said only "suggestions" hid the bug box behind a word for
+ * something else.
  *
  * ---------------------------------------------------------------------------
  * THE ONE ELEMENT IN THIS INTERFACE THAT TAKES A CLICK, ALMOST

@@ -595,12 +595,30 @@ export class FootyPool {
 /**
  * How long the throw disturbs the viewmodel, seconds.
  *
- * Not a simulation number: `game/combat.ts`'s `BALL_COOLDOWN` is 0.55 s and this
- * is 0.34, so the hand is back at rest with a fresh ball in it a fifth of a
- * second before the next throw is allowed. That ordering is deliberate -- a
- * viewmodel that was still recovering when the weapon was ready would make the
- * weapon feel slower than it is, which is the one direction this kind of error
- * must not fall.
+ * Not a simulation number, and **the ordering it used to rest on has inverted**.
+ *
+ * It used to read: `game/combat.BALL_COOLDOWN` is 0.55 s and this is 0.34, so
+ * the hand is back at rest with a fresh ball in it a fifth of a second before
+ * the next throw is allowed, because a viewmodel still recovering when the
+ * weapon is ready makes the weapon feel slower than it is.
+ *
+ * `BALL_COOLDOWN` is now 0.22 -- the player asked for the supply to restore 2.5x
+ * faster and the floor between throws went with it -- so during a burst the next
+ * throw arrives 0.12 s *before* this window closes and `sinceThrow` restarts
+ * from zero.
+ *
+ * That is left as it is rather than shortened to 0.20 to restore the old
+ * ordering, and the reason is what the two look like. The window is 0.09 s of
+ * ball visibly leaving the hand and then an empty hand -- see
+ * `RELEASE_SECONDS`. Restarting it early means a burst of three reads as three
+ * releases back to back, which is what a burst of three is. Shortening the
+ * window instead would put the resting ball back in frame for 20 ms between
+ * each pair, and a ball flickering into and out of the hand three times in half
+ * a second is the worse of the two by a distance.
+ *
+ * The old invariant still holds where it was actually about feel: outside a
+ * burst, the bar refills every `BALL_RECHARGE` -- 1.6 s -- and the hand is long
+ * since back at rest by then.
  */
 export const THROW_SECONDS = 0.34;
 
