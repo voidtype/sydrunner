@@ -1336,8 +1336,15 @@ function buildCarTailLights(): BufferGeometry {
  * `opacityNode` is the shared `nightOpacity` uniform and nothing else. That is
  * the whole day/night term for every sprite in this file: one uniform, written
  * once a frame, from the one ramp in `sky/calibration.ts`.
+ *
+ * `perInstance` is the one exception the build has and it belongs to the trains,
+ * which are the only thing in the city that can be in the dark at noon. It drops
+ * the uniform and leaves the level to `instanceColor`; `TrainLights` section 1
+ * carries the whole argument, including why nothing else may do this.
  */
-function nightMaterial(name: string, offset: boolean): MeshBasicNodeMaterial {
+function nightMaterial(
+  name: string, offset: boolean, perInstance = false,
+): MeshBasicNodeMaterial {
   const material = new MeshBasicNodeMaterial();
   material.name = name;
   material.vertexColors = true;
@@ -1347,7 +1354,7 @@ function nightMaterial(name: string, offset: boolean): MeshBasicNodeMaterial {
   material.depthWrite = false;
   material.depthTest = true;
   material.side = FrontSide;
-  material.opacityNode = nightOpacity;
+  if (!perInstance) material.opacityNode = nightOpacity;
   if (offset) {
     // The ground pools lie flat on the road and have to keep winning the depth
     // test at range. `world/contact.ts` works out why a metric lift is not
@@ -2511,6 +2518,656 @@ export class BikeLights {
   }
 }
 
+// --- The train ----------------------------------------------------------------
+
+/**
+ * How many carriages can be lit at once, per body type.
+ *
+ * **`world/trains.IMPOSTOR_CAPACITY`, exactly**, and it has to be: every train
+ * the fleet draws is a train that must be lit, and a box train with dark windows
+ * at 600 m is not a dimmer train, it is a *hole* in the string of lights that is
+ * the whole point of this feature. The fleet's own `verifyTrainLights` asserts
+ * the two against each other rather than trusting this comment, because the
+ * files cannot import each other -- `world/trains.ts` imports this one.
+ *
+ * Two sets rather than one because a Tangara is a double-decker and a Metropolis
+ * is not, and the difference is two rows of windows against one -- see
+ * `buildTrainWindows`. 900 instances is 58 kB of matrix and 11 kB of colour per
+ * set, which is the same order as the fleet's own instance buffer and is bought
+ * once at boot.
+ */
+export const TRAIN_LIGHT_CAPACITY = 900;
+
+/**
+ * And how many train *ends*. Two per consist, so this is the fleet's carriage
+ * ceiling divided by the shortest consist in the game -- the Metro's six -- and
+ * doubled: 900 carriages is at most 150 trains and therefore 300 ends. The
+ * fleet's `verifyTrainLights` does that division against the real consist tables
+ * rather than leaving it to this comment.
+ */
+export const TRAIN_END_CAPACITY = 320;
+
+/**
+ * The fluorescent, linear, largest channel 1.
+ *
+ * A Sydney train's saloon lighting is cool white and reads distinctly *blue*
+ * against the sodium and the warm LED in the street below it -- that contrast is
+ * most of how a lit train reads as a train rather than as a lit building, so the
+ * blue is deliberate and a little past neutral. `LAMP_SODIUM_COLOUR` is
+ * [1, 0.48, 0.11] and `LAMP_LED_COLOUR` [1, 0.7, 0.44]; this sits on the other
+ * side of white from both of them.
+ */
+const SALOON_COLOUR: Rgb = [0.78, 0.87, 1.0];
+
+/** Half the bodyside, and how far outside it the window sprites hang. */
+const TRAIN_HALF_WIDTH = 1.52;
+/**
+ * The window sprites sit **2 cm proud of the skin**, and both halves of that
+ * matter.
+ *
+ * Proud, because the sprite is depth-tested and never depth-written: at or
+ * inside the bodyside it loses the test against the carriage's own opaque hull
+ * and simply is not there, which is the failure mode `world/contact.ts` names --
+ * a transparent surface that loses does not z-fight, it disappears. Only 2 cm,
+ * because the same test is what keeps a train's windows *out of* the frame when
+ * the train is behind a warehouse, and because from inside the carriage the
+ * sprite is then behind the wall and correctly hidden. A rider looks out of a
+ * dark window at a dark city, which is what a window is.
+ */
+const WINDOW_PROUD = 0.02;
+
+/**
+ * The window band: how many panes, how wide, and where the decks are.
+ *
+ * **Discrete panes rather than a continuous strip, and this is the feature.**
+ * A lit train at 300 m is not a glowing line, it is a rhythm -- eight bright
+ * rectangles, a dark gap at the coupler, eight more -- and that rhythm is what
+ * the eye reads as *a train, moving* rather than as a light source that happens
+ * to be travelling. It survives to a surprising distance: the panes stop being
+ * resolvable at about 700 m and the beat they leave behind is still legible
+ * because the gaps are 40% of the pitch.
+ *
+ * Everything here is in **unit carriage lengths** on X, because the instance
+ * matrix scales X by the consist's own pitch exactly as the impostor box is
+ * scaled -- so one geometry is a 19.5 m Tangara and a 21.1 m Metropolis, with the
+ * panes and the gaps stretching in proportion, which is what they do in reality.
+ */
+const WINDOW_PANES = 8;
+const WINDOW_SPAN = 0.9;
+const WINDOW_PANE_SHARE = 0.6;
+/** The two saloons of a double-decker, and the one of a single. Metres over the railhead. */
+const DECK_LOWER: readonly [number, number] = [1.16, 2.0];
+const DECK_UPPER: readonly [number, number] = [2.42, 3.2];
+const DECK_SINGLE: readonly [number, number] = [1.34, 2.62];
+
+/**
+ * How bright a pane is, and how bright the wash around it.
+ *
+ * Judged against this file's own population rather than in isolation, which is
+ * the only way to judge an additive term in a renderer whose blend is in sRGB: a
+ * street lamp's head is 2.6 because it is two pixels at the distance it has to
+ * work at, a car's tail light is 0.9 because it is a 5 W marker, and a car's road
+ * pool is 0.42 across ten square metres. A carriage window is a large flat area
+ * of *diffuse* light -- a metre and a half of glass with a lit ceiling behind it
+ * -- so it belongs near the pool rather than near the lamp head, and 0.62 is a
+ * window you can see from the far platform without the train reading as being on
+ * fire from the near one.
+ *
+ * The wash is the same band with no gaps in it at a sixth of the level, and it is
+ * there for one reason: at 800 m a pane is under a pixel tall and a sub-pixel
+ * triangle is a triangle the rasteriser is entitled to miss entirely, so the
+ * panes *twinkle* as the train crosses the valley. The wash is continuous along
+ * the whole carriage and 2 m tall, so something is always covered, and what the
+ * twinkle becomes is a very slight shimmer on a line of light. It also happens to
+ * be what a lit carriage does to its own paintwork.
+ */
+const WINDOW_LEVEL = 0.62;
+const WINDOW_WASH_LEVEL = 0.17;
+/** The wash band, which is the two decks and the floor between them as one. */
+const WINDOW_WASH: readonly [number, number] = [1.05, 3.3];
+
+/**
+ * The headlight: a pair of lamps on the nose and what they throw down the track.
+ *
+ * A train's headlight is not a car's. It is aimed nearly level -- there is no
+ * oncoming driver to dazzle on a railway and the thing it exists to light is the
+ * signal and the track a long way off -- so `TRAIN_BEAM_DROP` is a fifth of the
+ * car's over three times the length, and the beam runs 30 m rather than 11.
+ *
+ * 30 m and not more, and the limit is the *curve* rather than the light. The
+ * sheet is a straight prism hung off one carriage's frame, and the railway it is
+ * hung on bends: on the sharpest curve a train takes at speed here (about 400 m
+ * radius) 30 m of chord stands 28 cm off the rails at its tip, which is inside
+ * the beam's own half-width. At 60 m it would be 1.1 m and the beam would visibly
+ * leave the track.
+ */
+const TRAIN_BEAM_LENGTH = 30;
+const TRAIN_BEAM_HALF_START = 0.22;
+const TRAIN_BEAM_HALF_END = 1.9;
+const TRAIN_BEAM_DROP = 0.55;
+const TRAIN_BEAM_LEVEL = 0.14;
+/** Where the lamps sit on the nose: over the railhead, and half-spacing across. */
+const TRAIN_LAMP_Y = 0.95;
+const TRAIN_LAMP_HALF_SPACING = 1.05;
+const TRAIN_LAMP_HALF = 0.19;
+const TRAIN_LAMP_LEVEL = 3.0;
+/** Headlight colour, linear. A modern rail headlight is white and slightly cool. */
+const TRAIN_BEAM_COLOUR: Rgb = [0.96, 0.97, 1.0];
+/** The ballast under the beam. Short, for `CAR_POOL_END`'s terrain reason, doubled. */
+const TRACK_POOL_START = 2.0;
+const TRACK_POOL_END = 22.0;
+const TRACK_POOL_HALF_START = 1.0;
+const TRACK_POOL_HALF_END = 2.9;
+const TRACK_POOL_LIFT = 0.16;
+const TRACK_POOL_RISE = 0.3;
+const TRACK_POOL_LEVEL = 0.3;
+const TRACK_POOL_SEGMENTS = 8;
+/** The tail: two red markers on the rear end, `TAIL_COLOUR`'s argument at rail scale. */
+const TRAIN_TAIL_HALF = 0.22;
+const TRAIN_TAIL_LEVEL = 1.0;
+
+/**
+ * How bright the one real light in the carriage is, and how far it reaches.
+ *
+ * `TORCH_INTENSITY` and `LAMP_INTENSITY` are in `sky/calibration.ts` because they
+ * are part of a calibration the daylight rests on -- every one of them is
+ * multiplied by `nightLevel` and is therefore exactly zero at noon, which is what
+ * makes the daytime numbers in that file still true. **This one is not**, and
+ * that is precisely why it is here instead: a train in a bore is lit at noon, so
+ * this term is not a function of the sun and putting it in that table would
+ * break the one invariant the table exists to state.
+ *
+ * It is quoted against the same night ambient floor everything else is, and
+ * calibrated against the street lamp rather than against taste:
+ * `LAMP_INTENSITY` is 70 at `decay = 2` from 8.6 m up, which puts **0.95** of
+ * irradiance on the road, and that is what "well lit" is worth in this renderer.
+ * 8 at `decay = 1.5` puts 1.5 on a seat 3 m away, 0.9 on the vestibule wall at
+ * 4 m and 0.35 at the far end of the carriage -- against the 0.070 a surface gets
+ * from the night sky. So the saloon is a couple of stops brighter than the
+ * footpath outside it and the far end is still five times the night.
+ *
+ * (It was 30 for one build and the first screenshot from a seat settled it: at
+ * a metre and a half the near wall, the ceiling and the grab poles were all at
+ * 255 and the interior had no shading left in it at all. An interior light is
+ * judged from *inside*, where the nearest surface is a metre away, and a number
+ * that looks reasonable against a street lamp eight metres up is four stops hot
+ * there.)
+ *
+ * `decay = 1.5` rather than the physical 2, and it is the one number here that is
+ * not physics. A real fluorescent saloon is a *line* of sources down the ceiling
+ * and this is one point standing in for twelve; inverse-square from a single
+ * point puts the far vestibule at a twentieth of the near one, which reads as a
+ * torch in a tunnel rather than as a lit carriage. 1.5 is the exponent at which
+ * one point looks like a row.
+ */
+const SALOON_INTENSITY = 8;
+const SALOON_DISTANCE = 26;
+const SALOON_DECAY = 1.5;
+/**
+ * How high over the **railhead** the light hangs, at the rider's own plan
+ * position.
+ *
+ * At the rider's x and z, because that is what makes one light enough -- see
+ * section 2 -- and at a fixed height rather than at their eye, because 2.55 m is
+ * the intermediate floor of a Tangara and this light casts no shadow. A
+ * shadowless point light sitting in the deck between the two saloons lights both
+ * of them: the lower deck from above at 1.4 m and the upper from below at 1.3 m,
+ * which is within a stop of each other. Put it at the rider's eye instead and a
+ * player on the upper deck is standing in a dark box with a bright floor.
+ */
+const SALOON_LIFT = 2.55;
+/**
+ * How long the saloon light survives without being told about a carriage.
+ *
+ * A staleness guard and nothing else. Every frame the fleet updates it either
+ * places this light or leaves it dark, so in the ordinary course it is exact --
+ * but a fleet that stops updating at all (no bake, a rail load that failed, a
+ * future caller that forgets) would otherwise leave a point light burning in the
+ * middle of Redfern forever, which is a bug with no owner. Half a second is
+ * thirty frames: long enough that a dropped frame never flickers it, short enough
+ * that nobody sees the orphan.
+ */
+const SALOON_STALE_S = 0.5;
+
+/**
+ * The window band of one carriage, in the carriage's own frame.
+ *
+ * **Unit length on X**, so the caller's instance matrix scales it by the
+ * consist's own pitch exactly as `world/trains.drawImpostor` scales the box, and
+ * one geometry serves both a Tangara and a Metropolis. y = 0 is the railhead, +Z
+ * and -Z are the two bodysides.
+ *
+ * `double` is the whole difference between the two sets: a Tangara carries two
+ * saloons and shows two rows of windows with a dark stripe between them where the
+ * intermediate floor is, and that stripe is the single most recognisable thing
+ * about a Sydney suburban train seen at night. A Metropolis is a single-decker and
+ * shows one taller row. Two geometries and two draws rather than a compromise
+ * band, because the compromise is a train that is neither.
+ *
+ * Every quad is emitted with **one winding**, facing out of its own bodyside.
+ * `Emissive.quad` would emit both and double the triangle count of the most
+ * numerous thing in this file for a face that is inside a steel box.
+ */
+function buildTrainWindows(double: boolean): BufferGeometry {
+  const m = new Emissive();
+  const decks: ReadonlyArray<readonly [number, number]> = double
+    ? [DECK_LOWER, DECK_UPPER]
+    : [DECK_SINGLE];
+  const pitch = WINDOW_SPAN / WINDOW_PANES;
+  const half = (pitch * WINDOW_PANE_SHARE) / 2;
+  const pane = scaled(SALOON_COLOUR, WINDOW_LEVEL);
+  const wash = scaled(SALOON_COLOUR, WINDOW_WASH_LEVEL);
+  const dim = scaled(SALOON_COLOUR, WINDOW_LEVEL * 0.25);
+
+  for (const side of [-1, 1] as const) {
+    const z = side * (TRAIN_HALF_WIDTH + WINDOW_PROUD);
+    // Corner order so `cross(b - a, c - a)` points **out** of this bodyside,
+    // which is the winding three's WebGPU backend calls front for an unflipped
+    // `FrontSide` material. A pane wound the other way is not dim, it is absent,
+    // and only on one side of every train in the city -- which is exactly the
+    // kind of defect that survives a screenshot. `verifyTrainLightKit`
+    // re-derives both sides' normals rather than trusting this loop.
+    const face = (x0: number, y0: number, x1: number, y1: number, c: Rgb, cTop: Rgb): void => {
+      const a = side > 0 ? x0 : x1;
+      const b = side > 0 ? x1 : x0;
+      m.quadUp([a, y0, z], [b, y0, z], [b, y1, z], [a, y1, z], [c, c, cTop, cTop]);
+    };
+
+    // The wash: one unbroken band per side, under everything, so there is always
+    // a lit fragment where the panes are sub-pixel. See `WINDOW_WASH_LEVEL`.
+    face(-WINDOW_SPAN / 2, WINDOW_WASH[0], WINDOW_SPAN / 2, WINDOW_WASH[1], wash, wash);
+
+    for (const [y0, y1] of decks) {
+      for (let i = 0; i < WINDOW_PANES; i++) {
+        const cx = -WINDOW_SPAN / 2 + pitch * (i + 0.5);
+        // Split top and bottom off the pane at a quarter level rather than
+        // running the full brightness to a ruled edge. A window does have a hard
+        // edge -- it is a frame -- but a hard edge on an *additive* sprite at
+        // 2 cm from the steel is a bright line that survives to any distance,
+        // and two extra strips a pane is cheap enough not to argue about.
+        const lip = (y1 - y0) * 0.12;
+        face(cx - half, y0, cx + half, y0 + lip, dim, pane);
+        face(cx - half, y0 + lip, cx + half, y1 - lip, pane, pane);
+        face(cx - half, y1 - lip, cx + half, y1, pane, dim);
+      }
+    }
+  }
+  return m.build(double ? 'train_windows_double' : 'train_windows_single');
+}
+
+/**
+ * The headlight kit, anchored at the **outer end of the leading carriage** with
+ * that carriage's own +X pointing down the track ahead.
+ *
+ * Two lamps, a beam and a pool on the ballast, which is `buildCarHeadLights`
+ * three times the size and one important shape different: the beam is aimed
+ * nearly level. See `TRAIN_BEAM_LENGTH`.
+ */
+function buildTrainHeadLights(): BufferGeometry {
+  const m = new Emissive();
+  const edge: Rgb = [0, 0, 0];
+
+  for (const side of [-1, 1]) {
+    const z = side * TRAIN_LAMP_HALF_SPACING;
+    blob(m, 0, TRAIN_LAMP_Y, z, TRAIN_LAMP_HALF, scaled(TRAIN_BEAM_COLOUR, TRAIN_LAMP_LEVEL));
+
+    for (let s = 0; s < BEAM_STOPS.length - 1; s++) {
+      const [t0] = BEAM_STOPS[s];
+      const [t1] = BEAM_STOPS[s + 1];
+      const c0 = scaled(TRAIN_BEAM_COLOUR, ramp(BEAM_STOPS, t0) * TRAIN_BEAM_LEVEL);
+      const c1 = scaled(TRAIN_BEAM_COLOUR, ramp(BEAM_STOPS, t1) * TRAIN_BEAM_LEVEL);
+      const at = (t: number) => ({
+        x: t * TRAIN_BEAM_LENGTH,
+        y: TRAIN_LAMP_Y - t * TRAIN_BEAM_DROP,
+        half: TRAIN_BEAM_HALF_START + (TRAIN_BEAM_HALF_END - TRAIN_BEAM_HALF_START) * t,
+      });
+      const a = at(t0);
+      const b = at(t1);
+      // Three strips a sheet, on `buildCarHeadLights`' finding: one quad ends at
+      // full brightness on a ruled line where it meets the ballast, and a
+      // headlight beam on a railway has no such line.
+      m.quad([a.x, a.y, z - a.half], [a.x, a.y, z - a.half * 0.4],
+        [b.x, b.y, z - b.half * 0.4], [b.x, b.y, z - b.half], [edge, c0, c1, edge]);
+      m.quad([a.x, a.y, z - a.half * 0.4], [a.x, a.y, z + a.half * 0.4],
+        [b.x, b.y, z + b.half * 0.4], [b.x, b.y, z - b.half * 0.4], [c0, c0, c1, c1]);
+      m.quad([a.x, a.y, z + a.half * 0.4], [a.x, a.y, z + a.half],
+        [b.x, b.y, z + b.half], [b.x, b.y, z + b.half * 0.4], [c0, edge, edge, c1]);
+      const av = a.half * 0.55;
+      const bv = b.half * 0.55;
+      m.quad([a.x, a.y - av, z], [a.x, a.y - av * 0.4, z],
+        [b.x, b.y - bv * 0.4, z], [b.x, b.y - bv, z], [edge, c0, c1, edge]);
+      m.quad([a.x, a.y - av * 0.4, z], [a.x, a.y + av * 0.4, z],
+        [b.x, b.y + bv * 0.4, z], [b.x, b.y - bv * 0.4, z], [c0, c0, c1, c1]);
+      m.quad([a.x, a.y + av * 0.4, z], [a.x, a.y + av, z],
+        [b.x, b.y + bv, z], [b.x, b.y + bv * 0.4, z], [c0, edge, edge, c1]);
+    }
+  }
+
+  // The ballast under the beam. `quadUp` and not `quad`, for the pools' reason:
+  // a player is above the four-foot, always.
+  for (let s = 0; s < TRACK_POOL_SEGMENTS; s++) {
+    const t0 = s / TRACK_POOL_SEGMENTS;
+    const t1 = (s + 1) / TRACK_POOL_SEGMENTS;
+    const at = (t: number) => ({
+      x: TRACK_POOL_START + (TRACK_POOL_END - TRACK_POOL_START) * t,
+      y: TRACK_POOL_LIFT + TRACK_POOL_RISE * t,
+      half: TRACK_POOL_HALF_START + (TRACK_POOL_HALF_END - TRACK_POOL_HALF_START) * t,
+      level: ramp([[0, 0.4], [0.25, 1], [0.7, 0.4], [1, 0]], t) * TRACK_POOL_LEVEL,
+    });
+    const a = at(t0);
+    const b = at(t1);
+    const c0 = scaled(TRAIN_BEAM_COLOUR, a.level);
+    const c1 = scaled(TRAIN_BEAM_COLOUR, b.level);
+    const edgeC: Rgb = [0, 0, 0];
+    m.quadUp([a.x, a.y, -a.half], [a.x, a.y, -a.half * 0.45],
+      [b.x, b.y, -b.half * 0.45], [b.x, b.y, -b.half], [edgeC, c0, c1, edgeC]);
+    m.quadUp([a.x, a.y, -a.half * 0.45], [a.x, a.y, a.half * 0.45],
+      [b.x, b.y, b.half * 0.45], [b.x, b.y, -b.half * 0.45], [c0, c0, c1, c1]);
+    m.quadUp([a.x, a.y, a.half * 0.45], [a.x, a.y, a.half],
+      [b.x, b.y, b.half], [b.x, b.y, b.half * 0.45], [c0, edgeC, edgeC, c1]);
+  }
+
+  return m.build('train_headlights');
+}
+
+/**
+ * The tail kit, on the same anchor as the head and in the same local frame.
+ *
+ * That the two share a frame is not a coincidence to be tidied away later: every
+ * consist in `game/riding.ts` ends with a carriage whose `flip` is true, so the
+ * rear vehicle's own +X already points backwards down the line and the rear end
+ * of the train is at the same `+X * halfLength` the nose is. `verifyTrainLights`
+ * asserts that about the consist tables rather than leaving it as a thing this
+ * comment happens to know.
+ *
+ * Two markers and no beam and no pool, which is `TAIL_COLOUR`'s argument
+ * unchanged: a tail light does not light the track and one that did would be
+ * wrong in a way people feel without seeing.
+ */
+function buildTrainTailLights(): BufferGeometry {
+  const m = new Emissive();
+  for (const side of [-1, 1]) {
+    blob(m, 0, TRAIN_LAMP_Y, side * TRAIN_LAMP_HALF_SPACING, TRAIN_TAIL_HALF,
+      scaled(TAIL_COLOUR, TRAIN_TAIL_LEVEL));
+  }
+  return m.build('train_taillights');
+}
+
+/**
+ * Every lit carriage in the city, plus the one real light in the one carriage the
+ * player is standing in.
+ *
+ * ---------------------------------------------------------------------------
+ * 1. WHY THE DAY/NIGHT TERM IS PER **INSTANCE** HERE AND NOWHERE ELSE.
+ *
+ * Every other sprite in this file reads the shared `nightOpacity` uniform and is
+ * therefore off by day, everywhere, by construction -- one uniform, one dusk
+ * ramp, no second threshold anywhere. A train breaks that and is the only thing
+ * in the game that can: **a train in a bore is in the dark at noon.** Two trains
+ * on the same line at the same instant, one on the viaduct at Meadowbank in full
+ * sun and one under Victoria Cross, need different answers, and no uniform can
+ * give two answers.
+ *
+ * So the level rides in `instanceColor`, written per carriage by the fleet, and
+ * the material's own opacity is 1. Two consequences worth stating:
+ *
+ *   - `setColorAt(0, white)` in the constructor of every set below, because
+ *     `NodeMaterial.setupDiffuseColor` multiplies by `instanceColor` **only when
+ *     the attribute exists at the moment the node graph is built**. Absent then,
+ *     absent from the shader forever, and every train in Sydney is fully lit at
+ *     midday. `world/rail-geo.ts` and `world/cars.ts` both carry this scar.
+ *   - the day path costs nothing anyway, because a carriage whose level is zero
+ *     is never *added*: `count` ends the frame at the number of lit carriages, so
+ *     a summer afternoon above ground is four instanced draws of zero instances.
+ *     That is what replaces `CarLights.setLive`, and it is strictly better --
+ *     there is no visibility to toggle and therefore no boot-order trap.
+ *
+ * ---------------------------------------------------------------------------
+ * 2. THE ONE REAL LIGHT, AND WHY EXACTLY ONE.
+ *
+ * The rig this file already owns is three real lights and the header explains at
+ * length that the number is a shader constant rather than a budget. This makes it
+ * four, and the fourth buys the one thing no amount of additive geometry can:
+ * **shading**. A carriage interior is 36,000 triangles of seat, pole, strap and
+ * moquette that exist as geometry and are lit by nothing after dark; an emissive
+ * term over the top of them would make them glow rather than make them lit, and
+ * the difference is exactly the difference between a photograph of a train and a
+ * drawing of one.
+ *
+ * It is one and not two because it follows the **rider**, not the carriage. A
+ * light hung at each carriage's centre would be eight lights for a train and
+ * seven of them light nothing anybody can see; a light hung 0.72 m over the
+ * player's own eye is always in the saloon the player is in, and the player is
+ * the only observer who is ever inside one. `SALOON_DECAY` is what makes that one
+ * point read as a ceiling full of tubes.
+ *
+ * Constructed here and added to the scene by `NightLights`, which is the one
+ * place in the build that is guaranteed to run before `warmUpPipelines` -- see
+ * this file's header for what a light appearing after that costs.
+ *
+ * ---------------------------------------------------------------------------
+ * 3. A MODULE SINGLETON, DELIBERATELY.
+ *
+ * `world/trains.ts` fills this and `NightLights` owns its light, and the two have
+ * no reference to each other. The alternative is a line of wiring in `main.ts`
+ * assigning one to the other -- which is what `trafficMovers.lights` is -- and it
+ * buys nothing here: there is exactly one fleet and exactly one night in the
+ * process, the sprites are a property of the *world* rather than of any
+ * particular rig, and `nightOpacity` two thousand lines above is already a
+ * city-wide singleton on identical terms. What it costs is the class of bug where
+ * the wiring line is deleted and the feature silently stops existing.
+ */
+export class TrainLights {
+  /** `[double-deck windows, single-deck windows, headlights, tail lights]`. */
+  readonly meshes: InstancedMesh[];
+  readonly material: MeshBasicNodeMaterial;
+  readonly geometries: BufferGeometry[];
+  /** The one real light. See section 2. */
+  readonly saloon: PointLight;
+
+  /** Carriages lit last frame, and how many of those because they are underground. */
+  drawn = 0;
+  drawnUnderground = 0;
+  /** Train ends lit last frame: heads and tails together. */
+  ends = 0;
+  /** Carriages and ends refused for want of capacity. Should be 0 forever. */
+  overflowed = 0;
+
+  private readonly counts = [0, 0, 0, 0];
+  private saloonLevel = 0;
+  private stale = SALOON_STALE_S;
+
+  constructor() {
+    // One material for all four sets: unlit, vertex-coloured, additive, never
+    // depth-written, and **no `opacityNode`**. See section 1.
+    this.material = nightMaterial('train_lights', false, true);
+    this.geometries = [
+      buildTrainWindows(true),
+      buildTrainWindows(false),
+      buildTrainHeadLights(),
+      buildTrainTailLights(),
+    ];
+    const names = ['train_windows_double', 'train_windows_single', 'train_headlights', 'train_taillights'];
+    const capacity = [TRAIN_LIGHT_CAPACITY, TRAIN_LIGHT_CAPACITY, TRAIN_END_CAPACITY, TRAIN_END_CAPACITY];
+    this.meshes = this.geometries.map((geometry, i) => {
+      const mesh = new InstancedMesh(geometry, this.material, capacity[i]);
+      mesh.name = names[i];
+      mesh.frustumCulled = false;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      // The colour buffer, allocated **before** the node graph is built. See
+      // section 1; without this line every train in the city is lit at noon.
+      mesh.setColorAt(0, _colour.setRGB(1, 1, 1));
+      // One instance, parked four kilometres under the world, and `count` left at
+      // one until the first frame's `end()` takes it over. `world/trains.warm`
+      // does the identical thing to the impostor set for the identical reason:
+      // these four are added to the fleet's own group and are walked by the
+      // fleet's warm-up pass, and a set that is drawing nothing at the moment of
+      // the walk is a set whose pipeline is compiled inside whichever frame first
+      // shows a lit train -- which is the frame the sun goes down, in front of the
+      // player, with a train in view. This project has shipped that bug.
+      _matrix.makeTranslation(0, -4000, 0);
+      mesh.setMatrixAt(0, _matrix);
+      mesh.count = 1;
+      mesh.visible = true;
+      return mesh;
+    });
+
+    const light = new PointLight(0xffffff, 0, SALOON_DISTANCE, SALOON_DECAY);
+    light.name = 'train_saloon';
+    // Never. One shadow rig in this build and it is the sun's; see the header.
+    light.castShadow = false;
+    light.color.setRGB(SALOON_COLOUR[0], SALOON_COLOUR[1], SALOON_COLOUR[2]);
+    // Parked under the world rather than at the origin, which is a real place --
+    // `NightLights`' own lamps make the same move for the same reason.
+    light.position.set(0, -1000, 0);
+    this.saloon = light;
+  }
+
+  /** Start a frame. Nothing is ever refused wholesale: see section 1. */
+  begin(): void {
+    this.counts[0] = 0;
+    this.counts[1] = 0;
+    this.counts[2] = 0;
+    this.counts[3] = 0;
+    this.saloonLevel = 0;
+    this.overflowed = 0;
+    // Zeroed here and not in `end()`, with the counts it belongs beside. It was
+    // left out of the first cut and simply accumulated -- 75,000 "underground
+    // carriages" after two minutes at Redfern -- which is worth a line because
+    // the number looked plausible for about a second and is the only evidence
+    // anybody has that the bore rule is still answering.
+    this.drawnUnderground = 0;
+  }
+
+  /**
+   * One carriage, from the matrix the fleet already built to draw it with.
+   *
+   * `matrix` is the carriage frame with X scaled by the consist's own pitch --
+   * exactly what `drawImpostor` puts on the box, and the reason the window band is
+   * built at unit length. `level` is 0 to 1 and is the carriage's own: night
+   * outside, or a bore at any hour.
+   */
+  car(matrix: Matrix4, metro: boolean, level: number, underground: boolean): void {
+    if (level <= 0) return;
+    const set = metro ? 1 : 0;
+    const at = this.counts[set];
+    if (at >= TRAIN_LIGHT_CAPACITY) {
+      this.overflowed++;
+      return;
+    }
+    const mesh = this.meshes[set];
+    mesh.setMatrixAt(at, matrix);
+    mesh.setColorAt(at, _colour.setRGB(level, level, level));
+    this.counts[set] = at + 1;
+    if (underground) this.drawnUnderground++;
+  }
+
+  /** The leading end of a consist, in the leading carriage's own frame. */
+  head(matrix: Matrix4, level: number): void {
+    this.endKit(2, matrix, level);
+  }
+
+  /** And the trailing end, in the trailing carriage's -- which points backwards. */
+  tail(matrix: Matrix4, level: number): void {
+    this.endKit(3, matrix, level);
+  }
+
+  private endKit(set: number, matrix: Matrix4, level: number): void {
+    if (level <= 0) return;
+    const at = this.counts[set];
+    if (at >= TRAIN_END_CAPACITY) {
+      this.overflowed++;
+      return;
+    }
+    const mesh = this.meshes[set];
+    mesh.setMatrixAt(at, matrix);
+    mesh.setColorAt(at, _colour.setRGB(level, level, level));
+    this.counts[set] = at + 1;
+  }
+
+  /**
+   * The player is standing in a lit carriage: their plan position, and the
+   * railhead under the carriage they are in.
+   *
+   * Called at most once a frame, by the fleet, from the same rectangle test that
+   * decides the train must not collide with them -- so the light is on exactly
+   * when the player is aboard, with no second source for that fact to drift from.
+   */
+  rider(x: number, railY: number, z: number, level: number): void {
+    if (level <= this.saloonLevel) return;
+    this.saloonLevel = level;
+    this.saloon.position.set(x, railY + SALOON_LIFT, z);
+  }
+
+  end(): void {
+    let cars = 0;
+    for (let i = 0; i < this.meshes.length; i++) {
+      const mesh = this.meshes[i];
+      const n = this.counts[i];
+      if (n > 0 || mesh.count > 0) {
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      }
+      mesh.count = n;
+      if (i < 2) cars += n;
+    }
+    this.drawn = cars;
+    this.ends = this.counts[2] + this.counts[3];
+    // Intensity, never `visible`. The invariant the whole night rests on.
+    this.saloon.intensity = SALOON_INTENSITY * this.saloonLevel;
+    this.stale = 0;
+  }
+
+  /**
+   * Age the saloon light, from whoever is running the frame clock.
+   *
+   * `NightLights.update` calls this and the fleet does not, which is the point:
+   * this is the guard against the fleet *not* running. See `SALOON_STALE_S`.
+   */
+  tick(dt: number): void {
+    if (this.saloon.intensity === 0) return;
+    this.stale += dt;
+    if (this.stale > SALOON_STALE_S) {
+      this.saloon.intensity = 0;
+      this.saloonLevel = 0;
+    }
+  }
+
+  /**
+   * Release everything. **Never called on the live singleton** -- and
+   * `NightLights.dispose` deliberately does not reach it, because the probes
+   * `verifyNightLights` builds would otherwise dispose the geometry the game is
+   * about to draw with.
+   */
+  dispose(): void {
+    for (const mesh of this.meshes) mesh.dispose();
+    for (const geometry of this.geometries) geometry.dispose();
+    this.material.dispose();
+  }
+}
+
+/**
+ * The one train light rig in the process. See `TrainLights` section 3.
+ *
+ * `world/trains.TrainFleet` puts the meshes in its own group and fills them;
+ * `NightLights` puts the real light in the scene. Neither file imports the other.
+ */
+export const trainLights = /*#__PURE__*/ new TrainLights();
+
+/**
+ * How far into the night the city is, as the last frame left it.
+ *
+ * The shared uniform, read back rather than recomputed, so a caller outside this
+ * file that needs the level cannot end up with a second dusk ramp. It is `one
+ * frame stale` for anything that runs before `NightLights.update` -- which is the
+ * fleet -- and that is 16 ms of a ramp that takes eight degrees of solar altitude
+ * to complete, or about twelve minutes of Sydney clock. Nothing can see it.
+ */
+export function nightLevelNow(): number {
+  return nightOpacity.value;
+}
+
 // --- The rig -----------------------------------------------------------------
 
 /**
@@ -2638,6 +3295,17 @@ export class NightLights {
 
     for (const mesh of this.carLights.meshes) scene.add(mesh);
     scene.add(this.bikeLights.mesh);
+
+    // --- And the fourth real light: the saloon of whichever carriage the player
+    // is standing in. Added here rather than by the fleet, because *here* is the
+    // one place in the boot that is guaranteed to run before `warmUpPipelines`
+    // and because a light must never be parented to something whose `visible` is
+    // ever toggled -- `TileStreamer` and `precompileGroup` both toggle a group's
+    // visibility, and `_projectObject` skips an invisible object's children, so a
+    // light in one would drop off the render list and recompile the scene. See
+    // `TrainLights` section 2. Its *sprites* live in the fleet's own group, which
+    // is safe because a mesh's visibility is in no cache key at all.
+    scene.add(trainLights.saloon);
   }
 
   /**
@@ -2669,6 +3337,12 @@ export class NightLights {
     const live = rig.level > NIGHT_VISIBLE_LEVEL;
     this.carLights.setLive(live);
     this.bikeLights.setLive(live);
+    // The trains are **not** given `live`, and that is the one asymmetry in this
+    // function. A train in a bore is lit at noon, so its sprites are not a
+    // function of the sun and its level is per carriage rather than per city --
+    // see `TrainLights` section 1. All this call does is age the saloon light so
+    // that a fleet which stops updating cannot leave one burning.
+    trainLights.tick(dt);
 
     this.clock += dt;
 
@@ -2824,9 +3498,16 @@ export class NightLights {
     }
   }
 
-  /** Every real light this rig owns. For the self-check and the dev handle. */
+  /**
+   * Every real light this rig owns. For the self-check and the dev handle.
+   *
+   * The saloon light is in the list even though `TrainLights` constructs it: what
+   * this list is *for* is the set of lights on the render list, which is what
+   * every material's cache key is hashed over, and a light that is in the scene
+   * and not in this list is a light the self-check cannot see.
+   */
   get realLights(): Object3D[] {
-    return [this.torch, ...this.lamps];
+    return [this.torch, trainLights.saloon, ...this.lamps];
   }
 
   /**
@@ -2839,6 +3520,11 @@ export class NightLights {
   dispose(): void {
     this.carLights.dispose();
     this.bikeLights.dispose();
+    // **And deliberately not `trainLights`.** That one is a module singleton
+    // shared with the fleet (see `TrainLights` section 3), and the only caller
+    // this method has is the self-check's throwaway probe -- which would
+    // otherwise dispose the geometry and the material the game is about to draw
+    // every train in Sydney with, three hundred lines before it does.
   }
 }
 
@@ -2952,9 +3638,12 @@ export function verifyNightLights(): string[] {
   //    about objects rather than about numbers.
   const probe = new NightLights(new Object3D());
   const real = probe.realLights;
-  if (real.length !== 1 + LAMP_REAL_COUNT) {
+  // The torch, the saloon and the lamps. The saloon is the fourth and the newest
+  // and `TrainLights` section 2 argues for it; what this number is guarding is
+  // that there is never a *fifth* without somebody having read that argument.
+  if (real.length !== 2 + LAMP_REAL_COUNT) {
     failures.push(
-      `The night rig owns ${real.length} real lights, not ${1 + LAMP_REAL_COUNT}. That count is a ` +
+      `The night rig owns ${real.length} real lights, not ${2 + LAMP_REAL_COUNT}. That count is a ` +
         `shader constant: LightsNode.customCacheKey hashes every light on the render list, so ` +
         `changing it rebuilds and recompiles every pipeline in the scene.`,
     );
@@ -3084,6 +3773,11 @@ export function verifyNightLights(): string[] {
     ['street lamp', lampGeometry],
     ['car headlights', buildCarHeadLights()],
     ['bike light', buildBikeLight()],
+    // The train's ballast pool, on the same predicate rather than on one of its
+    // own: the head kit's two lamps are `blob`s, so it is legitimately half
+    // face-down, and only the orphan test can tell that apart from a pool that
+    // will never be seen.
+    ['train headlights', buildTrainHeadLights()],
   ] as const) {
     const p = geometry.getAttribute('position');
     const index = geometry.getIndex();
@@ -3541,6 +4235,276 @@ export function verifyNightLights(): string[] {
     );
   }
   probe2.dispose();
+
+  // 9. The trains, which are the one population in this file whose level is not
+  //    the shared uniform. See `verifyTrainLightKit`.
+  for (const failure of verifyTrainLightKit()) failures.push(failure);
+
+  return failures;
+}
+
+/**
+ * The train light kit: the windows, the two ends, the one real light, and the
+ * frame cycle that drives them.
+ *
+ * Split out of `verifyNightLights` rather than folded into it because half of
+ * what it checks belongs to `world/trains.ts` and cannot be reached from there --
+ * that file imports this one, so the arrow only points one way and the geometry
+ * has to be asserted on this side of it. `verifyTrainLights` over there asserts
+ * the half that needs a bake and a consist. Both are run at boot; neither throws.
+ *
+ * Everything here is measured on a **throwaway** rig rather than on the singleton
+ * the game is about to draw with, so that a self-check can exercise the frame
+ * cycle -- including the states this feature is most likely to get stuck in --
+ * without leaving a carriage lit at the origin.
+ */
+export function verifyTrainLightKit(): string[] {
+  const failures: string[] = [];
+
+  // --- 1. The windows face out of their own bodyside, and sit just proud of it.
+  //
+  // A pane wound inwards is not dim, it is **absent**, and only on one side of
+  // every train in the city: `FrontSide` culls it, so a player on the down
+  // platform sees a lit train and a player on the up platform sees a black one.
+  // That is a defect a screenshot can easily be taken on the wrong side of, so it
+  // is re-derived here rather than trusted to the corner ordering in
+  // `buildTrainWindows`.
+  for (const double of [true, false]) {
+    const g = buildTrainWindows(double);
+    const p = g.getAttribute('position');
+    const index = g.getIndex()!;
+    let wrongWay = 0;
+    let insideSkin = 0;
+    let tooProud = 0;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let minY = Infinity;
+    for (let i = 0; i < index.count; i += 3) {
+      const a = index.getX(i);
+      const b = index.getX(i + 1);
+      const c = index.getX(i + 2);
+      const ax = p.getX(a), ay = p.getY(a), az = p.getZ(a);
+      const bx = p.getX(b), by = p.getY(b);
+      const cx = p.getX(c), cy = p.getY(c);
+      // The z component of `cross(b - a, c - a)`, which is the front face under
+      // `GPUFrontFace.CCW`. Only z, because every one of these triangles lies in
+      // a plane of constant z and the other two components are zero by
+      // construction -- and if they are not, the test below fails anyway.
+      const ux = bx - ax, uy = by - ay;
+      const vx = cx - ax, vy = cy - ay;
+      const nz = ux * vy - uy * vx;
+      if (nz * az <= 0) wrongWay++;
+      const proud = Math.abs(az) - TRAIN_HALF_WIDTH;
+      if (proud <= 0) insideSkin++;
+      if (proud > 0.05) tooProud++;
+      for (const [x, y] of [[ax, ay], [bx, by], [cx, cy]] as const) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+    const kind = double ? 'double-deck' : 'single-deck';
+    if (wrongWay > 0) {
+      failures.push(
+        `${wrongWay} of the ${kind} carriage's ${index.count / 3} window triangles are wound ` +
+          `towards the inside of the train. FrontSide culls those, so that is a train whose ` +
+          `windows are lit from one platform and black from the other -- and which of the two ` +
+          `you happen to look from is not something a screenshot settles.`,
+      );
+    }
+    if (insideSkin > 0 || tooProud > 0) {
+      failures.push(
+        `The ${kind} window band is not just outside the bodyside: ${insideSkin} vertices are at ` +
+          `or inside ${TRAIN_HALF_WIDTH} m and ${tooProud} are more than 5 cm proud of it. Inside ` +
+          `it the sprite loses the depth test against the carriage's own hull and simply is not ` +
+          `drawn; far outside it, it hangs in the air beside the train and is visible through the ` +
+          `next carriage. See WINDOW_PROUD.`,
+      );
+    }
+    // Unit length on X, because the instance matrix multiplies X by the consist's
+    // own pitch. A band built at 20 m would come out 400 m long.
+    if (maxX - minX > 1 || maxX - minX < 0.8) {
+      failures.push(
+        `The ${kind} window band is ${(maxX - minX).toFixed(2)} carriage lengths long. It is ` +
+          `built at unit length and scaled by the consist's pitch exactly as the impostor box is, ` +
+          `so anything but a little under 1 is a band the length of a platform.`,
+      );
+    }
+    // Inside the loading gauge: the impostor's roof is 4.15 and its sill 0.9, and
+    // a window above the roof is a window on the pantograph.
+    if (maxY > 4.0 || minY < 0.8) {
+      failures.push(
+        `The ${kind} window band spans ${minY.toFixed(2)} to ${maxY.toFixed(2)} m over the ` +
+          `railhead. The bodyside is 0.9 to 4.15, so this is glass in the underframe or in the ` +
+          `roof.`,
+      );
+    }
+    g.dispose();
+  }
+
+  // --- 2. The head kit throws forwards, stays on the track, and its pool is
+  //        wound upwards. `quadUp`'s own trap, restated for a new caller: a pool
+  //        wound the other way is culled and the symptom is "the train does not
+  //        light the track", which reads as a missing feature rather than a bug.
+  {
+    const g = buildTrainHeadLights();
+    const p = g.getAttribute('position');
+    const index = g.getIndex()!;
+    let behind = 0;
+    let outOfGauge = 0;
+    let reach = 0;
+    for (let i = 0; i < index.count; i += 3) {
+      const a = index.getX(i), b = index.getX(i + 1), c = index.getX(i + 2);
+      for (const v of [a, b, c]) {
+        const x = p.getX(v);
+        const z = p.getZ(v);
+        if (x < -0.4) behind++;
+        if (x > reach) reach = x;
+        if (Math.abs(z) > 3.2) outOfGauge++;
+      }
+    }
+    if (behind > 0) {
+      failures.push(
+        `${behind} vertices of the headlight kit are behind its own anchor. The anchor is the ` +
+          `**nose** of the leading carriage, so anything at negative x is a beam thrown through ` +
+          `the driver's cab and down the inside of the train.`,
+      );
+    }
+    if (Math.abs(reach - TRAIN_BEAM_LENGTH) > 0.5 && Math.abs(reach - TRACK_POOL_END) > 0.5) {
+      failures.push(
+        `The headlight kit reaches ${reach.toFixed(1)} m, neither the beam's ` +
+          `${TRAIN_BEAM_LENGTH} m nor the pool's ${TRACK_POOL_END} m.`,
+      );
+    }
+    if (outOfGauge > 0) {
+      failures.push(
+        `${outOfGauge} vertices of the headlight kit are more than 3.2 m off the track centre. ` +
+          `A beam wider than the four-foot and its cess is a beam lighting the platform coping ` +
+          `of the road beside it -- see TRAIN_BEAM_HALF_END.`,
+      );
+    }
+    // The pool's own winding is not checked here: it goes through the orphan
+    // face-down test in `verifyNightLights` above, with the street lamp's and the
+    // car's, because the head kit's two lamps are `blob`s and are legitimately
+    // half face-down. A naive flat-triangle count fires on those every time.
+    g.dispose();
+  }
+
+  // --- 3. The rig itself: the instanced sets, the colour buffer, the parked
+  //        warm-up instance, and the one real light.
+  const kit = new TrainLights();
+  if (kit.material.opacityNode !== null && kit.material.opacityNode !== undefined) {
+    failures.push(
+      `The train material carries an opacityNode. It must not: the day/night term for a train is ` +
+        `per **carriage**, because a train in a bore is lit at noon and one on the Meadowbank ` +
+        `bridge beside it is not, and one uniform cannot say both. See TrainLights section 1.`,
+    );
+  }
+  for (const mesh of kit.meshes) {
+    if (mesh.instanceColor === null) {
+      failures.push(
+        `${mesh.name} has no instanceColor buffer after construction. ` +
+          `NodeMaterial.setupDiffuseColor only multiplies by it when the attribute exists at the ` +
+          `moment the node graph is built, so this is every train in Sydney lit at midday, ` +
+          `forever, with no way to turn it off. setColorAt(0, white) in the constructor.`,
+      );
+    }
+    if (mesh.count < 1 || !mesh.visible) {
+      failures.push(
+        `${mesh.name} starts at count ${mesh.count} / visible ${mesh.visible}. A set that draws ` +
+          `nothing during the fleet's warm-up walk is a set whose pipeline is compiled inside ` +
+          `whichever frame first shows a lit train -- see world/warmup.ts, and the parked ` +
+          `instance in the constructor.`,
+      );
+    }
+  }
+  const saloon = kit.saloon;
+  if (saloon.visible !== true || saloon.castShadow === true || saloon.intensity !== 0) {
+    failures.push(
+      `The saloon light starts visible ${saloon.visible}, castShadow ${saloon.castShadow}, ` +
+        `intensity ${saloon.intensity}. It must be visible (an invisible light is off the render ` +
+        `list, which recompiles every pipeline in the scene), cast nothing, and be dark until ` +
+        `somebody boards.`,
+    );
+  }
+
+  // --- 4. One frame of the cycle, and then the *empty* frame after it, which is
+  //        the state this feature is most likely to get stuck in: the player gets
+  //        off, or the sun comes up, and something stays lit. Nothing in the
+  //        renderer would report that and the player would simply see a glowing
+  //        train in daylight.
+  // **Twice**, and that is not padding: every counter here is reset in `begin`
+  // and incremented in `car`, so one pass cannot tell a counter that is reset
+  // from one that accumulates. `drawnUnderground` was exactly that -- it read
+  // 75,033 after two minutes on the platform at Redfern, which is a plausible
+  // enough number to be believed and is the only evidence anybody has that the
+  // bore rule is still answering.
+  for (let pass = 0; pass < 2; pass++) {
+    kit.begin();
+    _matrix.identity();
+    kit.car(_matrix, false, 1, false);
+    kit.car(_matrix, true, 0.5, true);
+    kit.car(_matrix, false, 0, false);
+    kit.head(_matrix, 1);
+    kit.tail(_matrix, 1);
+    kit.rider(0, 2, 0, 1);
+    kit.end();
+  }
+  if (kit.drawn !== 2 || kit.ends !== 2 || kit.overflowed !== 0) {
+    failures.push(
+      `One frame with three carriages offered -- lit, half lit underground and dark -- drew ` +
+        `${kit.drawn} carriages and ${kit.ends} ends. It should be 2 and 2: a carriage at level ` +
+        `zero is never added at all, which is what makes a summer afternoon four draws of zero ` +
+        `instances rather than a buffer full of black quads.`,
+    );
+  }
+  if (kit.drawnUnderground !== 1) {
+    failures.push(
+      `${kit.drawnUnderground} carriages were counted as underground out of one offered. That ` +
+        `counter is how anybody ever notices the bore rule has stopped answering.`,
+    );
+  }
+  if (kit.saloon.intensity !== SALOON_INTENSITY) {
+    failures.push(
+      `A rider aboard a fully lit carriage got ${kit.saloon.intensity} of saloon light, not ` +
+        `${SALOON_INTENSITY}.`,
+    );
+  }
+  kit.begin();
+  kit.end();
+  const stuck = kit.meshes.filter((m) => m.count !== 0).map((m) => m.name);
+  if (stuck.length > 0 || kit.saloon.intensity !== 0 || kit.drawn !== 0 || kit.drawnUnderground !== 0) {
+    failures.push(
+      `After a frame in which nothing was offered, ${stuck.join(', ') || 'nothing'} is still ` +
+        `drawing and the saloon light is at ${kit.saloon.intensity}. That is the daybreak case ` +
+        `and the alighting case: whatever was lit last frame must go dark on the frame nobody ` +
+        `asks for it, or the player walks away from a train they are still standing inside the ` +
+        `light of.`,
+    );
+  }
+  // And the staleness guard, which is the *other* way this gets stuck: the fleet
+  // stops updating entirely and nothing ever calls `end()` again.
+  kit.begin();
+  kit.rider(0, 2, 0, 1);
+  kit.end();
+  kit.tick(SALOON_STALE_S * 0.4);
+  if (kit.saloon.intensity === 0) {
+    failures.push(
+      `The saloon light went out ${(SALOON_STALE_S * 0.4).toFixed(2)} s after being placed. The ` +
+        `staleness guard is meant to survive a dropped frame; at this rate it flickers.`,
+    );
+  }
+  kit.tick(SALOON_STALE_S);
+  if (kit.saloon.intensity !== 0) {
+    failures.push(
+      `The saloon light is still on ${(SALOON_STALE_S * 1.4).toFixed(2)} s after the last frame ` +
+        `that placed it. A fleet that stops updating -- no bake, a failed rail load -- would ` +
+        `leave a point light burning in the middle of Redfern for the session.`,
+    );
+  }
+  kit.dispose();
 
   return failures;
 }

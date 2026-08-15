@@ -84,12 +84,48 @@
  * re-derived without one in `checkRailAnnouncements`.
  *
  * ---------------------------------------------------------------------------
- * 5. THE RENDERER RULES. The impostor's `InstancedMesh` calls
+ * 5. AFTER DARK: A MOVING STRING OF LIT WINDOWS, AND ONE REAL LIGHT.
+ *
+ * The geometry is `world/nightlights.TrainLights` and the decisions about what a
+ * lit carriage looks like are over there with the rest of the night. What is
+ * *this* file's is the two questions only the fleet can answer -- **which**
+ * carriages are lit, and **how much** -- and both are answered in the same loops
+ * that already place them, off the same matrix, so the whole feature costs one
+ * extra `spanFlagsAt` per carriage and no second pass over the timetable.
+ *
+ *   - **Every carriage the fleet draws is lit, in both tiers.** That is not
+ *     generosity; it is where the value is. The nearest two trains are hero
+ *     models and everything else out to 1.7 km is a box, and a lit train at
+ *     600 m -- across the harbour, up the valley from Lane Cove -- is a thing you
+ *     see far more often than a train you are standing beside. So the window
+ *     sprite hangs on the box train exactly as it hangs on the Tangara, from the
+ *     same instance matrix, and `TRAIN_LIGHT_CAPACITY` is `IMPOSTOR_CAPACITY` so
+ *     that no train can ever be drawn dark. `verifyTrainLights` asserts it.
+ *   - **The level is per carriage, and the reason is the bore.** Every other
+ *     night term in the build is one city-wide uniform off the sun's altitude,
+ *     which is correct for everything that lives outdoors and wrong for the only
+ *     vehicle in Sydney that spends its day underground. `spanFlagsAt` answers
+ *     `SPAN_TUNNEL` for the arc length each carriage's *centre* is at, so a train
+ *     entering Wynyard lights up carriage by carriage as it takes the portal,
+ *     which is what one does.
+ *   - **One real light**, in the saloon of the carriage the player is standing
+ *     in, placed from `solidifyTrain`'s own rectangle test -- the same test that
+ *     decides the train must not collide with them. A rider is aboard exactly
+ *     when their plan position is inside a carriage, and hanging the light off
+ *     that means there is no second source for the fact and nothing to drift.
+ *
+ * ---------------------------------------------------------------------------
+ * 6. THE RENDERER RULES. The impostor's `InstancedMesh` calls
  * `setColorAt(0, white)` in its constructor, for the reason `world/rail-geo.ts`
- * and `world/cars.ts` both state. The model materials cannot be warmed by a
- * stand-in -- they come out of a GLB and there is nothing to stand in for -- so
- * `warm()` walks one instance of every carriage template through the same
- * `compileAsync` the tile streamer uses, before the first frame.
+ * and `world/cars.ts` both state -- and so do all four of the night sets, which
+ * carry their day/night level *in* that buffer. The model materials cannot be
+ * warmed by a stand-in -- they come out of a GLB and there is nothing to stand in
+ * for -- so `warm()` walks one instance of every carriage template through the
+ * same `compileAsync` the tile streamer uses, before the first frame. The night
+ * sets are in this file's own group and are walked by that same pass, each with
+ * one instance parked four kilometres down so that the walk has something to
+ * compile; a set drawing nothing is a set with no pipeline, and the frame that
+ * would have paid for it is the frame the sun goes down.
  */
 
 import {
@@ -112,6 +148,8 @@ import {
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 import {
+  SPAN_SUBWAY,
+  SPAN_TUNNEL,
   createTrainPose,
   dwellElapsed,
   liveTripCount,
@@ -122,14 +160,23 @@ import {
   type TrainPose,
 } from '../game/rail.ts';
 import {
+  METRO,
   METROPOLIS,
+  SUBURBAN,
   TANGARA,
   carFrameAt,
   consistOf,
   consistOffset,
   createCarFrame,
+  spanFlagsAt,
   type ConsistCar,
 } from '../game/riding.ts';
+import {
+  TRAIN_END_CAPACITY,
+  TRAIN_LIGHT_CAPACITY,
+  nightLevelNow,
+  trainLights,
+} from './nightlights.ts';
 
 const MODEL_DIR = '/trains/';
 
@@ -226,6 +273,9 @@ const _f = /*#__PURE__*/ new Vector3();
 const _u = /*#__PURE__*/ new Vector3();
 const _r = /*#__PURE__*/ new Vector3();
 const _colour = /*#__PURE__*/ new Color();
+/** The night's copy of a carriage matrix, and the shift out to a train's end. */
+const _lit = /*#__PURE__*/ new Matrix4();
+const _endShift = /*#__PURE__*/ new Matrix4();
 
 /**
  * A mesh's geometry, in the carriage's own frame, as plain float32.
@@ -634,6 +684,14 @@ export interface TrainFleetStats {
   solidCars: number;
   /** Carriages suppressed because the player is inside them. See `solidify`. */
   riddenCars: number;
+  /** Carriages wearing lit windows this frame. See section 5. */
+  litCars: number;
+  /** How many of those are lit because they are in a bore rather than because it is dark. */
+  litUnderground: number;
+  /** Train ends -- heads and tails together -- lit this frame. */
+  litEnds: number;
+  /** Lit carriages or ends refused for want of capacity. Must stay 0. */
+  lightOverflows: number;
 }
 
 /**
@@ -704,6 +762,10 @@ export class TrainFleet {
     updateMs: 0,
     solidCars: 0,
     riddenCars: 0,
+    litCars: 0,
+    litUnderground: 0,
+    litEnds: 0,
+    lightOverflows: 0,
   };
   /** Anything the split or the load could not do. Printed once at boot. */
   readonly warnings: string[] = [];
@@ -753,6 +815,22 @@ export class TrainFleet {
     // Without it every box train draws white forever. See section 5.
     this.impostor.setColorAt(0, _colour.setRGB(1, 1, 1));
     this.group.add(this.impostor);
+
+    // --- And the night, which rides in this group rather than in the night
+    // rig's. Two reasons, and the second is the one that matters.
+    //
+    // The sets are filled from carriage matrices this file computes, so they
+    // belong to the same lifecycle as the carriages -- and they are reached by
+    // `warm()`, which walks this group through `compileAsync` before the first
+    // frame, so nothing has to be added to `main.ts` for them to be warm. A mesh
+    // in a group whose `visible` is toggled is free; only a **light** in one is
+    // not, which is exactly why `TrainLights.saloon` is added to the scene by
+    // `NightLights` instead and is not here. See `TrainLights` section 2.
+    for (const mesh of trainLights.meshes) this.group.add(mesh);
+
+    // The self-check, run at boot through the channel this class already has for
+    // it: `main.ts` prints `warnings` unconditionally once the models are in.
+    for (const failure of verifyTrainLights()) this.warnings.push(failure);
   }
 
   /**
@@ -867,6 +945,11 @@ export class TrainFleet {
   update(bake: RailBake, t: number, x: number, z: number): void {
     const started = performance.now();
     this.release();
+    // How dark the city is, read once from the one dusk ramp in the build rather
+    // than recomputed here. A carriage in a bore overrides it; see section 5 and
+    // `nightLevelNow`, which explains why one frame of staleness is invisible.
+    this.night = nightLevelNow();
+    trainLights.begin();
     // Last frame's carriages come out of the index **before** this frame's
     // matrices are written into the same eight floats. The prism records are
     // pooled and rewritten in place -- see `solidAt` -- so leaving them
@@ -950,6 +1033,7 @@ export class TrainFleet {
     this.impostor.count = impostors;
     this.impostor.instanceMatrix.needsUpdate = true;
     if (this.impostor.instanceColor) this.impostor.instanceColor.needsUpdate = true;
+    trainLights.end();
 
     this.stats.modelTrains = modelled.size;
     this.stats.impostorCars = impostors;
@@ -957,8 +1041,45 @@ export class TrainFleet {
     this.stats.modelTriangles = triangles;
     this.stats.solidCars = solid;
     this.stats.riddenCars = ridden;
+    this.stats.litCars = trainLights.drawn;
+    this.stats.litUnderground = trainLights.drawnUnderground;
+    this.stats.litEnds = trainLights.ends;
+    this.stats.lightOverflows = trainLights.overflowed;
     this.stats.updateMs = performance.now() - started;
   }
+
+  /**
+   * How lit a carriage centred at `centre` is, 0 to 1.
+   *
+   * The whole of the underground rule, and it is one bit wide. `spanFlagsAt`
+   * reads the flags of the polyline vertex the carriage's centre is standing on
+   * -- the *entering* vertex, so a train straddling a portal counts as being in
+   * the tunnel it is entering, which is that function's own documented
+   * convention and is the right one here: a carriage half into the bore is a
+   * carriage whose windows have already come on.
+   *
+   * `SPAN_TUNNEL` and **not** `SPAN_SUBWAY`, which is a route tag rather than a
+   * bore: `world/rail-geo.ts` records that reading it as "Metro, therefore below
+   * ground" lined the wrong stretches of the Bankstown line, and a train lit at
+   * noon on an embankment at Punchbowl is that same mistake made visible.
+   */
+  private levelAt(bake: RailBake, dir: RailDirection, centre: number): number {
+    // The answer and *why* it is the answer, because they are not the same
+    // question and the difference is invisible at midnight. Underground is a
+    // fact about the track; a level of 1 is what it produces -- and at full dark
+    // a surface carriage is also at 1, so anything that recovers "in a bore"
+    // from the level alone reports zero every night, which is exactly the shape
+    // the first build shipped: `litUnderground` read 0 on the platform at
+    // Wynyard, where every train in sight was in one.
+    const bore = (spanFlagsAt(bake, dir, centre) & SPAN_TUNNEL) !== 0;
+    this.bore = bore;
+    return bore ? 1 : this.night;
+  }
+
+  /** How dark the city is this frame. See `update`. */
+  private night = 0;
+  /** Whether the last `levelAt` answered for a carriage in a bore. */
+  private bore = false;
 
   /**
    * Where a carriage goes to be solid. Null is a working configuration.
@@ -1028,6 +1149,16 @@ export class TrainFleet {
       const dz = pz - oz;
       if (dx * dx + dz * dz > SOLID_RADIUS * SOLID_RADIUS) continue;
       if (Math.abs(dx * fx + dz * fz) <= halfLen && Math.abs(dx * rx + dz * rz) <= hw) {
+        // **Aboard**, by the definition this method already rests on -- and
+        // therefore the one carriage in the city that gets a real light. Hung
+        // off this test rather than off `game/riding.ts`'s aboard state for the
+        // reason the suppression itself is: two sources for "which carriage is
+        // this person in" is two sources that can disagree, and the symptom of a
+        // disagreement here would be a saloon lit one carriage away from the
+        // player standing in it. The plan position is the player's own; the
+        // height is this carriage's railhead, which is what makes the light
+        // climb the Meadowbank bridge with the train it is in.
+        trainLights.rider(px, oy, pz, this.levelAt(bake, dir, centre));
         return -1;
       }
       const prism = this.solidAt(cursor);
@@ -1148,7 +1279,12 @@ export class TrainFleet {
         instance.root.visible = false;
         continue;
       }
-      placeCar(bake, dir, centre, instance.root, car.flip);
+      // `placeCar` inlined, because the night wants the matrix it built and not
+      // the position, quaternion and scale it decomposed into. Statement for
+      // statement the same two lines.
+      carMatrix(bake, dir, centre, car.flip, _matrix);
+      _matrix.decompose(instance.root.position, instance.root.quaternion, instance.root.scale);
+      this.lightCar(bake, dir, centre, k, consist);
       instance.root.visible = true;
       for (const door of instance.doors) {
         door.object.position.set(door.dx * open, door.dy * open, door.dz * open);
@@ -1177,6 +1313,10 @@ export class TrainFleet {
       const centre = consistOffset(s, k, consist.cars.length, consist.pitch);
       if (centre < 0) continue;
       carMatrix(bake, dir, centre, consist.cars[k].flip, _matrix);
+      // The night, from the **unscaled** frame and before the box takes it: the
+      // ends hang off the carriage's own axes and the window band does its own
+      // scaling, so this has to happen while the matrix is still orthonormal.
+      this.lightCar(bake, dir, centre, k, consist);
       // The box is built at unit length; the consist's own pitch scales it, so a
       // Metro car is 22 m and a Tangara 20.4 without a second geometry.
       _matrix.scale(_v.set(consist.pitch - 0.9, 1, 1));
@@ -1185,6 +1325,45 @@ export class TrainFleet {
       at++;
     }
     return at;
+  }
+
+  /**
+   * The lit windows of one carriage, and the head or tail lamps if it is an end
+   * one. `_matrix` must hold that carriage's **unscaled** frame.
+   *
+   * Shared by both tiers and called from inside both their loops rather than
+   * from a pass of its own, because the expensive half of placing a carriage is
+   * the two `sampleAlong` binary searches inside `carFrameAt` and they have just
+   * been paid for. What this adds is one more binary search -- `spanFlagsAt`,
+   * over the same cumulative array -- and a matrix copy.
+   *
+   * **The ends are anchored on the end carriages' own axes**, at half a body
+   * length forward of their centres. That works at both ends because every
+   * consist in `game/riding.ts` ends with a carriage whose `flip` is set, so the
+   * rear vehicle's +X already points back down the line: the same local frame
+   * describes the nose of the train and the tail of it, and the only difference
+   * between the two kits is what colour they are. `verifyTrainLights` asserts
+   * that about the tables rather than leaving it to this paragraph.
+   */
+  private lightCar(
+    bake: RailBake,
+    dir: RailDirection,
+    centre: number,
+    k: number,
+    consist: { cars: readonly ConsistCar[]; pitch: number; pride: boolean; metro: boolean },
+  ): void {
+    const level = this.levelAt(bake, dir, centre);
+    if (level <= 0) return;
+    const body = consist.pitch - 0.9;
+    const underground = this.bore;
+    _lit.copy(_matrix);
+    _lit.scale(_v.set(body, 1, 1));
+    trainLights.car(_lit, consist.metro, level, underground);
+    if (k === 0 || k === consist.cars.length - 1) {
+      _lit.copy(_matrix).multiply(_endShift.makeTranslation(body / 2, 0, 0));
+      if (k === 0) trainLights.head(_lit, level);
+      else trainLights.tail(_lit, level);
+    }
   }
 
   // --- The instance pool -------------------------------------------------------------
@@ -1260,12 +1439,15 @@ function carMatrix(
 
 const _frame = /*#__PURE__*/ createCarFrame();
 
-function placeCar(
-  bake: RailBake, dir: RailDirection, centre: number, root: Object3D, flip: boolean,
-): void {
-  carMatrix(bake, dir, centre, flip, _matrix);
-  _matrix.decompose(root.position, root.quaternion, root.scale);
-}
+/**
+ * `placeCar` used to live here and is now two lines inside `drawModel`.
+ *
+ * Not a tidy-up: the night sprites hang off the carriage's **matrix** and
+ * `decompose` is a one-way door -- a helper that took the root and gave nothing
+ * back left the caller re-deriving a frame that had just been built. Two lines
+ * inlined at the one call site, against a second `carFrameAt` per carriage per
+ * frame for every train in the city.
+ */
 
 /** One carriage's meshes, built from a template and reused forever after. */
 function buildInstance(template: CarTemplate): CarInstance {
@@ -1354,4 +1536,123 @@ function buildImpostorCar(): BufferGeometry {
   g.setIndex(new BufferAttribute(new Uint16Array(index), 1));
   g.computeBoundingSphere();
   return g;
+}
+
+// --- The self-check ------------------------------------------------------------------
+
+/**
+ * The half of the night that belongs to the fleet: the budget, the consist
+ * tables the end kits are anchored on, and the underground rule.
+ *
+ * Run from the constructor and reported through `warnings`, which `main.ts`
+ * already prints unconditionally -- so this is a boot-time check like
+ * `verifyNightLights` without needing a line anywhere else. The geometry half is
+ * `world/nightlights.verifyTrainLightKit` and runs from `verifyNightLights`; the
+ * split is forced by the import arrow, which only points one way.
+ *
+ * Nothing here throws. Every one of these presents as "the trains look a bit
+ * wrong at night", which is a report nobody can act on and which a screenshot
+ * taken from the other platform, or in the other half of the timetable, would
+ * not have caught.
+ */
+export function verifyTrainLights(): string[] {
+  const failures: string[] = [];
+
+  // --- 1. The budget. Every carriage the fleet draws must be a carriage the
+  //        night can light, or a train at 600 m has a hole in it -- and a hole in
+  //        a string of lit windows does not read as a dim train, it reads as two
+  //        shorter trains.
+  if (TRAIN_LIGHT_CAPACITY < IMPOSTOR_CAPACITY) {
+    failures.push(
+      `TRAIN_LIGHT_CAPACITY is ${TRAIN_LIGHT_CAPACITY} against IMPOSTOR_CAPACITY ` +
+        `${IMPOSTOR_CAPACITY}. The fleet can draw more carriages than the night can light, and ` +
+        `the ones that miss out are box trains at range -- which is exactly where a lit train is ` +
+        `worth the most.`,
+    );
+  }
+  const shortest = Math.min(SUBURBAN.length, METRO.length);
+  const ends = 2 * Math.ceil(IMPOSTOR_CAPACITY / shortest);
+  if (TRAIN_END_CAPACITY < ends) {
+    failures.push(
+      `TRAIN_END_CAPACITY is ${TRAIN_END_CAPACITY} and ${IMPOSTOR_CAPACITY} carriages of the ` +
+        `shortest consist in the game (${shortest}) is ${ends} ends. A train that overflows this ` +
+        `is a train with no headlight, coming at you.`,
+    );
+  }
+
+  // --- 2. The end kits' anchor, which is an assumption about `game/riding.ts`'s
+  //        tables and not about anything in this file. `lightCar` puts both kits
+  //        at `+X * halfBody` on their own carriage's frame and that is only the
+  //        two ends of the train while the leading carriage faces forwards and
+  //        the trailing one faces back. Flip the last entry of either table and
+  //        the tail lights move to the middle of the train, silently.
+  for (const [name, cars] of [['SUBURBAN', SUBURBAN], ['METRO', METRO]] as const) {
+    if (cars[0].flip !== false || cars[cars.length - 1].flip !== true) {
+      failures.push(
+        `${name} starts with flip ${cars[0].flip} and ends with flip ` +
+          `${cars[cars.length - 1].flip}. The headlight and the tail lights are anchored half a ` +
+          `body forward of the end carriages' own +X, which is the nose of the train and the ` +
+          `back of it only while the first car faces forwards and the last one faces back.`,
+      );
+    }
+  }
+  // And that carriage 0 really is the leading one, which is the other half of the
+  // same assumption -- `consistOffset` is in another file and its sign is the
+  // difference between a headlight and a light shining up the train's own back.
+  if (consistOffset(1000, 0, 8, 20.4) <= consistOffset(1000, 7, 8, 20.4)) {
+    failures.push(
+      `consistOffset puts carriage 0 behind carriage 7. The headlight is hung on carriage 0, so ` +
+        `this is a train being driven from the guard's end with its head lamps pointing at the ` +
+        `train behind it.`,
+    );
+  }
+
+  // --- 3. The underground rule, against a hand-built polyline: 200 m in the
+  //        open, 200 m of bore, 200 m in the open again.
+  //
+  // A stub rather than the real bake, because the real bake is a 30 MB download
+  // that a self-check running at boot has no business waiting for -- and because
+  // what is being checked is the *rule*, which is a bitmask and a binary search
+  // over a cumulative array. `spanFlagsAt` reads exactly two fields of a bake and
+  // four of a direction, so the stub is honest about what it stands in for.
+  {
+    const cum = Float64Array.from([0, 100, 200, 300, 400, 500, 600]);
+    const flags = Uint8Array.from([0, 0, SPAN_TUNNEL, SPAN_TUNNEL, 0, 0, 0]);
+    const bake = { cum, vertexFlags: flags } as unknown as RailBake;
+    const dir = { vertexOff: 0, vertexCount: 7 } as unknown as RailDirection;
+    const under = (s: number): boolean => (spanFlagsAt(bake, dir, s) & SPAN_TUNNEL) !== 0;
+    // Open, then the portal, then the bore, then out the other side. The vertex a
+    // carriage stands on is the one it is *entering*, so 200 exactly is already
+    // in the tunnel and 400 exactly is already out of it.
+    const cases: ReadonlyArray<readonly [number, boolean]> = [
+      [0, false], [50, false], [199.9, false], [200, true], [250, true],
+      [399.9, true], [400, false], [550, false],
+    ];
+    for (const [s, want] of cases) {
+      if (under(s) !== want) {
+        failures.push(
+          `The bore rule says a carriage at ${s} m along a 0-200 open / 200-400 tunnel / ` +
+            `400-600 open line is ${under(s) ? '' : 'not '}underground, and it is ` +
+            `${want ? '' : 'not '}. Getting this backwards is either a train with its lights on ` +
+            `in the sun or a black train in a tunnel, and the second one is invisible in every ` +
+            `sense.`,
+        );
+        break;
+      }
+    }
+    // And the flag itself: `SPAN_SUBWAY` is a route tag, not a bore, and reading
+    // it as one is a mistake `world/rail-geo.ts` has already made and recorded.
+    if ((spanFlagsAt(
+      { cum, vertexFlags: Uint8Array.from([SPAN_SUBWAY, SPAN_SUBWAY, 0, 0, 0, 0, 0]) } as unknown as RailBake,
+      dir, 50,
+    ) & SPAN_TUNNEL) !== 0) {
+      failures.push(
+        `A SPAN_SUBWAY stretch is being read as a bore. It is a route tag -- it reaches open ` +
+          `track on the converted Bankstown line -- so this is a train lit at noon on an ` +
+          `embankment at Punchbowl.`,
+      );
+    }
+  }
+
+  return failures;
 }

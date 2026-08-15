@@ -86,6 +86,7 @@ import {
   torchBikeMount,
   torchHandMount,
   verifyNightLights,
+  verifyTrainLightKit,
 } from './world/nightlights.ts';
 import { CollisionWorld } from './player/collision.ts';
 import {
@@ -303,7 +304,7 @@ import {
 // The arithmetic half of the railway, which the server evaluates too. See
 // `world/rail-solids.ts` for why the definition lives outside the renderer.
 import { RailSolidField } from './world/rail-solids.ts';
-import { TrainFleet } from './world/trains.ts';
+import { TrainFleet, verifyTrainLights } from './world/trains.ts';
 import {
   aboardFrame,
   aboardPose,
@@ -790,6 +791,18 @@ async function main(): Promise<void> {
   // onto one street -- all of them draw something plausible and none of them
   // throws. See `world/nightlights.ts`.
   const nightFailures = timed('night-lights', () => verifyNightLights());
+  // The train lighting's own two, on the same criterion and for the same reason
+  // the file above gives: a lit carriage that draws something plausible and
+  // throws nothing is exactly the failure a boot check exists to catch. The kit
+  // asserts the emissive window material and the real-light budget; the fleet
+  // half asserts that a carriage lights by its own disposition -- night, or a
+  // bore at any hour -- and that the day/night edge leaves nothing stuck on.
+  //
+  // Wired here rather than left exported and uncalled, which is this file's
+  // standing rule: a self-check nothing runs is a self-check that rots, and
+  // these two were written and then never reached because the round that wrote
+  // them was interrupted.
+  const trainLightFailures = timed('train-lights', () => [...verifyTrainLightKit(), ...verifyTrainLights()]);
   // And the day/night cycle, on exactly the night rig's criterion and with one
   // failure mode nothing else in this list has: **the cycle is the only thing
   // here that two players can disagree about.** It is a pure function of the
@@ -871,6 +884,7 @@ async function main(): Promise<void> {
     wallFailures.length ||
     lifecycleFailures.length ||
     nightFailures.length ||
+    trainLightFailures.length ||
     raveFailures.length ||
     cycleFailures.length ||
     duskFailures.length ||
@@ -919,6 +933,7 @@ async function main(): Promise<void> {
           ...wallFailures,
           ...lifecycleFailures,
           ...nightFailures,
+          ...trainLightFailures,
           ...raveFailures,
           ...cycleFailures,
           ...duskFailures,

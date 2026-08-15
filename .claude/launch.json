@@ -1,6 +1,18 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "sydney-client", "runtimeExecutable": "npm", "runtimeArgs": ["--workspace", "client", "run", "dev"], "port": 5173 }
+    {
+      "name": "sydney-client",
+      "//": "Vite invoked through an absolute node, not through npm. The preview harness starts with a bare PATH whose `node` is old enough to choke on destructuring, and npm is a script with a `#!/usr/bin/env node` shebang -- so naming npm here, even by absolute path, still runs it under the wrong interpreter and exits 1 before vite is reached. Every agent that tried to verify a change visually hit this and worked around it with a git worktree instead of fixing it. The root is the positional `client`, not a --root flag, which this vite rejects.",
+      "runtimeExecutable": "/Users/evanpollack/.nvm/versions/node/v22.12.0/bin/node",
+      "runtimeArgs": [
+        "client/node_modules/vite/bin/vite.js",
+        "client",
+        "--port",
+        "5173",
+        "--strictPort"
+      ],
+      "port": 5173
+    }
   ]
 }
