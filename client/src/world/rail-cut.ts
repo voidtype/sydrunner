@@ -560,6 +560,96 @@ export class RailCut {
   }
 
   /**
+   * The lattice the terrain mesh's carve is decided on, metres, or 0 for none.
+   *
+   * See `groundCutAt`. Set from outside for the same reason `setRoads` is: the
+   * DEM post is a property of the *world index*, which this file does not read
+   * and both ends already hold. Unset is the world exactly as it shipped.
+   */
+  private carvePitch = 0;
+
+  /**
+   * Tell the carve which lattice the ground is drawn on.
+   *
+   * `postM` is `index.terrain.post_m`; the sub-quad pitch is that over
+   * `terrain.CUT_SUBDIVISION`, restated here as an argument rather than imported
+   * so this module keeps no opinion about how finely a tile is refined.
+   */
+  setCarveLattice(postM: number, subdivision: number): void {
+    this.carvePitch = postM > 0 && subdivision > 0 ? postM / subdivision : 0;
+  }
+
+  /**
+   * `cutAt`, asked on the lattice the ground is actually **drawn** on.
+   *
+   * ---------------------------------------------------------------------------
+   * **THE OTHER HALF OF THE FOURTH REPORT**: *"i fall thru if i go past the
+   * fence"*, at world (-2492.54, 4281.58).
+   *
+   * Measured in a browser at that point, walking east along King Street: the
+   * drawn surface is continuous asphalt the whole way, and at x = -2479 to
+   * -2478 -- a slot **two metres wide**, with road either side of it -- `cutAt`
+   * answers -60.52 against a drawn surface at -52.65. Seven point nine metres of
+   * fall, under paving, in the middle of a road. Over a 60 m disc around the
+   * player, 551 of 38,183 half-metre samples on a drawn paved or grassed surface
+   * had the ground query more than 0.6 m below what is drawn.
+   *
+   * It is not a hole in the deck and it is not the carve being wrong. It is the
+   * two of them being **sampled differently**. `terrain.buildTerrainMesh` decides
+   * cut-or-keep per 3.9 m sub-quad from that sub-quad's *centre*; the ground
+   * query asks per point. So a sub-quad whose centre is clear is drawn whole, and
+   * up to 2.7 m of it -- the half-diagonal -- is ground the query has already
+   * taken away. `cutsAlong` says the same thing about the same lattice one screen
+   * up: *"sampled every four metres, which is the carve's own sub-quad pitch"*.
+   *
+   * So the ground query asks about the sub-quad, not the point. The mesh only
+   * ever asks at sub-quad centres and a centre is its own quantisation, so
+   * **this is bit-identical to `cutAt` for every call `buildTerrainMesh` makes**
+   * -- not one triangle of the world moves -- and for every other caller it is
+   * the same decision the mesh made, which is the whole property that was
+   * missing. `server/world.groundFor` carries it too, because a client standing
+   * on a rim the server thinks is a cutting is a client dragged into the hole.
+   *
+   * ---------------------------------------------------------------------------
+   * **THE ROAD RULE IS STILL ASKED AT THE POINT, AND IT HAS TO BE.** Quantising
+   * the whole of `cutAt` was measured and is wrong in the other direction: a
+   * two-metre footway is narrower than a sub-quad, so the *centre* of the cell
+   * it crosses is off it, and 153 half-metre samples of drawn footpath at Sydney
+   * Park Road went from standing to falling. Paving is drawn as tile geometry
+   * and does not come and go with the terrain mesh, so a paved surface under the
+   * asker keeps the ground whatever the lattice says.
+   *
+   * So the ground is kept for the **union** of the two reasons the mesh and the
+   * pipeline each have for drawing something here: the corridor does not take
+   * this sub-quad, or the sub-quad is decked, or the asker is standing on
+   * paving. The carve fires only where all three are false, which is the only
+   * place nothing at all is drawn.
+   *
+   * Unset lattice falls through to `cutAt` unchanged, which is the negative
+   * control `checkPavedIntegrity` runs the same sweep against.
+   */
+  groundCutAt(x: number, z: number, groundY: number): number {
+    if (this.carvePitch <= 0) return this.cutAt(x, z, groundY);
+    const p = this.carvePitch;
+    // The global sub-quad lattice, anchored at the world origin exactly as
+    // `buildTerrainMesh` anchors it: every tile's bounds are a whole number of
+    // DEM posts and a post is a whole number of sub-quads, so `Math.floor` here
+    // and `m0 + sc` there index the same cell in every tile that can see it.
+    const qx = (Math.floor(x / p) + 0.5) * p;
+    const qz = (Math.floor(z / p) + 0.5) * p;
+    const railY = this.railCutAt(qx, qz, groundY);
+    // The mesh kept this whole sub-quad, so there is ground drawn over every
+    // point in it and this is one of them.
+    if (!Number.isFinite(railY)) return Number.NaN;
+    // It kept it as a road deck, which is the same answer for the same reason.
+    if (this.decked(qx, qz, railY, groundY)) return Number.NaN;
+    // And the paving the asker is actually standing on, which is drawn per way
+    // rather than per sub-quad and is routinely narrower than one.
+    if (this.decked(x, z, railY, groundY)) return Number.NaN;
+    return railY;
+  }
+
+  /**
    * How wide the corridor is at a point **on the track centreline**.
    *
    * On the centreline specifically, and that is what makes it well defined: if

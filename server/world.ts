@@ -94,7 +94,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { CollisionWorld } from '../client/src/player/collision.ts';
-import { TerrainField, decodeTerrain } from '../client/src/world/terrain.ts';
+import { CUT_SUBDIVISION, TerrainField, decodeTerrain } from '../client/src/world/terrain.ts';
 import { decodePowerups } from '../client/src/world/powerups.ts';
 import { PowerupField, type PowerupPoint } from '../client/src/game/powerups.ts';
 import { EYE_HEIGHT, PLAYER_RADIUS } from '../client/src/player/controller.ts';
@@ -2008,6 +2008,12 @@ export async function loadWorld(
   // Street. `main.ts` makes this identical call over the identical bytes.
   if (world.rail) roads.adoptPaving(world.rail.paving);
   world.railCut?.setRoads(roads);
+  // **And which lattice the ground is drawn on**, which is what stops this
+  // process disagreeing with a browser's terrain mesh about where a cutting
+  // starts. `main.ts` makes the identical call from the identical two index
+  // fields. See `RailCut.groundCutAt` for the two-metre slot in King Street this
+  // exists for.
+  world.railCut?.setCarveLattice(index.tile_size / index.terrain.grid, CUT_SUBDIVISION);
   // The corridor opens out at a platform, and both ends have to agree about
   // where. This process cannot import `rail-geo` -- it draws things -- so the
   // anchors come from `riding.buildPlatforms`, and `main.ts` now reads the
@@ -2056,7 +2062,7 @@ export async function loadWorld(
       if (Number.isFinite(sampled)) lastGround = sampled;
       const boxFloor = world.stationBoxes?.floorAt(x, z, -Infinity) ?? -Infinity;
       if (boxFloor > -Infinity) return boxFloor;
-      const floor = world.railCut?.cutAt(x, z, sampled) ?? Number.NaN;
+      const floor = world.railCut?.groundCutAt(x, z, sampled) ?? Number.NaN;
       return Number.isFinite(floor) ? floor : lastGround;
     };
     // `buildChunk`'s `vesselled`, which is `() => false` with the flag down and
@@ -2451,7 +2457,7 @@ export function groundFor(world: ServerWorld): CombatWorld {
         const deck = vessels.heightAt(x, z, feetY);
         if (deck > -Infinity) return Math.max(deck, roof);
       }
-      const floor = cut === null ? Number.NaN : cut.cutAt(x, z, sampled);
+      const floor = cut === null ? Number.NaN : cut.groundCutAt(x, z, sampled);
       if (Number.isFinite(floor)) return Math.max(floor, roof);
       return Math.max(lastGround, roof);
     },

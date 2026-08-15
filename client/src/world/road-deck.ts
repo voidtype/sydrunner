@@ -456,6 +456,31 @@ export class RoadDeck {
   }
 
   /**
+   * Every strip this deck holds, once each.
+   *
+   * For the audits and for nothing that draws. `checkPavedIntegrity` walks the
+   * paving rather than sampling a disc around a coordinate, and it has to walk
+   * the deck's **own** list: a sweep that rebuilt the footprint from the sidecars
+   * would be asserting a second model of where paving is, which is the mistake
+   * three rounds of green lights were made of.
+   *
+   * A visitor rather than an array because the whole extent is 37,000 strips and
+   * the caller wants none of them kept.
+   */
+  eachStrip(
+    visit: (
+      ax: number, az: number, bx: number, bz: number,
+      half: number, ay: number, by: number, draped: boolean,
+    ) => void,
+  ): void {
+    // `adoptPaving` files the bake's foot paving under its own key in this same
+    // map, so the corridor's footways come out of this walk too.
+    for (const strips of this.byKey.values()) {
+      for (const s of strips) visit(s.ax, s.az, s.bx, s.bz, s.half, s.ay, s.by, s.draped);
+    }
+  }
+
+  /**
    * Is there any paved surface within `pad` of this point? The broad phase.
    *
    * Cell existence plus a distance test, `RailCut.near`'s shape exactly. Used by

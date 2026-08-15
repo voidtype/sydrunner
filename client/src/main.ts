@@ -39,7 +39,7 @@ import { createFacadeGlobals } from './world/facade.ts';
 import { loadFarLayer } from './world/far.ts';
 import { loadLandmarks, verifyLandmarks } from './world/landmarks.ts';
 import { createFarGround } from './world/ground.ts';
-import { NO_GROUND } from './world/terrain.ts';
+import { CUT_SUBDIVISION, NO_GROUND } from './world/terrain.ts';
 import { WaterLevels, verifyWading } from './world/wading.ts';
 import { loadFarWater, verifyWater } from './world/water.ts';
 import { atlasTextureSize } from './world/params-atlas.ts';
@@ -1564,6 +1564,18 @@ async function main(): Promise<void> {
       // `server/world.ts` does the identical call over the identical bytes.
       roadDeck.adoptPaving(railBake.paving);
       railCut.setRoads(roadDeck);
+      // **And which lattice the ground is drawn on.** `buildTerrainMesh` decides
+      // cut-or-keep per sub-quad from that sub-quad's centre, and until this line
+      // the ground query decided per point -- so a sub-quad drawn whole could have
+      // two metres of it already taken away underneath. `server/world.ts` makes the
+      // identical call from the identical two index fields. See
+      // `RailCut.groundCutAt`. A world with no terrain block draws no terrain
+      // mesh, so there is no lattice to agree with and `groundCutAt` stays
+      // `cutAt`.
+      railCut.setCarveLattice(
+        index.terrain ? index.tile_size / index.terrain.grid : 0,
+        CUT_SUBDIVISION,
+      );
       streamer.setRailCut(railCut);
       // **And the volume nothing may stand in.** The same corridor read the
       // other way round: `RailCut` says where the *ground* must not be, and
@@ -2704,7 +2716,55 @@ async function main(): Promise<void> {
    * agree to the bit, and where it is not this one still answers.
    */
   let railSolidField: RailSolidField | null = null;
-  const groundHeightAt = (x: number, z: number, feetY: number): number => {
+  /**
+   * The ground, with the railway's own solids **as an argument** rather than as
+   * a capture.
+   *
+   * ---------------------------------------------------------------------------
+   * **THIS PARAMETER IS THE FIX FOR AN UNBOUNDED MUTUAL RECURSION**, and the
+   * recursion was live in the shipped build at the default spawn:
+   *
+   *     groundHeightAt -> RailSolidField.roofHeight -> segmentSolidsFor
+   *       -> viaductSolids -> wildGround -> groundHeightAt -> ...
+   *
+   * `RangeError: Maximum call stack size exceeded`, thrown inside the animation
+   * callback, which aborts the remainder of that frame -- including the
+   * controller's ground correction. It reads as sticking, or as being dragged,
+   * and there is no frame that says why.
+   *
+   * **It is circular by definition, not by implementation, so no re-entrancy
+   * guard resolves it.** `viaductSolids` sets a pier's foot from the ground; the
+   * ground-parity round made `groundHeightAt` consult the railway's solids; so a
+   * pier's foot became partly defined by a query that needs the pier. A guard
+   * would return whichever half-built answer the stack happened to be holding,
+   * which is the "two descriptions of one thing" this project keeps paying for.
+   *
+   * **A pier's foot is therefore defined as the composed ground *minus* the
+   * rail-solid layer** -- this function with `rail` null -- and not as
+   * `rawGroundAt`. The choice matters in exactly one place and it is a real one:
+   * a pier standing inside a cutting must stand on the **cut floor**, which
+   * `railCut.groundCutAt` below supplies and the raw DEM does not; the DEM there
+   * is the sheet the corridor was carved out of, ten metres over the pier's
+   * actual base. Everything else the composition adds -- platforms, station
+   * boxes, vessels, roofs -- is `-Infinity` at the `-Infinity` feet a placement
+   * query asks with, so dropping the rail layer is the whole of the change.
+   *
+   * **And that is why this is not a change to the world.** `pick` and
+   * `CollisionWorld.roofHeight` both refuse a prism whose base is above the
+   * asker, so at `-Infinity` feet the rail-solid term was already `-Infinity`
+   * for every prism in the city: it contributed nothing and cost an infinite
+   * recursion. `checkGroundLayering` asserts that emptiness over the suite's own
+   * lattice rather than leaving it as this paragraph's assertion.
+   *
+   * `server/world.ts`'s own `wildGround` has never had the rail layer in it, so
+   * this is the client being brought **onto** the server's definition rather
+   * than away from it -- which is the direction that protects the 0-of-670,437
+   * parity rather than risking it.
+   */
+  const groundOn = (
+    x: number, z: number, feetY: number,
+    rail: RailSolidField | null,
+  ): number => {
     const sampled = streamer.ground?.height(x, z) ?? NO_GROUND;
     if (Number.isFinite(sampled)) lastGround = sampled;
     // `roofHeight` returns -Infinity when the player is not standing on
@@ -2734,7 +2794,7 @@ async function main(): Promise<void> {
     // is the term the server has.
     const roof = Math.max(
       collision.roofHeight(x, z, feetY),
-      railSolidField === null ? -Infinity : railSolidField.roofHeight(x, z, feetY),
+      rail === null ? -Infinity : rail.roofHeight(x, z, feetY),
     );
     if (platform > -Infinity) return Math.max(platform, roof);
     // **And the rest of the station, which is most of it.**
@@ -2782,22 +2842,40 @@ async function main(): Promise<void> {
       const deck = vesselField.heightAt(x, z, feetY);
       if (deck > -Infinity) return Math.max(deck, roof);
     }
-    const cutFloor = railCut === null ? Number.NaN : railCut.cutAt(x, z, sampled);
+    const cutFloor = railCut === null ? Number.NaN : railCut.groundCutAt(x, z, sampled);
     if (Number.isFinite(cutFloor)) return Math.max(cutFloor, roof);
     return Math.max(lastGround, roof);
   };
 
   /**
-   * The ground a bird stands on. Terrain only, never a roof.
+   * The ground a **body** stands on: every layer, the railway's solids included.
+   *
+   * The whole composition, and the one every simulation call site wants.
+   */
+  const groundHeightAt = (x: number, z: number, feetY: number): number =>
+    groundOn(x, z, feetY, railSolidField);
+
+  /**
+   * The ground a bird stands on, and the ground a **viaduct pier** stands on.
+   * Terrain, cut floor and station, never a roof and never the railway's own
+   * solids.
    *
    * `-Infinity` for the feet is `collision.roofHeight`'s "how high is the asker"
-   * and it is the whole of the difference: a turkey is not standing on anything
-   * but the park, and a query that folded in a roof would put one on top of the
-   * pavilion the moment its cell overlapped the footprint. Hoisted to a `const`
-   * rather than written at the call site because both callers are per frame or
-   * per tick, and a fresh closure on either would be an allocation forever.
+   * and it is the whole of the difference for a turkey: it is not standing on
+   * anything but the park, and a query that folded in a roof would put one on
+   * top of the pavilion the moment its cell overlapped the footprint.
+   *
+   * **`null` for the rail layer is the whole of the difference for a pier**, and
+   * it is the line that ends the recursion `groundOn`'s header describes: this
+   * is the function handed to `RailWorld` and to `RailSolidField`, so the thing
+   * that sets a pier's foot cannot be a thing that needs the pier. It is also,
+   * to the bit, what `server/world.ts` has always given its own field.
+   *
+   * Hoisted to a `const` rather than written at the call site because the
+   * callers are per frame or per tick, and a fresh closure on either would be an
+   * allocation forever.
    */
-  const wildGround = (x: number, z: number): number => groundHeightAt(x, z, -Infinity);
+  const wildGround = (x: number, z: number): number => groundOn(x, z, -Infinity, null);
 
   /**
    * The **raw** terrain height, which is deliberately not `groundHeightAt`.

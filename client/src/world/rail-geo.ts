@@ -2688,6 +2688,230 @@ function writeStationHouse(
  * mask's post pitch is measured in real metres. `v` is metres up the panel.
  * Together they are the whole of what `fences.createFenceOpenMaterial` reads.
  */
+/**
+ * One rib of the verge: the cross-section everything `writeVerge` draws hangs
+ * off.
+ *
+ * Exported because the rib walk is the **only** description in this build of
+ * where a boundary fence stands, and an audit that re-derived it would be
+ * auditing a copy. Three rounds of rail-side fixes shipped green beside a fence
+ * in a road for exactly that reason. See `vergeRibs`.
+ */
+export interface VergeRib {
+  cx: number; cz: number; fx: number; fz: number;
+  o: number; formation: number; verge: number; foot: number;
+  u: number; open: boolean; vessel: boolean;
+}
+
+/**
+ * A stretch of fence line that is actually drawn, between two stations on it.
+ *
+ * `u` is cumulative metres along the fence line -- what the bar mask is drawn in
+ * -- so a clipped end carries the interpolated value rather than restarting, and
+ * the bars either side of a road stay in step.
+ */
+export interface FenceRun {
+  ax: number; az: number; ay: number; au: number;
+  bx: number; bz: number; by: number; bu: number;
+}
+
+/**
+ * How finely the road rule is evaluated along a fence panel, metres.
+ *
+ * ---------------------------------------------------------------------------
+ * **THE FOURTH REPORT OF THE SAME DEFECT, AND WHY THE THIRD FIX DID NOT TAKE.**
+ *
+ *   > *"still a fence on king st, and i fall thru if i go past the fence"*
+ *
+ * reported standing at -33.907002, 151.181545 -- world (-2492.54, 4281.58).
+ * Measured off the shipped build in a browser at that point: the object in the
+ * frame is `rail_fence_-5,8`, one panel of it, running from (-2479.84, 4266.04)
+ * to (-2486.92, 4269.87), with **seven of twenty-one stations along it inside a
+ * drawn carriageway**. Its far rib is open -- `deckSurfaceAt` answers -52.61
+ * there, the road rule fired exactly as designed -- and its near rib is not.
+ *
+ * That is the whole bug, and it is not the rule. **The rule was a property of a
+ * rib and the object is a panel.** `a.open && b.open` drops a panel only when
+ * *both* ends are over paving, so the last panel before a bridge is drawn in
+ * full: it starts on open ground and marches the whole `VERGE_STEP_M` to the
+ * open rib, over the kerb and into the carriageway. No rib-wise audit could see
+ * it, because both of its ribs answer correctly -- which is how three rounds of
+ * green lights sat beside a fence in the road.
+ *
+ * The same arithmetic runs the other way: a carriageway narrower than a rib
+ * pitch, crossing between two closed ribs, is one the rib test never samples at
+ * all.
+ *
+ * So the *span* is sampled rather than its ends, and a panel is **clipped** to
+ * the stretches the rule allows rather than kept or dropped whole. One metre is
+ * chosen against the thing being resolved: `streets.MIN_ROAD_WIDTH` is 2.5 m, so
+ * no carriageway in the extract can fall between two stations, and the residual
+ * at either kerb is half a metre of fence -- against a rib pitch of eight.
+ */
+export const FENCE_CLIP_M = 1.0;
+
+/**
+ * Is the boundary fence opened at this point on the fence line?
+ *
+ * The predicate on its own, hoisted out of the rib walk so the sub-stations
+ * `fenceRuns` tests and the ribs `vergeRibs` builds ask the identical question
+ * of the identical objects.
+ *
+ * **Gated on the panel's own head against the soffit**, on `refillMasts`' terms
+ * and for the same measured reason: a road *viaduct* ten metres over a corridor
+ * is a deck too, and a fence standing on the ground under one is a real fence
+ * with real headroom. What must go is the panel that would come through the
+ * carriageway, which is the one whose foot is the kept ground the road is drawn
+ * on.
+ *
+ * `rawGround` is the raw terrain under the post, which is what a footway's
+ * draped surface is measured from -- the line the player's third report turned
+ * on, kept verbatim.
+ */
+export function fenceOpensAt(
+  fx: number, fz: number, foot: number,
+  cx: number, cz: number,
+  cut: RailCut | null,
+  rawGround: GroundAt,
+  plans: readonly StationPlan[],
+  vesselled: (x: number, z: number) => boolean,
+): boolean {
+  const deckY = cut === null ? Number.NaN : cut.deckSurfaceAt(fx, fz, rawGround(fx, fz));
+  const decked = Number.isFinite(deckY) && foot + FENCE_HEIGHT > deckY - DECK_THICKNESS_M;
+  return decked || entranceOpens(plans, fx, fz) || vesselled(cx, cz);
+}
+
+/**
+ * The verge's cross-sections along one side of one segment, or `null` where
+ * `markCorridorEdges` closed that side off.
+ *
+ * The rib walk with nothing drawn. `writeVerge` builds its strip and its fence
+ * from this and `checkPavedIntegrity` asks it where the fence stands: one
+ * description, two readers.
+ */
+export function vergeRibs(
+  seg: Segment,
+  side: number,
+  cut: RailCut | null,
+  rawGround: GroundAt,
+  plans: readonly StationPlan[],
+  vesselled: (x: number, z: number) => boolean,
+): VergeRib[] | null {
+  if (!seg.open[side < 0 ? 0 : 1]) return null;
+  const px = -seg.uz;
+  const pz = seg.ux;
+  const steps = Math.max(1, Math.round(seg.len / VERGE_STEP_M));
+  const ext = 0.4;
+  const ribs: VergeRib[] = [];
+  let u = 0;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const along = -ext + t * (seg.len + 2 * ext);
+    const cx = seg.ax + seg.ux * along;
+    const cz = seg.az + seg.uz * along;
+    const rail = seg.ay + (seg.by - seg.ay) * t;
+    const formation = rail - BALLAST_TOP_DROP - BALLAST_DEPTH;
+    const half = cut !== null ? cut.halfWidthAt(cx, cz) : CUT_HALF_WIDTH;
+    const o = Math.max(FENCE_OFFSET, half + FENCE_CLEAR);
+    const fx = cx + px * o * side;
+    const fz = cz + pz * o * side;
+    const g = rawGround(fx, fz);
+    // The fence stands on the ground, whatever the ground is doing: at a
+    // cutting that is the street ten metres over the formation, which is where
+    // a corridor fence goes and is the whole reason this is not measured from
+    // the rail. Bounded either way, so one wild DEM post cannot put a fence
+    // panel thirty metres in the air.
+    const real = Number.isFinite(g) ? g : formation;
+    const foot = Math.max(formation - 6, Math.min(formation + 26, real));
+    // The verge is bounded far more tightly, because it is a *surface* joining
+    // the formation to the ground and a steep one reads as a fault rather than
+    // as a batter.
+    const verge = Math.max(formation - VERGE_RELIEF, Math.min(formation + VERGE_RELIEF, real));
+    if (i > 0) {
+      const p = ribs[i - 1];
+      u += Math.hypot(fx - p.fx, fz - p.fz);
+    }
+    // **A fence panel standing in a roadway is the report, in those words**:
+    // *"if i do jump onto the fenced section of road, i can fall through down
+    // into the railroad"*. The fence line runs `FENCE_OFFSET` out from the
+    // centreline and knows nothing about streets, so at every crossing in the
+    // city it marched straight across the carriageway. A boundary fence stops
+    // at a road bridge -- that is what the parapet is for.
+    //
+    // The rule itself is `fenceOpensAt`; a rib carries its own answer, and
+    // `fenceRuns` asks the same question of the span between two of them.
+    ribs.push({
+      cx, cz, fx, fz, o, formation, verge, foot, u,
+      open: fenceOpensAt(fx, fz, foot, cx, cz, cut, rawGround, plans, vesselled),
+      vessel: vesselled(cx, cz),
+    });
+  }
+  return ribs;
+}
+
+/**
+ * Every stretch of boundary fence one side of one segment actually draws.
+ *
+ * The rule is the one it has been for three rounds -- `fenceOpensAt` -- and what
+ * changed is that it is asked of the *span* rather than of its two ends, and a
+ * panel is clipped rather than kept or dropped whole. See `FENCE_CLIP_M` for the
+ * measurement that forced it.
+ */
+export function fenceRuns(
+  ribs: readonly VergeRib[],
+  cut: RailCut | null,
+  rawGround: GroundAt,
+  plans: readonly StationPlan[],
+  vesselled: (x: number, z: number) => boolean,
+): FenceRun[] {
+  const runs: FenceRun[] = [];
+  const lerp = (a: number, b: number, k: number): number => a + (b - a) * k;
+  for (let i = 0; i < ribs.length - 1; i++) {
+    const a = ribs[i];
+    const b = ribs[i + 1];
+    const span = Math.hypot(b.fx - a.fx, b.fz - a.fz);
+    const steps = Math.max(1, Math.ceil(span / FENCE_CLIP_M));
+    /** Where the closed run in hand began, as a fraction from `a` to `b`. */
+    let from = -1;
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const fx = lerp(a.fx, b.fx, t);
+      const fz = lerp(a.fz, b.fz, t);
+      const foot = lerp(a.foot, b.foot, t);
+      // The two ends reuse the rib's own answer rather than recomputing it, so a
+      // run that carries on across a rib is continuous by construction and
+      // cannot be split by a float that came out differently the second time.
+      const open =
+        s === 0
+          ? a.open
+          : s === steps
+            ? b.open
+            : fenceOpensAt(
+              fx, fz, foot, lerp(a.cx, b.cx, t), lerp(a.cz, b.cz, t),
+              cut, rawGround, plans, vesselled,
+            );
+      if (!open) {
+        if (from < 0) from = t;
+        if (s < steps) continue;
+      }
+      if (from < 0) continue;
+      // The run ends at the last closed station: this one where the loop ran
+      // out, the previous one where the rule opened.
+      const to = open ? (s - 1) / steps : t;
+      if (to > from) {
+        runs.push({
+          ax: lerp(a.fx, b.fx, from), az: lerp(a.fz, b.fz, from),
+          ay: lerp(a.foot, b.foot, from), au: lerp(a.u, b.u, from),
+          bx: lerp(a.fx, b.fx, to), bz: lerp(a.fz, b.fz, to),
+          by: lerp(a.foot, b.foot, to), bu: lerp(a.u, b.u, to),
+        });
+      }
+      from = -1;
+    }
+  }
+  return runs;
+}
+
 function writeVerge(
   cess: Solid,
   fence: Solid,
@@ -2701,90 +2925,26 @@ function writeVerge(
    *
    * Then neither the verge nor the fence is drawn here, and the fence is the
    * interesting half. **This is the player's point 4 being answered by
-   * deletion.** The fence line below is measured out from a *track centreline*,
-   * which is why it marches across carriageways and fences the six-foot; the
-   * vessel's fence rides the rim, which is by definition the edge of the
-   * walkable world. See `writeVesselFence`. Two fences would be two fences.
+   * deletion.** The fence line is measured out from a *track centreline*, which
+   * is why it marches across carriageways and fences the six-foot; the vessel's
+   * fence rides the rim, which is by definition the edge of the walkable world.
+   * See `writeVesselFence`. Two fences would be two fences.
    */
   vesselled: (x: number, z: number) => boolean,
 ): void {
   const px = -seg.uz;
   const pz = seg.ux;
-  const steps = Math.max(1, Math.round(seg.len / VERGE_STEP_M));
-  const ext = 0.4;
 
   for (const side of [-1, 1]) {
-    if (!seg.open[side < 0 ? 0 : 1]) continue;
-    interface Rib {
-      cx: number; cz: number; fx: number; fz: number;
-      o: number; formation: number; verge: number; foot: number;
-      u: number; open: boolean; vessel: boolean;
-    }
-    const ribs: Rib[] = [];
-    let u = 0;
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const along = -ext + t * (seg.len + 2 * ext);
-      const cx = seg.ax + seg.ux * along;
-      const cz = seg.az + seg.uz * along;
-      const rail = seg.ay + (seg.by - seg.ay) * t;
-      const formation = rail - BALLAST_TOP_DROP - BALLAST_DEPTH;
-      const half = cut !== null ? cut.halfWidthAt(cx, cz) : CUT_HALF_WIDTH;
-      const o = Math.max(FENCE_OFFSET, half + FENCE_CLEAR);
-      const fx = cx + px * o * side;
-      const fz = cz + pz * o * side;
-      const g = rawGround(fx, fz);
-      // The fence stands on the ground, whatever the ground is doing: at a
-      // cutting that is the street ten metres over the formation, which is
-      // where a corridor fence goes and is the whole reason this is not
-      // measured from the rail. Bounded either way, so one wild DEM post cannot
-      // put a fence panel thirty metres in the air.
-      const real = Number.isFinite(g) ? g : formation;
-      const foot = Math.max(formation - 6, Math.min(formation + 26, real));
-      // The verge is bounded far more tightly, because it is a *surface* joining
-      // the formation to the ground and a steep one reads as a fault rather than
-      // as a batter.
-      const verge = Math.max(formation - VERGE_RELIEF, Math.min(formation + VERGE_RELIEF, real));
-      if (i > 0) {
-        const p = ribs[i - 1];
-        u += Math.hypot(fx - p.fx, fz - p.fz);
-      }
-      // **A fence panel standing in a roadway is the report, in those words**:
-      // *"if i do jump onto the fenced section of road, i can fall through down
-      // into the railroad"*. The fence line runs `FENCE_OFFSET` out from the
-      // centreline and knows nothing about streets, so at every crossing in the
-      // city it marched straight across the carriageway. A boundary fence stops
-      // at a road bridge -- that is what the parapet is for -- and the mechanism
-      // for stopping it already exists here: a rib that is `open` gets no panel.
-      // Same rule, second reason, exactly as the carve itself.
-      //
-      // **Gated on the panel's own head against the soffit**, on `refillMasts`'
-      // terms and for the same measured reason: a road *viaduct* ten metres over
-      // a corridor is a deck too, and a fence standing on the ground under one is
-      // a real fence with real headroom. What must go is the panel that would
-      // come through the carriageway, which is the one whose foot is the kept
-      // ground the road is drawn on.
-      // `g` is the raw terrain under the fence post, which is what a footway's
-      // draped surface is measured from. **This is the line the player's third
-      // report turns on**: the panel that was still standing across the paving at
-      // King Street had a carriageway 8 m away and a footway directly under it,
-      // and only the second one opens it.
-      const deckY = cut === null ? Number.NaN : cut.deckSurfaceAt(fx, fz, g);
-      const decked = Number.isFinite(deckY) && foot + FENCE_HEIGHT > deckY - DECK_THICKNESS_M;
-      const vessel = vesselled(cx, cz);
-      ribs.push({
-        cx, cz, fx, fz, o, formation, verge, foot, u,
-        open: decked || entranceOpens(plans, fx, fz) || vessel,
-        vessel,
-      });
-    }
+    const ribs = vergeRibs(seg, side, cut, rawGround, plans, vesselled);
+    if (ribs === null) continue;
 
     // `writeTrench`'s own hazard, in its own words: `px * o * side` mirrors the
     // frame, a mirror reverses handedness, and the same four corners in the same
     // order give one side its normal and the other side the opposite of it. The
     // verge is a `FrontSide` strip and would be culled on one whole side of
     // every railway in Sydney without this.
-    const at = (rib: Rib, o: number, y: number): [number, number, number] => [
+    const at = (rib: VergeRib, o: number, y: number): [number, number, number] => [
       rib.cx + px * o * side, y, rib.cz + pz * o * side,
     ];
     const face = (
@@ -2806,16 +2966,20 @@ function writeVerge(
           at(a, a.o, a.verge),
         );
       }
-      if (a.open && b.open) continue;
-      // The fence panel. Double-sided, so the winding above does not apply and
-      // is not repeated: see `fences.createRailFenceMaterial`.
-      const p0 = at(a, a.o, a.foot);
-      const p1 = at(b, b.o, b.foot);
-      const p2 = at(b, b.o, b.foot + FENCE_HEIGHT);
-      const p3 = at(a, a.o, a.foot + FENCE_HEIGHT);
+    }
+
+    // The fence, clipped to the stretches the road rule allows one. Double-sided,
+    // so the winding above does not apply and is not repeated: see
+    // `fences.createRailFenceMaterial`. A run's ends are already **on** the fence
+    // line -- `fenceRuns` interpolates between ribs that were offset when they
+    // were built -- so `at` is deliberately not used here.
+    for (const run of fenceRuns(ribs, cut, rawGround, plans, vesselled)) {
       fence.quad(
-        ...p0, ...p1, ...p2, ...p3,
-        [a.u, 0, b.u, 0, b.u, FENCE_HEIGHT, a.u, FENCE_HEIGHT],
+        run.ax, run.ay, run.az,
+        run.bx, run.by, run.bz,
+        run.bx, run.by + FENCE_HEIGHT, run.bz,
+        run.ax, run.ay + FENCE_HEIGHT, run.az,
+        [run.au, 0, run.bu, 0, run.bu, FENCE_HEIGHT, run.au, FENCE_HEIGHT],
       );
     }
   }

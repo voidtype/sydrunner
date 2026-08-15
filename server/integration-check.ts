@@ -1941,6 +1941,22 @@ async function main(): Promise<void> {
   say('');
   await checkRoadDeck();
 
+  // --- 34a1. And whether **anything at all** stands in a road, whoever drew it,
+  // and whether any drawn paving ends in a drop. `checkRoadDeck` above answers
+  // the same two questions about rail assets only and from its own copy of where
+  // a fence is, and it was green at the coordinate of the fourth report while
+  // the player was photographing a fence in the road. See `checkPavedIntegrity`.
+  say('');
+  await checkPavedIntegrity();
+
+  // --- 34a1b. And that the ground query's layers do not define each other. An
+  // unbounded mutual recursion between the composed ground and the railway's own
+  // solids shipped in 739fc2b and threw at the default spawn, and no check in
+  // this file could reach it because they all exercise the server's composition
+  // and the cycle was in the browser's. See `checkGroundLayering`.
+  say('');
+  await checkGroundLayering();
+
   // --- 34a2. And whether a body can get onto a platform at all. Every platform
   // assertion above this line asks `PlatformField` a question; this one walks a
   // body, which is the difference between a model that is right and a game that
@@ -5120,6 +5136,16 @@ if (only === 'ridingOnline') {
   process.exit(failures.length === 0 ? 0 : 1);
 } else if (only === 'roads') {
   await checkRoadDeck();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'layering') {
+  await checkGroundLayering();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'paved') {
+  await checkPavedIntegrity();
   for (const f of failures) say(`  - ${f}`);
   say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
   process.exit(failures.length === 0 ? 0 : 1);
@@ -23868,6 +23894,729 @@ function pointInsidePolygon(points: Float32Array, x: number, z: number): boolean
  * independent (`.lanes.bin` against the bake), and §6 is anchored on a
  * coordinate the player reported rather than on anything either file computed.
  */
+/**
+ * Nothing stands in a carriageway, and no drawn ground ends in a drop.
+ *
+ * ---------------------------------------------------------------------------
+ * **THE CHECK THAT WOULD HAVE CAUGHT IT, WRITTEN AFTER THE FOURTH REPORT.**
+ *
+ *   > *"still a fence on king st, and i fall thru if i go past the fence"*
+ *
+ * `checkRoadDeck` was green at that coordinate while the player was looking at
+ * the fence, and it was green for two reasons that are the whole design brief
+ * for this function.
+ *
+ *   1. **It only knew about rail assets.** Its own words: *"drawn rail assets --
+ *      catenary masts, boundary-fence ribs, trench copings"*. A fence emitted by
+ *      `fences.py`, a pole by `power.py`, a bin by `furniture.py` -- any of them
+ *      could stand in the middle of the Pacific Highway and that sweep would
+ *      report zero. So §2 below reads the **tile GLB** and tests every triangle
+ *      of every material slot, whatever emitted it, and names the slot when one
+ *      is in a road. It cannot be provenance-blind because it never asks what
+ *      the provenance is.
+ *   2. **It audited a copy.** It re-derived the fence line from the bake, rib by
+ *      rib, in this file -- and a rib-wise audit cannot see a panel-wise defect.
+ *      Measured at King Street: the drawn panel runs from (-2479.84, 4266.04) to
+ *      (-2486.92, 4269.87) with seven of twenty-one stations inside a drawn
+ *      carriageway, and **both of its ribs answer correctly**. So §1 below calls
+ *      `rail-geo.vergeRibs` and `rail-geo.fenceRuns` -- the functions that draw
+ *      the object -- and tests what they return. There is no copy left to drift.
+ *
+ * And the other half of the report, *"i fall thru"*: §3 walks every strip of
+ * drawn paving in the extent and asserts the ground query answers within a step
+ * of the surface. Measured before the fix, over a 60 m disc at the player's own
+ * coordinate: 551 of 38,183 half-metre samples on a drawn paved or grassed
+ * surface had the ground more than 0.6 m below it, worst 7.9 m, including a
+ * **two-metre slot straight across King Street** with road either side of it.
+ *
+ * Every section carries its negative control and every control is the same
+ * object with the fix taken out -- not a flag and not a second code path.
+ */
+/**
+ * The ground query is a stack of layers, and no layer may be defined by itself.
+ *
+ * ---------------------------------------------------------------------------
+ * **AN UNBOUNDED MUTUAL RECURSION THAT SHIPPED, AT THE DEFAULT SPAWN.**
+ *
+ *     groundHeightAt -> RailSolidField.roofHeight -> segmentSolidsFor
+ *       -> viaductSolids -> wildGround -> groundHeightAt -> ...
+ *
+ * `RangeError: Maximum call stack size exceeded`, observed in a browser at
+ * (-2262.7, 4618.7) on `739fc2b`. It is thrown **inside the animation
+ * callback**, so the rest of that frame does not run -- the controller's ground
+ * correction included -- and three's animation loop re-arms before the callback
+ * runs, so the session carries on and the only symptom is a body that sticks or
+ * is dragged for as long as somebody stands near a viaduct. Nothing in the frame
+ * says why.
+ *
+ * **Why 1,147 checks could not see it, which is the part worth writing down.**
+ * The cycle is not in a module. It is in the *composition*, and the composition
+ * exists in two places that were not the same: `main.ts` built `wildGround` out
+ * of the whole ground query, and `server/world.ts` built its own out of terrain,
+ * station boxes and `RailCut` with the rail solids left out. Every check in this
+ * file exercises the server's -- `groundFor` -- so the client's was never
+ * evaluated anywhere but in a browser. `station-suite`'s `makeGround` does model
+ * the client's, and it is only ever asked with a *finite* feet height, which
+ * reaches `roofHeight` through the **server's** field and its acyclic ground.
+ *
+ * So this section evaluates the client's composition, at the spawn and at every
+ * viaduct in the extent, and asserts three things: it terminates, its depth is
+ * bounded, and -- the control -- the wiring it replaced does not.
+ *
+ * ---------------------------------------------------------------------------
+ * **AND THAT THE FIX MOVED NOTHING**, which §1 proves rather than claims.
+ * `RailSolidField.pick` and `CollisionWorld.roofHeight` both refuse a prism
+ * whose base is above the asker, so at the `-Infinity` feet a placement query
+ * uses, the rail layer was already `-Infinity` for every prism in the city. It
+ * contributed nothing and cost an infinite recursion.
+ */
+async function checkGroundLayering(): Promise<void> {
+  say('--- The ground is a stack of layers, and none of them is defined by itself');
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const world = await loadWorld(root);
+  const bake = world.rail;
+  const solids = world.railSolids ?? null;
+  if (!bake || solids === null) {
+    say('    the world carries no rail bake. Skipped.');
+    return;
+  }
+  const railMod = (await import(new URL('../client/src/game/rail.ts', import.meta.url).pathname)) as typeof import('../client/src/game/rail.ts');
+  const solidMod = (await import(new URL('../client/src/world/rail-solids.ts', import.meta.url).pathname)) as typeof import('../client/src/world/rail-solids.ts');
+  interface RailSeg {
+    ax: number; ay: number; az: number; bx: number; by: number; bz: number;
+    ux: number; uz: number; len: number; flags: number; open: [boolean, boolean];
+  }
+  // Structural, for the reason `checkPavedIntegrity` gives: a typed import of
+  // `rail-geo` pulls three's DOM types into a program that has no `dom` lib.
+  const geoMod = (await import(new URL('../client/src/world/rail-geo.ts', import.meta.url).pathname)) as {
+    buildNetwork(bake: unknown): { segments: RailSeg[]; stations: unknown[] };
+  };
+  const net = geoMod.buildNetwork(bake);
+
+  // --- 1. The layer the fix removed was empty ---------------------------------
+  //
+  // Over the same lattice the parity claim is made on: a placement query asks at
+  // `-Infinity` feet, and at `-Infinity` feet no prism in the city is standing
+  // over the asker. If this is ever non-empty, dropping the layer from
+  // `wildGround` moved a pier and the line below is the one that says so.
+  let latticeSamples = 0;
+  let latticeAnswers = 0;
+  let latticeFirst = '';
+  {
+    const step = 4;
+    for (const seg of net.segments) {
+      if ((seg.flags & railMod.SPAN_BRIDGE) === 0) continue;
+      const steps = Math.max(1, Math.ceil(seg.len / step));
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        for (const off of [-6, 0, 6]) {
+          const x = seg.ax + (seg.bx - seg.ax) * t + -seg.uz * off;
+          const z = seg.az + (seg.bz - seg.az) * t + seg.ux * off;
+          latticeSamples++;
+          if (solids.roofHeight(x, z, -Infinity) > -Infinity) {
+            latticeAnswers++;
+            if (latticeFirst === '') latticeFirst = `${x.toFixed(0)}, ${z.toFixed(0)}`;
+          }
+        }
+      }
+    }
+  }
+  check(
+    latticeSamples > 10_000 && latticeAnswers === 0,
+    `at the -Infinity feet a placement query asks with, the rail-solid layer answers at ` +
+      `${latticeAnswers} of ${latticeSamples.toLocaleString()} samples over every viaduct in the extent` +
+      (latticeFirst ? `, first ${latticeFirst}` : '') +
+      `. That zero is why taking it out of the pier's own ground moved no geometry: pick() and ` +
+      `CollisionWorld.roofHeight both refuse a prism whose base is over the asker, so the term was ` +
+      `already empty and only the recursion was real`,
+  );
+
+  // --- 2. The client's composition, wired as `main.ts` now wires it -----------
+  //
+  // Rebuilt here rather than imported, because it lives in a closure inside
+  // `main`. Every clause is the one that file has, in that file's order, with
+  // the rail layer as an argument exactly as `groundOn` takes it.
+  let depth = 0;
+  let maxDepth = 0;
+  let lastGround = 0;
+  const composed = (
+    x: number, z: number, feetY: number,
+    rail: InstanceType<typeof solidMod.RailSolidField> | null,
+  ): number => {
+    depth++;
+    if (depth > maxDepth) maxDepth = depth;
+    try {
+      const sampled = world.terrain.height(x, z);
+      if (Number.isFinite(sampled)) lastGround = sampled;
+      const platform = world.platforms === null || world.platforms === undefined
+        ? -Infinity : world.platforms.heightAt(x, z, feetY);
+      const roof = Math.max(
+        world.collision.roofHeight(x, z, feetY),
+        rail === null ? -Infinity : rail.roofHeight(x, z, feetY),
+      );
+      if (platform > -Infinity) return Math.max(platform, roof);
+      const boxFloor = world.stationBoxes === null || world.stationBoxes === undefined
+        ? -Infinity : world.stationBoxes.floorAt(x, z, feetY);
+      if (boxFloor > -Infinity) return Math.max(boxFloor, roof);
+      const cutFloor = world.railCut === null || world.railCut === undefined
+        ? Number.NaN : world.railCut.groundCutAt(x, z, sampled);
+      if (Number.isFinite(cutFloor)) return Math.max(cutFloor, roof);
+      return Math.max(lastGround, roof);
+    } finally {
+      depth--;
+    }
+  };
+  const rawGround = (x: number, z: number): number => world.terrain.height(x, z);
+  const vesselled = (): boolean => false;
+  /** `main.ts`' `wildGround` as it now ships: the composition **minus** this layer. */
+  const wild = (x: number, z: number): number => composed(x, z, -Infinity, null);
+  const shipped = new solidMod.RailSolidField(net as never, world.railCut ?? null, rawGround, wild, vesselled);
+
+  /** Where a body would be standing to make the query: the spawn, and viaducts. */
+  const probes: Array<[string, number, number]> = [
+    ['the default spawn', spawnCentre(world.index as never).x, spawnCentre(world.index as never).z],
+    ['the reported coordinate on King Street', -2492.54, 4281.58],
+  ];
+  let viaducts = 0;
+  for (const seg of net.segments) {
+    if ((seg.flags & railMod.SPAN_BRIDGE) === 0) continue;
+    viaducts++;
+    if (viaducts % 7 !== 0) continue; // Every seventh, which is 80-odd probes.
+    probes.push([`viaduct ${viaducts}`, (seg.ax + seg.bx) / 2, (seg.az + seg.bz) / 2]);
+  }
+  let threw = '';
+  let probed = 0;
+  for (const [name, x, z] of probes) {
+    for (const dz of [-30, -12, 0, 12, 30]) {
+      for (const dx of [-30, -12, 0, 12, 30]) {
+        const px = x + dx;
+        const pz = z + dz;
+        const g = world.terrain.height(px, pz);
+        if (!Number.isFinite(g)) continue;
+        probed++;
+        try {
+          // A **finite** feet height, which is the whole point: at -Infinity the
+          // rail layer never builds a segment and the cycle never opens.
+          composed(px, pz, g + 1, shipped);
+        } catch (e) {
+          if (threw === '') threw = `${name} at ${px.toFixed(0)}, ${pz.toFixed(0)}: ${String(e)}`;
+        }
+      }
+    }
+  }
+  check(
+    threw === '' && probed > 1_000 && maxDepth <= 2,
+    `the client's composed ground answers at ${probed.toLocaleString()} points -- the default spawn, ` +
+      `the reported coordinate and ${probes.length - 2} viaducts of the ${viaducts.toLocaleString()} in ` +
+      `the extent, each on a 60 m cross -- without throwing, at a maximum nesting depth of ${maxDepth}` +
+      (threw ? `. FIRST THROW: ${threw}` : '') +
+      `. Depth 2 is a body's query reaching a pier's, and a pier's reaching nothing`,
+  );
+
+  // --- 3. THE NEGATIVE CONTROL: the wiring it replaced ------------------------
+  //
+  // The same field, given the ground query **with the rail layer folded back
+  // in** -- `main.ts` as it shipped at 739fc2b. Not a flag and not a second code
+  // path: one argument, changed back.
+  let control = '';
+  let controlNamed = false;
+  {
+    // eslint-disable-next-line prefer-const
+    let cyclic: InstanceType<typeof solidMod.RailSolidField>;
+    const wildCyclic = (x: number, z: number): number => composed(x, z, -Infinity, cyclic);
+    cyclic = new solidMod.RailSolidField(net as never, world.railCut ?? null, rawGround, wildCyclic, vesselled);
+    for (const seg of net.segments) {
+      if ((seg.flags & railMod.SPAN_BRIDGE) === 0) continue;
+      const x = (seg.ax + seg.bx) / 2;
+      const z = (seg.az + seg.bz) / 2;
+      const g = world.terrain.height(x, z);
+      if (!Number.isFinite(g)) continue;
+      try {
+        composed(x, z, g + 1, cyclic);
+      } catch (e) {
+        control = String(e);
+        controlNamed = control.includes(solidMod.RE_ENTRY);
+        break;
+      }
+    }
+  }
+  check(
+    control !== '',
+    `THE NEGATIVE CONTROL: with a pier's ground given the rail layer back -- the code as it shipped -- ` +
+      `the composed query at a viaduct raises. A pass above with nothing here would mean this section ` +
+      `cannot reach the cycle, which is exactly what was true of all 1,147 checks before it`,
+  );
+  check(
+    controlNamed,
+    `and it raises RailSolidField's own named refusal rather than a RangeError ` +
+      `(${control.slice(0, 90)}...), so a future re-wiring is a sentence naming the argument on the ` +
+      `first frame instead of a stack overflow ten thousand frames deep with a viaduct nowhere in it`,
+  );
+
+  // --- 4. And why the pier's ground is the composition and not the raw DEM ----
+  //
+  // The evidence for the choice, reported rather than asserted: the difference
+  // between the two candidates is a pier standing in a cutting, whose foot is the
+  // cut floor and whose DEM reading is the sheet the corridor was carved out of.
+  let piers = 0;
+  let moved = 0;
+  let worstMove = 0;
+  for (const seg of net.segments) {
+    if ((seg.flags & railMod.SPAN_BRIDGE) === 0) continue;
+    const count = Math.max(1, Math.round(seg.len / solidMod.PIER_SPACING));
+    for (let i = 0; i < count; i++) {
+      const t = (i + 0.5) / count;
+      const x = seg.ax + (seg.bx - seg.ax) * t;
+      const z = seg.az + (seg.bz - seg.az) * t;
+      const composedG = wild(x, z);
+      const rawG = rawGround(x, z);
+      if (!Number.isFinite(composedG) || !Number.isFinite(rawG)) continue;
+      piers++;
+      const d = Math.abs(composedG - rawG);
+      if (d > 0.05) {
+        moved++;
+        if (d > worstMove) worstMove = d;
+      }
+    }
+  }
+  check(
+    moved > 0,
+    `${moved.toLocaleString()} of ${piers.toLocaleString()} viaduct piers stand on a foot the raw DEM ` +
+      `would have got wrong, worst by ${worstMove.toFixed(1)} m -- which is why the pier's ground is the ` +
+      `composed query minus the rail layer and not rawGround: a pier inside a cutting stands on the cut ` +
+      `floor, and the DEM there is the sheet the corridor was carved out of`,
+  );
+}
+
+async function checkPavedIntegrity(): Promise<void> {
+  say('--- Nothing stands in a carriageway, and no drawn ground ends in a drop');
+
+  const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
+  const bakePath =
+    process.env.SYDNEY_RAIL ?? new URL('../data/scratch/rail/rail.bin', import.meta.url).pathname;
+  if (!(await Bun.file(bakePath).exists())) {
+    say(`    no rail bake at ${bakePath}. Skipped.`);
+    return;
+  }
+  const deckMod = (await import(new URL('../client/src/world/road-deck.ts', import.meta.url).pathname)) as typeof import('../client/src/world/road-deck.ts');
+  const cutMod = (await import(new URL('../client/src/world/rail-cut.ts', import.meta.url).pathname)) as typeof import('../client/src/world/rail-cut.ts');
+  /**
+   * `world/rail-geo.ts`, structurally.
+   *
+   * A `typeof import` of that module would pull three's DOM types into this
+   * process's program -- it builds materials and reaches for `document` -- and
+   * the server tsconfig has no `dom` lib. Structural, exactly as `checkRoadDeck`
+   * takes `buildNetwork`, and narrowed to the three exports that describe where
+   * a fence stands. **These are the functions `writeVerge` itself calls**, so
+   * what is asserted below is the object in the frame and not a model of it.
+   */
+  interface VergeRib {
+    cx: number; cz: number; fx: number; fz: number;
+    o: number; formation: number; verge: number; foot: number;
+    u: number; open: boolean; vessel: boolean;
+  }
+  interface FenceRun {
+    ax: number; az: number; ay: number; au: number;
+    bx: number; bz: number; by: number; bu: number;
+  }
+  interface RailSeg {
+    ax: number; ay: number; az: number; bx: number; by: number; bz: number;
+    ux: number; uz: number; len: number; flags: number; open: [boolean, boolean];
+  }
+  const geoMod = (await import(new URL('../client/src/world/rail-geo.ts', import.meta.url).pathname)) as {
+    buildNetwork(bake: unknown): { segments: RailSeg[] };
+    vergeRibs(
+      seg: RailSeg, side: number, cut: unknown, rawGround: (x: number, z: number) => number,
+      plans: readonly never[], vesselled: (x: number, z: number) => boolean,
+    ): VergeRib[] | null;
+    fenceRuns(
+      ribs: readonly VergeRib[], cut: unknown, rawGround: (x: number, z: number) => number,
+      plans: readonly never[], vesselled: (x: number, z: number) => boolean,
+    ): FenceRun[];
+  };
+  const terrainMod = (await import(new URL('../client/src/world/terrain.ts', import.meta.url).pathname)) as typeof import('../client/src/world/terrain.ts');
+  const trafficMod = (await import(new URL('../client/src/game/traffic.ts', import.meta.url).pathname)) as typeof import('../client/src/game/traffic.ts');
+  const ridingMod = (await import(new URL('../client/src/game/riding.ts', import.meta.url).pathname)) as typeof import('../client/src/game/riding.ts');
+  const glbMod = (await import(new URL('../client/src/world/tile-decode.ts', import.meta.url).pathname)) as typeof import('../client/src/world/tile-decode.ts');
+
+  const world = await loadWorld(root);
+  const bake = world.rail;
+  if (!bake) {
+    say('    the world carries no rail bake. Skipped.');
+    return;
+  }
+  const readBytes = async (path: string): Promise<ArrayBuffer | null> => {
+    const buf = await readFile(path).catch(() => null);
+    if (buf === null) return null;
+    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+  };
+
+  /**
+   * How far inside the kerb a solid has to be before it is *in* the road, metres.
+   *
+   * The kerb line is nominal on both sides of the comparison: an OSM `width` is
+   * a tag rather than a survey, and a Microsoft footprint is a raster trace, so a
+   * terrace wall and a carriageway edge routinely overlap by a metre in the data
+   * and by nothing at all in Newtown. Measured over the 2,504 corridor tiles: at
+   * zero slack, 43,368 triangles are "in a road" and 39,000 of them are brickwork
+   * on a kerb line. At 1.5 m the claim is the one worth making -- **nothing
+   * stands in the part of the road a car drives down** -- and a fence marching
+   * across a carriageway is nowhere near the edge of it.
+   */
+  const ROAD_KERB_SLACK_M = 1.5;
+
+  /**
+   * The two standing defects this round measured and did **not** fix, as
+   * ceilings that must not grow.
+   *
+   * A ceiling rather than a zero, said plainly rather than by omission, because
+   * the alternative that has actually shipped three times is worse: an assertion
+   * narrowed until it passes, which is how *"0 masts and 0 fence ribs"* sat
+   * beside a fence in a road. What is asserted here is the thing that is true --
+   * these numbers, over this build -- so a fourth class of object arriving in a
+   * carriageway, or a change that re-opens the carve, goes red on the next run
+   * even though today's residual is not zero.
+   *
+   *   - `PIPELINE_IN_ROAD_CEILING`: 16,901 triangles, of which 6,231 are
+   *     `fences.py` front fences standing in the travelled way -- the module
+   *     derives a property line from the street network and has no notion of a
+   *     second street crossing the frontage -- and the remainder is building
+   *     brickwork against a kerb line that is an OSM `width` tag rather than a
+   *     survey. The first is a real fix and it is a pipeline round; the second
+   *     may not be fixable at all from this data.
+   *   - `PAVING_FALL_CEILING`: 2,285 interior stations of drawn footway over a
+   *     carved corridor, down from 3,779. Every one measured is
+   *     `footpath_concrete`, which is round three's class exactly: paving
+   *     `lanes.py` excludes and `rail.corridor_paving` did not reach.
+   *   - `PLAYER_FALL_CEILING`: what is left of that within 60 m of the reported
+   *     coordinate, 12 stations, down from 19 -- and none of them on the
+   *     carriageway the report was filed from, which §4's line above asserts
+   *     directly.
+   */
+  const PIPELINE_IN_ROAD_CEILING = 16_901;
+  const PAVING_FALL_CEILING = 2_285;
+  const PLAYER_FALL_CEILING = 12;
+
+  // --- The two decks, and the difference between them is the whole of what
+  // "in a carriageway" means.
+  //
+  // `paved` is everything drawn -- carriageway plus footpath band plus the
+  // bake's own foot paving -- and is what the carve asks about and what §3
+  // walks. `metalled` is the carriageway **only**, because a building's wall
+  // stands on the property line and a front fence stands a metre inside it, and
+  // a sweep that called the footpath band a road would report every terrace in
+  // Sydney. See `RoadDeck`'s `Strip.half`.
+  const paved = new deckMod.RoadDeck();
+  const metalled = new deckMod.RoadDeck();
+  let laneTiles = 0;
+  for (const entry of world.index.tiles) {
+    const bytes = await readBytes(join(root, 'tiles', `${entry.key}.lanes.bin`));
+    if (bytes === null) continue;
+    const decoded = trafficMod.decodeLanes(bytes, entry.bounds[0], entry.bounds[1] + world.index.tile_size);
+    if (decoded === null) continue;
+    laneTiles++;
+    paved.adopt(entry.key, decoded.ways);
+    metalled.adopt(entry.key, decoded.ways.map((w) => ({
+      ...w,
+      halfWidth: Math.max(0.6, w.halfWidth - ROAD_KERB_SLACK_M),
+      footpathWidth: 0,
+    })));
+  }
+  if (paved.count === 0) {
+    say('    this build emits no lane sidecars. Skipped.');
+    return;
+  }
+  paved.adoptPaving(bake.paving);
+
+  const anchors = ridingMod.buildPlatforms(bake).sites;
+  const post = world.index.tile_size / world.index.terrain.grid;
+  /** The rule as it ships. */
+  const cut = new cutMod.RailCut(bake);
+  cut.setStations(anchors);
+  cut.setRoads(paved);
+  cut.setCarveLattice(post, terrainMod.CUT_SUBDIVISION);
+  /**
+   * THE NEGATIVE CONTROL FOR §3, and it is the same object with one line gone.
+   *
+   * A `RailCut` that was never told which lattice the ground is drawn on, whose
+   * `groundCutAt` is therefore `cutAt` verbatim -- the world exactly as it
+   * shipped. Nothing else about it differs: same bake, same stations, same deck.
+   */
+  const pointRule = new cutMod.RailCut(bake);
+  pointRule.setStations(anchors);
+  pointRule.setRoads(paved);
+
+  const rawGround = (x: number, z: number): number => world.terrain.height(x, z);
+  const noVessels = (): boolean => false;
+  const plans: never[] = [];
+  const net = geoMod.buildNetwork(bake);
+
+  const PLAYER = { x: -2492.54, z: 4281.58 };
+  const NEAR_PLAYER_M = 60;
+
+  // --- 1. The boundary fence, from the functions that draw it -----------------
+  //
+  // Not a re-derivation. `vergeRibs` is the rib walk `writeVerge` runs and
+  // `fenceRuns` is the clipping it emits from, imported and called here, so this
+  // is an assertion about the object in the frame rather than about a model of
+  // it.
+  const STATION_M = 0.5;
+  interface FenceTally { runs: number; inRoad: number; metres: number; near: number; first: string }
+  const tallyFence = (old: boolean): FenceTally => {
+    const out: FenceTally = { runs: 0, inRoad: 0, metres: 0, near: 0, first: '' };
+    for (const seg of net.segments) {
+      if (cutMod.drawnAsTunnel(seg.flags)) continue;
+      for (const side of [-1, 1]) {
+        const ribs = geoMod.vergeRibs(seg, side, cut, rawGround, plans, noVessels);
+        if (ribs === null) continue;
+        /**
+         * THE NEGATIVE CONTROL, and it is the rule as it shipped: a panel is
+         * dropped only when **both** its ribs are open, and is otherwise drawn
+         * whole from rib to rib. One boolean, in the one place the round
+         * changed, over the identical ribs from the identical walk.
+         */
+        const runs = old
+          ? ribs.slice(0, -1).flatMap((a, i) => {
+            const b = ribs[i + 1];
+            return a.open && b.open
+              ? []
+              : [{ ax: a.fx, az: a.fz, ay: a.foot, au: a.u, bx: b.fx, bz: b.fz, by: b.foot, bu: b.u }];
+          })
+          : geoMod.fenceRuns(ribs, cut, rawGround, plans, noVessels);
+        for (const run of runs) {
+          out.runs++;
+          const len = Math.hypot(run.bx - run.ax, run.bz - run.az);
+          const steps = Math.max(1, Math.ceil(len / STATION_M));
+          let inside = 0;
+          for (let s = 0; s <= steps; s++) {
+            const t = s / steps;
+            const x = run.ax + (run.bx - run.ax) * t;
+            const z = run.az + (run.bz - run.az) * t;
+            const surface = metalled.deckAt(x, z, world.terrain.height(x, z));
+            // A fence under a road *viaduct* is a real fence with real headroom,
+            // exactly as `fenceOpensAt` allows: only a panel whose head comes up
+            // through the surface is standing in the road.
+            if (!Number.isFinite(surface)) continue;
+            const foot = run.ay + (run.by - run.ay) * t;
+            if (foot + 1.8 <= surface - deckMod.DECK_THICKNESS_M) continue;
+            inside++;
+            if (out.first === '') out.first = `${x.toFixed(0)}, ${z.toFixed(0)}`;
+            if (Math.hypot(x - PLAYER.x, z - PLAYER.z) <= NEAR_PLAYER_M) out.near++;
+          }
+          if (inside > 0) {
+            out.inRoad++;
+            out.metres += (inside / (steps + 1)) * len;
+          }
+        }
+      }
+    }
+    return out;
+  };
+  const fenceWas = tallyFence(true);
+  const fenceNow = tallyFence(false);
+
+  check(
+    fenceWas.inRoad > 20 && fenceWas.near > 0,
+    `THE NEGATIVE CONTROL: with the rule asked of a panel's two ribs -- the code as it shipped -- ` +
+      `${fenceWas.inRoad.toLocaleString()} of ${fenceWas.runs.toLocaleString()} boundary-fence panels ` +
+      `stand in a carriageway, ${fenceWas.metres.toFixed(0)} m of fence across the city's roads, ` +
+      `${fenceWas.near} half-metre stations of it within ${NEAR_PLAYER_M} m of the player's own ` +
+      `coordinate${fenceWas.first ? `, first at ${fenceWas.first}` : ''}. A zero here would mean this ` +
+      `section cannot see the defect it was written for`,
+  );
+  check(
+    fenceNow.inRoad === 0,
+    `and with the rule asked of the span, ${fenceNow.inRoad} do ` +
+      `(${fenceNow.metres.toFixed(1)} m, ${fenceNow.near} stations near the player` +
+      `${fenceNow.first ? `, first at ${fenceNow.first}` : ''}). Panels are clipped at the kerb ` +
+      `rather than kept or dropped whole -- see rail-geo.FENCE_CLIP_M`,
+  );
+
+  // --- 2. And every other drawn solid, whatever emitted it --------------------
+  //
+  // The tile GLB, slot by slot, triangle by triangle. This is the section that
+  // is provenance-agnostic by construction: it never asks which module wrote a
+  // triangle, it asks where the triangle is, and it reports the slot -- which is
+  // the module -- only when one is in a road.
+  //
+  // Scoped to the tiles a railway crosses, because that is the whole extent this
+  // process can afford to parse and because a corridor is what puts an object
+  // somewhere its own module never looked. Stated in the line below rather than
+  // left as an assumption.
+  const corridorTiles = new Set<string>();
+  {
+    const p = bake.vertices;
+    const size = world.index.tile_size;
+    for (let i = 0; i < p.length; i += 3) {
+      const tx = Math.floor(p[i] / size);
+      const tz = Math.floor(-p[i + 2] / size);
+      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) corridorTiles.add(`${tx + dx}_${tz + dz}`);
+    }
+  }
+  const bySlot = new Map<string, number>();
+  /** The paving slots: a surface, not something standing on one. */
+  const PAVING_SLOTS = new Set(['road_asphalt', 'footpath_concrete', 'kerb_sandstone', 'park_grass']);
+  const STEP = 0.45;
+  /** §3's tally, filled from the same parse. See below. */
+  const fell = { tested: 0, now: 0, control: 0, worst: 0, where: '', nearNow: 0, nearControl: 0, slots: [] as string[] };
+  let slotsSeen = 0;
+  let trianglesTested = 0;
+  let tilesRead = 0;
+  let firstIntruder = '';
+  for (const entry of world.index.tiles) {
+    if (!corridorTiles.has(entry.key)) continue;
+    const bytes = await readBytes(join(root, 'tiles', `${entry.key}.glb`));
+    if (bytes === null) continue;
+    tilesRead++;
+    const glb = glbMod.parseTileGlb(bytes, 0);
+    const ox = entry.bounds[0];
+    const oz = entry.bounds[1] + world.index.tile_size;
+    for (const prim of glb.primitives) {
+      // The contact skirt is a decal painted on the ground, not an object.
+      if (prim.material === 'contact_ao') continue;
+      const pos = prim.attributes.find((a) => a.name === 'position');
+      if (pos === undefined) continue;
+      slotsSeen++;
+      const surfaceSlot = PAVING_SLOTS.has(prim.material);
+      const v = pos.array as Float32Array;
+      const ix = prim.index;
+      for (let t = 0; t + 2 < ix.length; t += 3) {
+        const a = ix[t] * 3;
+        const b = ix[t + 1] * 3;
+        const c = ix[t + 2] * 3;
+        const cx = ox + (v[a] + v[b] + v[c]) / 3;
+        const cz = oz + (v[a + 2] + v[b + 2] + v[c + 2]) / 3;
+        if (surfaceSlot) {
+          // --- 3. And no drawn paving ends in a drop --------------------------
+          //
+          // **Walked over the triangles the pipeline actually drew**, and that is
+          // the whole point of doing it here rather than over the deck. A sweep
+          // of the deck's own strips cannot fail: the deck is exactly what makes
+          // `cutAt` decline, so every point in it is kept by construction and the
+          // audit is circular. What the player fell through was drawn asphalt the
+          // deck's model did not reach -- a two-metre slot in King Street with
+          // road either side of it -- and only the drawn geometry knows it is
+          // there.
+          //
+          // Broad-phased on the corridor, because a triangle of park nowhere near
+          // a railway can never be carved and there are twenty million of them.
+          if (!(cut as unknown as { near(x: number, z: number, pad: number): boolean }).near(cx, cz, 40)) continue;
+          // Four stations: the centroid and the three edge midpoints. **Not the
+          // corners**, and that is a decision rather than a saving. A paving
+          // triangle's corners are exactly where the ribbon ends, and where a
+          // ribbon ends at a corridor rim a corner sits on the boundary of the
+          // carve by construction -- so counting corners measures the width of a
+          // float, not a hole somebody can stand in. The interior stations are
+          // the ones a body's centre can reach, and the slot that was missed at
+          // King Street was two metres wide against paving triangles seven.
+          for (let k = 0; k < 4; k++) {
+            const w = k === 0 ? [1 / 3, 1 / 3, 1 / 3] : k === 1 ? [0.5, 0.5, 0]
+              : k === 2 ? [0, 0.5, 0.5] : [0.5, 0, 0.5];
+            const x = ox + w[0] * v[a] + w[1] * v[b] + w[2] * v[c];
+            const z = oz + w[0] * v[a + 2] + w[1] * v[b + 2] + w[2] * v[c + 2];
+            const surface = w[0] * v[a + 1] + w[1] * v[b + 1] + w[2] * v[c + 1];
+            const g = world.terrain.height(x, z);
+            if (!Number.isFinite(g)) continue;
+            fell.tested++;
+            const near = Math.hypot(x - PLAYER.x, z - PLAYER.z) <= NEAR_PLAYER_M;
+            const before = pointRule.groundCutAt(x, z, g);
+            if (Number.isFinite(before) && surface - before > STEP) {
+              fell.control++;
+              if (near) fell.nearControl++;
+            }
+            const floor = cut.groundCutAt(x, z, g);
+            if (!Number.isFinite(floor)) continue;
+            const drop = surface - floor;
+            if (drop <= STEP) continue;
+            fell.now++;
+            if (near) fell.nearNow++;
+            if (fell.slots.length < 6) fell.slots.push(`${prim.material} ${x.toFixed(0)}, ${z.toFixed(0)} -${drop.toFixed(1)} m`);
+            if (drop > fell.worst) { fell.worst = drop; fell.where = `${x.toFixed(0)}, ${z.toFixed(0)}`; }
+          }
+          continue;
+        }
+        const top = Math.max(v[a + 1], v[b + 1], v[c + 1]);
+        const base = Math.min(v[a + 1], v[b + 1], v[c + 1]);
+        trianglesTested++;
+        const surface = metalled.deckAt(cx, cz, world.terrain.height(cx, cz));
+        if (!Number.isFinite(surface)) continue;
+        // Over the road and clear of it -- an awning, a bridge soffit, a building
+        // the corridor passes under -- is not an intruder, and below it is an
+        // undercroft. What is asserted is the thing that blocks a car.
+        if (base > surface + 0.05) continue;
+        if (top < surface - 0.05) continue;
+        bySlot.set(prim.material, (bySlot.get(prim.material) ?? 0) + 1);
+        if (firstIntruder === '') firstIntruder = `${prim.material} at ${cx.toFixed(0)}, ${cz.toFixed(0)}`;
+      }
+    }
+  }
+  const intruders = [...bySlot.values()].reduce((n, v) => n + v, 0);
+  const worstSlots = [...bySlot.entries()].sort((p, q) => q[1] - p[1]).slice(0, 6)
+    .map(([k, n]) => `${k} ${n.toLocaleString()}`).join(', ');
+  check(
+    tilesRead > 100 && trianglesTested > 100_000 && fell.tested > 100_000,
+    `the pipeline's own geometry is read for ${tilesRead.toLocaleString()} tiles a railway crosses: ` +
+      `${trianglesTested.toLocaleString()} standing triangles over ${slotsSeen.toLocaleString()} material ` +
+      `slots, and ${fell.tested.toLocaleString()} stations on drawn paving near a corridor. This section ` +
+      `asks nothing about which module emitted a triangle, which is the whole of why it can see a fence ` +
+      `the rail-side sweep could not`,
+  );
+  const fromFences = (bySlot.get('fence_masonry') ?? 0) + (bySlot.get('fence_iron') ?? 0)
+    + (bySlot.get('fence_timber') ?? 0);
+  check(
+    intruders <= PIPELINE_IN_ROAD_CEILING,
+    `${intruders.toLocaleString()} pipeline-drawn triangles stand in a carriageway, more than ` +
+      `${ROAD_KERB_SLACK_M} m inside its kerb, against a ceiling of ` +
+      `${PIPELINE_IN_ROAD_CEILING.toLocaleString()}` +
+      (worstSlots ? ` -- ${worstSlots}` : '') +
+      (firstIntruder ? `, first ${firstIntruder}` : '') +
+      `. ${fromFences.toLocaleString()} of them are fences.py front fences, which is a standing defect ` +
+      `this round measured and did not fix; the rest is brickwork on a nominal kerb line. The slot is ` +
+      `the module, which is the whole point of reading the file rather than the pipeline`,
+  );
+
+  check(
+    fell.control > 200 && fell.nearControl > 0,
+    `THE NEGATIVE CONTROL: with the carve asked per point -- the code as it shipped -- ` +
+      `${fell.control.toLocaleString()} of ${fell.tested.toLocaleString()} stations on drawn paving are ` +
+      `answered with a floor more than ${STEP} m below the surface they stand on, ` +
+      `${fell.nearControl} of them within ${NEAR_PLAYER_M} m of the player's own coordinate. ` +
+      `*"i fall thru if i go past the fence"*, counted`,
+  );
+  check(
+    fell.now <= PAVING_FALL_CEILING && fell.now * 3 < fell.control * 2,
+    `and with it asked on the lattice the ground is drawn on, ${fell.now.toLocaleString()} are ` +
+      `(ceiling ${PAVING_FALL_CEILING.toLocaleString()})` +
+      (fell.now ? `, worst ${fell.worst.toFixed(2)} m at ${fell.where} -- ${fell.slots.join('; ')}` : '') +
+      `. See RailCut.groundCutAt: the terrain mesh keeps or drops a whole ` +
+      `${(post / terrainMod.CUT_SUBDIVISION).toFixed(2)} m sub-quad and the ground query now decides on ` +
+      `the same one`,
+  );
+
+  // --- 4. And the coordinate the report was filed from ------------------------
+  {
+    const g = world.terrain.height(PLAYER.x, PLAYER.z);
+    const surface = paved.deckAt(PLAYER.x, PLAYER.z, g);
+    check(
+      Number.isFinite(surface),
+      `King Street at St Peters, (${PLAYER.x}, ${PLAYER.z}): the player is standing on drawn paving the ` +
+        `deck knows about (surface ${Number.isFinite(surface) ? surface.toFixed(2) : 'none'})`,
+    );
+    check(
+      !Number.isFinite(cut.groundCutAt(PLAYER.x, PLAYER.z, g)),
+      'and the carve does not take the ground out from under them',
+    );
+    check(
+      fenceNow.near === 0 && fell.nearNow <= PLAYER_FALL_CEILING,
+      `and within ${NEAR_PLAYER_M} m of them, ${fenceNow.near} stations of boundary fence stand in a ` +
+        `carriageway (ceiling 0) and ${fell.nearNow} interior stations of drawn footway fall away ` +
+        `(ceiling ${PLAYER_FALL_CEILING}) -- against ${fenceWas.near} and ${fell.nearControl} on the code ` +
+        `as it shipped`,
+    );
+  }
+}
+
 async function checkRoadDeck(): Promise<void> {
   say('--- Roads over the railway: uninterrupted everywhere');
 

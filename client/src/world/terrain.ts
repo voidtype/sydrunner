@@ -132,7 +132,7 @@ export interface TileSeam {
  * corridor covers entirely lose all sixty-four and cost nothing at all, so the
  * bill is two rows of sub-quads either side of the railway and nothing else.
  */
-const CUT_SUBDIVISION = 8;
+export const CUT_SUBDIVISION = 8;
 
 /**
  * How far the skirt around each tile hangs below its edge, metres.

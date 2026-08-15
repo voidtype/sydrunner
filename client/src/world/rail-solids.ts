@@ -1747,13 +1747,30 @@ export function sweptRing(
 }
 
 /**
+ * What `RailSolidField` refuses with when its `ground` argument consults it.
+ *
+ * Exported so `checkGroundLayering` can assert that the refusal is *this* and
+ * not a `RangeError` -- a named sentence on the first frame is a bug report, and
+ * a stack overflow ten thousand frames deep with no viaduct anywhere in it is
+ * what shipped.
+ */
+export const RE_ENTRY =
+  'rail-solids: the ground function given to RailSolidField consulted the field itself. '
+  + "A pier's foot cannot be defined by a query that needs the pier -- pass the composed "
+  + 'ground minus the rail-solid layer (main.ts wildGround, server/world.ts wildGround).';
+
+/**
  * A viaduct's solids: the deck, whose `base` is its soffit and whose box stands
  * a metre proud of the running surface for the parapets, and one pier per
  * `PIER_SPACING` of arc.
  *
- * `ground` rather than `rawGround`, exactly as `buildChunk` calls it, because
- * that is the reading a pier's foot was built on. See `RailSolidField` for the
- * one place the two ends can still differ over it.
+ * `ground` rather than `rawGround`, exactly as `buildChunk` calls it, because a
+ * pier inside a cutting stands on the **cut floor** and the raw DEM there is the
+ * sheet the corridor was carved out of. What that `ground` may **not** be is a
+ * query that consults the railway's own solids -- see `RailSolidField`'s
+ * `ground` parameter for the recursion that cost, and for why the resolution is
+ * a definition rather than a guard. See `RailSolidField` too for the one place
+ * the two ends can still differ over it.
  */
 export function viaductSolids(
   seg: Segment,
@@ -1904,8 +1921,41 @@ export class RailSolidField {
     private readonly cut: RailCut | null,
     private readonly rawGround: GroundAt,
     /**
-     * `RailWorld`'s `ground`, not its `rawGround`: a pier's foot is set from it
-     * and `buildChunk` passes the same distinction. See `viaductSolids`.
+     * The ground a pier's foot is set from, and it **must not consult this
+     * field**.
+     *
+     * ---------------------------------------------------------------------------
+     * This used to read *"`RailWorld`'s `ground`, not its `rawGround`: a pier's
+     * foot is set from it and `buildChunk` passes the same distinction"*, and
+     * that sentence was true when it was written and became false without
+     * anybody editing it. `main.ts`' `wildGround` was the whole composed ground
+     * query; the ground-parity round put `RailSolidField.roofHeight` **into**
+     * that composition; and from that commit a pier's foot was defined by a
+     * query that needs the pier:
+     *
+     *     groundHeightAt -> roofHeight -> segmentSolidsFor -> viaductSolids
+     *       -> wildGround -> groundHeightAt -> ...
+     *
+     * which is an unbounded mutual recursion, and it threw
+     * `RangeError: Maximum call stack size exceeded` inside the animation
+     * callback at the **default spawn** of the shipped build. The server never
+     * saw it: `server/world.ts` composes its own `wildGround` out of terrain,
+     * station boxes and `RailCut` and has never had this field in it, so the
+     * 1,147-check suite -- which exercises `groundFor`, not a browser's closure
+     * -- could not reach the cycle. See `checkGroundLayering`.
+     *
+     * **The resolution is definitional and not a guard.** A guard would return
+     * whichever half-built answer the stack was holding, which is two
+     * descriptions of one thing. A pier's foot is instead the composed ground
+     * *minus this layer* -- `main.ts`' `wildGround`, now `groundOn(..., null)`,
+     * and the server's own `wildGround`, which already was that. It is not
+     * `rawGround`, and the difference is real in one place: a pier inside a
+     * cutting stands on the **cut floor**, which the composition supplies and
+     * the raw DEM does not.
+     *
+     * The `RE_ENTRY` throw in `segmentSolidsFor` is the belt on top of that
+     * brace. It does not choose an answer -- it refuses, by name, on the first
+     * frame -- so it is a bug report rather than a second description.
      */
     private readonly ground: GroundAt,
     /** `buildChunk`'s `vesselled`, which is `() => false` with the flag down. */
@@ -1968,6 +2018,19 @@ export class RailSolidField {
   }
 
   /**
+   * Is a segment's solids being built right now? See `RE_ENTRY`.
+   *
+   * One boolean, and it exists so that a `ground` argument which consults this
+   * field fails **immediately and by name** rather than as a stack overflow ten
+   * thousand frames deep. It is not the fix -- see the `ground` parameter's own
+   * note for that -- and it can never fire on the shipped wiring, which
+   * `checkGroundLayering` asserts over the spawn and over every viaduct in the
+   * extent. Sequential calls from `roofHeight`'s loop clear it between segments;
+   * only a nested one trips it.
+   */
+  private building = false;
+
+  /**
    * `buildChunk`'s decision for one segment, and the prisms it produces.
    *
    * The two questions are asked in `buildChunk`'s own order and with
@@ -1976,10 +2039,23 @@ export class RailSolidField {
    * viaduct, and a bridge gets its deck whether or not it is also a bore,
    * because that `if` sits outside the `else`. A different order here would be a
    * different world.
+   *
+   * Split in two so the re-entry refusal wraps the *build* and not the cache
+   * hit: a cached answer is a value and nothing about returning one can recurse.
    */
   private segmentSolidsFor(i: number): SegmentSolids {
     const held = this.segmentCache[i];
     if (held !== null) return held;
+    if (this.building) throw new Error(RE_ENTRY);
+    this.building = true;
+    try {
+      return this.buildSegmentSolids(i);
+    } finally {
+      this.building = false;
+    }
+  }
+
+  private buildSegmentSolids(i: number): SegmentSolids {
     const s = this.net.segments[i];
     const prisms: Indexed[] = [];
     let complete = true;
