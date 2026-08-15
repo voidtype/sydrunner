@@ -113,6 +113,19 @@ import {
   type SuggestionList,
 } from '../client/src/net/suggestions.ts';
 import { FloodGuard, SUGGEST_BURST, SuggestionStore } from './suggestions.ts';
+import {
+  BugStore,
+  CLIENT_BURST,
+  MAX_IMAGE_BYTES,
+  MAX_REQUEST_BYTES,
+  makeJpeg,
+  makePng,
+  sanitiseImage,
+  sniffImage,
+  verifyBugs,
+} from './bugs.ts';
+import { parseChangelog, whenText } from '../client/src/net/changelog.ts';
+import { PROBE_EDGE, looksBlank, verifyBugReport } from '../client/src/net/bugreport.ts';
 // The lime e-bikes. See `checkBikes` at the foot of this file, which is entirely
 // self-contained and appended after every check that was here before it.
 import {
@@ -1601,6 +1614,24 @@ async function main(): Promise<void> {
   // silent failures it exists to catch.
   say('');
   await checkSuggestions();
+
+  // --- 23a. The bug box beside it, which shares that feature's credential and
+  // none of its risk profile. Suggestions put a sentence in an issue; this
+  // **commits a file into a public repository** on an unauthenticated public
+  // endpoint, so its failures are permanent rather than merely wrong -- a
+  // forwarded phone photograph publishes somebody's home coordinates and there
+  // is no way back. Every refusal here has a negative control beside it. See
+  // `checkBugReports`, appended last and self-contained.
+  say('');
+  await checkBugReports();
+
+  // --- 23b. And the change feed, which is the one feature in this repo whose
+  // input is the repository itself: three commits, generated at build time,
+  // asserted against the git they claim to come from. A generator that emitted
+  // last week's file leaves a panel drawing three plausible lines, which is
+  // exactly the failure a screenshot cannot see. See `checkChangeFeed`.
+  say('');
+  await checkChangeFeed();
 
   // --- 24. `/unstuck`, against the real lane graph and over a real hub. The
   // destination rule and the command surface are two different failures and are
@@ -24168,5 +24199,674 @@ async function checkPlatformStanding(): Promise<void> {
       `the track centre, ${PLATFORM_TOP_M} m over the rail; walked with the real controller over a ` +
       `RailWorld whose prisms are in the collision world, which is a browser's world and not this ` +
       `process's`,
+  );
+}
+
+// --- The bug box -------------------------------------------------------------------
+
+/**
+ * The public endpoint that writes bytes into a public repository.
+ *
+ * Every other feature checked in this file fails by being wrong. This one can
+ * fail by being **permanent**: an image committed to `voidtype/sydrunner` cannot
+ * be un-committed, and a phone photograph forwarded through with its EXIF intact
+ * publishes somebody's home coordinates into a public repo with no error, no
+ * warning and no way back. So this section is built around the refusals rather
+ * than around the happy path, and every refusal has a negative control beside
+ * it -- a validator that returned `false` unconditionally would pass every
+ * assertion about what it rejects while making the feature useless, and only the
+ * controls catch that.
+ *
+ * Six things it asserts that nothing else does:
+ *
+ *   1. **The size cap fires before the body is buffered.** Driven over a raw TCP
+ *      socket, because `fetch` computes its own `Content-Length` and cannot
+ *      express the lie. A server that read first and checked after would sit
+ *      here waiting for ninety-nine megabytes that never arrive.
+ *   2. **The magic numbers decide, not the content type.** PHP source declared
+ *      as `image/png` is refused; the declared type is never consulted.
+ *   3. **Metadata does not survive.** A PNG with a `tEXt` chunk full of GPS and
+ *      a JPEG with an EXIF `APP1` both come out without them, and both are still
+ *      valid images -- asserted on the bytes **on disk**, which is the copy that
+ *      would have been committed.
+ *   4. **A refusal costs a player nothing.** Ten rejected requests, then three
+ *      accepted ones. This is a regression check on a bug this code had.
+ *   5. **The GitHub calls are the two intended ones**, to the intended paths,
+ *      with the intended label, and the committed bytes are the *rebuilt* image
+ *      rather than the uploaded one.
+ *   6. **A queued report drains** when a token appears, and the queue is empty
+ *      afterwards.
+ */
+async function checkBugReports(): Promise<void> {
+  say('BUG REPORTS — hostile bytes, a public repo, and the picture that is the point');
+
+  const ID_A = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
+  const ID_B = '9f8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
+  const dir = `${Bun.env.TMPDIR ?? '/tmp'}/sydney-bugs-${process.pid}`;
+  await Bun.$`mkdir -p ${dir}`.quiet();
+
+  const GPS = new TextEncoder().encode('GPSLatitude -33.8688 GPSLongitude 151.2093');
+  const EXIF = new TextEncoder().encode('Exif MM* GPSLatitudeRef S');
+  const b64 = (bytes: Uint8Array): string => {
+    let s = '';
+    for (let i = 0; i < bytes.length; i += 32768) s += String.fromCharCode(...bytes.subarray(i, i + 32768));
+    return btoa(s);
+  };
+  const has = (haystack: Uint8Array, needle: Uint8Array): boolean => {
+    outer: for (let i = 0; i + needle.length <= haystack.length; i++) {
+      for (let j = 0; j < needle.length; j++) if (haystack[i + j] !== needle[j]) continue outer;
+      return true;
+    }
+    return false;
+  };
+
+  // --- 0. The module's own self-checks, run here as well as at boot, on
+  // `verifySuggestions`' argument: the process that holds the credential is the
+  // one whose arithmetic has to be right.
+  {
+    const failed = verifyBugs();
+    check(
+      failed.length === 0,
+      `the bug module's self-check passes (${failed.length ? failed[0] : 'sniff, strip, cap, path, both rate tiers'})`,
+    );
+    const client = verifyBugReport();
+    check(
+      client.length === 0,
+      `and the client half's, including the blank-frame detector and its negative controls ` +
+        `(${client.length ? client[0] : 'blank, night, tunnel, degenerate'})`,
+    );
+  }
+
+  // --- 1. The metadata strip, asserted on bytes rather than on a claim.
+  {
+    const png = makePng(64, 48, [
+      ['tEXt', GPS],
+      ['eXIf', GPS],
+    ]);
+    check(has(png, GPS), 'THE NEGATIVE CONTROL: the fixture PNG really does carry the GPS bytes before the strip');
+    const safe = sanitiseImage(png);
+    check(
+      safe !== null && !has(safe.bytes, GPS),
+      'a PNG carrying GPS text chunks comes out of the sanitiser without them',
+    );
+    check(
+      safe !== null && safe.width === 64 && safe.height === 48,
+      `and with its dimensions intact (${safe?.width}x${safe?.height})`,
+    );
+    check(
+      safe !== null && sanitiseImage(safe.bytes) !== null,
+      'and the rebuilt file is still a PNG by the same validator that judged the original',
+    );
+
+    const jpeg = makeJpeg(320, 240, true, EXIF);
+    check(has(jpeg, EXIF), 'THE NEGATIVE CONTROL: the fixture JPEG really does carry an EXIF APP1 before the strip');
+    const safeJpeg = sanitiseImage(jpeg);
+    check(
+      safeJpeg !== null && !has(safeJpeg.bytes, EXIF),
+      'a JPEG with an EXIF APP1 comes out without it, and the scan is copied through untouched',
+    );
+    check(
+      safeJpeg !== null && safeJpeg.width === 320 && safeJpeg.height === 240,
+      `and reports ${safeJpeg?.width}x${safeJpeg?.height} read out of its SOF`,
+    );
+  }
+
+  // --- 2. The server, with no token and a repo that does not exist, so this
+  // section is hermetic in `checkSuggestions`' exact sense: nothing in it can
+  // reach GitHub even if the environment running it has a credential in it.
+  const port = PORT + 5;
+  const proc = Bun.spawn(['bun', 'run', new URL('./index.ts', import.meta.url).pathname], {
+    env: {
+      ...process.env,
+      SYDNEY_PORT: String(port),
+      SYDNEY_BOTS: '0',
+      SYDNEY_BUGS: `${dir}/queue`,
+      SYDNEY_SUGGESTIONS: `${dir}/suggestions.json`,
+      SYDNEY_GITHUB_TOKEN: '',
+      SYDNEY_GITHUB_REPO: 'voidtype/sydney-integration-check-no-such-repo',
+    },
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+
+  try {
+    let up = false;
+    for (let i = 0; i < 120 && !up; i++) {
+      await sleep(100);
+      try {
+        up = (await fetch(`http://127.0.0.1:${port}/health`)).ok;
+      } catch {
+        // not yet
+      }
+    }
+    if (!up) {
+      check(false, 'the bug-report server never answered /health');
+      return;
+    }
+
+    const post = async (payload: unknown): Promise<{ status: number; ok: boolean; result: string; message: string }> => {
+      const res = await fetch(`http://127.0.0.1:${port}/bug`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const body = (await res.json()) as { ok?: boolean; result?: string; message?: string };
+      return { status: res.status, ok: body.ok === true, result: body.result ?? '', message: body.message ?? '' };
+    };
+
+    // --- 2a. The shape of the route.
+    {
+      const preflight = await fetch(`http://127.0.0.1:${port}/bug`, { method: 'OPTIONS' });
+      check(
+        preflight.status === 204 && (preflight.headers.get('access-control-allow-methods') ?? '').includes('POST'),
+        `the preflight is answered (${preflight.status}), which is what lets the dev page on vite's origin post at all`,
+      );
+      const wrongMethod = await fetch(`http://127.0.0.1:${port}/bug`);
+      check(wrongMethod.status === 405, `a GET to /bug is ${wrongMethod.status} rather than a report`);
+      const rubbish = await fetch(`http://127.0.0.1:${port}/bug`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: 'not json at all',
+      });
+      check(rubbish.status === 400, `a body that is not JSON is ${rubbish.status} and does not take the server with it`);
+    }
+
+    // --- 2b. The refusals, each naming what it refuses.
+    {
+      const noId = await post({ title: 'a bug report with no client id at all' });
+      check(noId.status === 400 && !noId.ok, `a report with no client id is refused: "${noId.message}"`);
+      const noTitle = await post({ clientId: ID_A, title: 'hi' });
+      check(
+        noTitle.status === 400 && !noTitle.ok,
+        `a title too short to mean anything is refused: "${noTitle.message}"`,
+      );
+
+      // The bytes decide, and the declared type is never consulted.
+      const php = await post({
+        clientId: ID_A,
+        title: 'a php file dressed up as a screenshot',
+        image: `data:image/png;base64,${btoa('<?php system($_GET["c"]); ?>')}`,
+      });
+      check(
+        php.status === 415 && !php.ok,
+        `PHP source declared as image/png is refused by its magic numbers: "${php.message}"`,
+      );
+      const gif = await post({
+        clientId: ID_A,
+        title: 'a gif, which this endpoint does not take',
+        image: `data:image/png;base64,${btoa('GIF89a ')}`,
+      });
+      check(gif.status === 415 && !gif.ok, 'a GIF is refused even though PNG was declared for it');
+      const svg = await post({
+        clientId: ID_A,
+        title: 'an svg with a script element inside it',
+        image: `data:image/png;base64,${btoa('<svg xmlns="http://www.w3.org/2000/svg"><script>x</script></svg>')}`,
+      });
+      check(
+        svg.status === 415 && !svg.ok,
+        'an SVG is refused — a document with script in it is not an image this repository will host',
+      );
+    }
+
+    // --- 2c. **The cap, enforced before the body is buffered.**
+    //
+    // Driven over a raw socket because `fetch` writes its own `Content-Length`
+    // and there is no way to lie through it. The request declares ninety-nine
+    // megabytes and then sends twenty-eight bytes and stops. A server that
+    // buffered first and checked after would sit here until a read timed out;
+    // this one answers 413 with almost nothing sent.
+    {
+      const started = performance.now();
+      const answer = await rawPost(
+        port,
+        [
+          'POST /bug HTTP/1.1',
+          `Host: 127.0.0.1:${port}`,
+          'Content-Type: application/json',
+          'Content-Length: 99999999',
+          '',
+          '',
+        ].join('\r\n'),
+        '{"clientId":"3f2504e0-4f89-4',
+        5000,
+      );
+      const elapsed = performance.now() - started;
+      check(
+        answer.includes('413'),
+        `a request declaring 95 MB is refused with 413 after ${elapsed.toFixed(0)} ms having sent 28 bytes of it — ` +
+          `the cap is read off the header before anything is buffered (the ceiling is ` +
+          `${(MAX_REQUEST_BYTES / 1048576).toFixed(0)} MB)`,
+      );
+
+      // And a body that lies the other way: no declared length at all, sent
+      // chunked, past the cap. This is the one a header-only rule misses
+      // entirely, and it is one `Transfer-Encoding: chunked` away from being
+      // the only request an attacker ever sends.
+      const chunk = 'a'.repeat(65536);
+      const chunks: string[] = [];
+      for (let sent = 0; sent < MAX_REQUEST_BYTES + 262144; sent += chunk.length) {
+        chunks.push(`${chunk.length.toString(16)}\r\n${chunk}\r\n`);
+      }
+      const chunkedStart = performance.now();
+      const chunked = await rawPost(
+        port,
+        [
+          'POST /bug HTTP/1.1',
+          `Host: 127.0.0.1:${port}`,
+          'Content-Type: application/json',
+          'Transfer-Encoding: chunked',
+          '',
+          '',
+        ].join('\r\n'),
+        chunks.join(''),
+        8000,
+      );
+      check(
+        chunked.includes('413'),
+        `a chunked body with **no declared length at all**, ${((MAX_REQUEST_BYTES + 262144) / 1048576).toFixed(1)} MB of it, ` +
+          `is answered ${chunked.slice(9, 12) || '(nothing)'} after ${(performance.now() - chunkedStart).toFixed(0)} ms — ` +
+          'this is the request a rule that only read content-length misses entirely, ' +
+          'and it is one `Transfer-Encoding: chunked` away from being the only request an attacker ever sends',
+      );
+    }
+
+    // --- 2d. The report that works, and the file it leaves on disk.
+    {
+      const png = makePng(96, 64, [
+        ['tEXt', GPS],
+        ['eXIf', GPS],
+      ]);
+      const filed = await post({
+        clientId: ID_A,
+        title: 'the platform at Redfern has a hole in it',
+        body: 'walked along the deck and fell through beside the stairs',
+        image: `data:image/png;base64,${b64(png)}`,
+        meta: {
+          'world x/z': '-2492.5 / 4281.6',
+          street: 'cnr King St & Carillon Ave',
+          suburb: 'Newtown',
+          riding: false,
+          'frame ms': 16.7,
+        },
+      });
+      check(
+        filed.status === 200 && filed.ok && filed.result === 'queued',
+        `a real report against a server with no token is accepted and queued rather than refused: "${filed.message}"`,
+      );
+
+      await sleep(250);
+      const listing = await Bun.$`ls -1 ${dir}/queue`.quiet().nothrow();
+      const names = listing.stdout
+        .toString()
+        .split('\n')
+        .filter((n) => n.trim() !== '');
+      check(
+        names.some((n) => n.endsWith('.json')),
+        `the queued report is on disk (${names.length} file(s) in the queue directory)`,
+      );
+      const imageName = names.find((n) => n.endsWith('.png')) ?? '';
+      check(imageName !== '', 'and its image is a file beside the JSON rather than base64 inside it');
+      if (imageName) {
+        const onDisk = new Uint8Array(await Bun.file(`${dir}/queue/${imageName}`).arrayBuffer());
+        check(
+          !has(onDisk, GPS),
+          `the image **as stored** carries no GPS text (${onDisk.length} B, down from ${png.length} B) — ` +
+            'this is the copy that would have been committed to a public repository',
+        );
+        check(
+          sniffImage(onDisk) === 'png' && sanitiseImage(onDisk) !== null,
+          'and it is still a valid PNG after the strip, which is what makes the strip safe rather than merely small',
+        );
+      }
+    }
+
+    // --- 2e. A refusal costs nothing, and then the budget does bind.
+    {
+      for (let i = 0; i < 10; i++) await post({ clientId: ID_B, title: 'no' });
+      let accepted = 0;
+      for (let i = 0; i < CLIENT_BURST + 2; i++) {
+        const out = await post({ clientId: ID_B, title: `a genuine report number ${i} about the trains` });
+        if (out.ok) accepted++;
+      }
+      check(
+        accepted === CLIENT_BURST,
+        `after ten refused requests a client still files ${accepted} real reports (the budget is ${CLIENT_BURST}) — ` +
+          'a rejection must not spend a filing slot, which is a bug this endpoint shipped with and this catches',
+      );
+      const over = await post({ clientId: ID_B, title: 'one more genuine report about the trains' });
+      check(over.status === 429 && !over.ok, `and the one after that is refused with a rate message: "${over.message}"`);
+    }
+  } finally {
+    proc.kill();
+  }
+
+  // --- 3. The GitHub calls, against a stub. Nothing here touches the network.
+  {
+    const calls: Array<{ method: string; url: string; body: Record<string, unknown> }> = [];
+    const stub = (async (url: string | URL | Request, init?: RequestInit) => {
+      const href = String(url);
+      const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+      calls.push({ method: init?.method ?? 'GET', url: href, body });
+      if (href.includes('/contents/')) {
+        return new Response(
+          JSON.stringify({
+            content: { download_url: 'https://raw.githubusercontent.com/voidtype/sydrunner/main/bugs/x.png' },
+          }),
+          { status: 201 },
+        );
+      }
+      return new Response(
+        JSON.stringify({ number: 4242, html_url: 'https://github.com/voidtype/sydrunner/issues/4242' }),
+        { status: 201 },
+      );
+    }) as unknown as typeof fetch;
+
+    const image = sanitiseImage(makePng(32, 32, [['tEXt', GPS]]))!;
+    const store = new BugStore({
+      dir: `${dir}/linked`,
+      repo: 'voidtype/sydrunner',
+      token: 'not-a-real-token',
+      timers: false,
+      fetch: stub,
+    });
+    const out = await store.file({
+      clientId: ID_A,
+      title: 'the fence is inside the road',
+      body: 'at the level crossing on Unwins Bridge Rd',
+      meta: [
+        ['street', 'Unwins Bridge Rd'],
+        ['suburb', 'Sydenham'],
+        ['pipe', 'a | b'],
+      ],
+      image,
+    });
+    check(out.result === 'filed' && out.issue === 4242, `a linked store files the report and reports its number: "${out.message}"`);
+    check(calls.length === 2, `and made exactly ${calls.length} GitHub calls — the image, then the issue`);
+
+    const put = calls[0];
+    check(
+      put.method === 'PUT' &&
+        /\/repos\/voidtype\/sydrunner\/contents\/bugs\/\d{4}-\d{2}-\d{2}-[0-9a-f]{16}\.png$/.test(put.url),
+      `the image goes to a server-generated path under bugs/ (${put.url.split('/contents/')[1] ?? put.url}) — ` +
+        'nothing a client sent is anywhere in that string',
+    );
+    check(
+      typeof put.body.content === 'string' && !/[^A-Za-z0-9+/=]/.test(String(put.body.content)),
+      'and its content field is base64 and nothing else',
+    );
+    const committed = Uint8Array.from(atob(String(put.body.content)), (c) => c.charCodeAt(0));
+    check(
+      !has(committed, GPS) && sniffImage(committed) === 'png',
+      `the committed bytes are the **rebuilt** image (${committed.length} B), not the ones that were uploaded`,
+    );
+    check(
+      !String(put.body.message).includes('the fence is inside the road'),
+      "the commit message is a literal rather than the player's title — a stranger's sentence does not belong in `git log` forever",
+    );
+
+    const issue = calls[1];
+    check(
+      issue.method === 'POST' && issue.url.endsWith('/repos/voidtype/sydrunner/issues'),
+      'the issue goes to the issues endpoint of that repo and no other',
+    );
+    check(
+      Array.isArray(issue.body.labels) && (issue.body.labels as string[]).join(',') === 'bug',
+      `and carries exactly the one label the user created (${JSON.stringify(issue.body.labels)})`,
+    );
+    const issueText = String(issue.body.body);
+    check(
+      issueText.indexOf('at the level crossing') < issueText.indexOf('<details>'),
+      "the player's own words are above the metadata block, which is what keeps them readable at the top of the issue",
+    );
+    check(
+      issueText.includes('![screenshot](https://raw.githubusercontent.com/'),
+      'the screenshot is embedded from the raw URL the contents API answered with',
+    );
+    check(issueText.includes('| pipe | a \\| b |'), 'and a pipe inside a metadata value is escaped rather than adding a column');
+
+    // --- 4. The drain: queued with no token, posted when one appears.
+    const offline = new BugStore({ dir: `${dir}/drain`, repo: 'voidtype/sydrunner', token: '', timers: false });
+    const queued = await offline.file({
+      clientId: ID_A,
+      title: 'a report filed while the server had no credential',
+      body: 'it should survive until one appears',
+      meta: [['suburb', 'Erskineville']],
+      image,
+    });
+    check(queued.result === 'queued', `an unlinked store queues rather than refusing: "${queued.message}"`);
+    calls.length = 0;
+    const linked = new BugStore({
+      dir: `${dir}/drain`,
+      repo: 'voidtype/sydrunner',
+      token: 'not-a-real-token',
+      timers: false,
+      fetch: stub,
+    });
+    const drained = await linked.drain();
+    check(drained === 1, `and a linked store started over the same directory drains ${drained} of them`);
+    const left = (await Bun.$`ls -1 ${dir}/drain`.quiet().nothrow()).stdout.toString().trim();
+    check(
+      left === '',
+      `the queue is empty afterwards — a drain that did not delete would file every queued report again every minute`,
+    );
+    check(
+      calls.some((c) => c.method === 'POST' && String(c.body.body).includes('Erskineville')),
+      'and the drained issue still carries the metadata collected when it was filed rather than when it was posted',
+    );
+  }
+
+  await Bun.$`rm -rf ${dir}`.quiet().nothrow();
+}
+
+/**
+ * Write a raw HTTP request and read whatever comes back, or give up.
+ *
+ * `fetch` cannot express "declare ninety-nine megabytes and send twenty-eight
+ * bytes", because it computes `Content-Length` itself -- and that request is the
+ * only way to prove the size cap fires **before** the body is buffered rather
+ * than after. So this writes the bytes onto a socket by hand.
+ *
+ * Returns the first response bytes seen, or '' if the connection was dropped or
+ * the timeout ran out. Both of those are passes for the chunked case: a server
+ * that hangs up on an oversize stream has enforced the cap.
+ */
+async function rawPost(port: number, head: string, body: string, timeoutMs: number): Promise<string> {
+  return new Promise<string>((resolve) => {
+    let answered = '';
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const finish = (): void => {
+      if (settled) return;
+      settled = true;
+      if (timer !== null) clearTimeout(timer);
+      resolve(answered);
+    };
+    timer = setTimeout(finish, timeoutMs);
+    /** How much of `body` has actually gone onto the wire. */
+    let sent = 0;
+    const pump = (socket: { write(data: string): number }): void => {
+      try {
+        while (sent < body.length) {
+          const wrote = socket.write(body.slice(sent, sent + 65536));
+          if (wrote <= 0) return; // full; `drain` will call this again
+          sent += wrote;
+        }
+      } catch {
+        // The server hung up mid-write, which is itself the cap firing.
+      }
+    };
+    void Bun.connect({
+      hostname: '127.0.0.1',
+      port,
+      socket: {
+        open(socket) {
+          socket.write(head);
+          // The head is flushed first and the body follows a moment later, so
+          // the server has the headers -- and therefore the declared length --
+          // well before the body finishes arriving. That is the whole exercise.
+          setTimeout(() => pump(socket), 50);
+        },
+        // **Backpressure, and it is not optional here.** The chunked case
+        // writes six megabytes, `socket.write` returns how much it actually
+        // took, and the first cut ignored that number -- so about 64 kB went
+        // out, the server sat waiting for a body that had stopped arriving, and
+        // the check "passed" on its own eight-second timeout while asserting
+        // nothing at all. A test that passes because nothing happened is worse
+        // than no test. `drain` is where the rest goes.
+        drain(socket) {
+          pump(socket);
+        },
+        data(socket, data) {
+          answered += new TextDecoder().decode(data);
+          if (answered.includes('\r\n\r\n')) {
+            socket.end();
+            finish();
+          }
+        },
+        close() {
+          finish();
+        },
+        error() {
+          finish();
+        },
+      },
+    }).catch(() => finish());
+  });
+}
+
+// --- The change feed ---------------------------------------------------------------
+
+/**
+ * "what's new": three commits, generated at build time, drawn in the panel.
+ *
+ * The one feature in this repo whose *input* is the repository itself, which
+ * makes it checkable in a way a hand-written list would never be: the hashes in
+ * the file must be commits this git actually has, carrying the subjects the feed
+ * claims for them. A generator that quietly emitted last week's file, or a
+ * parser that dropped an entry, both leave a panel drawing three plausible
+ * lines -- which is exactly the failure a screenshot cannot see.
+ */
+async function checkChangeFeed(): Promise<void> {
+  say("CHANGE FEED — three commits, generated at build time, and what happens when there is no git");
+
+  const root = new URL('..', import.meta.url).pathname;
+  const script = `${root}scripts/changelog.mjs`;
+  const out = `${root}client/public/changelog.json`;
+
+  // --- 1. The generator runs, is idempotent, and stays inside its budget.
+  const first = await Bun.$`node ${script}`.quiet().nothrow();
+  check(first.exitCode === 0, `scripts/changelog.mjs exits 0 (${first.stdout.toString().trim().split('\n').pop() ?? ''})`);
+  const before = await Bun.file(out)
+    .text()
+    .catch(() => '');
+  const second = await Bun.$`node ${script}`.quiet().nothrow();
+  const after = await Bun.file(out)
+    .text()
+    .catch(() => '');
+  check(
+    second.exitCode === 0 && before === after && before !== '',
+    'running it twice leaves the file byte-identical — idempotent, so it is not a vite reload and a git diff on every build',
+  );
+  check(
+    before.length > 0 && before.length < 1500,
+    `the whole feed is ${before.length} B, which is the "a few hundred bytes, not the whole history" budget`,
+  );
+
+  // --- 2. What it wrote is what git says, hash by hash.
+  const parsed = parseChangelog(JSON.parse(before || '{}'));
+  check(parsed.entries.length === 3, `it holds ${parsed.entries.length} entries`);
+  let matched = 0;
+  for (const entry of parsed.entries) {
+    const subject = (await Bun.$`git -C ${root} log -1 --format=%s ${entry.hash}`.quiet().nothrow()).stdout
+      .toString()
+      .trim();
+    if (subject === '') continue;
+    // The title is either the subject or -- where the subject said nothing --
+    // the first paragraph of the body, so a prefix match is the honest test.
+    if (subject.startsWith(entry.title.replace(/…$/, '').slice(0, 40))) matched++;
+  }
+  check(
+    matched === parsed.entries.length,
+    `every one of the ${parsed.entries.length} hashes is a commit this repository has, carrying the subject the feed claims for it`,
+  );
+  check(
+    parsed.build === parsed.entries[0]?.hash,
+    `and the build it reports (${parsed.build}) is the newest of them, which is what a bug report's "build" field means`,
+  );
+
+  // --- 3. THE NEGATIVE CONTROLS: every way the file can be absent or wrong.
+  //
+  // Without these the parser could return three entries unconditionally and
+  // everything above would pass. These are the states a fresh clone, a tarball
+  // and a static host that answers a 404 with `index.html` actually produce.
+  {
+    const bad: Array<[string, unknown]> = [
+      ['a missing file', undefined],
+      ['a 404 answered with a document', '<!doctype html><html><body>vite</body></html>'],
+      ['an empty object', {}],
+      ['entries that are not entries', { entries: [1, null, 'x'] }],
+      ['an entry with no hash', { entries: [{ title: 'a change nobody can find' }] }],
+    ];
+    let degraded = 0;
+    for (const [, raw] of bad) {
+      try {
+        if (parseChangelog(raw).entries.length === 0) degraded++;
+      } catch {
+        // Counted as a failure by not incrementing.
+      }
+    }
+    check(
+      degraded === bad.length,
+      `all ${bad.length} of the ways this file can be absent or wrong draw nothing rather than throwing or drawing "undefined" ` +
+        `(${bad.map(([what]) => what).join(', ')})`,
+    );
+  }
+
+  // --- 4. The generator with no git at all, which is the tarball case.
+  {
+    const empty = `${Bun.env.TMPDIR ?? '/tmp'}/sydney-nogit-${process.pid}`;
+    await Bun.$`rm -rf ${empty}`.quiet().nothrow();
+    await Bun.$`mkdir -p ${empty}/scripts`.quiet();
+    await Bun.$`mkdir -p ${empty}/client/public`.quiet();
+    await Bun.$`cp ${script} ${empty}/scripts/changelog.mjs`.quiet();
+    const ran = await Bun.$`node ${empty}/scripts/changelog.mjs`.quiet().nothrow();
+    const wrote = await Bun.file(`${empty}/client/public/changelog.json`).exists();
+    check(
+      ran.exitCode === 0 && !wrote,
+      `run outside a repository it exits 0 and writes nothing ("${ran.stdout.toString().trim()}") — ` +
+        'a build must not fail because it could not find out what changed last Tuesday',
+    );
+    await Bun.$`rm -rf ${empty}`.quiet().nothrow();
+  }
+
+  // --- 5. The date, in local days rather than in milliseconds.
+  {
+    const lateNight = new Date(2026, 7, 13, 1, 0, 0);
+    check(
+      whenText('2026-08-12', lateNight) === 'yesterday' && whenText('2026-08-13', lateNight) === 'today',
+      'a commit made at 23:00 and read at 01:00 reads as "yesterday" — millisecond arithmetic calls it "today"',
+    );
+  }
+
+  // --- 6. And the blank-frame detector, because the change feed and the bug box
+  // shipped together and this is the assertion that keeps the screenshot honest.
+  {
+    const uniform: number[] = [];
+    for (let i = 0; i < PROBE_EDGE * PROBE_EDGE; i++) uniform.push(0, 0, 0, 255);
+    const real: number[] = [];
+    for (let y = 0; y < PROBE_EDGE; y++) {
+      for (let x = 0; x < PROBE_EDGE; x++) real.push(40 + x * 8, 90 + y * 5, 160 - x * 3, 255);
+    }
+    check(looksBlank(uniform), 'a failed WebGPU readback — every pixel identical — is detected as blank and refused');
+    check(
+      !looksBlank(real),
+      'THE NEGATIVE CONTROL: a frame with a picture in it is not, so the button is not merely broken in the other direction',
+    );
+  }
+
+  say(
+    `    the feed is generated from git at build time, is ${before.length} B, degrades to nothing on every ` +
+      `absent-file path, and the bug box behind it caps an image at ${(MAX_IMAGE_BYTES / 1048576).toFixed(0)} MB ` +
+      `with a ${(MAX_REQUEST_BYTES / 1048576).toFixed(0)} MB request ceiling in front of that`,
   );
 }

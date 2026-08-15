@@ -56,6 +56,8 @@
  * number invites somebody to treat it as one.
  */
 
+import type { BugReportForm } from './bugreport.ts';
+import type { ChangelogFeed } from './changelog.ts';
 import {
   MAX_BODY_CHARS,
   MAX_TITLE_CHARS,
@@ -110,6 +112,25 @@ export interface SuggestionsHandlers {
   onVote(localId: number, dir: number): boolean;
 }
 
+/**
+ * The other two tabs, which this panel hosts and does not own.
+ *
+ * Passed in rather than constructed here, and optional so that nothing about
+ * this class needs either of them to exist. Each owns its own subtree of
+ * `index.html`, its own state and its own network; what this panel keeps is the
+ * three things that must be decided in exactly one place -- **which tab is
+ * shown, whether anything here is holding the keyboard, and what Escape does**.
+ * Two panels that each answered "am I typing?" would be two answers `main.ts`
+ * has to combine correctly on every key, forever.
+ */
+export interface PanelTabs {
+  changelog: ChangelogFeed;
+  bug: BugReportForm;
+}
+
+/** The tab names, which are also the `data-tab` values in `index.html`. */
+export type TabName = 'suggest' | 'new' | 'bug';
+
 /** What the panel says when the socket has gone away under it. */
 const LOST = 'lost the server — reload to reconnect';
 
@@ -125,6 +146,11 @@ export class SuggestionsPanel {
   private readonly footEl = document.getElementById('suggestions-foot')!;
 
   private readonly handlers: SuggestionsHandlers;
+  /** The other two tabs, or null in a page that has neither. */
+  private readonly tabs: PanelTabs | null;
+  private readonly tabButtons: HTMLButtonElement[];
+  private readonly panes: Map<TabName, HTMLElement> = new Map();
+  private current: TabName = 'suggest';
   /** Null offline. The panel still opens; see `open`. */
   private open_ = false;
   private list: SuggestionList | null = null;
@@ -135,10 +161,38 @@ export class SuggestionsPanel {
   /** Which rows are expanded to show their body. Kept across refreshes. */
   private readonly expanded = new Set<number>();
 
-  constructor(handlers: SuggestionsHandlers) {
+  constructor(handlers: SuggestionsHandlers, tabs: PanelTabs | null = null) {
     this.handlers = handlers;
+    this.tabs = tabs;
     this.titleEl.maxLength = MAX_TITLE_CHARS;
     this.bodyEl.maxLength = MAX_BODY_CHARS;
+
+    // The tab strip. Read out of the document rather than listed here, so
+    // adding a fourth tab is a `<button data-tab>` and a `<section>` in
+    // `index.html` and nothing in this file -- which is the same relationship
+    // the rows below have with the server: this file draws what it is given.
+    this.tabButtons = [...this.root.querySelectorAll<HTMLButtonElement>('#panel-tabs .tab')];
+    for (const el of this.root.querySelectorAll<HTMLElement>('.tabpane')) {
+      const name = el.id === 'panel-suggest' ? 'suggest' : el.id === 'panel-new' ? 'new' : 'bug';
+      this.panes.set(name, el);
+    }
+    for (const button of this.tabButtons) {
+      button.addEventListener('click', () => this.showTab((button.dataset.tab ?? 'suggest') as TabName));
+      // A tab is a button and a button takes the keyboard, so Escape has to
+      // work from one. Without this, tabbing to "report a bug" and pressing
+      // Escape does nothing at all, because the panel's own Escape lives in
+      // `main.ts`'s window listener and a focused button swallows nothing --
+      // but the *other* keys would reach the game, which is the bug this
+      // panel's whole keyboard discipline exists to prevent.
+      button.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          this.close();
+        }
+      });
+    }
+    if (tabs) tabs.bug.onEscape = () => this.close();
 
     const onCompose = (e: KeyboardEvent): void => {
       // Stopped as well as defaulted, on `hud.askName`'s exact argument:
@@ -177,9 +231,45 @@ export class SuggestionsPanel {
     this.root.addEventListener('click', (e) => e.stopPropagation());
   }
 
-  /** Is a field in this panel holding the keyboard? Registered with `hud`. */
+  /**
+   * Is a field in this panel holding the keyboard? Registered with `hud`.
+   *
+   * **Every** field in it, across every tab, which is why this getter is here
+   * rather than one per tab: `main.ts` asks this one question before it decides
+   * whether W walks, and an answer assembled from two sources at the call site
+   * is an answer that is wrong the first time somebody adds a third.
+   */
   get typing(): boolean {
-    return this.open_ && (document.activeElement === this.titleEl || document.activeElement === this.bodyEl);
+    if (!this.open_) return false;
+    if (document.activeElement === this.titleEl || document.activeElement === this.bodyEl) return true;
+    return this.tabs !== null && this.tabs.bug.typing;
+  }
+
+  /**
+   * Show one tab.
+   *
+   * `display: none` on the others, not opacity -- see the CSS note in
+   * `index.html`: a hidden pane is not laid out, not painted and not in the hit
+   * test, which is the same argument the panel makes about being hidden rather
+   * than transparent when it is shut.
+   */
+  showTab(name: TabName): void {
+    this.current = name;
+    for (const button of this.tabButtons) button.classList.toggle('on', button.dataset.tab === name);
+    for (const [key, pane] of this.panes) pane.classList.toggle('on', key === name);
+    if (!this.tabs) return;
+    // Each tab is told it became visible, so it can refresh what it draws
+    // rather than keep a copy from whenever the panel was last opened. The bug
+    // form's metadata block in particular is a snapshot of where the player is
+    // standing, and a stale one would be a lie in exactly the place the whole
+    // feature is about being accurate.
+    if (name === 'new') this.tabs.changelog.draw();
+    if (name === 'bug') this.tabs.bug.show();
+  }
+
+  /** Which tab is up. For `window.sydney` and for the checks. */
+  get tab(): TabName {
+    return this.current;
   }
 
   get visible(): boolean {
@@ -207,6 +297,9 @@ export class SuggestionsPanel {
     document.body.classList.add('suggesting');
     if (document.pointerLockElement) document.exitPointerLock();
     this.draw();
+    // Re-shown rather than assumed: the tab the player left it on is the tab
+    // they get back, and whichever it is has to be told it is visible again.
+    this.showTab(this.current);
     // A refresh that could not be sent means the socket died since the last
     // time the panel was open, which the player has no other way of learning:
     // the list they are looking at is whatever arrived before it went.
@@ -227,6 +320,7 @@ export class SuggestionsPanel {
     // for the rest of the session.
     this.titleEl.blur();
     this.bodyEl.blur();
+    if (this.tabs) this.tabs.bug.blur();
   }
 
   toggle(): void {

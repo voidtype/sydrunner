@@ -163,7 +163,9 @@ import {
 import { verifyTeleport } from './game/teleport.ts';
 import { verifySuggestions } from './net/suggestions.ts';
 import { SuggestionsPanel, clientId } from './suggestions.ts';
-import { ANIM, SNAPSHOT_INTERVAL, sanitiseName, suggestName, verifyNames, verifyNet } from './net/protocol.ts';
+import { ChangelogFeed, verifyChangelog } from './changelog.ts';
+import { BugReportForm, FrameGrabber, verifyBugReport } from './bugreport.ts';
+import { ANIM, PROTOCOL_VERSION, SNAPSHOT_INTERVAL, sanitiseName, suggestName, verifyNames, verifyNet } from './net/protocol.ts';
 import {
   FootyAssets,
   FootyPool,
@@ -555,6 +557,19 @@ async function main(): Promise<void> {
   // server runs this same function before it opens its socket, which is what
   // makes it worth having: it keeps the ledger. See `net/suggestions.ts`.
   const suggestionFailures = timed('suggestions', verifySuggestions);
+  // And the two tabs beside it, on the same criterion a fourth and fifth time.
+  // The change feed's failures are all *text*: a parser that trusts the shape
+  // draws "undefined" three times on any host that answers a missing file with
+  // `index.html`, and a date arithmetic in milliseconds mis-labels the newest
+  // entry exactly when somebody is checking whether their fix shipped. The bug
+  // box has one failure that is worse than text and is the reason this feature
+  // was asked for at all: a **blank capture**, which is a valid PNG of nothing
+  // that looks like the game rendering black, and which nothing downstream can
+  // tell from a real frame. `verifyBugReport` carries the negative control that
+  // keeps a legitimately dark screenshot attachable. See `changelog.ts` and
+  // `bugreport.ts`; the server runs neither, because neither has a server half.
+  const changelogFailures = timed('change feed', verifyChangelog);
+  const bugFailures = timed('bug box', verifyBugReport);
   // And the map readout, on the same criterion again. Every way this breaks
   // leaves a plausible street name under the map: the street behind you, the
   // street a hundred metres past the end of a way, a corner claimed halfway
@@ -864,7 +879,9 @@ async function main(): Promise<void> {
     chatBoxFailures.length ||
     unstuckFailures.length ||
     teleportFailures.length ||
-    suggestionFailures.length
+    suggestionFailures.length ||
+    changelogFailures.length ||
+    bugFailures.length
   ) {
     hud.fatal(
       'Self-checks failed:\n' +
@@ -911,6 +928,8 @@ async function main(): Promise<void> {
           ...unstuckFailures,
           ...teleportFailures,
           ...suggestionFailures,
+          ...changelogFailures,
+          ...bugFailures,
         ]
           .map((f) => '  - ' + f)
           .join('\n'),
@@ -1578,7 +1597,40 @@ async function main(): Promise<void> {
       if (seamFailures.length) {
         console.warn('[rail] terrain seam self-check:\n  - ' + seamFailures.join('\n  - '));
       }
-      if (new URLSearchParams(location.search).get('vessels') === '1') setVesselsEnabled(true);
+      // **`?vessels=1`, but only if the server is running them too.**
+      //
+      // The two ends have separate switches -- this query parameter and the
+      // server's `SYDNEY_VESSELS` -- and a flag that can be half on is not a
+      // flag, it is a trap. Half on, the browser draws the vessel corridor and
+      // answers its own ground from the sweep while the server keeps answering
+      // `groundFor` from the old path; the server wins every correction, and the
+      // player falls through roads that are demonstrably solid in the bake. That
+      // is not a hypothetical: a link handed out with `?vessels=1` outlived the
+      // `SYDNEY_VESSELS` drop-in it came with, and the next report was that the
+      // road fix had regressed. It had not. The link had.
+      //
+      // `/health` is same-origin in production, where this matters. A dev server
+      // on another port answers nothing, and there the flag is honoured with a
+      // warning -- somebody running two processes by hand is choosing this.
+      if (new URLSearchParams(location.search).get('vessels') === '1') {
+        let serverHas: boolean | null = null;
+        try {
+          const res = await fetch('/health', { cache: 'no-store' });
+          if (res.ok) serverHas = ((await res.json()) as { vessels?: boolean }).vessels === true;
+        } catch {
+          serverHas = null;
+        }
+        if (serverHas === false) {
+          console.warn(
+            '[vessels] ?vessels=1 ignored: this server answers the ground from the shipping path, ' +
+              'and half a flag makes a player fall through solid roads. Drop the parameter, or ' +
+              'set SYDNEY_VESSELS=1 on the server.',
+          );
+        } else {
+          if (serverHas === null) console.warn('[vessels] no /health to ask; honouring ?vessels=1 unchecked');
+          setVesselsEnabled(true);
+        }
+      }
       const geometryFailures = verifyRailGeometry(railNetwork);
       if (geometryFailures.length) {
         console.warn('[rail] derived network self-check:\n  - ' + geometryFailures.join('\n  - '));
@@ -3133,11 +3185,112 @@ async function main(): Promise<void> {
    * anything. `?? false` on each is what makes the offline path a returned
    * boolean rather than a thrown error: the panel asks, gets no, and says no.
    */
-  const suggestions = new SuggestionsPanel({
-    onRefresh: () => net?.requestSuggestions() ?? false,
-    onSubmit: (title, body) => net?.submitSuggestion(title, body) ?? false,
-    onVote: (localId, dir) => net?.voteSuggestion(localId, dir) ?? false,
+  /**
+   * The change feed, which is the one thing in this panel that needs no server
+   * at all: `public/changelog.json` is a static file beside the world tiles,
+   * written from `git log` at build time. Started fetching here rather than on
+   * the first open, so the tab is drawn rather than loading when somebody
+   * reaches it. See `client/src/changelog.ts`.
+   */
+  const changelog = new ChangelogFeed(
+    document.getElementById('changelog-list')!,
+    document.getElementById('changelog-foot')!,
+  );
+  changelog.load();
+
+  /**
+   * The frame grabber, and the one line of this feature that has to be in the
+   * render loop rather than in a panel.
+   *
+   * `toDataURL` on a WebGPU canvas is blank unless it is read in the same frame
+   * as a render -- silently blank, a valid PNG of nothing -- so the button
+   * queues a request and `grabber.afterRender()`, called immediately after
+   * `renderer.render` some four thousand lines below, is where the pixels are
+   * actually taken. See `client/src/bugreport.ts`, which is written at length
+   * about why that is the only arrangement that works.
+   */
+  const grabber = new FrameGrabber(canvas);
+
+  /**
+   * The bug box: the third tab, and the only thing in this client that sends
+   * anything over HTTP rather than down the socket.
+   *
+   * Its metadata callback is where `main.ts` earns its place in this feature.
+   * Everything in it lives somewhere different -- the locator under the map,
+   * the sky's clock, the combat state's bike, the frame ring, the streamer's
+   * asset version -- and this is already the one file that knows all of them.
+   * A panel that reached into each would be a panel that breaks whenever any of
+   * them moves.
+   *
+   * Every field is read defensively and the whole thing is inside the form's
+   * own try: a bug report is filed *because* something is wrong, so the moment
+   * this callback most needs to work is the moment the game is least healthy,
+   * and a metadata collector that threw would take the report with it.
+   */
+  const bug = new BugReportForm({
+    // '' offline, which the form turns into "no server — bug reports need one"
+    // rather than a button that does nothing. `net` is consulted rather than a
+    // captured boolean so a connection that settles later is picked up.
+    endpoint: () => (net === null || netUrl === null ? '' : httpBaseOf(netUrl)),
+    clientId,
+    capture: () => grabber.request(),
+    meta: () => {
+      const here = player.position;
+      const where = locator.stats();
+      return {
+        'world x/z': `${here.x.toFixed(1)} / ${here.z.toFixed(1)}`,
+        'world y': here.y.toFixed(1),
+        // What the minimap is already showing, which is the one line somebody
+        // can walk to: "cnr King St & Carillon Ave, Newtown" beats a pair of
+        // floats every time. `street` is sent **only when there is one** --
+        // `locator.text` falls back to the suburb where no centreline is near,
+        // and the first cut of this sent both, so a player standing in a park
+        // filed a report saying `street: Alexandria, suburb: Alexandria`. An
+        // empty field is dropped rather than drawn; see `collectMeta`.
+        // `where.text` is dropped when it is *only* the suburb, which is what
+        // the locator composes when no centreline is close enough to name --
+        // standing in Sydney Park, `text` and `suburb` are both "St Peters",
+        // and two rows saying the same word read as a broken collector.
+        where: where.text === (where.suburb ?? '') ? '' : where.text,
+        street: where.street ?? '',
+        suburb: where.suburb ?? '',
+        clock: sky.time.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }),
+        riding: playerCombat.ridingBike !== 0,
+        room: net?.room ?? -1,
+        build: changelog.build || 'unknown',
+        // The world's own version, which is a different fact from the bundle's:
+        // a client on today's code and last week's tiles is a real state and it
+        // is one of the harder ones to diagnose without being told.
+        world: streamer.assetVersion,
+        protocol: PROTOCOL_VERSION,
+        'frame ms': medianFrameMs(),
+        'render scale': renderScale,
+      };
+    },
   });
+
+  /**
+   * The panel, and the three tabs it hosts.
+   *
+   * Built **here, before `net` exists and whether or not it ever will**, on the
+   * chat box's argument exactly: the client is constructed a second or two later
+   * on the online path and never at all offline, and the panel has to be
+   * openable in both cases -- offline it says so, which is the whole of what
+   * `?offline` needs from this feature.
+   *
+   * The handlers read `net` through closures rather than holding it, so a
+   * connection that settles after this line is picked up without rebuilding
+   * anything. `?? false` on each is what makes the offline path a returned
+   * boolean rather than a thrown error: the panel asks, gets no, and says no.
+   */
+  const suggestions = new SuggestionsPanel(
+    {
+      onRefresh: () => net?.requestSuggestions() ?? false,
+      onSubmit: (title, body) => net?.submitSuggestion(title, body) ?? false,
+      onVote: (localId, dir) => net?.voteSuggestion(localId, dir) ?? false,
+    },
+    { changelog, bug },
+  );
 
   // --- The nameplates: a name and a large health bar over every other player.
   //
@@ -7573,6 +7726,16 @@ async function main(): Promise<void> {
     renderGuard.run(() => renderer.render(scene, camera), scene, hud);
     pipelineWatch.end(renderer, performance.now() - now);
 
+    // **The bug box's screenshot, and it has to be exactly here.**
+    //
+    // A WebGPU drawing buffer is presented and released, so `toDataURL` on this
+    // canvas from a click handler returns a blank image -- with no throw and no
+    // warning, which is the failure mode that matters. Inside this frame, one
+    // line after the render, the buffer is still there. Costs an array length
+    // check on every frame of every session and does real work on the one or
+    // two frames somebody presses the button. See `client/src/bugreport.ts`.
+    grabber.afterRender();
+
     // Cost of this frame, measured after the render call returns. Deltas above
     // 200 ms are dropped rather than recorded: they mean the browser stopped
     // issuing frames, not that the frame took that long to draw.
@@ -8305,6 +8468,43 @@ async function main(): Promise<void> {
      * alive: it should climb as the player crosses the city. `report().holds`
      * is the one that should never move -- see `TileStreamer.dispose`.
      */
+    /**
+     * The Escape panel, so its three tabs can be opened without a mouse.
+     *
+     * Exposed because two of them cannot be checked any other way. The change
+     * feed depends on a static file that a fresh clone does not have, and the
+     * bug box's screenshot button depends on a frame being read inside the
+     * render loop -- both of which are things somebody wants to *look at*
+     * rather than assert, and both of which need the panel on a particular tab
+     * before there is anything to look at.
+     *
+     *     sydney.panel.tab('bug')      open the bug box
+     *     sydney.panel.tab('new')      open the change feed
+     *     sydney.panel.grab()          take a frame exactly as the button does,
+     *                                  through the render loop, and answer
+     *                                  whether it came back blank
+     *
+     * `grab()` is the one that matters: it is the same call the button makes,
+     * so a blank capture in a browser is reproducible from a console instead of
+     * being a thing one person saw once.
+     */
+    panel: {
+      open: () => suggestions.open(),
+      close: () => suggestions.close(),
+      tab: (name: 'suggest' | 'new' | 'bug') => {
+        suggestions.open();
+        suggestions.showTab(name);
+        return suggestions.tab;
+      },
+      grab: () => grabber.request(),
+      get captures() {
+        return { grabbed: grabber.grabbed, blank: grabber.blanks };
+      },
+      get changelog() {
+        return { build: changelog.build, dirty: changelog.dirty };
+      },
+    },
+
     streaming: {
       report: () => streamer.lifecycleReport,
       phase: (key: string) => streamer.tilePhase(key),

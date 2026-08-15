@@ -5,6 +5,14 @@
 client/public/world/
 client/dist/
 
+# The change feed, which is generated from git and would otherwise be a file in
+# git that changes on every commit *because* of that commit -- a diff on every
+# build and a merge conflict on every branch. `scripts/changelog.mjs` writes it
+# before every `npm run dev` and every `npm run build`, so a working tree
+# without it is a working tree one command away from having it, and
+# `client/src/changelog.ts` draws nothing at all when it is missing.
+client/public/changelog.json
+
 # Pipeline cache and ledger. Gigabytes of downloaded OSM / Microsoft / terrain
 # source plus data/ledger.sqlite, all reproducible with `npm run world`.
 data/

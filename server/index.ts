@@ -93,6 +93,7 @@ import { verifyTeleport } from '../client/src/game/teleport.ts';
 import { trafficTick } from '../client/src/game/traffic.ts';
 import { verifySuggestions } from '../client/src/net/suggestions.ts';
 import { verifyAoi } from './aoi.ts';
+import { BugGuards, BugStore, defaultBugDir, handleBugRequest, verifyBugs } from './bugs.ts';
 import { ChatHub } from './chat.ts';
 import {
   SuggestionHub,
@@ -114,6 +115,9 @@ import {
   type Socket,
 } from './room.ts';
 import { loadWorld } from './world.ts';
+// Published on `/health` so the client's `?vessels=1` cannot disagree with it.
+// See the field's comment there for the failure that made this necessary.
+import { vesselsEnabled } from '../client/src/world/vessel.ts';
 
 const PORT = Number(process.env.SYDNEY_PORT ?? 8787);
 const WORLD_ROOT = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
@@ -198,6 +202,15 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // is quietly against the wrong week -- which nobody reports, because nobody
     // was counting. See `client/src/net/suggestions.ts`.
     ['verifySuggestions', verifySuggestions()],
+    // The bug box, which is the only public endpoint in this process that
+    // **writes bytes into a public repository** -- so its failures are not
+    // merely silent, they are permanent. A sniffer that trusts a content type
+    // commits something that is not a picture; a rebuild that forwards the file
+    // through leaves a phone photograph's EXIF GPS in a public repo; a size cap
+    // enforced after buffering is not a cap and passes every test that sends a
+    // small body. None of them throws and none of them can be un-done. See
+    // `server/bugs.ts`, which is written against exactly that list.
+    ['verifyBugs', verifyBugs()],
     ['verifyRewind', verifyRewind()],
     // PERFORMANCE.md phase 1's grid, which every hit test in the game now
     // takes its candidates from. A grid that is not a superset is a punch that
@@ -307,6 +320,27 @@ console.log(`[sydney] suggestions: ${suggestions.describe()}`);
 // api.github.com would be a boot that fails when GitHub does.
 void suggestions.refresh();
 
+/**
+ * The bug box, which shares the suggestions box's credential and nothing else.
+ *
+ * Host-wide for `suggestions`' reason -- a bug is about the game, not about the
+ * twelve people in room 3 -- and constructed here so it holds the same token
+ * read once from the environment. It is a **separate store** rather than a
+ * second method on `SuggestionStore` because the two have nothing in common
+ * underneath: a suggestion is a row in a ledger with votes against it, and a
+ * bug report is a file committed into a repository and never looked at again.
+ *
+ * `BugGuards` is deliberately *not* inside the store. It is per-request state
+ * belonging to the route, on the same seam `SuggestionHub` sits on relative to
+ * `SuggestionStore`, and keeping it out here is what lets the store be driven
+ * by a check with no rate limiting in the way.
+ */
+const bugs = new BugStore({ dir: defaultBugDir(), repo: githubRepo(), token: githubToken() });
+const bugGuards = new BugGuards();
+console.log(`[sydney] bugs: ${bugs.describe()}`);
+// Anything queued by a previous run with no token posts now, oldest first.
+void bugs.drain();
+
 // --- Connections --------------------------------------------------------------
 
 const conns = new Set<Socket>();
@@ -350,9 +384,27 @@ const server = Bun.serve<Conn>({
         // transcript header and a deployment probe should not have to sum an
         // array to answer "is anything alive in there".
         bots,
+        // **Whether this process answers the ground from vessels.** Published
+        // because the client has its own `?vessels=1` and the two are separate
+        // switches, so they can disagree -- and when they do the player falls
+        // through the world. The client renders the vessel corridor, the server
+        // keeps answering `groundFor` from the old path, the server wins every
+        // correction, and the effect is indistinguishable from the geometry
+        // being broken. It happened: a link with `?vessels=1` outlived the
+        // `SYDNEY_VESSELS` drop-in it was handed out with, and the next report
+        // was "the road fix regressed".
+        //
+        // A flag that can be half on is not a flag, it is a trap. `main.ts`
+        // reads this before honouring its own.
+        vessels: vesselsEnabled(),
         rooms: host.listing(),
         stage: world.index.stage,
         protocol: PROTOCOL_VERSION,
+        // Whether the two GitHub-backed features have a credential. A boolean
+        // and nothing else: a probe wants to know that the bug box will file
+        // rather than queue, and nothing about the token itself belongs on a
+        // route anybody can fetch.
+        github: { suggestions: suggestions.linked, bugs: bugs.linked },
         // The join disc's centre, which both ends already compute from the same
         // `index.json` (`game/spawn.spawnCentre`). Published because
         // `server/loadtest.ts`'s pileup scenario needs a world coordinate every
@@ -375,6 +427,32 @@ const server = Bun.serve<Conn>({
      * can make from four numbers.
      */
     if (url.pathname === '/rooms') return json(host.listing());
+    /*
+     * `/bug` -- a player's bug report, with the picture that makes it worth
+     * having. The only route in this process that **accepts** anything, which
+     * is why every line of what it does with what it accepts lives in
+     * `server/bugs.ts` behind one call.
+     *
+     * Its own route rather than a message on the socket, and that is a
+     * deliberate departure from how suggestions work. A screenshot is two to
+     * four megabytes; this server's WebSocket is configured
+     * `maxPayloadLength: 1024` because every frame it was designed for is a
+     * few dozen bytes of quantised integers, and raising that ceiling to admit
+     * an image would raise it for every frame from every client on the host.
+     * An HTTP POST is the right shape for a large one-off body, it can be
+     * capped and cancelled mid-flight (see `readCappedBody`), and it costs the
+     * game loop nothing.
+     *
+     * `srv.requestIP` rather than a header: `X-Forwarded-For` is a string a
+     * client can set, so trusting it would replace a weak cap with a decorative
+     * one. Behind Caddy this address is Caddy's, which is the same honest
+     * limitation `server/suggestions.addressOf` states -- and it is why
+     * `BugGuards` has a global hourly ceiling that no identity can get around.
+     */
+    if (url.pathname === '/bug') {
+      const ip = srv.requestIP(req)?.address ?? 'unknown';
+      return handleBugRequest(req, ip, bugs, bugGuards);
+    }
     /*
      * `/stats` -- what `server/loadtest.ts` reads, and the only thing in this
      * process that knows where a tick went.
@@ -879,9 +957,13 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     if (stopping) return;
     stopping = true;
     console.log(`[sydney] ${signal}: flushing suggestions…`);
-    void suggestions
-      .close()
-      .catch((err) => console.error(`[sydney] suggestions: flush failed: ${String(err)}`))
-      .finally(() => process.exit(0));
+    // The bug queue goes out on the same signal and for the same reason: a
+    // report accepted twenty seconds before a deploy would otherwise sit on
+    // disk until the next process's minute timer came round, and the player has
+    // already been told it is queued.
+    void Promise.all([
+      suggestions.close().catch((err) => console.error(`[sydney] suggestions: flush failed: ${String(err)}`)),
+      bugs.close().catch((err) => console.error(`[sydney] bugs: drain failed: ${String(err)}`)),
+    ]).finally(() => process.exit(0));
   });
 }

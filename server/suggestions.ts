@@ -918,16 +918,31 @@ export function stripTally(body: string): string {
  * Refilled continuously rather than reset on a window, so a client that behaves
  * for nine seconds is not punished at the tenth.
  */
+/*
+ * The size and the refill rate are **arguments with the suggestions numbers as
+ * defaults**, so every existing call site reads exactly as it did. That is not
+ * generality for its own sake: `server/bugs.ts` needs the same bucket at a
+ * completely different scale -- three tokens refilling one every ten minutes,
+ * where this is twenty-four refilling two a second -- and the requirement was to
+ * reuse this shape rather than invent a second one. Two rate limiters is two
+ * sets of boundary conditions to get right, and this one has already been
+ * argued about and re-tuned once.
+ */
 export class FloodGuard {
-  private tokens = SUGGEST_BURST;
+  private readonly burst: number;
+  private readonly refillPerSec: number;
+  private tokens: number;
   private at = 0;
 
-  constructor(now = Date.now()) {
+  constructor(now = Date.now(), burst = SUGGEST_BURST, refillPerSec = SUGGEST_REFILL_PER_SEC) {
+    this.burst = burst;
+    this.refillPerSec = refillPerSec;
+    this.tokens = burst;
     this.at = now;
   }
 
   allow(now = Date.now()): boolean {
-    this.tokens = Math.min(SUGGEST_BURST, this.tokens + ((now - this.at) / 1000) * SUGGEST_REFILL_PER_SEC);
+    this.tokens = Math.min(this.burst, this.tokens + ((now - this.at) / 1000) * this.refillPerSec);
     this.at = now;
     if (this.tokens < 1) return false;
     this.tokens -= 1;

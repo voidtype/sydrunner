@@ -866,10 +866,44 @@
          open it is behind it, so it goes -- through the body class rather than
          through `#help.hidden`, which `hud.setHelp` owns and would fight over. */
       body.suggesting #help { opacity: 0; }
-      #suggestions h1 {
-        font-size: 9px; letter-spacing: .38em; text-transform: uppercase;
-        color: #7f95ab; font-weight: normal; margin: 0 0 2px;
+      /* The tab strip, in the `<h1>`'s exact type: 9px, .38em tracking, upper
+         case, #7f95ab. It is the same label the panel always had, three times,
+         and the only new signal is which one is lit -- so nothing about the
+         panel's silhouette changed when it grew two more things in it.
+
+         `flex: none` on the strip and `min-height: 0` on the panes is what
+         keeps the scroll inside the list rather than on the panel: without it a
+         long suggestion list pushes the compose box out of the bottom of a
+         fixed-height box, which is the one layout failure this panel can have. */
+      #panel-tabs {
+        display: flex; gap: 14px; flex: none; margin: 0 0 6px;
+        border-bottom: 1px solid rgba(207,226,242,.18); padding-bottom: 5px;
       }
+      /* `#93a8bc` for an unselected tab and not the `#5f7285` this shipped with
+         for an afternoon, which is a legibility fix caught in a screenshot
+         rather than in a check.
+
+         The panel is 55% opaque over the world, so its text is read against
+         whatever the player is standing in front of. Against a night street the
+         dim tone is fine; against a bright sky at 10 am -- which is most of this
+         game -- the unselected tabs were **almost invisible**, and a tab nobody
+         can see is a feature nobody finds. `#5f7285` is this interface's tone
+         for small print that does not have to be found (an issue number, a
+         footer); a tab is navigation and belongs one step up, at the same
+         `#93a8bc` the note under it uses. */
+      #panel-tabs .tab {
+        background: none; border: none; padding: 0; cursor: pointer;
+        font: inherit; font-size: 9px; letter-spacing: .28em; text-transform: uppercase;
+        color: #93a8bc; line-height: 1.6;
+      }
+      #panel-tabs .tab:hover { color: #ffffff; }
+      #panel-tabs .tab.on { color: #cfe2f2; text-shadow: 0 0 10px rgba(207,226,242,.45); }
+      /* The pane, and the rule that makes tab switching free: a pane that is off
+         is `display: none`, so it is not laid out, not painted and not in the
+         hit test -- the same argument the panel itself makes about being hidden
+         rather than transparent. */
+      .tabpane { display: none; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+      .tabpane.on { display: flex; }
       #suggestions-note { color: #93a8bc; margin-bottom: 8px; }
       #suggestions-note.spent { color: #d98b8b; }
       /* The list scrolls and the compose box does not: the thing you are adding
@@ -948,6 +982,97 @@
         color: #5f7285; font-size: 10px; margin-top: 4px;
         border-top: 1px solid rgba(207,226,242,.10); padding-top: 5px;
       }
+      /* --- "what's new": three commits, in the suggestions rows' own type.
+
+         Deliberately not a new visual language. A change entry and a suggestion
+         are the same shape -- a line of prose, a paragraph under it, a dim
+         metadata line with an identifier in it -- so they share `.title`,
+         `.body` and `.meta` verbatim and the only thing this block adds is the
+         row's own border and spacing. */
+      #changelog-note { color: #93a8bc; margin-bottom: 8px; }
+      #changelog-list { overflow-y: auto; flex: 1 1 auto; min-height: 0;
+        border-top: 1px solid rgba(207,226,242,.18); }
+      #changelog-list .empty { color: #7f95ab; padding: 10px 0; }
+      #suggestions .change {
+        padding: 8px 0; border-bottom: 1px solid rgba(207,226,242,.10);
+      }
+      #suggestions .change .title { cursor: default; }
+      #suggestions .change .title:hover { color: #cfe2f2; }
+      #suggestions .change .body { margin: 4px 0 3px; }
+      #changelog-foot {
+        color: #5f7285; font-size: 10px; margin-top: 6px;
+        border-top: 1px solid rgba(207,226,242,.10); padding-top: 5px;
+      }
+
+      /* --- The bug box.
+
+         The same inputs, the same send button and the same status line as the
+         compose box one tab over -- they are `#suggestions input`, `#suggestions
+         textarea` and so on already, so almost nothing here is a new rule. What
+         is new is the attach row and the thumbnail, which is the only image this
+         interface has ever drawn. */
+      #bug { overflow-y: auto; gap: 6px; }
+      #bug-note { color: #93a8bc; margin-bottom: 4px; }
+      #bug-attach { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+      #bug-attach button, #bug-send {
+        background: rgba(207,226,242,.10); border: 1px solid rgba(207,226,242,.34);
+        color: #cfe2f2; font: inherit; font-size: 11px; padding: 4px 12px; cursor: pointer;
+      }
+      #bug-attach button:hover:not(:disabled), #bug-send:hover:not(:disabled) {
+        background: rgba(207,226,242,.20);
+      }
+      #bug-attach button:disabled, #bug-send:disabled { opacity: .4; cursor: default; }
+      /* The thumbnail row: the picture, and the two things you can do about it.
+         `display: none` until there is one, so the empty state has no gap in it
+         where an image would go. */
+      #bug-thumb { display: none; gap: 10px; align-items: flex-start; margin: 2px 0; }
+      #bug-thumb.has { display: flex; }
+      #bug-thumb img {
+        width: 128px; height: auto; max-height: 96px; object-fit: cover;
+        border: 1px solid rgba(207,226,242,.34); display: block;
+      }
+      #bug-thumb .side { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+      #bug-thumb .note { color: #7f95ab; font-size: 10px; }
+      #bug-thumb .side button {
+        background: none; border: none; padding: 0; cursor: pointer;
+        color: #d98b8b; font: inherit; font-size: 10px; text-decoration: underline;
+      }
+      /* The metadata disclosure. Shut by default and dim, because it is a thing
+         to be able to check rather than a thing to read -- the same call
+         `server/bugs.issueBody` makes about the `<details>` block in the issue
+         itself. */
+      #bug-details { color: #7f95ab; font-size: 10px; }
+      #bug-details summary { cursor: pointer; color: #5f7285; outline: none; }
+      #bug-details summary:hover { color: #93a8bc; }
+      #bug-meta {
+        margin-top: 5px; max-height: 108px; overflow-y: auto;
+        border-left: 1px solid rgba(207,226,242,.18); padding-left: 8px;
+      }
+      #bug-meta .metarow { display: flex; gap: 8px; line-height: 1.5; }
+      /* `#7f95ab` on the key rather than the footer's `#5f7285`, for the tab
+         strip's reason and caught the same way: this block sits over whatever
+         the player is standing in front of, and against a bright park the
+         dimmest tone in the palette stopped being readable. The value stays a
+         step brighter than the key, which is the ordering that matters. */
+      #bug-meta .k { color: #7f95ab; flex: 0 0 78px; }
+      /* The value takes the slack and wraps rather than widening the panel: a
+         user-agent string is 140 characters and would otherwise be a horizontal
+         scrollbar on the whole box. */
+      #bug-meta .v { color: #93a8bc; flex: 1 1 auto; min-width: 0; word-break: break-word; }
+      #bug-row {
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        margin-top: 2px;
+      }
+      #bug-count { color: #7f95ab; font-size: 10px; }
+      #bug-count.bad { color: #d98b8b; }
+      #bug-status { min-height: 1.5em; color: #93a8bc; }
+      #bug-status.ok { color: #8fd9a0; }
+      #bug-status.bad { color: #d98b8b; }
+      #bug-foot {
+        color: #5f7285; font-size: 10px;
+        border-top: 1px solid rgba(207,226,242,.10); padding-top: 5px;
+      }
+
       /* A short window is a laptop with the dev tools open. The list gives up
          its height first, because the compose box is the part you cannot use
          without. */
@@ -1200,21 +1325,76 @@
          double press is. The rows are built there, not here: how many there are
          is the server's answer and not a fact about this document. -->
     <div id="suggestions">
-      <h1>suggestions</h1>
-      <div id="suggestions-note"></div>
-      <div id="suggestions-list"></div>
-      <div id="suggestions-compose">
-        <input id="suggestions-title" maxlength="90" autocomplete="off" autocapitalize="off"
-               autocorrect="off" spellcheck="false" placeholder="a change you want, in one line" />
-        <textarea id="suggestions-body" maxlength="400" autocomplete="off"
-                  placeholder="why (optional)"></textarea>
-        <div id="suggestions-row">
-          <span id="suggestions-count"></span>
-          <button id="suggestions-send" type="button">suggest</button>
-        </div>
+      <!-- The tab strip that replaced the old `<h1>suggestions</h1>`. Three
+           tabs in one panel rather than three panels: there is one Escape
+           discipline, one z-index, one exception to the `pointer-events: none`
+           rule and one thing to close, and every one of those is a place a
+           second panel would have had to agree with this one. The buttons are
+           `type="button"` for the reason every button in this document is --
+           there is no form here and a default submit would reload the game. -->
+      <div id="panel-tabs" role="tablist">
+        <button class="tab on" type="button" data-tab="suggest" role="tab">suggestions</button>
+        <button class="tab" type="button" data-tab="new" role="tab">what&rsquo;s new</button>
+        <button class="tab" type="button" data-tab="bug" role="tab">report a bug</button>
       </div>
-      <div id="suggestions-status"></div>
-      <div id="suggestions-foot"></div>
+
+      <section id="panel-suggest" class="tabpane on">
+        <div id="suggestions-note"></div>
+        <div id="suggestions-list"></div>
+        <div id="suggestions-compose">
+          <input id="suggestions-title" maxlength="90" autocomplete="off" autocapitalize="off"
+                 autocorrect="off" spellcheck="false" placeholder="a change you want, in one line" />
+          <textarea id="suggestions-body" maxlength="400" autocomplete="off"
+                    placeholder="why (optional)"></textarea>
+          <div id="suggestions-row">
+            <span id="suggestions-count"></span>
+            <button id="suggestions-send" type="button">suggest</button>
+          </div>
+        </div>
+        <div id="suggestions-status"></div>
+        <div id="suggestions-foot"></div>
+      </section>
+
+      <!-- The three most recent commits, written into `public/changelog.json`
+           by `scripts/changelog.mjs` at build time. Rows are built in
+           `client/src/changelog.ts`: how many there are, and whether there are
+           any at all, is a fact about the build rather than about this
+           document. -->
+      <section id="panel-new" class="tabpane">
+        <div id="changelog-note">what has changed in the game lately</div>
+        <div id="changelog-list"></div>
+        <div id="changelog-foot"></div>
+      </section>
+
+      <!-- The bug box. See `client/src/bugreport.ts`, particularly on why the
+           screenshot button does not read the canvas when it is clicked. The
+           file input is `hidden` and driven by the button beside it, because a
+           bare file input cannot be styled into this interface and a player
+           should not be able to tell which of the two attach buttons is the
+           browser's. -->
+      <section id="bug" class="tabpane">
+        <div id="bug-note">something broken? a picture of it is worth ten paragraphs.</div>
+        <input id="bug-title" maxlength="90" autocomplete="off" autocapitalize="off"
+               autocorrect="off" spellcheck="false" placeholder="what went wrong, in one line" />
+        <textarea id="bug-body" maxlength="400" autocomplete="off"
+                  placeholder="where you were and what you did (optional)"></textarea>
+        <div id="bug-attach">
+          <button id="bug-shot" type="button">attach what I&rsquo;m looking at</button>
+          <button id="bug-pick" type="button">choose a file</button>
+          <input id="bug-file" type="file" accept="image/png,image/jpeg" hidden />
+        </div>
+        <div id="bug-thumb"></div>
+        <details id="bug-details">
+          <summary>attached automatically</summary>
+          <div id="bug-meta"></div>
+        </details>
+        <div id="bug-row">
+          <span id="bug-count"></span>
+          <button id="bug-send" type="button">send report</button>
+        </div>
+        <div id="bug-status"></div>
+        <div id="bug-foot">goes to github as an issue labelled <span class="issue">bug</span></div>
+      </section>
     </div>
 
     <div id="nameprompt">
