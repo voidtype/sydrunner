@@ -688,6 +688,92 @@ export class CombatAudio {
   }
 
   /**
+   * The bat middling a football: the thock. See `game/swat.ts`.
+   *
+   * **`thwack`'s three layers at a different pitch**, which is what the change
+   * that added this asked for and is also the right answer on its own terms: the
+   * object making the noise is the same 0.83 m of willow, and what changed is
+   * only what it hit. So the recipe is the bat's and the numbers are moved by one
+   * ratio each, in the direction leather-on-willow moves them from bone-on-willow:
+   *
+   *   - the **crack** goes *up*, 2.6 kHz to 3.4, and gets shorter. A ball is
+   *     harder and lighter than a person and the contact is over in a third of
+   *     the time, and the top end is the whole of what the ear identifies as
+   *     "middled" rather than "edged".
+   *   - the **knock** -- the blade's own two inharmonic partials -- goes up a
+   *     tone and decays faster. A bat rung by a ball rings; a bat rung by a
+   *     torso is damped by the torso.
+   *   - the **body** all but disappears: 0.18 against `thwack`'s 0.62, because
+   *     nothing heavy moved. That single ratio is most of what separates the two
+   *     sounds at range, and it is deliberate that the swat is the *quieter*
+   *     event -- it is a save rather than a score.
+   *
+   * `distance` attenuates on `footyBounce`'s curve, because unlike `thwack` this
+   * can happen to somebody else 40 m away: a swat is announced to every client in
+   * interest of the ball, not only to the two players in the exchange.
+   */
+  swat(distance = 0): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    const noise = this.noise;
+    if (!ctx || !master || !noise) return;
+    const t = ctx.currentTime;
+    const gain = 1 / (1 + Math.max(0, distance) / 10);
+    if (gain < 0.02) return;
+
+    // --- The crack, higher and shorter than the bat's own.
+    const burst = ctx.createBufferSource();
+    burst.buffer = noise;
+    burst.playbackRate.value = 1.7;
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = 3400;
+    // Tighter still than `thwack`'s 1.5. Two hard objects meeting is the
+    // narrowest impact in this file.
+    band.Q.value = 1.9;
+    const burstGain = ctx.createGain();
+    burstGain.gain.setValueAtTime(0.0001, t);
+    burstGain.gain.exponentialRampToValueAtTime(0.62 * gain, t + 0.002);
+    burstGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.035);
+    burst.connect(band).connect(burstGain).connect(master);
+    burst.start(t);
+    burst.stop(t + 0.09);
+
+    // --- The blade's two partials, a tone up on `thwack`'s and shorter. The
+    // 2.95 ratio is kept: it is what says "solid piece of wood" instead of
+    // "note", and it is a property of the bat rather than of what it hit.
+    for (const [hz, level, fall] of [
+      [440, 0.3, 0.05],
+      [1298, 0.17, 0.028],
+    ] as Array<[number, number, number]>) {
+      const partial = ctx.createOscillator();
+      partial.type = 'triangle';
+      partial.frequency.setValueAtTime(hz, t);
+      partial.frequency.exponentialRampToValueAtTime(hz * 0.9, t + fall);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(level * gain, t + 0.0025);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + fall);
+      partial.connect(g).connect(master);
+      partial.start(t);
+      partial.stop(t + fall + 0.05);
+    }
+
+    // --- And almost no body. See the header: nothing heavy moved.
+    const body = ctx.createOscillator();
+    body.type = 'sine';
+    body.frequency.setValueAtTime(210, t);
+    body.frequency.exponentialRampToValueAtTime(90, t + 0.05);
+    const bodyGain = ctx.createGain();
+    bodyGain.gain.setValueAtTime(0.0001, t);
+    bodyGain.gain.exponentialRampToValueAtTime(0.18 * gain, t + 0.005);
+    bodyGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+    body.connect(bodyGain).connect(master);
+    body.start(t);
+    body.stop(t + 0.11);
+  }
+
+  /**
    * A pedestrian being clobbered: the oof.
    *
    * The only sound in this file made by a *person* rather than by an object, and

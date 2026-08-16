@@ -18,6 +18,7 @@ import {
   Vector2,
   Vector3,
   WebGPURenderer,
+  type Material,
 } from 'three/webgpu';
 
 import { BOARD_HINT_M, DoorMarker, verifyDoorMarker } from './world/doormarker.ts';
@@ -110,7 +111,7 @@ import {
   verifyCharacterRig,
   type ActionName,
 } from './player/character.ts';
-import { BONE, verifyAnimation } from './player/animation.ts';
+import { BONE, PUNCH_ACTIVE, PUNCH_WIND_UP, verifyAnimation } from './player/animation.ts';
 import { BatAssets, BatProp, BatViewmodel, MAX_VIEW_REACH, verifyBat } from './player/bat.ts';
 import {
   applyWorldDamage,
@@ -149,7 +150,20 @@ import {
   BALL_RECHARGE,
   createHitReport,
 } from './game/combat.ts';
-import { BALL_RADIUS, FootyField, applyFootyHit, verifyFooty, type FootyEvent } from './game/footy.ts';
+import {
+  BALL_RADIUS,
+  FootyField,
+  LAUNCH_SPEED,
+  applyFootyHit,
+  verifyFooty,
+  type Footy,
+  type FootyEvent,
+} from './game/footy.ts';
+// --- F: bat swats the footy. The shared adjudication, run here offline exactly
+// as `server/sim.ts` runs it online, and the twelve-triangle contact puff that
+// is the picture half of it. See `game/swat.ts` and `world/swatpuff.ts`.
+import { SWAT_RADIUS, SWAT_SPEED_SCALE, createBallAt, swatBalls, verifySwat } from './game/swat.ts';
+import { SwatPuffs, verifySwatPuff } from './world/swatpuff.ts';
 import { NetClient, chooseRoom, fetchRooms, verifyNetClient, type RemotePlayer } from './net/client.ts';
 import { verifyChat } from './net/chat.ts';
 import { ChatBox, verifyChatBox } from './chat.ts';
@@ -521,6 +535,16 @@ async function main(): Promise<void> {
   // that does not converge reads as -- lag. None of the four has a frame that
   // says otherwise, which is exactly this project's bar.
   const footyFailures = timed('footy', verifyFooty);
+  // And the one interaction between the two weapons, on the same criterion and
+  // with the same shape of failure: **every broken version of a swat renders a
+  // perfectly good frame.** A window that is not the ACTIVE phase makes the
+  // mechanic untimed, an owner that does not change hands sends a returned ball
+  // straight through the person who threw it, and a deflection that adds speed
+  // rather than steering it overflows the wire on the fourth exchange. None of
+  // the three throws and none has a frame that says otherwise. The server runs
+  // this same function before it opens its socket. See `game/swat.ts`.
+  const swatFailures = timed('swat', verifySwat);
+  const swatPuffFailures = timed('swat puff', verifySwatPuff);
   const footyBallFailures = timed('footy model', verifyFootyBall);
   const netFailures = timed('net', verifyNet);
   const clientFailures = timed('net client', verifyNetClient);
@@ -878,6 +902,8 @@ async function main(): Promise<void> {
     combatFailures.length ||
     powerupFailures.length ||
     footyFailures.length ||
+    swatFailures.length ||
+    swatPuffFailures.length ||
     footyBallFailures.length ||
     netFailures.length ||
     clientFailures.length ||
@@ -928,6 +954,8 @@ async function main(): Promise<void> {
           ...combatFailures,
           ...powerupFailures,
           ...footyFailures,
+          ...swatFailures,
+          ...swatPuffFailures,
           ...footyBallFailures,
           ...netFailures,
           ...clientFailures,
@@ -1325,6 +1353,26 @@ async function main(): Promise<void> {
   /** Presentation for the balls in the air. One group for every throw in the world. */
   const footyPool = new FootyPool(footies);
   scene.add(footyPool.group);
+  // --- F: the contact puff where a bat middles a football. Twelve triangles,
+  // three of them, one material -- see `world/swatpuff.ts`. Built here with the
+  // other weapon assets so the warm-up compiles its pipeline rather than the
+  // frame somebody first returns a serve.
+  const swatPuffs = new SwatPuffs();
+  for (const mesh of swatPuffs.meshes) scene.add(mesh);
+  /** Scratch for the offline swat's ball rewind. See `game/swat.ts`. */
+  const swatScratch = createBallAt();
+  /**
+   * A throw the console asked for, and how many simulated seconds until it goes.
+   *
+   * The one piece of state `sydney.serve()` needs and the only reason it is not
+   * a pure function of its arguments -- see there for why the countdown is in
+   * simulated seconds rather than on a `setTimeout`. Null in every session
+   * nobody has typed `sydney.serve()` into, which is all of them.
+   */
+  let pendingServe: { combat: CombatantState; t: number } | null = null;
+  /** How many swats this session has seen, and the last one. `sydney.bat.swats`. */
+  let swatCount = 0;
+  let lastSwat: { mine: boolean; x: number; y: number; z: number; at: number } | null = null;
   /**
    * The lime e-bikes, on exactly the same terms as the three above: one geometry
    * and one material for every bike in the city, built here so the warm-up gets
@@ -1849,6 +1897,19 @@ async function main(): Promise<void> {
         // the viewmodel receives and the local player's own bat, which is on the
         // shadow layer, does not.
         { geometry: bats.geometry, material: bats.material, casts: true },
+        // --- F: the swat's contact puff, which is the loudest possible case of
+        // what this pass exists for. It is additive, unlit, `DoubleSide` and
+        // `toneMapped` off -- a pipeline nothing else in the frame shares -- and
+        // its three meshes are `visible = false` until somebody returns a serve,
+        // so `_projectObject` skips them and the compile lands on the exact
+        // frame the effect is supposed to make instant. Neither casts nor
+        // receives: see `world/swatpuff.ts`, where both are switched off.
+        {
+          geometry: swatPuffs.meshes[0].geometry,
+          material: swatPuffs.meshes[0].material as Material,
+          casts: false,
+          receives: [false],
+        },
         // The police kit's two props and the tracers, the street factions' four
         // props, the flock's five sets and the nameplate field. Every one of
         // these used to be built *below* this call and so could not be reached
@@ -5130,6 +5191,62 @@ async function main(): Promise<void> {
     return fighters.find((f) => f.combat.id === id);
   }
 
+  // --- F: bat swats the footy. The presentation, in one place. ---------------
+  //
+  // Called from two paths that decide the *same* thing in two different
+  // processes -- the offline swat below in `simulate`, and `netHandlers().onSwat`
+  // when the server has decided it -- which is the arrangement `onHit` and
+  // `netHandlers().onHit` already have and is what keeps a returned serve feeling
+  // identical whether it was adjudicated 30 ms away or in this process.
+  //
+  // Three things happen and each is aimed at a different person:
+  //
+  //   - the **thock**, for everybody in earshot, attenuated by range. `swat` is
+  //     `thwack`'s three layers re-pitched -- see `game/audio.ts`.
+  //   - the **puff** at the point of contact, for anybody who can see it: at
+  //     42 m/s the ball crosses the whole swing volume inside two frames, and
+  //     without a mark there a returned serve reads as a ball changing its mind.
+  //   - the **connect kick** on the viewmodel, for the swinger alone. The same
+  //     90 ms shudder a landed bat hit gives, and for the same reason: the blade
+  //     was arrested and the hands were not. It is the one piece of feedback that
+  //     says *you* did that.
+  /**
+   * How far a local predicted ball may be from a swat point and still be it.
+   *
+   * `netHandlers().onSwat` matches by proximity because local ball ids and
+   * server ball ids come out of two unrelated counters -- see there. 4 m is what
+   * half a round trip is worth: the event was sent when the server's copy was at
+   * the swat point, and by the time it arrives this client's copy has flown on
+   * for the downlink trip, which at 42 m/s and a bad 90 ms is 3.8 m. Wider than
+   * that and a *different* ball of yours a few metres away could be claimed;
+   * narrower and the correction is silently skipped on a slow connection, which
+   * leaves a ghost ball flying the old trajectory until it dies.
+   */
+  const SWAT_MATCH_M = 4;
+
+  // `mine` is resolved by the caller rather than compared here, because the two
+  // paths identify the local player differently: offline it is `playerCombat.id`
+  // and online it is `net.id`, which is what `netHandlers().onHit` already does
+  // one function up.
+  function swatFeedback(mine: boolean, x: number, y: number, z: number): void {
+    const range = Math.hypot(x - player.position.x, z - player.position.z);
+    if (range < BOUNCE_AUDIBLE) audio.swat(range);
+    swatPuffs.fire(x, y, z);
+    // Counted for `sydney.bat.swats`, on the terms `shadowReport` sets: a number
+    // to check a claim against rather than guess at. A swat is over in 260 ms
+    // and the tab this project is developed against is throttled -- see
+    // `sydney.serve` -- so "did that work" is a question a screenshot cannot
+    // always answer and this always can.
+    swatCount++;
+    lastSwat = { mine, x, y, z, at: performance.now() };
+    if (mine) {
+      viewmodel.connect();
+      // `feedback.hitLanded(false)` is deliberately **not** called. That is the
+      // screen shake for putting a pip on somebody, and a swat takes nobody's
+      // health -- shaking the frame for it would tell the player they scored.
+    }
+  }
+
   /** How far away someone else's pickup is still worth a sound. */
   const PICKUP_AUDIBLE = 22;
 
@@ -5207,7 +5324,7 @@ async function main(): Promise<void> {
    */
   function netHandlers(): ConstructorParameters<typeof NetClient>[1] {
     return {
-      onHit(attacker, victim, ko, footy, health) {
+      onHit(attacker, victim, ko, footy, health, returned) {
         // **An event whose attacker is its own victim is a car.**
         //
         // Nobody swung; the world did. There is no room in `net/protocol.ts`'s
@@ -5251,7 +5368,69 @@ async function main(): Promise<void> {
           else feedback.hitTaken();
         }
         void health;
-        if (ko) pushKill(`${who(attacker)} ${footy ? 'pegged' : 'batted'} ${who(victim)}`);
+        // Three verbs, and the third is the whole of the community suggestion
+        // this pass implements: a ball that changed hands in the air and then
+        // knocked somebody over is a *returned serve*, which is the most
+        // interesting thing that can happen in a fight in this game and would
+        // otherwise be indistinguishable from an ordinary peg. The flag is a
+        // spare bit on a byte already on the wire -- see `EVENT_FLAG.RETURNED`.
+        if (ko) {
+          const verb = footy ? (returned ? 'returned serve on' : 'pegged') : 'batted';
+          pushKill(`${who(attacker)} ${verb} ${who(victim)}`);
+        }
+      },
+      /**
+       * A bat sent a football back, decided by the server. See `game/swat.ts`.
+       *
+       * The presentation is `swatFeedback`'s, shared with the offline path as
+       * `onHit` is. What is *not* shared is the second half of this handler, and
+       * it exists for one listener only: the player who threw the ball.
+       *
+       * A swat leaves the ball's `thrower` alone -- deliberately, see
+       * `footy.Footy.owner` -- so the thrower's own client is still flying a
+       * local predicted copy on the pre-swat trajectory and there is nothing in
+       * the snapshot stream that could tell it otherwise, because
+       * `net/client.ownBall` filters its own throws out of that stream on
+       * purpose. So the correction happens here, from the six numbers the event
+       * carries.
+       *
+       * Matched by **proximity rather than by id**, and that is not laziness:
+       * local ball ids come from this client's own `FootyField` counter and
+       * server ball ids from the server's, so the two number spaces have never
+       * had anything to do with each other. What they do share is a position --
+       * both processes have been flying the same throw from the same spawn state
+       * through the same arithmetic -- so the local copy nearest the swat point
+       * is the swatted one, and `SWAT_MATCH_M` is the slack that allows for the
+       * half a round trip this event spent in the air.
+       */
+      onSwat(swinger, ball, x, y, z, vx, vy, vz) {
+        swatFeedback(net !== null && swinger === net.id, x, y, z);
+        void ball;
+        let nearest: Footy | null = null;
+        let best = SWAT_MATCH_M * SWAT_MATCH_M;
+        for (const b of localBalls.balls) {
+          const d =
+            (b.x - x) * (b.x - x) + (b.y - y) * (b.y - y) + (b.z - z) * (b.z - z);
+          if (d >= best) continue;
+          nearest = b;
+          best = d;
+        }
+        // Nothing near enough is the ordinary case and not an error: almost
+        // every swat in a room is two other people, and this client has no local
+        // copy of a ball it did not throw.
+        if (nearest === null) return;
+        nearest.x = x;
+        nearest.y = y;
+        nearest.z = z;
+        nearest.vx = vx;
+        nearest.vy = vy;
+        nearest.vz = vz;
+        // And it is not yours any more. The local copy has to agree about that
+        // or this client would predict its own ball passing harmlessly through
+        // the person who swatted it and knocking over the player it is now
+        // heading for -- neither of which it is allowed to decide online, but
+        // both of which it draws.
+        nearest.owner = swinger;
       },
       onBounce(x, y, z, bounces) {
         const range = Math.hypot(x - player.position.x, z - player.position.z);
@@ -6319,6 +6498,64 @@ async function main(): Promise<void> {
       localBikes.follow(riderViews, bikeSweep);
     }
 
+    // --- The console's staged serve, if one was asked for. See `sydney.serve`.
+    // Ahead of the swat sweep below, so a ball whose countdown expires on this
+    // tick is in the air in time for the blade that was aimed at it.
+    if (pendingServe !== null) {
+      pendingServe.t -= dt;
+      if (pendingServe.t <= 0) {
+        const c = pendingServe.combat;
+        // Aimed **here**, on the tick the ball actually leaves the hand, and not
+        // when `serve()` was typed. A dummy's yaw is written by its own input
+        // through `controller.step` on every one of the ticks in between, so a
+        // heading set at request time is gone by the next one -- and the ball
+        // sails off down the street at whatever the walk cycle was thinking
+        // about. This block runs *after* the fighters' `advance` loop above, so
+        // what it writes survives to `spawnFooty` and is overwritten again next
+        // tick, which is exactly the window it needs.
+        c.body.yaw = Math.atan2(
+          -(player.position.x - c.body.position.x),
+          -(player.position.z - c.body.position.z),
+        );
+        c.body.pitch = 0;
+        localBalls.add(c);
+        pendingServe = null;
+      }
+    }
+
+    // --- F: every bat that is mid-swing, against every ball in the air.
+    //
+    // `server/sim.ts` runs the identical sweep in the identical place -- before
+    // the ball step, so the deflected velocity is what the very next line
+    // integrates and the ball turns round on the tick the blade reached it
+    // rather than 16 ms and 0.7 m later.
+    //
+    // **Offline only**, on exactly the argument the swing's own `!online` guard
+    // makes above: online the server decides who was hit and this client would
+    // be adjudicating against remote balls it draws 100 ms in the past. What
+    // arrives instead is `EVENT.SWAT`, which carries the corrected ball state --
+    // see `netHandlers().onSwat`. Nothing about the *feel* is lost by that,
+    // because the bat's own hit sound is already server-driven online for the
+    // same reason.
+    //
+    // `back` is zero here: offline this client is the authority and its own
+    // screen is the simulation, so there is no view lag to compensate for.
+    if (!online) {
+      for (const f of fighters) {
+        // Spec 9's dummies do not swat, which is `server/sim.ts`'s rule about
+        // its bots on this side of the wire: neither has any model of a ball in
+        // the air, so every swat one landed would be a swing thrown for some
+        // other reason that happened to catch -- a coin flip wearing a skill
+        // mechanic, which is exactly what the suggestion this implements is
+        // about. Keeping the two paths agreed also keeps the offline stub a
+        // real test of the online one rather than a livelier version of it.
+        if (f.dummy) continue;
+        const ball = swatBalls(f.combat, localBalls.balls, dt, 0, swatScratch);
+        if (ball === null) continue;
+        swatFeedback(f.combat === playerCombat, ball.x, ball.y, ball.z);
+      }
+    }
+
     // --- Every football in the air, after every combatant has moved.
     //
     // The order is the one the server uses and it matters for the same reason
@@ -6342,9 +6579,24 @@ async function main(): Promise<void> {
       } else if (e.kind === 'hit' && e.victim) {
         // Offline only, by construction: `targets` is empty when a server is
         // deciding, so this branch cannot fire online.
-        applyFootyHit(fighterOf(e.ball.thrower)?.combat ?? playerCombat, e.victim, e.ball, ballReport);
+        //
+        // The **owner**, not the thrower: a ball somebody batted back belongs to
+        // whoever returned it, so it is their pip and their knockout. For every
+        // ball nobody swatted the two are the same fighter. See
+        // `footy.Footy.owner`; `server/sim.ts` reads the same field in the same
+        // place.
+        applyFootyHit(fighterOf(e.ball.owner)?.combat ?? playerCombat, e.victim, e.ball, ballReport);
         audio.footyHit(ballReport.ko);
         onFootyHit(ballReport);
+        // "%s returned serve on %s" -- the line the whole feature is for.
+        // Offline the feed is written here, where online `netHandlers().onHit`
+        // writes it off `EVENT_FLAG.RETURNED`. `who` offline has no roster to
+        // consult, so the local player is named directly, exactly as the
+        // run-over line below this does it.
+        if (ballReport.ko && e.ball.owner !== e.ball.thrower) {
+          const name = (id: number): string => (id === playerCombat.id ? 'you' : who(id));
+          pushKill(`${name(ballReport.attacker)} returned serve on ${name(ballReport.victim)}`);
+        }
       }
     }
 
@@ -7009,6 +7261,14 @@ async function main(): Promise<void> {
     feedback.setCaffeinated(playerCombat.flatWhiteT > 0);
     feedback.update(frameDt);
     feedback.applyToCamera(camera);
+
+    // --- F: the contact puffs, on the frame delta rather than the fixed step.
+    // `main.ts`'s standing rule about presentation, and `swatpuff.ts` restates
+    // it: the simulation is fixed so prediction and rewind agree, and a quarter
+    // of a second of fade has to be smooth at whatever rate the display runs.
+    // Costs a length check on an empty array in every frame but the few after a
+    // swat.
+    swatPuffs.update(frameDt);
 
     // Spec 8.3's chips, longest-lived first so the one about to expire is not
     // the one that moves. Built here rather than in `hud.ts` because which
@@ -8924,6 +9184,19 @@ async function main(): Promise<void> {
       get reach() {
         return { hitTest: REACH, castRadius: CAST_RADIUS, viewmodelMax: MAX_VIEW_REACH };
       },
+      /**
+       * Every football this bat -- or anybody else's -- has sent back, and where
+       * the last one was. See `game/swat.ts`.
+       *
+       * `count` is the one that answers a question a screenshot cannot: a swat
+       * is 260 ms of puff and a 30 ms crack, and the browser panes this project
+       * is developed against throttle a hidden tab to nothing. Paired with
+       * `sydney.serve()`, which stages one, it is how the mechanic is checked
+       * without a mouse and without luck.
+       */
+      get swats() {
+        return { count: swatCount, last: lastSwat, radius: SWAT_RADIUS, speedScale: SWAT_SPEED_SCALE };
+      },
       selfChecks: () => verifyBat(),
     },
 
@@ -8969,6 +9242,72 @@ async function main(): Promise<void> {
     /** Throw a football from the console, for testing without a mouse. */
     throwFooty() {
       throwBuffer = PUNCH_BUFFER;
+    },
+
+    /**
+     * Have somebody throw one **at you**, timed to arrive on the bat. Offline only.
+     *
+     * `swing()` and `throwFooty()` above exist because a weapon that can only be
+     * fired with a mouse cannot be checked from a console. This exists for the
+     * same reason one interaction further along, and it is the only practical
+     * way to stage a swat: a returned serve needs a ball thrown by somebody else
+     * arriving inside the 100 ms the blade is out, and hitting that by hand
+     * against a dummy that throws when it feels like it is a matter of luck.
+     *
+     * The sequence, which is the whole of it:
+     *
+     *   1. the nearest dummy is turned to face the player and the swing starts
+     *      **now**, through `punchBuffer` -- the same path the mouse takes;
+     *   2. `PUNCH_WIND_UP` later the blade comes out and the ACTIVE window runs
+     *      for `PUNCH_ACTIVE`, so the ball has to arrive at about
+     *      `0.15 + 0.05 = 0.2 s`;
+     *   3. a ball covers the gap in roughly `distance / LAUNCH_SPEED`, so the
+     *      throw is delayed by the difference.
+     *
+     * Roughly, and it says so in what it returns: `LAUNCH_RISE` lofts the throw
+     * a little and `DRAG` sheds 9% of the speed a second, so the arrival is a
+     * few milliseconds late at the far end of the range. The ACTIVE window is
+     * 100 ms wide and the error is under ten, so it lands inside it from about
+     * two metres out to about twelve. Past that the timing has to be nudged with
+     * `arrive`.
+     *
+     * **Nothing here is a mechanic.** It drives the same `advance`, the same
+     * `FootyField.add` and the same `swatBalls` a player's mouse does, through
+     * the same buffers -- which is why it cannot stage a swat the simulation
+     * would not have allowed.
+     */
+    serve(arrive = PUNCH_WIND_UP + PUNCH_ACTIVE * 0.5) {
+      const target = dummies[0];
+      if (!target) return 'no dummy to serve (online, or none spawned)';
+      const c = target.combat;
+      const dx = player.position.x - c.body.position.x;
+      const dz = player.position.z - c.body.position.z;
+      // The aim is set on the tick the ball leaves the hand rather than here --
+      // see the `pendingServe` branch in `simulate` -- because a dummy's yaw is
+      // rewritten by its own input every tick in between. All this needs to do
+      // is make sure it has a ball to throw.
+      c.phase = 'idle';
+      c.ballCharges = 3;
+      c.ballT = 10;
+      punchBuffer = PUNCH_BUFFER;
+      const range = Math.hypot(dx, dz);
+      const delay = Math.max(0, arrive - range / LAUNCH_SPEED);
+      // Counted down in **simulated** seconds by `simulate`, not by a
+      // `setTimeout`, and the difference is the whole reason this works. The
+      // swing's clock is `CombatantState.phaseT`, which only advances inside a
+      // fixed step; a browser that has backgrounded this tab stops calling
+      // `requestAnimationFrame` and stops the fixed steps with it, while a wall
+      // clock keeps running. A throw scheduled on the wall clock would arrive
+      // hundreds of simulated milliseconds after the swing it was aimed at, and
+      // the embedded browser panes this project is developed against throttle a
+      // hidden tab exactly that way -- `scores()` above records the same trap
+      // from the other side.
+      pendingServe = { combat: c, t: delay };
+      return (
+        `${target.kind} is ${range.toFixed(1)} m away; swinging now and throwing in ` +
+        `${(delay * 1000).toFixed(0)} ms so the ball arrives ${(arrive * 1000).toFixed(0)} ms in, ` +
+        `inside the ${(PUNCH_WIND_UP * 1000).toFixed(0)}-${((PUNCH_WIND_UP + PUNCH_ACTIVE) * 1000).toFixed(0)} ms window`
+      );
     },
 
     /** Spec 8.3's field: every point the client has seen, and their state. */

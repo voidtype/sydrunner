@@ -2634,6 +2634,9 @@ async function checkBikes(): Promise<void> {
           const ball = {
             id: 1,
             thrower: other.combat.id,
+            // The ball's owner, which for a ball nobody batted out of the air is
+            // its thrower. See `footy.Footy.owner` and `game/swat.ts`.
+            owner: other.combat.id,
             x: victim.combat.body.position.x,
             y: victim.combat.body.position.y,
             z: victim.combat.body.position.z + 1,
@@ -13697,7 +13700,7 @@ async function checkInputQueue(): Promise<void> {
       close(): void {},
     };
     const net = new NetClient('', {
-      onHit: () => {}, onBounce: () => {}, onPickup: () => {}, onJoin: () => {},
+      onHit: () => {}, onSwat: () => {}, onBounce: () => {}, onPickup: () => {}, onJoin: () => {},
       onLeave: () => {}, onDrop: () => {}, onStatus: () => {},
     }, { name: 'reconcile-probe', transport });
 
@@ -14154,7 +14157,7 @@ async function checkMeleeAtLatency(MS_PER_TICK: number, FIXED_DT: number): Promi
       close(): void {},
     };
     const net = new NetClient('', {
-      onHit: () => {}, onBounce: () => {}, onPickup: () => {}, onJoin: () => {},
+      onHit: () => {}, onSwat: () => {}, onBounce: () => {}, onPickup: () => {}, onJoin: () => {},
       onLeave: () => {}, onDrop: () => {}, onStatus: () => {},
     }, { name: 'rtt-probe', transport });
 
@@ -14693,7 +14696,7 @@ async function checkAccelerationRamp(): Promise<void> {
       close(): void {},
     };
     const net = new NetClient('', {
-      onHit: () => {}, onBounce: () => {}, onPickup: () => {}, onJoin: () => {},
+      onHit: () => {}, onSwat: () => {}, onBounce: () => {}, onPickup: () => {}, onJoin: () => {},
       onLeave: () => {}, onDrop: () => {}, onStatus: () => {},
     }, { name: 'ramp-probe', transport });
 
@@ -19466,7 +19469,7 @@ async function checkRidingOnline(): Promise<void> {
         close(): void {},
       };
       this.net = new NetClient('', {
-        onHit: () => {}, onBounce: () => {}, onPickup: () => {}, onJoin: () => {},
+        onHit: () => {}, onSwat: () => {}, onBounce: () => {}, onPickup: () => {}, onJoin: () => {},
         onLeave: () => {}, onDrop: () => {}, onStatus: () => {},
       }, { name, transport: this.transport, nowMs: this.clock });
       this.net.setRail(bake);

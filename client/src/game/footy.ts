@@ -519,8 +519,39 @@ export const RELEASE_FORWARD = 0.3;
 export interface Footy {
   /** Server-assigned, wrapping at 256 so it fits the snapshot's byte. Never 0. */
   id: number;
-  /** The combatant who threw it. Never a valid target for it. */
+  /**
+   * The combatant who threw it, and **who is drawing it**. Never changes.
+   *
+   * This is the field that goes on the wire (`protocol.BALL_BYTES`) and the one
+   * `net/client.ownBall` compares against to decide not to draw your own throws:
+   * a client flies its own balls from its own prediction at present time and
+   * everybody else's from the snapshot stream 100 ms behind, and drawing both
+   * would be two balls.
+   *
+   * It is deliberately **not** what a swat changes -- see `owner`. A field that
+   * changed hands mid-flight would make the ball vanish for the player who swatted
+   * it, who has no local copy to draw, and appear twice for the player who threw
+   * it, who does.
+   */
   thrower: number;
+  /**
+   * Whose ball it is: who it cannot hit, and who is credited when it lands.
+   *
+   * Equal to `thrower` for the whole of an ordinary flight, and split off from it
+   * by `game/swat.ts` -- a footy batted out of the air becomes the swinger's, so
+   * a returned ball can knock over the person who threw it and the knockout goes
+   * on the swinger's scoreboard. See that file's header, decision 4, for why the
+   * two are separate fields rather than one that moves.
+   *
+   * **Not on the wire, and it does not need to be.** The only two consequences it
+   * has -- who the ball may hit, and whose row a knockout moves -- are both
+   * decided by whoever is adjudicating, and a client that thought it was still
+   * its own ball would be wrong about nothing it draws. The one thing a client
+   * does need to know is that a knockout was a *return*, which rides on the HIT
+   * event's `EVENT_FLAG.RETURNED` for a bit rather than on twenty bytes a
+   * snapshot.
+   */
+  owner: number;
   x: number;
   y: number;
   z: number;
@@ -547,7 +578,11 @@ export interface FootyStep {
 }
 
 export function createFooty(): Footy {
-  return { id: 0, thrower: 0, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, age: 0, bounces: 0, alive: false };
+  return {
+    id: 0, thrower: 0, owner: 0,
+    x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0,
+    age: 0, bounces: 0, alive: false,
+  };
 }
 
 function clearStep(out: FootyStep): FootyStep {
@@ -595,6 +630,13 @@ export function spawnFooty(thrower: CombatantState, id: number, out: Footy): Foo
 
   out.id = id;
   out.thrower = thrower.id;
+  // Yours until somebody bats it back. `game/swat.ts` is the only thing in the
+  // game that moves this, and it is reset here rather than left alone because
+  // the records are **pooled** -- a ball handed back from `FootyField`'s pool
+  // still carries the owner of whoever last returned it, and a throw that spawned
+  // owned by the person who swatted your previous one would be unhittable by them
+  // and would credit them for your knockouts.
+  out.owner = thrower.id;
   // The release point, off the **yaw** basis rather than the pitched view, so
   // the ball does not swing away from the body when the thrower looks up.
   out.x = body.position.x + cosY * RELEASE_RIGHT - sinY * RELEASE_FORWARD;
@@ -771,7 +813,12 @@ export function stepFooty(
       sweep = index.collectWithin(mx, mz, Math.sqrt(hx * hx + hz * hz) + reach, sweepScratch);
     }
     for (const t of sweep) {
-      if (t.id === ball.thrower) continue;
+      // The **owner**, not the thrower, and that one word is the whole of what
+      // `game/swat.ts` buys: a ball batted out of the air belongs to whoever
+      // swatted it, so it can now knock over the person who threw it and cannot
+      // touch the person who sent it back. For every ball that was never swatted
+      // the two fields are the same number and this reads exactly as it did.
+      if (t.id === ball.owner) continue;
       if (!isTargetable(t)) continue;
       const foot = feetY(t);
       const d = segmentDistance(
@@ -973,9 +1020,17 @@ export function stepFooty(
  * returns a `HitReport` allocates one when it is not handed one; doing that here
  * would mean constructing a `Vector3`, and this module imports nothing from
  * three -- see the file header. Both call sites have a report to hand anyway.
+ *
+ * The first argument is the ball's **owner** rather than its thrower, and for
+ * every ball that was never batted out of the air those are the same combatant.
+ * The two come apart when `game/swat.ts` has been at it: the attacker on the
+ * report, the row the knockout lands on, and the heading a dead-vertical drop
+ * falls back to are all the person who *sent this ball on its way*, which after a
+ * swat is the person who returned it. Callers pass `participants.get(ball.owner)`
+ * for exactly that reason.
  */
 export function applyFootyHit(
-  thrower: CombatantState,
+  owner: CombatantState,
   victim: CombatantState,
   ball: Footy,
   out: HitReport,
@@ -986,11 +1041,11 @@ export function applyFootyHit(
   const plan = Math.sqrt(ix * ix + iz * iz);
   const speed = Math.sqrt(ix * ix + iy * iy + iz * iz);
   // A ball falling dead vertically would push the victim nowhere on the plan,
-  // so it falls back to the thrower's heading. `combat.applyHit` makes the same
+  // so it falls back to the owner's heading. `combat.applyHit` makes the same
   // fallback for the same degenerate case.
   if (plan < 1e-4) {
-    ix = -Math.sin(thrower.body.yaw);
-    iz = -Math.cos(thrower.body.yaw);
+    ix = -Math.sin(owner.body.yaw);
+    iz = -Math.cos(owner.body.yaw);
   } else {
     ix /= plan;
     iz /= plan;
@@ -1006,7 +1061,7 @@ export function applyFootyHit(
   // reading exempts it -- which would make a Flat White strictly better than no
   // powerup at all and give a Training player a reason to switch weapons to
   // dodge their own penalty. One rule for all damage has no such seam.
-  victim.health = Math.max(0, victim.health - BALL_DAMAGE * damageScale(thrower));
+  victim.health = Math.max(0, victim.health - BALL_DAMAGE * damageScale(owner));
   // `applyHit`'s femto-pip clamp. It matters here for the same reason: sums
   // like 3 - 1.4 - 1.4 - 0.2 miss zero by a few times 1e-16.
   if (victim.health < 1e-9) victim.health = 0;
@@ -1042,7 +1097,7 @@ export function applyFootyHit(
   // second ago and freezing their frame now would read as a network stall.
   victim.hitstopT = VICTIM_HITSTOP;
 
-  out.attacker = thrower.id;
+  out.attacker = owner.id;
   out.victim = victim.id;
   out.ko = ko;
   out.health = victim.health;
@@ -1543,6 +1598,55 @@ export function verifyFooty(): string[] {
     // throws as id 99, so a target sharing that id must be skipped.
     if (traceFooty(11, FLAT, [makeTarget(99, 0, -6)]).victim !== -1) {
       failures.push('A thrower was hit by their own ball.');
+    }
+  }
+
+  // --- IMMUNITY FOLLOWS THE **OWNER**, NOT THE THROWER, which is the whole of
+  // what `game/swat.ts` needed from this file.
+  //
+  // Two claims, and both fail in silence. A returned ball that still cannot hit
+  // the person who threw it makes the swat pointless in exactly the situation it
+  // exists for -- you bat their throw back at them and it passes through them --
+  // and there is no frame that says why, because the ball simply keeps flying.
+  // A returned ball that *can* hit the person who returned it is worse: you swat
+  // one at somebody, they step aside, and it comes back off a terrace and knocks
+  // you over with your own bat's velocity on it.
+  //
+  // Scripted here rather than in `verifySwat` because the rule being tested is
+  // this file's -- it is one word in `stepFooty`'s target loop -- and the check
+  // belongs where the word is. `verifySwat` tests the deflection that sets the
+  // field; this tests that the field is read.
+  {
+    const ball = createFooty();
+    // Thrown by 99, batted back by 7: the two fields disagree, which is the only
+    // state this branch exists for.
+    spawnFooty(makeTarget(99, 0, 0), 23, ball);
+    ball.owner = 7;
+    const s = createFootyStep();
+    // Straight back down the line at the thrower, who is now a legal target.
+    ball.x = 0;
+    ball.y = EYE_HEIGHT;
+    ball.z = 0;
+    ball.vx = 0;
+    ball.vy = 0;
+    ball.vz = -30;
+    const thrower = makeTarget(99, 0, -6);
+    const swinger = makeTarget(7, 0, -12);
+    let hit = -1;
+    for (let i = 0; i < 60 && ball.alive; i++) {
+      stepFooty(ball, STEP_DT, FLAT, [thrower, swinger], s);
+      if (s.victim) {
+        hit = s.victim.id;
+        break;
+      }
+    }
+    if (hit !== 99) {
+      failures.push(
+        `A ball owned by 7 and thrown by 99 hit ${hit === -1 ? 'nobody' : hit} on its way down a ` +
+          `line with both of them standing on it. The sweep must skip the ball's *owner* and not ` +
+          `its thrower, or a returned serve cannot hit the person who served it -- which is the ` +
+          `entire point of game/swat.ts.`,
+      );
     }
   }
 
