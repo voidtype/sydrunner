@@ -107,6 +107,15 @@ import {
 } from './player/character.ts';
 import { BONE, verifyAnimation } from './player/animation.ts';
 import { BatAssets, BatProp, BatViewmodel, MAX_VIEW_REACH, verifyBat } from './player/bat.ts';
+// --- Money, the phone and the weapon slots. See `client/src/money.ts`.
+//
+// One import and one `installMoney(...)` call, and everything else this feature
+// does to this file is four one-line hooks inside handlers that already exist.
+// `money.ts`'s header says why the hooks are called from here rather than
+// listened for from there.
+import { verifyCash } from './game/cash.ts';
+import { verifyPhone } from './phone.ts';
+import { installMoney } from './money.ts';
 import {
   applyWorldDamage,
   CAST_RADIUS,
@@ -577,6 +586,19 @@ async function main(): Promise<void> {
   // down a block, or "cnr Crown St & Crown St". None of them throws and none of
   // them has a frame that says otherwise -- see `verifyLocator`.
   const locatorFailures = timed('locator', verifyLocator);
+  // And the money, on the same criterion again, in two halves. The economy's
+  // failures are arithmetic that renders perfectly: a drop rule that floors
+  // before its minimum takes $5 off a player with $6 and nothing off one with
+  // $49, a Centrelink period computed in *real* days is a payment nobody in
+  // this game will ever collect, and a fare that rounds twice is a dollar
+  // short a third of the time in the house's favour. The slots' failures are
+  // worse in a different way: a swap that duplicates puts the bat in both
+  // hands, so the off-hand throw does nothing and there is no frame in which
+  // that reads as anything but a missing football. The server runs
+  // `verifyCash` too -- it is the side that pays. See `game/cash.ts` and
+  // `phone.ts`.
+  const cashFailures = timed('cash', verifyCash);
+  const phoneFailures = timed('phone', verifyPhone);
   // And the water, in two halves that fail in two different silent ways. A
   // sidecar decoded a word out of step is triangles at plausible coordinates and
   // impossible depths; a wading rule whose tile keying disagrees with the
@@ -895,7 +917,9 @@ async function main(): Promise<void> {
     teleportFailures.length ||
     suggestionFailures.length ||
     changelogFailures.length ||
-    bugFailures.length
+    bugFailures.length ||
+    cashFailures.length ||
+    phoneFailures.length
   ) {
     hud.fatal(
       'Self-checks failed:\n' +
@@ -943,6 +967,8 @@ async function main(): Promise<void> {
           ...unstuckFailures,
           ...teleportFailures,
           ...suggestionFailures,
+          ...cashFailures,
+          ...phoneFailures,
           ...changelogFailures,
           ...bugFailures,
         ]
@@ -4296,6 +4322,39 @@ async function main(): Promise<void> {
    */
   let mountHeld = false;
 
+  // --- Money, the phone and the weapon slots. See `client/src/money.ts`.
+  //
+  // Here rather than earlier because every accessor below has to be in scope:
+  // `self` is the shadow-layer body the handset parents to, `thirdPerson` is
+  // what decides whether the viewmodel or the prop is the one you see, and
+  // `minimap` is the seam both maps read their markers through.
+  const money = installMoney({
+    hud,
+    camera,
+    scene,
+    selfActor: self,
+    net: () => net,
+    position: () => player.position,
+    angles: () => ({ yaw: player.yaw, pitch: player.pitch }),
+    speed: () => Math.sqrt(player.velocity.x * player.velocity.x + player.velocity.z * player.velocity.z),
+    firstPerson: () => !thirdPerson,
+    riding: () => playerCombat.ridingBike !== 0,
+    openMap: () => bigmap.toggle(),
+    addMarkerSource: (source) => minimap.addMarkerSource(source),
+    // Which weapon viewmodels the slots want drawn this frame.
+    //
+    // Handed in as a setter rather than read back out, because the block above
+    // that owns `setVisibleToCamera` only runs on a **camera-mode change** --
+    // so a predicate consulted there would follow the third-person toggle and
+    // not the number row, and the bat would stay in frame beside a raised
+    // phone until you pressed `V`. This runs every frame from `money.frame`,
+    // after that block, and `thirdPerson` is still the outer authority.
+    setWeaponVisible: (bat, footy) => {
+      setVisibleToCamera(viewmodel.mesh, !thirdPerson && bat);
+      setVisibleToCamera(footyViewmodel.mesh, !thirdPerson && footy);
+    },
+  });
+
   // --- Riding a train ----------------------------------------------------------
   //
   // The client's half of `game/riding.ts`: predict the boarding, step the body
@@ -4575,6 +4634,11 @@ async function main(): Promise<void> {
    */
   window.addEventListener('mousedown', (e) => {
     if (!locked) return;
+    // The phone answers whichever button its hand is on, and consumes it -- so
+    // a click that opened the phone does not also arm a swing. Every other
+    // slot arrangement returns false here and the two lines below are exactly
+    // what they always were. See `client/src/money.ts`.
+    if (money.mousedown(e.button)) return;
     if (e.button === 0) punchBuffer = PUNCH_BUFFER;
     // Right click throws a football. Under pointer lock the context menu does
     // not appear anyway, but the listener below covers the drag-to-look fallback
@@ -4729,6 +4793,12 @@ async function main(): Promise<void> {
     if (hud.typing) return;
     const held = keys.has(e.code);
     keys.add(e.code);
+    // The number row, the phone's Escape and the Centrelink `E`. **After** the
+    // `hud.typing` interlock, so none of them fires while somebody is typing,
+    // and before every branch below, so the phone's Escape beats the
+    // suggestions box's -- which is the ordering `money.ts`'s header is about.
+    // Returns true only when it consumed the key. See `client/src/money.ts`.
+    if (money.keydown(e.code, e.shiftKey, held)) return;
     /* **`F` is the torch, and what it displaced went one key along.**
      *
      * A player asked for the flashlight on `F`, which is where every game since
@@ -5288,6 +5358,10 @@ async function main(): Promise<void> {
       },
       onSuggestAck(result, issue, message) {
         suggestions.ack(result, issue, message);
+      },
+      /** "+$34 fare". The pill, and the phone's wallet history. */
+      onMoney(note, balance) {
+        money.onMoney(note, balance);
       },
     };
   }
@@ -7024,6 +7098,10 @@ async function main(): Promise<void> {
     invisibleWalls.update(frameDt, player.position.x, player.position.z);
 
     minimap.update(frameDt, player.position.x, player.position.z, player.yaw);
+    // The balance, the piles of cash, the handset and the two prompts. One
+    // call, on `minimap.update`'s own terms: presentation, at the frame rate,
+    // reading state nothing here owns. See `client/src/money.ts`.
+    money.frame(frameDt);
 
     // And the big map, which costs one comparison on every frame it is closed --
     // which is nearly all of them. Same position and yaw as the disc above, and
@@ -9242,6 +9320,19 @@ async function main(): Promise<void> {
         dummies: dummies.map((d) => d.report),
       };
     },
+
+    /**
+     * The wallet, the slots and the phone. See `client/src/money.ts`.
+     *
+     *     sydney.money.report()          what is in each hand, and the balance
+     *     sydney.money.equip(2)          raise the phone (0 bat, 1 footy, 3 fists)
+     *     sydney.money.open()            open the phone's overlay
+     *
+     * `open()` is the one that earns its place: the phone needs a cursor, a
+     * cursor needs pointer lock to have been released, and a browser that
+     * refuses pointer lock outright has no click sequence that gets there.
+     */
+    money: money.debug,
 
     /** Move the camera and the player to a viewpoint, for inspecting the world. */
     look(view: { x: number; y: number; z: number; yaw?: number; pitch?: number }) {

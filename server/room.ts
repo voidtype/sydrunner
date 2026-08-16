@@ -78,6 +78,7 @@ import {
   INTEREST_LEAVE_BYTES,
   INTERP_DELAY_MS,
   MAX_REWIND_MS,
+  MSG,
   PROTOCOL_VERSION,
   SNAPSHOT_HZ,
   SNAPSHOT_INTERVAL,
@@ -102,6 +103,13 @@ import {
   type SnapshotNpc,
   type SnapshotPlayer,
 } from '../client/src/net/protocol.ts';
+// --- Money. See `client/src/net/cash.ts` and `server/sim.ts`.
+//
+// One block: two more frames on the same "on change, never on a timer" terms
+// `BIKES` and `INVESTIGATION` already established below.
+import { encodeFare, encodeWallet, type WalletFrame } from '../client/src/net/cash.ts';
+import { fakeDriving } from '../client/src/game/driving-contract.ts';
+import type { WalletStore } from './wallets.ts';
 import { botName } from './bots.ts';
 import { FrameGroups, InterestIndex, InterestSet } from './aoi.ts';
 import { Simulation, applyButtons, type Participant, type TickOutput } from './sim.ts';
@@ -621,6 +629,23 @@ export class Room {
   private readonly investigationCache = new Map<number, Uint8Array>();
 
   // --- Cadences.
+  /**
+   * The last `WALLET` and `FARE` version sent to each socket's participant.
+   *
+   * Keyed by **player id** rather than by socket, because that is what the
+   * version lives on and because a socket whose participant has gone has
+   * nothing to compare -- the entry is dropped in `leave`, which is what keeps
+   * this from being an unbounded map on a long-running host. Two small maps
+   * rather than two fields on `Conn`: `Conn` is `server/room.ts`'s public
+   * record and five branches are editing it this pass.
+   */
+  private readonly walletSent = new Map<number, number>();
+  private readonly fareSent = new Map<number, number>();
+  /** Reused; `encodeWallet` reads it and keeps nothing. */
+  private readonly walletScratch: WalletFrame = { balance: 0, centrelinkNextMs: -1, note: '', bundles: [] };
+  /** The bundle-list version at the last send, so a drop re-sends every wallet. */
+  private bundlesSent = -1;
+
   private rosterSent = -1;
   private rosterTick = 0;
   private investigationSent = -1;
@@ -680,12 +705,37 @@ export class Room {
    */
   private readonly snapshotPhase: number;
 
-  constructor(id: number, shared: ServerWorld, cap: number, bots: number) {
+  constructor(id: number, shared: ServerWorld, cap: number, bots: number, money: RoomMoney = {}) {
     this.id = id;
     this.cap = cap;
     this.snapshotPhase = id % SNAPSHOT_INTERVAL;
     // Its own powerups, everybody else's city. See `world.roomWorld`.
-    this.sim = new Simulation(roomWorld(shared));
+    //
+    // The wallet store is the **host's** and is deliberately shared across
+    // rooms -- a balance keyed by name cannot depend on which room the gateway
+    // put you in -- where the driving lookup is **this room's**, because a
+    // player id is a room's and not a host's (`protocol.AOI_ID_LIFECYCLE`). See
+    // `RoomMoney`.
+    const sim: Simulation = new Simulation(roomWorld(shared), {
+      wallets: money.wallets,
+      driving: money.fakeDriving
+        ? fakeDriving({
+            poseOf: (playerId) => {
+              const p = sim.participants.get(playerId);
+              if (!p) return null;
+              const b = p.combat.body;
+              return {
+                x: b.position.x,
+                y: b.position.y,
+                z: b.position.z,
+                yaw: b.yaw,
+                speed: Math.sqrt(b.velocity.x * b.velocity.x + b.velocity.z * b.velocity.z),
+              };
+            },
+          })
+        : undefined,
+    });
+    this.sim = sim;
     for (let i = 0; i < bots; i++) {
       // Named from `bots.BOT_NAMES` by index within the room, so every room has
       // a Bazza and a Shazza. That is deliberate rather than an oversight: a
@@ -762,6 +812,16 @@ export class Room {
     // knockout nameable in the kill feed. Sent before anything that could refer
     // to an id, which is the rule `server/index.ts` has always had here.
     ws.send(encodeRoster(this.sim.roster()));
+    // And this player's money, at join, because the HUD draws it from the first
+    // frame and a `$0` that becomes `$1,234` half a second later reads as the
+    // balance having been lost. `sendWallets` below would get there within a
+    // tick anyway; this is the same argument `encodePowerups` above makes about
+    // an icon that is briefly wrong.
+    const wallet = this.sim.walletFrame(p.id, this.walletScratch);
+    if (wallet !== null) {
+      ws.send(encodeWallet(MSG.WALLET, wallet));
+      this.walletSent.set(p.id, p.walletVersion);
+    }
     // And **no** join events for everybody already here, which is where v7 built
     // the client's remotes. Under AOI a remote is created by an `INTEREST`
     // entrance and by nothing else, so a joiner is told about the handful of
@@ -778,7 +838,12 @@ export class Room {
   leave(ws: Socket): void {
     this.conns.delete(ws);
     const p = ws.data.participant;
-    if (p) this.sim.leave(p.id);
+    if (p) {
+      this.sim.leave(p.id);
+      // Or the two version maps are a leak of one entry per join, forever.
+      this.walletSent.delete(p.id);
+      this.fareSent.delete(p.id);
+    }
   }
 
   // --- The tick ---------------------------------------------------------------
@@ -912,6 +977,8 @@ export class Room {
     this.sendRoster();
     this.sendInvestigations();
     this.sendBikes();
+    this.sendWallets();
+    this.sendFares();
     this.sendEvents();
     // Offset per room, so the host's egress is spread across the three ticks in
     // a snapshot interval rather than landing on one. See `snapshotPhase`.
@@ -1031,6 +1098,62 @@ export class Room {
       ws.send(frame);
       this.bytesSent += frame.byteLength;
       this.logBytes += frame.byteLength;
+    }
+  }
+
+  /**
+   * The money, per client, on change.
+   *
+   * Two triggers rather than one, and the second is the reason this is not a
+   * plain version compare: a player's own balance changing bumps
+   * `walletVersion`, and **anybody's** cash bundle appearing, being collected
+   * or expiring bumps the room-wide `bundleVersion` -- which every client has
+   * to be told about, because the pile is drawn in the world. So a bundle event
+   * re-sends every wallet in the room once. `net/cash.ts`'s header does the
+   * arithmetic on what that costs and why it is affordable; the short version
+   * is that a room drops a few bundles a minute and a frame is tens of bytes.
+   *
+   * What must not happen is this going on a timer. A `WALLET` frame per client
+   * per tick would be the largest reliable message in the game, sixty times a
+   * second, to say a number that changes twice a minute.
+   */
+  private sendWallets(): void {
+    const bundlesMoved = this.sim.bundleVersion !== this.bundlesSent;
+    for (const ws of this.conns) {
+      const p = ws.data.participant;
+      if (!p) continue;
+      if (!bundlesMoved && this.walletSent.get(p.id) === p.walletVersion) continue;
+      const frame = this.sim.walletFrame(p.id, this.walletScratch);
+      if (frame === null) continue;
+      this.walletSent.set(p.id, p.walletVersion);
+      const bytes = encodeWallet(MSG.WALLET, frame);
+      ws.send(bytes);
+      this.bytesSent += bytes.byteLength;
+      this.logBytes += bytes.byteLength;
+    }
+    this.bundlesSent = this.sim.bundleVersion;
+  }
+
+  /**
+   * The fare, to the one driver it belongs to, on change.
+   *
+   * Not deduplicated and not broadcast: a fare is nobody else's business, and
+   * the frame is 24 bytes on about six state changes a trip. `FareJob.version`
+   * is bumped by `server/fares.ts` on exactly the transitions worth sending,
+   * which is why this is a version compare rather than a diff of six fields.
+   */
+  private sendFares(): void {
+    const now = Date.now();
+    for (const ws of this.conns) {
+      const p = ws.data.participant;
+      if (!p) continue;
+      const job = p.fare;
+      if (this.fareSent.get(p.id) === job.version) continue;
+      this.fareSent.set(p.id, job.version);
+      const bytes = encodeFare(MSG.FARE, job, now);
+      ws.send(bytes);
+      this.bytesSent += bytes.byteLength;
+      this.logBytes += bytes.byteLength;
     }
   }
 
@@ -1240,6 +1363,24 @@ export class Room {
 }
 
 /**
+ * What a room needs to know about money, or nothing at all.
+ *
+ * **Optional in both members**, which is what keeps every existing
+ * `new Room(...)` and `new RoomHost(...)` in the checks and the load harness
+ * working unchanged: a room with no store gives every participant a null wallet
+ * and skips every money path, and a room with no `fakeDriving` gets
+ * `NO_DRIVING` and reports everybody on foot. That is not a degraded mode, it
+ * is the mode `server/integration-check.ts` and `server/loadtest.ts` want --
+ * neither of them should be writing a wallets file into the repository.
+ */
+export interface RoomMoney {
+  /** The host's store. Shared across every room; see `Room`'s constructor. */
+  wallets?: WalletStore;
+  /** `SYDNEY_FAKE_DRIVING=1`. See `game/driving-contract.fakeDriving`. */
+  fakeDriving?: boolean;
+}
+
+/**
  * R rooms in one process, sharing one loaded city.
  *
  * The gateway's data model: `/rooms` is this object's `listing()`, and a join
@@ -1251,9 +1392,16 @@ export class RoomHost {
   readonly rooms: Room[] = [];
   readonly world: ServerWorld;
 
-  constructor(world: ServerWorld, count: number, cap: number, bots: number, firstRoom = 0) {
+  constructor(
+    world: ServerWorld,
+    count: number,
+    cap: number,
+    bots: number,
+    firstRoom = 0,
+    money: RoomMoney = {},
+  ) {
     this.world = world;
-    for (let i = 0; i < count; i++) this.rooms.push(new Room(firstRoom + i, world, cap, bots));
+    for (let i = 0; i < count; i++) this.rooms.push(new Room(firstRoom + i, world, cap, bots, money));
   }
 
   get(id: number): Room | undefined {

@@ -6,6 +6,9 @@
  * needed while the world pipeline is still being tuned.
  */
 
+// The one place a balance becomes text. See `game/cash.formatMoney` for why
+// it is not `Intl.NumberFormat`.
+import { formatMoney } from './game/cash.ts';
 import type { Vector3 } from 'three/webgpu';
 import type { SolarPosition } from './sky/solar.ts';
 import { MAX_NAME_CHARS, MIN_NAME_CHARS, sanitiseName, type RosterEntry } from './net/protocol.ts';
@@ -483,6 +486,13 @@ export class Hud {
   private readonly staminaBar = document.getElementById('stamina')!;
   private readonly ballBar = document.getElementById('balls')!;
   private readonly effects = document.getElementById('effects')!;
+  /**
+   * The dollar balance, above the pips. See `money`.
+   *
+   * Non-null-asserted like every other element here, which is this class's
+   * standing bet that `index.html` and this file ship together.
+   */
+  private readonly moneyEl = document.getElementById('money')!;
   private readonly ko = document.getElementById('ko')!;
   private readonly investigationEl = document.getElementById('investigation')!;
   private readonly investigationReason = document.getElementById('investigation-reason')!;
@@ -1017,6 +1027,35 @@ export class Hud {
       this.ko.style.display = 'none';
     }
   }
+
+  /**
+   * `$1,234`, at the top of the vitals block.
+   *
+   * Called every frame with the balance as it stands, and cheap on `vitals`'
+   * own terms: the string is compared before it is written, so the common case
+   * -- a balance that has not moved -- is one string compare and no reflow.
+   *
+   * **Above the pips rather than beside the effects**, which is a layout
+   * decision worth a line: the effect chips are a row that appears and
+   * disappears, and a number that moved up and down the screen depending on
+   * whether you had a Flat White would be a number you have to look for. The
+   * balance is the one thing in this cluster that is always there.
+   *
+   * Hidden entirely at zero **only before the first frame arrives**, which the
+   * caller signals by passing `null`: `$0` is a real balance a player can be
+   * on (drop everything, spend it all) and blanking it would be the HUD lying
+   * about a state the player is in. What must not show is a `$0` during the
+   * second before the first `WALLET` lands on an `?offline` session that is
+   * never getting one.
+   */
+  money(balance: number | null): void {
+    const text = balance === null ? '' : formatMoney(balance);
+    if (text === this.moneyText) return;
+    this.moneyText = text;
+    this.moneyEl.textContent = text;
+  }
+
+  private moneyText = '\u0000';
 
   /**
    * "Under Investigation! {reason} — Ns", or nothing.

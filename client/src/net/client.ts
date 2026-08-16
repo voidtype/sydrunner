@@ -159,6 +159,19 @@ import {
   encodeSuggestVote,
   type SuggestionList,
 } from './suggestions.ts';
+// --- Money. See `net/cash.ts`.
+//
+// One block: two frames in, one out, and the two mirrors this object keeps of
+// them. `client/src/phone.ts` and `main.ts` read the mirrors; nothing else in
+// this file knows what a dollar is.
+import {
+  PHONE_OP,
+  decodeFare,
+  decodeWallet,
+  encodePhone,
+  type FareFrame,
+  type WalletFrame,
+} from './cash.ts';
 import { NPC_STATE, type NpcActor } from '../game/factions.ts';
 
 const FIXED_DT = 1 / TICK_HZ;
@@ -348,6 +361,15 @@ export interface NetHandlers {
   onSuggestions?(list: SuggestionList): void;
   /** Yes / no / not this week, with the server's own sentence. */
   onSuggestAck?(result: number, issue: number, message: string): void;
+  /**
+   * The balance moved, and the server's own sentence saying why -- "+$34 fare".
+   *
+   * Optional like `onChat`, for its reason: a headless probe has no HUD pill.
+   * Fired **only when there is something to say**, so a wallet frame re-sent
+   * because somebody else dropped a bundle does not re-announce a fare that was
+   * paid a minute ago. See `net/cash.WalletFrame.note`.
+   */
+  onMoney?(note: string, balance: number): void;
 }
 
 interface PendingInput {
@@ -948,6 +970,53 @@ export class NetClient {
     return true;
   }
 
+  // --- Money. See `net/cash.ts`. -----------------------------------------------
+
+  /**
+   * The balance, the claim countdown and the bundles, as the server last said.
+   *
+   * A mirror and never an authority: the client draws this and the server
+   * decides it. There is deliberately **no prediction** of any of it, unlike
+   * the mount and the investigation banner, and the reason is that money has no
+   * frame-accuracy requirement -- a balance that updates 50 ms late is a
+   * balance that updates, where a bike that mounts 50 ms late is a control that
+   * feels broken. Predicting a credit would also mean predicting a *refusal*,
+   * which is the one thing a client cannot do: the seven-day timer lives on the
+   * server.
+   *
+   * Starts empty rather than null so every reader is a field access. An
+   * `?offline` session never receives one and draws `$0`, which is the honest
+   * answer with nobody to ask.
+   */
+  readonly wallet: WalletFrame = { balance: 0, centrelinkNextMs: -1, note: '', bundles: [] };
+
+  /** The fare this client is on, as the server last said. See `MSG.FARE`. */
+  readonly fare: FareFrame = {
+    state: 'none', px: 0, pz: 0, dx: 0, dz: 0, offeredMs: 0, payout: 0,
+  };
+
+  /**
+   * Ask to be paid at the Centrelink you are standing at.
+   *
+   * Refused while offline on `sendChat`'s argument: a claim that vanished into
+   * a dead socket is worse than one visibly refused, and there is no offline
+   * economy to claim from. The office id is a row in `game/centrelink-data.ts`,
+   * which both ends compile in -- the server checks the position itself and
+   * uses the id only to notice that you asked for the wrong one.
+   */
+  claimCentrelink(officeId: string): boolean {
+    if (this.status !== 'online') return false;
+    this.transport.send(encodePhone(MSG.PHONE, PHONE_OP.CLAIM, officeId));
+    return true;
+  }
+
+  /** Clock on or off the rideshare shift. Idempotent; see `net/cash.PHONE_OP`. */
+  setRideshareOnline(online: boolean): boolean {
+    if (this.status !== 'online') return false;
+    this.transport.send(encodePhone(MSG.PHONE, online ? PHONE_OP.ONLINE : PHONE_OP.OFFLINE));
+    return true;
+  }
+
   /** Called every frame. Advances the interpolation clock and places the remotes. */
   update(dt: number): void {
     if (this.tickSynced) this.serverTick += dt * TICK_HZ;
@@ -1106,6 +1175,52 @@ export class NetClient {
       case MSG.SUGGEST_ACK: {
         const ack = decodeSuggestAck(frame, MSG.SUGGEST_ACK);
         if (ack) this.handlers.onSuggestAck?.(ack.result, ack.issue, ack.message);
+        return;
+      }
+      /*
+       * The wallet, and every cash bundle on the ground in the room.
+       *
+       * **Filed here rather than passed straight out**, which is the opposite
+       * of what `SUGGEST_LIST` above does and is right for the opposite reason:
+       * a suggestion list is a fact about a panel that is currently open, and
+       * this is a fact about the world that every frame needs -- the HUD draws
+       * the balance sixty times a second and the streamer draws the piles. So
+       * the frame is the mirror and the callback is only for the *moment* the
+       * note describes.
+       */
+      case MSG.WALLET: {
+        const w = decodeWallet(frame, MSG.WALLET);
+        if (!w) return;
+        // Written **into** the held record rather than replacing it, so a
+        // caller that took a reference at boot keeps reading the live one --
+        // which `main.ts`'s HUD tick and the phone's wallet app both do. The
+        // bundle array is spliced for the same reason.
+        this.wallet.balance = w.balance;
+        this.wallet.centrelinkNextMs = w.centrelinkNextMs;
+        this.wallet.note = w.note;
+        this.wallet.bundles.length = 0;
+        for (const b of w.bundles) this.wallet.bundles.push(b);
+        if (w.note !== '') this.handlers.onMoney?.(w.note, w.balance);
+        return;
+      }
+      /*
+       * The fare, which is only ever sent to the driver it belongs to.
+       *
+       * `Date.now()` is read here, on arrival, because the frame carries the
+       * offer's **age** rather than an instant -- see `net/cash.encodeFare`, and
+       * note that this is the one message in this switch that has to know what
+       * time it is.
+       */
+      case MSG.FARE: {
+        const f = decodeFare(frame, MSG.FARE, Date.now());
+        if (!f) return;
+        this.fare.state = f.state;
+        this.fare.px = f.px;
+        this.fare.pz = f.pz;
+        this.fare.dx = f.dx;
+        this.fare.dz = f.dz;
+        this.fare.offeredMs = f.offeredMs;
+        this.fare.payout = f.payout;
         return;
       }
       case MSG.POWERUPS: {

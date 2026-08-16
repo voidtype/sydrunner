@@ -238,6 +238,21 @@ export const MSG = {
    * across all three. See `suggestions.SUGGEST_OP`.
    */
   SUGGEST: 0x0c,
+  /**
+   * The phone, in one client message with a sub-op byte. See `net/cash.ts`.
+   *
+   * `SUGGEST`'s arrangement for `SUGGEST`'s two reasons: claiming a Centrelink
+   * payment and going on or off the rideshare shift are one conversation held
+   * from one screen a handful of times a session, three ids would be three
+   * cases in `server/index.ts` for one feature, and the per-socket flood guard
+   * that counts this feature's traffic would have to be summed across them.
+   *
+   * **0x0e rather than 0x0d**, which is free: the two server messages this
+   * feature answers with are `WALLET` at 0x8f and `FARE` at 0x90, so there is
+   * no low/high pairing to preserve here and 0x0d is left for whichever of the
+   * five branches landing beside this one wants a low id. See `net/cash.ts`.
+   */
+  PHONE: 0x0e,
 
   WELCOME: 0x81,
   SNAPSHOT: 0x82,
@@ -345,6 +360,30 @@ export const MSG = {
    * the line and know whether to empty the compose box.
    */
   SUGGEST_ACK: 0x8d,
+  /**
+   * How much money this player has, and every cash bundle on the ground in the
+   * room. See `net/cash.encodeWallet`.
+   *
+   * A message of its own rather than a field on the snapshot, on `BIKES`'
+   * argument: a balance changes when somebody is paid, robbed or knocked
+   * over -- a few times a minute across a whole room -- against a position that
+   * is different every tick. Twenty times a second it would be four bytes per
+   * player per snapshot to carry a number that is almost always the same one.
+   *
+   * **Per client and therefore never deduplicated** across sockets the way a
+   * snapshot body is (see `server/room.ts`'s `FrameGroups`), because the
+   * balance is a fact about the recipient. `net/cash.ts`'s header does the
+   * arithmetic on what that costs and why the bundles ride here anyway.
+   */
+  WALLET: 0x8f,
+  /**
+   * The rideshare fare this driver is on, if any. See `net/cash.encodeFare`.
+   *
+   * Sent on change, only to the driver it belongs to, and never to anybody
+   * else -- a fare is not a thing other players can see. Twenty-four bytes on
+   * each of about six state changes a trip.
+   */
+  FARE: 0x90,
 } as const;
 
 /**
@@ -3539,7 +3578,7 @@ export function verifyNet(): string[] {
     }
     // Which half each one belongs in, named here rather than inferred from a
     // prefix: a list is checkable and a naming convention is not.
-    const clientToServer = ['HELLO', 'INPUT', 'PING', 'CHAT_SAY', 'SUGGEST'];
+    const clientToServer = ['HELLO', 'INPUT', 'PING', 'CHAT_SAY', 'SUGGEST', 'PHONE'];
     for (const [name, id] of Object.entries(MSG)) {
       const wantsLow = clientToServer.includes(name);
       if (wantsLow && id >= 0x80) {
