@@ -856,6 +856,11 @@ export const REASON = {
    * one row of a table to make that day a one-line change. `game/heat.ts`
    * already prices both, so the 2-star response exists before anything can
    * commit them.
+   *
+   * `CAR_THEFT` is conditional on being *seen*: `driving.bystanderSeen` gates
+   * the call, which is the first crime in this game a civilian rather than an
+   * officer can report. `DANGEROUS_DRIVING` is not conditional on anything --
+   * running somebody down at speed is reported by the body.
    */
   CAR_THEFT: 6,
   DANGEROUS_DRIVING: 7,

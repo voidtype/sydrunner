@@ -423,6 +423,22 @@ export const MSG = {
    * room-global where the investigation channel is filtered to what you can see.
    */
   HEAT: 0x92,
+  /**
+   * Which cars somebody has taken, and who is in them. See `encodeCars`.
+   *
+   * A message of its own on `BIKES`' argument exactly -- a car record changes
+   * when somebody steals one, leaves one, or an abandoned one expires, which is
+   * a few times a minute across a whole room, against a position that is
+   * different every tick. The **pose of an occupied car is not on this message
+   * at all**: it is derived from its driver's own snapshot record, because a car
+   * follows its driver and the driver is already there at 20 Hz. See
+   * `game/driving.CarField.follow`.
+   *
+   * 0x91 rather than 0x8e because this workstream was one of six landing in
+   * parallel and the ids were handed out in advance so the branches could not
+   * collide. The gap at 0x8e..0x90 is other people's.
+   */
+  CARS: 0x91,
 } as const;
 
 /**
@@ -1852,6 +1868,23 @@ export function createSnapshot(): Snapshot {
 export const ENTER_FLAG = {
   BOT: 1 << 0,
   RIDING: 1 << 1,
+  /**
+   * ...and a third, for `RIDING`'s reason one step on.
+   *
+   * A player who walks into view **at the wheel of a car** needs the car built
+   * on the frame they appear. `MSG.CARS` will tell the client about the record
+   * too, but only when the record *changes* -- so a driver who has been circling
+   * Redfern for two minutes and finally drives into your interest radius is
+   * carried by no `CARS` message at all, and without this bit the first thing
+   * you see is a figure in a seated pose sliding down George Street at 22 m/s
+   * with no car under them until the next roster refresh.
+   *
+   * `RIDING` is set as well for a driver -- being in a car is `FLAG.RIDING` plus
+   * a `CARS` entry, which is the bike convention verbatim so that every
+   * nameplate and animation path keying on `RIDING` keeps working -- and this
+   * bit is what tells the two apart.
+   */
+  DRIVING: 1 << 2,
 } as const;
 
 /** Somebody who just came into a client's working set, with everything to draw them. */
@@ -2425,6 +2458,150 @@ export function decodeBikes(buffer: ArrayBuffer): BikeRecord[] | null {
     p += BIKE_RECORD_BYTES;
   }
   return out;
+}
+
+// --- Driven cars ----------------------------------------------------------------
+
+/**
+ * Which cars have been taken, who is in them, and which ones are gone.
+ *
+ *     u8   type = MSG.CARS
+ *     u16  count
+ *     u8   flags        CARS_FULL on the set a joiner is sent
+ *     per car:
+ *       u16  id         `CarField`'s allocation id, 1..n; 0 is "no car"
+ *       u32  carId      `traffic.identityOf(route, slot)`: which ambient car this was
+ *       u16  driver     the combatant id, or 0 for one standing in the street
+ *       u8   model      body << 4 | colour
+ *       u8   flags      CAR_REMOVED
+ *       i32  x, y, z    millimetres, as every position on this wire is
+ *       u16  yaw
+ *       i16  speed      centimetres per second, signed
+ *
+ * **Upsert semantics with an explicit delete**, which is the one place this
+ * diverges from `MSG.BIKES` one section up, and the divergence is forced. A bike
+ * is *planned*: the set is fixed by `bikes.bikePlan` for the life of a build, so
+ * a receiver that merges by id and never removes anything is complete. A car is
+ * *allocated*: the set is however many cars have been stolen and not yet
+ * expired, and it shrinks. Inferring a removal from absence would mean every
+ * message had to be the whole set, which is exactly the cost the upsert exists
+ * to avoid -- so a removal is a record with `CAR_REMOVED` set, and everything
+ * else about that record is ignored.
+ *
+ * `CARS_FULL` on the header is the joiner's set, and it means "replace, do not
+ * merge". Without it a client that reconnected to a restarted server would carry
+ * its old records forever, suppressing ambient cars nobody is driving.
+ *
+ * **The pose of an occupied car is here and is also stale, on purpose.** While
+ * somebody is driving, the car's real position is derived from that driver's
+ * snapshot record 20 times a second (`driving.CarField.follow`), and this
+ * message's copy is only as fresh as the last change. It matters for exactly two
+ * cases and both are worth the twelve bytes: an **empty** car, whose pose is
+ * derived from nothing at all, and the frame a car is **taken**, where the
+ * record arrives before the driver's next snapshot does.
+ *
+ * At a plausible worst case -- a dozen cars taken in a busy room -- the join
+ * message is 316 B, and a single theft is 30 B.
+ */
+export interface CarRecord {
+  id: number;
+  carId: number;
+  driver: number;
+  /** `world/cars.CAR_BODY_SIZE` index, 0..4. */
+  body: number;
+  /** `world/cars.CAR_PAINT` index, 0..7. */
+  colour: number;
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+  /** Signed, m/s. */
+  speed: number;
+  /** True for "this record is gone", and then every field but `id` is meaningless. */
+  removed?: boolean;
+}
+
+/** Header flag: this message is the whole set and replaces whatever the client had. */
+export const CARS_FULL = 1 << 0;
+/** Record flag: forget this id. */
+export const CAR_REMOVED = 1 << 0;
+
+export const CARS_HEADER_BYTES = 4;
+/** 2 + 4 + 2 + 1 + 1 + 4 + 4 + 4 + 2 + 2. Asserted in `verifyNet`, which is how it got right. */
+export const CAR_RECORD_BYTES = 26;
+
+export function carsBytes(count: number): number {
+  return CARS_HEADER_BYTES + count * CAR_RECORD_BYTES;
+}
+
+/**
+ * A speed as centimetres per second in an `i16`.
+ *
+ * Range +/- 327 m/s against a top speed of 22, so the clamp is unreachable in
+ * play and is here for the same reason every other clamp on this wire is: a
+ * `setInt16` given 40,000 wraps silently and the car goes backwards.
+ */
+function quantiseCarSpeed(v: number): number {
+  const cm = Math.round(v * 100);
+  return cm < -32768 ? -32768 : cm > 32767 ? 32767 : cm;
+}
+
+export function encodeCars(cars: readonly CarRecord[], full = false): ArrayBuffer {
+  const buffer = new ArrayBuffer(carsBytes(cars.length));
+  const v = new DataView(buffer);
+  v.setUint8(0, MSG.CARS);
+  v.setUint16(1, cars.length, true);
+  v.setUint8(3, full ? CARS_FULL : 0);
+  let p = CARS_HEADER_BYTES;
+  for (const c of cars) {
+    v.setUint16(p, c.id & 0xffff, true);
+    v.setUint32(p + 2, c.carId >>> 0, true);
+    v.setUint16(p + 6, c.driver & 0xffff, true);
+    // Both indices are small and fixed -- five bodies, eight paints -- so they
+    // share a byte rather than costing two. Masked rather than trusted: a body
+    // index that overflowed into the colour nibble would repaint the fleet.
+    v.setUint8(p + 8, ((c.body & 0x0f) << 4) | (c.colour & 0x0f));
+    v.setUint8(p + 9, c.removed ? CAR_REMOVED : 0);
+    v.setInt32(p + 10, quantisePos(c.x), true);
+    v.setInt32(p + 14, quantisePos(c.y), true);
+    v.setInt32(p + 18, quantisePos(c.z), true);
+    v.setUint16(p + 22, quantiseYaw(c.yaw), true);
+    v.setInt16(p + 24, quantiseCarSpeed(c.speed), true);
+    p += CAR_RECORD_BYTES;
+  }
+  return buffer;
+}
+
+export function decodeCars(buffer: ArrayBuffer): { cars: CarRecord[]; full: boolean } | null {
+  if (buffer.byteLength < CARS_HEADER_BYTES) return null;
+  const v = new DataView(buffer);
+  if (v.getUint8(0) !== MSG.CARS) return null;
+  const count = v.getUint16(1, true);
+  const full = (v.getUint8(3) & CARS_FULL) !== 0;
+  const cars: CarRecord[] = [];
+  let p = CARS_HEADER_BYTES;
+  // Bounded by what arrived rather than by what the count claims, on
+  // `decodeBikes`' rule and for its reason: a `DataView` read past the end
+  // throws, and a throw inside a socket callback takes the client's whole
+  // message pump with it.
+  for (let i = 0; i < count && p + CAR_RECORD_BYTES <= buffer.byteLength; i++) {
+    const model = v.getUint8(p + 8);
+    cars.push({
+      id: v.getUint16(p, true),
+      carId: v.getUint32(p + 2, true),
+      driver: v.getUint16(p + 6, true),
+      body: (model >> 4) & 0x0f,
+      colour: model & 0x0f,
+      removed: (v.getUint8(p + 9) & CAR_REMOVED) !== 0,
+      x: dequantisePos(v.getInt32(p + 10, true)),
+      y: dequantisePos(v.getInt32(p + 14, true)),
+      z: dequantisePos(v.getInt32(p + 18, true)),
+      yaw: dequantiseYaw(v.getUint16(p + 22, true)),
+      speed: v.getInt16(p + 24, true) / 100,
+    });
+    p += CAR_RECORD_BYTES;
+  }
+  return { cars, full };
 }
 
 // --- Investigations -------------------------------------------------------------
@@ -3711,6 +3888,77 @@ export function verifyNet(): string[] {
     if (decodeSunPress(new ArrayBuffer(0))) failures.push('An empty frame decoded as a SUN_PRESS.');
   }
 
+  // --- The driven cars, this pass's new message.
+  //
+  // What this catches, and every one of them renders rather than throws:
+  //
+  //   - **A `carId` that does not survive.** It is the *suppression key* -- see
+  //     `game/driving.ts` section 3 -- so a truncated or sign-mangled one means
+  //     the client suppresses the wrong ambient car, or none, and the street has
+  //     two of your car in it.
+  //   - **A `model` nibble that overflows.** Body and colour share a byte, so a
+  //     body index that leaked into the colour half repaints the fleet.
+  //   - **A removal that reads as an upsert.** The one thing `MSG.BIKES` never
+  //     had to encode. A dropped delete is a permanently suppressed ambient car:
+  //     a hole in the traffic that nothing will ever fill.
+  //   - **A speed that wraps.** `i16` centimetres, and a wrapped one is a car
+  //     the HUD says is doing -1,100 km/h.
+  {
+    const cars: CarRecord[] = [
+      { id: 1, carId: 0xdeadbeef, driver: 0, body: 4, colour: 7, x: -364.25, y: -31.75, z: 2682.5, yaw: 0.75, speed: -6.6 },
+      { id: 65535, carId: 1, driver: 65535, body: 0, colour: 0, x: 3999.99, y: -70.125, z: -3999.99, yaw: 6.28, speed: 22 },
+      { id: 74, carId: 0x80000000, driver: 12, body: 2, colour: 3, x: 0, y: 0, z: 0, yaw: 0, speed: 0, removed: true },
+    ];
+    const frame = encodeCars(cars, true);
+    if (frame.byteLength !== carsBytes(3)) {
+      failures.push(`A 3-car message is ${frame.byteLength} bytes; the layout says ${carsBytes(3)}.`);
+    }
+    const got = decodeCars(frame);
+    if (!got || got.cars.length !== 3) {
+      failures.push(`A 3-car message decoded to ${got?.cars.length ?? 'null'} records.`);
+    } else {
+      if (!got.full) failures.push('The CARS_FULL header flag did not survive the wire.');
+      for (let i = 0; i < 3; i++) {
+        const a = cars[i];
+        const b = got.cars[i];
+        if (b.id !== a.id) failures.push(`Car ${a.id}: id came back as ${b.id}.`);
+        // `>>> 0` on both sides: 0x80000000 is negative as a signed int and the
+        // whole point of this row is that the top bit of an identity survives.
+        if ((b.carId >>> 0) !== (a.carId >>> 0)) {
+          failures.push(`Car ${a.id}: carId 0x${(a.carId >>> 0).toString(16)} came back as 0x${(b.carId >>> 0).toString(16)}.`);
+        }
+        if (b.driver !== a.driver) failures.push(`Car ${a.id}: driver ${a.driver} came back as ${b.driver}.`);
+        if (b.body !== a.body || b.colour !== a.colour) {
+          failures.push(`Car ${a.id}: model ${a.body}/${a.colour} came back as ${b.body}/${b.colour}.`);
+        }
+        if ((b.removed ?? false) !== (a.removed ?? false)) {
+          failures.push(`Car ${a.id}: removed=${a.removed ?? false} came back as ${b.removed}.`);
+        }
+        if (Math.abs(b.speed - a.speed) > 0.02) {
+          failures.push(`Car ${a.id}: speed ${a.speed} came back as ${b.speed}; the tolerance is 2 cm/s.`);
+        }
+        for (const [axis, want, back] of [['x', a.x, b.x], ['y', a.y, b.y], ['z', a.z, b.z]] as Array<[string, number, number]>) {
+          if (Math.abs(back - want) > 0.01) {
+            failures.push(`Car ${a.id}: ${axis} ${want} came back as ${back}; the tolerance is 1 cm.`);
+          }
+        }
+      }
+    }
+    // An empty delta is legal and is what a tick with no change would send if
+    // anybody were foolish enough to send one; and the default is *not* full, or
+    // every delta would wipe the client's set.
+    const none = decodeCars(encodeCars([]));
+    if (none === null || none.cars.length !== 0) failures.push('An empty CARS message did not decode to an empty list.');
+    if (none !== null && none.full) failures.push('A CARS message defaulted to CARS_FULL; a delta must merge.');
+    // A truncated tail drops the rest rather than throwing inside the socket
+    // callback. `decodeBikes`' rule.
+    const short = frame.slice(0, CARS_HEADER_BYTES + CAR_RECORD_BYTES + 5);
+    const partial = decodeCars(short);
+    if (partial === null || partial.cars.length !== 1) {
+      failures.push(`A CARS message truncated mid-record decoded ${partial?.cars.length ?? 'null'} cars, not 1.`);
+    }
+  }
+
   // --- v8's interest message: who came into view and who went out of it.
   //
   // What this catches is the shape of failure the whole of AOI has: an entrant
@@ -3724,7 +3972,9 @@ export function verifyNet(): string[] {
       { id: 1, colourway: 0, flags: 0 },
       // The id a byte would have aliased, with both flag bits set.
       { id: 40000, colourway: 6, flags: ENTER_FLAG.BOT | ENTER_FLAG.RIDING },
-      { id: 65535, colourway: 3, flags: ENTER_FLAG.RIDING },
+      // A driver: `RIDING` *and* `DRIVING`, which is the combination this pass
+      // added and the one a client has to be able to tell from a cyclist.
+      { id: 65535, colourway: 3, flags: ENTER_FLAG.RIDING | ENTER_FLAG.DRIVING },
     ];
     const leaves = [2, 300, 65534];
     const frame = encodeInterest(enters, leaves);

@@ -693,6 +693,9 @@ const _position = /*#__PURE__*/ new Vector3();
 const _quaternion = /*#__PURE__*/ new Quaternion();
 const _scale = /*#__PURE__*/ new Vector3();
 const _up = /*#__PURE__*/ new Vector3(0, 1, 0);
+/** The car's own left, which is the axis a grade pitches it about. See `buildTileCars`. */
+const _left = /*#__PURE__*/ new Vector3(0, 0, 1);
+const _pitchQuat = /*#__PURE__*/ new Quaternion();
 const _colour = /*#__PURE__*/ new Color();
 
 /** Deterministic hash over the sidecar seed. Author-time only. */
@@ -742,8 +745,55 @@ export function buildTileCars(
       // the wheels go on the terrain plus that same clearance rather than on the
       // terrain itself -- otherwise every car in the city is buried to the rims
       // in its own road.
-      _position.set(data.x[i], groundAt(data.x[i], data.z[i]) + CARRIAGEWAY_Y, data.z[i]);
-      _quaternion.setFromAxisAngle(_up, data.heading[i]);
+      // --- APPEARANCE FIX 3: a parked car lies along the hill it is parked on.
+      //
+      // This function used to sample the terrain once, at the car's centre, and
+      // set it down **level**. The header above called that "the right kind of
+      // wrong" and reasoned about *camber* -- the cross-slope of a carriageway,
+      // which is about 1:20, and half a centimetre over a car's width really is
+      // invisible. The argument does not survive being applied to *grade*, and
+      // Sydney is not a flat city: a 4.6 m sedan set level on the 1:9 pull up
+      // Glebe Point Road has its nose 25 cm into the road and its boot 25 cm in
+      // the air. There are streets in this city where a whole rank of parked
+      // cars is buried to the axles at one end and flying at the other, and it
+      // is the first thing you see walking up one.
+      //
+      // So the terrain is now sampled at the **nose and the tail** as well, and
+      // the difference between them is a pitch about the car's own left axis.
+      // Three samples where there was one, at *tile build time* -- this loop
+      // runs once when a tile arrives and never again, inside the streamer's
+      // yielding budget, and costs nothing per frame.
+      //
+      // Camber is still ignored, and now deliberately rather than by omission:
+      // a roll would need a fourth and fifth sample across a width the terrain
+      // grid does not resolve, to correct an error the header already measured
+      // at half a centimetre.
+      //
+      // The height is taken at the **centre** still, so a car on a crest sits on
+      // the crest rather than being lifted by whichever end is higher.
+      const heading = data.heading[i];
+      // The car's local +X is its nose -- see `Station` and `CarBuilder` -- and
+      // the instance is rotated by `heading` about Y, so the nose direction in
+      // the tile plan is (cos, -sin) of it.
+      const noseX = Math.cos(heading);
+      const noseZ = -Math.sin(heading);
+      const half = BODY_SPEC[b].length * 0.5;
+      const groundHere = groundAt(data.x[i], data.z[i]);
+      const atNose = groundAt(data.x[i] + noseX * half, data.z[i] + noseZ * half);
+      const atTail = groundAt(data.x[i] - noseX * half, data.z[i] - noseZ * half);
+      _position.set(data.x[i], groundHere + CARRIAGEWAY_Y, data.z[i]);
+      _quaternion.setFromAxisAngle(_up, heading);
+      // Nose up is a **negative** rotation about the car's local +Z (its left),
+      // because a right-handed rotation about +Z takes +X down. Clamped to about
+      // 17 degrees so a car parked half on a kerb or over a grid seam cannot
+      // stand on its bumper -- the steepest street in the city is 1:4, which is
+      // 14 degrees, so nothing real is clipped by this.
+      const rise = atNose - atTail;
+      if (rise !== 0) {
+        const pitch = Math.max(-0.3, Math.min(0.3, Math.atan2(rise, half * 2)));
+        _pitchQuat.setFromAxisAngle(_left, -pitch);
+        _quaternion.multiply(_pitchQuat);
+      }
       // A few per cent of size variation, uniform so the proportions hold. Five
       // body types over a hundred cars in view is five silhouettes repeated
       // twenty times each, and a 4% spread is enough to stop the eye locking on
@@ -944,6 +994,20 @@ const liveried = policeLiveried;
 const MOVER_CAPACITY = 384;
 
 /**
+ * Where `TrafficMovers` gets the cars a player is steering.
+ *
+ * A `forEach` rather than an iterable of records, because the thing the draw
+ * loop wants is a `CarPose` -- the same record `poseCar` fills for the ambient
+ * fleet -- and the *source* of it is `game/driving.CarField`, which this file
+ * must never learn about. The caller composes the two with
+ * `traffic.drivenCarPose` and hands over one function. `world/carlod.ts`'s
+ * `CarModelSink` is the same shape for the same reason.
+ */
+export interface DrivenCarSource {
+  forEach(visit: (pose: CarPose) => void): void;
+}
+
+/**
  * Every moving car in view, as five instanced sets.
  *
  * **Not parented to a tile.** Every other instanced thing in this project lives
@@ -1033,6 +1097,42 @@ export class TrafficMovers {
   /** Cars drawn as models rather than boxes this frame. Diagnostics only. */
   modelled = 0;
 
+  /**
+   * Which ambient cars somebody has stolen, and must therefore not be drawn.
+   *
+   * `game/driving.CarField.suppressed`, handed over as a bare predicate for the
+   * reason `lights` and `models` are handed over as sinks: this loop already
+   * visits every car in view and the alternative -- a second pass that had to
+   * *agree* with it -- is how you end up with a car drawn twice. A schedule car
+   * is a lookup and cannot be deleted; taking it off the road is exactly and
+   * only this one question, asked here.
+   *
+   * Null is the whole of the "nobody has stolen anything" case and costs one
+   * comparison a frame rather than a call per car. See `game/driving.ts`
+   * section 3.
+   */
+  suppress: ((identity: number) => boolean) | null = null;
+
+  /**
+   * The cars a *player* is driving, drawn by this loop rather than by one of
+   * their own.
+   *
+   * The single most valuable line in this integration, and it is one property.
+   * A driven car needs a body, a paint, a shadow, a headlight at night and a
+   * near-field 3D model, and every one of those already exists **in this
+   * function** for the ambient fleet. Handing the driven poses to the same loop
+   * gets all five for free and, more to the point, gets them *consistently*: a
+   * stolen Camry is drawn by the same instanced set, in the same material, at
+   * the same LOD threshold as the Camry parked behind it, so there is no frame
+   * on which the car you are steering stops looking like traffic.
+   *
+   * Walked after the ambient sweep and before `end()`, so a driven car's model
+   * claim and headlights are flushed by the same two calls.
+   */
+  driven: DrivenCarSource | null = null;
+  /** Driven cars drawn last update. Diagnostics only. */
+  drivenDrawn = 0;
+
   constructor(assets: CarAssets) {
     this.band = new InstancedMesh(chequerBand(), assets.material, MOVER_CAPACITY);
     this.band.name = 'traffic_livery';
@@ -1111,8 +1211,15 @@ export class TrafficMovers {
     const lighting = lights !== null && lights.begin();
     const models = this.models;
     const modelling = models !== null && models.begin();
+    const suppress = this.suppress;
 
     forEachCarNear(field, x, z, TRAFFIC_DRAW_RADIUS, tick, this.scratch, this.pose, (p) => {
+      // **Somebody has taken this one.** Before everything, including the
+      // counters: a suppressed car is not drawn, not lit, not modelled and not
+      // counted, because from this frame on the thing at these coordinates is
+      // the record in `CarField` and not the timetable's copy of it. See
+      // `suppress`.
+      if (suppress !== null && suppress(p.identity)) return;
       const n = this.counts[p.body];
       if (n >= MOVER_CAPACITY) return;
       // Counted before the capacity test would have a chance to skew it, and
@@ -1204,6 +1311,49 @@ export class TrafficMovers {
         this.bandCount++;
       }
     });
+
+    // --- And the cars somebody is driving, through the identical fill.
+    //
+    // A second walk rather than a second *loop*: everything below this line --
+    // the capacity test, the box, the paint, the model claim, the headlights --
+    // is the ambient path's, called with a pose that came from a `CarField`
+    // record instead of from `poseCar`. See `driven`.
+    let drivenDrawn = 0;
+    if (this.driven !== null) {
+      this.driven.forEach((p) => {
+        const n = this.counts[p.body];
+        if (n >= MOVER_CAPACITY) return;
+        if (lighting) lights!.add(p);
+        const claimed = modelling && models!.claimed(p);
+        if (claimed) modelled++;
+        drivenDrawn++;
+        if (claimed) return;
+        const mesh = this.meshes[p.body];
+        _position.set(p.x, p.y, p.z);
+        // `update`'s own half-angle quaternion, and see its comment there.
+        const c = p.dx;
+        const sn = -p.dz;
+        const w2 = (1 + c) * 0.5;
+        if (w2 > 1e-12) {
+          const w = Math.sqrt(w2);
+          _quaternion.set(0, sn / (2 * w), 0, w);
+        } else {
+          _quaternion.set(0, 1, 0, 0);
+        }
+        _scale.set(p.scale, p.scale, p.scale);
+        _matrix.compose(_position, _quaternion, _scale);
+        mesh.setMatrixAt(n, _matrix);
+        // The paint the car had when it was ambient, with **no tonal jitter**:
+        // the jitter is a function of `(route, slot)` and a driven car's route
+        // is zero, so applying it would repaint every stolen car the same shade
+        // -- which is worse than not applying it at all.
+        const paint = PAINT[p.colour] ?? PAINT[0];
+        _colour.setRGB(paint[0], paint[1], paint[2]);
+        mesh.setColorAt(n, _colour);
+        this.counts[p.body] = n + 1;
+      });
+    }
+    this.drivenDrawn = drivenDrawn;
 
     let drawn = 0;
     for (let b = 0; b < BODY_COUNT; b++) {

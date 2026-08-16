@@ -72,6 +72,7 @@ import { verifyFooty } from '../client/src/game/footy.ts';
 // `client/src/game/swat.ts`.
 import { verifySwat } from '../client/src/game/swat.ts';
 import { verifyPowerups } from '../client/src/game/powerups.ts';
+import { verifyDriving } from '../client/src/game/driving.ts';
 import { verifySpatialHash } from '../client/src/game/spatialhash.ts';
 import { verifyMovementBasis } from '../client/src/player/controller.ts';
 import {
@@ -231,6 +232,13 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // looking. See `client/src/game/sunbutton.ts`.
     ['verifySunButton', verifySunButton()],
     ['verifyHeat', verifyHeat()],
+    // Taking a car and driving it. Run **here** as well as in the browser
+    // because the integrator, the claim and the suppression key are all this
+    // side's authority and every failure in that file renders: a handbrake that
+    // walks the car backwards looks like a physics quirk, and a suppression key
+    // that does not answer is your own car driving off to Ashfield beside you,
+    // running people down on the way. See `client/src/game/driving.ts`.
+    ['verifyDriving', verifyDriving()],
     // The suggestions box's week arithmetic, sanitiser, order and codecs.
     // Run **here** rather than only in the browser because the server is the
     // side that keeps the ledger, and every failure in that file is silent in

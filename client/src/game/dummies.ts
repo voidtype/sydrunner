@@ -193,7 +193,17 @@ export class ActorDriver {
     // punched still shows the flinch -- a reaction is a one-shot overlay and it
     // replaces the held ride, which is the correct precedence and is moot in
     // practice, since `combat.applyHit` takes the bike away in the same tick.
-    const riding = c.ridingBike !== 0;
+    // ...and a car's, which is the *same* clip and deliberately so. `clipRide`
+    // is "seated, hands forward, torso down", which is a rider on a bike and is
+    // also, at this rig's level of detail, somebody at a steering wheel -- and
+    // the alternative is a second seated clip that differs from this one by a
+    // couple of centimetres of elbow. What it buys is that a driver **sits**
+    // rather than standing in the middle of their own car with their head
+    // through the roof, which is the one thing about a driven car anybody would
+    // notice. `FLAG.RIDING` is set for a driver on the wire for exactly this
+    // reason -- see `protocol.ENTER_FLAG.DRIVING` -- so a remote gets it from
+    // `main.ts`'s snapshot path with nothing else edited.
+    const riding = c.ridingBike !== 0 || c.drivingCar !== 0;
     if (riding !== this.lastRiding) {
       // Cleared to `null` rather than to a locomotion: the ride is a held
       // reaction and what belongs underneath it is the actor's own derived
