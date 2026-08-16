@@ -101,6 +101,12 @@ import { verifyUnstuck } from '../client/src/game/unstuck.ts';
 // the top of the ladder -- lands on players in a session and never in a
 // browser's console. See `client/src/game/heat.ts`'s check for the list.
 import { verifyHeat } from '../client/src/game/heat.ts';
+// --- Workstream E. Three self-checks, all three of them shared modules being
+// run in the second runtime -- which is the premise this whole block exists to
+// test. See the comment above the list.
+import { verifyCharacters } from '../client/src/game/characters.ts';
+import { verifyEvents } from '../client/src/game/events.ts';
+import { verifyWallet } from './wallet-contract.ts';
 import { verifyTeleport } from '../client/src/game/teleport.ts';
 import { sunReady, sunScreaming, verifySunButton } from '../client/src/game/sunbutton.ts';
 import { trafficTick } from '../client/src/game/traffic.ts';
@@ -266,6 +272,32 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // `server/aoi.ts`, which asserts the rule against a brute-force scan.
     ['verifyAoi', verifyAoi()],
     ['verifySim', verifySim()],
+    // --- Workstream E's three, and every one of them is here rather than only
+    // in the browser because every one of them fails *silently and identically*
+    // in both runtimes.
+    //
+    // `verifyCharacters` covers the thing this process is uniquely placed to
+    // catch: the traffic epoch and the sky's epoch drifting apart. This is the
+    // authority for both clocks, so if they disagree here then every eshay in
+    // the city is standing at a station at two in the afternoon and the only
+    // symptom is the sun. It also walks the bias table for a character who
+    // exists everywhere, and samples the rounding margin on the cell
+    // populations -- the one determinism failure this feature can have, where
+    // two engines place a different *number* of people in a cell and the client
+    // draws somebody the server does not have.
+    //
+    // `verifyEvents` covers a schedule that is not a pure function of the day,
+    // which presents as a player describing a car crash nobody else can find,
+    // and a trackwork sign in the middle of a paddock.
+    //
+    // `verifyWallet` covers the no-op default. A `NO_WALLET.debit` that reported
+    // taking the amount it was asked for would put a lie in the kill feed --
+    // "they went through your pockets" for money that never moved -- in a build
+    // that has no money in it at all. It is three lines of arithmetic and it is
+    // the contract the branch that owns the money inherits.
+    ['verifyCharacters', verifyCharacters()],
+    ['verifyEvents', verifyEvents()],
+    ['verifyWallet', verifyWallet()],
   ];
   const failed = checks.filter(([, f]) => f.length > 0);
   if (failed.length > 0) {
