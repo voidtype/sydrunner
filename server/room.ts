@@ -90,6 +90,7 @@ import {
   encodePowerups,
   encodeRoster,
   encodeSnapshotInto,
+  encodeSun,
   encodeWelcome,
   investigationBytes,
   patchSnapshotAck,
@@ -105,7 +106,16 @@ import {
 import { botName } from './bots.ts';
 import { FrameGroups, InterestIndex, InterestSet } from './aoi.ts';
 import { Simulation, applyButtons, type Participant, type TickOutput } from './sim.ts';
-import { roomWorld, type ServerWorld } from './world.ts';
+import { groundFor, roomWorld, type ServerWorld } from './world.ts';
+import {
+  SUN_BUTTON_X,
+  SUN_BUTTON_Z,
+  SUN_PRESS,
+  newSunState,
+  trySunPress,
+  type SunState,
+} from '../client/src/game/sunbutton.ts';
+import { EYE_HEIGHT } from '../client/src/player/controller.ts';
 
 /** What a socket in this room carries. Moved here whole from `server/index.ts`. */
 export interface Conn {
@@ -680,10 +690,45 @@ export class Room {
    */
   private readonly snapshotPhase: number;
 
+  /**
+   * **The screaming sun, per room.** See `client/src/game/sunbutton.ts`.
+   *
+   * Per room rather than per host, which is the same call `powerupsDown` makes
+   * and the opposite of the one `server/chat.ts` makes, and the deciding
+   * question is the same both times: is this a fact about *the world* or a fact
+   * about *the conversation*? Chat crosses rooms because a lobby chat that
+   * called itself global would be a lie. The sun does not, because every room is
+   * a separate copy of Sydney -- room 3's powerups are down, room 4's are up,
+   * and a player who pressed the button in room 3 has not touched room 4's sky.
+   *
+   * The host's *clock* is shared (see `welcome`'s `clockMs`), so the two rooms'
+   * days line up; what differs is whether the button has been pressed in this
+   * one. That is the right split: everybody on the host is in the same evening
+   * and not everybody is in the same joke.
+   *
+   * In memory and nowhere else. A restart puts every room's sun back to normal,
+   * which is correct rather than a limitation -- the state's whole meaning is
+   * "somebody in this room did this recently", and a room that has just started
+   * has no recently.
+   */
+  private readonly sun: SunState = newSunState();
+
+  /**
+   * The composed ground query, for the one vertical test this room makes.
+   *
+   * Built once per room and held, rather than called as `groundFor(world)` at
+   * the press: that function closes over a `lastGround` accumulator and returns
+   * a fresh object each call, so building one per press would be an allocation
+   * on a path that has no business allocating and -- worse -- would throw away
+   * the accumulator that makes an unloaded tile answer sanely.
+   */
+  private readonly ground: ReturnType<typeof groundFor>;
+
   constructor(id: number, shared: ServerWorld, cap: number, bots: number) {
     this.id = id;
     this.cap = cap;
     this.snapshotPhase = id % SNAPSHOT_INTERVAL;
+    this.ground = groundFor(shared);
     // Its own powerups, everybody else's city. See `world.roomWorld`.
     this.sim = new Simulation(roomWorld(shared));
     for (let i = 0; i < bots; i++) {
@@ -758,6 +803,13 @@ export class Room {
     ws.send(encodePowerups(this.sim.powerupsDown()));
     // Every lime e-bike in this room, once, with whoever is currently on one.
     ws.send(encodeBikes(this.sim.bikeRecords()));
+    // And whether the sun is currently a screaming face, which is the whole of
+    // what this feature has to tell a joiner. Sent unconditionally, including to
+    // a room where nothing has ever happened -- two zeros -- for `BIKES`' own
+    // reason: a client that had to *infer* "not screaming" from the absence of a
+    // message would be a client whose stale optimistic state survived a
+    // reconnect. See `protocol.MSG.SUN`.
+    ws.send(encodeSun(this.sun.screamUntilMs, this.sun.cooldownUntilMs));
     // The scoreboard, which is room-global and is what makes an out-of-interest
     // knockout nameable in the kill feed. Sent before anything that could refer
     // to an id, which is the rule `server/index.ts` has always had here.
@@ -772,6 +824,79 @@ export class Room {
     // The investigation channel is likewise left to the next tick: the filter is
     // "suspects you can see, plus always your own", and a client with no working
     // set yet can see nobody. Its own is impossible on the join tick.
+  }
+
+  /**
+   * Somebody pressed the button in Sydney Park. `MSG.SUN_PRESS`.
+   *
+   * ---------------------------------------------------------------------------
+   * **The position tested is this room's, not the one the client sent** -- the
+   * client sent none, which is `protocol.MSG.SUN_PRESS`' whole layout argument.
+   * `p.combat.body.position` is what this process integrated from the input
+   * frames it accepted, so a client that teleported itself has already been
+   * dragged back by a correction and cannot press anything from Bondi.
+   *
+   * The vertical test needs the ground under the *button*, not under the
+   * presser: the two are equal when somebody is standing at it and differ
+   * exactly in the case the test is for. `groundFor` is asked at the button's
+   * own coordinates with `Infinity` feet, which is `eyeAt`'s convention.
+   *
+   * ---------------------------------------------------------------------------
+   * **An answer goes back whether or not it was allowed**, and only to the
+   * presser when it was not. The client wrote its own optimistic state on the
+   * frame the key went down (see `world/sunbutton.SunFeature.press`) so a
+   * refusal has to be contradicted by something; a broadcast on a refusal, on
+   * the other hand, would be sixteen bytes to every socket in the room to say
+   * that nothing happened.
+   *
+   * **Bots never reach here**, and not because they are filtered: a bot has no
+   * socket, and this is only ever called from the websocket message handler in
+   * `server/index.ts`. Worth stating because the brief asks for it and because
+   * the absence of a check is otherwise indistinguishable from a missing one.
+   */
+  sunPress(ws: Socket): void {
+    const p = ws.data.participant;
+    if (!p) return;
+    const now = Date.now();
+    const body = p.combat.body.position;
+    const result = trySunPress(
+      this.sun,
+      now,
+      body.x,
+      body.z,
+      // The body's position is the *eye*, as everywhere else in this process --
+      // see `eyeAt`. Feet is what the reach is about, and the difference is a
+      // whole storey of the three metres the test allows.
+      body.y - EYE_HEIGHT,
+      this.ground.groundHeight(SUN_BUTTON_X, SUN_BUTTON_Z, Infinity),
+    );
+    if (result !== SUN_PRESS.OK) {
+      // Refused: tell the one client that guessed otherwise, and nobody else.
+      ws.send(encodeSun(this.sun.screamUntilMs, this.sun.cooldownUntilMs));
+      return;
+    }
+    console.log(
+      `[sydney] room ${this.id}: player ${p.id} "${p.name}" pressed the sun button; ` +
+        `screaming for ${((this.sun.screamUntilMs - now) / 60000).toFixed(1)} min, ` +
+        `back in ${((this.sun.cooldownUntilMs - now) / 60000).toFixed(0)} min`,
+    );
+    this.broadcastSun();
+  }
+
+  /** The two instants, to every socket in this room. One encode, N sends. */
+  private broadcastSun(): void {
+    const frame = encodeSun(this.sun.screamUntilMs, this.sun.cooldownUntilMs);
+    for (const ws of this.conns) {
+      if (!ws.data.participant) continue;
+      ws.send(frame);
+      this.bytesSent += frame.byteLength;
+      this.logBytes += frame.byteLength;
+    }
+  }
+
+  /** The sun's two instants, for `/health`. A copy: the caller must not write. */
+  sunState(): SunState {
+    return { screamUntilMs: this.sun.screamUntilMs, cooldownUntilMs: this.sun.cooldownUntilMs };
   }
 
   /** A socket closed. */

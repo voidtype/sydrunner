@@ -21,6 +21,11 @@ import {
 } from 'three/webgpu';
 
 import { BOARD_HINT_M, DoorMarker, verifyDoorMarker } from './world/doormarker.ts';
+// --- The screaming sun and the button in Sydney Park. One feature, two files:
+//     the rules (shared with the server) and the renderer. See
+//     `game/sunbutton.ts` for where the button is and why it is there.
+import { verifySunButton } from './game/sunbutton.ts';
+import { SunFeature, verifySunButtonRenderer } from './world/sunbutton.ts';
 import { EXPOSURE } from './sky/calibration.ts';
 import { SydneySky } from './sky/sky.ts';
 import { verifyCycle } from './sky/cycle.ts';
@@ -843,6 +848,20 @@ async function main(): Promise<void> {
   // `RaveAssets` -- and is the one that would otherwise ship a laser fan that is
   // invisible from half the angles it is seen from.
   const raveFailures = timed('raves', () => verifyRaves());
+  // And the button in Sydney Park, in the same two halves the bikes have and
+  // failing in the same two silent ways. The **rules** half runs on the server
+  // too (`server/index.ts`) and is the one that matters: a scream that ends at
+  // the wrong boundary or a cooldown that comes back on the wrong day is a
+  // feature nobody can test without sitting through three real hours, and it
+  // renders perfectly the whole time. The **renderer** half is the sizing and
+  // the two-state legibility, on `verifyDoorMarker`'s criterion -- a face
+  // clipped past the far plane is simply invisible with nothing in the console,
+  // and a cooldown that looks like readiness is a player pressing a dead button
+  // and concluding the key is broken. See `game/sunbutton.ts`.
+  const sunButtonFailures = timed('sun button', () => [
+    ...verifySunButton(),
+    ...verifySunButtonRenderer(),
+  ]);
   // Once, at `debug` so it is out of the way, and slowest-first because the only
   // question anyone asks of this line is which one it was.
   checkMs.sort((a, b) => b[1] - a[1]);
@@ -886,6 +905,7 @@ async function main(): Promise<void> {
     nightFailures.length ||
     trainLightFailures.length ||
     raveFailures.length ||
+    sunButtonFailures.length ||
     cycleFailures.length ||
     duskFailures.length ||
     clockFailures.length ||
@@ -935,6 +955,7 @@ async function main(): Promise<void> {
           ...nightFailures,
           ...trainLightFailures,
           ...raveFailures,
+          ...sunButtonFailures,
           ...cycleFailures,
           ...duskFailures,
           ...clockFailures,
@@ -1703,6 +1724,36 @@ async function main(): Promise<void> {
    */
   const doorMarker = new DoorMarker();
   scene.add(doorMarker.group);
+  /**
+   * The button on the hill in Sydney Park, and the face it puts in the sky.
+   *
+   * One object holding a prop 231 m from the spawn disc and a billboard 14 km up
+   * `sunVector`; see `world/sunbutton.ts` for why those two live together and
+   * `game/sunbutton.ts` for the rules the server shares.
+   *
+   * Constructed here rather than lazily, on `MoonDisc`'s reason: a material that
+   * first appears the moment somebody presses the button is a pipeline compiled
+   * in the middle of an afternoon, and this one is added to the scene before the
+   * boot warm-up so `compileAsync` reaches it.
+   *
+   * `wildGround` rather than `groundHeightAt` for the plinth's feet, on that
+   * function's own argument: the plinth is standing on the park and a query that
+   * folded in a roof would put it on top of whatever the streamer thinks is
+   * overhead -- and, worse, `groundHeightAt` *writes* the player's `lastGround`,
+   * so asking it about a point 3 km away would move the player's own fallback
+   * height to a mound they have never been on.
+   */
+  const sunButton = new SunFeature({
+    groundAt: (x, z) => wildGround(x, z),
+    // The **server's** clock, which is the client's own plus the skew `WELCOME`
+    // established. `sky.now.nowMs` is that number and is the one the sky itself
+    // is drawn from, so the face's deadline and the sunset it is measured
+    // against can never be a frame apart. Offline the skew is zero, which is not
+    // a fallback so much as the honest answer -- see `SydneySky.serverSkew`.
+    clockMs: () => sky.now.nowMs,
+    notice: (text) => hud.notice(text),
+  });
+  scene.add(sunButton);
   /**
    * The record bag, fetched once and never blocking anything.
    *
@@ -5289,6 +5340,19 @@ async function main(): Promise<void> {
       onSuggestAck(result, issue, message) {
         suggestions.ack(result, issue, message);
       },
+      /*
+       * The sun's two instants, straight into the one object that owns them.
+       *
+       * Arrives at join, whenever anybody in the room presses the button, and as
+       * the answer to this client's own press -- accepted or refused. `adopt`
+       * replaces rather than merges and narrates only what is news; see
+       * `world/sunbutton.SunFeature.adopt`. The position is passed so the notice
+       * can say "somebody pressed the button" to people who can see the hill and
+       * "the sun has started screaming" to everybody else.
+       */
+      onSun(state) {
+        sunButton.adopt(state, player.position.x, player.position.z);
+      },
     };
   }
 
@@ -5411,6 +5475,37 @@ async function main(): Promise<void> {
    * for the same reasons -- no train, doors shut, standing too far from the door.
    */
   const pressMount = (): void => {
+    /* --- The button in Sydney Park, **ahead of everything**, and it is the one
+     *     addition to this chain that does not need to be in `sim.resolveMount`.
+     *
+     *     First because it is the narrowest: `SunFeature.press` refuses -- and
+     *     returns false, letting the rest of the chain run -- unless the player
+     *     is inside three metres of one specific point in one park. Nothing else
+     *     on this key can be true there at the same time, because a bike parked
+     *     on top of the mound would be a bike the plinth is standing in.
+     *
+     *     It returns true when the press was *consumed* rather than accepted, so
+     *     that pressing a recharging button puts up the refusal instead of
+     *     silently mounting a bike two metres away -- which is the one way this
+     *     could have made the `E` key worse.
+     *
+     *     `net?.pressSun()` rather than a bit on `INPUT`: see
+     *     `protocol.MSG.SUN_PRESS` for why this is not folded into the mount
+     *     chain on the wire either. Offline `net` is null, the send is skipped,
+     *     and the state `press` wrote locally is the only state there is -- which
+     *     is exactly the offline stub sim's contract everywhere else in this
+     *     file. */
+    if (
+      sunButton.press(
+        player.position.x,
+        player.position.y - EYE_HEIGHT,
+        player.position.z,
+        net ? () => void net.pressSun() : null,
+      )
+    ) {
+      return;
+    }
+
     const field = bikeWorld();
     // --- The train, ahead of the bike, on one key. `sim.resolveMount` runs the
     //     identical chain in the identical order, which is what makes this a
@@ -5943,8 +6038,15 @@ async function main(): Promise<void> {
       }
     }
     if (isAboard(playerCombat.aboard) || playerCombat.phase === 'ko' || !railBake) doorMarker.hide();
+    // The sun button's line shares this one channel and takes precedence over
+    // both, on the same "asked what is true, every tick" contract and for the
+    // same reason `pressMount` puts it first: it is only ever non-empty inside
+    // 2.5 m of one point in Sydney Park, where nothing else on this key can be
+    // offering anything. See `world/sunbutton.SunFeature.prompt`.
     hud.derived(
-      trainPill || ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText),
+      sunButton.prompt(player.position.x, player.position.z) ||
+        trainPill ||
+        ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText),
     );
 
     // Reconciliation, at the top of the tick and before anything is advanced.
@@ -7157,6 +7259,19 @@ async function main(): Promise<void> {
     // and animated here at the frame rate, which is the split every other
     // overlay in this file makes.
     doorMarker.update(frameDt);
+    // The button on the hill and the face in the sky, at the frame rate for the
+    // same reason: the plinth's ring breathes and the sun's jaw moves, and both
+    // are cosmetic. `sky.solar` is handed over rather than recomputed, on
+    // `MoonDisc.update`'s argument -- a face built from a second reading of the
+    // clock would sit beside the sun rather than on it.
+    sunButton.update(
+      frameDt,
+      camera,
+      sky.solar.direction,
+      sky.solar.altitude,
+      player.position.x,
+      player.position.z,
+    );
 
     // The night rig, after the streamer -- so a tile that arrived this frame
     // already has its luminaires in the set the four real lights are picked from

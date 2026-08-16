@@ -80,6 +80,7 @@ import {
   TICK_HZ,
   decodeHello,
   decodePing,
+  decodeSunPress,
   encodeBye,
   encodePong,
   frameType,
@@ -90,6 +91,7 @@ import { verifyNames, verifyNet } from '../client/src/net/protocol.ts';
 import { verifyChat } from '../client/src/net/chat.ts';
 import { verifyUnstuck } from '../client/src/game/unstuck.ts';
 import { verifyTeleport } from '../client/src/game/teleport.ts';
+import { sunReady, sunScreaming, verifySunButton } from '../client/src/game/sunbutton.ts';
 import { trafficTick } from '../client/src/game/traffic.ts';
 import { verifySuggestions } from '../client/src/net/suggestions.ts';
 import { verifyAoi } from './aoi.ts';
@@ -201,6 +203,13 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // `client/src/game/unstuck.ts`.
     ['verifyUnstuck', verifyUnstuck()],
     ['verifyTeleport', verifyTeleport()],
+    // The button in Sydney Park and the sun it screams at. Run **here** rather
+    // than only in the browser because this process is the one that keeps the
+    // two instants: every failure in that file is silent in this repo's sense --
+    // the button is pressed, the face goes up, and it goes away at the wrong
+    // hour or comes back on the wrong day, three real hours after anybody was
+    // looking. See `client/src/game/sunbutton.ts`.
+    ['verifySunButton', verifySunButton()],
     // The suggestions box's week arithmetic, sanitiser, order and codecs.
     // Run **here** rather than only in the browser because the server is the
     // side that keeps the ledger, and every failure in that file is silent in
@@ -426,6 +435,44 @@ const server = Bun.serve<Conn>({
          */
         clockMs,
         cyclePhase: Number(cyclePhase(clockMs).toFixed(6)),
+        /*
+         * **The screaming sun, for `vessels`' and `clockMs`' reason.**
+         *
+         * This is a global, server-authoritative piece of *appearance*, which is
+         * the exact category of state that has cost this project afternoons
+         * before: a client showing a face nobody else can see is
+         * indistinguishable, from the outside, from a client whose sky is
+         * broken. So it is readable with `curl`, without a socket, beside the
+         * clock the face's own deadline is measured against -- the two must be
+         * read together to mean anything, which is why they are adjacent fields
+         * rather than a nested block.
+         *
+         * The **first room's**, not a summary across rooms, and the field is
+         * named for one room's state on purpose. `Room.sun` is per room (see
+         * its comment), so a host running eight of them has eight answers and
+         * any single boolean here would be a lie in seven of them; `rooms`
+         * below is where a probe that cares goes. What this field is for is the
+         * ordinary case -- one room, one host, somebody asking "is the sun
+         * currently a face" -- and it says so by reporting `room`.
+         *
+         * `screaming` is published even though it is derivable from
+         * `screamUntilMs` and `clockMs`, which is the one place this feature
+         * breaks its own "no derived flags" rule. It is derived *here*, in the
+         * process that owns both inputs, exactly as `cyclePhase` above is and
+         * for the same stated reason: a probe that had to re-implement the
+         * comparison would be a second derivation nobody keeps in step.
+         */
+        sun: (() => {
+          const first = host.rooms[0];
+          const s = first ? first.sunState() : { screamUntilMs: 0, cooldownUntilMs: 0 };
+          return {
+            room: first ? first.id : -1,
+            screaming: sunScreaming(s, clockMs),
+            ready: sunReady(s, clockMs),
+            screamUntilMs: s.screamUntilMs,
+            cooldownUntilMs: s.cooldownUntilMs,
+          };
+        })(),
         rooms: host.listing(),
         stage: world.index.stage,
         protocol: PROTOCOL_VERSION,
@@ -752,6 +799,31 @@ const server = Bun.serve<Conn>({
          */
         case MSG.SUGGEST: {
           void suggestionHub.handle(ws, frame);
+          return;
+        }
+
+        /*
+         * The button on the hill in Sydney Park. See `server/room.sunPress`.
+         *
+         * Resolved against `conn.room` like every other case in this switch
+         * except the two above it, because the sun is a fact about *a copy of
+         * Sydney* rather than about the conversation -- `Room.sun` states that
+         * split at length.
+         *
+         * No flood guard, and that is a decision rather than an omission. The
+         * handler is idempotent by construction: a second press inside the
+         * three-in-game-day cooldown is refused by `trySunPress` and answered
+         * with sixteen bytes to the one socket that asked, so a client hammering
+         * this key at 60 Hz costs one distance test and one small send per
+         * frame and changes nothing. That is a smaller cost than
+         * `MSG.INPUT` already pays on the same socket, and the flood guards in
+         * this process exist for the messages that *write* something every time
+         * (chat, suggestions).
+         */
+        case MSG.SUN_PRESS: {
+          if (!decodeSunPress(frame)) return;
+          const room = conn.room >= 0 ? host.get(conn.room) : undefined;
+          room?.sunPress(ws);
           return;
         }
 

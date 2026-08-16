@@ -108,8 +108,10 @@ import {
   decodePowerups,
   decodeRoster,
   decodeSnapshot,
+  decodeSun,
   decodeWelcome,
   encodeHello,
+  encodeSunPress,
   encodeInput,
   encodeEvents,
   encodeInterest,
@@ -348,6 +350,25 @@ export interface NetHandlers {
   onSuggestions?(list: SuggestionList): void;
   /** Yes / no / not this week, with the server's own sentence. */
   onSuggestAck?(result: number, issue: number, message: string): void;
+  /**
+   * The sun's two instants changed, or arrived at join. See
+   * `game/sunbutton.ts`.
+   *
+   * Optional like `onChat` and for the same reason. It is also passed **out**
+   * rather than filed here, which is `CHAT_LINE`'s decision rather than
+   * `BIKES`': the state has exactly one owner on this end -- the `SunFeature` in
+   * `main.ts`, which needs it every frame to place a billboard -- and a mirror
+   * kept beside it would be a second copy of two numbers with no rule about
+   * which one the renderer reads. The bikes get a mirror here because
+   * `main.ts` *predicts* a mount against the server's copy and needs both; the
+   * sun's prediction is written straight into the one copy and corrected by
+   * this callback, so there is nothing to compare.
+   *
+   * The record is freshly allocated per message on purpose: it is handed to a
+   * caller that keeps it, at a few times an hour, so a reused scratch object
+   * would be a `SunState` that silently changed under whoever held it.
+   */
+  onSun?(state: { screamUntilMs: number; cooldownUntilMs: number }): void;
 }
 
 interface PendingInput {
@@ -948,6 +969,21 @@ export class NetClient {
     return true;
   }
 
+  /**
+   * Press the button in Sydney Park. One byte; the server decides.
+   *
+   * Returns whether the frame went out, which the caller ignores and should:
+   * `world/sunbutton.SunFeature.press` has already written its optimistic state
+   * and put a line on the HUD by the time this is called, and a socket that was
+   * not open is a client that is about to be told it is offline by every other
+   * path in this file. There is nothing useful for a caller to do differently.
+   */
+  pressSun(): boolean {
+    if (this.status !== 'online') return false;
+    this.transport.send(encodeSunPress());
+    return true;
+  }
+
   /** Called every frame. Advances the interpolation clock and places the remotes. */
   update(dt: number): void {
     if (this.tickSynced) this.serverTick += dt * TICK_HZ;
@@ -1152,6 +1188,18 @@ export class NetClient {
         // way to `MSG.BIKES`.
         this.investigations.clear();
         for (const r of records) this.investigations.set(r.playerId, { ...r });
+        return;
+      }
+      /*
+       * The screaming sun, on change, at join, and as the answer to this
+       * client's own press. See `protocol.MSG.SUN`.
+       *
+       * Passed straight out on `CHAT_LINE`'s argument -- see `NetHandlers.onSun`
+       * for why this one is not mirrored here the way `BIKES` is.
+       */
+      case MSG.SUN: {
+        const sun = decodeSun(frame);
+        if (sun) this.handlers.onSun?.(sun);
         return;
       }
       case MSG.BYE: {

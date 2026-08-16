@@ -238,6 +238,39 @@ export const MSG = {
    * across all three. See `suggestions.SUGGEST_OP`.
    */
   SUGGEST: 0x0c,
+  /**
+   * "I am standing at the button in Sydney Park and I have pressed it."
+   * See `game/sunbutton.ts`.
+   *
+   * **0x0d on `CHAT_SAY`'s convention** -- `0x8d`... except `0x8d` is already
+   * `SUGGEST_ACK`, so this one pair breaks the halves rule and it is worth
+   * saying why rather than leaving a reader to wonder. The rule pairs a request
+   * with *the reply it produces*, and this request produces `MSG.SUN` (0x8e),
+   * which is not a reply -- it is a broadcast that every client in the room
+   * gets, including ones that pressed nothing. There is no pairing to preserve,
+   * so the id is simply the next free number in the client range.
+   *
+   * **A message of its own rather than a bit on `INPUT`**, which is the obvious
+   * alternative given `BTN.MOUNT` is right there and the key is the same `E`.
+   * Rejected on two counts. `resolveMount` is already a four-way priority chain
+   * -- off a train, off a bike, onto a train, onto a bike -- whose whole
+   * correctness argument is that the client and `server/sim.ts` run it in the
+   * same order; wedging a fifth case into it makes both ends' chain longer to
+   * buy nothing, because a press on the button is not a mount and cannot be
+   * confused with one at the distances involved. And `INPUT` runs at 60 Hz
+   * through a ring buffer that deliberately drops frames under starvation (see
+   * `Conn.inbox`), which is exactly right for a level-triggered movement bit and
+   * exactly wrong for an event that happens once every three in-game days.
+   *
+   * **One byte, and it carries no position**, which is `INPUT_BYTES`' own rule
+   * stated again: a client that sends where it thinks it is is a client that can
+   * send where it would like to be. The server already owns the presser's body
+   * and checks the reach against that. The half-metre between the client's
+   * prompt radius (`SUN_PROMPT_M`, 2.5 m) and the server's (`SUN_REACH_M`, 3 m)
+   * is what absorbs the tick of walking the two ends can disagree about, and it
+   * is a much better place to spend the slack than a field the sender controls.
+   */
+  SUN_PRESS: 0x0d,
 
   WELCOME: 0x81,
   SNAPSHOT: 0x82,
@@ -345,6 +378,30 @@ export const MSG = {
    * the line and know whether to empty the compose box.
    */
   SUGGEST_ACK: 0x8d,
+  /**
+   * Whether the sun is a screaming face, and when the button comes back. See
+   * `encodeSun` and `game/sunbutton.ts`.
+   *
+   * A message of its own rather than a section of the snapshot, on `BIKES`'
+   * argument taken to its limit: this changes **once every three in-game days**
+   * -- three real hours -- and is otherwise two constants. On the snapshot path
+   * it would be sixteen bytes per client twenty times a second, forever, to
+   * carry a number nobody has changed since before the room started.
+   *
+   * Room-global and deliberately not interest-filtered, on `sendBikes`'
+   * argument: the sun is over everybody's head at once. A client 40 km away in
+   * Palm Beach is looking at the same sky as the one standing on the mound, so
+   * "who can see the button" is not the question -- there is no version of this
+   * feature where two players in one room see different suns.
+   *
+   * Sent on change to everybody, to every joiner beside `BIKES`, **and to the
+   * presser whether or not the press was accepted**. That last one is not
+   * symmetry for its own sake: `world/sunbutton.ts` writes the state
+   * optimistically on the frame the key goes down, so a refused press needs a
+   * frame to be corrected by. Without it, a client that guessed wrong would draw
+   * a face nobody else could see until the next real press three hours later.
+   */
+  SUN: 0x8e,
 } as const;
 
 /**
@@ -2359,6 +2416,80 @@ export function decodeInvestigations(buffer: ArrayBuffer): InvestigationRecord[]
   return out;
 }
 
+// --- The screaming sun ---------------------------------------------------------
+
+/**
+ * `MSG.SUN_PRESS`, one byte.
+ *
+ * An encoder for a message with no fields looks like ceremony and is not. It is
+ * the same ceremony `encodeInput` is: this file is the only place in the repo
+ * that writes a message id, so a caller that hand-rolled `new Uint8Array([0x0d])`
+ * would be a second place the wire is defined and the one place a renumbering
+ * would not reach.
+ */
+export function encodeSunPress(buffer = new ArrayBuffer(1)): ArrayBuffer {
+  new DataView(buffer).setUint8(0, MSG.SUN_PRESS);
+  return buffer;
+}
+
+/** True if this frame is a well-formed `SUN_PRESS`. There is nothing else to say. */
+export function decodeSunPress(buffer: ArrayBuffer): boolean {
+  return buffer.byteLength >= 1 && new DataView(buffer).getUint8(0) === MSG.SUN_PRESS;
+}
+
+/**
+ * `MSG.SUN`, seventeen bytes:
+ *
+ *     u8   type = MSG.SUN
+ *     f64  screamUntilMs
+ *     f64  cooldownUntilMs
+ *
+ * **Two `f64`s, for `Welcome.clockMs`' reason, stated once more because it is
+ * the only interesting thing about this layout.** These are absolute epoch
+ * milliseconds on the server's clock, and epoch milliseconds passed 2^32 in
+ * 1970 -- a `u32` of them is not a clock, it is a clock modulo 49 days. An `f64`
+ * holds every integer to 2^53, so there is no quantisation, no separate epoch to
+ * agree about, and no arithmetic on the receiving end beyond a comparison.
+ *
+ * The **alternative was two `u16`s of remaining seconds**, which is four bytes
+ * instead of sixteen and is wrong for the reason `game/sunbutton.ts`'s header
+ * gives at length: a remaining time has to be counted down by somebody, and the
+ * somebody would be a client whose tab was backgrounded for four minutes.
+ * `INVESTIGATION` sends a countdown and gets away with it because it is
+ * re-sent every two seconds; this is sent once and must still be right an hour
+ * later.
+ *
+ * There is **no "screaming" boolean** on the wire, and there must not be: it is
+ * `now < screamUntilMs`, derivable by both ends from the same two numbers, and a
+ * flag beside the instant it is derived from is a second owner of one fact --
+ * which is the disease `/health`'s `vessels` field exists to catch.
+ */
+export const SUN_BYTES = 17;
+
+export function encodeSun(
+  screamUntilMs: number,
+  cooldownUntilMs: number,
+  buffer = new ArrayBuffer(SUN_BYTES),
+): ArrayBuffer {
+  const v = new DataView(buffer);
+  v.setUint8(0, MSG.SUN);
+  v.setFloat64(1, screamUntilMs, true);
+  v.setFloat64(9, cooldownUntilMs, true);
+  return buffer;
+}
+
+export function decodeSun(
+  buffer: ArrayBuffer,
+): { screamUntilMs: number; cooldownUntilMs: number } | null {
+  if (buffer.byteLength < SUN_BYTES) return null;
+  const v = new DataView(buffer);
+  if (v.getUint8(0) !== MSG.SUN) return null;
+  return {
+    screamUntilMs: v.getFloat64(1, true),
+    cooldownUntilMs: v.getFloat64(9, true),
+  };
+}
+
 // --- The roster ---------------------------------------------------------------
 
 /**
@@ -3178,6 +3309,58 @@ export function verifyNet(): string[] {
     }
   }
 
+  /* --- The screaming sun's two instants.
+   *
+   * What this catches is the one failure this message can have and the one it
+   * would be hardest to find: a clock that does not survive the round trip. The
+   * face is drawn until `screamUntilMs` and nothing anywhere re-sends it, so a
+   * field that lost its low bits would produce a sun that stopped screaming at a
+   * plausible-looking wrong time, three hours after anybody was looking at the
+   * code. Both values are tested at a real epoch instant -- 1.8e12, which needs
+   * 41 bits and is where a `f32` or a `u32` would fail -- and at an instant past
+   * the year 2100, on `Welcome.clockMs`' own reasoning. */
+  {
+    const scream = 1_800_000_123_456;
+    const cool = 1_800_010_800_001;
+    const got = decodeSun(encodeSun(scream, cool));
+    if (encodeSun(scream, cool).byteLength !== SUN_BYTES) {
+      failures.push(`A SUN message is not ${SUN_BYTES} bytes.`);
+    }
+    if (!got || got.screamUntilMs !== scream || got.cooldownUntilMs !== cool) {
+      failures.push(
+        `A SUN message came back as ${JSON.stringify(got)} rather than ${scream}/${cool}. Both ` +
+          `fields are absolute epoch milliseconds and must be exact: they are sent once and are ` +
+          `still being compared against an hour later.`,
+      );
+    }
+    const late = decodeSun(encodeSun(4_102_444_800_000, 4_102_455_600_000));
+    if (!late || late.screamUntilMs !== 4_102_444_800_000) {
+      failures.push(
+        `A SUN instant in the year 2100 came back as ${late?.screamUntilMs}. The fields are f64 ` +
+          `and must hold every integer to 2^53.`,
+      );
+    }
+    // A fresh room's zeros are a legal message and mean "never". A decoder that
+    // treated them as absent would leave a joiner unable to be told the button
+    // is charged.
+    const never = decodeSun(encodeSun(0, 0));
+    if (!never || never.screamUntilMs !== 0 || never.cooldownUntilMs !== 0) {
+      failures.push('A SUN message of zeros -- a room nobody has pressed -- did not decode.');
+    }
+    // Truncation drops the frame rather than throwing inside the socket
+    // callback, which is `decodeRoster`'s rule for every decoder in this file.
+    if (decodeSun(encodeSun(scream, cool).slice(0, SUN_BYTES - 1)) !== null) {
+      failures.push('A truncated SUN message decoded rather than being refused.');
+    }
+    // And the press, which is one byte and still has to be told apart from
+    // every other one-byte thing that could arrive on that socket.
+    if (!decodeSunPress(encodeSunPress())) failures.push('A SUN_PRESS did not decode as one.');
+    if (decodeSunPress(encodeInput({ seq: 0, buttons: 0, forward: 0, right: 0, yaw: 0, pitch: 0 }))) {
+      failures.push('An INPUT frame decoded as a SUN_PRESS. The type byte is not being read.');
+    }
+    if (decodeSunPress(new ArrayBuffer(0))) failures.push('An empty frame decoded as a SUN_PRESS.');
+  }
+
   // --- v8's interest message: who came into view and who went out of it.
   //
   // What this catches is the shape of failure the whole of AOI has: an entrant
@@ -3539,7 +3722,7 @@ export function verifyNet(): string[] {
     }
     // Which half each one belongs in, named here rather than inferred from a
     // prefix: a list is checkable and a naming convention is not.
-    const clientToServer = ['HELLO', 'INPUT', 'PING', 'CHAT_SAY', 'SUGGEST'];
+    const clientToServer = ['HELLO', 'INPUT', 'PING', 'CHAT_SAY', 'SUGGEST', 'SUN_PRESS'];
     for (const [name, id] of Object.entries(MSG)) {
       const wantsLow = clientToServer.includes(name);
       if (wantsLow && id >= 0x80) {
