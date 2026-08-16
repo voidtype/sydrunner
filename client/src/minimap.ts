@@ -215,8 +215,6 @@ export type HazardSource = (prism: Prism) => HazardKind | null;
  * `world/bike.ts`'s beam, gated on exactly the same test, so the column in the
  * street and the dot on the map go out together the instant somebody gets on.
  */
-export type MarkerKind = 'training' | 'flat-white' | 'combatant' | 'bike' | 'rave' | 'event';
-
 /**
  * `event` is an **ambient event** out of `game/events.ts` -- a fender-bender, a
  * bin night, a burnout -- and it is the only kind on this list that carries a
@@ -231,6 +229,34 @@ export type MarkerKind = 'training' | 'flat-white' | 'combatant' | 'bike' | 'rav
  * information leak in that, because there is nothing to leak; the events are the
  * same for everybody and always were.
  */
+export type MarkerKind =
+  | 'training'
+  | 'flat-white'
+  | 'combatant'
+  | 'bike'
+  | 'rave'
+  | 'event'
+  /**
+   * A Centrelink office. See `game/centrelink-data.ts`.
+   *
+   * A **place** rather than a thing, which is the category `rave` opened and
+   * this one settles: a powerup is there or it is not, a combatant moves, and
+   * an office is a fixed point on a map that is worth a hundred dollars once a
+   * week. Drawn on the big map always and on the minimap inside 300 m, which is
+   * further than anything else here -- because unlike a cafe, walking past one
+   * without noticing costs you something.
+   */
+  | 'centrelink'
+  /**
+   * Where the SydRide passenger is, and where they are going.
+   *
+   * Two kinds rather than one with a flag, because the whole job of these two
+   * dots is to be told apart at a glance while driving: the pickup is where you
+   * are going *now* and the dropoff is where you are going *after*, and a map
+   * that drew them in one colour would be a map you have to read.
+   */
+  | 'fare-pickup'
+  | 'fare-dropoff';
 
 /**
  * One thing on the map, in world metres.
@@ -437,6 +463,12 @@ export function markerInk(kind: MarkerKind): string {
       return RAVE_DOT;
     case 'event':
       return EVENT_DOT;
+    case 'centrelink':
+      return CENTRELINK_DOT;
+    case 'fare-pickup':
+      return FARE_PICKUP_DOT;
+    case 'fare-dropoff':
+      return FARE_DROPOFF_DOT;
     default:
       return COMBATANT_DOT;
   }
@@ -472,6 +504,29 @@ const RAVE_DOT = 'rgb(236,86,196)';
  * impression.
  */
 const EVENT_DOT = 'rgb(240,150,40)';
+/**
+ * Centrelink, in the one colour money is drawn in anywhere in this interface.
+ *
+ * A muted gold rather than a bright one. The bike's lime and the rave's magenta
+ * are both *the colour of the thing they point at* -- a lime frame, a magenta
+ * rig -- and there is no such tie here: an office is a beige shopfront. So the
+ * dot is tied to the **HUD's** money instead, which is the `$1,234` above the
+ * pips, and the two being one colour is what makes the marker legible without a
+ * legend. Dark enough that thirty-one of them across a 60 km map do not read as
+ * a constellation.
+ */
+const CENTRELINK_DOT = 'rgb(214,178,96)';
+
+/**
+ * The fare's two ends: the pickup bright, the dropoff dimmer.
+ *
+ * The same hue, deliberately, because they are two ends of one job -- and two
+ * different hues would be two things to learn. What separates them is value,
+ * which is the one channel that survives being glanced at in peripheral vision
+ * while driving: the bright one is where you are going now.
+ */
+const FARE_PICKUP_DOT = 'rgb(120,214,236)';
+const FARE_DROPOFF_DOT = 'rgb(64,124,142)';
 
 const TAU = Math.PI * 2;
 

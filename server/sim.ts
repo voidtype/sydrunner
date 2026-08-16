@@ -238,6 +238,35 @@ import {
   RIDE_TRIP_GONE,
 } from '../client/src/game/riding.ts';
 
+// --- Money. See `client/src/game/cash.ts`, `server/wallets.ts`, `server/fares.ts`.
+//
+// One block, and everything behind it is a module of its own: the rules are
+// shared with the browser (a fare has to pay the same on the HUD as in the
+// ledger), the persistence is a file this class never touches directly, and the
+// fare's state machine is `server/fares.ts` for the reason its header gives.
+// What is left in this file is the four places money meets the simulation --
+// a knockout, a pickup, a claim and a tick.
+import {
+  CENTRELINK_PAYMENT,
+  CLAIM_RADIUS_M,
+  MAX_BUNDLES,
+  BUNDLE_SECONDS,
+  claimWaitMs,
+  dropOnDeath,
+  formatMoney,
+  nearestOffices,
+  officeAt,
+  passengerLine,
+  tickBundles,
+  type CashBundle,
+  type CentrelinkOffice,
+  type WalletRecord,
+} from '../client/src/game/cash.ts';
+import { NO_DRIVING, type DrivingLookup } from '../client/src/game/driving-contract.ts';
+import { createFare, stepFare, type FareContext, type FareJob } from './fares.ts';
+import { moveBalance, type WalletStore } from './wallets.ts';
+import type { WalletFrame } from '../client/src/net/cash.ts';
+
 export const FIXED_DT = 1 / TICK_HZ;
 
 /**
@@ -337,6 +366,38 @@ export interface Participant {
   mountHeld: boolean;
   /** Set when the socket closes; the combatant leaves on the next tick. */
   gone: boolean;
+
+  // --- Money. See `client/src/game/cash.ts`.
+  /**
+   * This player's wallet, or **null for a bot**.
+   *
+   * Null rather than an empty record, so that every money path in this file
+   * begins with the same three-character test and a bot cannot accidentally
+   * acquire a balance by being handed one somewhere. `server/wallets.ts`'s
+   * header says why a bot must not have one: it would put a row in the file for
+   * every room on the host at every restart, and a bot that *dropped* money on
+   * death would make farming the two bots in your room the best-paying job in
+   * Sydney.
+   *
+   * The record is **shared with the store**, not copied: it is the object in
+   * `WalletStore`'s map, so mutating `balance` here is what gets written to
+   * disk on the next debounce. Two players with the same name in two rooms
+   * therefore share one object, which is the honest consequence of keying on a
+   * name and is stated in the store's header.
+   */
+  wallet: WalletRecord | null;
+  /** Bumped whenever anything in the wallet frame changes. `Room` compares it. */
+  walletVersion: number;
+  /**
+   * Why the balance last moved -- "+$34 fare" -- pending delivery.
+   *
+   * Cleared by `walletFrame` the moment it is read, so it is sent once and
+   * never repeats: this is a moment, and the pill it lands in is
+   * `hud.notice`'s. See `net/cash.WalletFrame.note`.
+   */
+  walletNote: string;
+  /** The rideshare shift and whatever fare is running on it. See `server/fares.ts`. */
+  fare: FareJob;
 }
 
 export interface TickOutput {
@@ -702,8 +763,87 @@ export class Simulation {
   /** See `stepFactions`, which mutates the two members that change and nothing else. */
   private factionCtx!: FactionCtx;
 
-  constructor(world: ServerWorld) {
+  // --- Money ---------------------------------------------------------------
+  //
+  // Four members and one facade. Everything else about the wallet lives in
+  // `server/wallets.ts` (the file on disk), `server/fares.ts` (the job) and
+  // `client/src/game/cash.ts` (the rules), for the reason the import block at
+  // the top of this file gives.
+
+  /**
+   * Where balances are kept, or null in a world with no persistence.
+   *
+   * Null is the ordinary case for **every check in this repo**:
+   * `verifySim`, `server/integration-check.ts` and `server/loadtest.ts` all
+   * build a `Simulation` with one argument, and a store defaulted into
+   * existence there would be twenty checks writing a wallets file into the
+   * repository. So the store is injected by `server/index.ts` and by nothing
+   * else, and a null store means every participant's `wallet` is null and every
+   * money path in this file is skipped by the same test a bot is.
+   */
+  private readonly wallets: WalletStore | null;
+
+  /**
+   * Who is driving what. See `client/src/game/driving-contract.ts`.
+   *
+   * `NO_DRIVING` by default, which reports every player on foot -- so a build
+   * with no cars in it (which is every build until the driving workstream
+   * lands) runs the fare loop's "not in a car" branch forever and costs one
+   * boolean test per online player per tick.
+   */
+  readonly driving: DrivingLookup;
+
+  /** Every cash bundle lying on the ground in this room. Capped, swept, room-wide. */
+  private readonly bundles: CashBundle[] = [];
+  private nextBundleId = 1;
+  private readonly bundlePickups: Array<{ bundle: CashBundle; combatant: CombatantState }> = [];
+  /** Bumped when the list changes, so `Room` knows to re-send every wallet. */
+  bundleVersion = 0;
+
+  /** Reused by the fare loop; see `server/fares.ts` on why nothing here allocates. */
+  private readonly fareBands: PedBand[] = [];
+  private readonly fareCtx: FareContext = {
+    playerId: 0, tick: 0, dt: FIXED_DT, nowMs: 0,
+    x: 0, z: 0, speed: 0, inCar: false, ko: false,
+    peds: null as unknown as PedestrianField, bands: this.fareBands,
+  };
+
+  /**
+   * The money door, and the **only** one anything outside this class may use.
+   *
+   * `sim.wallet.credit(id, 34, 'fare')` rather than a method on `Simulation`,
+   * because the brief for this feature named exactly this surface and because
+   * grouping it says what it is: three verbs about one resource, none of which
+   * any other part of the simulation should be reaching around.
+   *
+   * The `why` is not decoration. It becomes the sentence in the next `WALLET`
+   * frame -- see `net/cash.WalletFrame.note` for why the *server* composes it
+   * rather than the client deriving one from the delta -- and a credit with no
+   * reason is money that appears on a HUD with nothing to explain it.
+   */
+  readonly wallet = {
+    /** Pay a player. Returns what actually landed, after the cap. */
+    credit: (playerId: number, amount: number, why: string): number =>
+      this.moveWallet(playerId, Math.abs(Math.trunc(amount)), why),
+    /**
+     * Take money off a player. Returns what actually moved, **negative**, which
+     * is how a caller learns a debit was short: a player on $3 asked for $10
+     * gets -3 back, not -10, and the caller decides whether that is a purchase
+     * or a refusal. Nothing in this pass debits; the door exists because the
+     * sinks are the next thing anybody builds.
+     */
+    debit: (playerId: number, amount: number, why: string): number =>
+      this.moveWallet(playerId, -Math.abs(Math.trunc(amount)), why),
+    /** What this player has, or 0 for a bot and for an id that has left. */
+    balanceOf: (playerId: number): number =>
+      this.participants.get(playerId)?.wallet?.balance ?? 0,
+  };
+
+  constructor(world: ServerWorld, options: { wallets?: WalletStore; driving?: DrivingLookup } = {}) {
     this.world = world;
+    this.wallets = options.wallets ?? null;
+    this.driving = options.driving ?? NO_DRIVING;
+    this.fareCtx.peds = world.peds;
     this.ballWorld = groundFor(world);
     this.factionWorld = groundFor(world);
     this.factionCtx = {
@@ -834,11 +974,17 @@ export class Simulation {
     history.seed(this.tick, combat.body.position.x, combat.body.position.y, combat.body.position.z, spot.yaw);
     this.histories.set(id, history);
 
+    // Named once, here, because the wallet below is keyed on the name that was
+    // actually assigned rather than the one that was asked for -- and
+    // `pickName` dedupes against the room, so calling it twice would be two
+    // chances to disagree about which Bazza this is.
+    const name = this.pickName(requestedName, id);
+
     const p: Participant = {
       id,
       colourway: this.pickColourway(preferredColourway),
       bot: null,
-      name: this.pickName(requestedName, id),
+      name,
       kos: 0,
       downs: 0,
       ping: 0,
@@ -864,6 +1010,15 @@ export class Simulation {
       viewTicks: 0,
       mountHeld: false,
       gone: false,
+      // **The wallet is opened here and only here**, by name, and only for a
+      // person. `WalletStore.for` creates on first sight, so a new name's first
+      // `WALLET` frame carries `STARTING_BALANCE` rather than a zero that is
+      // corrected a moment later. A bot, or a host with no store, gets null and
+      // is skipped by every money path in this file. See `server/wallets.ts`.
+      wallet: bot === null && this.wallets !== null ? this.wallets.for(name) : null,
+      walletVersion: 1,
+      walletNote: '',
+      fare: createFare(),
     };
     // The bot holds the combatant rather than the other way round, so `think()`
     // writes the same `input` object the tick loop reads -- one record, as
@@ -1025,6 +1180,100 @@ export class Simulation {
       if (attacker) attacker.kos++;
     }
     this.rosterVersion++;
+    // And the money falls out, here, in the one place that already knows both
+    // ends of a knockout. See `dropCash`.
+    if (victim) this.dropCash(victim);
+    // A knockout during a fare is what "-50% if you knocked anyone down" means
+    // when the anyone is a player rather than a pedestrian. Marked on the
+    // *attacker*, and only when it was somebody else -- a driver run over by a
+    // Camry (`attackerId === victimId`) has not driven roughly, they have been
+    // driven into.
+    if (attackerId !== victimId) this.markRough(attackerId);
+  }
+
+  // --- Money ---------------------------------------------------------------
+
+  /**
+   * Ten per cent of a knocked-out player's wallet, on the pavement at their
+   * feet. See `cash.dropOnDeath` for the percentage and why there is a floor.
+   *
+   * **At their feet rather than where they end up.** `combat.applyHit` has
+   * already applied the knockback by the time this runs, so the body is
+   * mid-flight; the bundle is placed at the position the body is at *now*,
+   * which is where the punch landed rather than where the ragdoll comes to
+   * rest. That is the readable answer -- the money is where the fight was --
+   * and it is also the only one that is stable, because where a body slides to
+   * depends on what it hits.
+   *
+   * A no-op for a bot, for a player with under $5, and when the room is already
+   * carrying `MAX_BUNDLES`. The last of those loses the money rather than
+   * queueing it: a cap that queued would be a cap that does nothing under
+   * exactly the conditions it exists for.
+   */
+  private dropCash(victim: Participant): void {
+    const wallet = victim.wallet;
+    if (wallet === null) return;
+    const amount = dropOnDeath(wallet.balance);
+    if (amount <= 0) return;
+    if (this.bundles.length >= MAX_BUNDLES) return;
+    if (moveBalance(wallet, -amount) === 0) return;
+    this.wallets?.markDirty();
+    const c = victim.combat;
+    this.bundles.push({
+      id: this.nextBundleId,
+      x: c.body.position.x,
+      // The ground under the body, not the eye -- `tickBundles` gates on feet
+      // against this number, exactly as `tickPowerups` does against a sidecar's
+      // baked ground height.
+      y: c.body.position.y - EYE_HEIGHT,
+      z: c.body.position.z,
+      amount,
+      from: victim.id,
+      ttl: BUNDLE_SECONDS,
+    });
+    // Wraps rather than growing without bound: the id is a `u16` on the wire
+    // and a bundle lives thirty seconds, so a room would have to drop two
+    // thousand a second for a wrap to alias a live one.
+    this.nextBundleId = this.nextBundleId >= 65535 ? 1 : this.nextBundleId + 1;
+    this.bundleVersion++;
+    victim.walletVersion++;
+    victim.walletNote = `-${formatMoney(amount)} dropped`;
+  }
+
+  /**
+   * Move one player's balance and leave a sentence explaining it.
+   *
+   * The single implementation behind `wallet.credit` and `wallet.debit`. A bot,
+   * a departed id and a host with no store all fall out of the same null test,
+   * and all three return 0 -- which is the honest answer to "how much moved".
+   */
+  private moveWallet(playerId: number, delta: number, why: string): number {
+    const p = this.participants.get(playerId);
+    if (!p || p.wallet === null) return 0;
+    const moved = moveBalance(p.wallet, delta);
+    if (moved === 0) return 0;
+    this.wallets?.markDirty();
+    p.walletVersion++;
+    p.walletNote = `${moved > 0 ? '+' : '-'}${formatMoney(Math.abs(moved))} ${why}`.slice(0, 40);
+    return moved;
+  }
+
+  /**
+   * This driver has knocked something down; halve the fare they are on.
+   *
+   * Level rather than edge and deliberately sticky: the flag is cleared when a
+   * passenger *boards* (see `server/fares.ts`) and at no other time, so one
+   * pedestrian at the start of a trip costs the whole trip. That is the rule as
+   * written -- "-50% if you knocked anyone down during the trip" -- and it is
+   * the only version a player can reason about, because a flag that decayed
+   * would make the penalty depend on when in the trip it happened.
+   *
+   * Cheap by construction: a map lookup and a boolean store, called from the
+   * three places something goes down.
+   */
+  private markRough(playerId: number): void {
+    const p = this.participants.get(playerId);
+    if (p && p.fare.state === 'toDropoff') p.fare.rough = true;
   }
 
   private pickColourway(preferred: number): number {
@@ -1410,7 +1659,11 @@ export class Simulation {
         const struck = strikePedestrianWithBall(
           this.world.peds, ball, BALL_RADIUS, FIXED_DT, tick, this.pedBands, this.pedPose,
         );
-        if (struck !== null) this.reportIfWitnessed(owner, struck.x, struck.z, REASON.ASSAULT);
+        if (struck !== null) {
+          this.reportIfWitnessed(owner, struck.x, struck.z, REASON.ASSAULT);
+          // A football out of a car window is still knocking somebody down.
+          this.markRough(owner.id);
+        }
         // And the officers, swept over the same one-tick segment. `npcHitTest`
         // reconstructs the previous position from the velocity exactly as
         // `strikePedestrianWithBall` does -- which is what `footy.stepFooty`
@@ -1508,6 +1761,38 @@ export class Simulation {
         index: indexOf(e.point.id),
       });
     }
+
+    // --- The money on the pavement, immediately after the powerups and for
+    // exactly their reasons: after every combatant has moved, against the live
+    // index rather than the rewound one, and resolved in combatant order so
+    // two players reaching one pile settle the same way on every machine.
+    //
+    // `tickBundles` compacts the list in place, so this loop is over what was
+    // *collected* and the survivors are already the whole list.
+    for (const e of tickBundles(this.bundles, this.combatants, FIXED_DT, this.bundlePickups, this.liveIndex)) {
+      this.bundleVersion++;
+      // No `EVENT` for a collection, deliberately. The `WALLET` frame the
+      // collector gets carries both halves -- the new balance and the sentence
+      // saying where it came from -- and everybody else's `WALLET` re-sends the
+      // bundle list without it, which is how the pile disappears from their
+      // screen. An event as well would be the same fact on the wire twice, and
+      // `EVENT.PICKUP` above is only an event because a powerup's *world state*
+      // (the icon, the respawn clock) is client-side and this is not.
+      this.moveWallet(e.combatant.id, e.bundle.amount, 'found');
+    }
+    if (this.bundles.length !== this.bundlesLastCount) {
+      // Expiry also changes the list, and `tickBundles` reports collections
+      // rather than deaths -- so the version is bumped off the length as well.
+      this.bundlesLastCount = this.bundles.length;
+      this.bundleVersion++;
+    }
+
+    // --- SydRide, last of the money passes, because a fare that pays reads the
+    // balance every pass above may have moved.
+    //
+    // O(players) and one boolean test for anybody not on shift. The context
+    // record is reused; see `server/fares.ts` on why nothing here allocates.
+    this.stepFares();
 
     // --- The bikes again, after everybody has moved and every hit has landed.
     //
@@ -1612,6 +1897,147 @@ export class Simulation {
    * A tuned rider, in front of the police. See the call site for why it is an
    * edge rather than a level.
    */
+  /** How long `this.bundles` was last tick, so expiry bumps the version too. */
+  private bundlesLastCount = 0;
+
+  /**
+   * Every online driver's fare, one fixed step each.
+   *
+   * The loop is over `this.ordered` rather than over a list of online drivers,
+   * on `stepRideBy`'s own terms: a second collection to maintain is a second
+   * thing that can disagree with the participant map, and the test that skips
+   * everybody else is one boolean read off a record that is already in cache.
+   *
+   * **Where the fare thinks the driver is** is the car's pose when there is a
+   * car and the body's when there is not, which matters at the two stop
+   * radii: a driver's body may be a metre from the car's origin, and five
+   * metres is not a radius that can spend one on a coordinate choice.
+   */
+  private stepFares(): void {
+    const nowMs = Date.now();
+    for (const p of this.ordered) {
+      const job = p.fare;
+      if (!job.online && job.state === 'none' && job.cooldownT <= 0) continue;
+      if (p.bot) continue;
+
+      const carId = this.driving.carOf(p.id);
+      const pose = carId !== 0 ? this.driving.carPose(carId) : null;
+      const c = p.combat;
+      const ctx = this.fareCtx;
+      ctx.playerId = p.id;
+      ctx.tick = this.tick;
+      ctx.nowMs = nowMs;
+      ctx.x = pose ? pose.x : c.body.position.x;
+      ctx.z = pose ? pose.z : c.body.position.z;
+      // The body's own plan speed when there is no pose to read one off.
+      // `velocity` is the integrator's, so this is the speed the tick just
+      // produced rather than an average over anything.
+      ctx.speed = pose
+        ? pose.speed
+        : Math.sqrt(c.body.velocity.x * c.body.velocity.x + c.body.velocity.z * c.body.velocity.z);
+      ctx.inCar = carId !== 0;
+      ctx.ko = c.phase === 'ko' || c.health <= 0;
+
+      const out = stepFare(job, ctx);
+      if (out.paid > 0) {
+        this.wallet.credit(p.id, out.paid, 'fare');
+        // The passenger's parting line, seeded off the fare so it is stable if
+        // the frame is ever re-sent. Appended to the notice rather than
+        // replacing it, because "+$27 fare" is the fact and the line is the
+        // flavour, and a player who missed the number would have nothing.
+        job.line = passengerLine(p.id ^ Math.trunc(job.tripM));
+      } else if (out.notice === 'passenger in') {
+        job.line = passengerLine(p.id ^ job.offeredMs);
+      }
+      if (out.notice !== '' && p.walletNote === '') p.walletNote = out.notice;
+    }
+  }
+
+  // --- The phone -------------------------------------------------------------
+
+  /**
+   * `PHONE_OP.CLAIM`: pay this player $100 if they are standing at that office
+   * and have not claimed there for seven in-game days.
+   *
+   * **Every clause is checked here and none is trusted from the client.** The
+   * office id names a row in a table both ends compile in, but the *position*
+   * is the server's own simulated body and the *timer* is the server's own
+   * record -- so a client that sent a claim for an office in Penrith while
+   * standing in Redfern is refused by geometry, and one that sent the same
+   * claim sixty times a second is refused by the clock. There is nothing to
+   * rate-limit beyond that: a refused claim costs a map lookup.
+   *
+   * Returns a sentence for the player, always, because a claim that silently
+   * does nothing is a button the player decides is broken. Lower case, on
+   * `factions.REASON_TEXT`'s voice.
+   */
+  claim(playerId: number, officeId: string): string {
+    const p = this.participants.get(playerId);
+    if (!p || p.wallet === null) return 'no wallet on this host';
+    const c = p.combat;
+    if (c.phase === 'ko' || c.health <= 0) return 'not while you are on the ground';
+    const office = officeAt(c.body.position.x, c.body.position.z);
+    if (office === null) return 'you are not at a centrelink';
+    // The id is compared rather than ignored. Standing at Redfern and claiming
+    // for Parramatta is refused rather than quietly redirected, because the
+    // phone shows a list and the player picked a row -- and a claim that paid
+    // the wrong office's timer would be a bug nobody could see.
+    if (officeId !== '' && officeId !== office.id) return `you are at ${office.name.toLowerCase()}`;
+    const wait = claimWaitMs(p.wallet.centrelink[office.id] ?? 0, Date.now());
+    if (wait > 0) return 'nothing due here yet';
+    this.wallets?.recordClaim(p.wallet, office.id, Date.now());
+    this.wallet.credit(playerId, CENTRELINK_PAYMENT, 'centrelink');
+    return '';
+  }
+
+  /** `PHONE_OP.ONLINE` / `OFFLINE`. Idempotent; see `net/cash.PHONE_OP`. */
+  setOnline(playerId: number, online: boolean): void {
+    const p = this.participants.get(playerId);
+    if (!p || p.wallet === null) return;
+    if (p.fare.online === online) return;
+    p.fare.online = online;
+    p.fare.version++;
+  }
+
+  /**
+   * What this player's `WALLET` frame says right now, and the note it carries
+   * is **consumed**: reading clears it, so a sentence is sent once.
+   *
+   * The countdown is for the nearest office within a claim radius plus a little
+   * -- see `net/cash.WalletFrame.centrelinkNextMs` for why one number rather
+   * than the whole table. `-1` means there is nothing near enough to be talking
+   * about, which is where a player is 99% of the time.
+   */
+  walletFrame(playerId: number, into: WalletFrame): WalletFrame | null {
+    const p = this.participants.get(playerId);
+    if (!p || p.wallet === null) return null;
+    into.balance = p.wallet.balance;
+    into.note = p.walletNote;
+    p.walletNote = '';
+    into.bundles = this.bundles;
+    into.centrelinkNextMs = -1;
+    const near = nearestOffices(p.combat.body.position.x, p.combat.body.position.z, 1, this.officeScratch);
+    // A little wider than the claim radius, so the phone's countdown appears as
+    // you walk up to the door rather than snapping on at the moment the prompt
+    // does. Thirty metres is about a shopfront's width either side.
+    if (near.length > 0 && near[0].distance <= CLAIM_RADIUS_M * 5) {
+      into.centrelinkNextMs = claimWaitMs(p.wallet.centrelink[near[0].office.id] ?? 0, Date.now());
+    }
+    return into;
+  }
+
+  private readonly officeScratch: Array<{ office: CentrelinkOffice; distance: number }> = [];
+
+  /** This player's fare, or null for a bot and for an id that has left. */
+  fareOf(playerId: number): FareJob | null {
+    return this.participants.get(playerId)?.fare ?? null;
+  }
+
+  /** Every bundle on the ground. Owned by this object; serialise before the next step. */
+  cashBundles(): readonly CashBundle[] {
+    return this.bundles;
+  }
+
   private stepRideBy(): void {
     const tick = trafficTick(Date.now());
     for (const p of this.ordered) {
@@ -2547,6 +2973,9 @@ export class Simulation {
     const hit = strikePedestrian(this.world.peds, p.combat, trafficTick(Date.now()), this.pedBands, this.pedPose);
     if (hit === null) return;
     this.reportIfWitnessed(p, hit.x, hit.z, REASON.ASSAULT);
+    // "-50% if you knocked anyone down during the trip". One of the three
+    // places anything goes down; see `markRough`.
+    this.markRough(p.id);
   }
 
   /**

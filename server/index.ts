@@ -121,6 +121,17 @@ import {
   githubRepo,
   githubToken,
 } from './suggestions.ts';
+// --- Money. See `client/src/game/cash.ts`, `server/wallets.ts`, `server/fares.ts`.
+//
+// One block, and the only three things this file has to know about the
+// feature: the checks it runs at boot, the store it constructs and hands to
+// every room, and the fake-driving hatch that makes the fare loop exercisable
+// before the driving workstream lands.
+import { verifyCash } from '../client/src/game/cash.ts';
+import { PHONE_OP, decodePhone, verifyCashWire } from '../client/src/net/cash.ts';
+import { verifyDrivingContract } from '../client/src/game/driving-contract.ts';
+import { verifyFares } from './fares.ts';
+import { WalletStore, defaultWalletPath, verifyWallets } from './wallets.ts';
 import { verifyRewind } from './rewind.ts';
 import { verifySim } from './sim.ts';
 import {
@@ -298,6 +309,19 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifyCharacters', verifyCharacters()],
     ['verifyEvents', verifyEvents()],
     ['verifyWallet', verifyWallet()],
+    // The money. Four checks rather than one, because they are four different
+    // kinds of failure and a merged list would say "cash" about all of them:
+    // the rules (a fare that pays the wrong amount), the wire (a bundle list
+    // that desynchronises), the file (a key that does not fold case, so a
+    // player's balance resets), and the fare's state machine (a stop clock that
+    // boards a passenger from a car that never stopped). Every one of them is
+    // silent in this repo's sense -- it renders, it pays, and the number is
+    // wrong. See each file's own check for the enumeration.
+    ['verifyCash', verifyCash()],
+    ['verifyCashWire', verifyCashWire()],
+    ['verifyWallets', verifyWallets()],
+    ['verifyFares', verifyFares()],
+    ['verifyDrivingContract', verifyDrivingContract()],
   ];
   const failed = checks.filter(([, f]) => f.length > 0);
   if (failed.length > 0) {
@@ -341,6 +365,43 @@ if (world.segments) {
 }
 
 /**
+ * The wallets, host-wide, loaded before anybody can join.
+ *
+ * Host-wide rather than per-room on `suggestions`' argument and one stronger:
+ * the key is a **name**, and two rooms with two files would be two balances for
+ * one person depending on which room they landed in -- which is the gateway
+ * deciding how much money you have. Constructed and `load`ed before the socket
+ * opens, so the first joiner's first `WALLET` frame is their real balance
+ * rather than a starting one that is corrected a moment later.
+ *
+ * `SYDNEY_STATE_DIR` moves the file; see `defaultWalletPath`.
+ */
+const wallets = new WalletStore(defaultWalletPath());
+await wallets.load();
+console.log(`[sydney] wallets: ${wallets.describe()}`);
+
+/**
+ * Who is driving what, for SydRide. See `client/src/game/driving-contract.ts`.
+ *
+ * `NO_DRIVING` unless `SYDNEY_FAKE_DRIVING=1`, because the driving workstream's
+ * `game/driving.ts` does not exist yet -- this branch was written against the
+ * interface rather than against the module, so that the day it lands the lead
+ * changes this one expression and nothing else.
+ *
+ * The hatch treats anybody moving faster than 6 m/s as a driver, which is under
+ * a sprint on purpose: it is the only way to exercise the fare loop end to end
+ * on a branch with no cars in it. Announced in the boot line, because a server
+ * where sprinting makes you a taxi should say so out loud.
+ *
+ * `poseOf` reads the **live** body out of whichever room the id is in. A player
+ * id is a room's rather than a host's (see `protocol.AOI_ID_LIFECYCLE`), so two
+ * rooms both have a player 7 -- and the lookup handed to a room must therefore
+ * be that room's. `RoomHost` builds one per room from this factory rather than
+ * sharing this object, which is the whole reason it is a factory.
+ */
+const FAKE_DRIVING = process.env.SYDNEY_FAKE_DRIVING === '1';
+
+/**
  * The rooms, sharing that one city read-only.
  *
  * `roomWorld` is what makes "read-only" true rather than hoped: it hands every
@@ -349,7 +410,13 @@ if (world.segments) {
  * See its header for the audit of everything else.
  */
 const tRooms = performance.now();
-const host = new RoomHost(world, ROOM_COUNT, ROOM_CAP, BOT_COUNT, ROOM_BASE);
+const host = new RoomHost(world, ROOM_COUNT, ROOM_CAP, BOT_COUNT, ROOM_BASE, {
+  wallets,
+  fakeDriving: FAKE_DRIVING,
+});
+if (FAKE_DRIVING) {
+  console.log('[sydney] SYDNEY_FAKE_DRIVING=1: anybody over 6 m/s counts as driving (SydRide debug hatch)');
+}
 console.log(
   `[sydney] ${ROOM_COUNT} room(s) ${ROOM_BASE}..${ROOM_BASE + ROOM_COUNT - 1}, cap ${ROOM_CAP} each ` +
     `(${ROOM_COUNT * ROOM_CAP} players this process), ${BOT_COUNT} bot(s) per room — ` +
@@ -542,6 +609,12 @@ const server = Bun.serve<Conn>({
         // rather than queue, and nothing about the token itself belongs on a
         // route anybody can fetch.
         github: { suggestions: suggestions.linked, bugs: bugs.linked },
+        // How many names have a balance on file, and whether the fare loop's
+        // debug hatch is on. Published for `vessels`' reason two paragraphs up:
+        // a flag that changes what the game does should be readable from
+        // outside, or nobody can tell why sprinting is paying money.
+        wallets: wallets.size,
+        fakeDriving: FAKE_DRIVING,
         // The join disc's centre, which both ends already compute from the same
         // `index.json` (`game/spawn.spawnCentre`). Published because
         // `server/loadtest.ts`'s pileup scenario needs a world coordinate every
@@ -887,6 +960,44 @@ const server = Bun.serve<Conn>({
           room?.sunPress(ws);
           return;
         }
+        /**
+         * The phone: claim a Centrelink payment, or clock on and off the
+         * rideshare shift. See `client/src/net/cash.ts` for why three
+         * operations are one message id.
+         *
+         * Unlike `CHAT_SAY` and `SUGGEST` above, this one is emphatically the
+         * **room's**: a claim is adjudicated against a body this room is
+         * simulating and a shift belongs to a fare loop this room is stepping.
+         * So it resolves `conn.room` and stops there, which is what every case
+         * except those two does.
+         *
+         * There is no flood guard beyond the rules themselves, and that is a
+         * decision rather than an omission: a claim is refused by a position
+         * test and a timer, both of which are a map lookup, and going online
+         * twice is idempotent by construction. The expensive thing in this
+         * feature -- picking a kerb point -- happens on the *tick* when a fare
+         * is offered and cannot be provoked from here at all.
+         */
+        case MSG.PHONE: {
+          const p = conn.participant;
+          if (!p) return;
+          const req = decodePhone(frame, MSG.PHONE);
+          if (!req) return;
+          const room = host.get(conn.room);
+          if (!room) return;
+          if (req.op === PHONE_OP.CLAIM) {
+            const refusal = room.sim.claim(p.id, req.officeId);
+            // A refusal is a sentence and a success is silence, because the
+            // success already has one: the `WALLET` frame the credit produces
+            // carries "+$100 centrelink" and arrives on the next tick. Two
+            // messages for one event would be the pill saying it twice.
+            if (refusal !== '' && p.walletNote === '') p.walletNote = refusal;
+            if (refusal !== '') p.walletVersion++;
+            return;
+          }
+          room.sim.setOnline(p.id, req.op === PHONE_OP.ONLINE);
+          return;
+        }
 
         default:
           return;
@@ -1126,6 +1237,11 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     void Promise.all([
       suggestions.close().catch((err) => console.error(`[sydney] suggestions: flush failed: ${String(err)}`)),
       bugs.close().catch((err) => console.error(`[sydney] bugs: drain failed: ${String(err)}`)),
+      // And the wallets, which are the second thing in this process worth
+      // flushing. Their debounce is 5 s rather than the ledger's 250 ms (see
+      // `server/wallets.ts`), so this is the difference between losing nothing
+      // on a deploy and losing whatever the last five seconds paid.
+      wallets.close().catch((err) => console.error(`[sydney] wallets: flush failed: ${String(err)}`)),
     ]).finally(() => process.exit(0));
   });
 }
