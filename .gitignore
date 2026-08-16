@@ -34,3 +34,7 @@ scratch/
 
 # macOS.
 .DS_Store
+
+# opencode orchestration loop scratch
+.opencode_logs/
+.opencode_receipt

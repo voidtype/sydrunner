@@ -225,6 +225,24 @@ const catalogue = new Map<string, RegionEntry>();
 const owner = new Map<string, string>();
 const resident = new Map<string, Resident>();
 const inFlight = new Map<string, Promise<Resident | null>>();
+/**
+ * When a failed bundle may be asked for again, per key. `ensure` used to say
+ * "startable again on a later frame" and meant it literally: a bundle that
+ * 404s was re-requested every frame for the life of the session, forever.
+ * Fine for a transient blip; a request storm for a real absence -- and the
+ * absence was real when the game moved domains and the R2 bucket's CORS still
+ * named only the old origin, so every CDN read was blocked, the probe disabled
+ * the CDN, and every region fell back to an origin that holds no regions.
+ * Hundreds of 404s a minute, at 60 Hz, was the console.
+ *
+ * Exponential backoff per key: 2 s, then 4, 8 ... capped at a minute. The
+ * per-tile path still serves the world in the meantime, exactly as it did
+ * before bundles existed, so nothing is lost but the log noise and the origin's
+ * bandwidth.
+ */
+const retryAt = new Map<string, { at: number; failures: number }>();
+const RETRY_BASE_MS = 2000;
+const RETRY_MAX_MS = 60_000;
 let playerX = 0;
 let playerZ = 0;
 /**
@@ -502,6 +520,8 @@ function ensure(key: string): Promise<Resident | null> {
   if (flying) return flying;
   const entry = catalogue.get(key);
   if (!entry) return Promise.resolve(null);
+  const hold = retryAt.get(key);
+  if (hold !== undefined && performance.now() < hold.at) return Promise.resolve(null);
 
   const job = (async (): Promise<Resident | null> => {
     try {
@@ -529,12 +549,16 @@ function ensure(key: string): Promise<Resident | null> {
       };
       resident.set(key, held);
       stats.fetched += 1;
+      retryAt.delete(key);
       return held;
     } catch {
       // Counted and forgotten. Every tile in it takes the per-tile path, which
       // is the world loading exactly as it did before bundles existed, and the
       // region is startable again on a later frame.
       stats.failed += 1;
+      const prev = retryAt.get(key)?.failures ?? 0;
+      const delay = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** prev);
+      retryAt.set(key, { at: performance.now() + delay, failures: prev + 1 });
       return null;
     } finally {
       inFlight.delete(key);
