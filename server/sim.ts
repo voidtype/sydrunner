@@ -125,6 +125,14 @@ import {
 // used here and nothing else -- one tick of the ambient promotion scan, and the
 // rule about whether hitting one of them is a crime.
 import { stepStreetlife, strikeCrime } from '../client/src/game/streetlife.ts';
+// --- Workstream E: the five characters and the ambient events.
+//
+// Same terms again: both modules import no three and both register only bytes
+// `NPC_KIND` reserved for them. Four entry points and nothing else -- the
+// ambient promotion scan, the "somebody hit a tradie" notification, the Karen's
+// witness door, and one tick of the event scheduler with its sweep.
+import { characterStruck, karenReport, stepCharacters } from '../client/src/game/characters.ts';
+import { stepEvents, sweepEvents } from '../client/src/game/events.ts';
 // And the wildlife, on the same terms again: `game/wildlife.ts` imports no three
 // and registers the three kind bytes `NPC_KIND` reserved for it. Three entry
 // points -- the ambient promotion scan, the predicate for "is this one of the
@@ -1402,6 +1410,23 @@ export class Simulation {
     // `WILDLIFE_BUDGET`, a third of the field -- so a park full of turkeys can
     // never be the reason an officer could not be dispatched to somebody.
     stepWildlife(ctx, this.wildScratch, this.wildPose);
+    // --- And workstream E's two, in the same place and for the same reason.
+    //
+    // `stepCharacters` promotes the eshay, Karen, tradie, influencer or agent a
+    // player has walked up to, inside its own eight-actor budget.
+    // `stepEvents` promotes the standoff's three and the burnout's constable
+    // inside a budget of three. Neither can be the reason an officer could not
+    // be dispatched; see `characters.MAX_CHARACTER_ACTORS`.
+    //
+    // `sweepEvents` runs **before** `stepEvents` deliberately, and it is the one
+    // ordering in this block that is not simply "after the step". It despawns
+    // actors whose event has finished, which is what frees the budget the
+    // promotion below then spends -- the other way round, an event that ended on
+    // the same tick a new one opened would hold its slot for one more tick every
+    // tick, and the symptom would be the second event never getting anybody.
+    sweepEvents(ctx);
+    stepCharacters(ctx);
+    stepEvents(ctx);
     // An investigation that ran out changes what the wire has to say, and
     // nothing inside the field can bump a version it does not know about.
     if (this.factions.investigationCount !== before) this.investigationVersion++;
@@ -2026,6 +2051,14 @@ export class Simulation {
     const reason = strikeCrime(actor);
     const strike = strikeNpc(this.factions, actor, pips, p.name, p.id, this.tick);
     if (!strike.landed) return;
+    // --- Workstream E: a tradie who has just been hit decks you back.
+    //
+    // **After** the strike, which is the opposite of `strikeCrime`'s rule and
+    // for the mirrored reason: that one asks about the person who was standing
+    // there a moment ago, and this tells the person who is standing there now
+    // what to do about it. A no-op for every other kind, including the other
+    // four of ours, so there is no `switch` here.
+    characterStruck(actor, p.id);
     const def = npcKind(actor.kind);
     // Assaulting police is its own reason and needs no witness -- see
     // `strikeOfficers`. Every other kind asks its own faction, which is what
@@ -2098,9 +2131,33 @@ export class Simulation {
   /** The crime, if anybody saw it. The whole of the witness rule's use here. */
   private reportIfWitnessed(p: Participant, x: number, z: number, reason: number): void {
     if (p.bot) return;
-    const w = policeWitness(x, z, trafficTick(Date.now()), this.witnessCtx, this.witness);
-    if (!w.seen) return;
-    this.accuse(p, reason);
+    const tick = trafficTick(Date.now());
+    const w = policeWitness(x, z, tick, this.witnessCtx, this.witness);
+    if (w.seen) {
+      this.accuse(p, reason);
+      return;
+    }
+    // --- Workstream E: and if no officer saw it, a Karen might have.
+    //
+    // This is her entire function -- see `game/characters.ts` section 1. She
+    // upgrades an *unwitnessed* crime to a witnessed one, which is why the call
+    // is here rather than beside `policeWitness`: asking her first would mean
+    // walking twenty-five metres of ambient placement on every swing in the city
+    // to answer a question a constable standing right there had already
+    // answered.
+    //
+    // `karenReport` calls `reportCrime` itself rather than returning a verdict
+    // for this method to act on, which is the framework's stated contract
+    // (`factions.ts` section 3): one call, drained by `FactionField.step` at the
+    // top of the next step. The version bump is the thing that call cannot do
+    // for itself -- `stepFactions` bumps when the *count* of live investigations
+    // changes, which covers a fresh one, and a re-label on somebody already
+    // wanted would otherwise leave the banner reading the previous crime. Two
+    // lines, exactly as the wildlife path above does it.
+    const open = this.factions.investigationOf(p.id);
+    if (karenReport(p.id, reason, x, z, tick, this.witnessCtx)) {
+      if (open && open.reason !== reason) this.investigationVersion++;
+    }
   }
 
   /**

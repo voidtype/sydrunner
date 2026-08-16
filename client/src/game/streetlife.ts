@@ -136,6 +136,7 @@ import {
   NPC_KIND,
   NPC_STATE,
   REASON,
+  npcKind,
   policeHostileTo,
   registerNpcKind,
   type FactionCtx,
@@ -2638,14 +2639,23 @@ policeHostileTo(NPC_KIND.DRUNK);
  *     swinging. Once they have snapped at you it is self-defence and the police
  *     are already on their way to break it up on their own account, through
  *     `policeHostileTo`.
- *   - **Anything else keeps the framework's answer**, `REASON.ASSAULT`, so a
- *     faction that lands after this one is unaffected by it.
+ *   - **Anything else asks its own registration**, through the optional
+ *     `NpcKindDef.strikeReason` hook, and gets the framework's answer --
+ *     `REASON.ASSAULT` -- when it has no opinion. That last clause is the one
+ *     line of this function that has changed since it shipped, and it changed
+ *     for `game/characters.ts`: five more kinds landed, one of which (the real
+ *     estate agent) needs a different sentence on the banner. The alternative
+ *     was five more names in the two `if`s above, which would have made a file
+ *     the meth heads own into a registry of everybody else's crimes. See
+ *     `factions.NpcKindDef.strikeReason`.
  */
 export function strikeCrime(actor: NpcActor): number {
   if (actor.kind === NPC_KIND.METHHEAD) return REASON.NONE;
   if (actor.kind === NPC_KIND.DRUNK) {
     return actor.target < 0 && actor.state !== NPC_STATE.DOWN ? REASON.ASSAULT : REASON.NONE;
   }
+  const def = npcKind(actor.kind);
+  if (def?.strikeReason) return def.strikeReason(actor);
   return REASON.ASSAULT;
 }
 

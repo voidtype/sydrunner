@@ -605,6 +605,28 @@ export const NPC_KIND = {
   TURKEY: 4,
   IBIS: 5,
   MAGPIE: 6,
+  /**
+   * The five characters, registered in `game/characters.ts`. Bytes 10 to 14,
+   * with **7, 8 and 9 deliberately left as a gap**.
+   *
+   * The gap is not an accident and it is not superstition. This batch is six
+   * branches written at once against one `main`, and the wire bytes are the one
+   * resource none of them can negotiate over at merge time -- two factions that
+   * both took 7 produce a build where a Karen is drawn as whatever the other
+   * branch registered, and `registerNpcKind` throws at module load in the lucky
+   * case. Three bytes cost nothing (`NPC_KIND` has 241 values left after this
+   * block) and they are the merge headroom for the branches landing beside this
+   * one. The same argument the wildlife block above makes about spending three
+   * bytes rather than putting a discriminator behind one.
+   *
+   * Within the block the order is the brief's order, which is also roughly the
+   * order a player meets them walking from a station out to a suburb.
+   */
+  ESHAY: 10,
+  KAREN: 11,
+  TRADIE: 12,
+  INFLUENCER: 13,
+  AGENT: 14,
 } as const;
 
 /**
@@ -721,6 +743,32 @@ export interface NpcActor {
    * rebuilt every frame forever. The authority never reads it.
    */
   seen: number;
+  /**
+   * The ambient event that promoted this actor, or **undefined for the ordinary
+   * case** -- an officer off a beat, a meth head off a suburb, anybody at all
+   * who was not part of a scheduled event.
+   *
+   * Not on the wire, and it does not need to be: it exists so that the authority
+   * can answer two questions it otherwise could not. *Has this event already
+   * been attended* -- without which `game/events.stepEvents` promotes a fresh
+   * standoff every tick until the cap refuses -- and *is this actor's event
+   * over*, which is what stops a constable standing in an empty car park for the
+   * rest of the session holding a slot the police need.
+   *
+   * `undefined` rather than `0` or `-1`, which is the one design decision here
+   * worth the sentence. Every other absent-value field on this record uses a
+   * sentinel (`target: -1`, `actorId: 0`) because those fields are read on the
+   * hot path by code that must not branch on a type. This one is read by
+   * `stepEvents` and `sweepEvents` alone, a handful of times a second, and an
+   * `undefined` is the only value that cannot collide with a real event id --
+   * which is packed cell arithmetic and is perfectly capable of being 0 or -1.
+   * `NpcActor.target`'s own header documents what happened the day a valid id
+   * was used as a sentinel.
+   *
+   * Optional, so `FactionField.promote` does not set it and no faction written
+   * before events existed changes by a byte.
+   */
+  eventId?: number;
 }
 
 /**
@@ -767,6 +815,32 @@ export interface NpcKindDef {
    * frame that says so.
    */
   think(actor: NpcActor, ctx: FactionCtx): void;
+
+  /**
+   * What hitting one of these is, as a `REASON`, or `REASON.NONE` for nothing.
+   *
+   * **Optional, and absent means the framework's own answer** --
+   * `REASON.ASSAULT`, the bystander rule -- so no faction written before this
+   * field existed changes behaviour by a bit.
+   *
+   * It is here rather than at the adjudicating call sites because of *which*
+   * question it answers. `streetlife.strikeCrime` is the one door both
+   * authorities put this question through (`server/sim.hitNpc` online,
+   * `main.ts` offline), and it already knows the two street kinds by name. A
+   * third, fourth and fifth faction adding themselves to that `switch` would
+   * make a file owned by the meth heads into a registry of everybody's crimes,
+   * which is the exact shape `registerNpcKind` exists to avoid: a faction
+   * states a fact about itself, and the framework carries it.
+   *
+   * Called with the actor **as they were standing a moment ago**, never after
+   * the strike -- `strikeCrime`'s own ordering rule, restated here because this
+   * hook is where a new faction reads it. A drunk who was minding their own
+   * business until the bat landed is a bystander, and asking afterwards finds
+   * them unconscious and answers no.
+   *
+   * Pure, deterministic, and on the authority only.
+   */
+  strikeReason?(actor: NpcActor): number;
 }
 
 const KINDS = new Map<number, NpcKindDef>();
@@ -823,6 +897,23 @@ export const REASON = {
   WILDLIFE: 3,
   ASSAULT_POLICE: 4,
   AFFRAY: 5,
+  /**
+   * Assaulting a real estate agent, and it is a separate code rather than
+   * `ASSAULT` for exactly one reason: the **banner text differs**.
+   *
+   * `REASON_TEXT` is the only thing a reason code decides -- the countdown, the
+   * extension and the cap are identical for every code in this table -- so a
+   * new code is warranted precisely when the sentence a player reads has to be
+   * a different sentence, and `game/characters.ts` has one line that has to be
+   * different. See that file's section on the agent for why.
+   *
+   * **13, not 6.** Codes 6 through 12 are reserved for the branches landing
+   * beside this one, on `NPC_KIND`'s own argument: the byte is on the wire and
+   * two branches that both took 6 would produce a build where the banner reads
+   * the other branch's crime. `WILDLIFE`'s precedent one block up is that a
+   * reserved-and-complete row costs one line and saves a protocol bump.
+   */
+  REAL_ESTATE: 13,
 } as const;
 
 /**
@@ -840,6 +931,11 @@ export const REASON_TEXT: Readonly<Record<number, string>> = {
   [REASON.WILDLIFE]: 'harming protected wildlife',
   [REASON.ASSAULT_POLICE]: 'assaulting police',
   [REASON.AFFRAY]: 'affray',
+  // The parenthetical is the joke and it is load-bearing rather than
+  // decorative: the banner's whole job is to tell you which of your last four
+  // actions started this, and this is the one crime in the table the game has
+  // an opinion about. See `game/characters.ts`, section 5.
+  [REASON.REAL_ESTATE]: 'assaulting a real estate agent (understandable)',
 };
 
 export function reasonText(code: number): string {

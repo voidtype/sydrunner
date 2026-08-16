@@ -397,6 +397,31 @@ import {
   verifyWildlife,
 } from './game/wildlife.ts';
 import { WildlifeAssets, WildlifeFlock, verifyWildlifeKit } from './world/wildlife.ts';
+// --- Workstream E: five more characters, and the ambient events they stand
+// around in. Same split once more -- `game/characters.ts` and `game/events.ts`
+// are the shared simulation the server runs, `world/characters.ts` and
+// `world/events.ts` are the renderers. See any of the four headers.
+import {
+  createCharacterPose,
+  dayAtTick,
+  daylight,
+  forEachCharacterNear,
+  saturdayAt,
+  KAREN_REPORT_LINE,
+  POSTED_LINE,
+  POSTED_LINE_BYSTANDER,
+  POSTED_RANGE,
+  TRADIE_HELP_LINE,
+  characterStruck,
+  isCharacterKind,
+  karenWitness,
+  stepCharacters,
+  verifyCharacters,
+} from './game/characters.ts';
+import { CharacterCrowd, CharacterKitAssets, characterWarmupParts, verifyCharacterKit } from './world/characters.ts';
+import { EVENT_NAME, stepEvents, sweepEvents, verifyEvents } from './game/events.ts';
+import { EventAssets, EventScene, eventWarmupParts, inTrackworkQueue, verifyEventKit } from './world/events.ts';
+import { verifyWallet } from './game/wallet-contract.ts';
 import { Hud, verifyHud } from './hud.ts';
 import { Minimap } from './minimap.ts';
 import { MapAtlas } from './mapatlas.ts';
@@ -729,6 +754,30 @@ async function main(): Promise<void> {
   // The **model** half runs later beside the assets -- see `verifyWildlifeKit`
   // by `WildlifeAssets`.
   const wildlifeFailures = timed('wildlife', () => verifyWildlife());
+  // --- Workstream E's three, on the same criterion as everything above them:
+  // every one of these ships as a tuning complaint rather than as a bug.
+  //
+  // `verifyCharacters` covers a bias table with a character in it who is
+  // everywhere -- which from any one street corner looks exactly like a
+  // character who is in the right place -- the two epochs drifting apart, which
+  // puts tradies on site at midnight, and the cell-population rounding, which is
+  // the one place two engines could place a different *number* of people and
+  // this client would draw somebody the server does not have.
+  //
+  // `verifyEvents` covers a schedule that is not a pure function of the day (a
+  // player describing a car crash nobody else can find), a start window that
+  // wraps past midnight and is read naively (the burnout simply never happens),
+  // and a trackwork queue in a paddock.
+  //
+  // `verifyWallet` covers the no-op default the eshays debit against until the
+  // wallet lands. See `game/wallet-contract.ts`.
+  //
+  // The **model** halves run later beside the assets -- `verifyCharacterKit`
+  // and `verifyEventKit` -- and they are the ones that would otherwise ship a
+  // hard hat inside somebody's skull.
+  const characterFailures = timed('characters', verifyCharacters);
+  const eventFailures = timed('events', verifyEvents);
+  const walletFailures = timed('wallet', verifyWallet);
   // And the nameplates, on the same criterion once more. Every way this breaks
   // renders: a text cache that misses re-uploads two megabytes of atlas twenty
   // times a second and reads as a streaming stall; a fade that is not monotonic
@@ -878,6 +927,9 @@ async function main(): Promise<void> {
     policeFailures.length ||
     streetFailures.length ||
     wildlifeFailures.length ||
+    characterFailures.length ||
+    eventFailures.length ||
+    walletFailures.length ||
     nameplateFailures.length ||
     guardFailures.length ||
     hudFailures.length ||
@@ -927,6 +979,9 @@ async function main(): Promise<void> {
           ...policeFailures,
           ...streetFailures,
           ...wildlifeFailures,
+          ...characterFailures,
+          ...eventFailures,
+          ...walletFailures,
           ...nameplateFailures,
           ...guardFailures,
           ...hudFailures,
@@ -1341,6 +1396,21 @@ async function main(): Promise<void> {
   const streetKitFailures = verifyStreetlifeKit(streetAssets);
   if (streetKitFailures.length) {
     hud.fatal('Street kit self-checks failed:\n' + streetKitFailures.map((f) => '  - ' + f).join('\n'));
+    return;
+  }
+  // --- Workstream E's two kits, on exactly the same terms: a fatal check beside
+  // the thing it checks, because a hard hat inside a skull is invisible from
+  // every angle and looks like the prop was never parented.
+  const characterAssets = new CharacterKitAssets(characters);
+  const characterKitFailures = verifyCharacterKit(characterAssets);
+  if (characterKitFailures.length) {
+    hud.fatal('Character kit self-checks failed:\n' + characterKitFailures.map((f) => '  - ' + f).join('\n'));
+    return;
+  }
+  const eventAssets = new EventAssets();
+  const eventKitFailures = verifyEventKit(eventAssets);
+  if (eventKitFailures.length) {
+    hud.fatal('Event kit self-checks failed:\n' + eventKitFailures.map((f) => '  - ' + f).join('\n'));
     return;
   }
   const wildlifeAssets = new WildlifeAssets();
@@ -1806,6 +1876,12 @@ async function main(): Promise<void> {
         // first shot fired, the first other player's plate.
         ...policeWarmupParts(policeAssets, tracers),
         ...streetlifeWarmupParts(streetAssets),
+        // Workstream E's props and its five instanced objects, compiled at boot
+        // rather than on the frame somebody first turns a corner into a bin
+        // night. WebGPU pipeline compilation is tens of milliseconds and it
+        // lands as a stall on exactly the frame the thing appears.
+        ...characterWarmupParts(characterAssets),
+        ...eventWarmupParts(eventAssets),
         ...nameplateWarmupParts(nameplates),
         // The rave's booth banner, which is the one thing in that whole feature
         // a stand-in can warm: everything else it draws is instanced, and
@@ -2383,6 +2459,26 @@ async function main(): Promise<void> {
   const streetCrowd = new StreetCrowd(streetAssets, characters);
   for (const rig of streetCrowd.rigs) scene.add(rig.mesh);
 
+  // --- And workstream E's five characters, on the same two tiers again. Twelve
+  // pooled rigs, and an ambient tier that is a hash over a 420 m cell grid
+  // weighted by the ABS census field -- so like the beats and the loiterers it
+  // costs nothing on the wire and exists identically in both modes.
+  const characterCrowd = new CharacterCrowd(characterAssets, characters);
+  for (const rig of characterCrowd.rigs) scene.add(rig.mesh);
+
+  // --- And the ambient events, which have **no rig at all**.
+  //
+  // Five instanced sets: bodies, cars, bins, signs and birds. A trackwork queue
+  // is twenty-five figures and a bin night is a dozen ibises, and neither of
+  // them moves -- see `world/events.ts` on why nothing in an event needs a
+  // skeleton. The sites themselves are a pure function of the in-game day, so
+  // every client sees the same crash on the same corner with nothing sent.
+  const eventScene = new EventScene(eventAssets);
+  for (const mesh of eventScene.meshes) scene.add(mesh);
+  /** When the player entered a trackwork queue, in seconds, or -1. See below. */
+  let queueSince = -1;
+  let queueTold = false;
+
   // --- And the wildlife, which is the same two tiers with no rig at all.
   //
   // A bird is 30 cm across and is never close enough for a skeleton to be worth
@@ -2528,6 +2624,16 @@ async function main(): Promise<void> {
    * aggro line is heard once. `NPC_STATE.CHASE` is their `AIM`.
    */
   const charging = new Set<number>();
+  /**
+   * Workstream E's edge set: influencers currently drawn on the ground, and
+   * tradies who have already offered a hand.
+   *
+   * One `Set` for two kinds rather than two, because the actor id space is
+   * shared and the two uses cannot collide -- an actor is one kind for its whole
+   * life. `firing` and `charging` above are the same arrangement for the same
+   * reason, and the alternative is two maps that are each mostly empty.
+   */
+  const posted = new Set<number>();
 
   /**
    * Where the promoted officers are: the server's list online, this process's
@@ -2556,7 +2662,29 @@ async function main(): Promise<void> {
   function accuse(x: number, z: number, reason: number, tick: number, alreadyWitnessed = false): void {
     if (!alreadyWitnessed) {
       const w = policeWitness(x, z, tick, witnessCtx, witness);
-      if (!w.seen) return;
+      // --- Workstream E: and if no officer saw it, a Karen might have.
+      //
+      // `karenWitness` rather than `karenReport`, and the difference is the
+      // whole of what a predicting client is allowed to do. `karenReport` calls
+      // `reportCrime`, which opens an investigation on the authority --
+      // `server/sim.reportIfWitnessed` calls it for exactly that reason. This
+      // client is not the authority when it is online, so it asks the query and
+      // opens its own *optimistic* banner, which is the identical trade it
+      // already makes off `policeWitness` one line up: right almost always, at
+      // most 50 ms ahead of the truth, and wrong costs a banner that clears
+      // itself on the next `MSG.INVESTIGATION`.
+      //
+      // Offline the branch below makes it real through the same
+      // `FactionField.accuse` the server calls, so there is one implementation
+      // rather than two that agree by inspection.
+      if (!w.seen) {
+        if (!karenWitness(x, z, tick, witnessCtx)) return;
+        // She says so. The line is cosmetic and local -- see
+        // `game/characters.ts` section 4 -- and it is posted here rather than
+        // from the crowd's own speech clock because *this* is the moment it
+        // means something.
+        hud.notice(KAREN_REPORT_LINE);
+      }
     }
     if (net) net.predictInvestigation(reason, COUNTDOWN_TICKS);
     else factions.accuse(playerCombat.id, reason, tick);
@@ -4185,6 +4313,33 @@ async function main(): Promise<void> {
     for (const venue of liveRaves(raveNight(sky.now.nowMs).index)) {
       if (!heardRaves.has(venue.site.id)) continue;
       sink.mark(venue.site.x, venue.site.z, 'rave');
+    }
+  });
+
+  /**
+   * Workstream E: the ambient events, on both maps out of one source.
+   *
+   * `EventScene.live` rather than a fresh `liveEventsAt` call, and the reason is
+   * the one `MarkerSource`'s own header gives about allocation: the scene
+   * already resolves the live set once a frame against the draw radius, and a
+   * second sweep here would be a second `eventsAt` over a 300 m box at 15 Hz
+   * forever. The consequence is stated rather than hidden -- **the markers reach
+   * exactly as far as the renderer does**, which is `EVENT_DRAW_RADIUS`, so the
+   * minimap's 250 m brief is satisfied and the big map shows only what is within
+   * 150 m rather than the whole city's schedule.
+   *
+   * That is a deliberate narrowing of the brief and it is the better behaviour:
+   * a big map listing every event in Greater Sydney would be a quest log, and
+   * `minimap.RAVE_DOT`'s header already argues that case for the raves -- a map
+   * that shows you what is out there is a quest list, and one that shows you
+   * what you are near is a map.
+   *
+   * The **label** is only read by the big map; the compass drops it. See
+   * `minimap.Marker.label`.
+   */
+  minimap.addMarkerSource((sink) => {
+    for (const site of eventScene.live) {
+      sink.mark(site.x, site.z, 'event', undefined, EVENT_NAME[site.kind] ?? 'something');
     }
   });
 
@@ -6152,6 +6307,29 @@ async function main(): Promise<void> {
           }
           if (hit.kind === NPC_KIND.POLICE || wild) predictInvestigation(crime);
           else if (crime !== REASON.NONE) accuse(hit.x, hit.z, crime, tick);
+          // --- Workstream E's two consequences of a landed swing.
+          //
+          // **The tradie decks you back.** Offline this is the whole of it;
+          // online `server/sim.hitNpc` has already made the same call against
+          // its own actor and this one is a no-op on a mirror the next snapshot
+          // overwrites. It is called unconditionally because it is a no-op for
+          // every kind but one -- no `switch` at a call site.
+          characterStruck(hit, playerCombat.id);
+          // **And the influencer posts it.**
+          //
+          // A HUD notice rather than anything on the wire, and the reason is
+          // `pushKill`'s a few hundred lines up, stated there in full: the
+          // snapshot carries no cause for an NPC going down, and inventing a
+          // cause byte for a line of text would be a protocol change for a
+          // joke. So the line names *you* on your own screen -- you are the one
+          // process that knows you did it -- and reads impersonally to anybody
+          // else inside `POSTED_RANGE` who watched an influencer hit the
+          // footpath. That is a real limitation against the brief, which asked
+          // for a notice naming you to everybody within a hundred metres, and it
+          // is the honest half of it rather than a protocol bump.
+          if (hit.kind === NPC_KIND.INFLUENCER) {
+            hud.notice(feedLine(POSTED_LINE, 'you'));
+          }
         }
       }
 
@@ -6326,6 +6504,13 @@ async function main(): Promise<void> {
         // cap is reached -- see `WILDLIFE_BUDGET` -- so a park full of turkeys
         // can never be the reason an officer could not be dispatched.
         stepWildlife(ctx, wildScratch, wildPose);
+        // And workstream E's, in the same place and for the same reason.
+        // `sweepEvents` runs first so that an event which ended this tick frees
+        // its promoted slot before `stepEvents` tries to spend it; see
+        // `server/sim.stepFactions`, which states the same ordering.
+        sweepEvents(ctx);
+        stepCharacters(ctx);
+        stepEvents(ctx);
         // Drained **here** rather than in the frame loop, because `step` clears
         // the list at the top of every call and `simulate` can run more than
         // once per frame when the accumulator has caught up on a stall. A bark
@@ -7428,6 +7613,61 @@ async function main(): Promise<void> {
       wildGround,
     );
 
+    // --- Workstream E: the five characters, both tiers, out of the same
+    // authority and on the same fractional tick as everybody above.
+    characterCrowd.update(
+      pedestrians,
+      policeField(),
+      trafficTick(Date.now()) + accumulator / FIXED_DT,
+      frameDt,
+      player.position.x,
+      player.position.z,
+    );
+    // Whatever the nearest one of them is saying. `hud.notice` rather than
+    // audio, because there is no audio for these five and handing an eshay the
+    // drunk's recording would be worse than silence -- see `game/characters.ts`
+    // section 4. The crowd clears its own queue at the top of every update, so a
+    // frame that skipped this drops lines rather than accumulating them.
+    for (const line of characterCrowd.lines) hud.notice(line.text);
+
+    // --- And the ambient events. `wildGround` rather than `groundHeightAt`:
+    // this wants the *raw* terrain height, because a queue of twenty-five
+    // commuters placed against the player's last known ground would float
+    // whenever the player was on a station platform. The wildlife's ground query
+    // already makes exactly this distinction and its header argues it.
+    eventScene.update(
+      trafficTick(Date.now()) + accumulator / FIXED_DT,
+      player.position.x,
+      player.position.z,
+      wildGround,
+      // The footpaths, so a site is snapped onto a kerb rather than drawn where
+      // the hash put it -- which the first cut of this feature demonstrated was
+      // sometimes the roof of a terrace. See `events.SNAP_REACH`.
+      pedestrians,
+    );
+
+    // --- Standing in a queue for a bus that is not coming.
+    //
+    // The clock is here rather than in `world/events.ts` because a clock is
+    // state and that object is a renderer -- `inTrackworkQueue` is a predicate
+    // and this is the twenty seconds. Reset on leaving, and told once: the line
+    // lands the first time and never again for the same queue, because the
+    // second time it is not deadpan, it is nagging.
+    {
+      const queue = inTrackworkQueue(eventScene.live, player.position.x, player.position.z);
+      if (queue === null) {
+        queueSince = -1;
+        queueTold = false;
+      } else {
+        const nowS = performance.now() / 1000;
+        if (queueSince < 0) queueSince = nowS;
+        else if (!queueTold && nowS - queueSince >= 20) {
+          queueTold = true;
+          hud.notice('the bus is not coming');
+        }
+      }
+    }
+
     // --- What a shot sounds and looks like.
     //
     // Read off the state byte rather than off an event, which is the whole
@@ -7470,6 +7710,44 @@ async function main(): Promise<void> {
         firing.delete(actor.id);
       }
     }
+
+    // --- Workstream E, off the same state bytes and the same rising-edge rule.
+    //
+    // Two lines, and both of them are things you find out by *watching* rather
+    // than by doing:
+    //
+    //   - an **influencer going down** within `POSTED_RANGE`. The client that
+    //     swung already said the version with your name in it, at the swing;
+    //     this is what everybody else gets, and it is impersonal because the
+    //     snapshot carries no attacker for an NPC knockdown. See the swing path.
+    //   - a **tradie helping somebody up**, which he signals by entering
+    //     `NPC_STATE.IDLE` beside a downed player -- there is no state byte for
+    //     "helping" and adding one would be a protocol change for a line, so the
+    //     range test is the signal. It fires at most once per tradie per session
+    //     through the same `posted` set, which is what stops it repeating on
+    //     every frame he stands there.
+    for (const actor of policeField().actors) {
+      if (!isCharacterKind(actor.kind)) continue;
+      const range = Math.hypot(actor.x - player.position.x, actor.z - player.position.z);
+      if (actor.kind === NPC_KIND.INFLUENCER) {
+        const wasDown = posted.has(actor.id);
+        if (actor.state === NPC_STATE.DOWN) {
+          if (!wasDown) {
+            posted.add(actor.id);
+            if (range < POSTED_RANGE) hud.notice(POSTED_LINE_BYSTANDER);
+          }
+        } else if (wasDown) {
+          posted.delete(actor.id);
+        }
+      } else if (actor.kind === NPC_KIND.TRADIE) {
+        if (posted.has(actor.id)) continue;
+        if (playerCombat.phase !== 'ko') continue;
+        if (range > 5) continue;
+        posted.add(actor.id);
+        hud.notice(TRADIE_HELP_LINE);
+      }
+    }
+
     tracers.update(frameDt);
 
     // --- And what the birds sound like, off the same state bytes.
@@ -9050,6 +9328,104 @@ async function main(): Promise<void> {
             }
           : null,
         standHere: near ? { x: near.x, y: near.y + EYE_HEIGHT, z: near.z } : null,
+      };
+    },
+
+    /**
+     * Workstream E: the five characters and the live events, and where to stand
+     * to meet one.
+     *
+     * `streetReport`'s argument verbatim, and it applies with more force here
+     * than anywhere else in the build: **both tiers of this feature are pure
+     * functions rather than objects**. An ambient Karen is a hash over a census
+     * cell and an event is a hash over the in-game day, so when somebody reports
+     * that they "never see any of the new characters" there is nothing in the
+     * scene graph to inspect and the three possible causes -- the wrong time of
+     * day, a cell whose bias is zero, and bands that have not streamed in --
+     * look identical from inside the game.
+     *
+     * `standHere` is the useful field on both halves: a point a couple of metres
+     * from the nearest character, and a point at the edge of the nearest live
+     * event, so `sydney.look(sydney.characters().standHere)` is a one-liner that
+     * puts the thing in front of the camera.
+     */
+    characters(radius = 200) {
+      const tick = trafficTick(Date.now());
+      const day = dayAtTick(tick);
+      const here = player.position;
+      const scratch: PedBand[] = [];
+      const probe = createCharacterPose();
+      const seen: Array<{ kind: string; metres: number; x: number; y: number; z: number }> = [];
+      if (pedestrians) {
+        forEachCharacterNear(pedestrians, here.x, here.z, radius, tick, scratch, probe, (p) => {
+          seen.push({
+            kind: npcKind(p.kind)?.name ?? String(p.kind),
+            metres: Math.round(Math.hypot(p.x - here.x, p.z - here.z) * 10) / 10,
+            x: Math.round(p.x * 10) / 10,
+            y: Math.round(p.y * 10) / 10,
+            z: Math.round(p.z * 10) / 10,
+          });
+        });
+      }
+      seen.sort((a, b) => a.metres - b.metres);
+      const promoted = [...policeField().actors]
+        .filter((a) => isCharacterKind(a.kind))
+        .map((a) => ({
+          id: a.id,
+          kind: npcKind(a.kind)?.name ?? String(a.kind),
+          state: Object.entries(NPC_STATE).find(([, v]) => v === a.state)?.[0] ?? String(a.state),
+          metres: Math.round(Math.hypot(a.x - here.x, a.z - here.z) * 10) / 10,
+          onYou: a.target >= 0,
+        }));
+      promoted.sort((a, b) => a.metres - b.metres);
+      const near = seen[0];
+      // The live events the renderer is holding, which is the same list the map
+      // markers come off -- see the marker source. Reading the scene's list
+      // rather than re-deriving it is deliberate: if the two ever disagree, this
+      // report shows what is actually being *drawn*.
+      const events = eventScene.live
+        .map((s) => ({
+          name: EVENT_NAME[s.kind] ?? String(s.kind),
+          metres: Math.round(Math.hypot(s.x - here.x, s.z - here.z)),
+          x: Math.round(s.x),
+          z: Math.round(s.z),
+          endsInRealMinutes: Math.round((s.startPhase + s.spanPhase - day.phase) * 60 * 10) / 10,
+        }))
+        .sort((a, b) => a.metres - b.metres);
+      const site = eventScene.live[0];
+      return {
+        tick,
+        day: day.index,
+        phase: Math.round(day.phase * 1000) / 1000,
+        daylight: daylight(day.phase),
+        saturday: saturdayAt(day.index),
+        ambient: seen.length,
+        promoted: promoted.length,
+        rigsDrawn: characterCrowd.ambient + characterCrowd.actors,
+        costMs: Math.round(characterCrowd.costMs * 1000) / 1000,
+        nearest: seen.slice(0, 8),
+        onYou: promoted.slice(0, 8),
+        events,
+        eventCostMs: Math.round(eventScene.costMs * 1000) / 1000,
+        eventInstances: eventScene.drawn,
+        // Two metres back from the nearest one, at eye height, looking at them.
+        standHere: near
+          ? {
+              x: near.x + (here.x - near.x) * 0.0001 + 2.2,
+              y: near.y + EYE_HEIGHT,
+              z: near.z + 2.2,
+              yaw: Math.atan2(-(near.x - (near.x + 2.2)), -(near.z - (near.z + 2.2))),
+            }
+          : null,
+        // And a viewpoint on the nearest live event: eighteen metres out, looking in.
+        watchEvent: site
+          ? {
+              x: site.x + 18,
+              y: wildGround(site.x + 18, site.z + 18) + EYE_HEIGHT,
+              z: site.z + 18,
+              yaw: Math.atan2(-(site.x - (site.x + 18)), -(site.z - (site.z + 18))),
+            }
+          : null,
       };
     },
 
