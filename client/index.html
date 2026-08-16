@@ -833,6 +833,56 @@
         #investigation { animation: none; }
       }
 
+      /* The heat ladder's star row, sitting on top of the banner.
+
+         POSITION. `#investigation` is at 13% and is three stacked lines; this
+         goes above it, which is why it is anchored by its own `bottom` against
+         a `top` of 13% rather than by a second magic percentage. `translate`
+         does both: -50% across to centre it on the column every other element
+         in this stack is centred on, and -100% up so its *bottom* edge sits at
+         13% whatever height the glyphs happen to render at. A second hard-coded
+         percentage would drift the moment the banner's font changed.
+
+         SIZE. `--vitals-scale`, the same product the bottom-left cluster uses,
+         because the request that produced that number -- "make the HUD stuff
+         much bigger, at least 3x" -- was about being able to read the interface
+         mid-fight, and there is nothing in this interface more mid-fight than
+         this. 11px is the base and the ladder multiplies it, so a 1080p player
+         reads 33px of stars and a 4K one 59px.
+
+         COLOUR. One colour for the whole row -- the banner's own `#f0a9a0` --
+         and the filled/unfilled distinction is carried by the *glyphs*, U+2605
+         against U+2606. Two spans and two colours would have meant building the
+         row out of markup, and `hud.heat` writes `textContent` on purpose (see
+         there). An outlined star in the same hue reads as an empty rung of this
+         row rather than as a different object, which is what a second colour
+         would have made it. At 4 and 5 the whole row goes to a hotter amber and
+         picks up a glow -- `.hot` -- because by then the information has
+         already been delivered and what is left to communicate is alarm.
+
+         The pulse is `#investigation`'s exactly, so the two move together and
+         read as one instrument rather than as two things that happen to be
+         stacked. It stops under prefers-reduced-motion with it. */
+      #heat {
+        position: fixed; top: 13%; left: 50%;
+        transform: translate(-50%, -100%);
+        pointer-events: none; text-align: center; display: none;
+        font-size: calc(11px * var(--vitals-scale));
+        line-height: 1;
+        letter-spacing: .06em;
+        color: #f0a9a0;
+        text-shadow: 0 1px 3px rgba(0,0,0,.9);
+        animation: investigating 2s ease-in-out infinite;
+      }
+      #heat.shown { display: block; }
+      #heat.hot {
+        color: #ffc66b;
+        text-shadow: 0 0 14px rgba(255,170,60,.55), 0 1px 3px rgba(0,0,0,.9);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #heat { animation: none; }
+      }
+
       /* The leaderboard, held on Tab.
 
          Held rather than toggled, which is the one interaction decision here:
@@ -1207,6 +1257,10 @@
          splitting the two would put the shape a file away from the arithmetic
          that places the marker on it. -->
     <div id="clock"></div>
+    <!-- The heat ladder's stars, above the banner. `#investigation` says why
+         the police are interested and this says how much; see `hud.heat` and
+         `game/heat.ts` for the ladder itself. -->
+    <div id="heat"></div>
     <div id="investigation">
       <div id="investigation-title">Under Investigation!</div>
       <div id="investigation-reason"></div>

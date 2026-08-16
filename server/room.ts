@@ -86,6 +86,7 @@ import {
   encodeEvents,
   encodeInterestInto,
   decodeInput,
+  encodeHeat,
   encodeInvestigationsInto,
   encodePowerups,
   encodeRoster,
@@ -103,6 +104,9 @@ import {
   type SnapshotNpc,
   type SnapshotPlayer,
 } from '../client/src/net/protocol.ts';
+// The shared wall-clock tick. The heat channel's deadlines are denominated in
+// it, exactly as `sim.stepFactions`' are -- see `sendHeat`.
+import { trafficTick } from '../client/src/game/traffic.ts';
 import { botName } from './bots.ts';
 import { FrameGroups, InterestIndex, InterestSet } from './aoi.ts';
 import { Simulation, applyButtons, type Participant, type TickOutput } from './sim.ts';
@@ -561,6 +565,18 @@ function takeInput(conn: Conn): InputFrame | null {
 const ROSTER_REFRESH_TICKS = TICK_HZ * 2;
 /** The police channel's, and it is the roster's exactly. See `server/index.ts`'s history. */
 const INVESTIGATION_REFRESH_TICKS = TICK_HZ * 2;
+/**
+ * And the heat ladder's, which is the same two seconds for a different reason.
+ *
+ * The investigation channel refreshes on a clock because the client *predicts*
+ * it and a wrong prediction is only cleared by a message that contradicts it.
+ * Nothing predicts heat -- there is no client-side ladder -- so this refresh is
+ * doing the humbler job of covering a dropped frame on a level that would
+ * otherwise stay wrong until the next crime. Five bytes a wanted player, a few
+ * times a minute, against a HUD that could sit on four stars after the player
+ * has already got away.
+ */
+const HEAT_REFRESH_TICKS = TICK_HZ * 2;
 
 /** A tick this far over budget waited on something. Bun exposes no GC hook. */
 const STALL_MS = (1000 / TICK_HZ) * 4;
@@ -635,6 +651,9 @@ export class Room {
   private rosterTick = 0;
   private investigationSent = -1;
   private investigationTick = 0;
+  /** The heat channel's watched version and refresh clock. See `sendHeat`. */
+  private heatSent = -1;
+  private heatTick = 0;
 
   // --- Measurement. Per room, because a host with one busy room and seven quiet
   // ones has to be able to say so.
@@ -1036,6 +1055,7 @@ export class Room {
 
     this.sendRoster();
     this.sendInvestigations();
+    this.sendHeat();
     this.sendBikes();
     this.sendEvents();
     // Offset per room, so the host's egress is spread across the three ticks in
@@ -1129,6 +1149,48 @@ export class Room {
         frame = this.investigationBytesOut.slice(0, n);
         this.investigationCache.set(key >>> 0, frame);
       }
+      ws.send(frame);
+      this.bytesSent += frame.byteLength;
+      this.logBytes += frame.byteLength;
+    }
+  }
+
+  /**
+   * The heat ladder: **room-global, one encode, everybody.**
+   *
+   * The one channel in this room that is deliberately *not* interest-filtered,
+   * and the argument is the reverse of the investigation channel's one method
+   * up. That one is filtered because a banner over somebody you cannot see is a
+   * fact about nobody. A star count is drawn on a **nameplate**, and a nameplate
+   * is only drawn for a player who is already in front of you -- so filtering
+   * here would be re-deciding on the server, per client, per refresh, a thing
+   * the renderer decides for free every frame. What it would buy is a handful of
+   * bytes: the full set for a room of sixteen is 83.
+   *
+   * So there is one frame and it is encoded once. No content cache and no
+   * scratch list, because there is nothing per-client to vary.
+   *
+   * **Sent on the join tick as well**, unlike the investigation channel: heat
+   * has no prediction behind it, so a joiner who is told nothing draws no stars
+   * on anybody until the next change -- and the change might be two minutes
+   * away, which is two minutes of a 4-star player walking around unmarked.
+   * `sim.tick` is fresh at zero on a new room, so the refresh clock below fires
+   * on the first tick a joiner is present for and this costs nothing extra.
+   */
+  private sendHeat(): void {
+    const sim = this.sim;
+    const changed = sim.heat.version !== this.heatSent;
+    const refresh = sim.tick - this.heatTick >= HEAT_REFRESH_TICKS;
+    if (!changed && !refresh) return;
+    this.heatSent = sim.heat.version;
+    this.heatTick = sim.tick;
+    // The deadlines are absolute ticks on the shared wall clock and the wire
+    // carries the remainder, so the encoder needs the instant it is speaking
+    // at. `trafficTick(Date.now())` is the same clock `stepFactions` reads and
+    // the same one every client runs -- see `protocol.encodeHeat`.
+    const frame = encodeHeat(sim.heatRecords(), trafficTick(Date.now()));
+    for (const ws of this.conns) {
+      if (!ws.data.participant) continue;
       ws.send(frame);
       this.bytesSent += frame.byteLength;
       this.logBytes += frame.byteLength;

@@ -1302,6 +1302,28 @@ export class CombatAudio {
   // scheduler with a 0.3 s lookahead over `game/rave.beatAt`, which means it
   // costs nothing when nobody is near a rave and needs no clock of its own.
 
+  // --- The heat ladder's two loops: a siren and a rotor -----------------------
+  //
+  // **Synthesised, and this is the file's founding argument holding rather than
+  // bending.** The one departure from it -- see `clips` at the top -- is for
+  // *voice*, on the grounds that "Oi! Stop right there" is not two oscillators
+  // and an envelope. A siren is *exactly* two oscillators and an envelope: it is
+  // a swept tone, it has been a swept tone since 1965, and a sampled one would
+  // be a file whose loop point, pitch and loudness were decided somewhere else
+  // and would have to be crossfaded to move with the car. A rotor is filtered
+  // noise chopped at blade-passing frequency, which is the physical description
+  // and the synthesis recipe in the same sentence.
+  //
+  // Both are **loops rather than one-shots**, which is why they are here beside
+  // the rave's chain rather than up with `gunshot` and `thwack`. A loop that is
+  // built and torn down has a lifecycle, and the pattern for that in this file
+  // is `raveUpdate`: one call a frame with a mix or `null`, the chain built on
+  // the first frame it is wanted and faded out and dropped when it is not. See
+  // `heatUpdate`.
+
+  /** The live siren and rotor chain, or null when nothing is wanted. */
+  private heat: HeatChain | null = null;
+
   /** The live chain, built on the first frame a rave is audible and torn down after. */
   private rave: RaveChain | null = null;
   /** Which venue the chain belongs to. A change tears the decks down. */
@@ -1319,6 +1341,206 @@ export class CombatAudio {
    * decides what is audible and no state anywhere else. Returns nothing and
    * throws nothing: a browser with no audio is a rave with lights.
    */
+  /**
+   * The siren and the rotor, for this frame. `null` for silence.
+   *
+   * One call from the frame loop with whatever the heat ladder currently has in
+   * the world, which is `raveUpdate`'s arrangement exactly: there is one place
+   * that decides what is audible and no state anywhere else.
+   *
+   * `sirenDistance` is the metres to the nearest patrol car with its lights on,
+   * or `Infinity` for none. `rotor` is 0..1, Polair's beam level -- not a
+   * distance, because the helicopter is *overhead* by construction and the thing
+   * that varies is whether it is there at all. The distinction is why these are
+   * two numbers in one call rather than two calls: they are the same chain, they
+   * fade together when the pursuit ends, and a player at 5 stars hears both.
+   */
+  heatUpdate(mix: HeatMix | null): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+
+    const sirenWanted = mix !== null && mix.sirenDistance < SIREN_RANGE;
+    const rotorWanted = mix !== null && mix.rotor > 0.01;
+    if (!sirenWanted && !rotorWanted) {
+      this.heatSilence();
+      return;
+    }
+
+    const chain = this.heat ?? this.heatBuild(ctx, master);
+    if (!chain) return;
+    this.heat = chain;
+    const t = ctx.currentTime;
+
+    // --- The siren's distance model. `bark`'s falloff rather than an impact's,
+    // and for `bark`'s stated reason: a siren tells you something is *about to*
+    // happen, and a warning you cannot hear until it is too late to act on is
+    // not a warning. Cut to nothing at the range rather than tapering forever,
+    // so a car three suburbs away is not a node running for the session.
+    const d = sirenWanted ? Math.max(0, mix.sirenDistance) : SIREN_RANGE;
+    const sirenGain = sirenWanted ? SIREN_GAIN / (1 + d / SIREN_HALF_DISTANCE) : 0;
+    chain.sirenOut.gain.setTargetAtTime(sirenGain, t, 0.12);
+    // The wail widens as it closes, which is the Doppler-adjacent cue that
+    // actually reads: near, the sweep is the whole octave; far, it is a warble.
+    const sweep = SIREN_SWEEP_HZ * (sirenWanted ? Math.max(0.35, 1 - d / SIREN_RANGE) : 0.35);
+    chain.sirenSweep.gain.setTargetAtTime(sweep, t, 0.2);
+
+    // --- The rotor. A level rather than a distance; see the doc above.
+    const rotor = rotorWanted ? mix.rotor : 0;
+    chain.rotorOut.gain.setTargetAtTime(ROTOR_GAIN * rotor, t, 0.25);
+    // The pan wanders slowly across the head, which is what makes it read as
+    // *overhead and circling* rather than as a machine bolted to the camera.
+    // A triangle, on `game/streetlife.triangle`'s argument: a sine spends most
+    // of its time at the ends of the stroke and a helicopter does not.
+    if (chain.rotorPan) {
+      const f = (t * ROTOR_ORBIT_HZ) % 1;
+      chain.rotorPan.pan.setTargetAtTime(f < 0.5 ? f * 4 - 1 : 3 - f * 4, t, 0.3);
+    }
+  }
+
+  /** Fade out, stop the elements and drop the graph. Idempotent. */
+  private heatSilence(): void {
+    const chain = this.heat;
+    if (!chain) return;
+    this.heat = null;
+    const ctx = this.ctx;
+    if (ctx) {
+      // A ramp rather than a disconnect. `raveSilence`' rule: a loop cut dead is
+      // a click, and 200 ms is under the time it takes to walk out of range.
+      chain.sirenOut.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.07);
+      chain.rotorOut.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.07);
+    }
+    // Stopped and disconnected on a timer, so the fade above is heard. The
+    // oscillators are single-use nodes and the chain is rebuilt from scratch the
+    // next time anything is wanted, which is how the Web Audio API is meant to
+    // be used and costs nothing at one pursuit a minute.
+    setTimeout(() => {
+      try {
+        for (const node of chain.sources) node.stop();
+      } catch {
+        // Already stopped by a context teardown. Nothing to do.
+      }
+      try {
+        chain.sirenOut.disconnect();
+        chain.rotorOut.disconnect();
+        chain.rotorPan?.disconnect();
+      } catch {
+        // Likewise.
+      }
+    }, 500);
+  }
+
+  /**
+   * Build the siren and the rotor. Both at once, because they share a lifecycle.
+   *
+   * **The siren** is the Australian wail: a triangle carrier swept up and down
+   * about 0.4 times a second by a second, much slower triangle. Two oscillators
+   * an octave apart rather than one, because a single tone reads as a test tone
+   * and the octave is what gives it the hard electronic edge a modern box has.
+   * Through a bandpass at the carrier's own centre, which takes the corners off
+   * the triangle without making it a sine.
+   *
+   * **The rotor** is the blade-passing chop: white noise through a low-pass at
+   * 400 Hz -- which is what a rotor's broadband hiss is, once the air has taken
+   * everything above it -- multiplied by a fast triangle at 13 Hz, which is four
+   * blades at about 200 rpm. Under it, a 27 Hz sine for the thump you feel
+   * rather than hear, at a level that does nothing on a laptop speaker and is
+   * the whole effect on anything with a woofer.
+   */
+  private heatBuild(ctx: AudioContext, master: GainNode): HeatChain | null {
+    const noise = this.noise;
+    if (!noise) return null;
+    const sources: AudioScheduledSourceNode[] = [];
+
+    // --- The siren.
+    const sirenOut = ctx.createGain();
+    sirenOut.gain.value = 0.0001;
+    const sirenBand = ctx.createBiquadFilter();
+    sirenBand.type = 'bandpass';
+    sirenBand.frequency.value = SIREN_CENTRE_HZ;
+    sirenBand.Q.value = 1.1;
+    sirenBand.connect(sirenOut).connect(master);
+
+    const carrier = ctx.createOscillator();
+    carrier.type = 'triangle';
+    carrier.frequency.value = SIREN_CENTRE_HZ;
+    const carrierGain = ctx.createGain();
+    carrierGain.gain.value = 0.7;
+    carrier.connect(carrierGain).connect(sirenBand);
+
+    const octave = ctx.createOscillator();
+    octave.type = 'square';
+    octave.frequency.value = SIREN_CENTRE_HZ * 2;
+    const octaveGain = ctx.createGain();
+    octaveGain.gain.value = 0.12;
+    octave.connect(octaveGain).connect(sirenBand);
+
+    // The wail itself: one slow triangle driving both carriers' frequency
+    // through a gain that is the sweep depth in hertz. Modulating the
+    // *frequency* rather than retriggering an envelope is what makes it a
+    // continuous wail rather than a sequence of chirps.
+    const wail = ctx.createOscillator();
+    wail.type = 'triangle';
+    wail.frequency.value = SIREN_WAIL_HZ;
+    const sirenSweep = ctx.createGain();
+    sirenSweep.gain.value = SIREN_SWEEP_HZ;
+    wail.connect(sirenSweep);
+    sirenSweep.connect(carrier.frequency);
+    // Half again into the octave, so the two do not sweep in lockstep and the
+    // pair beats slightly -- which is most of what makes a real box sound busy.
+    const sweepUp = ctx.createGain();
+    sweepUp.gain.value = 1.9;
+    sirenSweep.connect(sweepUp).connect(octave.frequency);
+
+    // --- The rotor.
+    const rotorOut = ctx.createGain();
+    rotorOut.gain.value = 0.0001;
+    let rotorPan: StereoPannerNode | null = null;
+    try {
+      rotorPan = ctx.createStereoPanner();
+      rotorOut.connect(rotorPan).connect(master);
+    } catch {
+      // No panner on this engine. The rotor is mono and still overhead; the
+      // orbit is a nicety and its absence is not worth a branch anywhere else.
+      rotorPan = null;
+      rotorOut.connect(master);
+    }
+
+    const hiss = ctx.createBufferSource();
+    hiss.buffer = noise;
+    hiss.loop = true;
+    const air = ctx.createBiquadFilter();
+    air.type = 'lowpass';
+    air.frequency.value = ROTOR_AIR_HZ;
+    const chop = ctx.createGain();
+    // The chop's *depth*: the noise is multiplied by (0.35 + blade), so the
+    // hiss never goes fully silent between blades. A rotor that did would read
+    // as a stutter rather than as a thump.
+    chop.gain.value = 0.35;
+    hiss.connect(air).connect(chop).connect(rotorOut);
+
+    const blade = ctx.createOscillator();
+    blade.type = 'triangle';
+    blade.frequency.value = ROTOR_BLADE_HZ;
+    const bladeDepth = ctx.createGain();
+    bladeDepth.gain.value = 0.55;
+    blade.connect(bladeDepth).connect(chop.gain);
+
+    const thump = ctx.createOscillator();
+    thump.type = 'sine';
+    thump.frequency.value = ROTOR_THUMP_HZ;
+    const thumpGain = ctx.createGain();
+    thumpGain.gain.value = 0.22;
+    thump.connect(thumpGain).connect(rotorOut);
+
+    const now = ctx.currentTime;
+    for (const node of [carrier, octave, wail, hiss, blade, thump]) {
+      node.start(now);
+      sources.push(node);
+    }
+    return { sirenOut, sirenSweep, rotorOut, rotorPan, sources };
+  }
+
   raveUpdate(mix: RaveMix | null): void {
     const ctx = this.ctx;
     const master = this.master;
@@ -2222,3 +2444,86 @@ const ANNOUNCE_CUTOFF_MIN = 520;
  * long enough to remove the step.
  */
 const ANNOUNCE_EDGE_S = 0.015;
+
+// --- The heat ladder's loops ---------------------------------------------------
+
+/**
+ * What the frame loop tells `heatUpdate`.
+ *
+ * Two numbers with deliberately different units, and the asymmetry is the
+ * design rather than an oversight. A **patrol car** is somewhere -- it comes
+ * down a street, it passes you, it goes away -- so it is a distance. **Polair**
+ * is overhead by construction: the whole point of the fifth rung is that it is
+ * above you and will not go away, so what varies is not where it is but whether
+ * it is there, which is the beam level `world/highway-patrol.Polair` is already
+ * ramping. Making the rotor a distance would have meant inventing a helicopter
+ * position for a helicopter that does not exist.
+ */
+export interface HeatMix {
+  /** Metres to the nearest patrol car with its lights on, or `Infinity`. */
+  sirenDistance: number;
+  /** Polair's beam, 0..1. `Polair.intensity`. */
+  rotor: number;
+}
+
+/** The live siren and rotor graph. Built by `heatBuild`, dropped by `heatSilence`. */
+interface HeatChain {
+  sirenOut: GainNode;
+  /** The wail's depth in hertz, widened as a car closes. See `heatUpdate`. */
+  sirenSweep: GainNode;
+  rotorOut: GainNode;
+  /** Null on an engine with no `StereoPannerNode`. The orbit is a nicety. */
+  rotorPan: StereoPannerNode | null;
+  /** Every node that has to be stopped on teardown. */
+  sources: AudioScheduledSourceNode[];
+}
+
+/**
+ * How far a siren carries, metres, and where it is half as loud.
+ *
+ * **Further than anything else in this file**, and further than a rave: 300 m
+ * against `RAVE_AUDIBLE_RANGE`'s 175, because a siren is the only sound in this
+ * build whose entire job is to be heard **before** you can see the thing making
+ * it. A player at 3 stars who hears the highway patrol two blocks away has been
+ * given a decision -- get off the road, get inside, get on a train -- and that
+ * decision is the whole of what the rung is for. One that first hears it at
+ * 60 m has been given a jump scare.
+ *
+ * The half-distance is `bark`'s 22 scaled to the range, so the curve has the
+ * same *shape* as the officers' shouting and simply reaches further.
+ */
+const SIREN_RANGE = 300;
+const SIREN_HALF_DISTANCE = 55;
+/** Level at the car. Under a gunshot and over a bark: it is loud, not startling. */
+const SIREN_GAIN = 0.30;
+
+/**
+ * The wail: where the tone sits, how far it sweeps, and how fast.
+ *
+ * 660 Hz with a 420 Hz sweep at 0.42 Hz is the Australian "wail" setting --
+ * a slow rise and fall through most of an octave, about two and a half seconds
+ * a cycle. The alternative box setting is the "yelp", which is the same sweep
+ * at four times the rate; it is not used here because a yelp is what a car uses
+ * *at* an intersection and a wail is what it uses coming down a road, and this
+ * one is always coming down a road.
+ */
+const SIREN_CENTRE_HZ = 660;
+const SIREN_SWEEP_HZ = 420;
+const SIREN_WAIL_HZ = 0.42;
+
+/**
+ * The rotor: the air, the blades and the thump.
+ *
+ * 13 Hz is four blades at about 195 rpm, which is a light twin-engine police
+ * helicopter and is the frequency the human ear reads as *helicopter* rather
+ * than as *fan*. The air is low-passed at 400 Hz because that is what a
+ * kilometre of atmosphere does to broadband noise, and 27 Hz is the airframe
+ * fundamental -- inaudible on a laptop, and the whole effect on a subwoofer.
+ */
+const ROTOR_BLADE_HZ = 13;
+const ROTOR_AIR_HZ = 400;
+const ROTOR_THUMP_HZ = 27;
+/** Level at full beam. Under the siren: it is a presence, not an event. */
+const ROTOR_GAIN = 0.22;
+/** How fast the pan wanders across the head, cycles a second. Slow: it is circling. */
+const ROTOR_ORBIT_HZ = 0.055;

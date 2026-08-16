@@ -402,6 +402,27 @@ export const MSG = {
    * a face nobody else could see until the next real press three hours later.
    */
   SUN: 0x8e,
+  /**
+   * How wanted everybody is, in stars. See `encodeHeat` and `game/heat.ts`.
+   *
+   * **0x92 rather than 0x8e**, and the gap is deliberate: this feature landed in
+   * a batch of six built in parallel against one table, and 0x8e..0x91 are
+   * pre-assigned to the siblings so that two branches cannot both take "the next
+   * free number" and both be right. A hole in a table of bytes costs nothing;
+   * two features that decode each other's frames cost a session.
+   *
+   * A message of its own rather than a widening of `INVESTIGATION`, which was
+   * genuinely the tempting option -- the two are the same shape, they change at
+   * the same moments and they are about the same players. Two reasons not to.
+   * The first is that they have different *lifetimes*: an investigation is a
+   * countdown that the client runs down itself between messages, and a star
+   * count is a level that must never move on its own, so folding them would put
+   * a field that must not be extrapolated inside a message that exists to be
+   * extrapolated. The second is that a star count is drawn on **other people's
+   * nameplates** -- a 4-star player is a visible target -- so this one is
+   * room-global where the investigation channel is filtered to what you can see.
+   */
+  HEAT: 0x92,
 } as const;
 
 /**
@@ -2589,6 +2610,120 @@ export function decodeSun(
   };
 }
 
+// --- Heat ------------------------------------------------------------------------
+
+/**
+ * How wanted everybody is, in stars.
+ *
+ *     u8   type = MSG.HEAT
+ *     u16  count
+ *     per entry:
+ *       u16  player id
+ *       u8   stars              0..`heat.HEAT_MAX`
+ *       u16  decay ticks left   0 while the police can still see them
+ *
+ * **A replacement, not an upsert**, which is `MSG.INVESTIGATION`'s call one
+ * section up and is right here for the identical reason: heat all ends, the end
+ * is the interesting event, and a delete record that went missing would be four
+ * stars painted on a player who is no longer wanted -- which on a nameplate is a
+ * target somebody else will act on.
+ *
+ * **Room-global, not interest-filtered**, which is where it *differs* from the
+ * investigation channel. That one is filtered because a banner over somebody you
+ * cannot see is a fact about nobody; this one is drawn on nameplates, and a
+ * nameplate is only drawn for a player you can already see -- so the filter
+ * would be recomputing on the server a thing the renderer decides anyway. At
+ * five bytes an entry the full set for a room of sixteen is 83 bytes, a few
+ * times a minute.
+ *
+ * **The decay clock is sent as a countdown and read as a deadline.** The record
+ * this file hands out carries `decayEndsTick`, an absolute tick on
+ * `traffic.trafficTick`'s shared wall clock -- which is what every consumer
+ * actually wants, because it can be compared against `trafficTick(Date.now())`
+ * on any frame with no clock of its own. What crosses the wire is the
+ * *remainder*, a `u16`, for the reason `quantisePing` gives about wrapping: an
+ * absolute tick is about 1.9 billion a year off the traffic epoch, so it does
+ * not fit a `u32` for the life of the build and a `f64` would be eight bytes to
+ * say "twenty seconds". The decoder adds the receiver's own tick back, which is
+ * exact to the tick that the two machines' clocks agree -- and `protocol` v11
+ * already publishes the server's clock at join precisely so that they do.
+ *
+ * Zero is **not** a deadline. It means "the police still have eyes on them", and
+ * it is a distinct state rather than a very small number: what the HUD wants to
+ * draw is whether you are getting away, and a client deriving that from a
+ * countdown near zero would show the star about to fall at the exact moment an
+ * officer walked round the corner.
+ */
+export interface HeatRecord {
+  playerId: number;
+  stars: number;
+  /** Absolute tick, on the shared wall clock, or 0 while they are still seen. */
+  decayEndsTick: number;
+}
+
+export const HEAT_HEADER_BYTES = 3;
+export const HEAT_ENTRY_BYTES = 5;
+
+export function heatBytes(count: number): number {
+  return HEAT_HEADER_BYTES + count * HEAT_ENTRY_BYTES;
+}
+
+/**
+ * `records` into a fresh buffer. `now` is the sender's tick, which is what the
+ * absolute deadlines are made relative to.
+ */
+export function encodeHeat(
+  records: readonly HeatRecord[],
+  now: number,
+  buffer = new ArrayBuffer(heatBytes(records.length)),
+): ArrayBuffer {
+  const v = new DataView(buffer);
+  encodeHeatInto(v, records, now);
+  return buffer;
+}
+
+/** The same bytes into a caller-owned buffer, returning the length written. */
+export function encodeHeatInto(v: DataView, records: readonly HeatRecord[], now: number): number {
+  v.setUint8(0, MSG.HEAT);
+  v.setUint16(1, Math.min(records.length, 65535), true);
+  let p = HEAT_HEADER_BYTES;
+  for (const r of records) {
+    v.setUint16(p, r.playerId & 0xffff, true);
+    v.setUint8(p + 2, Math.max(0, Math.min(255, Math.round(r.stars))));
+    // Clamped, never wrapped -- `encodeInvestigations` states the argument and
+    // it is the same one: a wrapped countdown would draw two minutes of hiding
+    // as one second left, which is the only number in this message a player
+    // reads as a promise.
+    const left = r.decayEndsTick > 0 ? Math.round(r.decayEndsTick - now) : 0;
+    v.setUint16(p + 3, Math.max(0, Math.min(65535, left)), true);
+    p += HEAT_ENTRY_BYTES;
+  }
+  return p;
+}
+
+/** `now` is the *receiver's* tick. See the layout note on the deadline. */
+export function decodeHeat(buffer: ArrayBuffer, now: number): HeatRecord[] | null {
+  if (buffer.byteLength < HEAT_HEADER_BYTES) return null;
+  const v = new DataView(buffer);
+  if (v.getUint8(0) !== MSG.HEAT) return null;
+  const count = v.getUint16(1, true);
+  const out: HeatRecord[] = [];
+  let p = HEAT_HEADER_BYTES;
+  // Bounded by what arrived rather than by what the count claims. See
+  // `decodeBikes`: a `DataView` read past the end throws, and a throw inside a
+  // socket callback takes the client's whole message pump with it.
+  for (let i = 0; i < count && p + HEAT_ENTRY_BYTES <= buffer.byteLength; i++) {
+    const left = v.getUint16(p + 3, true);
+    out.push({
+      playerId: v.getUint16(p, true),
+      stars: v.getUint8(p + 2),
+      decayEndsTick: left > 0 ? now + left : 0,
+    });
+    p += HEAT_ENTRY_BYTES;
+  }
+  return out;
+}
+
 // --- The roster ---------------------------------------------------------------
 
 /**
@@ -3319,6 +3454,81 @@ export function verifyNet(): string[] {
     const short = decodeInvestigations(frame.slice(0, INVESTIGATION_HEADER_BYTES + 6));
     if (short === null || short.length !== 1) {
       failures.push(`An investigation message truncated mid-record decoded ${short?.length ?? 'null'} entries, not 1.`);
+    }
+  }
+
+  // --- Heat, the graded ladder's channel. `MSG.HEAT`; see `encodeHeat`.
+  //
+  // What this catches: a star count that does not round-trip is a HUD and a
+  // nameplate claiming a different tier from the one the server is dispatching
+  // helicopters about. A deadline that does not survive the relative encoding is
+  // a decay clock counting toward a moment in 1970 -- which draws as "getting
+  // away" forever, on a player the police are standing next to.
+  {
+    const sent = 5_000_000;
+    const records: HeatRecord[] = [
+      { playerId: 1, stars: 5, decayEndsTick: sent + 900 },
+      { playerId: 300, stars: 0, decayEndsTick: 0 },
+      { playerId: 42, stars: 2, decayEndsTick: sent + 1 },
+    ];
+    const frame = encodeHeat(records, sent);
+    if (frame.byteLength !== heatBytes(3)) {
+      failures.push(`A 3-entry heat message is ${frame.byteLength} bytes; the layout says ${heatBytes(3)}.`);
+    }
+    // Decoded against the *receiver's* clock, which in the ordinary case is the
+    // sender's -- both ends run `traffic.trafficTick(Date.now())`.
+    const got = decodeHeat(frame, sent);
+    if (!got || got.length !== 3) {
+      failures.push(`A 3-entry heat message decoded to ${got?.length ?? 'null'} records.`);
+    } else {
+      for (let i = 0; i < 3; i++) {
+        const a = records[i];
+        const b = got[i];
+        if (b.playerId !== a.playerId || b.stars !== a.stars || b.decayEndsTick !== a.decayEndsTick) {
+          failures.push(
+            `Heat for ${a.playerId}: ${a.stars} stars ending ${a.decayEndsTick} came back as ` +
+              `${b.stars}/${b.decayEndsTick}.`,
+          );
+        }
+      }
+    }
+    // Zero is a state, not a small number. A record with the police still on it
+    // must not come back as a deadline a fraction of a second away.
+    const still = decodeHeat(encodeHeat([{ playerId: 3, stars: 3, decayEndsTick: 0 }], sent), sent + 10);
+    if (!still || still[0].decayEndsTick !== 0) {
+      failures.push(
+        `"The police can still see you" came back as a deadline of ${still?.[0].decayEndsTick}. ` +
+          'The HUD would draw a star about to fall on a player who is being shot at.',
+      );
+    }
+    // The empty message is how the last star comes off every HUD in the room.
+    const none = decodeHeat(encodeHeat([], sent), sent);
+    if (none === null || none.length !== 0) {
+      failures.push('An empty HEAT message did not decode to an empty list; that is how the stars come down.');
+    }
+    // Clamped rather than wrapped, like the investigation countdown.
+    const huge = decodeHeat(encodeHeat([{ playerId: 2, stars: 1, decayEndsTick: sent + 999999 }], sent), sent);
+    if (!huge || huge[0].decayEndsTick !== sent + 65535) {
+      failures.push('An over-long decay deadline wrapped instead of clamping.');
+    }
+    // And a truncated tail drops the rest rather than throwing.
+    const short = decodeHeat(frame.slice(0, HEAT_HEADER_BYTES + 6), sent);
+    if (short === null || short.length !== 1) {
+      failures.push(`A heat message truncated mid-record decoded ${short?.length ?? 'null'} entries, not 1.`);
+    }
+    // The two channels must not share an id -- they are the same shape and a
+    // collision would decode one as the other with no frame that says so.
+    // Asserted over the whole table rather than as a pair, because the batch
+    // this landed in had six branches taking bytes out of `MSG` at once and the
+    // failure mode of two of them agreeing is a client acting on a frame it
+    // was never sent. Read through `Object.values` so the compiler cannot
+    // constant-fold the comparison away -- which it does for a literal pair,
+    // and which is exactly how this check would have gone quietly true.
+    {
+      const bytes = Object.values(MSG) as number[];
+      if (new Set(bytes).size !== bytes.length) {
+        failures.push('Two entries of MSG share a byte. One message would be decoded as another.');
+      }
     }
   }
 

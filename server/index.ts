@@ -93,6 +93,13 @@ import {
 import { verifyNames, verifyNet } from '../client/src/net/protocol.ts';
 import { verifyChat } from '../client/src/net/chat.ts';
 import { verifyUnstuck } from '../client/src/game/unstuck.ts';
+// The heat ladder. Run here because this process is the authority for it: the
+// star count, the decay, the patrol cars and the RBTs are all decided in this
+// process and *sent*, so every one of that file's silent failures -- a
+// non-monotone threshold table, a tier that cannot be shed, a crime priced past
+// the top of the ladder -- lands on players in a session and never in a
+// browser's console. See `client/src/game/heat.ts`'s check for the list.
+import { verifyHeat } from '../client/src/game/heat.ts';
 import { verifyTeleport } from '../client/src/game/teleport.ts';
 import { sunReady, sunScreaming, verifySunButton } from '../client/src/game/sunbutton.ts';
 import { trafficTick } from '../client/src/game/traffic.ts';
@@ -223,6 +230,7 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // hour or comes back on the wrong day, three real hours after anybody was
     // looking. See `client/src/game/sunbutton.ts`.
     ['verifySunButton', verifySunButton()],
+    ['verifyHeat', verifyHeat()],
     // The suggestions box's week arithmetic, sanitiser, order and codecs.
     // Run **here** rather than only in the browser because the server is the
     // side that keeps the ledger, and every failure in that file is silent in
