@@ -269,6 +269,25 @@ import {
   type NpcActor,
 } from './game/factions.ts';
 import { PoliceAssets, PoliceSquad, Tracers, policeWarmupParts, verifyPoliceKit } from './world/police.ts';
+// --- The heat ladder (workstream D). Pure logic in `game/heat.ts`, which the
+// server imports too; the patrol car, the RBT props and the Polair spotlight in
+// `world/highway-patrol.ts`, which imports three and the server never sees.
+import {
+  HeatField,
+  heatLine,
+  installHeat,
+  stepHeat,
+  verifyHeat,
+  HEAT_MAX,
+  type HeatWorld,
+} from './game/heat.ts';
+import {
+  HighwayPatrolAssets,
+  HighwayPatrolFleet,
+  Polair,
+  highwayPatrolWarmupParts,
+  verifyHighwayPatrol,
+} from './world/highway-patrol.ts';
 // The illegal raves, on the same two-file split as everything ambient in this
 // build: `game/rave.ts` is the arithmetic every client agrees about -- which
 // warehouse, viaduct or park is live tonight, what is on the decks, where forty
@@ -693,6 +712,19 @@ async function main(): Promise<void> {
   // `verifyPoliceKit` call beside `PoliceAssets`. This is everything that needs
   // nothing but arithmetic, which is most of it.
   const policeFailures = timed('police', () => verifyPolice(undefined, SNAPSHOT_INTERVAL));
+  // And the graded response on top of them, in the same two halves.
+  //
+  // The **rules** half is where this feature's silent failures live and they all
+  // render a plausible city: a threshold table out of order makes committing a
+  // crime *lower* your star count, a tier that cannot be shed leaves a player
+  // wanted forever with the stars simply never going down, and a crime priced
+  // past the top of the ladder takes a bystander assault straight to Polair.
+  // None of them throws and every one of them reads as tuning. See `verifyHeat`.
+  //
+  // The **model** half runs earlier, beside the assets -- `verifyHighwayPatrol`
+  // by `HighwayPatrolAssets` -- and is the one that would otherwise ship a
+  // patrol car with a hole in one flank.
+  const heatFailures = timed('heat', verifyHeat);
   // And the street factions, on the same two halves again.
   //
   // The **rules** half has its own four: an anchor outside the built extent puts
@@ -876,6 +908,7 @@ async function main(): Promise<void> {
     pedFailures.length ||
     pedModelFailures.length ||
     policeFailures.length ||
+    heatFailures.length ||
     streetFailures.length ||
     wildlifeFailures.length ||
     nameplateFailures.length ||
@@ -925,6 +958,7 @@ async function main(): Promise<void> {
           ...pedFailures,
           ...pedModelFailures,
           ...policeFailures,
+          ...heatFailures,
           ...streetFailures,
           ...wildlifeFailures,
           ...nameplateFailures,
@@ -1337,6 +1371,16 @@ async function main(): Promise<void> {
     return;
   }
   const tracers = new Tracers();
+  // --- The heat ladder's furniture, on exactly the same terms: pure geometry,
+  // built up here so the first patrol car of a session is not a synchronous
+  // shader compile in the middle of a pursuit -- which is the one moment in a
+  // session where a 200 ms hitch is unambiguously the game's fault.
+  const patrolAssets = new HighwayPatrolAssets();
+  const patrolKitFailures = verifyHighwayPatrol(patrolAssets);
+  if (patrolKitFailures.length) {
+    hud.fatal('Highway patrol kit self-checks failed:\n' + patrolKitFailures.map((f) => '  - ' + f).join('\n'));
+    return;
+  }
   const streetAssets = new StreetlifeAssets(characters);
   const streetKitFailures = verifyStreetlifeKit(streetAssets);
   if (streetKitFailures.length) {
@@ -1805,6 +1849,10 @@ async function main(): Promise<void> {
         // the first officer, the first meth head, the first bush turkey, the
         // first shot fired, the first other player's plate.
         ...policeWarmupParts(policeAssets, tracers),
+        // And the heat ladder's: the patrol body, its light bar, one lens, the
+        // RBT's cone line and the Polair disc. Five pipelines that would
+        // otherwise each compile on the frame a 3-star pursuit arrived.
+        ...highwayPatrolWarmupParts(patrolAssets),
         ...streetlifeWarmupParts(streetAssets),
         ...nameplateWarmupParts(nameplates),
         // The rave's booth banner, which is the one thing in that whole feature
@@ -2371,6 +2419,43 @@ async function main(): Promise<void> {
   // warm-up that compiles them. Only the squad is built here.
   const squad = new PoliceSquad(policeAssets, characters);
   for (const rig of squad.rigs) scene.add(rig.mesh);
+
+  // --- The heat ladder (workstream D). One contiguous block; see `game/heat.ts`.
+  //
+  // The **field** is the offline authority's, exactly as `factions` above it is:
+  // online it is never stepped and the star count arrives on `MSG.HEAT`, and
+  // offline this process runs the same `stepHeat` the server runs, over the same
+  // file. `installHeat` is the handle `factions.accuse`'s crime funnel reaches
+  // it through -- one authority per process, and in a browser that is this one.
+  const heat = new HeatField();
+  installHeat(heat);
+  /**
+   * The two things the ladder needs beyond the faction context. Built once.
+   *
+   * `rideStop` is this process's answer to "what is the player's train doing",
+   * and it is resolved from the ride the player is already on rather than from
+   * anything new -- `aboardPose` against the same `railSeconds(Date.now())`
+   * every other rail call site in this file reads. -2 is on foot, -1 is aboard
+   * and moving, and anything else is the stop index the train is standing at.
+   * See `heat.HeatWorld`.
+   */
+  const heatWorld: HeatWorld = {
+    lanes: traffic,
+    rideStop: (id) => {
+      if (id !== playerCombat.id) return -2;
+      const a = playerCombat.aboard;
+      if (!railBake || !isAboard(a)) return -2;
+      const pose = aboardPose(railBake, a, railSeconds(Date.now()));
+      return pose === null ? -2 : pose.atStop;
+    },
+  };
+  /** The patrol cars and the RBTs in view, from whichever authority is running. */
+  const patrolFleet = new HighwayPatrolFleet(patrolAssets);
+  scene.add(patrolFleet.group);
+  /** Polair: a spotlight, a disc and a rotor. Not a helicopter. See its header. */
+  const polair = new Polair(scene, patrolAssets);
+  /** What the star row last read, so `hud.notice` fires on the edge and not the level. */
+  let heatShown = 0;
 
   // --- And the street factions, on exactly the same two tiers.
   //
@@ -3411,7 +3496,7 @@ async function main(): Promise<void> {
    * fifteen literals a frame.
    */
   const plate: PlateInput = {
-    id: 0, name: '', health: 0, headX: 0, headY: 0, headZ: 0, down: false,
+    id: 0, name: '', health: 0, headX: 0, headY: 0, headZ: 0, down: false, stars: 0,
   };
   /**
    * What to write over a training dummy.
@@ -3980,6 +4065,42 @@ async function main(): Promise<void> {
     }
   }
   const online = net !== null;
+
+  // --- `?heat=N`: start offline at N stars. **Offline only, by construction.**
+  //
+  // The ladder is a five-rung feature whose top two rungs take ninety seconds
+  // each to reach honestly, and every one of them puts something different in
+  // the world -- a car, a roadblock, a helicopter. A screenshot of the 4-star
+  // RBT that had to be earned by knocking out two officers and then surviving
+  // ninety seconds is a screenshot nobody takes twice, which means the rung
+  // stops being checked.
+  //
+  // The gate is `!online` and it is a gate rather than a warning: `HeatField` is
+  // the same class the server runs, so a `debugSet` reachable in a session would
+  // be a client setting its own star count -- and the answer to that in this
+  // project is always the same, which is that the authority decides. Online the
+  // param is read and ignored, and the notice says so rather than doing nothing
+  // silently.
+  {
+    const asked = new URLSearchParams(location.search).get('heat');
+    if (asked !== null) {
+      const want = Math.max(0, Math.min(HEAT_MAX, Math.round(Number(asked) || 0)));
+      if (online) hud.notice('?heat is offline-only — the server decides how wanted you are');
+      else if (want > 0) {
+        // **The banner first, then the stars.** A star count with no
+        // investigation behind it would be half the interface: the 1-star rung
+        // *is* the banner and every rung above it keeps it, so a debug aid that
+        // set one without the other would be showing a state the game cannot
+        // actually be in. `predictInvestigation` offline is `factions.accuse`,
+        // which fires the crime funnel and banks its own points -- so the
+        // `debugSet` has to come second, where it overwrites them.
+        predictInvestigation(REASON.ASSAULT);
+        heat.debugSet(playerCombat.id, want, trafficTick(Date.now()));
+        hud.notice(`?heat=${want} — ${want} star${want === 1 ? '' : 's'}`);
+      }
+    }
+  }
+
   // The suggestions box is server-backed: offline it opens and says so rather
   // than not opening, on the argument that a control which silently does nothing
   // is a control a player decides is broken. `?offline` is one of the two ways
@@ -6141,7 +6262,7 @@ async function main(): Promise<void> {
           // `game/wildlife.ts` section 3, and `server/sim.hitNpc`, which reaches
           // the identical answer through `reportWildlifeCrime`.
           const wild = isProtected(hit.kind);
-          const crime = hit.kind === NPC_KIND.POLICE
+          let crime = hit.kind === NPC_KIND.POLICE
             ? REASON.ASSAULT_POLICE
             : wild
               ? REASON.WILDLIFE
@@ -6149,6 +6270,15 @@ async function main(): Promise<void> {
           if (!online) {
             const strike = strikeNpc(factions, hit, 1, playerName, playerCombat.id, tick);
             if (strike.landed) audio.thwack(strike.down);
+            // **The swing and the result are two different charges.** Hitting a
+            // constable is a 2-star response and putting one on the ground is a
+            // 3-star one, which is not a distinction one reason code can carry
+            // -- see `game/heat.CRIME_POINTS`. Offline only, because online the
+            // server has already re-run the strike against its own actors and
+            // has already made this call in `sim.hitNpc`; this client's copy is
+            // a *prediction* and it does not know whether its swing landed on
+            // the authority's actor at all.
+            if (hit.kind === NPC_KIND.POLICE && strike.down) crime = REASON.MURDER_POLICE;
           }
           if (hit.kind === NPC_KIND.POLICE || wild) predictInvestigation(crime);
           else if (crime !== REASON.NONE) accuse(hit.x, hit.z, crime, tick);
@@ -6326,6 +6456,13 @@ async function main(): Promise<void> {
         // cap is reached -- see `WILDLIFE_BUDGET` -- so a park full of turkeys
         // can never be the reason an officer could not be dispatched.
         stepWildlife(ctx, wildScratch, wildPose);
+        // And the heat ladder, **after** the factions rather than before: the
+        // crimes reported during the last tick are drained by
+        // `FactionField.step`, which is what calls `accuse`, which is what feeds
+        // the ladder. Running it first would put every crime a tick late and
+        // would make a 3-star escalation arrive after the officers it brings.
+        // `server/sim.stepFactions` puts it in exactly the same place.
+        stepHeat(ctx, heat, heatWorld);
         // Drained **here** rather than in the frame loop, because `step` clears
         // the list at the top of every call and `simulate` can run more than
         // once per frame when the accumulator has caught up on a stall. A bark
@@ -7600,6 +7737,60 @@ async function main(): Promise<void> {
       );
     }
 
+    // --- The heat ladder: the star row, the line, and everything it put in the
+    // world. One contiguous block; see `game/heat.ts` and `world/highway-patrol.ts`.
+    {
+      // One number from whichever authority is running, exactly as the banner
+      // above takes one record: online it is `MSG.HEAT`, offline it is this
+      // process's own field, and nothing below this line knows which.
+      const stars = net ? net.heatStars : heat.starsOf(playerCombat.id);
+      hud.heat(stars);
+      // The voice, on the **edge** rather than the level. A `hud.notice` fired
+      // off the star count itself would repeat sixty times a second for as long
+      // as the rung lasted, which is `sim.stepRideBy`'s own lesson about a state
+      // that has to be read as an event.
+      if (stars !== heatShown) {
+        const line = heatLine(heatShown, stars);
+        if (line) hud.notice(line);
+        heatShown = stars;
+      }
+      // The patrol cars and the RBTs, out of the same `policeField()` the squad
+      // draws officers from -- which is not a police-only accessor despite the
+      // name: it is "wherever the promoted actors are", and each renderer
+      // filters the kinds it draws itself.
+      patrolFleet.update(policeField(), frameDt, player.position.x, player.position.z);
+      // And Polair, which needs no actor at all: it is a light aimed at the
+      // wanted player and the only thing it reads is their star count. Five is
+      // the top rung; see `game/heat.ts` section 4.
+      polair.update(
+        frameDt,
+        stars >= HEAT_MAX,
+        player.position.x,
+        player.position.y,
+        player.position.z,
+        groundHeightAt(player.position.x, player.position.z, player.position.y),
+      );
+      // The siren and the rotor. One call a frame with whatever is out there,
+      // which is `audio.raveUpdate`'s arrangement: one place decides what is
+      // audible and there is no state anywhere else. The siren's distance is to
+      // the nearest patrol car that is actually chasing somebody -- a car parked
+      // at an RBT has its bar on and its siren off, which is what one of those
+      // looks like on a real arterial.
+      let nearestSiren = Infinity;
+      for (const a of policeField().actors) {
+        if (a.kind !== NPC_KIND.HIGHWAY_PATROL || a.state === NPC_STATE.DOWN) continue;
+        const dx = a.x - player.position.x;
+        const dz = a.z - player.position.z;
+        const d = Math.sqrt(dx * dx + dz * dz);
+        if (d < nearestSiren) nearestSiren = d;
+      }
+      audio.heatUpdate(
+        nearestSiren === Infinity && polair.intensity <= 0.01
+          ? null
+          : { sirenDistance: nearestSiren, rotor: polair.intensity },
+      );
+    }
+
     // Every actor -- three dummies and the player's own body -- on the frame
     // delta rather than the fixed step. Deliberate, and the opposite of the
     // choice `simulate` makes above: the simulation is fixed so that prediction
@@ -7828,6 +8019,10 @@ async function main(): Promise<void> {
         plate.headY = plateHead.y;
         plate.headZ = plateHead.z;
         plate.down = r.anim === ANIM.KO;
+        // How wanted they are, under the name. A 4-star player is a visible
+        // target, which is the whole reason this is on other people's plates
+        // and not only on your own HUD. See `nameplates.starRow`.
+        plate.stars = net.heatOf(r.id);
         nameplates.add(plate, net.id);
       }
     } else {
@@ -7847,6 +8042,10 @@ async function main(): Promise<void> {
         plate.headY = plateHead.y;
         plate.headZ = plateHead.z;
         plate.down = f.combat.phase === 'ko';
+        // A training dummy has no standing with the police, and saying so
+        // explicitly rather than leaving the field from the last plate is the
+        // whole reason `PlateInput` is copied field by field -- see `add`.
+        plate.stars = heat.starsOf(f.combat.id);
         nameplates.add(plate, playerCombat.id);
       }
     }
@@ -8080,6 +8279,64 @@ async function main(): Promise<void> {
     player,
     globals,
     frameMs: () => medianFrameMs(),
+
+    /**
+     * The heat ladder, for the console. One contiguous block; see `game/heat.ts`.
+     *
+     * `sydney.heat.report()` answers the three questions this feature raises
+     * from outside a session, and none of them can be answered by looking:
+     *
+     *   - `stars` and `points` are the ladder itself. The **points are hidden
+     *     from the player on purpose** -- the whole design is that you read your
+     *     standing off five glyphs -- so this is the only place the number a
+     *     rung is actually made of can be seen, and it is the first thing to
+     *     type when a tier arrives earlier or later than it should.
+     *   - `cars` and `rbts` are what the ladder has actually put on the road,
+     *     against what the star count says should be there. A 3-star player with
+     *     `cars: 0` is the shared actor cap biting (`factions.MAX_ACTORS`) or a
+     *     suspect off the lane graph -- two completely different problems that
+     *     look identical from inside the game, which is no patrol car arriving.
+     *   - `polair` is the beam's level, which by day is the only way to tell the
+     *     fifth rung from the fourth without listening for the rotor.
+     *
+     * `set(n)` is `?heat=N` after the fact and carries the same offline gate,
+     * for the same reason: `HeatField` is the class the server runs, and a
+     * client setting its own star count is a client deciding how wanted it is.
+     */
+    heat: {
+      report: () => ({
+        stars: net ? net.heatStars : heat.starsOf(playerCombat.id),
+        points: Math.round(heat.pointsOf(playerCombat.id)),
+        wanted: heat.wantedCount,
+        cars: patrolFleet.cars,
+        rbts: patrolFleet.rbts,
+        spawnedCars: heat.patrolCarsSpawned,
+        placedRbts: heat.rbtsPlaced,
+        // What the shared cap is currently holding, across every faction. The
+        // number to read when a rung's furniture does not arrive: at
+        // `factions.MAX_ACTORS` a promotion is refused unless it can evict
+        // something, and "the field was full of seagulls" and "the ladder is
+        // broken" look identical from inside the game.
+        actors: factions.actors.length,
+        polair: Math.round(polair.intensity * 100) / 100,
+      }),
+      set: (n: number) => {
+        if (online) return 'offline only — the server decides how wanted you are';
+        heat.debugSet(playerCombat.id, n, trafficTick(Date.now()));
+        return heat.starsOf(playerCombat.id);
+      },
+    },
+    /**
+     * One presented frame as a PNG data URL. `await sydney.grab()`.
+     *
+     * The bug box's own grabber, exposed. `toDataURL` on a WebGPU canvas is
+     * blank unless it is read in the same frame as a render -- *silently* blank,
+     * a valid PNG of nothing -- so there is exactly one place in this client
+     * that can take a picture, and it is already wired into the render loop.
+     * A second one would be a second way to get an empty file. See
+     * `bugreport.FrameGrabber`.
+     */
+    grab: (timeoutMs?: number) => grabber.request(timeoutMs),
 
     /**
      * The night rig, for the console.

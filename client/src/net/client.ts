@@ -101,6 +101,7 @@ import {
   WebSocketTransport,
   createSnapshot,
   decodeBikes,
+  decodeHeat,
   decodeBye,
   decodeEvents,
   decodeInterest,
@@ -120,6 +121,7 @@ import {
   decodePong,
   frameType,
   rankRoster,
+  type HeatRecord,
   type InvestigationRecord,
   type NetTransport,
   type RosterEntry,
@@ -160,6 +162,9 @@ import {
   type SuggestionList,
 } from './suggestions.ts';
 import { NPC_STATE, type NpcActor } from '../game/factions.ts';
+// The shared wall-clock tick, for the heat channel's deadlines. Both ends run
+// this same function over the same epoch -- see `game/traffic.trafficTick`.
+import { trafficTick } from '../game/traffic.ts';
 
 const FIXED_DT = 1 / TICK_HZ;
 
@@ -519,6 +524,37 @@ export class NetClient {
       return;
     }
     this.investigations.set(this.id, { playerId: this.id, reason, ticks });
+  }
+
+  /**
+   * How wanted everybody is, keyed by player id, as the server last said.
+   *
+   * A plain mirror. Unlike `investigations` above it there is no local clock and
+   * no prediction -- see the `MSG.HEAT` case for why a level must not be
+   * extrapolated.
+   */
+  private readonly heat = new Map<number, HeatRecord>();
+
+  /** This client's own star count, 0..5. What the HUD draws its row from. */
+  get heatStars(): number {
+    return this.heat.get(this.id)?.stars ?? 0;
+  }
+
+  /**
+   * When this client's current star would fall if they stay hidden, as an
+   * absolute tick, or **0 while the police still have eyes on them**.
+   *
+   * Zero is a state rather than a very small number -- see
+   * `protocol.encodeHeat` -- and it is the difference the HUD actually draws:
+   * are they still on me, or am I getting away.
+   */
+  get heatDecayEndsTick(): number {
+    return this.heat.get(this.id)?.decayEndsTick ?? 0;
+  }
+
+  /** Anybody's, for the star row under their nameplate. A 4-star player is a target. */
+  heatOf(playerId: number): number {
+    return this.heat.get(playerId)?.stars ?? 0;
   }
 
   /** Run every countdown down by one tick's worth of frame. Called from `update`. */
@@ -1152,6 +1188,29 @@ export class NetClient {
         // way to `MSG.BIKES`.
         this.investigations.clear();
         for (const r of records) this.investigations.set(r.playerId, { ...r });
+        return;
+      }
+      case MSG.HEAT: {
+        // Decoded against **this** client's own wall-clock tick, which is what
+        // turns the wire's remaining-ticks back into the absolute deadline the
+        // record carries. See `protocol.decodeHeat`; the two clocks agree
+        // because v11 publishes the server's at join.
+        const records = decodeHeat(frame, trafficTick(Date.now()));
+        if (!records) return;
+        // Replacement, not upsert, on `MSG.INVESTIGATION`'s argument one case
+        // up: heat all ends, the end is the interesting event, and a missing
+        // delete is four stars painted on a player nobody is chasing -- which
+        // on a nameplate is a target somebody else will act on.
+        //
+        // No prediction and nothing run down locally, which is where this
+        // differs from the investigation channel. A star count is a *level*,
+        // not a countdown: a client that extrapolated it would draw a star
+        // falling off between messages and then jumping back on, and there is
+        // nothing a player could do with that. The deadline is carried so the
+        // HUD can say "you are getting away"; the stars only move when the
+        // authority says so.
+        this.heat.clear();
+        for (const r of records) this.heat.set(r.playerId, r);
         return;
       }
       case MSG.BYE: {

@@ -125,6 +125,18 @@ import {
 // used here and nothing else -- one tick of the ambient promotion scan, and the
 // rule about whether hitting one of them is a crime.
 import { stepStreetlife, strikeCrime } from '../client/src/game/streetlife.ts';
+// The heat ladder, on the same terms once more: `game/heat.ts` imports no three
+// and registers the two kind bytes `NPC_KIND` reserved for the highway patrol
+// and the RBT. Four entry points -- the field, one tick of it, the handle the
+// crime funnel reaches it through, and the world record it needs beyond the
+// faction context. See that file's header for the design.
+import {
+  HeatField,
+  installHeat,
+  stepHeat,
+  type HeatWorld,
+  type HeatRecord,
+} from '../client/src/game/heat.ts';
 // And the wildlife, on the same terms again: `game/wildlife.ts` imports no three
 // and registers the three kind bytes `NPC_KIND` reserved for it. Three entry
 // points -- the ambient promotion scan, the predicate for "is this one of the
@@ -461,6 +473,24 @@ export class Simulation {
    */
   readonly factions = new FactionField();
   /**
+   * The graded response: how wanted every player is, and everything the ladder
+   * has put on the road. See `client/src/game/heat.ts`.
+   *
+   * Beside `factions` rather than inside it, on the bikes' own argument: the
+   * investigation is a fact about the police and the ladder is a fact about the
+   * *player*, it outlives any one pursuit, and the two have different lifetimes
+   * on the wire -- `MSG.INVESTIGATION` is a countdown a client extrapolates and
+   * `MSG.HEAT` is a level it must not.
+   */
+  readonly heat = new HeatField();
+  /**
+   * The two things the ladder needs that `FactionCtx` does not carry, built once
+   * and never rebuilt: `stepFactions`' own discipline about the context, applied
+   * to a record with two members.
+   */
+  private readonly heatWorld: HeatWorld;
+  private readonly heatRecordPool: HeatRecord[] = [];
+  /**
    * Scratch for the wildlife's ambient query, so a 60 Hz tick allocates nothing.
    *
    * Per simulation rather than per module, on `carRoutes`/`carPose`'s argument
@@ -589,6 +619,19 @@ export class Simulation {
       ped: this.witnessPed,
       beat: this.witnessBeat,
     };
+    // The heat ladder's own two members. `lanes` is the same `TrafficField`
+    // every car in the city is drawn from -- a patrol car has to drive the
+    // roads that exist, not a second set -- and `rideStop` is this file's
+    // answer to "what is this player's train doing", which it already resolves
+    // every tick for the aboard section and would be a second copy of if
+    // `game/heat.ts` imported the rail bake to work it out again.
+    this.heatWorld = {
+      lanes: world.traffic,
+      rideStop: (id) => this.rideStop(id),
+    };
+    // The handle `factions.accuse`'s crime funnel reaches this field through.
+    // One authority per process; see `heat.installHeat`.
+    installHeat(this.heat);
 
     // The bikes, laid out from the same tile index every client reads and
     // snapped to the same ground the players walk on.
@@ -838,6 +881,14 @@ export class Simulation {
   private creditKo(attackerId: number, victimId: number): void {
     const victim = this.participants.get(victimId);
     if (victim) victim.downs++;
+    // **The heat ladder's terminal state, and this is the one funnel every
+    // knockout in the game passes through** -- a punch, a football, a car, a
+    // police round, jumping off a train, and the RBT. Being caught wipes it,
+    // whoever caught you, which is the brief's rule and is the only version
+    // that is playable: a 5-star player who respawns still at 5 stars respawns
+    // into a helicopter. The countdown is cleared beside it in `hurt` for the
+    // paths that reach that one; this covers the rest.
+    this.heat.reset(victimId);
     if (attackerId !== victimId) {
       const attacker = this.participants.get(attackerId);
       if (attacker) attacker.kos++;
@@ -1402,6 +1453,13 @@ export class Simulation {
     // `WILDLIFE_BUDGET`, a third of the field -- so a park full of turkeys can
     // never be the reason an officer could not be dispatched to somebody.
     stepWildlife(ctx, this.wildScratch, this.wildPose);
+    // And the heat ladder, **after** the factions rather than before: the
+    // crimes reported during the last tick are drained by `FactionField.step`,
+    // which is what calls `accuse`, which is what feeds the ladder. Running it
+    // first would put every crime a tick late and would make a 3-star
+    // escalation arrive after the officers it is supposed to bring. See
+    // `game/heat.stepHeat`, which states the same ordering from its own side.
+    stepHeat(ctx, this.heat, this.heatWorld);
     // An investigation that ran out changes what the wire has to say, and
     // nothing inside the field can bump a version it does not know about.
     if (this.factions.investigationCount !== before) this.investigationVersion++;
@@ -1459,6 +1517,10 @@ export class Simulation {
       // countdown's other terminal state, and a banner that survived a respawn
       // would have the player wanted for something they were already punished
       // for.
+      //
+      // The **ladder** is wiped by `creditKo` above rather than here, because
+      // that is the funnel every knockout passes through and this one is only
+      // the world's. See there.
       this.factions.clearInvestigation(playerId);
       this.investigationVersion++;
       this.seenRiding.set(playerId, false);
@@ -2033,7 +2095,14 @@ export class Simulation {
     // one only while they are calm" without this file knowing why. A kind that
     // registers no opinion gets the ordinary bystander rule.
     if (actor.kind === NPC_KIND.POLICE) {
-      this.accuse(p, REASON.ASSAULT_POLICE);
+      // **The swing and the result are two different charges**, which is what
+      // the heat ladder needs to grade them apart: hitting a constable is a
+      // 2-star response and putting one on the ground is a 3-star one, and a
+      // single reason code cannot carry that. `strike.down` is read here rather
+      // than inferred from the actor's state for the reason the crime is read
+      // *before* the strike a few lines up -- the state is already the answer
+      // to a different question by the time this line runs.
+      this.accuse(p, strike.down ? REASON.MURDER_POLICE : REASON.ASSAULT_POLICE);
     } else if (isProtected(actor.kind)) {
       // **A protected native, and the crime is unconditional.** No witness test
       // and no line of sight: a bush turkey, an ibis and a magpie are protected
@@ -2277,6 +2346,42 @@ export class Simulation {
     });
     out.length = n;
     return out;
+  }
+
+  /**
+   * How wanted everybody is, as the wire wants them. Reused; serialise before
+   * the next step.
+   *
+   * Pooled on `investigations()`' terms and for its reason: this is read on the
+   * transport's refresh and on every tick the star count changes, and a fresh
+   * array of fresh objects each time would be a few hundred short-lived
+   * allocations a minute to say the same three numbers.
+   */
+  heatRecords(): HeatRecord[] {
+    return this.heat.records(this.heatRecordPool);
+  }
+
+  /**
+   * What one player's train is doing: -2 on foot, -1 aboard and moving, or the
+   * index of the stop it is standing at. `heat.HeatWorld.rideStop`.
+   *
+   * Resolved from the ride the player is already on rather than from anything
+   * new: `aboardPose` is the same call `resolveAboard` makes a few lines away,
+   * against the same `railT` this tick already read once, so there is no second
+   * clock and no second opinion about which train anybody is on. A ride whose
+   * trip has finished reports "on foot", which is what it is about to be --
+   * `resolveAboard` puts them on the platform on this same tick.
+   */
+  private rideStop(playerId: number): number {
+    const p = this.participants.get(playerId);
+    if (!p) return -2;
+    const a = p.combat.aboard;
+    if (!isAboard(a)) return -2;
+    const bake = this.world.rail;
+    if (!bake) return -2;
+    const pose = aboardPose(bake, a, this.railT);
+    if (pose === null) return -2;
+    return pose.atStop;
   }
 
   /** Faction events this tick -- shots, barks, knockdowns. Drained by the transport. */

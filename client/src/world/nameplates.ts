@@ -287,8 +287,48 @@ const FONT_STACK = 'ui-monospace, SFMono-Regular, Menlo, monospace';
  */
 export const MAX_PLATES = 24;
 
-/** Backing, fill, two ticks, name. See the header. */
-export const QUADS_PER_PLATE = 5;
+/** Backing, fill, two ticks, name, stars. See the header. */
+export const QUADS_PER_PLATE = 6;
+
+/**
+ * The star row's height, as a fraction of the name's, and the gap over it.
+ *
+ * **Smaller than the name deliberately.** The brief for the heat ladder asked
+ * for "a small star row under the name so a 4-star player is a visible target",
+ * and the emphasis is on *small*: what a player has to read off a plate at 30 m
+ * is who somebody is and how hurt they are, and a star row the size of a name
+ * would be a second name. At 0.62 it is a badge under a label -- unmistakable
+ * once you know what it is, and not competing with the thing above it.
+ */
+const STAR_HEIGHT_SCALE = 0.62;
+const STAR_GAP = 0.03;
+
+/**
+ * The glyphs. Filled, unfilled, and the string builder that caches by count.
+ *
+ * A **string keyed into the same atlas the names use**, which is the trick that
+ * makes this feature almost free: `slotFor` caches a rasterisation by its text,
+ * so the six possible star rows occupy six atlas rows for the life of the
+ * session however many players are wearing them, and a plate costs one more
+ * `Map` lookup and one more quad. The alternative -- a sprite sheet of stars, or
+ * five quads a plate -- would have been a second texture, a second material or
+ * five times the geometry, for a row of text.
+ *
+ * Six strings built once at module load rather than concatenated per plate, so
+ * a frame with fifteen 3-star players allocates no strings at all.
+ */
+const STAR_ROWS: readonly string[] = /*#__PURE__*/ (() => {
+  const rows: string[] = [];
+  for (let n = 0; n <= 5; n++) rows.push('\u2605'.repeat(n) + '\u2606'.repeat(5 - n));
+  return rows;
+})();
+
+/** The row for a star count, or `''` for nobody wanted -- which draws nothing. */
+export function starRow(stars: number): string {
+  if (!(stars > 0)) return '';
+  const n = Math.max(0, Math.min(5, Math.round(stars)));
+  return STAR_ROWS[n];
+}
 
 const VERTS_PER_QUAD = 4;
 const INDICES_PER_QUAD = 6;
@@ -365,6 +405,17 @@ export interface PlateInput {
   headZ: number;
   /** Knocked out: the bar empties, the plate dims and the empty track goes red. */
   down: boolean;
+  /**
+   * How wanted they are, 0..5. `net/client.heatOf`, or the local field offline.
+   *
+   * Optional, and it defaults to nothing: two callers fill these plates -- the
+   * remotes online and the dummies offline -- and a training dummy has no
+   * standing with the police. An absent field draws no row at all rather than
+   * five empty stars, because a row of unfilled glyphs over every player in the
+   * street would be five times the ink to say the thing that is already true of
+   * everybody.
+   */
+  stars?: number;
 }
 
 /** A copy of a `PlateInput`, plus its range. Pooled; see `NameplateField.pending`. */
@@ -435,7 +486,7 @@ export class NameplateField {
    * record here is what lets the caller pass one scratch object for everybody.
    */
   private readonly pending: PendingPlate[] = Array.from({ length: MAX_PLATES }, () => ({
-    id: 0, name: '', health: 0, headX: 0, headY: 0, headZ: 0, down: false, distance: 0,
+    id: 0, name: '', health: 0, headX: 0, headY: 0, headZ: 0, down: false, stars: 0, distance: 0,
   }));
   private pendingCount = 0;
 
@@ -602,6 +653,7 @@ export class NameplateField {
     slot.headY = input.headY;
     slot.headZ = input.headZ;
     slot.down = input.down;
+    slot.stars = input.stars ?? 0;
     slot.distance = distance;
   }
 
@@ -800,6 +852,39 @@ export class NameplateField {
     // Both numbers are the same today and `verifyNameplates` is what keeps them
     // that way if `combat.MAX_HEALTH` ever moves.
 
+    // --- The star row, between the bar and the name.
+    //
+    // Written **before** the name so the name can be pushed up by exactly the
+    // height this took, which is how the row is "under the name" rather than
+    // over the bar: the plate grows upward and the two things a player already
+    // knows how to find -- the bar at the bottom, the name at the top -- stay
+    // where they were. See `starRow`, and `game/heat.ts` for what the stars are.
+    let starRise = 0;
+    {
+      const row = starRow(input.stars ?? 0);
+      const slot = row === '' ? null : this.slotFor(row);
+      if (slot !== null && slot.widthPx > 0) {
+        let starH = NAME_HEIGHT * STAR_HEIGHT_SCALE * scale;
+        let starW = starH * (slot.widthPx / SLOT_HEIGHT);
+        const cap = NAME_MAX_WIDTH * scale;
+        if (starW > cap) {
+          starH *= cap / starW;
+          starW = cap;
+        }
+        const bottom = barH + border + STAR_GAP * scale;
+        const v0 = slot.row * SLOT_HEIGHT;
+        c.setRGB(1, 1, 1);
+        this.quad(anchor, -starW / 2, starW / 2, bottom, bottom + starH, 0, v0, slot.widthPx, v0 + SLOT_HEIGHT, c, alpha);
+        starRise = starH + STAR_GAP * scale;
+      } else {
+        // Nobody wanted: still six quads. See the note on the degenerate fill --
+        // the quad count per plate has to be constant or the index buffer's
+        // fixed layout, and every budget check that reads it, stops being true.
+        c.setRGB(1, 1, 1);
+        this.quad(anchor, 0, 0, 0, 0, 0, 0, 0, 0, c, 0);
+      }
+    }
+
     // --- The name, centred over the bar.
     const slot = this.slotFor(input.name);
     if (slot.widthPx > 0) {
@@ -811,7 +896,7 @@ export class NameplateField {
         nameH *= cap / nameW;
         nameW = cap;
       }
-      const bottom = barH + border + NAME_GAP * scale;
+      const bottom = barH + border + NAME_GAP * scale + starRise;
       const u0 = 0;
       const u1 = slot.widthPx;
       const v0 = slot.row * SLOT_HEIGHT;
@@ -820,7 +905,7 @@ export class NameplateField {
       c.setRGB(1, 1, 1);
       this.quad(anchor, -nameW / 2, nameW / 2, bottom, bottom + nameH, u0, v0, u1, v1, c, alpha);
     } else {
-      // No name: still five quads. See the note on the degenerate fill.
+      // No name: still six quads. See the note on the degenerate fill.
       c.setRGB(1, 1, 1);
       this.quad(anchor, 0, 0, 0, 0, 0, 0, 0, 0, c, 0);
     }
@@ -918,9 +1003,47 @@ export function verifyNameplates(maxHealth: number): string[] {
     failures.push(`Nameplates draw ${MAX_PIPS} pips; combat has ${maxHealth}. The ticks would cut the bar in the wrong places.`);
   }
   // The tick loop writes `MAX_PIPS - 1` quads and the buffer layout budgets for
-  // exactly `QUADS_PER_PLATE`. Everything else in a plate is one quad each.
-  if (QUADS_PER_PLATE !== 3 + (MAX_PIPS - 1)) {
-    failures.push(`A plate writes ${3 + (MAX_PIPS - 1)} quads but ${QUADS_PER_PLATE} are budgeted; the index buffer's layout is wrong.`);
+  // exactly `QUADS_PER_PLATE`. Everything else in a plate is one quad each:
+  // the backing, the fill, the star row and the name.
+  if (QUADS_PER_PLATE !== 4 + (MAX_PIPS - 1)) {
+    failures.push(`A plate writes ${4 + (MAX_PIPS - 1)} quads but ${QUADS_PER_PLATE} are budgeted; the index buffer's layout is wrong.`);
+  }
+
+  // --- The star row. Six distinct strings, all five glyphs wide, and a row for
+  // nobody that draws nothing.
+  //
+  // What this catches: a star row that is the *same string* at two counts is a
+  // 2-star player and a 4-star player wearing the same badge, which is a target
+  // somebody picks wrong and there is no frame that says so -- both plates draw
+  // perfectly. A row of a different width at different counts wobbles as the
+  // ladder moves, which reads as the plate jittering. And a zero-star row that
+  // returned five empty glyphs would put a badge on every player in the street.
+  {
+    if (starRow(0) !== '') failures.push('An unwanted player is given a star row; every plate in the city would carry one.');
+    const seen = new Set<string>();
+    let width = -1;
+    for (let n = 1; n <= 5; n++) {
+      const row = starRow(n);
+      if (row === '') {
+        failures.push(`A ${n}-star player is given no star row at all.`);
+        continue;
+      }
+      if (seen.has(row)) failures.push(`${n} stars draws the same row as another count; the tiers are indistinguishable.`);
+      seen.add(row);
+      if (width < 0) width = [...row].length;
+      else if ([...row].length !== width) {
+        failures.push(`The ${n}-star row is ${[...row].length} glyphs and the others are ${width}; the row would jitter.`);
+      }
+    }
+    if (width !== 5) failures.push(`A star row is ${width} glyphs wide; the ladder is five stars.`);
+    // Out of range in either direction has to clamp rather than index off the
+    // end of the table, which returns `undefined` and rasterises the string
+    // "undefined" under somebody's name.
+    if (typeof starRow(9) !== 'string' || starRow(9) === '') failures.push('A star count past the top of the ladder produced no row.');
+    if (starRow(-1) !== '') failures.push('A negative star count produced a row.');
+    if (!(STAR_HEIGHT_SCALE > 0.3 && STAR_HEIGHT_SCALE < 1)) {
+      failures.push(`The star row is ${STAR_HEIGHT_SCALE} of a name's height; under 0.3 it is unreadable and at 1 it is a second name.`);
+    }
   }
 
   // --- The fade. Monotonic, and anchored at both ends.
@@ -985,7 +1108,13 @@ export function verifyNameplates(maxHealth: number): string[] {
   if (barOverCrown < 0.3 || barOverCrown > 0.9) {
     failures.push(`The bar sits ${barOverCrown.toFixed(2)} m over the crown; the order asked for about 0.55.`);
   }
-  const plateHeight = BAR_HEIGHT + BAR_BORDER * 2 + NAME_GAP + NAME_HEIGHT;
+  // The **tallest** a plate can be, which since the heat ladder is the one worn
+  // by a wanted player: the bar, the star row, and the name pushed up over it.
+  // Measured against the worst case rather than the common one, because the
+  // failure being guarded here -- a plate that dominates the body it belongs to
+  // -- happens to the plate that has the most on it.
+  const plateHeight =
+    BAR_HEIGHT + BAR_BORDER * 2 + STAR_GAP + NAME_HEIGHT * STAR_HEIGHT_SCALE + NAME_GAP + NAME_HEIGHT;
   if (plateHeight > figureHeight * 0.45) {
     failures.push(`A plate is ${plateHeight.toFixed(2)} m tall against a ${figureHeight} m figure; it would dominate the body.`);
   }

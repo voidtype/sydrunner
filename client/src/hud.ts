@@ -1057,6 +1057,51 @@ export class Hud {
 
   private investigationKey = '';
 
+  /**
+   * The star row over the banner: `★★☆☆☆`, or nothing at all.
+   *
+   * **Above the banner rather than replacing it**, which is the whole layout
+   * decision here. The banner answers *why* -- "assaulting a bystander" -- and
+   * the stars answer *how much*, and they are different questions a player asks
+   * at different moments: the reason once, when it appears, and the tier every
+   * few seconds for as long as it lasts. Stacking them puts the number that
+   * changes above the words that do not, in the column the eye is already on.
+   *
+   * The same 3x scale the vitals cluster carries, through `--vitals-scale` in
+   * `index.html` -- one number, one reason, and the only thing to touch if "3x"
+   * is ever "4x". A star row drawn at the banner's own 13 px would be the one
+   * element on this HUD that did not get bigger when the player asked for
+   * everything to get bigger.
+   *
+   * Written the way `investigation` above is written and for its reason: the
+   * glyph string is compared before it is assigned, so the common case -- a
+   * tier holding steady while the countdown runs -- is one string compare and
+   * no DOM write at all.
+   */
+  heat(stars: number): void {
+    const n = Math.max(0, Math.min(5, Math.round(stars)));
+    const row = n <= 0 ? '' : '★'.repeat(n) + '☆'.repeat(5 - n);
+    if (row === this.heatKey) return;
+    this.heatKey = row;
+    if (row === '') {
+      this.heatEl.classList.remove('shown');
+      return;
+    }
+    // `textContent`, never `innerHTML`. The string is built from two literals
+    // here and could never be markup -- and a HUD that would render markup if it
+    // ever were is a HUD one change away from being a problem. The same rule the
+    // banner one method up states.
+    this.heatEl.textContent = row;
+    this.heatEl.classList.add('shown');
+    // The top two rungs get their own class, because at 4 and 5 stars the thing
+    // the player needs is not information, it is alarm. See `#heat.hot` in
+    // `index.html`.
+    this.heatEl.classList.toggle('hot', n >= 4);
+  }
+
+  private heatKey = ' ';
+  private readonly heatEl = document.getElementById('heat')!;
+
   update(s: HudState): void {
     if (!this.debugVisible) return;
     const az = s.solar.azimuth;
