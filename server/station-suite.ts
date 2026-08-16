@@ -229,6 +229,8 @@ const FENCE_CLEAR = 0.9;
 const FENCE_HEIGHT = 1.8;
 /** `world/rail-geo.TRENCH_COPING_RISE`. */
 const TRENCH_COPING_RISE = 0.12;
+/** `world/rail-solids.TRENCH_COPING`: how far the wall's top laps over the rim. */
+const TRENCH_COPING = 0.5;
 /** `world/road-deck.DECK_THICKNESS_M`. */
 const DECK_THICKNESS = 0.45;
 /** `world/rail-geo.STAIR_INNER`/`STAIR_OUTER` midpoint and `ACCESS_ALONG`. */
@@ -845,6 +847,37 @@ class DrawnField {
    * about 45 degrees of level -- which is the same slope a body can walk up.
    */
   private readonly level: Float64Array;
+  /**
+   * The highest near-level drawn surface **that faces up**, which is a third
+   * question and the one this round exists for.
+   *
+   * ---------------------------------------------------------------------------
+   * **`level` is unsigned and that is exactly how a whole railway hid in it.**
+   * The player's report is *"i see thru the ground under my feet"*, riding a
+   * train in a cutting, and the cause was not a missing surface: `writeBallast`,
+   * `writeFormation`, `writeRails` and `writeViaduct` all emitted their floors
+   * with the normal pointing **down**, on `FrontSide` materials, so every one of
+   * them was culled from above. Measured in a browser at St Peters before the
+   * fix: 5,994 of 5,994 drawn ballast triangles and 1,904 of 1,904 rail heads
+   * faced down, and a ray cast straight down from the railhead hit nothing but
+   * the catenary.
+   *
+   * `level` could not see it, because `Math.abs(nY)` calls a backface a floor --
+   * which is precisely the assumption that made check 8b pass over the defect
+   * while the player was looking at it. This grid is the same rasterisation with
+   * the sign kept, and check 8c is the assertion built on it.
+   */
+  private readonly floor: Float64Array;
+  /**
+   * ...and the **lowest** of them, which is the one check 8c actually asks for.
+   *
+   * A canopy is an upward-facing near-level surface 3.9 m over a platform deck,
+   * and it is not a floor over the hole under the track -- the rider is beneath
+   * it. Taking the highest would call a carved corridor covered because
+   * something roofs it; taking the lowest asks "is there anything under me",
+   * which is the sightline in the report.
+   */
+  private readonly floorLow: Float64Array;
   private readonly n: number;
   private readonly x0: number;
   private readonly z0: number;
@@ -860,15 +893,19 @@ class DrawnField {
     this.z0 = centreZ - reach;
     this.top = new Float64Array(this.n * this.n).fill(-Infinity);
     this.level = new Float64Array(this.n * this.n).fill(-Infinity);
+    this.floor = new Float64Array(this.n * this.n).fill(-Infinity);
+    this.floorLow = new Float64Array(this.n * this.n).fill(Infinity);
   }
 
-  private mark(x: number, z: number, y: number, walkable: boolean): void {
+  private mark(x: number, z: number, y: number, walkable: boolean, faceUp: boolean): void {
     const ix = Math.floor((x - this.x0) / this.cell);
     const iz = Math.floor((z - this.z0) / this.cell);
     if (ix < 0 || iz < 0 || ix >= this.n || iz >= this.n) return;
     const c = iz * this.n + ix;
     if (y > this.top[c]) this.top[c] = y;
     if (walkable && y > this.level[c]) this.level[c] = y;
+    if (walkable && faceUp && y > this.floor[c]) this.floor[c] = y;
+    if (walkable && faceUp && y < this.floorLow[c]) this.floorLow[c] = y;
   }
 
   /** Walk a `THREE.Object3D` tree and burn every triangle into the grid. */
@@ -923,6 +960,12 @@ class DrawnField {
     const nZ = ux1 * vy1 - uy1 * vx1;
     const nLen = Math.hypot(nX, nY, nZ);
     const walkable = nLen > 1e-9 && Math.abs(nY) / nLen >= 0.7;
+    // **The sign, kept.** `nY` is the *geometric* normal of the triangle as it is
+    // wound, which is the same quantity the GPU back-face test and three's
+    // raycaster use -- so `faceUp` is literally "would a camera above this see
+    // it on a `FrontSide` material". See the `floor` grid for what reading only
+    // `Math.abs` hid.
+    const faceUp = nLen > 1e-9 && nY / nLen >= 0.7;
     // The interior, sampled on the grid. Skipped for a triangle whose plan is a
     // sliver -- `d` near zero is a vertical face and the edge walk below is the
     // whole of it -- and for an absurdly large one, which nothing in `rail-geo`
@@ -936,7 +979,7 @@ class DrawnField {
           if (l2 < -0.02 || l2 > 1.02) continue;
           const l3 = 1 - l1 - l2;
           if (l3 < -0.02 || l3 > 1.02) continue;
-          this.mark(x, z, l1 * ay + l2 * by + l3 * cy, walkable);
+          this.mark(x, z, l1 * ay + l2 * by + l3 * cy, walkable, faceUp);
         }
       }
     }
@@ -956,7 +999,7 @@ class DrawnField {
       for (let k = 0; k <= steps; k++) {
         const t = k / steps;
         // Edges never mark `level`: an edge is a line, not a floor.
-        this.mark(px0 + (px1 - px0) * t, pz0 + (pz1 - pz0) * t, hi, false);
+        this.mark(px0 + (px1 - px0) * t, pz0 + (pz1 - pz0) * t, hi, false, false);
       }
     }
   }
@@ -991,6 +1034,29 @@ class DrawnField {
     const iz = Math.floor((z - this.z0) / this.cell);
     if (ix < 0 || iz < 0 || ix >= this.n || iz >= this.n) return -Infinity;
     return this.level[iz * this.n + ix];
+  }
+
+  /**
+   * The highest surface at this point that a camera **above** it can see, or
+   * `-Infinity`.
+   *
+   * `walkableAt` with the sign kept. See the `floor` grid: the difference
+   * between the two is exactly the class of defect this round found, and it is
+   * the whole of check 8c.
+   */
+  floorAt(x: number, z: number): number {
+    const ix = Math.floor((x - this.x0) / this.cell);
+    const iz = Math.floor((z - this.z0) / this.cell);
+    if (ix < 0 || iz < 0 || ix >= this.n || iz >= this.n) return -Infinity;
+    return this.floor[iz * this.n + ix];
+  }
+
+  /** The **lowest** such surface, or `Infinity`. See `floorLow`. */
+  lowestFloorAt(x: number, z: number): number {
+    const ix = Math.floor((x - this.x0) / this.cell);
+    const iz = Math.floor((z - this.z0) / this.cell);
+    if (ix < 0 || iz < 0 || ix >= this.n || iz >= this.n) return Infinity;
+    return this.floorLow[iz * this.n + ix];
   }
 }
 
@@ -1054,6 +1120,33 @@ const VOID_ACROSS_M = 20;
  * it, which is the point: those are roofs and a roof over air is a roof.
  */
 const RAIL_PLANE_M = 2.0;
+
+/**
+ * How much of the carved corridor check 8c still lets look through, as a share.
+ *
+ * ---------------------------------------------------------------------------
+ * **A ceiling rather than a zero, and the number is the measurement.** Before
+ * the winding fix this check failed at **67%** -- 4,321 of 6,450 carved samples
+ * at St Peters, measured with a real raycaster in a browser, because the whole
+ * running surface of the railway faced away from the rider. After it: 7 of
+ * 5,376 at St Peters (0.13%) and 22 of 6,227 at Rockdale (0.35%).
+ *
+ * What is left is not the class. It is the last of the sampling mismatch
+ * `RailCut.groundCutAt` documents from the other side: the terrain mesh decides
+ * cut-or-keep per 3.9 m sub-quad from that sub-quad's *centre*, and
+ * `rail-geo.writeFormation` decides floor-or-not per 8 m rib from the
+ * *centreline*, against its own segment's railhead rather than the highest in
+ * the corridor. At the taper where a cutting runs out the two disagree by a
+ * metre or so and a scatter of isolated cells is carved with no slab in them.
+ * Closing it properly means the floor being decided on the carve's own lattice,
+ * which is a rib walk over `groundCutAt` and is the cost `writeFormation`'s own
+ * comment spends a paragraph refusing -- a separate round, and named as such.
+ *
+ * Half a percent is above the measured residual and far below anything that
+ * could be the class coming back: a single writer going inside out again puts
+ * this over 60% on the first station the suite reaches.
+ */
+const SEE_THROUGH_MAX_RATE = 0.005;
 
 // --- The suite ---------------------------------------------------------------------
 
@@ -1391,6 +1484,9 @@ export async function runStationSuite(
   let drawnRailStops = 0;
   let drawnInvisible = 0;
   let drawnVoids = 0;
+  /** Check 8c: carved corridor with nothing facing up under it, and its sample count. */
+  let drawnSee = 0;
+  let drawnCarved = 0;
 
   const builtRadius2 = world.index.radius_m * world.index.radius_m;
   const tileKeys = new Set(world.index.tiles.map((t) => t.key));
@@ -2192,6 +2288,18 @@ export async function runStationSuite(
         (s2) => !drawnAsTunnel(s2.flags) &&
           Math.hypot((s2.ax + s2.bx) / 2 - sx, (s2.az + s2.bz) / 2 - sz) < 300,
       );
+      /**
+       * How far the last `railNear` call was from the rail it answered with.
+       *
+       * On the closure rather than returned, because `railNear` is called once
+       * per sample in two loops of tens of thousands and an object per call is
+       * the difference between this check costing a second and costing five.
+       * Check 8c reads it to bound itself to the **formation**: past the
+       * corridor's own rim a body is inside the earth, and a sightline that
+       * would have to pass through a retaining wall to reach the sky is not one
+       * the player has.
+       */
+      let railNearD = Infinity;
       /** The rail head over a point, or NaN where no track is near enough. */
       const railNear = (x: number, z: number): number => {
         let best = Number.NaN;
@@ -2206,6 +2314,7 @@ export async function runStationSuite(
           bestD = d;
           best = s2.ay + ((s2.by - s2.ay) * t) / Math.max(1e-6, s2.len);
         }
+        railNearD = Math.sqrt(bestD);
         return best;
       };
 
@@ -2239,7 +2348,62 @@ export async function runStationSuite(
         }
       }
 
-      const drawnFail = invisible > 0 || voids > 0;
+      // --- 8c. The carved corridor with nothing drawn over the hole: the
+      //     **see-through**, and it is a different question from 8b.
+      //
+      //     *"i mean when im looking down ... i see thru the ground under my
+      //     feet when i do that"* -- riding a train, in a cutting. 8b asks
+      //     whether the ground query agrees with a drawn surface and answers in
+      //     metres of fall; it cannot see this defect at all, because the
+      //     surfaces were all there and all solid. What was missing was that
+      //     they faced the wrong way: `writeBallast`, `writeFormation`,
+      //     `writeRails` and `writeViaduct` wound every horizontal quad with the
+      //     normal pointing down, on `FrontSide` materials, so the entire
+      //     running surface of the railway was culled from above and a rider
+      //     looked straight through it. Where the terrain had been carved there
+      //     was nothing behind it either, and the sightline left the world.
+      //
+      //     So this is the assertion in the player's own terms: **where the
+      //     carve has taken the ground away, something the railway draws must
+      //     face up under the railhead plane.** Asked of `DrawnField`'s signed
+      //     grid, which is the same back-face test the GPU makes, and of
+      //     `RailCut.groundCutAt`, which is the same sub-quad decision
+      //     `terrain.buildTerrainMesh` makes about whether the sheet is there.
+      //     Neither side of it is a restatement of anything.
+      let seeThrough = 0;
+      let seeSamples = 0;
+      let firstSee = '';
+      if (cut !== null) {
+        for (let a = -ALONG8; a <= ALONG8; a += vstep) {
+          for (let c = -VOID_ACROSS_M; c <= VOID_ACROSS_M; c += vstep) {
+            const x = sx + ux * a + nx * c;
+            const z = sz + uz * a + nz * c;
+            const terr = world.terrain.height(x, z);
+            if (!Number.isFinite(terr)) continue;
+            const rail0 = railNear(x, z);
+            if (!Number.isFinite(rail0)) continue;
+            // **Inside the formation, and nowhere else.** See `railNearD`: the
+            // corridor's own rim plus the trench's coping is the last point a
+            // rider has a clear line down. `VOID_ACROSS_M` is the band 8b wants
+            // and it reaches twenty metres out, which past a retaining wall is
+            // twenty metres inside a hill.
+            if (railNearD > cut.halfWidthAt(x, z) + TRENCH_COPING) continue;
+            // Only where the terrain sheet is gone. Anywhere else the ground is
+            // drawn and a downward sightline stops on it whatever the railway
+            // did or did not build.
+            if (!Number.isFinite(cut.groundCutAt(x, z, terr))) continue;
+            seeSamples++;
+            // The **lowest** up-facing surface, so a canopy over the corridor
+            // does not answer for the floor under it. See `floorLow`.
+            const f = field.lowestFloorAt(x, z);
+            if (Number.isFinite(f) && f <= rail0 + RAIL_PLANE_M) continue;
+            seeThrough++;
+            if (firstSee === '') firstSee = `${x.toFixed(0)},${z.toFixed(0)}`;
+          }
+        }
+      }
+
+      const drawnFail = invisible > 0 || voids > 0 || seeThrough > 0;
       row.verdicts.drawn = triangles === 0 ? 'n/a' : drawnFail ? 'FAIL' : 'PASS';
       if (drawnFail) {
         const bits2: string[] = [];
@@ -2255,6 +2419,12 @@ export async function runStationSuite(
               `(worst ${worstVoid.toFixed(1)} m at ${worstVoidAt})`,
           );
         }
+        if (seeThrough > 0) {
+          bits2.push(
+            `${seeThrough}/${seeSamples} carved corridor samples have nothing facing up under the ` +
+              `railhead -- a sightline down from a carriage leaves the world (first at ${firstSee})`,
+          );
+        }
         row.notes.drawn = bits2.join('; ');
       }
       drawnTriangles += triangles;
@@ -2262,6 +2432,8 @@ export async function runStationSuite(
       drawnRailStops += railsFault.length;
       drawnInvisible += invisible;
       drawnVoids += voids;
+      drawnSee += seeThrough;
+      drawnCarved += seeSamples;
     }
   }
 
@@ -2512,6 +2684,20 @@ export async function runStationSuite(
     drawnVoids === 0,
     `nothing the railway draws in the corridor stands over open air: ${drawnVoids.toLocaleString()} ` +
       `drawn surfaces the ground query answers more than a metre below`,
+  );
+  // **The assertion this round exists for.** See check 8c: where the carve has
+  // taken the terrain sheet away, the railway must draw something that *faces
+  // up* under the railhead, or a rider looking down out of a carriage sees
+  // through the world. The whole running surface failed this before the winding
+  // fix and check 8b could not see it, because a back-face is a perfectly good
+  // solid and the ground query was answering off the same geometry.
+  emit(
+    drawnSee <= drawnCarved * SEE_THROUGH_MAX_RATE,
+    `no sightline down from the railhead leaves the world: ${drawnSee.toLocaleString()} of ` +
+      `${drawnCarved.toLocaleString()} carved corridor samples ` +
+      `(${(drawnCarved === 0 ? 0 : (100 * drawnSee) / drawnCarved).toFixed(2)}%, ceiling ` +
+      `${(100 * SEE_THROUGH_MAX_RATE).toFixed(1)}%) have nothing the railway draws facing up ` +
+      `beneath them. See SEE_THROUGH_MAX_RATE for what the residue is`,
   );
   // ...and the control, because zero above is also what a raster that read no
   // geometry would say. If `rail-geo` ever stops building under bun -- a DOM
@@ -2788,6 +2974,42 @@ export function runControls(emit: (ok: boolean, line: string) => void): void {
     emit(
       Math.abs(field.walkableAt(25, 25) - 5) < 0.01,
       `CONTROL: a level slab at 5 m reads as 5 m in the middle of itself (${field.walkableAt(25, 25).toFixed(2)})`,
+    );
+    // **The pair check 8c turns on, and it is the defect this round found
+    // reduced to twelve vertices.** Two slabs, identical but for the order the
+    // corners are named in. `walkableAt` -- `Math.abs(nY)` -- cannot tell them
+    // apart, which is exactly why check 8b sat green while the player was
+    // looking through the floor of a carriage. `lowestFloorAt` keeps the sign,
+    // which is the same back-face test the GPU makes on a `FrontSide` material,
+    // and must call one a floor and the other a hole.
+    //
+    // If the negative half of this stops failing, 8c is asserting nothing and
+    // the whole running surface of the railway can go inside out again without
+    // one line going red.
+    const facingUp = meshOf([
+      -30, 7, -30, -20, 7, -20, -20, 7, -30,
+      -30, 7, -30, -30, 7, -20, -20, 7, -20,
+    ]);
+    const facingDown = meshOf([
+      -30, 9, 20, -20, 9, 20, -20, 9, 30,
+      -30, 9, 20, -20, 9, 30, -30, 9, 30,
+    ]);
+    field.add(facingUp);
+    field.add(facingDown);
+    emit(
+      Math.abs(field.lowestFloorAt(-25, -25) - 7) < 0.01,
+      `CONTROL: a level slab wound to face up is a floor -- \`lowestFloorAt\` answers ` +
+        `${field.lowestFloorAt(-25, -25).toFixed(2)}`,
+    );
+    emit(
+      Math.abs(field.walkableAt(-25, 25) - 9) < 0.01,
+      `CONTROL: the same slab wound the other way is still *drawn* -- \`walkableAt\` answers ` +
+        `${field.walkableAt(-25, 25).toFixed(2)}, which is why check 8b never saw this class`,
+    );
+    emit(
+      !Number.isFinite(field.lowestFloorAt(-25, 25)),
+      `CONTROL: ...and it is not a *floor* -- \`lowestFloorAt\` answers ` +
+        `${field.lowestFloorAt(-25, 25)}. A back face is a hole with a normal`,
     );
   }
 }

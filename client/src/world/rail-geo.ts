@@ -1654,6 +1654,38 @@ function chunkDistance(cx: number, cz: number, x: number, z: number): number {
  * alternative, a mitred chain, would have to survive junctions where four
  * segments meet at a point and there is no mitre that is right for all of them.
  */
+// --- The winding rule, and the bug it hid for four rounds --------------------------
+//
+// **THE ONE RULE THE FOUR WRITERS BELOW GOT WRONG, WRITTEN DOWN ONCE.**
+//
+/*
+ * `Solid.quad(a, b, c, d)` takes its normal from `(b - a) x (d - a)`. Every
+ * writer in this file works in the track frame -- `a` and `b` are the two ends
+ * of the run, `c` and `d` are the same two ends at a **larger offset** across
+ * it -- and in that frame the arithmetic comes out like this:
+ *
+ *     u = b - a  =  along  =  (ux, 0, uz) * len
+ *     v = d - a  =  across =  (px, 0, pz) * width,  with (px, pz) = (-uz, ux)
+ *     u x v      =  (0, -(ux^2 + uz^2), 0) * len * width  =  **(0, -1, 0)**
+ *
+ * So the natural, obvious, reads-correctly-left-to-right order gives a surface
+ * that faces **down**, and every material here is `FrontSide`. A floor written
+ * that way is not a floor: it is a hole with a normal.
+ *
+ * `writeVerge` and `writeTrench` already know this -- both open with a `face`
+ * helper and a paragraph about handedness -- but they wrote it as a *mirroring*
+ * problem, about `side = -1` reversing the frame, and so the four writers that
+ * have no sides never got the note. `writeBallast`, `writeFormation`,
+ * `writeRails` and `writeViaduct` between them are the whole running surface of
+ * the railway, and all of it was inside out.
+ *
+ * The rule, stated so the next writer does not have to re-derive it: **to face
+ * up, wind the far offset first** -- `quad(d, c, b, a)` where `quad(a, b, c, d)`
+ * reads naturally. `Solid.box` is unaffected and correct, which is why the
+ * platforms, the copings and the station kit always looked right and only the
+ * things a train runs on did not.
+ */
+
 function writeBallast(
   s: Solid,
   seg: Segment,
@@ -1722,9 +1754,22 @@ function writeBallast(
   const b4 = p(bx, by, bz, baseHalf, -depthB);
   // Top, then the two shoulders. No underside and no ends: the underside is
   // buried and the ends are inside the next segment's overlap.
-  s.quad(...a1, ...b1, ...b2, ...a2);
-  s.quad(...a3, ...b3, ...b1, ...a1);
-  s.quad(...a2, ...b2, ...b4, ...a4);
+  //
+  // ---------------------------------------------------------------------------
+  // **AND EVERY ONE OF THEM WAS WOUND INSIDE OUT.** See the winding note above.
+  // The prism this function emits is the *floor of the railway*: it is what a
+  // rider looking down out of a carriage is standing over, and on a `FrontSide`
+  // material a downward normal means nothing is drawn there at all. Measured in
+  // a browser at St Peters, 8.0 m down in the cutting: **5,994 of 5,994** drawn
+  // ballast triangles faced down, a ray cast straight down from the railhead hit
+  // nothing but the catenary, and the frame from a seat is bare terrain,
+  // floating sleepers and wire with no blue metal in it anywhere. That is the
+  // report, in the player's words -- *"i see thru the ground under my feet"* --
+  // and it is why four rounds of widening and flooring the formation never
+  // touched it: the geometry was always there and was never drawn.
+  s.quad(...a2, ...b2, ...b1, ...a1);
+  s.quad(...a1, ...b1, ...b3, ...a3);
+  s.quad(...a4, ...b4, ...b2, ...a2);
 }
 
 /**
@@ -1811,8 +1856,13 @@ function writeFormation(
     const a = ribs[i];
     const b = ribs[i + 1];
     if (!a.cut && !b.cut) continue;
-    // Wound to face up, which is the only side of it anybody ever sees.
-    s.quad(...at(a, -a.half), ...at(b, -b.half), ...at(b, b.half), ...at(a, a.half));
+    // Wound to face up, which is the only side of it anybody ever sees -- and
+    // until this round it was not. The far offset goes first; see the winding
+    // note above `writeBallast`. This slab is the floor of a *carved* corridor,
+    // so a downward normal on it is the worst case there is: the ground has
+    // been taken away and the thing put back in the hole is invisible from
+    // inside the hole.
+    s.quad(...at(a, a.half), ...at(b, b.half), ...at(b, -b.half), ...at(a, -a.half));
   }
 }
 
@@ -1833,10 +1883,14 @@ function writeRails(s: Solid, seg: Segment): void {
     const by = seg.by;
     const lo = RAIL_HEIGHT;
     // Head, then the two webs. A rail seen from a metre away is a bright line
-    // and two dark ones, and that is exactly three quads.
-    s.quad(ax - wx, ay, az - wz, bx - wx, by, bz - wz, bx + wx, by, bz + wz, ax + wx, ay, az + wz);
-    s.quad(ax - wx, ay - lo, az - wz, bx - wx, by - lo, bz - wz, bx - wx, by, bz - wz, ax - wx, ay, az - wz);
-    s.quad(ax + wx, ay, az + wz, bx + wx, by, bz + wz, bx + wx, by - lo, bz + wz, ax + wx, ay - lo, az + wz);
+    // and two dark ones, and that is exactly three quads -- wound far-offset
+    // first, per the note above `writeBallast`. A rail head is the single most
+    // looked-down-at surface in the game and it faced the wrong way: 1,904 of
+    // 1,904 head triangles measured with a negative normal, so from a carriage
+    // the running line was not drawn at all.
+    s.quad(ax + wx, ay, az + wz, bx + wx, by, bz + wz, bx - wx, by, bz - wz, ax - wx, ay, az - wz);
+    s.quad(ax - wx, ay, az - wz, bx - wx, by, bz - wz, bx - wx, by - lo, bz - wz, ax - wx, ay - lo, az - wz);
+    s.quad(ax + wx, ay - lo, az + wz, bx + wx, by - lo, bz + wz, bx + wx, by, bz + wz, ax + wx, ay, az + wz);
   }
 }
 
@@ -1865,10 +1919,17 @@ function writeViaduct(
   const corner = (x: number, z: number, o: number, y: number): [number, number, number] => [
     x + px * o, y, z + pz * o,
   ];
-  s.quad(...corner(ax, az, -h, top), ...corner(bx, bz, -h, top), ...corner(bx, bz, h, top), ...corner(ax, az, h, top));
-  s.quad(...corner(ax, az, -h, soffit), ...corner(ax, az, h, soffit), ...corner(bx, bz, h, soffit), ...corner(bx, bz, -h, soffit));
-  s.quad(...corner(ax, az, h, soffit), ...corner(ax, az, h, top), ...corner(bx, bz, h, top), ...corner(bx, bz, h, soffit));
-  s.quad(...corner(bx, bz, -h, soffit), ...corner(bx, bz, -h, top), ...corner(ax, az, -h, top), ...corner(ax, az, -h, soffit));
+  // **Every quad below is wound far-corner-first.** All ten of them read the
+  // natural way round before this round and all ten faced inwards: the deck top
+  // pointed at the ground, the soffit pointed at the sky, and both fascias and
+  // both parapets pointed into the deck. See the winding note above
+  // `writeBallast` -- it is the same one sign, and a viaduct is the case where
+  // it costs twice, because a rider looks down through the deck and a walker
+  // underneath looks up through the soffit.
+  s.quad(...corner(ax, az, h, top), ...corner(bx, bz, h, top), ...corner(bx, bz, -h, top), ...corner(ax, az, -h, top));
+  s.quad(...corner(bx, bz, -h, soffit), ...corner(bx, bz, h, soffit), ...corner(ax, az, h, soffit), ...corner(ax, az, -h, soffit));
+  s.quad(...corner(bx, bz, h, soffit), ...corner(bx, bz, h, top), ...corner(ax, az, h, top), ...corner(ax, az, h, soffit));
+  s.quad(...corner(ax, az, -h, soffit), ...corner(ax, az, -h, top), ...corner(bx, bz, -h, top), ...corner(bx, bz, -h, soffit));
   // Parapets, which are what a viaduct is recognised by from underneath and from
   // the street beside it.
   for (const side of [-1, 1]) {
@@ -1878,22 +1939,22 @@ function writeViaduct(
     const dxp = bx + px * o;
     const dzp = bz + pz * o;
     s.quad(
-      cx - px * 0.22, top, cz - pz * 0.22,
+      cx - px * 0.22, top + 0.95, cz - pz * 0.22,
+      dxp - px * 0.22, top + 0.95, dzp - pz * 0.22,
       dxp - px * 0.22, top, dzp - pz * 0.22,
-      dxp - px * 0.22, top + 0.95, dzp - pz * 0.22,
-      cx - px * 0.22, top + 0.95, cz - pz * 0.22,
+      cx - px * 0.22, top, cz - pz * 0.22,
     );
     s.quad(
-      cx + px * 0.22, top + 0.95, cz + pz * 0.22,
-      dxp + px * 0.22, top + 0.95, dzp + pz * 0.22,
-      dxp + px * 0.22, top, dzp + pz * 0.22,
       cx + px * 0.22, top, cz + pz * 0.22,
-    );
-    s.quad(
-      cx - px * 0.22, top + 0.95, cz - pz * 0.22,
-      dxp - px * 0.22, top + 0.95, dzp - pz * 0.22,
+      dxp + px * 0.22, top, dzp + pz * 0.22,
       dxp + px * 0.22, top + 0.95, dzp + pz * 0.22,
       cx + px * 0.22, top + 0.95, cz + pz * 0.22,
+    );
+    s.quad(
+      cx + px * 0.22, top + 0.95, cz + pz * 0.22,
+      dxp + px * 0.22, top + 0.95, dzp + pz * 0.22,
+      dxp - px * 0.22, top + 0.95, dzp - pz * 0.22,
+      cx - px * 0.22, top + 0.95, cz - pz * 0.22,
     );
   }
 

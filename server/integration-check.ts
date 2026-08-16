@@ -16308,6 +16308,173 @@ async function checkDayCycle(): Promise<void> {
         `pattern here would have produced`,
     );
   }
+
+  /* =========================================================================
+   * 19. **THE OUTSIDE OF A LIT CARRIAGE, AND THE OPEN DOOR IN IT.**
+   *
+   *     *"its too light at night -- see this yellow door covered by lights? i
+   *     honestly hate the outside sprites u made they look bad"*, with a frame
+   *     of a Tangara at a platform whose whole bodyside is a row of flat,
+   *     near-white slabs and whose yellow door has been swallowed by them.
+   *
+   *     What is checked here is the **premise of the fix**, because that is the
+   *     part an assertion can settle and a screenshot cannot: the models carry
+   *     real translucent glazing over a real modelled interior, so there is
+   *     something behind the glass to see and the additive band over the top of
+   *     it was covering a train with a picture of a train. If that ever stops
+   *     being true -- a re-export that flattens the interior, a glazing material
+   *     that goes opaque -- then `windowBandFade` handing the near tier to the
+   *     model is handing it to nothing, and the honest response is to put the
+   *     band back rather than to ship a black box on rails.
+   *
+   *     The geometry of the wedge and the frame cycle that drives it are in
+   *     `nightlights.verifyTrainLightKit`, which runs at boot with three in the
+   *     process; this is the asset half and the pure-rule half.
+   * ======================================================================= */
+  {
+    const {
+      SALOON_INTERIOR_GLOW,
+      SALOON_INTERIOR_RE,
+      SALOON_ROOM_COLOUR,
+      WINDOW_HERO_FAR,
+      WINDOW_HERO_NEAR,
+      paintSaloonInterior,
+      windowBandFade,
+    } = await import('../client/src/world/nightlights.ts');
+
+    /* `PanelMaterial` plus the two texture slots the interior rule moves
+     * between, which is all `InteriorMaterial` types. Same reason as the
+     * stand-in above: three resolves out of `client/node_modules` and this
+     * directory has no copy of it. */
+    const interiorStandIn = (map: unknown = null) => {
+      const rgb = { r: 0, g: 0, b: 0 };
+      return {
+        emissive: {
+          ...rgb,
+          setRGB(r: number, g: number, b: number) {
+            this.r = r;
+            this.g = g;
+            this.b = b;
+          },
+        },
+        emissiveIntensity: 1,
+        map,
+        emissiveMap: null as unknown,
+      };
+    };
+
+    // --- The rule. The saloon, and not the tubes in its ceiling.
+    const saloon = interiorStandIn({ atlas: true });
+    const saloonHit = paintSaloonInterior(saloon, 'interior');
+    check(
+      saloonHit &&
+        saloon.emissiveIntensity === SALOON_INTERIOR_GLOW &&
+        Math.abs(saloon.emissive.b - SALOON_ROOM_COLOUR[2]) < 1e-6 &&
+        Math.abs(saloon.emissive.r - SALOON_ROOM_COLOUR[0]) < 1e-6,
+      `the carriage interior is lit to ${saloon.emissiveIntensity} in SALOON_ROOM_COLOUR -- an ` +
+        `ambient standing in for a ceiling of fluorescents, because nothing in this renderer carries ` +
+        `light from the luminaires to the room they are in`,
+    );
+    check(
+      SALOON_ROOM_COLOUR[0] / SALOON_ROOM_COLOUR[2] > 0.85,
+      `  and it is nearer neutral (R/B ${(SALOON_ROOM_COLOUR[0] / SALOON_ROOM_COLOUR[2]).toFixed(2)}) ` +
+        `than the tubes themselves. Under a source whose blue is at 1.0 and red at 0.78 the white ` +
+        `vestibule lining clips in blue alone and goes cyan; at this ratio the channels arrive ` +
+        `together and an over-bright white panel stays white`,
+    );
+    check(
+      saloon.emissiveMap === saloon.map && saloon.map !== null,
+      `  and it wears the material's own base-colour map as its emissive map, so the moquette stays ` +
+        `moquette and the grab poles stay yellow. A flat emissive would add one colour to every ` +
+        `surface in the saloon, which is the sticker problem moved indoors`,
+    );
+    const copied = interiorStandIn({ atlas: true });
+    check(
+      paintSaloonInterior(copied, 'interior.001') && copied.emissiveIntensity === SALOON_INTERIOR_GLOW,
+      `  and a Blender duplicate ("interior.001", which is what the Tangara's middle cars carry) is ` +
+        `the same room on a different carriage and gets the same level`,
+    );
+    const bare = interiorStandIn(null);
+    check(
+      paintSaloonInterior(bare, 'interior') && bare.emissiveMap === null,
+      `  and a material with no base map gets the level and no emissive map, which is three's own ` +
+        `meaning for an absent map rather than a special case here`,
+    );
+    /* The negative controls, and they are the ones with teeth: this pattern sits
+     * one underscore from two materials that already carry an emissive, and
+     * doubling up on a luminaire is a blown ceiling panel on every train. */
+    for (const name of ['interior_emission', 'interior_emission.001', 'interior_light', 'light',
+      'train_all_lights', 'exterior', 'exterior_pride', 'windows', 'Glass']) {
+      const other = interiorStandIn({ atlas: true });
+      check(
+        !paintSaloonInterior(other, name) && other.emissiveIntensity === 1,
+        `  negative control: "${name}" is not the saloon and is left alone`,
+      );
+    }
+
+    // --- The handover. Two numbers decide whether the sprite grid comes back.
+    check(
+      windowBandFade(0) === 0 && windowBandFade(WINDOW_HERO_NEAR) === 0,
+      `windowBandFade puts none of the window sprite band on a carriage inside ${WINDOW_HERO_NEAR} m ` +
+        `-- the distance at which a player is looking at a real Tangara through real glass and the ` +
+        `band lines up with none of it`,
+    );
+    check(
+      windowBandFade(WINDOW_HERO_FAR) === 1 && windowBandFade(2000) === 1,
+      `  and all of it past ${WINDOW_HERO_FAR} m, where a pane is a few pixels and the band is the ` +
+        `whole of what makes a train read as lit across a valley`,
+    );
+    check(
+      WINDOW_HERO_FAR < 260,
+      `  and the whole ramp (${WINDOW_HERO_NEAR}-${WINDOW_HERO_FAR} m) is inside world/trains.ts's ` +
+        `260 m MODEL_RADIUS, so it never coincides with the model-to-box swap. Two pops in one ` +
+        `frame is a pop nobody can attribute`,
+    );
+
+    // --- The premise, read off the shipped GLBs.
+    const trainDir19 = new URL('../client/public/trains', import.meta.url).pathname;
+    for (const file of ['tangara.glb', 'metropolis.glb']) {
+      const bytes = await readFile(join(trainDir19, file)).catch(() => null);
+      if (bytes === null) {
+        say(`  (no ${file}; the glazing and interior checks need the models)`);
+        continue;
+      }
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      const gltf = JSON.parse(
+        new TextDecoder().decode(bytes.subarray(20, 20 + view.getUint32(12, true))),
+      ) as {
+        materials?: Array<{ name?: string; alphaMode?: string }>;
+        meshes?: Array<{ primitives?: Array<{ material?: number; indices?: number }> }>;
+        accessors?: Array<{ count?: number }>;
+      };
+      const materials = gltf.materials ?? [];
+      const glazing = materials.filter(
+        (m) => m.alphaMode === 'BLEND' && /window|glass/i.test(m.name ?? ''),
+      );
+      check(
+        glazing.length > 0,
+        `${file} glazes its windows with ${glazing.length} blended material(s) ` +
+          `(${glazing.map((m) => m.name).join(', ')}) -- so the interior is genuinely visible ` +
+          `through them, which is the entire reason the near tier can stop wearing the sprite band`,
+      );
+      // How much interior there is to see, in triangles, from the accessors.
+      let interiorTris = 0;
+      for (const mesh of gltf.meshes ?? []) {
+        for (const prim of mesh.primitives ?? []) {
+          const name = materials[prim.material ?? -1]?.name ?? '';
+          if (!SALOON_INTERIOR_RE.test(name)) continue;
+          interiorTris += (gltf.accessors?.[prim.indices ?? -1]?.count ?? 0) / 3;
+        }
+      }
+      check(
+        interiorTris > 20_000,
+        `  and ${Math.round(interiorTris)} triangles of modelled saloon behind that glass, matched ` +
+          `by ${SALOON_INTERIOR_RE}. This is the number the fix rests on: seats, poles, stairs and ` +
+          `floor that exist and were lit by nothing after dark. Under it, "take the sprite off and ` +
+          `let the interior show" has no interior to show`,
+      );
+    }
+  }
 }
 
 /**

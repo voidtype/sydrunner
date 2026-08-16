@@ -2698,6 +2698,155 @@ export function paintSaloonPanels(m: PanelMaterial, sourceName: string): boolean
   return true;
 }
 
+/**
+ * **The saloon the luminaires light, as opposed to the luminaires.**
+ *
+ * `SALOON_PANEL_LEVEL` makes the ceiling tubes glow and does nothing whatever to
+ * the room under them, because nothing in this renderer carries light from a
+ * surface to another surface. So the carriage that shipped was a set of bright
+ * strips floating over 69,000 triangles of seat, pole, floor and moquette lit by
+ * the **night sky** -- a display value of about 29. Seen through the model's own
+ * glazing from a platform that is the interior of an unlit shed, which is why the
+ * additive sprite band was doing all the work and why taking it away cannot be
+ * the whole change: remove the sticker and put nothing behind the glass and the
+ * train reads as *darker* than it did.
+ *
+ * The correct light source is the one that is already there and cannot reach:
+ * twelve fluorescent tubes down a ceiling, filling a 3 m box. What that produces
+ * is very close to a **uniform ambient inside the carriage**, and an ambient on a
+ * textured surface is exactly `albedo x constant` -- which is what an emissive
+ * term with the material's own base-colour map as its `emissiveMap` is. So the
+ * moquette stays moquette, the grab poles stay yellow, the floor stays the floor,
+ * and all of it comes up together. A flat `emissive` with no map would instead
+ * add a constant to every surface and wash the interior into one colour, which is
+ * the sticker problem moved indoors.
+ *
+ * **Level, and it was measured through the glass rather than derived.** A
+ * Tangara's interior atlas is dark -- navy moquette, charcoal floor, grey lining,
+ * an albedo nearer 0.05 than the 0.25 this file's wall examples use -- and it is
+ * then seen through a translucent pane that takes about half of what is left. So
+ * the arithmetic that gives a "lit room" for a nominal surface is off by an order
+ * of magnitude here, and the honest way to set this was to stand on the platform
+ * at Redfern at the darkest phase of a moonless night and read the frame:
+ *
+ * ```
+ *   emissiveIntensity     0      0.6     2.4      5.0
+ *   interior, mean          3.0    8.2   20.1    28.4     (of 255, through glass)
+ * ```
+ *
+ * against a **platform deck at 12.8** and a **bodyside at 2.9** in the same
+ * frame. 0 is a black box behind glass, which is what shipped under the sprite
+ * band; 5.0 buys another two per cent of legibility in the far half of the
+ * carriage and costs a stop of the daytime restraint below.
+ *
+ * **2.0 rather than the 2.4 that reading suggested, and the second frame is why.**
+ * The measurement above is a saloon seen through glass from five metres, where
+ * everything in the box is moquette and floor. Standing in an *open doorway* at
+ * two metres the nearest surface is the vestibule lining, which is the one white
+ * thing in the model -- and at 2.4 nine per cent of that panel clipped. Clipping
+ * is exactly the failure the player named on the outside of the glass and it is
+ * no better on the inside of it. At 2.0 it is under three per cent, on the
+ * corners of a panel a metre from the eye, which is what a white panel under a
+ * fluorescent does.
+ *
+ * The colour moved with it -- see `SALOON_ROOM_COLOUR`.
+ *
+ * **Not gated on the sun, for `SALOON_PANEL_LEVEL`'s reason.** A saloon light is
+ * on at noon and this is material state, set once at GLB load, with no per-frame
+ * cost and nowhere to read a clock from even if it wanted one. What it costs is
+ * that a carriage interior at midday is about a stop brighter than its own albedo
+ * under `HEMISPHERE_DAY` would make it -- which is a lit saloon in daylight, seen
+ * through glass, next to a sunlit bodyside four times brighter than either. It is
+ * the right error and it is the small one; the alternative is a second per-carriage
+ * uniform on a 115,000-triangle material to hide a difference nobody can see.
+ *
+ * **Not the ridden carriage's job.** `SALOON_INTENSITY` is a real `PointLight`
+ * and stays exactly as it was: it is what gives the carriage the player is
+ * standing in real falloff and real shading, which an ambient cannot. This is
+ * what the other hundred and fifty carriages get, from outside, for nothing.
+ */
+export const SALOON_INTERIOR_GLOW = 2.0;
+
+/**
+ * The colour of the light *in* the saloon, as opposed to the colour of the tubes.
+ *
+ * `SALOON_COLOUR` is [0.78, 0.87, 1.0] and is the radiance of the diffuser
+ * itself: a cool white a clear step past neutral, and deliberately so, because
+ * that contrast against the sodium in the street below is most of how a lit train
+ * reads as a train. This is a step back toward neutral and it is the same
+ * argument `BOUNCE_FRACTION` makes about a sunlit street: **the light that has
+ * arrived at a surface is not the light that left the source.** What fills a
+ * carriage is the tubes' output after two or three bounces off cream lining, grey
+ * floor and blue moquette, and every one of those takes blue out.
+ *
+ * It also fixes a specific artefact rather than only being more correct. The one
+ * white surface in either model is the vestibule lining, which is the nearest
+ * thing to the eye when standing in an open doorway -- and under a source whose
+ * blue channel is at 1.0 and whose red is at 0.78, the first thing that happens
+ * as it approaches clipping is that **blue clips alone and the panel goes cyan**.
+ * At R/B 0.92 the three channels arrive together, so an over-bright white panel
+ * renders as an over-bright *white* panel. The dark moquette, which is nowhere
+ * near clipping, keeps its cool cast either way.
+ */
+export const SALOON_ROOM_COLOUR: Rgb = [0.92, 0.96, 1.0];
+
+/**
+ * Which of a train GLB's materials is **the inside of the carriage**.
+ *
+ * Deliberately narrow, and the two exclusions are the point: `interior_emission`
+ * and `interior_light` are the luminaires and are `SALOON_PANEL_RE`'s, so the
+ * anchors and the optional `.001` suffix keep this from swallowing them and
+ * putting a second emissive term on a panel that already has one. Blender's
+ * duplicate suffix is matched for `SALOON_PANEL_RE`'s reason -- the Tangara's
+ * middle cars carry `interior.001`, which is the same room on a different
+ * carriage.
+ *
+ * ```
+ *   tangara.glb      interior         69,392 triangles, the driving cars
+ *                    interior.001     38,184, the middle cars
+ *   metropolis.glb   interior        114,997
+ * ```
+ *
+ * A name list is a weak rule whose failure mode is silence, exactly as over at
+ * `SALOON_PANEL_RE`: a model whose interior is called something else gets a dark
+ * saloon behind bright glass, which looks like a taste decision. `world/trains.ts`
+ * counts what this matched per file and warns on zero, and
+ * `server/integration-check.ts` reads the shipped glTF and asserts the names.
+ */
+export const SALOON_INTERIOR_RE = /^interior(\.\d+)?$/;
+
+/**
+ * The little of a three material this rule touches. `PanelMaterial` plus the base
+ * map, because the whole trick is that the emissive wears the albedo.
+ *
+ * `map` is `unknown` rather than `Texture` for `PanelMaterial`'s reason: this
+ * interface exists so `server/integration-check.ts` can exercise the rule in a
+ * process with no renderer in it, and naming a three type here would drag one in.
+ */
+export interface InteriorMaterial extends PanelMaterial {
+  map?: unknown;
+  emissiveMap?: unknown;
+}
+
+/**
+ * Light the room rather than the tubes. Returns whether this material was one.
+ *
+ * Three writes, all uniforms or texture bindings set once at GLB load, so this
+ * costs nothing per frame. A material with no base map still gets the level --
+ * the emissive is then flat, which is the right answer for an untextured surface
+ * and is what `emissiveMap` being absent already means to three.
+ */
+export function paintSaloonInterior(m: InteriorMaterial, sourceName: string): boolean {
+  if (!SALOON_INTERIOR_RE.test(sourceName)) return false;
+  m.emissive.setRGB(
+    SALOON_ROOM_COLOUR[0], SALOON_ROOM_COLOUR[1], SALOON_ROOM_COLOUR[2], LinearSRGBColorSpace,
+  );
+  m.emissiveIntensity = SALOON_INTERIOR_GLOW;
+  // The albedo, as the shape of the light. See `SALOON_INTERIOR_GLOW`.
+  if (m.map) m.emissiveMap = m.map;
+  return true;
+}
+
 /** Half the bodyside, and how far outside it the window sprites hang. */
 const TRAIN_HALF_WIDTH = 1.52;
 /**
@@ -2730,10 +2879,92 @@ const WINDOW_PROUD = 0.02;
  * matrix scales X by the consist's own pitch exactly as the impostor box is
  * scaled -- so one geometry is a 19.5 m Tangara and a 21.1 m Metropolis, with the
  * panes and the gaps stretching in proportion, which is what they do in reality.
+ *
+ * ---------------------------------------------------------------------------
+ * **AND IT IS A DISTANT-TRAIN DEVICE ONLY, WHICH IT WAS NOT WHEN IT SHIPPED.**
+ *
+ * *"i honestly hate the outside sprites u made they look bad"*, with a frame of a
+ * Tangara at a platform in which the whole bodyside is a row of flat, uniform,
+ * near-white slabs and the yellow door between them has been swallowed. Every
+ * word of that is right and the cause is arithmetic rather than taste: this
+ * material is **additive in sRGB** (see `nightMaterial`), so `WINDOW_LEVEL` is
+ * added to the display value rather than to the radiance. 0.62 was +158 code
+ * values on a bodyside sitting at about 20, laid down as an eight-by-two grid of
+ * hard-edged rectangles that line up with **nothing** -- the band is a generic
+ * unit-length pattern and a Tangara's real glass runs 1.21 to 4.24 m over the
+ * railhead in a completely different rhythm. From a platform it is a sticker of a
+ * train stuck over a train.
+ *
+ * It is also, at 300 m, the only reason a train reads as lit at all. Both facts
+ * are true at once, so the band is now gated on **distance** rather than deleted:
+ * see `windowBandFade`. Inside 60 m a hero carriage wears none of it and what
+ * lights it is what actually lights a real one -- the ceiling luminaires
+ * (`SALOON_PANEL_LEVEL`), the saloon they light (`SALOON_INTERIOR_GLOW`), and the
+ * modelled interior seen through the model's own translucent glazing. Past 150 m
+ * it wears the full band, because past 150 m there is no interior to see and a
+ * box train has no windows to see it through.
  */
 const WINDOW_PANES = 8;
 const WINDOW_SPAN = 0.9;
 const WINDOW_PANE_SHARE = 0.6;
+
+/**
+ * How bright each pane is, as a fraction of `WINDOW_LEVEL`, going down the
+ * carriage -- and the answer to "flat, uniform".
+ *
+ * A real lit carriage is not eight identical rectangles. Somebody is standing in
+ * front of that one, this one is behind a grab pole, that one has the blind half
+ * down over a seat back, and the vestibule between the two saloons is a stop
+ * darker than either. None of that is worth modelling and all of it is worth
+ * *implying*, which is what an uneven row of panes does for free: the variation
+ * is baked into vertex colour once, at build, and costs a multiply in a loop that
+ * runs 32 times in the life of the process.
+ *
+ * Eight entries for eight panes, and the table is **rotated** by deck and by
+ * bodyside -- see `buildTrainWindows`. One table applied identically everywhere
+ * would put the same dark pane at the same place on every carriage of every train
+ * in the city, which is a pattern rather than a variation and reads worse than
+ * uniform does.
+ *
+ * The 0.22 is the blind, and it is deliberately low enough to be a *gap* in the
+ * row rather than a dim pane: at 300 m what survives is the rhythm, and a rhythm
+ * needs rests in it.
+ */
+const WINDOW_PANE_VARIATION: readonly number[] = [1.0, 0.78, 0.93, 0.22, 1.0, 0.86, 0.64, 0.97];
+
+/**
+ * Where the sprite band hands over to the real carriage, metres.
+ *
+ * Two numbers rather than a switch, because a band that vanished at a threshold
+ * would pop -- and it would pop on the *nearest* train in the frame, which is the
+ * one being looked at. `windowBandFade` ramps it, and the ramp is entirely inside
+ * the model tier (`world/trains.MODEL_RADIUS` is 260 m) so nothing crosses the
+ * LOD swap and the sprite handover: a carriage is a box wearing a full band, or a
+ * model wearing a full band, or a model wearing less of one, in that order,
+ * outside in.
+ *
+ * 60 m is where a 20 m carriage is still 30 degrees across and the grid is
+ * plainly a grid. 150 m is where a pane is about four pixels at this field of
+ * view and the model's own glass is a smear -- past it the band is carrying the
+ * whole train and there is nothing left for it to fight with.
+ */
+export const WINDOW_HERO_NEAR = 60;
+export const WINDOW_HERO_FAR = 150;
+
+/**
+ * How much of the window band a carriage `metres` away wears, 0 to 1.
+ *
+ * Pure, and exported, so `verifyTrainLightKit` can assert the two ends and the
+ * monotonicity rather than trusting the smoothstep -- and so `world/trains.ts`
+ * has no second copy of the rule. Impostor carriages never call it: they are past
+ * both numbers by construction and always wear the whole band.
+ */
+export function windowBandFade(metres: number): number {
+  if (metres <= WINDOW_HERO_NEAR) return 0;
+  if (metres >= WINDOW_HERO_FAR) return 1;
+  const t = (metres - WINDOW_HERO_NEAR) / (WINDOW_HERO_FAR - WINDOW_HERO_NEAR);
+  return t * t * (3 - 2 * t);
+}
 /** The two saloons of a double-decker, and the one of a single. Metres over the railhead. */
 const DECK_LOWER: readonly [number, number] = [1.16, 2.0];
 const DECK_UPPER: readonly [number, number] = [2.42, 3.2];
@@ -2759,9 +2990,21 @@ const DECK_SINGLE: readonly [number, number] = [1.34, 2.62];
  * the whole carriage and 2 m tall, so something is always covered, and what the
  * twinkle becomes is a very slight shimmer on a line of light. It also happens to
  * be what a lit carriage does to its own paintwork.
+ *
+ * **0.62 is 0.40 now, and the paragraph above is exactly where it went wrong.**
+ * "From the far platform" and "from the near one" were the two cases considered,
+ * and this band is now drawn at neither of them -- `windowBandFade` hands the
+ * near platform to the real carriage. What is left for this number to serve is a
+ * train at 150 m and beyond, where every pane is a handful of pixels against a
+ * black valley and 0.40 is still four times the ambient floor. What 0.62 bought
+ * was the last stop of brightness at 800 m, and what it cost was that anything
+ * inside a couple of hundred metres clipped: an additive sRGB blend at 0.62 puts
+ * +158 code values on whatever is behind it, so eight panes and their wash were a
+ * single white slab long before the fade had begun. The wash follows it down by
+ * the same ratio, because its whole job is to be a sixth of a pane.
  */
-const WINDOW_LEVEL = 0.62;
-const WINDOW_WASH_LEVEL = 0.17;
+const WINDOW_LEVEL = 0.4;
+const WINDOW_WASH_LEVEL = 0.11;
 /** The wash band, which is the two decks and the floor between them as one. */
 const WINDOW_WASH: readonly [number, number] = [1.05, 3.3];
 
@@ -2868,6 +3111,227 @@ const SALOON_LIFT = 2.55;
  */
 const SALOON_STALE_S = 0.5;
 
+/* ---------------------------------------------------------------------------
+ * THE OPEN DOORS, AND WHAT THEY PUT ON THE PLATFORM.
+ *
+ * *"the onboard lights need to account for the doors"*, and from outside at
+ * night an open door was a **black rectangle** -- the one place on a lit carriage
+ * where you are looking straight into the saloon, rendered darker than the
+ * bodyside beside it, because the sprite band covered the steel and stopped at
+ * the door. Everything below is the correction, and it is deliberately made of
+ * the two cheapest things in this file rather than of the obvious expensive one.
+ *
+ * **The clock is `rail.dwellElapsed` and there is no second one.**
+ * `world/trains.doorOpenness` already turns it into 0-to-1 for the leaves the
+ * animator drew; the same float arrives here as the instance level and as the
+ * real light's. A door that is 40% open spills 40% of the light, by construction,
+ * and nothing here can drift from where the leaves actually are.
+ *
+ * **WHAT IS REAL AND WHAT IS NOT, AND THE BUDGET.**
+ *
+ * A spot light per open door is 32 lights for one eight-car set, and this file's
+ * header prices a real light at 0.6 s of boot and a per-fragment cost in every
+ * material in the build, forever. So:
+ *
+ *   - **Geometry, at every open door of the two hero trains.** A wedge of light
+ *     lying on the platform deck, additive, in one instanced draw --
+ *     `DOOR_SPILL_CAPACITY` of them, which covers both model-tier consists at
+ *     every doorway on both sides with room to spare. Impostor trains get none:
+ *     they have no door leaves drawn, so a wedge under one would be light coming
+ *     out of a shut steel box.
+ *   - **Exactly one real light in the city**, at the single nearest open doorway.
+ *     One, and this is the whole argument for the number: the wedge is *emissive*
+ *     and therefore lights nothing -- not the player standing in the doorway, not
+ *     the bench behind them, not the platform sign. One spot at the door the
+ *     player is actually at buys all of that where it can be seen, and the
+ *     ninety-ninth doorway in the frame is four pixels of deck.
+ *
+ * **A spot rather than a point, and that is not an aesthetic choice.** Nothing in
+ * this rig casts a shadow (see the header), so a point light hung inside the
+ * saloon would light the platform straight through the carriage's steel side --
+ * with the doors shut. The cone *is* the mask: anchored in the door aperture and
+ * aimed out and down, it reaches the deck outside and nothing behind it, which is
+ * the one geometry that gets a shut door and an open door visibly different
+ * without a shadow map.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Where the platform deck is, metres over the railhead.
+ *
+ * `game/riding.PLATFORM_TOP_M` and `PLATFORM_INNER_M` restated, exactly as that
+ * file restates them from `world/rail-geo.ts`, and for the same reason inverted:
+ * this file must not import the riding controller to draw a sprite. What makes
+ * the restatement safe is that a doorway frame *is* a carriage frame -- y = 0 is
+ * the railhead at both ends of the pipeline -- so 1.05 up and 1.62 out lands on
+ * the deck whether the train is at Redfern, on the Meadowbank bridge or in a
+ * cutting at Wynyard. `verifyTrainLightKit` asserts these against the two
+ * imported constants rather than leaving it to this paragraph.
+ */
+const DOOR_DECK_Y = 1.05;
+const DOOR_DECK_INNER = 1.62;
+
+/**
+ * The wedge: how far out over the deck it reaches, and how wide it is at each
+ * end.
+ *
+ * 4.2 m out, against `PLATFORM_WIDTH_M`'s 5.5 -- so the light stops short of the
+ * back of the platform and the wedge has a visible far edge on the deck rather
+ * than running off it and reading as a lit floor. That gap is the effect: what
+ * says "the doors are open" from thirty metres down the platform is the *shape*,
+ * a bright trapezium with dark deck either side of it, and a pool that covered
+ * the whole width would just be a brighter station.
+ *
+ * It spreads, 1.15 m half-width at the threshold to 2.05 at the far edge, which
+ * is the projection of a 2.3 m aperture lit from a ceiling 2 m inboard of it.
+ * The threshold half-width is the Tangara's own doorway (measured off the shipped
+ * GLB: leaves at x -7.29 to -5.09 about a centre at -6.19); a Metropolis doorway
+ * is 1.92 m and wears the same wedge 15% too wide, which is a difference no
+ * screenshot has ever shown and is cheaper than a second geometry.
+ */
+const DOOR_SPILL_REACH = 4.2;
+const DOOR_SPILL_HALF_START = 1.15;
+const DOOR_SPILL_HALF_END = 2.05;
+/** Clear of the deck by the coat of paint that stops it z-fighting the platform. */
+const DOOR_SPILL_LIFT = 0.03;
+
+/**
+ * How the wedge fades going out, as `[fraction of the reach, brightness]`.
+ *
+ * Not inverse-square, and the reason is the same one `POOL_STOPS` gives: this is
+ * a *large soft source* -- a two-metre doorway with a ceiling of tubes behind it
+ * -- seen at a grazing angle across a deck, so the falloff is dominated by the
+ * cosine and by how much of the opening each patch of deck can still see. The
+ * near half holds up and the last third goes to nothing, which is what stops the
+ * wedge having a ruled edge on the platform.
+ */
+const DOOR_SPILL_STOPS: ReadonlyArray<readonly [number, number]> = [
+  [0, 1], [0.25, 0.86], [0.5, 0.6], [0.75, 0.3], [1, 0],
+];
+
+/**
+ * How bright the wedge is, in this file's own additive currency.
+ *
+ * A street lamp's road pool is `POOL_LEVEL` and a car's is 0.42 over ten square
+ * metres; this is a smaller area, closer to its source and much brighter in
+ * reality -- a saloon full of fluorescents opening onto a deck. 0.34 lands the
+ * threshold end at about +87 code values over the platform's own night value,
+ * which is the deck plainly lit, and the far edge at nothing. It is deliberately
+ * under `WINDOW_LEVEL`'s old 0.62: this one is light on a floor and reads as
+ * light on a floor, where that one was light on a wall you were looking through.
+ */
+const DOOR_SPILL_LEVEL = 0.34;
+/** Strips across the wedge, so its sides fade rather than being ruled lines. */
+const DOOR_SPILL_EDGE_SHARE = 0.42;
+
+/**
+ * How many doorways can wear a wedge at once.
+ *
+ * Both hero consists, every doorway, both sides, and half as much again. An
+ * eight-car Tangara has two doorways a side (16 leaves a carriage, in pairs, at
+ * x -6.19 and +4.79) so it is 32; a six-car Metropolis has three a side, so 36.
+ * 128 is two of the larger with 78% headroom, and `overflowed` counts anything
+ * refused -- which should be forever zero, because `world/trains.MAX_MODEL_TRAINS`
+ * is 2 and nothing else offers.
+ */
+export const DOOR_SPILL_CAPACITY = 128;
+
+/**
+ * The one real light: where it sits in the aperture, where it looks, and how hard.
+ *
+ * 2.1 m over the railhead is the middle of a Tangara doorway (1.18 to 3.45) and
+ * of a Metropolis one (1.23 to 3.22), and 1.0 m inboard of the platform face --
+ * 0.9 m inside the bodyside -- puts it *behind* the opening rather than in it, so
+ * the door frame and the leaves are between the source and the deck. That is what
+ * makes the cone land as a shape with the doorway's own proportions instead of as
+ * a circle painted round the player's feet.
+ *
+ * It aims at the deck 2.4 m out, which is 1.05 m down and 3.4 m across from the
+ * source: a beam 20 degrees under level. The cone at 0.62 rad is 71 degrees
+ * across, wide enough to take in the whole threshold from that close, and the
+ * penumbra is high for `TORCH_PENUMBRA`'s reason -- a hard-edged spot on a
+ * platform deck reads as a projector.
+ *
+ * 26 at decay 2 puts 0.98 of irradiance on the deck at the aim point, which is
+ * within 3% of what `LAMP_INTENSITY` puts on the road under a street lamp -- the
+ * value this file calls "well lit" -- and 4x the night ambient floor. It is not a
+ * coincidence and it is the only calibration available: there is no photograph of
+ * this, so the honest reference is the one lit surface in the game whose level
+ * was already argued.
+ */
+const DOOR_SPOT_LIFT = 2.1;
+const DOOR_SPOT_INBOARD = 1.0;
+const DOOR_SPOT_AIM_OUT = 2.4;
+const DOOR_SPOT_INTENSITY = 26;
+const DOOR_SPOT_DISTANCE = 14;
+const DOOR_SPOT_ANGLE = 0.62;
+const DOOR_SPOT_PENUMBRA = 0.6;
+
+/**
+ * How far away the real door light gives up, metres.
+ *
+ * Past 60 m the deck under a doorway is a few pixels and the spot is paying its
+ * per-fragment cost to move nothing; inside it, it is the door the player is
+ * walking towards. The same number as `TORCH_DISTANCE`, and that is the argument:
+ * this is the range at which a light in this game is worth having.
+ */
+const DOOR_SPOT_RANGE = 60;
+
+/**
+ * The wedge of light one open door lays on the platform, in the **doorway
+ * frame**: origin at the railhead under the doorway centre, +X along the
+ * carriage, +Z out through the opening.
+ *
+ * In metres and **not** unit-scaled, unlike the window band -- the caller
+ * multiplies the carriage's own orthonormal frame by a translation along X and
+ * nothing else, so a Tangara doorway and a Metropolis doorway get the same
+ * physical wedge rather than one stretched by the consist's pitch.
+ *
+ * `quadUp` throughout, on its own terms: a player is above a platform deck,
+ * always, so the underside of this is never in frame.
+ */
+function buildDoorSpill(): BufferGeometry {
+  const m = new Emissive();
+  const y = DOOR_DECK_Y + DOOR_SPILL_LIFT;
+  const at = (t: number) => ({
+    z: DOOR_DECK_INNER + t * (DOOR_SPILL_REACH - DOOR_DECK_INNER),
+    half: DOOR_SPILL_HALF_START + (DOOR_SPILL_HALF_END - DOOR_SPILL_HALF_START) * t,
+    c: scaled(SALOON_COLOUR, ramp(DOOR_SPILL_STOPS, t) * DOOR_SPILL_LEVEL),
+  });
+  const edge: Rgb = [0, 0, 0];
+
+  for (let s = 0; s < DOOR_SPILL_STOPS.length - 1; s++) {
+    const a = at(DOOR_SPILL_STOPS[s][0]);
+    const b = at(DOOR_SPILL_STOPS[s + 1][0]);
+    // Three strips across, exactly as the head-light sheet is split: one quad
+    // running to full brightness on a ruled line is a wedge with a hard side, and
+    // light coming out of a doorway has no such line. The middle strip is
+    // `DOOR_SPILL_EDGE_SHARE` of the half-width and the two outer ones fade to
+    // black, which under an additive blend is the soft edge.
+    const inner = DOOR_SPILL_EDGE_SHARE;
+    // Corner order so `cross(b - a, c - a)` comes out **+Y**: the first edge runs
+    // along -X and the second heads out along +Z, which is the same handedness
+    // `disc` walks its rings with (tangent, then radial). Reversed, the wedge is
+    // not dim, it is culled -- and `verifyNightLights`' face-down sweep is what
+    // catches that rather than this comment.
+    m.quadUp(
+      [-a.half * inner, y, a.z], [-a.half, y, a.z],
+      [-b.half, y, b.z], [-b.half * inner, y, b.z],
+      [a.c, edge, edge, b.c],
+    );
+    m.quadUp(
+      [a.half * inner, y, a.z], [-a.half * inner, y, a.z],
+      [-b.half * inner, y, b.z], [b.half * inner, y, b.z],
+      [a.c, a.c, b.c, b.c],
+    );
+    m.quadUp(
+      [a.half, y, a.z], [a.half * inner, y, a.z],
+      [b.half * inner, y, b.z], [b.half, y, b.z],
+      [edge, a.c, b.c, edge],
+    );
+  }
+  return m.build('train_doorspill');
+}
+
 /**
  * The window band of one carriage, in the carriage's own frame.
  *
@@ -2894,9 +3358,7 @@ function buildTrainWindows(double: boolean): BufferGeometry {
     : [DECK_SINGLE];
   const pitch = WINDOW_SPAN / WINDOW_PANES;
   const half = (pitch * WINDOW_PANE_SHARE) / 2;
-  const pane = scaled(SALOON_COLOUR, WINDOW_LEVEL);
   const wash = scaled(SALOON_COLOUR, WINDOW_WASH_LEVEL);
-  const dim = scaled(SALOON_COLOUR, WINDOW_LEVEL * 0.25);
 
   for (const side of [-1, 1] as const) {
     const z = side * (TRAIN_HALF_WIDTH + WINDOW_PROUD);
@@ -2916,9 +3378,19 @@ function buildTrainWindows(double: boolean): BufferGeometry {
     // a lit fragment where the panes are sub-pixel. See `WINDOW_WASH_LEVEL`.
     face(-WINDOW_SPAN / 2, WINDOW_WASH[0], WINDOW_SPAN / 2, WINDOW_WASH[1], wash, wash);
 
-    for (const [y0, y1] of decks) {
+    for (let deck = 0; deck < decks.length; deck++) {
+      const [y0, y1] = decks[deck];
       for (let i = 0; i < WINDOW_PANES; i++) {
         const cx = -WINDOW_SPAN / 2 + pitch * (i + 0.5);
+        // The pane's own share of the level. Rotated by deck and by bodyside so
+        // that the eight entries are four different orders on one carriage --
+        // otherwise the blind is in the same seat on every deck of every train,
+        // which is a wallpaper rather than a variation. The offsets are coprime
+        // with 8 so the rotations cannot land on each other.
+        const turn = deck * 3 + (side > 0 ? 0 : 5);
+        const share = WINDOW_PANE_VARIATION[(i + turn) % WINDOW_PANE_VARIATION.length];
+        const pane = scaled(SALOON_COLOUR, WINDOW_LEVEL * share);
+        const dim = scaled(SALOON_COLOUR, WINDOW_LEVEL * share * 0.25);
         // Split top and bottom off the pane at a quarter level rather than
         // running the full brightness to a ruled edge. A window does have a hard
         // edge -- it is a frame -- but a hard edge on an *additive* sprite at
@@ -3097,27 +3569,52 @@ function buildTrainTailLights(): BufferGeometry {
  * the wiring line is deleted and the feature silently stops existing.
  */
 export class TrainLights {
-  /** `[double-deck windows, single-deck windows, headlights, tail lights]`. */
+  /**
+   * `[double-deck windows, single-deck windows, headlights, tail lights, door
+   * spill]`.
+   */
   readonly meshes: InstancedMesh[];
   readonly material: MeshBasicNodeMaterial;
   readonly geometries: BufferGeometry[];
-  /** The one real light. See section 2. */
+  /** The real light in the carriage the player is standing in. See section 2. */
   readonly saloon: PointLight;
+  /**
+   * And the real light at the nearest open doorway -- the *second* one, and the
+   * whole of this rig's door budget. See the door section above for why it is a
+   * spot rather than a point and why there is exactly one.
+   */
+  readonly doorLight: SpotLight;
 
   /** Carriages lit last frame, and how many of those because they are underground. */
   drawn = 0;
   drawnUnderground = 0;
+  /**
+   * Carriages that actually wore the sprite band, which is no longer the same
+   * number as `drawn`.
+   *
+   * A hero carriage inside `WINDOW_HERO_NEAR` is lit -- by its own glazing, its
+   * luminaires and the saloon behind them -- and wears no band at all, so `drawn`
+   * counts what the night rig answered for and this counts what it drew. The two
+   * being equal is what the shipped bug looked like: a sprite grid pasted over
+   * every hero model at every distance.
+   */
+  banded = 0;
   /** Train ends lit last frame: heads and tails together. */
   ends = 0;
-  /** Carriages and ends refused for want of capacity. Should be 0 forever. */
+  /** Open doorways wearing a wedge of light on the deck this frame. */
+  spills = 0;
+  /** Carriages, ends and doorways refused for want of capacity. Should be 0 forever. */
   overflowed = 0;
 
-  private readonly counts = [0, 0, 0, 0];
+  private readonly counts = [0, 0, 0, 0, 0];
   private saloonLevel = 0;
   private stale = SALOON_STALE_S;
+  /** How far away the doorway the real light is currently claimed by is. */
+  private doorPick = Infinity;
+  private doorLevel = 0;
 
   constructor() {
-    // One material for all four sets: unlit, vertex-coloured, additive, never
+    // One material for all five sets: unlit, vertex-coloured, additive, never
     // depth-written, and **no `opacityNode`**. See section 1.
     this.material = nightMaterial('train_lights', false, true);
     this.geometries = [
@@ -3125,9 +3622,16 @@ export class TrainLights {
       buildTrainWindows(false),
       buildTrainHeadLights(),
       buildTrainTailLights(),
+      buildDoorSpill(),
     ];
-    const names = ['train_windows_double', 'train_windows_single', 'train_headlights', 'train_taillights'];
-    const capacity = [TRAIN_LIGHT_CAPACITY, TRAIN_LIGHT_CAPACITY, TRAIN_END_CAPACITY, TRAIN_END_CAPACITY];
+    const names = [
+      'train_windows_double', 'train_windows_single', 'train_headlights', 'train_taillights',
+      'train_doorspill',
+    ];
+    const capacity = [
+      TRAIN_LIGHT_CAPACITY, TRAIN_LIGHT_CAPACITY, TRAIN_END_CAPACITY, TRAIN_END_CAPACITY,
+      DOOR_SPILL_CAPACITY,
+    ];
     this.meshes = this.geometries.map((geometry, i) => {
       const mesh = new InstancedMesh(geometry, this.material, capacity[i]);
       mesh.name = names[i];
@@ -3161,6 +3665,21 @@ export class TrainLights {
     // `NightLights`' own lamps make the same move for the same reason.
     light.position.set(0, -1000, 0);
     this.saloon = light;
+
+    const door = new SpotLight(0xffffff, 0);
+    door.name = 'train_door';
+    door.angle = DOOR_SPOT_ANGLE;
+    door.penumbra = DOOR_SPOT_PENUMBRA;
+    door.distance = DOOR_SPOT_DISTANCE;
+    door.decay = 2;
+    // Never, for the header's reason and one of its own: this light moves to a
+    // different doorway whenever the player walks past one, so a shadow map for
+    // it could never be cached for two frames running.
+    door.castShadow = false;
+    door.color.setRGB(SALOON_COLOUR[0], SALOON_COLOUR[1], SALOON_COLOUR[2]);
+    door.position.set(0, -1000, 0);
+    door.target.position.set(0, -1000, 1);
+    this.doorLight = door;
   }
 
   /** Start a frame. Nothing is ever refused wholesale: see section 1. */
@@ -3169,14 +3688,23 @@ export class TrainLights {
     this.counts[1] = 0;
     this.counts[2] = 0;
     this.counts[3] = 0;
+    this.counts[4] = 0;
     this.saloonLevel = 0;
     this.overflowed = 0;
+    this.doorPick = Infinity;
+    this.doorLevel = 0;
+    this.banded = 0;
     // Zeroed here and not in `end()`, with the counts it belongs beside. It was
     // left out of the first cut and simply accumulated -- 75,000 "underground
     // carriages" after two minutes at Redfern -- which is worth a line because
     // the number looked plausible for about a second and is the only evidence
     // anybody has that the bore rule is still answering.
     this.drawnUnderground = 0;
+    // And `drawn` with it, for the same reason and a newer one: it is counted in
+    // `car` now rather than read off the instance counts in `end`, because a hero
+    // carriage inside `WINDOW_HERO_NEAR` is lit and has no instance. A counter
+    // incremented per call and reset anywhere but here accumulates silently.
+    this.drawn = 0;
   }
 
   /**
@@ -3186,9 +3714,21 @@ export class TrainLights {
    * exactly what `drawImpostor` puts on the box, and the reason the window band is
    * built at unit length. `level` is 0 to 1 and is the carriage's own: night
    * outside, or a bore at any hour.
+   *
+   * `fade` is `windowBandFade` of the carriage's own distance and is **not**
+   * folded into `level` by the caller, deliberately: they answer different
+   * questions -- one is "is this carriage lit", which drives the counters and the
+   * bore rule, and the other is "should the sprite band be doing the lighting",
+   * which is a property of how far away it is. A hero carriage at 20 m is fully
+   * lit and wears no band, and `drawn` must still say so or `litUnderground`
+   * stops meaning anything at Wynyard.
    */
-  car(matrix: Matrix4, metro: boolean, level: number, underground: boolean): void {
+  car(matrix: Matrix4, metro: boolean, level: number, underground: boolean, fade = 1): void {
     if (level <= 0) return;
+    if (underground) this.drawnUnderground++;
+    this.drawn++;
+    const shown = level * fade;
+    if (shown <= 0) return;
     const set = metro ? 1 : 0;
     const at = this.counts[set];
     if (at >= TRAIN_LIGHT_CAPACITY) {
@@ -3197,9 +3737,58 @@ export class TrainLights {
     }
     const mesh = this.meshes[set];
     mesh.setMatrixAt(at, matrix);
-    mesh.setColorAt(at, _colour.setRGB(level, level, level));
+    mesh.setColorAt(at, _colour.setRGB(shown, shown, shown));
     this.counts[set] = at + 1;
-    if (underground) this.drawnUnderground++;
+  }
+
+  /**
+   * One open doorway: the wedge on the deck, and a bid for the one real light.
+   *
+   * `matrix` is the **doorway frame** -- the carriage's own orthonormal basis
+   * translated along its X to the doorway centre, and turned about Y for the far
+   * bodyside so that local +Z always points out through the opening. Unscaled, so
+   * a metre in this geometry is a metre on the platform.
+   *
+   * `open` is `world/trains.doorOpenness` and nothing else, so the wedge grows and
+   * dies with the leaves the animator drew rather than with a clock of its own.
+   * `metres` is how far the player is from this doorway and decides only which
+   * one of them gets the real light -- the nearest, which is the one whose deck
+   * anybody can see.
+   */
+  doorway(matrix: Matrix4, level: number, open: number, metres: number): void {
+    const shown = level * open;
+    if (shown <= 0) return;
+    const at = this.counts[4];
+    if (at >= DOOR_SPILL_CAPACITY) {
+      this.overflowed++;
+      return;
+    }
+    const mesh = this.meshes[4];
+    mesh.setMatrixAt(at, matrix);
+    mesh.setColorAt(at, _colour.setRGB(shown, shown, shown));
+    this.counts[4] = at + 1;
+
+    // The bid. One light, so the nearest doorway inside its range takes it and
+    // everything else is geometry. Resolved in `end()`, which is the only place
+    // an intensity is written -- see `SALOON_INTENSITY`'s sibling line there.
+    if (metres >= this.doorPick || metres > DOOR_SPOT_RANGE) return;
+    this.doorPick = metres;
+    this.doorLevel = shown;
+    // The source sits inboard of the opening and the aim point out over the deck,
+    // both in the doorway's own frame, so the cone comes out of the doorway the
+    // way light does. `Matrix4.elements` is column-major: columns 0/1/2 are the
+    // carriage's along/up/across axes and column 3 is the doorway's origin at the
+    // railhead.
+    const e = matrix.elements;
+    const put = (out: Vector3, up: number, across: number): void => {
+      out.set(
+        e[12] + e[4] * up + e[8] * across,
+        e[13] + e[5] * up + e[9] * across,
+        e[14] + e[6] * up + e[10] * across,
+      );
+    };
+    put(this.doorLight.position, DOOR_SPOT_LIFT, DOOR_DECK_INNER - DOOR_SPOT_INBOARD);
+    put(this.doorLight.target.position, DOOR_DECK_Y, DOOR_DECK_INNER + DOOR_SPOT_AIM_OUT);
   }
 
   /** The leading end of a consist, in the leading carriage's own frame. */
@@ -3240,7 +3829,7 @@ export class TrainLights {
   }
 
   end(): void {
-    let cars = 0;
+    let banded = 0;
     for (let i = 0; i < this.meshes.length; i++) {
       const mesh = this.meshes[i];
       const n = this.counts[i];
@@ -3249,12 +3838,17 @@ export class TrainLights {
         if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       }
       mesh.count = n;
-      if (i < 2) cars += n;
+      if (i < 2) banded += n;
     }
-    this.drawn = cars;
+    this.banded = banded;
     this.ends = this.counts[2] + this.counts[3];
-    // Intensity, never `visible`. The invariant the whole night rests on.
+    this.spills = this.counts[4];
+    // Intensity, never `visible`. The invariant the whole night rests on, and it
+    // holds for both of these: the door light goes to zero when no doorway bid,
+    // and its `target` stays parked wherever the last bid left it, which nothing
+    // can see because nothing is being emitted along it.
     this.saloon.intensity = SALOON_INTENSITY * this.saloonLevel;
+    this.doorLight.intensity = DOOR_SPOT_INTENSITY * this.doorLevel;
     this.stale = 0;
   }
 
@@ -3265,11 +3859,18 @@ export class TrainLights {
    * this is the guard against the fleet *not* running. See `SALOON_STALE_S`.
    */
   tick(dt: number): void {
-    if (this.saloon.intensity === 0) return;
+    if (this.saloon.intensity === 0 && this.doorLight.intensity === 0) return;
     this.stale += dt;
     if (this.stale > SALOON_STALE_S) {
       this.saloon.intensity = 0;
       this.saloonLevel = 0;
+      // The door light is on the same guard and for a worse case than the
+      // saloon's: it is anchored to a doorway rather than to the player, so a
+      // fleet that stopped updating would leave a spot burning on an empty
+      // platform at a station the player left ten minutes ago.
+      this.doorLight.intensity = 0;
+      this.doorLevel = 0;
+      this.doorPick = Infinity;
     }
   }
 
@@ -3480,6 +4081,13 @@ export class NightLights {
     // `TrainLights` section 2. Its *sprites* live in the fleet's own group, which
     // is safe because a mesh's visibility is in no cache key at all.
     scene.add(trainLights.saloon);
+    // --- And the fifth: the nearest open doorway. Same rule, same place, and its
+    // `target` too -- a `SpotLight` aims at an `Object3D` and one that is not in
+    // the scene graph never has its world matrix updated, so the beam would point
+    // wherever the target's *local* transform happened to leave it. The torch
+    // above adds its own for the same reason.
+    scene.add(trainLights.doorLight);
+    scene.add(trainLights.doorLight.target);
   }
 
   /**
@@ -3700,7 +4308,7 @@ export class NightLights {
    * and not in this list is a light the self-check cannot see.
    */
   get realLights(): Object3D[] {
-    return [this.torch, trainLights.saloon, ...this.lamps];
+    return [this.torch, trainLights.saloon, trainLights.doorLight, ...this.lamps];
   }
 
   /**
@@ -3831,12 +4439,14 @@ export function verifyNightLights(): string[] {
   //    about objects rather than about numbers.
   const probe = new NightLights(new Object3D());
   const real = probe.realLights;
-  // The torch, the saloon and the lamps. The saloon is the fourth and the newest
-  // and `TrainLights` section 2 argues for it; what this number is guarding is
-  // that there is never a *fifth* without somebody having read that argument.
-  if (real.length !== 2 + LAMP_REAL_COUNT) {
+  // The torch, the saloon, the door and the lamps. The saloon was the fourth and
+  // `TrainLights` section 2 argues for it; the door spot is the fifth and the
+  // door section argues for *that*, including why it is one and not one per open
+  // doorway. What this number is guarding is that there is never a **sixth**
+  // without somebody having read both.
+  if (real.length !== 3 + LAMP_REAL_COUNT) {
     failures.push(
-      `The night rig owns ${real.length} real lights, not ${2 + LAMP_REAL_COUNT}. That count is a ` +
+      `The night rig owns ${real.length} real lights, not ${3 + LAMP_REAL_COUNT}. That count is a ` +
         `shader constant: LightsNode.customCacheKey hashes every light on the render list, so ` +
         `changing it rebuilds and recompiles every pipeline in the scene.`,
     );
@@ -4754,6 +5364,253 @@ export function verifyTrainLightKit(): string[] {
         `leave a point light burning in the middle of Redfern for the session.`,
     );
   }
+
+  // --- 5. **THE HANDOVER**: `windowBandFade`, which is the one number standing
+  //        between a hero carriage and the sprite grid the player asked to have
+  //        taken off it. Both ends and the monotonicity, because a ramp that
+  //        went the wrong way would put the band on the near train and take it
+  //        off the far one, which is the shipped bug with a minus sign.
+  if (windowBandFade(0) !== 0 || windowBandFade(WINDOW_HERO_NEAR) !== 0) {
+    failures.push(
+      `windowBandFade puts ${windowBandFade(0)} of the sprite band on a carriage at the player's ` +
+        `feet. It must be exactly zero inside ${WINDOW_HERO_NEAR} m: that band is a generic ` +
+        `unit-length grid that lines up with no real window on either model, and over a hero ` +
+        `carriage at a platform it is a picture of a train stuck on a train.`,
+    );
+  }
+  if (windowBandFade(WINDOW_HERO_FAR) !== 1 || windowBandFade(1e4) !== 1) {
+    failures.push(
+      `windowBandFade only reaches ${windowBandFade(WINDOW_HERO_FAR)} at ${WINDOW_HERO_FAR} m. ` +
+        `Past there the band is the *whole* of what makes a train read as lit -- there is no ` +
+        `interior left to see -- so anything under 1 is a dimmer city seen from every hill in it.`,
+    );
+  }
+  {
+    let previous = -1;
+    let wrongWay = 0;
+    for (let d = 0; d <= WINDOW_HERO_FAR + 20; d += 0.5) {
+      const f = windowBandFade(d);
+      if (f < previous - 1e-9) wrongWay++;
+      previous = f;
+    }
+    if (wrongWay > 0) {
+      failures.push(
+        `windowBandFade falls with distance at ${wrongWay} of the sampled metres. It is swept ` +
+          `rather than spot-checked because a non-monotonic ramp is a band that brightens and ` +
+          `dims as a player walks along a platform, which reads as flicker rather than as a bug.`,
+      );
+    }
+  }
+
+  // --- 6. **THE DOOR WEDGE**, on the same terms as the window band: it lies on
+  //        the platform deck, it is outboard of the platform face, and it is
+  //        wound face-up. A wedge wound the other way is culled and the symptom
+  //        is "the doors do not light the platform", which reads as the feature
+  //        never having been built.
+  {
+    const g = buildDoorSpill();
+    const p = g.getAttribute('position');
+    const index = g.getIndex()!;
+    const deck = DOOR_DECK_Y + DOOR_SPILL_LIFT;
+    let offDeck = 0;
+    let inboard = 0;
+    let faceDown = 0;
+    let reach = 0;
+    for (let i = 0; i < index.count; i += 3) {
+      const a = index.getX(i), b = index.getX(i + 1), c = index.getX(i + 2);
+      const ax = p.getX(a), az = p.getZ(a);
+      const ux = p.getX(b) - ax, uz = p.getZ(b) - az;
+      const vx = p.getX(c) - ax, vz = p.getZ(c) - az;
+      // The y component of `cross(b - a, c - a)` for a triangle in a plane of
+      // constant y, which is what `quadUp` promises and what `FrontSide` keeps.
+      if (uz * vx - ux * vz <= 0) faceDown++;
+      for (const v of [a, b, c]) {
+        if (Math.abs(p.getY(v) - deck) > 1e-6) offDeck++;
+        const z = p.getZ(v);
+        if (z < DOOR_DECK_INNER - 1e-6) inboard++;
+        if (z > reach) reach = z;
+      }
+    }
+    if (faceDown > 0) {
+      failures.push(
+        `${faceDown} of the door wedge's ${index.count / 3} triangles are wound face-down. ` +
+          `FrontSide culls those, so this is a train whose open doors put nothing on the platform ` +
+          `-- and nothing is exactly what the state before this change looked like.`,
+      );
+    }
+    if (offDeck > 0) {
+      failures.push(
+        `${offDeck} of the door wedge's vertices are not at ${deck.toFixed(2)} m over the railhead. ` +
+          `It is light lying on a platform deck, and a deck is flat: anything off it either ` +
+          `z-fights the paving or floats over it as a sheet you can see the edge of.`,
+      );
+    }
+    if (inboard > 0) {
+      failures.push(
+        `${inboard} of the door wedge's vertices are inboard of the ${DOOR_DECK_INNER} m platform ` +
+          `face. That is light drawn in the gap between the train and the coping, at deck height, ` +
+          `which is inside the carriage's own solid box.`,
+      );
+    }
+    if (Math.abs(reach - DOOR_SPILL_REACH) > 1e-6) {
+      failures.push(
+        `The door wedge reaches ${reach.toFixed(2)} m from the track centre rather than ` +
+          `${DOOR_SPILL_REACH}. A platform is 5.5 m wide from the face; a wedge that ran the whole ` +
+          `way over it would stop being a shape and start being a lit floor.`,
+      );
+    }
+    g.dispose();
+  }
+
+  // --- 7. **OPEN AND SHUT MUST DIFFER, AND MEASURABLY.** The whole of the
+  //        report is that they did not: a shut door was a lit window band and an
+  //        open one was a black rectangle in the middle of it, and neither state
+  //        put anything on the deck. So the frame cycle is driven through both,
+  //        and the shut case is the negative control rather than an afterthought
+  //        -- a wedge that is always on is as wrong as one that never is, and it
+  //        is the version that looks fine in a screenshot of an open door.
+  {
+    const probe = new TrainLights();
+    const spill = probe.meshes[4];
+    _matrix.identity();
+
+    probe.begin();
+    probe.doorway(_matrix, 1, 0, 5);
+    probe.end();
+    const shutDrawn = spill.count;
+    const shutLight = probe.doorLight.intensity;
+
+    probe.begin();
+    probe.doorway(_matrix, 1, 1, 5);
+    probe.end();
+    const openDrawn = spill.count;
+    const openLight = probe.doorLight.intensity;
+
+    if (shutDrawn !== 0 || shutLight !== 0) {
+      failures.push(
+        `A doorway offered with the leaves shut drew ${shutDrawn} wedges and lit the door spot to ` +
+          `${shutLight}. Both must be zero. This is the control the feature exists against: light ` +
+          `on the platform that does not depend on the doors is a station lamp somebody has ` +
+          `attached to a train.`,
+      );
+    }
+    if (openDrawn !== 1 || openLight !== DOOR_SPOT_INTENSITY) {
+      failures.push(
+        `A doorway offered wide open drew ${openDrawn} wedges and lit the door spot to ` +
+          `${openLight} rather than 1 and ${DOOR_SPOT_INTENSITY}.`,
+      );
+    }
+    // Half open is half of both, because the only clock either of them has is
+    // `world/trains.doorOpenness` and it arrives as this argument.
+    probe.begin();
+    probe.doorway(_matrix, 1, 0.5, 5);
+    probe.end();
+    if (Math.abs(probe.doorLight.intensity - DOOR_SPOT_INTENSITY * 0.5) > 1e-6) {
+      failures.push(
+        `A half-open doorway lit the spot to ${probe.doorLight.intensity} rather than half of ` +
+          `${DOOR_SPOT_INTENSITY}. The leaves take ${1.6} s to travel and the light has to travel ` +
+          `with them, off the same number, or the spill snaps on before the door is open.`,
+      );
+    }
+
+    // Where the beam goes, which is the whole reason it is a spot: out of the
+    // opening and down onto the deck, never back through the carriage.
+    probe.begin();
+    probe.doorway(_matrix, 1, 1, 5);
+    probe.end();
+    const src = probe.doorLight.position;
+    const aim = probe.doorLight.target.position;
+    if (!(src.z > 0 && src.z < DOOR_DECK_INNER) || src.y <= DOOR_DECK_Y) {
+      failures.push(
+        `The door spot sits at z ${src.z.toFixed(2)}, y ${src.y.toFixed(2)} in the doorway frame. ` +
+          `It has to be inboard of the ${DOOR_DECK_INNER} m platform face and above the deck -- in ` +
+          `the aperture, behind the leaves -- or the doorway is not what is shaping the light.`,
+      );
+    }
+    if (!(aim.z > src.z && aim.y < src.y)) {
+      failures.push(
+        `The door spot aims from (${src.z.toFixed(2)}, ${src.y.toFixed(2)}) to ` +
+          `(${aim.z.toFixed(2)}, ${aim.y.toFixed(2)}) in the doorway frame. It must point outward ` +
+          `and down. Nothing in this rig casts a shadow, so the cone is the only mask there is: ` +
+          `pointed anywhere else it lights the platform straight through the bodyside, with the ` +
+          `doors shut.`,
+      );
+    }
+
+    // And the nearest doorway wins the one light, which is the budget. Offered
+    // a near one and a far one in either order, the near one takes it.
+    for (const order of [[4, 40], [40, 4]] as const) {
+      probe.begin();
+      _matrix.makeTranslation(0, 0, 0);
+      probe.doorway(_matrix, 1, 1, order[0]);
+      _matrix.makeTranslation(100, 0, 0);
+      probe.doorway(_matrix, 1, 1, order[1]);
+      probe.end();
+      const near = order[0] < order[1] ? 0 : 100;
+      if (Math.abs(probe.doorLight.position.x - near) > 1e-6) {
+        failures.push(
+          `Offered doorways at ${order[0]} m and ${order[1]} m in that order, the one real door ` +
+            `light went to the one at x ${probe.doorLight.position.x}. It must always be the ` +
+            `nearest: there is exactly one of these in the city and the deck it lights is the only ` +
+            `deck anybody is standing on.`,
+        );
+      }
+    }
+    // Out of range is out of the budget entirely -- geometry only.
+    probe.begin();
+    _matrix.identity();
+    probe.doorway(_matrix, 1, 1, DOOR_SPOT_RANGE + 10);
+    probe.end();
+    if (probe.doorLight.intensity !== 0 || probe.meshes[4].count !== 1) {
+      failures.push(
+        `A doorway ${DOOR_SPOT_RANGE + 10} m away drew ${probe.meshes[4].count} wedges and lit the ` +
+          `spot to ${probe.doorLight.intensity}. Past ${DOOR_SPOT_RANGE} m the wedge is still worth ` +
+          `drawing -- it is free -- and the real light is worth nothing but its per-fragment cost.`,
+      );
+    }
+    // The empty frame, and the staleness guard, on the saloon's own terms: this
+    // light is anchored to a doorway rather than to the player, so an orphan
+    // burns on a platform the player left rather than following them about.
+    probe.begin();
+    probe.end();
+    if (probe.doorLight.intensity !== 0 || probe.meshes[4].count !== 0) {
+      failures.push(
+        `After a frame in which no doorway was offered the door spot is at ` +
+          `${probe.doorLight.intensity} over ${probe.meshes[4].count} wedges. That is the departure ` +
+          `case: the doors shut, the train pulls out, and the light it left is still on the deck.`,
+      );
+    }
+    probe.begin();
+    _matrix.identity();
+    probe.doorway(_matrix, 1, 1, 5);
+    probe.end();
+    probe.tick(SALOON_STALE_S * 1.4);
+    if (probe.doorLight.intensity !== 0) {
+      failures.push(
+        `The door spot survived ${(SALOON_STALE_S * 1.4).toFixed(2)} s of a fleet that stopped ` +
+          `updating. It is on the same guard as the saloon light and for a worse case -- this one ` +
+          `is not attached to the player, so nobody would ever walk into it and notice.`,
+      );
+    }
+
+    // And the band, which is the other half of the same frame: a hero carriage
+    // close enough to be seen properly is *lit* and *not banded*.
+    probe.begin();
+    _matrix.identity();
+    probe.car(_matrix, false, 1, false, windowBandFade(20));
+    probe.car(_matrix, false, 1, false, windowBandFade(400));
+    probe.end();
+    if (probe.drawn !== 2 || probe.banded !== 1) {
+      failures.push(
+        `A carriage at 20 m and one at 400 m came out as ${probe.drawn} lit and ${probe.banded} ` +
+          `banded; it must be 2 and 1. Those two counters being equal is precisely the state the ` +
+          `player photographed -- every lit carriage in the city wearing the sprite grid, including ` +
+          `the one they were standing next to.`,
+      );
+    }
+    probe.dispose();
+  }
+
   kit.dispose();
 
   return failures;

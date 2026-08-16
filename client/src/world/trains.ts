@@ -181,12 +181,16 @@ import {
   type ConsistCar,
 } from '../game/riding.ts';
 import {
+  DOOR_SPILL_CAPACITY,
+  SALOON_INTERIOR_RE,
   SALOON_PANEL_RE,
   TRAIN_END_CAPACITY,
   TRAIN_LIGHT_CAPACITY,
   nightLevelNow,
+  paintSaloonInterior,
   paintSaloonPanels,
   trainLights,
+  windowBandFade,
 } from './nightlights.ts';
 
 const MODEL_DIR = '/trains/';
@@ -256,6 +260,28 @@ interface DoorPart {
   dz: number;
 }
 
+/**
+ * One **opening** in a bodyside, as opposed to one door leaf.
+ *
+ * The night wants openings and the animator gave leaves: a Tangara doorway is two
+ * leaves that part in the middle, so the sixteen leaves on a carriage are four
+ * doorways -- two a side. `DoorPart` cannot answer for one because it is keyed by
+ * *displacement and material* and its geometry is every leaf that shares those,
+ * merged; a bounding box round it is a bounding box round the whole carriage.
+ *
+ * So this is measured separately, at load, by clustering the leaves' own boxes.
+ * `x` is along the carriage from its centre and `side` is which bodyside, both in
+ * the carriage's own frame -- which is the frame `carMatrix` builds and the frame
+ * `world/nightlights.buildDoorSpill` is drawn in, so placing a wedge is a
+ * translation and at most a half turn.
+ */
+interface Doorway {
+  /** Along the carriage, metres from its centre. */
+  x: number;
+  /** +1 or -1: which bodyside this opening is in. */
+  side: number;
+}
+
 interface CarTemplate {
   key: string;
   lengthM: number;
@@ -266,6 +292,8 @@ interface CarTemplate {
   body: Array<{ geometry: BufferGeometry; material: Material }>;
   /** One entry per (displacement, material). */
   doors: DoorPart[];
+  /** One entry per opening in a bodyside. See `Doorway`. */
+  doorways: Doorway[];
 }
 
 /** A carriage in the scene, pooled and reused. */
@@ -287,6 +315,17 @@ const _colour = /*#__PURE__*/ new Color();
 /** The night's copy of a carriage matrix, and the shift out to a train's end. */
 const _lit = /*#__PURE__*/ new Matrix4();
 const _endShift = /*#__PURE__*/ new Matrix4();
+/**
+ * A half turn about Y, built once: what puts a door wedge on the other bodyside.
+ *
+ * A rotation and not a mirror, deliberately -- see `lightCar`. Built with
+ * `makeRotationY(Math.PI)` rather than written out so that the two off-diagonal
+ * signs cannot be transposed by hand, which is a bug that looks like the wedge
+ * being on the right side and pointing at the train.
+ */
+const _halfTurn = /*#__PURE__*/ new Matrix4().makeRotationY(Math.PI);
+/** No doorways, for the impostor tier. Shared, so the box path allocates nothing. */
+const EMPTY_DOORWAYS: readonly Doorway[] = [];
 
 /**
  * A mesh's geometry, in the carriage's own frame, as plain float32.
@@ -521,16 +560,29 @@ function convertMaterial(source: Material, label: string): MeshStandardNodeMater
   // in `nightlights.ts` with the rest of what a lit carriage looks like -- see
   // section 5 of this file's header -- and this is the only thing that calls it.
   if (paintSaloonPanels(m, source.name)) saloonPanelsPainted++;
+  // And the room they light, which is the other half of the same job and is the
+  // half the exterior sprite band was standing in for. Called **after** the line
+  // above and gated on a regex that excludes the luminaires, so no material can
+  // take both -- see `SALOON_INTERIOR_RE`. It reads `m.map`, which is why it is
+  // here and not up beside the base-colour assignment.
+  if (paintSaloonInterior(m, source.name)) saloonInteriorsPainted++;
   materialCache.set(source, m);
   return m;
 }
 
 /** How many luminaires `convertMaterial` has lit. See the count check in `load`. */
 let saloonPanelsPainted = 0;
+/** And how many saloons. See `nightlights.SALOON_INTERIOR_RE`. */
+let saloonInteriorsPainted = 0;
 
 /** The running total, per process. See `nightlights.SALOON_PANEL_RE`. */
 export function saloonPanelCount(): number {
   return saloonPanelsPainted;
+}
+
+/** The running total, per process. See `nightlights.SALOON_INTERIOR_RE`. */
+export function saloonInteriorCount(): number {
+  return saloonInteriorsPainted;
 }
 
 /** `PropertyBinding.sanitizeNodeName`, matching what the loader did to the name. */
@@ -554,9 +606,13 @@ function splitModel(
   interface Bucket {
     body: Map<Material, BufferGeometry[]>;
     doors: Map<string, { part: DoorPart; parts: BufferGeometry[] }>;
+    /** Every door leaf's own box in the carriage frame, for `clusterDoorways`. */
+    leaves: Array<{ x: number; z: number }>;
   }
   const buckets = new Map<string, Bucket>();
-  for (const car of spec.cars) buckets.set(car.key, { body: new Map(), doors: new Map() });
+  for (const car of spec.cars) {
+    buckets.set(car.key, { body: new Map(), doors: new Map(), leaves: [] });
+  }
 
   const local = new Matrix4();
   const box = new Vector3();
@@ -613,6 +669,14 @@ function splitModel(
         bucket.doors.set(key, entry);
       }
       entry.parts.push(geometry);
+      // The leaf's own plan centre, in the carriage frame. `box` is the mesh's
+      // bounding-box centre in world space and `local` is the transform that
+      // brings that frame to the carriage's, so this is the same two subtractions
+      // `bakeGeometry` is about to apply to every vertex, done once.
+      bucket.leaves.push({
+        x: box.x - car.centreX,
+        z: box.z - (car.box.minZ + car.box.maxZ) / 2,
+      });
       return;
     }
 
@@ -649,7 +713,57 @@ function splitModel(
       railY: car.railY,
       body,
       doors,
+      doorways: clusterDoorways(bucket.leaves),
     });
+  }
+  return out;
+}
+
+/**
+ * How close two door leaves have to be, along the carriage, to be two halves of
+ * one opening. Metres.
+ *
+ * A Tangara leaf is 1.10 m wide and its partner's centre is 1.10 m away; the next
+ * doorway along is 11 m away on a driving car and 10 m on a middle one. A
+ * Metropolis leaf is 0.95 m and the next doorway is 5.6 m off, which is the
+ * tightest case in either model. So anything from about 1.3 to 5 m separates the
+ * two answers, and 2.4 sits in the middle of that with a factor of two either
+ * side -- deliberately, because the failure is silent in both directions: too
+ * small and every leaf becomes its own doorway (twice as many wedges, each half a
+ * metre off centre), too large and a whole bodyside collapses into one wedge in
+ * the middle of the carriage. `verifyTrainLights` counts what came out against
+ * what the two shipped models actually have.
+ */
+const DOORWAY_CLUSTER_M = 2.4;
+
+/**
+ * Turn a bodyside full of door leaves into the openings they make.
+ *
+ * Sorted by position along the carriage and swept, per side, which is O(n log n)
+ * on sixteen leaves once per template at load. Nothing here runs per frame.
+ *
+ * The side is the sign of the leaf's own z, and the two sides are clustered
+ * **separately**: a Tangara's leaves are within 3 cm of the same x on both
+ * bodysides, so one sweep over all sixteen would pair the left leaf with the
+ * right one and put the doorway on the centreline.
+ */
+function clusterDoorways(leaves: ReadonlyArray<{ x: number; z: number }>): Doorway[] {
+  const out: Doorway[] = [];
+  for (const side of [1, -1] as const) {
+    const xs = leaves.filter((l) => Math.sign(l.z) === side).map((l) => l.x).sort((a, b) => a - b);
+    let sum = 0;
+    let n = 0;
+    const flush = (): void => {
+      if (n > 0) out.push({ x: sum / n, side });
+      sum = 0;
+      n = 0;
+    };
+    for (const x of xs) {
+      if (n > 0 && x - sum / n > DOORWAY_CLUSTER_M) flush();
+      sum += x;
+      n++;
+    }
+    flush();
   }
   return out;
 }
@@ -707,8 +821,18 @@ export interface TrainFleetStats {
   solidCars: number;
   /** Carriages suppressed because the player is inside them. See `solidify`. */
   riddenCars: number;
-  /** Carriages wearing lit windows this frame. See section 5. */
+  /** Carriages the night rig answered for this frame. See section 5. */
   litCars: number;
+  /**
+   * How many of those actually wore the exterior sprite band.
+   *
+   * Below `litCars` exactly when a hero carriage is close enough to be lit by its
+   * own interior instead -- see `nightlights.windowBandFade`. Equal to it on a
+   * platform is the shipped bug: a sprite grid over a model with real glass.
+   */
+  bandedCars: number;
+  /** Open doorways laying light on a platform deck this frame. */
+  doorSpills: number;
   /** How many of those are lit because they are in a bore rather than because it is dark. */
   litUnderground: number;
   /** Train ends -- heads and tails together -- lit this frame. */
@@ -786,6 +910,8 @@ export class TrainFleet {
     solidCars: 0,
     riddenCars: 0,
     litCars: 0,
+    bandedCars: 0,
+    doorSpills: 0,
     litUnderground: 0,
     litEnds: 0,
     lightOverflows: 0,
@@ -889,8 +1015,24 @@ export class TrainFleet {
           // that runs in the constructor, before a single byte of GLB has
           // arrived, and could only ever have asserted zero.
           const panelsBefore = saloonPanelCount();
+          const interiorsBefore = saloonInteriorCount();
           const templates = splitModel(gltf.scene, spec, this.warnings);
           const panels = saloonPanelCount() - panelsBefore;
+          // The saloon itself, on identical terms and for a sharper reason: with
+          // the exterior sprite band gone from the near tier (see
+          // `nightlights.windowBandFade`) this term is *the* thing that makes a
+          // carriage read as lit from a platform. A model whose interior material
+          // is called something else is a black box behind glass, which looks
+          // like the feature was removed rather than like a rule missed.
+          const interiors = saloonInteriorCount() - interiorsBefore;
+          if (interiors === 0) {
+            this.warnings.push(
+              `${spec.file}: no saloon interior found. Nothing in it matched ${SALOON_INTERIOR_RE}, ` +
+                `so the inside of every carriage in this model is lit by the night sky alone -- and ` +
+                `the near tier no longer wears the window sprite band that used to hide that. ` +
+                `Print the material names and extend the pattern in nightlights.ts.`,
+            );
+          }
           if (panels === 0) {
             this.warnings.push(
               `${spec.file}: no saloon ceiling luminaire found. Every material in it was converted ` +
@@ -902,6 +1044,29 @@ export class TrainFleet {
           }
           const model = spec.file.replace(/\.glb$/, '');
           for (const [key, template] of templates) {
+            /* **What `clusterDoorways` made of the leaves**, checked here because
+             * this is the first moment anything knows: `verifyTrainLights` runs
+             * in the constructor, before a byte of GLB has arrived.
+             *
+             * Both real carriages come out **even and small** -- a Tangara's
+             * sixteen leaves are four openings, two a side; a Metropolis's
+             * twenty-four are six, three a side. An odd count means one side was
+             * clustered differently from the other, which is a doorway drawn on
+             * the platform with no doorway above it; a large one means
+             * `DOORWAY_CLUSTER_M` has stopped pairing the leaves and every leaf
+             * has become its own wedge, half a metre off centre. Neither shows
+             * in a still of a shut train, which is why it is a warning and not a
+             * comment. */
+            const ways = template.doorways;
+            const perSide = [1, -1].map((s) => ways.filter((d) => d.side === s).length);
+            if (ways.length === 0 || ways.length > 8 || perSide[0] !== perSide[1]) {
+              this.warnings.push(
+                `${spec.file}: carriage ${key} clustered ${ways.length} doorways from its leaves ` +
+                  `(${perSide[0]} one side, ${perSide[1]} the other). A real carriage has two or ` +
+                  `three a side and the same number on both. See DOORWAY_CLUSTER_M -- what this ` +
+                  `feeds is the wedge of light an open door lays on the platform.`,
+              );
+            }
             this.templates.set(`${model}:${key}`, template);
             this.pitches.set(`${model}:${key}`, spec.pitch);
             let tris = 0;
@@ -991,6 +1156,13 @@ export class TrainFleet {
     // than recomputed here. A carriage in a bore overrides it; see section 5 and
     // `nightLevelNow`, which explains why one frame of staleness is invisible.
     this.night = nightLevelNow();
+    // Where the player is, for the two things in `lightCar` that are a function
+    // of distance: how much of the sprite band a hero carriage wears, and which
+    // single open doorway in the city gets the one real light. Stashed rather
+    // than threaded through four call sites, on `this.night`'s own terms -- it is
+    // read only inside this call and is rewritten at the top of the next one.
+    this.px = x;
+    this.pz = z;
     trainLights.begin();
     // Last frame's carriages come out of the index **before** this frame's
     // matrices are written into the same eight floats. The prism records are
@@ -1084,6 +1256,8 @@ export class TrainFleet {
     this.stats.solidCars = solid;
     this.stats.riddenCars = ridden;
     this.stats.litCars = trainLights.drawn;
+    this.stats.bandedCars = trainLights.banded;
+    this.stats.doorSpills = trainLights.spills;
     this.stats.litUnderground = trainLights.drawnUnderground;
     this.stats.litEnds = trainLights.ends;
     this.stats.lightOverflows = trainLights.overflowed;
@@ -1326,7 +1500,12 @@ export class TrainFleet {
       // statement the same two lines.
       carMatrix(bake, dir, centre, car.flip, _matrix);
       _matrix.decompose(instance.root.position, instance.root.quaternion, instance.root.scale);
-      this.lightCar(bake, dir, centre, k, consist);
+      // **The hero tier, and therefore the tier that has a real interior and real
+      // doors.** `open` is the animator's own number, already computed for the
+      // leaves two lines down, and `instance.template.doorways` is where they are
+      // -- so the night gets the doors from the same two facts the geometry does
+      // and there is no second door clock anywhere in the build.
+      this.lightCar(bake, dir, centre, k, consist, true, open, instance.template.doorways);
       instance.root.visible = true;
       for (const door of instance.doors) {
         door.object.position.set(door.dx * open, door.dy * open, door.dz * open);
@@ -1358,7 +1537,12 @@ export class TrainFleet {
       // The night, from the **unscaled** frame and before the box takes it: the
       // ends hang off the carriage's own axes and the window band does its own
       // scaling, so this has to happen while the matrix is still orthonormal.
-      this.lightCar(bake, dir, centre, k, consist);
+      //
+      // No doors, and that is the honest answer rather than an omission: a box
+      // train has no leaves to open, so a wedge of light on a platform under one
+      // would be light coming out of a shut steel box. It is also past
+      // `WINDOW_HERO_NEAR` by construction, so it wears the whole sprite band.
+      this.lightCar(bake, dir, centre, k, consist, false, 0, EMPTY_DOORWAYS);
       // The box is built at unit length; the consist's own pitch scales it, so a
       // Metro car is 22 m and a Tangara 20.4 without a second geometry.
       _matrix.scale(_v.set(consist.pitch - 0.9, 1, 1));
@@ -1386,6 +1570,13 @@ export class TrainFleet {
    * describes the nose of the train and the tail of it, and the only difference
    * between the two kits is what colour they are. `verifyTrainLights` asserts
    * that about the tables rather than leaving it to this paragraph.
+   *
+   * **`hero` is the tier and it decides two separate things**, which is why it is
+   * a flag here rather than two. A hero carriage has a modelled interior behind
+   * translucent glazing and door leaves that move, so it fades out of the sprite
+   * band as it gets close (`windowBandFade`) and it puts light on the platform
+   * through whatever of its doorways are open. A box carriage has neither, wears
+   * the whole band, and is offered no doorways.
    */
   private lightCar(
     bake: RailBake,
@@ -1393,20 +1584,56 @@ export class TrainFleet {
     centre: number,
     k: number,
     consist: { cars: readonly ConsistCar[]; pitch: number; pride: boolean; metro: boolean },
+    hero: boolean,
+    open: number,
+    doorways: readonly Doorway[],
   ): void {
     const level = this.levelAt(bake, dir, centre);
     if (level <= 0) return;
     const body = consist.pitch - 0.9;
     const underground = this.bore;
+    // How far the player is from this carriage, from the frame that has just been
+    // built rather than from a second `poseTrain`. The plan distance and not the
+    // slant: the eye is within a couple of metres of the railhead whenever any of
+    // this matters, and it saves the only square root in the loop being wrong
+    // about a train on a viaduct.
+    const e = _matrix.elements;
+    const dx = this.px - e[12];
+    const dz = this.pz - e[14];
+    const metres = Math.sqrt(dx * dx + dz * dz);
+
     _lit.copy(_matrix);
     _lit.scale(_v.set(body, 1, 1));
-    trainLights.car(_lit, consist.metro, level, underground);
+    trainLights.car(_lit, consist.metro, level, underground, hero ? windowBandFade(metres) : 1);
+
+    // The doors. `open` is zero for a box train and for any train that is not
+    // standing at a platform, so the whole of this costs one compare on all but a
+    // handful of carriages in the city.
+    if (open > 0) {
+      for (const doorway of doorways) {
+        _lit.copy(_matrix).multiply(_endShift.makeTranslation(doorway.x, 0, 0));
+        // The far bodyside, as a **half turn about Y** rather than a mirror.
+        // Mirroring would flip the handedness of the basis and invert the winding
+        // of every triangle in the wedge, and a `FrontSide` additive quad wound
+        // backwards is not dim, it is absent -- on exactly one side of every
+        // train, which is the defect `buildTrainWindows` already carries a
+        // paragraph about. The wedge is symmetric across the carriage axis, so
+        // the turn costs nothing but the sign of two columns.
+        if (doorway.side < 0) _lit.multiply(_halfTurn);
+        trainLights.doorway(_lit, level, open, metres);
+      }
+    }
+
     if (k === 0 || k === consist.cars.length - 1) {
       _lit.copy(_matrix).multiply(_endShift.makeTranslation(body / 2, 0, 0));
       if (k === 0) trainLights.head(_lit, level);
       else trainLights.tail(_lit, level);
     }
   }
+
+  /** Where the player was when `update` started. See `lightCar`. */
+  private px = 0;
+  private pz = 0;
 
   // --- The instance pool -------------------------------------------------------------
 
@@ -1619,6 +1846,22 @@ export function verifyTrainLights(): string[] {
       `TRAIN_END_CAPACITY is ${TRAIN_END_CAPACITY} and ${IMPOSTOR_CAPACITY} carriages of the ` +
         `shortest consist in the game (${shortest}) is ${ends} ends. A train that overflows this ` +
         `is a train with no headlight, coming at you.`,
+    );
+  }
+  // The doorways, which are budgeted against the **model** tier rather than the
+  // impostor one: only a hero carriage has leaves that open, so the worst frame
+  // this file can produce is `MAX_MODEL_TRAINS` of the longest consist, every
+  // doorway, both sides. Six doorways a carriage is the Metropolis (three a side,
+  // measured off the shipped GLB by `clusterDoorways`) and eight cars is the
+  // Tangara, so the product is a bound on both rather than either.
+  const longest = Math.max(SUBURBAN.length, METRO.length);
+  const worstDoorways = MAX_MODEL_TRAINS * longest * 6;
+  if (DOOR_SPILL_CAPACITY < worstDoorways) {
+    failures.push(
+      `DOOR_SPILL_CAPACITY is ${DOOR_SPILL_CAPACITY} against a worst case of ${worstDoorways} -- ` +
+        `${MAX_MODEL_TRAINS} model trains of ${longest} carriages with six doorways each. What ` +
+        `overflows is not a dark platform, it is *some* doors spilling light and others not, on ` +
+        `the same train, which reads as a bug in the door animation rather than in a capacity.`,
     );
   }
 
