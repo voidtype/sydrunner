@@ -823,6 +823,22 @@ export const REASON = {
   WILDLIFE: 3,
   ASSAULT_POLICE: 4,
   AFFRAY: 5,
+  /**
+   * Taking a car that is not yours, and driving one like you took it.
+   *
+   * Reported by `game/driving.ts` and graded by nobody in this file: the heat
+   * ladder that decides what a car thief is worth is a separate workstream, and
+   * this module's only job -- the one `WILDLIFE` two rows up was reserved for --
+   * is to have the byte and the string ready before the feature that needs them
+   * lands. `reportCrime(id, REASON.CAR_THEFT)` and the police arrive.
+   *
+   * `CAR_THEFT` is conditional on being *seen*: `driving.bystanderSeen` gates
+   * the call, which is the first crime in this game a civilian rather than an
+   * officer can report. `DANGEROUS_DRIVING` is not conditional on anything --
+   * running somebody down at speed is reported by the body.
+   */
+  CAR_THEFT: 6,
+  DANGEROUS_DRIVING: 7,
 } as const;
 
 /**
@@ -840,6 +856,8 @@ export const REASON_TEXT: Readonly<Record<number, string>> = {
   [REASON.WILDLIFE]: 'harming protected wildlife',
   [REASON.ASSAULT_POLICE]: 'assaulting police',
   [REASON.AFFRAY]: 'affray',
+  [REASON.CAR_THEFT]: 'stealing a car',
+  [REASON.DANGEROUS_DRIVING]: 'dangerous driving',
 };
 
 export function reasonText(code: number): string {

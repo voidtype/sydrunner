@@ -69,6 +69,7 @@
 import { verifyCombat } from '../client/src/game/combat.ts';
 import { verifyFooty } from '../client/src/game/footy.ts';
 import { verifyPowerups } from '../client/src/game/powerups.ts';
+import { verifyDriving } from '../client/src/game/driving.ts';
 import { verifySpatialHash } from '../client/src/game/spatialhash.ts';
 import { verifyMovementBasis } from '../client/src/player/controller.ts';
 import {
@@ -201,6 +202,13 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // `client/src/game/unstuck.ts`.
     ['verifyUnstuck', verifyUnstuck()],
     ['verifyTeleport', verifyTeleport()],
+    // Taking a car and driving it. Run **here** as well as in the browser
+    // because the integrator, the claim and the suppression key are all this
+    // side's authority and every failure in that file renders: a handbrake that
+    // walks the car backwards looks like a physics quirk, and a suppression key
+    // that does not answer is your own car driving off to Ashfield beside you,
+    // running people down on the way. See `client/src/game/driving.ts`.
+    ['verifyDriving', verifyDriving()],
     // The suggestions box's week arithmetic, sanitiser, order and codecs.
     // Run **here** rather than only in the browser because the server is the
     // side that keeps the ledger, and every failure in that file is silent in

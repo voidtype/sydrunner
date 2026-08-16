@@ -1146,7 +1146,7 @@ export interface PedestrianHit {
   /** Seconds they will spend on the ground. `downSeconds(key, tick)`. */
   seconds: number;
   /** What hit them. Open for a future cause without changing the shape. */
-  cause: 'bat' | 'footy';
+  cause: 'bat' | 'footy' | 'car';
   /** The combatant id responsible, or 0 when nothing owns it. */
   attacker: number;
 }
@@ -1335,6 +1335,93 @@ export function strikePedestrianWithBall(
   return land(field, bestKey, bestOsm, bestSide, bestSlot, bestX, bestY, bestZ, tick, 'footy', ball.thrower, scratch, pose);
 }
 
+/**
+ * A **driven** car, against the crowd. `game/driving.ts`'s only reach into this
+ * module.
+ *
+ * The third cause, and it is deliberately not routed through
+ * `traffic.carHitting`: that function tests one `CombatantState` capsule against
+ * the ambient fleet, and this tests the whole crowd against *one* box that a
+ * player is steering. The geometry is `traffic.carOverlaps`' -- an oriented box
+ * in plan, tested with the same `along`/`across` decomposition and the same
+ * "left of a heading `(dx, dz)` is `(dz, -dx)`" convention `lanes.py` offsets a
+ * lane by -- so somebody standing where an ambient car would have hit them is
+ * hit by a driven car in the same spot.
+ *
+ * The **nearest** victim only, per call, on `strikePedestrian`'s rule: a car
+ * through a bus queue that flattened nine people on one tick would be nine
+ * `PedestrianHit` announcements in one frame and nine crimes reported for one
+ * act. One a tick at 60 Hz is still a bus queue going down, over a fifth of a
+ * second, which reads better anyway.
+ *
+ * Returns the victim's pose, already down, or null. The caller decides what it
+ * costs -- `server/sim.ts` reports the crime; this module has never known what a
+ * crime is.
+ */
+export function runDownPedestrian(
+  field: PedestrianField,
+  car: {
+    x: number;
+    y: number;
+    z: number;
+    /** Unit heading in the world plan, as `traffic.CarPose` carries it. */
+    dx: number;
+    dz: number;
+    halfLength: number;
+    halfWidth: number;
+    height: number;
+  },
+  driver: number,
+  tick: number,
+  scratch: PedBand[],
+  pose: PedPose,
+): PedPose | null {
+  // The broadphase, one number rather than one per candidate, on
+  // `STRIKE_QUERY_RADIUS`' argument: a broadphase whose size changes per
+  // candidate is not a broadphase. The half-diagonal of the longest body plus a
+  // capsule covers every box this can be handed.
+  const reach = car.halfLength + car.halfWidth + CAPSULE_RADIUS;
+
+  let bestPlan = Infinity;
+  let bestKey = -1;
+  let bestX = 0;
+  let bestY = 0;
+  let bestZ = 0;
+  let bestOsm = 0;
+  let bestSide = 0;
+  let bestSlot = 0;
+
+  forEachPedestrianNear(field, car.x, car.z, reach, tick, scratch, pose, (p) => {
+    // Already on the footpath. `traffic`'s re-hit guard, and it is what stops a
+    // car parked on top of somebody re-flattening them sixty times a second.
+    if (p.down) return;
+    // The vertical gate, `traffic.carOverlaps`' and for its reason: without it a
+    // car on the Cahill Expressway mows down the queue on Alfred Street eight
+    // metres below.
+    if (p.y > car.y + car.height) return;
+    if (p.y + CAPSULE_HEIGHT < car.y) return;
+    const rx = p.x - car.x;
+    const rz = p.z - car.z;
+    const along = rx * car.dx + rz * car.dz;
+    if (along > car.halfLength + CAPSULE_RADIUS || along < -car.halfLength - CAPSULE_RADIUS) return;
+    const across = rx * car.dz - rz * car.dx;
+    if (across > car.halfWidth + CAPSULE_RADIUS || across < -car.halfWidth - CAPSULE_RADIUS) return;
+    const plan2 = rx * rx + rz * rz;
+    if (plan2 >= bestPlan) return;
+    bestPlan = plan2;
+    bestKey = p.key;
+    bestX = p.x;
+    bestY = p.y;
+    bestZ = p.z;
+    bestOsm = p.osmId;
+    bestSide = p.side;
+    bestSlot = p.slot;
+  });
+
+  if (bestKey < 0) return null;
+  return land(field, bestKey, bestOsm, bestSide, bestSlot, bestX, bestY, bestZ, tick, 'car', driver, scratch, pose);
+}
+
 /** Put somebody on the ground, tell the listeners, and hand back their pose. */
 function land(
   field: PedestrianField,
@@ -1346,7 +1433,7 @@ function land(
   y: number,
   z: number,
   tick: number,
-  cause: 'bat' | 'footy',
+  cause: 'bat' | 'footy' | 'car',
   attacker: number,
   scratch: PedBand[],
   pose: PedPose,

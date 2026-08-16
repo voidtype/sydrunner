@@ -876,6 +876,16 @@ const HEAD_LEVEL = 2.6;
 export const CAR_LIGHT_CAPACITY = 384;
 
 /**
+ * How many cars can be showing brake lights at once.
+ *
+ * Only cars a *player* is steering ever do -- the ambient fleet's braking is a
+ * lookup nobody asked to see lit -- and protocol v8 sends a client at most 40
+ * players. 48 is that with room for the local driver and a dummy or two, which
+ * is `BIKE_LIGHT_CAPACITY`'s own sum and for its own reason. 6 kB.
+ */
+export const CAR_BRAKE_CAPACITY = 48;
+
+/**
  * The headlight beam: where it starts on the car, how far it throws, and how
  * wide it gets.
  *
@@ -2152,6 +2162,8 @@ export class CarLights implements CarLightSink {
    */
   private live = true;
   private count = 0;
+  /** Brake lamps this frame. Its own counter, because its own set is never gated on night. */
+  private brakeCount = 0;
 
   constructor() {
     this.material = nightMaterial('car_lights', false);
@@ -2186,18 +2198,105 @@ export class CarLights implements CarLightSink {
       mesh.visible = true;
       return mesh;
     });
+    // --- And the brake set, third and last, sharing the tail lamp's geometry
+    // and the one material. Appended to `this.meshes` rather than exposed
+    // separately so `main.ts` adds it to the scene, disposes it and warms its
+    // pipeline through the lines that already do all three for the other two --
+    // `setLive`, `end` and `dispose` index around it.
+    //
+    // Visible at construction and *never hidden*, which is the whole point:
+    // `mesh.count` is zero unless somebody is braking, and a set with a count of
+    // zero costs one skipped draw call. See `setLive`.
+    {
+      const brakes = new InstancedMesh(this.tailGeometry, this.material, CAR_BRAKE_CAPACITY);
+      brakes.name = 'car_brakelights';
+      brakes.count = 0;
+      brakes.frustumCulled = false;
+      brakes.castShadow = false;
+      brakes.receiveShadow = false;
+      brakes.visible = true;
+      this.meshes.push(brakes);
+    }
   }
 
-  /** Whether the sprites are being drawn at all. See `NIGHT_VISIBLE_LEVEL`. */
+  /**
+   * Whether the sprites are being drawn at all. See `NIGHT_VISIBLE_LEVEL`.
+   *
+   * **The brake set is exempt**, and that is the whole reason this loop is
+   * indexed rather than a `for..of` over `this.meshes`: a brake light is on
+   * because a driver is standing on the pedal, which is as true at noon as it is
+   * at midnight. Head and tail lamps are a *night* thing and stay gated.
+   */
   setLive(live: boolean): void {
     if (live === this.live) return;
     this.live = live;
-    for (const mesh of this.meshes) mesh.visible = live;
+    this.meshes[0].visible = live;
+    this.meshes[1].visible = live;
   }
 
   begin(): boolean {
     this.count = 0;
     return this.live;
+  }
+
+  /**
+   * A driven car's brake lamps, on at any hour. Returns nothing and gates on
+   * nothing but capacity.
+   *
+   * Separate from `add` above because the two have different *owners*: `add` is
+   * fed by `world/cars.TrafficMovers` for the ambient fleet at night, and this is
+   * fed for the handful of cars a player is steering, whenever one of them is on
+   * the brake. It reuses the tail geometry and the tail material rather than
+   * authoring a second lamp, so a braking car's lights are the same lights every
+   * other car in the city has -- which is the point, and is also why this is
+   * thirty lines here rather than a module of its own.
+   *
+   * `begin`/`end` bracket it exactly as they bracket `add`; a frame that calls
+   * neither leaves the set at last frame's count, which is why `beginBrakes` is
+   * unconditional where `begin` returns a boolean.
+   */
+  beginBrakes(): void {
+    this.brakeCount = 0;
+  }
+
+  addBrake(pose: CarPose): void {
+    if (this.brakeCount >= CAR_BRAKE_CAPACITY) return;
+    // `add`'s half-angle quaternion, and see its comment: one square root
+    // against three transcendentals.
+    const c = pose.dx;
+    const s = -pose.dz;
+    const w2 = (1 + c) * 0.5;
+    if (w2 > 1e-12) {
+      const w = Math.sqrt(w2);
+      _quaternion.set(0, s / (2 * w), 0, w);
+    } else {
+      _quaternion.set(0, 1, 0, 0);
+    }
+    _carScale.set(pose.scale, pose.scale, pose.scale);
+    const size = CAR_BODY_SIZE[pose.body] ?? CAR_BODY_SIZE[0];
+    const reach = size.length * 0.5 * pose.scale;
+    _position.set(pose.x - pose.dx * reach, pose.y, pose.z - pose.dz * reach);
+    _matrix.compose(_position, _quaternion, _carScale);
+    this.meshes[2].setMatrixAt(this.brakeCount, _matrix);
+    this.brakeCount++;
+  }
+
+  /**
+   * The two sets the day/night switch owns: head lamps and tail lamps.
+   *
+   * `meshes` is what `main.ts` adds to the scene and disposes, and it carries a
+   * third entry -- the brake lamps -- that must never be hidden. Every caller
+   * asking "is the night's additive geometry drawn" wants *these two*, which is
+   * why the distinction is a named getter rather than a slice at each call site.
+   */
+  get nightSets(): readonly InstancedMesh[] {
+    return [this.meshes[0], this.meshes[1]];
+  }
+
+  endBrakes(): void {
+    const mesh = this.meshes[2];
+    if (this.brakeCount > 0 || mesh.count > 0) mesh.instanceMatrix.needsUpdate = true;
+    mesh.count = this.brakeCount;
   }
 
   add(pose: CarPose): void {
@@ -2239,7 +2338,10 @@ export class CarLights implements CarLightSink {
   }
 
   end(): void {
-    for (const mesh of this.meshes) {
+    // Indices rather than a walk, for `setLive`'s reason: the brake set has its
+    // own count and its own bracket.
+    for (let i = 0; i < 2; i++) {
+      const mesh = this.meshes[i];
       if (this.count > 0 || mesh.count > 0) mesh.instanceMatrix.needsUpdate = true;
       mesh.count = this.count;
     }
@@ -5072,7 +5174,11 @@ export function verifyNightLights(): string[] {
   // The sprites are meshes and may be hidden freely; the *lights* may not, and
   // the two are one keystroke apart in this file. So: on at midnight, off at
   // three in the afternoon, and the light set unchanged either way.
-  if (!probe2.bikeLights.mesh.visible || probe2.carLights.meshes.some((m) => !m.visible)) {
+  // `nightSets` and not `meshes`: the brake lamps are in that array too and are
+  // deliberately *not* on the night's switch, because a brake light is on
+  // because somebody is standing on the pedal, which is as true at noon as it is
+  // at midnight. See `CarLights.setLive`.
+  if (!probe2.bikeLights.mesh.visible || probe2.carLights.nightSets.some((m) => !m.visible)) {
     failures.push(
       `The night's additive sets are not drawn with the sun 20 degrees down. They are the whole ` +
         `of what a headlight looks like -- the real lights only ever put light on surfaces -- so ` +
@@ -5080,7 +5186,7 @@ export function verifyNightLights(): string[] {
     );
   }
   probe2.update(1 / 60, camera, 57.11, 0, null, null);
-  if (probe2.bikeLights.mesh.visible || probe2.carLights.meshes.some((m) => m.visible)) {
+  if (probe2.bikeLights.mesh.visible || probe2.carLights.nightSets.some((m) => m.visible)) {
     failures.push(
       `The night's additive sets are still drawn at 3 pm. An additive blend at zero alpha is a ` +
         `no-op visually and is not one in the frame: every fragment is still rasterised and ` +

@@ -217,6 +217,30 @@ import {
   type RideSteering,
   type RiderView,
 } from './game/bikes.ts';
+// --- Workstream B: taking a car. One import block, one install call, and every
+// line of logic in `game/driving.ts` (the rules, three-free, shared with the
+// server) and `world/drivencars.ts` (the picture). See either header.
+import {
+  CarField,
+  DRIVE_CAM_DISTANCE,
+  DRIVE_CAM_LIFT,
+  createDrivingScratch,
+  resolveTake,
+  shapeDriveSteering,
+  verifyDriving,
+  TAKEABLE_SPEED,
+  TAKE_HEIGHT,
+  TAKE_RADIUS,
+  type DriveSteering,
+  type DriverView,
+} from './game/driving.ts';
+import {
+  DrivenCarView,
+  speedText,
+  takePrompt,
+  verifyDrivenCars,
+  type DriverPose,
+} from './world/drivencars.ts';
 import {
   BIKE_LEAN,
   BikeAssets,
@@ -620,6 +644,16 @@ async function main(): Promise<void> {
   // pedalling in mid-air beside its own saddle, which reads as a rigging bug and
   // is really two files disagreeing. See `game/bikes.ts` and `world/bike.ts`.
   const bikeFailures = timed('bikes', verifyBikes);
+  // And the cars, in the same two halves and failing in the same two silent
+  // ways. The **rules** half: a handbrake that walks a stopped car backwards
+  // reads as a physics quirk, and a suppression key that does not answer is the
+  // car you just stole still driving to Ashfield beside you, running people down
+  // on the way. The **picture** half: a prompt that survives a knockout is the
+  // bikes' own reported bug one feature over, and a speed readout in the wrong
+  // unit is a car that everybody reports as "feeling slow". See
+  // `game/driving.ts` and `world/drivencars.ts`.
+  const drivingFailures = timed('driving', verifyDriving);
+  const drivenCarFailures = timed('drivencars', verifyDrivenCars);
   // And where the camera is looking from, which fails in this project's shape
   // exactly: every broken version of a zoom draws a perfectly good frame. A
   // ladder that cannot reach the far end is the reported bug -- *"cant zoom out
@@ -870,6 +904,8 @@ async function main(): Promise<void> {
     cdnFailures.length ||
     spawnFailures.length ||
     bikeFailures.length ||
+    drivingFailures.length ||
+    drivenCarFailures.length ||
     cameraFailures.length ||
     bikeMeshFailures.length ||
     bikeGlowFailures.length ||
@@ -919,6 +955,8 @@ async function main(): Promise<void> {
           ...cdnFailures,
           ...spawnFailures,
           ...bikeFailures,
+          ...drivingFailures,
+          ...drivenCarFailures,
           ...cameraFailures,
           ...bikeMeshFailures,
           ...bikeGlowFailures,
@@ -3592,6 +3630,59 @@ async function main(): Promise<void> {
   };
   /** Whichever field is authoritative right now. See the block above. */
   const bikeWorld = (): BikeField => (net ? net.bikes : localBikes);
+
+  // --- Workstream B: the cars. `bikeWorld` above is the pattern for all of it.
+  /** The offline authority. Unused while a server is answering; see `carWorld`. */
+  const localCars = new CarField();
+  const carWorld = (): CarField => (net ? net.cars : localCars);
+  /** Where `driving.shapeDriveSteering` writes. One object, reused every frame. */
+  const driveSteering: DriveSteering = { right: 0, yawDelta: 0 };
+  /** Scratch for `resolveTake`, so a prompt asked sixty times a second allocates nothing. */
+  const takeScratch = createDrivingScratch();
+  /** Whether there is a car within reach this frame. Recomputed, never stored. */
+  let takeableNear = false;
+  /** `CarField.follow`'s input, offline only. `riderViews`' twin. */
+  const driverViews: DriverView[] = [];
+  /**
+   * Where a driver's body is on screen, for `DrivenCarView`. See its header:
+   * the local player from the *predicted* position so the car moves on the frame
+   * the input does, and a remote from their *interpolated* one so the car and
+   * the body in it are on the same 100 ms clock.
+   */
+  const drivenCars = new DrivenCarView(carWorld, (driverId: number, out: DriverPose): boolean => {
+    // `-1` is the view's way of saying "this is the car *you* are in" without
+    // going through an id -- see `DrivenCarView`'s `localCar`. Offline the local
+    // combatant id is 0, which is also the field's empty sentinel, so an id
+    // comparison alone cannot answer this.
+    if (driverId === -1 || driverId === playerCombat.id) {
+      out.x = player.position.x;
+      out.y = player.position.y - EYE_HEIGHT;
+      out.z = player.position.z;
+      out.yaw = player.yaw;
+      return true;
+    }
+    const remote = net?.remotes.get(driverId);
+    if (!remote || remote.fresh) return false;
+    out.x = remote.position.x;
+    out.y = remote.position.y - EYE_HEIGHT;
+    out.z = remote.position.z;
+    out.yaw = remote.yaw;
+    return true;
+  }, () => playerCombat.drivingCar);
+  /** Is this remote at the wheel? The parked-bike draw consults it -- see below. */
+  const isDriving = (id: number): boolean => carWorld().carOf(id) !== 0;
+  // And the four properties that are the whole of drawing a driven car: through
+  // the loop that already draws every other car in Sydney, at the same LOD, in
+  // the same material, with the same headlights. `world/drivencars.ts`' header
+  // is why this is four lines and not a renderer. Here rather than beside the
+  // fleet's own `lights`/`models` because `drivenCars` is declared here, and it
+  // is declared here because it needs `player` and `net`.
+  trafficMovers.suppress = drivenCars.suppress;
+  trafficMovers.driven = drivenCars.source;
+  if (carModels) {
+    carModels.suppress = drivenCars.suppress;
+    carModels.drivenClaims = drivenCars.claims;
+  }
   /**
    * Is this bike the one the local player has *predicted* they are on?
    *
@@ -4510,6 +4601,17 @@ async function main(): Promise<void> {
   const RIDE_NUDGE_SECONDS = 1.5;
   let rideNudgeT = 0;
   let rideNudgeText = RIDE_PROMPT;
+  /**
+   * Seconds until the horn can sound again.
+   *
+   * A cooldown rather than an edge, because `punch` is level-triggered on this
+   * wire (see `protocol.BTN`) and a held left click would otherwise be sixty
+   * honks a second. A third of a second is about the length of one, so leaning
+   * on the button gives a repeating parp rather than a tone -- which is what a
+   * horn does and is also the only thing that reads as deliberate.
+   */
+  let honkT = 0;
+  const HONK_SECONDS = 0.34;
   /**
    * Where `bikes.shapeRideSteering` writes. One object, reused every frame.
    *
@@ -5442,14 +5544,102 @@ async function main(): Promise<void> {
       // pill is derived at the top of this function now, so getting off with
       // `E` clears it for the same reason getting knocked off does: the
       // question is asked again and the answer is different.
+    } else if (playerCombat.drivingCar !== 0) {
+      // Out of the car, and the record stays where the body is -- offline
+      // `CarField.follow` does it at the end of this tick, online the server
+      // does and the mirror is corrected. `sim.resolveMount` runs the identical
+      // branch in the identical position, which is what makes this a prediction
+      // rather than a second opinion.
+      const wasDriving = playerCombat.drivingCar;
+      playerCombat.drivingCar = 0;
+      playerCombat.carSpeed = 0;
+      // And the record stops being anybody's. Offline this is the whole of the
+      // release -- see `CarField.leave` for why the sweep cannot do it there --
+      // and online it is a prediction the next `MSG.CARS` confirms.
+      carWorld().leave(wasDriving);
+      net?.predictedCarChange();
     } else if (!predictBoard()) {
       const bike = field.nearestFree(player.position.x, player.position.y - EYE_HEIGHT, player.position.z);
       if (bike && field.claim(bike.id, playerCombat.id)) {
         playerCombat.ridingBike = bike.id;
         net?.predictedBikeChange();
         audio.pickupFlatWhite();
+      } else {
+        predictTakeCar();
       }
     }
+  };
+
+  /**
+   * Predict getting into a car. The bottom of `E`'s priority chain.
+   *
+   * `sim.tryTakeCar` is the authority and runs the identical two steps in the
+   * identical order -- an empty record standing in the street first, then a car
+   * off the timetable -- against the identical `TrafficField` at the identical
+   * whole tick. What this buys is the frame: the chase camera and the speed
+   * change on the frame `E` goes down rather than a round trip later, and
+   * `net.predictedCarChange` is what stops the snapshots already in flight from
+   * undoing it.
+   *
+   * Offline this **is** the authority, which is what makes `?offline` a real
+   * test of the feature rather than a second implementation of it.
+   */
+  const predictTakeCar = (): void => {
+    const cars = carWorld();
+    const feet = player.position.y - EYE_HEIGHT;
+    // Somebody's abandoned getaway car, or the one you parked. No crime: the
+    // theft happened when it came off the timetable and was reported then.
+    let best: ReturnType<CarField['get']> | null = null;
+    let bestD2 = TAKE_RADIUS * TAKE_RADIUS;
+    for (const car of cars.all()) {
+      if (car.driverId !== 0) continue;
+      const dy = car.y - feet;
+      if (dy > TAKE_HEIGHT || dy < -TAKE_HEIGHT) continue;
+      const dx = car.x - player.position.x;
+      const dz = car.z - player.position.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > bestD2 || (best !== null && d2 >= bestD2)) continue;
+      best = car;
+      bestD2 = d2;
+    }
+    if (best) {
+      best.driverId = playerCombat.id;
+      playerCombat.drivingCar = best.id;
+      playerCombat.carSpeed = 0;
+      player.yaw = best.yaw;
+      net?.predictedCarChange();
+      audio.pickupFlatWhite();
+      return;
+    }
+    // Or one off the timetable, which is the theft. **No crime is predicted**:
+    // unlike the tuned ride-by twenty screens down, whether anybody saw it
+    // depends on the crowd's line of sight, and a banner that appeared and then
+    // vanished when the server disagreed would be worse than one 50 ms late.
+    if (
+      !resolveTake(
+        traffic,
+        player.position.x,
+        feet,
+        player.position.z,
+        trafficTick(Date.now()),
+        takeScratch.routes,
+        takeScratch.pose,
+        (identity) => cars.suppressed(identity),
+        takeScratch.take,
+      )
+    ) {
+      return;
+    }
+    const taken = cars.take(takeScratch.take, playerCombat.id);
+    if (taken === null) return;
+    playerCombat.drivingCar = taken.id;
+    playerCombat.carSpeed = 0;
+    // Point the driver down the street rather than at whatever shopfront they
+    // happened to be facing. A look direction is client-authoritative on this
+    // wire, so this needs nobody's permission -- see `driving.headingYaw`.
+    player.yaw = taken.yaw;
+    net?.predictedCarChange();
+    audio.pickupFlatWhite();
   };
 
   /**
@@ -5873,10 +6063,19 @@ async function main(): Promise<void> {
     // nudge is legible; a no-op with no nudge is a bug. So the buffer is *held*
     // rather than dropped, and the swing comes out on the frame you get off,
     // which is what a player who pressed it a moment early actually wanted.
-    const armed = playerCombat.ridingBike === 0;
+    // ...and while driving, on the identical argument one paragraph up: you are
+    // doing 22 m/s and you click. The horn is what a left click does instead --
+    // see `honkT` -- so unlike the bike this is a click with an *answer*, and
+    // the nudge is therefore skipped for a driver.
+    const armed = playerCombat.ridingBike === 0 && playerCombat.drivingCar === 0;
+    if (playerCombat.drivingCar !== 0 && punchBuffer > 0 && honkT <= 0) {
+      honkT = HONK_SECONDS;
+      audio.thwack(false);
+    }
+    honkT = Math.max(0, honkT - dt);
     input.punch = armed && punchBuffer > 0;
     input.throwBall = armed && throwBuffer > 0;
-    if (!armed && (punchBuffer > 0 || throwBuffer > 0) && rideNudgeT <= 0) {
+    if (playerCombat.ridingBike !== 0 && (punchBuffer > 0 || throwBuffer > 0) && rideNudgeT <= 0) {
       rideNudgeT = RIDE_NUDGE_SECONDS;
       rideNudgeText = RIDE_PROMPT;
     }
@@ -5943,8 +6142,47 @@ async function main(): Promise<void> {
       }
     }
     if (isAboard(playerCombat.aboard) || playerCombat.phase === 'ko' || !railBake) doorMarker.hide();
+    // --- Is there a car within reach? Asked every frame and stored nowhere,
+    //     which is `bikes.ridePrompt`'s rule: a prompt that is *set* has to be
+    //     *cleared*, and every state that ends without pressing a key strands
+    //     it. `takePrompt` is a pure function of what is true now.
+    //
+    // The lookup runs only when the player is on foot and could actually take
+    // something, so the cost outside that -- which is nearly all of the time --
+    // is three comparisons.
+    takeableNear = false;
+    if (playerCombat.drivingCar === 0 && playerCombat.ridingBike === 0 && playerCombat.phase !== 'ko') {
+      const cars = carWorld();
+      const feet = player.position.y - EYE_HEIGHT;
+      for (const car of cars.all()) {
+        if (car.driverId !== 0) continue;
+        const dy = car.y - feet;
+        if (dy > TAKE_HEIGHT || dy < -TAKE_HEIGHT) continue;
+        const dx = car.x - player.position.x;
+        const dz = car.z - player.position.z;
+        if (dx * dx + dz * dz <= TAKE_RADIUS * TAKE_RADIUS) {
+          takeableNear = true;
+          break;
+        }
+      }
+      if (!takeableNear) {
+        takeableNear = resolveTake(
+          traffic,
+          player.position.x,
+          feet,
+          player.position.z,
+          trafficTick(Date.now()),
+          takeScratch.routes,
+          takeScratch.pose,
+          (identity) => cars.suppressed(identity),
+          takeScratch.take,
+        );
+      }
+    }
     hud.derived(
-      trainPill || ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText),
+      trainPill ||
+        ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText) ||
+        takePrompt(takeableNear, playerCombat.drivingCar !== 0, playerCombat.phase),
     );
 
     // Reconciliation, at the top of the tick and before anything is advanced.
@@ -6202,6 +6440,37 @@ async function main(): Promise<void> {
     // Online this is skipped entirely: `net.bikes` is a mirror the server
     // corrects, and sweeping it here would be this client inventing state that
     // the next `MSG.BIKES` would contradict.
+    // --- The cars, offline, on the bikes' own terms one block down.
+    //
+    // `server/sim.stepCars` runs the identical sweep in the identical place. The
+    // whole of what it does here is carry an occupied car to its driver and
+    // leave any whose driver has stopped driving standing in the road -- which
+    // offline is what drops the car when the player is batted out of it,
+    // knocked out, or respawns. Online it is skipped: `net.cars` is a mirror the
+    // server corrects, and sweeping it here would be this client inventing state
+    // the next `MSG.CARS` would contradict.
+    //
+    // The knockdown and the five-minute expiry are deliberately *not* predicted.
+    // Both are consequences with a name attached -- a crime reported, a record
+    // deleted -- and a client that guessed either would be a client that undid
+    // its guess when the server disagreed.
+    if (!online && localCars.size > 0) {
+      driverViews.length = 0;
+      for (const f of fighters) {
+        const c = f.combat;
+        driverViews.push({
+          id: c.id,
+          drivingCar: c.drivingCar,
+          carSpeed: c.carSpeed,
+          x: c.body.position.x,
+          feetY: c.body.position.y - EYE_HEIGHT,
+          z: c.body.position.z,
+          yaw: c.body.yaw,
+        });
+      }
+      localCars.follow(driverViews);
+    }
+
     if (!online) {
       riderViews.length = 0;
       for (const f of fighters) {
@@ -6368,7 +6637,12 @@ async function main(): Promise<void> {
         // prediction rather than a second opinion -- see its comment for the
         // argument.
         if (isAboard(f.combat.aboard)) continue;
-        const car = carHitting(traffic, f.combat, tick, carRoutes, carPose);
+        // The suppression predicate, and without it the first thing that happens
+        // after you steal a car is that its ambient copy runs you over from
+        // inside the seat you are sitting in. `server/sim.ts` passes the
+        // identical one at the identical point, which is what keeps this a
+        // prediction rather than a second opinion.
+        const car = carHitting(traffic, f.combat, tick, carRoutes, carPose, drivenCars.suppress);
         if (car === null) continue;
         const ko = applyCarHit(f.combat, car);
         carHits.count++;
@@ -6631,6 +6905,23 @@ async function main(): Promise<void> {
     );
     input.right = rideSteering.right;
     input.yaw += rideSteering.yawDelta;
+    // And the wheel, on the bars' own terms exactly -- see the paragraph above,
+    // which is the whole argument for why steering is an input remap and not a
+    // second integrator. `shapeDriveSteering` leaves a walker and a cyclist
+    // alone, so this composes rather than competing. The car's *signed* speed
+    // is passed, not the body's ground speed, because reversing has to invert
+    // the wheel and a plan speed has no sign.
+    shapeDriveSteering(
+      playerCombat,
+      (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0),
+      playerCombat.carSpeed,
+      frameDt,
+      driveSteering,
+    );
+    if (playerCombat.drivingCar !== 0) {
+      input.right = driveSteering.right;
+      input.yaw += driveSteering.yawDelta;
+    }
 
     const turn = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0);
     const look = (keys.has('ArrowDown') ? 1 : 0) - (keys.has('ArrowUp') ? 1 : 0);
@@ -6741,7 +7032,19 @@ async function main(): Promise<void> {
     // one `Math.max` and is called every frame rather than on the mount event,
     // because a ride can end for reasons no event fires for. See
     // `game/camera.ts`.
-    const chosenDistance = liveCameraDistance(cameraDistance, playerCombat.ridingBike !== 0);
+    let chosenDistance = liveCameraDistance(cameraDistance, playerCombat.ridingBike !== 0);
+    // --- And a car, which is a bigger thing to look at than a bicycle.
+    //
+    // A **floor and never a ceiling**, exactly as `liveCameraDistance` treats the
+    // ride: a driver who has asked for 12.8 m keeps 12.8, a driver in first
+    // person gets 7 m for the duration, and their own choice comes back the
+    // moment they get out. Nothing here writes the preference, which is the
+    // property that makes "comes back" true for free -- see `game/camera.ts`.
+    //
+    // Applied here rather than by widening `liveCameraDistance` because
+    // `game/camera.ts` is a file five other workstreams are also editing this
+    // week, and a `Math.max` at the one call site says the same thing.
+    if (playerCombat.drivingCar !== 0) chosenDistance = Math.max(chosenDistance, DRIVE_CAM_DISTANCE);
     // --- Aboard a train the view is **first person**, and this is the call the
     //     riding round makes after having looked at both alternatives on screen.
     //
@@ -6821,6 +7124,19 @@ async function main(): Promise<void> {
       // `chaseDistance` is where the camera *is* and this is what it is trying to
       // get back to, so backing into a terrace and stepping out again returns you
       // to the boom you chose rather than to wherever the wall left you.
+      // How high over the eye the boom sits. Three cases now, and the third is
+      // the car: 2.5 m rather than the walker's 1.5, because a car is 4.6 m long
+      // and a boom at head height looks along its roof rather than down at it.
+      // One `const` rather than the two copies of a ternary this was, because
+      // the occlusion march and the placement below have to agree about where
+      // the camera is going -- a march at one height and a placement at another
+      // is a camera that ducks for walls it is nowhere near.
+      const chaseLift =
+        rideAboardForCamera !== null
+          ? RIDE_CHASE_LIFT
+          : playerCombat.drivingCar !== 0
+            ? DRIVE_CAM_LIFT
+            : CHASE_LIFT;
       const speed = Math.hypot(player.velocity.x, player.velocity.z);
       const want = Math.min(
         CAMERA_MAX,
@@ -6848,7 +7164,7 @@ async function main(): Promise<void> {
       const blockedAt = (d: number): boolean => {
         const px = headX - dirX * d;
         const pz = headZ - dirZ * d;
-        const py = headY - dirY * d + (rideAboardForCamera !== null ? RIDE_CHASE_LIFT : CHASE_LIFT);
+        const py = headY - dirY * d + chaseLift;
         // --- Aboard, the carriage is the only thing in the way, and it is the
         //     only thing that must be.
         //
@@ -6895,9 +7211,24 @@ async function main(): Promise<void> {
       // silently turns reconciliation off in third person, and the symptom is
       // remote-looking rubber-banding that only happens on a bike.
       camera.position.x -= dirX * chaseDistance;
-      camera.position.y +=
-        (rideAboardForCamera !== null ? RIDE_CHASE_LIFT : CHASE_LIFT) - dirY * chaseDistance;
+      camera.position.y += chaseLift - dirY * chaseDistance;
       camera.position.z -= dirZ * chaseDistance;
+      // --- The lean, and it is on the **camera** rather than on the car's body.
+      //
+      // `world/drivencars.DRIVE_CAM_ROLL` carries the whole argument for why:
+      // the box fleet composes every car's matrix from a two-component heading
+      // with no third axis in it, deliberately, and adding one for the two cars
+      // a room has stolen would fork the draw path for exactly the cars that
+      // most need to look like traffic.
+      //
+      // Added to `rotation.z` after `applyToCamera` has set the yaw and pitch,
+      // and taken back out again by the same line next frame because
+      // `applyToCamera` assigns rather than accumulates. `feedback.applyToCamera`
+      // below is the same seam and the same order.
+      if (playerCombat.drivingCar !== 0) {
+        camera.rotation.z += drivenCars.camRoll;
+        camera.position.y -= drivenCars.camDip * chaseDistance;
+      }
     } else {
       // Reset, so stepping back into third person starts at the near distance
       // and eases out rather than appearing at full extension.
@@ -6936,6 +7267,12 @@ async function main(): Promise<void> {
           seconds: 0,
         });
       }
+    }
+    // The speedo, first in the list because while you are driving it is the one
+    // number on the HUD that changes every frame. A chip with no countdown draws
+    // as a bare label -- see `hud.vitals` -- which is what a speed readout is.
+    if (playerCombat.drivingCar !== 0) {
+      powerupChips.unshift({ name: `DRIVING · ${speedText(playerCombat.carSpeed)}`, seconds: 0 });
     }
     if (playerCombat.ridingBike !== 0) {
       powerupChips.push({
@@ -7256,6 +7593,20 @@ async function main(): Promise<void> {
         player.position.z,
       );
     }
+
+    // The brake lamps and the camera's lean, before the movers so the lamps are
+    // filled in the same frame the bodies they hang off are placed. `steer` is
+    // the wheel as a fraction of full lock, taken from the yaw the input builder
+    // produced this frame -- `RIDE_TURN_RATE` is the bike's own normaliser and is
+    // the right order of magnitude for a car's, which is all a cosmetic lean
+    // needs. See `world/drivencars.DrivenCarView.update`.
+    drivenCars.update(
+      nightLights.carLights,
+      playerCombat.drivingCar,
+      playerCombat.carSpeed,
+      frameDt > 1e-5 ? driveSteering.yawDelta / frameDt / RIDE_TURN_RATE : 0,
+      frameDt,
+    );
 
     trafficMovers.update(
       traffic,
@@ -7721,7 +8072,11 @@ async function main(): Promise<void> {
       for (const r of net.remotes.values()) {
         const entry = remotes.get(r.id);
         if (!entry) continue;
-        if (r.riding && !r.fresh) {
+        // `FLAG.RIDING` is set for a driver too -- that is the contract, see
+        // `protocol.ENTER_FLAG.DRIVING` -- so the bike is drawn only for the
+        // remotes who are actually on one. Without this clause every driver in
+        // the room has a lime bike welded under their car.
+        if (r.riding && !r.fresh && !isDriving(r.id)) {
           if (!entry.bike) {
             entry.bike = new RiddenBike(bikes);
             scene.add(entry.bike.mesh);
@@ -8565,6 +8920,84 @@ async function main(): Promise<void> {
     },
 
     /**
+     * Taking a car, from a console.
+     *
+     * `sydney.trafficReport().standBesideParked` is the precedent and this is
+     * the same idea one step further on: that one hands back a coordinate beside
+     * a parked schedule car, and `find` here searches a *wide* radius for one
+     * that is actually **takeable** -- stopped or under `TAKEABLE_SPEED`, and not
+     * already somebody's -- which is a different question and the one that
+     * matters. The manual test for this whole feature is two lines:
+     *
+     *     sydney.cars.find()      the nearest car you could get into, and where
+     *     sydney.cars.stand()     put yourself beside it, then press E
+     *
+     * `stand` teleports and is therefore **offline only** -- online the server
+     * owns the position and would correct it inside a snapshot, which would look
+     * like the harness being broken rather than like the rule it is. Use
+     * `/tp <suburb>` and walk, which is what a player does.
+     */
+    cars: {
+      field: () => carWorld(),
+      report: () => ({
+        records: carWorld().size,
+        driving: playerCombat.drivingCar,
+        speed: playerCombat.carSpeed,
+        kmh: Math.round(Math.abs(playerCombat.carSpeed) * 3.6),
+        drawn: drivenCars.drawn,
+        camRoll: Number(drivenCars.camRoll.toFixed(4)),
+        prompt: takePrompt(takeableNear, playerCombat.drivingCar !== 0, playerCombat.phase),
+        all: carWorld().all().map((c) => ({
+          id: c.id,
+          carId: c.carId,
+          driver: c.driverId,
+          body: c.body,
+          x: Math.round(c.x * 10) / 10,
+          z: Math.round(c.z * 10) / 10,
+          speed: Math.round(c.speed * 10) / 10,
+          emptyS: Math.round(c.emptyMs / 1000),
+        })),
+      }),
+      /**
+       * The nearest takeable car within `radius` metres, or null.
+       *
+       * Deliberately **not** `resolveTake`: that one is the reach test at 2.2 m
+       * and this is a search. The filter is otherwise identical -- under
+       * `TAKEABLE_SPEED` and not suppressed -- so a car this returns is a car
+       * `resolveTake` will agree about once you are standing next to it.
+       */
+      find: (radius = 300) => {
+        const cars = carWorld();
+        const tick = trafficTick(Date.now());
+        let best: { identity: number; x: number; y: number; z: number; range: number; speed: number; parked: boolean } | null = null;
+        forEachCarNear(
+          traffic, player.position.x, player.position.z, radius, tick, carRoutes, carPose, (c) => {
+            if (c.speed > TAKEABLE_SPEED) return;
+            if (cars.suppressed(c.identity)) return;
+            const range = Math.hypot(c.x - player.position.x, c.z - player.position.z);
+            if (best !== null && range >= best.range) return;
+            best = {
+              identity: c.identity, x: c.x, y: c.y, z: c.z, range,
+              speed: Math.round(c.speed * 100) / 100,
+              parked: c.stage === CAR_STAGE_PARKED_IN || c.stage === CAR_STAGE_PARKED_OUT,
+            };
+          },
+        );
+        return best;
+      },
+      /** Stand beside the nearest takeable car. Offline only -- see the block header. */
+      stand: (radius = 300) => {
+        if (net) return 'online: the server owns your position. /tp to a suburb and walk.';
+        const handle = (dev as { cars: { find(r: number): { x: number; y: number; z: number } | null } }).cars;
+        const found = handle.find(radius);
+        if (found === null) return 'no takeable car within that radius.';
+        player.position.set(found.x + 1.8, found.y + EYE_HEIGHT, found.z);
+        player.velocity.set(0, 0, 0);
+        return found;
+      },
+    },
+
+    /**
      * The rotating minimap.
      *
      * `minimap.stats()` is the one to reach for: it reports the last redraw's
@@ -8884,6 +9317,9 @@ async function main(): Promise<void> {
         models: carModels.loadedFiles.length,
         pools: carModels.poolSizes(),
         skipped: carModels.skipped,
+        // Which files had their tyres put back on the road at load, and by how
+        // much. See `carlod.mergeModel`'s appearance fix 1.
+        reseated: carModels.reseated,
         claimed: carModels.claimedCount,
         parked: carModels.parkedTiles,
         triangles: carModels.triangles,

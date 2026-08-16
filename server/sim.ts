@@ -65,13 +65,32 @@ import { UNSTUCK_CAR_CLEAR_M, unstuckDestination, type UnstuckSpot } from '../cl
 import { tickPowerups, type PickupEvent } from '../client/src/game/powerups.ts';
 import {
   applyCarHit,
+  carHitStrength,
   carHitting,
+  carOverlaps,
+  canBeRunDown,
   createCarPose,
+  drivenCarPose,
   forEachCarNear,
   trafficTick,
   type CarPose,
   type LaneRoute,
 } from '../client/src/game/traffic.ts';
+// Taking a car. Pure and three-free on the bikes' own terms -- the server runs
+// this file, the browser runs this file, and neither runs the other's copy of
+// it. See `game/driving.ts`, whose header is the design.
+import {
+  CarField,
+  RUN_DOWN_SPEED,
+  TAKE_HEIGHT,
+  TAKE_RADIUS,
+  WITNESS_RADIUS,
+  bystanderSeen,
+  createDrivingScratch,
+  resolveTake,
+  type DrivenCar,
+  type DriverView,
+} from '../client/src/game/driving.ts';
 // The lime e-bikes. Pure, three-free, and the same file the browser runs -- which
 // is what makes a claim mean the same thing on both ends. See `game/bikes.ts`.
 import {
@@ -93,6 +112,7 @@ import {
   suggestName,
   uniqueName,
   type BikeRecord,
+  type CarRecord,
   type InvestigationRecord,
   type NetEvent,
   type RosterEntry,
@@ -110,6 +130,7 @@ import {
   MAX_ACTORS,
   NPC_KIND,
   REASON,
+  reportCrime,
   createBeatPose,
   createWitness,
   npcHitTest,
@@ -138,6 +159,8 @@ import {
 } from '../client/src/game/wildlife.ts';
 import {
   createPedPose,
+  forEachPedestrianNear,
+  runDownPedestrian,
   strikePedestrian,
   strikePedestrianWithBall,
   type PedBand,
@@ -201,6 +224,28 @@ export const FIXED_DT = 1 / TICK_HZ;
  * tick. A 9 m ring of eight is far enough apart to be a fight rather than a
  * scrum and near enough that everybody can see everybody.
  */
+/**
+ * One driven car as the wire wants it. Here rather than inline at the two call
+ * sites so the field list cannot drift between the joiner's set and a delta.
+ */
+function carRecord(c: DrivenCar): CarRecord {
+  return {
+    id: c.id,
+    carId: c.carId,
+    driver: c.driverId,
+    body: c.body,
+    colour: c.colour,
+    x: c.x,
+    y: c.y,
+    z: c.z,
+    yaw: c.yaw,
+    speed: c.speed,
+  };
+}
+
+/** The "nothing changed" answer from `carDelta`, so a quiet tick allocates nothing. */
+const EMPTY_CARS: readonly CarRecord[] = [];
+
 const JOIN_RING = 9;
 const JOIN_PER_RING = 8;
 
@@ -342,6 +387,7 @@ export class Simulation {
     traffic: 0,
     powerups: 0,
     bikes: 0,
+    cars: 0,
     npc: 0,
     history: 0,
   };
@@ -450,6 +496,44 @@ export class Simulation {
    * have. See `protocol.encodeBikes` for that argument in full.
    */
   readonly bikes = new BikeField();
+  /**
+   * Every car anybody in this room has taken, and the authority on who is in one.
+   *
+   * **Not laid out at boot**, which is the whole way this differs from the bikes
+   * above: there is no plan and no fixed set, because a car record exists only
+   * for as long as somebody has stolen a car and not yet abandoned it. The field
+   * starts empty in every process and stays that way in a room nobody has
+   * stolen anything in, which is what makes the feature cost nothing until it is
+   * used.
+   *
+   * Public and named `cars` because the workstream contract says so: other
+   * passes reach `Simulation.cars` for the `DrivingLookup` on it.
+   */
+  readonly cars = new CarField();
+  /** Records that changed this tick, for `room.sendCars`. Reused; see `bikeChanges`. */
+  private readonly carChanges: DrivenCar[] = [];
+  /** Ids that expired this tick, likewise. */
+  private readonly carRemovals: number[] = [];
+  private readonly carSweep: DrivenCar[] = [];
+  private readonly driverViews: DriverView[] = [];
+  /**
+   * Scratch for `resolveTake` and for the driven fleet's own hit tests, on
+   * `carRoutes`/`carPose`'s argument: this runs per driven car per tick and per
+   * `E` press, and a fresh array and a fresh pose for each of them is the
+   * allocation this class spends its whole budget avoiding.
+   */
+  private readonly takeScratch = createDrivingScratch();
+  private readonly drivenPose: CarPose = createCarPose();
+  /**
+   * When `expireCars` last ran, as a wall clock.
+   *
+   * A clock rather than a tick count because the five-minute abandonment is a
+   * wall-clock promise and `this.tick` counts steps since *this room* started --
+   * a room that fell behind for a second would keep a car alive a second longer,
+   * which is invisible, but a room restarted under a running host would restart
+   * the clock, which is not.
+   */
+  private carExpiryAt = Date.now();
   /**
    * The factions, and every investigation running against a player.
    *
@@ -627,6 +711,30 @@ export class Simulation {
    */
   bikeDelta(): readonly Bike[] {
     return this.bikeChanges;
+  }
+
+  /** Every driven car, as the wire wants them. The full set, for a joiner. */
+  carRecords(): CarRecord[] {
+    return this.cars.all().map(carRecord);
+  }
+
+  /**
+   * What changed about the cars this tick: takes, releases, and expiries.
+   *
+   * Two lists folded into one message, because a removal is a record with a
+   * flag on this wire -- see `protocol.encodeCars`. Owned and reused, on
+   * `bikeDelta`'s contract.
+   */
+  carDelta(): readonly CarRecord[] {
+    if (this.carChanges.length === 0 && this.carRemovals.length === 0) return EMPTY_CARS;
+    const out: CarRecord[] = this.carChanges.map(carRecord);
+    for (const id of this.carRemovals) {
+      // Everything but the id is meaningless on a removal, and is zeroed rather
+      // than left at whatever the record held so a decoder that ignored the flag
+      // would produce something obviously wrong rather than something plausible.
+      out.push({ id, carId: 0, driver: 0, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: 0, speed: 0, removed: true });
+    }
+    return out;
   }
 
   // --- Membership -------------------------------------------------------------
@@ -984,6 +1092,8 @@ export class Simulation {
     this.tick++;
     this.events.length = 0;
     this.bikeChanges.length = 0;
+    this.carChanges.length = 0;
+    this.carRemovals.length = 0;
 
     // --- Departures, before anything reads the list.
     let departed = false;
@@ -1204,7 +1314,15 @@ export class Simulation {
         // standing in. The client makes the identical check in the identical
         // place -- `main.ts` -- which is what keeps the prediction exact.
         if (isAboard(p.combat.aboard)) continue;
-        const car = carHitting(this.world.traffic, p.combat, tick, this.carRoutes, this.carPose);
+        // Suppressed cars are skipped, which is the other half of "the car you
+        // stole stops driving to Ashfield" -- without it the ghost of your own
+        // car runs *you* over from inside the seat you are sitting in on the
+        // first tick you stop. `main.ts` passes the identical predicate at the
+        // identical point.
+        const car = carHitting(
+          this.world.traffic, p.combat, tick, this.carRoutes, this.carPose,
+          (identity) => this.cars.suppressed(identity),
+        );
         if (car === null) continue;
         const ko = applyCarHit(p.combat, car);
         // Credited to the victim as their own attacker, which `creditKo` reads
@@ -1304,6 +1422,11 @@ export class Simulation {
     // view and again only after they have left it. See `seenRiding`.
     this.stepRideBy();
     this.phaseMs.bikes += performance.now() - t;
+
+    // --- And the cars, on the bikes' own terms one phase up.
+    t = performance.now();
+    this.stepCars();
+    this.phaseMs.cars += performance.now() - t;
 
     // --- The factions, after everything that could have started an
     // investigation and before the history is recorded.
@@ -1523,15 +1646,294 @@ export class Simulation {
       return;
     }
 
+    if (c.drivingCar !== 0) {
+      // Out. Same shape as the bike one line up and for the same reason: the
+      // car is left standing where the body is by `CarField.follow` at the end
+      // of this tick, which has the position *after* the step. Clearing the
+      // field is the whole of it -- the sweep does the rest, and a player who
+      // is knocked out instead of pressing E gets identical behaviour from
+      // identical code.
+      //
+      // The record survives with `driverId = 0`, which is the brief's rule and
+      // is what makes a getaway car a thing anybody can take: the next person
+      // to press E beside it is refused by `resolveTake` (its ambient copy is
+      // suppressed, so it is not in the lookup) and served by `nearestEmptyCar`
+      // below instead.
+      c.drivingCar = 0;
+      c.carSpeed = 0;
+      return;
+    }
+
     if (this.tryBoard(p)) return;
     const feet = c.body.position.y - EYE_HEIGHT;
     const bike = this.bikes.nearestFree(c.body.position.x, feet, c.body.position.z);
-    if (!bike) return;
-    // The one place a claim is decided, and it can still fail: an earlier
-    // participant in this same loop may have taken it a microsecond ago.
-    if (!this.bikes.claim(bike.id, c.id)) return;
-    c.ridingBike = bike.id;
-    this.bikeChanges.push(bike);
+    if (bike) {
+      // The one place a claim is decided, and it can still fail: an earlier
+      // participant in this same loop may have taken it a microsecond ago.
+      if (!this.bikes.claim(bike.id, c.id)) return;
+      c.ridingBike = bike.id;
+      this.bikeChanges.push(bike);
+      return;
+    }
+
+    this.tryTakeCar(p);
+  }
+
+  /**
+   * Get into the car beside you, if the *server* agrees there is one.
+   *
+   * The anti-cheat story is `tryBoard`'s verbatim and is worth restating,
+   * because it is the whole reason the parked kerb fleet is not stealable (see
+   * `game/driving.ts` section 1): `INPUT` is ten bytes of buttons and a look
+   * direction, so there is no field in which a client could *name* a car. A
+   * take is a question asked with a button, and it is answered here against
+   *
+   *   1. **this server's own position for that body**, never one the client sent;
+   *   2. **this server's own evaluation of `poseCar`** at this tick's traffic
+   *      tick, which is a closed-form function of the millisecond and is
+   *      asserted identical to the browser's by `checkTraffic`;
+   *   3. `CarField`, which refuses an identity somebody already has.
+   *
+   * An empty car standing in the street is checked **first**, because it is a
+   * thing the world contains that the lookup no longer describes -- its ambient
+   * copy is suppressed precisely so it stops existing on the timetable, so
+   * `resolveTake` will never find it. Getting back into the car you just parked
+   * is the commonest thing a driver does and it has to work.
+   */
+  private tryTakeCar(p: Participant): void {
+    const c = p.combat;
+    const feet = c.body.position.y - EYE_HEIGHT;
+
+    // --- Somebody's abandoned getaway car, or your own.
+    const standing = this.nearestEmptyCar(c.body.position.x, feet, c.body.position.z);
+    if (standing !== null) {
+      standing.driverId = c.id;
+      standing.emptyMs = 0;
+      c.drivingCar = standing.id;
+      c.carSpeed = 0;
+      this.carChanges.push(standing);
+      // **No crime.** Getting into a car that is already standing open in the
+      // street with nobody in it is not the theft -- the theft happened when
+      // somebody took it off the timetable, and it was reported then. Charging
+      // for it again would mean a driver who stopped at a red, got out to punch
+      // somebody and got back in collected two counts of car theft.
+      return;
+    }
+
+    // --- Or one off the timetable, which is the theft.
+    const scratch = this.takeScratch;
+    if (
+      !resolveTake(
+        this.world.traffic,
+        c.body.position.x,
+        feet,
+        c.body.position.z,
+        trafficTick(Date.now()),
+        scratch.routes,
+        scratch.pose,
+        (identity) => this.cars.suppressed(identity),
+        scratch.take,
+      )
+    ) {
+      return;
+    }
+    const car = this.cars.take(scratch.take, c.id);
+    // Null means an earlier participant in this same loop took it a microsecond
+    // ago -- `CarField.take` is the one place that claim is decided, exactly as
+    // `BikeField.claim` is for a bike.
+    if (car === null) return;
+    c.drivingCar = car.id;
+    c.carSpeed = 0;
+    this.carChanges.push(car);
+
+    // --- And the crime, if anybody was there to see it.
+    //
+    // Reported and not graded: what a car thief is worth is the heat ladder's
+    // decision and lives in another module. See `factions.REASON.CAR_THEFT`.
+    //
+    // Bots never steal cars (`Bot` never sets `BTN.MOUNT`), so there is no
+    // clause here about them -- but a bot standing on the footpath *is* a
+    // witness under `policeWitness`' promoted-actor tier, which is correct.
+    if (this.sawTheft(car.x, car.y, car.z)) reportCrime(c.id, REASON.CAR_THEFT);
+  }
+
+  /**
+   * The nearest car standing empty within reach, or null.
+   *
+   * Linear in driven cars, which are counted in ones -- see the budget note in
+   * this class's header. Ties break on the record id rather than on the float
+   * distance, on `BikeField.nearestFree`'s rule and for its reason: the client
+   * predicts this same choice and an integer comparison is a rule both ends can
+   * state.
+   */
+  private nearestEmptyCar(x: number, feetY: number, z: number): DrivenCar | null {
+    let best: DrivenCar | null = null;
+    let bestD2 = TAKE_RADIUS * TAKE_RADIUS;
+    for (const car of this.cars.all()) {
+      if (car.driverId !== 0) continue;
+      const dy = car.y - feetY;
+      if (dy > TAKE_HEIGHT || dy < -TAKE_HEIGHT) continue;
+      const dx = car.x - x;
+      const dz = car.z - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > bestD2) continue;
+      if (best !== null && d2 >= bestD2) continue;
+      best = car;
+      bestD2 = d2;
+    }
+    return best;
+  }
+
+  /**
+   * Did anybody see that theft?
+   *
+   * Both tiers, and the order is `policeWitness`' own: an officer is a witness
+   * and so is anybody on the footpath. `driving.bystanderSeen` does the geometry
+   * and this supplies the crowd and the line of sight, which keeps
+   * `game/driving.ts` out of the pedestrian module's import graph -- the same
+   * seam `factions.policeWitness` makes with its `ctx`.
+   */
+  private sawTheft(x: number, y: number, z: number): boolean {
+    if (policeWitness(x, z, trafficTick(Date.now()), this.witnessCtx, this.witness).seen) return true;
+    const peds = this.world.peds;
+    if (peds === null) return false;
+    const tick = trafficTick(Date.now());
+    return bystanderSeen(
+      x,
+      y,
+      z,
+      (visit) => {
+        forEachPedestrianNear(peds, x, z, WITNESS_RADIUS, tick, this.witnessBands, this.witnessPed, (ped) => {
+          visit(ped.x, ped.y, ped.z, ped.down);
+        });
+      },
+      this.world.collision === null
+        ? null
+        : (ax, ay, az, bx, by, bz) => this.world.collision!.blocked(ax, ay, az, bx, by, bz),
+    );
+  }
+
+  /**
+   * The driven cars, after everybody has moved and every hit has landed.
+   *
+   * Three sweeps, and all three are sweeps rather than events on `BikeField`'s
+   * argument -- one rule covering being knocked out, being run over, respawning,
+   * pressing E and disconnecting, none of which needed to know cars exist.
+   *
+   *   1. **`follow`** carries each occupied car to its driver and leaves any
+   *      whose driver has stopped driving standing in the road.
+   *   2. **The knockdown**, which is `game/traffic.ts`' own, reused rather than
+   *      reimplemented: a driven car fills a `CarPose` (`drivenCarPose`) and is
+   *      then put through `carOverlaps`, `carHitStrength` and `applyCarHit`
+   *      exactly as an ambient one is. That is the only way "a car knocks you
+   *      down" can mean one thing in this game.
+   *   3. **Expiry**, at 1 Hz rather than 60, because it is a five-minute clock.
+   *
+   * O(driven cars), and driven cars are counted in ones. The knockdown's inner
+   * loop is O(driven cars x participants) at spec 2's sixteen-player cap, which
+   * at a plausible three stolen cars is 48 box tests a tick -- against the
+   * `carHitting` phase above, which is sixteen broadphase queries over a fleet
+   * of thousands.
+   */
+  private stepCars(): void {
+    if (this.cars.size === 0) return;
+
+    this.driverViews.length = 0;
+    for (const p of this.ordered) {
+      const c = p.combat;
+      this.driverViews.push({
+        id: c.id,
+        drivingCar: c.drivingCar,
+        carSpeed: c.carSpeed,
+        x: c.body.position.x,
+        feetY: c.body.position.y - EYE_HEIGHT,
+        z: c.body.position.z,
+        yaw: c.body.yaw,
+      });
+    }
+    for (const car of this.cars.follow(this.driverViews, this.carSweep)) {
+      this.carChanges.push(car);
+    }
+
+    // --- What the driven fleet ran over.
+    const tick = trafficTick(Date.now());
+    for (const car of this.cars.all()) {
+      if (car.driverId === 0) continue;
+      const speed = car.speed < 0 ? -car.speed : car.speed;
+      if (speed < RUN_DOWN_SPEED) continue;
+      const pose = drivenCarPose(car, this.drivenPose);
+      // `carHitStrength` scales the launch by how fast the thing that hit you
+      // was going, and it is already 1 at everything past
+      // `CAR_HIT_FULL_SPEED` (8 m/s) -- so the brief's 4 m/s floor lands in the
+      // ramp's middle and a car that has just pulled away tips you over where
+      // one at a road speed sends you across the street. That continuity is the
+      // property `carHitStrength`'s header says is a requirement.
+      if (carHitStrength(pose) <= 0) continue;
+
+      let offended = false;
+
+      // --- Players and bots.
+      for (const victim of this.ordered) {
+        if (victim.id === car.driverId) continue;
+        // Nobody on a train is run over by a stolen Camry, on exactly the
+        // clause the ambient fleet has thirty lines up and for its reason.
+        if (isAboard(victim.combat.aboard)) continue;
+        if (!canBeRunDown(victim.combat)) continue;
+        if (!carOverlaps(pose, victim.combat)) continue;
+        const ko = applyCarHit(victim.combat, pose);
+        // Credited to the **driver** rather than to the victim, which is the one
+        // place this differs from the ambient fleet: there really is somebody
+        // behind the wheel, and a knockout with a name on it is the difference
+        // between "you got run down" and "a car got you".
+        if (ko) this.creditKo(car.driverId, victim.id);
+        this.events.push({
+          kind: EVENT.HIT,
+          attacker: car.driverId,
+          victim: victim.id,
+          flags: ko ? EVENT_FLAG.KO : 0,
+          health: victim.combat.health,
+        });
+        offended = true;
+      }
+
+      // --- And the crowd.
+      if (this.world.peds !== null) {
+        const hit = runDownPedestrian(
+          this.world.peds, pose, car.driverId, tick, this.pedBands, this.pedPose,
+        );
+        if (hit !== null) offended = true;
+      }
+
+      // Unconditional, unlike the theft: `REASON.CAR_THEFT` needs a witness
+      // because a crime nobody saw is not reported, and a body in the road is
+      // its own witness. See `factions.REASON.DANGEROUS_DRIVING`.
+      if (offended) reportCrime(car.driverId, REASON.DANGEROUS_DRIVING);
+    }
+
+    // --- Expiry, at 1 Hz. See `carExpiryAt`.
+    const now = Date.now();
+    const elapsed = now - this.carExpiryAt;
+    if (elapsed >= 1000) {
+      this.carExpiryAt = now;
+      for (const id of this.cars.expire(elapsed, (car) => this.nearestPersonTo(car.x, car.z), this.carRemovals)) {
+        // Nothing else to undo. The ambient car was only ever *suppressed* --
+        // see `game/driving.ts` section 3 -- so removing the record is the whole
+        // of putting it back on its timetable.
+        void id;
+      }
+    }
+  }
+
+  /** Plan distance from the nearest participant to a point. `expire`'s gate. */
+  private nearestPersonTo(x: number, z: number): number {
+    let best = Infinity;
+    for (const p of this.ordered) {
+      const dx = p.combat.body.position.x - x;
+      const dz = p.combat.body.position.z - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < best) best = d2;
+    }
+    return best === Infinity ? Infinity : Math.sqrt(best);
   }
 
   // --- Trains ---------------------------------------------------------------------
@@ -2173,7 +2575,13 @@ export class Simulation {
           // bike drawn under it; `TUNED` is mostly for its owner and is the only
           // way a client ever learns it has been unlocked -- see
           // `net/client.reconcile`, which takes it and never sets it.
-          (c.ridingBike !== 0 ? FLAG.RIDING : 0) |
+          // A driver is `RIDING` too, and that is the contract rather than a
+          // shortcut: "being in a car is `FLAG.RIDING` plus a `CARS` roster
+          // entry naming the driver" is exactly the bike convention, so every
+          // nameplate, seated pose and camera rule already keying on this bit
+          // keeps working for a car with nothing edited. `ENTER_FLAG.DRIVING`
+          // and the `CARS` roster are what tell the two apart.
+          (c.ridingBike !== 0 || c.drivingCar !== 0 ? FLAG.RIDING : 0) |
           (c.bikeTuned ? FLAG.TUNED : 0);
       s.ballCharges = c.ballCharges;
     }

@@ -201,6 +201,10 @@ import {
 // in `game/bikes.ts` reads a powerup binding until it is called. See
 // `bikes.bikeSpeedScale`, where that is the whole reason it is a function.
 import { shapeRideInput } from './bikes.ts';
+// The cars, on exactly the bikes' terms one line up: the *rules* half, three-free,
+// run by the server and the browser and `net/client.reconcile`'s replay from one
+// file. See `game/driving.ts`.
+import { shapeDriveInput, stepCarSpeed } from './driving.ts';
 // The wading rule. A pure module with no import of its own -- see its header for
 // why the water level reaches both ends of the wire without going over it.
 import {
@@ -464,6 +468,33 @@ export interface CombatantState {
    */
   ridingBike: number;
   /**
+   * The car this combatant has taken, or 0 for anybody not driving.
+   *
+   * Here on `ridingBike`'s argument, and it is the same argument twice:
+   * `game/driving.shapeDriveInput` reads it on the way into the integrator, so
+   * it **is** movement state, and a second record of who is in a car would be a
+   * second opinion about how fast somebody is going. The id is
+   * `driving.CarField`'s allocation id -- runtime-issued rather than planned,
+   * which is the one way a car differs from a bike here -- and `CarField.follow`
+   * reconciles the two once a tick, exactly as `BikeField.follow` does.
+   */
+  drivingCar: number;
+  /**
+   * The car's signed speed along the driver's heading, m/s. Zero on foot.
+   *
+   * The **whole** of the car's physics, and it is on the combatant rather than
+   * on the car record for the reason above: `combat.advance` and
+   * `net/client.reconcile`'s replay both have to reach it, and neither of them
+   * may import `game/driving.CarField`. Integrated once a tick by
+   * `driving.stepCarSpeed` and copied out to the wire by `CarField.follow`.
+   *
+   * Unforgeable for `ridingBike`'s reason: `protocol.INPUT_BYTES` carries
+   * buttons and a look direction and no numbers at all, so a client cannot tell
+   * a server how fast its car is going -- the server integrates the same
+   * function from the same buttons and finds out.
+   */
+  carSpeed: number;
+  /**
    * Whether this combatant has found the tuning stall in Redfern this session.
    *
    * Per session and never persisted, on spec 12's terms. It is on the combatant
@@ -567,6 +598,22 @@ export interface CombatWorld {
    * the wire.
    */
   waterSurface?(x: number, z: number): number;
+  /**
+   * Is this point on a carriageway?
+   *
+   * Optional, and read by exactly one thing: `game/driving.stepCarSpeed`, which
+   * halves a car's top speed off the road. A third member rather than something
+   * derived from `groundHeight` on `waterSurface`'s argument -- it is a
+   * different question with a different answer at the same point, and both ends
+   * supply it from the same lane graph (`traffic.TrafficField.near`), which is
+   * what lets the off-road rule be predicted on the client and enforced on the
+   * server with nothing new on the wire.
+   *
+   * Absent means "everywhere is road", which is the correct failure: a client
+   * whose lane sidecar has not streamed yet would otherwise crawl down a street
+   * the server knows is a street, and the correction for that is a lurch.
+   */
+  onRoad?(x: number, z: number): boolean;
 }
 
 /** What happened to one combatant on one tick. Presentation reads this; nothing here does. */
@@ -633,6 +680,9 @@ export function createCombatant(id: number, x = 0, z = 0): CombatantState {
     // On foot, and untuned. Both are session state a joiner starts without.
     ridingBike: 0,
     bikeTuned: false,
+    // And not in a car. See `drivingCar`: `game/driving.ts` owns the meaning.
+    drivingCar: 0,
+    carSpeed: 0,
     // On foot. See `CombatantState.aboard`: the record is allocated here once
     // and mutated forever after, never replaced.
     aboard: createAboardSlot(),
@@ -785,6 +835,11 @@ export function advance(
     // whose rider has stopped riding and parks it where the body is, which is
     // the death spot. Nothing here knows that class exists.
     c.ridingBike = 0;
+    // And out of the car, on the identical argument. `CarField.follow` leaves it
+    // in the road where the body fell, which is where a car whose driver has
+    // just gone through the windscreen belongs.
+    c.drivingCar = 0;
+    c.carSpeed = 0;
     ragdollStep(c, dt, world);
     // Look is left alone. A dead camera that will not turn reads as a crash.
     // Clamped here rather than trusted, because this is the one path that does
@@ -938,6 +993,34 @@ export function advance(
   // It also forces the sprint, which is why it runs after `movement.sprint` was
   // set from the input and not before.
   shapeRideInput(c, movement);
+  // --- The car's one number, integrated here and exactly once a tick.
+  //
+  // Before the shaping, because the shaping reads it, and inside `advance`
+  // rather than at the two call sites because this is the function the browser,
+  // the server and nothing else all run -- `net/client.reconcile`'s replay calls
+  // `controller.step` directly and deliberately does **not** re-integrate, which
+  // is `shapeDriveInput`'s header. It is handed `movement` rather than `input`
+  // so a flinch takes the throttle away exactly as it takes the walk away.
+  stepCarSpeed(
+    c,
+    movement,
+    dt,
+    c.body.position.x,
+    c.body.position.y - EYE_HEIGHT,
+    c.body.position.z,
+    movement.yaw,
+    world ?? null,
+  );
+  // And the car, last of all, on the bike's argument exactly: it multiplies the
+  // scale rather than replacing it, it is read off the combatant because
+  // `INPUT` carries no number a client could lie with, and it runs after
+  // `movement.sprint` was set from the input because it forces the sprint.
+  //
+  // The two are mutually exclusive by construction -- nothing grants a car to
+  // somebody on a bike -- so the composition never actually happens; it is
+  // written as a multiply anyway because the alternative is a rule about which
+  // wins, which is a rule somebody has to remember. See `game/driving.ts`.
+  shapeDriveInput(c, movement);
 
   const fromX = c.body.position.x;
   const fromZ = c.body.position.z;
@@ -1242,6 +1325,8 @@ export function applyWorldDamage(c: CombatantState, pips: number): boolean {
   c.koT = 0;
   c.respawnT = KO_SECONDS;
   c.ridingBike = 0;
+  c.drivingCar = 0;
+  c.carSpeed = 0;
   return true;
 }
 
@@ -1306,6 +1391,12 @@ export function applyHit(attacker: CombatantState, victim: CombatantState, out?:
   // knowing that class exists. That is deliberate -- `applyFootyHit` below and a
   // disconnect three files away get the same behaviour from the same sweep.
   victim.ridingBike = 0;
+  // And out of the car. A driver batted through their own windscreen at 22 m/s
+  // who kept the wheel would be a car steered by a ragdoll, and the sweep in
+  // `driving.CarField.follow` handles the rest for the reason the bike line
+  // above gives.
+  victim.drivingCar = 0;
+  victim.carSpeed = 0;
 
   const ko = victim.health <= 0;
   if (ko) {
@@ -1362,6 +1453,11 @@ export function respawnAt(c: CombatantState, x: number, y: number, z: number, ya
   // is a place you went. Making a player walk back to Redfern every knockout
   // would turn a one-off discovery into a chore.
   c.ridingBike = 0;
+  // And on foot rather than back at the wheel, on the same argument: the car is
+  // already standing where you were run over, and respawning 30 m away still
+  // holding it would drag it across Redfern.
+  c.drivingCar = 0;
+  c.carSpeed = 0;
   // Spec 8.3 says nothing about death, and the only defensible reading is that
   // a coffee does not survive a knockout. Keeping them would make dying with 40
   // seconds of Training left a *cheap* way to reposition; clearing them makes

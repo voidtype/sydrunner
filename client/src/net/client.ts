@@ -85,6 +85,10 @@ import {
 } from '../game/combat.ts';
 import { applyPowerup, type PowerupKind } from '../game/powerups.ts';
 import { BikeField, shapeRideInput } from '../game/bikes.ts';
+// The cars, on the bikes' terms exactly: the same class the server runs, from
+// the same file, so that a claim and a suppression mean the same thing on both
+// ends. See `game/driving.ts`.
+import { CarField, shapeDriveInput } from '../game/driving.ts';
 import { EYE_HEIGHT, step, type InputSnapshot, type PlayerState } from '../player/controller.ts';
 import {
   ANIM,
@@ -101,6 +105,7 @@ import {
   WebSocketTransport,
   createSnapshot,
   decodeBikes,
+  decodeCars,
   decodeBye,
   decodeEvents,
   decodeInterest,
@@ -1143,6 +1148,40 @@ export class NetClient {
         this.serverBikeKnown = true;
         return;
       }
+      case MSG.CARS: {
+        const message = decodeCars(frame);
+        if (!message) return;
+        // `CARS_FULL` is a **replacement**, and it is what a joiner is sent.
+        // Without honouring it, a client that reconnected to a restarted server
+        // would keep every record it had and go on suppressing ambient cars
+        // nobody is driving -- holes in the traffic that nothing ever fills.
+        if (message.full) this.cars.clear();
+        for (const r of message.cars) {
+          if (r.removed) {
+            this.cars.remove(r.id);
+            continue;
+          }
+          this.cars.adopt({
+            id: r.id,
+            carId: r.carId,
+            body: r.body,
+            colour: r.colour,
+            x: r.x,
+            y: r.y,
+            z: r.z,
+            yaw: r.yaw,
+            speed: r.speed,
+            driverId: r.driver,
+          });
+        }
+        // Which car the server thinks *this* client is in. Derived rather than
+        // sent separately, on `MSG.BIKES`' argument: the driver id is already on
+        // every record, and a second field saying "and yours is number 12" would
+        // be the field that disagreed with the list beside it.
+        this.serverCar = this.cars.carOf(this.id);
+        this.serverCarKnown = true;
+        return;
+      }
       case MSG.INVESTIGATION: {
         const records = decodeInvestigations(frame);
         if (!records) return;
@@ -1173,6 +1212,21 @@ export class NetClient {
    * meaning the same thing on both ends.
    */
   readonly bikes = new BikeField();
+  /**
+   * Every car anybody has taken, as the server last described it.
+   *
+   * A mirror rather than an authority, on `bikes`' terms: `main.ts` predicts its
+   * own theft so the camera and the speed change on the frame `E` goes down, and
+   * `MSG.CARS` is what corrects it. It is also what the **renderer** reads to
+   * suppress ambient cars, which is why it is public.
+   */
+  readonly cars = new CarField();
+  /** The car the server says this client is in, or 0. See the CARS case. */
+  private serverCar = 0;
+  /** False until the first CARS message, so a joiner does not eject itself. */
+  private serverCarKnown = false;
+  /** The input seq a local take or exit was predicted on, or -1. `bikePredictedAt`'s twin. */
+  private carPredictedAt = -1;
   /** The bike the server says this client is on, or 0. See the BIKES case. */
   private serverBike = 0;
   /** False until the first BIKES message, so a joiner does not dismount itself. */
@@ -1199,6 +1253,19 @@ export class NetClient {
    */
   predictedBikeChange(): void {
     this.bikePredictedAt = (this.seq + 1) & 0xffff;
+  }
+
+  /**
+   * `predictedBikeChange`'s twin for the cars, arithmetic included.
+   *
+   * Same reason, one order of magnitude worse: snapshots in flight when `E` went
+   * down were generated before the server saw it, so they all say "not driving",
+   * and adopting them would drop the player out of the car for a frame -- which
+   * at 22 m/s is the chase camera cutting to a first-person view of the road and
+   * back inside 50 ms.
+   */
+  predictedCarChange(): void {
+    this.carPredictedAt = (this.seq + 1) & 0xffff;
   }
 
   /**
@@ -1477,6 +1544,24 @@ export class NetClient {
       local.ridingBike = this.serverBike;
     }
 
+    // --- The car, on the bike's own gate three lines up and for its reason.
+    //
+    // What is adopted is the **identity** of the car and never its speed:
+    // `carSpeed` is integrated by `driving.stepCarSpeed` from buttons both ends
+    // have, so the two agree by construction, and there is nothing on the wire
+    // to take it from anyway. See `shapeDriveInput`'s header on the bounded
+    // error that leaves in the replay.
+    const carAcked = this.pendingAck >= 0 && seqLE(this.carPredictedAt, this.pendingAck);
+    if (this.serverCarKnown && (this.carPredictedAt < 0 || carAcked)) {
+      this.carPredictedAt = -1;
+      if (local.drivingCar !== this.serverCar) {
+        local.drivingCar = this.serverCar;
+        // A car you are no longer in has no speed. Left alone, a player thrown
+        // out at 22 m/s would keep the number and the HUD would keep reading it.
+        if (this.serverCar === 0) local.carSpeed = 0;
+      }
+    }
+
     // --- The ride, on the bike's own gate and for its own reason.
     //
     // Adopted only once the server has acknowledged the input that carried the
@@ -1526,6 +1611,15 @@ export class NetClient {
         this.bikePredictedAt = -1;
         this.serverBike = 0;
         local.ridingBike = 0;
+        // And out of the car, on the identical argument. The server has already
+        // left it standing in the road -- `combat.advance` clears the field on
+        // the knockout tick and `CarField.follow` does the rest -- so this is
+        // the client refusing to spend a round trip driving a car it is no
+        // longer in, which at 22 m/s is 1.1 m of somebody else's street.
+        this.carPredictedAt = -1;
+        this.serverCar = 0;
+        local.drivingCar = 0;
+        local.carSpeed = 0;
       } else if (serverPhase === 'flinch' && local.phase !== 'flinch') {
         local.phase = 'flinch';
         local.phaseT = 0;
@@ -1675,6 +1769,16 @@ export class NetClient {
       // copied from the stored input above and forced true here, exactly as
       // `advance` does it.
       shapeRideInput(local, input);
+      // And the car, through the **same function** `combat.advance` calls, for
+      // the reason `game/bikes.ts` states about the bike one line up: two copies
+      // of this arithmetic are two copies that drift, and a replay that forgot
+      // the car would rewind the driver 22 m/s of trajectory on every snapshot.
+      //
+      // Deliberately **not** `stepCarSpeed`: the integration happens once a
+      // tick inside `advance`, and re-integrating here would run it three to
+      // five more times per snapshot on this end and once on the server. See
+      // `driving.shapeDriveInput`'s header for the bounded error that leaves.
+      shapeDriveInput(local, input);
       step(body, input, FIXED_DT, world.collision, (x, z, feet) => world.groundHeight(x, z, feet));
     }
 

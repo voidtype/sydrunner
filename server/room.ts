@@ -83,6 +83,7 @@ import {
   SNAPSHOT_INTERVAL,
   TICK_HZ,
   encodeBikes,
+  encodeCars,
   encodeEvents,
   encodeInterestInto,
   decodeInput,
@@ -758,6 +759,12 @@ export class Room {
     ws.send(encodePowerups(this.sim.powerupsDown()));
     // Every lime e-bike in this room, once, with whoever is currently on one.
     ws.send(encodeBikes(this.sim.bikeRecords()));
+    // And every car anybody in this room has taken, as a **replacement** rather
+    // than an upsert -- see `protocol.CARS_FULL`. Almost always an empty
+    // four-byte frame, because a room nobody has stolen a car in has no records
+    // at all, and that is the point: the feature costs four bytes a join until
+    // somebody uses it.
+    ws.send(encodeCars(this.sim.carRecords(), true));
     // The scoreboard, which is room-global and is what makes an out-of-interest
     // knockout nameable in the kill feed. Sent before anything that could refer
     // to an id, which is the rule `server/index.ts` has always had here.
@@ -912,6 +919,7 @@ export class Room {
     this.sendRoster();
     this.sendInvestigations();
     this.sendBikes();
+    this.sendCars();
     this.sendEvents();
     // Offset per room, so the host's egress is spread across the three ticks in
     // a snapshot interval rather than landing on one. See `snapshotPhase`.
@@ -1034,6 +1042,29 @@ export class Room {
     }
   }
 
+  /**
+   * The cars, on the tick somebody takes one, leaves one, or an abandoned one
+   * expires. Only what changed.
+   *
+   * Room-global and deliberately not interest-filtered, on `sendBikes`' argument
+   * exactly -- and one more that is specific to this message. A `CARS` record is
+   * what tells a client to **suppress** an ambient car, and suppression has to
+   * be world-wide or a client that drove across town would find the timetable
+   * still running cars nobody else can see. Filtering by interest would make the
+   * traffic itself disagree between two players standing in the same street.
+   */
+  private sendCars(): void {
+    const changed = this.sim.carDelta();
+    if (changed.length === 0) return;
+    const frame = encodeCars(changed);
+    for (const ws of this.conns) {
+      if (!ws.data.participant) continue;
+      ws.send(frame);
+      this.bytesSent += frame.byteLength;
+      this.logBytes += frame.byteLength;
+    }
+  }
+
   /** Events on the tick they happen, room-global. See this file's header table. */
   private sendEvents(): void {
     if (this.out.events.length === 0) return;
@@ -1108,7 +1139,13 @@ export class Room {
           rec.id = id;
           rec.colourway = other?.colourway ?? 0;
           rec.flags = other
-            ? (other.bot ? ENTER_FLAG.BOT : 0) | (other.combat.ridingBike !== 0 ? ENTER_FLAG.RIDING : 0)
+            ? (other.bot ? ENTER_FLAG.BOT : 0) |
+              (other.combat.ridingBike !== 0 || other.combat.drivingCar !== 0 ? ENTER_FLAG.RIDING : 0) |
+              // The third bit, so a driver who walks into view arrives *with*
+              // their car rather than as a seated figure sliding down George
+              // Street until the next `CARS` message -- which for a car taken
+              // two minutes ago is never. See `protocol.ENTER_FLAG.DRIVING`.
+              (other.combat.drivingCar !== 0 ? ENTER_FLAG.DRIVING : 0)
             : 0;
           e++;
         }

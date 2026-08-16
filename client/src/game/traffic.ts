@@ -1856,6 +1856,17 @@ export function carHitting(
   tick: number,
   scratch: LaneRoute[],
   pose: CarPose,
+  /**
+   * Cars somebody has stolen, which are no longer on their timetable.
+   *
+   * Optional, and absent means "nobody has taken anything" -- which is what
+   * every caller written before `game/driving.ts` existed meant, and is still
+   * true of the two self-checks below. See `driving.CarField.suppressed`: a car
+   * a player is steering is *also* still a lookup, and without this clause the
+   * ghost of it carries on down the timetable running people over from inside
+   * the car you are sitting in.
+   */
+  suppressed?: (identity: number) => boolean,
 ): CarPose | null {
   if (!canBeRunDown(c)) return null;
   let hit = false;
@@ -1874,12 +1885,68 @@ export function carHitting(
       // rule, a camera collision) needs the overlap to keep telling the truth.
       // What changes is only whether it knocks you over.
       if (carHitStrength(p) <= 0) return;
+      if (suppressed !== undefined && suppressed(p.identity)) return;
       if (!carOverlaps(p, c)) return;
       hit = true;
       return true;
     },
   );
   return hit ? pose : null;
+}
+
+/**
+ * Fill a `CarPose` from a car a **player** is driving.
+ *
+ * The whole of how a stolen car reuses the run-over machinery rather than
+ * getting its own. `carOverlaps`, `carHitStrength`, `applyCarHit` and
+ * `pedestrians.runDownPedestrian` all take a `CarPose` and none of them asks
+ * where it came from -- so a driven car that fills one is hit-tested by the
+ * identical geometry the ambient fleet is, which is the only way "a car knocks
+ * you down" can mean one thing in this game.
+ *
+ * `route` and `slot` are left at zero and `identity` carries the *source*
+ * identity, which is the same number the suppression key is: it means nothing
+ * to the hit test and everything to a caller that wants to know which ambient
+ * car this used to be.
+ *
+ * The heading is derived from the driver's yaw with the two transcendentals
+ * that implies, which is affordable here and nowhere else in this file: this
+ * runs once per *driven* car per tick, and driven cars are counted in ones,
+ * where `poseCar` runs on two hundred ambient cars a frame and is written to
+ * take exactly one square root.
+ *
+ * `scale` is 1 rather than the 4 % jitter a parked car gets. A driven car's hit
+ * box has to be the box the player learns, and a hatch that was 3 % smaller than
+ * the identical hatch beside it is a difference nobody could ever attribute.
+ */
+export function drivenCarPose(
+  car: { carId: number; body: number; colour: number; x: number; y: number; z: number; yaw: number; speed: number },
+  out: CarPose,
+): CarPose {
+  const size = CAR_BODY_SIZE[car.body] ?? CAR_BODY_SIZE[0];
+  out.route = 0;
+  out.slot = 0;
+  out.x = car.x;
+  out.y = car.y;
+  out.z = car.z;
+  // Yaw 0 faces -Z, exactly as `controller.step` derives it, and the pose's
+  // heading is a unit vector in the same plan the lanes are offset in.
+  out.dx = -Math.sin(car.yaw);
+  out.dz = -Math.cos(car.yaw);
+  out.body = car.body;
+  out.colour = car.colour;
+  out.scale = 1;
+  out.halfLength = size.length * 0.5;
+  out.halfWidth = size.width * 0.5;
+  out.height = size.height;
+  out.stage = CAR_STAGE_DRIVING;
+  out.routeT = 0;
+  // **Unsigned**, because everything downstream of a pose treats `speed` as a
+  // magnitude -- `carHitStrength` compares it against two positive constants --
+  // and a car reversing at 5 m/s hits just as hard as one going forwards.
+  out.speed = car.speed < 0 ? -car.speed : car.speed;
+  out.identity = car.carId;
+  return out;
 }
 
 /**
@@ -1926,6 +1993,11 @@ export function applyCarHit(victim: CombatantState, pose: CarPose): boolean {
   // parks any bike whose rider has stopped riding, so nothing here needs to know
   // that class exists.
   victim.ridingBike = 0;
+  // And out of the car, on the identical argument. Being T-boned by a bus while
+  // driving is the second canonical way to lose a vehicle, and
+  // `driving.CarField.follow` leaves yours in the road where the body landed.
+  victim.drivingCar = 0;
+  victim.carSpeed = 0;
 
   const ko = victim.health <= 0;
   if (ko) {
