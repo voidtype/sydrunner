@@ -18,9 +18,15 @@ import {
   Vector2,
   Vector3,
   WebGPURenderer,
+  type Material,
 } from 'three/webgpu';
 
 import { BOARD_HINT_M, DoorMarker, verifyDoorMarker } from './world/doormarker.ts';
+// --- The screaming sun and the button in Sydney Park. One feature, two files:
+//     the rules (shared with the server) and the renderer. See
+//     `game/sunbutton.ts` for where the button is and why it is there.
+import { verifySunButton } from './game/sunbutton.ts';
+import { SunFeature, verifySunButtonRenderer } from './world/sunbutton.ts';
 import { EXPOSURE } from './sky/calibration.ts';
 import { SydneySky } from './sky/sky.ts';
 import { verifyCycle } from './sky/cycle.ts';
@@ -105,8 +111,17 @@ import {
   verifyCharacterRig,
   type ActionName,
 } from './player/character.ts';
-import { BONE, verifyAnimation } from './player/animation.ts';
+import { BONE, PUNCH_ACTIVE, PUNCH_WIND_UP, verifyAnimation } from './player/animation.ts';
 import { BatAssets, BatProp, BatViewmodel, MAX_VIEW_REACH, verifyBat } from './player/bat.ts';
+// --- Money, the phone and the weapon slots. See `client/src/money.ts`.
+//
+// One import and one `installMoney(...)` call, and everything else this feature
+// does to this file is four one-line hooks inside handlers that already exist.
+// `money.ts`'s header says why the hooks are called from here rather than
+// listened for from there.
+import { verifyCash } from './game/cash.ts';
+import { verifyPhone } from './phone.ts';
+import { installMoney } from './money.ts';
 import {
   applyWorldDamage,
   CAST_RADIUS,
@@ -144,7 +159,20 @@ import {
   BALL_RECHARGE,
   createHitReport,
 } from './game/combat.ts';
-import { BALL_RADIUS, FootyField, applyFootyHit, verifyFooty, type FootyEvent } from './game/footy.ts';
+import {
+  BALL_RADIUS,
+  FootyField,
+  LAUNCH_SPEED,
+  applyFootyHit,
+  verifyFooty,
+  type Footy,
+  type FootyEvent,
+} from './game/footy.ts';
+// --- F: bat swats the footy. The shared adjudication, run here offline exactly
+// as `server/sim.ts` runs it online, and the twelve-triangle contact puff that
+// is the picture half of it. See `game/swat.ts` and `world/swatpuff.ts`.
+import { SWAT_RADIUS, SWAT_SPEED_SCALE, createBallAt, swatBalls, verifySwat } from './game/swat.ts';
+import { SwatPuffs, verifySwatPuff } from './world/swatpuff.ts';
 import { NetClient, chooseRoom, fetchRooms, verifyNetClient, type RemotePlayer } from './net/client.ts';
 import { verifyChat } from './net/chat.ts';
 import { ChatBox, verifyChatBox } from './chat.ts';
@@ -217,6 +245,30 @@ import {
   type RideSteering,
   type RiderView,
 } from './game/bikes.ts';
+// --- Workstream B: taking a car. One import block, one install call, and every
+// line of logic in `game/driving.ts` (the rules, three-free, shared with the
+// server) and `world/drivencars.ts` (the picture). See either header.
+import {
+  CarField,
+  DRIVE_CAM_DISTANCE,
+  DRIVE_CAM_LIFT,
+  createDrivingScratch,
+  resolveTake,
+  shapeDriveSteering,
+  verifyDriving,
+  TAKEABLE_SPEED,
+  TAKE_HEIGHT,
+  TAKE_RADIUS,
+  type DriveSteering,
+  type DriverView,
+} from './game/driving.ts';
+import {
+  DrivenCarView,
+  speedText,
+  takePrompt,
+  verifyDrivenCars,
+  type DriverPose,
+} from './world/drivencars.ts';
 import {
   BIKE_LEAN,
   BikeAssets,
@@ -269,6 +321,25 @@ import {
   type NpcActor,
 } from './game/factions.ts';
 import { PoliceAssets, PoliceSquad, Tracers, policeWarmupParts, verifyPoliceKit } from './world/police.ts';
+// --- The heat ladder (workstream D). Pure logic in `game/heat.ts`, which the
+// server imports too; the patrol car, the RBT props and the Polair spotlight in
+// `world/highway-patrol.ts`, which imports three and the server never sees.
+import {
+  HeatField,
+  heatLine,
+  installHeat,
+  stepHeat,
+  verifyHeat,
+  HEAT_MAX,
+  type HeatWorld,
+} from './game/heat.ts';
+import {
+  HighwayPatrolAssets,
+  HighwayPatrolFleet,
+  Polair,
+  highwayPatrolWarmupParts,
+  verifyHighwayPatrol,
+} from './world/highway-patrol.ts';
 // The illegal raves, on the same two-file split as everything ambient in this
 // build: `game/rave.ts` is the arithmetic every client agrees about -- which
 // warehouse, viaduct or park is live tonight, what is on the decks, where forty
@@ -397,6 +468,31 @@ import {
   verifyWildlife,
 } from './game/wildlife.ts';
 import { WildlifeAssets, WildlifeFlock, verifyWildlifeKit } from './world/wildlife.ts';
+// --- Workstream E: five more characters, and the ambient events they stand
+// around in. Same split once more -- `game/characters.ts` and `game/events.ts`
+// are the shared simulation the server runs, `world/characters.ts` and
+// `world/events.ts` are the renderers. See any of the four headers.
+import {
+  createCharacterPose,
+  dayAtTick,
+  daylight,
+  forEachCharacterNear,
+  saturdayAt,
+  KAREN_REPORT_LINE,
+  POSTED_LINE,
+  POSTED_LINE_BYSTANDER,
+  POSTED_RANGE,
+  TRADIE_HELP_LINE,
+  characterStruck,
+  isCharacterKind,
+  karenWitness,
+  stepCharacters,
+  verifyCharacters,
+} from './game/characters.ts';
+import { CharacterCrowd, CharacterKitAssets, characterWarmupParts, verifyCharacterKit } from './world/characters.ts';
+import { EVENT_NAME, stepEvents, sweepEvents, verifyEvents } from './game/events.ts';
+import { EventAssets, EventScene, eventWarmupParts, inTrackworkQueue, verifyEventKit } from './world/events.ts';
+import { verifyWallet } from './game/wallet-contract.ts';
 import { Hud, verifyHud } from './hud.ts';
 import { Minimap } from './minimap.ts';
 import { MapAtlas } from './mapatlas.ts';
@@ -516,6 +612,16 @@ async function main(): Promise<void> {
   // that does not converge reads as -- lag. None of the four has a frame that
   // says otherwise, which is exactly this project's bar.
   const footyFailures = timed('footy', verifyFooty);
+  // And the one interaction between the two weapons, on the same criterion and
+  // with the same shape of failure: **every broken version of a swat renders a
+  // perfectly good frame.** A window that is not the ACTIVE phase makes the
+  // mechanic untimed, an owner that does not change hands sends a returned ball
+  // straight through the person who threw it, and a deflection that adds speed
+  // rather than steering it overflows the wire on the fourth exchange. None of
+  // the three throws and none has a frame that says otherwise. The server runs
+  // this same function before it opens its socket. See `game/swat.ts`.
+  const swatFailures = timed('swat', verifySwat);
+  const swatPuffFailures = timed('swat puff', verifySwatPuff);
   const footyBallFailures = timed('footy model', verifyFootyBall);
   const netFailures = timed('net', verifyNet);
   const clientFailures = timed('net client', verifyNetClient);
@@ -577,6 +683,19 @@ async function main(): Promise<void> {
   // down a block, or "cnr Crown St & Crown St". None of them throws and none of
   // them has a frame that says otherwise -- see `verifyLocator`.
   const locatorFailures = timed('locator', verifyLocator);
+  // And the money, on the same criterion again, in two halves. The economy's
+  // failures are arithmetic that renders perfectly: a drop rule that floors
+  // before its minimum takes $5 off a player with $6 and nothing off one with
+  // $49, a Centrelink period computed in *real* days is a payment nobody in
+  // this game will ever collect, and a fare that rounds twice is a dollar
+  // short a third of the time in the house's favour. The slots' failures are
+  // worse in a different way: a swap that duplicates puts the bat in both
+  // hands, so the off-hand throw does nothing and there is no frame in which
+  // that reads as anything but a missing football. The server runs
+  // `verifyCash` too -- it is the side that pays. See `game/cash.ts` and
+  // `phone.ts`.
+  const cashFailures = timed('cash', verifyCash);
+  const phoneFailures = timed('phone', verifyPhone);
   // And the water, in two halves that fail in two different silent ways. A
   // sidecar decoded a word out of step is triangles at plausible coordinates and
   // impossible depths; a wading rule whose tile keying disagrees with the
@@ -620,6 +739,16 @@ async function main(): Promise<void> {
   // pedalling in mid-air beside its own saddle, which reads as a rigging bug and
   // is really two files disagreeing. See `game/bikes.ts` and `world/bike.ts`.
   const bikeFailures = timed('bikes', verifyBikes);
+  // And the cars, in the same two halves and failing in the same two silent
+  // ways. The **rules** half: a handbrake that walks a stopped car backwards
+  // reads as a physics quirk, and a suppression key that does not answer is the
+  // car you just stole still driving to Ashfield beside you, running people down
+  // on the way. The **picture** half: a prompt that survives a knockout is the
+  // bikes' own reported bug one feature over, and a speed readout in the wrong
+  // unit is a car that everybody reports as "feeling slow". See
+  // `game/driving.ts` and `world/drivencars.ts`.
+  const drivingFailures = timed('driving', verifyDriving);
+  const drivenCarFailures = timed('drivencars', verifyDrivenCars);
   // And where the camera is looking from, which fails in this project's shape
   // exactly: every broken version of a zoom draws a perfectly good frame. A
   // ladder that cannot reach the far end is the reported bug -- *"cant zoom out
@@ -693,6 +822,19 @@ async function main(): Promise<void> {
   // `verifyPoliceKit` call beside `PoliceAssets`. This is everything that needs
   // nothing but arithmetic, which is most of it.
   const policeFailures = timed('police', () => verifyPolice(undefined, SNAPSHOT_INTERVAL));
+  // And the graded response on top of them, in the same two halves.
+  //
+  // The **rules** half is where this feature's silent failures live and they all
+  // render a plausible city: a threshold table out of order makes committing a
+  // crime *lower* your star count, a tier that cannot be shed leaves a player
+  // wanted forever with the stars simply never going down, and a crime priced
+  // past the top of the ladder takes a bystander assault straight to Polair.
+  // None of them throws and every one of them reads as tuning. See `verifyHeat`.
+  //
+  // The **model** half runs earlier, beside the assets -- `verifyHighwayPatrol`
+  // by `HighwayPatrolAssets` -- and is the one that would otherwise ship a
+  // patrol car with a hole in one flank.
+  const heatFailures = timed('heat', verifyHeat);
   // And the street factions, on the same two halves again.
   //
   // The **rules** half has its own four: an anchor outside the built extent puts
@@ -729,6 +871,30 @@ async function main(): Promise<void> {
   // The **model** half runs later beside the assets -- see `verifyWildlifeKit`
   // by `WildlifeAssets`.
   const wildlifeFailures = timed('wildlife', () => verifyWildlife());
+  // --- Workstream E's three, on the same criterion as everything above them:
+  // every one of these ships as a tuning complaint rather than as a bug.
+  //
+  // `verifyCharacters` covers a bias table with a character in it who is
+  // everywhere -- which from any one street corner looks exactly like a
+  // character who is in the right place -- the two epochs drifting apart, which
+  // puts tradies on site at midnight, and the cell-population rounding, which is
+  // the one place two engines could place a different *number* of people and
+  // this client would draw somebody the server does not have.
+  //
+  // `verifyEvents` covers a schedule that is not a pure function of the day (a
+  // player describing a car crash nobody else can find), a start window that
+  // wraps past midnight and is read naively (the burnout simply never happens),
+  // and a trackwork queue in a paddock.
+  //
+  // `verifyWallet` covers the no-op default the eshays debit against until the
+  // wallet lands. See `game/wallet-contract.ts`.
+  //
+  // The **model** halves run later beside the assets -- `verifyCharacterKit`
+  // and `verifyEventKit` -- and they are the ones that would otherwise ship a
+  // hard hat inside somebody's skull.
+  const characterFailures = timed('characters', verifyCharacters);
+  const eventFailures = timed('events', verifyEvents);
+  const walletFailures = timed('wallet', verifyWallet);
   // And the nameplates, on the same criterion once more. Every way this breaks
   // renders: a text cache that misses re-uploads two megabytes of atlas twenty
   // times a second and reads as a streaming stall; a fade that is not monotonic
@@ -843,6 +1009,20 @@ async function main(): Promise<void> {
   // `RaveAssets` -- and is the one that would otherwise ship a laser fan that is
   // invisible from half the angles it is seen from.
   const raveFailures = timed('raves', () => verifyRaves());
+  // And the button in Sydney Park, in the same two halves the bikes have and
+  // failing in the same two silent ways. The **rules** half runs on the server
+  // too (`server/index.ts`) and is the one that matters: a scream that ends at
+  // the wrong boundary or a cooldown that comes back on the wrong day is a
+  // feature nobody can test without sitting through three real hours, and it
+  // renders perfectly the whole time. The **renderer** half is the sizing and
+  // the two-state legibility, on `verifyDoorMarker`'s criterion -- a face
+  // clipped past the far plane is simply invisible with nothing in the console,
+  // and a cooldown that looks like readiness is a player pressing a dead button
+  // and concluding the key is broken. See `game/sunbutton.ts`.
+  const sunButtonFailures = timed('sun button', () => [
+    ...verifySunButton(),
+    ...verifySunButtonRenderer(),
+  ]);
   // Once, at `debug` so it is out of the way, and slowest-first because the only
   // question anyone asks of this line is which one it was.
   checkMs.sort((a, b) => b[1] - a[1]);
@@ -859,6 +1039,8 @@ async function main(): Promise<void> {
     combatFailures.length ||
     powerupFailures.length ||
     footyFailures.length ||
+    swatFailures.length ||
+    swatPuffFailures.length ||
     footyBallFailures.length ||
     netFailures.length ||
     clientFailures.length ||
@@ -870,14 +1052,20 @@ async function main(): Promise<void> {
     cdnFailures.length ||
     spawnFailures.length ||
     bikeFailures.length ||
+    drivingFailures.length ||
+    drivenCarFailures.length ||
     cameraFailures.length ||
     bikeMeshFailures.length ||
     bikeGlowFailures.length ||
     pedFailures.length ||
     pedModelFailures.length ||
     policeFailures.length ||
+    heatFailures.length ||
     streetFailures.length ||
     wildlifeFailures.length ||
+    characterFailures.length ||
+    eventFailures.length ||
+    walletFailures.length ||
     nameplateFailures.length ||
     guardFailures.length ||
     hudFailures.length ||
@@ -886,6 +1074,7 @@ async function main(): Promise<void> {
     nightFailures.length ||
     trainLightFailures.length ||
     raveFailures.length ||
+    sunButtonFailures.length ||
     cycleFailures.length ||
     duskFailures.length ||
     clockFailures.length ||
@@ -895,7 +1084,9 @@ async function main(): Promise<void> {
     teleportFailures.length ||
     suggestionFailures.length ||
     changelogFailures.length ||
-    bugFailures.length
+    bugFailures.length ||
+    cashFailures.length ||
+    phoneFailures.length
   ) {
     hud.fatal(
       'Self-checks failed:\n' +
@@ -908,6 +1099,8 @@ async function main(): Promise<void> {
           ...combatFailures,
           ...powerupFailures,
           ...footyFailures,
+          ...swatFailures,
+          ...swatPuffFailures,
           ...footyBallFailures,
           ...netFailures,
           ...clientFailures,
@@ -919,14 +1112,20 @@ async function main(): Promise<void> {
           ...cdnFailures,
           ...spawnFailures,
           ...bikeFailures,
+          ...drivingFailures,
+          ...drivenCarFailures,
           ...cameraFailures,
           ...bikeMeshFailures,
           ...bikeGlowFailures,
           ...pedFailures,
           ...pedModelFailures,
           ...policeFailures,
+          ...heatFailures,
           ...streetFailures,
           ...wildlifeFailures,
+          ...characterFailures,
+          ...eventFailures,
+          ...walletFailures,
           ...nameplateFailures,
           ...guardFailures,
           ...hudFailures,
@@ -935,6 +1134,7 @@ async function main(): Promise<void> {
           ...nightFailures,
           ...trainLightFailures,
           ...raveFailures,
+          ...sunButtonFailures,
           ...cycleFailures,
           ...duskFailures,
           ...clockFailures,
@@ -943,6 +1143,8 @@ async function main(): Promise<void> {
           ...unstuckFailures,
           ...teleportFailures,
           ...suggestionFailures,
+          ...cashFailures,
+          ...phoneFailures,
           ...changelogFailures,
           ...bugFailures,
         ]
@@ -1304,6 +1506,26 @@ async function main(): Promise<void> {
   /** Presentation for the balls in the air. One group for every throw in the world. */
   const footyPool = new FootyPool(footies);
   scene.add(footyPool.group);
+  // --- F: the contact puff where a bat middles a football. Twelve triangles,
+  // three of them, one material -- see `world/swatpuff.ts`. Built here with the
+  // other weapon assets so the warm-up compiles its pipeline rather than the
+  // frame somebody first returns a serve.
+  const swatPuffs = new SwatPuffs();
+  for (const mesh of swatPuffs.meshes) scene.add(mesh);
+  /** Scratch for the offline swat's ball rewind. See `game/swat.ts`. */
+  const swatScratch = createBallAt();
+  /**
+   * A throw the console asked for, and how many simulated seconds until it goes.
+   *
+   * The one piece of state `sydney.serve()` needs and the only reason it is not
+   * a pure function of its arguments -- see there for why the countdown is in
+   * simulated seconds rather than on a `setTimeout`. Null in every session
+   * nobody has typed `sydney.serve()` into, which is all of them.
+   */
+  let pendingServe: { combat: CombatantState; t: number } | null = null;
+  /** How many swats this session has seen, and the last one. `sydney.bat.swats`. */
+  let swatCount = 0;
+  let lastSwat: { mine: boolean; x: number; y: number; z: number; at: number } | null = null;
   /**
    * The lime e-bikes, on exactly the same terms as the three above: one geometry
    * and one material for every bike in the city, built here so the warm-up gets
@@ -1337,10 +1559,35 @@ async function main(): Promise<void> {
     return;
   }
   const tracers = new Tracers();
+  // --- The heat ladder's furniture, on exactly the same terms: pure geometry,
+  // built up here so the first patrol car of a session is not a synchronous
+  // shader compile in the middle of a pursuit -- which is the one moment in a
+  // session where a 200 ms hitch is unambiguously the game's fault.
+  const patrolAssets = new HighwayPatrolAssets();
+  const patrolKitFailures = verifyHighwayPatrol(patrolAssets);
+  if (patrolKitFailures.length) {
+    hud.fatal('Highway patrol kit self-checks failed:\n' + patrolKitFailures.map((f) => '  - ' + f).join('\n'));
+    return;
+  }
   const streetAssets = new StreetlifeAssets(characters);
   const streetKitFailures = verifyStreetlifeKit(streetAssets);
   if (streetKitFailures.length) {
     hud.fatal('Street kit self-checks failed:\n' + streetKitFailures.map((f) => '  - ' + f).join('\n'));
+    return;
+  }
+  // --- Workstream E's two kits, on exactly the same terms: a fatal check beside
+  // the thing it checks, because a hard hat inside a skull is invisible from
+  // every angle and looks like the prop was never parented.
+  const characterAssets = new CharacterKitAssets(characters);
+  const characterKitFailures = verifyCharacterKit(characterAssets);
+  if (characterKitFailures.length) {
+    hud.fatal('Character kit self-checks failed:\n' + characterKitFailures.map((f) => '  - ' + f).join('\n'));
+    return;
+  }
+  const eventAssets = new EventAssets();
+  const eventKitFailures = verifyEventKit(eventAssets);
+  if (eventKitFailures.length) {
+    hud.fatal('Event kit self-checks failed:\n' + eventKitFailures.map((f) => '  - ' + f).join('\n'));
     return;
   }
   const wildlifeAssets = new WildlifeAssets();
@@ -1704,6 +1951,36 @@ async function main(): Promise<void> {
   const doorMarker = new DoorMarker();
   scene.add(doorMarker.group);
   /**
+   * The button on the hill in Sydney Park, and the face it puts in the sky.
+   *
+   * One object holding a prop 231 m from the spawn disc and a billboard 14 km up
+   * `sunVector`; see `world/sunbutton.ts` for why those two live together and
+   * `game/sunbutton.ts` for the rules the server shares.
+   *
+   * Constructed here rather than lazily, on `MoonDisc`'s reason: a material that
+   * first appears the moment somebody presses the button is a pipeline compiled
+   * in the middle of an afternoon, and this one is added to the scene before the
+   * boot warm-up so `compileAsync` reaches it.
+   *
+   * `wildGround` rather than `groundHeightAt` for the plinth's feet, on that
+   * function's own argument: the plinth is standing on the park and a query that
+   * folded in a roof would put it on top of whatever the streamer thinks is
+   * overhead -- and, worse, `groundHeightAt` *writes* the player's `lastGround`,
+   * so asking it about a point 3 km away would move the player's own fallback
+   * height to a mound they have never been on.
+   */
+  const sunButton = new SunFeature({
+    groundAt: (x, z) => wildGround(x, z),
+    // The **server's** clock, which is the client's own plus the skew `WELCOME`
+    // established. `sky.now.nowMs` is that number and is the one the sky itself
+    // is drawn from, so the face's deadline and the sunset it is measured
+    // against can never be a frame apart. Offline the skew is zero, which is not
+    // a fallback so much as the honest answer -- see `SydneySky.serverSkew`.
+    clockMs: () => sky.now.nowMs,
+    notice: (text) => hud.notice(text),
+  });
+  scene.add(sunButton);
+  /**
    * The record bag, fetched once and never blocking anything.
    *
    * `client/public/audio/dj/tracks.json` is written by `scripts/dj-manifest.sh`
@@ -1798,6 +2075,19 @@ async function main(): Promise<void> {
         // the viewmodel receives and the local player's own bat, which is on the
         // shadow layer, does not.
         { geometry: bats.geometry, material: bats.material, casts: true },
+        // --- F: the swat's contact puff, which is the loudest possible case of
+        // what this pass exists for. It is additive, unlit, `DoubleSide` and
+        // `toneMapped` off -- a pipeline nothing else in the frame shares -- and
+        // its three meshes are `visible = false` until somebody returns a serve,
+        // so `_projectObject` skips them and the compile lands on the exact
+        // frame the effect is supposed to make instant. Neither casts nor
+        // receives: see `world/swatpuff.ts`, where both are switched off.
+        {
+          geometry: swatPuffs.meshes[0].geometry,
+          material: swatPuffs.meshes[0].material as Material,
+          casts: false,
+          receives: [false],
+        },
         // The police kit's two props and the tracers, the street factions' four
         // props, the flock's five sets and the nameplate field. Every one of
         // these used to be built *below* this call and so could not be reached
@@ -1805,7 +2095,17 @@ async function main(): Promise<void> {
         // the first officer, the first meth head, the first bush turkey, the
         // first shot fired, the first other player's plate.
         ...policeWarmupParts(policeAssets, tracers),
+        // And the heat ladder's: the patrol body, its light bar, one lens, the
+        // RBT's cone line and the Polair disc. Five pipelines that would
+        // otherwise each compile on the frame a 3-star pursuit arrived.
+        ...highwayPatrolWarmupParts(patrolAssets),
         ...streetlifeWarmupParts(streetAssets),
+        // Workstream E's props and its five instanced objects, compiled at boot
+        // rather than on the frame somebody first turns a corner into a bin
+        // night. WebGPU pipeline compilation is tens of milliseconds and it
+        // lands as a stall on exactly the frame the thing appears.
+        ...characterWarmupParts(characterAssets),
+        ...eventWarmupParts(eventAssets),
         ...nameplateWarmupParts(nameplates),
         // The rave's booth banner, which is the one thing in that whole feature
         // a stand-in can warm: everything else it draws is instanced, and
@@ -2372,6 +2672,43 @@ async function main(): Promise<void> {
   const squad = new PoliceSquad(policeAssets, characters);
   for (const rig of squad.rigs) scene.add(rig.mesh);
 
+  // --- The heat ladder (workstream D). One contiguous block; see `game/heat.ts`.
+  //
+  // The **field** is the offline authority's, exactly as `factions` above it is:
+  // online it is never stepped and the star count arrives on `MSG.HEAT`, and
+  // offline this process runs the same `stepHeat` the server runs, over the same
+  // file. `installHeat` is the handle `factions.accuse`'s crime funnel reaches
+  // it through -- one authority per process, and in a browser that is this one.
+  const heat = new HeatField();
+  installHeat(heat);
+  /**
+   * The two things the ladder needs beyond the faction context. Built once.
+   *
+   * `rideStop` is this process's answer to "what is the player's train doing",
+   * and it is resolved from the ride the player is already on rather than from
+   * anything new -- `aboardPose` against the same `railSeconds(Date.now())`
+   * every other rail call site in this file reads. -2 is on foot, -1 is aboard
+   * and moving, and anything else is the stop index the train is standing at.
+   * See `heat.HeatWorld`.
+   */
+  const heatWorld: HeatWorld = {
+    lanes: traffic,
+    rideStop: (id) => {
+      if (id !== playerCombat.id) return -2;
+      const a = playerCombat.aboard;
+      if (!railBake || !isAboard(a)) return -2;
+      const pose = aboardPose(railBake, a, railSeconds(Date.now()));
+      return pose === null ? -2 : pose.atStop;
+    },
+  };
+  /** The patrol cars and the RBTs in view, from whichever authority is running. */
+  const patrolFleet = new HighwayPatrolFleet(patrolAssets);
+  scene.add(patrolFleet.group);
+  /** Polair: a spotlight, a disc and a rotor. Not a helicopter. See its header. */
+  const polair = new Polair(scene, patrolAssets);
+  /** What the star row last read, so `hud.notice` fires on the edge and not the level. */
+  let heatShown = 0;
+
   // --- And the street factions, on exactly the same two tiers.
   //
   // The ambient tier here is not the pedestrian schedule -- a loiterer is not
@@ -2382,6 +2719,26 @@ async function main(): Promise<void> {
   // Likewise: the kit and its check are above, beside the warm-up.
   const streetCrowd = new StreetCrowd(streetAssets, characters);
   for (const rig of streetCrowd.rigs) scene.add(rig.mesh);
+
+  // --- And workstream E's five characters, on the same two tiers again. Twelve
+  // pooled rigs, and an ambient tier that is a hash over a 420 m cell grid
+  // weighted by the ABS census field -- so like the beats and the loiterers it
+  // costs nothing on the wire and exists identically in both modes.
+  const characterCrowd = new CharacterCrowd(characterAssets, characters);
+  for (const rig of characterCrowd.rigs) scene.add(rig.mesh);
+
+  // --- And the ambient events, which have **no rig at all**.
+  //
+  // Five instanced sets: bodies, cars, bins, signs and birds. A trackwork queue
+  // is twenty-five figures and a bin night is a dozen ibises, and neither of
+  // them moves -- see `world/events.ts` on why nothing in an event needs a
+  // skeleton. The sites themselves are a pure function of the in-game day, so
+  // every client sees the same crash on the same corner with nothing sent.
+  const eventScene = new EventScene(eventAssets);
+  for (const mesh of eventScene.meshes) scene.add(mesh);
+  /** When the player entered a trackwork queue, in seconds, or -1. See below. */
+  let queueSince = -1;
+  let queueTold = false;
 
   // --- And the wildlife, which is the same two tiers with no rig at all.
   //
@@ -2528,6 +2885,16 @@ async function main(): Promise<void> {
    * aggro line is heard once. `NPC_STATE.CHASE` is their `AIM`.
    */
   const charging = new Set<number>();
+  /**
+   * Workstream E's edge set: influencers currently drawn on the ground, and
+   * tradies who have already offered a hand.
+   *
+   * One `Set` for two kinds rather than two, because the actor id space is
+   * shared and the two uses cannot collide -- an actor is one kind for its whole
+   * life. `firing` and `charging` above are the same arrangement for the same
+   * reason, and the alternative is two maps that are each mostly empty.
+   */
+  const posted = new Set<number>();
 
   /**
    * Where the promoted officers are: the server's list online, this process's
@@ -2556,7 +2923,29 @@ async function main(): Promise<void> {
   function accuse(x: number, z: number, reason: number, tick: number, alreadyWitnessed = false): void {
     if (!alreadyWitnessed) {
       const w = policeWitness(x, z, tick, witnessCtx, witness);
-      if (!w.seen) return;
+      // --- Workstream E: and if no officer saw it, a Karen might have.
+      //
+      // `karenWitness` rather than `karenReport`, and the difference is the
+      // whole of what a predicting client is allowed to do. `karenReport` calls
+      // `reportCrime`, which opens an investigation on the authority --
+      // `server/sim.reportIfWitnessed` calls it for exactly that reason. This
+      // client is not the authority when it is online, so it asks the query and
+      // opens its own *optimistic* banner, which is the identical trade it
+      // already makes off `policeWitness` one line up: right almost always, at
+      // most 50 ms ahead of the truth, and wrong costs a banner that clears
+      // itself on the next `MSG.INVESTIGATION`.
+      //
+      // Offline the branch below makes it real through the same
+      // `FactionField.accuse` the server calls, so there is one implementation
+      // rather than two that agree by inspection.
+      if (!w.seen) {
+        if (!karenWitness(x, z, tick, witnessCtx)) return;
+        // She says so. The line is cosmetic and local -- see
+        // `game/characters.ts` section 4 -- and it is posted here rather than
+        // from the crowd's own speech clock because *this* is the moment it
+        // means something.
+        hud.notice(KAREN_REPORT_LINE);
+      }
     }
     if (net) net.predictInvestigation(reason, COUNTDOWN_TICKS);
     else factions.accuse(playerCombat.id, reason, tick);
@@ -3411,7 +3800,7 @@ async function main(): Promise<void> {
    * fifteen literals a frame.
    */
   const plate: PlateInput = {
-    id: 0, name: '', health: 0, headX: 0, headY: 0, headZ: 0, down: false,
+    id: 0, name: '', health: 0, headX: 0, headY: 0, headZ: 0, down: false, stars: 0,
   };
   /**
    * What to write over a training dummy.
@@ -3592,6 +3981,59 @@ async function main(): Promise<void> {
   };
   /** Whichever field is authoritative right now. See the block above. */
   const bikeWorld = (): BikeField => (net ? net.bikes : localBikes);
+
+  // --- Workstream B: the cars. `bikeWorld` above is the pattern for all of it.
+  /** The offline authority. Unused while a server is answering; see `carWorld`. */
+  const localCars = new CarField();
+  const carWorld = (): CarField => (net ? net.cars : localCars);
+  /** Where `driving.shapeDriveSteering` writes. One object, reused every frame. */
+  const driveSteering: DriveSteering = { right: 0, yawDelta: 0 };
+  /** Scratch for `resolveTake`, so a prompt asked sixty times a second allocates nothing. */
+  const takeScratch = createDrivingScratch();
+  /** Whether there is a car within reach this frame. Recomputed, never stored. */
+  let takeableNear = false;
+  /** `CarField.follow`'s input, offline only. `riderViews`' twin. */
+  const driverViews: DriverView[] = [];
+  /**
+   * Where a driver's body is on screen, for `DrivenCarView`. See its header:
+   * the local player from the *predicted* position so the car moves on the frame
+   * the input does, and a remote from their *interpolated* one so the car and
+   * the body in it are on the same 100 ms clock.
+   */
+  const drivenCars = new DrivenCarView(carWorld, (driverId: number, out: DriverPose): boolean => {
+    // `-1` is the view's way of saying "this is the car *you* are in" without
+    // going through an id -- see `DrivenCarView`'s `localCar`. Offline the local
+    // combatant id is 0, which is also the field's empty sentinel, so an id
+    // comparison alone cannot answer this.
+    if (driverId === -1 || driverId === playerCombat.id) {
+      out.x = player.position.x;
+      out.y = player.position.y - EYE_HEIGHT;
+      out.z = player.position.z;
+      out.yaw = player.yaw;
+      return true;
+    }
+    const remote = net?.remotes.get(driverId);
+    if (!remote || remote.fresh) return false;
+    out.x = remote.position.x;
+    out.y = remote.position.y - EYE_HEIGHT;
+    out.z = remote.position.z;
+    out.yaw = remote.yaw;
+    return true;
+  }, () => playerCombat.drivingCar);
+  /** Is this remote at the wheel? The parked-bike draw consults it -- see below. */
+  const isDriving = (id: number): boolean => carWorld().carOf(id) !== 0;
+  // And the four properties that are the whole of drawing a driven car: through
+  // the loop that already draws every other car in Sydney, at the same LOD, in
+  // the same material, with the same headlights. `world/drivencars.ts`' header
+  // is why this is four lines and not a renderer. Here rather than beside the
+  // fleet's own `lights`/`models` because `drivenCars` is declared here, and it
+  // is declared here because it needs `player` and `net`.
+  trafficMovers.suppress = drivenCars.suppress;
+  trafficMovers.driven = drivenCars.source;
+  if (carModels) {
+    carModels.suppress = drivenCars.suppress;
+    carModels.drivenClaims = drivenCars.claims;
+  }
   /**
    * Is this bike the one the local player has *predicted* they are on?
    *
@@ -3980,6 +4422,42 @@ async function main(): Promise<void> {
     }
   }
   const online = net !== null;
+
+  // --- `?heat=N`: start offline at N stars. **Offline only, by construction.**
+  //
+  // The ladder is a five-rung feature whose top two rungs take ninety seconds
+  // each to reach honestly, and every one of them puts something different in
+  // the world -- a car, a roadblock, a helicopter. A screenshot of the 4-star
+  // RBT that had to be earned by knocking out two officers and then surviving
+  // ninety seconds is a screenshot nobody takes twice, which means the rung
+  // stops being checked.
+  //
+  // The gate is `!online` and it is a gate rather than a warning: `HeatField` is
+  // the same class the server runs, so a `debugSet` reachable in a session would
+  // be a client setting its own star count -- and the answer to that in this
+  // project is always the same, which is that the authority decides. Online the
+  // param is read and ignored, and the notice says so rather than doing nothing
+  // silently.
+  {
+    const asked = new URLSearchParams(location.search).get('heat');
+    if (asked !== null) {
+      const want = Math.max(0, Math.min(HEAT_MAX, Math.round(Number(asked) || 0)));
+      if (online) hud.notice('?heat is offline-only — the server decides how wanted you are');
+      else if (want > 0) {
+        // **The banner first, then the stars.** A star count with no
+        // investigation behind it would be half the interface: the 1-star rung
+        // *is* the banner and every rung above it keeps it, so a debug aid that
+        // set one without the other would be showing a state the game cannot
+        // actually be in. `predictInvestigation` offline is `factions.accuse`,
+        // which fires the crime funnel and banks its own points -- so the
+        // `debugSet` has to come second, where it overwrites them.
+        predictInvestigation(REASON.ASSAULT);
+        heat.debugSet(playerCombat.id, want, trafficTick(Date.now()));
+        hud.notice(`?heat=${want} — ${want} star${want === 1 ? '' : 's'}`);
+      }
+    }
+  }
+
   // The suggestions box is server-backed: offline it opens and says so rather
   // than not opening, on the argument that a control which silently does nothing
   // is a control a player decides is broken. `?offline` is one of the two ways
@@ -4188,6 +4666,33 @@ async function main(): Promise<void> {
     }
   });
 
+  /**
+   * Workstream E: the ambient events, on both maps out of one source.
+   *
+   * `EventScene.live` rather than a fresh `liveEventsAt` call, and the reason is
+   * the one `MarkerSource`'s own header gives about allocation: the scene
+   * already resolves the live set once a frame against the draw radius, and a
+   * second sweep here would be a second `eventsAt` over a 300 m box at 15 Hz
+   * forever. The consequence is stated rather than hidden -- **the markers reach
+   * exactly as far as the renderer does**, which is `EVENT_DRAW_RADIUS`, so the
+   * minimap's 250 m brief is satisfied and the big map shows only what is within
+   * 150 m rather than the whole city's schedule.
+   *
+   * That is a deliberate narrowing of the brief and it is the better behaviour:
+   * a big map listing every event in Greater Sydney would be a quest log, and
+   * `minimap.RAVE_DOT`'s header already argues that case for the raves -- a map
+   * that shows you what is out there is a quest list, and one that shows you
+   * what you are near is a map.
+   *
+   * The **label** is only read by the big map; the compass drops it. See
+   * `minimap.Marker.label`.
+   */
+  minimap.addMarkerSource((sink) => {
+    for (const site of eventScene.live) {
+      sink.mark(site.x, site.z, 'event', undefined, EVENT_NAME[site.kind] ?? 'something');
+    }
+  });
+
   // --- The big map, on `M`.
   //
   // The city at up to nine kilometres, north-up, lettered with suburb and street
@@ -4295,6 +4800,39 @@ async function main(): Promise<void> {
    * is true.
    */
   let mountHeld = false;
+
+  // --- Money, the phone and the weapon slots. See `client/src/money.ts`.
+  //
+  // Here rather than earlier because every accessor below has to be in scope:
+  // `self` is the shadow-layer body the handset parents to, `thirdPerson` is
+  // what decides whether the viewmodel or the prop is the one you see, and
+  // `minimap` is the seam both maps read their markers through.
+  const money = installMoney({
+    hud,
+    camera,
+    scene,
+    selfActor: self,
+    net: () => net,
+    position: () => player.position,
+    angles: () => ({ yaw: player.yaw, pitch: player.pitch }),
+    speed: () => Math.sqrt(player.velocity.x * player.velocity.x + player.velocity.z * player.velocity.z),
+    firstPerson: () => !thirdPerson,
+    riding: () => playerCombat.ridingBike !== 0,
+    openMap: () => bigmap.toggle(),
+    addMarkerSource: (source) => minimap.addMarkerSource(source),
+    // Which weapon viewmodels the slots want drawn this frame.
+    //
+    // Handed in as a setter rather than read back out, because the block above
+    // that owns `setVisibleToCamera` only runs on a **camera-mode change** --
+    // so a predicate consulted there would follow the third-person toggle and
+    // not the number row, and the bat would stay in frame beside a raised
+    // phone until you pressed `V`. This runs every frame from `money.frame`,
+    // after that block, and `thirdPerson` is still the outer authority.
+    setWeaponVisible: (bat, footy) => {
+      setVisibleToCamera(viewmodel.mesh, !thirdPerson && bat);
+      setVisibleToCamera(footyViewmodel.mesh, !thirdPerson && footy);
+    },
+  });
 
   // --- Riding a train ----------------------------------------------------------
   //
@@ -4511,6 +5049,17 @@ async function main(): Promise<void> {
   let rideNudgeT = 0;
   let rideNudgeText = RIDE_PROMPT;
   /**
+   * Seconds until the horn can sound again.
+   *
+   * A cooldown rather than an edge, because `punch` is level-triggered on this
+   * wire (see `protocol.BTN`) and a held left click would otherwise be sixty
+   * honks a second. A third of a second is about the length of one, so leaning
+   * on the button gives a repeating parp rather than a tone -- which is what a
+   * horn does and is also the only thing that reads as deliberate.
+   */
+  let honkT = 0;
+  const HONK_SECONDS = 0.34;
+  /**
    * Where `bikes.shapeRideSteering` writes. One object, reused every frame.
    *
    * A record rather than two return values because the two halves are one
@@ -4575,6 +5124,11 @@ async function main(): Promise<void> {
    */
   window.addEventListener('mousedown', (e) => {
     if (!locked) return;
+    // The phone answers whichever button its hand is on, and consumes it -- so
+    // a click that opened the phone does not also arm a swing. Every other
+    // slot arrangement returns false here and the two lines below are exactly
+    // what they always were. See `client/src/money.ts`.
+    if (money.mousedown(e.button)) return;
     if (e.button === 0) punchBuffer = PUNCH_BUFFER;
     // Right click throws a football. Under pointer lock the context menu does
     // not appear anyway, but the listener below covers the drag-to-look fallback
@@ -4729,6 +5283,12 @@ async function main(): Promise<void> {
     if (hud.typing) return;
     const held = keys.has(e.code);
     keys.add(e.code);
+    // The number row, the phone's Escape and the Centrelink `E`. **After** the
+    // `hud.typing` interlock, so none of them fires while somebody is typing,
+    // and before every branch below, so the phone's Escape beats the
+    // suggestions box's -- which is the ordering `money.ts`'s header is about.
+    // Returns true only when it consumed the key. See `client/src/money.ts`.
+    if (money.keydown(e.code, e.shiftKey, held)) return;
     /* **`F` is the torch, and what it displaced went one key along.**
      *
      * A player asked for the flashlight on `F`, which is where every game since
@@ -5079,6 +5639,62 @@ async function main(): Promise<void> {
     return fighters.find((f) => f.combat.id === id);
   }
 
+  // --- F: bat swats the footy. The presentation, in one place. ---------------
+  //
+  // Called from two paths that decide the *same* thing in two different
+  // processes -- the offline swat below in `simulate`, and `netHandlers().onSwat`
+  // when the server has decided it -- which is the arrangement `onHit` and
+  // `netHandlers().onHit` already have and is what keeps a returned serve feeling
+  // identical whether it was adjudicated 30 ms away or in this process.
+  //
+  // Three things happen and each is aimed at a different person:
+  //
+  //   - the **thock**, for everybody in earshot, attenuated by range. `swat` is
+  //     `thwack`'s three layers re-pitched -- see `game/audio.ts`.
+  //   - the **puff** at the point of contact, for anybody who can see it: at
+  //     42 m/s the ball crosses the whole swing volume inside two frames, and
+  //     without a mark there a returned serve reads as a ball changing its mind.
+  //   - the **connect kick** on the viewmodel, for the swinger alone. The same
+  //     90 ms shudder a landed bat hit gives, and for the same reason: the blade
+  //     was arrested and the hands were not. It is the one piece of feedback that
+  //     says *you* did that.
+  /**
+   * How far a local predicted ball may be from a swat point and still be it.
+   *
+   * `netHandlers().onSwat` matches by proximity because local ball ids and
+   * server ball ids come out of two unrelated counters -- see there. 4 m is what
+   * half a round trip is worth: the event was sent when the server's copy was at
+   * the swat point, and by the time it arrives this client's copy has flown on
+   * for the downlink trip, which at 42 m/s and a bad 90 ms is 3.8 m. Wider than
+   * that and a *different* ball of yours a few metres away could be claimed;
+   * narrower and the correction is silently skipped on a slow connection, which
+   * leaves a ghost ball flying the old trajectory until it dies.
+   */
+  const SWAT_MATCH_M = 4;
+
+  // `mine` is resolved by the caller rather than compared here, because the two
+  // paths identify the local player differently: offline it is `playerCombat.id`
+  // and online it is `net.id`, which is what `netHandlers().onHit` already does
+  // one function up.
+  function swatFeedback(mine: boolean, x: number, y: number, z: number): void {
+    const range = Math.hypot(x - player.position.x, z - player.position.z);
+    if (range < BOUNCE_AUDIBLE) audio.swat(range);
+    swatPuffs.fire(x, y, z);
+    // Counted for `sydney.bat.swats`, on the terms `shadowReport` sets: a number
+    // to check a claim against rather than guess at. A swat is over in 260 ms
+    // and the tab this project is developed against is throttled -- see
+    // `sydney.serve` -- so "did that work" is a question a screenshot cannot
+    // always answer and this always can.
+    swatCount++;
+    lastSwat = { mine, x, y, z, at: performance.now() };
+    if (mine) {
+      viewmodel.connect();
+      // `feedback.hitLanded(false)` is deliberately **not** called. That is the
+      // screen shake for putting a pip on somebody, and a swat takes nobody's
+      // health -- shaking the frame for it would tell the player they scored.
+    }
+  }
+
   /** How far away someone else's pickup is still worth a sound. */
   const PICKUP_AUDIBLE = 22;
 
@@ -5156,7 +5772,7 @@ async function main(): Promise<void> {
    */
   function netHandlers(): ConstructorParameters<typeof NetClient>[1] {
     return {
-      onHit(attacker, victim, ko, footy, health) {
+      onHit(attacker, victim, ko, footy, health, returned) {
         // **An event whose attacker is its own victim is a car.**
         //
         // Nobody swung; the world did. There is no room in `net/protocol.ts`'s
@@ -5200,7 +5816,69 @@ async function main(): Promise<void> {
           else feedback.hitTaken();
         }
         void health;
-        if (ko) pushKill(`${who(attacker)} ${footy ? 'pegged' : 'batted'} ${who(victim)}`);
+        // Three verbs, and the third is the whole of the community suggestion
+        // this pass implements: a ball that changed hands in the air and then
+        // knocked somebody over is a *returned serve*, which is the most
+        // interesting thing that can happen in a fight in this game and would
+        // otherwise be indistinguishable from an ordinary peg. The flag is a
+        // spare bit on a byte already on the wire -- see `EVENT_FLAG.RETURNED`.
+        if (ko) {
+          const verb = footy ? (returned ? 'returned serve on' : 'pegged') : 'batted';
+          pushKill(`${who(attacker)} ${verb} ${who(victim)}`);
+        }
+      },
+      /**
+       * A bat sent a football back, decided by the server. See `game/swat.ts`.
+       *
+       * The presentation is `swatFeedback`'s, shared with the offline path as
+       * `onHit` is. What is *not* shared is the second half of this handler, and
+       * it exists for one listener only: the player who threw the ball.
+       *
+       * A swat leaves the ball's `thrower` alone -- deliberately, see
+       * `footy.Footy.owner` -- so the thrower's own client is still flying a
+       * local predicted copy on the pre-swat trajectory and there is nothing in
+       * the snapshot stream that could tell it otherwise, because
+       * `net/client.ownBall` filters its own throws out of that stream on
+       * purpose. So the correction happens here, from the six numbers the event
+       * carries.
+       *
+       * Matched by **proximity rather than by id**, and that is not laziness:
+       * local ball ids come from this client's own `FootyField` counter and
+       * server ball ids from the server's, so the two number spaces have never
+       * had anything to do with each other. What they do share is a position --
+       * both processes have been flying the same throw from the same spawn state
+       * through the same arithmetic -- so the local copy nearest the swat point
+       * is the swatted one, and `SWAT_MATCH_M` is the slack that allows for the
+       * half a round trip this event spent in the air.
+       */
+      onSwat(swinger, ball, x, y, z, vx, vy, vz) {
+        swatFeedback(net !== null && swinger === net.id, x, y, z);
+        void ball;
+        let nearest: Footy | null = null;
+        let best = SWAT_MATCH_M * SWAT_MATCH_M;
+        for (const b of localBalls.balls) {
+          const d =
+            (b.x - x) * (b.x - x) + (b.y - y) * (b.y - y) + (b.z - z) * (b.z - z);
+          if (d >= best) continue;
+          nearest = b;
+          best = d;
+        }
+        // Nothing near enough is the ordinary case and not an error: almost
+        // every swat in a room is two other people, and this client has no local
+        // copy of a ball it did not throw.
+        if (nearest === null) return;
+        nearest.x = x;
+        nearest.y = y;
+        nearest.z = z;
+        nearest.vx = vx;
+        nearest.vy = vy;
+        nearest.vz = vz;
+        // And it is not yours any more. The local copy has to agree about that
+        // or this client would predict its own ball passing harmlessly through
+        // the person who swatted it and knocking over the player it is now
+        // heading for -- neither of which it is allowed to decide online, but
+        // both of which it draws.
+        nearest.owner = swinger;
       },
       onBounce(x, y, z, bounces) {
         const range = Math.hypot(x - player.position.x, z - player.position.z);
@@ -5288,6 +5966,23 @@ async function main(): Promise<void> {
       },
       onSuggestAck(result, issue, message) {
         suggestions.ack(result, issue, message);
+      },
+      /*
+       * The sun's two instants, straight into the one object that owns them.
+       *
+       * Arrives at join, whenever anybody in the room presses the button, and as
+       * the answer to this client's own press -- accepted or refused. `adopt`
+       * replaces rather than merges and narrates only what is news; see
+       * `world/sunbutton.SunFeature.adopt`. The position is passed so the notice
+       * can say "somebody pressed the button" to people who can see the hill and
+       * "the sun has started screaming" to everybody else.
+       */
+      onSun(state) {
+        sunButton.adopt(state, player.position.x, player.position.z);
+      },
+      /** "+$34 fare". The pill, and the phone's wallet history. */
+      onMoney(note, balance) {
+        money.onMoney(note, balance);
       },
     };
   }
@@ -5411,6 +6106,37 @@ async function main(): Promise<void> {
    * for the same reasons -- no train, doors shut, standing too far from the door.
    */
   const pressMount = (): void => {
+    /* --- The button in Sydney Park, **ahead of everything**, and it is the one
+     *     addition to this chain that does not need to be in `sim.resolveMount`.
+     *
+     *     First because it is the narrowest: `SunFeature.press` refuses -- and
+     *     returns false, letting the rest of the chain run -- unless the player
+     *     is inside three metres of one specific point in one park. Nothing else
+     *     on this key can be true there at the same time, because a bike parked
+     *     on top of the mound would be a bike the plinth is standing in.
+     *
+     *     It returns true when the press was *consumed* rather than accepted, so
+     *     that pressing a recharging button puts up the refusal instead of
+     *     silently mounting a bike two metres away -- which is the one way this
+     *     could have made the `E` key worse.
+     *
+     *     `net?.pressSun()` rather than a bit on `INPUT`: see
+     *     `protocol.MSG.SUN_PRESS` for why this is not folded into the mount
+     *     chain on the wire either. Offline `net` is null, the send is skipped,
+     *     and the state `press` wrote locally is the only state there is -- which
+     *     is exactly the offline stub sim's contract everywhere else in this
+     *     file. */
+    if (
+      sunButton.press(
+        player.position.x,
+        player.position.y - EYE_HEIGHT,
+        player.position.z,
+        net ? () => void net.pressSun() : null,
+      )
+    ) {
+      return;
+    }
+
     const field = bikeWorld();
     // --- The train, ahead of the bike, on one key. `sim.resolveMount` runs the
     //     identical chain in the identical order, which is what makes this a
@@ -5442,14 +6168,102 @@ async function main(): Promise<void> {
       // pill is derived at the top of this function now, so getting off with
       // `E` clears it for the same reason getting knocked off does: the
       // question is asked again and the answer is different.
+    } else if (playerCombat.drivingCar !== 0) {
+      // Out of the car, and the record stays where the body is -- offline
+      // `CarField.follow` does it at the end of this tick, online the server
+      // does and the mirror is corrected. `sim.resolveMount` runs the identical
+      // branch in the identical position, which is what makes this a prediction
+      // rather than a second opinion.
+      const wasDriving = playerCombat.drivingCar;
+      playerCombat.drivingCar = 0;
+      playerCombat.carSpeed = 0;
+      // And the record stops being anybody's. Offline this is the whole of the
+      // release -- see `CarField.leave` for why the sweep cannot do it there --
+      // and online it is a prediction the next `MSG.CARS` confirms.
+      carWorld().leave(wasDriving);
+      net?.predictedCarChange();
     } else if (!predictBoard()) {
       const bike = field.nearestFree(player.position.x, player.position.y - EYE_HEIGHT, player.position.z);
       if (bike && field.claim(bike.id, playerCombat.id)) {
         playerCombat.ridingBike = bike.id;
         net?.predictedBikeChange();
         audio.pickupFlatWhite();
+      } else {
+        predictTakeCar();
       }
     }
+  };
+
+  /**
+   * Predict getting into a car. The bottom of `E`'s priority chain.
+   *
+   * `sim.tryTakeCar` is the authority and runs the identical two steps in the
+   * identical order -- an empty record standing in the street first, then a car
+   * off the timetable -- against the identical `TrafficField` at the identical
+   * whole tick. What this buys is the frame: the chase camera and the speed
+   * change on the frame `E` goes down rather than a round trip later, and
+   * `net.predictedCarChange` is what stops the snapshots already in flight from
+   * undoing it.
+   *
+   * Offline this **is** the authority, which is what makes `?offline` a real
+   * test of the feature rather than a second implementation of it.
+   */
+  const predictTakeCar = (): void => {
+    const cars = carWorld();
+    const feet = player.position.y - EYE_HEIGHT;
+    // Somebody's abandoned getaway car, or the one you parked. No crime: the
+    // theft happened when it came off the timetable and was reported then.
+    let best: ReturnType<CarField['get']> | null = null;
+    let bestD2 = TAKE_RADIUS * TAKE_RADIUS;
+    for (const car of cars.all()) {
+      if (car.driverId !== 0) continue;
+      const dy = car.y - feet;
+      if (dy > TAKE_HEIGHT || dy < -TAKE_HEIGHT) continue;
+      const dx = car.x - player.position.x;
+      const dz = car.z - player.position.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > bestD2 || (best !== null && d2 >= bestD2)) continue;
+      best = car;
+      bestD2 = d2;
+    }
+    if (best) {
+      best.driverId = playerCombat.id;
+      playerCombat.drivingCar = best.id;
+      playerCombat.carSpeed = 0;
+      player.yaw = best.yaw;
+      net?.predictedCarChange();
+      audio.pickupFlatWhite();
+      return;
+    }
+    // Or one off the timetable, which is the theft. **No crime is predicted**:
+    // unlike the tuned ride-by twenty screens down, whether anybody saw it
+    // depends on the crowd's line of sight, and a banner that appeared and then
+    // vanished when the server disagreed would be worse than one 50 ms late.
+    if (
+      !resolveTake(
+        traffic,
+        player.position.x,
+        feet,
+        player.position.z,
+        trafficTick(Date.now()),
+        takeScratch.routes,
+        takeScratch.pose,
+        (identity) => cars.suppressed(identity),
+        takeScratch.take,
+      )
+    ) {
+      return;
+    }
+    const taken = cars.take(takeScratch.take, playerCombat.id);
+    if (taken === null) return;
+    playerCombat.drivingCar = taken.id;
+    playerCombat.carSpeed = 0;
+    // Point the driver down the street rather than at whatever shopfront they
+    // happened to be facing. A look direction is client-authoritative on this
+    // wire, so this needs nobody's permission -- see `driving.headingYaw`.
+    player.yaw = taken.yaw;
+    net?.predictedCarChange();
+    audio.pickupFlatWhite();
   };
 
   /**
@@ -5873,10 +6687,19 @@ async function main(): Promise<void> {
     // nudge is legible; a no-op with no nudge is a bug. So the buffer is *held*
     // rather than dropped, and the swing comes out on the frame you get off,
     // which is what a player who pressed it a moment early actually wanted.
-    const armed = playerCombat.ridingBike === 0;
+    // ...and while driving, on the identical argument one paragraph up: you are
+    // doing 22 m/s and you click. The horn is what a left click does instead --
+    // see `honkT` -- so unlike the bike this is a click with an *answer*, and
+    // the nudge is therefore skipped for a driver.
+    const armed = playerCombat.ridingBike === 0 && playerCombat.drivingCar === 0;
+    if (playerCombat.drivingCar !== 0 && punchBuffer > 0 && honkT <= 0) {
+      honkT = HONK_SECONDS;
+      audio.thwack(false);
+    }
+    honkT = Math.max(0, honkT - dt);
     input.punch = armed && punchBuffer > 0;
     input.throwBall = armed && throwBuffer > 0;
-    if (!armed && (punchBuffer > 0 || throwBuffer > 0) && rideNudgeT <= 0) {
+    if (playerCombat.ridingBike !== 0 && (punchBuffer > 0 || throwBuffer > 0) && rideNudgeT <= 0) {
       rideNudgeT = RIDE_NUDGE_SECONDS;
       rideNudgeText = RIDE_PROMPT;
     }
@@ -5943,8 +6766,53 @@ async function main(): Promise<void> {
       }
     }
     if (isAboard(playerCombat.aboard) || playerCombat.phase === 'ko' || !railBake) doorMarker.hide();
+    // The sun button's line shares this one channel and takes precedence over
+    // both, on the same "asked what is true, every tick" contract and for the
+    // same reason `pressMount` puts it first: it is only ever non-empty inside
+    // 2.5 m of one point in Sydney Park, where nothing else on this key can be
+    // offering anything. See `world/sunbutton.SunFeature.prompt`.
+    // --- Is there a car within reach? Asked every frame and stored nowhere,
+    //     which is `bikes.ridePrompt`'s rule: a prompt that is *set* has to be
+    //     *cleared*, and every state that ends without pressing a key strands
+    //     it. `takePrompt` is a pure function of what is true now.
+    //
+    // The lookup runs only when the player is on foot and could actually take
+    // something, so the cost outside that -- which is nearly all of the time --
+    // is three comparisons.
+    takeableNear = false;
+    if (playerCombat.drivingCar === 0 && playerCombat.ridingBike === 0 && playerCombat.phase !== 'ko') {
+      const cars = carWorld();
+      const feet = player.position.y - EYE_HEIGHT;
+      for (const car of cars.all()) {
+        if (car.driverId !== 0) continue;
+        const dy = car.y - feet;
+        if (dy > TAKE_HEIGHT || dy < -TAKE_HEIGHT) continue;
+        const dx = car.x - player.position.x;
+        const dz = car.z - player.position.z;
+        if (dx * dx + dz * dz <= TAKE_RADIUS * TAKE_RADIUS) {
+          takeableNear = true;
+          break;
+        }
+      }
+      if (!takeableNear) {
+        takeableNear = resolveTake(
+          traffic,
+          player.position.x,
+          feet,
+          player.position.z,
+          trafficTick(Date.now()),
+          takeScratch.routes,
+          takeScratch.pose,
+          (identity) => cars.suppressed(identity),
+          takeScratch.take,
+        );
+      }
+    }
     hud.derived(
-      trainPill || ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText),
+      sunButton.prompt(player.position.x, player.position.z) ||
+        trainPill ||
+        ridePrompt(playerCombat, playerCombat.phase, rideNudgeT, rideNudgeText) ||
+        takePrompt(takeableNear, playerCombat.drivingCar !== 0, playerCombat.phase),
     );
 
     // Reconciliation, at the top of the tick and before anything is advanced.
@@ -6141,7 +7009,7 @@ async function main(): Promise<void> {
           // `game/wildlife.ts` section 3, and `server/sim.hitNpc`, which reaches
           // the identical answer through `reportWildlifeCrime`.
           const wild = isProtected(hit.kind);
-          const crime = hit.kind === NPC_KIND.POLICE
+          let crime = hit.kind === NPC_KIND.POLICE
             ? REASON.ASSAULT_POLICE
             : wild
               ? REASON.WILDLIFE
@@ -6149,9 +7017,41 @@ async function main(): Promise<void> {
           if (!online) {
             const strike = strikeNpc(factions, hit, 1, playerName, playerCombat.id, tick);
             if (strike.landed) audio.thwack(strike.down);
+            // **The swing and the result are two different charges.** Hitting a
+            // constable is a 2-star response and putting one on the ground is a
+            // 3-star one, which is not a distinction one reason code can carry
+            // -- see `game/heat.CRIME_POINTS`. Offline only, because online the
+            // server has already re-run the strike against its own actors and
+            // has already made this call in `sim.hitNpc`; this client's copy is
+            // a *prediction* and it does not know whether its swing landed on
+            // the authority's actor at all.
+            if (hit.kind === NPC_KIND.POLICE && strike.down) crime = REASON.MURDER_POLICE;
           }
           if (hit.kind === NPC_KIND.POLICE || wild) predictInvestigation(crime);
           else if (crime !== REASON.NONE) accuse(hit.x, hit.z, crime, tick);
+          // --- Workstream E's two consequences of a landed swing.
+          //
+          // **The tradie decks you back.** Offline this is the whole of it;
+          // online `server/sim.hitNpc` has already made the same call against
+          // its own actor and this one is a no-op on a mirror the next snapshot
+          // overwrites. It is called unconditionally because it is a no-op for
+          // every kind but one -- no `switch` at a call site.
+          characterStruck(hit, playerCombat.id);
+          // **And the influencer posts it.**
+          //
+          // A HUD notice rather than anything on the wire, and the reason is
+          // `pushKill`'s a few hundred lines up, stated there in full: the
+          // snapshot carries no cause for an NPC going down, and inventing a
+          // cause byte for a line of text would be a protocol change for a
+          // joke. So the line names *you* on your own screen -- you are the one
+          // process that knows you did it -- and reads impersonally to anybody
+          // else inside `POSTED_RANGE` who watched an influencer hit the
+          // footpath. That is a real limitation against the brief, which asked
+          // for a notice naming you to everybody within a hundred metres, and it
+          // is the honest half of it rather than a protocol bump.
+          if (hit.kind === NPC_KIND.INFLUENCER) {
+            hud.notice(feedLine(POSTED_LINE, 'you'));
+          }
         }
       }
 
@@ -6202,6 +7102,37 @@ async function main(): Promise<void> {
     // Online this is skipped entirely: `net.bikes` is a mirror the server
     // corrects, and sweeping it here would be this client inventing state that
     // the next `MSG.BIKES` would contradict.
+    // --- The cars, offline, on the bikes' own terms one block down.
+    //
+    // `server/sim.stepCars` runs the identical sweep in the identical place. The
+    // whole of what it does here is carry an occupied car to its driver and
+    // leave any whose driver has stopped driving standing in the road -- which
+    // offline is what drops the car when the player is batted out of it,
+    // knocked out, or respawns. Online it is skipped: `net.cars` is a mirror the
+    // server corrects, and sweeping it here would be this client inventing state
+    // the next `MSG.CARS` would contradict.
+    //
+    // The knockdown and the five-minute expiry are deliberately *not* predicted.
+    // Both are consequences with a name attached -- a crime reported, a record
+    // deleted -- and a client that guessed either would be a client that undid
+    // its guess when the server disagreed.
+    if (!online && localCars.size > 0) {
+      driverViews.length = 0;
+      for (const f of fighters) {
+        const c = f.combat;
+        driverViews.push({
+          id: c.id,
+          drivingCar: c.drivingCar,
+          carSpeed: c.carSpeed,
+          x: c.body.position.x,
+          feetY: c.body.position.y - EYE_HEIGHT,
+          z: c.body.position.z,
+          yaw: c.body.yaw,
+        });
+      }
+      localCars.follow(driverViews);
+    }
+
     if (!online) {
       riderViews.length = 0;
       for (const f of fighters) {
@@ -6215,6 +7146,64 @@ async function main(): Promise<void> {
         });
       }
       localBikes.follow(riderViews, bikeSweep);
+    }
+
+    // --- The console's staged serve, if one was asked for. See `sydney.serve`.
+    // Ahead of the swat sweep below, so a ball whose countdown expires on this
+    // tick is in the air in time for the blade that was aimed at it.
+    if (pendingServe !== null) {
+      pendingServe.t -= dt;
+      if (pendingServe.t <= 0) {
+        const c = pendingServe.combat;
+        // Aimed **here**, on the tick the ball actually leaves the hand, and not
+        // when `serve()` was typed. A dummy's yaw is written by its own input
+        // through `controller.step` on every one of the ticks in between, so a
+        // heading set at request time is gone by the next one -- and the ball
+        // sails off down the street at whatever the walk cycle was thinking
+        // about. This block runs *after* the fighters' `advance` loop above, so
+        // what it writes survives to `spawnFooty` and is overwritten again next
+        // tick, which is exactly the window it needs.
+        c.body.yaw = Math.atan2(
+          -(player.position.x - c.body.position.x),
+          -(player.position.z - c.body.position.z),
+        );
+        c.body.pitch = 0;
+        localBalls.add(c);
+        pendingServe = null;
+      }
+    }
+
+    // --- F: every bat that is mid-swing, against every ball in the air.
+    //
+    // `server/sim.ts` runs the identical sweep in the identical place -- before
+    // the ball step, so the deflected velocity is what the very next line
+    // integrates and the ball turns round on the tick the blade reached it
+    // rather than 16 ms and 0.7 m later.
+    //
+    // **Offline only**, on exactly the argument the swing's own `!online` guard
+    // makes above: online the server decides who was hit and this client would
+    // be adjudicating against remote balls it draws 100 ms in the past. What
+    // arrives instead is `EVENT.SWAT`, which carries the corrected ball state --
+    // see `netHandlers().onSwat`. Nothing about the *feel* is lost by that,
+    // because the bat's own hit sound is already server-driven online for the
+    // same reason.
+    //
+    // `back` is zero here: offline this client is the authority and its own
+    // screen is the simulation, so there is no view lag to compensate for.
+    if (!online) {
+      for (const f of fighters) {
+        // Spec 9's dummies do not swat, which is `server/sim.ts`'s rule about
+        // its bots on this side of the wire: neither has any model of a ball in
+        // the air, so every swat one landed would be a swing thrown for some
+        // other reason that happened to catch -- a coin flip wearing a skill
+        // mechanic, which is exactly what the suggestion this implements is
+        // about. Keeping the two paths agreed also keeps the offline stub a
+        // real test of the online one rather than a livelier version of it.
+        if (f.dummy) continue;
+        const ball = swatBalls(f.combat, localBalls.balls, dt, 0, swatScratch);
+        if (ball === null) continue;
+        swatFeedback(f.combat === playerCombat, ball.x, ball.y, ball.z);
+      }
     }
 
     // --- Every football in the air, after every combatant has moved.
@@ -6240,9 +7229,24 @@ async function main(): Promise<void> {
       } else if (e.kind === 'hit' && e.victim) {
         // Offline only, by construction: `targets` is empty when a server is
         // deciding, so this branch cannot fire online.
-        applyFootyHit(fighterOf(e.ball.thrower)?.combat ?? playerCombat, e.victim, e.ball, ballReport);
+        //
+        // The **owner**, not the thrower: a ball somebody batted back belongs to
+        // whoever returned it, so it is their pip and their knockout. For every
+        // ball nobody swatted the two are the same fighter. See
+        // `footy.Footy.owner`; `server/sim.ts` reads the same field in the same
+        // place.
+        applyFootyHit(fighterOf(e.ball.owner)?.combat ?? playerCombat, e.victim, e.ball, ballReport);
         audio.footyHit(ballReport.ko);
         onFootyHit(ballReport);
+        // "%s returned serve on %s" -- the line the whole feature is for.
+        // Offline the feed is written here, where online `netHandlers().onHit`
+        // writes it off `EVENT_FLAG.RETURNED`. `who` offline has no roster to
+        // consult, so the local player is named directly, exactly as the
+        // run-over line below this does it.
+        if (ballReport.ko && e.ball.owner !== e.ball.thrower) {
+          const name = (id: number): string => (id === playerCombat.id ? 'you' : who(id));
+          pushKill(`${name(ballReport.attacker)} returned serve on ${name(ballReport.victim)}`);
+        }
       }
     }
 
@@ -6326,6 +7330,20 @@ async function main(): Promise<void> {
         // cap is reached -- see `WILDLIFE_BUDGET` -- so a park full of turkeys
         // can never be the reason an officer could not be dispatched.
         stepWildlife(ctx, wildScratch, wildPose);
+        // And the heat ladder, **after** the factions rather than before: the
+        // crimes reported during the last tick are drained by
+        // `FactionField.step`, which is what calls `accuse`, which is what feeds
+        // the ladder. Running it first would put every crime a tick late and
+        // would make a 3-star escalation arrive after the officers it brings.
+        // `server/sim.stepFactions` puts it in exactly the same place.
+        stepHeat(ctx, heat, heatWorld);
+        // And workstream E's, in the same place and for the same reason.
+        // `sweepEvents` runs first so that an event which ended this tick frees
+        // its promoted slot before `stepEvents` tries to spend it; see
+        // `server/sim.stepFactions`, which states the same ordering.
+        sweepEvents(ctx);
+        stepCharacters(ctx);
+        stepEvents(ctx);
         // Drained **here** rather than in the frame loop, because `step` clears
         // the list at the top of every call and `simulate` can run more than
         // once per frame when the accumulator has caught up on a stall. A bark
@@ -6368,7 +7386,12 @@ async function main(): Promise<void> {
         // prediction rather than a second opinion -- see its comment for the
         // argument.
         if (isAboard(f.combat.aboard)) continue;
-        const car = carHitting(traffic, f.combat, tick, carRoutes, carPose);
+        // The suppression predicate, and without it the first thing that happens
+        // after you steal a car is that its ambient copy runs you over from
+        // inside the seat you are sitting in. `server/sim.ts` passes the
+        // identical one at the identical point, which is what keeps this a
+        // prediction rather than a second opinion.
+        const car = carHitting(traffic, f.combat, tick, carRoutes, carPose, drivenCars.suppress);
         if (car === null) continue;
         const ko = applyCarHit(f.combat, car);
         carHits.count++;
@@ -6631,6 +7654,23 @@ async function main(): Promise<void> {
     );
     input.right = rideSteering.right;
     input.yaw += rideSteering.yawDelta;
+    // And the wheel, on the bars' own terms exactly -- see the paragraph above,
+    // which is the whole argument for why steering is an input remap and not a
+    // second integrator. `shapeDriveSteering` leaves a walker and a cyclist
+    // alone, so this composes rather than competing. The car's *signed* speed
+    // is passed, not the body's ground speed, because reversing has to invert
+    // the wheel and a plan speed has no sign.
+    shapeDriveSteering(
+      playerCombat,
+      (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0),
+      playerCombat.carSpeed,
+      frameDt,
+      driveSteering,
+    );
+    if (playerCombat.drivingCar !== 0) {
+      input.right = driveSteering.right;
+      input.yaw += driveSteering.yawDelta;
+    }
 
     const turn = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0);
     const look = (keys.has('ArrowDown') ? 1 : 0) - (keys.has('ArrowUp') ? 1 : 0);
@@ -6741,7 +7781,19 @@ async function main(): Promise<void> {
     // one `Math.max` and is called every frame rather than on the mount event,
     // because a ride can end for reasons no event fires for. See
     // `game/camera.ts`.
-    const chosenDistance = liveCameraDistance(cameraDistance, playerCombat.ridingBike !== 0);
+    let chosenDistance = liveCameraDistance(cameraDistance, playerCombat.ridingBike !== 0);
+    // --- And a car, which is a bigger thing to look at than a bicycle.
+    //
+    // A **floor and never a ceiling**, exactly as `liveCameraDistance` treats the
+    // ride: a driver who has asked for 12.8 m keeps 12.8, a driver in first
+    // person gets 7 m for the duration, and their own choice comes back the
+    // moment they get out. Nothing here writes the preference, which is the
+    // property that makes "comes back" true for free -- see `game/camera.ts`.
+    //
+    // Applied here rather than by widening `liveCameraDistance` because
+    // `game/camera.ts` is a file five other workstreams are also editing this
+    // week, and a `Math.max` at the one call site says the same thing.
+    if (playerCombat.drivingCar !== 0) chosenDistance = Math.max(chosenDistance, DRIVE_CAM_DISTANCE);
     // --- Aboard a train the view is **first person**, and this is the call the
     //     riding round makes after having looked at both alternatives on screen.
     //
@@ -6821,6 +7873,19 @@ async function main(): Promise<void> {
       // `chaseDistance` is where the camera *is* and this is what it is trying to
       // get back to, so backing into a terrace and stepping out again returns you
       // to the boom you chose rather than to wherever the wall left you.
+      // How high over the eye the boom sits. Three cases now, and the third is
+      // the car: 2.5 m rather than the walker's 1.5, because a car is 4.6 m long
+      // and a boom at head height looks along its roof rather than down at it.
+      // One `const` rather than the two copies of a ternary this was, because
+      // the occlusion march and the placement below have to agree about where
+      // the camera is going -- a march at one height and a placement at another
+      // is a camera that ducks for walls it is nowhere near.
+      const chaseLift =
+        rideAboardForCamera !== null
+          ? RIDE_CHASE_LIFT
+          : playerCombat.drivingCar !== 0
+            ? DRIVE_CAM_LIFT
+            : CHASE_LIFT;
       const speed = Math.hypot(player.velocity.x, player.velocity.z);
       const want = Math.min(
         CAMERA_MAX,
@@ -6848,7 +7913,7 @@ async function main(): Promise<void> {
       const blockedAt = (d: number): boolean => {
         const px = headX - dirX * d;
         const pz = headZ - dirZ * d;
-        const py = headY - dirY * d + (rideAboardForCamera !== null ? RIDE_CHASE_LIFT : CHASE_LIFT);
+        const py = headY - dirY * d + chaseLift;
         // --- Aboard, the carriage is the only thing in the way, and it is the
         //     only thing that must be.
         //
@@ -6895,9 +7960,24 @@ async function main(): Promise<void> {
       // silently turns reconciliation off in third person, and the symptom is
       // remote-looking rubber-banding that only happens on a bike.
       camera.position.x -= dirX * chaseDistance;
-      camera.position.y +=
-        (rideAboardForCamera !== null ? RIDE_CHASE_LIFT : CHASE_LIFT) - dirY * chaseDistance;
+      camera.position.y += chaseLift - dirY * chaseDistance;
       camera.position.z -= dirZ * chaseDistance;
+      // --- The lean, and it is on the **camera** rather than on the car's body.
+      //
+      // `world/drivencars.DRIVE_CAM_ROLL` carries the whole argument for why:
+      // the box fleet composes every car's matrix from a two-component heading
+      // with no third axis in it, deliberately, and adding one for the two cars
+      // a room has stolen would fork the draw path for exactly the cars that
+      // most need to look like traffic.
+      //
+      // Added to `rotation.z` after `applyToCamera` has set the yaw and pitch,
+      // and taken back out again by the same line next frame because
+      // `applyToCamera` assigns rather than accumulates. `feedback.applyToCamera`
+      // below is the same seam and the same order.
+      if (playerCombat.drivingCar !== 0) {
+        camera.rotation.z += drivenCars.camRoll;
+        camera.position.y -= drivenCars.camDip * chaseDistance;
+      }
     } else {
       // Reset, so stepping back into third person starts at the near distance
       // and eases out rather than appearing at full extension.
@@ -6907,6 +7987,14 @@ async function main(): Promise<void> {
     feedback.setCaffeinated(playerCombat.flatWhiteT > 0);
     feedback.update(frameDt);
     feedback.applyToCamera(camera);
+
+    // --- F: the contact puffs, on the frame delta rather than the fixed step.
+    // `main.ts`'s standing rule about presentation, and `swatpuff.ts` restates
+    // it: the simulation is fixed so prediction and rewind agree, and a quarter
+    // of a second of fade has to be smooth at whatever rate the display runs.
+    // Costs a length check on an empty array in every frame but the few after a
+    // swat.
+    swatPuffs.update(frameDt);
 
     // Spec 8.3's chips, longest-lived first so the one about to expire is not
     // the one that moves. Built here rather than in `hud.ts` because which
@@ -6936,6 +8024,12 @@ async function main(): Promise<void> {
           seconds: 0,
         });
       }
+    }
+    // The speedo, first in the list because while you are driving it is the one
+    // number on the HUD that changes every frame. A chip with no countdown draws
+    // as a bare label -- see `hud.vitals` -- which is what a speed readout is.
+    if (playerCombat.drivingCar !== 0) {
+      powerupChips.unshift({ name: `DRIVING · ${speedText(playerCombat.carSpeed)}`, seconds: 0 });
     }
     if (playerCombat.ridingBike !== 0) {
       powerupChips.push({
@@ -7024,6 +8118,10 @@ async function main(): Promise<void> {
     invisibleWalls.update(frameDt, player.position.x, player.position.z);
 
     minimap.update(frameDt, player.position.x, player.position.z, player.yaw);
+    // The balance, the piles of cash, the handset and the two prompts. One
+    // call, on `minimap.update`'s own terms: presentation, at the frame rate,
+    // reading state nothing here owns. See `client/src/money.ts`.
+    money.frame(frameDt);
 
     // And the big map, which costs one comparison on every frame it is closed --
     // which is nearly all of them. Same position and yaw as the disc above, and
@@ -7157,6 +8255,19 @@ async function main(): Promise<void> {
     // and animated here at the frame rate, which is the split every other
     // overlay in this file makes.
     doorMarker.update(frameDt);
+    // The button on the hill and the face in the sky, at the frame rate for the
+    // same reason: the plinth's ring breathes and the sun's jaw moves, and both
+    // are cosmetic. `sky.solar` is handed over rather than recomputed, on
+    // `MoonDisc.update`'s argument -- a face built from a second reading of the
+    // clock would sit beside the sun rather than on it.
+    sunButton.update(
+      frameDt,
+      camera,
+      sky.solar.direction,
+      sky.solar.altitude,
+      player.position.x,
+      player.position.z,
+    );
 
     // The night rig, after the streamer -- so a tile that arrived this frame
     // already has its luminaires in the set the four real lights are picked from
@@ -7256,6 +8367,20 @@ async function main(): Promise<void> {
         player.position.z,
       );
     }
+
+    // The brake lamps and the camera's lean, before the movers so the lamps are
+    // filled in the same frame the bodies they hang off are placed. `steer` is
+    // the wheel as a fraction of full lock, taken from the yaw the input builder
+    // produced this frame -- `RIDE_TURN_RATE` is the bike's own normaliser and is
+    // the right order of magnitude for a car's, which is all a cosmetic lean
+    // needs. See `world/drivencars.DrivenCarView.update`.
+    drivenCars.update(
+      nightLights.carLights,
+      playerCombat.drivingCar,
+      playerCombat.carSpeed,
+      frameDt > 1e-5 ? driveSteering.yawDelta / frameDt / RIDE_TURN_RATE : 0,
+      frameDt,
+    );
 
     trafficMovers.update(
       traffic,
@@ -7428,6 +8553,61 @@ async function main(): Promise<void> {
       wildGround,
     );
 
+    // --- Workstream E: the five characters, both tiers, out of the same
+    // authority and on the same fractional tick as everybody above.
+    characterCrowd.update(
+      pedestrians,
+      policeField(),
+      trafficTick(Date.now()) + accumulator / FIXED_DT,
+      frameDt,
+      player.position.x,
+      player.position.z,
+    );
+    // Whatever the nearest one of them is saying. `hud.notice` rather than
+    // audio, because there is no audio for these five and handing an eshay the
+    // drunk's recording would be worse than silence -- see `game/characters.ts`
+    // section 4. The crowd clears its own queue at the top of every update, so a
+    // frame that skipped this drops lines rather than accumulating them.
+    for (const line of characterCrowd.lines) hud.notice(line.text);
+
+    // --- And the ambient events. `wildGround` rather than `groundHeightAt`:
+    // this wants the *raw* terrain height, because a queue of twenty-five
+    // commuters placed against the player's last known ground would float
+    // whenever the player was on a station platform. The wildlife's ground query
+    // already makes exactly this distinction and its header argues it.
+    eventScene.update(
+      trafficTick(Date.now()) + accumulator / FIXED_DT,
+      player.position.x,
+      player.position.z,
+      wildGround,
+      // The footpaths, so a site is snapped onto a kerb rather than drawn where
+      // the hash put it -- which the first cut of this feature demonstrated was
+      // sometimes the roof of a terrace. See `events.SNAP_REACH`.
+      pedestrians,
+    );
+
+    // --- Standing in a queue for a bus that is not coming.
+    //
+    // The clock is here rather than in `world/events.ts` because a clock is
+    // state and that object is a renderer -- `inTrackworkQueue` is a predicate
+    // and this is the twenty seconds. Reset on leaving, and told once: the line
+    // lands the first time and never again for the same queue, because the
+    // second time it is not deadpan, it is nagging.
+    {
+      const queue = inTrackworkQueue(eventScene.live, player.position.x, player.position.z);
+      if (queue === null) {
+        queueSince = -1;
+        queueTold = false;
+      } else {
+        const nowS = performance.now() / 1000;
+        if (queueSince < 0) queueSince = nowS;
+        else if (!queueTold && nowS - queueSince >= 20) {
+          queueTold = true;
+          hud.notice('the bus is not coming');
+        }
+      }
+    }
+
     // --- What a shot sounds and looks like.
     //
     // Read off the state byte rather than off an event, which is the whole
@@ -7470,6 +8650,44 @@ async function main(): Promise<void> {
         firing.delete(actor.id);
       }
     }
+
+    // --- Workstream E, off the same state bytes and the same rising-edge rule.
+    //
+    // Two lines, and both of them are things you find out by *watching* rather
+    // than by doing:
+    //
+    //   - an **influencer going down** within `POSTED_RANGE`. The client that
+    //     swung already said the version with your name in it, at the swing;
+    //     this is what everybody else gets, and it is impersonal because the
+    //     snapshot carries no attacker for an NPC knockdown. See the swing path.
+    //   - a **tradie helping somebody up**, which he signals by entering
+    //     `NPC_STATE.IDLE` beside a downed player -- there is no state byte for
+    //     "helping" and adding one would be a protocol change for a line, so the
+    //     range test is the signal. It fires at most once per tradie per session
+    //     through the same `posted` set, which is what stops it repeating on
+    //     every frame he stands there.
+    for (const actor of policeField().actors) {
+      if (!isCharacterKind(actor.kind)) continue;
+      const range = Math.hypot(actor.x - player.position.x, actor.z - player.position.z);
+      if (actor.kind === NPC_KIND.INFLUENCER) {
+        const wasDown = posted.has(actor.id);
+        if (actor.state === NPC_STATE.DOWN) {
+          if (!wasDown) {
+            posted.add(actor.id);
+            if (range < POSTED_RANGE) hud.notice(POSTED_LINE_BYSTANDER);
+          }
+        } else if (wasDown) {
+          posted.delete(actor.id);
+        }
+      } else if (actor.kind === NPC_KIND.TRADIE) {
+        if (posted.has(actor.id)) continue;
+        if (playerCombat.phase !== 'ko') continue;
+        if (range > 5) continue;
+        posted.add(actor.id);
+        hud.notice(TRADIE_HELP_LINE);
+      }
+    }
+
     tracers.update(frameDt);
 
     // --- And what the birds sound like, off the same state bytes.
@@ -7600,6 +8818,60 @@ async function main(): Promise<void> {
       );
     }
 
+    // --- The heat ladder: the star row, the line, and everything it put in the
+    // world. One contiguous block; see `game/heat.ts` and `world/highway-patrol.ts`.
+    {
+      // One number from whichever authority is running, exactly as the banner
+      // above takes one record: online it is `MSG.HEAT`, offline it is this
+      // process's own field, and nothing below this line knows which.
+      const stars = net ? net.heatStars : heat.starsOf(playerCombat.id);
+      hud.heat(stars);
+      // The voice, on the **edge** rather than the level. A `hud.notice` fired
+      // off the star count itself would repeat sixty times a second for as long
+      // as the rung lasted, which is `sim.stepRideBy`'s own lesson about a state
+      // that has to be read as an event.
+      if (stars !== heatShown) {
+        const line = heatLine(heatShown, stars);
+        if (line) hud.notice(line);
+        heatShown = stars;
+      }
+      // The patrol cars and the RBTs, out of the same `policeField()` the squad
+      // draws officers from -- which is not a police-only accessor despite the
+      // name: it is "wherever the promoted actors are", and each renderer
+      // filters the kinds it draws itself.
+      patrolFleet.update(policeField(), frameDt, player.position.x, player.position.z);
+      // And Polair, which needs no actor at all: it is a light aimed at the
+      // wanted player and the only thing it reads is their star count. Five is
+      // the top rung; see `game/heat.ts` section 4.
+      polair.update(
+        frameDt,
+        stars >= HEAT_MAX,
+        player.position.x,
+        player.position.y,
+        player.position.z,
+        groundHeightAt(player.position.x, player.position.z, player.position.y),
+      );
+      // The siren and the rotor. One call a frame with whatever is out there,
+      // which is `audio.raveUpdate`'s arrangement: one place decides what is
+      // audible and there is no state anywhere else. The siren's distance is to
+      // the nearest patrol car that is actually chasing somebody -- a car parked
+      // at an RBT has its bar on and its siren off, which is what one of those
+      // looks like on a real arterial.
+      let nearestSiren = Infinity;
+      for (const a of policeField().actors) {
+        if (a.kind !== NPC_KIND.HIGHWAY_PATROL || a.state === NPC_STATE.DOWN) continue;
+        const dx = a.x - player.position.x;
+        const dz = a.z - player.position.z;
+        const d = Math.sqrt(dx * dx + dz * dz);
+        if (d < nearestSiren) nearestSiren = d;
+      }
+      audio.heatUpdate(
+        nearestSiren === Infinity && polair.intensity <= 0.01
+          ? null
+          : { sirenDistance: nearestSiren, rotor: polair.intensity },
+      );
+    }
+
     // Every actor -- three dummies and the player's own body -- on the frame
     // delta rather than the fixed step. Deliberate, and the opposite of the
     // choice `simulate` makes above: the simulation is fixed so that prediction
@@ -7721,7 +8993,11 @@ async function main(): Promise<void> {
       for (const r of net.remotes.values()) {
         const entry = remotes.get(r.id);
         if (!entry) continue;
-        if (r.riding && !r.fresh) {
+        // `FLAG.RIDING` is set for a driver too -- that is the contract, see
+        // `protocol.ENTER_FLAG.DRIVING` -- so the bike is drawn only for the
+        // remotes who are actually on one. Without this clause every driver in
+        // the room has a lime bike welded under their car.
+        if (r.riding && !r.fresh && !isDriving(r.id)) {
           if (!entry.bike) {
             entry.bike = new RiddenBike(bikes);
             scene.add(entry.bike.mesh);
@@ -7828,6 +9104,10 @@ async function main(): Promise<void> {
         plate.headY = plateHead.y;
         plate.headZ = plateHead.z;
         plate.down = r.anim === ANIM.KO;
+        // How wanted they are, under the name. A 4-star player is a visible
+        // target, which is the whole reason this is on other people's plates
+        // and not only on your own HUD. See `nameplates.starRow`.
+        plate.stars = net.heatOf(r.id);
         nameplates.add(plate, net.id);
       }
     } else {
@@ -7847,6 +9127,10 @@ async function main(): Promise<void> {
         plate.headY = plateHead.y;
         plate.headZ = plateHead.z;
         plate.down = f.combat.phase === 'ko';
+        // A training dummy has no standing with the police, and saying so
+        // explicitly rather than leaving the field from the last plate is the
+        // whole reason `PlateInput` is copied field by field -- see `add`.
+        plate.stars = heat.starsOf(f.combat.id);
         nameplates.add(plate, playerCombat.id);
       }
     }
@@ -8080,6 +9364,64 @@ async function main(): Promise<void> {
     player,
     globals,
     frameMs: () => medianFrameMs(),
+
+    /**
+     * The heat ladder, for the console. One contiguous block; see `game/heat.ts`.
+     *
+     * `sydney.heat.report()` answers the three questions this feature raises
+     * from outside a session, and none of them can be answered by looking:
+     *
+     *   - `stars` and `points` are the ladder itself. The **points are hidden
+     *     from the player on purpose** -- the whole design is that you read your
+     *     standing off five glyphs -- so this is the only place the number a
+     *     rung is actually made of can be seen, and it is the first thing to
+     *     type when a tier arrives earlier or later than it should.
+     *   - `cars` and `rbts` are what the ladder has actually put on the road,
+     *     against what the star count says should be there. A 3-star player with
+     *     `cars: 0` is the shared actor cap biting (`factions.MAX_ACTORS`) or a
+     *     suspect off the lane graph -- two completely different problems that
+     *     look identical from inside the game, which is no patrol car arriving.
+     *   - `polair` is the beam's level, which by day is the only way to tell the
+     *     fifth rung from the fourth without listening for the rotor.
+     *
+     * `set(n)` is `?heat=N` after the fact and carries the same offline gate,
+     * for the same reason: `HeatField` is the class the server runs, and a
+     * client setting its own star count is a client deciding how wanted it is.
+     */
+    heat: {
+      report: () => ({
+        stars: net ? net.heatStars : heat.starsOf(playerCombat.id),
+        points: Math.round(heat.pointsOf(playerCombat.id)),
+        wanted: heat.wantedCount,
+        cars: patrolFleet.cars,
+        rbts: patrolFleet.rbts,
+        spawnedCars: heat.patrolCarsSpawned,
+        placedRbts: heat.rbtsPlaced,
+        // What the shared cap is currently holding, across every faction. The
+        // number to read when a rung's furniture does not arrive: at
+        // `factions.MAX_ACTORS` a promotion is refused unless it can evict
+        // something, and "the field was full of seagulls" and "the ladder is
+        // broken" look identical from inside the game.
+        actors: factions.actors.length,
+        polair: Math.round(polair.intensity * 100) / 100,
+      }),
+      set: (n: number) => {
+        if (online) return 'offline only — the server decides how wanted you are';
+        heat.debugSet(playerCombat.id, n, trafficTick(Date.now()));
+        return heat.starsOf(playerCombat.id);
+      },
+    },
+    /**
+     * One presented frame as a PNG data URL. `await sydney.grab()`.
+     *
+     * The bug box's own grabber, exposed. `toDataURL` on a WebGPU canvas is
+     * blank unless it is read in the same frame as a render -- *silently* blank,
+     * a valid PNG of nothing -- so there is exactly one place in this client
+     * that can take a picture, and it is already wired into the render loop.
+     * A second one would be a second way to get an empty file. See
+     * `bugreport.FrameGrabber`.
+     */
+    grab: (timeoutMs?: number) => grabber.request(timeoutMs),
 
     /**
      * The night rig, for the console.
@@ -8565,6 +9907,84 @@ async function main(): Promise<void> {
     },
 
     /**
+     * Taking a car, from a console.
+     *
+     * `sydney.trafficReport().standBesideParked` is the precedent and this is
+     * the same idea one step further on: that one hands back a coordinate beside
+     * a parked schedule car, and `find` here searches a *wide* radius for one
+     * that is actually **takeable** -- stopped or under `TAKEABLE_SPEED`, and not
+     * already somebody's -- which is a different question and the one that
+     * matters. The manual test for this whole feature is two lines:
+     *
+     *     sydney.cars.find()      the nearest car you could get into, and where
+     *     sydney.cars.stand()     put yourself beside it, then press E
+     *
+     * `stand` teleports and is therefore **offline only** -- online the server
+     * owns the position and would correct it inside a snapshot, which would look
+     * like the harness being broken rather than like the rule it is. Use
+     * `/tp <suburb>` and walk, which is what a player does.
+     */
+    cars: {
+      field: () => carWorld(),
+      report: () => ({
+        records: carWorld().size,
+        driving: playerCombat.drivingCar,
+        speed: playerCombat.carSpeed,
+        kmh: Math.round(Math.abs(playerCombat.carSpeed) * 3.6),
+        drawn: drivenCars.drawn,
+        camRoll: Number(drivenCars.camRoll.toFixed(4)),
+        prompt: takePrompt(takeableNear, playerCombat.drivingCar !== 0, playerCombat.phase),
+        all: carWorld().all().map((c) => ({
+          id: c.id,
+          carId: c.carId,
+          driver: c.driverId,
+          body: c.body,
+          x: Math.round(c.x * 10) / 10,
+          z: Math.round(c.z * 10) / 10,
+          speed: Math.round(c.speed * 10) / 10,
+          emptyS: Math.round(c.emptyMs / 1000),
+        })),
+      }),
+      /**
+       * The nearest takeable car within `radius` metres, or null.
+       *
+       * Deliberately **not** `resolveTake`: that one is the reach test at 2.2 m
+       * and this is a search. The filter is otherwise identical -- under
+       * `TAKEABLE_SPEED` and not suppressed -- so a car this returns is a car
+       * `resolveTake` will agree about once you are standing next to it.
+       */
+      find: (radius = 300) => {
+        const cars = carWorld();
+        const tick = trafficTick(Date.now());
+        let best: { identity: number; x: number; y: number; z: number; range: number; speed: number; parked: boolean } | null = null;
+        forEachCarNear(
+          traffic, player.position.x, player.position.z, radius, tick, carRoutes, carPose, (c) => {
+            if (c.speed > TAKEABLE_SPEED) return;
+            if (cars.suppressed(c.identity)) return;
+            const range = Math.hypot(c.x - player.position.x, c.z - player.position.z);
+            if (best !== null && range >= best.range) return;
+            best = {
+              identity: c.identity, x: c.x, y: c.y, z: c.z, range,
+              speed: Math.round(c.speed * 100) / 100,
+              parked: c.stage === CAR_STAGE_PARKED_IN || c.stage === CAR_STAGE_PARKED_OUT,
+            };
+          },
+        );
+        return best;
+      },
+      /** Stand beside the nearest takeable car. Offline only -- see the block header. */
+      stand: (radius = 300) => {
+        if (net) return 'online: the server owns your position. /tp to a suburb and walk.';
+        const handle = (dev as { cars: { find(r: number): { x: number; y: number; z: number } | null } }).cars;
+        const found = handle.find(radius);
+        if (found === null) return 'no takeable car within that radius.';
+        player.position.set(found.x + 1.8, found.y + EYE_HEIGHT, found.z);
+        player.velocity.set(0, 0, 0);
+        return found;
+      },
+    },
+
+    /**
      * The rotating minimap.
      *
      * `minimap.stats()` is the one to reach for: it reports the last redraw's
@@ -8809,6 +10229,19 @@ async function main(): Promise<void> {
       get reach() {
         return { hitTest: REACH, castRadius: CAST_RADIUS, viewmodelMax: MAX_VIEW_REACH };
       },
+      /**
+       * Every football this bat -- or anybody else's -- has sent back, and where
+       * the last one was. See `game/swat.ts`.
+       *
+       * `count` is the one that answers a question a screenshot cannot: a swat
+       * is 260 ms of puff and a 30 ms crack, and the browser panes this project
+       * is developed against throttle a hidden tab to nothing. Paired with
+       * `sydney.serve()`, which stages one, it is how the mechanic is checked
+       * without a mouse and without luck.
+       */
+      get swats() {
+        return { count: swatCount, last: lastSwat, radius: SWAT_RADIUS, speedScale: SWAT_SPEED_SCALE };
+      },
       selfChecks: () => verifyBat(),
     },
 
@@ -8856,6 +10289,72 @@ async function main(): Promise<void> {
       throwBuffer = PUNCH_BUFFER;
     },
 
+    /**
+     * Have somebody throw one **at you**, timed to arrive on the bat. Offline only.
+     *
+     * `swing()` and `throwFooty()` above exist because a weapon that can only be
+     * fired with a mouse cannot be checked from a console. This exists for the
+     * same reason one interaction further along, and it is the only practical
+     * way to stage a swat: a returned serve needs a ball thrown by somebody else
+     * arriving inside the 100 ms the blade is out, and hitting that by hand
+     * against a dummy that throws when it feels like it is a matter of luck.
+     *
+     * The sequence, which is the whole of it:
+     *
+     *   1. the nearest dummy is turned to face the player and the swing starts
+     *      **now**, through `punchBuffer` -- the same path the mouse takes;
+     *   2. `PUNCH_WIND_UP` later the blade comes out and the ACTIVE window runs
+     *      for `PUNCH_ACTIVE`, so the ball has to arrive at about
+     *      `0.15 + 0.05 = 0.2 s`;
+     *   3. a ball covers the gap in roughly `distance / LAUNCH_SPEED`, so the
+     *      throw is delayed by the difference.
+     *
+     * Roughly, and it says so in what it returns: `LAUNCH_RISE` lofts the throw
+     * a little and `DRAG` sheds 9% of the speed a second, so the arrival is a
+     * few milliseconds late at the far end of the range. The ACTIVE window is
+     * 100 ms wide and the error is under ten, so it lands inside it from about
+     * two metres out to about twelve. Past that the timing has to be nudged with
+     * `arrive`.
+     *
+     * **Nothing here is a mechanic.** It drives the same `advance`, the same
+     * `FootyField.add` and the same `swatBalls` a player's mouse does, through
+     * the same buffers -- which is why it cannot stage a swat the simulation
+     * would not have allowed.
+     */
+    serve(arrive = PUNCH_WIND_UP + PUNCH_ACTIVE * 0.5) {
+      const target = dummies[0];
+      if (!target) return 'no dummy to serve (online, or none spawned)';
+      const c = target.combat;
+      const dx = player.position.x - c.body.position.x;
+      const dz = player.position.z - c.body.position.z;
+      // The aim is set on the tick the ball leaves the hand rather than here --
+      // see the `pendingServe` branch in `simulate` -- because a dummy's yaw is
+      // rewritten by its own input every tick in between. All this needs to do
+      // is make sure it has a ball to throw.
+      c.phase = 'idle';
+      c.ballCharges = 3;
+      c.ballT = 10;
+      punchBuffer = PUNCH_BUFFER;
+      const range = Math.hypot(dx, dz);
+      const delay = Math.max(0, arrive - range / LAUNCH_SPEED);
+      // Counted down in **simulated** seconds by `simulate`, not by a
+      // `setTimeout`, and the difference is the whole reason this works. The
+      // swing's clock is `CombatantState.phaseT`, which only advances inside a
+      // fixed step; a browser that has backgrounded this tab stops calling
+      // `requestAnimationFrame` and stops the fixed steps with it, while a wall
+      // clock keeps running. A throw scheduled on the wall clock would arrive
+      // hundreds of simulated milliseconds after the swing it was aimed at, and
+      // the embedded browser panes this project is developed against throttle a
+      // hidden tab exactly that way -- `scores()` above records the same trap
+      // from the other side.
+      pendingServe = { combat: c, t: delay };
+      return (
+        `${target.kind} is ${range.toFixed(1)} m away; swinging now and throwing in ` +
+        `${(delay * 1000).toFixed(0)} ms so the ball arrives ${(arrive * 1000).toFixed(0)} ms in, ` +
+        `inside the ${(PUNCH_WIND_UP * 1000).toFixed(0)}-${((PUNCH_WIND_UP + PUNCH_ACTIVE) * 1000).toFixed(0)} ms window`
+      );
+    },
+
     /** Spec 8.3's field: every point the client has seen, and their state. */
     powerups,
 
@@ -8884,6 +10383,9 @@ async function main(): Promise<void> {
         models: carModels.loadedFiles.length,
         pools: carModels.poolSizes(),
         skipped: carModels.skipped,
+        // Which files had their tyres put back on the road at load, and by how
+        // much. See `carlod.mergeModel`'s appearance fix 1.
+        reseated: carModels.reseated,
         claimed: carModels.claimedCount,
         parked: carModels.parkedTiles,
         triangles: carModels.triangles,
@@ -9050,6 +10552,104 @@ async function main(): Promise<void> {
             }
           : null,
         standHere: near ? { x: near.x, y: near.y + EYE_HEIGHT, z: near.z } : null,
+      };
+    },
+
+    /**
+     * Workstream E: the five characters and the live events, and where to stand
+     * to meet one.
+     *
+     * `streetReport`'s argument verbatim, and it applies with more force here
+     * than anywhere else in the build: **both tiers of this feature are pure
+     * functions rather than objects**. An ambient Karen is a hash over a census
+     * cell and an event is a hash over the in-game day, so when somebody reports
+     * that they "never see any of the new characters" there is nothing in the
+     * scene graph to inspect and the three possible causes -- the wrong time of
+     * day, a cell whose bias is zero, and bands that have not streamed in --
+     * look identical from inside the game.
+     *
+     * `standHere` is the useful field on both halves: a point a couple of metres
+     * from the nearest character, and a point at the edge of the nearest live
+     * event, so `sydney.look(sydney.characters().standHere)` is a one-liner that
+     * puts the thing in front of the camera.
+     */
+    characters(radius = 200) {
+      const tick = trafficTick(Date.now());
+      const day = dayAtTick(tick);
+      const here = player.position;
+      const scratch: PedBand[] = [];
+      const probe = createCharacterPose();
+      const seen: Array<{ kind: string; metres: number; x: number; y: number; z: number }> = [];
+      if (pedestrians) {
+        forEachCharacterNear(pedestrians, here.x, here.z, radius, tick, scratch, probe, (p) => {
+          seen.push({
+            kind: npcKind(p.kind)?.name ?? String(p.kind),
+            metres: Math.round(Math.hypot(p.x - here.x, p.z - here.z) * 10) / 10,
+            x: Math.round(p.x * 10) / 10,
+            y: Math.round(p.y * 10) / 10,
+            z: Math.round(p.z * 10) / 10,
+          });
+        });
+      }
+      seen.sort((a, b) => a.metres - b.metres);
+      const promoted = [...policeField().actors]
+        .filter((a) => isCharacterKind(a.kind))
+        .map((a) => ({
+          id: a.id,
+          kind: npcKind(a.kind)?.name ?? String(a.kind),
+          state: Object.entries(NPC_STATE).find(([, v]) => v === a.state)?.[0] ?? String(a.state),
+          metres: Math.round(Math.hypot(a.x - here.x, a.z - here.z) * 10) / 10,
+          onYou: a.target >= 0,
+        }));
+      promoted.sort((a, b) => a.metres - b.metres);
+      const near = seen[0];
+      // The live events the renderer is holding, which is the same list the map
+      // markers come off -- see the marker source. Reading the scene's list
+      // rather than re-deriving it is deliberate: if the two ever disagree, this
+      // report shows what is actually being *drawn*.
+      const events = eventScene.live
+        .map((s) => ({
+          name: EVENT_NAME[s.kind] ?? String(s.kind),
+          metres: Math.round(Math.hypot(s.x - here.x, s.z - here.z)),
+          x: Math.round(s.x),
+          z: Math.round(s.z),
+          endsInRealMinutes: Math.round((s.startPhase + s.spanPhase - day.phase) * 60 * 10) / 10,
+        }))
+        .sort((a, b) => a.metres - b.metres);
+      const site = eventScene.live[0];
+      return {
+        tick,
+        day: day.index,
+        phase: Math.round(day.phase * 1000) / 1000,
+        daylight: daylight(day.phase),
+        saturday: saturdayAt(day.index),
+        ambient: seen.length,
+        promoted: promoted.length,
+        rigsDrawn: characterCrowd.ambient + characterCrowd.actors,
+        costMs: Math.round(characterCrowd.costMs * 1000) / 1000,
+        nearest: seen.slice(0, 8),
+        onYou: promoted.slice(0, 8),
+        events,
+        eventCostMs: Math.round(eventScene.costMs * 1000) / 1000,
+        eventInstances: eventScene.drawn,
+        // Two metres back from the nearest one, at eye height, looking at them.
+        standHere: near
+          ? {
+              x: near.x + (here.x - near.x) * 0.0001 + 2.2,
+              y: near.y + EYE_HEIGHT,
+              z: near.z + 2.2,
+              yaw: Math.atan2(-(near.x - (near.x + 2.2)), -(near.z - (near.z + 2.2))),
+            }
+          : null,
+        // And a viewpoint on the nearest live event: eighteen metres out, looking in.
+        watchEvent: site
+          ? {
+              x: site.x + 18,
+              y: wildGround(site.x + 18, site.z + 18) + EYE_HEIGHT,
+              z: site.z + 18,
+              yaw: Math.atan2(-(site.x - (site.x + 18)), -(site.z - (site.z + 18))),
+            }
+          : null,
       };
     },
 
@@ -9242,6 +10842,19 @@ async function main(): Promise<void> {
         dummies: dummies.map((d) => d.report),
       };
     },
+
+    /**
+     * The wallet, the slots and the phone. See `client/src/money.ts`.
+     *
+     *     sydney.money.report()          what is in each hand, and the balance
+     *     sydney.money.equip(2)          raise the phone (0 bat, 1 footy, 3 fists)
+     *     sydney.money.open()            open the phone's overlay
+     *
+     * `open()` is the one that earns its place: the phone needs a cursor, a
+     * cursor needs pointer lock to have been released, and a browser that
+     * refuses pointer lock outright has no click sequence that gets there.
+     */
+    money: money.debug,
 
     /** Move the camera and the player to a viewpoint, for inspecting the world. */
     look(view: { x: number; y: number; z: number; yaw?: number; pitch?: number }) {

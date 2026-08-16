@@ -78,18 +78,22 @@ import {
   INTEREST_LEAVE_BYTES,
   INTERP_DELAY_MS,
   MAX_REWIND_MS,
+  MSG,
   PROTOCOL_VERSION,
   SNAPSHOT_HZ,
   SNAPSHOT_INTERVAL,
   TICK_HZ,
   encodeBikes,
+  encodeCars,
   encodeEvents,
   encodeInterestInto,
   decodeInput,
+  encodeHeat,
   encodeInvestigationsInto,
   encodePowerups,
   encodeRoster,
   encodeSnapshotInto,
+  encodeSun,
   encodeWelcome,
   investigationBytes,
   patchSnapshotAck,
@@ -102,10 +106,29 @@ import {
   type SnapshotNpc,
   type SnapshotPlayer,
 } from '../client/src/net/protocol.ts';
+// The shared wall-clock tick. The heat channel's deadlines are denominated in
+// it, exactly as `sim.stepFactions`' are -- see `sendHeat`.
+import { trafficTick } from '../client/src/game/traffic.ts';
+// --- Money. See `client/src/net/cash.ts` and `server/sim.ts`.
+//
+// One block: two more frames on the same "on change, never on a timer" terms
+// `BIKES` and `INVESTIGATION` already established below.
+import { encodeFare, encodeWallet, type WalletFrame } from '../client/src/net/cash.ts';
+import { fakeDriving } from '../client/src/game/driving-contract.ts';
+import type { WalletStore } from './wallets.ts';
 import { botName } from './bots.ts';
 import { FrameGroups, InterestIndex, InterestSet } from './aoi.ts';
 import { Simulation, applyButtons, type Participant, type TickOutput } from './sim.ts';
-import { roomWorld, type ServerWorld } from './world.ts';
+import { groundFor, roomWorld, type ServerWorld } from './world.ts';
+import {
+  SUN_BUTTON_X,
+  SUN_BUTTON_Z,
+  SUN_PRESS,
+  newSunState,
+  trySunPress,
+  type SunState,
+} from '../client/src/game/sunbutton.ts';
+import { EYE_HEIGHT } from '../client/src/player/controller.ts';
 
 /** What a socket in this room carries. Moved here whole from `server/index.ts`. */
 export interface Conn {
@@ -551,6 +574,18 @@ function takeInput(conn: Conn): InputFrame | null {
 const ROSTER_REFRESH_TICKS = TICK_HZ * 2;
 /** The police channel's, and it is the roster's exactly. See `server/index.ts`'s history. */
 const INVESTIGATION_REFRESH_TICKS = TICK_HZ * 2;
+/**
+ * And the heat ladder's, which is the same two seconds for a different reason.
+ *
+ * The investigation channel refreshes on a clock because the client *predicts*
+ * it and a wrong prediction is only cleared by a message that contradicts it.
+ * Nothing predicts heat -- there is no client-side ladder -- so this refresh is
+ * doing the humbler job of covering a dropped frame on a level that would
+ * otherwise stay wrong until the next crime. Five bytes a wanted player, a few
+ * times a minute, against a HUD that could sit on four stars after the player
+ * has already got away.
+ */
+const HEAT_REFRESH_TICKS = TICK_HZ * 2;
 
 /** A tick this far over budget waited on something. Bun exposes no GC hook. */
 const STALL_MS = (1000 / TICK_HZ) * 4;
@@ -621,10 +656,30 @@ export class Room {
   private readonly investigationCache = new Map<number, Uint8Array>();
 
   // --- Cadences.
+  /**
+   * The last `WALLET` and `FARE` version sent to each socket's participant.
+   *
+   * Keyed by **player id** rather than by socket, because that is what the
+   * version lives on and because a socket whose participant has gone has
+   * nothing to compare -- the entry is dropped in `leave`, which is what keeps
+   * this from being an unbounded map on a long-running host. Two small maps
+   * rather than two fields on `Conn`: `Conn` is `server/room.ts`'s public
+   * record and five branches are editing it this pass.
+   */
+  private readonly walletSent = new Map<number, number>();
+  private readonly fareSent = new Map<number, number>();
+  /** Reused; `encodeWallet` reads it and keeps nothing. */
+  private readonly walletScratch: WalletFrame = { balance: 0, centrelinkNextMs: -1, note: '', bundles: [] };
+  /** The bundle-list version at the last send, so a drop re-sends every wallet. */
+  private bundlesSent = -1;
+
   private rosterSent = -1;
   private rosterTick = 0;
   private investigationSent = -1;
   private investigationTick = 0;
+  /** The heat channel's watched version and refresh clock. See `sendHeat`. */
+  private heatSent = -1;
+  private heatTick = 0;
 
   // --- Measurement. Per room, because a host with one busy room and seven quiet
   // ones has to be able to say so.
@@ -680,12 +735,72 @@ export class Room {
    */
   private readonly snapshotPhase: number;
 
-  constructor(id: number, shared: ServerWorld, cap: number, bots: number) {
+  /**
+   * **The screaming sun, per room.** See `client/src/game/sunbutton.ts`.
+   *
+   * Per room rather than per host, which is the same call `powerupsDown` makes
+   * and the opposite of the one `server/chat.ts` makes, and the deciding
+   * question is the same both times: is this a fact about *the world* or a fact
+   * about *the conversation*? Chat crosses rooms because a lobby chat that
+   * called itself global would be a lie. The sun does not, because every room is
+   * a separate copy of Sydney -- room 3's powerups are down, room 4's are up,
+   * and a player who pressed the button in room 3 has not touched room 4's sky.
+   *
+   * The host's *clock* is shared (see `welcome`'s `clockMs`), so the two rooms'
+   * days line up; what differs is whether the button has been pressed in this
+   * one. That is the right split: everybody on the host is in the same evening
+   * and not everybody is in the same joke.
+   *
+   * In memory and nowhere else. A restart puts every room's sun back to normal,
+   * which is correct rather than a limitation -- the state's whole meaning is
+   * "somebody in this room did this recently", and a room that has just started
+   * has no recently.
+   */
+  private readonly sun: SunState = newSunState();
+
+  /**
+   * The composed ground query, for the one vertical test this room makes.
+   *
+   * Built once per room and held, rather than called as `groundFor(world)` at
+   * the press: that function closes over a `lastGround` accumulator and returns
+   * a fresh object each call, so building one per press would be an allocation
+   * on a path that has no business allocating and -- worse -- would throw away
+   * the accumulator that makes an unloaded tile answer sanely.
+   */
+  private readonly ground: ReturnType<typeof groundFor>;
+
+  constructor(id: number, shared: ServerWorld, cap: number, bots: number, money: RoomMoney = {}) {
     this.id = id;
     this.cap = cap;
     this.snapshotPhase = id % SNAPSHOT_INTERVAL;
+    this.ground = groundFor(shared);
     // Its own powerups, everybody else's city. See `world.roomWorld`.
-    this.sim = new Simulation(roomWorld(shared));
+    //
+    // The wallet store is the **host's** and is deliberately shared across
+    // rooms -- a balance keyed by name cannot depend on which room the gateway
+    // put you in -- where the driving lookup is **this room's**, because a
+    // player id is a room's and not a host's (`protocol.AOI_ID_LIFECYCLE`). See
+    // `RoomMoney`.
+    const sim: Simulation = new Simulation(roomWorld(shared), {
+      wallets: money.wallets,
+      driving: money.fakeDriving
+        ? fakeDriving({
+            poseOf: (playerId) => {
+              const p = sim.participants.get(playerId);
+              if (!p) return null;
+              const b = p.combat.body;
+              return {
+                x: b.position.x,
+                y: b.position.y,
+                z: b.position.z,
+                yaw: b.yaw,
+                speed: Math.sqrt(b.velocity.x * b.velocity.x + b.velocity.z * b.velocity.z),
+              };
+            },
+          })
+        : undefined,
+    });
+    this.sim = sim;
     for (let i = 0; i < bots; i++) {
       // Named from `bots.BOT_NAMES` by index within the room, so every room has
       // a Bazza and a Shazza. That is deliberate rather than an oversight: a
@@ -758,10 +873,33 @@ export class Room {
     ws.send(encodePowerups(this.sim.powerupsDown()));
     // Every lime e-bike in this room, once, with whoever is currently on one.
     ws.send(encodeBikes(this.sim.bikeRecords()));
+    // And whether the sun is currently a screaming face, which is the whole of
+    // what this feature has to tell a joiner. Sent unconditionally, including to
+    // a room where nothing has ever happened -- two zeros -- for `BIKES`' own
+    // reason: a client that had to *infer* "not screaming" from the absence of a
+    // message would be a client whose stale optimistic state survived a
+    // reconnect. See `protocol.MSG.SUN`.
+    ws.send(encodeSun(this.sun.screamUntilMs, this.sun.cooldownUntilMs));
+    // And every car anybody in this room has taken, as a **replacement** rather
+    // than an upsert -- see `protocol.CARS_FULL`. Almost always an empty
+    // four-byte frame, because a room nobody has stolen a car in has no records
+    // at all, and that is the point: the feature costs four bytes a join until
+    // somebody uses it.
+    ws.send(encodeCars(this.sim.carRecords(), true));
     // The scoreboard, which is room-global and is what makes an out-of-interest
     // knockout nameable in the kill feed. Sent before anything that could refer
     // to an id, which is the rule `server/index.ts` has always had here.
     ws.send(encodeRoster(this.sim.roster()));
+    // And this player's money, at join, because the HUD draws it from the first
+    // frame and a `$0` that becomes `$1,234` half a second later reads as the
+    // balance having been lost. `sendWallets` below would get there within a
+    // tick anyway; this is the same argument `encodePowerups` above makes about
+    // an icon that is briefly wrong.
+    const wallet = this.sim.walletFrame(p.id, this.walletScratch);
+    if (wallet !== null) {
+      ws.send(encodeWallet(MSG.WALLET, wallet));
+      this.walletSent.set(p.id, p.walletVersion);
+    }
     // And **no** join events for everybody already here, which is where v7 built
     // the client's remotes. Under AOI a remote is created by an `INTEREST`
     // entrance and by nothing else, so a joiner is told about the handful of
@@ -774,11 +912,89 @@ export class Room {
     // set yet can see nobody. Its own is impossible on the join tick.
   }
 
+  /**
+   * Somebody pressed the button in Sydney Park. `MSG.SUN_PRESS`.
+   *
+   * ---------------------------------------------------------------------------
+   * **The position tested is this room's, not the one the client sent** -- the
+   * client sent none, which is `protocol.MSG.SUN_PRESS`' whole layout argument.
+   * `p.combat.body.position` is what this process integrated from the input
+   * frames it accepted, so a client that teleported itself has already been
+   * dragged back by a correction and cannot press anything from Bondi.
+   *
+   * The vertical test needs the ground under the *button*, not under the
+   * presser: the two are equal when somebody is standing at it and differ
+   * exactly in the case the test is for. `groundFor` is asked at the button's
+   * own coordinates with `Infinity` feet, which is `eyeAt`'s convention.
+   *
+   * ---------------------------------------------------------------------------
+   * **An answer goes back whether or not it was allowed**, and only to the
+   * presser when it was not. The client wrote its own optimistic state on the
+   * frame the key went down (see `world/sunbutton.SunFeature.press`) so a
+   * refusal has to be contradicted by something; a broadcast on a refusal, on
+   * the other hand, would be sixteen bytes to every socket in the room to say
+   * that nothing happened.
+   *
+   * **Bots never reach here**, and not because they are filtered: a bot has no
+   * socket, and this is only ever called from the websocket message handler in
+   * `server/index.ts`. Worth stating because the brief asks for it and because
+   * the absence of a check is otherwise indistinguishable from a missing one.
+   */
+  sunPress(ws: Socket): void {
+    const p = ws.data.participant;
+    if (!p) return;
+    const now = Date.now();
+    const body = p.combat.body.position;
+    const result = trySunPress(
+      this.sun,
+      now,
+      body.x,
+      body.z,
+      // The body's position is the *eye*, as everywhere else in this process --
+      // see `eyeAt`. Feet is what the reach is about, and the difference is a
+      // whole storey of the three metres the test allows.
+      body.y - EYE_HEIGHT,
+      this.ground.groundHeight(SUN_BUTTON_X, SUN_BUTTON_Z, Infinity),
+    );
+    if (result !== SUN_PRESS.OK) {
+      // Refused: tell the one client that guessed otherwise, and nobody else.
+      ws.send(encodeSun(this.sun.screamUntilMs, this.sun.cooldownUntilMs));
+      return;
+    }
+    console.log(
+      `[sydney] room ${this.id}: player ${p.id} "${p.name}" pressed the sun button; ` +
+        `screaming for ${((this.sun.screamUntilMs - now) / 60000).toFixed(1)} min, ` +
+        `back in ${((this.sun.cooldownUntilMs - now) / 60000).toFixed(0)} min`,
+    );
+    this.broadcastSun();
+  }
+
+  /** The two instants, to every socket in this room. One encode, N sends. */
+  private broadcastSun(): void {
+    const frame = encodeSun(this.sun.screamUntilMs, this.sun.cooldownUntilMs);
+    for (const ws of this.conns) {
+      if (!ws.data.participant) continue;
+      ws.send(frame);
+      this.bytesSent += frame.byteLength;
+      this.logBytes += frame.byteLength;
+    }
+  }
+
+  /** The sun's two instants, for `/health`. A copy: the caller must not write. */
+  sunState(): SunState {
+    return { screamUntilMs: this.sun.screamUntilMs, cooldownUntilMs: this.sun.cooldownUntilMs };
+  }
+
   /** A socket closed. */
   leave(ws: Socket): void {
     this.conns.delete(ws);
     const p = ws.data.participant;
-    if (p) this.sim.leave(p.id);
+    if (p) {
+      this.sim.leave(p.id);
+      // Or the two version maps are a leak of one entry per join, forever.
+      this.walletSent.delete(p.id);
+      this.fareSent.delete(p.id);
+    }
   }
 
   // --- The tick ---------------------------------------------------------------
@@ -911,7 +1127,11 @@ export class Room {
 
     this.sendRoster();
     this.sendInvestigations();
+    this.sendHeat();
     this.sendBikes();
+    this.sendCars();
+    this.sendWallets();
+    this.sendFares();
     this.sendEvents();
     // Offset per room, so the host's egress is spread across the three ticks in
     // a snapshot interval rather than landing on one. See `snapshotPhase`.
@@ -1011,6 +1231,48 @@ export class Room {
   }
 
   /**
+   * The heat ladder: **room-global, one encode, everybody.**
+   *
+   * The one channel in this room that is deliberately *not* interest-filtered,
+   * and the argument is the reverse of the investigation channel's one method
+   * up. That one is filtered because a banner over somebody you cannot see is a
+   * fact about nobody. A star count is drawn on a **nameplate**, and a nameplate
+   * is only drawn for a player who is already in front of you -- so filtering
+   * here would be re-deciding on the server, per client, per refresh, a thing
+   * the renderer decides for free every frame. What it would buy is a handful of
+   * bytes: the full set for a room of sixteen is 83.
+   *
+   * So there is one frame and it is encoded once. No content cache and no
+   * scratch list, because there is nothing per-client to vary.
+   *
+   * **Sent on the join tick as well**, unlike the investigation channel: heat
+   * has no prediction behind it, so a joiner who is told nothing draws no stars
+   * on anybody until the next change -- and the change might be two minutes
+   * away, which is two minutes of a 4-star player walking around unmarked.
+   * `sim.tick` is fresh at zero on a new room, so the refresh clock below fires
+   * on the first tick a joiner is present for and this costs nothing extra.
+   */
+  private sendHeat(): void {
+    const sim = this.sim;
+    const changed = sim.heat.version !== this.heatSent;
+    const refresh = sim.tick - this.heatTick >= HEAT_REFRESH_TICKS;
+    if (!changed && !refresh) return;
+    this.heatSent = sim.heat.version;
+    this.heatTick = sim.tick;
+    // The deadlines are absolute ticks on the shared wall clock and the wire
+    // carries the remainder, so the encoder needs the instant it is speaking
+    // at. `trafficTick(Date.now())` is the same clock `stepFactions` reads and
+    // the same one every client runs -- see `protocol.encodeHeat`.
+    const frame = encodeHeat(sim.heatRecords(), trafficTick(Date.now()));
+    for (const ws of this.conns) {
+      if (!ws.data.participant) continue;
+      ws.send(frame);
+      this.bytesSent += frame.byteLength;
+      this.logBytes += frame.byteLength;
+    }
+  }
+
+  /**
    * The bikes, on the tick a claim or a drop happens, and only what changed.
    *
    * Room-global and deliberately not interest-filtered. The set is fixed at 74
@@ -1031,6 +1293,85 @@ export class Room {
       ws.send(frame);
       this.bytesSent += frame.byteLength;
       this.logBytes += frame.byteLength;
+    }
+  }
+
+  /**
+   * The cars, on the tick somebody takes one, leaves one, or an abandoned one
+   * expires. Only what changed.
+   *
+   * Room-global and deliberately not interest-filtered, on `sendBikes`' argument
+   * exactly -- and one more that is specific to this message. A `CARS` record is
+   * what tells a client to **suppress** an ambient car, and suppression has to
+   * be world-wide or a client that drove across town would find the timetable
+   * still running cars nobody else can see. Filtering by interest would make the
+   * traffic itself disagree between two players standing in the same street.
+   */
+  private sendCars(): void {
+    const changed = this.sim.carDelta();
+    if (changed.length === 0) return;
+    const frame = encodeCars(changed);
+    for (const ws of this.conns) {
+      if (!ws.data.participant) continue;
+      ws.send(frame);
+      this.bytesSent += frame.byteLength;
+      this.logBytes += frame.byteLength;
+    }
+  }
+
+  /**
+   * The money, per client, on change.
+   *
+   * Two triggers rather than one, and the second is the reason this is not a
+   * plain version compare: a player's own balance changing bumps
+   * `walletVersion`, and **anybody's** cash bundle appearing, being collected
+   * or expiring bumps the room-wide `bundleVersion` -- which every client has
+   * to be told about, because the pile is drawn in the world. So a bundle event
+   * re-sends every wallet in the room once. `net/cash.ts`'s header does the
+   * arithmetic on what that costs and why it is affordable; the short version
+   * is that a room drops a few bundles a minute and a frame is tens of bytes.
+   *
+   * What must not happen is this going on a timer. A `WALLET` frame per client
+   * per tick would be the largest reliable message in the game, sixty times a
+   * second, to say a number that changes twice a minute.
+   */
+  private sendWallets(): void {
+    const bundlesMoved = this.sim.bundleVersion !== this.bundlesSent;
+    for (const ws of this.conns) {
+      const p = ws.data.participant;
+      if (!p) continue;
+      if (!bundlesMoved && this.walletSent.get(p.id) === p.walletVersion) continue;
+      const frame = this.sim.walletFrame(p.id, this.walletScratch);
+      if (frame === null) continue;
+      this.walletSent.set(p.id, p.walletVersion);
+      const bytes = encodeWallet(MSG.WALLET, frame);
+      ws.send(bytes);
+      this.bytesSent += bytes.byteLength;
+      this.logBytes += bytes.byteLength;
+    }
+    this.bundlesSent = this.sim.bundleVersion;
+  }
+
+  /**
+   * The fare, to the one driver it belongs to, on change.
+   *
+   * Not deduplicated and not broadcast: a fare is nobody else's business, and
+   * the frame is 24 bytes on about six state changes a trip. `FareJob.version`
+   * is bumped by `server/fares.ts` on exactly the transitions worth sending,
+   * which is why this is a version compare rather than a diff of six fields.
+   */
+  private sendFares(): void {
+    const now = Date.now();
+    for (const ws of this.conns) {
+      const p = ws.data.participant;
+      if (!p) continue;
+      const job = p.fare;
+      if (this.fareSent.get(p.id) === job.version) continue;
+      this.fareSent.set(p.id, job.version);
+      const bytes = encodeFare(MSG.FARE, job, now);
+      ws.send(bytes);
+      this.bytesSent += bytes.byteLength;
+      this.logBytes += bytes.byteLength;
     }
   }
 
@@ -1108,7 +1449,13 @@ export class Room {
           rec.id = id;
           rec.colourway = other?.colourway ?? 0;
           rec.flags = other
-            ? (other.bot ? ENTER_FLAG.BOT : 0) | (other.combat.ridingBike !== 0 ? ENTER_FLAG.RIDING : 0)
+            ? (other.bot ? ENTER_FLAG.BOT : 0) |
+              (other.combat.ridingBike !== 0 || other.combat.drivingCar !== 0 ? ENTER_FLAG.RIDING : 0) |
+              // The third bit, so a driver who walks into view arrives *with*
+              // their car rather than as a seated figure sliding down George
+              // Street until the next `CARS` message -- which for a car taken
+              // two minutes ago is never. See `protocol.ENTER_FLAG.DRIVING`.
+              (other.combat.drivingCar !== 0 ? ENTER_FLAG.DRIVING : 0)
             : 0;
           e++;
         }
@@ -1240,6 +1587,24 @@ export class Room {
 }
 
 /**
+ * What a room needs to know about money, or nothing at all.
+ *
+ * **Optional in both members**, which is what keeps every existing
+ * `new Room(...)` and `new RoomHost(...)` in the checks and the load harness
+ * working unchanged: a room with no store gives every participant a null wallet
+ * and skips every money path, and a room with no `fakeDriving` gets
+ * `NO_DRIVING` and reports everybody on foot. That is not a degraded mode, it
+ * is the mode `server/integration-check.ts` and `server/loadtest.ts` want --
+ * neither of them should be writing a wallets file into the repository.
+ */
+export interface RoomMoney {
+  /** The host's store. Shared across every room; see `Room`'s constructor. */
+  wallets?: WalletStore;
+  /** `SYDNEY_FAKE_DRIVING=1`. See `game/driving-contract.fakeDriving`. */
+  fakeDriving?: boolean;
+}
+
+/**
  * R rooms in one process, sharing one loaded city.
  *
  * The gateway's data model: `/rooms` is this object's `listing()`, and a join
@@ -1251,9 +1616,16 @@ export class RoomHost {
   readonly rooms: Room[] = [];
   readonly world: ServerWorld;
 
-  constructor(world: ServerWorld, count: number, cap: number, bots: number, firstRoom = 0) {
+  constructor(
+    world: ServerWorld,
+    count: number,
+    cap: number,
+    bots: number,
+    firstRoom = 0,
+    money: RoomMoney = {},
+  ) {
     this.world = world;
-    for (let i = 0; i < count; i++) this.rooms.push(new Room(firstRoom + i, world, cap, bots));
+    for (let i = 0; i < count; i++) this.rooms.push(new Room(firstRoom + i, world, cap, bots, money));
   }
 
   get(id: number): Room | undefined {

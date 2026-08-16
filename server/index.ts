@@ -68,7 +68,11 @@
 
 import { verifyCombat } from '../client/src/game/combat.ts';
 import { verifyFooty } from '../client/src/game/footy.ts';
+// The bat against the ball, in the process that adjudicates it. See
+// `client/src/game/swat.ts`.
+import { verifySwat } from '../client/src/game/swat.ts';
 import { verifyPowerups } from '../client/src/game/powerups.ts';
+import { verifyDriving } from '../client/src/game/driving.ts';
 import { verifySpatialHash } from '../client/src/game/spatialhash.ts';
 import { verifyMovementBasis } from '../client/src/player/controller.ts';
 import {
@@ -80,6 +84,7 @@ import {
   TICK_HZ,
   decodeHello,
   decodePing,
+  decodeSunPress,
   encodeBye,
   encodePong,
   frameType,
@@ -89,7 +94,21 @@ import {
 import { verifyNames, verifyNet } from '../client/src/net/protocol.ts';
 import { verifyChat } from '../client/src/net/chat.ts';
 import { verifyUnstuck } from '../client/src/game/unstuck.ts';
+// The heat ladder. Run here because this process is the authority for it: the
+// star count, the decay, the patrol cars and the RBTs are all decided in this
+// process and *sent*, so every one of that file's silent failures -- a
+// non-monotone threshold table, a tier that cannot be shed, a crime priced past
+// the top of the ladder -- lands on players in a session and never in a
+// browser's console. See `client/src/game/heat.ts`'s check for the list.
+import { verifyHeat } from '../client/src/game/heat.ts';
+// --- Workstream E. Three self-checks, all three of them shared modules being
+// run in the second runtime -- which is the premise this whole block exists to
+// test. See the comment above the list.
+import { verifyCharacters } from '../client/src/game/characters.ts';
+import { verifyEvents } from '../client/src/game/events.ts';
+import { verifyWallet } from './wallet-contract.ts';
 import { verifyTeleport } from '../client/src/game/teleport.ts';
+import { sunReady, sunScreaming, verifySunButton } from '../client/src/game/sunbutton.ts';
 import { trafficTick } from '../client/src/game/traffic.ts';
 import { verifySuggestions } from '../client/src/net/suggestions.ts';
 import { verifyAoi } from './aoi.ts';
@@ -102,6 +121,17 @@ import {
   githubRepo,
   githubToken,
 } from './suggestions.ts';
+// --- Money. See `client/src/game/cash.ts`, `server/wallets.ts`, `server/fares.ts`.
+//
+// One block, and the only three things this file has to know about the
+// feature: the checks it runs at boot, the store it constructs and hands to
+// every room, and the fake-driving hatch that makes the fare loop exercisable
+// before the driving workstream lands.
+import { verifyCash } from '../client/src/game/cash.ts';
+import { PHONE_OP, decodePhone, verifyCashWire } from '../client/src/net/cash.ts';
+import { verifyDrivingContract } from '../client/src/game/driving-contract.ts';
+import { verifyFares } from './fares.ts';
+import { WalletStore, defaultWalletPath, verifyWallets } from './wallets.ts';
 import { verifyRewind } from './rewind.ts';
 import { verifySim } from './sim.ts';
 import {
@@ -176,6 +206,16 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifyCombat', verifyCombat()],
     ['verifyPowerups', verifyPowerups()],
     ['verifyFooty', verifyFooty()],
+    // And the one interaction between the two weapons, which fails in this
+    // project's shape exactly: **every broken version of it renders a perfectly
+    // good frame.** A timing window that is not the ACTIVE phase makes the
+    // mechanic untimed and there is nothing on screen that says the window is
+    // wrong; an owner that does not change hands makes a returned ball pass
+    // through the person who threw it, which looks like a miss; and a deflection
+    // that adds speed rather than steering it clips `protocol.BALL_BYTES`' i8 on
+    // the fourth exchange of a rally and points the tumble sideways. This
+    // process is the one that decides all three online. See `game/swat.ts`.
+    ['verifySwat', verifySwat()],
     ['verifyNet', verifyNet()],
     // The names, in the process that has the last word on them. This one is run
     // on both ends deliberately: the browser sanitises so the prompt shows the
@@ -201,6 +241,21 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // `client/src/game/unstuck.ts`.
     ['verifyUnstuck', verifyUnstuck()],
     ['verifyTeleport', verifyTeleport()],
+    // The button in Sydney Park and the sun it screams at. Run **here** rather
+    // than only in the browser because this process is the one that keeps the
+    // two instants: every failure in that file is silent in this repo's sense --
+    // the button is pressed, the face goes up, and it goes away at the wrong
+    // hour or comes back on the wrong day, three real hours after anybody was
+    // looking. See `client/src/game/sunbutton.ts`.
+    ['verifySunButton', verifySunButton()],
+    ['verifyHeat', verifyHeat()],
+    // Taking a car and driving it. Run **here** as well as in the browser
+    // because the integrator, the claim and the suppression key are all this
+    // side's authority and every failure in that file renders: a handbrake that
+    // walks the car backwards looks like a physics quirk, and a suppression key
+    // that does not answer is your own car driving off to Ashfield beside you,
+    // running people down on the way. See `client/src/game/driving.ts`.
+    ['verifyDriving', verifyDriving()],
     // The suggestions box's week arithmetic, sanitiser, order and codecs.
     // Run **here** rather than only in the browser because the server is the
     // side that keeps the ledger, and every failure in that file is silent in
@@ -228,6 +283,45 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // `server/aoi.ts`, which asserts the rule against a brute-force scan.
     ['verifyAoi', verifyAoi()],
     ['verifySim', verifySim()],
+    // --- Workstream E's three, and every one of them is here rather than only
+    // in the browser because every one of them fails *silently and identically*
+    // in both runtimes.
+    //
+    // `verifyCharacters` covers the thing this process is uniquely placed to
+    // catch: the traffic epoch and the sky's epoch drifting apart. This is the
+    // authority for both clocks, so if they disagree here then every eshay in
+    // the city is standing at a station at two in the afternoon and the only
+    // symptom is the sun. It also walks the bias table for a character who
+    // exists everywhere, and samples the rounding margin on the cell
+    // populations -- the one determinism failure this feature can have, where
+    // two engines place a different *number* of people in a cell and the client
+    // draws somebody the server does not have.
+    //
+    // `verifyEvents` covers a schedule that is not a pure function of the day,
+    // which presents as a player describing a car crash nobody else can find,
+    // and a trackwork sign in the middle of a paddock.
+    //
+    // `verifyWallet` covers the no-op default. A `NO_WALLET.debit` that reported
+    // taking the amount it was asked for would put a lie in the kill feed --
+    // "they went through your pockets" for money that never moved -- in a build
+    // that has no money in it at all. It is three lines of arithmetic and it is
+    // the contract the branch that owns the money inherits.
+    ['verifyCharacters', verifyCharacters()],
+    ['verifyEvents', verifyEvents()],
+    ['verifyWallet', verifyWallet()],
+    // The money. Four checks rather than one, because they are four different
+    // kinds of failure and a merged list would say "cash" about all of them:
+    // the rules (a fare that pays the wrong amount), the wire (a bundle list
+    // that desynchronises), the file (a key that does not fold case, so a
+    // player's balance resets), and the fare's state machine (a stop clock that
+    // boards a passenger from a car that never stopped). Every one of them is
+    // silent in this repo's sense -- it renders, it pays, and the number is
+    // wrong. See each file's own check for the enumeration.
+    ['verifyCash', verifyCash()],
+    ['verifyCashWire', verifyCashWire()],
+    ['verifyWallets', verifyWallets()],
+    ['verifyFares', verifyFares()],
+    ['verifyDrivingContract', verifyDrivingContract()],
   ];
   const failed = checks.filter(([, f]) => f.length > 0);
   if (failed.length > 0) {
@@ -271,6 +365,43 @@ if (world.segments) {
 }
 
 /**
+ * The wallets, host-wide, loaded before anybody can join.
+ *
+ * Host-wide rather than per-room on `suggestions`' argument and one stronger:
+ * the key is a **name**, and two rooms with two files would be two balances for
+ * one person depending on which room they landed in -- which is the gateway
+ * deciding how much money you have. Constructed and `load`ed before the socket
+ * opens, so the first joiner's first `WALLET` frame is their real balance
+ * rather than a starting one that is corrected a moment later.
+ *
+ * `SYDNEY_STATE_DIR` moves the file; see `defaultWalletPath`.
+ */
+const wallets = new WalletStore(defaultWalletPath());
+await wallets.load();
+console.log(`[sydney] wallets: ${wallets.describe()}`);
+
+/**
+ * Who is driving what, for SydRide. See `client/src/game/driving-contract.ts`.
+ *
+ * `NO_DRIVING` unless `SYDNEY_FAKE_DRIVING=1`, because the driving workstream's
+ * `game/driving.ts` does not exist yet -- this branch was written against the
+ * interface rather than against the module, so that the day it lands the lead
+ * changes this one expression and nothing else.
+ *
+ * The hatch treats anybody moving faster than 6 m/s as a driver, which is under
+ * a sprint on purpose: it is the only way to exercise the fare loop end to end
+ * on a branch with no cars in it. Announced in the boot line, because a server
+ * where sprinting makes you a taxi should say so out loud.
+ *
+ * `poseOf` reads the **live** body out of whichever room the id is in. A player
+ * id is a room's rather than a host's (see `protocol.AOI_ID_LIFECYCLE`), so two
+ * rooms both have a player 7 -- and the lookup handed to a room must therefore
+ * be that room's. `RoomHost` builds one per room from this factory rather than
+ * sharing this object, which is the whole reason it is a factory.
+ */
+const FAKE_DRIVING = process.env.SYDNEY_FAKE_DRIVING === '1';
+
+/**
  * The rooms, sharing that one city read-only.
  *
  * `roomWorld` is what makes "read-only" true rather than hoped: it hands every
@@ -279,7 +410,13 @@ if (world.segments) {
  * See its header for the audit of everything else.
  */
 const tRooms = performance.now();
-const host = new RoomHost(world, ROOM_COUNT, ROOM_CAP, BOT_COUNT, ROOM_BASE);
+const host = new RoomHost(world, ROOM_COUNT, ROOM_CAP, BOT_COUNT, ROOM_BASE, {
+  wallets,
+  fakeDriving: FAKE_DRIVING,
+});
+if (FAKE_DRIVING) {
+  console.log('[sydney] SYDNEY_FAKE_DRIVING=1: anybody over 6 m/s counts as driving (SydRide debug hatch)');
+}
 console.log(
   `[sydney] ${ROOM_COUNT} room(s) ${ROOM_BASE}..${ROOM_BASE + ROOM_COUNT - 1}, cap ${ROOM_CAP} each ` +
     `(${ROOM_COUNT * ROOM_CAP} players this process), ${BOT_COUNT} bot(s) per room — ` +
@@ -426,6 +563,44 @@ const server = Bun.serve<Conn>({
          */
         clockMs,
         cyclePhase: Number(cyclePhase(clockMs).toFixed(6)),
+        /*
+         * **The screaming sun, for `vessels`' and `clockMs`' reason.**
+         *
+         * This is a global, server-authoritative piece of *appearance*, which is
+         * the exact category of state that has cost this project afternoons
+         * before: a client showing a face nobody else can see is
+         * indistinguishable, from the outside, from a client whose sky is
+         * broken. So it is readable with `curl`, without a socket, beside the
+         * clock the face's own deadline is measured against -- the two must be
+         * read together to mean anything, which is why they are adjacent fields
+         * rather than a nested block.
+         *
+         * The **first room's**, not a summary across rooms, and the field is
+         * named for one room's state on purpose. `Room.sun` is per room (see
+         * its comment), so a host running eight of them has eight answers and
+         * any single boolean here would be a lie in seven of them; `rooms`
+         * below is where a probe that cares goes. What this field is for is the
+         * ordinary case -- one room, one host, somebody asking "is the sun
+         * currently a face" -- and it says so by reporting `room`.
+         *
+         * `screaming` is published even though it is derivable from
+         * `screamUntilMs` and `clockMs`, which is the one place this feature
+         * breaks its own "no derived flags" rule. It is derived *here*, in the
+         * process that owns both inputs, exactly as `cyclePhase` above is and
+         * for the same stated reason: a probe that had to re-implement the
+         * comparison would be a second derivation nobody keeps in step.
+         */
+        sun: (() => {
+          const first = host.rooms[0];
+          const s = first ? first.sunState() : { screamUntilMs: 0, cooldownUntilMs: 0 };
+          return {
+            room: first ? first.id : -1,
+            screaming: sunScreaming(s, clockMs),
+            ready: sunReady(s, clockMs),
+            screamUntilMs: s.screamUntilMs,
+            cooldownUntilMs: s.cooldownUntilMs,
+          };
+        })(),
         rooms: host.listing(),
         stage: world.index.stage,
         protocol: PROTOCOL_VERSION,
@@ -434,6 +609,12 @@ const server = Bun.serve<Conn>({
         // rather than queue, and nothing about the token itself belongs on a
         // route anybody can fetch.
         github: { suggestions: suggestions.linked, bugs: bugs.linked },
+        // How many names have a balance on file, and whether the fare loop's
+        // debug hatch is on. Published for `vessels`' reason two paragraphs up:
+        // a flag that changes what the game does should be readable from
+        // outside, or nobody can tell why sprinting is paying money.
+        wallets: wallets.size,
+        fakeDriving: FAKE_DRIVING,
         // The join disc's centre, which both ends already compute from the same
         // `index.json` (`game/spawn.spawnCentre`). Published because
         // `server/loadtest.ts`'s pileup scenario needs a world coordinate every
@@ -755,6 +936,69 @@ const server = Bun.serve<Conn>({
           return;
         }
 
+        /*
+         * The button on the hill in Sydney Park. See `server/room.sunPress`.
+         *
+         * Resolved against `conn.room` like every other case in this switch
+         * except the two above it, because the sun is a fact about *a copy of
+         * Sydney* rather than about the conversation -- `Room.sun` states that
+         * split at length.
+         *
+         * No flood guard, and that is a decision rather than an omission. The
+         * handler is idempotent by construction: a second press inside the
+         * three-in-game-day cooldown is refused by `trySunPress` and answered
+         * with sixteen bytes to the one socket that asked, so a client hammering
+         * this key at 60 Hz costs one distance test and one small send per
+         * frame and changes nothing. That is a smaller cost than
+         * `MSG.INPUT` already pays on the same socket, and the flood guards in
+         * this process exist for the messages that *write* something every time
+         * (chat, suggestions).
+         */
+        case MSG.SUN_PRESS: {
+          if (!decodeSunPress(frame)) return;
+          const room = conn.room >= 0 ? host.get(conn.room) : undefined;
+          room?.sunPress(ws);
+          return;
+        }
+        /**
+         * The phone: claim a Centrelink payment, or clock on and off the
+         * rideshare shift. See `client/src/net/cash.ts` for why three
+         * operations are one message id.
+         *
+         * Unlike `CHAT_SAY` and `SUGGEST` above, this one is emphatically the
+         * **room's**: a claim is adjudicated against a body this room is
+         * simulating and a shift belongs to a fare loop this room is stepping.
+         * So it resolves `conn.room` and stops there, which is what every case
+         * except those two does.
+         *
+         * There is no flood guard beyond the rules themselves, and that is a
+         * decision rather than an omission: a claim is refused by a position
+         * test and a timer, both of which are a map lookup, and going online
+         * twice is idempotent by construction. The expensive thing in this
+         * feature -- picking a kerb point -- happens on the *tick* when a fare
+         * is offered and cannot be provoked from here at all.
+         */
+        case MSG.PHONE: {
+          const p = conn.participant;
+          if (!p) return;
+          const req = decodePhone(frame, MSG.PHONE);
+          if (!req) return;
+          const room = host.get(conn.room);
+          if (!room) return;
+          if (req.op === PHONE_OP.CLAIM) {
+            const refusal = room.sim.claim(p.id, req.officeId);
+            // A refusal is a sentence and a success is silence, because the
+            // success already has one: the `WALLET` frame the credit produces
+            // carries "+$100 centrelink" and arrives on the next tick. Two
+            // messages for one event would be the pill saying it twice.
+            if (refusal !== '' && p.walletNote === '') p.walletNote = refusal;
+            if (refusal !== '') p.walletVersion++;
+            return;
+          }
+          room.sim.setOnline(p.id, req.op === PHONE_OP.ONLINE);
+          return;
+        }
+
         default:
           return;
       }
@@ -993,6 +1237,11 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     void Promise.all([
       suggestions.close().catch((err) => console.error(`[sydney] suggestions: flush failed: ${String(err)}`)),
       bugs.close().catch((err) => console.error(`[sydney] bugs: drain failed: ${String(err)}`)),
+      // And the wallets, which are the second thing in this process worth
+      // flushing. Their debounce is 5 s rather than the ledger's 250 ms (see
+      // `server/wallets.ts`), so this is the difference between losing nothing
+      // on a deploy and losing whatever the last five seconds paid.
+      wallets.close().catch((err) => console.error(`[sydney] wallets: flush failed: ${String(err)}`)),
     ]).finally(() => process.exit(0));
   });
 }

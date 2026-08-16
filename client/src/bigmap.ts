@@ -320,6 +320,16 @@ const SUBURB_PX = 11;
 const SUBURB_MAX_HALF_PX = 172;
 const STREET_PX = 9;
 const LANDMARK_PX = 9;
+
+/**
+ * The event label, a point smaller than a landmark's.
+ *
+ * Smaller because it is *transient* and a landmark is not: the type hierarchy on
+ * this map should read as permanence, so the harbour is biggest, the landmarks
+ * next, and a car crash that will be gone in four minutes is the smallest thing
+ * with a name on it.
+ */
+const EVENT_LABEL_PX = 8;
 const CHROME_PX = 10;
 
 /**
@@ -497,6 +507,8 @@ interface Dot {
   z: number;
   kind: MarkerKind;
   yaw: number | undefined;
+  /** `Marker.label`. Drawn beside the dot; undefined for every kind but `event`. */
+  label: string | undefined;
 }
 
 export class BigMap implements MarkerSink {
@@ -699,17 +711,23 @@ export class BigMap implements MarkerSink {
   }
 
   /** `MarkerSink`. Culls to the view box, so no provider has to know the zoom. */
-  mark(x: number, z: number, kind: MarkerKind, yaw?: number): void {
+  mark(x: number, z: number, kind: MarkerKind, yaw?: number, label?: string): void {
     if (x < this.cullMinX || x > this.cullMaxX || z < this.cullMinZ || z > this.cullMaxZ) return;
     let d = this.pool[this.dotCount];
     if (d === undefined) {
-      d = { x: 0, z: 0, kind: 'combatant', yaw: undefined };
+      d = { x: 0, z: 0, kind: 'combatant', yaw: undefined, label: undefined };
       this.pool.push(d);
     }
     d.x = x;
     d.z = z;
     d.kind = kind;
     d.yaw = yaw;
+    // **Assigned unconditionally**, including when it is undefined. The pool is
+    // reused across frames and across providers, so a marker that skipped this
+    // line would inherit whatever the last occupant of this slot was called --
+    // and the symptom is a combatant dot labelled "bin night", on some frames,
+    // depending on how many powerups happened to be in view.
+    d.label = label;
     this.dotCount++;
   }
 
@@ -1410,6 +1428,44 @@ export class BigMap implements MarkerSink {
       ctx.arc(sx, sy, r, 0, TAU);
       ctx.fill();
 
+      // The name, for the one kind that has one. See `Marker.label`.
+      //
+      // Deliberately outside the label-collision system the landmarks and the
+      // street names use: those two are dense fields where a claim is what stops
+      // the map turning into a wall of text, and an event marker is one of a
+      // handful on screen. Paying for a `LabelBox` here would also mean an event
+      // name could be *dropped* in favour of a suburb label, which is exactly
+      // backwards -- the suburb is there every session and the event is on for
+      // four minutes.
+      //
+      // The style is set and restored inside the branch rather than hoisted,
+      // because the loop above runs a style write per *run* of like markers and
+      // hoisting a font set would pay for it on every frame with no events on
+      // screen at all.
+      if (d.label !== undefined) {
+        const saveFont = ctx.font;
+        const saveAlign = ctx.textAlign;
+        const saveBaseline = ctx.textBaseline;
+        const saveStroke = ctx.strokeStyle;
+        const saveWidth = ctx.lineWidth;
+        ctx.font = `${EVENT_LABEL_PX}px ${MONO}`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.strokeStyle = HALO;
+        ctx.lineWidth = HALO_PX;
+        ctx.lineJoin = 'round';
+        BigMap.halo(ctx, d.label, sx + r + 4, sy);
+        ctx.font = saveFont;
+        ctx.textAlign = saveAlign;
+        ctx.textBaseline = saveBaseline;
+        ctx.strokeStyle = saveStroke;
+        ctx.lineWidth = saveWidth;
+        // The run-tracking above keyed off `kind` alone, and the branch has just
+        // overwritten `fillStyle` with nothing -- `halo` uses the current fill,
+        // which is still the marker ink, so the label is drawn in the event's
+        // own amber. That is intended: the label and the dot are one object.
+      }
+
       // Which way they are facing, where that is known -- the same tick the
       // minimap draws and for the same reason: on a map of a melee game, the
       // most useful thing about somebody else is which way they are looking.
@@ -1602,7 +1658,10 @@ export function verifyBigMap(): string[] {
   // rendered as "somebody who can hit you" is the exact failure that is
   // invisible in a screenshot and wrong in a fight.
   {
-    const kinds: MarkerKind[] = ['training', 'flat-white', 'combatant', 'bike', 'rave'];
+    const kinds: MarkerKind[] = [
+      'training', 'flat-white', 'combatant', 'bike', 'rave', 'event',
+      'centrelink', 'fare-pickup', 'fare-dropoff',
+    ];
     const seen = new Map<string, MarkerKind>();
     for (const kind of kinds) {
       const ink = markerInk(kind);

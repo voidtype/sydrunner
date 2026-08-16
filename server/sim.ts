@@ -57,6 +57,10 @@ import {
   type HitReport,
 } from '../client/src/game/combat.ts';
 import { FootyField, applyFootyHit, type FootyEvent } from '../client/src/game/footy.ts';
+// The bat against the ball. Pure, three-free, and the same file the browser runs
+// offline -- which is what makes "the bat reached it" mean the same thing in the
+// two processes that ever decide it. See `client/src/game/swat.ts`.
+import { createBallAt, swatBalls } from '../client/src/game/swat.ts';
 import { pickSpawnPoint } from '../client/src/game/spawn.ts';
 // `/unstuck`, and the whole of its rule. Shared with the client, which runs the
 // identical function offline -- see `client/src/game/unstuck.ts`, whose header
@@ -65,13 +69,32 @@ import { UNSTUCK_CAR_CLEAR_M, unstuckDestination, type UnstuckSpot } from '../cl
 import { tickPowerups, type PickupEvent } from '../client/src/game/powerups.ts';
 import {
   applyCarHit,
+  carHitStrength,
   carHitting,
+  carOverlaps,
+  canBeRunDown,
   createCarPose,
+  drivenCarPose,
   forEachCarNear,
   trafficTick,
   type CarPose,
   type LaneRoute,
 } from '../client/src/game/traffic.ts';
+// Taking a car. Pure and three-free on the bikes' own terms -- the server runs
+// this file, the browser runs this file, and neither runs the other's copy of
+// it. See `game/driving.ts`, whose header is the design.
+import {
+  CarField,
+  RUN_DOWN_SPEED,
+  TAKE_HEIGHT,
+  TAKE_RADIUS,
+  WITNESS_RADIUS,
+  bystanderSeen,
+  createDrivingScratch,
+  resolveTake,
+  type DrivenCar,
+  type DriverView,
+} from '../client/src/game/driving.ts';
 // The lime e-bikes. Pure, three-free, and the same file the browser runs -- which
 // is what makes a claim mean the same thing on both ends. See `game/bikes.ts`.
 import {
@@ -93,6 +116,7 @@ import {
   suggestName,
   uniqueName,
   type BikeRecord,
+  type CarRecord,
   type InvestigationRecord,
   type NetEvent,
   type RosterEntry,
@@ -110,6 +134,7 @@ import {
   MAX_ACTORS,
   NPC_KIND,
   REASON,
+  reportCrime,
   createBeatPose,
   createWitness,
   npcHitTest,
@@ -125,6 +150,27 @@ import {
 // used here and nothing else -- one tick of the ambient promotion scan, and the
 // rule about whether hitting one of them is a crime.
 import { stepStreetlife, strikeCrime } from '../client/src/game/streetlife.ts';
+// The heat ladder, on the same terms once more: `game/heat.ts` imports no three
+// and registers the two kind bytes `NPC_KIND` reserved for the highway patrol
+// and the RBT. Four entry points -- the field, one tick of it, the handle the
+// crime funnel reaches it through, and the world record it needs beyond the
+// faction context. See that file's header for the design.
+import {
+  HeatField,
+  installHeat,
+  stepHeat,
+  type HeatWorld,
+  type HeatRecord,
+} from '../client/src/game/heat.ts';
+// --- Workstream E: the five characters and the ambient events.
+//
+// Same terms again: both modules import no three and both register only bytes
+// `NPC_KIND` reserved for them. Four entry points and nothing else -- the
+// ambient promotion scan, the "somebody hit a tradie" notification, the Karen's
+// witness door, and one tick of the event scheduler with its sweep.
+import { characterStruck, karenReport, stepCharacters } from '../client/src/game/characters.ts';
+import { stepEvents, sweepEvents } from '../client/src/game/events.ts';
+import { setWallet, type WalletLookup } from '../client/src/game/wallet-contract.ts';
 // And the wildlife, on the same terms again: `game/wildlife.ts` imports no three
 // and registers the three kind bytes `NPC_KIND` reserved for it. Three entry
 // points -- the ambient promotion scan, the predicate for "is this one of the
@@ -138,6 +184,8 @@ import {
 } from '../client/src/game/wildlife.ts';
 import {
   createPedPose,
+  forEachPedestrianNear,
+  runDownPedestrian,
   strikePedestrian,
   strikePedestrianWithBall,
   type PedBand,
@@ -191,6 +239,35 @@ import {
   RIDE_TRIP_GONE,
 } from '../client/src/game/riding.ts';
 
+// --- Money. See `client/src/game/cash.ts`, `server/wallets.ts`, `server/fares.ts`.
+//
+// One block, and everything behind it is a module of its own: the rules are
+// shared with the browser (a fare has to pay the same on the HUD as in the
+// ledger), the persistence is a file this class never touches directly, and the
+// fare's state machine is `server/fares.ts` for the reason its header gives.
+// What is left in this file is the four places money meets the simulation --
+// a knockout, a pickup, a claim and a tick.
+import {
+  CENTRELINK_PAYMENT,
+  CLAIM_RADIUS_M,
+  MAX_BUNDLES,
+  BUNDLE_SECONDS,
+  claimWaitMs,
+  dropOnDeath,
+  formatMoney,
+  nearestOffices,
+  officeAt,
+  passengerLine,
+  tickBundles,
+  type CashBundle,
+  type CentrelinkOffice,
+  type WalletRecord,
+} from '../client/src/game/cash.ts';
+import { type DrivingLookup } from '../client/src/game/driving-contract.ts';
+import { createFare, stepFare, type FareContext, type FareJob } from './fares.ts';
+import { moveBalance, type WalletStore } from './wallets.ts';
+import type { WalletFrame } from '../client/src/net/cash.ts';
+
 export const FIXED_DT = 1 / TICK_HZ;
 
 /**
@@ -201,6 +278,28 @@ export const FIXED_DT = 1 / TICK_HZ;
  * tick. A 9 m ring of eight is far enough apart to be a fight rather than a
  * scrum and near enough that everybody can see everybody.
  */
+/**
+ * One driven car as the wire wants it. Here rather than inline at the two call
+ * sites so the field list cannot drift between the joiner's set and a delta.
+ */
+function carRecord(c: DrivenCar): CarRecord {
+  return {
+    id: c.id,
+    carId: c.carId,
+    driver: c.driverId,
+    body: c.body,
+    colour: c.colour,
+    x: c.x,
+    y: c.y,
+    z: c.z,
+    yaw: c.yaw,
+    speed: c.speed,
+  };
+}
+
+/** The "nothing changed" answer from `carDelta`, so a quiet tick allocates nothing. */
+const EMPTY_CARS: readonly CarRecord[] = [];
+
 const JOIN_RING = 9;
 const JOIN_PER_RING = 8;
 
@@ -268,6 +367,38 @@ export interface Participant {
   mountHeld: boolean;
   /** Set when the socket closes; the combatant leaves on the next tick. */
   gone: boolean;
+
+  // --- Money. See `client/src/game/cash.ts`.
+  /**
+   * This player's wallet, or **null for a bot**.
+   *
+   * Null rather than an empty record, so that every money path in this file
+   * begins with the same three-character test and a bot cannot accidentally
+   * acquire a balance by being handed one somewhere. `server/wallets.ts`'s
+   * header says why a bot must not have one: it would put a row in the file for
+   * every room on the host at every restart, and a bot that *dropped* money on
+   * death would make farming the two bots in your room the best-paying job in
+   * Sydney.
+   *
+   * The record is **shared with the store**, not copied: it is the object in
+   * `WalletStore`'s map, so mutating `balance` here is what gets written to
+   * disk on the next debounce. Two players with the same name in two rooms
+   * therefore share one object, which is the honest consequence of keying on a
+   * name and is stated in the store's header.
+   */
+  wallet: WalletRecord | null;
+  /** Bumped whenever anything in the wallet frame changes. `Room` compares it. */
+  walletVersion: number;
+  /**
+   * Why the balance last moved -- "+$34 fare" -- pending delivery.
+   *
+   * Cleared by `walletFrame` the moment it is read, so it is sent once and
+   * never repeats: this is a moment, and the pill it lands in is
+   * `hud.notice`'s. See `net/cash.WalletFrame.note`.
+   */
+  walletNote: string;
+  /** The rideshare shift and whatever fare is running on it. See `server/fares.ts`. */
+  fare: FareJob;
 }
 
 export interface TickOutput {
@@ -342,6 +473,7 @@ export class Simulation {
     traffic: 0,
     powerups: 0,
     bikes: 0,
+    cars: 0,
     npc: 0,
     history: 0,
   };
@@ -407,6 +539,17 @@ export class Simulation {
    * in this process would do.
    */
   private readonly ballReport: HitReport = createHitReport();
+  /**
+   * Scratch for the swat's ball rewind, allocated once for the life of the
+   * process.
+   *
+   * `swatBalls` writes each candidate ball's rewound position into it and
+   * consumes the answer before the next one, on `carPose`'s terms exactly: the
+   * query is synchronous, nothing holds it across a line, and the alternative is
+   * a record per ball per active tick of every swing in the room. See
+   * `game/swat.ts`.
+   */
+  private readonly swatScratch = createBallAt();
 
   /**
    * Scratch for the traffic query, allocated once for the life of the process.
@@ -451,6 +594,44 @@ export class Simulation {
    */
   readonly bikes = new BikeField();
   /**
+   * Every car anybody in this room has taken, and the authority on who is in one.
+   *
+   * **Not laid out at boot**, which is the whole way this differs from the bikes
+   * above: there is no plan and no fixed set, because a car record exists only
+   * for as long as somebody has stolen a car and not yet abandoned it. The field
+   * starts empty in every process and stays that way in a room nobody has
+   * stolen anything in, which is what makes the feature cost nothing until it is
+   * used.
+   *
+   * Public and named `cars` because the workstream contract says so: other
+   * passes reach `Simulation.cars` for the `DrivingLookup` on it.
+   */
+  readonly cars = new CarField();
+  /** Records that changed this tick, for `room.sendCars`. Reused; see `bikeChanges`. */
+  private readonly carChanges: DrivenCar[] = [];
+  /** Ids that expired this tick, likewise. */
+  private readonly carRemovals: number[] = [];
+  private readonly carSweep: DrivenCar[] = [];
+  private readonly driverViews: DriverView[] = [];
+  /**
+   * Scratch for `resolveTake` and for the driven fleet's own hit tests, on
+   * `carRoutes`/`carPose`'s argument: this runs per driven car per tick and per
+   * `E` press, and a fresh array and a fresh pose for each of them is the
+   * allocation this class spends its whole budget avoiding.
+   */
+  private readonly takeScratch = createDrivingScratch();
+  private readonly drivenPose: CarPose = createCarPose();
+  /**
+   * When `expireCars` last ran, as a wall clock.
+   *
+   * A clock rather than a tick count because the five-minute abandonment is a
+   * wall-clock promise and `this.tick` counts steps since *this room* started --
+   * a room that fell behind for a second would keep a car alive a second longer,
+   * which is invisible, but a room restarted under a running host would restart
+   * the clock, which is not.
+   */
+  private carExpiryAt = Date.now();
+  /**
    * The factions, and every investigation running against a player.
    *
    * One field for the process, on the bikes' own argument: a police officer
@@ -460,6 +641,24 @@ export class Simulation {
    * to keep true.
    */
   readonly factions = new FactionField();
+  /**
+   * The graded response: how wanted every player is, and everything the ladder
+   * has put on the road. See `client/src/game/heat.ts`.
+   *
+   * Beside `factions` rather than inside it, on the bikes' own argument: the
+   * investigation is a fact about the police and the ladder is a fact about the
+   * *player*, it outlives any one pursuit, and the two have different lifetimes
+   * on the wire -- `MSG.INVESTIGATION` is a countdown a client extrapolates and
+   * `MSG.HEAT` is a level it must not.
+   */
+  readonly heat = new HeatField();
+  /**
+   * The two things the ladder needs that `FactionCtx` does not carry, built once
+   * and never rebuilt: `stepFactions`' own discipline about the context, applied
+   * to a record with two members.
+   */
+  private readonly heatWorld: HeatWorld;
+  private readonly heatRecordPool: HeatRecord[] = [];
   /**
    * Scratch for the wildlife's ambient query, so a 60 Hz tick allocates nothing.
    *
@@ -565,8 +764,104 @@ export class Simulation {
   /** See `stepFactions`, which mutates the two members that change and nothing else. */
   private factionCtx!: FactionCtx;
 
-  constructor(world: ServerWorld) {
+  // --- Money ---------------------------------------------------------------
+  //
+  // Four members and one facade. Everything else about the wallet lives in
+  // `server/wallets.ts` (the file on disk), `server/fares.ts` (the job) and
+  // `client/src/game/cash.ts` (the rules), for the reason the import block at
+  // the top of this file gives.
+
+  /**
+   * Where balances are kept, or null in a world with no persistence.
+   *
+   * Null is the ordinary case for **every check in this repo**:
+   * `verifySim`, `server/integration-check.ts` and `server/loadtest.ts` all
+   * build a `Simulation` with one argument, and a store defaulted into
+   * existence there would be twenty checks writing a wallets file into the
+   * repository. So the store is injected by `server/index.ts` and by nothing
+   * else, and a null store means every participant's `wallet` is null and every
+   * money path in this file is skipped by the same test a bot is.
+   */
+  private readonly wallets: WalletStore | null;
+
+  /**
+   * Who is driving what. See `client/src/game/driving-contract.ts`.
+   *
+   * `NO_DRIVING` by default, which reports every player on foot -- so a build
+   * with no cars in it (which is every build until the driving workstream
+   * lands) runs the fare loop's "not in a car" branch forever and costs one
+   * boolean test per online player per tick.
+   */
+  readonly driving: DrivingLookup;
+
+  /** Every cash bundle lying on the ground in this room. Capped, swept, room-wide. */
+  private readonly bundles: CashBundle[] = [];
+  private nextBundleId = 1;
+  private readonly bundlePickups: Array<{ bundle: CashBundle; combatant: CombatantState }> = [];
+  /** Bumped when the list changes, so `Room` knows to re-send every wallet. */
+  bundleVersion = 0;
+
+  /** Reused by the fare loop; see `server/fares.ts` on why nothing here allocates. */
+  private readonly fareBands: PedBand[] = [];
+  private readonly fareCtx: FareContext = {
+    playerId: 0, tick: 0, dt: FIXED_DT, nowMs: 0,
+    x: 0, z: 0, speed: 0, inCar: false, ko: false,
+    peds: null as unknown as PedestrianField, bands: this.fareBands,
+  };
+
+  /**
+   * The money door, and the **only** one anything outside this class may use.
+   *
+   * `sim.wallet.credit(id, 34, 'fare')` rather than a method on `Simulation`,
+   * because the brief for this feature named exactly this surface and because
+   * grouping it says what it is: three verbs about one resource, none of which
+   * any other part of the simulation should be reaching around.
+   *
+   * The `why` is not decoration. It becomes the sentence in the next `WALLET`
+   * frame -- see `net/cash.WalletFrame.note` for why the *server* composes it
+   * rather than the client deriving one from the delta -- and a credit with no
+   * reason is money that appears on a HUD with nothing to explain it.
+   */
+  /**
+   * `this.wallet` on the characters module's terms: `debit` reports what was
+   * taken as a **positive** number where the door below reports the movement
+   * as a negative one. See `game/wallet-contract.WalletLookup`.
+   */
+  private readonly walletLookup: WalletLookup = {
+    debit: (playerId, amount, why) => -this.wallet.debit(playerId, amount, why),
+    credit: (playerId, amount, why) => {
+      this.wallet.credit(playerId, amount, why);
+    },
+    balanceOf: (playerId) => this.wallet.balanceOf(playerId),
+  };
+
+  readonly wallet = {
+    /** Pay a player. Returns what actually landed, after the cap. */
+    credit: (playerId: number, amount: number, why: string): number =>
+      this.moveWallet(playerId, Math.abs(Math.trunc(amount)), why),
+    /**
+     * Take money off a player. Returns what actually moved, **negative**, which
+     * is how a caller learns a debit was short: a player on $3 asked for $10
+     * gets -3 back, not -10, and the caller decides whether that is a purchase
+     * or a refusal. Nothing in this pass debits; the door exists because the
+     * sinks are the next thing anybody builds.
+     */
+    debit: (playerId: number, amount: number, why: string): number =>
+      this.moveWallet(playerId, -Math.abs(Math.trunc(amount)), why),
+    /** What this player has, or 0 for a bot and for an id that has left. */
+    balanceOf: (playerId: number): number =>
+      this.participants.get(playerId)?.wallet?.balance ?? 0,
+  };
+
+  constructor(world: ServerWorld, options: { wallets?: WalletStore; driving?: DrivingLookup } = {}) {
     this.world = world;
+    this.wallets = options.wallets ?? null;
+    // The real thing by default, now that the driving workstream has landed:
+    // the fare loop asks `this.cars` who is driving what, and `NO_DRIVING`
+    // survives only as the answer a caller gets when it explicitly asks for
+    // nothing (`SYDNEY_FAKE_DRIVING=1` passes the sprint hatch instead).
+    this.driving = options.driving ?? this.cars;
+    this.fareCtx.peds = world.peds;
     this.ballWorld = groundFor(world);
     this.factionWorld = groundFor(world);
     this.factionCtx = {
@@ -589,6 +884,19 @@ export class Simulation {
       ped: this.witnessPed,
       beat: this.witnessBeat,
     };
+    // The heat ladder's own two members. `lanes` is the same `TrafficField`
+    // every car in the city is drawn from -- a patrol car has to drive the
+    // roads that exist, not a second set -- and `rideStop` is this file's
+    // answer to "what is this player's train doing", which it already resolves
+    // every tick for the aboard section and would be a second copy of if
+    // `game/heat.ts` imported the rail bake to work it out again.
+    this.heatWorld = {
+      lanes: world.traffic,
+      rideStop: (id) => this.rideStop(id),
+    };
+    // The handle `factions.accuse`'s crime funnel reaches this field through.
+    // One authority per process; see `heat.installHeat`.
+    installHeat(this.heat);
 
     // The bikes, laid out from the same tile index every client reads and
     // snapped to the same ground the players walk on.
@@ -629,6 +937,30 @@ export class Simulation {
     return this.bikeChanges;
   }
 
+  /** Every driven car, as the wire wants them. The full set, for a joiner. */
+  carRecords(): CarRecord[] {
+    return this.cars.all().map(carRecord);
+  }
+
+  /**
+   * What changed about the cars this tick: takes, releases, and expiries.
+   *
+   * Two lists folded into one message, because a removal is a record with a
+   * flag on this wire -- see `protocol.encodeCars`. Owned and reused, on
+   * `bikeDelta`'s contract.
+   */
+  carDelta(): readonly CarRecord[] {
+    if (this.carChanges.length === 0 && this.carRemovals.length === 0) return EMPTY_CARS;
+    const out: CarRecord[] = this.carChanges.map(carRecord);
+    for (const id of this.carRemovals) {
+      // Everything but the id is meaningless on a removal, and is zeroed rather
+      // than left at whatever the record held so a decoder that ignored the flag
+      // would produce something obviously wrong rather than something plausible.
+      out.push({ id, carId: 0, driver: 0, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: 0, speed: 0, removed: true });
+    }
+    return out;
+  }
+
   // --- Membership -------------------------------------------------------------
 
   /**
@@ -660,11 +992,17 @@ export class Simulation {
     history.seed(this.tick, combat.body.position.x, combat.body.position.y, combat.body.position.z, spot.yaw);
     this.histories.set(id, history);
 
+    // Named once, here, because the wallet below is keyed on the name that was
+    // actually assigned rather than the one that was asked for -- and
+    // `pickName` dedupes against the room, so calling it twice would be two
+    // chances to disagree about which Bazza this is.
+    const name = this.pickName(requestedName, id);
+
     const p: Participant = {
       id,
       colourway: this.pickColourway(preferredColourway),
       bot: null,
-      name: this.pickName(requestedName, id),
+      name,
       kos: 0,
       downs: 0,
       ping: 0,
@@ -690,6 +1028,15 @@ export class Simulation {
       viewTicks: 0,
       mountHeld: false,
       gone: false,
+      // **The wallet is opened here and only here**, by name, and only for a
+      // person. `WalletStore.for` creates on first sight, so a new name's first
+      // `WALLET` frame carries `STARTING_BALANCE` rather than a zero that is
+      // corrected a moment later. A bot, or a host with no store, gets null and
+      // is skipped by every money path in this file. See `server/wallets.ts`.
+      wallet: bot === null && this.wallets !== null ? this.wallets.for(name) : null,
+      walletVersion: 1,
+      walletNote: '',
+      fare: createFare(),
     };
     // The bot holds the combatant rather than the other way round, so `think()`
     // writes the same `input` object the tick loop reads -- one record, as
@@ -838,11 +1185,113 @@ export class Simulation {
   private creditKo(attackerId: number, victimId: number): void {
     const victim = this.participants.get(victimId);
     if (victim) victim.downs++;
+    // **The heat ladder's terminal state, and this is the one funnel every
+    // knockout in the game passes through** -- a punch, a football, a car, a
+    // police round, jumping off a train, and the RBT. Being caught wipes it,
+    // whoever caught you, which is the brief's rule and is the only version
+    // that is playable: a 5-star player who respawns still at 5 stars respawns
+    // into a helicopter. The countdown is cleared beside it in `hurt` for the
+    // paths that reach that one; this covers the rest.
+    this.heat.reset(victimId);
     if (attackerId !== victimId) {
       const attacker = this.participants.get(attackerId);
       if (attacker) attacker.kos++;
     }
     this.rosterVersion++;
+    // And the money falls out, here, in the one place that already knows both
+    // ends of a knockout. See `dropCash`.
+    if (victim) this.dropCash(victim);
+    // A knockout during a fare is what "-50% if you knocked anyone down" means
+    // when the anyone is a player rather than a pedestrian. Marked on the
+    // *attacker*, and only when it was somebody else -- a driver run over by a
+    // Camry (`attackerId === victimId`) has not driven roughly, they have been
+    // driven into.
+    if (attackerId !== victimId) this.markRough(attackerId);
+  }
+
+  // --- Money ---------------------------------------------------------------
+
+  /**
+   * Ten per cent of a knocked-out player's wallet, on the pavement at their
+   * feet. See `cash.dropOnDeath` for the percentage and why there is a floor.
+   *
+   * **At their feet rather than where they end up.** `combat.applyHit` has
+   * already applied the knockback by the time this runs, so the body is
+   * mid-flight; the bundle is placed at the position the body is at *now*,
+   * which is where the punch landed rather than where the ragdoll comes to
+   * rest. That is the readable answer -- the money is where the fight was --
+   * and it is also the only one that is stable, because where a body slides to
+   * depends on what it hits.
+   *
+   * A no-op for a bot, for a player with under $5, and when the room is already
+   * carrying `MAX_BUNDLES`. The last of those loses the money rather than
+   * queueing it: a cap that queued would be a cap that does nothing under
+   * exactly the conditions it exists for.
+   */
+  private dropCash(victim: Participant): void {
+    const wallet = victim.wallet;
+    if (wallet === null) return;
+    const amount = dropOnDeath(wallet.balance);
+    if (amount <= 0) return;
+    if (this.bundles.length >= MAX_BUNDLES) return;
+    if (moveBalance(wallet, -amount) === 0) return;
+    this.wallets?.markDirty();
+    const c = victim.combat;
+    this.bundles.push({
+      id: this.nextBundleId,
+      x: c.body.position.x,
+      // The ground under the body, not the eye -- `tickBundles` gates on feet
+      // against this number, exactly as `tickPowerups` does against a sidecar's
+      // baked ground height.
+      y: c.body.position.y - EYE_HEIGHT,
+      z: c.body.position.z,
+      amount,
+      from: victim.id,
+      ttl: BUNDLE_SECONDS,
+    });
+    // Wraps rather than growing without bound: the id is a `u16` on the wire
+    // and a bundle lives thirty seconds, so a room would have to drop two
+    // thousand a second for a wrap to alias a live one.
+    this.nextBundleId = this.nextBundleId >= 65535 ? 1 : this.nextBundleId + 1;
+    this.bundleVersion++;
+    victim.walletVersion++;
+    victim.walletNote = `-${formatMoney(amount)} dropped`;
+  }
+
+  /**
+   * Move one player's balance and leave a sentence explaining it.
+   *
+   * The single implementation behind `wallet.credit` and `wallet.debit`. A bot,
+   * a departed id and a host with no store all fall out of the same null test,
+   * and all three return 0 -- which is the honest answer to "how much moved".
+   */
+  private moveWallet(playerId: number, delta: number, why: string): number {
+    const p = this.participants.get(playerId);
+    if (!p || p.wallet === null) return 0;
+    const moved = moveBalance(p.wallet, delta);
+    if (moved === 0) return 0;
+    this.wallets?.markDirty();
+    p.walletVersion++;
+    p.walletNote = `${moved > 0 ? '+' : '-'}${formatMoney(Math.abs(moved))} ${why}`.slice(0, 40);
+    return moved;
+  }
+
+  /**
+   * This driver has knocked something down; halve the fare they are on.
+   *
+   * Level rather than edge and deliberately sticky: the flag is cleared when a
+   * passenger *boards* (see `server/fares.ts`) and at no other time, so one
+   * pedestrian at the start of a trip costs the whole trip. That is the rule as
+   * written -- "-50% if you knocked anyone down during the trip" -- and it is
+   * the only version a player can reason about, because a flag that decayed
+   * would make the penalty depend on when in the trip it happened.
+   *
+   * Cheap by construction: a map lookup and a boolean store, called from the
+   * three places something goes down.
+   */
+  private markRough(playerId: number): void {
+    const p = this.participants.get(playerId);
+    if (p && p.fare.state === 'toDropoff') p.fare.rough = true;
   }
 
   private pickColourway(preferred: number): number {
@@ -984,6 +1433,8 @@ export class Simulation {
     this.tick++;
     this.events.length = 0;
     this.bikeChanges.length = 0;
+    this.carChanges.length = 0;
+    this.carRemovals.length = 0;
 
     // --- Departures, before anything reads the list.
     let departed = false;
@@ -1119,21 +1570,90 @@ export class Simulation {
     // snapshot stream, and rewinding it would mean a ball that visibly passed
     // somebody 100 ms ago knocking them over now. So `server/rewind.ts` is not
     // consulted here at all, and the 250 ms ring stays a melee mechanism.
+    // --- ...but first, every bat that is mid-swing, against every ball in the
+    // air. The community suggestion; see `game/swat.ts`.
+    //
+    // **Before the step, and that ordering is the decision.** A swat deflects
+    // the ball's velocity, and running it here means the deflected velocity is
+    // what the very next line integrates -- the ball turns round on the tick the
+    // blade reached it. Run *after* the step it would turn round one tick late,
+    // 16 ms and 0.7 m further into the swinger's own face, which is exactly the
+    // frame a player is looking at when they decide whether a swat worked.
+    //
+    // The cost is O(swingers x balls) and both terms are small: a swing is in
+    // its `active` window for six of the 30 ticks it lasts and most players are
+    // not swinging on most ticks, so the ordinary tick pays one `phase` compare
+    // per player. It is not put behind the spatial index for that reason -- the
+    // grid lookup would cost more than the loop it saves at the sizes this
+    // actually runs at, and `swingCatches` rejects on a plan distance before it
+    // does any real work.
+    for (const p of this.ordered) {
+      // **Bots do not swat**, and that is a deliberate line rather than an
+      // oversight. `server/bots.ts` swings when somebody is in reach; it has no
+      // model of a ball in the air at all, so every swat it landed would be one
+      // it swung for a different reason and happened to catch -- a coin flip
+      // wearing a skill mechanic, and specifically the coin flip the community
+      // suggestion this implements is *about*. A bot that returned serve by
+      // accident would read as a bot that reads the ball better than a person
+      // can. Giving it a real one means teaching it to lead a projectile, which
+      // is a bot pass rather than a weapon pass.
+      if (p.bot) continue;
+      if (p.combat.phase !== 'active') continue;
+      const ball = swatBalls(
+        p.combat,
+        this.balls.balls,
+        FIXED_DT,
+        // The swinger's own view lag, which is the same number the melee's
+        // rewind uses and is derived once per tick by `Room.step`. It is the
+        // *ball* that gets rewound here rather than the bodies -- see
+        // `game/swat.ts`, decision 2, where the two are read together.
+        p.viewTicks * FIXED_DT,
+        this.swatScratch,
+      );
+      if (ball === null) continue;
+      // The event carries the ball's post-swat state as well as the two ids,
+      // because the player who *threw* it is still flying a local predicted copy
+      // that now disagrees with this process about which way it is going --
+      // `Footy.thrower` is deliberately unchanged by a swat, so nothing in the
+      // snapshot stream can tell them. See `protocol.SwatEvent`.
+      this.events.push({
+        kind: EVENT.SWAT,
+        swinger: p.id,
+        ball: ball.id,
+        x: ball.x,
+        y: ball.y,
+        z: ball.z,
+        vx: ball.vx,
+        vy: ball.vy,
+        vz: ball.vz,
+      });
+    }
+
     t = performance.now();
     for (const e of this.balls.step(FIXED_DT, this.ballWorld, this.combatants, this.ballEvents, this.liveIndex)) {
       if (e.kind !== 'hit' || !e.victim) continue;
-      const thrower = this.participants.get(e.ball.thrower);
-      // A ball whose thrower has since disconnected still counts. It is in the
+      // The **owner**, not the thrower: a ball that was batted back belongs to
+      // whoever returned it, and the knockout goes on their row. For every ball
+      // nobody swatted the two are the same participant. See `footy.Footy.owner`.
+      const owner = this.participants.get(e.ball.owner);
+      // A ball whose owner has since disconnected still counts. It is in the
       // air and it is nobody's property any more; refusing the hit would make
       // leaving a way to un-throw.
-      if (!thrower) continue;
-      applyFootyHit(thrower.combat, e.victim, e.ball, this.ballReport);
-      if (this.ballReport.ko) this.creditKo(thrower.id, e.victim.id);
+      if (!owner) continue;
+      applyFootyHit(owner.combat, e.victim, e.ball, this.ballReport);
+      if (this.ballReport.ko) this.creditKo(owner.id, e.victim.id);
       this.events.push({
         kind: EVENT.HIT,
-        attacker: thrower.id,
+        attacker: owner.id,
         victim: e.victim.id,
-        flags: EVENT_FLAG.FOOTY | (this.ballReport.ko ? EVENT_FLAG.KO : 0),
+        flags:
+          EVENT_FLAG.FOOTY |
+          (this.ballReport.ko ? EVENT_FLAG.KO : 0) |
+          // "%s returned serve on %s" rather than "%s pegged %s". The bit is set
+          // whenever the ball changed hands in the air, which includes the case
+          // the suggestion was really about -- a return that knocks over the
+          // person who threw it -- and reads correctly for the others.
+          (e.ball.owner !== e.ball.thrower ? EVENT_FLAG.RETURNED : 0),
         health: e.victim.health,
       });
     }
@@ -1149,12 +1669,19 @@ export class Simulation {
     {
       const tick = trafficTick(Date.now());
       for (const ball of this.balls.balls) {
-        const thrower = this.participants.get(ball.thrower);
-        if (!thrower) continue;
+        // The owner again, and here it is a question about **blame**: knocking a
+        // pedestrian over with a football you batted out of the air is your
+        // assault and not the assault of whoever threw it at you.
+        const owner = this.participants.get(ball.owner);
+        if (!owner) continue;
         const struck = strikePedestrianWithBall(
           this.world.peds, ball, BALL_RADIUS, FIXED_DT, tick, this.pedBands, this.pedPose,
         );
-        if (struck !== null) this.reportIfWitnessed(thrower, struck.x, struck.z, REASON.ASSAULT);
+        if (struck !== null) {
+          this.reportIfWitnessed(owner, struck.x, struck.z, REASON.ASSAULT);
+          // A football out of a car window is still knocking somebody down.
+          this.markRough(owner.id);
+        }
         // And the officers, swept over the same one-tick segment. `npcHitTest`
         // reconstructs the previous position from the velocity exactly as
         // `strikePedestrianWithBall` does -- which is what `footy.stepFooty`
@@ -1166,7 +1693,7 @@ export class Simulation {
           ball.x, ball.y, ball.z,
           BALL_RADIUS,
         );
-        if (actor !== null) this.hitNpc(actor, 1, thrower);
+        if (actor !== null) this.hitNpc(actor, 1, owner);
       }
     }
     this.phaseMs.balls += performance.now() - t;
@@ -1204,7 +1731,15 @@ export class Simulation {
         // standing in. The client makes the identical check in the identical
         // place -- `main.ts` -- which is what keeps the prediction exact.
         if (isAboard(p.combat.aboard)) continue;
-        const car = carHitting(this.world.traffic, p.combat, tick, this.carRoutes, this.carPose);
+        // Suppressed cars are skipped, which is the other half of "the car you
+        // stole stops driving to Ashfield" -- without it the ghost of your own
+        // car runs *you* over from inside the seat you are sitting in on the
+        // first tick you stop. `main.ts` passes the identical predicate at the
+        // identical point.
+        const car = carHitting(
+          this.world.traffic, p.combat, tick, this.carRoutes, this.carPose,
+          (identity) => this.cars.suppressed(identity),
+        );
         if (car === null) continue;
         const ko = applyCarHit(p.combat, car);
         // Credited to the victim as their own attacker, which `creditKo` reads
@@ -1244,6 +1779,38 @@ export class Simulation {
         index: indexOf(e.point.id),
       });
     }
+
+    // --- The money on the pavement, immediately after the powerups and for
+    // exactly their reasons: after every combatant has moved, against the live
+    // index rather than the rewound one, and resolved in combatant order so
+    // two players reaching one pile settle the same way on every machine.
+    //
+    // `tickBundles` compacts the list in place, so this loop is over what was
+    // *collected* and the survivors are already the whole list.
+    for (const e of tickBundles(this.bundles, this.combatants, FIXED_DT, this.bundlePickups, this.liveIndex)) {
+      this.bundleVersion++;
+      // No `EVENT` for a collection, deliberately. The `WALLET` frame the
+      // collector gets carries both halves -- the new balance and the sentence
+      // saying where it came from -- and everybody else's `WALLET` re-sends the
+      // bundle list without it, which is how the pile disappears from their
+      // screen. An event as well would be the same fact on the wire twice, and
+      // `EVENT.PICKUP` above is only an event because a powerup's *world state*
+      // (the icon, the respawn clock) is client-side and this is not.
+      this.moveWallet(e.combatant.id, e.bundle.amount, 'found');
+    }
+    if (this.bundles.length !== this.bundlesLastCount) {
+      // Expiry also changes the list, and `tickBundles` reports collections
+      // rather than deaths -- so the version is bumped off the length as well.
+      this.bundlesLastCount = this.bundles.length;
+      this.bundleVersion++;
+    }
+
+    // --- SydRide, last of the money passes, because a fare that pays reads the
+    // balance every pass above may have moved.
+    //
+    // O(players) and one boolean test for anybody not on shift. The context
+    // record is reused; see `server/fares.ts` on why nothing here allocates.
+    this.stepFares();
 
     // --- The bikes again, after everybody has moved and every hit has landed.
     //
@@ -1305,6 +1872,11 @@ export class Simulation {
     this.stepRideBy();
     this.phaseMs.bikes += performance.now() - t;
 
+    // --- And the cars, on the bikes' own terms one phase up.
+    t = performance.now();
+    this.stepCars();
+    this.phaseMs.cars += performance.now() - t;
+
     // --- The factions, after everything that could have started an
     // investigation and before the history is recorded.
     //
@@ -1343,6 +1915,147 @@ export class Simulation {
    * A tuned rider, in front of the police. See the call site for why it is an
    * edge rather than a level.
    */
+  /** How long `this.bundles` was last tick, so expiry bumps the version too. */
+  private bundlesLastCount = 0;
+
+  /**
+   * Every online driver's fare, one fixed step each.
+   *
+   * The loop is over `this.ordered` rather than over a list of online drivers,
+   * on `stepRideBy`'s own terms: a second collection to maintain is a second
+   * thing that can disagree with the participant map, and the test that skips
+   * everybody else is one boolean read off a record that is already in cache.
+   *
+   * **Where the fare thinks the driver is** is the car's pose when there is a
+   * car and the body's when there is not, which matters at the two stop
+   * radii: a driver's body may be a metre from the car's origin, and five
+   * metres is not a radius that can spend one on a coordinate choice.
+   */
+  private stepFares(): void {
+    const nowMs = Date.now();
+    for (const p of this.ordered) {
+      const job = p.fare;
+      if (!job.online && job.state === 'none' && job.cooldownT <= 0) continue;
+      if (p.bot) continue;
+
+      const carId = this.driving.carOf(p.id);
+      const pose = carId !== 0 ? this.driving.carPose(carId) : null;
+      const c = p.combat;
+      const ctx = this.fareCtx;
+      ctx.playerId = p.id;
+      ctx.tick = this.tick;
+      ctx.nowMs = nowMs;
+      ctx.x = pose ? pose.x : c.body.position.x;
+      ctx.z = pose ? pose.z : c.body.position.z;
+      // The body's own plan speed when there is no pose to read one off.
+      // `velocity` is the integrator's, so this is the speed the tick just
+      // produced rather than an average over anything.
+      ctx.speed = pose
+        ? pose.speed
+        : Math.sqrt(c.body.velocity.x * c.body.velocity.x + c.body.velocity.z * c.body.velocity.z);
+      ctx.inCar = carId !== 0;
+      ctx.ko = c.phase === 'ko' || c.health <= 0;
+
+      const out = stepFare(job, ctx);
+      if (out.paid > 0) {
+        this.wallet.credit(p.id, out.paid, 'fare');
+        // The passenger's parting line, seeded off the fare so it is stable if
+        // the frame is ever re-sent. Appended to the notice rather than
+        // replacing it, because "+$27 fare" is the fact and the line is the
+        // flavour, and a player who missed the number would have nothing.
+        job.line = passengerLine(p.id ^ Math.trunc(job.tripM));
+      } else if (out.notice === 'passenger in') {
+        job.line = passengerLine(p.id ^ job.offeredMs);
+      }
+      if (out.notice !== '' && p.walletNote === '') p.walletNote = out.notice;
+    }
+  }
+
+  // --- The phone -------------------------------------------------------------
+
+  /**
+   * `PHONE_OP.CLAIM`: pay this player $100 if they are standing at that office
+   * and have not claimed there for seven in-game days.
+   *
+   * **Every clause is checked here and none is trusted from the client.** The
+   * office id names a row in a table both ends compile in, but the *position*
+   * is the server's own simulated body and the *timer* is the server's own
+   * record -- so a client that sent a claim for an office in Penrith while
+   * standing in Redfern is refused by geometry, and one that sent the same
+   * claim sixty times a second is refused by the clock. There is nothing to
+   * rate-limit beyond that: a refused claim costs a map lookup.
+   *
+   * Returns a sentence for the player, always, because a claim that silently
+   * does nothing is a button the player decides is broken. Lower case, on
+   * `factions.REASON_TEXT`'s voice.
+   */
+  claim(playerId: number, officeId: string): string {
+    const p = this.participants.get(playerId);
+    if (!p || p.wallet === null) return 'no wallet on this host';
+    const c = p.combat;
+    if (c.phase === 'ko' || c.health <= 0) return 'not while you are on the ground';
+    const office = officeAt(c.body.position.x, c.body.position.z);
+    if (office === null) return 'you are not at a centrelink';
+    // The id is compared rather than ignored. Standing at Redfern and claiming
+    // for Parramatta is refused rather than quietly redirected, because the
+    // phone shows a list and the player picked a row -- and a claim that paid
+    // the wrong office's timer would be a bug nobody could see.
+    if (officeId !== '' && officeId !== office.id) return `you are at ${office.name.toLowerCase()}`;
+    const wait = claimWaitMs(p.wallet.centrelink[office.id] ?? 0, Date.now());
+    if (wait > 0) return 'nothing due here yet';
+    this.wallets?.recordClaim(p.wallet, office.id, Date.now());
+    this.wallet.credit(playerId, CENTRELINK_PAYMENT, 'centrelink');
+    return '';
+  }
+
+  /** `PHONE_OP.ONLINE` / `OFFLINE`. Idempotent; see `net/cash.PHONE_OP`. */
+  setOnline(playerId: number, online: boolean): void {
+    const p = this.participants.get(playerId);
+    if (!p || p.wallet === null) return;
+    if (p.fare.online === online) return;
+    p.fare.online = online;
+    p.fare.version++;
+  }
+
+  /**
+   * What this player's `WALLET` frame says right now, and the note it carries
+   * is **consumed**: reading clears it, so a sentence is sent once.
+   *
+   * The countdown is for the nearest office within a claim radius plus a little
+   * -- see `net/cash.WalletFrame.centrelinkNextMs` for why one number rather
+   * than the whole table. `-1` means there is nothing near enough to be talking
+   * about, which is where a player is 99% of the time.
+   */
+  walletFrame(playerId: number, into: WalletFrame): WalletFrame | null {
+    const p = this.participants.get(playerId);
+    if (!p || p.wallet === null) return null;
+    into.balance = p.wallet.balance;
+    into.note = p.walletNote;
+    p.walletNote = '';
+    into.bundles = this.bundles;
+    into.centrelinkNextMs = -1;
+    const near = nearestOffices(p.combat.body.position.x, p.combat.body.position.z, 1, this.officeScratch);
+    // A little wider than the claim radius, so the phone's countdown appears as
+    // you walk up to the door rather than snapping on at the moment the prompt
+    // does. Thirty metres is about a shopfront's width either side.
+    if (near.length > 0 && near[0].distance <= CLAIM_RADIUS_M * 5) {
+      into.centrelinkNextMs = claimWaitMs(p.wallet.centrelink[near[0].office.id] ?? 0, Date.now());
+    }
+    return into;
+  }
+
+  private readonly officeScratch: Array<{ office: CentrelinkOffice; distance: number }> = [];
+
+  /** This player's fare, or null for a bot and for an id that has left. */
+  fareOf(playerId: number): FareJob | null {
+    return this.participants.get(playerId)?.fare ?? null;
+  }
+
+  /** Every bundle on the ground. Owned by this object; serialise before the next step. */
+  cashBundles(): readonly CashBundle[] {
+    return this.bundles;
+  }
+
   private stepRideBy(): void {
     const tick = trafficTick(Date.now());
     for (const p of this.ordered) {
@@ -1402,6 +2115,36 @@ export class Simulation {
     // `WILDLIFE_BUDGET`, a third of the field -- so a park full of turkeys can
     // never be the reason an officer could not be dispatched to somebody.
     stepWildlife(ctx, this.wildScratch, this.wildPose);
+    // And the heat ladder, **after** the factions rather than before: the
+    // crimes reported during the last tick are drained by `FactionField.step`,
+    // which is what calls `accuse`, which is what feeds the ladder. Running it
+    // first would put every crime a tick late and would make a 3-star
+    // escalation arrive after the officers it is supposed to bring. See
+    // `game/heat.stepHeat`, which states the same ordering from its own side.
+    stepHeat(ctx, this.heat, this.heatWorld);
+    // --- And workstream E's two, in the same place and for the same reason.
+    //
+    // `stepCharacters` promotes the eshay, Karen, tradie, influencer or agent a
+    // player has walked up to, inside its own eight-actor budget.
+    // `stepEvents` promotes the standoff's three and the burnout's constable
+    // inside a budget of three. Neither can be the reason an officer could not
+    // be dispatched; see `characters.MAX_CHARACTER_ACTORS`.
+    //
+    // `sweepEvents` runs **before** `stepEvents` deliberately, and it is the one
+    // ordering in this block that is not simply "after the step". It despawns
+    // actors whose event has finished, which is what frees the budget the
+    // promotion below then spends -- the other way round, an event that ended on
+    // the same tick a new one opened would hold its slot for one more tick every
+    // tick, and the symptom would be the second event never getting anybody.
+    sweepEvents(ctx);
+    // The eshays roll a player for $20 through the characters module's
+    // process-wide `wallet()` handle. Pointed at **this** simulation on every
+    // tick rather than once at boot, because a host runs several rooms and each
+    // room is its own `Simulation` with its own participant ids -- a wallet
+    // handle set once would debit room 0's player 7 for room 3's mugging.
+    setWallet(this.walletLookup);
+    stepCharacters(ctx);
+    stepEvents(ctx);
     // An investigation that ran out changes what the wire has to say, and
     // nothing inside the field can bump a version it does not know about.
     if (this.factions.investigationCount !== before) this.investigationVersion++;
@@ -1459,6 +2202,10 @@ export class Simulation {
       // countdown's other terminal state, and a banner that survived a respawn
       // would have the player wanted for something they were already punished
       // for.
+      //
+      // The **ladder** is wiped by `creditKo` above rather than here, because
+      // that is the funnel every knockout passes through and this one is only
+      // the world's. See there.
       this.factions.clearInvestigation(playerId);
       this.investigationVersion++;
       this.seenRiding.set(playerId, false);
@@ -1523,15 +2270,294 @@ export class Simulation {
       return;
     }
 
+    if (c.drivingCar !== 0) {
+      // Out. Same shape as the bike one line up and for the same reason: the
+      // car is left standing where the body is by `CarField.follow` at the end
+      // of this tick, which has the position *after* the step. Clearing the
+      // field is the whole of it -- the sweep does the rest, and a player who
+      // is knocked out instead of pressing E gets identical behaviour from
+      // identical code.
+      //
+      // The record survives with `driverId = 0`, which is the brief's rule and
+      // is what makes a getaway car a thing anybody can take: the next person
+      // to press E beside it is refused by `resolveTake` (its ambient copy is
+      // suppressed, so it is not in the lookup) and served by `nearestEmptyCar`
+      // below instead.
+      c.drivingCar = 0;
+      c.carSpeed = 0;
+      return;
+    }
+
     if (this.tryBoard(p)) return;
     const feet = c.body.position.y - EYE_HEIGHT;
     const bike = this.bikes.nearestFree(c.body.position.x, feet, c.body.position.z);
-    if (!bike) return;
-    // The one place a claim is decided, and it can still fail: an earlier
-    // participant in this same loop may have taken it a microsecond ago.
-    if (!this.bikes.claim(bike.id, c.id)) return;
-    c.ridingBike = bike.id;
-    this.bikeChanges.push(bike);
+    if (bike) {
+      // The one place a claim is decided, and it can still fail: an earlier
+      // participant in this same loop may have taken it a microsecond ago.
+      if (!this.bikes.claim(bike.id, c.id)) return;
+      c.ridingBike = bike.id;
+      this.bikeChanges.push(bike);
+      return;
+    }
+
+    this.tryTakeCar(p);
+  }
+
+  /**
+   * Get into the car beside you, if the *server* agrees there is one.
+   *
+   * The anti-cheat story is `tryBoard`'s verbatim and is worth restating,
+   * because it is the whole reason the parked kerb fleet is not stealable (see
+   * `game/driving.ts` section 1): `INPUT` is ten bytes of buttons and a look
+   * direction, so there is no field in which a client could *name* a car. A
+   * take is a question asked with a button, and it is answered here against
+   *
+   *   1. **this server's own position for that body**, never one the client sent;
+   *   2. **this server's own evaluation of `poseCar`** at this tick's traffic
+   *      tick, which is a closed-form function of the millisecond and is
+   *      asserted identical to the browser's by `checkTraffic`;
+   *   3. `CarField`, which refuses an identity somebody already has.
+   *
+   * An empty car standing in the street is checked **first**, because it is a
+   * thing the world contains that the lookup no longer describes -- its ambient
+   * copy is suppressed precisely so it stops existing on the timetable, so
+   * `resolveTake` will never find it. Getting back into the car you just parked
+   * is the commonest thing a driver does and it has to work.
+   */
+  private tryTakeCar(p: Participant): void {
+    const c = p.combat;
+    const feet = c.body.position.y - EYE_HEIGHT;
+
+    // --- Somebody's abandoned getaway car, or your own.
+    const standing = this.nearestEmptyCar(c.body.position.x, feet, c.body.position.z);
+    if (standing !== null) {
+      standing.driverId = c.id;
+      standing.emptyMs = 0;
+      c.drivingCar = standing.id;
+      c.carSpeed = 0;
+      this.carChanges.push(standing);
+      // **No crime.** Getting into a car that is already standing open in the
+      // street with nobody in it is not the theft -- the theft happened when
+      // somebody took it off the timetable, and it was reported then. Charging
+      // for it again would mean a driver who stopped at a red, got out to punch
+      // somebody and got back in collected two counts of car theft.
+      return;
+    }
+
+    // --- Or one off the timetable, which is the theft.
+    const scratch = this.takeScratch;
+    if (
+      !resolveTake(
+        this.world.traffic,
+        c.body.position.x,
+        feet,
+        c.body.position.z,
+        trafficTick(Date.now()),
+        scratch.routes,
+        scratch.pose,
+        (identity) => this.cars.suppressed(identity),
+        scratch.take,
+      )
+    ) {
+      return;
+    }
+    const car = this.cars.take(scratch.take, c.id);
+    // Null means an earlier participant in this same loop took it a microsecond
+    // ago -- `CarField.take` is the one place that claim is decided, exactly as
+    // `BikeField.claim` is for a bike.
+    if (car === null) return;
+    c.drivingCar = car.id;
+    c.carSpeed = 0;
+    this.carChanges.push(car);
+
+    // --- And the crime, if anybody was there to see it.
+    //
+    // Reported and not graded: what a car thief is worth is the heat ladder's
+    // decision and lives in another module. See `factions.REASON.CAR_THEFT`.
+    //
+    // Bots never steal cars (`Bot` never sets `BTN.MOUNT`), so there is no
+    // clause here about them -- but a bot standing on the footpath *is* a
+    // witness under `policeWitness`' promoted-actor tier, which is correct.
+    if (this.sawTheft(car.x, car.y, car.z)) reportCrime(c.id, REASON.CAR_THEFT);
+  }
+
+  /**
+   * The nearest car standing empty within reach, or null.
+   *
+   * Linear in driven cars, which are counted in ones -- see the budget note in
+   * this class's header. Ties break on the record id rather than on the float
+   * distance, on `BikeField.nearestFree`'s rule and for its reason: the client
+   * predicts this same choice and an integer comparison is a rule both ends can
+   * state.
+   */
+  private nearestEmptyCar(x: number, feetY: number, z: number): DrivenCar | null {
+    let best: DrivenCar | null = null;
+    let bestD2 = TAKE_RADIUS * TAKE_RADIUS;
+    for (const car of this.cars.all()) {
+      if (car.driverId !== 0) continue;
+      const dy = car.y - feetY;
+      if (dy > TAKE_HEIGHT || dy < -TAKE_HEIGHT) continue;
+      const dx = car.x - x;
+      const dz = car.z - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > bestD2) continue;
+      if (best !== null && d2 >= bestD2) continue;
+      best = car;
+      bestD2 = d2;
+    }
+    return best;
+  }
+
+  /**
+   * Did anybody see that theft?
+   *
+   * Both tiers, and the order is `policeWitness`' own: an officer is a witness
+   * and so is anybody on the footpath. `driving.bystanderSeen` does the geometry
+   * and this supplies the crowd and the line of sight, which keeps
+   * `game/driving.ts` out of the pedestrian module's import graph -- the same
+   * seam `factions.policeWitness` makes with its `ctx`.
+   */
+  private sawTheft(x: number, y: number, z: number): boolean {
+    if (policeWitness(x, z, trafficTick(Date.now()), this.witnessCtx, this.witness).seen) return true;
+    const peds = this.world.peds;
+    if (peds === null) return false;
+    const tick = trafficTick(Date.now());
+    return bystanderSeen(
+      x,
+      y,
+      z,
+      (visit) => {
+        forEachPedestrianNear(peds, x, z, WITNESS_RADIUS, tick, this.witnessBands, this.witnessPed, (ped) => {
+          visit(ped.x, ped.y, ped.z, ped.down);
+        });
+      },
+      this.world.collision === null
+        ? null
+        : (ax, ay, az, bx, by, bz) => this.world.collision!.blocked(ax, ay, az, bx, by, bz),
+    );
+  }
+
+  /**
+   * The driven cars, after everybody has moved and every hit has landed.
+   *
+   * Three sweeps, and all three are sweeps rather than events on `BikeField`'s
+   * argument -- one rule covering being knocked out, being run over, respawning,
+   * pressing E and disconnecting, none of which needed to know cars exist.
+   *
+   *   1. **`follow`** carries each occupied car to its driver and leaves any
+   *      whose driver has stopped driving standing in the road.
+   *   2. **The knockdown**, which is `game/traffic.ts`' own, reused rather than
+   *      reimplemented: a driven car fills a `CarPose` (`drivenCarPose`) and is
+   *      then put through `carOverlaps`, `carHitStrength` and `applyCarHit`
+   *      exactly as an ambient one is. That is the only way "a car knocks you
+   *      down" can mean one thing in this game.
+   *   3. **Expiry**, at 1 Hz rather than 60, because it is a five-minute clock.
+   *
+   * O(driven cars), and driven cars are counted in ones. The knockdown's inner
+   * loop is O(driven cars x participants) at spec 2's sixteen-player cap, which
+   * at a plausible three stolen cars is 48 box tests a tick -- against the
+   * `carHitting` phase above, which is sixteen broadphase queries over a fleet
+   * of thousands.
+   */
+  private stepCars(): void {
+    if (this.cars.size === 0) return;
+
+    this.driverViews.length = 0;
+    for (const p of this.ordered) {
+      const c = p.combat;
+      this.driverViews.push({
+        id: c.id,
+        drivingCar: c.drivingCar,
+        carSpeed: c.carSpeed,
+        x: c.body.position.x,
+        feetY: c.body.position.y - EYE_HEIGHT,
+        z: c.body.position.z,
+        yaw: c.body.yaw,
+      });
+    }
+    for (const car of this.cars.follow(this.driverViews, this.carSweep)) {
+      this.carChanges.push(car);
+    }
+
+    // --- What the driven fleet ran over.
+    const tick = trafficTick(Date.now());
+    for (const car of this.cars.all()) {
+      if (car.driverId === 0) continue;
+      const speed = car.speed < 0 ? -car.speed : car.speed;
+      if (speed < RUN_DOWN_SPEED) continue;
+      const pose = drivenCarPose(car, this.drivenPose);
+      // `carHitStrength` scales the launch by how fast the thing that hit you
+      // was going, and it is already 1 at everything past
+      // `CAR_HIT_FULL_SPEED` (8 m/s) -- so the brief's 4 m/s floor lands in the
+      // ramp's middle and a car that has just pulled away tips you over where
+      // one at a road speed sends you across the street. That continuity is the
+      // property `carHitStrength`'s header says is a requirement.
+      if (carHitStrength(pose) <= 0) continue;
+
+      let offended = false;
+
+      // --- Players and bots.
+      for (const victim of this.ordered) {
+        if (victim.id === car.driverId) continue;
+        // Nobody on a train is run over by a stolen Camry, on exactly the
+        // clause the ambient fleet has thirty lines up and for its reason.
+        if (isAboard(victim.combat.aboard)) continue;
+        if (!canBeRunDown(victim.combat)) continue;
+        if (!carOverlaps(pose, victim.combat)) continue;
+        const ko = applyCarHit(victim.combat, pose);
+        // Credited to the **driver** rather than to the victim, which is the one
+        // place this differs from the ambient fleet: there really is somebody
+        // behind the wheel, and a knockout with a name on it is the difference
+        // between "you got run down" and "a car got you".
+        if (ko) this.creditKo(car.driverId, victim.id);
+        this.events.push({
+          kind: EVENT.HIT,
+          attacker: car.driverId,
+          victim: victim.id,
+          flags: ko ? EVENT_FLAG.KO : 0,
+          health: victim.combat.health,
+        });
+        offended = true;
+      }
+
+      // --- And the crowd.
+      if (this.world.peds !== null) {
+        const hit = runDownPedestrian(
+          this.world.peds, pose, car.driverId, tick, this.pedBands, this.pedPose,
+        );
+        if (hit !== null) offended = true;
+      }
+
+      // Unconditional, unlike the theft: `REASON.CAR_THEFT` needs a witness
+      // because a crime nobody saw is not reported, and a body in the road is
+      // its own witness. See `factions.REASON.DANGEROUS_DRIVING`.
+      if (offended) reportCrime(car.driverId, REASON.DANGEROUS_DRIVING);
+    }
+
+    // --- Expiry, at 1 Hz. See `carExpiryAt`.
+    const now = Date.now();
+    const elapsed = now - this.carExpiryAt;
+    if (elapsed >= 1000) {
+      this.carExpiryAt = now;
+      for (const id of this.cars.expire(elapsed, (car) => this.nearestPersonTo(car.x, car.z), this.carRemovals)) {
+        // Nothing else to undo. The ambient car was only ever *suppressed* --
+        // see `game/driving.ts` section 3 -- so removing the record is the whole
+        // of putting it back on its timetable.
+        void id;
+      }
+    }
+  }
+
+  /** Plan distance from the nearest participant to a point. `expire`'s gate. */
+  private nearestPersonTo(x: number, z: number): number {
+    let best = Infinity;
+    for (const p of this.ordered) {
+      const dx = p.combat.body.position.x - x;
+      const dz = p.combat.body.position.z - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < best) best = d2;
+    }
+    return best === Infinity ? Infinity : Math.sqrt(best);
   }
 
   // --- Trains ---------------------------------------------------------------------
@@ -1971,6 +2997,9 @@ export class Simulation {
     const hit = strikePedestrian(this.world.peds, p.combat, trafficTick(Date.now()), this.pedBands, this.pedPose);
     if (hit === null) return;
     this.reportIfWitnessed(p, hit.x, hit.z, REASON.ASSAULT);
+    // "-50% if you knocked anyone down during the trip". One of the three
+    // places anything goes down; see `markRough`.
+    this.markRough(p.id);
   }
 
   /**
@@ -2026,6 +3055,14 @@ export class Simulation {
     const reason = strikeCrime(actor);
     const strike = strikeNpc(this.factions, actor, pips, p.name, p.id, this.tick);
     if (!strike.landed) return;
+    // --- Workstream E: a tradie who has just been hit decks you back.
+    //
+    // **After** the strike, which is the opposite of `strikeCrime`'s rule and
+    // for the mirrored reason: that one asks about the person who was standing
+    // there a moment ago, and this tells the person who is standing there now
+    // what to do about it. A no-op for every other kind, including the other
+    // four of ours, so there is no `switch` here.
+    characterStruck(actor, p.id);
     const def = npcKind(actor.kind);
     // Assaulting police is its own reason and needs no witness -- see
     // `strikeOfficers`. Every other kind asks its own faction, which is what
@@ -2033,7 +3070,14 @@ export class Simulation {
     // one only while they are calm" without this file knowing why. A kind that
     // registers no opinion gets the ordinary bystander rule.
     if (actor.kind === NPC_KIND.POLICE) {
-      this.accuse(p, REASON.ASSAULT_POLICE);
+      // **The swing and the result are two different charges**, which is what
+      // the heat ladder needs to grade them apart: hitting a constable is a
+      // 2-star response and putting one on the ground is a 3-star one, and a
+      // single reason code cannot carry that. `strike.down` is read here rather
+      // than inferred from the actor's state for the reason the crime is read
+      // *before* the strike a few lines up -- the state is already the answer
+      // to a different question by the time this line runs.
+      this.accuse(p, strike.down ? REASON.MURDER_POLICE : REASON.ASSAULT_POLICE);
     } else if (isProtected(actor.kind)) {
       // **A protected native, and the crime is unconditional.** No witness test
       // and no line of sight: a bush turkey, an ibis and a magpie are protected
@@ -2098,9 +3142,33 @@ export class Simulation {
   /** The crime, if anybody saw it. The whole of the witness rule's use here. */
   private reportIfWitnessed(p: Participant, x: number, z: number, reason: number): void {
     if (p.bot) return;
-    const w = policeWitness(x, z, trafficTick(Date.now()), this.witnessCtx, this.witness);
-    if (!w.seen) return;
-    this.accuse(p, reason);
+    const tick = trafficTick(Date.now());
+    const w = policeWitness(x, z, tick, this.witnessCtx, this.witness);
+    if (w.seen) {
+      this.accuse(p, reason);
+      return;
+    }
+    // --- Workstream E: and if no officer saw it, a Karen might have.
+    //
+    // This is her entire function -- see `game/characters.ts` section 1. She
+    // upgrades an *unwitnessed* crime to a witnessed one, which is why the call
+    // is here rather than beside `policeWitness`: asking her first would mean
+    // walking twenty-five metres of ambient placement on every swing in the city
+    // to answer a question a constable standing right there had already
+    // answered.
+    //
+    // `karenReport` calls `reportCrime` itself rather than returning a verdict
+    // for this method to act on, which is the framework's stated contract
+    // (`factions.ts` section 3): one call, drained by `FactionField.step` at the
+    // top of the next step. The version bump is the thing that call cannot do
+    // for itself -- `stepFactions` bumps when the *count* of live investigations
+    // changes, which covers a fresh one, and a re-label on somebody already
+    // wanted would otherwise leave the banner reading the previous crime. Two
+    // lines, exactly as the wildlife path above does it.
+    const open = this.factions.investigationOf(p.id);
+    if (karenReport(p.id, reason, x, z, tick, this.witnessCtx)) {
+      if (open && open.reason !== reason) this.investigationVersion++;
+    }
   }
 
   /**
@@ -2173,7 +3241,13 @@ export class Simulation {
           // bike drawn under it; `TUNED` is mostly for its owner and is the only
           // way a client ever learns it has been unlocked -- see
           // `net/client.reconcile`, which takes it and never sets it.
-          (c.ridingBike !== 0 ? FLAG.RIDING : 0) |
+          // A driver is `RIDING` too, and that is the contract rather than a
+          // shortcut: "being in a car is `FLAG.RIDING` plus a `CARS` roster
+          // entry naming the driver" is exactly the bike convention, so every
+          // nameplate, seated pose and camera rule already keying on this bit
+          // keeps working for a car with nothing edited. `ENTER_FLAG.DRIVING`
+          // and the `CARS` roster are what tell the two apart.
+          (c.ridingBike !== 0 || c.drivingCar !== 0 ? FLAG.RIDING : 0) |
           (c.bikeTuned ? FLAG.TUNED : 0);
       s.ballCharges = c.ballCharges;
     }
@@ -2277,6 +3351,42 @@ export class Simulation {
     });
     out.length = n;
     return out;
+  }
+
+  /**
+   * How wanted everybody is, as the wire wants them. Reused; serialise before
+   * the next step.
+   *
+   * Pooled on `investigations()`' terms and for its reason: this is read on the
+   * transport's refresh and on every tick the star count changes, and a fresh
+   * array of fresh objects each time would be a few hundred short-lived
+   * allocations a minute to say the same three numbers.
+   */
+  heatRecords(): HeatRecord[] {
+    return this.heat.records(this.heatRecordPool);
+  }
+
+  /**
+   * What one player's train is doing: -2 on foot, -1 aboard and moving, or the
+   * index of the stop it is standing at. `heat.HeatWorld.rideStop`.
+   *
+   * Resolved from the ride the player is already on rather than from anything
+   * new: `aboardPose` is the same call `resolveAboard` makes a few lines away,
+   * against the same `railT` this tick already read once, so there is no second
+   * clock and no second opinion about which train anybody is on. A ride whose
+   * trip has finished reports "on foot", which is what it is about to be --
+   * `resolveAboard` puts them on the platform on this same tick.
+   */
+  private rideStop(playerId: number): number {
+    const p = this.participants.get(playerId);
+    if (!p) return -2;
+    const a = p.combat.aboard;
+    if (!isAboard(a)) return -2;
+    const bake = this.world.rail;
+    if (!bake) return -2;
+    const pose = aboardPose(bake, a, this.railT);
+    if (pose === null) return -2;
+    return pose.atStop;
   }
 
   /** Faction events this tick -- shots, barks, knockdowns. Drained by the transport. */
@@ -2688,6 +3798,115 @@ export function verifySim(): string[] {
       failures.push(
         `A punch with no rewind landed on a victim ${separation.toFixed(2)} m away. ` +
           `The reach gate is not working, and the rewind case above proves nothing.`,
+      );
+    }
+  }
+
+  // --- A RETURNED SERVE, END TO END, THROUGH THE REAL TICK LOOP.
+  //
+  // `game/swat.ts`'s own `verifySwat` proves the geometry and the deflection
+  // against a hand-built swinger; this proves the four things only this loop can
+  // be wrong about, and every one of them renders a perfectly good frame:
+  //
+  //   - the swat pass runs at all, and runs **before** `balls.step`, so the ball
+  //     turns round on the tick the blade reached it rather than one tick and
+  //     0.7 m later;
+  //   - the `EVENT.SWAT` that carries the correction to the thrower's own
+  //     predicted copy is actually emitted, with the right swinger on it. Miss
+  //     it and the thrower watches a ghost ball fly on down the street;
+  //   - the returned ball can hit **the person who threw it**, which is the
+  //     mechanic, and is one word (`ball.owner`) in `footy.stepFooty`'s target
+  //     loop away from being silently impossible;
+  //   - the knockout is credited to the *swinger* and flagged `RETURNED`, so the
+  //     feed says "returned serve on" rather than crediting the thrower with
+  //     knocking themselves over.
+  //
+  // Six metres apart, which is the geometry that makes the timing work rather
+  // than an arbitrary distance: a ball crosses it in about 0.14 s and the swing
+  // takes 0.15 s to get the blade out, so a throw one tick after the swing
+  // starts arrives inside the 100 ms `PUNCH_ACTIVE` window with room either
+  // side. Any closer and the ball beats the wind-up; much further and it has
+  // dropped under the bat.
+  {
+    const sim4 = new Simulation(world);
+    const swinger = sim4.join(0, null, 'Batter');
+    const thrower = sim4.join(1, null, 'Bowler');
+    // The swinger at +Z looking down -Z, the thrower at the origin looking back.
+    // The yaw goes on the **input** as well as the body for the reason the punch
+    // case above states: `controller.step` copies it in on every tick.
+    swinger.combat.body.position.set(0, EYE_HEIGHT, 6);
+    thrower.combat.body.position.set(0, EYE_HEIGHT, 0);
+    swinger.combat.body.yaw = 0;
+    swinger.input.yaw = 0;
+    thrower.combat.body.yaw = Math.PI;
+    thrower.input.yaw = Math.PI;
+    swinger.history.seed(sim4.tick, 0, EYE_HEIGHT, 6, 0);
+    thrower.history.seed(sim4.tick, 0, EYE_HEIGHT, 0, Math.PI);
+    // One pip left, so the return that lands is a knockout and the credit and
+    // the flag can both be read off one event.
+    thrower.combat.health = 1;
+
+    let swats = 0;
+    let swatBy = -1;
+    let returnedKo = 0;
+    let koAttacker = -1;
+    let hits = 0;
+    for (let i = 0; i < 90; i++) {
+      swinger.input.punch = i === 0;
+      thrower.input.throwBall = i === 1;
+      // Both stand still: the point of the check is the ball, and a thrower who
+      // wandered out of the return's line would make it a test of the walk.
+      thrower.combat.body.position.set(0, EYE_HEIGHT, 0);
+      thrower.combat.body.velocity.set(0, 0, 0);
+      sim4.step(out);
+      for (const e of out.events) {
+        if (e.kind === EVENT.SWAT) {
+          swats++;
+          swatBy = e.swinger;
+        } else if (e.kind === EVENT.HIT && (e.flags & EVENT_FLAG.FOOTY) !== 0) {
+          hits++;
+          if ((e.flags & EVENT_FLAG.RETURNED) !== 0 && (e.flags & EVENT_FLAG.KO) !== 0) {
+            returnedKo++;
+            koAttacker = e.attacker;
+          }
+        }
+      }
+      thrower.input.throwBall = false;
+    }
+
+    if (swats !== 1) {
+      failures.push(
+        `A ball thrown into a swing produced ${swats} SWAT events, not 1. Either the swat pass is ` +
+          `not running in the tick, or it is running outside the ACTIVE window.`,
+      );
+    }
+    if (swats > 0 && swatBy !== swinger.id) {
+      failures.push(`A SWAT event named ${swatBy} as the swinger rather than ${swinger.id}.`);
+    }
+    if (hits !== 1) {
+      failures.push(
+        `The returned ball produced ${hits} footy HIT events, not 1. A ball batted back must be ` +
+          `able to hit the person who threw it -- that is the whole mechanic, and footy.stepFooty ` +
+          `skipping its *thrower* rather than its *owner* is what silently prevents it.`,
+      );
+    }
+    if (returnedKo !== 1) {
+      failures.push(
+        `A returned serve that knocked its thrower out produced ${returnedKo} events flagged ` +
+          `RETURNED|KO. Without the flag the feed says "pegged" and the most interesting thing ` +
+          `that can happen in a fight is indistinguishable from an ordinary throw.`,
+      );
+    }
+    if (returnedKo > 0 && koAttacker !== swinger.id) {
+      failures.push(
+        `A returned serve credited ${koAttacker} rather than the swinger ${swinger.id}. The ` +
+          `knockout belongs to whoever sent the ball back, not to whoever threw it.`,
+      );
+    }
+    if (swinger.kos !== 1 || thrower.downs !== 1) {
+      failures.push(
+        `After a returned serve the swinger has ${swinger.kos} KOs and the thrower ${thrower.downs} ` +
+          `downs; both should be 1.`,
       );
     }
   }

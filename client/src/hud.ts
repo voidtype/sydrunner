@@ -6,6 +6,9 @@
  * needed while the world pipeline is still being tuned.
  */
 
+// The one place a balance becomes text. See `game/cash.formatMoney` for why
+// it is not `Intl.NumberFormat`.
+import { formatMoney } from './game/cash.ts';
 import type { Vector3 } from 'three/webgpu';
 import type { SolarPosition } from './sky/solar.ts';
 import { MAX_NAME_CHARS, MIN_NAME_CHARS, sanitiseName, type RosterEntry } from './net/protocol.ts';
@@ -483,6 +486,13 @@ export class Hud {
   private readonly staminaBar = document.getElementById('stamina')!;
   private readonly ballBar = document.getElementById('balls')!;
   private readonly effects = document.getElementById('effects')!;
+  /**
+   * The dollar balance, above the pips. See `money`.
+   *
+   * Non-null-asserted like every other element here, which is this class's
+   * standing bet that `index.html` and this file ship together.
+   */
+  private readonly moneyEl = document.getElementById('money')!;
   private readonly ko = document.getElementById('ko')!;
   private readonly investigationEl = document.getElementById('investigation')!;
   private readonly investigationReason = document.getElementById('investigation-reason')!;
@@ -1019,6 +1029,35 @@ export class Hud {
   }
 
   /**
+   * `$1,234`, at the top of the vitals block.
+   *
+   * Called every frame with the balance as it stands, and cheap on `vitals`'
+   * own terms: the string is compared before it is written, so the common case
+   * -- a balance that has not moved -- is one string compare and no reflow.
+   *
+   * **Above the pips rather than beside the effects**, which is a layout
+   * decision worth a line: the effect chips are a row that appears and
+   * disappears, and a number that moved up and down the screen depending on
+   * whether you had a Flat White would be a number you have to look for. The
+   * balance is the one thing in this cluster that is always there.
+   *
+   * Hidden entirely at zero **only before the first frame arrives**, which the
+   * caller signals by passing `null`: `$0` is a real balance a player can be
+   * on (drop everything, spend it all) and blanking it would be the HUD lying
+   * about a state the player is in. What must not show is a `$0` during the
+   * second before the first `WALLET` lands on an `?offline` session that is
+   * never getting one.
+   */
+  money(balance: number | null): void {
+    const text = balance === null ? '' : formatMoney(balance);
+    if (text === this.moneyText) return;
+    this.moneyText = text;
+    this.moneyEl.textContent = text;
+  }
+
+  private moneyText = '\u0000';
+
+  /**
    * "Under Investigation! {reason} — Ns", or nothing.
    *
    * Called every frame with the state as it stands, and cheap on the same terms
@@ -1056,6 +1095,51 @@ export class Hud {
   }
 
   private investigationKey = '';
+
+  /**
+   * The star row over the banner: `★★☆☆☆`, or nothing at all.
+   *
+   * **Above the banner rather than replacing it**, which is the whole layout
+   * decision here. The banner answers *why* -- "assaulting a bystander" -- and
+   * the stars answer *how much*, and they are different questions a player asks
+   * at different moments: the reason once, when it appears, and the tier every
+   * few seconds for as long as it lasts. Stacking them puts the number that
+   * changes above the words that do not, in the column the eye is already on.
+   *
+   * The same 3x scale the vitals cluster carries, through `--vitals-scale` in
+   * `index.html` -- one number, one reason, and the only thing to touch if "3x"
+   * is ever "4x". A star row drawn at the banner's own 13 px would be the one
+   * element on this HUD that did not get bigger when the player asked for
+   * everything to get bigger.
+   *
+   * Written the way `investigation` above is written and for its reason: the
+   * glyph string is compared before it is assigned, so the common case -- a
+   * tier holding steady while the countdown runs -- is one string compare and
+   * no DOM write at all.
+   */
+  heat(stars: number): void {
+    const n = Math.max(0, Math.min(5, Math.round(stars)));
+    const row = n <= 0 ? '' : '★'.repeat(n) + '☆'.repeat(5 - n);
+    if (row === this.heatKey) return;
+    this.heatKey = row;
+    if (row === '') {
+      this.heatEl.classList.remove('shown');
+      return;
+    }
+    // `textContent`, never `innerHTML`. The string is built from two literals
+    // here and could never be markup -- and a HUD that would render markup if it
+    // ever were is a HUD one change away from being a problem. The same rule the
+    // banner one method up states.
+    this.heatEl.textContent = row;
+    this.heatEl.classList.add('shown');
+    // The top two rungs get their own class, because at 4 and 5 stars the thing
+    // the player needs is not information, it is alarm. See `#heat.hot` in
+    // `index.html`.
+    this.heatEl.classList.toggle('hot', n >= 4);
+  }
+
+  private heatKey = ' ';
+  private readonly heatEl = document.getElementById('heat')!;
 
   update(s: HudState): void {
     if (!this.debugVisible) return;

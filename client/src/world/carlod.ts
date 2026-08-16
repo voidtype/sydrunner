@@ -406,6 +406,13 @@ function mappedBody(entry: CarModelEntry): BodyKey | null {
 interface MergedModel {
   geometry: BufferGeometry;
   box: CarModelBox;
+  /**
+   * How far the file's own lowest vertex was from its origin, metres, before
+   * this loader put it back on the road. Negative is a car that was sunk into
+   * the carriageway and positive one that was hovering. Reported by
+   * `sydney.carModelReport()` so the fix is a number rather than an opinion.
+   */
+  seat: number;
   triangles: number;
 }
 
@@ -650,8 +657,42 @@ function mergeModel(root: Object3D, tint: 'multiply' | 'none', yaw: number): Mer
   geometry.computeBoundingBox();
 
   const bounds = geometry.boundingBox!;
+
+  // --- APPEARANCE FIX 1: put the tyres on the road.
+  //
+  // The header says these files are "pre-normalised for length and ground
+  // plane", and for most of them that is true. It is not true for all of them,
+  // and the failure is the most visible thing about the near field:
+  // `CarModelFleet.consider` composes a claimed car's matrix from the *box*
+  // car's, whose origin is its wheel contact patch because `world/cars.ts`
+  // builds it that way -- so a model whose own lowest vertex sits under its
+  // origin is drawn with its tyres in the carriageway, and one over it hovers.
+  // From the footpath it reads as the road being soft.
+  //
+  // Trusting the author is what produced that, so this stops trusting them: the
+  // merged geometry is translated so its lowest vertex is exactly y = 0, and the
+  // matrix's own `CARRIAGEWAY_Y` clearance is then the only thing between a tyre
+  // and the road.
+  //
+  // **Baked into the geometry, once, at load** -- exactly where `YAW_CORRECTION`
+  // is baked and for its reason: it is a property of the file, it never changes,
+  // and a per-instance translate would be an extra term on every matrix in the
+  // near field for a constant.
+  //
+  // The lowest vertex is the contact patch on every body in this set. It would
+  // not be on a model with a dropped exhaust under the axle line, and if one
+  // ever arrives the error is a millimetre of hover -- the right direction for
+  // this to be wrong in, and why this is a translate rather than a rejection.
+  const seat = bounds.min.y;
+  if (seat !== 0) {
+    geometry.translate(0, -seat, 0);
+    geometry.computeBoundingSphere();
+    geometry.computeBoundingBox();
+  }
+
   return {
     geometry,
+    seat,
     box: {
       length: bounds.max.x - bounds.min.x,
       width: bounds.max.z - bounds.min.z,
@@ -760,6 +801,12 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
   /** Files loaded, and files the manifest named but this refused or lost. */
   readonly loadedFiles: string[] = [];
   readonly skipped: Array<{ file: string; why: string }> = [];
+  /**
+   * Files whose ground plane was not where the manifest promised, and how far
+   * this loader had to lift them, millimetres. Positive is a car that was sunk
+   * into the road. See `mergeModel`.
+   */
+  readonly reseated: Array<{ file: string; byMm: number }> = [];
 
   /** Pools by body class, in manifest order, with holes. See section 1. */
   private readonly pools = new Map<BodyKey, Array<ModelSlot | null>>();
@@ -771,6 +818,33 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
   /** One error, not one per frame. See `begin`. */
   private warnedNoEnd = false;
   private frameNo = 0;
+
+  /**
+   * Which ambient cars somebody has stolen. `world/cars.TrafficMovers.suppress`'s
+   * twin, and it has to exist separately because this file runs its own sweep
+   * over the same fleet.
+   *
+   * Without it a stolen car keeps its model claim from the sweep even though
+   * `TrafficMovers` has stopped posing it, and the model sits at the kerb the
+   * car was taken from for the two frames the release rule allows -- then
+   * vanishes, which reads as the car being deleted and reappearing.
+   *
+   * Revoking an existing claim is **not** done here and does not need to be: a
+   * suppressed car stops being considered, its `sweep` stamp goes stale, and the
+   * release pass at the bottom of `sweep` revokes it on exactly the rule it
+   * already had for a car that reached the end of its route.
+   */
+  suppress: ((identity: number) => boolean) | null = null;
+
+  /**
+   * The cars a player is driving, so they can be models too.
+   *
+   * Set by the caller alongside `suppress` and walked at the end of the sweep.
+   * A driven car is the *nearest* car in the world by construction -- you are
+   * sitting in it -- so it is the one car in the city where drawing a box
+   * instead of a model would be most obvious.
+   */
+  drivenClaims: (visit: (pose: CarPose) => void) => void = () => {};
 
   constructor(pose: CarPose) {
     this.pose = pose;
@@ -817,7 +891,27 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     // catches, and these are the cars close enough for that shadow to be the
     // thing that sits them on the road.
     mesh.castShadow = true;
-    mesh.receiveShadow = false;
+    // --- APPEARANCE FIX 2: and it catches the shadow it is standing in.
+    //
+    // `TrafficMovers` and `buildTileCars` both set this false on a stated trade
+    // -- "the shadow a car throws down the lane is worth more than the one it
+    // catches" -- and that trade is right for *them*: they draw up to 210 movers
+    // and 400-odd parked boxes per tile, and a receiver samples the shadow map
+    // per fragment.
+    //
+    // It is the wrong trade here and this is the one fleet where it is. These
+    // are the two dozen cars inside `CLAIM_RADIUS` -- the ones a player is
+    // standing next to -- and a car in the shade of a terrace lit as though it
+    // were in full sun does not sit in the street, it is pasted on top of it.
+    // It is also the half of "no shadow contact" that the casting flag cannot
+    // fix: at midday a car's own shadow is a thin pool under the sills, and what
+    // tells you the car is *in* the world is the building's shadow crossing its
+    // roof.
+    //
+    // Bounded by `CLAIM_RADIUS` and `PER_MODEL_CAPACITY`: at most 24 instances
+    // per model, all near the camera, all already inside the shadow volume the
+    // buildings around them are being sampled for.
+    mesh.receiveShadow = true;
     // Never owned by a tile, so an eviction must never free this geometry -- the
     // same flag the moving fleet carries for the same reason.
     mesh.userData.traffic = true;
@@ -845,6 +939,13 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     });
     this.pools.set(body, pool);
     this.loadedFiles.push(entry.file);
+    // Only the ones that were actually wrong, and only past a millimetre --
+    // a list of 24 zeroes says nothing, and a list of the three files whose
+    // tyres were in the road is the whole of the fix stated as data. See
+    // `mergeModel`'s appearance fix 1.
+    if (merged.seat > 0.001 || merged.seat < -0.001) {
+      this.reseated.push({ file: entry.file, byMm: Math.round(-merged.seat * 1000) });
+    }
   }
 
   /** Add a hole to a pool: a model the manifest names that this file will not draw. */
@@ -948,8 +1049,18 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     // already at that kerb and has to be drawn on the same terms, which is the
     // whole point of `game/traffic.ts`'s park stages.
     forEachCarNear(field, x, z, CLAIM_RADIUS, tick, this.scratch, this.pose, (p) => {
+      if (this.suppress !== null && this.suppress(p.identity)) return;
       const body: BodyKey = policeLiveried(p.route, p.slot, p.x, p.z) ? 'police' : p.body;
       this.consider(p.identity, p.x, p.z, body, p.colour, null, 0, p);
+    });
+
+    // --- And the driven fleet, on the schedule fleet's own terms: keyed by the
+    // same identity, claimed out of the same pools, released by the same rule.
+    // No livery, because a car somebody stole is not a police car whatever it
+    // was five minutes ago -- and a stolen squad car that kept its chequer would
+    // be a *feature*, not this pass's.
+    this.drivenClaims((p) => {
+      this.consider(p.identity, p.x, p.z, p.body, p.colour, null, 0, p);
     });
 
     // --- And the parked fleet, tile by tile. The bounds test is what keeps this

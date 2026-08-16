@@ -238,6 +238,54 @@ export const MSG = {
    * across all three. See `suggestions.SUGGEST_OP`.
    */
   SUGGEST: 0x0c,
+  /**
+   * "I am standing at the button in Sydney Park and I have pressed it."
+   * See `game/sunbutton.ts`.
+   *
+   * **0x0d on `CHAT_SAY`'s convention** -- `0x8d`... except `0x8d` is already
+   * `SUGGEST_ACK`, so this one pair breaks the halves rule and it is worth
+   * saying why rather than leaving a reader to wonder. The rule pairs a request
+   * with *the reply it produces*, and this request produces `MSG.SUN` (0x8e),
+   * which is not a reply -- it is a broadcast that every client in the room
+   * gets, including ones that pressed nothing. There is no pairing to preserve,
+   * so the id is simply the next free number in the client range.
+   *
+   * **A message of its own rather than a bit on `INPUT`**, which is the obvious
+   * alternative given `BTN.MOUNT` is right there and the key is the same `E`.
+   * Rejected on two counts. `resolveMount` is already a four-way priority chain
+   * -- off a train, off a bike, onto a train, onto a bike -- whose whole
+   * correctness argument is that the client and `server/sim.ts` run it in the
+   * same order; wedging a fifth case into it makes both ends' chain longer to
+   * buy nothing, because a press on the button is not a mount and cannot be
+   * confused with one at the distances involved. And `INPUT` runs at 60 Hz
+   * through a ring buffer that deliberately drops frames under starvation (see
+   * `Conn.inbox`), which is exactly right for a level-triggered movement bit and
+   * exactly wrong for an event that happens once every three in-game days.
+   *
+   * **One byte, and it carries no position**, which is `INPUT_BYTES`' own rule
+   * stated again: a client that sends where it thinks it is is a client that can
+   * send where it would like to be. The server already owns the presser's body
+   * and checks the reach against that. The half-metre between the client's
+   * prompt radius (`SUN_PROMPT_M`, 2.5 m) and the server's (`SUN_REACH_M`, 3 m)
+   * is what absorbs the tick of walking the two ends can disagree about, and it
+   * is a much better place to spend the slack than a field the sender controls.
+   */
+  SUN_PRESS: 0x0d,
+  /**
+   * The phone, in one client message with a sub-op byte. See `net/cash.ts`.
+   *
+   * `SUGGEST`'s arrangement for `SUGGEST`'s two reasons: claiming a Centrelink
+   * payment and going on or off the rideshare shift are one conversation held
+   * from one screen a handful of times a session, three ids would be three
+   * cases in `server/index.ts` for one feature, and the per-socket flood guard
+   * that counts this feature's traffic would have to be summed across them.
+   *
+   * **0x0e rather than 0x0d**, which is free: the two server messages this
+   * feature answers with are `WALLET` at 0x8f and `FARE` at 0x90, so there is
+   * no low/high pairing to preserve here and 0x0d is left for whichever of the
+   * five branches landing beside this one wants a low id. See `net/cash.ts`.
+   */
+  PHONE: 0x0e,
 
   WELCOME: 0x81,
   SNAPSHOT: 0x82,
@@ -345,6 +393,91 @@ export const MSG = {
    * the line and know whether to empty the compose box.
    */
   SUGGEST_ACK: 0x8d,
+  /**
+   * Whether the sun is a screaming face, and when the button comes back. See
+   * `encodeSun` and `game/sunbutton.ts`.
+   *
+   * A message of its own rather than a section of the snapshot, on `BIKES`'
+   * argument taken to its limit: this changes **once every three in-game days**
+   * -- three real hours -- and is otherwise two constants. On the snapshot path
+   * it would be sixteen bytes per client twenty times a second, forever, to
+   * carry a number nobody has changed since before the room started.
+   *
+   * Room-global and deliberately not interest-filtered, on `sendBikes`'
+   * argument: the sun is over everybody's head at once. A client 40 km away in
+   * Palm Beach is looking at the same sky as the one standing on the mound, so
+   * "who can see the button" is not the question -- there is no version of this
+   * feature where two players in one room see different suns.
+   *
+   * Sent on change to everybody, to every joiner beside `BIKES`, **and to the
+   * presser whether or not the press was accepted**. That last one is not
+   * symmetry for its own sake: `world/sunbutton.ts` writes the state
+   * optimistically on the frame the key goes down, so a refused press needs a
+   * frame to be corrected by. Without it, a client that guessed wrong would draw
+   * a face nobody else could see until the next real press three hours later.
+   */
+  SUN: 0x8e,
+  /**
+   * How wanted everybody is, in stars. See `encodeHeat` and `game/heat.ts`.
+   *
+   * **0x92 rather than 0x8e**, and the gap is deliberate: this feature landed in
+   * a batch of six built in parallel against one table, and 0x8e..0x91 are
+   * pre-assigned to the siblings so that two branches cannot both take "the next
+   * free number" and both be right. A hole in a table of bytes costs nothing;
+   * two features that decode each other's frames cost a session.
+   *
+   * A message of its own rather than a widening of `INVESTIGATION`, which was
+   * genuinely the tempting option -- the two are the same shape, they change at
+   * the same moments and they are about the same players. Two reasons not to.
+   * The first is that they have different *lifetimes*: an investigation is a
+   * countdown that the client runs down itself between messages, and a star
+   * count is a level that must never move on its own, so folding them would put
+   * a field that must not be extrapolated inside a message that exists to be
+   * extrapolated. The second is that a star count is drawn on **other people's
+   * nameplates** -- a 4-star player is a visible target -- so this one is
+   * room-global where the investigation channel is filtered to what you can see.
+   */
+  HEAT: 0x92,
+  /**
+   * Which cars somebody has taken, and who is in them. See `encodeCars`.
+   *
+   * A message of its own on `BIKES`' argument exactly -- a car record changes
+   * when somebody steals one, leaves one, or an abandoned one expires, which is
+   * a few times a minute across a whole room, against a position that is
+   * different every tick. The **pose of an occupied car is not on this message
+   * at all**: it is derived from its driver's own snapshot record, because a car
+   * follows its driver and the driver is already there at 20 Hz. See
+   * `game/driving.CarField.follow`.
+   *
+   * 0x91 rather than 0x8e because this workstream was one of six landing in
+   * parallel and the ids were handed out in advance so the branches could not
+   * collide. The gap at 0x8e..0x90 is other people's.
+   */
+  CARS: 0x91,
+  /**
+   * How much money this player has, and every cash bundle on the ground in the
+   * room. See `net/cash.encodeWallet`.
+   *
+   * A message of its own rather than a field on the snapshot, on `BIKES`'
+   * argument: a balance changes when somebody is paid, robbed or knocked
+   * over -- a few times a minute across a whole room -- against a position that
+   * is different every tick. Twenty times a second it would be four bytes per
+   * player per snapshot to carry a number that is almost always the same one.
+   *
+   * **Per client and therefore never deduplicated** across sockets the way a
+   * snapshot body is (see `server/room.ts`'s `FrameGroups`), because the
+   * balance is a fact about the recipient. `net/cash.ts`'s header does the
+   * arithmetic on what that costs and why the bundles ride here anyway.
+   */
+  WALLET: 0x8f,
+  /**
+   * The rideshare fare this driver is on, if any. See `net/cash.encodeFare`.
+   *
+   * Sent on change, only to the driver it belongs to, and never to anybody
+   * else -- a fare is not a thing other players can see. Twenty-four bytes on
+   * each of about six state changes a trip.
+   */
+  FARE: 0x90,
 } as const;
 
 /**
@@ -417,7 +550,26 @@ export const MSG = {
  * milliseconds passed 2^32 in 1970 and a `f64` holds them exactly (integers to
  * 2^53), so there is no quantisation and no epoch to agree on separately.
  */
-export const PROTOCOL_VERSION = 11;
+/*
+ * v12 is the batch of six built in parallel against this one table, and the
+ * ids were **pre-assigned** before any of them was written -- which is the only
+ * reason six branches merged without two of them decoding each other's frames:
+ *
+ *     0x0d SUN_PRESS   the button in Sydney Park          (client -> server)
+ *     0x0e PHONE       claim / clock on / clock off       (client -> server)
+ *     0x8e SUN         the screaming face's two instants
+ *     0x8f WALLET      the balance, the claim timer, the cash on the ground
+ *     0x90 FARE        the rideshare job's state
+ *     0x91 CARS        who has taken which car
+ *     0x92 HEAT        how wanted everybody is, in stars
+ *
+ * plus `EVENT.SWAT` inside `EVENTS`, `ENTER_FLAG.DRIVING`, and NPC kinds 7-14
+ * on the snapshot's NPC section. One bump for the lot rather than six: a
+ * client from before this batch cannot decode any of it, and a client from
+ * after it needs all of it, so there is no version between 11 and 12 that
+ * would have described a real build.
+ */
+export const PROTOCOL_VERSION = 12;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
@@ -1774,6 +1926,23 @@ export function createSnapshot(): Snapshot {
 export const ENTER_FLAG = {
   BOT: 1 << 0,
   RIDING: 1 << 1,
+  /**
+   * ...and a third, for `RIDING`'s reason one step on.
+   *
+   * A player who walks into view **at the wheel of a car** needs the car built
+   * on the frame they appear. `MSG.CARS` will tell the client about the record
+   * too, but only when the record *changes* -- so a driver who has been circling
+   * Redfern for two minutes and finally drives into your interest radius is
+   * carried by no `CARS` message at all, and without this bit the first thing
+   * you see is a figure in a seated pose sliding down George Street at 22 m/s
+   * with no car under them until the next roster refresh.
+   *
+   * `RIDING` is set as well for a driver -- being in a car is `FLAG.RIDING` plus
+   * a `CARS` entry, which is the bike convention verbatim so that every
+   * nameplate and animation path keying on `RIDING` keeps working -- and this
+   * bit is what tells the two apart.
+   */
+  DRIVING: 1 << 2,
 } as const;
 
 /** Somebody who just came into a client's working set, with everything to draw them. */
@@ -1941,12 +2110,45 @@ export const EVENT = {
   PICKUP: 3,
   JOIN: 4,
   LEAVE: 5,
+  /**
+   * A bat sent a football back. See `game/swat.ts`.
+   *
+   * **The one thing in this weapon pair that genuinely is a transition**, which
+   * is why it is an event at the same time as the note above is arguing that a
+   * thrown ball is not. A ball in flight is state: it is in every snapshot for
+   * its whole life, so a client that missed one is corrected by the next. A ball
+   * *changing direction because somebody hit it* is a 30 ms crack, a puff of
+   * contact and a shudder in the swinger's hands, and none of the three can be
+   * recovered from a position twenty times a second -- at 42 m/s the deflection
+   * is over inside one snapshot interval, exactly like the bounce that
+   * `BALL_BYTES` spends a whole byte on a counter to announce.
+   *
+   * It carries the ball's post-swat state as well as the two ids, and that is
+   * not redundant with the snapshot: the ball's *thrower* is unchanged by a swat
+   * -- see `footy.Footy.owner` -- so the player who threw it is still flying
+   * their own predicted copy of it and has no other way to be told that the copy
+   * is now wrong. The position and velocity here are what corrects it.
+   */
+  SWAT: 6,
 } as const;
 
 export const EVENT_FLAG = {
   KO: 1 << 0,
   /** The hit came from a thrown ball rather than the bat. Decides the sound and the feed verb. */
   FOOTY: 1 << 1,
+  /**
+   * The ball that landed had been batted back by somebody. Only ever set with
+   * `FOOTY`.
+   *
+   * A bit rather than a field, and a bit rather than nothing, for the same
+   * reason `FOOTY` is one: the *consequence* already rides on `attacker`, which
+   * the server sets to the ball's owner, so the scoreboard and the knockback are
+   * right without this. What is missing without it is the **feed line** -- "%s
+   * returned serve on %s" rather than "%s pegged %s" -- and a returned serve is
+   * the most interesting thing that can happen in a fight in this game. Losing
+   * it to a spare bit in a byte already on the wire would be a strange economy.
+   */
+  RETURNED: 1 << 2,
 };
 
 export interface HitEvent {
@@ -1976,7 +2178,48 @@ export interface JoinEvent {
   bot: number;
 }
 
-export type NetEvent = HitEvent | PickupEventFrame | JoinEvent;
+/**
+ * A bat sent a football back. 20 bytes, which is `BALL_BYTES` by coincidence and
+ * for the same reasons.
+ *
+ *     u16  swinger             who swung. The ball's owner from here on.
+ *     u16  ball                the ball's own id, unchanged by the swat
+ *     i32  x, y, z             millimetres, as every position on this wire is
+ *     i8   vx, vy, vz          half-metres a second, as `BALL_BYTES` carries them
+ *
+ * Three jobs, and the third is the one that makes it carry a position at all:
+ *
+ *   - **the noise and the puff**, which every client near enough plays at
+ *     `(x, y, z)`. A client that has the ball in interest could read the point
+ *     off its own copy, but a client 40 m away that is only just inside earshot
+ *     may not have it at all -- `aoi.selectBalls` filters by the *ball's*
+ *     position -- and a crack with no location cannot be attenuated;
+ *   - **the swinger's own feedback**: the connect kick on the viewmodel, which
+ *     is keyed on the id rather than on the point;
+ *   - **the correction**. The ball's `thrower` is deliberately unchanged by a
+ *     swat -- see `footy.Footy.owner` -- so the player who threw it is still
+ *     flying a local predicted copy that now disagrees with the server about
+ *     which way the ball is going. These six numbers are what puts it right, and
+ *     they are the whole reason this is not a four-byte event.
+ *
+ * The velocity is an i8 of half-metres a second on `BALL_BYTES`' argument
+ * exactly, and it survives the same test: a swat leaves the ball at
+ * `swat.SWAT_SPEED_SCALE` of the speed it arrived at, so the fastest thing this
+ * field can ever carry is 0.85 of the fastest thing the snapshot already does.
+ */
+export interface SwatEvent {
+  kind: 6;
+  swinger: number;
+  ball: number;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+}
+
+export type NetEvent = HitEvent | PickupEventFrame | JoinEvent | SwatEvent;
 
 /**
  * A batch of events, `u8 type`, `u8 count`, then each event's own bytes.
@@ -1991,6 +2234,7 @@ const EVENT_BYTES: Record<number, number> = {
   [EVENT.PICKUP]: 10,
   [EVENT.JOIN]: 5,
   [EVENT.LEAVE]: 5,
+  [EVENT.SWAT]: 20,
 };
 
 /**
@@ -2027,6 +2271,18 @@ export function encodeEvents(events: readonly NetEvent[]): ArrayBuffer {
       v.setInt16(p + 4, e.tileX, true);
       v.setInt16(p + 6, e.tileZ, true);
       v.setUint16(p + 8, e.index, true);
+    } else if (e.kind === EVENT.SWAT) {
+      // The snapshot's own quantisers, deliberately: the receiver's correction
+      // has to land on the same millimetre the next snapshot will, or a ball is
+      // put right by this event and then jumped by the one after it.
+      v.setUint16(p + 1, e.swinger & 0xffff, true);
+      v.setUint16(p + 3, e.ball & 0xffff, true);
+      v.setInt32(p + 5, quantisePos(e.x), true);
+      v.setInt32(p + 9, quantisePos(e.y), true);
+      v.setInt32(p + 13, quantisePos(e.z), true);
+      v.setInt8(p + 17, quantiseVelocity(e.vx));
+      v.setInt8(p + 18, quantiseVelocity(e.vy));
+      v.setInt8(p + 19, quantiseVelocity(e.vz));
     } else {
       v.setUint16(p + 1, e.id & 0xffff, true);
       v.setUint8(p + 3, e.colourway);
@@ -2068,6 +2324,18 @@ export function decodeEvents(buffer: ArrayBuffer): NetEvent[] | null {
         tileX: v.getInt16(p + 4, true),
         tileZ: v.getInt16(p + 6, true),
         index: v.getUint16(p + 8, true),
+      });
+    } else if (kind === EVENT.SWAT) {
+      out.push({
+        kind: EVENT.SWAT,
+        swinger: v.getUint16(p + 1, true),
+        ball: v.getUint16(p + 3, true),
+        x: dequantisePos(v.getInt32(p + 5, true)),
+        y: dequantisePos(v.getInt32(p + 9, true)),
+        z: dequantisePos(v.getInt32(p + 13, true)),
+        vx: dequantiseVelocity(v.getInt8(p + 17)),
+        vy: dequantiseVelocity(v.getInt8(p + 18)),
+        vz: dequantiseVelocity(v.getInt8(p + 19)),
       });
     } else {
       out.push({
@@ -2250,6 +2518,150 @@ export function decodeBikes(buffer: ArrayBuffer): BikeRecord[] | null {
   return out;
 }
 
+// --- Driven cars ----------------------------------------------------------------
+
+/**
+ * Which cars have been taken, who is in them, and which ones are gone.
+ *
+ *     u8   type = MSG.CARS
+ *     u16  count
+ *     u8   flags        CARS_FULL on the set a joiner is sent
+ *     per car:
+ *       u16  id         `CarField`'s allocation id, 1..n; 0 is "no car"
+ *       u32  carId      `traffic.identityOf(route, slot)`: which ambient car this was
+ *       u16  driver     the combatant id, or 0 for one standing in the street
+ *       u8   model      body << 4 | colour
+ *       u8   flags      CAR_REMOVED
+ *       i32  x, y, z    millimetres, as every position on this wire is
+ *       u16  yaw
+ *       i16  speed      centimetres per second, signed
+ *
+ * **Upsert semantics with an explicit delete**, which is the one place this
+ * diverges from `MSG.BIKES` one section up, and the divergence is forced. A bike
+ * is *planned*: the set is fixed by `bikes.bikePlan` for the life of a build, so
+ * a receiver that merges by id and never removes anything is complete. A car is
+ * *allocated*: the set is however many cars have been stolen and not yet
+ * expired, and it shrinks. Inferring a removal from absence would mean every
+ * message had to be the whole set, which is exactly the cost the upsert exists
+ * to avoid -- so a removal is a record with `CAR_REMOVED` set, and everything
+ * else about that record is ignored.
+ *
+ * `CARS_FULL` on the header is the joiner's set, and it means "replace, do not
+ * merge". Without it a client that reconnected to a restarted server would carry
+ * its old records forever, suppressing ambient cars nobody is driving.
+ *
+ * **The pose of an occupied car is here and is also stale, on purpose.** While
+ * somebody is driving, the car's real position is derived from that driver's
+ * snapshot record 20 times a second (`driving.CarField.follow`), and this
+ * message's copy is only as fresh as the last change. It matters for exactly two
+ * cases and both are worth the twelve bytes: an **empty** car, whose pose is
+ * derived from nothing at all, and the frame a car is **taken**, where the
+ * record arrives before the driver's next snapshot does.
+ *
+ * At a plausible worst case -- a dozen cars taken in a busy room -- the join
+ * message is 316 B, and a single theft is 30 B.
+ */
+export interface CarRecord {
+  id: number;
+  carId: number;
+  driver: number;
+  /** `world/cars.CAR_BODY_SIZE` index, 0..4. */
+  body: number;
+  /** `world/cars.CAR_PAINT` index, 0..7. */
+  colour: number;
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+  /** Signed, m/s. */
+  speed: number;
+  /** True for "this record is gone", and then every field but `id` is meaningless. */
+  removed?: boolean;
+}
+
+/** Header flag: this message is the whole set and replaces whatever the client had. */
+export const CARS_FULL = 1 << 0;
+/** Record flag: forget this id. */
+export const CAR_REMOVED = 1 << 0;
+
+export const CARS_HEADER_BYTES = 4;
+/** 2 + 4 + 2 + 1 + 1 + 4 + 4 + 4 + 2 + 2. Asserted in `verifyNet`, which is how it got right. */
+export const CAR_RECORD_BYTES = 26;
+
+export function carsBytes(count: number): number {
+  return CARS_HEADER_BYTES + count * CAR_RECORD_BYTES;
+}
+
+/**
+ * A speed as centimetres per second in an `i16`.
+ *
+ * Range +/- 327 m/s against a top speed of 22, so the clamp is unreachable in
+ * play and is here for the same reason every other clamp on this wire is: a
+ * `setInt16` given 40,000 wraps silently and the car goes backwards.
+ */
+function quantiseCarSpeed(v: number): number {
+  const cm = Math.round(v * 100);
+  return cm < -32768 ? -32768 : cm > 32767 ? 32767 : cm;
+}
+
+export function encodeCars(cars: readonly CarRecord[], full = false): ArrayBuffer {
+  const buffer = new ArrayBuffer(carsBytes(cars.length));
+  const v = new DataView(buffer);
+  v.setUint8(0, MSG.CARS);
+  v.setUint16(1, cars.length, true);
+  v.setUint8(3, full ? CARS_FULL : 0);
+  let p = CARS_HEADER_BYTES;
+  for (const c of cars) {
+    v.setUint16(p, c.id & 0xffff, true);
+    v.setUint32(p + 2, c.carId >>> 0, true);
+    v.setUint16(p + 6, c.driver & 0xffff, true);
+    // Both indices are small and fixed -- five bodies, eight paints -- so they
+    // share a byte rather than costing two. Masked rather than trusted: a body
+    // index that overflowed into the colour nibble would repaint the fleet.
+    v.setUint8(p + 8, ((c.body & 0x0f) << 4) | (c.colour & 0x0f));
+    v.setUint8(p + 9, c.removed ? CAR_REMOVED : 0);
+    v.setInt32(p + 10, quantisePos(c.x), true);
+    v.setInt32(p + 14, quantisePos(c.y), true);
+    v.setInt32(p + 18, quantisePos(c.z), true);
+    v.setUint16(p + 22, quantiseYaw(c.yaw), true);
+    v.setInt16(p + 24, quantiseCarSpeed(c.speed), true);
+    p += CAR_RECORD_BYTES;
+  }
+  return buffer;
+}
+
+export function decodeCars(buffer: ArrayBuffer): { cars: CarRecord[]; full: boolean } | null {
+  if (buffer.byteLength < CARS_HEADER_BYTES) return null;
+  const v = new DataView(buffer);
+  if (v.getUint8(0) !== MSG.CARS) return null;
+  const count = v.getUint16(1, true);
+  const full = (v.getUint8(3) & CARS_FULL) !== 0;
+  const cars: CarRecord[] = [];
+  let p = CARS_HEADER_BYTES;
+  // Bounded by what arrived rather than by what the count claims, on
+  // `decodeBikes`' rule and for its reason: a `DataView` read past the end
+  // throws, and a throw inside a socket callback takes the client's whole
+  // message pump with it.
+  for (let i = 0; i < count && p + CAR_RECORD_BYTES <= buffer.byteLength; i++) {
+    const model = v.getUint8(p + 8);
+    cars.push({
+      id: v.getUint16(p, true),
+      carId: v.getUint32(p + 2, true),
+      driver: v.getUint16(p + 6, true),
+      body: (model >> 4) & 0x0f,
+      colour: model & 0x0f,
+      removed: (v.getUint8(p + 9) & CAR_REMOVED) !== 0,
+      x: dequantisePos(v.getInt32(p + 10, true)),
+      y: dequantisePos(v.getInt32(p + 14, true)),
+      z: dequantisePos(v.getInt32(p + 18, true)),
+      yaw: dequantiseYaw(v.getUint16(p + 22, true)),
+      speed: v.getInt16(p + 24, true) / 100,
+    });
+    p += CAR_RECORD_BYTES;
+  }
+  return { cars, full };
+}
+
 // --- Investigations -------------------------------------------------------------
 
 /**
@@ -2355,6 +2767,194 @@ export function decodeInvestigations(buffer: ArrayBuffer): InvestigationRecord[]
       ticks: v.getUint16(p + 3, true),
     });
     p += INVESTIGATION_ENTRY_BYTES;
+  }
+  return out;
+}
+
+// --- The screaming sun ---------------------------------------------------------
+
+/**
+ * `MSG.SUN_PRESS`, one byte.
+ *
+ * An encoder for a message with no fields looks like ceremony and is not. It is
+ * the same ceremony `encodeInput` is: this file is the only place in the repo
+ * that writes a message id, so a caller that hand-rolled `new Uint8Array([0x0d])`
+ * would be a second place the wire is defined and the one place a renumbering
+ * would not reach.
+ */
+export function encodeSunPress(buffer = new ArrayBuffer(1)): ArrayBuffer {
+  new DataView(buffer).setUint8(0, MSG.SUN_PRESS);
+  return buffer;
+}
+
+/** True if this frame is a well-formed `SUN_PRESS`. There is nothing else to say. */
+export function decodeSunPress(buffer: ArrayBuffer): boolean {
+  return buffer.byteLength >= 1 && new DataView(buffer).getUint8(0) === MSG.SUN_PRESS;
+}
+
+/**
+ * `MSG.SUN`, seventeen bytes:
+ *
+ *     u8   type = MSG.SUN
+ *     f64  screamUntilMs
+ *     f64  cooldownUntilMs
+ *
+ * **Two `f64`s, for `Welcome.clockMs`' reason, stated once more because it is
+ * the only interesting thing about this layout.** These are absolute epoch
+ * milliseconds on the server's clock, and epoch milliseconds passed 2^32 in
+ * 1970 -- a `u32` of them is not a clock, it is a clock modulo 49 days. An `f64`
+ * holds every integer to 2^53, so there is no quantisation, no separate epoch to
+ * agree about, and no arithmetic on the receiving end beyond a comparison.
+ *
+ * The **alternative was two `u16`s of remaining seconds**, which is four bytes
+ * instead of sixteen and is wrong for the reason `game/sunbutton.ts`'s header
+ * gives at length: a remaining time has to be counted down by somebody, and the
+ * somebody would be a client whose tab was backgrounded for four minutes.
+ * `INVESTIGATION` sends a countdown and gets away with it because it is
+ * re-sent every two seconds; this is sent once and must still be right an hour
+ * later.
+ *
+ * There is **no "screaming" boolean** on the wire, and there must not be: it is
+ * `now < screamUntilMs`, derivable by both ends from the same two numbers, and a
+ * flag beside the instant it is derived from is a second owner of one fact --
+ * which is the disease `/health`'s `vessels` field exists to catch.
+ */
+export const SUN_BYTES = 17;
+
+export function encodeSun(
+  screamUntilMs: number,
+  cooldownUntilMs: number,
+  buffer = new ArrayBuffer(SUN_BYTES),
+): ArrayBuffer {
+  const v = new DataView(buffer);
+  v.setUint8(0, MSG.SUN);
+  v.setFloat64(1, screamUntilMs, true);
+  v.setFloat64(9, cooldownUntilMs, true);
+  return buffer;
+}
+
+export function decodeSun(
+  buffer: ArrayBuffer,
+): { screamUntilMs: number; cooldownUntilMs: number } | null {
+  if (buffer.byteLength < SUN_BYTES) return null;
+  const v = new DataView(buffer);
+  if (v.getUint8(0) !== MSG.SUN) return null;
+  return {
+    screamUntilMs: v.getFloat64(1, true),
+    cooldownUntilMs: v.getFloat64(9, true),
+  };
+}
+
+// --- Heat ------------------------------------------------------------------------
+
+/**
+ * How wanted everybody is, in stars.
+ *
+ *     u8   type = MSG.HEAT
+ *     u16  count
+ *     per entry:
+ *       u16  player id
+ *       u8   stars              0..`heat.HEAT_MAX`
+ *       u16  decay ticks left   0 while the police can still see them
+ *
+ * **A replacement, not an upsert**, which is `MSG.INVESTIGATION`'s call one
+ * section up and is right here for the identical reason: heat all ends, the end
+ * is the interesting event, and a delete record that went missing would be four
+ * stars painted on a player who is no longer wanted -- which on a nameplate is a
+ * target somebody else will act on.
+ *
+ * **Room-global, not interest-filtered**, which is where it *differs* from the
+ * investigation channel. That one is filtered because a banner over somebody you
+ * cannot see is a fact about nobody; this one is drawn on nameplates, and a
+ * nameplate is only drawn for a player you can already see -- so the filter
+ * would be recomputing on the server a thing the renderer decides anyway. At
+ * five bytes an entry the full set for a room of sixteen is 83 bytes, a few
+ * times a minute.
+ *
+ * **The decay clock is sent as a countdown and read as a deadline.** The record
+ * this file hands out carries `decayEndsTick`, an absolute tick on
+ * `traffic.trafficTick`'s shared wall clock -- which is what every consumer
+ * actually wants, because it can be compared against `trafficTick(Date.now())`
+ * on any frame with no clock of its own. What crosses the wire is the
+ * *remainder*, a `u16`, for the reason `quantisePing` gives about wrapping: an
+ * absolute tick is about 1.9 billion a year off the traffic epoch, so it does
+ * not fit a `u32` for the life of the build and a `f64` would be eight bytes to
+ * say "twenty seconds". The decoder adds the receiver's own tick back, which is
+ * exact to the tick that the two machines' clocks agree -- and `protocol` v11
+ * already publishes the server's clock at join precisely so that they do.
+ *
+ * Zero is **not** a deadline. It means "the police still have eyes on them", and
+ * it is a distinct state rather than a very small number: what the HUD wants to
+ * draw is whether you are getting away, and a client deriving that from a
+ * countdown near zero would show the star about to fall at the exact moment an
+ * officer walked round the corner.
+ */
+export interface HeatRecord {
+  playerId: number;
+  stars: number;
+  /** Absolute tick, on the shared wall clock, or 0 while they are still seen. */
+  decayEndsTick: number;
+}
+
+export const HEAT_HEADER_BYTES = 3;
+export const HEAT_ENTRY_BYTES = 5;
+
+export function heatBytes(count: number): number {
+  return HEAT_HEADER_BYTES + count * HEAT_ENTRY_BYTES;
+}
+
+/**
+ * `records` into a fresh buffer. `now` is the sender's tick, which is what the
+ * absolute deadlines are made relative to.
+ */
+export function encodeHeat(
+  records: readonly HeatRecord[],
+  now: number,
+  buffer = new ArrayBuffer(heatBytes(records.length)),
+): ArrayBuffer {
+  const v = new DataView(buffer);
+  encodeHeatInto(v, records, now);
+  return buffer;
+}
+
+/** The same bytes into a caller-owned buffer, returning the length written. */
+export function encodeHeatInto(v: DataView, records: readonly HeatRecord[], now: number): number {
+  v.setUint8(0, MSG.HEAT);
+  v.setUint16(1, Math.min(records.length, 65535), true);
+  let p = HEAT_HEADER_BYTES;
+  for (const r of records) {
+    v.setUint16(p, r.playerId & 0xffff, true);
+    v.setUint8(p + 2, Math.max(0, Math.min(255, Math.round(r.stars))));
+    // Clamped, never wrapped -- `encodeInvestigations` states the argument and
+    // it is the same one: a wrapped countdown would draw two minutes of hiding
+    // as one second left, which is the only number in this message a player
+    // reads as a promise.
+    const left = r.decayEndsTick > 0 ? Math.round(r.decayEndsTick - now) : 0;
+    v.setUint16(p + 3, Math.max(0, Math.min(65535, left)), true);
+    p += HEAT_ENTRY_BYTES;
+  }
+  return p;
+}
+
+/** `now` is the *receiver's* tick. See the layout note on the deadline. */
+export function decodeHeat(buffer: ArrayBuffer, now: number): HeatRecord[] | null {
+  if (buffer.byteLength < HEAT_HEADER_BYTES) return null;
+  const v = new DataView(buffer);
+  if (v.getUint8(0) !== MSG.HEAT) return null;
+  const count = v.getUint16(1, true);
+  const out: HeatRecord[] = [];
+  let p = HEAT_HEADER_BYTES;
+  // Bounded by what arrived rather than by what the count claims. See
+  // `decodeBikes`: a `DataView` read past the end throws, and a throw inside a
+  // socket callback takes the client's whole message pump with it.
+  for (let i = 0; i < count && p + HEAT_ENTRY_BYTES <= buffer.byteLength; i++) {
+    const left = v.getUint16(p + 3, true);
+    out.push({
+      playerId: v.getUint16(p, true),
+      stars: v.getUint8(p + 2),
+      decayEndsTick: left > 0 ? now + left : 0,
+    });
+    p += HEAT_ENTRY_BYTES;
   }
   return out;
 }
@@ -3092,12 +3692,96 @@ export function verifyNet(): string[] {
     }
   }
 
-  // --- Events: a batch of all four kinds, out and back.
+  // --- Heat, the graded ladder's channel. `MSG.HEAT`; see `encodeHeat`.
+  //
+  // What this catches: a star count that does not round-trip is a HUD and a
+  // nameplate claiming a different tier from the one the server is dispatching
+  // helicopters about. A deadline that does not survive the relative encoding is
+  // a decay clock counting toward a moment in 1970 -- which draws as "getting
+  // away" forever, on a player the police are standing next to.
+  {
+    const sent = 5_000_000;
+    const records: HeatRecord[] = [
+      { playerId: 1, stars: 5, decayEndsTick: sent + 900 },
+      { playerId: 300, stars: 0, decayEndsTick: 0 },
+      { playerId: 42, stars: 2, decayEndsTick: sent + 1 },
+    ];
+    const frame = encodeHeat(records, sent);
+    if (frame.byteLength !== heatBytes(3)) {
+      failures.push(`A 3-entry heat message is ${frame.byteLength} bytes; the layout says ${heatBytes(3)}.`);
+    }
+    // Decoded against the *receiver's* clock, which in the ordinary case is the
+    // sender's -- both ends run `traffic.trafficTick(Date.now())`.
+    const got = decodeHeat(frame, sent);
+    if (!got || got.length !== 3) {
+      failures.push(`A 3-entry heat message decoded to ${got?.length ?? 'null'} records.`);
+    } else {
+      for (let i = 0; i < 3; i++) {
+        const a = records[i];
+        const b = got[i];
+        if (b.playerId !== a.playerId || b.stars !== a.stars || b.decayEndsTick !== a.decayEndsTick) {
+          failures.push(
+            `Heat for ${a.playerId}: ${a.stars} stars ending ${a.decayEndsTick} came back as ` +
+              `${b.stars}/${b.decayEndsTick}.`,
+          );
+        }
+      }
+    }
+    // Zero is a state, not a small number. A record with the police still on it
+    // must not come back as a deadline a fraction of a second away.
+    const still = decodeHeat(encodeHeat([{ playerId: 3, stars: 3, decayEndsTick: 0 }], sent), sent + 10);
+    if (!still || still[0].decayEndsTick !== 0) {
+      failures.push(
+        `"The police can still see you" came back as a deadline of ${still?.[0].decayEndsTick}. ` +
+          'The HUD would draw a star about to fall on a player who is being shot at.',
+      );
+    }
+    // The empty message is how the last star comes off every HUD in the room.
+    const none = decodeHeat(encodeHeat([], sent), sent);
+    if (none === null || none.length !== 0) {
+      failures.push('An empty HEAT message did not decode to an empty list; that is how the stars come down.');
+    }
+    // Clamped rather than wrapped, like the investigation countdown.
+    const huge = decodeHeat(encodeHeat([{ playerId: 2, stars: 1, decayEndsTick: sent + 999999 }], sent), sent);
+    if (!huge || huge[0].decayEndsTick !== sent + 65535) {
+      failures.push('An over-long decay deadline wrapped instead of clamping.');
+    }
+    // And a truncated tail drops the rest rather than throwing.
+    const short = decodeHeat(frame.slice(0, HEAT_HEADER_BYTES + 6), sent);
+    if (short === null || short.length !== 1) {
+      failures.push(`A heat message truncated mid-record decoded ${short?.length ?? 'null'} entries, not 1.`);
+    }
+    // The two channels must not share an id -- they are the same shape and a
+    // collision would decode one as the other with no frame that says so.
+    // Asserted over the whole table rather than as a pair, because the batch
+    // this landed in had six branches taking bytes out of `MSG` at once and the
+    // failure mode of two of them agreeing is a client acting on a frame it
+    // was never sent. Read through `Object.values` so the compiler cannot
+    // constant-fold the comparison away -- which it does for a literal pair,
+    // and which is exactly how this check would have gone quietly true.
+    {
+      const bytes = Object.values(MSG) as number[];
+      if (new Set(bytes).size !== bytes.length) {
+        failures.push('Two entries of MSG share a byte. One message would be decoded as another.');
+      }
+    }
+  }
+
+  // --- Events: a batch of every kind, out and back.
   {
     const events: NetEvent[] = [
       { kind: EVENT.HIT, attacker: 1, victim: 2, flags: EVENT_FLAG.KO | EVENT_FLAG.FOOTY, health: 0 },
       { kind: EVENT.PICKUP, combatant: 4, powerup: 1, tileX: -3, tileZ: 5, index: 17 },
       { kind: EVENT.JOIN, id: 9, colourway: 2, bot: 1 },
+      // A swat, with a negative coordinate and a negative velocity on every
+      // axis it has one -- which is the case a sign error in the i32 or the i8
+      // survives, since Sydney's origin is Town Hall and half the city is west
+      // and north of it.
+      {
+        kind: EVENT.SWAT, swinger: 3, ball: 4242,
+        x: -812.345, y: 15.5, z: 1420.99,
+        vx: -21.5, vy: 8, vz: -35.5,
+      },
     ];
     const got = decodeEvents(encodeEvents(events));
     if (!got || got.length !== events.length) {
@@ -3113,6 +3797,38 @@ export function verifyNet(): string[] {
       }
       const join = got[2] as JoinEvent;
       if (join.id !== 9 || join.bot !== 1) failures.push('A JOIN event did not round-trip.');
+      // The swat. The position is millimetres and has to come back to one; the
+      // velocity is half-metres a second and is the coarsest field on this wire,
+      // so it is checked against its own quantum rather than against the value.
+      // A swat whose position does not survive puts the puff and the crack in
+      // the wrong street, and one whose velocity does not survive corrects the
+      // thrower's own predicted ball onto a heading the server never chose --
+      // which reads as the ball being swatted twice.
+      const swat = got[3] as SwatEvent;
+      const wanted = events[3] as SwatEvent;
+      if (
+        swat.swinger !== wanted.swinger ||
+        swat.ball !== wanted.ball ||
+        Math.abs(swat.x - wanted.x) > 0.001 ||
+        Math.abs(swat.y - wanted.y) > 0.001 ||
+        Math.abs(swat.z - wanted.z) > 0.001
+      ) {
+        failures.push(
+          `A SWAT event did not round-trip: ${wanted.swinger}/${wanted.ball} at ` +
+            `(${wanted.x}, ${wanted.y}, ${wanted.z}) came back as ${swat.swinger}/${swat.ball} at ` +
+            `(${swat.x}, ${swat.y}, ${swat.z}).`,
+        );
+      }
+      if (
+        Math.abs(swat.vx - wanted.vx) > 0.25 ||
+        Math.abs(swat.vy - wanted.vy) > 0.25 ||
+        Math.abs(swat.vz - wanted.vz) > 0.25
+      ) {
+        failures.push(
+          `A SWAT event's velocity came back as (${swat.vx}, ${swat.vy}, ${swat.vz}) against ` +
+            `(${wanted.vx}, ${wanted.vy}, ${wanted.vz}). Half a metre a second is the quantum.`,
+        );
+      }
     }
     // The retired kind. A batch carrying an event this build does not know must
     // drop the rest rather than resynchronise on the middle of a record -- which
@@ -3178,6 +3894,129 @@ export function verifyNet(): string[] {
     }
   }
 
+  /* --- The screaming sun's two instants.
+   *
+   * What this catches is the one failure this message can have and the one it
+   * would be hardest to find: a clock that does not survive the round trip. The
+   * face is drawn until `screamUntilMs` and nothing anywhere re-sends it, so a
+   * field that lost its low bits would produce a sun that stopped screaming at a
+   * plausible-looking wrong time, three hours after anybody was looking at the
+   * code. Both values are tested at a real epoch instant -- 1.8e12, which needs
+   * 41 bits and is where a `f32` or a `u32` would fail -- and at an instant past
+   * the year 2100, on `Welcome.clockMs`' own reasoning. */
+  {
+    const scream = 1_800_000_123_456;
+    const cool = 1_800_010_800_001;
+    const got = decodeSun(encodeSun(scream, cool));
+    if (encodeSun(scream, cool).byteLength !== SUN_BYTES) {
+      failures.push(`A SUN message is not ${SUN_BYTES} bytes.`);
+    }
+    if (!got || got.screamUntilMs !== scream || got.cooldownUntilMs !== cool) {
+      failures.push(
+        `A SUN message came back as ${JSON.stringify(got)} rather than ${scream}/${cool}. Both ` +
+          `fields are absolute epoch milliseconds and must be exact: they are sent once and are ` +
+          `still being compared against an hour later.`,
+      );
+    }
+    const late = decodeSun(encodeSun(4_102_444_800_000, 4_102_455_600_000));
+    if (!late || late.screamUntilMs !== 4_102_444_800_000) {
+      failures.push(
+        `A SUN instant in the year 2100 came back as ${late?.screamUntilMs}. The fields are f64 ` +
+          `and must hold every integer to 2^53.`,
+      );
+    }
+    // A fresh room's zeros are a legal message and mean "never". A decoder that
+    // treated them as absent would leave a joiner unable to be told the button
+    // is charged.
+    const never = decodeSun(encodeSun(0, 0));
+    if (!never || never.screamUntilMs !== 0 || never.cooldownUntilMs !== 0) {
+      failures.push('A SUN message of zeros -- a room nobody has pressed -- did not decode.');
+    }
+    // Truncation drops the frame rather than throwing inside the socket
+    // callback, which is `decodeRoster`'s rule for every decoder in this file.
+    if (decodeSun(encodeSun(scream, cool).slice(0, SUN_BYTES - 1)) !== null) {
+      failures.push('A truncated SUN message decoded rather than being refused.');
+    }
+    // And the press, which is one byte and still has to be told apart from
+    // every other one-byte thing that could arrive on that socket.
+    if (!decodeSunPress(encodeSunPress())) failures.push('A SUN_PRESS did not decode as one.');
+    if (decodeSunPress(encodeInput({ seq: 0, buttons: 0, forward: 0, right: 0, yaw: 0, pitch: 0 }))) {
+      failures.push('An INPUT frame decoded as a SUN_PRESS. The type byte is not being read.');
+    }
+    if (decodeSunPress(new ArrayBuffer(0))) failures.push('An empty frame decoded as a SUN_PRESS.');
+  }
+
+  // --- The driven cars, this pass's new message.
+  //
+  // What this catches, and every one of them renders rather than throws:
+  //
+  //   - **A `carId` that does not survive.** It is the *suppression key* -- see
+  //     `game/driving.ts` section 3 -- so a truncated or sign-mangled one means
+  //     the client suppresses the wrong ambient car, or none, and the street has
+  //     two of your car in it.
+  //   - **A `model` nibble that overflows.** Body and colour share a byte, so a
+  //     body index that leaked into the colour half repaints the fleet.
+  //   - **A removal that reads as an upsert.** The one thing `MSG.BIKES` never
+  //     had to encode. A dropped delete is a permanently suppressed ambient car:
+  //     a hole in the traffic that nothing will ever fill.
+  //   - **A speed that wraps.** `i16` centimetres, and a wrapped one is a car
+  //     the HUD says is doing -1,100 km/h.
+  {
+    const cars: CarRecord[] = [
+      { id: 1, carId: 0xdeadbeef, driver: 0, body: 4, colour: 7, x: -364.25, y: -31.75, z: 2682.5, yaw: 0.75, speed: -6.6 },
+      { id: 65535, carId: 1, driver: 65535, body: 0, colour: 0, x: 3999.99, y: -70.125, z: -3999.99, yaw: 6.28, speed: 22 },
+      { id: 74, carId: 0x80000000, driver: 12, body: 2, colour: 3, x: 0, y: 0, z: 0, yaw: 0, speed: 0, removed: true },
+    ];
+    const frame = encodeCars(cars, true);
+    if (frame.byteLength !== carsBytes(3)) {
+      failures.push(`A 3-car message is ${frame.byteLength} bytes; the layout says ${carsBytes(3)}.`);
+    }
+    const got = decodeCars(frame);
+    if (!got || got.cars.length !== 3) {
+      failures.push(`A 3-car message decoded to ${got?.cars.length ?? 'null'} records.`);
+    } else {
+      if (!got.full) failures.push('The CARS_FULL header flag did not survive the wire.');
+      for (let i = 0; i < 3; i++) {
+        const a = cars[i];
+        const b = got.cars[i];
+        if (b.id !== a.id) failures.push(`Car ${a.id}: id came back as ${b.id}.`);
+        // `>>> 0` on both sides: 0x80000000 is negative as a signed int and the
+        // whole point of this row is that the top bit of an identity survives.
+        if ((b.carId >>> 0) !== (a.carId >>> 0)) {
+          failures.push(`Car ${a.id}: carId 0x${(a.carId >>> 0).toString(16)} came back as 0x${(b.carId >>> 0).toString(16)}.`);
+        }
+        if (b.driver !== a.driver) failures.push(`Car ${a.id}: driver ${a.driver} came back as ${b.driver}.`);
+        if (b.body !== a.body || b.colour !== a.colour) {
+          failures.push(`Car ${a.id}: model ${a.body}/${a.colour} came back as ${b.body}/${b.colour}.`);
+        }
+        if ((b.removed ?? false) !== (a.removed ?? false)) {
+          failures.push(`Car ${a.id}: removed=${a.removed ?? false} came back as ${b.removed}.`);
+        }
+        if (Math.abs(b.speed - a.speed) > 0.02) {
+          failures.push(`Car ${a.id}: speed ${a.speed} came back as ${b.speed}; the tolerance is 2 cm/s.`);
+        }
+        for (const [axis, want, back] of [['x', a.x, b.x], ['y', a.y, b.y], ['z', a.z, b.z]] as Array<[string, number, number]>) {
+          if (Math.abs(back - want) > 0.01) {
+            failures.push(`Car ${a.id}: ${axis} ${want} came back as ${back}; the tolerance is 1 cm.`);
+          }
+        }
+      }
+    }
+    // An empty delta is legal and is what a tick with no change would send if
+    // anybody were foolish enough to send one; and the default is *not* full, or
+    // every delta would wipe the client's set.
+    const none = decodeCars(encodeCars([]));
+    if (none === null || none.cars.length !== 0) failures.push('An empty CARS message did not decode to an empty list.');
+    if (none !== null && none.full) failures.push('A CARS message defaulted to CARS_FULL; a delta must merge.');
+    // A truncated tail drops the rest rather than throwing inside the socket
+    // callback. `decodeBikes`' rule.
+    const short = frame.slice(0, CARS_HEADER_BYTES + CAR_RECORD_BYTES + 5);
+    const partial = decodeCars(short);
+    if (partial === null || partial.cars.length !== 1) {
+      failures.push(`A CARS message truncated mid-record decoded ${partial?.cars.length ?? 'null'} cars, not 1.`);
+    }
+  }
+
   // --- v8's interest message: who came into view and who went out of it.
   //
   // What this catches is the shape of failure the whole of AOI has: an entrant
@@ -3191,7 +4030,9 @@ export function verifyNet(): string[] {
       { id: 1, colourway: 0, flags: 0 },
       // The id a byte would have aliased, with both flag bits set.
       { id: 40000, colourway: 6, flags: ENTER_FLAG.BOT | ENTER_FLAG.RIDING },
-      { id: 65535, colourway: 3, flags: ENTER_FLAG.RIDING },
+      // A driver: `RIDING` *and* `DRIVING`, which is the combination this pass
+      // added and the one a client has to be able to tell from a cyclist.
+      { id: 65535, colourway: 3, flags: ENTER_FLAG.RIDING | ENTER_FLAG.DRIVING },
     ];
     const leaves = [2, 300, 65534];
     const frame = encodeInterest(enters, leaves);
@@ -3539,7 +4380,7 @@ export function verifyNet(): string[] {
     }
     // Which half each one belongs in, named here rather than inferred from a
     // prefix: a list is checkable and a naming convention is not.
-    const clientToServer = ['HELLO', 'INPUT', 'PING', 'CHAT_SAY', 'SUGGEST'];
+    const clientToServer = ['HELLO', 'INPUT', 'PING', 'CHAT_SAY', 'SUGGEST', 'SUN_PRESS', 'PHONE'];
     for (const [name, id] of Object.entries(MSG)) {
       const wantsLow = clientToServer.includes(name);
       if (wantsLow && id >= 0x80) {

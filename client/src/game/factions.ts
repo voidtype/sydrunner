@@ -605,6 +605,44 @@ export const NPC_KIND = {
   TURKEY: 4,
   IBIS: 5,
   MAGPIE: 6,
+  /**
+   * The heat ladder's 3-star arrival, registered in `game/heat.ts`. A **car**,
+   * not a person, and it is a kind rather than an entity of its own for the
+   * reason stated at that registration: everything a promoted actor gets -- an
+   * id, eighteen bytes of wire, health, the shared cap, `strikeNpc`'s re-hit
+   * guard, a feed line -- is everything a pursuit car needs, and taking a byte
+   * out of a table with 249 spare costs nothing.
+   */
+  HIGHWAY_PATROL: 7,
+  /**
+   * **Reserved and deliberately never registered.** Polair is a spotlight from
+   * the sky and a rotor thump, drawn by `world/highway-patrol.ts` off the star
+   * count alone -- see `game/heat.ts`'s header, section 4. The byte is claimed
+   * here anyway, because the day somebody does model the helicopter is the day
+   * a client and a server have to agree what 8 means, and `verifyHeat` asserts
+   * that nothing has quietly started promoting them.
+   */
+  POLAIR: 8,
+  /**
+   * The 4-star roadblock: one actor that is a car and eight witches' hats. Its
+   * two officers are ordinary `POLICE` actors standing beside it, so they are
+   * hittable and `world/police.PoliceSquad` draws them with no new case.
+   */
+  RBT: 9,
+  /**
+   * The five characters, registered in `game/characters.ts`. Bytes 10 to 14 --
+   * pre-assigned when this batch of six branches was written against one
+   * `main`, because wire bytes are the one resource branches cannot negotiate
+   * over at merge time. 7-9 above were the heat ladder's allocation.
+   *
+   * Within the block the order is the brief's order, which is also roughly the
+   * order a player meets them walking from a station out to a suburb.
+   */
+  ESHAY: 10,
+  KAREN: 11,
+  TRADIE: 12,
+  INFLUENCER: 13,
+  AGENT: 14,
 } as const;
 
 /**
@@ -721,6 +759,32 @@ export interface NpcActor {
    * rebuilt every frame forever. The authority never reads it.
    */
   seen: number;
+  /**
+   * The ambient event that promoted this actor, or **undefined for the ordinary
+   * case** -- an officer off a beat, a meth head off a suburb, anybody at all
+   * who was not part of a scheduled event.
+   *
+   * Not on the wire, and it does not need to be: it exists so that the authority
+   * can answer two questions it otherwise could not. *Has this event already
+   * been attended* -- without which `game/events.stepEvents` promotes a fresh
+   * standoff every tick until the cap refuses -- and *is this actor's event
+   * over*, which is what stops a constable standing in an empty car park for the
+   * rest of the session holding a slot the police need.
+   *
+   * `undefined` rather than `0` or `-1`, which is the one design decision here
+   * worth the sentence. Every other absent-value field on this record uses a
+   * sentinel (`target: -1`, `actorId: 0`) because those fields are read on the
+   * hot path by code that must not branch on a type. This one is read by
+   * `stepEvents` and `sweepEvents` alone, a handful of times a second, and an
+   * `undefined` is the only value that cannot collide with a real event id --
+   * which is packed cell arithmetic and is perfectly capable of being 0 or -1.
+   * `NpcActor.target`'s own header documents what happened the day a valid id
+   * was used as a sentinel.
+   *
+   * Optional, so `FactionField.promote` does not set it and no faction written
+   * before events existed changes by a byte.
+   */
+  eventId?: number;
 }
 
 /**
@@ -767,6 +831,32 @@ export interface NpcKindDef {
    * frame that says so.
    */
   think(actor: NpcActor, ctx: FactionCtx): void;
+
+  /**
+   * What hitting one of these is, as a `REASON`, or `REASON.NONE` for nothing.
+   *
+   * **Optional, and absent means the framework's own answer** --
+   * `REASON.ASSAULT`, the bystander rule -- so no faction written before this
+   * field existed changes behaviour by a bit.
+   *
+   * It is here rather than at the adjudicating call sites because of *which*
+   * question it answers. `streetlife.strikeCrime` is the one door both
+   * authorities put this question through (`server/sim.hitNpc` online,
+   * `main.ts` offline), and it already knows the two street kinds by name. A
+   * third, fourth and fifth faction adding themselves to that `switch` would
+   * make a file owned by the meth heads into a registry of everybody's crimes,
+   * which is the exact shape `registerNpcKind` exists to avoid: a faction
+   * states a fact about itself, and the framework carries it.
+   *
+   * Called with the actor **as they were standing a moment ago**, never after
+   * the strike -- `strikeCrime`'s own ordering rule, restated here because this
+   * hook is where a new faction reads it. A drunk who was minding their own
+   * business until the bat landed is a bystander, and asking afterwards finds
+   * them unconscious and answers no.
+   *
+   * Pure, deterministic, and on the authority only.
+   */
+  strikeReason?(actor: NpcActor): number;
 }
 
 const KINDS = new Map<number, NpcKindDef>();
@@ -823,6 +913,61 @@ export const REASON = {
   WILDLIFE: 3,
   ASSAULT_POLICE: 4,
   AFFRAY: 5,
+  /**
+   * Taking a car that is not yours, and driving one like you took it.
+   *
+   * **Declared here rather than by the driving feature that reports them**, on
+   * exactly `WILDLIFE`'s argument one paragraph up: a reason code that arrived
+   * with its faction would be a protocol byte moving for a string, and it costs
+   * one row of a table to make that day a one-line change. `game/heat.ts`
+   * already prices both, so the 2-star response exists before anything can
+   * commit them.
+   *
+   * `CAR_THEFT` is conditional on being *seen*: `driving.bystanderSeen` gates
+   * the call, which is the first crime in this game a civilian rather than an
+   * officer can report. `DANGEROUS_DRIVING` is not conditional on anything --
+   * running somebody down at speed is reported by the body.
+   */
+  CAR_THEFT: 6,
+  DANGEROUS_DRIVING: 7,
+  /**
+   * Driving through a random breath test. See `game/heat.ts`, 4 stars.
+   *
+   * Its own reason rather than `DANGEROUS_DRIVING` because the banner is the
+   * only thing that tells a player *which* of the last four things they did is
+   * being answered, and "dangerous driving" appearing as you burst through a
+   * line of witches' hats would be the interface describing the wrong event.
+   */
+  RBT_EVADE: 8,
+  /**
+   * Knocking an officer out, as distinct from hitting one.
+   *
+   * `ASSAULT_POLICE` is the swing and this is the result, and the ladder needs
+   * them separate: hitting a constable is a 2-star response and putting one on
+   * the ground is a 3-star one, which is not a distinction a single code can
+   * carry. The name is the charge sheet's rather than the simulation's -- an
+   * officer in this game gets back up after five seconds -- and it is kept
+   * because the *banner* is written in the voice of what you are wanted for,
+   * not of what actually happened.
+   */
+  MURDER_POLICE: 9,
+  // 10..12 are left free on purpose. The characters faction takes 13..16.
+  /**
+   * Assaulting a real estate agent, and it is a separate code rather than
+   * `ASSAULT` for exactly one reason: the **banner text differs**.
+   *
+   * `REASON_TEXT` is the only thing a reason code decides -- the countdown, the
+   * extension and the cap are identical for every code in this table -- so a
+   * new code is warranted precisely when the sentence a player reads has to be
+   * a different sentence, and `game/characters.ts` has one line that has to be
+   * different. See that file's section on the agent for why.
+   *
+   * **13, not 10.** Codes 6 through 9 were the driving and heat branches'
+   * allocation and 10-12 are headroom, on `NPC_KIND`'s own argument: the byte
+   * is on the wire and two branches that both took the next free number would
+   * produce a build where the banner reads the other branch's crime.
+   */
+  REAL_ESTATE: 13,
 } as const;
 
 /**
@@ -840,6 +985,15 @@ export const REASON_TEXT: Readonly<Record<number, string>> = {
   [REASON.WILDLIFE]: 'harming protected wildlife',
   [REASON.ASSAULT_POLICE]: 'assaulting police',
   [REASON.AFFRAY]: 'affray',
+  [REASON.CAR_THEFT]: 'stealing a car',
+  [REASON.DANGEROUS_DRIVING]: 'dangerous driving',
+  [REASON.RBT_EVADE]: 'evading an rbt',
+  [REASON.MURDER_POLICE]: 'putting an officer down',
+  // The parenthetical is the joke and it is load-bearing rather than
+  // decorative: the banner's whole job is to tell you which of your last four
+  // actions started this, and this is the one crime in the table the game has
+  // an opinion about. See `game/characters.ts`, section 5.
+  [REASON.REAL_ESTATE]: 'assaulting a real estate agent (understandable)',
 };
 
 export function reasonText(code: number): string {
@@ -882,7 +1036,7 @@ export interface Investigation {
  * reported from inside a ball's step and one reported from inside a swing
  * resolve in the same place, in the same order, on both ends.
  */
-const pendingCrimes: Array<{ playerId: number; reason: number }> = [];
+const pendingCrimes: Array<{ playerId: number; reason: number; witness: number }> = [];
 
 /**
  * Tell the police about something. **The whole of a consumer's dependency on
@@ -901,12 +1055,74 @@ export function reportCrime(playerId: number, reason: number): void {
   // making the victim their own attacker rather than by using an id of 0, so
   // nothing in this project actually needs 0 to mean absent.
   if (!Number.isFinite(playerId) || playerId < 0) return;
-  pendingCrimes.push({ playerId, reason });
+  pendingCrimes.push({ playerId, reason, witness: 0 });
+}
+
+/**
+ * The same call, from a faction whose witness is **not** a constable.
+ *
+ * The characters faction's half of the contract, and the reason it is a second
+ * entry point rather than an argument on the first: `reportCrime` is called
+ * from six places today, every one of which has already applied its own witness
+ * rule -- `server/sim.reportIfWitnessed` runs `policeWitness`, an officer you
+ * hit is their own witness, and wildlife is unconditional on purpose. Adding a
+ * parameter would have made every one of those call sites state something they
+ * do not know. This one is for the case the graded response actually needs to
+ * tell apart: a member of the public who *called it in*, where the police were
+ * nowhere near and the heat should still rise.
+ *
+ * `witnessKind` is `heat.WITNESS_KIND`. It is a plain number here rather than
+ * that type because `game/heat.ts` imports this file and the import may not go
+ * the other way.
+ */
+export function addWitnessedCrime(playerId: number, reason: number, witnessKind = 1): void {
+  if (!Number.isFinite(playerId) || playerId < 0) return;
+  pendingCrimes.push({ playerId, reason, witness: witnessKind | 0 });
 }
 
 /** For a check that has to start from nothing, and for a respawn. Not called in play. */
 export function clearPendingCrimes(): void {
   pendingCrimes.length = 0;
+}
+
+/**
+ * Who wants to be told about an adjudicated crime. See `FactionField.accuse`.
+ *
+ * A listener list rather than a direct call into the consequence, on exactly
+ * `policeHostileTo`'s argument: the module that decides *what a crime is worth*
+ * does not own the definition of what a crime is, and a `factions.ts` that
+ * imported `game/heat.ts` to price one would be a cycle -- heat imports this
+ * file for `REASON`, `NPC_KIND` and the whole actor framework.
+ *
+ * Hooked at `accuse` rather than at `reportCrime` deliberately, because those
+ * are not the same set: `reportCrime` is the *queue* and only the wildlife
+ * faction uses it, while `server/sim.accuse` and `main.ts`'s offline path call
+ * `FactionField.accuse` straight. One funnel, and it is the lower one.
+ */
+const crimeListeners: Array<(playerId: number, reason: number, witness: number, tick: number) => void> = [];
+
+export function onCrime(fn: (playerId: number, reason: number, witness: number, tick: number) => void): void {
+  crimeListeners.push(fn);
+}
+
+/**
+ * How many stars a player carries, or 0.
+ *
+ * A forwarder rather than the answer, and the indirection is the point: the
+ * ladder lives in `game/heat.ts` and this file must not import it, but every
+ * existing consumer of the police already imports *this* one and should not
+ * have to learn a second module's name to ask a question about how wanted
+ * somebody is. `game/heat.ts` installs the reader at load; before it does, or
+ * in a process that never loaded it, the honest answer is zero.
+ */
+let heatReader: ((playerId: number) => number) | null = null;
+
+export function setHeatReader(fn: ((playerId: number) => number) | null): void {
+  heatReader = fn;
+}
+
+export function heatOf(playerId: number): number {
+  return heatReader === null ? 0 : heatReader(playerId);
 }
 
 /**
@@ -2137,7 +2353,14 @@ export class FactionField {
    * Returns the investigation, whether it was new, and the reason it now
    * carries -- `server/sim.ts` needs all three to decide what to put on the wire.
    */
-  accuse(playerId: number, reason: number, tick: number): { investigation: Investigation; opened: boolean } {
+  accuse(playerId: number, reason: number, tick: number, witness = 0): { investigation: Investigation; opened: boolean } {
+    // **The one funnel.** Every adjudicated crime in the game reaches this
+    // line -- the module queue drains into it, `server/sim.accuse` calls it and
+    // so does `main.ts` offline -- which is why the graded response hooks here
+    // rather than at `reportCrime`. See `onCrime`. The listeners run *before*
+    // the investigation is opened or extended, so a consumer that wants to know
+    // what the standing was a moment ago can still ask.
+    for (const fn of crimeListeners) fn(playerId, reason, witness, tick);
     const existing = this.investigations.get(playerId);
     if (existing === undefined) {
       const fresh: Investigation = { playerId, reason, ticks: COUNTDOWN_TICKS, since: tick };
@@ -2278,7 +2501,7 @@ export class FactionField {
     this.combatants = ctx.combatants;
 
     // --- 1. Reported crimes.
-    for (const crime of pendingCrimes) this.accuse(crime.playerId, crime.reason, ctx.tick);
+    for (const crime of pendingCrimes) this.accuse(crime.playerId, crime.reason, ctx.tick, crime.witness);
     pendingCrimes.length = 0;
 
     // --- 2. The countdowns.

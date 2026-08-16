@@ -85,6 +85,10 @@ import {
 } from '../game/combat.ts';
 import { applyPowerup, type PowerupKind } from '../game/powerups.ts';
 import { BikeField, shapeRideInput } from '../game/bikes.ts';
+// The cars, on the bikes' terms exactly: the same class the server runs, from
+// the same file, so that a claim and a suppression mean the same thing on both
+// ends. See `game/driving.ts`.
+import { CarField, shapeDriveInput } from '../game/driving.ts';
 import { EYE_HEIGHT, step, type InputSnapshot, type PlayerState } from '../player/controller.ts';
 import {
   ANIM,
@@ -101,6 +105,8 @@ import {
   WebSocketTransport,
   createSnapshot,
   decodeBikes,
+  decodeHeat,
+  decodeCars,
   decodeBye,
   decodeEvents,
   decodeInterest,
@@ -108,8 +114,10 @@ import {
   decodePowerups,
   decodeRoster,
   decodeSnapshot,
+  decodeSun,
   decodeWelcome,
   encodeHello,
+  encodeSunPress,
   encodeInput,
   encodeEvents,
   encodeInterest,
@@ -120,6 +128,7 @@ import {
   decodePong,
   frameType,
   rankRoster,
+  type HeatRecord,
   type InvestigationRecord,
   type NetTransport,
   type RosterEntry,
@@ -159,7 +168,23 @@ import {
   encodeSuggestVote,
   type SuggestionList,
 } from './suggestions.ts';
+// --- Money. See `net/cash.ts`.
+//
+// One block: two frames in, one out, and the two mirrors this object keeps of
+// them. `client/src/phone.ts` and `main.ts` read the mirrors; nothing else in
+// this file knows what a dollar is.
+import {
+  PHONE_OP,
+  decodeFare,
+  decodeWallet,
+  encodePhone,
+  type FareFrame,
+  type WalletFrame,
+} from './cash.ts';
 import { NPC_STATE, type NpcActor } from '../game/factions.ts';
+// The shared wall-clock tick, for the heat channel's deadlines. Both ends run
+// this same function over the same epoch -- see `game/traffic.trafficTick`.
+import { trafficTick } from '../game/traffic.ts';
 
 const FIXED_DT = 1 / TICK_HZ;
 
@@ -297,7 +322,23 @@ export interface RemoteBall {
 
 /** What `main.ts` needs to react to. Presentation, exactly as the offline path's is. */
 export interface NetHandlers {
-  onHit(attacker: number, victim: number, ko: boolean, footy: boolean, health: number): void;
+  onHit(attacker: number, victim: number, ko: boolean, footy: boolean, health: number, returned: boolean): void;
+  /**
+   * A bat sent a football back. See `game/swat.ts` and `protocol.SwatEvent`.
+   *
+   * The six numbers after the ids are the ball's state *after* the deflection,
+   * and they do two different jobs for two different listeners: everybody uses
+   * the point for the crack and the puff, and the player who **threw** the ball
+   * uses the whole lot to correct the local predicted copy they are still
+   * flying. A swat deliberately does not change the ball's `thrower` -- see
+   * `footy.Footy.owner` -- so this event is the only thing that can tell them.
+   */
+  onSwat(
+    swinger: number,
+    ball: number,
+    x: number, y: number, z: number,
+    vx: number, vy: number, vz: number,
+  ): void;
   /** A ball bounced. `bounces` is which one, so the caller can vary the thud. */
   onBounce(x: number, y: number, z: number, bounces: number): void;
   onPickup(combatant: number, kind: PowerupKind, tileKey: string, index: number): void;
@@ -348,6 +389,34 @@ export interface NetHandlers {
   onSuggestions?(list: SuggestionList): void;
   /** Yes / no / not this week, with the server's own sentence. */
   onSuggestAck?(result: number, issue: number, message: string): void;
+  /**
+   * The sun's two instants changed, or arrived at join. See
+   * `game/sunbutton.ts`.
+   *
+   * Optional like `onChat` and for the same reason. It is also passed **out**
+   * rather than filed here, which is `CHAT_LINE`'s decision rather than
+   * `BIKES`': the state has exactly one owner on this end -- the `SunFeature` in
+   * `main.ts`, which needs it every frame to place a billboard -- and a mirror
+   * kept beside it would be a second copy of two numbers with no rule about
+   * which one the renderer reads. The bikes get a mirror here because
+   * `main.ts` *predicts* a mount against the server's copy and needs both; the
+   * sun's prediction is written straight into the one copy and corrected by
+   * this callback, so there is nothing to compare.
+   *
+   * The record is freshly allocated per message on purpose: it is handed to a
+   * caller that keeps it, at a few times an hour, so a reused scratch object
+   * would be a `SunState` that silently changed under whoever held it.
+   */
+  onSun?(state: { screamUntilMs: number; cooldownUntilMs: number }): void;
+  /**
+   * The balance moved, and the server's own sentence saying why -- "+$34 fare".
+   *
+   * Optional like `onChat`, for its reason: a headless probe has no HUD pill.
+   * Fired **only when there is something to say**, so a wallet frame re-sent
+   * because somebody else dropped a bundle does not re-announce a fare that was
+   * paid a minute ago. See `net/cash.WalletFrame.note`.
+   */
+  onMoney?(note: string, balance: number): void;
 }
 
 interface PendingInput {
@@ -519,6 +588,37 @@ export class NetClient {
       return;
     }
     this.investigations.set(this.id, { playerId: this.id, reason, ticks });
+  }
+
+  /**
+   * How wanted everybody is, keyed by player id, as the server last said.
+   *
+   * A plain mirror. Unlike `investigations` above it there is no local clock and
+   * no prediction -- see the `MSG.HEAT` case for why a level must not be
+   * extrapolated.
+   */
+  private readonly heat = new Map<number, HeatRecord>();
+
+  /** This client's own star count, 0..5. What the HUD draws its row from. */
+  get heatStars(): number {
+    return this.heat.get(this.id)?.stars ?? 0;
+  }
+
+  /**
+   * When this client's current star would fall if they stay hidden, as an
+   * absolute tick, or **0 while the police still have eyes on them**.
+   *
+   * Zero is a state rather than a very small number -- see
+   * `protocol.encodeHeat` -- and it is the difference the HUD actually draws:
+   * are they still on me, or am I getting away.
+   */
+  get heatDecayEndsTick(): number {
+    return this.heat.get(this.id)?.decayEndsTick ?? 0;
+  }
+
+  /** Anybody's, for the star row under their nameplate. A 4-star player is a target. */
+  heatOf(playerId: number): number {
+    return this.heat.get(playerId)?.stars ?? 0;
   }
 
   /** Run every countdown down by one tick's worth of frame. Called from `update`. */
@@ -948,6 +1048,68 @@ export class NetClient {
     return true;
   }
 
+  /**
+   * Press the button in Sydney Park. One byte; the server decides.
+   *
+   * Returns whether the frame went out, which the caller ignores and should:
+   * `world/sunbutton.SunFeature.press` has already written its optimistic state
+   * and put a line on the HUD by the time this is called, and a socket that was
+   * not open is a client that is about to be told it is offline by every other
+   * path in this file. There is nothing useful for a caller to do differently.
+   */
+  pressSun(): boolean {
+    if (this.status !== 'online') return false;
+    this.transport.send(encodeSunPress());
+    return true;
+  }
+
+  // --- Money. See `net/cash.ts`. -----------------------------------------------
+
+  /**
+   * The balance, the claim countdown and the bundles, as the server last said.
+   *
+   * A mirror and never an authority: the client draws this and the server
+   * decides it. There is deliberately **no prediction** of any of it, unlike
+   * the mount and the investigation banner, and the reason is that money has no
+   * frame-accuracy requirement -- a balance that updates 50 ms late is a
+   * balance that updates, where a bike that mounts 50 ms late is a control that
+   * feels broken. Predicting a credit would also mean predicting a *refusal*,
+   * which is the one thing a client cannot do: the seven-day timer lives on the
+   * server.
+   *
+   * Starts empty rather than null so every reader is a field access. An
+   * `?offline` session never receives one and draws `$0`, which is the honest
+   * answer with nobody to ask.
+   */
+  readonly wallet: WalletFrame = { balance: 0, centrelinkNextMs: -1, note: '', bundles: [] };
+
+  /** The fare this client is on, as the server last said. See `MSG.FARE`. */
+  readonly fare: FareFrame = {
+    state: 'none', px: 0, pz: 0, dx: 0, dz: 0, offeredMs: 0, payout: 0,
+  };
+
+  /**
+   * Ask to be paid at the Centrelink you are standing at.
+   *
+   * Refused while offline on `sendChat`'s argument: a claim that vanished into
+   * a dead socket is worse than one visibly refused, and there is no offline
+   * economy to claim from. The office id is a row in `game/centrelink-data.ts`,
+   * which both ends compile in -- the server checks the position itself and
+   * uses the id only to notice that you asked for the wrong one.
+   */
+  claimCentrelink(officeId: string): boolean {
+    if (this.status !== 'online') return false;
+    this.transport.send(encodePhone(MSG.PHONE, PHONE_OP.CLAIM, officeId));
+    return true;
+  }
+
+  /** Clock on or off the rideshare shift. Idempotent; see `net/cash.PHONE_OP`. */
+  setRideshareOnline(online: boolean): boolean {
+    if (this.status !== 'online') return false;
+    this.transport.send(encodePhone(MSG.PHONE, online ? PHONE_OP.ONLINE : PHONE_OP.OFFLINE));
+    return true;
+  }
+
   /** Called every frame. Advances the interpolation clock and places the remotes. */
   update(dt: number): void {
     if (this.tickSynced) this.serverTick += dt * TICK_HZ;
@@ -1108,6 +1270,52 @@ export class NetClient {
         if (ack) this.handlers.onSuggestAck?.(ack.result, ack.issue, ack.message);
         return;
       }
+      /*
+       * The wallet, and every cash bundle on the ground in the room.
+       *
+       * **Filed here rather than passed straight out**, which is the opposite
+       * of what `SUGGEST_LIST` above does and is right for the opposite reason:
+       * a suggestion list is a fact about a panel that is currently open, and
+       * this is a fact about the world that every frame needs -- the HUD draws
+       * the balance sixty times a second and the streamer draws the piles. So
+       * the frame is the mirror and the callback is only for the *moment* the
+       * note describes.
+       */
+      case MSG.WALLET: {
+        const w = decodeWallet(frame, MSG.WALLET);
+        if (!w) return;
+        // Written **into** the held record rather than replacing it, so a
+        // caller that took a reference at boot keeps reading the live one --
+        // which `main.ts`'s HUD tick and the phone's wallet app both do. The
+        // bundle array is spliced for the same reason.
+        this.wallet.balance = w.balance;
+        this.wallet.centrelinkNextMs = w.centrelinkNextMs;
+        this.wallet.note = w.note;
+        this.wallet.bundles.length = 0;
+        for (const b of w.bundles) this.wallet.bundles.push(b);
+        if (w.note !== '') this.handlers.onMoney?.(w.note, w.balance);
+        return;
+      }
+      /*
+       * The fare, which is only ever sent to the driver it belongs to.
+       *
+       * `Date.now()` is read here, on arrival, because the frame carries the
+       * offer's **age** rather than an instant -- see `net/cash.encodeFare`, and
+       * note that this is the one message in this switch that has to know what
+       * time it is.
+       */
+      case MSG.FARE: {
+        const f = decodeFare(frame, MSG.FARE, Date.now());
+        if (!f) return;
+        this.fare.state = f.state;
+        this.fare.px = f.px;
+        this.fare.pz = f.pz;
+        this.fare.dx = f.dx;
+        this.fare.dz = f.dz;
+        this.fare.offeredMs = f.offeredMs;
+        this.fare.payout = f.payout;
+        return;
+      }
       case MSG.POWERUPS: {
         const down = decodePowerups(frame);
         if (!down) return;
@@ -1143,6 +1351,40 @@ export class NetClient {
         this.serverBikeKnown = true;
         return;
       }
+      case MSG.CARS: {
+        const message = decodeCars(frame);
+        if (!message) return;
+        // `CARS_FULL` is a **replacement**, and it is what a joiner is sent.
+        // Without honouring it, a client that reconnected to a restarted server
+        // would keep every record it had and go on suppressing ambient cars
+        // nobody is driving -- holes in the traffic that nothing ever fills.
+        if (message.full) this.cars.clear();
+        for (const r of message.cars) {
+          if (r.removed) {
+            this.cars.remove(r.id);
+            continue;
+          }
+          this.cars.adopt({
+            id: r.id,
+            carId: r.carId,
+            body: r.body,
+            colour: r.colour,
+            x: r.x,
+            y: r.y,
+            z: r.z,
+            yaw: r.yaw,
+            speed: r.speed,
+            driverId: r.driver,
+          });
+        }
+        // Which car the server thinks *this* client is in. Derived rather than
+        // sent separately, on `MSG.BIKES`' argument: the driver id is already on
+        // every record, and a second field saying "and yours is number 12" would
+        // be the field that disagreed with the list beside it.
+        this.serverCar = this.cars.carOf(this.id);
+        this.serverCarKnown = true;
+        return;
+      }
       case MSG.INVESTIGATION: {
         const records = decodeInvestigations(frame);
         if (!records) return;
@@ -1152,6 +1394,41 @@ export class NetClient {
         // way to `MSG.BIKES`.
         this.investigations.clear();
         for (const r of records) this.investigations.set(r.playerId, { ...r });
+        return;
+      }
+      /*
+       * The screaming sun, on change, at join, and as the answer to this
+       * client's own press. See `protocol.MSG.SUN`.
+       *
+       * Passed straight out on `CHAT_LINE`'s argument -- see `NetHandlers.onSun`
+       * for why this one is not mirrored here the way `BIKES` is.
+       */
+      case MSG.SUN: {
+        const sun = decodeSun(frame);
+        if (sun) this.handlers.onSun?.(sun);
+        return;
+      }
+      case MSG.HEAT: {
+        // Decoded against **this** client's own wall-clock tick, which is what
+        // turns the wire's remaining-ticks back into the absolute deadline the
+        // record carries. See `protocol.decodeHeat`; the two clocks agree
+        // because v11 publishes the server's at join.
+        const records = decodeHeat(frame, trafficTick(Date.now()));
+        if (!records) return;
+        // Replacement, not upsert, on `MSG.INVESTIGATION`'s argument one case
+        // up: heat all ends, the end is the interesting event, and a missing
+        // delete is four stars painted on a player nobody is chasing -- which
+        // on a nameplate is a target somebody else will act on.
+        //
+        // No prediction and nothing run down locally, which is where this
+        // differs from the investigation channel. A star count is a *level*,
+        // not a countdown: a client that extrapolated it would draw a star
+        // falling off between messages and then jumping back on, and there is
+        // nothing a player could do with that. The deadline is carried so the
+        // HUD can say "you are getting away"; the stars only move when the
+        // authority says so.
+        this.heat.clear();
+        for (const r of records) this.heat.set(r.playerId, r);
         return;
       }
       case MSG.BYE: {
@@ -1173,6 +1450,21 @@ export class NetClient {
    * meaning the same thing on both ends.
    */
   readonly bikes = new BikeField();
+  /**
+   * Every car anybody has taken, as the server last described it.
+   *
+   * A mirror rather than an authority, on `bikes`' terms: `main.ts` predicts its
+   * own theft so the camera and the speed change on the frame `E` goes down, and
+   * `MSG.CARS` is what corrects it. It is also what the **renderer** reads to
+   * suppress ambient cars, which is why it is public.
+   */
+  readonly cars = new CarField();
+  /** The car the server says this client is in, or 0. See the CARS case. */
+  private serverCar = 0;
+  /** False until the first CARS message, so a joiner does not eject itself. */
+  private serverCarKnown = false;
+  /** The input seq a local take or exit was predicted on, or -1. `bikePredictedAt`'s twin. */
+  private carPredictedAt = -1;
   /** The bike the server says this client is on, or 0. See the BIKES case. */
   private serverBike = 0;
   /** False until the first BIKES message, so a joiner does not dismount itself. */
@@ -1199,6 +1491,19 @@ export class NetClient {
    */
   predictedBikeChange(): void {
     this.bikePredictedAt = (this.seq + 1) & 0xffff;
+  }
+
+  /**
+   * `predictedBikeChange`'s twin for the cars, arithmetic included.
+   *
+   * Same reason, one order of magnitude worse: snapshots in flight when `E` went
+   * down were generated before the server saw it, so they all say "not driving",
+   * and adopting them would drop the player out of the car for a frame -- which
+   * at 22 m/s is the chase camera cutting to a first-person view of the road and
+   * back inside 50 ms.
+   */
+  predictedCarChange(): void {
+    this.carPredictedAt = (this.seq + 1) & 0xffff;
   }
 
   /**
@@ -1237,7 +1542,10 @@ export class NetClient {
           (e.flags & EVENT_FLAG.KO) !== 0,
           (e.flags & EVENT_FLAG.FOOTY) !== 0,
           e.health,
+          (e.flags & EVENT_FLAG.RETURNED) !== 0,
         );
+      } else if (e.kind === EVENT.SWAT) {
+        this.handlers.onSwat(e.swinger, e.ball, e.x, e.y, e.z, e.vx, e.vy, e.vz);
       } else if (e.kind === EVENT.PICKUP) {
         this.handlers.onPickup(e.combatant, e.powerup as PowerupKind, `${e.tileX}_${e.tileZ}`, e.index);
       } else if (e.kind === EVENT.JOIN) {
@@ -1477,6 +1785,24 @@ export class NetClient {
       local.ridingBike = this.serverBike;
     }
 
+    // --- The car, on the bike's own gate three lines up and for its reason.
+    //
+    // What is adopted is the **identity** of the car and never its speed:
+    // `carSpeed` is integrated by `driving.stepCarSpeed` from buttons both ends
+    // have, so the two agree by construction, and there is nothing on the wire
+    // to take it from anyway. See `shapeDriveInput`'s header on the bounded
+    // error that leaves in the replay.
+    const carAcked = this.pendingAck >= 0 && seqLE(this.carPredictedAt, this.pendingAck);
+    if (this.serverCarKnown && (this.carPredictedAt < 0 || carAcked)) {
+      this.carPredictedAt = -1;
+      if (local.drivingCar !== this.serverCar) {
+        local.drivingCar = this.serverCar;
+        // A car you are no longer in has no speed. Left alone, a player thrown
+        // out at 22 m/s would keep the number and the HUD would keep reading it.
+        if (this.serverCar === 0) local.carSpeed = 0;
+      }
+    }
+
     // --- The ride, on the bike's own gate and for its own reason.
     //
     // Adopted only once the server has acknowledged the input that carried the
@@ -1526,6 +1852,15 @@ export class NetClient {
         this.bikePredictedAt = -1;
         this.serverBike = 0;
         local.ridingBike = 0;
+        // And out of the car, on the identical argument. The server has already
+        // left it standing in the road -- `combat.advance` clears the field on
+        // the knockout tick and `CarField.follow` does the rest -- so this is
+        // the client refusing to spend a round trip driving a car it is no
+        // longer in, which at 22 m/s is 1.1 m of somebody else's street.
+        this.carPredictedAt = -1;
+        this.serverCar = 0;
+        local.drivingCar = 0;
+        local.carSpeed = 0;
       } else if (serverPhase === 'flinch' && local.phase !== 'flinch') {
         local.phase = 'flinch';
         local.phaseT = 0;
@@ -1675,6 +2010,16 @@ export class NetClient {
       // copied from the stored input above and forced true here, exactly as
       // `advance` does it.
       shapeRideInput(local, input);
+      // And the car, through the **same function** `combat.advance` calls, for
+      // the reason `game/bikes.ts` states about the bike one line up: two copies
+      // of this arithmetic are two copies that drift, and a replay that forgot
+      // the car would rewind the driver 22 m/s of trajectory on every snapshot.
+      //
+      // Deliberately **not** `stepCarSpeed`: the integration happens once a
+      // tick inside `advance`, and re-integrating here would run it three to
+      // five more times per snapshot on this end and once on the server. See
+      // `driving.shapeDriveInput`'s header for the bounded error that leaves.
+      shapeDriveInput(local, input);
       step(body, input, FIXED_DT, world.collision, (x, z, feet) => world.groundHeight(x, z, feet));
     }
 
@@ -2981,6 +3326,7 @@ export function verifyNetClient(): string[] {
 function silentHandlers(): NetHandlers {
   return {
     onHit: () => {},
+    onSwat: () => {},
     onBounce: () => {},
     onPickup: () => {},
     onJoin: () => {},
