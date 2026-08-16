@@ -550,7 +550,26 @@ export const MSG = {
  * milliseconds passed 2^32 in 1970 and a `f64` holds them exactly (integers to
  * 2^53), so there is no quantisation and no epoch to agree on separately.
  */
-export const PROTOCOL_VERSION = 11;
+/*
+ * v12 is the batch of six built in parallel against this one table, and the
+ * ids were **pre-assigned** before any of them was written -- which is the only
+ * reason six branches merged without two of them decoding each other's frames:
+ *
+ *     0x0d SUN_PRESS   the button in Sydney Park          (client -> server)
+ *     0x0e PHONE       claim / clock on / clock off       (client -> server)
+ *     0x8e SUN         the screaming face's two instants
+ *     0x8f WALLET      the balance, the claim timer, the cash on the ground
+ *     0x90 FARE        the rideshare job's state
+ *     0x91 CARS        who has taken which car
+ *     0x92 HEAT        how wanted everybody is, in stars
+ *
+ * plus `EVENT.SWAT` inside `EVENTS`, `ENTER_FLAG.DRIVING`, and NPC kinds 7-14
+ * on the snapshot's NPC section. One bump for the lot rather than six: a
+ * client from before this batch cannot decode any of it, and a client from
+ * after it needs all of it, so there is no version between 11 and 12 that
+ * would have described a real build.
+ */
+export const PROTOCOL_VERSION = 12;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;

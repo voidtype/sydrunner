@@ -170,6 +170,7 @@ import {
 // witness door, and one tick of the event scheduler with its sweep.
 import { characterStruck, karenReport, stepCharacters } from '../client/src/game/characters.ts';
 import { stepEvents, sweepEvents } from '../client/src/game/events.ts';
+import { setWallet, type WalletLookup } from '../client/src/game/wallet-contract.ts';
 // And the wildlife, on the same terms again: `game/wildlife.ts` imports no three
 // and registers the three kind bytes `NPC_KIND` reserved for it. Three entry
 // points -- the ambient promotion scan, the predicate for "is this one of the
@@ -262,7 +263,7 @@ import {
   type CentrelinkOffice,
   type WalletRecord,
 } from '../client/src/game/cash.ts';
-import { NO_DRIVING, type DrivingLookup } from '../client/src/game/driving-contract.ts';
+import { type DrivingLookup } from '../client/src/game/driving-contract.ts';
 import { createFare, stepFare, type FareContext, type FareJob } from './fares.ts';
 import { moveBalance, type WalletStore } from './wallets.ts';
 import type { WalletFrame } from '../client/src/net/cash.ts';
@@ -821,6 +822,19 @@ export class Simulation {
    * rather than the client deriving one from the delta -- and a credit with no
    * reason is money that appears on a HUD with nothing to explain it.
    */
+  /**
+   * `this.wallet` on the characters module's terms: `debit` reports what was
+   * taken as a **positive** number where the door below reports the movement
+   * as a negative one. See `game/wallet-contract.WalletLookup`.
+   */
+  private readonly walletLookup: WalletLookup = {
+    debit: (playerId, amount, why) => -this.wallet.debit(playerId, amount, why),
+    credit: (playerId, amount, why) => {
+      this.wallet.credit(playerId, amount, why);
+    },
+    balanceOf: (playerId) => this.wallet.balanceOf(playerId),
+  };
+
   readonly wallet = {
     /** Pay a player. Returns what actually landed, after the cap. */
     credit: (playerId: number, amount: number, why: string): number =>
@@ -842,7 +856,11 @@ export class Simulation {
   constructor(world: ServerWorld, options: { wallets?: WalletStore; driving?: DrivingLookup } = {}) {
     this.world = world;
     this.wallets = options.wallets ?? null;
-    this.driving = options.driving ?? NO_DRIVING;
+    // The real thing by default, now that the driving workstream has landed:
+    // the fare loop asks `this.cars` who is driving what, and `NO_DRIVING`
+    // survives only as the answer a caller gets when it explicitly asks for
+    // nothing (`SYDNEY_FAKE_DRIVING=1` passes the sprint hatch instead).
+    this.driving = options.driving ?? this.cars;
     this.fareCtx.peds = world.peds;
     this.ballWorld = groundFor(world);
     this.factionWorld = groundFor(world);
@@ -2119,6 +2137,12 @@ export class Simulation {
     // the same tick a new one opened would hold its slot for one more tick every
     // tick, and the symptom would be the second event never getting anybody.
     sweepEvents(ctx);
+    // The eshays roll a player for $20 through the characters module's
+    // process-wide `wallet()` handle. Pointed at **this** simulation on every
+    // tick rather than once at boot, because a host runs several rooms and each
+    // room is its own `Simulation` with its own participant ids -- a wallet
+    // handle set once would debit room 0's player 7 for room 3's mugging.
+    setWallet(this.walletLookup);
     stepCharacters(ctx);
     stepEvents(ctx);
     // An investigation that ran out changes what the wire has to say, and
