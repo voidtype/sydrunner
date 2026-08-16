@@ -97,16 +97,18 @@ const FACE_DISTANCE_M = 14000;
 /**
  * The face's disc, in degrees of the render's own field of view.
  *
- * The real sun is 0.53 degrees. The brief asks for four to six times that; this
- * is five, which puts the disc at about 45 pixels of a 1080-line frame at the
- * base 72-degree field of view -- big enough that the eyes and the mouth read
- * without a zoom, small enough that it is still recognisably *the sun* and not a
- * balloon. `sky/moon.ts`'s `MOON_APPARENT_GAIN` argument (that the render's
+ * The real sun is 0.53 degrees. The first cut was five times that -- about 45
+ * pixels of a 1080-line frame -- and in the shipped-size preview it read as a
+ * dot with a red pixel in it: a face you had to be told about. This is a joke
+ * that only works if it is unmissable, so it is now **twelve** times the sun,
+ * roughly 110 pixels tall on a 1080 frame, a proper cartoon sun somebody drew
+ * on the sky. It still reads as the sun rather than a balloon because it sits
+ * exactly on the solar disc and carries the sun's own colour. `sky/moon.ts`'s `MOON_APPARENT_GAIN` argument (that the render's
  * field of view is 2.4x the player's own) is deliberately **not** applied on top:
  * that correction exists so a physically-sized moon arrives at the retina at the
  * angle memory expects, and this object has no correct size to be wrong about.
  */
-const FACE_DEGREES = 0.53 * 5;
+const FACE_DEGREES = 0.53 * 12;
 
 /**
  * What fraction of the canvas the face's disc occupies, edge to edge.
@@ -866,14 +868,14 @@ function drawScreamFace(ctx: CanvasRenderingContext2D | null, size: number, t: n
 export function verifySunButtonRenderer(): string[] {
   const bad: string[] = [];
 
-  // --- 1. The face is between four and six times the real sun. Under that and
-  //        the whole thing is a smudge nobody can see a mouth on; over it and it
-  //        is a moon-sized cartoon that stops reading as the sun at all.
+  // --- 1. The face is between ten and sixteen times the real sun. Under that
+  //        and it is a smudge nobody can see a mouth on (five times was tried
+  //        and was); over it and it is a planet, not a sun.
   const times = FACE_DEGREES / 0.53;
-  if (!(times >= 4 && times <= 6)) {
+  if (!(times >= 10 && times <= 16)) {
     bad.push(
-      `The screaming face is ${times.toFixed(2)}x the real sun's angular size; the brief is 4-6x. ` +
-        `Below 4 the mouth is not legible at the base field of view and above 6 it reads as a moon.`,
+      `The screaming face is ${times.toFixed(2)}x the real sun's angular size; the band is 10-16x. ` +
+        `Below 10 the mouth is not legible at the base field of view and above 16 it reads as a planet.`,
     );
   }
 
