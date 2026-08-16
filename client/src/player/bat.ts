@@ -33,16 +33,36 @@
  * smoothly out of a thick handle over 70 mm and narrowed again at the end, which
  * is a paddle's profile exactly, wearing a cricket bat's cross-section.
  *
+ * That pass fixed the *corners* and left the *lengths* alone, and the report came
+ * back a second time -- **"it still looks like a paddle; make the rubber bit of
+ * the handle shorter"**. It was right again, and for a reason worth stating
+ * because it is not the same reason: the handle was 41% of the bat. A paddle is
+ * a short face on a long stick. Every corner on the model was in the right place
+ * and the *ratio* between the two halves was a paddle's, so at a glance -- which
+ * is all a weapon in a brawler ever gets -- the silhouette was still wrong.
+ *
  * So, in the order the eye uses them:
  *
+ *   - **Two thirds of the bat is blade.** 0.550 m of a 0.828 m bat, against
+ *     0.485 m before. A Law 5 bat is 0.565 m of 0.855 m -- 66.1% -- and this is
+ *     66.4%. The handle came down from 0.343 m to 0.278 m to pay for it, and
+ *     nothing at the toe moved, so the swing's reach is the number it always
+ *     was. This is the single change the second report was about.
+ *   - **A rubber grip that covers the handle and nothing else.** 0.203 m of
+ *     rubber over a 0.278 m handle, against 0.263 m before -- six centimetres of
+ *     black gone off a bat that only gained a centimetre of pale willow at the
+ *     other end, which is why the change reads as *much* larger than the numbers
+ *     look. The grip stops well clear of the shoulder and the splice shows
+ *     below it. See `GRIP_END_Y`.
  *   - **Square shoulders.** The blade is at full width 30 mm below the shoulder,
  *     not 70, and it starts that ramp at 40% width rather than 55. What a viewer
  *     sees is a pair of corners where the handle meets the blade. See
- *     `SHOULDER_FULL_Y`, which is the single number this whole pass is about.
- *   - **A handle a third of the blade's width.** 42 mm against 125 -- a real
- *     bat's 3.4 ratio, near enough -- where it used to be 60 against 125. A
- *     handle that is half as wide as the blade gives the shoulder corner nothing
- *     to be a corner of.
+ *     `SHOULDER_FULL_Y`.
+ *   - **A handle under a third of the blade's width.** 39 mm against 108 -- a
+ *     ratio of 2.8, against a real bat's 3.4 -- where the first pass had 42
+ *     against 125 and the version before that 60 against 125. A handle that is
+ *     half as wide as the blade gives the shoulder corner nothing to be a corner
+ *     of.
  *   - **A squared toe.** Full width to the very end, losing only its depth over
  *     the last 45 mm, so the blade ends in a flat rectangle. It used to narrow to
  *     90% of its width, and a blade that narrows at the tip is a paddle.
@@ -59,12 +79,20 @@
  *     buffer, and their job is to show the viewer the join: a join you cannot
  *     see is read as one tapered object, which is the paddle again.
  *
- * The proportions are a real bat's, scaled to this figure. A Law 5 bat is 0.965 m
- * overall with a 0.559 m blade, on a person of about 1.80 m: 54% of their height,
- * blade 58% of the bat. This one is 0.83 m on a 1.70 m figure -- 49% of height,
- * blade 60% of the bat. It reads *larger* than that arithmetic suggests, because
- * spec 8.1's figure has noodle arms and a 0.19 m mitt, and a bat is judged
- * against the hand holding it.
+ * The proportions are a real bat's, scaled to this figure. A Law 5 bat is 0.855 m
+ * overall with a 0.565 m blade and a 0.108 m face, on a person of about 1.80 m.
+ * This one is 0.828 m on a 1.70 m figure with a 0.550 m blade and the same
+ * 0.108 m face: the *ratios* are the real bat's to within half a percent and the
+ * bat itself is 97% of full size on a figure that is 94% of a person. It reads
+ * *larger* than that arithmetic suggests, because spec 8.1's figure has noodle
+ * arms and a 0.19 m mitt, and a bat is judged against the hand holding it.
+ *
+ * The blade narrowed from 125 mm to 108 mm in the same pass, which is the Law 5
+ * maximum and the number this file's own check has always been written against
+ * -- the header claimed 0.108 m while `BLADE_PROFILE` drew 0.125, and only the
+ * constant was ever true. A blade 16% wider than a real one is the other half of
+ * "paddle": width is what a table-tennis bat has and length is what a cricket
+ * bat has, and the model had them the wrong way round in both directions.
  *
  * ---------------------------------------------------------------------------
  * One geometry and one material for every bat in the game.
@@ -188,13 +216,44 @@ import { CharacterActor, CharacterAssets, SELF_SHADOW_LAYER } from './character.
 
 /** Top of the rubber grip cap, above the attachment point. */
 const GRIP_CAP_Y = 0.028;
-/** Where the rubber grip stops and the bare cane of the splice shows. */
-const GRIP_END_Y = -0.235;
-/** Where the handle ends and the blade begins. The shoulder. */
-const SHOULDER_Y = -0.315;
+/**
+ * Where the rubber grip stops and the bare cane of the splice shows.
+ *
+ * **-0.175, up from -0.235, and this constant is what the second paddle report
+ * asked for by name**: *"make the rubber bit of the handle shorter"*. The rubber
+ * now runs 0.203 m from the cap, against 0.263 m, and covers 73% of a handle
+ * that is itself 65 mm shorter -- so the black part of the bat lost a quarter of
+ * its length in one change.
+ *
+ * The rule it is set by is the real object's: **the grip covers the handle and
+ * nothing else.** A cricket bat's rubber is a sleeve pulled over the cane down
+ * to somewhere above the splice, and the bare cane and the binding below it are
+ * visible on every bat ever made. A grip that ran on into the shoulder would
+ * hide the join, and a join you cannot see is read as one tapered object -- the
+ * paddle, again, from the direction the colour buffer rather than the outline
+ * gives it away.
+ *
+ * There is 75 mm of splice below it, which at this scale is about a thumb's
+ * width of pale cane between two dark-to-mid surfaces. Less than about 50 mm and
+ * the step stops registering at the range a fight happens at.
+ */
+const GRIP_END_Y = -0.175;
+/**
+ * Where the handle ends and the blade begins. The shoulder.
+ *
+ * **-0.25, up from -0.315**, which puts the handle at 0.278 m of a 0.828 m bat
+ * -- 33.6%, against a real bat's 34% and against this model's own 41.4% before
+ * the change. Everything below this line is unchanged: the toe is still at
+ * `TOE_Y` and the bat is still `BAT_LENGTH` long, so the 65 mm the handle gave
+ * up went straight into the blade and **not one number the hit test or the
+ * clearance checks measure has moved.** That is deliberate -- `combat.REACH` is
+ * compiled into the server and the whole point of a proportion fix is that it is
+ * only a proportion fix.
+ */
+const SHOULDER_Y = -0.25;
 /**
  * Where the blade is at full width, and the single most important number in
- * this file for whether it reads as a bat.
+ * this file for whether the *join* reads as a bat.
  *
  * 30 mm below the shoulder. A cricket bat's blade does not *grow* out of its
  * handle -- the splice is let into a blade that is already 108 mm across, so the
@@ -202,10 +261,12 @@ const SHOULDER_Y = -0.315;
  * them, and the eye reads that corner as "cricket" before it reads anything
  * else. This used to be 70 mm of smooth flare from 55% width, which is the same
  * curve a table-tennis bat has between its handle and its face, and it is why
- * the model came back as *"the cricket bat looks like a paddle"*. Everything
- * else in this pass is second to this one.
+ * the model first came back as *"the cricket bat looks like a paddle"*.
+ *
+ * It tracks `SHOULDER_Y` rather than standing on its own, because the thing that
+ * has to stay true is the 30 mm *ramp* and not the height it happens at.
  */
-const SHOULDER_FULL_Y = -0.345;
+const SHOULDER_FULL_Y = SHOULDER_Y - 0.03;
 /** Where the toe's back bevel starts. The last 45 mm lose depth, not width. */
 const TOE_BEVEL_Y = -0.755;
 /** The toe. Overall length is `GRIP_CAP_Y - TOE_Y`. */
@@ -213,27 +274,41 @@ const TOE_Y = -0.8;
 
 /** Overall length, grip cap to toe, metres. 0.83 m on a 1.70 m figure. */
 export const BAT_LENGTH = GRIP_CAP_Y - TOE_Y;
-/** Blade length, shoulder to toe. 60% of the bat, as a real one is 58%. */
+/** Blade length, shoulder to toe. 66.4% of the bat, as a real one is 66.1%. */
 export const BLADE_LENGTH = SHOULDER_Y - TOE_Y;
-/** Blade half-width at the edges, metres. A Law 5 bat is 0.108 m across. */
-const BLADE_HALF_WIDTH = 0.0625;
+/**
+ * Blade half-width at the edges, metres. **0.054, so the blade is 108 mm across.**
+ *
+ * Law 5's maximum, and the number the header and `verifyBat`'s message have both
+ * claimed since the first version of this file while `BLADE_PROFILE` quietly drew
+ * 125 mm -- the check compared the geometry against *this constant* and passed,
+ * because the constant was 0.0625 and the essay was the only thing telling the
+ * truth. Both are now 108.
+ *
+ * A blade 16% over the legal width is the width half of "paddle": what tells a
+ * table-tennis bat from a cricket bat, once the corners are right, is that one is
+ * about as wide as it is long and the other is five times longer than it is
+ * wide. This blade is 0.550 m over 0.108 m -- 5.1 -- where it used to be 0.485
+ * over 0.125, which is 3.9 and is a *ping-pong* proportion wearing willow.
+ */
+const BLADE_HALF_WIDTH = 0.054;
 
 /**
  * Handle radii: the grip cap, the shaft, and the collar at the bottom of the
  * rubber.
  *
- * **A third thinner than they were**, and this is the other half of the paddle
- * fix. A cricket bat's handle is about 32 mm across against a 108 mm blade -- a
- * ratio of 3.4 -- and a paddle's is barely half its face. These used to reach
- * 60 mm against a 125 mm blade, a ratio of 2.1, which put the handle's silhouette
- * inside the same family as the blade's and left nothing for the shoulder corner
- * to be a corner *of*. At 42 mm the ratio is 3.0, and the grip now reads as a
- * stick the blade is mounted on rather than as the narrow end of one object.
+ * **Thinner again, tracking the narrower blade.** A cricket bat's handle is about
+ * 32 mm across against a 108 mm blade -- a ratio of 3.4 -- and a paddle's is
+ * barely half its face. The original model reached 60 mm against a 125 mm blade,
+ * a ratio of 2.1, which put the handle's silhouette inside the same family as the
+ * blade's and left nothing for the shoulder corner to be a corner *of*; the first
+ * fix took it to 42 against 125, a ratio of 3.0. Holding that ratio against a
+ * 108 mm blade means 36 mm of rubber, which is what these are.
  */
-const GRIP_CAP_R = 0.021;
-const GRIP_TOP_R = 0.0175;
-const GRIP_WAIST_R = 0.0158;
-const GRIP_END_R = 0.0182;
+const GRIP_CAP_R = 0.0178;
+const GRIP_TOP_R = 0.015;
+const GRIP_WAIST_R = 0.0136;
+const GRIP_END_R = 0.0156;
 
 /**
  * The splice: bare cane between the rubber and the shoulder, with a proud
@@ -241,14 +316,18 @@ const GRIP_END_R = 0.0182;
  *
  * Pale against a near-black grip and a mid-tone blade, so the eye is given the
  * *join* -- which is where a cricket bat's handle visibly stops and a paddle's
- * never does. The collar is 5 mm proud of the cane under it, which at this scale
+ * never does. The collar is 4 mm proud of the cane under it, which at this scale
  * is one clear step in the silhouette rather than a stripe that only exists in
  * the colour buffer.
+ *
+ * The collar is the **widest thing on the handle** at 39 mm, which is what
+ * `verifyBat`'s handle-to-blade check measures -- 0.36 of the blade, comfortably
+ * under the 0.45 it fails at and near the 0.35 a real bat manages.
  */
-const COLLAR_Y = -0.252;
-const COLLAR_R = 0.0232;
-const SPLICE_R = 0.0225;
-const SPLICE_BASE_R = 0.0242;
+const COLLAR_Y = -0.192;
+const COLLAR_R = 0.0196;
+const SPLICE_R = 0.019;
+const SPLICE_BASE_R = 0.0205;
 
 /** Sides on the handle. Eight, which is `character.ts`'s `LIMB_SIDES` and reads round enough at arm's length. */
 const HANDLE_SIDES = 8;
@@ -438,21 +517,30 @@ function circle(sides: number): Profile {
  * The blade's cross-section: a flat face at -Z, two chamfers, two edges, and a
  * ridge. Seven points, counter-clockwise in (x, z), in metres.
  *
- * The numbers are a Law 5 bat's: 0.125 m across the edges, 0.038 m at the edge
- * itself and 0.070 m at the spine. What the chamfer buys is worth naming, since
- * it is two of the seven points and would be the obvious thing to drop: without
- * it the face meets the edge at a right angle, and a right angle on a flat-shaded
- * object turns into a hard black line down both sides of the blade at every light
- * angle -- which reads as a modelling seam rather than as a bat.
+ * The numbers are a Law 5 bat's, and they are now the ones the header claims:
+ * **0.108 m across the edges, 0.022 m thick at the edge itself and 0.040 m at
+ * the spine.** They used to be 0.125 / 0.020 / 0.070, which was 16% too wide and
+ * three quarters too deep -- a section that reads as a *plank* side-on, and the
+ * one dimension a paddle and a bat genuinely share is that neither of them is a
+ * plank. The 40 mm spine is the brief's number and it is a shade under a modern
+ * bat's 55-65; what it buys is a blade whose side-on silhouette is a thin blade
+ * with a spine on it rather than a slab, which at this triangle count is the
+ * whole of the read.
+ *
+ * What the chamfer buys is worth naming, since it is two of the seven points and
+ * would be the obvious thing to drop: without it the face meets the edge at a
+ * right angle, and a right angle on a flat-shaded object turns into a hard black
+ * line down both sides of the blade at every light angle -- which reads as a
+ * modelling seam rather than as a bat.
  */
 const BLADE_PROFILE: Profile = [
-  [-0.055, -0.02], // face, left
-  [0.055, -0.02], // face, right
-  [0.0625, -0.004], // right chamfer
-  [0.0625, 0.016], // right edge, back
-  [0.0, 0.05], // the spine
-  [-0.0625, 0.016], // left edge, back
-  [-0.0625, -0.004], // left chamfer
+  [-0.0475, -0.012], // face, left
+  [0.0475, -0.012], // face, right
+  [0.054, -0.0035], // right chamfer
+  [0.054, 0.01], // right edge, back
+  [0.0, 0.028], // the spine
+  [-0.054, 0.01], // left edge, back
+  [-0.054, -0.0035], // left chamfer
 ];
 
 /** One colour per blade edge, in profile order. Face and chamfers pale, back deep. */
@@ -489,14 +577,21 @@ export class BatAssets {
 
     // --- The handle: a rubber grip, capped at the top so the bat is not a pipe
     // seen end-on when it is shouldered and the toe is pointing at the sky. It
-    // stops above the shoulder now -- see `GRIP_END_Y` -- because a grip that ran
-    // all the way into the blade is a paddle's handle.
+    // stops **well** above the shoulder -- see `GRIP_END_Y`, which is the
+    // constant the second paddle report asked for -- because a grip that ran all
+    // the way into the blade is a paddle's handle, and one that ran most of the
+    // way is a paddle's proportions.
+    //
+    // The waist ring sits at 0.6 of the rubber's length rather than at a fixed
+    // depth, so the taper keeps its shape now that the sleeve is 60 mm shorter:
+    // a waist pinned at -0.14 on a grip ending at -0.175 would put the narrowest
+    // point 35 mm from the bottom and read as a bulge rather than as a taper.
     p.loft(
       round,
       [
         { y: GRIP_CAP_Y, sx: GRIP_CAP_R, sz: GRIP_CAP_R },
         { y: 0, sx: GRIP_TOP_R, sz: GRIP_TOP_R },
-        { y: -0.14, sx: GRIP_WAIST_R, sz: GRIP_WAIST_R },
+        { y: -0.105, sx: GRIP_WAIST_R, sz: GRIP_WAIST_R },
         { y: GRIP_END_Y, sx: GRIP_END_R, sz: GRIP_END_R },
       ],
       roundColours,
@@ -515,7 +610,7 @@ export class BatAssets {
       [
         { y: GRIP_END_Y, sx: GRIP_END_R, sz: GRIP_END_R },
         { y: COLLAR_Y, sx: COLLAR_R, sz: COLLAR_R },
-        { y: -0.3, sx: SPLICE_R, sz: SPLICE_R },
+        { y: -0.228, sx: SPLICE_R, sz: SPLICE_R },
         { y: SHOULDER_Y, sx: SPLICE_BASE_R, sz: SPLICE_BASE_R },
       ],
       spliceColours,
@@ -529,10 +624,17 @@ export class BatAssets {
     // Six rings, and every one of them is a silhouette decision:
     //
     //   `SHOULDER_Y`      40% wide -- the neck the splice is let into, barely
-    //                     wider than the cane above it.
+    //                     wider than the cane above it. **65 mm higher than it
+    //                     was**, which is the whole of the second paddle fix:
+    //                     the blade is 0.550 m of a 0.828 m bat instead of
+    //                     0.485.
     //   `SHOULDER_FULL_Y` 100% wide, 30 mm later. **The corner.** See the
     //                     constant; this is the line between a bat and a paddle.
-    //   -0.50             full section.
+    //   -0.46             full section. A third of the way down the longer
+    //                     blade, where -0.50 was a third of the way down the
+    //                     short one -- the ring is a fraction of the blade and
+    //                     not a height, and pinning it would have left the
+    //                     section constant over the top 40% of the new blade.
     //   -0.62             106% deep -- the spine swells over the middle of the
     //                     blade, which is where a real bat carries its wood and
     //                     is the bulge you see side-on. Width is untouched: the
@@ -549,7 +651,7 @@ export class BatAssets {
       [
         { y: SHOULDER_Y, sx: 0.4, sz: 0.5 },
         { y: SHOULDER_FULL_Y, sx: 1, sz: 0.88 },
-        { y: -0.5, sx: 1, sz: 1 },
+        { y: -0.46, sx: 1, sz: 1 },
         { y: -0.62, sx: 1, sz: 1.06 },
         { y: TOE_BEVEL_Y, sx: 1, sz: 0.86 },
         { y: TOE_Y, sx: 0.985, sz: 0.42 },
@@ -1062,12 +1164,19 @@ function wrapPi(a: number): number {
  * The repo's rule -- `verifyAnimation`, `verifyCharacterRig`, `verifyCombat` --
  * is that a check exists where the failure is **silent**: it renders, it does not
  * throw, and it reads as a taste decision. A weapon has an unusual number of
- * those, and each of the six below is one that was actually hit while this was
+ * those, and each of the ones below is one that was actually hit while this was
  * being built:
  *
  *   - **Winding.** A lofted solid inside out is a bat you can see the inside of
  *     from outside and nothing else. This is the failure the README's winding
  *     pass documents on the city's walls.
+ *   - **The blade is two thirds of the bat, and the rubber is a quarter of it.**
+ *     The two the *second* paddle report was about, and the pair of them is the
+ *     reason this list grew: the first four silhouette checks are all local to
+ *     the join, so a model can pass every one of them and still be a short face
+ *     on a long stick. Both are measured off the buffer -- the blade by walking
+ *     up from the toe to the last full-width band, the rubber off the colour
+ *     attribute -- so neither is a constant compared with itself.
  *   - **The bat is on the right wrist.** Parenting to the wrong bone -- or to the
  *     mesh, which also "works" -- produces a bat that floats near the character
  *     and does not swing. It looks like an animation problem.
@@ -1237,6 +1346,78 @@ export function verifyBat(): string[] {
           `against ${(nearToe * 1000).toFixed(1)} mm near the toe. A blade of constant section is ` +
           `a plank, and a plank on a stick is a paddle.`,
       );
+    }
+
+    // 5. **Two thirds of the bat is blade**, which is what the *second* paddle
+    //    report was about and is the one property none of the four above can
+    //    see: every corner on this model can be in exactly the right place and
+    //    the object still read as a paddle, because a paddle is a short face on
+    //    a long stick and all four checks above are local to the join.
+    //
+    //    Measured by walking up from the toe to the last band that is still
+    //    within 95% of full width, so it finds the shoulder from the *geometry*
+    //    rather than from `SHOULDER_Y`. A real bat is 0.565 of 0.855, which is
+    //    66%; the band is generous at both ends because this is a proportion and
+    //    not a measurement, and what it exists to catch is the 59% the model
+    //    shipped with and the 50% it would take to be a paddle again.
+    let bladeTop = TOE_Y;
+    for (let y = TOE_Y; y <= GRIP_CAP_Y; y += 0.005) {
+      if (spanAt(y - 0.0026, y + 0.0026) >= full * 0.95) bladeTop = y;
+    }
+    const bladeFraction = (bladeTop - TOE_Y) / (GRIP_CAP_Y - TOE_Y);
+    if (bladeFraction < 0.6 || bladeFraction > 0.72) {
+      failures.push(
+        `The blade is ${(bladeFraction * 100).toFixed(0)}% of the bat's length. A Law 5 bat is 66% ` +
+          `-- 0.565 m of 0.855 -- and under about 60% the object is a short face on a long stick, ` +
+          `which is a paddle whatever the corners at the join look like. This is the measurement ` +
+          `the report "make the rubber bit of the handle shorter" was really about.`,
+      );
+    }
+
+    // 6. **The rubber grip covers the handle and stops above the shoulder.**
+    //
+    //    Read off the *colour* buffer rather than off `GRIP_END_Y`, which makes
+    //    it a second opinion in the same way the winding check is: the colour
+    //    was written by `loft` from the caller's `edgeColours` and the height by
+    //    the ring table, so a grip lofted past the splice fails here even though
+    //    both constants are individually fine.
+    //
+    //    Two claims. The rubber must **end above the blade** with bare cane
+    //    showing -- a grip that runs into the shoulder hides the join, and a join
+    //    a viewer cannot see is read as one tapered object. And it must be a
+    //    *quarter* of the bat rather than a third: 0.203 m of 0.828 is 25%, where
+    //    the model that came back as a paddle a second time had 0.263 of 0.828,
+    //    which is 32% of the whole weapon in black rubber.
+    const colour = assets.geometry.getAttribute('color');
+    let rubberLowest = Infinity;
+    let rubberHighest = -Infinity;
+    for (let i = 0; i < position.count; i++) {
+      // The grip is the only near-black triple in the buffer; the willow and the
+      // cane are all above 0.28 on every channel.
+      if (colour.getX(i) > 0.1 || colour.getY(i) > 0.1) continue;
+      const y = position.getY(i);
+      if (y < rubberLowest) rubberLowest = y;
+      if (y > rubberHighest) rubberHighest = y;
+    }
+    if (!Number.isFinite(rubberLowest)) {
+      failures.push('No part of the bat is grip-coloured; the handle has lost its rubber.');
+    } else {
+      const bare = rubberLowest - bladeTop;
+      if (bare < 0.04) {
+        failures.push(
+          `The rubber grip ends ${(bare * 1000).toFixed(0)} mm above the blade. It has to leave at ` +
+            `least 40 mm of bare cane and binding showing, or the join between the handle and the ` +
+            `blade is invisible and the whole thing reads as one tapered object.`,
+        );
+      }
+      const rubber = (rubberHighest - rubberLowest) / (GRIP_CAP_Y - TOE_Y);
+      if (rubber > 0.28) {
+        failures.push(
+          `The rubber grip is ${(rubber * 100).toFixed(0)}% of the bat's length. A quarter is the ` +
+            `most a real one covers, and the direct instruction on this model was to make the ` +
+            `rubber bit of the handle shorter.`,
+        );
+      }
     }
   }
 

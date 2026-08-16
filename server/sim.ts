@@ -57,6 +57,10 @@ import {
   type HitReport,
 } from '../client/src/game/combat.ts';
 import { FootyField, applyFootyHit, type FootyEvent } from '../client/src/game/footy.ts';
+// The bat against the ball. Pure, three-free, and the same file the browser runs
+// offline -- which is what makes "the bat reached it" mean the same thing in the
+// two processes that ever decide it. See `client/src/game/swat.ts`.
+import { createBallAt, swatBalls } from '../client/src/game/swat.ts';
 import { pickSpawnPoint } from '../client/src/game/spawn.ts';
 // `/unstuck`, and the whole of its rule. Shared with the client, which runs the
 // identical function offline -- see `client/src/game/unstuck.ts`, whose header
@@ -407,6 +411,17 @@ export class Simulation {
    * in this process would do.
    */
   private readonly ballReport: HitReport = createHitReport();
+  /**
+   * Scratch for the swat's ball rewind, allocated once for the life of the
+   * process.
+   *
+   * `swatBalls` writes each candidate ball's rewound position into it and
+   * consumes the answer before the next one, on `carPose`'s terms exactly: the
+   * query is synchronous, nothing holds it across a line, and the alternative is
+   * a record per ball per active tick of every swing in the room. See
+   * `game/swat.ts`.
+   */
+  private readonly swatScratch = createBallAt();
 
   /**
    * Scratch for the traffic query, allocated once for the life of the process.
@@ -1119,21 +1134,90 @@ export class Simulation {
     // snapshot stream, and rewinding it would mean a ball that visibly passed
     // somebody 100 ms ago knocking them over now. So `server/rewind.ts` is not
     // consulted here at all, and the 250 ms ring stays a melee mechanism.
+    // --- ...but first, every bat that is mid-swing, against every ball in the
+    // air. The community suggestion; see `game/swat.ts`.
+    //
+    // **Before the step, and that ordering is the decision.** A swat deflects
+    // the ball's velocity, and running it here means the deflected velocity is
+    // what the very next line integrates -- the ball turns round on the tick the
+    // blade reached it. Run *after* the step it would turn round one tick late,
+    // 16 ms and 0.7 m further into the swinger's own face, which is exactly the
+    // frame a player is looking at when they decide whether a swat worked.
+    //
+    // The cost is O(swingers x balls) and both terms are small: a swing is in
+    // its `active` window for six of the 30 ticks it lasts and most players are
+    // not swinging on most ticks, so the ordinary tick pays one `phase` compare
+    // per player. It is not put behind the spatial index for that reason -- the
+    // grid lookup would cost more than the loop it saves at the sizes this
+    // actually runs at, and `swingCatches` rejects on a plan distance before it
+    // does any real work.
+    for (const p of this.ordered) {
+      // **Bots do not swat**, and that is a deliberate line rather than an
+      // oversight. `server/bots.ts` swings when somebody is in reach; it has no
+      // model of a ball in the air at all, so every swat it landed would be one
+      // it swung for a different reason and happened to catch -- a coin flip
+      // wearing a skill mechanic, and specifically the coin flip the community
+      // suggestion this implements is *about*. A bot that returned serve by
+      // accident would read as a bot that reads the ball better than a person
+      // can. Giving it a real one means teaching it to lead a projectile, which
+      // is a bot pass rather than a weapon pass.
+      if (p.bot) continue;
+      if (p.combat.phase !== 'active') continue;
+      const ball = swatBalls(
+        p.combat,
+        this.balls.balls,
+        FIXED_DT,
+        // The swinger's own view lag, which is the same number the melee's
+        // rewind uses and is derived once per tick by `Room.step`. It is the
+        // *ball* that gets rewound here rather than the bodies -- see
+        // `game/swat.ts`, decision 2, where the two are read together.
+        p.viewTicks * FIXED_DT,
+        this.swatScratch,
+      );
+      if (ball === null) continue;
+      // The event carries the ball's post-swat state as well as the two ids,
+      // because the player who *threw* it is still flying a local predicted copy
+      // that now disagrees with this process about which way it is going --
+      // `Footy.thrower` is deliberately unchanged by a swat, so nothing in the
+      // snapshot stream can tell them. See `protocol.SwatEvent`.
+      this.events.push({
+        kind: EVENT.SWAT,
+        swinger: p.id,
+        ball: ball.id,
+        x: ball.x,
+        y: ball.y,
+        z: ball.z,
+        vx: ball.vx,
+        vy: ball.vy,
+        vz: ball.vz,
+      });
+    }
+
     t = performance.now();
     for (const e of this.balls.step(FIXED_DT, this.ballWorld, this.combatants, this.ballEvents, this.liveIndex)) {
       if (e.kind !== 'hit' || !e.victim) continue;
-      const thrower = this.participants.get(e.ball.thrower);
-      // A ball whose thrower has since disconnected still counts. It is in the
+      // The **owner**, not the thrower: a ball that was batted back belongs to
+      // whoever returned it, and the knockout goes on their row. For every ball
+      // nobody swatted the two are the same participant. See `footy.Footy.owner`.
+      const owner = this.participants.get(e.ball.owner);
+      // A ball whose owner has since disconnected still counts. It is in the
       // air and it is nobody's property any more; refusing the hit would make
       // leaving a way to un-throw.
-      if (!thrower) continue;
-      applyFootyHit(thrower.combat, e.victim, e.ball, this.ballReport);
-      if (this.ballReport.ko) this.creditKo(thrower.id, e.victim.id);
+      if (!owner) continue;
+      applyFootyHit(owner.combat, e.victim, e.ball, this.ballReport);
+      if (this.ballReport.ko) this.creditKo(owner.id, e.victim.id);
       this.events.push({
         kind: EVENT.HIT,
-        attacker: thrower.id,
+        attacker: owner.id,
         victim: e.victim.id,
-        flags: EVENT_FLAG.FOOTY | (this.ballReport.ko ? EVENT_FLAG.KO : 0),
+        flags:
+          EVENT_FLAG.FOOTY |
+          (this.ballReport.ko ? EVENT_FLAG.KO : 0) |
+          // "%s returned serve on %s" rather than "%s pegged %s". The bit is set
+          // whenever the ball changed hands in the air, which includes the case
+          // the suggestion was really about -- a return that knocks over the
+          // person who threw it -- and reads correctly for the others.
+          (e.ball.owner !== e.ball.thrower ? EVENT_FLAG.RETURNED : 0),
         health: e.victim.health,
       });
     }
@@ -1149,12 +1233,15 @@ export class Simulation {
     {
       const tick = trafficTick(Date.now());
       for (const ball of this.balls.balls) {
-        const thrower = this.participants.get(ball.thrower);
-        if (!thrower) continue;
+        // The owner again, and here it is a question about **blame**: knocking a
+        // pedestrian over with a football you batted out of the air is your
+        // assault and not the assault of whoever threw it at you.
+        const owner = this.participants.get(ball.owner);
+        if (!owner) continue;
         const struck = strikePedestrianWithBall(
           this.world.peds, ball, BALL_RADIUS, FIXED_DT, tick, this.pedBands, this.pedPose,
         );
-        if (struck !== null) this.reportIfWitnessed(thrower, struck.x, struck.z, REASON.ASSAULT);
+        if (struck !== null) this.reportIfWitnessed(owner, struck.x, struck.z, REASON.ASSAULT);
         // And the officers, swept over the same one-tick segment. `npcHitTest`
         // reconstructs the previous position from the velocity exactly as
         // `strikePedestrianWithBall` does -- which is what `footy.stepFooty`
@@ -1166,7 +1253,7 @@ export class Simulation {
           ball.x, ball.y, ball.z,
           BALL_RADIUS,
         );
-        if (actor !== null) this.hitNpc(actor, 1, thrower);
+        if (actor !== null) this.hitNpc(actor, 1, owner);
       }
     }
     this.phaseMs.balls += performance.now() - t;
@@ -2688,6 +2775,115 @@ export function verifySim(): string[] {
       failures.push(
         `A punch with no rewind landed on a victim ${separation.toFixed(2)} m away. ` +
           `The reach gate is not working, and the rewind case above proves nothing.`,
+      );
+    }
+  }
+
+  // --- A RETURNED SERVE, END TO END, THROUGH THE REAL TICK LOOP.
+  //
+  // `game/swat.ts`'s own `verifySwat` proves the geometry and the deflection
+  // against a hand-built swinger; this proves the four things only this loop can
+  // be wrong about, and every one of them renders a perfectly good frame:
+  //
+  //   - the swat pass runs at all, and runs **before** `balls.step`, so the ball
+  //     turns round on the tick the blade reached it rather than one tick and
+  //     0.7 m later;
+  //   - the `EVENT.SWAT` that carries the correction to the thrower's own
+  //     predicted copy is actually emitted, with the right swinger on it. Miss
+  //     it and the thrower watches a ghost ball fly on down the street;
+  //   - the returned ball can hit **the person who threw it**, which is the
+  //     mechanic, and is one word (`ball.owner`) in `footy.stepFooty`'s target
+  //     loop away from being silently impossible;
+  //   - the knockout is credited to the *swinger* and flagged `RETURNED`, so the
+  //     feed says "returned serve on" rather than crediting the thrower with
+  //     knocking themselves over.
+  //
+  // Six metres apart, which is the geometry that makes the timing work rather
+  // than an arbitrary distance: a ball crosses it in about 0.14 s and the swing
+  // takes 0.15 s to get the blade out, so a throw one tick after the swing
+  // starts arrives inside the 100 ms `PUNCH_ACTIVE` window with room either
+  // side. Any closer and the ball beats the wind-up; much further and it has
+  // dropped under the bat.
+  {
+    const sim4 = new Simulation(world);
+    const swinger = sim4.join(0, null, 'Batter');
+    const thrower = sim4.join(1, null, 'Bowler');
+    // The swinger at +Z looking down -Z, the thrower at the origin looking back.
+    // The yaw goes on the **input** as well as the body for the reason the punch
+    // case above states: `controller.step` copies it in on every tick.
+    swinger.combat.body.position.set(0, EYE_HEIGHT, 6);
+    thrower.combat.body.position.set(0, EYE_HEIGHT, 0);
+    swinger.combat.body.yaw = 0;
+    swinger.input.yaw = 0;
+    thrower.combat.body.yaw = Math.PI;
+    thrower.input.yaw = Math.PI;
+    swinger.history.seed(sim4.tick, 0, EYE_HEIGHT, 6, 0);
+    thrower.history.seed(sim4.tick, 0, EYE_HEIGHT, 0, Math.PI);
+    // One pip left, so the return that lands is a knockout and the credit and
+    // the flag can both be read off one event.
+    thrower.combat.health = 1;
+
+    let swats = 0;
+    let swatBy = -1;
+    let returnedKo = 0;
+    let koAttacker = -1;
+    let hits = 0;
+    for (let i = 0; i < 90; i++) {
+      swinger.input.punch = i === 0;
+      thrower.input.throwBall = i === 1;
+      // Both stand still: the point of the check is the ball, and a thrower who
+      // wandered out of the return's line would make it a test of the walk.
+      thrower.combat.body.position.set(0, EYE_HEIGHT, 0);
+      thrower.combat.body.velocity.set(0, 0, 0);
+      sim4.step(out);
+      for (const e of out.events) {
+        if (e.kind === EVENT.SWAT) {
+          swats++;
+          swatBy = e.swinger;
+        } else if (e.kind === EVENT.HIT && (e.flags & EVENT_FLAG.FOOTY) !== 0) {
+          hits++;
+          if ((e.flags & EVENT_FLAG.RETURNED) !== 0 && (e.flags & EVENT_FLAG.KO) !== 0) {
+            returnedKo++;
+            koAttacker = e.attacker;
+          }
+        }
+      }
+      thrower.input.throwBall = false;
+    }
+
+    if (swats !== 1) {
+      failures.push(
+        `A ball thrown into a swing produced ${swats} SWAT events, not 1. Either the swat pass is ` +
+          `not running in the tick, or it is running outside the ACTIVE window.`,
+      );
+    }
+    if (swats > 0 && swatBy !== swinger.id) {
+      failures.push(`A SWAT event named ${swatBy} as the swinger rather than ${swinger.id}.`);
+    }
+    if (hits !== 1) {
+      failures.push(
+        `The returned ball produced ${hits} footy HIT events, not 1. A ball batted back must be ` +
+          `able to hit the person who threw it -- that is the whole mechanic, and footy.stepFooty ` +
+          `skipping its *thrower* rather than its *owner* is what silently prevents it.`,
+      );
+    }
+    if (returnedKo !== 1) {
+      failures.push(
+        `A returned serve that knocked its thrower out produced ${returnedKo} events flagged ` +
+          `RETURNED|KO. Without the flag the feed says "pegged" and the most interesting thing ` +
+          `that can happen in a fight is indistinguishable from an ordinary throw.`,
+      );
+    }
+    if (returnedKo > 0 && koAttacker !== swinger.id) {
+      failures.push(
+        `A returned serve credited ${koAttacker} rather than the swinger ${swinger.id}. The ` +
+          `knockout belongs to whoever sent the ball back, not to whoever threw it.`,
+      );
+    }
+    if (swinger.kos !== 1 || thrower.downs !== 1) {
+      failures.push(
+        `After a returned serve the swinger has ${swinger.kos} KOs and the thrower ${thrower.downs} ` +
+          `downs; both should be 1.`,
       );
     }
   }

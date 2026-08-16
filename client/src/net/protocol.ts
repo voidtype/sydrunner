@@ -1941,12 +1941,45 @@ export const EVENT = {
   PICKUP: 3,
   JOIN: 4,
   LEAVE: 5,
+  /**
+   * A bat sent a football back. See `game/swat.ts`.
+   *
+   * **The one thing in this weapon pair that genuinely is a transition**, which
+   * is why it is an event at the same time as the note above is arguing that a
+   * thrown ball is not. A ball in flight is state: it is in every snapshot for
+   * its whole life, so a client that missed one is corrected by the next. A ball
+   * *changing direction because somebody hit it* is a 30 ms crack, a puff of
+   * contact and a shudder in the swinger's hands, and none of the three can be
+   * recovered from a position twenty times a second -- at 42 m/s the deflection
+   * is over inside one snapshot interval, exactly like the bounce that
+   * `BALL_BYTES` spends a whole byte on a counter to announce.
+   *
+   * It carries the ball's post-swat state as well as the two ids, and that is
+   * not redundant with the snapshot: the ball's *thrower* is unchanged by a swat
+   * -- see `footy.Footy.owner` -- so the player who threw it is still flying
+   * their own predicted copy of it and has no other way to be told that the copy
+   * is now wrong. The position and velocity here are what corrects it.
+   */
+  SWAT: 6,
 } as const;
 
 export const EVENT_FLAG = {
   KO: 1 << 0,
   /** The hit came from a thrown ball rather than the bat. Decides the sound and the feed verb. */
   FOOTY: 1 << 1,
+  /**
+   * The ball that landed had been batted back by somebody. Only ever set with
+   * `FOOTY`.
+   *
+   * A bit rather than a field, and a bit rather than nothing, for the same
+   * reason `FOOTY` is one: the *consequence* already rides on `attacker`, which
+   * the server sets to the ball's owner, so the scoreboard and the knockback are
+   * right without this. What is missing without it is the **feed line** -- "%s
+   * returned serve on %s" rather than "%s pegged %s" -- and a returned serve is
+   * the most interesting thing that can happen in a fight in this game. Losing
+   * it to a spare bit in a byte already on the wire would be a strange economy.
+   */
+  RETURNED: 1 << 2,
 };
 
 export interface HitEvent {
@@ -1976,7 +2009,48 @@ export interface JoinEvent {
   bot: number;
 }
 
-export type NetEvent = HitEvent | PickupEventFrame | JoinEvent;
+/**
+ * A bat sent a football back. 20 bytes, which is `BALL_BYTES` by coincidence and
+ * for the same reasons.
+ *
+ *     u16  swinger             who swung. The ball's owner from here on.
+ *     u16  ball                the ball's own id, unchanged by the swat
+ *     i32  x, y, z             millimetres, as every position on this wire is
+ *     i8   vx, vy, vz          half-metres a second, as `BALL_BYTES` carries them
+ *
+ * Three jobs, and the third is the one that makes it carry a position at all:
+ *
+ *   - **the noise and the puff**, which every client near enough plays at
+ *     `(x, y, z)`. A client that has the ball in interest could read the point
+ *     off its own copy, but a client 40 m away that is only just inside earshot
+ *     may not have it at all -- `aoi.selectBalls` filters by the *ball's*
+ *     position -- and a crack with no location cannot be attenuated;
+ *   - **the swinger's own feedback**: the connect kick on the viewmodel, which
+ *     is keyed on the id rather than on the point;
+ *   - **the correction**. The ball's `thrower` is deliberately unchanged by a
+ *     swat -- see `footy.Footy.owner` -- so the player who threw it is still
+ *     flying a local predicted copy that now disagrees with the server about
+ *     which way the ball is going. These six numbers are what puts it right, and
+ *     they are the whole reason this is not a four-byte event.
+ *
+ * The velocity is an i8 of half-metres a second on `BALL_BYTES`' argument
+ * exactly, and it survives the same test: a swat leaves the ball at
+ * `swat.SWAT_SPEED_SCALE` of the speed it arrived at, so the fastest thing this
+ * field can ever carry is 0.85 of the fastest thing the snapshot already does.
+ */
+export interface SwatEvent {
+  kind: 6;
+  swinger: number;
+  ball: number;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+}
+
+export type NetEvent = HitEvent | PickupEventFrame | JoinEvent | SwatEvent;
 
 /**
  * A batch of events, `u8 type`, `u8 count`, then each event's own bytes.
@@ -1991,6 +2065,7 @@ const EVENT_BYTES: Record<number, number> = {
   [EVENT.PICKUP]: 10,
   [EVENT.JOIN]: 5,
   [EVENT.LEAVE]: 5,
+  [EVENT.SWAT]: 20,
 };
 
 /**
@@ -2027,6 +2102,18 @@ export function encodeEvents(events: readonly NetEvent[]): ArrayBuffer {
       v.setInt16(p + 4, e.tileX, true);
       v.setInt16(p + 6, e.tileZ, true);
       v.setUint16(p + 8, e.index, true);
+    } else if (e.kind === EVENT.SWAT) {
+      // The snapshot's own quantisers, deliberately: the receiver's correction
+      // has to land on the same millimetre the next snapshot will, or a ball is
+      // put right by this event and then jumped by the one after it.
+      v.setUint16(p + 1, e.swinger & 0xffff, true);
+      v.setUint16(p + 3, e.ball & 0xffff, true);
+      v.setInt32(p + 5, quantisePos(e.x), true);
+      v.setInt32(p + 9, quantisePos(e.y), true);
+      v.setInt32(p + 13, quantisePos(e.z), true);
+      v.setInt8(p + 17, quantiseVelocity(e.vx));
+      v.setInt8(p + 18, quantiseVelocity(e.vy));
+      v.setInt8(p + 19, quantiseVelocity(e.vz));
     } else {
       v.setUint16(p + 1, e.id & 0xffff, true);
       v.setUint8(p + 3, e.colourway);
@@ -2068,6 +2155,18 @@ export function decodeEvents(buffer: ArrayBuffer): NetEvent[] | null {
         tileX: v.getInt16(p + 4, true),
         tileZ: v.getInt16(p + 6, true),
         index: v.getUint16(p + 8, true),
+      });
+    } else if (kind === EVENT.SWAT) {
+      out.push({
+        kind: EVENT.SWAT,
+        swinger: v.getUint16(p + 1, true),
+        ball: v.getUint16(p + 3, true),
+        x: dequantisePos(v.getInt32(p + 5, true)),
+        y: dequantisePos(v.getInt32(p + 9, true)),
+        z: dequantisePos(v.getInt32(p + 13, true)),
+        vx: dequantiseVelocity(v.getInt8(p + 17)),
+        vy: dequantiseVelocity(v.getInt8(p + 18)),
+        vz: dequantiseVelocity(v.getInt8(p + 19)),
       });
     } else {
       out.push({
@@ -3092,12 +3191,21 @@ export function verifyNet(): string[] {
     }
   }
 
-  // --- Events: a batch of all four kinds, out and back.
+  // --- Events: a batch of every kind, out and back.
   {
     const events: NetEvent[] = [
       { kind: EVENT.HIT, attacker: 1, victim: 2, flags: EVENT_FLAG.KO | EVENT_FLAG.FOOTY, health: 0 },
       { kind: EVENT.PICKUP, combatant: 4, powerup: 1, tileX: -3, tileZ: 5, index: 17 },
       { kind: EVENT.JOIN, id: 9, colourway: 2, bot: 1 },
+      // A swat, with a negative coordinate and a negative velocity on every
+      // axis it has one -- which is the case a sign error in the i32 or the i8
+      // survives, since Sydney's origin is Town Hall and half the city is west
+      // and north of it.
+      {
+        kind: EVENT.SWAT, swinger: 3, ball: 4242,
+        x: -812.345, y: 15.5, z: 1420.99,
+        vx: -21.5, vy: 8, vz: -35.5,
+      },
     ];
     const got = decodeEvents(encodeEvents(events));
     if (!got || got.length !== events.length) {
@@ -3113,6 +3221,38 @@ export function verifyNet(): string[] {
       }
       const join = got[2] as JoinEvent;
       if (join.id !== 9 || join.bot !== 1) failures.push('A JOIN event did not round-trip.');
+      // The swat. The position is millimetres and has to come back to one; the
+      // velocity is half-metres a second and is the coarsest field on this wire,
+      // so it is checked against its own quantum rather than against the value.
+      // A swat whose position does not survive puts the puff and the crack in
+      // the wrong street, and one whose velocity does not survive corrects the
+      // thrower's own predicted ball onto a heading the server never chose --
+      // which reads as the ball being swatted twice.
+      const swat = got[3] as SwatEvent;
+      const wanted = events[3] as SwatEvent;
+      if (
+        swat.swinger !== wanted.swinger ||
+        swat.ball !== wanted.ball ||
+        Math.abs(swat.x - wanted.x) > 0.001 ||
+        Math.abs(swat.y - wanted.y) > 0.001 ||
+        Math.abs(swat.z - wanted.z) > 0.001
+      ) {
+        failures.push(
+          `A SWAT event did not round-trip: ${wanted.swinger}/${wanted.ball} at ` +
+            `(${wanted.x}, ${wanted.y}, ${wanted.z}) came back as ${swat.swinger}/${swat.ball} at ` +
+            `(${swat.x}, ${swat.y}, ${swat.z}).`,
+        );
+      }
+      if (
+        Math.abs(swat.vx - wanted.vx) > 0.25 ||
+        Math.abs(swat.vy - wanted.vy) > 0.25 ||
+        Math.abs(swat.vz - wanted.vz) > 0.25
+      ) {
+        failures.push(
+          `A SWAT event's velocity came back as (${swat.vx}, ${swat.vy}, ${swat.vz}) against ` +
+            `(${wanted.vx}, ${wanted.vy}, ${wanted.vz}). Half a metre a second is the quantum.`,
+        );
+      }
     }
     // The retired kind. A batch carrying an event this build does not know must
     // drop the rest rather than resynchronise on the middle of a record -- which

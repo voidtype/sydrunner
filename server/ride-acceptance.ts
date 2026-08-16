@@ -75,7 +75,7 @@ class Pilot {
 
   constructor(readonly name: string) {
     this.net = new NetClient(URL_, {
-      onHit: () => {}, onBounce: () => {}, onPickup: () => {}, onJoin: () => {},
+      onHit: () => {}, onSwat: () => {}, onBounce: () => {}, onPickup: () => {}, onJoin: () => {},
       onLeave: () => {}, onDrop: () => {}, onStatus: () => {},
     }, { name });
     this.net.setRail(bake);

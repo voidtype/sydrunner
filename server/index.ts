@@ -68,6 +68,9 @@
 
 import { verifyCombat } from '../client/src/game/combat.ts';
 import { verifyFooty } from '../client/src/game/footy.ts';
+// The bat against the ball, in the process that adjudicates it. See
+// `client/src/game/swat.ts`.
+import { verifySwat } from '../client/src/game/swat.ts';
 import { verifyPowerups } from '../client/src/game/powerups.ts';
 import { verifySpatialHash } from '../client/src/game/spatialhash.ts';
 import { verifyMovementBasis } from '../client/src/player/controller.ts';
@@ -176,6 +179,16 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifyCombat', verifyCombat()],
     ['verifyPowerups', verifyPowerups()],
     ['verifyFooty', verifyFooty()],
+    // And the one interaction between the two weapons, which fails in this
+    // project's shape exactly: **every broken version of it renders a perfectly
+    // good frame.** A timing window that is not the ACTIVE phase makes the
+    // mechanic untimed and there is nothing on screen that says the window is
+    // wrong; an owner that does not change hands makes a returned ball pass
+    // through the person who threw it, which looks like a miss; and a deflection
+    // that adds speed rather than steering it clips `protocol.BALL_BYTES`' i8 on
+    // the fourth exchange of a rally and points the tumble sideways. This
+    // process is the one that decides all three online. See `game/swat.ts`.
+    ['verifySwat', verifySwat()],
     ['verifyNet', verifyNet()],
     // The names, in the process that has the last word on them. This one is run
     // on both ends deliberately: the browser sanitises so the prompt shows the

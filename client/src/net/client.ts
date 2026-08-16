@@ -297,7 +297,23 @@ export interface RemoteBall {
 
 /** What `main.ts` needs to react to. Presentation, exactly as the offline path's is. */
 export interface NetHandlers {
-  onHit(attacker: number, victim: number, ko: boolean, footy: boolean, health: number): void;
+  onHit(attacker: number, victim: number, ko: boolean, footy: boolean, health: number, returned: boolean): void;
+  /**
+   * A bat sent a football back. See `game/swat.ts` and `protocol.SwatEvent`.
+   *
+   * The six numbers after the ids are the ball's state *after* the deflection,
+   * and they do two different jobs for two different listeners: everybody uses
+   * the point for the crack and the puff, and the player who **threw** the ball
+   * uses the whole lot to correct the local predicted copy they are still
+   * flying. A swat deliberately does not change the ball's `thrower` -- see
+   * `footy.Footy.owner` -- so this event is the only thing that can tell them.
+   */
+  onSwat(
+    swinger: number,
+    ball: number,
+    x: number, y: number, z: number,
+    vx: number, vy: number, vz: number,
+  ): void;
   /** A ball bounced. `bounces` is which one, so the caller can vary the thud. */
   onBounce(x: number, y: number, z: number, bounces: number): void;
   onPickup(combatant: number, kind: PowerupKind, tileKey: string, index: number): void;
@@ -1237,7 +1253,10 @@ export class NetClient {
           (e.flags & EVENT_FLAG.KO) !== 0,
           (e.flags & EVENT_FLAG.FOOTY) !== 0,
           e.health,
+          (e.flags & EVENT_FLAG.RETURNED) !== 0,
         );
+      } else if (e.kind === EVENT.SWAT) {
+        this.handlers.onSwat(e.swinger, e.ball, e.x, e.y, e.z, e.vx, e.vy, e.vz);
       } else if (e.kind === EVENT.PICKUP) {
         this.handlers.onPickup(e.combatant, e.powerup as PowerupKind, `${e.tileX}_${e.tileZ}`, e.index);
       } else if (e.kind === EVENT.JOIN) {
@@ -2981,6 +3000,7 @@ export function verifyNetClient(): string[] {
 function silentHandlers(): NetHandlers {
   return {
     onHit: () => {},
+    onSwat: () => {},
     onBounce: () => {},
     onPickup: () => {},
     onJoin: () => {},
