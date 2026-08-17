@@ -332,6 +332,9 @@ import {
 } from './game/camera.ts';
 import { FOV_BASE, Feedback } from './game/feedback.ts';
 import { Locator, verifyLocator } from './game/locator.ts';
+// WORKSTREAM N (carry): "back where you left off", the one sentence a restored
+// session is visible as. See `game/carry.ts` for why the suburb is this end's.
+import { installRestoredNotice, verifyCarry } from './game/carry.ts';
 // The police, and the faction framework they are the first user of. `factions.ts`
 // is the shared simulation half -- the server runs the identical file -- and
 // `world/police.ts` is the renderer. See either header.
@@ -728,6 +731,11 @@ async function main(): Promise<void> {
   // down a block, or "cnr Crown St & Crown St". None of them throws and none of
   // them has a frame that says otherwise -- see `verifyLocator`.
   const locatorFailures = timed('locator', verifyLocator);
+  // WORKSTREAM N (carry): the restore sentence, on the same criterion. A
+  // dangling em dash in a pill and a suburb poll that never gives up are both
+  // invisible to anything that only asks whether the player ended up in the
+  // right place. See `verifyCarry`.
+  const carryFailures = timed('carry', verifyCarry);
   // And the money, on the same criterion again, in two halves. The economy's
   // failures are arithmetic that renders perfectly: a drop rule that floors
   // before its minimum takes $5 off a player with $6 and nothing off one with
@@ -1106,6 +1114,7 @@ async function main(): Promise<void> {
     clientFailures.length ||
     nameFailures.length ||
     locatorFailures.length ||
+    carryFailures.length ||
     trafficFailures.length ||
     wadingFailures.length ||
     waterFailures.length ||
@@ -1170,6 +1179,7 @@ async function main(): Promise<void> {
           ...clientFailures,
           ...nameFailures,
           ...locatorFailures,
+          ...carryFailures,
           ...trafficFailures,
           ...wadingFailures,
           ...waterFailures,
@@ -4498,7 +4508,11 @@ async function main(): Promise<void> {
       clientId: clientId(),
       token: joinChoice.token,
     });
-    joinGate.markJoined(joinChoice.token);
+    // WORKSTREAM N (carry): the second argument tells a mid-game sign-up which
+    // body to carry the level and the location off. A closure rather than the
+    // two numbers, because the `WELCOME` that assigns them has not arrived on
+    // this line -- see `accounts.SessionSource`.
+    joinGate.markJoined(joinChoice.token, () => ({ playerId: client.id, room: client.room }));
     // Awaited, and this is the one place the boot blocks on the network.
     //
     // The alternative -- connect in the background and spawn the dummies now,
@@ -4699,6 +4713,19 @@ async function main(): Promise<void> {
   // which is a better boot than a loading screen held open for a lookup table.
   const locator = new Locator(streamer, '/world', streamer.assetVersion);
   void locator.loadSuburbs();
+
+  // WORKSTREAM N (carry): *"logging off should save my location till next log
+  // in"*, said out loud. Here rather than beside the welcome eight hundred lines
+  // up, because the sentence wants the suburb and the suburb wants the atlas
+  // that was fetched on the line above -- `installRestoredNotice` waits for it,
+  // briefly, and says the sentence without it rather than not at all. It returns
+  // immediately unless this join actually restored a spot, which is every guest
+  // and every ordinary login. See `game/carry.ts`.
+  installRestoredNotice({
+    restored: () => net?.welcome?.restored === true,
+    suburb: () => locator.stats().suburb ?? '',
+    notice: (message) => hud.notice(message),
+  });
 
   // And where the water is, which is the one region on the map that gets a fill
   // of its own. The streamer already holds every resident tile's sheet in world

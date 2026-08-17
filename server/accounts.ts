@@ -72,12 +72,16 @@ import {
   type AccountRecord,
   type AccountView,
   type HandleCheck,
+  type LastPos,
+  carriedLine,
   handleKey,
+  lastPosThisWeek,
   levelFor,
   passwordRefusal,
   resetIfNewWeek,
   sanitiseAccount,
   sanitiseHandle,
+  sanitiseLastPos,
   tokenLive,
   tokenShaped,
   weekOf,
@@ -125,6 +129,67 @@ export interface AuthOutcome {
   message: string;
   token: string;
   account: AccountView | null;
+  /**
+   * What came across from the guest session, on sign-up. Zeroed everywhere else.
+   *
+   * On the outcome rather than only in `message` because the client shows the
+   * sentence *and* has to decide what to do next, and parsing a sentence to find
+   * out whether a spot carried would be an English-language wire format. See
+   * `carriedLine`, which composes the sentence from these same three fields.
+   */
+  carried: CarriedProgress;
+}
+
+/** The three things a sign-up can bring across from a guest session. */
+export interface CarriedProgress {
+  kills: number;
+  level: number;
+  /** Whether the guest's current position was saved onto the new account. */
+  spot: boolean;
+}
+
+const CARRIED_NOTHING: CarriedProgress = { kills: 0, level: 1, spot: false };
+
+/**
+ * A live guest, as the sign-up route needs them. Filled in by `server/index.ts`.
+ *
+ * This file cannot see a `Participant` and must not learn to: `server/sim.ts`
+ * imports three.js-free game modules and a `CollisionWorld`, and an
+ * `AccountStore` that imported the simulation would be an HTTP route that could
+ * not be constructed without a world. So the socket layer -- which owns both --
+ * flattens a participant into these six numbers and hands them over, which is
+ * exactly the shape `Simulation.join` already takes an `AccountRecord` in.
+ *
+ * `y` is the **feet** height and the position is the one a body would be dropped
+ * at: a player who is aboard a train or driving when this is taken has already
+ * been projected onto the ground beneath them by `Simulation.carryOf`. Riding
+ * state is deliberately not part of this -- see that method.
+ */
+export interface LiveSpot {
+  /** The participant's name as the room assigned it, for the identity check. */
+  name: string;
+  /** Player knockouts this session. */
+  kills: number;
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+}
+
+/**
+ * How this file finds a body. Two questions, both answered by `server/index.ts`.
+ *
+ * Injected rather than imported for the reason `LiveSpot` gives, and it is
+ * nullable for a second one: `AccountStore` is constructed in tests and in
+ * `server/accounts-check.ts` phase A with no host at all, and every route here
+ * has to keep working when the answer to "where is this person standing" is
+ * "there is no simulation".
+ */
+export interface LiveLookup {
+  /** The participant at (room, playerId), or null. For the sign-up carry. */
+  guest(room: number, playerId: number): LiveSpot | null;
+  /** Where the account with this id is standing right now, or null. For logout. */
+  ofAccount(accountId: string): LiveSpot | null;
 }
 
 export class AccountStore {
@@ -296,12 +361,58 @@ export class AccountStore {
    * Saved synchronously rather than on the debounce. See
    * `ACCOUNT_SAVE_DEBOUNCE_MS`.
    */
-  async signup(rawHandle: string, password: string, guestName: string, wallets: WalletStore | null, now = Date.now()): Promise<AuthOutcome> {
+  /**
+   * ---------------------------------------------------------------------------
+   * **AND THE LEVEL AND THE SPOT COME TOO.**
+   *
+   * *"if i sign up it should automatically transfer my level and location to the
+   * new account."* `carry` is that, and it is the guest's live participant --
+   * their session knockouts and where their body is standing -- flattened by
+   * `server/index.ts` into a `LiveSpot`.
+   *
+   * **How the participant is found, and why it is stronger than the wallet's
+   * rule.** The wallet migrates on the *name in the form*, which the paragraph
+   * above defends as a claim that grants no new capability. The kills and the
+   * spot could have been done the same way -- find whoever is playing as
+   * "Bazza" and take their progress -- and that would have been strictly worse
+   * than the wallet case rather than equal to it, because it is a capability
+   * that did not previously exist: typing somebody else's name would *take their
+   * position and their score* rather than a balance they could already spend.
+   *
+   * So the client sends the `playerId` and `room` its own `WELCOME` gave it, and
+   * `server/index.ts` looks that participant up. The name is then checked
+   * against the `guestName` on the form -- folded, so the room's "Bazza (2)"
+   * still matches -- and a mismatch carries nothing. That is not proof either
+   * (a hand-built client can send any id), but the id is not guessable from
+   * outside the room and the check makes the two facts agree, which is as far as
+   * this can be taken without a session secret for something worth a level.
+   *
+   * A carried record is stamped into **this** week (`levelWeek`), because a
+   * guest's kills are this session's and a session is inside a week by
+   * construction.
+   *
+   * Saved synchronously rather than on the debounce. See
+   * `ACCOUNT_SAVE_DEBOUNCE_MS`.
+   */
+  async signup(
+    rawHandle: string,
+    password: string,
+    guestName: string,
+    wallets: WalletStore | null,
+    carry: LiveSpot | null = null,
+    now = Date.now(),
+  ): Promise<AuthOutcome> {
     const handle = sanitiseHandle(rawHandle);
     if (handle === '') return refuse(400, 'pick a handle of two to sixteen characters');
     const badPassword = passwordRefusal(password);
     if (badPassword !== '') return refuse(400, badPassword);
     if (this.registered(handle)) return refuse(409, 'that handle belongs to an account already');
+
+    // The guest's own numbers, taken **before** the hash's await: the
+    // participant can leave during those tens of milliseconds, and a `LiveSpot`
+    // is already a copy rather than a live reference for exactly that reason.
+    const kills = carry === null ? 0 : Math.max(0, Math.min(1e9, Math.trunc(carry.kills)));
+    const spot = carry === null ? null : sanitiseLastPos({ x: carry.x, y: carry.y, z: carry.z, yaw: carry.yaw, savedMs: now });
 
     const record: AccountRecord = {
       id: crypto.randomUUID(),
@@ -312,9 +423,10 @@ export class AccountStore {
       lastSeenMs: now,
       providers: {},
       tokens: [],
-      kills: 0,
-      level: 1,
+      kills,
+      level: levelFor(kills),
       levelWeek: weekOf(now),
+      lastPos: spot,
     };
     // Re-checked **after** the await. Hashing is tens of milliseconds and this
     // process is single-threaded but not single-*task*: two sign-ups for one
@@ -334,7 +446,16 @@ export class AccountStore {
     if (wallets !== null && guestName !== '') wallets.migrateToAccount(guestName, record.id, now);
 
     await this.save();
-    return { ok: true, status: 200, message: `signed up as ${handle}`, token, account: view(record) };
+    const carried: CarriedProgress = { kills: record.kills, level: record.level, spot: record.lastPos !== null };
+    // "signed up as Bazza" when nothing came across -- which is the honest
+    // sentence for somebody who registered from the landing page before joining
+    // -- and "welcome, Bazza — level 2 and your spot came with you" when
+    // something did. The second is `carriedLine`'s, in the shared module, so
+    // `verifyAccounts` can drive the wording on both ends.
+    const message = carried.kills === 0 && !carried.spot
+      ? `signed up as ${handle}`
+      : carriedLine(handle, carried.kills, carried.level, carried.spot);
+    return { ok: true, status: 200, message, token, account: view(record), carried };
   }
 
   /** Log in. Answers the same sentence for a wrong handle and a wrong password. */
@@ -352,14 +473,100 @@ export class AccountStore {
     resetIfNewWeek(record, now);
     const token = this.mint(record, now);
     await this.save();
-    return { ok: true, status: 200, message: `welcome back, ${record.handle}`, token, account: view(record) };
+    return {
+      ok: true,
+      status: 200,
+      message: `welcome back, ${record.handle}`,
+      token,
+      account: view(record),
+      carried: CARRIED_NOTHING,
+    };
   }
 
-  /** Drop one token. Idempotent: logging out twice is a success both times. */
-  logout(token: string, now = Date.now()): AuthOutcome {
+  /**
+   * Drop one token. Idempotent: logging out twice is a success both times.
+   *
+   * **And it saves your spot on the way out**, which is the one thing this route
+   * does besides forgetting a string. `spot` is where `server/index.ts` found
+   * this account standing, or null when they are not in a room -- logging out
+   * from a landing page, from a second tab, or the morning after.
+   *
+   * Here as well as on the socket close, rather than only on the close, because
+   * the two are different moments and a player who logs out *while playing* has
+   * said something: the close will fire eventually and would save the same spot,
+   * but "eventually" is whenever they shut the tab, and by then they may have
+   * spent ten minutes walking somewhere as a guest. The spot that belongs to the
+   * account is the one it had when it stopped being logged in.
+   */
+  logout(token: string, spot: LiveSpot | null = null, now = Date.now()): AuthOutcome {
+    if (spot !== null) {
+      const record = this.byToken(token, now);
+      if (record !== null) this.rememberSpot(record, spot, now);
+    }
     this.revoke(token);
-    void now;
-    return { ok: true, status: 200, message: 'logged out', token: '', account: null };
+    return { ok: true, status: 200, message: 'logged out', token: '', account: null, carried: CARRIED_NOTHING };
+  }
+
+  // --- Where you logged off ------------------------------------------------------
+
+  /**
+   * Write where this account is standing. Debounced, like the kills.
+   *
+   * On the cheap side of `ACCOUNT_SAVE_DEBOUNCE_MS`'s split deliberately: a lost
+   * spot costs a returning player a walk back to Newtown, and a two-second
+   * window on that is a trade the sign-up path was not allowed to make but this
+   * one is. The alternative -- an `await this.save()` on every socket close --
+   * would be a filesystem write per disconnect on a 1 vCPU box, which is a
+   * write per player per reload.
+   *
+   * The record is re-derived through `sanitiseLastPos` rather than assigned
+   * field by field, so the one parser is the only thing that has ever produced a
+   * `LastPos`: a NaN yaw off a body that was mid-teleport would otherwise reach
+   * the file, and the reader that refuses it is on the *next* boot.
+   */
+  rememberSpot(record: AccountRecord, spot: LiveSpot, now = Date.now()): boolean {
+    // Rolled first, on `creditKill`'s argument exactly: a spot saved at 00:00:01
+    // on Monday belongs to the new week, and stamping it before the roll would
+    // have `resetIfNewWeek` throw it away a millisecond later.
+    if (resetIfNewWeek(record, now)) this.touch();
+    const parsed = sanitiseLastPos({ x: spot.x, y: spot.y, z: spot.z, yaw: spot.yaw, savedMs: now });
+    if (parsed === null) return false;
+    record.lastPos = parsed;
+    record.lastSeenMs = now;
+    this.touch();
+    return true;
+  }
+
+  /**
+   * Where this account should spawn, or null for the spawn disc.
+   *
+   * The week rule applied at the **read**, and a stale spot is cleared here
+   * rather than left for the parser on the next boot. That is `byToken`'s
+   * arrangement with `resetIfNewWeek` and it is deliberate for the same reason:
+   * this is the only code path that will ever look at the value again, so
+   * leaving it is leaving a row on disk that says something untrue.
+   *
+   * Whether the spot is still *standable* is not this file's question --
+   * `Simulation.join` puts the answer through `game/spawn.restoreSpawnPoint`
+   * against the world. See that call.
+   */
+  spotFor(record: AccountRecord, now = Date.now()): LastPos | null {
+    if (resetIfNewWeek(record, now)) this.touch();
+    const spot = record.lastPos;
+    if (spot === null) return null;
+    if (!lastPosThisWeek(spot, now)) {
+      record.lastPos = null;
+      this.touch();
+      return null;
+    }
+    return spot;
+  }
+
+  /** Forget it. For a spot the world refused, so it is not re-tried every join. */
+  clearSpot(record: AccountRecord): void {
+    if (record.lastPos === null) return;
+    record.lastPos = null;
+    this.touch();
   }
 
   /**
@@ -470,7 +677,7 @@ export function view(record: AccountRecord): AccountView {
 }
 
 function refuse(status: number, message: string): AuthOutcome {
-  return { ok: false, status, message, token: '', account: null };
+  return { ok: false, status, message, token: '', account: null, carried: CARRIED_NOTHING };
 }
 
 // --- The rate limits ---------------------------------------------------------------
@@ -564,6 +771,7 @@ export async function handleAuthRequest(
   store: AccountStore,
   guards: AuthGuards,
   wallets: WalletStore | null,
+  live: LiveLookup | null = null,
   now = Date.now(),
 ): Promise<Response> {
   if (req.method === 'OPTIONS') return authCors(new Response(null, { status: 204 }));
@@ -587,7 +795,19 @@ export async function handleAuthRequest(
     // that reduces this process's state, and a player who cannot log out of a
     // shared machine because somebody else on their address was hammering the
     // login form is the worst refusal in the feature.
-    return outcome(store.logout(bearerOf(req), now));
+    //
+    // The record is resolved twice on this path -- once here to find the body,
+    // once inside `logout` to write to it -- and that is two map lookups on a
+    // route nobody calls twice a minute. The alternative is `logout` taking a
+    // resolved record, which would put the "is this token even live" test at the
+    // call site rather than in the store.
+    const token = bearerOf(req);
+    let standing: LiveSpot | null = null;
+    if (live !== null && token !== '') {
+      const record = store.byToken(token, now);
+      if (record !== null) standing = live.ofAccount(record.id);
+    }
+    return outcome(store.logout(token, standing, now));
   }
 
   if (route === 'signup' || route === 'login') {
@@ -613,10 +833,42 @@ export async function handleAuthRequest(
     const password = typeof parsed.password === 'string' ? parsed.password : '';
     if (route === 'login') return outcome(await store.login(handle, password, now));
     const guestName = typeof parsed.guestName === 'string' ? parsed.guestName : '';
-    return outcome(await store.signup(handle, password, guestName, wallets, now));
+    return outcome(await store.signup(handle, password, guestName, wallets, liveGuest(parsed, guestName, live), now));
   }
 
   return authJson(404, { ok: false, message: 'no such route', account: null });
+}
+
+/**
+ * The live guest a sign-up body names, if the two facts on it agree. Or null.
+ *
+ * The identity check `signup`'s header argues for, and it is three lines
+ * because it is meant to be readable rather than clever:
+ *
+ *   1. a `playerId` and a `room` off the form, both parsed as numbers rather
+ *      than believed -- `room` defaults to 0, which is the room a bare
+ *      `wss://host/ws` lands in and therefore the right default;
+ *   2. the participant at that address, or nothing;
+ *   3. **the name that participant is actually wearing must fold to the name on
+ *      the form.** `handleKey` rather than `===`, because the room may have
+ *      deduped "Bazza" into "Bazza (2)" -- no, it may not: `uniqueName` produces
+ *      a *different* string, so this compares what the client believes it is
+ *      called with what it is called, and a disagreement means the client is
+ *      confused or lying. Either way, nothing carries.
+ *
+ * A guest with no name on the form carries nothing, because there would be
+ * nothing to check the participant against -- and that is the same guest whose
+ * wallet does not migrate either, one line up in `handleAuthRequest`.
+ */
+function liveGuest(parsed: Record<string, unknown>, guestName: string, live: LiveLookup | null): LiveSpot | null {
+  if (live === null || guestName === '') return null;
+  const playerId = Number(parsed.playerId);
+  const room = Number(parsed.room);
+  if (!Number.isFinite(playerId) || playerId <= 0 || playerId > 65535) return null;
+  const found = live.guest(Number.isFinite(room) ? room : 0, Math.trunc(playerId));
+  if (found === null) return null;
+  if (handleKey(found.name) !== handleKey(guestName)) return null;
+  return found;
 }
 
 function outcome(out: AuthOutcome): Response {
@@ -625,6 +877,9 @@ function outcome(out: AuthOutcome): Response {
     message: out.message,
     token: out.token,
     account: out.account,
+    // What actually came across, so the client does not have to read the
+    // sentence to find out. See `AuthOutcome.carried`.
+    carried: out.carried,
   });
 }
 
@@ -660,4 +915,4 @@ function authCors(res: Response): Response {
  */
 export { verifyAccounts } from '../client/src/net/accounts.ts';
 export { accountWalletKey } from './wallets.ts';
-export type { AccountRecord, AccountView } from '../client/src/net/accounts.ts';
+export type { AccountRecord, AccountView, LastPos } from '../client/src/net/accounts.ts';

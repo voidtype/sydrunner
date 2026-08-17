@@ -78,6 +78,37 @@
  * week it was last counted in (`levelWeek`), and anything that reads or writes
  * kills checks it first. A cron job would have had to run, and a cron job that
  * did not run leaves a player at level 8 in a week where everybody else is at 1.
+ *
+ * ---------------------------------------------------------------------------
+ * YOUR SPOT, AND WHY IT LIVES AND DIES WITH THE LEVEL
+ *
+ * *"logging off should save my location till next log in (persisted to end of
+ * week)"*. That is `AccountRecord.lastPos`, and the parenthesis is the whole of
+ * its lifetime rule: a spot is **this week's spot**, on the same Monday the
+ * ladder resets on, and `resetIfNewWeek` clears it in the same three lines that
+ * zero the kills.
+ *
+ * Tying the two together was a decision rather than a convenience. The
+ * alternatives were a spot that never expired -- which is a player returning in
+ * March to a suburb they were passing through in January, next to nobody, with
+ * no memory of why they are there -- and a spot with a lifetime of its own,
+ * which is a second calendar to explain and a second one to get wrong. A week is
+ * long enough that "log off in Newtown on Tuesday, come back Thursday, still in
+ * Newtown" holds, which is the whole of what was asked for, and short enough
+ * that the answer to "why am I back at the park?" is the answer everybody
+ * already knows: it is a new week and everything reset.
+ *
+ * The stored `y` is a **feet** height, not the eye, because everything that
+ * validates a spot works in feet -- `game/spawn.isSpawnable` takes the number
+ * `spawnGround` returns, and the call sites add `EYE_HEIGHT` themselves. Storing
+ * the eye would mean every reader had to know which of the two it had.
+ *
+ * Nothing here decides whether a saved spot is still *standable*. That is
+ * `game/spawn.restoreSpawnPoint`, against a world this module cannot see: a
+ * building can be built over your spot, a tile can stop being in the build, and
+ * a record from a week where the pipeline drew the terrain differently is a
+ * record that would drop somebody through the ground. This file owns the week
+ * rule and the parser; that one owns the ground.
  */
 
 import { MAX_NAME_CHARS, sanitiseName } from './protocol.ts';
@@ -242,6 +273,104 @@ export function weekOf(at: number | Date = Date.now()): string {
   return weekKey(at);
 }
 
+// --- Where you were standing ---------------------------------------------------
+
+/**
+ * How far from the origin a saved spot may be before it is not a spot.
+ *
+ * Greater Sydney as this game builds it is a 60 km square around Town Hall, so
+ * anything past 200 km is a hand-edited file, a corrupted read, or a coordinate
+ * that arrived in the wrong units. It is a *sanity* bound and not a world
+ * boundary -- `game/spawn.restoreSpawnPoint` is what actually decides whether a
+ * spot is standable, and it will refuse a point a kilometre off the built edge
+ * long before this does. This exists so that a `1e300` in the file cannot reach
+ * the ground query at all, on `sanitiseAccount`'s standing argument that a
+ * number off disk is a claim.
+ */
+export const LAST_POS_LIMIT_M = 200_000;
+
+/**
+ * Where an account was standing when it last logged off.
+ *
+ * `y` is the **feet** height, per the header. `savedMs` is the only lifetime
+ * this record has: see `lastPosThisWeek`.
+ */
+export interface LastPos {
+  x: number;
+  /** Feet, not the eye. See the header. */
+  y: number;
+  z: number;
+  yaw: number;
+  /** `Date.now()` when this was written. The week rule reads this and nothing else. */
+  savedMs: number;
+}
+
+/**
+ * Is this spot still this week's?
+ *
+ * The one comparison in the feature, and it is deliberately against `savedMs`
+ * rather than against `AccountRecord.levelWeek`. The two agree in every ordinary
+ * case -- `resetIfNewWeek` clears both together -- but they can disagree in the
+ * one case that matters: a hand-edited file, which is exactly the file this
+ * module's parser exists to distrust. Reading the timestamp the spot carries
+ * means a row whose `levelWeek` says Monday and whose spot was saved in
+ * September is refused on the evidence rather than on the label.
+ */
+export function lastPosThisWeek(pos: LastPos, at: number | Date = Date.now()): boolean {
+  return weekOf(pos.savedMs) === weekOf(at);
+}
+
+/**
+ * One saved spot off disk, or null.
+ *
+ * `sanitiseAccount`'s discipline applied to five numbers, and the fifth is the
+ * reason it is a function rather than four `Number.isFinite` calls inline: a
+ * `savedMs` that is not a number makes `weekOf` answer for the epoch, which is
+ * always a different week, which would make every spot on the box stale. That
+ * fails safe rather than dangerously, and it fails *silently* -- which is the
+ * class of thing this repo writes checks for. So it is refused here instead.
+ */
+export function sanitiseLastPos(value: unknown): LastPos | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const raw = value as Partial<LastPos>;
+  const x = Number(raw.x);
+  const y = Number(raw.y);
+  const z = Number(raw.z);
+  const yaw = Number(raw.yaw);
+  const savedMs = Number(raw.savedMs);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+  if (!Number.isFinite(yaw) || !Number.isFinite(savedMs) || savedMs <= 0) return null;
+  if (Math.abs(x) > LAST_POS_LIMIT_M || Math.abs(z) > LAST_POS_LIMIT_M || Math.abs(y) > LAST_POS_LIMIT_M) {
+    return null;
+  }
+  return { x, y, z, yaw, savedMs };
+}
+
+/**
+ * What the sign-up route says came across with the new account.
+ *
+ * A pure function of three facts rather than a sentence built at the call site,
+ * for `joinPane`'s reason exactly: it is the one part of that response with a
+ * *rule* in it -- what carried and what did not -- and a rule is a property of
+ * the feature rather than of the route that happens to answer. `verifyAccounts`
+ * drives it in both runtimes.
+ *
+ * There is deliberately **no suburb in it**. The owner's phrasing was *"your
+ * spot at Newtown came with you"*, and the server cannot say Newtown: the suburb
+ * table is a map atlas the browser loads (`client/src/mapatlas.ts`) and the
+ * server has no copy and no reason to grow one for one sentence. The client says
+ * the suburb on the *restore*, where it has the atlas in hand -- see
+ * `game/carry.restoredLine`. Here it is "your spot", which is true and short.
+ */
+export function carriedLine(handle: string, kills: number, level: number, spot: boolean): string {
+  const bits: string[] = [];
+  if (kills > 0) bits.push(level > 1 ? `level ${level}` : `${kills} ${kills === 1 ? 'kill' : 'kills'}`);
+  if (spot) bits.push('your spot');
+  if (bits.length === 0) return `welcome, ${handle}`;
+  const carried = bits.length === 1 ? bits[0] : `${bits[0]} and ${bits[1]}`;
+  return `welcome, ${handle} — ${carried} came with you`;
+}
+
 // --- The record ------------------------------------------------------------------
 
 /**
@@ -275,6 +404,15 @@ export interface AccountRecord {
   level: number;
   /** The `weekOf` the kills above were counted in. */
   levelWeek: string;
+  /**
+   * Where this account logged off, or null.
+   *
+   * Written on socket close and on `/auth/logout`, cleared by the weekly reset,
+   * and read once per join. Null rather than a zeroed record on `Participant`'s
+   * argument: every path that restores a spot begins with the same test, and
+   * (0, 0, 0) is a real point in this world -- it is Town Hall.
+   */
+  lastPos: LastPos | null;
 }
 
 /** What the file on disk looks like. Versioned, on `WalletFile`'s terms. */
@@ -287,7 +425,8 @@ export interface AccountFile {
 /**
  * Roll a record into the current week if it is behind. Returns whether it moved.
  *
- * The **only** place kills are zeroed, called from every path that reads or
+ * The **only** place kills are zeroed **and the only place a saved spot is
+ * dropped by the calendar**, called from every path that reads or
  * writes them (load, login, join, a knockout, and the per-room minute check).
  * That redundancy is the design: a lazy reset that is only applied on one of
  * those paths is a player whose level resets when they happen to reconnect and
@@ -302,6 +441,10 @@ export function resetIfNewWeek(record: AccountRecord, at: number | Date = Date.n
   record.levelWeek = week;
   record.kills = 0;
   record.level = 1;
+  // *"persisted to end of week"*, and this is the end of the week. Cleared in
+  // the same three lines as the ladder rather than in a rule of its own, so
+  // there is exactly one Monday in this feature -- see the header.
+  record.lastPos = null;
   return true;
 }
 
@@ -378,8 +521,19 @@ export function sanitiseAccount(value: unknown, now = Date.now()): AccountRecord
     // disagreed with the kills beside it is the one number a player checks.
     level: 1,
     levelWeek: typeof raw.levelWeek === 'string' ? raw.levelWeek : '',
+    // **Absent is the ordinary case, not an error.** Every account written
+    // before this feature existed has no `lastPos`, and so does every account
+    // that has never logged off since the last Monday. A parser that treated a
+    // missing spot as a bad row would have refused the whole file on the deploy
+    // that introduced it.
+    lastPos: sanitiseLastPos(raw.lastPos),
   };
   record.level = levelFor(record.kills);
+  // A spot from a week that has ended, on a row whose `levelWeek` says
+  // otherwise. `resetIfNewWeek` below cannot catch this one -- it compares the
+  // *label* -- and the case is real: a hand-edited file, and a file written by a
+  // build whose clock was wrong. Refused on the evidence; see `lastPosThisWeek`.
+  if (record.lastPos !== null && !lastPosThisWeek(record.lastPos, now)) record.lastPos = null;
   // And rolled forward before anybody sees it, so a box that was off over the
   // weekend does not serve last week's ladder for the first minute of this one.
   resetIfNewWeek(record, now);
@@ -495,6 +649,10 @@ export function feedbackGate(signedIn: boolean, boundAtJoin: boolean): 'none' | 
  *   - A **parser that trusts the file** turns a hand-edited row into an account
  *     whose stored level disagrees with its kills, or -- worse -- one holding a
  *     token that never expires.
+ *   - A **saved spot that outlives its week** puts a player back in a suburb
+ *     they were in a fortnight ago, and one that is dropped a week early puts
+ *     them at the park on Tuesday. Neither throws, neither logs, and both are
+ *     one string compare away from the other.
  *
  * No disk, no network, no hashing: `Bun.password` is exercised by the running
  * server and a check that awaited a hash would add tens of milliseconds to every
@@ -681,6 +839,86 @@ export function verifyAccounts(): string[] {
     }
   }
 
+  // --- The saved spot: the parser, the week rule, and the sentence.
+  {
+    // A Wednesday in the same ISO week as the Monday the section above uses, so
+    // "this week" and "last week" here are the calendar's and not a guess.
+    const now = Date.UTC(2026, 7, 19, 3, 0, 0);
+    const lastWeek = now - 8 * 24 * 3600 * 1000;
+
+    // The parser, on the rows a hand-edited file can really contain.
+    const bad: Array<[unknown, string]> = [
+      [null, 'null'],
+      [undefined, 'a missing spot'],
+      ['Newtown', 'a string'],
+      [[], 'an array'],
+      [{ x: 1, y: 2, z: 3, yaw: 0 }, 'no savedMs'],
+      [{ x: 1, y: 2, z: 3, yaw: 0, savedMs: 0 }, 'a savedMs of zero'],
+      [{ x: 1, y: 2, z: 3, yaw: Number.NaN, savedMs: now }, 'a NaN yaw'],
+      [{ x: 'here', y: 2, z: 3, yaw: 0, savedMs: now }, 'a non-numeric x'],
+      [{ x: 1e300, y: 2, z: 3, yaw: 0, savedMs: now }, 'an x past the end of the world'],
+      [{ x: 1, y: 2, z: -1e9, yaw: 0, savedMs: now }, 'a z past the end of the world'],
+    ];
+    for (const [row, why] of bad) {
+      if (sanitiseLastPos(row) !== null) failures.push(`A saved spot with ${why} was accepted off disk.`);
+    }
+    const spot = sanitiseLastPos({ x: -2236.4, y: 12.5, z: 4543.3, yaw: 1.25, savedMs: now });
+    if (!spot) {
+      failures.push('A well-formed saved spot was refused off disk.');
+    } else if (spot.x !== -2236.4 || spot.y !== 12.5 || spot.z !== 4543.3 || spot.yaw !== 1.25) {
+      failures.push(`A saved spot came back as (${spot.x}, ${spot.y}, ${spot.z}) yaw ${spot.yaw}; it must be exact.`);
+    }
+
+    // The week rule, which is the whole of the lifetime.
+    if (spot && !lastPosThisWeek(spot, now)) failures.push("This week's saved spot was treated as stale.");
+    if (spot && lastPosThisWeek({ ...spot, savedMs: lastWeek }, now)) {
+      failures.push('A spot saved last week was treated as current; the reset that zeroes the level must drop it too.');
+    }
+
+    // A record parses **with and without** a spot -- the second is every account
+    // written before this feature and every account that has not logged off
+    // since Monday, so a parser that refused it would refuse the whole file.
+    const withSpot = sanitiseAccount({ ...fakeAccount(now), lastPos: { x: 10, y: 0, z: 20, yaw: 0, savedMs: now } }, now);
+    if (!withSpot) failures.push('An account carrying a saved spot was refused off disk.');
+    else if (withSpot.lastPos === null) failures.push('An account carrying a saved spot lost it in the parser.');
+    const without = sanitiseAccount(fakeAccount(now), now);
+    if (!without) failures.push('An account with no saved spot was refused off disk; every old row is one.');
+    else if (without.lastPos !== null) failures.push('An account with no saved spot came back with one.');
+
+    // A spot from last week does not survive the parser, whatever the row's
+    // `levelWeek` claims. This is the case `resetIfNewWeek` cannot see.
+    const stale = sanitiseAccount(
+      { ...fakeAccount(now), levelWeek: weekOf(now), lastPos: { x: 10, y: 0, z: 20, yaw: 0, savedMs: lastWeek } },
+      now,
+    );
+    if (stale?.lastPos !== null) {
+      failures.push("A spot saved last week survived on a row labelled with this week's level week.");
+    }
+
+    // And the reset drops it, in the same call that zeroes the ladder.
+    const record = fakeAccount(now);
+    record.lastPos = { x: 10, y: 0, z: 20, yaw: 0, savedMs: now };
+    if (resetIfNewWeek(record, now)) failures.push('A record already in the current week was reset.');
+    if (record.lastPos === null) failures.push('A same-week reset dropped the saved spot anyway.');
+    record.levelWeek = '2020-W01';
+    resetIfNewWeek(record, now);
+    if (record.lastPos !== null) failures.push('A weekly reset kept the saved spot; a spot outlives its week.');
+
+    // The sentence the sign-up route answers with.
+    const lines: Array<[number, number, boolean, string]> = [
+      [12, 2, true, 'welcome, Bazza — level 2 and your spot came with you'],
+      [12, 2, false, 'welcome, Bazza — level 2 came with you'],
+      [4, 1, true, 'welcome, Bazza — 4 kills and your spot came with you'],
+      [1, 1, false, 'welcome, Bazza — 1 kill came with you'],
+      [0, 1, true, 'welcome, Bazza — your spot came with you'],
+      [0, 1, false, 'welcome, Bazza'],
+    ];
+    for (const [kills, level, hasSpot, want] of lines) {
+      const got = carriedLine('Bazza', kills, level, hasSpot);
+      if (got !== want) failures.push(`carriedLine(${kills}, ${level}, ${hasSpot}) is ${JSON.stringify(got)}, not ${JSON.stringify(want)}.`);
+    }
+  }
+
   // --- The landing panel's state machine, and the gate's.
   {
     const panes: Array<[boolean, 'quick' | 'account', JoinPane]> = [
@@ -741,5 +979,6 @@ function fakeAccount(now: number): AccountRecord {
     kills: 0,
     level: 1,
     levelWeek: weekOf(now),
+    lastPos: null,
   };
 }

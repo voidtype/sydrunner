@@ -2999,12 +2999,20 @@ async function checkBikes(): Promise<void> {
   // spawn and no clock, and a v11 client reading a v10 one reads eight bytes
   // that are not there. See `protocol.PROTOCOL_VERSION`, `WELCOME_BYTES` and
   // `ABOARD_BYTES`.
+  // **The version is still 14 on the carry branch and the welcome is already
+  // 36 bytes**, and that pair is deliberately inconsistent for exactly as long
+  // as it takes the lead to merge the batch. Workstream N grew `WELCOME` by a
+  // flags byte (v15's `restored`) and does not own the version number -- two
+  // branches that each bumped would merge to a version neither describes -- so
+  // the bump is one line the lead changes here and in `protocol.ts` together.
+  // See `PROTOCOL_VERSION`'s v15 note. If this line is still reading 14 after
+  // the batch has landed, that is the bug this check exists to catch.
   check(PROTOCOL_VERSION === 14, `the protocol is at version ${PROTOCOL_VERSION}`);
   check(
-    WELCOME_BYTES === 35,
-    `  and a WELCOME is ${WELCOME_BYTES} bytes: 27 through v10, plus v11's f64 clock. A field added ` +
-      `without the version moving is a browser tab open across a deploy reading the spawn out of the ` +
-      `middle of a timestamp`,
+    WELCOME_BYTES === 36,
+    `  and a WELCOME is ${WELCOME_BYTES} bytes: 27 through v10, plus v11's f64 clock, plus v15's ` +
+      `flags byte. A field added without the version moving is a browser tab open across a deploy ` +
+      `reading the spawn out of the middle of a timestamp`,
   );
   {
     // A protocol-5 hello -- which is what a browser tab left open across this

@@ -53,6 +53,26 @@
  * The rejected alternative was a mid-session rebind message -- a rename, a
  * wallet swap and a roster rewrite on a live body, all to save a reload that a
  * player who has just filled in a sign-up form is entirely willing to do.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT DOES COME ACROSS, THOUGH: THE LEVEL AND THE SPOT (workstream N)
+ *
+ * *"if i sign up it should automatically transfer my level and location to the
+ * new account."* That is not the rebind above and does not need it: the account
+ * is created with the guest's kills and the guest's position **already on it**,
+ * so the *next* hello -- after the reload the sentence asks for -- puts the
+ * player back exactly where they were signing up, at the level they had earned.
+ * Nothing about the live socket changes, which is why this fits inside the
+ * design rather than against it.
+ *
+ * The one thing this file has to contribute is **who to carry from**. The
+ * sign-up is an HTTP request and the server has no way to tell which of the
+ * bodies in its rooms sent it, so the form carries this session's `playerId` and
+ * `room` -- the two numbers `WELCOME` handed this client -- beside the guest
+ * name it already sent for the wallet. The server looks that participant up and
+ * refuses to carry anything unless its name matches the name on the form; see
+ * `server/accounts.ts`'s `liveGuest`, which argues why that check is worth
+ * having even though the id is not a secret.
  */
 
 import {
@@ -89,6 +109,18 @@ export interface JoinGateDeps {
   /** `hud.notice`. One sentence in the pill. */
   notice(message: string): void;
 }
+
+/**
+ * Which participant this browser currently is, for the sign-up carry.
+ *
+ * A function rather than two numbers because it is read at *submit* time and
+ * handed over at *connect* time, and between those two moments the `WELCOME`
+ * arrives -- see `markJoined`, which is called with the socket built and the id
+ * still zero. Reading through a closure is what makes the numbers the ones the
+ * server actually assigned rather than the placeholders they were a second
+ * earlier.
+ */
+export type SessionSource = () => { playerId: number; room: number };
 
 /** What `landing()` resolves with: everything the socket needs to open. */
 export interface JoinChoice {
@@ -160,6 +192,14 @@ export class JoinGate {
    * rather than being derived from `token !== ''`.
    */
   private tokenAtJoin = false;
+  /**
+   * Which participant this session is, or null before there is a socket.
+   *
+   * Null at the landing screen and null offline, which is correct rather than a
+   * gap: there is no body to carry a position off, and the server's carry is
+   * skipped for exactly the same reason. See `SessionSource`.
+   */
+  private session: SessionSource | null = null;
   /** 'signup' or 'login'. One set of fields, two modes; see `index.html`. */
   private mode: 'login' | 'signup' = 'login';
   /**
@@ -291,9 +331,17 @@ export class JoinGate {
   /**
    * Called once, when the socket is built, with the token that went on the
    * hello. See `tokenAtJoin`.
+   *
+   * `session` is workstream N's addition: it is read later, when a sign-up is
+   * submitted, to tell the server which body to carry the level and the spot
+   * from. Passed here rather than to the constructor because this is the first
+   * moment there is a socket to ask, and read through the function rather than
+   * copied because at this instant the `WELCOME` has not arrived and the id is
+   * still zero. See `SessionSource`.
    */
-  markJoined(token: string): void {
+  markJoined(token: string, session: SessionSource | null = null): void {
     this.tokenAtJoin = token !== '';
+    this.session = session;
     this.paint();
   }
 
@@ -567,6 +615,12 @@ export class JoinGate {
           // save progress?". Only sent on sign-up; a login has an account
           // already and its balance is not a guest's to claim.
           guestName: this.mode === 'signup' ? readName() : '',
+          // And **which body that is**, so the level and the location come too.
+          // Workstream N; see the header's last section. Zeroes when there is no
+          // socket -- signing up from the landing screen, or offline -- which
+          // the server reads as "carry nothing" rather than as an error, because
+          // it is: there is no session to carry from yet.
+          ...(this.mode === 'signup' ? (this.session?.() ?? { playerId: 0, room: -1 }) : {}),
         }),
       });
       // Every message here is a literal in `server/accounts.ts`, including the

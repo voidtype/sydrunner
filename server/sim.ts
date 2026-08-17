@@ -61,7 +61,10 @@ import { FootyField, applyFootyHit, type FootyEvent } from '../client/src/game/f
 // offline -- which is what makes "the bat reached it" mean the same thing in the
 // two processes that ever decide it. See `client/src/game/swat.ts`.
 import { createBallAt, swatBalls } from '../client/src/game/swat.ts';
-import { pickSpawnPoint } from '../client/src/game/spawn.ts';
+// WORKSTREAM N (carry): `restoreSpawnPoint` is `pickSpawnPoint`'s test without
+// its draw -- the validator an account's remembered spot has to pass before
+// anybody is put back on it. See `join`.
+import { pickSpawnPoint, restoreSpawnPoint, spawnGround } from '../client/src/game/spawn.ts';
 // `/unstuck`, and the whole of its rule. Shared with the client, which runs the
 // identical function offline -- see `client/src/game/unstuck.ts`, whose header
 // says why this is a chat command rather than a message id.
@@ -290,7 +293,7 @@ import type { WalletFrame } from '../client/src/net/cash.ts';
 // which wallet a joiner opens, what a knockout does to the ladder, and the
 // sentence a guest is shown when they cross $100.
 import { levelFor } from '../client/src/net/accounts.ts';
-import type { AccountRecord, AccountStore } from './accounts.ts';
+import type { AccountRecord, AccountStore, LiveSpot } from './accounts.ts';
 
 export const FIXED_DT = 1 / TICK_HZ;
 
@@ -473,6 +476,18 @@ export interface Participant {
    * arithmetic and states why it is a two-bucket sliding counter.
    */
   npcCash: NpcCashBank;
+  /**
+   * Did this participant spawn where they logged off, rather than in the disc?
+   *
+   * Written once, in `join`, and read once, by `Room.welcome`, which puts it on
+   * the wire as protocol v15's `WELCOME` flag. It is on the participant rather
+   * than returned from `join` because `welcome` is a separate call on a separate
+   * object and threading a second return value through `Room.join` would be a
+   * parameter every caller has to carry to hand one bit to one line.
+   *
+   * False for every guest and every bot, always. See `Simulation.join`.
+   */
+  restored: boolean;
   /**
    * Has this guest already been asked to sign up, this session, for each reason?
    *
@@ -1154,9 +1169,51 @@ export class Simulation {
     account: AccountRecord | null = null,
   ): Participant {
     const id = this.allocateId();
-    const spot = this.joinSpot();
-    const combat = createCombatant(id, spot.x, spot.z);
     const world = groundFor(this.world);
+    /*
+     * --- Where this body starts. Workstream N.
+     *
+     * *"logging off should save my location till next log in."* An account with
+     * a spot from this week starts on it; everybody else -- every guest, every
+     * bot, every account that has not logged off since Monday -- gets the disc,
+     * which is the behaviour that shipped and is still the common path.
+     *
+     * Three things can refuse the spot and they are deliberately three different
+     * files: the **calendar** is `AccountStore.spotFor` (this week or nothing),
+     * the **ground** is `game/spawn.restoreSpawnPoint` (a building can have been
+     * built over it, a tile can have left the build, the terrain can have
+     * moved), and the **world** is whatever `groundFor` answers today. A refusal
+     * falls through to the disc with a sentence saying so, because a returning
+     * player who silently lands in Sydney Park would read it as the feature not
+     * working rather than as their spot being gone.
+     *
+     * A refused spot is also **forgotten**, not left to be re-tried on every
+     * join for the rest of the week: it will not start passing, and a stored
+     * position nothing will ever restore is a row on disk saying something
+     * untrue. See `AccountStore.clearSpot`.
+     *
+     * The probe world here is `world` -- this participant's own -- rather than a
+     * fresh one, which is the opposite of `joinSpot`'s rule and is correct for
+     * the opposite reason: `joinSpot` samples many candidates and must not let a
+     * rejected one's ground follow the joiner in, whereas this asks about
+     * exactly one point and it is the point the body is about to stand on.
+     */
+    let remembered: { x: number; z: number; yaw: number } | null = null;
+    let lostSpot = false;
+    if (account !== null && bot === null && this.accounts !== null) {
+      const saved = this.accounts.spotFor(account);
+      if (saved !== null) {
+        const here = restoreSpawnPoint(saved, world);
+        if (here !== null) remembered = { x: here.x, z: here.z, yaw: saved.yaw };
+        else {
+          lostSpot = true;
+          this.accounts.clearSpot(account);
+        }
+      }
+    }
+    const restored = remembered !== null;
+    const spot = remembered ?? this.joinSpot();
+    const combat = createCombatant(id, spot.x, spot.z);
     combat.body.position.y = eyeAt(world, spot.x, spot.z);
     combat.body.yaw = spot.yaw;
 
@@ -1231,6 +1288,9 @@ export class Simulation {
       // pedestrians would otherwise be the one participant with no cap, and
       // `dropNpcCash` refuses a bot on the wallet test rather than on this one.
       npcCash: createNpcCashBank(),
+      // Whether the spawn above is the spot they logged off at. See the block
+      // that computed it, and `Room.welcome`, which is the only reader.
+      restored,
       prompted: 0,
     };
     // The bot holds the combatant rather than the other way round, so `think()`
@@ -1250,12 +1310,65 @@ export class Simulation {
       colourway: participant.colourway,
       bot: bot ? 1 : 0,
     });
+    // After the participant exists, because `note` looks it up by id -- and it
+    // is a note rather than a `WELCOME` field because it is an *explanation*
+    // rather than a fact about the position: the spawn in the welcome is a
+    // perfectly ordinary spawn and the only thing wrong with it is that it is
+    // not where they left. Forty characters, in the pill, once.
+    if (lostSpot) this.note(id, 'your spot was gone; back at the park');
     return participant;
   }
 
+  /**
+   * A participant, flattened into what the account store can hold. Workstream N.
+   *
+   * The bridge between a body and a row on disk, and it exists here rather than
+   * in `server/accounts.ts` because it is the half that needs a world: the
+   * position saved is the **ground beneath the body**, not the body's eye and
+   * not the seat it is sitting in.
+   *
+   * **Riding state is not saved, deliberately.** A player who logs off on the
+   * T1 to Hornsby has a position that is a fact about a *train* -- by the time
+   * they come back that service has terminated, and the brief rules it out in
+   * as many words. A player in a stolen Corolla is the same case with a shorter
+   * timescale, and there is a second reason there: the car is `server/cars.ts`'
+   * and restoring somebody into a vehicle that no longer exists would be a join
+   * that has to invent one. So both are dropped to the ground under them, which
+   * is where they would have been dropped anyway had they pressed `E`, and the
+   * spot is validated on the way back in like any other -- a body in a rail
+   * tunnel projects to a point under a building, `restoreSpawnPoint` refuses it,
+   * and they start at the park with the sentence that says why.
+   *
+   * `spawnGround` rather than `groundHeight(x, z, feetY)`: the roofs are taken
+   * out, on that function's own argument. Logging off on a warehouse roof and
+   * coming back inside the warehouse is worse than coming back on the street.
+   */
+  carryOf(p: Participant): LiveSpot {
+    const x = p.combat.body.position.x;
+    const z = p.combat.body.position.z;
+    return { name: p.name, kills: p.kos, x, y: spawnGround(p.world, x, z), z, yaw: p.combat.body.yaw };
+  }
+
+  /**
+   * A socket closed. **This is where a logged-in player's spot is saved.**
+   *
+   * Here rather than in `Room.leave` or in `server/index.ts`'s close handler
+   * because this is the one function every departure goes through, and a spot
+   * that is only saved on *some* of the ways out is worse than one that is never
+   * saved: a player whose position persists after a tab close and not after a
+   * network drop has a feature that works about half the time and no way to tell
+   * which half they are in.
+   *
+   * A guest saves nothing -- there is nowhere to put it -- and a bot has no
+   * account by construction. The write is debounced by the store; see
+   * `AccountStore.rememberSpot`.
+   */
   leave(id: number): void {
     const p = this.participants.get(id);
     if (!p) return;
+    if (p.account !== null && this.accounts !== null) {
+      this.accounts.rememberSpot(p.account, this.carryOf(p));
+    }
     p.gone = true;
   }
 

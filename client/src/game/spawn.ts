@@ -400,6 +400,51 @@ export function pickSpawnPoint(
   return { x: centre.x, y: Number.isFinite(base) ? base : 0, z: centre.z };
 }
 
+// --- Somewhere you have already been ---------------------------------------------
+
+/**
+ * Is a **remembered** spot still somewhere a person can stand? The point, or null.
+ *
+ * `pickSpawnPoint` draws a candidate and tests it; this is handed one and does
+ * nothing but the test. It exists because an account's saved position (see
+ * `net/accounts.LastPos`) is the one point in this game that was valid *at some
+ * other time* -- everything else in this file is validated in the same tick it
+ * is produced -- and the world between then and now is not the same world:
+ *
+ *   - the pipeline can rebuild, and a building can now stand where somebody
+ *     logged off in a car park;
+ *   - the stage can change, and a spot in a tile that is no longer in the build
+ *     is a spot over nothing;
+ *   - the terrain can move under it, which is the quiet one: a saved `y` several
+ *     metres under the ground it was taken from means a body that spawns inside
+ *     the hill and is corrected upward through it.
+ *
+ * So the ground is **re-sampled** rather than trusted, the stored `y` is used
+ * only as evidence about whether this is still the same place (the
+ * `SPAWN_MAX_RELIEF` test `pickSpawnPoint` applies to its own draws, for the
+ * same reason), and the rest is `isSpawnable` unchanged -- the identical water,
+ * prism and clearance tests a fresh spawn passes. A restored player has to
+ * satisfy everything a new one does; the only thing being skipped is the dither.
+ *
+ * Returns the point with its **feet** `y` re-derived, so a caller that adds
+ * `EYE_HEIGHT` gets today's ground rather than last Tuesday's.
+ */
+export function restoreSpawnPoint(
+  saved: { x: number; y: number; z: number },
+  world: SpawnWorld,
+): { x: number; y: number; z: number } | null {
+  if (!Number.isFinite(saved.x) || !Number.isFinite(saved.z)) return null;
+  const y = spawnGround(world, saved.x, saved.z);
+  if (!Number.isFinite(y)) return null;
+  // The stored height against today's. Over the relief bound means the ground
+  // has moved, the tile is missing and `groundHeight` is answering with whoever
+  // asked last, or the spot was saved on a roof that is no longer there --
+  // three different faults with one honest answer, which is "not here".
+  if (Number.isFinite(saved.y) && Math.abs(y - saved.y) > SPAWN_MAX_RELIEF) return null;
+  if (!isSpawnable(saved.x, saved.z, y, world)) return null;
+  return { x: saved.x, y, z: saved.z };
+}
+
 // --- The self-check -------------------------------------------------------------
 
 /**
@@ -510,6 +555,46 @@ export function verifySpawn(): string[] {
       groundHeight: () => 0,
     };
     if (isSpawnable(0, 0, 0, walled)) failures.push('A point inside a collision prism was reported spawnable.');
+  }
+
+  // --- A remembered spot is re-validated against **today's** world.
+  //
+  //     Every one of these fails silently in the game: a restore that refuses a
+  //     good spot puts a returning player back at the park and reads as the
+  //     feature not working, and a restore that accepts a bad one drops them
+  //     inside a building and reads as the game not loading.
+  {
+    const flat: SpawnWorld = { collision: null, groundHeight: () => 0 };
+    const here = restoreSpawnPoint({ x: 120, y: 0, z: -40 }, flat);
+    if (!here || here.x !== 120 || here.z !== -40) {
+      failures.push(`A spot on open flat ground was refused; got ${JSON.stringify(here)}.`);
+    }
+    // The ground is re-derived rather than echoed: the saved `y` is evidence,
+    // not an answer.
+    const raised: SpawnWorld = { collision: null, groundHeight: () => 7 };
+    const lifted = restoreSpawnPoint({ x: 0, y: 0, z: 0 }, raised);
+    if (lifted?.y !== 7) failures.push(`A restored spot kept its stored height (${lifted?.y}) instead of today's ground.`);
+    // ...but only while the two are the same place. Terrain that has moved by
+    // more than the relief bound is a different world.
+    if (restoreSpawnPoint({ x: 0, y: -SPAWN_MAX_RELIEF - 5, z: 0 }, flat) !== null) {
+      failures.push('A spot saved far under today\'s terrain was restored; the body would start inside the hill.');
+    }
+    // And every refusal a fresh spawn gets, a restored one gets.
+    const walled: SpawnWorld = { collision: { resolve: () => ({ hit: true }) }, groundHeight: () => 0 };
+    if (restoreSpawnPoint({ x: 0, y: 0, z: 0 }, walled) !== null) {
+      failures.push('A spot with a building now standing on it was restored.');
+    }
+    const pond: SpawnWorld = { collision: null, groundHeight: () => 0, waterSurface: () => 1.5 };
+    if (restoreSpawnPoint({ x: 0, y: 0, z: 0 }, pond) !== null) {
+      failures.push('A spot under 1.5 m of water was restored.');
+    }
+    const hole: SpawnWorld = { collision: null, groundHeight: () => Number.NaN };
+    if (restoreSpawnPoint({ x: 0, y: 0, z: 0 }, hole) !== null) {
+      failures.push('A spot over a tile that is no longer built was restored.');
+    }
+    if (restoreSpawnPoint({ x: Number.NaN, y: 0, z: 0 }, flat) !== null) {
+      failures.push('A spot with a NaN coordinate was restored.');
+    }
   }
 
   return failures;
