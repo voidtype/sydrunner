@@ -68,14 +68,26 @@
  * warm page cache, and exits non-zero on any failure.
  *
  * ---------------------------------------------------------------------------
- * WHAT A REFUSAL MEANS, AND THE ONE HONEST ONE.
+ * WHAT A REFUSAL MEANS, AND WHY THE BOUND IS NOT ZERO.
  *
- * The timetable runs on the wall clock and this driver spends real ticks, so a
- * car filed by the census whose dwell was ending is genuinely somewhere else by
- * the time a body is stood beside it. That refusal is expected, it is bounded
- * (section 4's ceiling), and it has a tell: the *client* refuses in the same
- * breath. A refusal the client would have offered is always a failure, and is
- * asserted per car rather than counted.
+ * The timetable runs on the wall clock and this driver spends real ticks -- a
+ * `sim.step` over the shipped world costs milliseconds and section 2 holds the
+ * throttle for a second -- so the census is a photograph of a city that has
+ * since moved. The first version of this file trusted it and measured 142
+ * refusals in 264 presses, every one of them a car that had driven off. `repose`
+ * is the answer: the census says only *where to look*, and every press asks the
+ * timetable again at the instant it stands the body up. What is left after that
+ * is one tick of skew between the prompt and the press, which is 16.7 ms, and
+ * the two bounds in section 4 are sized for it:
+ *
+ *   - **refusals**, a twentieth of the sweep. Above that the take is refusing.
+ *   - **promised refusals**, two: a press refused at a car the client's own
+ *     `resolveTake` had just offered. That is the reported bug's exact shape and
+ *     it gets the tighter bound for that reason.
+ *
+ * Two things that are *not* refusals and are counted apart: a car that has left
+ * (`movedOn`), and a free lime bike inside `bikes.MOUNT_RADIUS` of the standing
+ * point, which `resolveMount` correctly answers before the car (`bikeAnswersFirst`).
  *
  * Environment: `SYDNEY_WORLD` to point at another bake, `TAKE_SWEEP` to cap how
  * many cars section 4 walks.
@@ -382,13 +394,45 @@ const player = sim.join(0, null, 'thief');
 const out: TickOutput = { tick: 0, events: [], snapshot: null };
 const clientScratch = createDrivingScratch();
 
-/** Put the body beside a car, authoritatively, exactly as `/tp` does. */
+/**
+ * Put the body beside a car, authoritatively, exactly as `/tp` does.
+ *
+ * `sim.placeAt` ends any ride, which is `enterLocal`'s rule. The bike is cleared
+ * here on top of that, and it is not defensive tidying: `E` is a priority chain
+ * and a bike beats a car, so a press that mounted one instead would leave this
+ * participant riding for the rest of the sweep and every press after it would
+ * be a *dismount* rather than a take. That is the shape of harness bug that
+ * makes a hundred green presses meaningless.
+ */
 function place(p: Participant, at: { x: number; z: number }, feetY: number, yaw: number): void {
   sim.placeAt(p, at.x, feetY + EYE_HEIGHT, at.z, yaw);
+  p.combat.ridingBike = 0;
   p.combat.carSpeed = 0;
   p.input.forward = 0;
   p.input.right = 0;
   p.input.yaw = yaw;
+}
+
+/**
+ * Is there something else on `E` at this point that the server answers first?
+ *
+ * `Simulation.resolveMount` is a priority chain -- off a train, off a bike, onto
+ * a train, onto a bike, into a car -- and the car is last. So a standing point
+ * with a free lime bike inside `bikes.MOUNT_RADIUS` is a point where pressing
+ * `E` correctly gets you a bike, and counting that as the take refusing would be
+ * this check asserting that the chain is a bug. There are 5,511 bikes in the
+ * build, so over a two-hundred-press sweep it happens.
+ *
+ * Worth stating because it is also the *first* thing this driver saw that looked
+ * like the reported failure: two presses in one run where the client's
+ * `resolveTake` offered a car and the server gave nothing. Both were a bike.
+ * `resolveTake` is only the last link, so a client-side prompt drawn from it
+ * alone will always be able to promise a car that `E` answers differently -- and
+ * `main.ts.pressMount` runs the identical chain in the identical order, so what
+ * the player gets is a bike and not nothing.
+ */
+function bikeAnswersFirst(at: { x: number; z: number }, feetY: number): boolean {
+  return sim.bikes.nearestFree(at.x, feetY, at.z) !== null;
 }
 
 /**
@@ -559,6 +603,8 @@ const sweepCap = Number(process.env.TAKE_SWEEP ?? '9999');
 let took = 0;
 let skipped = 0;
 let movedOn = 0;
+let bikeFirst = 0;
+let promised = 0;
 const refused: string[] = [];
 for (const filedAs of candidates.slice(0, sweepCap)) {
   // Per flank rather than per candidate, because the four ticks the first press
@@ -577,10 +623,20 @@ for (const filedAs of candidates.slice(0, sweepCap)) {
     const at = standBeside(c, side);
     place(player, at, c.groundY, c.yaw);
     const feet = player.combat.body.position.y - EYE_HEIGHT;
+    // A bike at this point is answered before the car and correctly so. See
+    // `bikeAnswersFirst`: not a refusal, and not this section's business.
+    if (bikeAnswersFirst(at, feet)) {
+      bikeFirst++;
+      continue;
+    }
     const predicted = clientWouldTake(at.x, feet, at.z);
     pressE(player);
     const carId = player.combat.drivingCar;
     if (carId === 0) {
+      // Counted twice when the client would have promised this car, because that
+      // is the reported symptom in as many words: the pill says "E -- take the
+      // car" and the key does nothing. See `promised` below.
+      if (predicted !== 0) promised++;
       refused.push(
         `identity ${c.identity} ${side > 0 ? 'kerb' : 'road'} flank, stage ${c.stage}, ` +
           `speed ${c.speed.toFixed(2)}, range ${Math.hypot(c.x - at.x, c.z - at.z).toFixed(2)} m, ` +
@@ -602,7 +658,7 @@ for (const filedAs of candidates.slice(0, sweepCap)) {
 }
 say(
   `  ${took} take(s) granted, ${refused.length} refused, ${movedOn} had moved on, ` +
-    `${skipped} skipped for terrain`,
+    `${skipped} skipped for terrain, ${bikeFirst} answered by a bike first`,
 );
 for (const r of refused.slice(0, 12)) say(`    refused: ${r}`);
 /**
@@ -620,6 +676,25 @@ if (refused.length > Math.max(4, took * 0.05)) {
   fail(
     `${refused.length} of ${took + refused.length} presses at a re-posed car were refused. ` +
       `A couple is the pose being one tick older than the press; this many is the take refusing.`,
+  );
+}
+/**
+ * And the tighter bound on the half of those that were **promised**.
+ *
+ * A refusal where the client's own `resolveTake` came back with the identity is
+ * the reported failure exactly: the HUD offers the car and `E` does nothing.
+ * Measured at 0 to 2 per two-hundred-press sweep, and every one examined was a
+ * tick's worth of the timetable between the two calls -- `clientWouldTake` reads
+ * `Date.now()` and `tryTakeCar` reads it again inside the step, and a `TRAFFIC_HZ`
+ * tick is 16.7 ms. Two is the bound; a run of them means the two ends are asking
+ * genuinely different questions, which is what `coverBays` was.
+ */
+say(`  ${promised} of those refusals were cars the client would have promised`);
+if (promised > Math.max(2, took * 0.02)) {
+  fail(
+    `${promised} presses were refused at a car the client's own \`resolveTake\` offered. That is the ` +
+      `reported bug's shape -- the HUD promises a car and \`E\` does nothing -- and it is more than a ` +
+      `tick of the timetable between the prompt and the press.`,
   );
 }
 
