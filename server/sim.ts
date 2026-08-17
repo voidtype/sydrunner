@@ -76,7 +76,11 @@ import {
   createCarPose,
   drivenCarPose,
   forEachCarNear,
+  nearestBay,
   trafficTick,
+  createBayPose,
+  CAR_BODY_SIZE,
+  type BayPose,
   type CarPose,
   type LaneRoute,
 } from '../client/src/game/traffic.ts';
@@ -85,13 +89,20 @@ import {
 // it. See `game/driving.ts`, whose header is the design.
 import {
   CarField,
+  CAR_HEALTH_MAX,
+  MAX_DRIVEN_CARS,
+  PARK_SNAP_RADIUS,
+  PEDESTRIAN_DAMAGE,
   RUN_DOWN_SPEED,
   TAKE_HEIGHT,
   TAKE_RADIUS,
   WITNESS_RADIUS,
   bystanderSeen,
+  carCrashClosing,
+  crashDamage,
   createDrivingScratch,
   resolveTake,
+  snapToBay,
   type DrivenCar,
   type DriverView,
 } from '../client/src/game/driving.ts';
@@ -294,6 +305,7 @@ function carRecord(c: DrivenCar): CarRecord {
     z: c.z,
     yaw: c.yaw,
     speed: c.speed,
+    health: c.health,
   };
 }
 
@@ -609,7 +621,14 @@ export class Simulation {
   readonly cars = new CarField();
   /** Records that changed this tick, for `room.sendCars`. Reused; see `bikeChanges`. */
   private readonly carChanges: DrivenCar[] = [];
-  /** Ids that expired this tick, likewise. */
+  /**
+   * Ids the budget recycled this tick, likewise.
+   *
+   * This used to be "ids that expired". Nothing expires now -- see
+   * `game/driving.ts` section 6 -- so the only thing that ever lands here is a
+   * record `CarField.recycleFarthest` freed to make room for a four hundred and
+   * first theft, which is once per room per four hundred cars.
+   */
   private readonly carRemovals: number[] = [];
   private readonly carSweep: DrivenCar[] = [];
   private readonly driverViews: DriverView[] = [];
@@ -622,15 +641,26 @@ export class Simulation {
   private readonly takeScratch = createDrivingScratch();
   private readonly drivenPose: CarPose = createCarPose();
   /**
-   * When `expireCars` last ran, as a wall clock.
+   * Where every participant is, as a flat `[x, z, ...]`, for
+   * `CarField.recycleFarthest`.
    *
-   * A clock rather than a tick count because the five-minute abandonment is a
-   * wall-clock promise and `this.tick` counts steps since *this room* started --
-   * a room that fell behind for a second would keep a car alive a second longer,
-   * which is invisible, but a room restarted under a running host would restart
-   * the clock, which is not.
+   * Rebuilt only when the budget is actually reached -- which is once per room
+   * per four hundred thefts -- rather than every tick, and reused rather than
+   * allocated so the rare case is not also an allocating case.
    */
-  private carExpiryAt = Date.now();
+  private readonly recycleScratch: number[] = [];
+  /** Scratch for the bay snap when a driver gets out. See `parkOnLeave`. */
+  private readonly bayScratch: LaneRoute[] = [];
+  private readonly bayProbe: BayPose = createBayPose();
+  /**
+   * The roster the ambient traffic yields to, handed to the traffic field once a
+   * tick. See `traffic.HoldLedger`.
+   *
+   * Reused and rebuilt in place: the whole point of the ledger is that it costs
+   * nothing in a room where nobody has taken a car, and an array of four hundred
+   * object literals a tick would be the one part of it that did.
+   */
+  private readonly blockers: Array<{ x: number; y: number; z: number; halfLength: number }> = [];
   /**
    * The factions, and every investigation running against a player.
    *
@@ -2361,6 +2391,28 @@ export class Simulation {
     ) {
       return;
     }
+    // --- Make room, if the room is out of records.
+    //
+    // `game/driving.ts` section 6: cars do not despawn, so the only thing that
+    // ever frees a record is this, and it only runs on the theft that would push
+    // the room past `MAX_DRIVEN_CARS`. The rule -- never occupied, never within
+    // `RECYCLE_KEEP_RADIUS` of anybody, then farthest, then oldest -- is
+    // `CarField.recycleFarthest`'s and is checked there.
+    //
+    // A failed recycle is a failed take, and that is the correct failure: `E`
+    // does nothing, which is what pressing `E` at a car somebody else has
+    // already taken does, rather than a car being deleted out of somebody's view
+    // so that a four hundred and first one could exist.
+    if (this.cars.size >= MAX_DRIVEN_CARS) {
+      this.recycleScratch.length = 0;
+      for (const other of this.ordered) {
+        this.recycleScratch.push(other.combat.body.position.x, other.combat.body.position.z);
+      }
+      const recycled = this.cars.recycleFarthest(this.recycleScratch);
+      if (recycled === 0) return;
+      this.carRemovals.push(recycled);
+    }
+
     const car = this.cars.take(scratch.take, c.id);
     // Null means an earlier participant in this same loop took it a microsecond
     // ago -- `CarField.take` is the one place that claim is decided, exactly as
@@ -2451,20 +2503,42 @@ export class Simulation {
    *      then put through `carOverlaps`, `carHitStrength` and `applyCarHit`
    *      exactly as an ambient one is. That is the only way "a car knocks you
    *      down" can mean one thing in this game.
-   *   3. **Expiry**, at 1 Hz rather than 60, because it is a five-minute clock.
+   *   3. **The crashes**, which is new: a wall or a kerb arrives on the
+   *      combatant as `carCrashDv` (`combat.advance` filled it), car against car
+   *      is decided here because it is the one collision that needs two records,
+   *      and both go through `CarField.damage` so the cooldown has one owner.
+   *   4. **The clocks**, every tick. What used to be a 1 Hz expiry sweep is now
+   *      `CarField.age`, which removes nothing -- see `game/driving.ts` section
+   *      6, where the five-minute abandonment became a budget.
    *
-   * O(driven cars), and driven cars are counted in ones. The knockdown's inner
-   * loop is O(driven cars x participants) at spec 2's sixteen-player cap, which
-   * at a plausible three stolen cars is 48 box tests a tick -- against the
-   * `carHitting` phase above, which is sixteen broadphase queries over a fleet
-   * of thousands.
+   * O(driven cars), and driven cars are now counted in hundreds rather than in
+   * ones -- the budget is `MAX_DRIVEN_CARS`. Every sweep here was already
+   * O(records) with a handful of adds each, and the two that are not (the
+   * knockdown and the car-against-car test) are gated on a car being *occupied
+   * and moving*, which is bounded by the sixteen-player cap however many wrecks
+   * are standing around the city.
    */
   private stepCars(): void {
+    // The blocker roster is published even when it is empty, because "empty"
+    // is the signal that puts `HoldLedger.live` back to false and lets every
+    // ambient car in Sydney skip the hold in one comparison. Doing it before the
+    // early-out below is what makes the last car being recycled actually release
+    // the traffic that was queued behind it.
+    this.publishBlockers();
     if (this.cars.size === 0) return;
 
     this.driverViews.length = 0;
     for (const p of this.ordered) {
       const c = p.combat;
+      // **The health mirror, pushed in before anything reads it.** See
+      // `combat.CombatantState.carHealth`: `combat.advance` needs to know how
+      // wrecked the car is and cannot reach a `CarField`, so the owner of the
+      // field puts the number where the integrator can see it. One tick stale by
+      // construction, which is 17 ms of the wrong top speed on the tick a car is
+      // written off.
+      c.carHealth = c.drivingCar === 0
+        ? CAR_HEALTH_MAX
+        : this.cars.get(c.drivingCar)?.health ?? CAR_HEALTH_MAX;
       this.driverViews.push({
         id: c.id,
         drivingCar: c.drivingCar,
@@ -2475,7 +2549,64 @@ export class Simulation {
         yaw: c.body.yaw,
       });
     }
+
+    // --- What everybody drove into. Drained before `follow`, because a crash
+    // that killed the driver has already cleared `drivingCar` and the sweep is
+    // about to leave the car in the road -- and the wall still happened.
+    for (const p of this.ordered) {
+      const c = p.combat;
+      const dv = c.carCrashDv;
+      c.carCrashDv = 0;
+      if (dv <= 0 || c.drivingCar === 0) continue;
+      const cost = crashDamage(dv);
+      if (cost <= 0) continue;
+      const car = this.cars.damage(c.drivingCar, cost);
+      if (car !== null) this.carChanges.push(car);
+    }
+
+    // --- And into each other. The only collision in this game that needs two
+    // records, which is why it is here and not in `combat.advance` with the
+    // other half of the detection.
+    //
+    // Gated on the outer car being **occupied and moving**, so the loop is
+    // O(drivers x records) and not O(records^2): a room at the four-hundred-car
+    // budget with sixteen players driving is 6,400 plan-distance tests a tick,
+    // and a room where every car is parked is zero. `carCrashClosing` is four
+    // multiplies before its own early-out.
+    for (const car of this.cars.all()) {
+      if (car.driverId === 0) continue;
+      const speed = car.speed < 0 ? -car.speed : car.speed;
+      if (speed <= 0.5) continue;
+      const size = CAR_BODY_SIZE[car.body] ?? CAR_BODY_SIZE[0];
+      const half = size.length * 0.5;
+      for (const other of this.cars.all()) {
+        if (other === car) continue;
+        // The vertical gate, `carOverlaps`' own: a car on the Cahill Expressway
+        // is not in the car on Alfred Street eight metres below it.
+        const dy = other.y - car.y;
+        if (dy > TAKE_HEIGHT || dy < -TAKE_HEIGHT) continue;
+        const otherSize = CAR_BODY_SIZE[other.body] ?? CAR_BODY_SIZE[0];
+        const closing = carCrashClosing(
+          { x: car.x, z: car.z, yaw: car.yaw, speed: car.speed, halfLength: half },
+          { x: other.x, z: other.z, yaw: other.yaw, speed: other.speed, halfLength: otherSize.length * 0.5 },
+        );
+        if (closing <= 0) continue;
+        // **Both of them**, which is the brief's word and is also the only
+        // answer that does not need a rule about who was at fault. The cooldown
+        // on each record is what stops the two of them trading damage every
+        // tick they stay tangled.
+        const cost = crashDamage(closing);
+        const a = this.cars.damage(car.id, cost);
+        if (a !== null) this.carChanges.push(a);
+        const b = this.cars.damage(other.id, cost);
+        if (b !== null) this.carChanges.push(b);
+      }
+    }
+
     for (const car of this.cars.follow(this.driverViews, this.carSweep)) {
+      // A car whose driver has just got out (or been thrown out) is snapped into
+      // a kerb bay if it stopped beside one. See `parkOnLeave`.
+      this.parkOnLeave(car);
       this.carChanges.push(car);
     }
 
@@ -2525,7 +2656,15 @@ export class Simulation {
         const hit = runDownPedestrian(
           this.world.peds, pose, car.driverId, tick, this.pedBands, this.pedPose,
         );
-        if (hit !== null) offended = true;
+        if (hit !== null) {
+          offended = true;
+          // Two hp, and cosmetic on purpose -- see `driving.PEDESTRIAN_DAMAGE`.
+          // Through the same `damage` call the walls use, so the same cooldown
+          // applies and a car driven through a crowd collects one dent per half
+          // second rather than one per body.
+          const scuffed = this.cars.damage(car.id, PEDESTRIAN_DAMAGE);
+          if (scuffed !== null) this.carChanges.push(scuffed);
+        }
       }
 
       // Unconditional, unlike the theft: `REASON.CAR_THEFT` needs a witness
@@ -2534,30 +2673,78 @@ export class Simulation {
       if (offended) reportCrime(car.driverId, REASON.DANGEROUS_DRIVING);
     }
 
-    // --- Expiry, at 1 Hz. See `carExpiryAt`.
-    const now = Date.now();
-    const elapsed = now - this.carExpiryAt;
-    if (elapsed >= 1000) {
-      this.carExpiryAt = now;
-      for (const id of this.cars.expire(elapsed, (car) => this.nearestPersonTo(car.x, car.z), this.carRemovals)) {
-        // Nothing else to undo. The ambient car was only ever *suppressed* --
-        // see `game/driving.ts` section 3 -- so removing the record is the whole
-        // of putting it back on its timetable.
-        void id;
-      }
-    }
+    // --- The clocks, every tick. **Nothing expires.** See `CarField.age` and
+    // `game/driving.ts` section 6: what this used to be was a 1 Hz sweep looking
+    // for cars to delete, and what it is now is the empty-clock that breaks the
+    // recycling tie and the crash cooldown that stops a scrape being fatal.
+    // Every tick rather than every second because the cooldown is half a second
+    // and a 1 Hz decrement cannot express it.
+    this.cars.age(1000 / TICK_HZ);
   }
 
-  /** Plan distance from the nearest participant to a point. `expire`'s gate. */
-  private nearestPersonTo(x: number, z: number): number {
-    let best = Infinity;
-    for (const p of this.ordered) {
-      const dx = p.combat.body.position.x - x;
-      const dz = p.combat.body.position.z - z;
-      const d2 = dx * dx + dz * dz;
-      if (d2 < best) best = d2;
+  /**
+   * Hand the driven records to the traffic field, so the ambient fleet yields to
+   * them. See `traffic.HoldLedger`.
+   *
+   * Every record and not only the moving ones, which is the whole feature: the
+   * thing traffic has to queue behind is the Camry somebody **left** in the
+   * lane, and a car with a driver in it is a car that will move on its own. The
+   * occupied ones are in the roster too because a player who has stopped at a
+   * green light is just as much an obstruction as one who got out.
+   *
+   * Rebuilt in place into `this.blockers`, which is grown once and reused: this
+   * runs every tick over up to `MAX_DRIVEN_CARS` records and the array is the
+   * only thing that could allocate.
+   */
+  private publishBlockers(): void {
+    const cars = this.cars.all();
+    let n = 0;
+    for (const car of cars) {
+      const size = CAR_BODY_SIZE[car.body] ?? CAR_BODY_SIZE[0];
+      const slot = this.blockers[n];
+      if (slot === undefined) {
+        this.blockers.push({ x: car.x, y: car.y, z: car.z, halfLength: size.length * 0.5 });
+      } else {
+        slot.x = car.x;
+        slot.y = car.y;
+        slot.z = car.z;
+        slot.halfLength = size.length * 0.5;
+      }
+      n++;
     }
-    return best === Infinity ? Infinity : Math.sqrt(best);
+    this.blockers.length = n;
+    this.world.traffic.held.setBlockers(this.blockers);
+  }
+
+  /**
+   * A car whose driver has just got out, snapped into the kerb bay beside it if
+   * there is one within reach.
+   *
+   * The brief's second clause: "a car you leave in a parking bay is a parked
+   * car, not a car in the middle of the lane". Without it, getting out beside a
+   * bay leaves the car wherever the *body* was standing when the sweep ran --
+   * which is a metre and a half out from the gutter at whatever angle the driver
+   * happened to be looking, and reads as abandoned rather than as parked.
+   *
+   * The bays are `pipeline/sydney/bays.py`'s, read out of the sidecar by
+   * `traffic.nearestBay`, so this cannot invent a parking spot: it is the same
+   * ledger the ambient fleet parks in, which is what stops a player's car being
+   * snapped on top of one of the 23,020 static ones.
+   *
+   * `PARK_SNAP_RADIUS` is the brief's 3 m, and it is a *snap* rather than a pull
+   * -- a car left in the middle of the road stays exactly where it was left,
+   * because the whole point of the other half of this feature is that the
+   * traffic yields to it.
+   */
+  private parkOnLeave(car: DrivenCar): void {
+    if (car.driverId !== 0) return;
+    const found = nearestBay(this.world.traffic, car.x, car.z, PARK_SNAP_RADIUS, this.bayScratch, this.bayProbe);
+    // Two calls and no arithmetic here: the *geometry* of finding a bay is
+    // `traffic.nearestBay`'s and is asserted in `verifyTraffic`, and the *rule*
+    // about what to do with one is `driving.snapToBay`'s and is asserted in
+    // `verifyDriving`. `main.ts`' offline sweep runs the identical pair, which
+    // is what makes `?offline` the same feature rather than a second one.
+    snapToBay(car, found ? this.bayProbe : null);
   }
 
   // --- Trains ---------------------------------------------------------------------

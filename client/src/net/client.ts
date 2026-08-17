@@ -1375,6 +1375,12 @@ export class NetClient {
             yaw: r.yaw,
             speed: r.speed,
             driverId: r.driver,
+            // The crash damage. Authoritative and unconditional -- see
+            // `driving.CarField.adopt`: this is the line that corrects a
+            // driver's own prediction of how hard they hit the wall, and a
+            // client that kept the kinder of the two numbers would be a client
+            // that repaired its car by mispredicting.
+            health: r.health,
           });
         }
         // Which car the server thinks *this* client is in. Derived rather than

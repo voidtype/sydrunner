@@ -60,10 +60,19 @@
  * a 180 m radius is not a thing that exists.
  */
 
-import { CAR_BODY_SIZE, createCarPose, drivenCarPose, type CarPose } from '../game/traffic.ts';
-import { DRIVE_TOP_SPEED, type CarField } from '../game/driving.ts';
+import {
+  CAR_BODY_SIZE,
+  createCarPose,
+  drivenCarPose,
+  forEachCarNear,
+  type CarPose,
+  type LaneRoute,
+  type TrafficField,
+} from '../game/traffic.ts';
+import { CAR_HEALTH_MAX, DRIVE_TOP_SPEED, carIsSmoking, type CarField } from '../game/driving.ts';
 import type { DrivenCarSource } from './cars.ts';
 import type { CarLights } from './nightlights.ts';
+import type { CarSmoke } from './carsmoke.ts';
 
 /** Where a driver's body is this frame, filled by the caller. */
 export interface DriverPose {
@@ -167,6 +176,26 @@ export class DrivenCarView {
      * same paragraph.
      */
     private readonly localCar: () => number,
+    /**
+     * Is a car standing here close enough to be worth drawing? Optional, and
+     * absent means "everything", which is what every caller written before the
+     * budget meant and is still true of `verifyDrivenCars`.
+     *
+     * **This exists because cars stopped despawning.** The field used to hold
+     * the two or three cars a room had stolen in the last five minutes and this
+     * loop could walk all of them; `game/driving.MAX_DRIVEN_CARS` is now 400,
+     * spread over sixty kilometres of Sydney, and posing every one of them
+     * twice a frame is eight hundred `Math.sin`/`Math.cos` pairs to place cars
+     * in Penrith that nobody can see.
+     *
+     * The gate is on the **record's** stored position, before `drivenCarPose`
+     * runs, so a car out of range costs one subtract and one compare. And it is
+     * the *record's* position on purpose, not the driver's: a remote driver
+     * whose car is beyond the gate is beyond it either way, and reaching for
+     * their interpolated pose to decide whether to reach for their interpolated
+     * pose is a question that answers itself.
+     */
+    private readonly near: (x: number, z: number) => boolean = () => true,
   ) {
     this.source = { forEach: (visit) => this.forEach(visit) };
     this.claims = (visit) => this.forEach(visit);
@@ -184,6 +213,17 @@ export class DrivenCarView {
   private forEach(visit: (pose: CarPose) => void): void {
     let n = 0;
     for (const car of this.field().all()) {
+      // The range gate, before the pose. See the `near` constructor argument:
+      // the field holds up to four hundred records spread over the whole city
+      // now that cars no longer despawn, and this is what stops the draw loop
+      // paying for the ones in Penrith.
+      //
+      // **On the record's own coordinates**, which for an *occupied* car are as
+      // stale as the last `MSG.CARS` -- and that is fine at this radius: a car
+      // whose record is 400 m away and whose driver has since crossed into range
+      // is a car whose driver is doing 22 m/s and will be re-broadcast within
+      // the second. The gate is generous for exactly this reason.
+      if (!this.near(car.x, car.z)) continue;
       const out = this.pose;
       drivenCarPose(car, out);
       const mine = car.id === this.localCar();
@@ -216,13 +256,40 @@ export class DrivenCarView {
    * Every driven car gets its brake test; only the local one gets the camera,
    * because the camera is the local player's.
    */
-  update(lights: CarLights, localCar: number, localSpeed: number, steer: number, dt: number): void {
+  update(
+    lights: CarLights,
+    localCar: number,
+    localSpeed: number,
+    steer: number,
+    dt: number,
+    /**
+     * The plume rig, or null. Optional so `verifyDrivenCars` and any caller
+     * written before the crash damage keeps working.
+     *
+     * Fed from inside *this* walk rather than from a pass of its own, on
+     * `TrafficMovers.lights`' argument exactly: this loop already computes the
+     * exact on-screen pose of every driven car, and a second pass that had to
+     * agree with it is how a plume ends up hanging over an empty parking space.
+     */
+    smoke: CarSmoke | null = null,
+    /** Where the view is, for the plume's billboard. Ignored when `smoke` is null. */
+    cameraX = 0,
+    cameraY = 0,
+    cameraZ = 0,
+  ): void {
     lights.beginBrakes();
+    if (smoke !== null) smoke.begin(dt, cameraX, cameraY, cameraZ);
     const live = new Set<number>();
     this.forEach((pose) => {
       // The identity is the source car's -- see `drivenCarPose` -- which is what
       // keys this map, and is stable for the life of the record.
       live.add(pose.identity);
+      // --- The plume, before the brake test, because a wreck standing at a kerb
+      // fails every clause of that test and still has to smoke. Handed *every*
+      // driven car: `CarSmoke.add` grades the pose through `driving.damageGrade`
+      // and returns immediately for anything that is not smoking, so the
+      // threshold lives in one place rather than here as well.
+      if (smoke !== null) smoke.add(pose);
       const was = this.lastSpeed.get(pose.identity);
       // `pose.speed` is a magnitude, which is exactly what the deceleration test
       // wants: shedding speed reads the same whichever way the car is pointing.
@@ -237,6 +304,7 @@ export class DrivenCarView {
       lights.addBrake(this.brakeFrom(pose));
     });
     lights.endBrakes();
+    if (smoke !== null) smoke.end();
     // A record that has gone -- expired, or its ambient car handed back -- takes
     // its history with it, or this map is a slow leak keyed on every car anybody
     // in the session ever stole.
@@ -310,6 +378,161 @@ export function speedText(metresPerSecond: number): string {
   return `${kmh} km/h`;
 }
 
+// --- The horn a car gives somebody standing in front of it ------------------------
+
+/**
+ * How long a player has to stand in a lane before the car behind them leans on
+ * the horn, seconds. The brief's 1.
+ *
+ * A dwell rather than an edge, and that is the whole design: an ambient car
+ * passes within a few metres of somebody on a footpath a dozen times a minute in
+ * town, and a horn on proximity would be the city permanently beeping. What is
+ * being detected is a *person standing in the road*, which is a thing that takes
+ * a second to establish.
+ */
+export const HONK_DWELL = 1;
+
+/** How far in front of a car counts as "in front of it", metres. */
+const HONK_REACH = 9;
+/** And how far to either side. A lane, near enough. See `traffic.HOLD_LANE_HALF`. */
+const HONK_HALF_WIDTH = 2.4;
+/** How slow a car has to be to be *stuck* rather than simply approaching, m/s. */
+const HONK_MAX_SPEED = 3;
+/** How long after a honk before the same street is allowed another, seconds. */
+const HONK_COOLDOWN = 4;
+
+/**
+ * Whether an ambient car is currently leaning on its horn at you.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS IS CLIENT-SIDE AND WHY THAT IS NOT A COMPROMISE.
+ *
+ * A horn is a sound and nothing else. It applies no damage, moves nothing,
+ * reports no crime and appears in no snapshot -- so the only thing that has to
+ * be true of it is that *you* hear it when a car is stuck behind *you*, and the
+ * client is the only process that knows where your ears are. Putting it on the
+ * server would mean a message id, an interest test and a wire field for an event
+ * whose entire consequence is one 0.4 s parp. `game/traffic.ts`'s header makes
+ * the same argument about the ambient fleet in general: zero bandwidth, because
+ * both ends can evaluate the same lookup.
+ *
+ * The rule, and each clause is a case that would otherwise fire wrongly:
+ *
+ *   - the car has to be **near-stationary** (`HONK_MAX_SPEED`), because a car
+ *     doing 14 m/s toward you is not stuck behind you, it is about to run you
+ *     over, and `traffic.applyCarHit` has that covered;
+ *   - you have to be **ahead of it and in its lane**, or every car on the
+ *     opposite carriageway honks at a pedestrian on the median;
+ *   - you have to have been there for `HONK_DWELL`, so walking across a street
+ *     in front of a car at a red is silent;
+ *   - and one honk resets a cooldown, because the state persists for as long as
+ *     you stand there and an un-cooled version is sixty horns a second.
+ *
+ * The dwell is a single scalar rather than a per-car map, deliberately: what is
+ * being timed is *the player standing still in a lane*, not any particular car's
+ * patience, and a map keyed on identity would have to be evicted and would honk
+ * afresh every time the queue shuffled.
+ */
+export class HonkWatch {
+  /** Seconds the player has been standing in front of a stopped car. */
+  private dwell = 0;
+  /** Seconds until the next horn is allowed. */
+  private cooldown = 0;
+
+  /**
+   * Advance, and return true on the frame a horn should sound.
+   *
+   * `scratch` and `pose` are the caller's, on `forEachCarNear`'s contract: this
+   * runs every frame and must allocate nothing.
+   */
+  update(
+    field: TrafficField,
+    x: number,
+    z: number,
+    tick: number,
+    dt: number,
+    onFoot: boolean,
+    scratch: LaneRoute[],
+    pose: CarPose,
+  ): boolean {
+    if (this.cooldown > 0) this.cooldown -= dt;
+    if (!onFoot) {
+      // In a car or on a bike you are traffic, not an obstruction. The dwell is
+      // reset rather than frozen so getting out again starts the clock afresh.
+      this.dwell = 0;
+      return false;
+    }
+
+    let blocking = false;
+    forEachCarNear(field, x, z, HONK_REACH, tick, scratch, pose, (p) => {
+      if (p.speed > HONK_MAX_SPEED) return;
+      // Am I in front of this car? `(dx, dz)` is its heading and left of it is
+      // `(dz, -dx)`, which is `carOverlaps`' own frame and `lanes.py`'s.
+      const rx = x - p.x;
+      const rz = z - p.z;
+      const ahead = rx * p.dx + rz * p.dz;
+      if (ahead <= 0 || ahead > HONK_REACH) return;
+      const across = rx * p.dz - rz * p.dx;
+      if (across > HONK_HALF_WIDTH || across < -HONK_HALF_WIDTH) return;
+      // A car in one of its parked stages is furniture and does not honk at
+      // anybody -- it is not going anywhere. `carHitStrength` filters the same
+      // two stages for the same reason one file over.
+      if (p.stage === 0 || p.stage === 4) return;
+      blocking = true;
+      return true;
+    });
+
+    if (!blocking) {
+      this.dwell = 0;
+      return false;
+    }
+    this.dwell += dt;
+    if (this.dwell < HONK_DWELL || this.cooldown > 0) return false;
+    this.cooldown = HONK_COOLDOWN;
+    return true;
+  }
+
+  /** How long the player has been in the way. The dev overlay. */
+  get standing(): number {
+    return this.dwell;
+  }
+}
+
+// --- The car's own health bar -----------------------------------------------------
+
+/**
+ * The inline `width` of the car-health bar's fill, as the HUD wants it.
+ *
+ * A pure function so `verifyDrivenCars` can assert it at boot, on
+ * `hud.ballBlockWidth`'s hard-won argument: that function exists because a
+ * width written into the DOM outranks any class rule and can only be taken back
+ * by another write, and the bug it was written for shipped and was played for a
+ * session. The same trap is here -- a bar painted at 1 % by a mispredicted crash
+ * and never repainted because the server agreed with the *health* while the
+ * width was already wrong -- so the width is computed from the state every
+ * frame and there is no "set" and no "clear".
+ */
+export function carHealthWidth(health: number): string {
+  const k = health <= 0 ? 0 : health >= CAR_HEALTH_MAX ? 1 : health / CAR_HEALTH_MAX;
+  return `${Math.round(k * 100)}%`;
+}
+
+/**
+ * Which band the bar is in, as a class name: `''`, `'dented'` or `'wrecked'`.
+ *
+ * Three names rather than a colour ramp, because the HUD in this project is
+ * "four rectangles and a dot" (see `client/index.html`) and a continuously
+ * interpolated bar would be the only gradient in it. The three names are the
+ * three bands `game/driving.ts` already defines, so the bar changes colour on
+ * exactly the health at which the car starts to smoke -- which is the moment the
+ * *behaviour* changes, and is therefore the only moment worth marking.
+ */
+export function carHealthClass(health: number): string {
+  if (health <= 0) return 'wrecked';
+  if (carIsSmoking(health)) return 'dented';
+  return '';
+}
+
 /**
  * What this catches that a typecheck cannot.
  *
@@ -346,6 +569,50 @@ export function verifyDrivenCars(): string[] {
   }
   // The lamps have to fit on the bodies they are hung off.
   if (CAR_BODY_SIZE.length === 0) failures.push('There are no car body sizes to hang a brake lamp on.');
+
+  // --- The car-health bar. `hud.ballBlockWidth`'s trap, one feature over: a
+  //     width is written into the DOM and only another write can take it back,
+  //     so the ends have to be exact or a full bar is painted at 99 % forever
+  //     and a written-off one keeps a sliver.
+  if (carHealthWidth(CAR_HEALTH_MAX) !== '100%') {
+    failures.push(`An undamaged car's bar is "${carHealthWidth(CAR_HEALTH_MAX)}", not full.`);
+  }
+  if (carHealthWidth(0) !== '0%') failures.push(`A written-off car's bar is "${carHealthWidth(0)}", not empty.`);
+  if (carHealthWidth(CAR_HEALTH_MAX * 2) !== '100%') failures.push('A health above the maximum overflowed the bar.');
+  if (carHealthWidth(-5) !== '0%') failures.push('A negative health gave the bar a negative width.');
+  if (carHealthWidth(CAR_HEALTH_MAX / 2) !== '50%') failures.push('A half-wrecked car\'s bar is not half full.');
+  // The three bands, and the middle one starting exactly where the smoke does.
+  if (carHealthClass(CAR_HEALTH_MAX) !== '') failures.push('An undamaged car\'s bar is not in the plain band.');
+  if (carHealthClass(0) !== 'wrecked') failures.push('A write-off\'s bar is not in the wrecked band.');
+  if (carHealthClass(CAR_HEALTH_MAX * 0.5) !== '') {
+    failures.push('A car on half health is in the dented band; the bar changes colour when the smoke starts, not before.');
+  }
+  if (!carIsSmoking(30) || carHealthClass(30) !== 'dented') {
+    failures.push('A smoking car\'s bar is not in the dented band. The two thresholds have drifted apart.');
+  }
+
+  // --- The horn. Nothing here needs a `TrafficField`, which is the point of
+  //     testing the *dwell* rather than the geometry: the geometry is
+  //     `forEachCarNear`'s and is checked in `verifyTraffic`, and what this
+  //     catches is a horn that goes off the instant a car appears, or one that
+  //     never stops.
+  {
+    const watch = new HonkWatch();
+    // No field, so nothing is ever blocking: the dwell must never start.
+    const empty = { near: () => [] } as unknown as TrafficField;
+    const scratch: LaneRoute[] = [];
+    const pose = createCarPose();
+    for (let i = 0; i < 300; i++) {
+      if (watch.update(empty, 0, 0, i, 1 / 60, true, scratch, pose)) {
+        failures.push('A horn sounded on an empty street.');
+        break;
+      }
+    }
+    if (watch.standing !== 0) failures.push(`Standing on an empty street accrued ${watch.standing} s of dwell.`);
+    if (!(HONK_DWELL > 0 && HONK_DWELL < 5)) {
+      failures.push(`HONK_DWELL is ${HONK_DWELL} s, which is not "somebody is standing in the road".`);
+    }
+  }
 
   return failures;
 }

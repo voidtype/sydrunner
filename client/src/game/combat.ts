@@ -204,7 +204,7 @@ import { shapeRideInput } from './bikes.ts';
 // The cars, on exactly the bikes' terms one line up: the *rules* half, three-free,
 // run by the server and the browser and `net/client.reconcile`'s replay from one
 // file. See `game/driving.ts`.
-import { shapeDriveInput, stepCarSpeed } from './driving.ts';
+import { CAR_HEALTH_MAX, crashFromClamp, shapeDriveInput, stepCarSpeed } from './driving.ts';
 // The wading rule. A pure module with no import of its own -- see its header for
 // why the water level reaches both ends of the wire without going over it.
 import {
@@ -495,6 +495,34 @@ export interface CombatantState {
    */
   carSpeed: number;
   /**
+   * The condition of that car, 0..`driving.CAR_HEALTH_MAX`. See
+   * `driving.DriveState.carHealth`, which is the same field and carries the
+   * argument for why it is here rather than read off the record.
+   *
+   * The short version: `advance` runs `stepCarSpeed`, a damaged car is slower,
+   * and `advance` has no way to reach a `CarField` -- importing one would put
+   * `game/combat.ts` in `game/driving.ts`'s import graph and close the cycle
+   * that file's structural `DriveState` exists to keep open. So the owner of the
+   * field pushes the number in once a tick, on both ends.
+   *
+   * Full for anybody on foot, and `stepCarSpeed` does not read it then.
+   */
+  carHealth: number;
+  /**
+   * Metres per second of speed the last driving step lost to a collision.
+   *
+   * A **one-tick outbox**: `advance` writes it (the nose probe's return plus
+   * `driving.crashFromClamp`'s), and the car sweep at the end of the tick reads
+   * it, turns it into health off the record through `driving.crashDamage`, and
+   * zeroes it. It lives here rather than being returned from `advance` because
+   * `advance` has four call sites across two processes and three of them do not
+   * care, and because a crash detected during `net/client.reconcile`'s replay
+   * must be able to arrive at the same place as one detected live.
+   *
+   * Zero on almost every tick of almost every session.
+   */
+  carCrashDv: number;
+  /**
    * Whether this combatant has found the tuning stall in Redfern this session.
    *
    * Per session and never persisted, on spec 12's terms. It is on the combatant
@@ -683,6 +711,11 @@ export function createCombatant(id: number, x = 0, z = 0): CombatantState {
     // And not in a car. See `drivingCar`: `game/driving.ts` owns the meaning.
     drivingCar: 0,
     carSpeed: 0,
+    // Undamaged rather than zero, because zero means *written off* on this
+    // scale and a combatant on foot would otherwise be carrying a wreck around
+    // waiting for the first car they get into to inherit a dead engine.
+    carHealth: CAR_HEALTH_MAX,
+    carCrashDv: 0,
     // On foot. See `CombatantState.aboard`: the record is allocated here once
     // and mutated forever after, never replaced.
     aboard: createAboardSlot(),
@@ -840,6 +873,12 @@ export function advance(
     // just gone through the windscreen belongs.
     c.drivingCar = 0;
     c.carSpeed = 0;
+    // And the two fields that hang off the car: the mirrored condition back to
+    // full, so the next car this combatant gets into is not born a wreck, and
+    // the crash outbox emptied, so an impact detected on the tick they came out
+    // is not billed to a car they are no longer in. See `carHealth`/`carCrashDv`.
+    c.carHealth = CAR_HEALTH_MAX;
+    c.carCrashDv = 0;
     ragdollStep(c, dt, world);
     // Look is left alone. A dead camera that will not turn reads as a crash.
     // Clamped here rather than trusted, because this is the one path that does
@@ -1001,7 +1040,13 @@ export function advance(
   // `controller.step` directly and deliberately does **not** re-integrate, which
   // is `shapeDriveInput`'s header. It is handed `movement` rather than `input`
   // so a flinch takes the throttle away exactly as it takes the walk away.
-  stepCarSpeed(
+  //
+  // The return is the speed the nose probe took off the car, which is the first
+  // half of the crash detection. It is *added* to the outbox rather than
+  // assigned, so a tick where the bonnet hit a wall and the capsule was then
+  // clamped by the same wall reports both -- see `carCrashDv`, and
+  // `crashFromClamp` below for the second half.
+  c.carCrashDv += stepCarSpeed(
     c,
     movement,
     dt,
@@ -1054,6 +1099,21 @@ export function advance(
       c.body.onGround = true;
     }
   }
+
+  // --- The other half of the crash detection, and it has to be here because it
+  // is a question about where the step *landed* -- the same reason the wading
+  // clause above it is here.
+  //
+  // `controller.step` resolves the driver's capsule against the prisms and
+  // simply puts the body somewhere else; the car's scalar knows nothing about
+  // it. `crashFromClamp` compares the distance actually covered against the
+  // distance the speed promised, calls the shortfall an impact, and takes it off
+  // the car. See its header for why the tolerance is not zero.
+  //
+  // Below the wading undo, deliberately: a player who was pushed back out of
+  // deep water did not crash into anything, and measuring before the undo would
+  // charge them for a wave.
+  c.carCrashDv += crashFromClamp(c, c.body.position.x - fromX, c.body.position.z - fromZ, dt);
 
   return events;
 }
@@ -1327,6 +1387,12 @@ export function applyWorldDamage(c: CombatantState, pips: number): boolean {
   c.ridingBike = 0;
   c.drivingCar = 0;
   c.carSpeed = 0;
+  // And the two fields that hang off the car: the mirrored condition back to
+  // full, so the next car this combatant gets into is not born a wreck, and
+  // the crash outbox emptied, so an impact detected on the tick they came out
+  // is not billed to a car they are no longer in. See `carHealth`/`carCrashDv`.
+  c.carHealth = CAR_HEALTH_MAX;
+  c.carCrashDv = 0;
   return true;
 }
 
@@ -1397,6 +1463,12 @@ export function applyHit(attacker: CombatantState, victim: CombatantState, out?:
   // above gives.
   victim.drivingCar = 0;
   victim.carSpeed = 0;
+  // And the two fields that hang off the car: the mirrored condition back to
+  // full, so the next car this combatant gets into is not born a wreck, and
+  // the crash outbox emptied, so an impact detected on the tick they came out
+  // is not billed to a car they are no longer in. See `carHealth`/`carCrashDv`.
+  victim.carHealth = CAR_HEALTH_MAX;
+  victim.carCrashDv = 0;
 
   const ko = victim.health <= 0;
   if (ko) {
@@ -1458,6 +1530,12 @@ export function respawnAt(c: CombatantState, x: number, y: number, z: number, ya
   // holding it would drag it across Redfern.
   c.drivingCar = 0;
   c.carSpeed = 0;
+  // And the two fields that hang off the car: the mirrored condition back to
+  // full, so the next car this combatant gets into is not born a wreck, and
+  // the crash outbox emptied, so an impact detected on the tick they came out
+  // is not billed to a car they are no longer in. See `carHealth`/`carCrashDv`.
+  c.carHealth = CAR_HEALTH_MAX;
+  c.carCrashDv = 0;
   // Spec 8.3 says nothing about death, and the only defensible reading is that
   // a coffee does not survive a knockout. Keeping them would make dying with 40
   // seconds of Training left a *cheap* way to reposition; clearing them makes

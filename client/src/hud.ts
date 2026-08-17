@@ -355,6 +355,25 @@ export interface VitalsState {
    * is what stops a third one being a change in two files.
    */
   effects: ReadonlyArray<{ name: string; seconds: number }>;
+  /**
+   * The condition of the car being driven, as a width and a band -- or null for
+   * anybody on foot, which collapses the row.
+   *
+   * **A width and a class rather than a number**, which is deliberate and is
+   * `ballBlockWidth`'s lesson applied before the bug rather than after it: the
+   * two are computed by pure functions in `world/drivencars.ts`
+   * (`carHealthWidth`, `carHealthClass`) that `verifyDrivenCars` asserts at
+   * boot, so the DOM write in this file has no arithmetic in it at all. The
+   * failure that function exists to prevent -- a bar painted at 1 % by a
+   * mispredicted frame and never repainted -- is exactly available here, because
+   * a crash is predicted by the driver's client and corrected by the next
+   * `MSG.CARS`.
+   *
+   * Under the speed readout, which is the `DRIVING - 79 km/h` chip in `effects`
+   * above it: the brief asked for it there, and the reason it is right is that a
+   * bar with no label is only legible next to the thing it is about.
+   */
+  carHealth: { width: string; band: string } | null;
 }
 
 const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
@@ -485,6 +504,8 @@ export class Hud {
   private readonly pips = document.getElementById('pips')!;
   private readonly staminaBar = document.getElementById('stamina')!;
   private readonly ballBar = document.getElementById('balls')!;
+  /** The car's condition, under the bars. Hidden unless somebody is driving. */
+  private readonly carBar = document.getElementById('carhealth')!;
   private readonly effects = document.getElementById('effects')!;
   /**
    * The dollar balance, above the pips. See `money`.
@@ -1017,6 +1038,30 @@ export class Hud {
       const seconds = s.effects[i].seconds;
       this.effectEls[i].textContent =
         seconds > 0 ? `${s.effects[i].name} ${Math.ceil(seconds)}` : s.effects[i].name;
+    }
+
+    // --- The car's condition, under the bars and under the speed chip.
+    //
+    // Written from the state every frame with **no arithmetic here at all** --
+    // `world/drivencars.carHealthWidth` and `carHealthClass` are pure functions
+    // that `verifyDrivenCars` asserts at boot. That split is `ballBlockWidth`'s
+    // lesson taken before the bug rather than after it: an inline width outranks
+    // every class rule and can only be taken back by another write, so the write
+    // must happen every frame and the number in it must be checkable somewhere
+    // that is not a running game.
+    //
+    // Display, not a class, for the collapse: the row has a child so `:empty`
+    // cannot reach it, and a bar that reserved its own height while the player
+    // was on foot would move the pips up and down every time somebody got out of
+    // a car.
+    const car = s.carHealth;
+    if (car === null) {
+      if (this.carBar.style.display !== 'none') this.carBar.style.display = 'none';
+    } else {
+      if (this.carBar.style.display === 'none') this.carBar.style.display = '';
+      if (this.carBar.className !== car.band) this.carBar.className = car.band;
+      const fill = this.carBar.firstElementChild as HTMLElement | null;
+      if (fill) fill.style.width = car.width;
     }
 
     if (s.respawnIn > 0) {

@@ -101,6 +101,16 @@ import {
   type TrafficField,
 } from '../game/traffic.ts';
 import { policeLiveried } from '../game/factions.ts';
+// The dents, graded once in the three-free rules file so the four systems that
+// draw a damaged car cannot disagree about what "dented" means. See
+// `game/driving.damageGrade`.
+import {
+  CRUMPLE_HEIGHT,
+  CRUMPLE_LENGTH,
+  CRUMPLE_WIDTH,
+  createDamageGrade,
+  damageGrade,
+} from '../game/driving.ts';
 import type { CarLightSink } from './nightlights.ts';
 import type { CarModelSink } from './carlod.ts';
 
@@ -1007,6 +1017,59 @@ export interface DrivenCarSource {
   forEach(visit: (pose: CarPose) => void): void;
 }
 
+// --- Dents ------------------------------------------------------------------------
+
+/**
+ * The deformation and the tint, drawn straight out of `game/driving.damageGrade`.
+ *
+ * **A non-uniform scale and a paint multiply, and nothing else**, and that is the
+ * whole design of the dents. The alternatives were a second geometry per body
+ * per damage band (five bodies times three bands is fifteen sets of geometry for
+ * an effect two or three cars in a room ever show) and a vertex shader that
+ * displaced the panels (a second pipeline, on a material shared with 875,000
+ * static cars). This is three multiplies inside a `compose` the fill loop was
+ * doing anyway, and it costs the ambient fleet exactly nothing because their
+ * damage is a hard zero.
+ *
+ * **The numbers are not this file's**, and that is load-bearing rather than
+ * tidy. Four systems draw a damaged car -- this one, `world/carlod.ts`,
+ * `world/nightlights.ts` and `world/carsmoke.ts` -- and a car that was 12 %
+ * folded as a box and 0 % folded as a model would straighten out as the player
+ * walked up to it, which is exactly the "type switch at the boundary" the LOD
+ * swap exists to have none of. So the grading lives in the three-free rules file
+ * where `verifyDamageGrade` can assert it without a renderer, and this is a
+ * three-line adapter onto a `Vector3`.
+ */
+const _grade = /*#__PURE__*/ createDamageGrade();
+
+/** The instance tone for a car this damaged. `damageGrade().darken`. */
+export function crumpleTone(damage: number): number {
+  return damageGrade(damage, _grade).darken;
+}
+
+/**
+ * The per-instance scale for this pose, dents included. Writes into `out`.
+ *
+ * Exported because `world/carlod.ts` composes its own matrices for the near-field
+ * model fleet and has to fold the identical deformation in -- see the block
+ * comment above.
+ */
+export function crumpleScale(pose: CarPose, out: Vector3): Vector3 {
+  const d = damageGrade(pose.damage, _grade).dent;
+  if (d === 0) {
+    out.set(pose.scale, pose.scale, pose.scale);
+    return out;
+  }
+  // Local +X is the nose (see `Station`), +Y is up and +Z is across, which is
+  // the same convention the hit box and the livery band are built in.
+  out.set(
+    pose.scale * (1 - CRUMPLE_LENGTH * d),
+    pose.scale * (1 - CRUMPLE_HEIGHT * d),
+    pose.scale * (1 + CRUMPLE_WIDTH * d),
+  );
+  return out;
+}
+
 /**
  * Every moving car in view, as five instanced sets.
  *
@@ -1340,15 +1403,29 @@ export class TrafficMovers {
         } else {
           _quaternion.set(0, 1, 0, 0);
         }
-        _scale.set(p.scale, p.scale, p.scale);
+        // **The crumple.** See `crumpleScale`: a car that has been driven into
+        // things is shorter, lower and a shade wider, which is what a folded
+        // bonnet and a sagging roof do to a silhouette at fifty metres. It is a
+        // non-uniform scale on a matrix this loop was composing anyway, so it
+        // costs three multiplies and no geometry at all -- and it applies to the
+        // ambient fleet for free, where `p.damage` is always exactly zero and
+        // the three multiplies are by one.
+        crumpleScale(p, _scale);
         _matrix.compose(_position, _quaternion, _scale);
         mesh.setMatrixAt(n, _matrix);
         // The paint the car had when it was ambient, with **no tonal jitter**:
         // the jitter is a function of `(route, slot)` and a driven car's route
         // is zero, so applying it would repaint every stolen car the same shade
         // -- which is worse than not applying it at all.
+        //
+        // Darkened toward the dents by `crumpleTone`, which is the other half of
+        // the read: a panel that has been folded catches the light differently
+        // and reads as dirt and shadow, and darkening the *paint* is the only
+        // way to say so through a material this fleet shares with every car in
+        // the city.
         const paint = PAINT[p.colour] ?? PAINT[0];
-        _colour.setRGB(paint[0], paint[1], paint[2]);
+        const tone = crumpleTone(p.damage);
+        _colour.setRGB(paint[0] * tone, paint[1] * tone, paint[2] * tone);
         mesh.setColorAt(n, _colour);
         this.counts[p.body] = n + 1;
       });

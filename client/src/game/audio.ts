@@ -62,6 +62,28 @@
 
 import type { RailAnnounceMix, RailVoice } from './rail-audio.ts';
 
+/**
+ * How hard a crash has to be before glass breaks. `CombatAudio.carCrunch`'s
+ * `strength`, so a fraction of the top speed.
+ *
+ * A third, which on `driving.DRIVE_TOP_SPEED`'s 22 m/s is a 7 m/s impact --
+ * about the speed at which `driving.crashDamage` first takes more than twenty
+ * health, and comfortably past anything that could be called parking.
+ */
+const SHATTER_STRENGTH = 0.33;
+
+/**
+ * The two diaphragms of a car horn, hertz. See `CombatAudio.carHorn`.
+ *
+ * 405 and 500 is a shade over a major third, which is what the pair in a
+ * mid-market sedan actually is -- close enough to beat audibly and far enough
+ * apart not to read as one note gone sour.
+ */
+const HORN_PARTIALS = [405, 500];
+
+/** How long one parp lasts, seconds. `main.ts`' `HONK_SECONDS` less its cooldown gap. */
+const HORN_SECONDS = 0.3;
+
 export class CombatAudio {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -891,6 +913,193 @@ export class CombatAudio {
       osc.connect(gain).connect(master);
       osc.start(start);
       osc.stop(start + fall + 0.05);
+    }
+  }
+
+  // --- The car ----------------------------------------------------------------
+
+  /**
+   * Metal meeting something that is not going to move: the crunch.
+   *
+   * `strength` is 0 to 1, and it is the crash's own delta-v scaled by the top
+   * speed -- so a kerb at 4 m/s and a wall at 22 arrive here as 0.05 and 1, and
+   * the sound is the *same recipe* at two intensities rather than two sounds
+   * with a threshold between them. That continuity is the audio half of
+   * `driving.CRASH_FREE_SPEED`'s argument: a step in the damage curve would be
+   * unfair and a step in the sound would be worse, because a player learns how
+   * hard they hit something by ear long before they look at the bar.
+   *
+   * Three layers, on `thwack`'s structure and re-voiced for sheet steel:
+   *
+   *   - the **crunch** says *panel*. A bandpassed noise burst, but wide (Q 0.6
+   *     against the bat's 1.5) and low (900 Hz), with a 4 ms attack. A bat is a
+   *     narrow crack because willow is one dense object; a wing is a broad
+   *     scrape because it is a large thin thing that goes on failing for a few
+   *     milliseconds after it starts.
+   *   - the **crack** says *glass and trim*, and it is the layer that separates
+   *     a real crash from a scrape: a short high burst at 4.2 kHz that only
+   *     appears past `SHATTER_STRENGTH`. Nothing on a car makes that noise until
+   *     something breaks.
+   *   - the **thud** says *two tonnes stopped*. A sine from 130 Hz to 38 over
+   *     `0.1 + 0.2 x strength` seconds -- the one layer that gets *longer* with
+   *     the impact rather than merely louder, which is the whole of why a big
+   *     crash reads as big.
+   *
+   * Driver-local and unattenuated: this is a thing that happened to the car you
+   * are sitting in. A crash somebody else had thirty metres away is *their*
+   * client's business, which is the same call `thwack` makes about being hit.
+   */
+  carCrunch(strength: number): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    const noise = this.noise;
+    if (!ctx || !master || !noise) return;
+    const k = strength < 0 ? 0 : strength > 1 ? 1 : strength;
+    if (k < 0.02) return;
+    const t = ctx.currentTime;
+    // A floor under the level as well as a scale, because the quietest crash
+    // that reaches here is still a crash and has to be audible over a running
+    // engine and a city: 0.25 at nothing, 1 at a write-off.
+    const level = 0.25 + 0.75 * k;
+
+    // --- The panel.
+    const panel = ctx.createBufferSource();
+    panel.buffer = noise;
+    // Lower playback for a bigger impact: a heavier crash is a slower failure,
+    // which is `thwack`'s knockout trick and is one multiply rather than a
+    // second sound to design.
+    panel.playbackRate.value = 1.15 - 0.35 * k;
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = 900;
+    // Wide. See the header: sheet steel is not willow.
+    band.Q.value = 0.6;
+    const panelGain = ctx.createGain();
+    panelGain.gain.setValueAtTime(0.0001, t);
+    panelGain.gain.exponentialRampToValueAtTime(0.5 * level, t + 0.004);
+    panelGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.1 + 0.14 * k);
+    panel.connect(band).connect(panelGain).connect(master);
+    panel.start(t);
+    panel.stop(t + 0.32);
+
+    // --- The glass, only past the point where something actually breaks.
+    if (k > SHATTER_STRENGTH) {
+      const shard = ctx.createBufferSource();
+      shard.buffer = noise;
+      shard.playbackRate.value = 2.1;
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 4200;
+      const shardGain = ctx.createGain();
+      // Starting 12 ms in, not at zero: glass breaks *after* the panel folds,
+      // and the twelve milliseconds are the whole difference between one event
+      // and two.
+      const at = t + 0.012;
+      shardGain.gain.setValueAtTime(0.0001, at);
+      shardGain.gain.exponentialRampToValueAtTime(0.3 * (k - SHATTER_STRENGTH) / (1 - SHATTER_STRENGTH), at + 0.004);
+      shardGain.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+      shard.connect(hp).connect(shardGain).connect(master);
+      shard.start(at);
+      shard.stop(at + 0.2);
+    }
+
+    // --- The weight.
+    const body = ctx.createOscillator();
+    body.type = 'sine';
+    const fall = 0.1 + 0.2 * k;
+    body.frequency.setValueAtTime(130, t);
+    body.frequency.exponentialRampToValueAtTime(38, t + fall);
+    const bodyGain = ctx.createGain();
+    bodyGain.gain.setValueAtTime(0.0001, t);
+    bodyGain.gain.exponentialRampToValueAtTime(0.34 * level, t + 0.008);
+    bodyGain.gain.exponentialRampToValueAtTime(0.0001, t + fall);
+    body.connect(bodyGain).connect(master);
+    body.start(t);
+    body.stop(t + fall + 0.06);
+  }
+
+  /**
+   * A kerb, a bollard, a wing along a wall: the thump.
+   *
+   * `carCrunch`'s panel layer alone, quieter and shorter, with no glass and
+   * almost no weight under it. It exists as a separate call rather than as
+   * `carCrunch(0.05)` because the two mean different things to a player and the
+   * difference has to be audible without looking: a crunch is *damage* and a
+   * thump is *you touched something*, and the crash cooldown means a thump often
+   * costs nothing at all. A sound that scaled continuously all the way down to
+   * silence would leave the player unable to tell "that was free" from "that was
+   * one hit point".
+   */
+  carScrape(): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    const noise = this.noise;
+    if (!ctx || !master || !noise) return;
+    const t = ctx.currentTime;
+
+    const rub = ctx.createBufferSource();
+    rub.buffer = noise;
+    rub.playbackRate.value = 0.8;
+    const band = ctx.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.value = 620;
+    band.Q.value = 0.8;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.14, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+    rub.connect(band).connect(gain).connect(master);
+    rub.start(t);
+    rub.stop(t + 0.14);
+  }
+
+  /**
+   * A car horn. Two detuned squares and a filter, which is what a horn is.
+   *
+   * A real car horn is a pair of electromagnetic diaphragms tuned about a
+   * semitone apart -- typically near 400 and 500 Hz -- and the beating between
+   * them is the whole character of the sound. Two oscillators is therefore not a
+   * simplification here; it is the mechanism. Square waves rather than sines
+   * because a diaphragm clatters rather than sings, and a lowpass at 2.4 kHz to
+   * take the top off the square so it reads as brass rather than as a chiptune.
+   *
+   * `distance` attenuates on `footyBounce`'s curve, because unlike the crunch
+   * this is a sound *other* cars make: the horn a player leans on is at zero and
+   * an ambient car honking at somebody standing in Pitt Street is at whatever
+   * the range is.
+   *
+   * This replaces the `thwack(false)` that stood in for a horn when the driving
+   * landed -- a stand-in the driving workstream flagged in `main.ts` and did not
+   * have the budget to fix.
+   */
+  carHorn(distance = 0): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+    const t = ctx.currentTime;
+    const gain = 1 / (1 + Math.max(0, distance) / 10);
+    if (gain < 0.02) return;
+
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 2400;
+    lp.Q.value = 0.7;
+    const out = ctx.createGain();
+    // A fast attack and a fast release, both a few milliseconds: a horn is a
+    // switch, and anything slower reads as a synthesiser pad.
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.exponentialRampToValueAtTime(0.13 * gain, t + 0.008);
+    out.gain.setValueAtTime(0.13 * gain, t + HORN_SECONDS - 0.03);
+    out.gain.exponentialRampToValueAtTime(0.0001, t + HORN_SECONDS);
+    lp.connect(out).connect(master);
+
+    for (const hz of HORN_PARTIALS) {
+      const osc = ctx.createOscillator();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(hz, t);
+      osc.connect(lp);
+      osc.start(t);
+      osc.stop(t + HORN_SECONDS + 0.02);
     }
   }
 

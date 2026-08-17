@@ -200,7 +200,7 @@ import {
   type TrafficField,
 } from '../game/traffic.ts';
 import { policeLiveried } from '../game/factions.ts';
-import { BODY_COUNT, CAR_LIVERY_WHITE, CAR_PAINT, type TileCars } from './cars.ts';
+import { BODY_COUNT, CAR_LIVERY_WHITE, CAR_PAINT, crumpleScale, crumpleTone, type TileCars } from './cars.ts';
 
 // --- The contract with the rest of the client -----------------------------------
 
@@ -741,10 +741,17 @@ interface Claim {
   frame: number;
   /** The last matrix written, so a compaction can move it without a re-pose. */
   matrix: Matrix4;
-  /** The paint this instance was given, for the same reason. Linear. */
+  /**
+   * The paint this instance was given, for the same reason. Linear, and
+   * **undarkened**: the crash tone is applied on top of it by `claimed`, so a
+   * car that is repaired -- or a compaction that moves this claim -- puts back
+   * the colour the car actually is rather than the colour it was last drawn.
+   */
   pr: number;
   pg: number;
   pb: number;
+  /** The `CarPose.damage` this instance was last painted for. See `claimed`. */
+  damage: number;
 }
 
 /** The tile instance a claim has zero-scaled, and what to put back. */
@@ -1009,6 +1016,18 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     claim.frame = this.frameNo;
     poseMatrix(pose, claim.matrix);
     claim.slot.mesh.setMatrixAt(claim.index, claim.matrix);
+    // **The dent tone, repainted only when it moves.** The paint is written once
+    // at `consider` and never again -- a parked car does not change colour --
+    // and crash damage is the one thing that breaks that assumption. So it is
+    // handled here, where the pose is, rather than by making `consider` run per
+    // frame: the comparison is one float against a number already on the claim,
+    // and the `setColorAt` happens on the two or three frames a session where a
+    // car somebody is looking at actually crashed.
+    if (pose.damage !== claim.damage) {
+      claim.damage = pose.damage;
+      const tone = crumpleTone(pose.damage);
+      claim.slot.mesh.setColorAt(claim.index, _colour.setRGB(claim.pr * tone, claim.pg * tone, claim.pb * tone));
+    }
     claim.slot.dirty = true;
     return true;
   }
@@ -1164,6 +1183,10 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
       pr: 1,
       pg: 1,
       pb: 1,
+      // Undamaged until `claimed` says otherwise, which for a parked car is
+      // never: the tile fleet has no crash damage and its claims are never
+      // re-posed.
+      damage: 0,
     };
     slot.claims.push(claim);
     this.byIdentity.set(identity, claim);
@@ -1226,7 +1249,11 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
       last.index = vacated;
       slot.claims[vacated] = last;
       slot.mesh.setMatrixAt(vacated, last.matrix);
-      slot.mesh.setColorAt(vacated, _colour.setRGB(last.pr, last.pg, last.pb));
+      // The crash tone travels with the claim. Without it, a wreck whose
+      // neighbour in the instance buffer was released would be repainted in its
+      // showroom colour and stay that way until it crashed again.
+      const tone = crumpleTone(last.damage);
+      slot.mesh.setColorAt(vacated, _colour.setRGB(last.pr * tone, last.pg * tone, last.pb * tone));
     }
     slot.mesh.count = slot.claims.length;
     slot.dirty = true;
@@ -1375,7 +1402,14 @@ function poseMatrix(pose: CarPose, out: Matrix4): void {
   } else {
     _quaternion.set(0, 1, 0, 0);
   }
-  _scale.set(pose.scale, pose.scale, pose.scale);
+  // **The dents, folded in here rather than at the caller.** `world/cars.ts`
+  // owns the deformation (`crumpleScale`) and the near-field fleet has to apply
+  // the identical one: a car that straightened itself out as the player walked
+  // up to it and became a model would be the most visible possible failure of
+  // the LOD swap, and is precisely the "type switch at the boundary" this file's
+  // header says it has none of. Zero for every ambient car, which is all but two
+  // or three of the claims in any frame.
+  crumpleScale(pose, _scale);
   out.compose(_position, _quaternion, _scale);
 }
 
