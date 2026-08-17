@@ -101,6 +101,7 @@ import {
   type TrafficField,
 } from '../game/traffic.ts';
 import { policeLiveried } from '../game/factions.ts';
+import type { ViewLatch } from '../game/viewlatch.ts';
 // The dents, graded once in the three-free rules file so the four systems that
 // draw a damaged car cannot disagree about what "dented" means. See
 // `game/driving.damageGrade`.
@@ -1189,6 +1190,27 @@ export class TrafficMovers {
   suppress: ((identity: number) => boolean) | null = null;
 
   /**
+   * The (dis)appearance latch, or null.
+   *
+   * The whole of the coupling to `game/viewlatch.ts`, and it is one property for
+   * `lights`' and `models`' reason a third time: this loop already visits every
+   * car in view, and whether a car is drawn is a decision that has to be made
+   * *once*, in the same place the instance is filled. A second pass that had to
+   * agree with this one about which cars exist is how a car ends up hidden by the
+   * box fleet and drawn by the model fleet at the same time.
+   *
+   * Null is the whole of the "nobody has handed one over" case -- the offline
+   * renderer, the checks -- and costs one comparison a frame. `update` also needs
+   * a camera direction before it can latch anything; without one the latch is
+   * skipped, because a latch that guessed which way you were looking would hide
+   * cars at random.
+   */
+  latch: ViewLatch | null = null;
+  /** Cars hidden and ghosted by the latch last frame. Diagnostics only. */
+  latched = 0;
+  ghosted = 0;
+
+  /**
    * The cars a *player* is driving, drawn by this loop rather than by one of
    * their own.
    *
@@ -1276,7 +1298,26 @@ export class TrafficMovers {
    * and the server agree, and the *picture* runs between them so a 144 Hz
    * display does not see 60 Hz cars.
    */
-  update(field: TrafficField, tick: number, x: number, z: number): void {
+  update(
+    field: TrafficField,
+    tick: number,
+    x: number,
+    z: number,
+    /**
+     * Where the camera is and which way it is pointing, in the world plan.
+     *
+     * Optional, and only the latch reads it: `x`/`z` above are the *player*, which
+     * is what the draw radius is measured from, and in first person the camera is
+     * at their eye -- but the two are not the same thing and the one that decides
+     * whether a car appeared in shot is the camera. Omitted, `latch` does nothing,
+     * which is the right behaviour for a caller that cannot say where the camera
+     * is (the checks, and anything head-less).
+     */
+    camX?: number,
+    camZ?: number,
+    camDx?: number,
+    camDz?: number,
+  ): void {
     const at = performance.now();
     for (let b = 0; b < BODY_COUNT; b++) this.counts[b] = 0;
     this.bandCount = 0;
@@ -1287,14 +1328,26 @@ export class TrafficMovers {
     const models = this.models;
     const modelling = models !== null && models.begin();
     const suppress = this.suppress;
+    // The latch, if there is one and if the caller said where the camera is. See
+    // `game/viewlatch.ts`: a car that comes into existence inside the shot is not
+    // drawn until you look away, and one that stops existing inside it goes on
+    // being drawn until you do.
+    const dirX = camDx;
+    const dirZ = camDz;
+    const latch = dirX === undefined || dirZ === undefined ? null : this.latch;
+    if (latch !== null) latch.begin(tick, camX ?? x, camZ ?? z, dirX ?? 0, dirZ ?? 1);
 
-    forEachCarNear(field, x, z, TRAFFIC_DRAW_RADIUS, tick, this.scratch, this.pose, (p) => {
-      // **Somebody has taken this one.** Before everything, including the
-      // counters: a suppressed car is not drawn, not lit, not modelled and not
-      // counted, because from this frame on the thing at these coordinates is
-      // the record in `CarField` and not the timetable's copy of it. See
-      // `suppress`.
-      if (suppress !== null && suppress(p.identity)) return;
+    /**
+     * Fill one instance from one pose.
+     *
+     * Hoisted out of the walk so that the **ghosts** go through it too: a car the
+     * latch is still drawing after its schedule stopped has to be the same body,
+     * the same paint, the same livery and the same model claim it was a frame
+     * ago, and the only way to guarantee that is for there to be one fill. The
+     * driven fleet below makes the same argument and is why this loop was already
+     * written to be called with a pose from anywhere.
+     */
+    const fill = (p: CarPose): void => {
       const n = this.counts[p.body];
       if (n >= MOVER_CAPACITY) return;
       // Counted before the capacity test would have a chance to skew it, and
@@ -1385,7 +1438,39 @@ export class TrafficMovers {
         this.band.setMatrixAt(this.bandCount, _matrix);
         this.bandCount++;
       }
+    };
+
+    forEachCarNear(field, x, z, TRAFFIC_DRAW_RADIUS, tick, this.scratch, this.pose, (p) => {
+      // **Somebody has taken this one.** Before everything, including the
+      // counters: a suppressed car is not drawn, not lit, not modelled and not
+      // counted, because from this frame on the thing at these coordinates is
+      // the record in `CarField` and not the timetable's copy of it. See
+      // `suppress`.
+      if (suppress !== null && suppress(p.identity)) return;
+      // **And has this one only just come into existence in front of you?** Also
+      // before the counters, and for the same reason: a latched car is not drawn,
+      // not lit and not modelled, because as far as this frame is concerned it is
+      // not there. See `game/viewlatch.ts`.
+      if (latch !== null && !latch.shows(p)) return;
+      fill(p);
     });
+
+    // --- The cars whose schedule ran out while you were looking at them.
+    //
+    // Between the ambient walk and the driven one, because that is where they
+    // belong: they were ambient cars a moment ago and they go through the ambient
+    // fleet's own fill. `end()` first, because it is what promotes a car the walk
+    // stopped offering into a ghost -- the order is `begin`, walk, `end`,
+    // `forEachGhost`, and `verifyViewLatch` asserts each step of it.
+    if (latch !== null) {
+      latch.end();
+      latch.forEachGhost(fill);
+      this.latched = latch.hidden;
+      this.ghosted = latch.ghosts;
+    } else {
+      this.latched = 0;
+      this.ghosted = 0;
+    }
 
     // --- And the cars somebody is driving, through the identical fill.
     //

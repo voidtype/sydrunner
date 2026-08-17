@@ -196,6 +196,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import {
   forEachCarNear,
   type CarPose,
+  type LaneObstacles,
   type LaneRoute,
   type TrafficField,
 } from '../game/traffic.ts';
@@ -805,6 +806,26 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
   sweepMs = 0;
   /** Sweeps that found a model's capacity full. Should stay at zero. */
   overflows = 0;
+  /**
+   * Where to register the parked fleet as things traffic must not drive through,
+   * or null.
+   *
+   * `traffic.TrafficField.obstacles`, handed over rather than reached for, and
+   * this class is the one that does it for a reason that is entirely about
+   * lifecycle: `adopt`/`release` here are already the only pair of calls in the
+   * client that brackets a tile's parked cars exactly -- the streamer calls them
+   * as a tile is built and as it is disposed -- and an obstacle registered on any
+   * other clock would outlive the meshes it came from.
+   *
+   * Null is a client that never loaded the models, or a check. Then the traffic
+   * does not go round the *static* fleet (the bays it always goes round, because
+   * those come out of the sidecar in `TrafficField.adopt`), which is exactly the
+   * behaviour that shipped before this round -- see
+   * `traffic.LaneObstacles.adoptStatics` for why the static half is the client's
+   * business alone.
+   */
+  obstacles: LaneObstacles | null = null;
+
   /** Files loaded, and files the manifest named but this refused or lost. */
   readonly loadedFiles: string[] = [];
   readonly skipped: Array<{ file: string; why: string }> = [];
@@ -1336,6 +1357,44 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
       }
     }
     this.tiles.set(tileKey, tile);
+
+    // --- And the same cars again, as obstacles the moving fleet steers round.
+    //
+    // The **height comes off the instance matrix** rather than out of a terrain
+    // query, and that is the whole reason this is done here rather than in the
+    // streamer: `buildTileCars` has already put every one of these cars on the
+    // ground with the tile's own height grid, and element 13 of its matrix is
+    // that answer. A second query would be a second opinion about where the road
+    // is, on a fleet whose whole job is to be exactly where the road is -- and the
+    // vertical gate in `traffic.resolveLaneShare` is what stops a car parked on
+    // the Cahill Expressway pushing the traffic aside eight metres below it, so it
+    // has to be the real number.
+    if (this.obstacles !== null) {
+      const y = new Float32Array(data.count);
+      for (let i = 0; i < data.count; i++) {
+        const mesh = tile.mesh[i];
+        if (mesh === null) {
+          // No instanced set for this body: nothing was drawn, so there is
+          // nothing standing there to drive round either.
+          y[i] = NaN;
+          continue;
+        }
+        mesh.getMatrixAt(tile.index[i], _matrix);
+        y[i] = _matrix.elements[13];
+      }
+      this.obstacles.adoptStatics(
+        tileKey,
+        data.count,
+        data.x,
+        data.z,
+        y,
+        data.body,
+        data.seed,
+        data.identity,
+        originX,
+        originZ,
+      );
+    }
   }
 
   release(tileKey: string): void {
@@ -1344,6 +1403,10 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     // Without restoring: the meshes are about to be disposed with the tile.
     for (const claim of [...tile.claims]) this.revoke(claim, false);
     this.tiles.delete(tileKey);
+    // The obstacles go with them. Keyed separately from the tile's *lanes* inside
+    // `LaneObstacles`, because the two are held on different clocks -- see
+    // `adoptStatics`.
+    this.obstacles?.dropStatics(tileKey);
   }
 
   /**

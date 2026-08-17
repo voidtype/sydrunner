@@ -378,6 +378,12 @@ export function verifyCarSmoke(): string[] {
     route: 0, slot: 0, x, y: 0, z: 0, dx: 1, dz: 0,
     body: 0, colour: 0, scale: 1, halfLength: 2.3, halfWidth: 0.9, height: 1.45,
     stage: 2, routeT: 0, speed: 0, identity, damage, held: 0,
+    // The pass offset and the two life stamps `game/traffic.ts` added with the
+    // obstacle rule. Nothing in this file reads them -- a plume is a function of
+    // damage and position -- and they are here because a `CarPose` is a whole
+    // record, and a literal that goes stale against it is a compile error rather
+    // than a bug, which is the point of building the fixture this way.
+    swerve: 0, bornAgo: 10, endsIn: 10,
   });
 
   // --- One car draws its whole plume, and an empty frame draws nothing.
