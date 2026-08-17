@@ -52,6 +52,7 @@ tile, or on the run.
 from __future__ import annotations
 
 import math
+from collections import Counter
 from dataclasses import dataclass
 
 import numpy as np
@@ -496,7 +497,14 @@ class VegetationNetwork:
         greens: list[osm.OsmGreen],
         mapped: list[osm.OsmTree],
         street_network: streets.StreetNetwork,
+        rail_envelope=None,
     ) -> None:
+        # The railway, as a plan keep-out. `None` where the build has no rail
+        # bake to read, in which case nothing is kept out and `railenv.load`
+        # has already said so.
+        self._rail = rail_envelope
+        #: Trees dropped for standing in the corridor, by source, for the report.
+        self.rail_dropped: Counter[str] = Counter()
         self._greens = greens
         self._green_polys = [g.polygon for g in greens]
         self._green_tree = STRtree(self._green_polys) if greens else None
@@ -532,9 +540,15 @@ class VegetationNetwork:
 
     @classmethod
     def load(
-        cls, radius_m: float, street_network: streets.StreetNetwork
+        cls,
+        radius_m: float,
+        street_network: streets.StreetNetwork,
+        rail_envelope=None,
     ) -> VegetationNetwork:
-        return cls(osm.read_green(radius_m), osm.read_trees(radius_m), street_network)
+        return cls(
+            osm.read_green(radius_m), osm.read_trees(radius_m), street_network,
+            rail_envelope,
+        )
 
     # --- Reporting -----------------------------------------------------------
 
@@ -693,6 +707,37 @@ class VegetationNetwork:
             road = surf.carriageway
             street = [t for t in street if not road.contains(Point(t.east, t.north))]
             park = [t for t in park if not road.contains(Point(t.east, t.north))]
+
+        # And anything standing in the railway, whatever produced it.
+        #
+        # HERE RATHER THAN IN THE THREE GENERATORS, and for the reason the road
+        # test above is here: this is the one place all three sources have
+        # landed, so a keep-out written once cannot be a keep-out two of them
+        # have and the third does not. `_position_is_clear` looked like the
+        # place -- it holds the junction, mapped-tree and building keep-outs --
+        # but it is only ever asked about a *street* tree, and the trees in the
+        # corridor are not street trees. Measured over the shipped world, of the
+        # trees inside the corridor the split is scattered park interiors and
+        # surveyed nodes, not procedural rows.
+        #
+        # **A surveyed tree is dropped too**, which is the one place this module
+        # overrides OSM. Everywhere else a mapped node is *"never moved, never
+        # thinned and never overridden"*. Inside the rail corridor the carve has
+        # taken the ground away, so keeping the node means a surveyed tree
+        # hanging in a trench -- and the two claims cannot both be honoured. The
+        # corridor is the narrower and better-surveyed of the two geometries, so
+        # it wins, and the count is reported by source so the override is
+        # visible rather than silent.
+        if self._rail is not None:
+            def clear(t: Tree) -> bool:
+                if not self._rail.in_corridor(t.east, t.north):
+                    return True
+                self.rail_dropped[t.origin] += 1
+                return False
+
+            mapped = [t for t in mapped if clear(t)]
+            street = [t for t in street if clear(t)]
+            park = [t for t in park if clear(t)]
 
         return self._cap(mapped, street, park)
 
