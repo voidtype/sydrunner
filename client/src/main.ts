@@ -133,7 +133,8 @@ import { HandsAssets, HandsViewmodel, verifyHands } from './player/hands.ts';
 import { verifyCash } from './game/cash.ts';
 // `SLOT` as well as the check, so `setWeaponVisible` below can tell "fists"
 // from "phone" -- both of them say "no bat", and only one of them wants hands.
-import { SLOT, verifyPhone } from './phone.ts';
+import { verifyPhone } from './phone.ts';
+import { SLOT } from './game/phone.ts';
 import { installMoney } from './money.ts';
 import {
   applyWorldDamage,

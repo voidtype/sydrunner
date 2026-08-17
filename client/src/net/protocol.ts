@@ -577,7 +577,14 @@ export const MSG = {
  * mis-stride every entry after the first, which is a scoreboard of garbage
  * names, so this is not a change either side can be lenient about.
  */
-export const PROTOCOL_VERSION = 13;
+/*
+ * v14: `ROSTER` entries carry `kills` (u16) beside `level`, so the HUD can
+ * draw XP toward the next level (12 -> 14 bytes an entry). Everything else in
+ * this batch -- hands, cash drops, the phone's maps and camera, persistent
+ * traffic, metro gangways -- cost the wire nothing, which is the shape a
+ * feature here is supposed to have.
+ */
+export const PROTOCOL_VERSION = 14;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
