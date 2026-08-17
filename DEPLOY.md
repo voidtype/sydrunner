@@ -61,6 +61,61 @@ if (location.protocol === 'https:') return `wss://${location.host}/ws`;
 
 ## Redeploy
 
+> ### One-off before the next deploy: proxy `/auth/*`
+>
+> The accounts pass (workstream G) puts four HTTP routes on the game server —
+> `POST /auth/signup`, `POST /auth/login`, `POST /auth/logout` and
+> `GET /auth/check?handle=`, plus `GET /auth/me` — and Caddy does not forward
+> them today. It proxies `/ws` (and `/ws/<n>` via `rooms.Caddyfile`) and nothing
+> else, so **without this line every one of those requests is answered by the
+> static file server with a 404, the landing page's live handle check silently
+> fails, and every handle reads as available until the join is refused with a
+> `BYE`.** That is the worst shape of failure this feature has: the game works,
+> the page looks right, and accounts quietly do not exist.
+>
+> Add to the site block in `/etc/caddy/Caddyfile`, beside the `handle /ws`
+> block (or beside the `import /etc/caddy/rooms.Caddyfile` line that replaced
+> it):
+>
+> ```caddyfile
+> handle /auth/* {
+> 	reverse_proxy 127.0.0.1:8787
+> }
+> ```
+>
+> Same port as `/ws` because it is the same process — there is one account store
+> per host and it is the one the socket authenticates against. Then, as with
+> every Caddy change on this box:
+>
+> ```bash
+> ssh -i ~/.ssh/sydney_deploy root@oxford-tractor.bnr.la \
+>   'caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy'
+> ```
+>
+> Verify from the Mac — a JSON body rather than the app's HTML is the whole test:
+>
+> ```bash
+> curl -s 'https://oxford-tractor.bnr.la/auth/check?handle=bazza'
+> # {"available":true,"reason":"","handle":"bazza"}
+> ```
+>
+> Or run the whole feature against the box, which takes about a second and
+> covers the routes, the socket join, the handle refusal and the feedback gate:
+>
+> ```bash
+> SYDNEY_CHECK_URL=https://oxford-tractor.bnr.la bun run server/accounts-check.ts
+> ```
+>
+> It registers one throwaway handle per run (`Chk#####`) and leaves it behind;
+> that is deliberate, so a second run proves the *first* run's account persisted.
+>
+> **`accounts.json` lives beside `wallets.json`** in `SYDNEY_STATE_DIR`
+> (`/opt/sydney/state` on the box) and is written atomically on the same
+> pattern. It is the only file on the box that must not be lost: it holds every
+> registered handle. It contains argon2id password hashes and no email
+> addresses, so it is not personal data — but it is credentials, and it must not
+> be committed, rsynced into `dist/`, or copied anywhere public.
+
 From the repo root on the Mac, after `npm run build` **and the precompress step**:
 
 ```bash

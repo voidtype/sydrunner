@@ -746,6 +746,10 @@ function checkNames(): void {
     kos: i * 3,
     downs: (settled.length - i) * 2,
     ping: i === 0 ? 0 : i * 11,
+    // Varied across the entries on purpose: this check exists to catch a name
+    // length that shifts the entry behind it, and a level that was the same on
+    // every row would be the one field that could not detect the shift.
+    level: 1 + i,
   }));
   const back = decodeRoster(encodeRoster(entries));
   check(back !== null && back.length === entries.length, `a ${entries.length}-entry roster round-tripped through the wire (${back?.length} back)`);

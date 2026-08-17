@@ -130,6 +130,24 @@ export const SUGGEST_RESULT = {
   UNKNOWN: 4,
   /** Accepted and stored, but not yet on GitHub. See `SuggestionState`. */
   QUEUED: 5,
+  /**
+   * Refused: this socket has no account. See `client/src/net/accounts.ts`.
+   *
+   * A code of its own rather than folding into `BAD`, and it is worth the byte.
+   * The panel colours `BAD` as "you did something wrong, fix it and try again"
+   * and keeps the compose box; this is *"you cannot do this yet, here is how"*
+   * and the panel answers it with a sign-up button rather than a red line. A
+   * shared code is the only way both ends can agree which of those two a
+   * refusal is -- the message text is a sentence for a human and is not
+   * something the client should be matching on.
+   *
+   * Added without a protocol bump because `SUGGEST_ACK` has always carried the
+   * result as an opaque byte and `SuggestionsPanel.ack` has always treated
+   * anything that is not `OK`/`QUEUED` as a failure with a message. An older
+   * client meeting this code shows the sentence in red, which is correct if
+   * plainer.
+   */
+  ACCOUNT: 6,
 } as const;
 
 /**

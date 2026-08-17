@@ -11,7 +11,7 @@
 import { formatMoney } from './game/cash.ts';
 import type { Vector3 } from 'three/webgpu';
 import type { SolarPosition } from './sky/solar.ts';
-import { MAX_NAME_CHARS, MIN_NAME_CHARS, sanitiseName, type RosterEntry } from './net/protocol.ts';
+import { type RosterEntry } from './net/protocol.ts';
 
 export interface HudState {
   /** Median recent frame time in milliseconds. More honest than a frame count. */
@@ -493,15 +493,25 @@ export class Hud {
    * standing bet that `index.html` and this file ship together.
    */
   private readonly moneyEl = document.getElementById('money')!;
+  /** `lvl 3`, beside the balance. See `level`. */
+  private readonly levelEl = document.getElementById('level')!;
   private readonly ko = document.getElementById('ko')!;
   private readonly investigationEl = document.getElementById('investigation')!;
   private readonly investigationReason = document.getElementById('investigation-reason')!;
   private readonly investigationCount = document.getElementById('investigation-count')!;
   private readonly board = document.getElementById('leaderboard')!;
   private readonly boardRows = document.getElementById('leaderboard-rows')!;
+  /**
+   * The join panel, which this class no longer *drives* -- only hides.
+   *
+   * Everything about what is in it (the two tabs, the availability check, the
+   * password fields, the logged-in line) belongs to `client/src/accounts.ts`,
+   * because it is a conversation with the server rather than a readout of the
+   * game and because it has to be reachable a second time from the Escape panel.
+   * What is left here is the one thing the HUD legitimately has an opinion
+   * about: a fatal error must be able to take it off the screen. See `fatal`.
+   */
   private readonly prompt = document.getElementById('nameprompt')!;
-  private readonly promptInput = document.getElementById('nameprompt-input') as HTMLInputElement;
-  private readonly promptJoin = document.getElementById('nameprompt-join')!;
   /**
    * Hidden by default (user order): the overlay is developer telemetry, and a
    * player's first screenful should be Sydney, not numbers. `?debug=true` (any
@@ -633,73 +643,27 @@ export class Hud {
     // screen, so it is also the one thing that can hide a fatal error. A player
     // typing a name into a build that has already failed to start is the least
     // useful state this client can be in.
-    this.hideNamePrompt();
+    this.hideJoin();
   }
 
-  // --- The name prompt --------------------------------------------------------
+  // --- The join panel -----------------------------------------------------------
 
   /**
-   * Ask who is playing, and resolve with what they said.
+   * Take the join panel off the screen.
    *
-   * Called once, on the online path only, and **not awaited where it is
-   * shown**: `main.ts` puts it up the moment the world is drawable and collects
-   * it half a second later when it is ready to open a socket, so the typing
-   * happens during the streaming rather than in front of it. That is the whole
-   * reason this returns a promise instead of taking a callback -- the two ends
-   * of the wait are in different parts of the boot.
+   * The only thing this class does to that panel, and it exists for one caller:
+   * `fatal`. The prompt is drawn *over* the loading screen, so it is also the
+   * one element that can hide a fatal error -- and a player typing a handle into
+   * a build that has already failed to start is the least useful state this
+   * client can be in.
    *
-   * `suggested` is prefilled rather than placeheld, so Enter on an untouched
-   * field is a valid answer and the fastest path into the game is one key. The
-   * field is sanitised on the way out with the same function the server will run
-   * on arrival (`protocol.sanitiseName`), so what the player sees accepted here
-   * is what appears over their head -- and a name that does not survive it falls
-   * back to the suggestion rather than being refused, because a modal that
-   * argues with you about punctuation is a modal nobody finishes.
+   * It used to be a private half of `askName`, which lived here and asked for a
+   * name. That method is `client/src/accounts.ts`'s `JoinGate` now: what the
+   * panel asks has grown a live availability check and a password, both of which
+   * are conversations with the server, and a HUD that held them would be a HUD
+   * that knew what a session token was.
    */
-  askName(suggested: string): Promise<string> {
-    return new Promise((resolve) => {
-      this.promptInput.value = suggested;
-      this.promptInput.placeholder = suggested;
-      // Both the cap and the sentence under the field come from the constants
-      // rather than from the markup, so the one place the rule is written is
-      // `protocol.ts` and the note cannot go stale against the sanitiser.
-      this.promptInput.maxLength = MAX_NAME_CHARS;
-      const note = document.getElementById('nameprompt-note');
-      if (note) note.textContent = `${MIN_NAME_CHARS}–${MAX_NAME_CHARS} characters · enter to join`;
-      this.prompt.classList.add('shown');
-      // Focus after the class, or the element is still `display: none` and the
-      // browser refuses -- silently, leaving a prompt nobody can type into
-      // without clicking it first.
-      this.promptInput.focus();
-      this.promptInput.select();
-
-      let done = false;
-      const finish = (): void => {
-        if (done) return;
-        done = true;
-        const typed = sanitiseName(this.promptInput.value);
-        this.hideNamePrompt();
-        this.promptInput.removeEventListener('keydown', onKey);
-        this.promptJoin.removeEventListener('click', finish);
-        resolve(typed || sanitiseName(suggested));
-      };
-      const onKey = (e: KeyboardEvent): void => {
-        // Stopped as well as defaulted, because `main.ts` binds `Tab` and the
-        // backquote on `window` and both are characters somebody may want in a
-        // name -- and `Tab` in particular would otherwise open the leaderboard
-        // behind the prompt while moving the focus off the field.
-        e.stopPropagation();
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          finish();
-        }
-      };
-      this.promptInput.addEventListener('keydown', onKey);
-      this.promptJoin.addEventListener('click', finish);
-    });
-  }
-
-  private hideNamePrompt(): void {
+  hideJoin(): void {
     this.prompt.classList.remove('shown');
   }
 
@@ -741,7 +705,11 @@ export class Hud {
    */
   leaderboard(rows: readonly RosterEntry[], selfId: number): void {
     if (!this.boardVisible) return;
-    const key = rows.map((r) => `${r.id}:${r.name}:${r.kos}:${r.downs}:${r.ping}:${r.bot ? 1 : 0}`).join('|') + `#${selfId}`;
+    // The level is in the key as well as in the row. Without it a level-up
+    // while the board is held open would not redraw -- the comparison is what
+    // makes this cheap, and a field left out of it is a field that goes stale
+    // exactly when somebody is looking at it.
+    const key = rows.map((r) => `${r.id}:${r.name}:${r.kos}:${r.downs}:${r.ping}:${r.level}:${r.bot ? 1 : 0}`).join('|') + `#${selfId}`;
     if (key === this.boardKey) return;
     this.boardKey = key;
     this.boardRows.textContent = '';
@@ -754,6 +722,17 @@ export class Hud {
       // another player: the sanitiser strips the controls that would let it lie
       // about its own width, and this is what stops it being markup.
       name.textContent = r.name || `player ${r.id}`;
+      // The level column. A dash at level 1 rather than "1", on the ping
+      // column's own argument two blocks down: every guest and every bot is
+      // level 1, and a column of ones is a column that says nothing. The dash
+      // says "no ladder here" and the number says "this many".
+      const level = document.createElement('td');
+      if (r.level <= 1) {
+        level.textContent = '—';
+        level.className = 'none';
+      } else {
+        level.textContent = String(r.level);
+      }
       const kos = document.createElement('td');
       kos.textContent = String(r.kos);
       const downs = document.createElement('td');
@@ -767,7 +746,7 @@ export class Hud {
       } else {
         ping.textContent = `${r.ping}`;
       }
-      tr.append(name, kos, downs, ping);
+      tr.append(name, level, kos, downs, ping);
       this.boardRows.appendChild(tr);
     }
   }
@@ -1056,6 +1035,34 @@ export class Hud {
   }
 
   private moneyText = '\u0000';
+
+  /**
+   * `lvl 3`, in the vitals cluster beside the balance.
+   *
+   * **Beside the dollars rather than under the name on the leaderboard alone**,
+   * because a level that is only visible when you hold Tab is a level you
+   * discover by accident. The two numbers together are what a player has
+   * accumulated -- one this session, one this week -- and putting them on one
+   * line means the cluster still reads as three groups (what you have, what
+   * you are carrying, what you are made of) rather than four.
+   *
+   * `null` draws nothing, which is the `?offline` case and the second before
+   * the first roster lands. Level 1 draws nothing either, and that is
+   * deliberate rather than a bug: every guest and every bot in the city is
+   * level 1, so a `lvl 1` on screen would be a permanent label that says
+   * nothing about anybody. It appears the moment it means something.
+   *
+   * Cheap to call every frame on `money`'s terms exactly: the string is
+   * compared before it is written.
+   */
+  level(level: number | null): void {
+    const text = level === null || level <= 1 ? '' : `lvl ${level}`;
+    if (text === this.levelText) return;
+    this.levelText = text;
+    this.levelEl.textContent = text;
+  }
+
+  private levelText = '\u0000';
 
   /**
    * "Under Investigation! {reason} — Ns", or nothing.

@@ -132,6 +132,22 @@ import { PHONE_OP, decodePhone, verifyCashWire } from '../client/src/net/cash.ts
 import { verifyDrivingContract } from '../client/src/game/driving-contract.ts';
 import { verifyFares } from './fares.ts';
 import { WalletStore, defaultWalletPath, verifyWallets } from './wallets.ts';
+// --- Accounts, unique handles and the level ladder. Workstream G.
+//
+// One block, and the same three things this file has to know about the feature
+// that the money block above it lists: the check it runs at boot, the store it
+// constructs and hands to every room, and the routes it puts in front of it.
+// The rules are `client/src/net/accounts.ts` (shared with the browser, because
+// a handle has to fold the same way in the field the player types it into) and
+// the store is `server/accounts.ts`.
+import {
+  AccountStore,
+  AuthGuards,
+  bearerOf,
+  defaultAccountPath,
+  handleAuthRequest,
+  verifyAccounts,
+} from './accounts.ts';
 import { verifyRewind } from './rewind.ts';
 import { verifySim } from './sim.ts';
 import {
@@ -322,6 +338,15 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifyWallets', verifyWallets()],
     ['verifyFares', verifyFares()],
     ['verifyDrivingContract', verifyDrivingContract()],
+    // The accounts, the handles and the ladder. Run **here** as well as in the
+    // browser because this process is the authority for every one of them and
+    // every failure in that file is silent in this repo's sense: a handle fold
+    // that lets two accounts render identically is an impersonation nobody
+    // reports, a level formula off by one puts the wrong number over every body
+    // in the city, a week that is not the suggestions box's week resets the
+    // ladder on the wrong day, and a token expiry that is not enforced makes
+    // every session on the box permanent. See `client/src/net/accounts.ts`.
+    ['verifyAccounts', verifyAccounts()],
   ];
   const failed = checks.filter(([, f]) => f.length > 0);
   if (failed.length > 0) {
@@ -381,6 +406,24 @@ await wallets.load();
 console.log(`[sydney] wallets: ${wallets.describe()}`);
 
 /**
+ * The accounts, host-wide, loaded before anybody can join.
+ *
+ * Host-wide for `wallets`' reason and one stronger: a handle is **globally
+ * unique**, and two rooms with two files would be two people wearing one handle
+ * depending on where the gateway put them -- which is the exact thing an account
+ * exists to make impossible. Constructed and `load`ed before the socket opens,
+ * so the first `HELLO` carrying a token can be resolved rather than being
+ * treated as a guest for the first second of a session.
+ *
+ * `SYDNEY_STATE_DIR` moves the file, beside `wallets.json`; see
+ * `defaultAccountPath`.
+ */
+const accounts = new AccountStore(defaultAccountPath());
+await accounts.load();
+const authGuards = new AuthGuards();
+console.log(`[sydney] accounts: ${accounts.describe()}`);
+
+/**
  * Who is driving what, for SydRide. See `client/src/game/driving-contract.ts`.
  *
  * `NO_DRIVING` unless `SYDNEY_FAKE_DRIVING=1`, because the driving workstream's
@@ -412,6 +455,7 @@ const FAKE_DRIVING = process.env.SYDNEY_FAKE_DRIVING === '1';
 const tRooms = performance.now();
 const host = new RoomHost(world, ROOM_COUNT, ROOM_CAP, BOT_COUNT, ROOM_BASE, {
   wallets,
+  accounts,
   fakeDriving: FAKE_DRIVING,
 });
 if (FAKE_DRIVING) {
@@ -614,6 +658,11 @@ const server = Bun.serve<Conn>({
         // a flag that changes what the game does should be readable from
         // outside, or nobody can tell why sprinting is paying money.
         wallets: wallets.size,
+        // How many handles are registered. Published for `wallets`' reason one
+        // line up, and it is the one number that says whether the accounts file
+        // actually loaded -- a store that moved a broken file aside boots
+        // perfectly and answers zero here.
+        accounts: accounts.size,
         fakeDriving: FAKE_DRIVING,
         // The join disc's centre, which both ends already compute from the same
         // `index.json` (`game/spawn.spawnCentre`). Published because
@@ -638,6 +687,30 @@ const server = Bun.serve<Conn>({
      */
     if (url.pathname === '/rooms') return json(host.listing());
     /*
+     * `/auth/*` -- sign up, log in, log out, and the landing page's live handle
+     * check. Workstream G; see `server/accounts.ts` for all four and for why
+     * they are HTTP rather than socket messages.
+     *
+     * A prefix rather than four `if`s here, on `/bug`'s argument: every line of
+     * what this does lives in that file behind one call, and a feature that
+     * needed four cases in this function would be a feature that had put itself
+     * in the middle of the server.
+     *
+     * `srv.requestIP` rather than a header, verbatim for `/bug`'s reason:
+     * `X-Forwarded-For` is a string a client can set, so trusting it would
+     * replace a rate limit with a decorative one. Behind Caddy this address is
+     * Caddy's -- the same honest limitation stated there and in
+     * `server/suggestions.addressOf`.
+     *
+     * **DEPLOY.md's redeploy section has the Caddyfile line this needs.** Caddy
+     * proxies `/ws` today and this path is new; without it the landing page's
+     * check silently fails in production and every handle reads as available.
+     */
+    if (url.pathname.startsWith('/auth/')) {
+      const ip = srv.requestIP(req)?.address ?? 'unknown';
+      return handleAuthRequest(req, url, ip, accounts, authGuards, wallets);
+    }
+    /*
      * `/bug` -- a player's bug report, with the picture that makes it worth
      * having. The only route in this process that **accepts** anything, which
      * is why every line of what it does with what it accepts lives in
@@ -661,7 +734,12 @@ const server = Bun.serve<Conn>({
      */
     if (url.pathname === '/bug') {
       const ip = srv.requestIP(req)?.address ?? 'unknown';
-      return handleBugRequest(req, ip, bugs, bugGuards);
+      // The account, resolved **here** rather than inside the bug route, on the
+      // seam `ip` already sits on: that file knows what a bug report is and
+      // nothing about tokens. Null for a guest, which the route refuses with
+      // "sign up to send feedback" -- see workstream G's gates.
+      const author = accounts.byToken(bearerOf(req))?.handle ?? null;
+      return handleBugRequest(req, ip, bugs, bugGuards, author);
     }
     /*
      * `/stats` -- what `server/loadtest.ts` reads, and the only thing in this
@@ -856,11 +934,50 @@ const server = Bun.serve<Conn>({
             ws.close(1013, 'full');
             return;
           }
+          /*
+           * --- Who this is. Workstream G.
+           *
+           * Two rules, and between them they are the whole of "a handle is
+           * globally unique, checked at landing":
+           *
+           *  1. **A valid token wins and the name is ignored.** Not merged, not
+           *     preferred, ignored. The name on a hello is a *request* (see
+           *     `protocol.encodeHello`) and a handle is not, so reconciling the
+           *     two would be inventing a rule for a case that has an answer: the
+           *     account says who you are. `sim.join` still dedupes the handle
+           *     against the room, because one person with two tabs open is real
+           *     and two identical scoreboard rows is a scoreboard that has
+           *     stopped working.
+           *
+           *  2. **A guest may not wear a registered handle.** Refused with a
+           *     `BYE` that says what to do, rather than being silently renamed
+           *     to "Bazza (2)" -- which is what `uniqueName` would otherwise do
+           *     and which would put somebody one character away from a name they
+           *     do not own, in a kill feed, permanently.
+           *
+           * The refusal is a `BYE` and not a rename because the client has
+           * already had a chance to know: the landing page checks the handle
+           * against `/auth/check` as it is typed. Reaching here with a taken
+           * handle means a stale tab, a hand-built client, or somebody who
+           * registered the handle in the last few seconds -- and all three want
+           * to be told rather than quietly given a different name.
+           *
+           * An **expired or unknown token is a guest**, not an error. A player
+           * whose thirty days ran out mid-session should land in the game and be
+           * asked to log in again, not be refused at the door.
+           */
+          const account = hello.token === '' ? null : accounts.byToken(hello.token);
+          if (account === null && accounts.registered(hello.name)) {
+            ws.send(encodeBye('that handle belongs to an account — log in or pick another'));
+            ws.close(1008, 'handle');
+            return;
+          }
+          if (account !== null) accounts.seen(account);
           // The name is a request, exactly as the colourway is. `sim.join`
           // sanitises it again and dedupes it against the room -- see
           // `Simulation.pickName` -- so what comes back on `p.name` is what this
           // player is actually called, which is not always what they asked for.
-          const p = wanted.join(conn, hello.colourway, hello.name);
+          const p = wanted.join(conn, hello.colourway, account?.handle ?? hello.name, account);
           if (!p) {
             ws.send(encodeBye(`room ${wanted.id} is full (${wanted.cap} players)`));
             ws.close(1013, 'full');
@@ -870,7 +987,11 @@ const server = Bun.serve<Conn>({
           wanted.conns.add(ws);
           wanted.welcome(ws, p);
           console.log(
-            `[sydney] room ${wanted.id}: player ${p.id} "${p.name}" joined (kit ${p.colourway}); ` +
+            // "as an account" and never the token, the id or anything else off
+            // the record. A bearer credential in a log file is an account handed
+            // to whoever reads the log; see `AccountStore`'s header.
+            `[sydney] room ${wanted.id}: player ${p.id} "${p.name}" joined ` +
+              `(kit ${p.colourway}${account ? `, lvl ${p.level}, account` : ', guest'}); ` +
               `${wanted.sim.participants.size} in the room`,
           );
           return;
@@ -1242,6 +1363,12 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
       // `server/wallets.ts`), so this is the difference between losing nothing
       // on a deploy and losing whatever the last five seconds paid.
       wallets.close().catch((err) => console.error(`[sydney] wallets: flush failed: ${String(err)}`)),
+      // And the accounts, which are the third. Their debounce is two seconds
+      // rather than the wallets' five (see `ACCOUNT_SAVE_DEBOUNCE_MS`) and the
+      // sign-up path writes synchronously, so what this actually flushes is the
+      // last few seconds of the level ladder -- a knockout that would otherwise
+      // be lost on every deploy.
+      accounts.close().catch((err) => console.error(`[sydney] accounts: flush failed: ${String(err)}`)),
     ]).finally(() => process.exit(0));
   });
 }

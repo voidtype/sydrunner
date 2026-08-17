@@ -81,6 +81,9 @@ import {
   createWallet,
   type WalletRecord,
 } from '../client/src/game/cash.ts';
+// One import for one check and one assertion: the account key space is proved
+// disjoint from the name one by the character cap, and the cap lives there.
+import { MAX_NAME_CHARS } from '../client/src/net/protocol.ts';
 
 /** What the file on disk looks like. Versioned so a later shape can be read. */
 interface WalletFile {
@@ -105,6 +108,31 @@ interface WalletFile {
  */
 export function walletKey(name: string): string {
   return name.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/**
+ * The key an **account's** wallet is filed under.
+ *
+ * The header above says at length that a name is a claim and not proof, and
+ * ends by saying the fix is an account system in a different pass. That pass
+ * landed (`server/accounts.ts`), and this is the one line of it that reaches
+ * into this file: a player who is logged in gets a wallet keyed by their
+ * account's UUID rather than by the name they are wearing, so it cannot be
+ * spent by whoever types that name next. Guests are unchanged and keep
+ * `walletKey`, which is what makes the account optional rather than a wall.
+ *
+ * **The two key spaces cannot collide**, and that is a property rather than a
+ * hope: `walletKey` runs on a name that `sanitiseName` has already clipped to
+ * `MAX_NAME_CHARS` (sixteen), and `account:` is eight characters followed by a
+ * 36-character UUID. There is no name a player can type that reaches 44
+ * characters, so no guest can ever land on an account's row.
+ *
+ * Lower-cased for `walletKey`'s reason, even though a UUID from
+ * `crypto.randomUUID` is already lower-case: the two keys go into one map and a
+ * second normalisation rule in the same map is a second rule to get wrong.
+ */
+export function accountWalletKey(accountId: string): string {
+  return `account:${accountId}`.toLowerCase();
 }
 
 /** Where the file lives. `SYDNEY_STATE_DIR` moves the whole directory. */
@@ -214,6 +242,66 @@ export class WalletStore {
   /** Does this name already have a wallet? For the check, and for `/health`. */
   has(name: string): boolean {
     return this.file.wallets[walletKey(name)] !== undefined;
+  }
+
+  /**
+   * An **account's** wallet, created on first sight. See `accountWalletKey`.
+   *
+   * A second door rather than a flag on `for`, because the two take different
+   * kinds of string and mixing them would be one function whose caller has to
+   * remember which. `Simulation.join` picks between them once, on whether the
+   * participant is bound to an account, and nothing else in the codebase calls
+   * either.
+   */
+  forAccount(accountId: string, nowMs = Date.now()): WalletRecord {
+    const key = accountWalletKey(accountId);
+    let record = this.file.wallets[key];
+    if (record === undefined) {
+      record = createWallet(STARTING_BALANCE);
+      this.file.wallets[key] = record;
+    }
+    record.lastSeenMs = nowMs;
+    this.touch();
+    return record;
+  }
+
+  /**
+   * "Would you like to save progress?" -- the guest's balance onto the account.
+   *
+   * Called once, from `AccountStore.signup`, at the moment an account comes into
+   * existence. Three things about how it is written:
+   *
+   *   - It **moves rather than adds**, and the guest row is deleted. Leaving it
+   *     would be a balance that the next person to type that name inherits,
+   *     which is the exact behaviour signing up is supposed to end.
+   *   - It refuses to overwrite an account wallet that already has more than the
+   *     starting balance in it. That cannot happen on today's call path -- the
+   *     account was created milliseconds ago -- and it is checked anyway,
+   *     because the day social login lands, `signup` becomes a route that can be
+   *     reached for an account that already existed, and a migration that
+   *     clobbered would be somebody's money gone with no error.
+   *   - It does nothing at all if the guest name has no wallet, which is the
+   *     ordinary case for a player who signed up from the landing page before
+   *     ever joining.
+   *
+   * Returns what moved, so the caller can say so if it ever wants to.
+   */
+  migrateToAccount(guestName: string, accountId: string, nowMs = Date.now()): number {
+    const from = walletKey(guestName);
+    const guest = this.file.wallets[from];
+    if (guest === undefined) return 0;
+    const to = accountWalletKey(accountId);
+    const held = this.file.wallets[to];
+    if (held !== undefined && held.balance > STARTING_BALANCE) return 0;
+    // The whole record travels, not only the balance: the Centrelink claim
+    // stamps are what stop a player claiming at the same office twice in an
+    // hour, and a migration that dropped them would make signing up worth $100
+    // at every office in the city.
+    guest.lastSeenMs = nowMs;
+    this.file.wallets[to] = guest;
+    delete this.file.wallets[from];
+    this.touch();
+    return guest.balance;
   }
 
   /**
@@ -402,6 +490,30 @@ export function verifyWallets(): string[] {
     // rule stated in the header and it has to be true rather than assumed.
     if (walletKey('Bazza (2)') === walletKey('Bazza')) {
       failures.push('A deduped name shares a wallet with the name it was deduped from.');
+    }
+  }
+
+  // --- The account key space, which must not overlap the name one.
+  //
+  // The failure this catches is the worst one in the file: an account key a
+  // guest could reach by typing a name is one player spending another's balance
+  // with no error anywhere. `accountWalletKey` argues that it is unreachable
+  // from the character cap; this asserts it rather than trusting the argument.
+  {
+    const id = '3f2504e0-4f89-11d3-9a0c-0305e82c3301';
+    const key = accountWalletKey(id);
+    if (!key.startsWith('account:')) failures.push(`An account wallet key is ${key}, which is not namespaced.`);
+    if (accountWalletKey(id) !== accountWalletKey(id.toUpperCase())) {
+      failures.push('Account wallet keys do not fold case; one account would have two balances.');
+    }
+    if (key.length <= MAX_NAME_CHARS) {
+      failures.push(`An account key is ${key.length} characters, which a ${MAX_NAME_CHARS}-character name could reach.`);
+    }
+    // And the other direction: the longest name anybody can type, keyed, is
+    // still shorter than the shortest account key.
+    const longest = walletKey('x'.repeat(MAX_NAME_CHARS));
+    if (longest.length >= key.length) {
+      failures.push(`A ${longest.length}-character name key can reach the account key space.`);
     }
   }
 

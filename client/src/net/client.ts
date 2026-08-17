@@ -507,9 +507,32 @@ export class NetClient {
     return this.names.get(id) ?? `player ${id}`;
   }
 
+  /**
+   * Every level this client has been told, id to level. See `RosterEntry.level`.
+   *
+   * A **map beside `names` rather than a scan of `roster`**, and the reason is
+   * the same one `names` has: the nameplate loop asks for one of these per
+   * remote per frame, and `roster` is a decode-order array that would be an
+   * O(players) find each time. Unlike `names` it is *not* a growing history --
+   * it is rewritten by every refresh and pruned with the names, because a level
+   * is only ever wanted for somebody currently on the board or currently
+   * standing in front of you.
+   */
+  private readonly levels = new Map<number, number>();
+
+  /** This player's level, or 1 -- the floor, and what a guest or a bot is. */
+  levelOf(id: number): number {
+    return this.levels.get(id) ?? 1;
+  }
+
   /** The local player's own name, as the server actually assigned it. */
   get myName(): string {
     return this.names.get(this.id) ?? '';
+  }
+
+  /** The local player's own level, for the HUD's `lvl N` beside the balance. */
+  get myLevel(): number {
+    return this.levelOf(this.id);
   }
 
   /** The board, in the order it is drawn. See `protocol.rankRoster`. */
@@ -831,6 +854,22 @@ export class NetClient {
   private readonly clientId: string;
 
   /**
+   * This browser's session token, or `''` for a guest.
+   *
+   * Handed in for `clientId`'s reason exactly: it lives in `localStorage` (see
+   * `client/src/accounts.ts`) and this layer only *carries* it, so a reconnect
+   * -- which rebuilds this object -- does not lose the login. It is put on the
+   * `HELLO` and read nowhere else in this file.
+   *
+   * It is a **bearer credential**, and the one rule about it here is that it
+   * never appears in a log line, a status string or a `report()`. The
+   * connection diagnostics in this class print the URL and the round trip; a
+   * token in a console somebody screenshots into the bug box would be an
+   * account handed over in a public repository.
+   */
+  private readonly token: string;
+
+  /**
    * The wall clock the timetable is read on. `Date.now` in a browser.
    *
    * Injectable for one reason and it is the reason this feature shipped broken:
@@ -850,12 +889,13 @@ export class NetClient {
     url: string,
     handlers: NetHandlers,
     options: {
-      name?: string; transport?: NetTransport; clientId?: string; nowMs?: () => number;
+      name?: string; transport?: NetTransport; clientId?: string; nowMs?: () => number; token?: string;
     } = {},
   ) {
     this.handlers = handlers;
     this.wantedName = options.name ?? '';
     this.clientId = options.clientId ?? '';
+    this.token = options.token ?? '';
     this.nowMs = options.nowMs ?? Date.now;
     // Injectable so the integration harness and any future WebTransport class
     // can be dropped in without this file knowing. See `protocol.NetTransport`.
@@ -863,8 +903,11 @@ export class NetClient {
     this.transport.onopen = () => {
       // 255 asks the server to choose a kit. See `protocol.encodeHello`: two
       // players in the same singlet defeats the whole reason there are seven.
-      // The name is a request on exactly the same terms.
-      this.transport.send(encodeHello(255, this.wantedName));
+      // The name is a request on exactly the same terms -- and the token, when
+      // there is one, is the one field on this frame that is *not* a request:
+      // it names an account, and the server takes the handle off that rather
+      // than off the name beside it.
+      this.transport.send(encodeHello(255, this.wantedName, this.token));
     };
     this.transport.onframe = (frame) => this.receive(frame);
     this.transport.onclose = (reason) => {
@@ -1517,11 +1560,18 @@ export class NetClient {
    */
   private rememberNames(entries: readonly RosterEntry[]): void {
     for (const e of entries) if (e.name) this.names.set(e.id, e.name);
+    // The levels go in the same pass rather than a second loop, and they are
+    // pruned by the same rule below. A level for an id nobody can name is a
+    // level nothing will ever draw.
+    for (const e of entries) this.levels.set(e.id, e.level);
     if (this.names.size > 128) {
       const live = new Set(entries.map((e) => e.id));
       for (const id of [...this.names.keys()]) {
         if (this.names.size <= 128) break;
-        if (!live.has(id)) this.names.delete(id);
+        if (!live.has(id)) {
+          this.names.delete(id);
+          this.levels.delete(id);
+        }
       }
     }
   }
@@ -3086,8 +3136,8 @@ export function verifyNetClient(): string[] {
     const net = new NetClient('', silentHandlers(), { transport });
     net.id = 1;
     const roster: RosterEntry[] = [
-      { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 3, downs: 1, ping: 21 },
-      { id: 2, colourway: 1, bot: true, name: 'Shazza', kos: 4, downs: 0, ping: 0 },
+      { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 3, downs: 1, ping: 21, level: 1 },
+      { id: 2, colourway: 1, bot: true, name: 'Shazza', kos: 4, downs: 0, ping: 0, level: 1 },
     ];
     transport.onframe?.(encodeRoster(roster));
     if (net.nameOf(2) !== 'Shazza') failures.push(`A roster's name did not reach nameOf: got ${net.nameOf(2)}.`);
@@ -3231,9 +3281,9 @@ export function verifyNetClient(): string[] {
     // it, whether or not they can be seen.
     transport.onframe?.(
       encodeRoster([
-        { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 20 },
-        { id: 2, colourway: 4, bot: false, name: 'Shazza', kos: 0, downs: 0, ping: 30 },
-        { id: 3, colourway: 5, bot: true, name: 'Davo', kos: 0, downs: 0, ping: 0 },
+        { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 20, level: 4 },
+        { id: 2, colourway: 4, bot: false, name: 'Shazza', kos: 0, downs: 0, ping: 30, level: 2 },
+        { id: 3, colourway: 5, bot: true, name: 'Davo', kos: 0, downs: 0, ping: 0, level: 1 },
       ]),
     );
     // A JOIN for somebody across town. A feed line, and **no body**.

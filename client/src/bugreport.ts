@@ -197,6 +197,16 @@ export interface BugReportHandlers {
   /** The HTTP origin of the game server, or '' offline. */
   endpoint(): string;
   clientId(): string;
+  /**
+   * This browser's session token, or `''` for a guest. Workstream G.
+   *
+   * A **callback rather than a value**, exactly as `endpoint` and `clientId`
+   * are, and for the same reason: this form is constructed once at boot and a
+   * player can log in from the Escape panel afterwards, so a token captured at
+   * construction would be a form that stayed logged out for the session. Asked
+   * for at the moment a report is sent, which is when it matters.
+   */
+  token(): string;
   meta: MetaSource;
   /** Ask the render loop for the next frame. */
   capture(): Promise<Capture>;
@@ -541,9 +551,18 @@ export class BugReportForm {
       meta: Object.fromEntries(this.collectMeta()),
     };
     try {
+      // The bearer header, when there is one. `server/bugs.handleBugRequest`
+      // refuses a report with no account (workstream G's feedback gate), and
+      // the panel puts a sign-up button in front of the send button so this
+      // ought to be unreachable -- but the header is what makes the request
+      // *correct*, and the gate has to hold against a client that is out of
+      // step with itself rather than only against the one that is not.
+      const token = this.handlers.token();
+      const headers: Record<string, string> = { 'content-type': 'application/json' };
+      if (token !== '') headers.authorization = `Bearer ${token}`;
       const res = await fetch(`${base}/bug`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
       });
       // The server's message is a literal in `server/bugs.ts` in every case,

@@ -194,6 +194,15 @@ import { verifySuggestions } from './net/suggestions.ts';
 import { SuggestionsPanel, clientId } from './suggestions.ts';
 import { ChangelogFeed, verifyChangelog } from './changelog.ts';
 import { BugReportForm, FrameGrabber, verifyBugReport } from './bugreport.ts';
+// --- Accounts, handles and the level ladder. Workstream G.
+//
+// `JoinGate` owns the landing panel (which used to be `hud.askName`), the
+// session token, and the "sign up to send feedback" blocks in the Escape box.
+// `verifyAccounts` is the shared rules module's check, run here as well as on
+// the server for `verifyNames`' reason: both ends fold a handle and both ends
+// compute a level, and the whole arrangement only works if the two runs agree.
+import { JoinGate } from './accounts.ts';
+import { verifyAccounts } from './net/accounts.ts';
 import { ANIM, PROTOCOL_VERSION, SNAPSHOT_INTERVAL, sanitiseName, suggestName, verifyNames, verifyNet } from './net/protocol.ts';
 import {
   FootyAssets,
@@ -895,6 +904,7 @@ async function main(): Promise<void> {
   const characterFailures = timed('characters', verifyCharacters);
   const eventFailures = timed('events', verifyEvents);
   const walletFailures = timed('wallet', verifyWallet);
+  const accountFailures = timed('accounts', verifyAccounts);
   // And the nameplates, on the same criterion once more. Every way this breaks
   // renders: a text cache that misses re-uploads two megabytes of atlas twenty
   // times a second and reads as a streaming stall; a fade that is not monotonic
@@ -1066,6 +1076,7 @@ async function main(): Promise<void> {
     characterFailures.length ||
     eventFailures.length ||
     walletFailures.length ||
+    accountFailures.length ||
     nameplateFailures.length ||
     guardFailures.length ||
     hudFailures.length ||
@@ -1126,6 +1137,7 @@ async function main(): Promise<void> {
           ...characterFailures,
           ...eventFailures,
           ...walletFailures,
+          ...accountFailures,
           ...nameplateFailures,
           ...guardFailures,
           ...hudFailures,
@@ -2274,8 +2286,28 @@ async function main(): Promise<void> {
   // offline and is reloaded online does not ask twice for the same answer.
   const netUrl = resolveServerUrl();
   const storedName = loadName();
-  const namePromise =
-    netUrl === null ? Promise.resolve(storedName || sanitiseName(suggestName())) : hud.askName(storedName || sanitiseName(suggestName()));
+  // --- Workstream G: the landing panel, the token, and the feedback gates.
+  //
+  // One object and one block. `hud.askName` was a name box and a promise; this
+  // is the same promise with two tabs behind it -- quick play (the name box, now
+  // with a live `/auth/check` on it) and log in / sign up. It also owns the
+  // "sign up to send feedback" blocks in the Escape panel, because they are the
+  // same state and the same form. Everything about it is `client/src/accounts.ts`.
+  //
+  // `restore()` is awaited *before* the panel goes up, so a returning player is
+  // shown "playing as Bazza · log out" rather than an empty field that is
+  // corrected a moment later. It is bounded by the same `withDeadline` every
+  // other boot fetch is, one screenful below.
+  const joinGate = new JoinGate({
+    endpoint: () => (netUrl === null ? '' : httpBaseOf(netUrl)),
+    notice: (message) => hud.notice(message),
+  });
+  const joinPromise: Promise<{ name: string; token: string }> =
+    netUrl === null
+      ? Promise.resolve({ name: storedName || sanitiseName(suggestName()), token: '' })
+      : joinGate
+          .restore()
+          .then(() => joinGate.landing(storedName || sanitiseName(suggestName())));
 
   /**
    * Wait for something, but never for longer than `ms`.
@@ -3715,6 +3747,9 @@ async function main(): Promise<void> {
     // captured boolean so a connection that settles later is picked up.
     endpoint: () => (net === null || netUrl === null ? '' : httpBaseOf(netUrl)),
     clientId,
+    // Asked for at send time rather than captured, so a player who signs up from
+    // the Escape panel can file a report without reloading. See workstream G.
+    token: () => joinGate.sessionToken,
     capture: () => grabber.request(),
     meta: () => {
       const here = player.position;
@@ -4302,7 +4337,10 @@ async function main(): Promise<void> {
   //
   // Stored **after** the await rather than inside `askName`, so the HUD stays a
   // thing that draws and this file keeps every decision about what persists.
-  const playerName = await namePromise;
+  const joinChoice = await joinPromise;
+  const playerName = joinChoice.name;
+  // Stored whether it was typed or came off an account, because it is what the
+  // *next* boot prefills and what a sign-up offers as the guest name to migrate.
   saveName(playerName);
   dev.name = playerName;
 
@@ -4334,7 +4372,15 @@ async function main(): Promise<void> {
     // net layer -- so it survives a reconnect, which rebuilds this object. See
     // `client/src/suggestions.ts`, which is honest about it being a claim rather
     // than proof of anything.
-    const client = new NetClient(joinUrl, netHandlers(), { name: playerName, clientId: clientId() });
+    // The token rides beside the name on the hello, and `markJoined` is what
+    // tells the gates whether this *session* is bound to an account -- signing
+    // up later does not rebind a live socket. See `client/src/accounts.ts`.
+    const client = new NetClient(joinUrl, netHandlers(), {
+      name: playerName,
+      clientId: clientId(),
+      token: joinChoice.token,
+    });
+    joinGate.markJoined(joinChoice.token);
     // Awaited, and this is the one place the boot blocks on the network.
     //
     // The alternative -- connect in the background and spawn the dummies now,
@@ -8104,6 +8150,11 @@ async function main(): Promise<void> {
     // and no scores, and drawing "you 0 0 —" would be inventing a match. The
     // panel appears with nothing in it, which is the truth.
     if (hud.leaderboardVisible) hud.leaderboard(net ? net.leaderboard() : [], net ? net.id : -1);
+    // Workstream G: `lvl 3` under the balance. Off the roster, which is where
+    // the level lives (see `protocol.RosterEntry.level`), and null offline --
+    // there is no ladder without a server to keep one. Cheap every frame on
+    // `hud.money`'s terms: the string is compared before it is written.
+    hud.level(net ? net.myLevel : null);
 
     // The map, on the frame delta and redrawing on its own 15 Hz clock inside.
     // `player.yaw` rather than `input.yaw`, and the difference is visible: the
@@ -9108,6 +9159,11 @@ async function main(): Promise<void> {
         // target, which is the whole reason this is on other people's plates
         // and not only on your own HUD. See `nameplates.starRow`.
         plate.stars = net.heatOf(r.id);
+        // And what level they are, beside the stars. Workstream G: a level is a
+        // fact about the person the same way the star row is a fact about their
+        // standing with the police, and both belong under the name rather than
+        // only on a board you have to hold Tab to read.
+        plate.level = net.levelOf(r.id);
         nameplates.add(plate, net.id);
       }
     } else {

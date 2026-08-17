@@ -267,6 +267,14 @@ import { type DrivingLookup } from '../client/src/game/driving-contract.ts';
 import { createFare, stepFare, type FareContext, type FareJob } from './fares.ts';
 import { moveBalance, type WalletStore } from './wallets.ts';
 import type { WalletFrame } from '../client/src/net/cash.ts';
+// --- Accounts and the level ladder. See `client/src/net/accounts.ts` for the
+// rules, `server/accounts.ts` for the store, and workstream G's brief for the
+// three gates. One block, on the money block's terms one comment up: what is
+// left in *this* file is the three places an account meets the simulation --
+// which wallet a joiner opens, what a knockout does to the ladder, and the
+// sentence a guest is shown when they cross $100.
+import { levelFor } from '../client/src/net/accounts.ts';
+import type { AccountRecord, AccountStore } from './accounts.ts';
 
 export const FIXED_DT = 1 / TICK_HZ;
 
@@ -399,7 +407,87 @@ export interface Participant {
   walletNote: string;
   /** The rideshare shift and whatever fare is running on it. See `server/fares.ts`. */
   fare: FareJob;
+
+  // --- Accounts. See `client/src/net/accounts.ts`.
+  /**
+   * The account this participant is logged in as, or **null for a guest**.
+   *
+   * Null rather than an empty record, on `wallet`'s argument exactly: every
+   * account path in this file begins with the same three-character test, and a
+   * guest cannot accidentally acquire a ladder by being handed one somewhere.
+   *
+   * The record is **shared with the store**, not copied -- it is the object in
+   * `AccountStore`'s map -- so incrementing `kills` here is what gets written to
+   * disk on the next debounce. That is the same bargain `wallet` strikes and it
+   * has the same consequence: one person logged in twice is two participants
+   * mutating one record, which is correct (their kills add up) rather than a
+   * race, because this process is single-threaded and neither of them is
+   * reading the value across an `await`.
+   *
+   * A bot never has one. There is nothing to log a bot into.
+   */
+  account: AccountRecord | null;
+  /**
+   * `account?.id ?? null`, kept as a field because it is the **contract** other
+   * workstreams were told to expect and because it is what the wallet is keyed
+   * by. Duplicating one string off the record beside it is cheaper than making
+   * every reader reach through a nullable object for the only field of it they
+   * are entitled to.
+   */
+  accountId: string | null;
+  /**
+   * What the roster carries and the plate draws. 1 for a guest, always.
+   *
+   * Mirrored onto the participant rather than read off `account` at roster time
+   * for one reason and it is a real one: `roster()` runs several times a second
+   * over every participant in the room and is on PERFORMANCE.md's
+   * allocation-free path, and a `p.account?.level ?? 1` there is a nullable
+   * dereference per player per refresh to read a number that changes a few times
+   * an evening. This is written on join and on the two events that can move it.
+   */
+  level: number;
+  /**
+   * Has this guest already been asked to sign up, this session, for each reason?
+   *
+   * A bitfield of `PROMPTED.*` rather than two booleans, so adding a third gate
+   * later is a constant rather than a field -- and so that "once per session" is
+   * visibly one rule rather than two that drifted. Never set for an account: the
+   * prompts are the whole of what a guest is shown and an account has already
+   * answered them.
+   */
+  prompted: number;
 }
+
+/**
+ * The sign-up prompts a guest can be shown, once each per session.
+ *
+ * *"more than 100 dollars (would u like to save progress)?"* and *"sign up to
+ * level up"*. Both are **once**, and the once is what makes them a nudge rather
+ * than nagging: a player who has decided not to sign up crosses $100 again every
+ * few minutes and reaches a level threshold every ten kills, and a prompt on
+ * each would be the game arguing with a decision they already made.
+ */
+export const PROMPTED = {
+  /** Crossed `SAVE_PROMPT_BALANCE`. */
+  MONEY: 1,
+  /** Earned enough kills that an account would have levelled. */
+  LEVEL: 2,
+} as const;
+
+/**
+ * The balance at which a guest is asked whether they want to keep it.
+ *
+ * $100, from the brief. Worth stating why the number is a *threshold crossing*
+ * rather than a state: a player who is asked the moment they go over and says
+ * no should not be asked again when they drop to $90 and climb back, which is
+ * what testing `balance >= 100` every tick would do. The `PROMPTED.MONEY` bit is
+ * what makes it a crossing.
+ *
+ * **Nothing is taken from them.** The brief is explicit and it is worth having
+ * in the code beside the constant, because the obvious next feature -- a cap on
+ * what a guest can hold -- is exactly the wall this whole design refuses to be.
+ */
+export const SAVE_PROMPT_BALANCE = 100;
 
 export interface TickOutput {
   tick: number;
@@ -785,6 +873,19 @@ export class Simulation {
   private readonly wallets: WalletStore | null;
 
   /**
+   * Where accounts are kept, or null in a world with no persistence.
+   *
+   * Null is the ordinary case for every check in this repo, verbatim for
+   * `wallets`' reason one field up: `verifySim`, `server/integration-check.ts`
+   * and `server/loadtest.ts` all build a `Simulation` with one argument, and a
+   * store defaulted into existence there would be twenty checks writing an
+   * accounts file into the repository. Injected by `server/index.ts` and by
+   * nothing else; a null store means every participant is a guest and every
+   * ladder path in this file is skipped by the same test a bot is.
+   */
+  private readonly accounts: AccountStore | null;
+
+  /**
    * Who is driving what. See `client/src/game/driving-contract.ts`.
    *
    * `NO_DRIVING` by default, which reports every player on foot -- so a build
@@ -853,9 +954,16 @@ export class Simulation {
       this.participants.get(playerId)?.wallet?.balance ?? 0,
   };
 
-  constructor(world: ServerWorld, options: { wallets?: WalletStore; driving?: DrivingLookup } = {}) {
+  constructor(
+    world: ServerWorld,
+    options: { wallets?: WalletStore; driving?: DrivingLookup; accounts?: AccountStore } = {},
+  ) {
     this.world = world;
     this.wallets = options.wallets ?? null;
+    // Beside `wallets` in the options bag, which is the contract workstream G
+    // published: the two stores are the host's, shared across every room on it,
+    // and are the only two things in this constructor that outlive the process.
+    this.accounts = options.accounts ?? null;
     // The real thing by default, now that the driving workstream has landed:
     // the fare loop asks `this.cars` who is driving what, and `NO_DRIVING`
     // survives only as the answer a caller gets when it explicitly asks for
@@ -980,7 +1088,26 @@ export class Simulation {
    * sanitiser that ran in the browser ran inside something the player controls,
    * and deduped against everybody already in the world.
    */
-  join(preferredColourway: number, bot: BotKind | null, requestedName = ''): Participant {
+  /**
+   * `account` is the record `server/index.ts` resolved from the `HELLO`'s token,
+   * or null for a guest. It arrives here rather than being looked up because
+   * this class holds no opinion about tokens: the socket layer authenticates and
+   * the simulation is handed the answer, which is the same shape the colourway
+   * and the name arrive in and the reason this signature has grown rather than
+   * this file having learnt about HTTP.
+   *
+   * **A logged-in participant's name is the handle, not the request.** The
+   * caller passes `account.handle` as `requestedName`; `pickName` still dedupes
+   * it against the room, because two tabs logged into one account is a real
+   * thing a person does and two identical rows on a scoreboard is a scoreboard
+   * that has stopped working.
+   */
+  join(
+    preferredColourway: number,
+    bot: BotKind | null,
+    requestedName = '',
+    account: AccountRecord | null = null,
+  ): Participant {
     const id = this.allocateId();
     const spot = this.joinSpot();
     const combat = createCombatant(id, spot.x, spot.z);
@@ -1033,10 +1160,29 @@ export class Simulation {
       // `WALLET` frame carries `STARTING_BALANCE` rather than a zero that is
       // corrected a moment later. A bot, or a host with no store, gets null and
       // is skipped by every money path in this file. See `server/wallets.ts`.
-      wallet: bot === null && this.wallets !== null ? this.wallets.for(name) : null,
+      // **The wallet is keyed by the account when there is one**, which is the
+      // one thing accounts change about money and the reason they change it:
+      // `server/wallets.ts`' header says a name is a claim and not proof, so a
+      // balance kept under a name can be spent by whoever types it next. An
+      // account id cannot be typed. A guest is unchanged and keeps the name key,
+      // which is what makes signing up optional rather than a wall -- and
+      // `WalletStore.migrateToAccount` is how the guest's balance follows them
+      // over on the day they do sign up.
+      wallet:
+        bot !== null || this.wallets === null
+          ? null
+          : account !== null
+            ? this.wallets.forAccount(account.id)
+            : this.wallets.for(name),
       walletVersion: 1,
       walletNote: '',
       fare: createFare(),
+      account: bot === null ? account : null,
+      accountId: bot === null && account !== null ? account.id : null,
+      // The ladder, off the record if there is one. A guest and a bot are both
+      // level 1 and stay there for the session; see `RosterEntry.level`.
+      level: bot === null && account !== null ? account.level : 1,
+      prompted: 0,
     };
     // The bot holds the combatant rather than the other way round, so `think()`
     // writes the same `input` object the tick loop reads -- one record, as
@@ -1146,10 +1292,11 @@ export class Simulation {
     for (const p of this.participants.values()) {
       let s = out[n];
       if (s === undefined) {
-        s = { id: 0, colourway: 0, bot: false, name: '', kos: 0, downs: 0, ping: 0 };
+        s = { id: 0, colourway: 0, bot: false, name: '', kos: 0, downs: 0, ping: 0, level: 1 };
         out.push(s);
       }
       s.id = p.id;
+      s.level = p.level;
       s.colourway = p.colourway;
       s.bot = p.bot !== null;
       s.name = p.name;
@@ -1195,7 +1342,26 @@ export class Simulation {
     this.heat.reset(victimId);
     if (attackerId !== victimId) {
       const attacker = this.participants.get(attackerId);
-      if (attacker) attacker.kos++;
+      if (attacker) {
+        attacker.kos++;
+        // --- The ladder. *"10 kills levels u up"*, and the one place kills are
+        // counted for it.
+        //
+        // Here rather than in a listener on the roster, because this is the
+        // funnel every knockout in the game already passes through (the comment
+        // above this method enumerates them: a punch, a football, a car, a
+        // police round, a train, the RBT) and a second counter anywhere else
+        // would be the one that stopped counting when a weapon changed.
+        //
+        // **A bot's KO of a player counts and a player's KO of a bot counts**,
+        // which is what the brief means by "as `kos` counts today": the two
+        // numbers must agree or the leaderboard and the plate over the same body
+        // would disagree about the same fight. What does *not* count is
+        // `attackerId === victimId`, and that falls out of the branch this is
+        // already inside -- a player knocked over by their own thrown football
+        // has not levelled up.
+        this.creditLadder(attacker);
+      }
     }
     this.rosterVersion++;
     // And the money falls out, here, in the one place that already knows both
@@ -1207,6 +1373,134 @@ export class Simulation {
     // Camry (`attackerId === victimId`) has not driven roughly, they have been
     // driven into.
     if (attackerId !== victimId) this.markRough(attackerId);
+  }
+
+  // --- Accounts and the ladder -----------------------------------------------
+
+  /**
+   * Say one sentence to one player, in the pill, on the next frame.
+   *
+   * **The `WALLET` frame's note field, used for something that is not money**,
+   * and that deserves a paragraph rather than a shrug.
+   *
+   * There is exactly one per-player text channel from this process to a client:
+   * `WalletFrame.note`, delivered by `walletFrame` and drawn by `hud.notice` (see
+   * `net/cash.WalletFrame.note` for why the *server* composes the sentence
+   * rather than the client deriving one). Everything else on this wire is either
+   * broadcast (`CHAT`, `EVENTS`) or a reply to something the client asked for
+   * (`SUGGEST_ACK`, `SUN`). The three things accounts have to say -- "you levelled
+   * up", "sign up to keep this", "new week, everybody is level 1" -- are all the
+   * same shape as "+$34 fare": a moment, addressed to one person, that belongs in
+   * the pill and nowhere else.
+   *
+   * The alternative was `MSG.NOTE`, a new id (0x93 was reserved for this
+   * workstream) carrying a string. It was rejected because it would have been a
+   * second message doing what an existing one does, a second decoder, a second
+   * cadence to get right in `Room.step`, and a second thing for the client to
+   * route into the same `hud.notice` call -- to say a sentence a few times an
+   * evening. `walletVersion++` with no balance movement is what makes it work:
+   * `Room` re-sends the wallet because the version moved, the balance in it is
+   * simply the balance, and the note rides along. That is not a hack around the
+   * cadence, it *is* the cadence -- the version has always meant "something in
+   * this player's wallet frame changed", and the note is in the wallet frame.
+   *
+   * **Queued rather than dropped when the pill is already taken**, and that is
+   * the one non-obvious thing here. The first cut let the first writer win, on
+   * the Centrelink refusal path's precedent -- and the accounts check caught
+   * what that costs: the tick a guest scores their tenth knockout is also the
+   * tick they walk over the cash their victim dropped, so `+$6 found` claimed
+   * the pill and *"sign up to level up"* was silently thrown away. It is a
+   * once-per-session prompt. Thrown away once is thrown away for good.
+   *
+   * So the money sentence still wins **this** frame -- it is the thing that
+   * just happened, and it is what `+$6 found` is for -- and the account
+   * sentence lands on the next one, which is 16 ms later. One pending sentence
+   * per player, overwritten rather than stacked: two queued notes would be a
+   * queue, and a queue of pill messages is a player reading last minute's news.
+   */
+  note(playerId: number, text: string): void {
+    const p = this.participants.get(playerId);
+    if (!p) return;
+    if (p.walletNote !== '') {
+      this.pendingNotes.set(playerId, text.slice(0, 40));
+      return;
+    }
+    p.walletNote = text.slice(0, 40);
+    p.walletVersion++;
+  }
+
+  /**
+   * One knockout, against the ladder. Called from `creditKo` and nowhere else.
+   *
+   * The **guest branch is the interesting one**, and it is the brief's rule
+   * stated as code: *"kills accrue for everyone, but level only advances for
+   * accounts -- a guest reaching a level threshold gets 'sign up to level up'
+   * once and stays level 1."* So a guest's `kos` goes up (it is on the
+   * scoreboard, it is what the room is playing for) and their `level` does not
+   * move, because there is nowhere durable to keep it: a level that lived only
+   * in this process would be a level that vanished on the next deploy, which is
+   * a worse experience than never having had one.
+   *
+   * Cheap by construction, which matters because this is on the knockout path in
+   * a room that can hold 128: a null test, an increment, and a comparison. The
+   * store's own write is debounced (`ACCOUNT_SAVE_DEBOUNCE_MS`).
+   */
+  private creditLadder(attacker: Participant): void {
+    const account = attacker.account;
+    if (account === null) {
+      // A guest at the first threshold. `attacker.kos` has already been
+      // incremented by the caller, so this fires on the tenth kill exactly.
+      if ((attacker.prompted & PROMPTED.LEVEL) === 0 && levelFor(attacker.kos) > 1) {
+        attacker.prompted |= PROMPTED.LEVEL;
+        this.note(attacker.id, 'sign up to level up (esc)');
+      }
+      return;
+    }
+    if (this.accounts === null) return;
+    const out = this.accounts.creditKill(account);
+    if (out.reset) {
+      // The week turned over between this player's last kill and this one. Said
+      // out loud, because the alternative is a player watching their level drop
+      // from 6 to 1 in the middle of a fight with no explanation on screen.
+      attacker.level = account.level;
+      this.rosterVersion++;
+      this.note(attacker.id, 'new week. everyone is level 1 again.');
+      return;
+    }
+    if (out.levelled) {
+      attacker.level = out.level;
+      // The roster carries the level, so a level-up has to invalidate it or the
+      // number over this player's head stays wrong until the next two-second
+      // refresh -- which is exactly long enough for the pill to say "level 3"
+      // over a plate that still says 2.
+      this.rosterVersion++;
+      this.note(attacker.id, `level ${out.level}`);
+    }
+  }
+
+  /**
+   * Roll every logged-in participant into the current week. Called on the minute.
+   *
+   * The lazy reset in `net/accounts.resetIfNewWeek` covers everybody who joins,
+   * logs in or gets a knockout after Monday 00:00. This covers the one case it
+   * cannot: **a player who is standing still when the week turns over**. Without
+   * it their plate would say level 6 in a city where everybody else is at 1,
+   * until they happened to knock somebody down.
+   *
+   * On the minute rather than on the tick, from `Room.step`, because the thing
+   * being detected is a boundary that happens once a week and the worst error a
+   * minute's granularity can produce is a minute. It is O(players) and it is one
+   * string compare each; see `AccountStore.rollWeek`.
+   */
+  rollWeeks(nowMs = Date.now()): void {
+    if (this.accounts === null) return;
+    for (const p of this.participants.values()) {
+      if (p.account === null) continue;
+      if (!this.accounts.rollWeek(p.account, nowMs)) continue;
+      p.level = p.account.level;
+      this.rosterVersion++;
+      this.note(p.id, 'new week. everyone is level 1 again.');
+    }
   }
 
   // --- Money ---------------------------------------------------------------
@@ -1273,7 +1567,63 @@ export class Simulation {
     this.wallets?.markDirty();
     p.walletVersion++;
     p.walletNote = `${moved > 0 ? '+' : '-'}${formatMoney(Math.abs(moved))} ${why}`.slice(0, 40);
+    // --- "Would you like to save progress?" See `SAVE_PROMPT_BALANCE`.
+    //
+    // **Here rather than on a tick**, because this is the only place in the
+    // process where a balance goes up, so a threshold crossing is detectable
+    // exactly once and costs one comparison against a number that just changed.
+    // A per-tick `balance >= 100` sweep would be O(players) at 60 Hz to notice
+    // an event that happens once per player per session.
+    //
+    // The note is composed **after** the money one above rather than instead of
+    // it, and the money one wins: the pill has room for one sentence, and
+    // "+$34 fare" is the thing the player just did. The prompt is queued onto
+    // the *next* movement, which is a few seconds away in any session where the
+    // balance is climbing -- and if it never comes, the player was not earning
+    // and the prompt would have been noise.
+    if (
+      moved > 0 &&
+      p.account === null &&
+      (p.prompted & PROMPTED.MONEY) === 0 &&
+      p.wallet.balance >= SAVE_PROMPT_BALANCE &&
+      p.wallet.balance - moved < SAVE_PROMPT_BALANCE
+    ) {
+      p.prompted |= PROMPTED.MONEY;
+      this.note(p.id, 'would you like to save progress? sign up (esc)');
+    }
     return moved;
+  }
+
+  /**
+   * One sentence per player waiting for the pill to be free. See `note`.
+   *
+   * A `Map` rather than a queue: the newest sentence replaces the pending one,
+   * because a pill is a *moment* and a backlog of moments is a player being
+   * told what happened a minute ago. Bounded by the room -- one entry per
+   * participant at worst, and every entry is cleared on the next tick.
+   */
+  private readonly pendingNotes = new Map<number, string>();
+
+  /**
+   * Deliver anything `note` had to queue. Called once a tick by `Room.step`.
+   *
+   * Separate from the tick body rather than folded into it because it is
+   * `Room`'s cadence question rather than the simulation's: a queued sentence
+   * has to be written *after* this tick's wallet frames have been read, or it
+   * would go out on the same frame as the sentence it is queued behind and one
+   * of the two would be lost -- which is the failure `note` exists to prevent.
+   */
+  drainNotes(): void {
+    if (this.pendingNotes.size === 0) return;
+    for (const [id, text] of this.pendingNotes) {
+      const p = this.participants.get(id);
+      // Still busy: a tick where something else claimed the pill again. Left in
+      // the map for the next one rather than dropped, which is the whole point.
+      if (!p || p.walletNote !== '') continue;
+      p.walletNote = text;
+      p.walletVersion++;
+      this.pendingNotes.delete(id);
+    }
   }
 
   /**

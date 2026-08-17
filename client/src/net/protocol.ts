@@ -977,13 +977,48 @@ export function decodeInput(buffer: ArrayBuffer, out: InputFrame): InputFrame | 
 }
 
 /**
- * Say hello. 5 bytes and a name:
+ * The session token's byte cap on the wire.
+ *
+ * `accounts.TOKEN_CHARS` is 64 hex characters, which is 64 bytes of ASCII. The
+ * cap is stated **here** rather than imported because this file is the wire and
+ * a length prefix is a wire fact: a decoder that trusted an import for its bound
+ * would be a decoder whose bound moved when a constant three files away did.
+ * `verifyNet` asserts the two agree, which is the right place for that.
+ */
+export const MAX_TOKEN_BYTES = 96;
+
+/**
+ * Say hello. 5 bytes, a name, and (since accounts) a token:
  *
  *     u8   type = MSG.HELLO
  *     u16  protocol version
  *     u8   preferred colourway
  *     u8   name length **in bytes**
  *     ...  the name, UTF-8, at most `MAX_NAME_BYTES`
+ *     u8   token length in bytes        <- optional tail; 0 or absent for a guest
+ *     ...  the token, ASCII hex, at most `MAX_TOKEN_BYTES`
+ *
+ * ---------------------------------------------------------------------------
+ * **THE TOKEN IS A TAIL, AND THAT IS THE WHOLE LAYOUT DECISION.**
+ *
+ * It goes after the variable-length name rather than in front of it, so every
+ * offset that existed before accounts is byte-for-byte where it was. A hello
+ * with no tail decodes exactly as it did -- the decoder reads the frame it
+ * actually got and stops -- which means the tail costs nothing to a guest, and a
+ * client built before this change is not a parse failure but simply a client
+ * with no token. That is the same property the *name* was given when it was
+ * added after a 4-byte hello (see the version note below), and it is the reason
+ * this needed no protocol bump of its own.
+ *
+ * The alternative -- a fixed-width token field -- would have put 96 bytes on
+ * every guest's hello and moved the name, which is a change every decoder has to
+ * agree about on the same deploy.
+ *
+ * **What the server does with it is `server/index.ts`'s**, and the short version
+ * is: a valid token replaces the name entirely. The name on this frame is a
+ * *request* (see below) and an account handle is not -- so a logged-in client's
+ * name field is ignored rather than reconciled, which is the only rule that
+ * cannot produce a player whose plate and whose account disagree.
  *
  * The colourway is a *request* rather than a choice because two players who both
  * ask for red have to end up different -- telling combatants apart at fifteen
@@ -1002,34 +1037,59 @@ export function decodeInput(buffer: ArrayBuffer, out: InputFrame): InputFrame | 
  * of bytes 1-2 and the server still refuses it by version with a `BYE` it can
  * print, rather than failing to parse and dropping it into a silent socket.
  */
-export function encodeHello(colourway = 255, name = ''): ArrayBuffer {
+export function encodeHello(colourway = 255, name = '', token = ''): ArrayBuffer {
   const bytes = NAME_ENCODER.encode(name);
   const n = Math.min(bytes.length, MAX_NAME_BYTES);
-  const buffer = new ArrayBuffer(5 + n);
+  // A token is ASCII hex by construction (`accounts.tokenShaped`), so this
+  // encode is a byte per character -- but it goes through the same encoder as
+  // the name rather than being assumed, because a caller that handed this
+  // function a non-token string would otherwise write a length that disagrees
+  // with the bytes and desynchronise the frame it is the last field of.
+  const tokenBytes = NAME_ENCODER.encode(token);
+  const t = Math.min(tokenBytes.length, MAX_TOKEN_BYTES);
+  // The tail is omitted entirely for a guest rather than written as a zero
+  // byte, so a guest's hello is the same length it has always been and the
+  // "old client" and "no account" cases are one case on the wire.
+  const buffer = new ArrayBuffer(5 + n + (t > 0 ? 1 + t : 0));
   const v = new DataView(buffer);
   v.setUint8(0, MSG.HELLO);
   v.setUint16(1, PROTOCOL_VERSION, true);
   v.setUint8(3, colourway);
   v.setUint8(4, n);
   new Uint8Array(buffer, 5).set(bytes.subarray(0, n));
+  if (t > 0) {
+    v.setUint8(5 + n, t);
+    new Uint8Array(buffer, 6 + n).set(tokenBytes.subarray(0, t));
+  }
   return buffer;
 }
 
 export function decodeHello(
   buffer: ArrayBuffer,
-): { version: number; colourway: number; name: string } | null {
+): { version: number; colourway: number; name: string; token: string } | null {
   if (buffer.byteLength < 4) return null;
   const v = new DataView(buffer);
   if (v.getUint8(0) !== MSG.HELLO) return null;
   let name = '';
+  let nameLen = 0;
   if (buffer.byteLength >= 5) {
     // Bounded by what actually arrived rather than by what the prefix claims: a
     // length byte that overruns the frame is the one thing a hostile hello can
     // cheaply say, and `TextDecoder` on an out-of-range view throws.
-    const n = Math.min(v.getUint8(4), MAX_NAME_BYTES, buffer.byteLength - 5);
-    if (n > 0) name = NAME_DECODER.decode(new Uint8Array(buffer, 5, n));
+    nameLen = Math.min(v.getUint8(4), MAX_NAME_BYTES, buffer.byteLength - 5);
+    if (nameLen > 0) name = NAME_DECODER.decode(new Uint8Array(buffer, 5, nameLen));
   }
-  return { version: v.getUint16(1, true), colourway: v.getUint8(3), name };
+  // The tail, bounded the same way and absent without complaint. Note that
+  // `nameLen` is the **clamped** length rather than the one the prefix claimed,
+  // so a hello whose name byte lies cannot be used to point this read at an
+  // offset the frame does not contain.
+  let token = '';
+  const tailAt = 5 + nameLen;
+  if (buffer.byteLength > tailAt) {
+    const t = Math.min(v.getUint8(tailAt), MAX_TOKEN_BYTES, buffer.byteLength - tailAt - 1);
+    if (t > 0) token = NAME_DECODER.decode(new Uint8Array(buffer, tailAt + 1, t));
+  }
+  return { version: v.getUint16(1, true), colourway: v.getUint8(3), name, token };
 }
 
 /**
@@ -2974,7 +3034,27 @@ export function decodeHeat(buffer: ArrayBuffer, now: number): HeatRecord[] | nul
  *       u16  downs
  *       u16  ping, ms         0 for a bot, which has no socket
  *       u8   name length in bytes
+ *       u8   level            1..255; see `accounts.levelFor`
  *       ...  the name, UTF-8
+ *
+ * The **level rides here rather than on a message of its own**, which is the
+ * decision the accounts pass had to make and the one this record was already
+ * shaped for. A level is a fact about a person that changes a few times an
+ * evening, is wanted for every player at once (the board), and has to be
+ * available for somebody who is not currently visible (a nameplate is not, but
+ * the leaderboard is room-global -- see the widening note below). That is the
+ * same shape as `kos` in every respect, and `kos` is on this record.
+ *
+ * A `u8` because `accounts.MAX_LEVEL` is 255 and `levelFor` clamps there. One
+ * byte per entry is 128 bytes at a full room on a two-second refresh: 0.5
+ * kbit/s, which is under a twentieth of what this message already costs.
+ *
+ * The **level byte sits after the name length rather than before it**, which
+ * looks arbitrary and is not: the name length has been at `p + 10` since v8 and
+ * `ROSTER_ENTRY_BYTES` is what moved. Putting the new field last inside the
+ * fixed part means every existing offset in this record is unchanged, so the
+ * diff is one constant and one read rather than five re-numbered lines that all
+ * have to be right at once.
  *
  * **A reliable event rather than a section of the snapshot**, and that is the
  * whole design of this message. A name is 25 bytes at the cap, so carrying the
@@ -3005,6 +3085,15 @@ export interface RosterEntry {
   downs: number;
   /** Round trip in ms, as reported by that client. 0 for a bot. See `encodePing`. */
   ping: number;
+  /**
+   * This player's level, 1..255. `accounts.levelFor(kills)`.
+   *
+   * **1 for everybody without an account**, including every bot, and that is the
+   * feature rather than a gap: kills accrue for guests and the ladder does not
+   * move for them, because there is nowhere durable to keep it. See
+   * `net/accounts.ts` for why the ladder exists at all and why it resets.
+   */
+  level: number;
 }
 
 /**
@@ -3027,8 +3116,11 @@ export interface RosterEntry {
  * refresh is two seconds rather than one.
  */
 export const ROSTER_HEADER_BYTES = 3;
-/** Everything in an entry except the name itself. */
-export const ROSTER_ENTRY_BYTES = 11;
+/**
+ * Everything in an entry except the name itself. 11 through v12; 12 with the
+ * level byte the accounts pass added on the end. See the record's own note.
+ */
+export const ROSTER_ENTRY_BYTES = 12;
 
 export function rosterBytes(entries: readonly RosterEntry[]): number {
   let total = ROSTER_HEADER_BYTES;
@@ -3054,6 +3146,12 @@ export function encodeRoster(entries: readonly RosterEntry[]): ArrayBuffer {
     v.setUint16(p + 6, Math.max(0, Math.min(65535, e.downs)), true);
     v.setUint16(p + 8, quantisePing(e.ping), true);
     v.setUint8(p + 10, name.length);
+    // Clamped rather than masked. `e.level & 0xff` would draw a level 256 player
+    // as level 0, which is a number the ladder cannot produce and which
+    // `accounts.levelFor` exists to make unreachable -- but the clamp is here
+    // too, because this encoder is handed a number by four call sites and one
+    // of them being wrong should not put an impossible plate over a body.
+    v.setUint8(p + 11, Math.max(1, Math.min(255, Math.round(e.level || 1))));
     bytes.set(name, p + ROSTER_ENTRY_BYTES);
     p += ROSTER_ENTRY_BYTES + name.length;
   }
@@ -3081,6 +3179,11 @@ export function decodeRoster(buffer: ArrayBuffer): RosterEntry[] | null {
       kos: v.getUint16(p + 4, true),
       downs: v.getUint16(p + 6, true),
       ping: v.getUint16(p + 8, true),
+      // `|| 1` rather than the raw byte: a zero here is either a truncated
+      // record or an encoder that forgot the field, and "level 0" is a number
+      // the ladder cannot produce. Falling back to the floor draws something
+      // true about a player with no account rather than something impossible.
+      level: v.getUint8(p + 11) || 1,
       name: nameLen > 0 ? NAME_DECODER.decode(new Uint8Array(buffer, p + ROSTER_ENTRY_BYTES, nameLen)) : '',
     });
     p += ROSTER_ENTRY_BYTES + nameLen;
@@ -4173,6 +4276,58 @@ export function verifyNet(): string[] {
         threw = true;
       }
       if (threw) failures.push('A HELLO whose name length overran the frame threw rather than being clipped.');
+
+      // --- The token tail. Every one of these is a way to be logged out
+      // silently, which is this feature's whole shape of failure: the game plays
+      // perfectly and your level is somebody else's.
+      const session = 'ab12cd34'.repeat(8); // 64 hex, `accounts.TOKEN_CHARS`
+      if (session.length !== 64) failures.push('The token fixture is not 64 characters; the checks below prove nothing.');
+      const authed = decodeHello(encodeHello(3, 'Bazza', session));
+      if (!authed || authed.name !== 'Bazza' || authed.token !== session) {
+        failures.push(`A HELLO carrying a token came back with token ${JSON.stringify(authed?.token)}; a logged-in player would join as a guest.`);
+      }
+      // A guest's hello must be **byte-identical** to what it was before the
+      // tail existed, or every client built against v12 is a parse away from
+      // being refused for a reason nobody can see.
+      const guest = encodeHello(3, 'Bazza');
+      if (guest.byteLength !== 5 + NAME_ENCODER.encode('Bazza').length) {
+        failures.push(`A guest HELLO is ${guest.byteLength} bytes; the token tail must be absent, not zero-length.`);
+      }
+      if (decodeHello(guest)?.token !== '') failures.push('A guest HELLO decoded with a token.');
+      // An empty name with a token: the tail's offset is derived from the name
+      // length, so the zero case is the one that gets the arithmetic wrong.
+      const nameless = decodeHello(encodeHello(255, '', session));
+      if (!nameless || nameless.name !== '' || nameless.token !== session) {
+        failures.push('A HELLO with a token and no name did not round-trip; the tail offset is wrong at nameLen 0.');
+      }
+      // A token past the cap is clipped rather than written long, which would
+      // put a length byte on the wire that disagrees with the bytes after it.
+      const huge = decodeHello(encodeHello(255, 'Bazza', 'f'.repeat(500)));
+      if (!huge || huge.token.length > MAX_TOKEN_BYTES) {
+        failures.push(`An over-long token came back at ${huge?.token.length} bytes against a ${MAX_TOKEN_BYTES} cap.`);
+      }
+      // And the hostile version of the same frame: a name length that lies, with
+      // bytes after it. The tail read must be bounded by what arrived, or a
+      // three-byte hello can be made to read off the end of the buffer.
+      const liar2 = new ArrayBuffer(10);
+      const lv3 = new DataView(liar2);
+      lv3.setUint8(0, MSG.HELLO);
+      lv3.setUint16(1, PROTOCOL_VERSION, true);
+      lv3.setUint8(3, 255);
+      lv3.setUint8(4, 3);
+      lv3.setUint8(8, 200); // a token length that overruns
+      let threw2 = false;
+      try {
+        decodeHello(liar2);
+      } catch {
+        threw2 = true;
+      }
+      if (threw2) failures.push('A HELLO whose token length overran the frame threw rather than being clipped.');
+      // The wire's cap has to be able to carry a real token, or every login
+      // would be silently truncated into a token nothing matches.
+      if (MAX_TOKEN_BYTES < 64) {
+        failures.push(`MAX_TOKEN_BYTES is ${MAX_TOKEN_BYTES}, which cannot carry a 64-character session token.`);
+      }
     }
 
     // --- PING, and the round trip it now carries for the scoreboard.
@@ -4495,14 +4650,14 @@ export function verifyNames(): string[] {
   // leaderboard of players nobody has ever seen.
   {
     const entries: RosterEntry[] = [
-      { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 7, downs: 2, ping: 34 },
-      { id: 2, colourway: 3, bot: true, name: 'Shazza', kos: 0, downs: 11, ping: 0 },
-      { id: 200, colourway: 6, bot: false, name: 'Bazza (2)', kos: 65535, downs: 3, ping: 65535 },
+      { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 7, downs: 2, ping: 34, level: 3 },
+      { id: 2, colourway: 3, bot: true, name: 'Shazza', kos: 0, downs: 11, ping: 0, level: 1 },
+      { id: 200, colourway: 6, bot: false, name: 'Bazza (2)', kos: 65535, downs: 3, ping: 65535, level: 255 },
       // The empty name is reachable: a client that sends nothing is given one by
       // the server, but the *record* has to survive a zero-length string or the
       // decoder walks off the end of the entry before it.
-      { id: 15, colourway: 1, bot: false, name: '', kos: 1, downs: 1, ping: 999 },
-      { id: 9, colourway: 2, bot: false, name: 'Kev 🦘', kos: 2, downs: 0, ping: 12 },
+      { id: 15, colourway: 1, bot: false, name: '', kos: 1, downs: 1, ping: 999, level: 1 },
+      { id: 9, colourway: 2, bot: false, name: 'Kev 🦘', kos: 2, downs: 0, ping: 12, level: 12 },
     ];
     const frame = encodeRoster(entries);
     if (frame.byteLength !== rosterBytes(entries)) {
@@ -4522,7 +4677,28 @@ export function verifyNames(): string[] {
         if (b.kos !== a.kos || b.downs !== a.downs || b.ping !== a.ping) {
           failures.push(`Roster entry ${a.id}: ${a.kos}/${a.downs}/${a.ping} came back as ${b.kos}/${b.downs}/${b.ping}.`);
         }
+        // The level, which rides after the name length and is therefore the one
+        // field a mis-sized `ROSTER_ENTRY_BYTES` corrupts *first*: the name would
+        // start a byte early and every entry after it would decode as plausible
+        // garbage. See the record's layout note.
+        if (b.level !== a.level) {
+          failures.push(`Roster entry ${a.id}: level ${a.level} came back as ${b.level}.`);
+        }
       }
+    }
+    // A level the encoder should never be handed. Clamped rather than masked:
+    // 256 & 0xff is 0, and "lvl 0" is a number the ladder cannot produce.
+    const silly = decodeRoster(
+      encodeRoster([{ id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 0, level: 4000 }]),
+    );
+    if (!silly || silly[0].level !== 255) {
+      failures.push(`A level of 4000 came back as ${silly?.[0].level} rather than being clamped to 255.`);
+    }
+    const zero = decodeRoster(
+      encodeRoster([{ id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 0, level: 0 }]),
+    );
+    if (!zero || zero[0].level !== 1) {
+      failures.push(`A level of 0 came back as ${zero?.[0].level} rather than the floor of 1.`);
     }
     // A truncated frame drops the tail rather than throwing. A throw here is
     // inside a socket callback and takes the client's whole message pump.
@@ -4541,10 +4717,10 @@ export function verifyNames(): string[] {
   // --- The order the leaderboard is drawn in.
   {
     const rows: RosterEntry[] = [
-      { id: 1, colourway: 0, bot: false, name: 'Davo', kos: 2, downs: 1, ping: 0 },
-      { id: 2, colourway: 0, bot: false, name: 'Bazza', kos: 5, downs: 9, ping: 0 },
-      { id: 3, colourway: 0, bot: false, name: 'Macca', kos: 2, downs: 0, ping: 0 },
-      { id: 4, colourway: 0, bot: false, name: 'Shazza', kos: 0, downs: 0, ping: 0 },
+      { id: 1, colourway: 0, bot: false, name: 'Davo', kos: 2, downs: 1, ping: 0, level: 1 },
+      { id: 2, colourway: 0, bot: false, name: 'Bazza', kos: 5, downs: 9, ping: 0, level: 1 },
+      { id: 3, colourway: 0, bot: false, name: 'Macca', kos: 2, downs: 0, ping: 0, level: 1 },
+      { id: 4, colourway: 0, bot: false, name: 'Shazza', kos: 0, downs: 0, ping: 0, level: 1 },
     ];
     const order = rankRoster(rows).map((r) => r.name).join(',');
     // Bazza leads on kills despite being knocked down nine times -- the board is

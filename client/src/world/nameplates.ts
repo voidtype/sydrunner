@@ -287,8 +287,16 @@ const FONT_STACK = 'ui-monospace, SFMono-Regular, Menlo, monospace';
  */
 export const MAX_PLATES = 24;
 
-/** Backing, fill, two ticks, name, stars. See the header. */
-export const QUADS_PER_PLATE = 6;
+/**
+ * Backing, fill, two ticks, name, stars, **level**. See the header.
+ *
+ * Seven since workstream G. The count has to be a constant rather than a
+ * function of what a plate happens to carry, because the index buffer is built
+ * once at construction with a fixed six indices per quad per slot -- so a plate
+ * with no stars and no level still writes two degenerate quads rather than
+ * skipping them. `verifyNameplates` asserts the arithmetic both ways.
+ */
+export const QUADS_PER_PLATE = 7;
 
 /**
  * The star row's height, as a fraction of the name's, and the gap over it.
@@ -302,6 +310,17 @@ export const QUADS_PER_PLATE = 6;
  */
 const STAR_HEIGHT_SCALE = 0.62;
 const STAR_GAP = 0.03;
+/**
+ * The gap between the level label and the star row, in the same units.
+ *
+ * They share one line -- the brief asked for the level *beside* the stars
+ * rather than on a row of its own -- so the plate grows no taller for having
+ * both, which is what keeps `verifyNameplates`' "a plate must not dominate the
+ * body" budget intact. A third of the vertical gap, because horizontal space
+ * between two short labels reads as wider than the same number of metres does
+ * vertically.
+ */
+const BADGE_GAP = 0.04;
 
 /**
  * The glyphs. Filled, unfilled, and the string builder that caches by count.
@@ -328,6 +347,30 @@ export function starRow(stars: number): string {
   if (!(stars > 0)) return '';
   const n = Math.max(0, Math.min(5, Math.round(stars)));
   return STAR_ROWS[n];
+}
+
+/**
+ * The label for a level, or `''` -- which draws nothing.
+ *
+ * **Empty at level 1**, and that is the same decision `starRow` makes about
+ * zero stars, for the same reason stated there: every guest and every bot in
+ * the city is level 1, so a `lvl 1` under every name in the street would be
+ * five times the ink to say the thing that is already true of everybody. The
+ * row appears when it means something.
+ *
+ * Rasterised through the **same atlas cache the names use**, which is what
+ * makes this cost almost nothing: `slotFor` keys on the string, so a lobby
+ * where nine people are level 3 occupies one atlas row between them. The
+ * distinct strings are bounded by the levels actually present in a room, which
+ * in practice is a handful; and the cache evicts least-recently-asked-for
+ * rather than failing if it is ever more (see `slotFor`).
+ *
+ * Clamped to the `u8` the roster carries, so a decode error draws a wrong
+ * number rather than "lvl undefined".
+ */
+export function levelRow(level: number): string {
+  if (!(level > 1)) return '';
+  return `lvl ${Math.max(2, Math.min(255, Math.round(level)))}`;
 }
 
 const VERTS_PER_QUAD = 4;
@@ -416,6 +459,15 @@ export interface PlateInput {
    * everybody.
    */
   stars?: number;
+  /**
+   * What level they are, 1..255. `net/client.levelOf`, or absent offline.
+   *
+   * Optional and defaulting to nothing, on `stars`' argument exactly: the two
+   * callers are the remotes online and the dummies offline, and a training
+   * dummy has no ladder any more than it has a police record. See `levelRow`,
+   * which draws nothing at 1.
+   */
+  level?: number;
 }
 
 /** A copy of a `PlateInput`, plus its range. Pooled; see `NameplateField.pending`. */
@@ -486,7 +538,7 @@ export class NameplateField {
    * record here is what lets the caller pass one scratch object for everybody.
    */
   private readonly pending: PendingPlate[] = Array.from({ length: MAX_PLATES }, () => ({
-    id: 0, name: '', health: 0, headX: 0, headY: 0, headZ: 0, down: false, stars: 0, distance: 0,
+    id: 0, name: '', health: 0, headX: 0, headY: 0, headZ: 0, down: false, stars: 0, level: 1, distance: 0,
   }));
   private pendingCount = 0;
 
@@ -654,6 +706,7 @@ export class NameplateField {
     slot.headZ = input.headZ;
     slot.down = input.down;
     slot.stars = input.stars ?? 0;
+    slot.level = input.level ?? 1;
     slot.distance = distance;
   }
 
@@ -852,37 +905,69 @@ export class NameplateField {
     // Both numbers are the same today and `verifyNameplates` is what keeps them
     // that way if `combat.MAX_HEALTH` ever moves.
 
-    // --- The star row, between the bar and the name.
+    // --- The badge row: the level and the stars, side by side, between the bar
+    // and the name.
     //
     // Written **before** the name so the name can be pushed up by exactly the
     // height this took, which is how the row is "under the name" rather than
     // over the bar: the plate grows upward and the two things a player already
     // knows how to find -- the bar at the bottom, the name at the top -- stay
-    // where they were. See `starRow`, and `game/heat.ts` for what the stars are.
+    // where they were. See `starRow` and `levelRow`, `game/heat.ts` for what
+    // the stars are, and `net/accounts.ts` for what the level is.
+    //
+    // **One line for both, centred as a group**, which is the layout decision
+    // here and the reason the plate did not get taller: the brief asked for the
+    // level *beside* the stars, and a row each would have added a name's worth
+    // of height to every plate belonging to somebody with an account -- which
+    // `verifyNameplates` measures against the figure and would have failed.
+    // Either badge may be absent and the group re-centres, so a level-4 player
+    // with no heat gets a centred `lvl 4` rather than one shoved to the left of
+    // where five stars would have been.
     let starRise = 0;
     {
-      const row = starRow(input.stars ?? 0);
-      const slot = row === '' ? null : this.slotFor(row);
-      if (slot !== null && slot.widthPx > 0) {
-        let starH = NAME_HEIGHT * STAR_HEIGHT_SCALE * scale;
-        let starW = starH * (slot.widthPx / SLOT_HEIGHT);
-        const cap = NAME_MAX_WIDTH * scale;
-        if (starW > cap) {
-          starH *= cap / starW;
-          starW = cap;
-        }
-        const bottom = barH + border + STAR_GAP * scale;
-        const v0 = slot.row * SLOT_HEIGHT;
-        c.setRGB(1, 1, 1);
-        this.quad(anchor, -starW / 2, starW / 2, bottom, bottom + starH, 0, v0, slot.widthPx, v0 + SLOT_HEIGHT, c, alpha);
-        starRise = starH + STAR_GAP * scale;
+      const levelText = levelRow(input.level ?? 1);
+      const starText = starRow(input.stars ?? 0);
+      // Rasterised (or found in the atlas) before either is placed, because the
+      // group's width -- and therefore where each of them starts -- needs both.
+      const levelSlot = levelText === '' ? null : this.slotFor(levelText);
+      const starSlot = starText === '' ? null : this.slotFor(starText);
+      const badgeH = NAME_HEIGHT * STAR_HEIGHT_SCALE * scale;
+      const levelW = levelSlot && levelSlot.widthPx > 0 ? badgeH * (levelSlot.widthPx / SLOT_HEIGHT) : 0;
+      const starW = starSlot && starSlot.widthPx > 0 ? badgeH * (starSlot.widthPx / SLOT_HEIGHT) : 0;
+      const gap = levelW > 0 && starW > 0 ? BADGE_GAP * scale : 0;
+      let total = levelW + gap + starW;
+      let height = badgeH;
+      const cap = NAME_MAX_WIDTH * scale;
+      // Both shrink together rather than the wider one being clipped, which is
+      // the same bargain the name makes one block down: a badge row that was
+      // squashed on one side would read as two different type sizes.
+      const squeeze = total > cap && total > 0 ? cap / total : 1;
+      total *= squeeze;
+      height *= squeeze;
+      const bottom = barH + border + STAR_GAP * scale;
+      c.setRGB(1, 1, 1);
+      let cursor = -total / 2;
+      // The level first, so it reads "lvl 4 ★★☆☆☆" left to right -- who they
+      // are, then how wanted they are.
+      if (levelSlot !== null && levelW > 0) {
+        const w = levelW * squeeze;
+        const v0 = levelSlot.row * SLOT_HEIGHT;
+        this.quad(anchor, cursor, cursor + w, bottom, bottom + height, 0, v0, levelSlot.widthPx, v0 + SLOT_HEIGHT, c, alpha);
+        cursor += w + gap * squeeze;
       } else {
-        // Nobody wanted: still six quads. See the note on the degenerate fill --
-        // the quad count per plate has to be constant or the index buffer's
-        // fixed layout, and every budget check that reads it, stops being true.
-        c.setRGB(1, 1, 1);
+        // Absent: still a quad. See the note on the degenerate fill -- the quad
+        // count per plate has to be constant or the index buffer's fixed layout,
+        // and every budget check that reads it, stops being true.
         this.quad(anchor, 0, 0, 0, 0, 0, 0, 0, 0, c, 0);
       }
+      if (starSlot !== null && starW > 0) {
+        const w = starW * squeeze;
+        const v0 = starSlot.row * SLOT_HEIGHT;
+        this.quad(anchor, cursor, cursor + w, bottom, bottom + height, 0, v0, starSlot.widthPx, v0 + SLOT_HEIGHT, c, alpha);
+      } else {
+        this.quad(anchor, 0, 0, 0, 0, 0, 0, 0, 0, c, 0);
+      }
+      if (total > 0) starRise = height + STAR_GAP * scale;
     }
 
     // --- The name, centred over the bar.
@@ -1004,9 +1089,37 @@ export function verifyNameplates(maxHealth: number): string[] {
   }
   // The tick loop writes `MAX_PIPS - 1` quads and the buffer layout budgets for
   // exactly `QUADS_PER_PLATE`. Everything else in a plate is one quad each:
-  // the backing, the fill, the star row and the name.
-  if (QUADS_PER_PLATE !== 4 + (MAX_PIPS - 1)) {
-    failures.push(`A plate writes ${4 + (MAX_PIPS - 1)} quads but ${QUADS_PER_PLATE} are budgeted; the index buffer's layout is wrong.`);
+  // the backing, the fill, the level, the star row and the name -- five, and
+  // every one of them written unconditionally even when it is degenerate.
+  if (QUADS_PER_PLATE !== 5 + (MAX_PIPS - 1)) {
+    failures.push(`A plate writes ${5 + (MAX_PIPS - 1)} quads but ${QUADS_PER_PLATE} are budgeted; the index buffer's layout is wrong.`);
+  }
+
+  // --- The level label. Distinct at every level, absent at 1, and clamped.
+  //
+  // What this catches: a `levelRow` that returned something at level 1 would put
+  // a badge under every guest and every bot in the city, which is exactly the
+  // failure the star row's own check exists for. A label that did not clamp
+  // would rasterise "lvl undefined" under somebody's name off a decode error --
+  // and it would render perfectly, which is this repo's definition of a silent
+  // failure.
+  {
+    if (levelRow(1) !== '') failures.push('A level-1 player is given a level badge; every plate in the city would carry one.');
+    if (levelRow(0) !== '' || levelRow(-3) !== '') failures.push('A level below the floor produced a badge.');
+    const seen = new Set<string>();
+    for (let n = 2; n <= 12; n++) {
+      const row = levelRow(n);
+      if (row === '') {
+        failures.push(`A level-${n} player is given no badge.`);
+        continue;
+      }
+      if (seen.has(row)) failures.push(`Level ${n} draws the same badge as another level; the two are indistinguishable.`);
+      seen.add(row);
+    }
+    if (!/^lvl 255$/.test(levelRow(9000))) {
+      failures.push(`A level past the u8 drew ${JSON.stringify(levelRow(9000))} rather than being clamped.`);
+    }
+    if (/undefined|NaN/.test(levelRow(NaN))) failures.push('A NaN level rasterised its own error into the atlas.');
   }
 
   // --- The star row. Six distinct strings, all five glyphs wide, and a row for
@@ -1113,6 +1226,10 @@ export function verifyNameplates(maxHealth: number): string[] {
   // Measured against the worst case rather than the common one, because the
   // failure being guarded here -- a plate that dominates the body it belongs to
   // -- happens to the plate that has the most on it.
+  // The level shares the star row's line rather than taking one of its own (see
+  // `BADGE_GAP`), so this sum is unchanged by the accounts pass -- which is the
+  // property that layout decision was made for and is worth asserting by having
+  // the budget still pass rather than by having been widened to fit.
   const plateHeight =
     BAR_HEIGHT + BAR_BORDER * 2 + STAR_GAP + NAME_HEIGHT * STAR_HEIGHT_SCALE + NAME_GAP + NAME_HEIGHT;
   if (plateHeight > figureHeight * 0.45) {
@@ -1189,10 +1306,13 @@ export function verifyNameplates(maxHealth: number): string[] {
       failures.push(`The local player was given ${field.live} plate(s); they have the HUD.`);
     }
 
-    // --- One remote, at a readable distance. Five quads, and the winding of
-    // every one of them faces the camera.
+    // --- One remote, at a readable distance. Every quad in the budget, and the
+    // winding of every one of them faces the camera. Given a level and stars, so
+    // the two badges are real quads rather than the degenerate pair -- a
+    // constant count has to hold in both directions and the populated one is
+    // the direction that can overflow.
     field.begin(camera);
-    field.add({ id: 8, name: 'Davo', health: 2, headX: 0, headY: 0, headZ: -10, down: false }, 7);
+    field.add({ id: 8, name: 'Davo', health: 2, headX: 0, headY: 0, headZ: -10, down: false, stars: 3, level: 4 }, 7);
     field.end();
     if (field.live !== 1) failures.push(`A remote at 10 m got ${field.live} plates, not 1.`);
     const drawn = field.mesh.geometry.drawRange.count / INDICES_PER_QUAD;

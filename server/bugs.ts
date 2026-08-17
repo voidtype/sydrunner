@@ -1064,6 +1064,18 @@ export async function handleBugRequest(
   ip: string,
   store: BugStore,
   guards: BugGuards,
+  /**
+   * The handle of the account this report is filed by, or `null` for a guest.
+   *
+   * Resolved by `server/index.ts` from the request's `Authorization: Bearer`
+   * header before this is called, on the same seam the IP arrives on: this file
+   * knows what a bug report is and nothing about tokens, exactly as it knows
+   * nothing about how `ip` was obtained.
+   *
+   * A **handle rather than a boolean**, because the gate is not the only thing
+   * the account is good for -- see where it is used below.
+   */
+  author: string | null,
   now = Date.now(),
 ): Promise<Response> {
   if (req.method === 'OPTIONS') return corsResponse(new Response(null, { status: 204 }));
@@ -1096,6 +1108,39 @@ export async function handleBugRequest(
   const clientId = typeof parsed.clientId === 'string' ? parsed.clientId : '';
   if (!validClientId(clientId)) {
     return bugJson({ status: 400, result: 'rejected', issue: 0, url: '', message: 'this client has no id — reload the page.' });
+  }
+
+  /*
+   * --- The account gate. Workstream G: *"the bug reporter requires an
+   * account"*.
+   *
+   * **In front of the image decode and behind the client id**, which is the
+   * ordering this whole route is built on: everything cheap before everything
+   * expensive. A guest attaching a four-megabyte screenshot should be refused
+   * before the base64 is decoded, not after -- but they should also be told
+   * something better than "no id", so the id check stays first.
+   *
+   * 401 rather than 403: the request is not forbidden, it is unauthenticated,
+   * and the difference is what the client's status line says. The player reads
+   * `message`; the code is for whoever is reading a proxy log at three in the
+   * morning wondering why the bug box went quiet.
+   *
+   * Worth saying why the bug box is gated at all, since it is the one surface
+   * here whose value goes *down* with friction: it is the only public endpoint
+   * in this process that writes bytes into a public repository (see the file
+   * header). Every other rate limit here is about volume; this one is about the
+   * fact that a report which cannot be traced to a durable identity cannot be
+   * followed up, and a repository full of anonymous single-line issues is a
+   * repository nobody reads.
+   */
+  if (author === null) {
+    return bugJson({
+      status: 401,
+      result: 'rejected',
+      issue: 0,
+      url: '',
+      message: 'sign up to send feedback — bug reports need an account.',
+    });
   }
 
   // The cheap tier, **before** the image is decoded. Decoding four megabytes of
@@ -1153,11 +1198,18 @@ export async function handleBugRequest(
     return bugJson({ status: 429, result: 'rate', issue: 0, url: '', message: claimed.why });
   }
 
+  // The handle goes into the report's metadata rather than into its title, so
+  // an issue says who filed it without the board becoming a list of names. It
+  // is the **server's** answer to who this is (a verified token), which is what
+  // makes it worth recording at all -- `SuggestionHub.handle` makes the same
+  // argument about taking the author off the participant rather than the frame.
+  const meta = sanitiseMeta(parsed.meta);
+  meta.unshift(['account', author]);
   const outcome = await store.file({
     clientId,
     title,
     body: reportBody,
-    meta: sanitiseMeta(parsed.meta),
+    meta,
     image,
   });
   return bugJson(outcome);

@@ -662,6 +662,21 @@
       }
       #money:empty { display: none; }
 
+      /* The level, immediately under the balance and a rung quieter than it.
+         Same collapse rule and the same reason: a session with no ladder in it
+         (offline, a guest, level 1) must not reserve a row in a cluster whose
+         whole job is to be read in peripheral vision. The blue rather than the
+         gold, because gold in this interface means money and a level is not
+         money -- it is the same tone `#help`'s descriptions use, which is the
+         "this is a label" voice established at the top of this stylesheet. */
+      #level {
+        font-size: calc(9px * var(--vitals-scale));
+        letter-spacing: .16em; text-transform: uppercase;
+        color: #93a8bc; text-shadow: 0 1px 3px rgba(0,0,0,.9);
+        line-height: 1; margin-top: calc(2px * var(--vitals-scale));
+      }
+      #level:empty { display: none; }
+
 
       /* ---------------------------------------------------------------------
          THE PHONE. `client/src/phone.ts` drives it; this is its whole
@@ -1337,7 +1352,10 @@
       #nameprompt-sub {
         font-size: 11px; line-height: 1.7; color: #b9cbdb; margin-bottom: 22px;
       }
-      #nameprompt-row { display: flex; gap: 10px; align-items: stretch; justify-content: center; }
+      /* A class as well as the id, because the login pane needs the same row
+         and an id may appear once. The id is kept so the quick-play markup this
+         panel grew out of reads unchanged. */
+      #nameprompt-row, .nameprompt-row { display: flex; gap: 10px; align-items: stretch; justify-content: center; }
       #nameprompt input {
         font: inherit; font-size: 13px; letter-spacing: .08em;
         color: #e6eef6; background: transparent; text-align: center;
@@ -1352,7 +1370,80 @@
         border: 1px solid rgba(207,226,242,.34); padding: 3px 14px;
       }
       #nameprompt button:hover { border-color: #cfe2f2; }
-      #nameprompt-note { font-size: 10px; color: #5f7285; margin-top: 16px; line-height: 1.6; }
+      #nameprompt-note, #account-note, #signedin-note {
+        font-size: 10px; color: #5f7285; margin-top: 16px; line-height: 1.6;
+      }
+      #nameprompt-note.bad, #account-note.bad { color: #f0a9a0; }
+      #nameprompt-note.ok, #account-note.ok { color: #9fc79a; }
+
+      /* --- The two ways in: quick play, or an account.
+         Workstream G. `client/src/accounts.ts` drives all of it.
+
+         The tab strip is `#panel-tabs`' to the pixel -- same 9px uppercase,
+         same underline-on-selected, same `type="button"` -- rather than a new
+         idiom, because this document already has one way of saying "two views
+         of one panel" and a second would be a second thing to keep in step. The
+         difference is that these are centred, since the panel they sit in is. */
+      #nameprompt-tabs {
+        display: flex; gap: 18px; justify-content: center; margin-bottom: 18px;
+      }
+      #nameprompt-tabs button {
+        font: inherit; font-size: 9px; letter-spacing: .16em; text-transform: uppercase;
+        color: #5f7285; background: transparent; border: 0; border-bottom: 1px solid transparent;
+        padding: 3px 2px; cursor: pointer;
+      }
+      #nameprompt-tabs button.on { color: #cfe2f2; border-bottom-color: #cfe2f2; }
+      #nameprompt-tabs button:hover { color: #b9cbdb; }
+      .joinpane { display: none; }
+      .joinpane.on { display: block; }
+      /* The login pane stacks where quick play is a row, because it has two
+         fields and a row of three controls would be wider than the panel. */
+      #nameprompt-login .field {
+        display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 12px;
+      }
+      #nameprompt-login label {
+        font-size: 9px; letter-spacing: .16em; text-transform: uppercase; color: #5f7285;
+      }
+      /* The signed-in line, in the corner of the panel. Small, quiet, and with
+         the log-out control as a text button rather than a bordered one: it is
+         a thing you should be able to find and not a thing anybody should press
+         by accident on their way into a game. */
+      /* Above the title rather than absolutely positioned in the corner of the
+         panel, which is where the first cut put it: the panel is 420px and
+         centred, so "the corner" was directly over the wordmark. In the flow it
+         is a line of its own and cannot collide with anything. */
+      #nameprompt-who {
+        text-align: right; margin-bottom: 8px;
+        font-size: 10px; color: #7f95ab; letter-spacing: .04em;
+      }
+      #nameprompt-who:empty { display: none; }
+      #nameprompt-who button {
+        font: inherit; font-size: 10px; color: #cfe2f2; background: transparent;
+        border: 0; padding: 0 0 0 6px; cursor: pointer; text-decoration: underline;
+      }
+
+      /* --- The feedback gate, in the two panels that need an account.
+         Sits where the compose box would be; see `client/src/accounts.ts`. */
+      .signupgate {
+        display: none; border: 1px solid rgba(207,226,242,.18); padding: 10px 12px;
+        margin-top: 10px; font-size: 11px; line-height: 1.7; color: #b9cbdb;
+      }
+      .signupgate.shown { display: block; }
+      .signupgate button {
+        font: inherit; font-size: 9px; letter-spacing: .16em; text-transform: uppercase;
+        color: #cfe2f2; background: transparent; cursor: pointer;
+        border: 1px solid rgba(207,226,242,.34); padding: 3px 14px; margin-top: 8px;
+      }
+      .signupgate button:hover { border-color: #cfe2f2; }
+      /* What the gate replaces, hidden by `JoinGate.paint` setting `hidden`.
+         Spelled out here because the UA's `[hidden] { display: none }` is the
+         lowest specificity there is, and every one of these already has an id
+         rule giving it a `display` -- so the attribute alone does nothing and
+         the compose box sits under the gate telling a guest to sign up. It is
+         an id-plus-attribute selector rather than `!important` for that
+         reason: the specificity is the fix, not a louder declaration. */
+      #suggestions-compose[hidden], #bug-title[hidden], #bug-body[hidden],
+      #bug-attach[hidden], #bug-row[hidden] { display: none; }
 
       #loading {
         position: fixed; inset: 0; display: grid; place-items: center;
@@ -1401,6 +1492,10 @@
            a number that moved up the screen when a Flat White expired would be
            a number you have to look for. -->
       <div id="money"></div>
+      <!-- The level, under the balance. Empty at level 1 and offline; see
+           `client/src/hud.ts`'s `level` for why a `lvl 1` on every screen in
+           the city would be a label rather than information. -->
+      <div id="level"></div>
       <div id="effects"></div>
       <div id="pips"></div>
       <div id="stamina"></div>
@@ -1675,7 +1770,11 @@
       <h1>Sydney</h1>
       <table>
         <thead>
-          <tr><th>name</th><th>kos</th><th>downs</th><th>ping</th></tr>
+          <!-- `lvl` sits second, next to the name, because it is a property of
+               the *person* where the three columns after it are properties of
+               the session. See `client/src/net/accounts.ts` for the ladder and
+               why it resets every Monday. -->
+          <tr><th>name</th><th>lvl</th><th>kos</th><th>downs</th><th>ping</th></tr>
         </thead>
         <tbody id="leaderboard-rows"></tbody>
       </table>
@@ -1702,6 +1801,14 @@
       <section id="panel-suggest" class="tabpane on">
         <div id="suggestions-note"></div>
         <div id="suggestions-list"></div>
+        <!-- The account gate. Shown in place of the compose box for a guest;
+             see `client/src/accounts.ts` and `server/suggestions.ts`'s refusal.
+             The list above it stays readable, deliberately: a panel a guest
+             cannot read cannot advertise what signing up is for. -->
+        <div class="signupgate" id="suggestions-gate">
+          sign up to send feedback — suggestions and votes need an account.
+          <div><button type="button" data-signup="1">sign up</button></div>
+        </div>
         <div id="suggestions-compose">
           <input id="suggestions-title" maxlength="90" autocomplete="off" autocapitalize="off"
                  autocorrect="off" spellcheck="false" placeholder="a change you want, in one line" />
@@ -1749,6 +1856,10 @@
           <summary>attached automatically</summary>
           <div id="bug-meta"></div>
         </details>
+        <div class="signupgate" id="bug-gate">
+          sign up to send feedback — bug reports need an account.
+          <div><button type="button" data-signup="1">sign up</button></div>
+        </div>
         <div id="bug-row">
           <span id="bug-count"></span>
           <button id="bug-send" type="button">send report</button>
@@ -1758,16 +1869,73 @@
       </section>
     </div>
 
+    <!-- The landing panel. Two ways in, and `client/src/accounts.ts` owns every
+         listener on it: `hud.ts` only hides it, on a fatal error.
+
+         Quick play is what this panel has always been -- a name box and a join
+         button -- and it is first and selected by default, because an account is
+         optional and the fastest path into Sydney must stay one key. What is new
+         is that the name is checked against `/auth/check` as it is typed: a
+         handle somebody has registered is not available to a guest, and finding
+         that out here is enormously better than finding it out as a `BYE` after
+         350 MB of city has streamed in. -->
     <div id="nameprompt">
       <div id="nameprompt-inner">
+        <!-- "playing as Bazza · log out", written by `JoinGate.paint`. -->
+        <div id="nameprompt-who"></div>
         <div id="nameprompt-title">Sydney</div>
-        <div id="nameprompt-sub">what should everyone call you?</div>
-        <div id="nameprompt-row">
-          <input id="nameprompt-input" maxlength="16" autocomplete="off" autocapitalize="off"
-                 autocorrect="off" spellcheck="false" />
-          <button id="nameprompt-join" type="button">join</button>
+        <div id="nameprompt-tabs" role="tablist">
+          <button class="on" type="button" data-join="quick" role="tab">quick play</button>
+          <button type="button" data-join="account" role="tab">log in / sign up</button>
         </div>
-        <div id="nameprompt-note">2–16 characters · enter to join</div>
+
+        <!-- The third state, and the one a returning player sees: logged in,
+             nothing to type, one button. It is a pane rather than a variation
+             of quick play because the quick-play pane's whole content is a
+             question this player has already answered. -->
+        <section id="nameprompt-signedin" class="joinpane">
+          <div id="nameprompt-sub">welcome back.</div>
+          <div class="nameprompt-row">
+            <button id="account-play" type="button">play</button>
+          </div>
+          <div id="signedin-note">your level and your cash are on this account</div>
+        </section>
+
+        <section id="nameprompt-quick" class="joinpane">
+          <div id="nameprompt-sub">what should everyone call you?</div>
+          <div id="nameprompt-row">
+            <input id="nameprompt-input" maxlength="16" autocomplete="off" autocapitalize="off"
+                   autocorrect="off" spellcheck="false" />
+            <button id="nameprompt-join" type="button">join</button>
+          </div>
+          <div id="nameprompt-note">2–16 characters · enter to join</div>
+        </section>
+
+        <!-- Sign-up needs the password twice; log in does not, so the confirm
+             field is hidden rather than being a third pane. One set of fields,
+             one submit button, and a mode switch under it: two panes would be
+             two places for the handle to be typed and two states to keep in
+             step with the availability check. -->
+        <section id="nameprompt-login" class="joinpane">
+          <div class="field">
+            <label for="account-handle">handle</label>
+            <input id="account-handle" maxlength="16" autocomplete="username" autocapitalize="off"
+                   autocorrect="off" spellcheck="false" />
+          </div>
+          <div class="field">
+            <label for="account-password">password</label>
+            <input id="account-password" type="password" maxlength="200" autocomplete="current-password" />
+          </div>
+          <div class="field" id="account-confirm-field" hidden>
+            <label for="account-confirm">password again</label>
+            <input id="account-confirm" type="password" maxlength="200" autocomplete="new-password" />
+          </div>
+          <div class="nameprompt-row">
+            <button id="account-submit" type="button">log in</button>
+            <button id="account-switch" type="button">sign up instead</button>
+          </div>
+          <div id="account-note">handles are unique · there is no password reset</div>
+        </section>
       </div>
     </div>
 

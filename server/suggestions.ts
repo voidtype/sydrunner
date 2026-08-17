@@ -1012,6 +1012,32 @@ export class SuggestionHub {
       this.sendList(ws, req.clientId, now);
       return;
     }
+
+    /*
+     * --- The account gate. Workstream G.
+     *
+     * *"the suggestions box (submit + vote) require an account"*, and the two
+     * words that decided where this line sits are **submit + vote**: `LIST` is
+     * above it and is deliberately still open to guests. A panel a guest cannot
+     * read is a panel that cannot advertise what signing up is for -- they see
+     * the week's suggestions, they see the scores, and the one thing they are
+     * told is how to join in.
+     *
+     * Refused **here** rather than inside the store, which is the same seam
+     * `FloodGuard` sits on one block up: the store is a ledger and has no
+     * concept of a socket, and a gate that lived in it would be a gate the
+     * checks have to authenticate past.
+     *
+     * `BYE`-free by the brief's instruction, and it would be wrong anyway --
+     * disconnecting somebody from a game they are standing in because they
+     * clicked an upvote is the disproportionate answer this file already refuses
+     * to give to a malformed frame.
+     */
+    if (!ws.data?.participant?.accountId) {
+      send(ws, encodeSuggestAck(MSG_SUGGEST_ACK, SUGGEST_RESULT.ACCOUNT, 0, 'sign up to send feedback'));
+      return;
+    }
+
     if (req.op === SUGGEST_OP.VOTE) {
       const out = this.store.vote(req.clientId, ip, req.localId, req.dir, now);
       send(ws, encodeSuggestAck(MSG_SUGGEST_ACK, out.result, out.issue, out.message));
@@ -1083,7 +1109,21 @@ export class SuggestionHub {
  * wants is: something to send on, the participant's name, and an address.
  */
 export interface SuggestSocket {
-  data?: { participant?: { name?: string } | null } | null;
+  data?: {
+    participant?: {
+      name?: string;
+      /**
+       * The account this socket is logged in as, or null/absent for a guest.
+       *
+       * Structural like the rest of this interface, so the suggestions feature
+       * still knows nothing about `server/sim.ts` -- but note that this is the
+       * **server's** answer and not the client's: it is set at join from a token
+       * the server verified, so a client cannot claim one. See
+       * `Participant.accountId`.
+       */
+      accountId?: string | null;
+    } | null;
+  } | null;
   send(data: ArrayBuffer | Uint8Array): number;
   remoteAddress?: string;
 }

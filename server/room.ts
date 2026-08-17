@@ -116,6 +116,7 @@ import { trafficTick } from '../client/src/game/traffic.ts';
 import { encodeFare, encodeWallet, type WalletFrame } from '../client/src/net/cash.ts';
 import { fakeDriving } from '../client/src/game/driving-contract.ts';
 import type { WalletStore } from './wallets.ts';
+import type { AccountRecord, AccountStore } from './accounts.ts';
 import { botName } from './bots.ts';
 import { FrameGroups, InterestIndex, InterestSet } from './aoi.ts';
 import { Simulation, applyButtons, type Participant, type TickOutput } from './sim.ts';
@@ -572,6 +573,18 @@ function takeInput(conn: Conn): InputFrame | null {
  * is a ping column.
  */
 const ROSTER_REFRESH_TICKS = TICK_HZ * 2;
+
+/**
+ * How often a room checks whether the ISO week has turned over. One minute.
+ *
+ * The event being detected happens once every seven days at a boundary nobody
+ * is watching, and the cost of noticing it late is that a player's level says 6
+ * for up to a minute into a week where it is 1. Every finer cadence spends
+ * O(players) string compares to shorten a window nobody can perceive; every
+ * coarser one is a minute somebody could spend fighting under the wrong number.
+ * See `Simulation.rollWeeks` and `net/accounts.resetIfNewWeek`.
+ */
+const WEEK_CHECK_TICKS = TICK_HZ * 60;
 /** The police channel's, and it is the roster's exactly. See `server/index.ts`'s history. */
 const INVESTIGATION_REFRESH_TICKS = TICK_HZ * 2;
 /**
@@ -783,6 +796,7 @@ export class Room {
     // `RoomMoney`.
     const sim: Simulation = new Simulation(roomWorld(shared), {
       wallets: money.wallets,
+      accounts: money.accounts,
       driving: money.fakeDriving
         ? fakeDriving({
             poseOf: (playerId) => {
@@ -829,9 +843,13 @@ export class Room {
    * it into a `BYE` the client prints -- because "full" is a gateway answer and
    * this class does not know whether another room would have taken them.
    */
-  join(conn: Conn, colourway: number, name: string): Participant | null {
+  join(conn: Conn, colourway: number, name: string, account: AccountRecord | null = null): Participant | null {
     if (!this.open) return null;
-    const p = this.sim.join(colourway, null, name);
+    // The account, resolved from the hello's token by `server/index.ts` before
+    // this is called. It is passed straight through rather than looked up here
+    // for the reason `Simulation.join` states: this class does not know what a
+    // token is, and the layer that authenticates is the socket layer.
+    const p = this.sim.join(colourway, null, name, account);
     conn.participant = p;
     conn.interest.clear();
     return p;
@@ -1125,12 +1143,27 @@ export class Room {
 
     this.sim.step(this.out);
 
+    // --- Accounts, once a second's worth of ticks apart. Two cheap sweeps that
+    // are not the simulation's business and are not worth a tick each.
+    //
+    // `rollWeeks` is the Monday-00:00 case: a player standing still when the
+    // week turns over has nothing that would otherwise notice. `WEEK_CHECK_TICKS`
+    // is a minute, which is the granularity the brief asked for and is three
+    // orders of magnitude finer than the thing being detected.
+    if (this.sim.tick % WEEK_CHECK_TICKS === 0) this.sim.rollWeeks();
+
     this.sendRoster();
     this.sendInvestigations();
     this.sendHeat();
     this.sendBikes();
     this.sendCars();
     this.sendWallets();
+    // Queued pill sentences, **after** the wallet frames rather than before: a
+    // note that could not be written because the money already had the pill is
+    // delivered on the following tick, so a player sees "+$60 fare" and then
+    // "would you like to save progress?" rather than one of the two. See
+    // `Simulation.note`.
+    this.sim.drainNotes();
     this.sendFares();
     this.sendEvents();
     // Offset per room, so the host's egress is spread across the three ticks in
@@ -1602,6 +1635,15 @@ export interface RoomMoney {
   wallets?: WalletStore;
   /** `SYDNEY_FAKE_DRIVING=1`. See `game/driving-contract.fakeDriving`. */
   fakeDriving?: boolean;
+  /**
+   * The host's accounts, for the same reason and on the same terms as
+   * `wallets`: an account is a fact about a person, not about the room the
+   * gateway happened to put them in, and a per-room store would be a level that
+   * depended on where you spawned. Optional, so every existing construction in
+   * the checks and the load harness still compiles and still runs with every
+   * participant a guest. See `server/accounts.ts`.
+   */
+  accounts?: AccountStore;
 }
 
 /**
