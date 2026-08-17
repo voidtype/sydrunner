@@ -94,8 +94,17 @@ export interface DriverPose {
  * measured frame to frame -- which catches the handbrake and a wall for free and
  * catches neither of the two cases that are not braking.
  *
- * 0.08 of the top speed a second is 1.8 m/s^2, well under the 2.2 of
- * `DRIVE_COAST`, so lifting off does not light them.
+ * 0.12 of the top speed a second is 5.3 m/s^2 at the current 44, comfortably
+ * over the 4.4 of `DRIVE_COAST`, so lifting off does not light them and the
+ * 18 m/s^2 of `DRIVE_BRAKE` does.
+ *
+ * **A fraction rather than an absolute, and it survived the top speed
+ * doubling by construction** -- which is the whole reason it was written this
+ * way. Both sides of the comparison scaled together: the threshold went from
+ * 2.6 to 5.3 m/s^2 and `DRIVE_COAST` went from 2.2 to 4.4, so the margin between
+ * "coasting" and "braking" is the same 20% it was. (The old figures in this
+ * paragraph -- 0.08 and 1.8 -- were stale against the 0.12 below long before
+ * that; both are now the numbers the code actually produces.)
  */
 const BRAKE_THRESHOLD = 0.12;
 

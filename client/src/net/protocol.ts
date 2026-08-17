@@ -2697,9 +2697,16 @@ export function carsBytes(count: number): number {
 /**
  * A speed as centimetres per second in an `i16`.
  *
- * Range +/- 327 m/s against a top speed of 22, so the clamp is unreachable in
+ * Range +/- 327 m/s against a top speed of 44 -- seven times the headroom, and
+ * it was fourteen before the top speed doubled -- so the clamp is unreachable in
  * play and is here for the same reason every other clamp on this wire is: a
  * `setInt16` given 40,000 wraps silently and the car goes backwards.
+ *
+ * This is the field to check when a car's top speed moves, and it is the reason
+ * that move needed no wire work: a `u8` or an `i8` here would have saturated at
+ * 2.55 m/s or 1.27, and the speed would have had to be quantised in halves the
+ * way `quantiseVelocity` does the football's. Centimetres in an `i16` was
+ * already the right call for a quantity a driver reads off a HUD.
  */
 function quantiseCarSpeed(v: number): number {
   const cm = Math.round(v * 100);
@@ -3090,6 +3097,7 @@ export function decodeHeat(buffer: ArrayBuffer, now: number): HeatRecord[] | nul
  *       u16  ping, ms         0 for a bot, which has no socket
  *       u8   name length in bytes
  *       u8   level            1..255; see `accounts.levelFor`
+ *       u16  kills            toward the next level; see `RosterEntry.kills`
  *       ...  the name, UTF-8
  *
  * The **level rides here rather than on a message of its own**, which is the
@@ -3110,6 +3118,20 @@ export function decodeHeat(buffer: ArrayBuffer, now: number): HeatRecord[] | nul
  * fixed part means every existing offset in this record is unchanged, so the
  * diff is one constant and one read rather than five re-numbered lines that all
  * have to be right at once.
+ *
+ * **`kills` was appended on exactly that rule**, one field further on, when the
+ * HUD had to show *"LVL 1 · 3/10"* rather than a bare level. The two bytes buy
+ * the only thing a level cannot say on its own -- how far through it you are --
+ * and they go on the end for the same reason the level byte did: every offset
+ * above `p + 12` is untouched, so the diff is one constant, one write and one
+ * read. It is a `u16` and not a `u8` because an account's weekly kills are
+ * uncapped by anything except the week (`accounts.levelFor` clamps the *level*
+ * at 255, which is 2,550 kills) and a wrapped count would draw a player at
+ * level 40 as 3/10 through it.
+ *
+ * 2 bytes an entry is 256 bytes at a full 128-player room on a two-second
+ * refresh: 1 kbit/s, which is a tenth of what the roster already costs and is
+ * the same bargain the level byte struck.
  *
  * **A reliable event rather than a section of the snapshot**, and that is the
  * whole design of this message. A name is 25 bytes at the cap, so carrying the
@@ -3149,6 +3171,27 @@ export interface RosterEntry {
    * `net/accounts.ts` for why the ladder exists at all and why it resets.
    */
   level: number;
+  /**
+   * Kills counted **toward the ladder**, 0..65535. What the HUD's XP bar fills
+   * with and what `accounts.levelFor` was applied to to get `level`.
+   *
+   * **This is not `kos`, and the difference is the whole reason it is a separate
+   * field on a record that already carries a knockout count.** `kos` is *this
+   * session in this room* -- it is what the leaderboard is playing for and it
+   * resets when you reconnect. This is the ladder's own counter: for an account
+   * it is `AccountRecord.kills`, which is persisted and resets weekly with the
+   * level; for a guest or a bot there is nowhere durable to keep one, so the
+   * server sends `kos` here and the bar fills for the session. That guest bar is
+   * deliberately truthful about what it is -- see `game/levelhud.levelLine`,
+   * which appends *"sign up to level up"* rather than letting a guest watch a
+   * bar fill and nothing happen.
+   *
+   * The consequence worth stating: `kills >= kos` for an account who has played
+   * more than one session this week, and `kills === kos` for everybody else. A
+   * reader that wanted "how is this player doing right now" wants `kos`; a
+   * reader that wanted "how close are they to levelling" wants this.
+   */
+  kills: number;
 }
 
 /**
@@ -3173,9 +3216,10 @@ export interface RosterEntry {
 export const ROSTER_HEADER_BYTES = 3;
 /**
  * Everything in an entry except the name itself. 11 through v12; 12 with the
- * level byte the accounts pass added on the end. See the record's own note.
+ * level byte the accounts pass added on the end; 14 with the `u16` of kills the
+ * XP bar needs. See the record's own note.
  */
-export const ROSTER_ENTRY_BYTES = 12;
+export const ROSTER_ENTRY_BYTES = 14;
 
 export function rosterBytes(entries: readonly RosterEntry[]): number {
   let total = ROSTER_HEADER_BYTES;
@@ -3207,6 +3251,12 @@ export function encodeRoster(entries: readonly RosterEntry[]): ArrayBuffer {
     // too, because this encoder is handed a number by four call sites and one
     // of them being wrong should not put an impossible plate over a body.
     v.setUint8(p + 11, Math.max(1, Math.min(255, Math.round(e.level || 1))));
+    // Clamped, not masked, on the level byte's rule one line up and for the
+    // sharper version of its reason: a wrapped `u16` draws a player 65,537 kills
+    // into the week as one kill in, which is a bar that empties itself. Rounded
+    // as well, because `e.kills` is handed over by four call sites and one of
+    // them is a guest's session count that has never been through `Math.round`.
+    v.setUint16(p + 12, Math.max(0, Math.min(65535, Math.round(e.kills || 0))), true);
     bytes.set(name, p + ROSTER_ENTRY_BYTES);
     p += ROSTER_ENTRY_BYTES + name.length;
   }
@@ -3239,6 +3289,11 @@ export function decodeRoster(buffer: ArrayBuffer): RosterEntry[] | null {
       // the ladder cannot produce. Falling back to the floor draws something
       // true about a player with no account rather than something impossible.
       level: v.getUint8(p + 11) || 1,
+      // No `|| 0` fallback and none wanted: zero kills is a real, common state
+      // -- it is every player's first minute -- so unlike the level there is
+      // nothing here to distinguish "absent" from "none", and inventing a floor
+      // would be inventing progress.
+      kills: v.getUint16(p + 12, true),
       name: nameLen > 0 ? NAME_DECODER.decode(new Uint8Array(buffer, p + ROSTER_ENTRY_BYTES, nameLen)) : '',
     });
     p += ROSTER_ENTRY_BYTES + nameLen;
@@ -4122,7 +4177,16 @@ export function verifyNet(): string[] {
   {
     const cars: CarRecord[] = [
       { id: 1, carId: 0xdeadbeef, driver: 0, body: 4, colour: 7, x: -364.25, y: -31.75, z: 2682.5, yaw: 0.75, speed: -6.6, health: 0 },
-      { id: 65535, carId: 1, driver: 65535, body: 0, colour: 0, x: 3999.99, y: -70.125, z: -3999.99, yaw: 6.28, speed: 22, health: 37 },
+      // `speed: 44` is `driving.DRIVE_TOP_SPEED` exactly, and it is the literal
+      // rather than an import on `MEASURED_REACH_TARGET`'s standing argument in
+      // `player/bat.ts`: a check that imported the constant would assert that a
+      // number equals itself through two files. Written down here it is a second
+      // opinion, and the question it answers is the one the doubling raised --
+      // does the wire still carry a car at its top speed? It does with room to
+      // spare: the field is `i16` centimetres, so it saturates at 327 m/s, and
+      // the +/- 63.5 m/s clamp anybody grepping for will find belongs to
+      // `quantiseVelocity` and the *football*, not to a car.
+      { id: 65535, carId: 1, driver: 65535, body: 0, colour: 0, x: 3999.99, y: -70.125, z: -3999.99, yaw: 6.28, speed: 44, health: 37 },
       { id: 74, carId: 0x80000000, driver: 12, body: 2, colour: 3, x: 0, y: 0, z: 0, yaw: 0, speed: 0, removed: true },
     ];
     const frame = encodeCars(cars, true);
@@ -4737,14 +4801,14 @@ export function verifyNames(): string[] {
   // leaderboard of players nobody has ever seen.
   {
     const entries: RosterEntry[] = [
-      { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 7, downs: 2, ping: 34, level: 3 },
-      { id: 2, colourway: 3, bot: true, name: 'Shazza', kos: 0, downs: 11, ping: 0, level: 1 },
-      { id: 200, colourway: 6, bot: false, name: 'Bazza (2)', kos: 65535, downs: 3, ping: 65535, level: 255 },
+      { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 7, downs: 2, ping: 34, level: 3, kills: 27 },
+      { id: 2, colourway: 3, bot: true, name: 'Shazza', kos: 0, downs: 11, ping: 0, level: 1, kills: 0 },
+      { id: 200, colourway: 6, bot: false, name: 'Bazza (2)', kos: 65535, downs: 3, ping: 65535, level: 255, kills: 65535 },
       // The empty name is reachable: a client that sends nothing is given one by
       // the server, but the *record* has to survive a zero-length string or the
       // decoder walks off the end of the entry before it.
-      { id: 15, colourway: 1, bot: false, name: '', kos: 1, downs: 1, ping: 999, level: 1 },
-      { id: 9, colourway: 2, bot: false, name: 'Kev 🦘', kos: 2, downs: 0, ping: 12, level: 12 },
+      { id: 15, colourway: 1, bot: false, name: '', kos: 1, downs: 1, ping: 999, level: 1, kills: 1 },
+      { id: 9, colourway: 2, bot: false, name: 'Kev 🦘', kos: 2, downs: 0, ping: 12, level: 12, kills: 119 },
     ];
     const frame = encodeRoster(entries);
     if (frame.byteLength !== rosterBytes(entries)) {
@@ -4771,18 +4835,37 @@ export function verifyNames(): string[] {
         if (b.level !== a.level) {
           failures.push(`Roster entry ${a.id}: level ${a.level} came back as ${b.level}.`);
         }
+        // And the kills behind it, which is the field the HUD's XP bar fills
+        // from. It sits *after* the level and before the name, so a
+        // `ROSTER_ENTRY_BYTES` that was not widened with it corrupts the name
+        // length's meaning rather than this number -- which is why the check
+        // above and this one fail together and the message worth reading is the
+        // pair of them.
+        if (b.kills !== a.kills) {
+          failures.push(`Roster entry ${a.id}: ${a.kills} kills came back as ${b.kills}.`);
+        }
       }
+    }
+    // A kill count no week can produce. `u16`, clamped rather than wrapped, on
+    // the level's own argument: 65536 & 0xffff is 0, and a bar that empties
+    // itself at the top of the ladder is the one failure a progress bar cannot
+    // survive.
+    const farmed = decodeRoster(
+      encodeRoster([{ id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 0, level: 255, kills: 90000 }]),
+    );
+    if (!farmed || farmed[0].kills !== 65535) {
+      failures.push(`90,000 kills came back as ${farmed?.[0].kills} rather than being clamped to 65535.`);
     }
     // A level the encoder should never be handed. Clamped rather than masked:
     // 256 & 0xff is 0, and "lvl 0" is a number the ladder cannot produce.
     const silly = decodeRoster(
-      encodeRoster([{ id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 0, level: 4000 }]),
+      encodeRoster([{ id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 0, level: 4000, kills: 0 }]),
     );
     if (!silly || silly[0].level !== 255) {
       failures.push(`A level of 4000 came back as ${silly?.[0].level} rather than being clamped to 255.`);
     }
     const zero = decodeRoster(
-      encodeRoster([{ id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 0, level: 0 }]),
+      encodeRoster([{ id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 0, level: 0, kills: 0 }]),
     );
     if (!zero || zero[0].level !== 1) {
       failures.push(`A level of 0 came back as ${zero?.[0].level} rather than the floor of 1.`);
@@ -4804,10 +4887,10 @@ export function verifyNames(): string[] {
   // --- The order the leaderboard is drawn in.
   {
     const rows: RosterEntry[] = [
-      { id: 1, colourway: 0, bot: false, name: 'Davo', kos: 2, downs: 1, ping: 0, level: 1 },
-      { id: 2, colourway: 0, bot: false, name: 'Bazza', kos: 5, downs: 9, ping: 0, level: 1 },
-      { id: 3, colourway: 0, bot: false, name: 'Macca', kos: 2, downs: 0, ping: 0, level: 1 },
-      { id: 4, colourway: 0, bot: false, name: 'Shazza', kos: 0, downs: 0, ping: 0, level: 1 },
+      { id: 1, colourway: 0, bot: false, name: 'Davo', kos: 2, downs: 1, ping: 0, level: 1, kills: 2 },
+      { id: 2, colourway: 0, bot: false, name: 'Bazza', kos: 5, downs: 9, ping: 0, level: 1, kills: 5 },
+      { id: 3, colourway: 0, bot: false, name: 'Macca', kos: 2, downs: 0, ping: 0, level: 1, kills: 2 },
+      { id: 4, colourway: 0, bot: false, name: 'Shazza', kos: 0, downs: 0, ping: 0, level: 1, kills: 0 },
     ];
     const order = rankRoster(rows).map((r) => r.name).join(',');
     // Bazza leads on kills despite being knocked down nine times -- the board is

@@ -116,6 +116,14 @@ import {
 } from './player/character.ts';
 import { BONE, PUNCH_ACTIVE, PUNCH_WIND_UP, verifyAnimation } from './player/animation.ts';
 import { BatAssets, BatProp, BatViewmodel, MAX_VIEW_REACH, verifyBat } from './player/bat.ts';
+// --- Workstream I: your own hands, for the slot that holds nothing.
+//
+// *"i cant see my hands while punching"*. Slot 4 is fists and had no
+// viewmodel at all, so a punch was a hitstop and a sound. `player/hands.ts`
+// is the bat viewmodel's shape twice over -- two mitts on the camera, posed
+// from a pure function in `game/hands-pose.ts` -- and everything this file
+// does about it is four short blocks marked "Workstream I".
+import { HandsAssets, HandsViewmodel, verifyHands } from './player/hands.ts';
 // --- Money, the phone and the weapon slots. See `client/src/money.ts`.
 //
 // One import and one `installMoney(...)` call, and everything else this feature
@@ -123,7 +131,9 @@ import { BatAssets, BatProp, BatViewmodel, MAX_VIEW_REACH, verifyBat } from './p
 // `money.ts`'s header says why the hooks are called from here rather than
 // listened for from there.
 import { verifyCash } from './game/cash.ts';
-import { verifyPhone } from './phone.ts';
+// `SLOT` as well as the check, so `setWeaponVisible` below can tell "fists"
+// from "phone" -- both of them say "no bat", and only one of them wants hands.
+import { SLOT, verifyPhone } from './phone.ts';
 import { installMoney } from './money.ts';
 import {
   applyWorldDamage,
@@ -622,6 +632,14 @@ async function main(): Promise<void> {
   // reads as lag; and a viewmodel over the crosshair is a complaint rather than
   // a bug. See `player/bat.ts`.
   const batFailures = timed('bat', verifyBat);
+  // And the hands, on the same criterion. Four of this check's failures are
+  // invisible from the seat of whoever built it: a mirrored hand drawn inside
+  // out looks like a shading bug, a mitt a different size from the body's is
+  // only visible if you press `V` mid-punch, a hand past the near budget clips
+  // the wall you are already standing against, and a jab that does not travel
+  // far enough down the view axis is *exactly* the report this file's newest
+  // viewmodel exists to answer -- a punch you cannot see. See `player/hands.ts`.
+  const handsFailures = timed('hands', verifyHands);
   const combatFailures = timed('combat', verifyCombat);
   const powerupFailures = timed('powerups', verifyPowerups);
   // The four this pass adds, on the same criterion.
@@ -1076,6 +1094,7 @@ async function main(): Promise<void> {
     animFailures.length ||
     rigFailures.length ||
     batFailures.length ||
+    handsFailures.length ||
     combatFailures.length ||
     powerupFailures.length ||
     footyFailures.length ||
@@ -1139,6 +1158,7 @@ async function main(): Promise<void> {
           ...animFailures,
           ...rigFailures,
           ...batFailures,
+          ...handsFailures,
           ...combatFailures,
           ...powerupFailures,
           ...footyFailures,
@@ -3950,6 +3970,21 @@ async function main(): Promise<void> {
   const viewmodel = new BatViewmodel(bats);
   camera.add(viewmodel.group);
   scene.add(camera);
+  // --- Workstream I: and your own two hands, for the slot that holds nothing.
+  //
+  // Kit 3, which is `self`'s colourway two dozen lines up -- the local body is
+  // hard-coded to that kit today, and taking the same literal is what keeps the
+  // hands you look down at the same colour as the arms you see in third person.
+  // If the local kit ever becomes a choice this is the second place to read it.
+  //
+  // Camera-parented like the bat, hidden from the start: `setWeaponVisible`
+  // below turns them on when fists are the primary slot and `money.frame` calls
+  // it every frame. Hidden rather than visible because the default slots are
+  // bat/footy (`phone.defaultHands`), so no session begins with fists up.
+  const handsViewmodel = new HandsViewmodel(new HandsAssets(3));
+  camera.add(handsViewmodel.group);
+  setVisibleToCamera(handsViewmodel.primary, false);
+  setVisibleToCamera(handsViewmodel.off, false);
   /**
    * Your own football, in front of your own eye, and one on your own body.
    *
@@ -4959,6 +4994,37 @@ async function main(): Promise<void> {
     setWeaponVisible: (bat, footy) => {
       setVisibleToCamera(viewmodel.mesh, !thirdPerson && bat);
       setVisibleToCamera(footyViewmodel.mesh, !thirdPerson && footy);
+      // --- Workstream I: the hands, and the bat on your own body.
+      //
+      // **Hands when the primary slot is fists**, which is not the same as "no
+      // bat": the phone also says no bat, and a pair of fists floating beside a
+      // raised handset is the failure `verifyHands` names. Read off
+      // `money.hands` rather than derived from the two flags for exactly that
+      // reason -- see `MoneyHooks.showsBat`, whose comment says the two
+      // predicates deliberately do not enumerate the slots.
+      //
+      // The off hand goes with the primary one. A one-handed pose (phone up,
+      // fist ready) would be a fifth key set and is not what was asked for.
+      const fists = money.hands.primary === SLOT.FISTS;
+      setVisibleToCamera(handsViewmodel.primary, !thirdPerson && fists);
+      setVisibleToCamera(handsViewmodel.off, !thirdPerson && fists);
+      // And in **third** person a fists player must not still be swinging a
+      // bat. `selfBat` is a `BatProp` on your own body's wrist and there is no
+      // stowed position for it -- see `BatProp`, which deliberately has no
+      // `set()` because spec 8.2's melee was always the bat. It is now not, so
+      // the prop is hidden on the same predicate the viewmodel uses.
+      //
+      // `visible` rather than the layer here, and the difference matters: the
+      // camera-mode block below owns `selfBat`'s *layer* and would fight a
+      // second writer, exactly as `BatViewmodel`'s own comment warns about. The
+      // two compose -- the layer says "third person", this says "holding it".
+      //
+      // **Remote players are untouched and will still show a bat.** Slot state
+      // is not on the wire (`protocol.RosterEntry` carries no hands), so this
+      // client cannot know what anybody else has equipped; a remote on fists
+      // draws a bat and will until a slot byte joins the roster. Stated rather
+      // than hidden, on the brief's instruction.
+      selfBat.mesh.visible = !fists;
     },
   });
 
@@ -5737,6 +5803,12 @@ async function main(): Promise<void> {
       // `combat.HITSTOP`, so the shudder runs over the frames the simulation is
       // frozen for and the two read as one event -- see `BatViewmodel.connect`.
       viewmodel.connect();
+      // Workstream I: and the fist, on the same 90 ms. Both are kicked whichever
+      // one is on screen -- the hidden one is being posed anyway (see the frame
+      // loop) and a shudder nobody saw costs nothing. A knuckle that lands on
+      // somebody stops harder than a bat does, which is what the shorter, tighter
+      // decay in `HandsViewmodel` is for.
+      handsViewmodel.connect();
     }
     if (r.victim === playerCombat.id) {
       if (r.ko) feedback.knockedOut();
@@ -5938,6 +6010,10 @@ async function main(): Promise<void> {
         if (mine) {
           feedback.hitLanded(ko);
           if (!footy) viewmodel.connect();
+          // Workstream I: the fist takes the same kick as the bat on a melee
+          // hit, and neither takes one for a football -- the thing that was
+          // arrested there is a ball thirty metres away.
+          if (!footy) handsViewmodel.connect();
         }
         if (theirs) {
           if (ko) feedback.knockedOut();
@@ -8087,6 +8163,17 @@ async function main(): Promise<void> {
       // hides nothing at all. Same fact as `castShadowOnly`'s, one container up.
       setVisibleToCamera(viewmodel.mesh, !thirdPerson);
       setVisibleToCamera(footyViewmodel.mesh, !thirdPerson);
+      // --- Workstream I: and the hands, on the same channel and for the same
+      // reason -- `HandsViewmodel.update` writes its own `group.visible` on a
+      // knockout, so a `visible` toggle here would be overwritten before the
+      // next draw. On the two **meshes** rather than the group, because three
+      // tests layers per object and a `Group` is never itself drawn.
+      //
+      // Unconditionally off in third person and *provisionally* on in first --
+      // `setWeaponVisible` runs later in the same frame from `money.frame` and
+      // has the last word about whether fists are actually equipped.
+      setVisibleToCamera(handsViewmodel.primary, !thirdPerson);
+      setVisibleToCamera(handsViewmodel.off, !thirdPerson);
     }
     if (thirdPerson) {
       // Chase: back along the view ray and up. The distance is eased so that
@@ -8367,11 +8454,24 @@ async function main(): Promise<void> {
     // and no scores, and drawing "you 0 0 —" would be inventing a match. The
     // panel appears with nothing in it, which is the truth.
     if (hud.leaderboardVisible) hud.leaderboard(net ? net.leaderboard() : [], net ? net.id : -1);
-    // Workstream G: `lvl 3` under the balance. Off the roster, which is where
-    // the level lives (see `protocol.RosterEntry.level`), and null offline --
-    // there is no ladder without a server to keep one. Cheap every frame on
-    // `hud.money`'s terms: the string is compared before it is written.
-    hud.level(net ? net.myLevel : null);
+    // --- Workstream I: `LVL 1 · 3/10` and an XP bar, under the balance.
+    //
+    // Workstream G's `lvl 3` line, now carrying the progress under it -- the
+    // report was *"i cant se my level or XP anywhere"*, and the level-1
+    // suppression that hid it is gone from `hud.level`, `nameplates.levelRow`
+    // and nowhere else. Both numbers are off the roster, which is where the
+    // ladder lives (see `protocol.RosterEntry.level` and `.kills`), and null
+    // offline -- there is no ladder without a server to keep one.
+    //
+    // `guest` is the browser's own answer rather than anything on the wire, and
+    // it has to be: whether somebody has an account is not a fact this room
+    // publishes about them (deliberately -- see `RosterEntry`), and the only
+    // player whose account status this client is entitled to know is the one
+    // sitting at it. `joinGate.signedIn` is true the moment a token exists.
+    //
+    // Cheap every frame on `hud.money`'s terms: the composed string and the bar
+    // width are compared as one key before anything is written.
+    hud.level(net ? { level: net.myLevel, kills: net.myKills, guest: !joinGate.signedIn } : null);
 
     // The map, on the frame delta and redrawing on its own 15 Hz clock inside.
     // `player.yaw` rather than `input.yaw`, and the difference is visible: the
@@ -9198,6 +9298,21 @@ async function main(): Promise<void> {
       // rock-steady in the corner of the frame through a throw that is visibly
       // a whole-body action, which reads as two unrelated animations.
       throwT: playerCombat.ballT,
+    });
+    // --- Workstream I: and your hands, on the same frame delta and the same
+    // predicted phase. Posed **unconditionally**, whether or not fists are
+    // equipped: the pose is two vector writes and four Euler writes off a pure
+    // function, and the alternative -- skipping the update while the bat is out
+    // -- means the hands come back on screen holding whatever pose they were in
+    // when you last switched away, which is a fist frozen mid-jab on the frame
+    // you press 4. Visibility is `setWeaponVisible`'s, above.
+    handsViewmodel.update(frameDt, {
+      phase: playerCombat.phase,
+      phaseT: playerCombat.phaseT,
+      speed: Math.hypot(player.velocity.x, player.velocity.z),
+      yaw: player.yaw,
+      pitch: player.pitch,
+      hitstop: playerCombat.hitstopT > 0,
     });
     // And the ball in the other hand, on the same frame delta and off the same
     // predicted clock -- so the release starts on the frame the button goes down

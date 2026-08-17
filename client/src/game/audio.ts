@@ -66,11 +66,18 @@ import type { RailAnnounceMix, RailVoice } from './rail-audio.ts';
  * How hard a crash has to be before glass breaks. `CombatAudio.carCrunch`'s
  * `strength`, so a fraction of the top speed.
  *
- * A third, which on `driving.DRIVE_TOP_SPEED`'s 22 m/s is a 7 m/s impact --
+ * A sixth, which on `driving.DRIVE_TOP_SPEED`'s 44 m/s is a 7.3 m/s impact --
  * about the speed at which `driving.crashDamage` first takes more than twenty
  * health, and comfortably past anything that could be called parking.
+ *
+ * **0.16, halved from 0.33 when the top speed doubled.** The number that has to
+ * stay put is the *impact* -- glass breaks at about seven metres a second and
+ * always has -- and this constant is a fraction of the top speed rather than an
+ * absolute, so it had to move to keep it there. Left at a third it would have
+ * taken a 14.5 m/s hit to break a window, which is a crash that already costs
+ * most of the car's health in silence.
  */
-const SHATTER_STRENGTH = 0.33;
+const SHATTER_STRENGTH = 0.16;
 
 /**
  * The two diaphragms of a car horn, hertz. See `CombatAudio.carHorn`.

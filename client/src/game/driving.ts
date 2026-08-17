@@ -46,7 +46,7 @@
  * argued that one out and refused it, and the argument is stronger here, not
  * weaker: a fork is a thing the server has to reproduce exactly, that
  * `net/client.reconcile`'s replay has to run over every un-acked input, and
- * whose first disagreement shows up as a car rubber-banding at 22 m/s.
+ * whose first disagreement shows up as a car rubber-banding at 44 m/s.
  *
  * So there is no fork. What this file integrates is **one number** -- the car's
  * signed speed along its own heading -- and then it hands that number to the
@@ -190,20 +190,41 @@ import {
 // --- The handling ---------------------------------------------------------------
 
 /**
- * Top speed on a road, metres per second. 22 is 79 km/h.
+ * Top speed on a road, metres per second. **44 is 158 km/h.**
  *
- * The brief's number, and it is the right one for a reason worth writing down:
- * it is a shade *under* the e-bike's 26.2 m/s. A car that outran a lime bike
- * would make the bike -- which is a whole feature with a tuning stall in
- * Redfern -- the slow way to cross the city, and the thing a car has over a bike
- * is that it survives contact with the world, not that it is faster.
+ * *"make cars top velocity 100% faster"*, and the doubling is the whole of this
+ * constant's current history: it was 22 (79 km/h), which was the original
+ * brief's number and was chosen to sit a shade *under* the e-bike's 26.2 m/s so
+ * that a lime bike stayed the fast way across the city.
+ *
+ * That trade is now deliberately the other way round, and it is worth stating
+ * because the old paragraph argued the opposite at length. A car at 44 m/s
+ * comfortably outruns the bike, and what the bike keeps instead is everything
+ * the top speed was never the point of: it fits down a laneway, it turns inside
+ * five metres at any speed (see `DRIVE_TURN_RATE_FAST` for what a car at 44 m/s
+ * cannot do), it is parked on every second corner, and taking one is not a
+ * crime. The car's 44 is a *highway* number -- the Cahill, the Anzac Bridge,
+ * Southern Cross Drive -- and on a CBD block you will never see the top of
+ * third gear.
+ *
+ * **Every deceleration constant below is doubled with it** so that each
+ * time-to-stop is unchanged (see `DRIVE_BRAKE`), and the acceleration is
+ * deliberately *not*, so the car takes twice as long to reach twice the speed --
+ * which is what a power-limited top-end raise physically means and is the only
+ * version where the new speed is something you build up to rather than something
+ * you are handed on the first press of W.
  */
-export const DRIVE_TOP_SPEED = 22;
+export const DRIVE_TOP_SPEED = 44;
 
 /**
  * And off the carriageway. Half, because a sedan across a park is not a rally
  * car and the alternative -- driving being identical everywhere -- makes the
  * road network cosmetic.
+ *
+ * **Derived rather than written down**, which it was not before: it was the
+ * literal 11 beside a literal 22, and the pair of them is exactly the kind of
+ * thing that survives one of the two being doubled. The rule is the sentence
+ * above -- *half* -- and the rule is now the code.
  *
  * Whether you are on a road is `DrivingWorld.onRoad`, which both ends answer
  * from the same lane graph, and which is **optional**: a world that cannot say
@@ -211,23 +232,53 @@ export const DRIVE_TOP_SPEED = 22;
  * not streamed in yet would otherwise crawl for a second on a street the server
  * knows is a street, and the correction for that is a visible lurch.
  */
-export const DRIVE_TOP_SPEED_ROUGH = 11;
+export const DRIVE_TOP_SPEED_ROUGH = DRIVE_TOP_SPEED * 0.5;
 
-/** Metres per second squared under throttle. 0 to 22 m/s in 3.7 s. */
+/**
+ * Metres per second squared under throttle. **0 to 44 m/s in 7.3 s.**
+ *
+ * Unchanged by the doubling, and that is the decision rather than an oversight:
+ * the run to the top is now twice as long in time and four times as long in
+ * distance (161 m against 40), so the top speed is a thing a straight road gives
+ * you rather than a thing every press of W hands over. It is also what keeps
+ * the *first* three seconds of driving feeling exactly as they did, which is
+ * most of the driving that happens in this city.
+ *
+ * 7.3 s is a shade over the ~7 s the instruction asked for and is the price of
+ * leaving the constant alone; the alternative was 6.3 m/s^2, a number with no
+ * argument behind it that would have moved the low-speed feel to buy 0.3 s at
+ * the top.
+ */
 export const DRIVE_ACCELERATION = 6;
 
 /**
- * And on the brake -- `S` against a forward speed. Half again as strong as the
- * throttle, which is what makes `S` read as a brake pedal rather than as a
- * reverse gear you have to wait for.
+ * And on the brake -- `S` against a forward speed. Three times the throttle,
+ * which is what makes `S` read as a brake pedal rather than as a reverse gear
+ * you have to wait for.
+ *
+ * **Doubled with the top speed, from 9**, and the invariant it is holding is the
+ * *time* on the pedal rather than the distance: 22/9 was 2.4 s from the top and
+ * 44/18 is 2.4 s from the new one. The stopping distance doubles with the speed,
+ * from 27 m to 54 m, which is the honest consequence of going twice as fast and
+ * is the thing a driver has to learn. Holding the *distance* instead would have
+ * needed 36 m/s^2 -- nearly 4 g -- and a car that stops dead from 158 km/h in
+ * the length of a terrace is a car with no weight in it at all.
  */
-export const DRIVE_BRAKE = 9;
+export const DRIVE_BRAKE = 18;
 
 /**
  * Reverse top speed, as a fraction of the forward one. `game/bikes.RIDE_REVERSE`'s
  * number and its argument: the same key means "slow down" first and "back out of
- * this laneway" second, and 30 % of 22 is 6.6 m/s, which is a reversing speed
- * rather than a manoeuvre nobody asked for.
+ * this laneway" second.
+ *
+ * **Still 30 %**, on instruction, which is now 13.2 m/s -- and that is worth a
+ * line because 47 km/h in reverse is quick. It is kept as a fraction rather than
+ * pinned to the old 6.6 m/s absolute because the clause it exists for is "a
+ * reversing speed rather than a manoeuvre nobody asked for", and what makes
+ * reverse feel like reverse is that it is visibly a third of forward, not that
+ * it is any particular number of metres a second. Reverse is also the one gear
+ * with no acceleration advantage: `DRIVE_ACCELERATION` is unchanged, so it takes
+ * 2.2 s to reach and you are on the brake (18 m/s^2) the moment you press W.
  */
 export const DRIVE_REVERSE = 0.3;
 
@@ -235,13 +286,17 @@ export const DRIVE_REVERSE = 0.3;
  * Engine braking, with no key held at all.
  *
  * Small on purpose: a car that shed its speed as fast as it gained it would
- * never coast, and coasting is most of what driving in a city is. At 2.2 m/s^2 a
- * car at the top speed rolls for ten seconds and 110 m, which is a city block.
+ * never coast, and coasting is most of what driving in a city is. **Doubled
+ * with the top speed, from 2.2**, on `DRIVE_BRAKE`'s rule -- at 4.4 m/s^2 a car
+ * at the top speed still rolls for the ten seconds the old number gave it, and
+ * now covers 220 m doing it. Leaving it at 2.2 would have been twenty seconds
+ * of a car refusing to slow down, which is the one failure mode of engine
+ * braking a player reads as the throttle being stuck.
  */
-export const DRIVE_COAST = 2.2;
+export const DRIVE_COAST = 4.4;
 
-/** Space. Nearly twice the brake, and it works against a reverse too. */
-export const DRIVE_HANDBRAKE = 16;
+/** Space. Nearly twice the brake, and it works against a reverse too. Doubled from 16. */
+export const DRIVE_HANDBRAKE = 32;
 
 /**
  * How fast the wheel turns at a crawl, radians per second, and at the top speed.
@@ -249,12 +304,30 @@ export const DRIVE_HANDBRAKE = 16;
  * `game/bikes.rideTurnRate`'s shape and for its stated reason -- what a driver
  * holds constant across the range is the turn *radius*, and a linear `w(v)`
  * against a linear `v` is the closest a one-line function gets to that. The
- * numbers are heavier than the bike's (1.6 / 0.9) because a car is heavier than
- * a bike: at 22 m/s the radius is 44 m, which is a main-road corner taken at
- * speed, and at 5 m/s it is 4.3 m, which is a three-point turn.
+ * crawl number is heavier than the bike's 1.6 because a car is heavier than a
+ * bike: at 5 m/s the radius is 4.3 m, which is a three-point turn.
+ *
+ * **`DRIVE_TURN_RATE_FAST` came down from 0.5 to 0.33 when the top speed
+ * doubled, and that is the one constant in this block the doubling could not
+ * simply scale.** The quantity a car actually runs out of in a corner is
+ * *lateral acceleration*, which is `v x w` -- so leaving the rate alone while
+ * doubling the speed would have doubled it too:
+ *
+ *     22 m/s x 0.50 rad/s = 11.0 m/s^2   (1.1 g)  -- the old top-speed corner
+ *     44 m/s x 0.50 rad/s = 22.0 m/s^2   (2.2 g)  -- a slot car, or a spin
+ *     44 m/s x 0.33 rad/s = 14.5 m/s^2   (1.5 g)  -- this
+ *
+ * 1.5 g is still well past a real sedan and is the arcade allowance this game
+ * has always taken; 2.2 g is the point at which the car stops reading as having
+ * mass and starts reading as a cursor. The radius at the top is 133 m, which is
+ * a motorway sweeper -- you cannot take a Sydney street corner at 158 km/h, and
+ * that is the correct answer rather than a limitation. `verifyDriving` asserts
+ * both the radius and the lateral figure, because the failure here has no
+ * picture that says so: a car that corners at 2 g simply feels *good* to whoever
+ * tuned it and wrong to everybody else.
  */
 export const DRIVE_TURN_RATE = 1.35;
-export const DRIVE_TURN_RATE_FAST = 0.5;
+export const DRIVE_TURN_RATE_FAST = 0.33;
 /** Where the ramp bottoms out. The top speed, so nothing in normal play is clamped. */
 export const DRIVE_TURN_FULL_SPEED = DRIVE_TOP_SPEED;
 
@@ -386,7 +459,7 @@ export const CRASH_FREE_SPEED = 3;
  *
  * Six, which is the brief's, and the two numbers it is chosen to produce are:
  * a 6 m/s hit is 18 -- a scrape you can see and carry on from -- and a
- * `DRIVE_TOP_SPEED` wall at 22 m/s is `(22 - 3) x 6 = 114`, clamped to
+ * `DRIVE_TOP_SPEED` wall is `(0.66 x 44 - 3) x 6 = 156`, clamped to
  * `CRASH_DAMAGE_MAX`... which is only 60, so a full-speed wall is *not* an
  * instant write-off from full health. That is intentional and it took a round
  * of thinking to keep: an instant write-off from one mistake makes the whole
@@ -396,11 +469,29 @@ export const CRASH_FREE_SPEED = 3;
  *
  * And the curve compounds in the *forgiving* direction, which is worth stating
  * because it is not obvious from the constants. A car under 40 is capped at
- * `CAR_SMOKING_SCALE` of the top speed, so it can never hit anything at 22
- * again: `server/cardamage.tmp.ts` drives the real thing at a wall three times
- * and measures 60, then 34.3, then the last 5.7. Three heavy crashes to lose a
- * car, and each one is smaller than the last -- a damaged car is harder to
- * finish off, not more fragile.
+ * `CAR_SMOKING_SCALE` of the top speed, so its *next* crash is slower than its
+ * last: `server/cardamage-check.ts` drives the real thing at a wall and
+ * measures 60 for the first, which leaves it smoking on exactly 40.
+ *
+ * **The doubling of `DRIVE_TOP_SPEED` changed the tail of that and is worth
+ * recording, because the headline number did not move.** A top-speed wall was
+ * 114 raw against a cap of 60 before and is 156 against the same 60 now -- the
+ * curve saturated long before the old top speed and it saturates harder -- so
+ * the *first* crash costs exactly what it always did and a full-health car is
+ * still not written off by one mistake. What changed is the second one: a
+ * smoking car is capped at 0.6 of the top speed, which used to be 13.2 m/s and a
+ * 61 hp raw hit, and is now 26.4 and a 141 hp raw hit. Both clamp to 60, and 60
+ * is more than the 40 a smoking car has left.
+ *
+ * So a car is **two** heavy walls rather than three. That is a smaller change
+ * than it sounds and it is left alone deliberately: the property the whole
+ * feature is built on -- *the first heavy crash is a warning rather than the
+ * end* -- is untouched, and it is the only one anybody experiences. Pulling
+ * `CRASH_DAMAGE_PER_SPEED` down to restore the third run would make every
+ * *light* knock cheaper too, which is the wrong end of the curve to pay from.
+ * What *also* changed is how much road you need to reach the top at all -- see
+ * `DRIVE_ACCELERATION` -- and 161 m of clear carriageway is rarer in this city
+ * than 40 was.
  */
 export const CRASH_DAMAGE_PER_SPEED = 6;
 
@@ -945,7 +1036,7 @@ export function stepCarSpeed(
   }
 
   // Re-clamped after the fact as well as inside `approach`, because `top` can
-  // *fall* between ticks -- driving off a road at 22 m/s -- and a target the
+  // *fall* between ticks -- driving off a road at 44 m/s -- and a target the
   // speed is already past would otherwise be approached from the wrong side and
   // never reached.
   v = clamp(v, floor, top);
@@ -974,17 +1065,17 @@ export function stepCarSpeed(
     );
     if (hit.hit) {
       // Not to zero: a hard stop at a kerb reads as the car being deleted. Two
-      // thirds off per tick sheds 22 m/s in about 90 ms, which is a crunch.
+      // thirds off per tick sheds 44 m/s in about 90 ms, which is a crunch.
       const before = v;
       v *= 0.34;
       if (v < 0.2) v = 0;
       // **The impulse.** Two thirds of the speed in one tick is the whole of
       // what the car "lost to the wall", and it is the number `crashDamage`
-      // wants -- which is why the 0.66 factor matters twice over: at 22 m/s it
-      // reports 14.5 m/s of delta-v and therefore a 60 hp write-off's worth of
+      // wants -- which is why the 0.66 factor matters twice over: at 44 m/s it
+      // reports 29 m/s of delta-v and therefore a 60 hp write-off's worth of
       // damage on the *first* tick, and the `CRASH_COOLDOWN_MS` half-second
       // swallows the four ticks of continued grinding that follow. Reporting
-      // the whole 22 across five ticks would have been the same crash costing
+      // the whole 44 across five ticks would have been the same crash costing
       // five times as much.
       lost = before - v;
     }
@@ -1002,7 +1093,7 @@ export function stepCarSpeed(
  * `controller.step` is what actually moves a driver (section 2: "the car you are
  * driving is not a new body, it is your body, geared"), and when it resolves the
  * capsule against a prism it simply *puts the body somewhere else* -- the car's
- * scalar carries on at 22 m/s while the player stands still against a wall. The
+ * scalar carries on at 44 m/s while the player stands still against a wall. The
  * nose probe catches most of that, but not a car sliding into a wall at an
  * angle, not a kerb the probe's 1.8 m reach steps over, and not a corner the
  * capsule wedges into.
@@ -1036,7 +1127,7 @@ export function crashFromClamp(c: DriveState, movedX: number, movedZ: number, dt
   const lost = shortfall / dt;
   // Take it off the car as well as reporting it. Without this the scalar is
   // untouched by the wall it just hit, so the very next tick asks the controller
-  // for 22 m/s again and the car grinds along the prism at full throttle for as
+  // for 44 m/s again and the car grinds along the prism at full throttle for as
   // long as the player holds W -- which is the bug the nose probe was written to
   // avoid and which this path reintroduces if it only *measures*.
   c.carSpeed = c.carSpeed < 0 ? c.carSpeed + lost : c.carSpeed - lost;
@@ -1064,6 +1155,14 @@ const CLAMP_SLIP = 0.15;
  * Recording a speed per pending input would remove it and cost a field on every
  * queued frame; it is not worth it and this paragraph is the record of that
  * decision.
+ *
+ * **Doubling `DRIVE_TOP_SPEED` to 44 did not move that bound**, which is worth a
+ * line because it is the obvious thing to worry about when a car gets faster.
+ * The error is `DRIVE_ACCELERATION x replayTicks x dt` -- how far the *speed*
+ * can drift over the replay -- and the acceleration is deliberately unchanged,
+ * so it is the same 0.5 m/s it always was. What doubled is the distance the car
+ * covers in those ticks, and that is not an error: both ends integrate the same
+ * larger number from the same acked state.
  *
  * Runs **after** `shapeRideInput`, and the two are mutually exclusive by
  * construction: `resolveTake` refuses a car to anybody on a bike.
@@ -1190,7 +1289,7 @@ export function shapeDriveSteering(
  *
  * The closing speed is the rate the gap is shrinking along the line between
  * them, which is the only frame-invariant "how hard did they hit" available
- * without a real contact normal: two cars side by side at 22 m/s in the same
+ * without a real contact normal: two cars side by side at 44 m/s in the same
  * direction have a closing speed of zero and do not crash, which is exactly
  * right, and one reversing into another at 5 m/s crashes at 5.
  */
@@ -1875,14 +1974,19 @@ export function verifyDriving(): string[] {
   const failures: string[] = [];
 
   // --- The integrator reaches the stated top speed and does not pass it.
+  //
+  // Twelve seconds of throttle rather than the ten this used to run, because the
+  // top speed doubled and the acceleration did not: the ramp is 7.3 s now and a
+  // ten-second window is only 37% of headroom over it. Twelve keeps the same
+  // "comfortably past the ramp" property the original had.
   {
     const c: DriveState = { drivingCar: 1, carSpeed: 0, carHealth: CAR_HEALTH_MAX };
     const dt = 1 / 60;
-    for (let i = 0; i < 600; i++) stepCarSpeed(c, { forward: 1, jump: false }, dt, 0, 0, 0, 0, null);
+    for (let i = 0; i < 720; i++) stepCarSpeed(c, { forward: 1, jump: false }, dt, 0, 0, 0, 0, null);
     if (Math.abs(c.carSpeed - DRIVE_TOP_SPEED) > 1e-6) {
-      failures.push(`Ten seconds of throttle reached ${c.carSpeed.toFixed(3)} m/s, not ${DRIVE_TOP_SPEED}.`);
+      failures.push(`Twelve seconds of throttle reached ${c.carSpeed.toFixed(3)} m/s, not ${DRIVE_TOP_SPEED}.`);
     }
-    // And it got there in about the time the constant promises: v/a = 3.67 s.
+    // And it got there in about the time the constant promises: v/a = 7.33 s.
     const ramp: DriveState = { drivingCar: 1, carSpeed: 0, carHealth: CAR_HEALTH_MAX };
     let ticks = 0;
     while (ramp.carSpeed < DRIVE_TOP_SPEED - 1e-9 && ticks < 3600) {
@@ -1895,6 +1999,42 @@ export function verifyDriving(): string[] {
       failures.push(
         `0 to ${DRIVE_TOP_SPEED} m/s took ${seconds.toFixed(2)} s against the ${want.toFixed(2)} s ` +
           `${DRIVE_ACCELERATION} m/s^2 promises.`,
+      );
+    }
+    // **The instruction's own number, asserted rather than assumed.** *"make
+    // cars top velocity 100% faster"* is a claim about a specific figure --
+    // 44 m/s, 158 km/h -- and it is the one thing in this block that a future
+    // tuning pass could quietly undo while every relative check above still
+    // passed. `DRIVE_TOP_SPEED_ROUGH` is checked against the *rule* (half)
+    // rather than against 22, because it is now derived and asserting the
+    // literal would be comparing a constant with itself.
+    if (DRIVE_TOP_SPEED !== 44) {
+      failures.push(
+        `DRIVE_TOP_SPEED is ${DRIVE_TOP_SPEED} m/s. The instruction doubled it from 22 to 44 ` +
+          `(158 km/h); a change back is a change to the feature, not to a tuning knob.`,
+      );
+    }
+    if (Math.abs(DRIVE_TOP_SPEED_ROUGH - DRIVE_TOP_SPEED * 0.5) > 1e-9) {
+      failures.push(
+        `Off-road is ${DRIVE_TOP_SPEED_ROUGH} m/s against a road top of ${DRIVE_TOP_SPEED}; the rule ` +
+          `this constant states is "half", and half is what makes the road network worth using.`,
+      );
+    }
+    // Every deceleration is at least the acceleration and stops the car in the
+    // time the headers claim -- the invariant the doubling was carried out
+    // under. Two and a half seconds is the brake's 2.44 rounded up.
+    const stopSeconds = DRIVE_TOP_SPEED / DRIVE_BRAKE;
+    if (stopSeconds > 2.5) {
+      failures.push(
+        `Full brake from the top speed takes ${stopSeconds.toFixed(2)} s. The doubling was done on ` +
+          `the rule that every time-to-stop is unchanged, and the old car stopped in 2.44 s.`,
+      );
+    }
+    const coastSeconds = DRIVE_TOP_SPEED / DRIVE_COAST;
+    if (coastSeconds > 11) {
+      failures.push(
+        `A car coasting from the top speed rolls for ${coastSeconds.toFixed(1)} s. Over about ten ` +
+          `seconds engine braking reads as a stuck throttle rather than as a car with weight.`,
       );
     }
   }
@@ -2071,9 +2211,33 @@ export function verifyDriving(): string[] {
     if (driveTurnRate(0) !== 0) failures.push(`driveTurnRate(0) is ${driveTurnRate(0)}, not zero.`);
     // And the radius stays in one order of magnitude across the range, which is
     // the property the ramp exists to hold. `bikes.verifyBikes`' own assertion.
+    //
+    // **140 m rather than the 70 this used to allow**, and the widening is the
+    // top speed's doubling arriving here. A radius bound is a bound on `v/w`,
+    // so at twice the speed the same *feel* is twice the radius; holding 70 m at
+    // 44 m/s would have demanded 0.63 rad/s, which is 28 m/s^2 of lateral
+    // acceleration and is the slot car `DRIVE_TURN_RATE_FAST`'s header refuses.
     const radiusTop = DRIVE_TOP_SPEED / fast;
-    if (radiusTop > 70) {
+    if (radiusTop > 140) {
       failures.push(`A car at ${DRIVE_TOP_SPEED} m/s turns in ${radiusTop.toFixed(0)} m; that is not a corner.`);
+    }
+    // The other side of the same number, and the one that actually decides
+    // whether a car reads as having mass: **lateral acceleration at the top**.
+    //
+    // This check is new with the doubling and it is the one that matters, for a
+    // reason the radius bound alone cannot express. A radius that is too small
+    // and a radius that is too large are different failures -- one is a spin,
+    // one is a barge -- and `v x w` is the quantity that distinguishes them at
+    // any speed. 1.6 g is the arcade allowance; a real sedan on a dry road is
+    // about 0.9 and this game has never pretended to be one. Past 2 g the car
+    // stops being a car and starts being a cursor, and there is no frame that
+    // says so: it simply feels good to whoever tuned it.
+    const lateralTop = DRIVE_TOP_SPEED * fast;
+    if (lateralTop > 1.6 * 9.81) {
+      failures.push(
+        `A car cornering at ${DRIVE_TOP_SPEED} m/s pulls ${(lateralTop / 9.81).toFixed(2)} g ` +
+          `(${lateralTop.toFixed(1)} m/s^2). Past about 1.6 g it is a slot car; see DRIVE_TURN_RATE_FAST.`,
+      );
     }
     if (12 / mid < 3) failures.push('A car at 12 m/s turns inside three metres, which is a spin.');
   }

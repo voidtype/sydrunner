@@ -30,14 +30,31 @@ import {
   CAR_SMOKING_HEALTH,
   CAR_SMOKING_SCALE,
   CRASH_DAMAGE_MAX,
+  DRIVE_ACCELERATION,
   DRIVE_TOP_SPEED,
 } from '../client/src/game/driving.ts';
 
-/** `verifySim`'s empty city, with one wall across the road at z = -60. */
+/**
+ * How far down the road the wall is, metres.
+ *
+ * **Derived from the top speed rather than the 60 m this used to hard-code**,
+ * and the derivation is what stops it rotting the way the literal did: the
+ * whole point of run 1 is a *healthy car at its top speed* hitting a wall, and
+ * `v^2 / 2a` is how much road that needs. At 22 m/s it was 40 m, so 60 was
+ * enough by half; at 44 it is 161, and 60 m of run-up would have put the car
+ * into the wall at 27 m/s while the check went on claiming it measured a
+ * top-speed crash.
+ *
+ * Plus 40 m of margin, so the car is genuinely *at* the top rather than
+ * arriving there in the same tick it hits.
+ */
+const RUN_UP = DRIVE_TOP_SPEED * DRIVE_TOP_SPEED / (2 * DRIVE_ACCELERATION) + 40;
+
+/** `verifySim`'s empty city, with one wall across the road at the end of the run-up. */
 function emptyWorld(): ServerWorld {
   const collision = new CollisionWorld();
   collision.addPrisms('wall', [{
-    points: new Float32Array([-20, -62, 20, -62, 20, -58, -20, -58]),
+    points: new Float32Array([-20, -RUN_UP - 2, 20, -RUN_UP - 2, 20, -RUN_UP + 2, -20, -RUN_UP + 2]),
     height: 8,
     base: 0,
   }]);
@@ -101,14 +118,14 @@ function run(): number {
 
   console.log('--- a car driven at full throttle into a wall, through Simulation.step');
 
-  // === 1. Healthy car, sixty metres of run-up.
-  const first = chargeTheWall(900);
+  // === 1. Healthy car, a full run-up. See `RUN_UP`.
+  const first = chargeTheWall(1800);
   console.log(
     `  run 1: top ${first.top.toFixed(2)} m/s, health ${first.healthBefore} -> ${car.health}, ` +
       `stopped at z = ${p.combat.body.position.z.toFixed(1)} after ${first.ticks} ticks`,
   );
   if (Math.abs(first.top - DRIVE_TOP_SPEED) > 0.5) {
-    failures.push(`A healthy car reached ${first.top.toFixed(2)} m/s over 60 m; the top speed is ${DRIVE_TOP_SPEED}.`);
+    failures.push(`A healthy car reached ${first.top.toFixed(2)} m/s over ${RUN_UP.toFixed(0)} m; the top speed is ${DRIVE_TOP_SPEED}.`);
   }
   if (car.health >= CAR_HEALTH_MAX) {
     failures.push('Driving into a wall at the top speed did the car no damage at all.');
@@ -136,7 +153,7 @@ function run(): number {
   let runs = 1;
   while (car.health > 0 && runs < 8) {
     place(0);
-    const again = chargeTheWall(900);
+    const again = chargeTheWall(1800);
     runs++;
     console.log(
       `  run ${runs}: top ${again.top.toFixed(2)} m/s, health ${again.healthBefore.toFixed(1)} -> ` +

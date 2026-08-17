@@ -9,6 +9,12 @@
 // The one place a balance becomes text. See `game/cash.formatMoney` for why
 // it is not `Intl.NumberFormat`.
 import { formatMoney } from './game/cash.ts';
+// The level line and the XP bar's width, both of them pure. This file cannot be
+// imported outside a browser -- it reaches for `document` in a field
+// initialiser -- so every string and every number it draws that is worth
+// asserting lives one module away and is checked on both ends. Same arrangement
+// `formatMoney` above is here under. See `game/levelhud.ts`.
+import { levelLine, xpBarWidth } from './game/levelhud.ts';
 import type { Vector3 } from 'three/webgpu';
 import type { SolarPosition } from './sky/solar.ts';
 import { type RosterEntry } from './net/protocol.ts';
@@ -514,8 +520,18 @@ export class Hud {
    * standing bet that `index.html` and this file ship together.
    */
   private readonly moneyEl = document.getElementById('money')!;
-  /** `lvl 3`, beside the balance. See `level`. */
+  /**
+   * `LVL 1 · 3/10` and its XP bar, under the balance. See `level`.
+   *
+   * Three elements rather than one because the row is a line of text over a
+   * progress track now, and the track's fill has to be addressable on its own:
+   * `#level` is the block that collapses, `#level-text` is the sentence, and
+   * `#level-xp i` is the width that moves. Same non-null-asserted bet the rest
+   * of this class makes that `index.html` and this file ship together.
+   */
   private readonly levelEl = document.getElementById('level')!;
+  private readonly levelLabel = document.getElementById('level-text')!;
+  private readonly levelBarFill = document.getElementById('level-xp')!.firstElementChild as HTMLElement;
   private readonly ko = document.getElementById('ko')!;
   private readonly investigationEl = document.getElementById('investigation')!;
   private readonly investigationReason = document.getElementById('investigation-reason')!;
@@ -730,7 +746,7 @@ export class Hud {
     // while the board is held open would not redraw -- the comparison is what
     // makes this cheap, and a field left out of it is a field that goes stale
     // exactly when somebody is looking at it.
-    const key = rows.map((r) => `${r.id}:${r.name}:${r.kos}:${r.downs}:${r.ping}:${r.level}:${r.bot ? 1 : 0}`).join('|') + `#${selfId}`;
+    const key = rows.map((r) => `${r.id}:${r.name}:${r.kos}:${r.downs}:${r.ping}:${r.level}:${r.kills}:${r.bot ? 1 : 0}`).join('|') + `#${selfId}`;
     if (key === this.boardKey) return;
     this.boardKey = key;
     this.boardRows.textContent = '';
@@ -754,6 +770,22 @@ export class Hud {
       } else {
         level.textContent = String(r.level);
       }
+      // The XP column: the ladder's own kill count, which is this week's for an
+      // account and this session's for a guest. See `RosterEntry.kills`.
+      //
+      // A **whole number rather than the `3/10` the HUD draws**, and that is a
+      // column-width decision rather than an inconsistency: the vitals line is
+      // about *this* player and wants the fraction, and a board of sixteen rows
+      // wants a sortable number that fits in three characters. A dash at zero,
+      // on the ping column's rule two blocks down -- a column of noughts is a
+      // column that says nothing.
+      const xp = document.createElement('td');
+      if (r.kills <= 0) {
+        xp.textContent = '—';
+        xp.className = 'none';
+      } else {
+        xp.textContent = String(r.kills);
+      }
       const kos = document.createElement('td');
       kos.textContent = String(r.kos);
       const downs = document.createElement('td');
@@ -767,7 +799,7 @@ export class Hud {
       } else {
         ping.textContent = `${r.ping}`;
       }
-      tr.append(name, level, kos, downs, ping);
+      tr.append(name, level, xp, kos, downs, ping);
       this.boardRows.appendChild(tr);
     }
   }
@@ -1082,7 +1114,8 @@ export class Hud {
   private moneyText = '\u0000';
 
   /**
-   * `lvl 3`, in the vitals cluster beside the balance.
+   * `LVL 1 · 3/10` and a thin bar under it, in the vitals cluster beside the
+   * balance.
    *
    * **Beside the dollars rather than under the name on the leaderboard alone**,
    * because a level that is only visible when you hold Tab is a level you
@@ -1091,20 +1124,42 @@ export class Hud {
    * line means the cluster still reads as three groups (what you have, what
    * you are carrying, what you are made of) rather than four.
    *
-   * `null` draws nothing, which is the `?offline` case and the second before
-   * the first roster lands. Level 1 draws nothing either, and that is
-   * deliberate rather than a bug: every guest and every bot in the city is
-   * level 1, so a `lvl 1` on screen would be a permanent label that says
-   * nothing about anybody. It appears the moment it means something.
+   * **The level-1 suppression is gone**, and its removal is the whole of the
+   * report *"i cant se my level or XP anywhere"*. The paragraph that used to
+   * live here argued that every guest and every bot is level 1, so a `lvl 1` on
+   * screen would be a permanent label saying nothing about anybody -- which is
+   * true of a bare `lvl 1` and is exactly why the line now carries the fraction
+   * instead. A player at 3/10 is being told something that changes every thirty
+   * seconds. See `game/levelhud.ts`, which owns every character of the string,
+   * argues the reversal at length and is checked on both ends.
    *
-   * Cheap to call every frame on `money`'s terms exactly: the string is
-   * compared before it is written.
+   * `null` still draws nothing, and that case is now the *only* one: it is
+   * `?offline` and the second before the first roster lands, where there is no
+   * ladder rather than an empty one.
+   *
+   * Cheap to call every frame on `money`'s terms exactly: the composed string is
+   * compared before anything is written, and the bar's width rides in the same
+   * key -- so a frame in which neither the level, the kills nor the guest flag
+   * moved is one string comparison and no reflow. The width is *in* the key
+   * rather than compared separately so the two can never be written out of
+   * step, which would be a bar that disagrees with the number above it.
    */
-  level(level: number | null): void {
-    const text = level === null || level <= 1 ? '' : `lvl ${level}`;
-    if (text === this.levelText) return;
-    this.levelText = text;
-    this.levelEl.textContent = text;
+  level(state: { level: number; kills: number; guest: boolean } | null): void {
+    const text = state === null ? '' : levelLine(state.level, state.kills, state.guest);
+    const width = state === null ? '0' : xpBarWidth(state.level, state.kills);
+    const key = text + '|' + width;
+    if (key === this.levelText) return;
+    this.levelText = key;
+    this.levelLabel.textContent = text;
+    // The row is hidden explicitly rather than through `#level:empty`, which is
+    // how `#money` next to it collapses: an element with children is never
+    // `:empty`, and this one has a label and a bar in it now. One `display`
+    // write on the two frames a session where the answer changes.
+    const show = text !== '';
+    if ((this.levelEl.style.display === 'none') === show) {
+      this.levelEl.style.display = show ? '' : 'none';
+    }
+    this.levelBarFill.style.width = width;
   }
 
   private levelText = '\u0000';
