@@ -657,7 +657,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     # tile it has actually emitted -- so a narrowed run would otherwise ship an
     # index listing five tiles and delete the other 218 from the client's world,
     # with all 218 still sitting on disk.
-    only = {k.strip() for k in (args.only or "").split(",") if k.strip()}
+    only = _only_keys(args.only)
     if only:
         unknown = only - set(keys)
         if unknown:
@@ -3166,7 +3166,7 @@ def cmd_road_grade_audit(args: argparse.Namespace) -> int:
 
     only = None
     if args.only:
-        only = {k.strip() for part in args.only for k in part.split(",") if k.strip()}
+        only = _only_keys(args.only)
         missing = only - keys
         if missing:
             raise SystemExit(f"--only names tiles the index does not have: {sorted(missing)}")
@@ -4604,7 +4604,7 @@ def cmd_clearance_audit(args: argparse.Namespace) -> int:
         raise AuditUnresolved(f"no {config.INDEX_PATH}; there is no world to audit")
     index = json.loads(config.INDEX_PATH.read_text())
     keys = [t["key"] if isinstance(t, dict) else t for t in index["tiles"]]
-    only = {k.strip() for spec in (args.only or []) for k in spec.split(",") if k.strip()}
+    only = _only_keys(args.only)
     if only:
         missing = only - set(keys)
         if missing:
@@ -5136,6 +5136,43 @@ def _emitted_tile_keys() -> list[str]:
     return [t["key"] for t in index["tiles"]]
 
 
+def _only_keys(spec: str | list[str] | None) -> set[str]:
+    """A `--only` argument as a set of tile keys, with `@file` expansion.
+
+    Every `--only` in this file already took a comma-separated list, and that
+    was fine while the narrowed runs were five tiles wide. The station round
+    is 382 -- every 500 m tile a **surface** station envelope touches, plus the
+    tiles that hold the centroid of a footprint the envelope deletes -- and
+    2.7 kB of tile keys pasted into four commands is a list that will be wrong
+    in one of them. So a leading `@` reads the keys out of a file instead, one
+    per line, blank lines and `#` comments ignored.
+
+    Takes both shapes because both are already in use: `build` and
+    `fence-road-audit` declare a plain string, `clearance-audit` and
+    `road-grade-audit` declare `action="append"`. Normalising here rather than
+    changing four declarations keeps every existing invocation working.
+    """
+    if not spec:
+        return set()
+    parts = [spec] if isinstance(spec, str) else list(spec)
+    out: set[str] = set()
+    for part in parts:
+        for token in str(part).split(","):
+            token = token.strip()
+            if not token:
+                continue
+            if token.startswith("@"):
+                text = Path(token[1:]).expanduser().read_text()
+                out |= {
+                    line.strip()
+                    for line in text.splitlines()
+                    if line.strip() and not line.lstrip().startswith("#")
+                }
+            else:
+                out.add(token)
+    return out
+
+
 @_audit
 def cmd_station_clear_audit(args: argparse.Namespace) -> int:
     """RULE 1. No building stands on a station.
@@ -5400,6 +5437,21 @@ def cmd_rail_veg_audit(args: argparse.Namespace) -> int:
             f"no rail bake at {railenv.BAKE_PATH}, so there is no corridor to audit against"
         )
     keys = _emitted_tile_keys()
+    # `--only`, on exactly `fence-road-audit`'s terms and for exactly its
+    # reason: a partial re-emit fixes the tiles it re-emits and no others, so
+    # the whole-world count answers a question the run did not ask. Scoped, the
+    # verdict is "no tree stands in the corridor **in the tiles this build
+    # wrote**", which is a claim a partial build can actually earn. The
+    # unscoped run is still the default and is still the one that answers for
+    # the shipped world -- see the note this prints when the scope is narrowed.
+    only = _only_keys(args.only)
+    if only:
+        keys = [k for k in keys if k in only]
+        missing = only - set(keys)
+        print(f"  --only: {len(keys):,} tiles in scope"
+              + (f" ({len(missing):,} named but not emitted)" if missing else ""))
+        print("  NOTE: this is a scoped verdict. Trees in the corridor outside these"
+              " tiles are not counted and are not fixed by the run that wrote them.")
     print(f"{len(keys):,} emitted tiles, {env.track_km:,.0f} km of non-tunnel track "
           f"at {railenv.FENCE_OFFSET:.1f} m")
 
@@ -5495,7 +5547,7 @@ def cmd_fence_road_audit(args: argparse.Namespace) -> int:
     index = json.loads(config.INDEX_PATH.read_text())
     _require_readable_geometry(index)
     keys = [t["key"] for t in index["tiles"]]
-    only = {k for k in args.only.split(",") if k} if args.only else None
+    only = _only_keys(args.only)
     if only:
         keys = [k for k in keys if k in only]
     print(f"{len(keys):,} tiles, every fence triangle against the metalled carriageway")
@@ -5617,7 +5669,10 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument(
         "--only",
         default="",
-        help="comma-separated tile keys to emit, e.g. '0_3,0_4,1_2'. Everything else"
+        help="comma-separated tile keys to emit, e.g. '0_3,0_4,1_2', or"
+        " `@FILE` to read them one to a line -- see `_only_keys`, and use the"
+        " file form past a handful, because a 382-tile station round pasted"
+        " into a shell is a list that will be wrong somewhere. Everything else"
         " keeps the tiles and the index entries it already has -- see"
         " `_carry_index_tiles`. For verifying a local change without a citywide"
         " rebuild.",
@@ -5943,6 +5998,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     rv.add_argument("--max-trees", type=int, default=0,
                     help="trees the corridor may still hold")
+    # Added for the station round's partial re-emit, in `fence-road-audit`'s
+    # words and for its reason: 382 tiles were rebuilt and 17,731 were not, so
+    # the unscoped count measures the world and not the run. Scoping it does
+    # not make the rest of the corridor clean and the command says so when it
+    # is narrowed -- see `cmd_rail_veg_audit`.
+    rv.add_argument("--only", default="",
+                    help="comma-separated tile keys, or @FILE for one key a line,"
+                    " for checking a partial re-emit without reading the whole world")
     rv.add_argument("--worst", type=int, default=12, help="offenders to name")
     rv.set_defaults(func=cmd_rail_veg_audit)
 
@@ -5953,8 +6016,8 @@ def main(argv: list[str] | None = None) -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     fr.add_argument("--only", default="",
-                    help="comma-separated tile keys, for checking one change without"
-                    " reading the whole world")
+                    help="comma-separated tile keys, or @FILE for one key a line,"
+                    " for checking one change without reading the whole world")
     # Not zero, and the number is a measurement rather than a target. A fence
     # is clipped against the carriageway ribbons `streets.py` draws, and
     # `.lanes.bin` carries the same ways at the same widths -- but the two are
