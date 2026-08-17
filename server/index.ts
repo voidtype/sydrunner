@@ -108,6 +108,8 @@ import { verifyCharacters } from '../client/src/game/characters.ts';
 import { verifyEvents } from '../client/src/game/events.ts';
 import { verifyWallet } from './wallet-contract.ts';
 import { verifyTeleport } from '../client/src/game/teleport.ts';
+// WORKSTREAM L (trains): the Metro's open gangways. See `verifyGangway`.
+import { verifyGangway } from '../client/src/game/riding.ts';
 import { sunReady, sunScreaming, verifySunButton } from '../client/src/game/sunbutton.ts';
 import { trafficTick } from '../client/src/game/traffic.ts';
 import { verifySuggestions } from '../client/src/net/suggestions.ts';
@@ -257,6 +259,16 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // `client/src/game/unstuck.ts`.
     ['verifyUnstuck', verifyUnstuck()],
     ['verifyTeleport', verifyTeleport()],
+    // Walking between the carriages of a Metropolis, which this process is the
+    // authority for: `sim.exitCarriage` runs `riding.rideExit` on every rider on
+    // every tick and the browser predicts the identical crossing. Run **here** as
+    // well as in the browser because every failure in it is silent in this repo's
+    // sense -- a gangway that stays shut looks like a feature nobody built, and a
+    // sign wrong in the reframe puts a passenger 22 m from where the other end
+    // has them, at 130 km/h, on somebody else's screen only. It cannot be folded
+    // into `verifyRiding`, which needs the controller's eye height and body
+    // radius and has no caller here that holds either. See `game/riding.ts`.
+    ['verifyGangway', verifyGangway()],
     // The button in Sydney Park and the sun it screams at. Run **here** rather
     // than only in the browser because this process is the one that keeps the
     // two instants: every failure in that file is silent in this repo's sense --

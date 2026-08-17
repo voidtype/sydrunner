@@ -315,7 +315,7 @@ import {
   dirOf,
   dwellAt,
   dwellStand,
-  exitLocal,
+  rideExit,
   findBoarding,
   interiorOfCar,
   nearestDwell,
@@ -19534,7 +19534,16 @@ async function checkRidingOnline(): Promise<void> {
         }
       }
       advance(this.combat, this.input, FIXED_DT, world);
-      if (world !== combatWorld) exitLocal(this.combat.aboard, this.body, this.frame);
+      // `riding.rideExit`, which is `exitLocal` with the Metro's gangway crossing
+      // in it -- the same line `main.ts` and `sim.exitCarriage` run. Written here
+      // rather than left as the bare composition on this file's own standing
+      // argument: the last time this harness kept its own copy of the seam it was
+      // testing a boarding no player could perform. The yaw delta goes on
+      // `input.yaw` because while aboard that field is the rider's carriage-local
+      // heading, which is what the swing below already relies on.
+      if (world !== combatWorld) {
+        this.input.yaw += rideExit(bake, this.combat.aboard, this.body, t, this.frame);
+      }
       this.net.sendInput(this.input, this.body.velocity);
     }
 

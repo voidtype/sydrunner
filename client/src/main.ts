@@ -422,7 +422,6 @@ import {
   createCarriageStand,
   createRideBanner,
   dirOf,
-  exitLocal,
   findBoarding,
   frameYaw,
   insideCarriage,
@@ -434,6 +433,7 @@ import {
   projectAboard,
   rideBanner,
   rideEnter,
+  rideExit,
   RIDE_ON,
   spanFlagsAt,
   stopPlatform,
@@ -5152,10 +5152,20 @@ async function main(): Promise<void> {
     return combatWorld;
   };
 
+  // --- WORKSTREAM L (trains): the gangway, at the one seam it can be at.
+  //
+  // `riding.rideExit` is `exitLocal` with the walk-through crossing between the
+  // read and the composition -- see its header, and `sim.exitCarriage`, which is
+  // this call statement for statement. What is this end's alone is the number it
+  // returns: crossing the one reversed coupling in a Metro turns the carriage
+  // frame through half a turn, and while aboard `input.yaw` *is* the rider's
+  // carriage-local heading (see `wasAboard`), so the mouse accumulator has to
+  // turn with it or a rider walking through the middle of the train comes out
+  // facing the way they came.
   const exitCarriage = (): void => {
     if (!rideActive) return;
     rideActive = false;
-    exitLocal(playerCombat.aboard, player, rideFrame);
+    input.yaw += rideExit(railBake, playerCombat.aboard, player, railSeconds(Date.now()), rideFrame);
   };
 
   /**

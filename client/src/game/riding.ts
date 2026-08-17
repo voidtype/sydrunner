@@ -122,6 +122,48 @@
  * contains no trigonometry at all. `checkRiding` asserts that separation by
  * comparing ten thousand derived world positions against a reference with
  * `Object.is`.
+ *
+ * ---------------------------------------------------------------------------
+ * 5. THE METRO IS A WALK-THROUGH TRAIN, AND A CROSSING IS A CHANGE OF BASIS.
+ *
+ *   > *"u should be able to move between carriages on metro when the train is
+ *   > moving"*
+ *
+ * An Alstom Metropolis has **open gangways**: six cars, one tube, and you can
+ * see from the front cab window to the back one. A Tangara does not -- its ends
+ * are bulkheads and nobody walks between carriages of one at line speed -- so
+ * the two consists differ here, and the difference lives in the interior table
+ * (`CarriageInterior.gangway`) rather than in a branch anybody has to remember.
+ *
+ * **The crossing is `crossGangway`, and it contains no world coordinates, no
+ * bake, no clock and no train speed.** That is not an economy, it is the claim
+ * section 1 makes coming due. A rider's authority is `(car, x, y, z, yaw)` in
+ * one carriage's frame; the *same physical point* in the neighbour's frame is
+ * that tuple with the car index stepped, the offset shifted by the consist's own
+ * pitch, and -- across the one coupling in a Metro where the two cars face
+ * opposite ways -- three signs and a half turn flipped. A train doing 130 km/h
+ * enters into none of it, because a carriage frame is a stationary room whatever
+ * the room is doing. `verifyGangway` states that as a test rather than as this
+ * paragraph: the identical walk is driven at 0 m/s and at 30 m/s and the two
+ * local trajectories are compared with `Object.is`.
+ *
+ * **Where the boundary is, and why it is not the modelled bulkhead.** The
+ * carriages' own interiors do not meet: on the shipped Metropolis a mid-to-mid
+ * coupling leaves 0.4 m between the two measured bulkheads and a lead-to-mid one
+ * *overlaps* by 0.1 m, because the lead car's saloon probed 0.3 m longer than
+ * half the pitch. Either number as a crossing plane is a step in the floor or a
+ * hole in it. So the plane is the **coupling midpoint** -- `pitch / 2` from each
+ * carriage's centre, which is one point in the world described identically by
+ * both frames -- and at a gangway end the interior's own bulkhead is moved out
+ * to it. A rider leaving car k at `x = +pitch/2` arrives in car k-1 at
+ * `x = -pitch/2`, exactly, and walking back returns them to the double they
+ * started at.
+ *
+ * The floor needs nothing: a Metropolis has `deck === null`, so `carriageFloor`
+ * answers `vestibuleY` for every x, including the half-metre of gangway either
+ * side of the plane. The bellows a rider walks through is drawn by
+ * `world/trains.ts` and collides with nobody, which is the same division of
+ * labour the door leaves already have.
  */
 
 import {
@@ -449,6 +491,49 @@ export interface SaloonDeck {
   split: number;
 }
 
+/**
+ * How wide and how tall the hole between two carriages is, metres.
+ *
+ * A Metropolis gangway is a rectangular aperture in an otherwise solid end: the
+ * bellows is 2.4 m across on the outside and what a passenger walks through is
+ * about 1.3 m of it, with a header at 2.0 m over the floor and the frame of the
+ * ring either side. Half the aperture, so the opening is `+/- half`, on
+ * `DoorBay.half`'s own convention -- these two are the same kind of number in
+ * the same frame and are deliberately spelled the same way.
+ *
+ * **The height gates entry and nothing else.** A body already in the tube is not
+ * ejected for jumping: `carriageResolve` has no ceiling anywhere in it (see
+ * `CarriageInterior.ceilingY`, which is presentation only), so a header that
+ * pushed back would be the one piece of vertical collision in the carriage and
+ * would push a jumping rider *sideways*, which is worse than letting them clip
+ * the ring. What it does buy is that a rider cannot enter the gangway from the
+ * top of a jump and land inside the bellows.
+ */
+export const GANGWAY_HALF_WIDTH_M = 0.65;
+export const GANGWAY_HEIGHT_M = 2.0;
+
+/**
+ * The open ends of a walk-through carriage, and where the crossing plane is.
+ *
+ * Which ends rather than "has gangways", because a Metropolis lead car has one
+ * of each: the saloon end couples to the next car and the cab end is the front
+ * of the train. That is a property of the *template* and not of where it sits in
+ * the consist -- both lead cars in `METRO` face their cab outward, which is what
+ * their `flip` is for -- so it belongs in this table beside the door bays.
+ *
+ * `plane` is half the consist's own pitch. See section 5 for why the crossing
+ * cannot be at `xMin`/`xMax`: those are measured off the mesh and the two
+ * carriages' measurements do not meet.
+ */
+export interface Gangway {
+  /** The -X end of this carriage is open. */
+  min: boolean;
+  /** The +X end is. */
+  max: boolean;
+  /** |x| of the crossing plane, metres from the carriage centre. */
+  plane: number;
+}
+
 export interface CarriageInterior {
   key: string;
   /** Interior bulkheads along the carriage. Asymmetric on a driving car -- the cab. */
@@ -462,7 +547,19 @@ export interface CarriageInterior {
   ceilingY: number;
   deck: SaloonDeck | null;
   doors: readonly DoorBay[];
+  /** Open ends, or null on a carriage whose ends are bulkheads. See section 5. */
+  gangway: Gangway | null;
 }
+
+/**
+ * Half a Metro's pitch: where one carriage stops being the room you are in.
+ *
+ * Written once and shared by the three Metropolis templates, because it is one
+ * plane seen from two sides -- a value typed three times is three values that
+ * can be typed differently, and the symptom of a 5 cm disagreement is a rider
+ * who crosses into the next carriage and is immediately pushed back out of it.
+ */
+const METRO_GANGWAY_PLANE = /*#__PURE__*/ METRO_PITCH / 2;
 
 /**
  * Every carriage the game can put a person inside, measured off the shipped GLBs.
@@ -491,6 +588,10 @@ const INTERIORS: readonly CarriageInterior[] = [
     ceilingY: 3.58,
     deck: { x0: -4.4, x1: 3.1, lowerY: 0.39, upperY: 2.51, stair: 0.9, split: 1.45 },
     doors: [{ x: -6.19, half: 1.1 }, { x: 4.79, half: 1.1 }],
+    // A Tangara's ends are bulkheads with a slam door in them and its saloons are
+    // two decks 2.1 m apart -- there is no level a gangway could be at, and the
+    // real train does not have one. See section 5.
+    gangway: null,
   },
   {
     key: `${TANGARA}:mid`,
@@ -501,6 +602,7 @@ const INTERIORS: readonly CarriageInterior[] = [
     ceilingY: 3.58,
     deck: { x0: -3.4, x1: 3.4, lowerY: 0.39, upperY: 2.51, stair: 1.2, split: 1.45 },
     doors: [{ x: -5.56, half: 1.1 }, { x: 5.56, half: 1.1 }],
+    gangway: null,
   },
   {
     key: `${METROPOLIS}:lead`,
@@ -511,6 +613,13 @@ const INTERIORS: readonly CarriageInterior[] = [
     ceilingY: 3.4,
     deck: null,
     doors: [{ x: -6.71, half: 0.95 }, { x: -0.61, half: 0.95 }, { x: 5.49, half: 0.95 }],
+    // **One end only, and which one falls out of the measurement.** The probe put
+    // this car's bulkheads at -11.3 and +9.0 -- 2.3 m of asymmetry, which is the
+    // cab. `METRO` gives both lead cars the flip that turns their +X outward, so
+    // the cab is the nose of the train at one end and the back of it at the other,
+    // and the open end is -X in both. `verifyGangway` asserts that against the
+    // table rather than leaving it to this paragraph.
+    gangway: { min: true, max: false, plane: METRO_GANGWAY_PLANE },
   },
   {
     key: `${METROPOLIS}:mid`,
@@ -521,6 +630,7 @@ const INTERIORS: readonly CarriageInterior[] = [
     ceilingY: 3.4,
     deck: null,
     doors: [{ x: -6.11, half: 0.95 }, { x: -0.01, half: 0.95 }, { x: 6.09, half: 0.95 }],
+    gangway: { min: true, max: true, plane: METRO_GANGWAY_PLANE },
   },
   {
     key: `${METROPOLIS}:trail`,
@@ -531,6 +641,11 @@ const INTERIORS: readonly CarriageInterior[] = [
     ceilingY: 3.4,
     deck: null,
     doors: [{ x: -6.09, half: 0.95 }, { x: 0.01, half: 0.95 }, { x: 6.11, half: 0.95 }],
+    // Open at both ends despite the name: in `METRO` the two trailers are coupled
+    // back to back in the middle of the set, which is the one place in either
+    // consist where a rider crosses between two carriages facing opposite ways.
+    // See `crossGangway` for the three signs that costs.
+    gangway: { min: true, max: true, plane: METRO_GANGWAY_PLANE },
   },
 ];
 
@@ -552,7 +667,15 @@ const INTERIORS: readonly CarriageInterior[] = [
 export const RIDER_CARRIAGE_SPAN_M = /*#__PURE__*/ (() => {
   let worst = 0;
   for (const it of INTERIORS) {
-    const span = Math.hypot(it.xMax - it.xMin, it.halfWidth * 2);
+    // **The reachable span, which on a walk-through carriage is wider than the
+    // measured one.** A gangway moves the end wall out to the coupling plane, so
+    // a Metropolis mid car is walkable from -11 to +11 rather than from -10.8 to
+    // +10.8 -- and a bound that is not a bound is a punch that misses somebody
+    // standing in a bellows.
+    const g = it.gangway;
+    const lo = g !== null && g.min ? Math.min(it.xMin, -g.plane) : it.xMin;
+    const hi = g !== null && g.max ? Math.max(it.xMax, g.plane) : it.xMax;
+    const span = Math.hypot(hi - lo, it.halfWidth * 2);
     if (span > worst) worst = span;
   }
   return Math.ceil(worst);
@@ -628,6 +751,49 @@ export interface CarriageMove {
 }
 
 /**
+ * Is the gangway at one end of this carriage open to a body here?
+ *
+ * `end` is `+1` for the +X end and `-1` for the -X one. Three questions, in the
+ * order that makes the cheap one first: does this carriage have a gangway at all
+ * (a Tangara never does), is that end of it open (a Metropolis lead car's cab
+ * end is not), and is the body inside the aperture.
+ *
+ * The width test carries the body's own radius, so a rider walks *through* the
+ * ring rather than into it; the height test does not, because there is no
+ * ceiling collision anywhere in this file and a header that pushed back would be
+ * the only one. See `GANGWAY_HEIGHT_M`.
+ *
+ * Exported because `verifyGangway` drives it directly at the four corners of the
+ * aperture, which is the only way to test a hole: a hole that is too big and a
+ * hole that is not there both look like a wall from one sample.
+ */
+export function gangwayAdmits(
+  it: CarriageInterior, end: number, lz: number, probeY: number, radius: number,
+): boolean {
+  const g = it.gangway;
+  if (g === null) return false;
+  if (!(end < 0 ? g.min : g.max)) return false;
+  const half = GANGWAY_HALF_WIDTH_M - radius;
+  if (half <= 0 || lz < -half || lz > half) return false;
+  // **`probeY` is not the body's feet and getting that wrong shuts the gangway
+  // for everybody.** `controller.step` hands a mover `feetY + STEP_HEIGHT` -- the
+  // kerb probe, so that a step a body can climb is not a wall it walks into --
+  // and `carriageResolve`'s deck split already reads its argument that way. Taken
+  // literally here, a rider standing flat on the floor measures 42 cm taller than
+  // they are, the header refuses them, and the whole feature is a bulkhead. It
+  // cost an acceptance run to find, because the walk ran the full length of the
+  // carriage and stopped dead at the plane, which looks exactly like a crossing
+  // that did not fire.
+  //
+  // The floor is the vestibule's: single-deckers only, which `verifyGangway`
+  // asserts, so `carriageFloor` would answer the same for any x.
+  const feet = probeY - PLATFORM_STEP_M;
+  const floor = it.vestibuleY;
+  if (feet < floor - PLATFORM_STEP_M) return false;
+  return feet + RIDER_EYE_HEIGHT <= floor + GANGWAY_HEIGHT_M;
+}
+
+/**
  * Slide a body along the carriage's walls. The plan half of the interior.
  *
  * Four bulkheads, two side walls, and -- inside a stair zone -- the divider
@@ -640,6 +806,19 @@ export interface CarriageMove {
  * an omission. Getting off is `E` -- see `alightPlatform` and the tunnel rule --
  * because a disembark has to put a body somewhere specific and agreed by both
  * ends, and "wherever they happened to walk out of the hole" is neither.
+ *
+ * **A gangway end is not**, and it is the one hole in this box. See section 5:
+ * on a Metropolis the bulkhead at an open end is moved out to the coupling plane
+ * and the body may pass it, inside a 1.3 m aperture. Past the old bulkhead line
+ * the body is in the bellows and the *aperture* is its side wall rather than the
+ * bodyside, which is what stops a rider walking into the gangway and then
+ * sidestepping out of the train through the concertina.
+ *
+ * Which of the two the side clamp uses is decided from `fromX` -- where the body
+ * already is -- and not from `toX`. Deciding it from the destination is the
+ * version that reads correctly and plays wrong: a rider standing in the bellows
+ * who pushes sideways would fail the aperture test, lose the wider x limit with
+ * it, and be dragged half a metre back down the train by a sideways key.
  */
 export function carriageResolve(
   it: CarriageInterior,
@@ -653,13 +832,49 @@ export function carriageResolve(
   let z = toZ;
   let hit = false;
 
-  const xLo = it.xMin + radius;
-  const xHi = it.xMax - radius;
-  const zLim = it.halfWidth - radius;
+  let xLo = it.xMin + radius;
+  let xHi = it.xMax - radius;
+  const zShell = it.halfWidth - radius;
+  const zGang = GANGWAY_HALF_WIDTH_M - radius;
+
+  // Across first, because the gangway's admission is a question about z and the
+  // shell's own clamp is not a question about x. Two independent clamps in
+  // either order give the same answer; this order lets the second read the first.
+  if (z < -zShell) { z = -zShell; hit = true; }
+  else if (z > zShell) { z = zShell; hit = true; }
+
+  const g = it.gangway;
+  if (g !== null) {
+    // Already in the tube at one end: the plane is the limit and the aperture is
+    // the wall, whatever the body is trying to do.
+    // **A radius past the plane, and the margin is not slack.** Every other wall
+    // in this carriage is offset inward by the body's radius so the body's skin
+    // stops on it. The plane is not a wall -- it is the line at which a rider
+    // changes rooms, and `crossGangway` fires on the same tick -- so the clamp
+    // past it is the backstop for a tick in which the crossing cannot happen
+    // (a consist with a carriage missing). One radius is where the body is
+    // entirely in the next carriage, and a rider is never seen at it.
+    //
+    // It also has to be **strictly** past the plane, or a body clamped exactly on
+    // it is a body the crossing cannot take and the resolver will not release:
+    // the two rules would hold it on the boundary forever.
+    const reach = g.plane + radius;
+    const inMax = g.max && fromX > xHi;
+    const inMin = g.min && fromX < xLo;
+    if (inMax || inMin) {
+      if (inMax) xHi = reach;
+      else xLo = -reach;
+      if (z < -zGang) { z = -zGang; hit = true; }
+      else if (z > zGang) { z = zGang; hit = true; }
+    } else {
+      // In the saloon, walking at an end. The aperture decides.
+      if (x > xHi && gangwayAdmits(it, 1, z, feetY, radius)) xHi = reach;
+      else if (x < xLo && gangwayAdmits(it, -1, z, feetY, radius)) xLo = -reach;
+    }
+  }
+
   if (x < xLo) { x = xLo; hit = true; }
   else if (x > xHi) { x = xHi; hit = true; }
-  if (z < -zLim) { z = -zLim; hit = true; }
-  else if (z > zLim) { z = zLim; hit = true; }
 
   const deck = it.deck;
   if (deck !== null) {
@@ -752,10 +967,20 @@ export function doorBayAt(it: CarriageInterior, lx: number, slack = 0): number {
   return -1;
 }
 
-/** Is this local point inside the carriage shell at all? Used by the camera clamp. */
+/**
+ * Is this local point inside the carriage shell at all? Used by the camera clamp.
+ *
+ * The gangway widens it at an open end, on `RIDER_CARRIAGE_SPAN_M`'s argument:
+ * a rider standing in a bellows is inside the train, and a camera clamp that
+ * said otherwise would let the boom out through the concertina at exactly the
+ * moment there is a second carriage behind it to see through.
+ */
 export function insideCarriage(it: CarriageInterior, lx: number, ly: number, lz: number): boolean {
+  const g = it.gangway;
+  const lo = g !== null && g.min ? Math.min(it.xMin, -g.plane) : it.xMin;
+  const hi = g !== null && g.max ? Math.max(it.xMax, g.plane) : it.xMax;
   return (
-    lx >= it.xMin && lx <= it.xMax &&
+    lx >= lo && lx <= hi &&
     lz >= -it.halfWidth && lz <= it.halfWidth &&
     ly >= -0.5 && ly <= it.ceilingY + (it.deck === null ? 0 : 1.0)
   );
@@ -1481,6 +1706,159 @@ export function isAboard(a: AboardSlot): boolean {
   return a.line >= 0;
 }
 
+// --- Walking between carriages ------------------------------------------------------------
+
+/**
+ * Which way round carriage `k` is coupled, as `+1` or `-1`. Zero off the end.
+ *
+ * The sign every piece of arithmetic in this section is written in terms of: a
+ * carriage's local +X is the direction of increasing arc length when it is not
+ * flipped and the opposite when it is, which is exactly what `carFrameAt` does
+ * with the same flag. Naming it makes the crossing one line instead of four
+ * branches, and four branches is where a sign goes missing.
+ */
+export function carSign(consist: Consist, car: number): number {
+  const c = consist.cars[car];
+  if (c === undefined) return 0;
+  return c.flip ? -1 : 1;
+}
+
+/**
+ * A carriage-local point, moved into another carriage of the same consist.
+ *
+ * ---------------------------------------------------------------------------
+ * The one piece of algebra in this section, written out once so that
+ * `crossGangway` and `net/client.reconcileAboard` cannot derive it differently.
+ *
+ * A point at local x in carriage k is at arc length `centre(k) + sign(k) * x`,
+ * and `consistOffset` puts `centre(k) - centre(j)` at `(j - k) * pitch`. Solving
+ * for the same arc length in j's frame:
+ *
+ *     x_j = turn * x_k + sign(j) * (j - k) * pitch     where turn = sign(j) * sign(k)
+ *
+ * `turn` is `+1` between two carriages coupled the same way round and `-1`
+ * across a reversal -- which a `METRO` set has exactly one of, in the middle,
+ * where the two trailer cars are back to back. Across a reversal the frame is
+ * the old one turned through half a turn about its own up axis, so **z and the
+ * x/z components of any free vector flip with it**. Only y survives untouched,
+ * because the turn is about up.
+ *
+ * Returns false when either index is off the end of the consist, in which case
+ * nothing is written -- a caller that ignored that would be reframing into a
+ * carriage that is not there and would get a plausible number for it.
+ */
+export function reframeAcross(
+  consist: Consist, fromCar: number, toCar: number, p: Vec3Out,
+): boolean {
+  const sk = carSign(consist, fromCar);
+  const sj = carSign(consist, toCar);
+  if (sk === 0 || sj === 0) return false;
+  const turn = sj * sk;
+  p.x = turn * p.x + sj * (toCar - fromCar) * consist.pitch;
+  p.z = turn * p.z;
+  return true;
+}
+
+/**
+ * Half a turn, wrapped into (-pi, pi]. The yaw a reversed coupling costs.
+ *
+ * Written as an add and two compares rather than with a modulo, because a
+ * negative operand's `%` is the one piece of arithmetic in this file people
+ * disagree about -- and because the input is a yaw that is already wrapped, so
+ * one subtraction is always enough.
+ */
+function halfTurnYaw(yaw: number): number {
+  let y = yaw + Math.PI;
+  if (y > Math.PI) y -= 2 * Math.PI;
+  else if (y <= -Math.PI) y += 2 * Math.PI;
+  return y;
+}
+
+/**
+ * Walk a rider through a gangway if they have passed a coupling plane.
+ *
+ * ---------------------------------------------------------------------------
+ * **THE WHOLE OF "MOVE BETWEEN CARRIAGES ON THE METRO WHILE THE TRAIN IS
+ * MOVING", AND THE TRAIN'S SPEED IS NOT AN ARGUMENT.**
+ *
+ * There is no bake here, no clock, no pose and no metres a second. A carriage
+ * frame is a stationary room -- that is section 1's whole claim -- so crossing
+ * between two of them at 130 km/h is the same arithmetic as crossing between
+ * them in a siding, and `verifyGangway` drives the identical walk at 0 m/s and
+ * at 30 m/s and compares the two local trajectories with `Object.is`.
+ *
+ * Called inside the fixed step on **both** ends, from `rideExit`, after the
+ * controller has moved the body and before the composition that turns the local
+ * offset back into a world position. That ordering is the point: the frame the
+ * body is composed against is the frame it ends the tick in, so the witness
+ * `enterLocal` reads on the next tick is a witness the *new* carriage wrote.
+ * Composing against the old carriage instead would be right to within the
+ * railway's curvature over one carriage and wrong by exactly the amount that
+ * makes a self-check pass and a curve look wrong.
+ *
+ * Returns the yaw delta it applied, which is `0` almost always and `+/-pi`
+ * across the reversed coupling. **The caller owns what to do with it**, and on
+ * the client that is not optional: `main.ts` keeps the rider's carriage-local
+ * heading in `input.yaw` -- the mouse accumulator -- and writes it into the body
+ * every tick, so a half turn applied here and not there is a rider who crosses
+ * the middle of a Metro and is instantly facing the way they came. On the server
+ * there is no accumulator to correct; the client's next input arrives already
+ * turned, and this keeps the one snapshot in between honest.
+ *
+ * The loop is bounded by the consist rather than run once, and that is a guard
+ * rather than a case: a walk is 0.07 m a tick and a plane is 11 m from the last
+ * one, so nothing reachable crosses twice. What it protects against is a body
+ * that arrived somewhere impossible -- a bad reframe, a replay seeded from a
+ * stale snapshot -- being left two carriages out of its own index forever.
+ */
+export function crossGangway(a: AboardSlot, consist: Consist): number {
+  let turned = 0;
+  for (let guard = 0; guard < consist.cars.length; guard++) {
+    const it = interiorOfCar(consist, a.car);
+    if (it === null) return turned;
+    const g = it.gangway;
+    if (g === null) return turned;
+    // Which end has been passed, if either. **Strictly past, and the strictness
+    // is load-bearing**: a rider who crosses at `plane + d` arrives at
+    // `-plane + d` in the neighbour, which is strictly inside *its* plane, so the
+    // crossing cannot fire again on the same body in the same loop. With `>=` the
+    // arrival at exactly `-plane` would qualify and a rider standing on a
+    // coupling would ping-pong between the two carriages until the guard ran out
+    // -- an even number of times, so it would land back where it started and
+    // present as a gangway that simply does not work.
+    const end = g.max && a.x > g.plane ? 1 : g.min && a.x < -g.plane ? -1 : 0;
+    if (end === 0) return turned;
+
+    const sk = carSign(consist, a.car);
+    if (sk === 0) return turned;
+    // The +X end of a carriage points at the carriage *ahead* of it when the
+    // carriage is not flipped -- `consistOffset` gives car 0 the greatest arc
+    // length -- and at the one behind when it is.
+    const next = a.car + (end > 0 ? -sk : sk);
+    const sj = carSign(consist, next);
+    if (sj === 0) return turned;
+
+    const turn = sj * sk;
+    a.x = turn * a.x + sj * (next - a.car) * consist.pitch;
+    a.z = turn * a.z;
+    a.vx = turn * a.vx;
+    a.vz = turn * a.vz;
+    if (turn < 0) {
+      // The delta that was actually applied rather than a nominal `Math.PI`.
+      // `halfTurnYaw` wraps, so the step is `+pi` or `-pi` depending on which
+      // side of the circle the rider was looking at -- and the caller adds this
+      // to an accumulator that is never wrapped, so handing back the wrong one
+      // would leave `input.yaw` a full turn away from `a.yaw` and the two
+      // drifting apart every time somebody walks the length of the train.
+      const before = a.yaw;
+      a.yaw = halfTurnYaw(a.yaw);
+      turned += a.yaw - before;
+    }
+    a.car = next;
+  }
+  return turned;
+}
+
 export function clearAboard(a: AboardSlot): void {
   a.line = NOT_ABOARD;
   a.vx = 0;
@@ -1591,6 +1969,20 @@ export function enterLocal(a: AboardSlot, body: RiderBody, f: CarFrame): boolean
  * to catch.
  */
 export function exitLocal(a: AboardSlot, body: RiderBody, f: CarFrame): void {
+  readAboard(a, body);
+  projectAboard(a, body, f);
+}
+
+/**
+ * The first half of `exitLocal`: take the stepped body's local pose into the slot.
+ *
+ * Split out so that `rideExit` can put the gangway crossing *between* the read
+ * and the composition, which is the only place it can go -- the crossing changes
+ * which carriage's frame the composition must use, and the composition is what
+ * writes the witness. Nothing else calls this; `exitLocal` is still the two
+ * halves together and is still what a caller with no bake wants.
+ */
+function readAboard(a: AboardSlot, body: RiderBody): void {
   const p = body.position;
   const v = body.velocity;
   a.x = p.x;
@@ -1600,23 +1992,52 @@ export function exitLocal(a: AboardSlot, body: RiderBody, f: CarFrame): void {
   a.vy = v.y;
   a.vz = v.z;
   a.yaw = body.yaw;
+}
 
-  localToWorld(f, a.x, a.y, a.z, _tmp);
-  p.x = _tmp.x;
-  p.y = _tmp.y;
-  p.z = _tmp.z;
-  localToWorldDir(f, a.vx, a.vy, a.vz, _tmp);
-  v.x = _tmp.x;
-  v.y = _tmp.y;
-  v.z = _tmp.z;
-  body.yaw = a.yaw + frameYaw(f);
-
-  a.wx = p.x;
-  a.wy = p.y;
-  a.wz = p.z;
-  a.wvx = v.x;
-  a.wvy = v.y;
-  a.wvz = v.z;
+/**
+ * `exitLocal`, with the gangway in it. What both fixed steps actually call.
+ *
+ * Three statements in order, and the order is the whole function:
+ *
+ *   1. **Read** the stepped body's local pose into the slot. It is still in the
+ *      carriage it started the tick in.
+ *   2. **Cross**, if the controller walked it past a coupling plane. `a.car`
+ *      changes and `a.x` shifts by the pitch; see `crossGangway`, which is pure
+ *      and has never heard of the clock.
+ *   3. **Compose** against the frame of the carriage it is in *now*, which is
+ *      re-derived when step 2 fired. Composing against the old frame instead is
+ *      wrong by the railway's curvature over one carriage -- centimetres, on a
+ *      curve, every time anybody walks through a bellows, and invisible in every
+ *      still.
+ *
+ * Returns the yaw delta the crossing applied, `0` unless the rider went through
+ * the one reversed coupling in a Metro. See `crossGangway` for who owes what to
+ * that number: on the client it has to be added to `input.yaw`, on the server it
+ * can be dropped.
+ *
+ * A null bake, an unknown direction, or a frame that will not re-derive all fall
+ * back to composing against the frame the caller already had -- which is the
+ * pre-gangway behaviour exactly, and is one tick of a carriage-length lie rather
+ * than a rider left with no world position at all.
+ */
+export function rideExit(
+  bake: RailBake | null, a: AboardSlot, body: RiderBody, t: number, frame: CarFrame,
+): number {
+  readAboard(a, body);
+  let turned = 0;
+  if (bake !== null) {
+    const dir = dirOf(bake, a.line, a.dir);
+    if (dir !== null) {
+      const was = a.car;
+      turned = crossGangway(a, consistOf(dir, a.trip));
+      // Only when the index really moved. `aboardFrame` is two binary searches
+      // and two square roots and this runs for every rider on every tick, where
+      // a crossing happens twice a minute at most.
+      if (a.car !== was) aboardFrame(bake, a, t, frame);
+    }
+  }
+  projectAboard(a, body, frame);
+  return turned;
 }
 
 /**
@@ -2578,6 +2999,12 @@ export function poseAheadOnLine(
  */
 export function verifyRiding(eyeHeight: number, radius: number): string[] {
   const bad: string[] = [];
+  // The walk-through half, which is its own function because the **server** runs
+  // it: `verifyRiding` needs the controller's two constants and there is nobody
+  // in `server/index.ts` holding them, so folding the gangway into it would have
+  // left the one new piece of shared arithmetic in the build checked on exactly
+  // one of the two ends that evaluate it. See `verifyGangway`.
+  for (const failure of verifyGangway()) bad.push(failure);
   if (eyeHeight !== RIDER_EYE_HEIGHT) {
     bad.push(`the controller's eye is ${eyeHeight} m and this module's copy is ${RIDER_EYE_HEIGHT}`);
   }
@@ -2730,5 +3157,441 @@ export function verifyRiding(eyeHeight: number, radius: number): string[] {
       bad.push(`the box built for an underground station does not answer its own floor`);
     }
   }
+  return bad;
+}
+
+// --- The walk-through check ----------------------------------------------------------------
+
+/**
+ * A curving, climbing railway with nothing on it, for the two checks that need
+ * a frame rather than a number.
+ *
+ * A stub rather than the shipped bake, on `world/trains.verifyTrainLights`' own
+ * argument: the real bake is a 30 MB download and a self-check that runs at boot
+ * on both ends has no business waiting for one. What `carFrameAt` reads of a bake
+ * is exactly two arrays and four fields of a direction, so the stub is honest
+ * about what it stands in for -- and it is deliberately **not straight and not
+ * level**, because a straight level test track is the one shape on which a wrong
+ * frame and a right frame agree.
+ */
+function gangwayStubBake(): { bake: RailBake; dir: RailDirection } {
+  const N = 300;
+  const SPAN = 10;
+  const cum = new Float64Array(N);
+  const vertices = new Float64Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const s = i * SPAN;
+    cum[i] = s;
+    // A parabolic drift across and a 2% climb, written as multiplies so the stub
+    // has no trigonometry in it either -- see section 4. Over the 130 m a consist
+    // occupies this bends about as hard as the approach to Redfern.
+    const u = s / 1000;
+    vertices[i * 3] = s;
+    vertices[i * 3 + 1] = s * 0.02;
+    vertices[i * 3 + 2] = u * u * 60;
+  }
+  return {
+    bake: { cum, vertices } as unknown as RailBake,
+    dir: { vertexOff: 0, vertexCount: N } as unknown as RailDirection,
+  };
+}
+
+/** A Metro consist, without a bake to ask for one. See `consistOf`. */
+function metroConsist(): Consist {
+  return { cars: METRO, pitch: METRO_PITCH, pride: false, metro: true };
+}
+
+/**
+ * One tick of a scripted walk along a consist: resolve, then cross.
+ *
+ * **The same two calls in the same order the fixed step makes**, which is the
+ * only way this proves anything: `combat.advance` moves the body through
+ * `CarriageStand.mover` (which is `carriageResolve`) and `rideExit` crosses it
+ * afterwards. A driver that crossed first, or that skipped the resolver, would
+ * be testing a walk nobody can perform -- which is precisely how the riding
+ * feature shipped broken the first time, with an acceptance harness that wrote
+ * its own copy of the seam.
+ *
+ * `step` is the local x displacement this tick, signed, and it comes back
+ * flipped when the crossing went through a reversed coupling: a rider walking
+ * one way in the world walks the other way in a carriage that is coupled the
+ * other way round, and the caller keeps the world direction.
+ */
+function walkTick(
+  a: AboardSlot, consist: Consist, step: number, feetY: number, out: CarriageMove,
+): number {
+  const it = interiorOfCar(consist, a.car);
+  if (it === null) return step;
+  // `feetY + PLATFORM_STEP_M`, because that is what `controller.step` hands a
+  // mover -- the kerb probe rather than the feet. A driver that passed the feet
+  // would be a driver testing a resolver nobody calls. See `gangwayAdmits`.
+  carriageResolve(it, a.x, a.z, a.x + step, a.z, RIDER_RADIUS, feetY + PLATFORM_STEP_M, out);
+  a.x = out.x;
+  a.z = out.z;
+  return crossGangway(a, consist) !== 0 ? -step : step;
+}
+
+/** Arc length of a rider along their own train, for the monotonicity sweep. */
+function riderArc(consist: Consist, a: AboardSlot, head: number): number {
+  const centre = consistOffset(head, a.car, consist.cars.length, consist.pitch);
+  return centre + carSign(consist, a.car) * a.x;
+}
+
+/**
+ * The gangways: the table, the arithmetic, and a rider walking the whole train.
+ *
+ * ---------------------------------------------------------------------------
+ * Its own export rather than a paragraph inside `verifyRiding`, because **both
+ * runtimes run this one**. `verifyRiding` takes the controller's eye height and
+ * body radius as arguments so the two restated constants can be compared against
+ * the originals, and there is nobody in `server/index.ts` holding either -- so a
+ * gangway check that lived only in there would be checked in the browser and not
+ * in the process that is authoritative for where every rider in the city is
+ * standing. `verifyRiding` calls this as well, so the browser gets it too and
+ * there is one implementation.
+ *
+ * Every failure here is silent in this repo's sense. A gangway that is shut is a
+ * feature that looks unbuilt. A gangway that is open at the wrong end is a rider
+ * walking out of the front of the train. A sign wrong in `crossGangway` is a
+ * rider who steps into the next carriage and is 22 m from where the other end
+ * thinks they are -- which renders as a passenger standing in the four-foot, at
+ * 130 km/h, on somebody else's screen only.
+ */
+export function verifyGangway(): string[] {
+  const bad: string[] = [];
+  const consist = metroConsist();
+  const n = consist.cars.length;
+
+  // --- 1. The table. Which ends are open is a claim about the consist, and the
+  //        consist is in another table twenty lines up; this is the only place
+  //        the two are ever compared.
+  for (const it of INTERIORS) {
+    const g = it.gangway;
+    if (g === null) continue;
+    if (it.deck !== null) {
+      bad.push(
+        `${it.key} has a gangway and two decks. A gangway is a hole at one height and a ` +
+          `double-decker's ends are at three; gangwayAdmits answers off vestibuleY alone and ` +
+          `would put the aperture in the ceiling of the lower saloon.`,
+      );
+    }
+    if (g.plane * 2 !== METRO_PITCH) {
+      bad.push(
+        `${it.key}'s crossing plane is ${g.plane} m, which is not half the ${METRO_PITCH} m Metro ` +
+          `pitch. The plane is one point in the world seen from two carriages -- half a metre of ` +
+          `disagreement is a rider who crosses and is pushed straight back.`,
+      );
+    }
+    if (GANGWAY_HALF_WIDTH_M - RIDER_RADIUS < 0.2) {
+      bad.push(
+        `the gangway aperture is ${(GANGWAY_HALF_WIDTH_M * 2).toFixed(2)} m wide against a ` +
+          `${(RIDER_RADIUS * 2).toFixed(2)} m body, which leaves ` +
+          `${((GANGWAY_HALF_WIDTH_M - RIDER_RADIUS) * 2).toFixed(2)} m of aim. A gangway a player ` +
+          `has to line up on is a gangway they report as shut.`,
+      );
+    }
+    if (GANGWAY_HEIGHT_M <= RIDER_EYE_HEIGHT) {
+      bad.push(
+        `the gangway header is ${GANGWAY_HEIGHT_M} m over a floor a ${RIDER_EYE_HEIGHT} m eye ` +
+          `stands on. Nobody can walk through it standing up.`,
+      );
+    }
+  }
+  for (const car of SUBURBAN) {
+    const it = interiorFor(car.key);
+    if (it !== null && it.gangway !== null) {
+      bad.push(
+        `${car.key} runs in a SUBURBAN consist and has a gangway. A Tangara's ends are bulkheads ` +
+          `and its saloons are two decks 2.1 m apart; opening one is a passenger walking into the ` +
+          `space between two carriages at 110 km/h.`,
+      );
+    }
+  }
+  // And the ends themselves, against the consist's own adjacency: an end with a
+  // neighbour behind it must be open and an end with the outside behind it must
+  // not. Getting this backwards at the two lead cars is a rider stepping out of
+  // the nose of the train, which is a fall the game has no animation for.
+  for (let k = 0; k < n; k++) {
+    const it = interiorOfCar(consist, k);
+    if (it === null) { bad.push(`METRO carriage ${k} (${consist.cars[k].key}) has no interior`); continue; }
+    const g = it.gangway;
+    if (g === null) { bad.push(`METRO carriage ${k} (${consist.cars[k].key}) has no gangway at all`); continue; }
+    const s = carSign(consist, k);
+    // The +X end faces the carriage ahead when the car is not flipped.
+    const aheadOfMaxEnd = k - s;
+    const aheadOfMinEnd = k + s;
+    const wantMax = aheadOfMaxEnd >= 0 && aheadOfMaxEnd < n;
+    const wantMin = aheadOfMinEnd >= 0 && aheadOfMinEnd < n;
+    if (g.max !== wantMax || g.min !== wantMin) {
+      bad.push(
+        `METRO carriage ${k} (${consist.cars[k].key}, flip ${consist.cars[k].flip}) is open ` +
+          `${g.min ? '-X' : ''}${g.min && g.max ? ' and ' : ''}${g.max ? '+X' : ''} and its ` +
+          `neighbours are at ${wantMin ? aheadOfMinEnd : 'nothing'} off -X and ` +
+          `${wantMax ? aheadOfMaxEnd : 'nothing'} off +X. An open end with no carriage behind it ` +
+          `is a hole in the front of the train.`,
+      );
+    }
+  }
+
+  // --- 2. The aperture, at its four corners. A hole that is too big and a hole
+  //        that is not there both look like a wall from one sample, so this
+  //        drives `carriageResolve` at the centre, off to one side, mid-jump and
+  //        on a Tangara -- and the last three must all be refused.
+  {
+    const mid = interiorFor(`${METROPOLIS}:mid`)!;
+    const cab = interiorFor(`${TANGARA}:cab`)!;
+    const move: CarriageMove = { x: 0, z: 0, hit: false };
+    const floor = mid.vestibuleY;
+    const plane = mid.gangway!.plane;
+    // Feet, and the driver adds the step probe exactly as `controller.step` does.
+    const cases: ReadonlyArray<readonly [string, CarriageInterior, number, number, boolean]> = [
+      ['down the middle of a Metro gangway', mid, 0, floor, true],
+      ['off to one side of it', mid, 0.55, floor, false],
+      ['at the very edge of the aperture', mid, GANGWAY_HALF_WIDTH_M - RIDER_RADIUS - 0.01, floor, true],
+      ['a hand past the edge of it', mid, GANGWAY_HALF_WIDTH_M - RIDER_RADIUS + 0.05, floor, false],
+      ['at the top of a jump', mid, 0, floor + 1.0, false],
+      ['through a Tangara bulkhead', cab, 0, cab.vestibuleY, false],
+    ];
+    for (const [what, it, z, feetY, want] of cases) {
+      const from = it.xMax - 1;
+      carriageResolve(it, from, z, from + 3, z, RIDER_RADIUS, feetY + PLATFORM_STEP_M, move);
+      const through = move.x > it.xMax - RIDER_RADIUS + 1e-9;
+      if (through !== want) {
+        bad.push(
+          `a body walking ${what} was ${through ? '' : 'not '}let past the carriage end and ` +
+            `should ${want ? '' : 'not '}have been; it stopped at x ${move.x.toFixed(3)} against a ` +
+            `bulkhead at ${(it.xMax - RIDER_RADIUS).toFixed(3)} and a plane at ${plane}.`,
+        );
+      }
+    }
+    // And the tube's own side wall: a body already through the ring cannot then
+    // sidestep out of the train between the two carriages.
+    carriageResolve(
+      mid, plane - 0.1, 0, plane - 0.1, 1.2, RIDER_RADIUS, floor + PLATFORM_STEP_M, move,
+    );
+    if (Math.abs(move.z) > GANGWAY_HALF_WIDTH_M - RIDER_RADIUS + 1e-9) {
+      bad.push(
+        `a body standing in the bellows sidestepped to z ${move.z.toFixed(3)}, which is outside the ` +
+          `${GANGWAY_HALF_WIDTH_M} m aperture. Between two carriages there is a concertina and then ` +
+          `there is the ballast.`,
+      );
+    }
+    // ...and that it is not *pushed back down the train* for trying, which is
+    // the version of this rule that reads correctly and plays wrong. See
+    // `carriageResolve`.
+    if (move.x < plane - 0.1 - 1e-9) {
+      bad.push(
+        `a body in the bellows that pushed sideways was dragged from x ${(plane - 0.1).toFixed(2)} ` +
+          `back to ${move.x.toFixed(2)}. A sideways key must not move anybody along the train.`,
+      );
+    }
+  }
+
+  // --- 3. THE ALGEBRA, BOTH WAYS AND AGAINST ITSELF.
+  //
+  // Two claims, and they are different claims. `reframeAcross` must be its own
+  // inverse -- there and back is a multiply by the same +/-1 and an add and a
+  // subtract of the same pitch, so the doubles must come back identical and this
+  // asserts `Object.is` rather than a tolerance. And `crossGangway` must agree
+  // with it: the walk-through path and the reconciler's path are the same change
+  // of basis, and the whole reason `reframeAcross` is a separate export is that a
+  // second copy of this arithmetic in `net/client.ts` is a second copy that can
+  // be signed differently -- which presents as a rider who is fine until they
+  // are corrected, and then is in the wrong carriage.
+  for (let k = 0; k < n; k++) {
+    for (const end of [-1, 1] as const) {
+      const it = interiorOfCar(consist, k);
+      const g = it?.gangway ?? null;
+      if (g === null || !(end < 0 ? g.min : g.max)) continue;
+      const s = carSign(consist, k);
+      const j = k + (end > 0 ? -s : s);
+      const seed = { x: end * (g.plane + 0.12), y: 1.23 + RIDER_EYE_HEIGHT, z: 0.21 };
+
+      // (a) There and back, on the pure function.
+      const p: Vec3Out = { x: seed.x, y: seed.y, z: seed.z };
+      if (!reframeAcross(consist, k, j, p) || !reframeAcross(consist, j, k, p)) {
+        bad.push(`reframeAcross refused the coupling between METRO carriages ${k} and ${j}`);
+        continue;
+      }
+      for (const [name, got, want] of [
+        ['x', p.x, seed.x], ['y', p.y, seed.y], ['z', p.z, seed.z],
+      ] as ReadonlyArray<readonly [string, number, number]>) {
+        if (!Object.is(got, want)) {
+          bad.push(
+            `reframing between METRO carriages ${k} and ${j} and back changed ${name} from ${want} ` +
+              `to ${got}. Both directions are the same multiply by the same +/-1 and the same ` +
+              `${consist.pitch} m; a difference is a sign written twice.`,
+          );
+        }
+      }
+
+      // (b) And the walk-through path lands on exactly what (a) says it should.
+      const want: Vec3Out = { x: seed.x, y: seed.y, z: seed.z };
+      reframeAcross(consist, k, j, want);
+      const a = createAboardSlot();
+      a.line = 0;
+      a.car = k;
+      a.x = seed.x;
+      a.y = seed.y;
+      a.z = seed.z;
+      a.yaw = 1.1;
+      a.vx = 3.3;
+      a.vy = -0.4;
+      a.vz = 0.7;
+      const turned = crossGangway(a, consist);
+      if (a.car !== j) {
+        bad.push(
+          `a rider a hand past carriage ${k}'s open ${end < 0 ? '-X' : '+X'} plane ended on ` +
+            `carriage ${a.car} rather than ${j}. That end couples to ${j}: see the flip table.`,
+        );
+        continue;
+      }
+      if (!Object.is(a.x, want.x) || !Object.is(a.z, want.z) || !Object.is(a.y, want.y)) {
+        bad.push(
+          `crossGangway put a rider at (${a.x}, ${a.y}, ${a.z}) in carriage ${j} where ` +
+            `reframeAcross says (${want.x}, ${want.y}, ${want.z}). The two must be the same ` +
+            `arithmetic or the reconciler and the walk disagree about which carriage anybody is in.`,
+        );
+      }
+      // The velocity is a free vector and turns with the frame; the yaw is the
+      // half turn, and only across the one reversed coupling.
+      const turn = carSign(consist, j) * s;
+      if (!Object.is(a.vx, turn * 3.3) || !Object.is(a.vz, turn * 0.7) || !Object.is(a.vy, -0.4)) {
+        bad.push(
+          `crossing carriage ${k}'s ${end < 0 ? '-X' : '+X'} gangway left the velocity at ` +
+            `(${a.vx}, ${a.vy}, ${a.vz}) where the frame turned by ${turn}. A rider punched down ` +
+            `the aisle keeps going down the aisle through a gangway.`,
+        );
+      }
+      if (turn > 0 && (turned !== 0 || a.yaw !== 1.1)) {
+        bad.push(
+          `crossing between two carriages coupled the same way round turned the rider ${turned} rad`,
+        );
+      }
+      if (turn < 0 && Math.abs(Math.abs(turned) - Math.PI) > 1e-12) {
+        bad.push(
+          `crossing the reversed coupling between carriages ${k} and ${j} turned the rider ` +
+            `${turned} rad rather than half a turn. \`main.ts\` adds this to the mouse ` +
+            `accumulator, so a wrong answer here is a rider who walks through the middle of a ` +
+            `Metro and comes out facing backwards.`,
+        );
+      }
+    }
+  }
+
+  // --- 4. A rider walks the whole train, at a stand and at 30 m/s.
+  //
+  // The acceptance in one loop, and every clause of the request is in it: the
+  // carriage index steps by exactly one and never leaves the consist, the arc
+  // length along the train never goes backwards, the floor under the body never
+  // steps, the walk reaches the far cab -- and **the two speeds produce the same
+  // trajectory to the bit**, which is the whole architectural claim.
+  {
+    const { bake, dir } = gangwayStubBake();
+    const HEAD = 800;
+    const SPEED = 30;
+    const DT = 1 / 60;
+    const STEP = 4.4 * DT;
+    const feetY = 1.23;
+    const frame = createCarFrame();
+    const world: Vec3Out = { x: 0, y: 0, z: 0 };
+    const back: Vec3Out = { x: 0, y: 0, z: 0 };
+    const move: CarriageMove = { x: 0, z: 0, hit: false };
+    /** One run. `speed` is what the train is doing; the walk is identical. */
+    const run = (speed: number): Array<readonly [number, number, number, number]> => {
+      const a = createAboardSlot();
+      a.line = 0;
+      a.car = n - 1;
+      a.x = 8.5;
+      a.y = feetY + RIDER_EYE_HEIGHT;
+      a.z = 0;
+      let step = -STEP;
+      let lastArc = -Infinity;
+      let lastCar = a.car;
+      const trail: Array<readonly [number, number, number, number]> = [];
+      for (let i = 0; i < 3000; i++) {
+        const head = HEAD + speed * i * DT;
+        step = walkTick(a, consist, step, feetY, move);
+        trail.push([a.car, a.x, a.z, a.yaw]);
+        if (a.car < 0 || a.car >= n) {
+          bad.push(`the walk left the consist: carriage ${a.car} of ${n} at ${speed} m/s`);
+          break;
+        }
+        if (Math.abs(a.car - lastCar) > 1) {
+          bad.push(
+            `the walk went from carriage ${lastCar} to ${a.car} in one tick at ${speed} m/s. A ` +
+              `rider crosses one coupling at a time or they have been teleported.`,
+          );
+          break;
+        }
+        lastCar = a.car;
+        // Against a **fixed** head, so this is where the rider is along their own
+        // train rather than where the train is along the railway. The second
+        // would climb at 30 m/s and would say nothing about the walk.
+        const arc = riderArc(consist, a, HEAD);
+        if (arc < lastArc - 1e-9) {
+          bad.push(
+            `the walk went backwards along the train at ${speed} m/s: ${arc.toFixed(3)} m after ` +
+              `${lastArc.toFixed(3)} m, on carriage ${a.car}. The carriage index and the position ` +
+              `along the train have to move together or a crossing is a jump.`,
+          );
+          break;
+        }
+        lastArc = arc;
+        const it = interiorOfCar(consist, a.car);
+        if (it === null || carriageFloor(it, a.x, a.z, feetY) !== feetY) {
+          bad.push(`the floor under the walk is not ${feetY} m on carriage ${a.car}`);
+          break;
+        }
+        // And the composition, under motion: pull the world position back through
+        // the very frame that made it. Exact, because the basis is orthonormal.
+        const centre = consistOffset(head, a.car, n, consist.pitch);
+        carFrameAt(bake, dir, centre, consist.cars[a.car].flip, frame);
+        localToWorld(frame, a.x, a.y, a.z, world);
+        worldToLocal(frame, world.x, world.y, world.z, back);
+        if (Math.abs(back.x - a.x) > 1e-9 || Math.abs(back.z - a.z) > 1e-9) {
+          bad.push(
+            `a rider at ${speed} m/s composed to world and back came out ` +
+              `${(back.x - a.x).toFixed(6)} m along and ${(back.z - a.z).toFixed(6)} m across from ` +
+              `where they were. The carriage frame is orthonormal and its inverse is its ` +
+              `transpose; anything here is a frame that is not.`,
+          );
+          break;
+        }
+      }
+      return trail;
+    };
+    const still = run(0);
+    const fast = run(SPEED);
+    const walked = still.length > 0 ? still[still.length - 1][0] : -1;
+    if (walked !== 0) {
+      bad.push(
+        `a rider who walked ${still.length} ticks from the back of a Metro ended on carriage ` +
+          `${walked} rather than 0. The whole point of an open gangway is that the train is one ` +
+          `room; a walk that stops in the middle of it is a coupling that did not open.`,
+      );
+    }
+    if (still.length !== fast.length) {
+      bad.push(
+        `the same walk took ${still.length} ticks at a stand and ${fast.length} at ${SPEED} m/s`,
+      );
+    } else {
+      let differed = -1;
+      for (let i = 0; i < still.length && differed < 0; i++) {
+        for (let f = 0; f < 4; f++) if (!Object.is(still[i][f], fast[i][f])) differed = i;
+      }
+      if (differed >= 0) {
+        bad.push(
+          `the walk at ${SPEED} m/s parted company with the walk at a stand on tick ${differed}: ` +
+            `carriage ${fast[differed][0]} at x ${fast[differed][1]} against carriage ` +
+            `${still[differed][0]} at x ${still[differed][1]}. A carriage frame is a stationary ` +
+            `room -- if the train's own speed can reach this arithmetic then riding is back to ` +
+            `being a velocity two ends have to agree about, which is the bug the whole file is ` +
+            `shaped to avoid.`,
+        );
+      }
+    }
+  }
+
   return bad;
 }

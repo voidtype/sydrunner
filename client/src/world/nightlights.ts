@@ -2991,6 +2991,103 @@ export const SALOON_INTERIOR_GLOW = 2.0;
  */
 export const SALOON_ROOM_COLOUR: Rgb = [0.92, 0.96, 1.0];
 
+/* ---------------------------------------------------------------------------
+ * AND HOW MUCH OF ALL OF THAT SURVIVES THE NIGHT, WHICH IS NOT ALL OF IT.
+ *
+ *   > *"it is too bright at night in the metro"*
+ *
+ * Three terms light the inside of a carriage and none of them was a function of
+ * the sun: `SALOON_PANEL_LEVEL` on the ceiling tubes, `SALOON_INTERIOR_GLOW` on
+ * the room under them, and `SALOON_INTENSITY` on the one real light in the
+ * carriage the player is standing in. Every one of those paragraphs argues, and
+ * argues correctly, that a saloon light is on at noon. That is still true. What
+ * is also true, and is what the report is about, is that **this renderer has a
+ * fixed exposure and a human eye does not.**
+ *
+ * At midday a Metropolis interior is one lit box among a city of sunlit
+ * surfaces four times brighter than it, and it reads as a lit carriage. At
+ * midnight it is the brightest thing within a kilometre and the tone curve gives
+ * it exactly the same code values -- so what was "a lit saloon" becomes a light
+ * box with a train drawn round it. A real eye adapts down two or three stops
+ * walking into a station at night and the picture comes back; nothing in this
+ * build does that, so the adaptation has to be spent here or not at all.
+ *
+ * **Why the Metro and not the Tangara.** Two reasons, and the second is the one
+ * that makes this a split rather than a global change. The Metropolis `interior`
+ * material is 114,997 triangles of a *bright white* saloon -- white lining, white
+ * ceiling, pale floor -- against a Tangara's navy moquette and charcoal, so the
+ * same `emissiveIntensity` on the same albedo trick lands the two an easy stop
+ * apart before anything else happens. And the Metro is the one train in Sydney
+ * that spends its life in a bore, so its interior is what a player sees for the
+ * whole of a ride rather than for the length of a tunnel. The Tangara's night
+ * was tuned last round against a platform at Redfern and nobody complained about
+ * it; it is left exactly where it was, which is what
+ * `TANGARA_NIGHT_INTERIOR_GAIN` being 1 says.
+ *
+ * **0.45, and it is a scene-referred number.** The complaint is relative, so the
+ * target is relative: the metro interior at full night is a little under half the
+ * radiance it was, which through the Neutral curve is roughly two thirds of the
+ * display value and lands the saloon a clear step under the platform lighting
+ * instead of a step over it. A real M1 saloon is bright -- it is not floodlit,
+ * and it is certainly not the brightest thing at Chatswood at two in the morning.
+ * All three terms move together by the same factor, because they are three
+ * descriptions of one room and moving them apart would leave the tubes searing
+ * over a saloon that had gone dim, which is a different and worse picture.
+ *
+ * **What is deliberately NOT in this**: the exterior window band (`WINDOW_LEVEL`)
+ * and the wedge an open door lays on the platform (`DOOR_SPILL_LEVEL`). Both were
+ * tuned last round against the specific complaint that they clipped, both are
+ * about what the train looks like from *outside*, and `world/trains.verifyTrainLights`
+ * pins both to the value they have so this change cannot drift into them.
+ *
+ * **The driver is the city-wide dusk ramp and not the carriage's own level**,
+ * which is forced rather than chosen: `paintSaloonInterior` writes an
+ * `emissiveIntensity` onto a material shared by every carriage of a model, and
+ * the bore rule (`world/trains.levelAt`) is per carriage. A per-carriage uniform
+ * on a 115,000-triangle material to dim a train in a tunnel at noon is a cost
+ * with no picture behind it -- and the report says *at night*.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * How much of its daytime interior a Metropolis keeps at full night.
+ *
+ * See the block above for the derivation and for why the Tangara does not share
+ * it. `world/trains.verifyTrainLights` asserts this is at most half the day term
+ * and no brighter than the Tangara's.
+ */
+export const METRO_NIGHT_INTERIOR_GAIN = 0.45;
+
+/**
+ * And the Tangara's, which is 1 and is a statement rather than a placeholder.
+ *
+ * The constant exists so that the two trains are visibly two numbers in one
+ * table: the alternative is a `metro ? 0.45 : 1` somewhere, which is the same
+ * arithmetic with the Tangara's decision written as a fallback rather than as a
+ * decision. If a report ever comes in about a Tangara at night, this is where it
+ * goes, and `interiorNightGain` needs no change at all.
+ */
+export const TANGARA_NIGHT_INTERIOR_GAIN = 1;
+
+/**
+ * The multiplier on every interior term of a carriage, given how dark it is out.
+ *
+ * Pure and exported so that `world/trains.verifyTrainLights` can assert the two
+ * ends and the monotonicity rather than trusting a lerp, and so that the fleet --
+ * which applies it to two materials and one point light -- has no second copy of
+ * the rule. Linear in `night` because `nightOpacity` is already a smoothstep over
+ * solar altitude (see `NIGHT_START_DEG`): ramping a ramp buys a curve nobody
+ * asked for and a dusk that changes speed halfway through.
+ *
+ * `night` outside 0..1 is clamped rather than trusted. It arrives from
+ * `nightLevelNow`, which is a uniform, and a uniform is a thing another file can
+ * write.
+ */
+export function interiorNightGain(metro: boolean, night: number): number {
+  const n = night < 0 ? 0 : night > 1 ? 1 : night;
+  const floor = metro ? METRO_NIGHT_INTERIOR_GAIN : TANGARA_NIGHT_INTERIOR_GAIN;
+  return 1 + (floor - 1) * n;
+}
+
 /**
  * Which of a train GLB's materials is **the inside of the carriage**.
  *
@@ -3204,7 +3301,15 @@ const DECK_SINGLE: readonly [number, number] = [1.34, 2.62];
  * single white slab long before the fade had begun. The wash follows it down by
  * the same ratio, because its whole job is to be a sixth of a pane.
  */
-const WINDOW_LEVEL = 0.4;
+/**
+ * Exported for one reason and it is not use: `world/trains.verifyTrainLights`
+ * **pins** it. This is a number the metro-interior change of this round had every
+ * opportunity to drift into and must not have -- the band is what a train looks
+ * like from three hundred metres away and it was tuned, twice, against a player's
+ * own screenshot. A constant with a check on it is a constant somebody has to
+ * mean to change.
+ */
+export const WINDOW_LEVEL = 0.4;
 const WINDOW_WASH_LEVEL = 0.11;
 /** The wash band, which is the two decks and the floor between them as one. */
 const WINDOW_WASH: readonly [number, number] = [1.05, 3.3];
@@ -3283,7 +3388,7 @@ const TRAIN_TAIL_LEVEL = 1.0;
  * torch in a tunnel rather than as a lit carriage. 1.5 is the exponent at which
  * one point looks like a row.
  */
-const SALOON_INTENSITY = 8;
+export const SALOON_INTENSITY = 8;
 const SALOON_DISTANCE = 26;
 const SALOON_DECAY = 1.5;
 /**
@@ -3420,7 +3525,8 @@ const DOOR_SPILL_STOPS: ReadonlyArray<readonly [number, number]> = [
  * under `WINDOW_LEVEL`'s old 0.62: this one is light on a floor and reads as
  * light on a floor, where that one was light on a wall you were looking through.
  */
-const DOOR_SPILL_LEVEL = 0.34;
+/** Pinned by `world/trains.verifyTrainLights` for `WINDOW_LEVEL`'s reason. */
+export const DOOR_SPILL_LEVEL = 0.34;
 /** Strips across the wedge, so its sides fade rather than being ruled lines. */
 const DOOR_SPILL_EDGE_SHARE = 0.42;
 
@@ -3809,6 +3915,8 @@ export class TrainLights {
 
   private readonly counts = [0, 0, 0, 0, 0];
   private saloonLevel = 0;
+  /** `interiorNightGain` for the ridden carriage's own model. See `rider`. */
+  private saloonGain = 1;
   private stale = SALOON_STALE_S;
   /** How far away the doorway the real light is currently claimed by is. */
   private doorPick = Infinity;
@@ -3891,6 +3999,7 @@ export class TrainLights {
     this.counts[3] = 0;
     this.counts[4] = 0;
     this.saloonLevel = 0;
+    this.saloonGain = 1;
     this.overflowed = 0;
     this.doorPick = Infinity;
     this.doorLevel = 0;
@@ -4022,10 +4131,20 @@ export class TrainLights {
    * Called at most once a frame, by the fleet, from the same rectangle test that
    * decides the train must not collide with them -- so the light is on exactly
    * when the player is aboard, with no second source for that fact to drift from.
+   *
+   * `gain` is `interiorNightGain` of this train's own type, and it is the third
+   * of the three interior terms that move together after dark -- the other two
+   * are material state the fleet writes directly. It is a separate argument from
+   * `level` rather than multiplied into it by the caller, for `car`'s reason one
+   * function down: they answer different questions. `level` is "is this carriage
+   * lit", which is a fact about a bore and the sun and drives whether there is a
+   * light at all; `gain` is "how much of its daytime saloon does this model keep
+   * at night", which is a fact about the model.
    */
-  rider(x: number, railY: number, z: number, level: number): void {
+  rider(x: number, railY: number, z: number, level: number, gain = 1): void {
     if (level <= this.saloonLevel) return;
     this.saloonLevel = level;
+    this.saloonGain = gain;
     this.saloon.position.set(x, railY + SALOON_LIFT, z);
   }
 
@@ -4048,7 +4167,7 @@ export class TrainLights {
     // holds for both of these: the door light goes to zero when no doorway bid,
     // and its `target` stays parked wherever the last bid left it, which nothing
     // can see because nothing is being emitted along it.
-    this.saloon.intensity = SALOON_INTENSITY * this.saloonLevel;
+    this.saloon.intensity = SALOON_INTENSITY * this.saloonLevel * this.saloonGain;
     this.doorLight.intensity = DOOR_SPOT_INTENSITY * this.doorLevel;
     this.stale = 0;
   }
@@ -4065,6 +4184,7 @@ export class TrainLights {
     if (this.stale > SALOON_STALE_S) {
       this.saloon.intensity = 0;
       this.saloonLevel = 0;
+      this.saloonGain = 1;
       // The door light is on the same guard and for a worse case than the
       // saloon's: it is anchored to a doorway rather than to the player, so a
       // fleet that stopped updating would leave a spot burning on an empty
@@ -5882,6 +6002,41 @@ export function verifyTrainLightKit(): string[] {
         `The door spot survived ${(SALOON_STALE_S * 1.4).toFixed(2)} s of a fleet that stopped ` +
           `updating. It is on the same guard as the saloon light and for a worse case -- this one ` +
           `is not attached to the player, so nobody would ever walk into it and notice.`,
+      );
+    }
+
+    // And the interior gain, on the one term of it that is a light rather than a
+    // material: a rider in a Metro at full night gets `METRO_NIGHT_INTERIOR_GAIN`
+    // of the saloon light a rider in a Tangara gets, and both are the full
+    // `SALOON_INTENSITY` at noon. Driven through `begin`/`rider`/`end` rather
+    // than read off the constant, because the failure worth catching is the gain
+    // being accepted and then not multiplied in -- which renders as the reported
+    // bug being unfixed and reads as a taste disagreement.
+    for (const [what, metro, night] of [
+      ['a Tangara at midnight', false, 1],
+      ['a Metro at midday', true, 0],
+      ['a Metro at midnight', true, 1],
+    ] as ReadonlyArray<readonly [string, boolean, number]>) {
+      probe.begin();
+      probe.rider(0, 0, 0, 1, interiorNightGain(metro, night));
+      probe.end();
+      const want = SALOON_INTENSITY * interiorNightGain(metro, night);
+      if (Math.abs(probe.saloon.intensity - want) > 1e-9) {
+        failures.push(
+          `the saloon light for ${what} came out at ${probe.saloon.intensity} rather than ` +
+            `${want}. The night gain has to reach the intensity or "it is too bright at night in ` +
+            `the metro" is still true and the constant is decoration.`,
+        );
+      }
+    }
+    if (
+      SALOON_INTENSITY * interiorNightGain(true, 1) >=
+      SALOON_INTENSITY * interiorNightGain(false, 1)
+    ) {
+      failures.push(
+        `a Metro's saloon light at full night is not under a Tangara's. The whole report is that ` +
+          `the Metro reads brighter than everything around it, and the Tangara is what "around ` +
+          `it" is being measured against.`,
       );
     }
 
