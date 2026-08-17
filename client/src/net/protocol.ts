@@ -604,7 +604,15 @@ export const MSG = {
  * inside the same ISO week is put back where it logged off, and the client is
  * told so it can say so.
  */
-export const PROTOCOL_VERSION = 15;
+/*
+ * v16 carries no new field. It exists because `traffic.coverBays` changed which
+ * grid cell a route is bucketed in, and `forEachCarNear`'s visit order decides
+ * which of two stopped cars a take resolves to -- a v15 client and a v16
+ * server would predict different cars. Same bytes, different arithmetic, so a
+ * bump. Everything else in the batch (Polair, the lane-share pass, the
+ * viewmodel fixes, the map key) is client-derived or pure.
+ */
+export const PROTOCOL_VERSION = 16;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
