@@ -73,6 +73,12 @@ import { verifyFooty } from '../client/src/game/footy.ts';
 import { verifySwat } from '../client/src/game/swat.ts';
 import { verifyPowerups } from '../client/src/game/powerups.ts';
 import { verifyDamageGrade, verifyDriving } from '../client/src/game/driving.ts';
+// WORKSTREAM S: the parked fleet's decoder and residency accounting. Three-free
+// by rule -- this process now streams `.cars.bin` per hexagon so that the 23,020
+// cars at a kerb are takeable and not just the forty on the timetable. The body
+// and paint counts are omitted here and passed by `main.ts`, which is the end
+// that can load the palette; see `verifyStaticCars`.
+import { verifyStaticCars } from '../client/src/game/staticcars.ts';
 import { verifyTraffic } from '../client/src/game/traffic.ts';
 // --- Workstream Q. A client presentation rule, checked here anyway: see the
 // header of `game/viewlatch.ts` for why a rule about what the *browser* draws is
@@ -318,6 +324,11 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // that does not answer is your own car driving off to Ashfield beside you,
     // running people down on the way. See `client/src/game/driving.ts`.
     ['verifyDriving', verifyDriving()],
+    // And the fleet it can now steal from. See `game/staticcars.ts`: a decoder
+    // that drifted from the pipeline's 16-byte stride puts every car in Sydney at
+    // a plausible-looking wrong position, which renders perfectly and makes `E`
+    // do nothing.
+    ['verifyStaticCars', verifyStaticCars()],
     // The first-person punch's pose curve. Run **here** as well as in the
     // browser because it is three-free and because it is timed off the same
     // `animation.PUNCH_*` envelope this process adjudicates a swing with: a
@@ -516,6 +527,22 @@ if (world.segments) {
       `${(s.lanes.capBytes / 1e6).toFixed(0)} MB cap (SYDNEY_LANES_CAP_MB), ` +
       `${s.lanes.tiles} tiles, ${s.lanes.items.toLocaleString()} routes ` +
       `(${s.lanes.marginM} m margin against collision's ${s.collision.marginM} m)`,
+  );
+  // --- WORKSTREAM S. The car count is the number to read: it is how many of the
+  // cars a player can walk up to this process can actually let them steal, and
+  // **zero is a meaningful and silent failure mode** -- `.cars.bin` is a per-tile
+  // sidecar that DEPLOY.md's rsync did not ship until this round, and a box
+  // without it boots clean, plays fine and refuses every parked car. See the
+  // third layer's `apply` in `server/world.ts` on why a missing file is not an
+  // error, and DEPLOY.md §A step 2 for the include line that fixes it.
+  console.log(
+    `[sydney] parked cars per hexagon: ${s.staticCars.resident}/${s.hexes} resident, ` +
+      `${(s.staticCars.bytes / 1e6).toFixed(1)} MB estimated against a ` +
+      `${(s.staticCars.capBytes / 1e6).toFixed(0)} MB cap (SYDNEY_STATIC_CARS_CAP_MB), ` +
+      `${s.staticCars.tiles} tiles, ${s.staticCars.items.toLocaleString()} cars` +
+      (s.staticCars.items === 0
+        ? ' — NONE. No parked car is takeable; the box is missing tiles/*.cars.bin (DEPLOY.md §A step 2).'
+        : ''),
   );
 }
 

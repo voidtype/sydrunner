@@ -100,6 +100,18 @@ import { PowerupField, type PowerupPoint } from '../client/src/game/powerups.ts'
 import { EYE_HEIGHT, PLAYER_RADIUS } from '../client/src/player/controller.ts';
 import { WaterLevels } from '../client/src/world/wading.ts';
 import { TrafficField, decodeLanes } from '../client/src/game/traffic.ts';
+// --- WORKSTREAM S: the parked fleet, which this process used to refuse to know
+// about. `game/driving.ts` section 1 carried the deviation in as many words --
+// "the server has no idea the first one exists" -- and the consequence was that
+// only about forty of the cars within a player's reach were takeable while
+// 23,020 identical ones at the same kerbs were not. `.cars.bin` is now the third
+// hexagon layer, on the prisms' and the lanes' own slots. See
+// `STATIC_CARS_NEED_MARGIN_M` and `game/staticcars.ts`.
+import {
+  StaticCarField,
+  decodeCars,
+  estimateStaticCarBytes,
+} from '../client/src/game/staticcars.ts';
 import { PedestrianField } from '../client/src/game/pedestrians.ts';
 import { spawnCentre } from '../client/src/game/spawn.ts';
 import {
@@ -197,11 +209,64 @@ export const COLLISION_NEED_MARGIN_M = 500;
  */
 export const LANES_NEED_MARGIN_M = 2000;
 
+/**
+ * And how close before a hexagon's **parked cars** are wanted. The lanes' 2,000 m,
+ * and it is the same number for a different reason.
+ *
+ * A `.cars.bin` does not run out of its own tile the way a route does -- a parked
+ * car is inside the tile it is filed under, always -- so the argument that sized
+ * the lane skirt does not apply. What sizes this one is the *other* end of the
+ * wire.
+ *
+ * The browser holds a tile's parked cars only while the tile itself is built,
+ * which is a ring of a few hundred metres around the camera, and it draws its
+ * take prompt from `driving.resolveTake` over exactly that set. So the property
+ * that has to hold is **the server's set is a superset of the client's**: a
+ * prompt the browser offers must be a car this process can grant, or `E` promises
+ * a car and does nothing -- which is the reported bug's exact shape and is what
+ * `server/take-check.ts` bounds at two per sweep. 2,000 m is four times the
+ * client's whole tile ring, so the superset is not close: it holds with a
+ * kilometre and a half of slack in every direction.
+ *
+ * The reverse gap -- this process holding a car whose tile the browser has not
+ * built yet -- is a keypress that works where no prompt was drawn, which is a
+ * strictly better failure and is left alone.
+ *
+ * Sharing the lane margin also means the third layer adds **no distance sweep**:
+ * `update` computes the needed set at 500 m and at 2,000 m as it always did, and
+ * this layer reads the second one. See `HexResidency.update`.
+ */
+export const STATIC_CARS_NEED_MARGIN_M = LANES_NEED_MARGIN_M;
+
 /** `SYDNEY_COLLISION_CAP_MB`'s default, megabytes of estimated resident prisms. */
 export const DEFAULT_COLLISION_CAP_MB = 450;
 
 /** `SYDNEY_LANES_CAP_MB`'s default, megabytes of estimated resident lane graph. */
 export const DEFAULT_LANES_CAP_MB = 300;
+
+/**
+ * `SYDNEY_STATIC_CARS_CAP_MB`'s default, megabytes of estimated resident parked cars.
+ *
+ * **Twenty-four, and the whole city is forty-six.** 1,402,623 cars over 13,362
+ * tiles at `staticcars.estimateStaticCarBytes` is 46.1 MB -- against 193 MB of
+ * prisms and 132 MB of lane graph on a world a third this radius -- so this is by
+ * far the cheapest of the three layers and the cap is a backstop rather than a
+ * working limit. Unlike the other two, the figure is **RSS rather than live heap**
+ * and needs no ratio applied to it; `staticcars.BYTES_PER_STATIC_CAR` says why.
+ *
+ * It is set *under* the whole-city figure on purpose. What the residency actually
+ * holds is the hexagons within `STATIC_CARS_NEED_MARGIN_M` of somebody, and that
+ * is **measured, at the spawn: 3 hexagons, 907 tiles, 141,823 cars, 4.5 MB.** So
+ * 24 MB is five times what a room in one suburb needs and about half of Sydney;
+ * the only thing that can reach it is a pathological spread of players across the
+ * whole extent -- and at that point the needed set is a hard floor anyway
+ * (`HexLayer.trim` logs and holds), exactly as it is for the other two layers.
+ * Verified by booting at `SYDNEY_STATIC_CARS_CAP_MB=1`: the layer reports 4.5 MB
+ * against the 1 MB cap and 17 refusals to evict, which is the rule working. A
+ * default of 50 would never bind at all and would tell an operator nothing about
+ * what this layer costs.
+ */
+export const DEFAULT_STATIC_CARS_CAP_MB = 24;
 
 /**
  * What one prism and one polygon vertex cost resident, bytes.
@@ -411,7 +476,7 @@ interface LayerSlot {
 
 interface HexSlot {
   entry: HexEntry;
-  /** The manifest's tiles, read once, shared by both layers, kept across evictions. */
+  /** The manifest's tiles, read once, shared by every layer, kept across evictions. */
   tiles: HexTiles | null;
   /** In flight, so two layers wanting the same manifest read it once. */
   reading: Promise<HexTiles | null> | null;
@@ -419,6 +484,8 @@ interface HexSlot {
   usedAt: number;
   collision: LayerSlot;
   lanes: LayerSlot;
+  /** WORKSTREAM S: `.cars.bin`, the parked fleet. See `STATIC_CARS_NEED_MARGIN_M`. */
+  staticCars: LayerSlot;
 }
 
 function emptyLayerSlot(): LayerSlot {
@@ -443,7 +510,7 @@ export interface LayerStats {
   bytes: number;
   capBytes: number;
   tiles: number;
-  /** Prisms, for collision; routes, for the lane graph. */
+  /** Prisms, for collision; routes, for the lane graph; parked cars, for `.cars.bin`. */
   items: number;
   loads: number;
   evictions: number;
@@ -484,6 +551,8 @@ export interface SegmentStats {
   pending: number;
   collision: LayerStats;
   lanes: LayerStats;
+  /** WORKSTREAM S: the parked fleet. `items` is cars. */
+  staticCars: LayerStats;
 }
 
 /**
@@ -899,8 +968,10 @@ export class HexResidency {
   private readonly rootIndex: HexIndex | null;
   readonly capBytes: number;
   readonly lanesCapBytes: number;
+  readonly staticCarsCapBytes: number;
   private readonly collisionLayer: HexLayer;
   private readonly lanesLayer: HexLayer;
+  private readonly staticCarsLayer: HexLayer;
 
   /** Monotonic, bumped per needed-set recomputation. The LRU clock. */
   private clock = 0;
@@ -944,11 +1015,20 @@ export class HexResidency {
      * a deck attached later would miss every hexagon that had already landed.
      */
     roads: RoadDeck,
+    /**
+     * WORKSTREAM S: the parked fleet, on the roads' terms exactly -- a
+     * constructor argument, because the third layer's `apply` closure is built in
+     * here and a field attached afterwards would miss every hexagon that had
+     * already landed.
+     */
+    staticCars: StaticCarField = new StaticCarField(),
+    staticCarsCap: number = staticCarsCapBytes(),
   ) {
     this.root = root;
     this.rootIndex = rootIndex;
     this.capBytes = capBytes;
     this.lanesCapBytes = lanesCapBytes;
+    this.staticCarsCapBytes = staticCarsCap;
     const manifest = (slot: HexSlot): Promise<HexTiles | null> => this.readManifest(slot);
     this.collisionLayer = new HexLayer(
       {
@@ -1047,6 +1127,57 @@ export class HexResidency {
       (slot) => slot.lanes,
       manifest,
     );
+    // --- WORKSTREAM S: the third layer, and it is the shortest of the three
+    //     because everything hard about residency was already here.
+    //
+    // `.cars.bin` is a `u32` count and sixteen bytes a car, decoded by
+    // `staticcars.decodeCars` -- the same function the browser's streamer runs,
+    // moved out of `world/cars.ts` so this process can load it at all. There is
+    // no second consumer and no envelope to feed: a parked car is a row in a
+    // field and the only question anybody asks it is `resolveTake`'s.
+    //
+    // **A missing file is a tile with no parked cars, and that is deliberate.**
+    // `HexLayer.read` uses `readOptional`, so a `.cars.bin` the box was never
+    // sent reads as absent rather than as an error -- which matters more here
+    // than for the other two layers, because until DEPLOY.md §A step 2 gains
+    // `--include='*.cars.bin'` **that is every tile on the box**. A deployment
+    // that has not shipped them behaves exactly as the server did before this
+    // workstream: schedule cars are takeable, parked ones are not, nothing warns
+    // and nothing breaks. `boot`'s log line reports the resident car count so the
+    // difference is visible in one number.
+    this.staticCarsLayer = new HexLayer(
+      {
+        name: 'static cars',
+        capName: 'SYDNEY_STATIC_CARS_CAP_MB',
+        capBytes: staticCarsCap,
+        marginM: STATIC_CARS_NEED_MARGIN_M,
+        path: (key) => join('tiles', `${key}.cars.bin`),
+        has: (key) => staticCars.has(key),
+        apply: (key, buffer, originX, originZ) => {
+          // The tile key goes into the decoder because a parked car's identity is
+          // `staticCarIdentity(tileKey, index)` and the sidecar carries none of
+          // its own -- the browser passes the identical argument in
+          // `streamer.buildTile`, which is what makes the two ends name the same
+          // car. Without it `StaticCarField.adopt` refuses the tile outright.
+          const decoded = decodeCars(buffer, key);
+          if (decoded === null) return { items: 0, bytes: 0 };
+          // The prisms' origin pair, verbatim: `originZ` is already
+          // `bounds[1] + tile_size`. See `readTiles`, and this file's header on
+          // what getting the frame wrong looks like (nothing, until a player
+          // presses E at a car that is 250 m from where the server thinks it is).
+          staticCars.adopt(key, decoded, originX, originZ);
+          return {
+            items: decoded.count,
+            bytes: estimateStaticCarBytes(decoded.count, 1),
+          };
+        },
+        remove: (key) => staticCars.drop(key),
+      },
+      root,
+      this.slots,
+      (slot) => slot.staticCars,
+      manifest,
+    );
     if (!hexesUsable(rootIndex)) return;
     this.arm();
     for (const entry of this.contract!.list) {
@@ -1057,6 +1188,7 @@ export class HexResidency {
         usedAt: 0,
         collision: emptyLayerSlot(),
         lanes: emptyLayerSlot(),
+        staticCars: emptyLayerSlot(),
       });
     }
   }
@@ -1206,6 +1338,12 @@ export class HexResidency {
     return slot !== undefined && this.lanesLayer.isResident(slot);
   }
 
+  /** And its parked cars? WORKSTREAM S. */
+  isStaticCarsResident(id: string): boolean {
+    const slot = this.slots.get(id);
+    return slot !== undefined && this.staticCarsLayer.isResident(slot);
+  }
+
   /** Is its collision wanted by somebody, as of the last needed-set recomputation? */
   isNeeded(id: string): boolean {
     return this.collisionLayer.needed.has(id);
@@ -1248,6 +1386,14 @@ export class HexResidency {
       // save half of that and cost the two margins their independence.
       this.neededWithin(points, COLLISION_NEED_MARGIN_M, this.collisionLayer.needed);
       this.neededWithin(points, LANES_NEED_MARGIN_M, this.lanesLayer.needed);
+      // **The third layer borrows the second's answer rather than sweeping
+      // again.** `STATIC_CARS_NEED_MARGIN_M` *is* `LANES_NEED_MARGIN_M` -- see
+      // that constant for why the two arrive at the same number from different
+      // arguments -- so a third pass would compute a set already in hand.
+      // Copied rather than aliased, so the two layers keep separate `Set`s and a
+      // future change to either margin is one line here and nothing else.
+      this.staticCarsLayer.needed.clear();
+      for (const id of this.lanesLayer.needed) this.staticCarsLayer.needed.add(id);
       // The stamp is per hexagon, so a hexagon wanted by either layer is
       // recently-used for both. That is the right meaning: `usedAt` orders
       // evictions by how long ago anybody cared about this piece of the map, and
@@ -1259,12 +1405,22 @@ export class HexResidency {
         this.collisionLayer.start(slot);
       }
       for (const id of this.lanesLayer.needed) this.lanesLayer.start(this.slots.get(id)!);
+      for (const id of this.staticCarsLayer.needed) this.staticCarsLayer.start(this.slots.get(id)!);
     }
     const began = performance.now();
     const deadline = began + APPLY_BUDGET_MS;
     this.collisionLayer.drain(deadline);
     // Whatever collision left, and never less than `LANES_FLOOR_MS`. See there.
     this.lanesLayer.drain(Math.max(deadline, performance.now() + LANES_FLOOR_MS));
+    // And the parked cars, last and with the same floor, which is the right
+    // priority for the same reason the lanes are behind the prisms: a player
+    // falling through the world outranks a car that has not started driving,
+    // which outranks a car that is not going anywhere at all. It is also the
+    // cheapest of the three to decode -- `decodeCars` is 0.03 ms for an average
+    // tile and does no indexing -- so the floor drains any queue the reader can
+    // fill. `LANES_FLOOR_MS`' own argument applies verbatim: the pending queue
+    // holds `ArrayBuffer`s, so starving it is a memory leak.
+    this.staticCarsLayer.drain(Math.max(deadline, performance.now() + LANES_FLOOR_MS));
     // After the decode rather than before it, and every tick rather than every
     // fifteenth. The bytes only ever *arrive* in `drain`, so trimming ahead of it
     // measures the residency one budget out of date and leaves the process over
@@ -1292,6 +1448,7 @@ export class HexResidency {
     this.arm();
     this.collisionLayer.trim(this.pinnedFor(this.collisionLayer));
     this.lanesLayer.trim(this.pinnedFor(this.lanesLayer));
+    this.staticCarsLayer.trim(this.pinnedFor(this.staticCarsLayer));
   }
 
   /** Read and decode one hexagon's **collision** to completion. The boot path. */
@@ -1308,16 +1465,30 @@ export class HexResidency {
     await this.lanesLayer.loadNow(slot, ++this.clock);
   }
 
+  /**
+   * And its parked cars. WORKSTREAM S, and the boot walk calls this on the lane
+   * layer's own terms -- see `loadWorld`, which stops the moment either cap bites.
+   */
+  async loadStaticCarsNow(id: string): Promise<void> {
+    const slot = this.slots.get(id);
+    if (slot === undefined) return;
+    await this.staticCarsLayer.loadNow(slot, ++this.clock);
+  }
+
   /** Wait for every load in flight to land. The boot path's `ensureHexesNear`. */
   async settle(): Promise<void> {
     // Ten seconds of local-disk reads is a disk that is not going to answer;
     // giving up leaves the hexagon absent and re-startable rather than holding
     // the boot open, which is `ensureHexesNear`'s own call.
     const until = performance.now() + 10_000;
-    while ((this.collisionLayer.busy || this.lanesLayer.busy) && performance.now() < until) {
+    while (
+      (this.collisionLayer.busy || this.lanesLayer.busy || this.staticCarsLayer.busy) &&
+      performance.now() < until
+    ) {
       await new Promise((resolve) => setTimeout(resolve, 1));
       this.collisionLayer.drain(Infinity);
       this.lanesLayer.drain(Infinity);
+      this.staticCarsLayer.drain(Infinity);
     }
   }
 
@@ -1337,6 +1508,7 @@ export class HexResidency {
   dropAll(): void {
     this.collisionLayer.dropAll();
     this.lanesLayer.dropAll();
+    this.staticCarsLayer.dropAll();
   }
 
   /**
@@ -1350,6 +1522,7 @@ export class HexResidency {
   neededAllResident(): boolean {
     for (const id of this.collisionLayer.needed) if (!this.isResident(id)) return false;
     for (const id of this.lanesLayer.needed) if (!this.isLanesResident(id)) return false;
+    for (const id of this.staticCarsLayer.needed) if (!this.isStaticCarsResident(id)) return false;
     return true;
   }
 
@@ -1363,9 +1536,15 @@ export class HexResidency {
     return this.lanesLayer.fileBytes;
   }
 
+  /** And the parked cars' sidecars. WORKSTREAM S. */
+  get residentStaticCarFileBytes(): number {
+    return this.staticCarsLayer.fileBytes;
+  }
+
   stats(): SegmentStats {
     const collision = this.collisionLayer.stats();
     const lanes = this.lanesLayer.stats();
+    const staticCars = this.staticCarsLayer.stats();
     return {
       enabled: this.contract !== null,
       hexes: this.slots.size,
@@ -1382,6 +1561,7 @@ export class HexResidency {
       pending: collision.pending,
       collision,
       lanes,
+      staticCars,
     };
   }
 }
@@ -1450,6 +1630,34 @@ export function collisionCapBytes(): number {
 export function lanesCapBytes(): number {
   const raw = Number(process.env.SYDNEY_LANES_CAP_MB ?? DEFAULT_LANES_CAP_MB);
   const mb = Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_LANES_CAP_MB;
+  return mb * 1e6;
+}
+
+/**
+ * And the parked fleet's, in the same denomination and for the same reasons.
+ *
+ * WORKSTREAM S. Twenty-four megabytes by default against 46.1 MB for every parked
+ * car in Sydney -- see `DEFAULT_STATIC_CARS_CAP_MB` for why the default is under
+ * the whole rather than over it.
+ *
+ * **"The same denomination" is not quite true and the difference is in this
+ * layer's favour.** `collisionCapBytes` counts *live heap* and an operator has to
+ * apply the measured ~1.9x heap-to-RSS ratio by hand to size a box. This layer is
+ * six `ArrayBuffer`s a tile with no index over them, which JSC accounts as
+ * external memory and does not report in `heapUsed` at all -- so
+ * `staticcars.BYTES_PER_STATIC_CAR` was measured as an RSS delta instead, and 24
+ * here means about 24 MB of resident process. No ratio, no arithmetic.
+ *
+ * A third variable rather than a share of one of the others, on `lanesCapBytes`'
+ * three arguments verbatim: the two existing numbers are documented in DEPLOY.md
+ * with measured ratios behind them and are already set on a 1 GB box, the failure
+ * modes are not interchangeable (a missing parked car is a car you cannot steal;
+ * a missing prism is a wall you walk through), and a shared account could not
+ * trade between the layers anyway because evicting a car does not free a prism.
+ */
+export function staticCarsCapBytes(): number {
+  const raw = Number(process.env.SYDNEY_STATIC_CARS_CAP_MB ?? DEFAULT_STATIC_CARS_CAP_MB);
+  const mb = Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_STATIC_CARS_CAP_MB;
   return mb * 1e6;
 }
 
@@ -1612,7 +1820,42 @@ export interface ServerWorld {
    * landed, which is exactly what `Sim.resolveStrike` now does.
    */
   peds: PedestrianField;
-  bytes: { collision: number; terrain: number; powerups: number; lanes: number };
+  /**
+   * Every parked car **near somebody**, and therefore every car a player can
+   * actually steal. WORKSTREAM S.
+   *
+   * Held per hexagon under `SYDNEY_STATIC_CARS_CAP_MB`, on the prisms' and the
+   * lane graph's terms and on the same slots -- see `HexResidency`. It used to
+   * not exist at all, and `game/driving.ts` section 1 spent three rounds
+   * explaining why: `.cars.bin` was a renderer file. The measurement that made
+   * the third layer obvious rather than expensive is in
+   * `staticcars.BYTES_PER_STATIC_CAR` -- the whole city is 33 MB, an order of
+   * magnitude under either of the other two layers, because a parked car is six
+   * numbers and never moves.
+   *
+   * Nothing about a parked car is ever sent to a client. Both ends decode the
+   * same bytes into the same field and `driving.resolveTake` asks both. What is
+   * on the wire is only the `DrivenCar` record that exists *after* somebody has
+   * taken one, which is the same `MSG.CARS` upsert a stolen schedule car has
+   * always used -- the identity fits its `u32` and the protocol needed no change.
+   *
+   * **Optional on `segments`' own terms**, which is this file's convention for
+   * something `loadWorld` always builds and a hand-made fixture never does:
+   * absent means "no parked car is takeable", which is precisely the behaviour
+   * that shipped before this workstream and is exactly right for the empty test
+   * cities in `sim.verifySim`, `cardamage-check.ts` and `accounts-check.ts` --
+   * none of which has a street, let alone a car parked in one. `loadWorld` sets
+   * it unconditionally, so every real world has one.
+   */
+  staticCars?: StaticCarField;
+  bytes: {
+    collision: number;
+    terrain: number;
+    powerups: number;
+    lanes: number;
+    /** Optional for the reason `staticCars` above is: a fixture has no sidecars. */
+    staticCars?: number;
+  };
   /**
    * The decoded powerup sidecars, kept so a second room can have its own field
    * without a second read of the disk. See `roomWorld`.
@@ -1790,6 +2033,7 @@ export async function loadWorld(
   root: string,
   capBytes = collisionCapBytes(),
   laneCapBytes = lanesCapBytes(),
+  staticCarCapBytes = staticCarsCapBytes(),
 ): Promise<ServerWorld> {
   const index = JSON.parse(await readFile(join(root, 'index.json'), 'utf8')) as WorldIndex;
 
@@ -1837,12 +2081,24 @@ export async function loadWorld(
    * answer for a process that has not read a street yet.
    */
   const roads = new RoadDeck();
-  const segments = new HexResidency(root, rootIndex, collision, capBytes, traffic, peds, laneCapBytes, roads);
+  /**
+   * The parked fleet, on `roads`' and `envelope`'s terms: constructed before the
+   * residency because the third layer fills it as each hexagon's `.cars.bin`
+   * lands, so it has to exist before the residency does. Its `groundAt` is
+   * attached at the bottom of this function, once there is a `railCut` and a
+   * `railSolids` for `groundFor` to fold in -- see `staticcars.ts` section 3 on
+   * why the height is a query rather than a stored field.
+   */
+  const staticCars = new StaticCarField();
+  const segments = new HexResidency(
+    root, rootIndex, collision, capBytes, traffic, peds, laneCapBytes, roads,
+    staticCars, staticCarCapBytes,
+  );
   const terrain = new TerrainField(index.terrain.grid, index.tile_size, root);
   const powerups = new PowerupField();
   const tileOf = new Map<string, { tileX: number; tileZ: number }>();
   const points: PowerupPoint[] = [];
-  const bytes = { collision: 0, terrain: 0, powerups: 0, lanes: 0 };
+  const bytes = { collision: 0, terrain: 0, powerups: 0, lanes: 0, staticCars: 0 };
   const powerupSource: Array<{
     tileKey: string;
     kind: Uint8Array;
@@ -1934,6 +2190,28 @@ export async function loadWorld(
       // `HexResidency`'s lane layer owns it, per hexagon, at
       // `LANES_NEED_MARGIN_M`. `HexTiles` carries the identical origin pair out
       // of the hexagon manifest, which lists the same bounds.
+      // The parked fleet, on the prisms' and the lanes' terms: read here only on
+      // an **unsegmented** world, where there is no hexagon to own it. That is
+      // the synthetic worlds the checks build and any bake made before
+      // `sydney hex-pack`; on the real 60 km build `HexResidency`'s third layer
+      // owns this at `STATIC_CARS_NEED_MARGIN_M` and this branch never runs.
+      //
+      // Whole-world here is affordable *because of* the measurement in
+      // `staticcars.BYTES_PER_STATIC_CAR`: 46 MB for every parked car in Sydney.
+      // A pre-hex world already reads every prism and every lane at boot, which
+      // is 325 MB, so this is a rounding error against a configuration that was
+      // never going to fit a 1 GB box anyway.
+      const parked = segments.enabled
+        ? null
+        : await readOptional(join(root, 'tiles', `${entry.key}.cars.bin`));
+      if (parked) {
+        const decoded = decodeCars(parked, entry.key);
+        if (decoded) {
+          bytes.staticCars += parked.byteLength;
+          staticCars.adopt(entry.key, decoded, entry.bounds[0], entry.bounds[1] + index.tile_size);
+        }
+      }
+
       const lanes = segments.enabled
         ? null
         : await readOptional(join(root, 'tiles', `${entry.key}.lanes.bin`));
@@ -1978,6 +2256,7 @@ export async function loadWorld(
     powerups,
     traffic,
     peds,
+    staticCars,
     points,
     tileOf,
     bytes,
@@ -2177,6 +2456,14 @@ export async function loadWorld(
       // 60 km, to arrive at exactly the residency this would have had anyway.
       // The prisms cannot do this because the bikes genuinely need them.
       if (segments.stats().lanes.evictions === 0) await segments.loadLanesNow(entry.id);
+      // And its parked cars, on exactly the same terms and for exactly the same
+      // reason: so that *a world that fits under its cap ends up whole*. That
+      // property is what `server/take-check.ts` and every check that walks up to
+      // a car three suburbs from the spawn depend on, and at 46 MB for the whole
+      // city the default 24 MB cap means this walk covers about half of Sydney
+      // before it stops. Past the first eviction every further hexagon would be
+      // read, decoded and immediately trimmed.
+      if (segments.stats().staticCars.evictions === 0) await segments.loadStaticCarsNow(entry.id);
       const mine = new Set<string>();
       for (const key of collision.residentTiles()) if (!seen.has(key)) mine.add(key);
       for (const bike of layOutBikes(world, mine, plans)) placed.push(bike);
@@ -2221,9 +2508,25 @@ export async function loadWorld(
     segments.trimToCap();
     bytes.collision = segments.residentFileBytes;
     bytes.lanes = segments.residentLaneFileBytes;
+    bytes.staticCars = segments.residentStaticCarFileBytes;
   } else {
     world.bikeSpots = layOutBikes(world);
   }
+
+  // --- WORKSTREAM S: and where the ground is, for the parked fleet.
+  //
+  // Last, because `groundFor` closes over `platforms`, `railCut`, `railSolids`,
+  // `stationBoxes` and `vessels` at the moment it is called, and all five are
+  // filled in above. A `CombatWorld` of its own rather than a shared one, on the
+  // reason `groundFor`'s own header gives: it carries a `lastGround`, and one
+  // shared with a combatant would let a car inherit the height of whoever was
+  // standing on a warehouse roof.
+  //
+  // `feetY` reaches this from `resolveTake`'s asker, so the answer is "the ground
+  // under this car, on the level the person pressing E is standing on" -- which is
+  // the whole of how a car on the Cahill Expressway and a player on Alfred Street
+  // stay each other's business or not. See `game/staticcars.ts` section 3.
+  staticCars.groundAt = groundFor(world).groundHeight;
 
   return world;
 }

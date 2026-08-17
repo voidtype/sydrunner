@@ -46,6 +46,16 @@
  *      `route.laneBay0/1`). Both are `speed 0` and both must be takeable; the
  *      second did not exist when the take last worked, and is the case the owner
  *      most plausibly walked up to.
+ *   4b. **The parked fleet, which is 23,020 of the cars a player can reach
+ *      against the timetable's forty.** Sections 6 and 7 are workstream S: they
+ *      press `E` beside a car out of `<tile>.cars.bin`, which until this round the
+ *      server did not know existed. See `game/staticcars.ts` section 1 and
+ *      `game/driving.ts` section 1, which this workstream retired. Section 6 also
+ *      builds a **second, independently decoded** `StaticCarField` off the same
+ *      bytes with its own ground function, and asks it the client's question at
+ *      the server's tick -- which is the only way to test the property the two
+ *      ends actually rest on: not "the same code agrees with itself" but "two
+ *      decodes of one file name one car".
  *   5. **The wire.** Section 5 is a real `Room`, a real `NetClient` and a real
  *      `MSG.CARS` in between, because the browser *predicts* the take and then
  *      ignores the server's opinion of which car it is in until the input
@@ -121,6 +131,16 @@ import {
   headingYaw,
   resolveTake,
 } from '../client/src/game/driving.ts';
+// WORKSTREAM S. `decodeCars` is aliased because `net/protocol.ts` exports a
+// `decodeCars` of its own for `MSG.CARS`, and section 6 needs both: one reads a
+// sidecar off the disk, the other reads a record off the wire.
+import {
+  StaticCarField,
+  createStaticCarPose,
+  decodeCars as decodeCarSidecar,
+  type StaticCarPose,
+} from '../client/src/game/staticcars.ts';
+import { decodeCars as decodeCarsWire, encodeCars } from '../client/src/net/protocol.ts';
 
 const failures: string[] = [];
 const say = (s: string): void => { console.log(s); };
@@ -140,6 +160,15 @@ interface Candidate {
   laneEdge: boolean;
   /** The ground under the point a player would stand on to reach it. */
   groundY: number;
+  /**
+   * WORKSTREAM S: true for a car out of `<tile>.cars.bin` rather than off the
+   * timetable.
+   *
+   * The difference matters to `repose` and to nothing else: a static car cannot
+   * drive off between the census and the press, because it is furniture. That is
+   * the whole reason sections 6 and 7 need no refusal budget of their own.
+   */
+  isStatic?: boolean;
 }
 
 const root = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
@@ -148,6 +177,93 @@ const ground = groundFor(world);
 const combatWorld = groundFor(world);
 
 say(`--- take-check: ${world.traffic.tileCount} lane tiles, spawn ${world.spawn.x.toFixed(0)}, ${world.spawn.z.toFixed(0)}`);
+
+// ---------------------------------------------------------------------------
+// WORKSTREAM S. The browser's copy of the parked fleet, decoded here from the
+// same files, so that "both ends name the same car" is a claim this driver can
+// actually falsify.
+//
+// The temptation is to hand `world.staticCars` to both sides of every comparison
+// below. That tests nothing: it is one object agreeing with itself. What the
+// feature rests on is that **two independent decodes of one `.cars.bin` produce
+// the same identities at the same world coordinates** -- the server's through
+// `HexResidency`'s third layer out of a hexagon manifest, the browser's through
+// `streamer.buildTile` out of `index.json`. So this reads the sidecars the way
+// the *browser* addresses them (`index.json`'s `bounds`, the tile group's
+// translation) and gives the field its own ground closure, which is the second
+// half of `game/staticcars.ts` section 3's honesty about the height.
+//
+// Bounded to the tiles near the census centres rather than the whole city, for
+// the reason the server's own residency is bounded: 13,362 sidecars is 46 MB and
+// a driver that loaded all of them would be measuring the wrong thing.
+// ---------------------------------------------------------------------------
+
+const clientStatics = new StaticCarField();
+{
+  const centreList: Array<[number, number]> = [
+    [world.spawn.x, world.spawn.z], [0, 0], [-4000, 2000], [2000, 1000],
+  ];
+  const RANGE = 1200;
+  let read = 0;
+  let missing = 0;
+  for (const entry of world.index.tiles) {
+    const originX = entry.bounds[0];
+    const originZ = entry.bounds[1] + world.index.tile_size;
+    // The tile's own extent in world metres, on the streamer's frame: x runs east
+    // from `bounds[0]` and z runs *south* from `bounds[1] + tile_size`.
+    const midX = originX + world.index.tile_size / 2;
+    const midZ = originZ - world.index.tile_size / 2;
+    let near = false;
+    for (const [cx, cz] of centreList) {
+      if (Math.abs(midX - cx) < RANGE && Math.abs(midZ - cz) < RANGE) near = true;
+    }
+    if (!near) continue;
+    let buffer: ArrayBuffer | null = null;
+    try {
+      const file = Bun.file(`${root}/tiles/${entry.key}.cars.bin`);
+      buffer = await file.arrayBuffer();
+    } catch {
+      buffer = null;
+    }
+    if (buffer === null) {
+      missing++;
+      continue;
+    }
+    const decoded = decodeCarSidecar(buffer, entry.key);
+    if (decoded === null) continue;
+    clientStatics.adopt(entry.key, decoded, originX, originZ);
+    read++;
+  }
+  // Its own ground, and deliberately a *different* `CombatWorld` instance from
+  // the server's: `groundFor` carries a `lastGround` per caller (see its header),
+  // so sharing one would hide exactly the class of disagreement this is for.
+  clientStatics.groundAt = groundFor(world).groundHeight;
+  say(
+    `  the client's own parked fleet: ${read} sidecar(s) read, ${missing} absent, ` +
+      `${clientStatics.carCount.toLocaleString()} cars ` +
+      `(${(clientStatics.bytes / 1e6).toFixed(1)} MB estimated)`,
+  );
+  const server = world.staticCars;
+  if (server === undefined) {
+    fail('`loadWorld` returned a world with no `staticCars` field at all; the third layer is not wired up.');
+  } else {
+    say(
+      `  the server's residency: ${server.tileCount} tile(s), ` +
+        `${server.carCount.toLocaleString()} cars (${(server.bytes / 1e6).toFixed(1)} MB estimated, ` +
+        `cap SYDNEY_STATIC_CARS_CAP_MB)`,
+    );
+    if (server.carCount === 0) {
+      fail(
+        'The server holds no parked cars at all. Either the bake has no `tiles/*.cars.bin` or the ' +
+          'residency\'s third layer is not loading them -- and every one of the 23,020 cars at the ' +
+          'kerbs in town is unstealable, which is the reported bug exactly.',
+      );
+    }
+  }
+  if (clientStatics.carCount === 0) {
+    fail('No `.cars.bin` could be read near any centre, so sections 6 and 7 have nothing to press at.');
+  }
+}
 
 /**
  * Where a player stands to reach a car, and which side of it they are on.
@@ -207,6 +323,10 @@ function reachable(c: Candidate): boolean {
  * pulling out of a bay covers in the second this might be behind.
  */
 function repose(c: Candidate): Candidate | null {
+  // WORKSTREAM S: a parked car is not on a clock. The whole methodological
+  // problem this function exists for -- the census is a photograph, the timetable
+  // is a clock -- does not apply to it, so the photograph is still true.
+  if (c.isStatic) return c;
   let found: Candidate | null = null;
   forEachCarNear(
     world.traffic, c.x, c.z, 30, trafficTick(Date.now()), censusRoutes, censusPose,
@@ -450,7 +570,15 @@ function pressE(p: Participant): void {
   sim.step(out);
 }
 
-/** What the browser's prompt and its prediction would say at this instant. */
+/**
+ * What the browser's prompt and its prediction would say at this instant.
+ *
+ * **`clientStatics` is a second, independently decoded copy of the parked fleet**
+ * and that is the point of it -- see `buildClientStatics`. Passing
+ * `world.staticCars` here would be the server checking its own arithmetic; a
+ * separate field over the same bytes with its own ground closure is what the
+ * browser actually has.
+ */
 function clientWouldTake(x: number, feetY: number, z: number): number {
   const found = resolveTake(
     world.traffic,
@@ -462,6 +590,7 @@ function clientWouldTake(x: number, feetY: number, z: number): number {
     clientScratch.pose,
     (identity) => sim.cars.suppressed(identity),
     clientScratch.take,
+    clientStatics,
   );
   return found ? clientScratch.take.identity : 0;
 }
@@ -728,7 +857,18 @@ class HeldSocket {
   }
 }
 
-function runOnline(shared: ServerWorld, subject: Candidate): void {
+function runOnline(
+  shared: ServerWorld,
+  subject: Candidate,
+  /**
+   * WORKSTREAM S: the client's own parked fleet, for the prediction below.
+   *
+   * Null keeps section 5 exactly as it was -- a schedule car, no statics -- and
+   * section 7 passes `clientStatics` so that the *predicted* take is a parked car
+   * and the record the server allocates has to be the same one.
+   */
+  statics: StaticCarField | null = null,
+): void {
   const room = new Room(0, shared, 8, 0);
   const FIXED_DT = 1 / TICK_HZ;
 
@@ -852,6 +992,7 @@ function runOnline(shared: ServerWorld, subject: Candidate): void {
       scratch.pose,
       (identity) => cars.suppressed(identity),
       scratch.take,
+      statics,
     );
     if (!offered) {
       fail('Online: the client would not have offered the take at all, so there was nothing to predict.');
@@ -948,6 +1089,295 @@ if (onlineSubject === undefined) {
 } else {
   runOnline(world, onlineSubject);
 }
+
+
+// ---------------------------------------------------------------------------
+// 6. WORKSTREAM S: a car out of `.cars.bin`, which is the car a player actually
+//    walks up to.
+//
+// The whole reported bug in one section. Everything above this line was already
+// green when the owner said *"i also seem to no longer be able to steal cars"*,
+// because everything above this line presses `E` at a **schedule** car -- one of
+// about forty within reach against 23,020 identical parked ones that answered
+// nothing. Six claims, in the order they fail:
+//
+//   1. The two ends name the same car. Asked of a separately decoded field with
+//      its own ground closure; see `clientStatics`.
+//   2. `E` grants it, and the record carries the static identity.
+//   3. It drives. "Taken but not drivable is the same bug wearing a hat."
+//   4. The identity survives `MSG.CARS` intact. `staticCarIdentity` uses the full
+//      32-bit range where `traffic.carHash` in practice does too, and the record
+//      field is a `u32` -- this is the assertion behind "the wire needed no
+//      change", and a `u16` there would truncate 65,535 of every 65,536 cars into
+//      one identity and suppress the wrong car on every client in the room.
+//   5. Out and back in, which is `nearestEmptyCar` rather than `resolveTake`.
+//   6. **It comes back.** Removing the record is the whole of putting a static car
+//      back at its kerb -- there is no state, only the suppression -- and this is
+//      the assertion that `recycleFarthest` returns the city to itself.
+//
+// No refusal budget and no `repose` staleness: a parked car is furniture and
+// cannot have driven off between the census and the press. That is why this
+// section asserts equality where section 4 has to bound a rate.
+// ---------------------------------------------------------------------------
+
+say('--- 6. a car out of `.cars.bin` (workstream S)');
+
+/** Every parked car near a point, as candidates, nearest first. */
+function staticCandidates(cx: number, cz: number, radius: number, cap: number): Candidate[] {
+  const out: Candidate[] = [];
+  const seen = new Set<number>();
+  clientStatics.forEachStaticNear(cx, 0, cz, radius, (car: StaticCarPose) => {
+    if (out.length >= cap || seen.has(car.identity)) return;
+    seen.add(car.identity);
+    const c: Candidate = {
+      identity: car.identity,
+      x: car.x,
+      y: car.y,
+      z: car.z,
+      yaw: car.yaw,
+      speed: 0,
+      // A parked car is in a bay by definition, so it is filed as the stage
+      // everything downstream treats a kerbed car as. `CarPose.stage` is not a
+      // thing a static car has; this is the label, and `isStatic` is the fact.
+      stage: CAR_STAGE_PARKED_IN,
+      laneEdge: false,
+      groundY: 0,
+      isStatic: true,
+    };
+    const at = standBeside(c, 1);
+    c.groundY = ground.groundHeight(at.x, at.z, c.y);
+    out.push(c);
+  });
+  out.sort((a, b) => a.identity - b.identity);
+  return out;
+}
+
+const staticPool: Candidate[] = [];
+for (const [cx, cz, name] of centres) {
+  const before = staticPool.length;
+  const found = staticCandidates(cx, cz, 300, 400);
+  for (const c of found) {
+    if (!reachable(c)) continue;
+    // A car the *server* cannot see is not this section's subject: the server's
+    // residency is capped, so a hexagon out past the cap holds no cars and `E`
+    // would correctly do nothing. Section 1's census has the same shape of
+    // filter for lanes; this is the parked fleet's.
+    let serverSees = false;
+    const at = standBeside(c, 1);
+    world.staticCars?.forEachStaticNear(at.x, c.groundY, at.z, TAKE_RADIUS, (s) => {
+      if (s.identity === c.identity) serverSees = true;
+    });
+    if (!serverSees) continue;
+    staticPool.push(c);
+  }
+  say(`  ${name}: ${staticPool.length - before} parked car(s) both ends can see and a player can reach`);
+}
+
+if (staticPool.length === 0) {
+  fail(
+    'Not one parked car near any of the four centres is visible to both ends on reachable ground. ' +
+      'Either `tiles/*.cars.bin` is absent, or the server residency has not loaded a hexagon anybody ' +
+      'is standing in, and no parked car in Sydney is stealable.',
+  );
+} else {
+  const subject = staticPool[0];
+
+  // --- (1) The two ends, at the same instant, off two decodes of one file.
+  const at = standBeside(subject, 1);
+  place(player, at, subject.groundY, subject.yaw);
+  const feet = player.combat.body.position.y - EYE_HEIGHT;
+  const predicted = clientWouldTake(at.x, feet, at.z);
+  if (predicted !== subject.identity) {
+    fail(
+      `static: the client's own decode named ${predicted} where it is standing beside ${subject.identity}, ` +
+        `${Math.hypot(subject.x - at.x, subject.z - at.z).toFixed(2)} m away with dy ` +
+        `${(subject.y - feet).toFixed(2)}. Two decodes of one \`.cars.bin\` disagree, or a schedule car ` +
+        'is nearer -- either way the HUD and the authority are asking different questions.',
+    );
+  }
+
+  // --- (2) The press, and the record.
+  pressE(player);
+  const carId = player.combat.drivingCar;
+  if (carId === 0) {
+    fail(
+      `static: pressing E beside parked car ${subject.identity} did not put the player in a car ` +
+        `(range ${Math.hypot(subject.x - at.x, subject.z - at.z).toFixed(2)} m, dy ` +
+        `${(subject.y - feet).toFixed(2)}). This is the reported bug.`,
+    );
+  } else {
+    const record = sim.carRecords().find((r) => r.id === carId);
+    if (!record) {
+      fail(`static: \`drivingCar\` is ${carId} and there is no such record on the wire.`);
+    } else {
+      if (record.carId !== subject.identity) {
+        fail(`static: took identity ${record.carId} while standing beside ${subject.identity}.`);
+      }
+      // --- (4) The identity through `MSG.CARS`, which is the "no protocol bump"
+      //     claim as an assertion rather than as a comment.
+      const wire = decodeCarsWire(encodeCars([record]));
+      if (wire === null || wire.cars.length !== 1) {
+        fail('static: a `CARS` frame carrying a parked car did not decode at all.');
+      } else if (wire.cars[0].carId !== subject.identity) {
+        fail(
+          `static: identity ${subject.identity} came back off the wire as ${wire.cars[0].carId}. ` +
+            '`CarRecord.carId` must carry the full `staticCarIdentity` u32 range or suppression names ' +
+            'the wrong car on every client in the room.',
+        );
+      }
+      if (!sim.cars.suppressed(subject.identity)) {
+        fail(
+          'static: the stolen car is not suppressed, so its box is still parked at the kerb and the ' +
+            'traffic still steers round it. There are two of it.',
+        );
+      }
+      // --- (3) And it drives.
+      const fromX = record.x;
+      const fromZ = record.z;
+      player.input.forward = 1;
+      for (let i = 0; i < TICK_HZ; i++) sim.step(out);
+      player.input.forward = 0;
+      const after = sim.cars.get(carId);
+      const moved = after === undefined ? 0 : Math.hypot(after.x - fromX, after.z - fromZ);
+      if (moved < 3) {
+        fail(`static: a second of full throttle moved the parked car ${moved.toFixed(2)} m.`);
+      }
+      // --- (5) Out, and back in through the other branch of `tryTakeCar`.
+      pressE(player);
+      if (player.combat.drivingCar !== 0) fail('static: pressing E in the car did not get the player out.');
+      if (sim.cars.get(carId) === undefined) fail('static: the car vanished when its driver got out.');
+      pressE(player);
+      if (player.combat.drivingCar !== carId) {
+        fail(
+          `static: pressing E beside the car just parked did not get back in ` +
+            `(\`drivingCar\` is ${player.combat.drivingCar}, the record is ${carId}).`,
+        );
+      }
+      say(`  identity ${subject.identity} -> record ${carId}, drove ${moved.toFixed(1)} m in a second, out and back in`);
+
+      // --- (6) And it comes home. `recycleFarthest`'s own effect, forced.
+      pressE(player);
+      sim.cars.remove(carId);
+      if (sim.cars.suppressed(subject.identity)) {
+        fail('static: the identity is still suppressed after its record was recycled; the car never comes back.');
+      }
+      place(player, at, subject.groundY, subject.yaw);
+      const backFeet = player.combat.body.position.y - EYE_HEIGHT;
+      const again = clientWouldTake(at.x, backFeet, at.z);
+      if (again !== subject.identity) {
+        fail(
+          `static: after the record was recycled the same standing point offers ${again} rather than ` +
+            `${subject.identity}. A recycled parked car is supposed to be simply *there* again, in its ` +
+            'bay, at the identity it always had -- there is no state to restore.',
+        );
+      }
+      const probe = createStaticCarPose();
+      if (!clientStatics.findStatic(subject.identity, backFeet, probe)) {
+        fail('static: the recycled car is no longer in the field at all.');
+      } else if (Math.abs(probe.x - subject.x) > 1e-3 || Math.abs(probe.z - subject.z) > 1e-3) {
+        fail(
+          `static: the recycled car is at (${probe.x.toFixed(2)}, ${probe.z.toFixed(2)}) where it was ` +
+            `parked at (${subject.x.toFixed(2)}, ${subject.z.toFixed(2)}).`,
+        );
+      }
+      say('  recycled: suppression cleared, the car is offered again from the same standing point');
+    }
+  }
+
+  // --- The sweep, both flanks, and this one *can* assert zero refusals.
+  //
+  // Section 4's budget exists because the timetable moves between the prompt and
+  // the press. Nothing here moves. So a refusal is a refusal, and the bound is
+  // the two things that are honestly not this feature's business: a lime bike
+  // answered first (`bikeAnswersFirst`), or a *schedule* car parked nearer than
+  // the static one, which is the take working and picking the right car.
+  const sweepStatics = staticPool.slice(0, Number(process.env.TAKE_STATIC_SWEEP ?? '60'));
+  let sTook = 0;
+  let sBike = 0;
+  let sOther = 0;
+  const sRefused: string[] = [];
+  for (const c of sweepStatics) {
+    for (const side of [1, -1]) {
+      const stand = standBeside(c, side);
+      place(player, stand, c.groundY, c.yaw);
+      const f = player.combat.body.position.y - EYE_HEIGHT;
+      if (bikeAnswersFirst(stand, f)) {
+        sBike++;
+        continue;
+      }
+      const want = clientWouldTake(stand.x, f, stand.z);
+      pressE(player);
+      const got = player.combat.drivingCar;
+      if (got === 0) {
+        sRefused.push(
+          `identity ${c.identity} ${side > 0 ? 'kerb' : 'road'} flank, range ` +
+            `${Math.hypot(c.x - stand.x, c.z - stand.z).toFixed(2)} m, dy ${(c.y - f).toFixed(2)}, ` +
+            `client ${want === 0 ? 'also refused' : `offered ${want}`}`,
+        );
+        continue;
+      }
+      const rec = sim.carRecords().find((r) => r.id === got);
+      if (rec && rec.carId !== c.identity) sOther++;
+      else sTook++;
+      pressE(player);
+      sim.cars.remove(got);
+    }
+  }
+  say(
+    `  sweep: ${sTook} parked car(s) taken, ${sOther} presses answered by a nearer schedule car, ` +
+      `${sBike} answered by a bike first, ${sRefused.length} refused`,
+  );
+  for (const r of sRefused.slice(0, 12)) say(`    refused: ${r}`);
+  if (sRefused.length > 0) {
+    fail(
+      `${sRefused.length} of ${sTook + sOther + sRefused.length} presses beside a parked car were ` +
+        'refused. Nothing about a parked car moves between the prompt and the press, so unlike ' +
+        'section 4 this bound is zero: every one of these is the take refusing a car that is ' +
+        'standing right there.',
+    );
+  }
+  if (sTook === 0) {
+    fail('The parked-car sweep granted nothing at all, so nothing above it was measured.');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 7. WORKSTREAM S online: a parked car, predicted, through the wire.
+//
+// Section 5's harness with a static subject, and it is not redundant with it.
+// What section 5 covers is the *record* -- that the client's predicted id is the
+// one the server allocates, and that the adoption does not snap the driver back
+// onto the footpath. Both of those turn on the **identity** matching, and a
+// parked car's identity comes from a different function, a different file and a
+// different residency on each end. If the server's decode and the browser's
+// disagreed by so much as a tile origin, section 6 would still pass (it compares
+// two fields directly) and this would put the driver back on the kerb one round
+// trip after every theft.
+// ---------------------------------------------------------------------------
+
+say('--- 7. online: a predicted parked-car take against the wire');
+if (staticPool.length === 0) {
+  say('  no parked car available; case not exercised this run.');
+} else {
+  // **The same car section 6 drove**, deliberately, and this is the one place in
+  // this file where the subject is picked rather than swept.
+  //
+  // The reason is isolation. A parked car is wherever `parking.py` put it, and a
+  // fair number of them are in spots a *player* cannot drive out of forward from
+  // the flank they are standing on -- nose against a wall, on a driveway, up a
+  // kerb -- which is a fact about that parking space and not about the wire. The
+  // first attempt at this section took `staticPool[staticPool.length - 1]` and
+  // failed with "a second of throttle moved the server's body 0.00 m" while every
+  // other assertion in the section passed: the take was granted, the record ids
+  // matched, the mirror agreed, and the car simply had nowhere to go.
+  //
+  // Section 6 has already proved this particular car drives 3 m offline, so a
+  // failure here can only be the loopback -- which is the whole point of the
+  // section. The parked fleet's *coverage* is section 6's sweep, which is eighty
+  // cars from both flanks and asserts zero refusals.
+  runOnline(world, staticPool[0], clientStatics);
+}
+
 
 if (failures.length === 0) {
   say('\ntake-check: OK');

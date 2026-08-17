@@ -179,7 +179,8 @@ rsync -a --partial -e "$SSHOPT" \
   client/dist/world/far-water.bin client/dist/world/street-names.bin client/dist/world/landmarks.glb \
   $BOX:/opt/sydney/dist/world/
 rsync -a --partial -e "$SSHOPT" \
-  --include='*/' --include='*.lanes.bin' --include='*.terr.bin' --include='*.pow.bin' --exclude='*' \
+  --include='*/' --include='*.lanes.bin' --include='*.terr.bin' --include='*.pow.bin' \
+  --include='*.cars.bin' --exclude='*' \
   client/dist/world/tiles/ $BOX:/opt/sydney/dist/world/tiles/
 
 # 3. The shared simulation modules, and the server itself. NOT OPTIONAL when the
@@ -190,6 +191,24 @@ rsync -az --partial --delete --exclude node_modules -e "$SSHOPT" server/ $BOX:/o
 
 ssh -i ~/.ssh/sydney_deploy $BOX 'chown -R root:root /opt/sydney && systemctl restart sydney'
 ```
+
+> **`*.cars.bin` is new in the workstream-S round and the server is silent
+> without it.** `.cars.bin` was a renderer file until the parked fleet became
+> stealable, so this include line did not exist and the box has none of them. A
+> box missing them **boots clean, plays fine, and refuses every parked car** —
+> which is the reported bug (*"i also seem to no longer be able to steal cars"*)
+> restored in full, because the ~23,000 cars at the kerbs are the ones a player
+> walks up to and the ~40 schedule cars are not. The residency treats a missing
+> sidecar as a tile with no parked cars on purpose (a partially-shipped world must
+> not fail to boot), so **the only signal is the boot line**:
+>
+> ```
+> [sydney] parked cars per hexagon: 39/86 resident, 24.0 MB estimated against a 24 MB cap
+>          (SYDNEY_STATIC_CARS_CAP_MB), 6343 tiles, 736,116 cars
+> ```
+>
+> A `0 cars` there is appended with `— NONE`. Gate on it. 22.5 MB of files over
+> 13,362 tiles.
 
 Note `$SSHOPT` is only ever passed to `rsync -e`, which splits it itself. A bare
 `$SSHOPT root@host …` does **not** word-split under zsh and fails with `no such
@@ -206,9 +225,10 @@ answer to it.
 | `tiles/*.glb`, `regions/` | **11 GB** | the browser, **from R2 only** |
 | `collision/` | 333 MB | the server |
 | `tiles/*.{lanes,terr,pow}.bin` | 155 MB | the server |
+| `tiles/*.cars.bin` | 22.5 MB | the server (**new**, workstream S) |
 | `hexes/`, pivots, far layer | ~70 MB | both |
 
-488 MB on the box against 12 GB of world. **The consequence is that the CDN is
+510 MB on the box against 12 GB of world. **The consequence is that the CDN is
 now load-bearing rather than an optimisation**: if `world.3rp.uk` were down the
 page would load and the server would simulate, but no geometry would stream and
 the origin has none to fall back on. That is a deliberate trade — a 20 GB disk
@@ -523,7 +543,10 @@ every `verify*` in the self-check line; `bun run server/accounts-check.ts` (with
 `bun run server/cardamage-check.ts`; `bun run server/take-check.ts` (7 s over
 the shipped bake — it presses `E` beside real parked cars through the real
 `Simulation` and then once more over a real `Room` and a real `NetClient`, and
-it is the only thing that covers stealing a car at all); and
+it is the only thing that covers stealing a car at all — **since workstream S its
+sections 6 and 7 press `E` at a car out of `tiles/*.cars.bin`, so it is also the
+gate that catches a box the `.cars.bin` rsync did not reach**: `the server's
+residency: N cars` in its own output, and it fails outright at zero); and
 `RIDE_GANGWAY=only bun run server/ride-acceptance.ts` when trains changed.
 These are the repeatable, cheap tests that replaced browser-driven checking;
 add to them rather than around them. If the protocol shape changed, bump `PROTOCOL_VERSION` **once**
@@ -584,10 +607,14 @@ block from it. So:
    moving domains without this = a 404 storm and a client that falls back to
    the origin for the whole world).
 5. **Ship the server's copy of the same tiles** — `.lanes.bin`, `.terr.bin`,
-   `.pow.bin` and `collision/` for exactly the rebuilt tile ids, plus the
-   pivots and the far layer, with `rsync --files-from` (never `--delete`,
-   never `.glb`, never `regions/`), then `systemctl restart sydney`. Server and
-   CDN must always describe the same ground.
+   `.pow.bin`, `.cars.bin` and `collision/` for exactly the rebuilt tile ids,
+   plus the pivots and the far layer, with `rsync --files-from` (never
+   `--delete`, never `.glb`, never `regions/`), then `systemctl restart sydney`.
+   Server and CDN must always describe the same ground — and since workstream S
+   that includes the parked cars: `.cars.bin` is what makes a kerbed car
+   stealable, and a retile that reshuffles a tile's parking changes every
+   `staticCarIdentity` in it, so a box on the old bytes and a browser on the new
+   ones name different cars.
 6. Only then ship the client bundle (§A) if `client/src` changed too.
 
 `data/scratch/station-round/` holds the scripts from the 2026-08-17 station
@@ -633,14 +660,26 @@ the knobs are here and the multi-process shape is config, not code.
 | `SYDNEY_BOTS` | `2` | Bots **per room**, so 8 rooms at the default is 16 |
 | `SYDNEY_COLLISION_CAP_MB` | `450` | Collision prisms held, in **estimated resident megabytes**. The 1 GB box wants 150–250 |
 | `SYDNEY_LANES_CAP_MB` | `300` | The lane graph — cars and footpaths — on the same terms. The 1 GB box wants 100–150 |
+| `SYDNEY_STATIC_CARS_CAP_MB` | `24` | The **parked fleet** (`tiles/*.cars.bin`), the cars a player steals. RSS megabytes, not heap — see below. The 1 GB box can leave this at the default |
 
-**The two caps are counted in estimated resident bytes, not file bytes**, and
+**The three caps are counted in estimated resident bytes, not file bytes**, and
 that is what makes them real controls: the 19.3 km world is 25.4 MB of collision
 files against 193 MB of heap, and 13.9 MB of lane files against 132 MB. A cap in
-file bytes would never bind at any radius this project will build. Both are held
-**per hexagon and near a player** — a hexagon is loaded when anybody is inside it
-or within 500 m (collision) or 2,000 m (lanes) of its boundary, and evicted
-least-recently-needed when over cap.
+file bytes would never bind at any radius this project will build. All three are
+held **per hexagon and near a player** — a hexagon is loaded when anybody is
+inside it or within 500 m (collision) or 2,000 m (lanes, parked cars) of its
+boundary, and evicted least-recently-needed when over cap.
+
+**The parked-car cap is the one exception to "estimated resident" meaning heap,
+and it is in the operator's favour.** That layer is almost entirely
+`ArrayBuffer` backing store, which JSC accounts as external memory and does not
+report in `heapUsed` at all — so it was measured as an RSS delta instead (30
+bytes a car over the 1,402,623-car bake; `game/staticcars.BYTES_PER_STATIC_CAR`
+carries the method). So `24` here means about 24 MB of resident process with no
+1.9x ratio to apply, where 450 of collision means roughly 850 MB. The whole
+static fleet is 46 MB, and a room in one suburb holds **3 hexagons, 907 tiles,
+141,823 cars, 4.5 MB** (measured at the spawn), so the default is five times what
+ordinary play needs and binds only on a pathological spread of players.
 
 **Neither cap will evict a hexagon somebody is standing in.** It goes over
 budget and logs a warning instead, once every ten seconds. `[sydney] collision
@@ -833,7 +872,9 @@ welcome, ≥20 snapshots, a rising `ackSeq`, and a close code of 1000.
 - **Memory.** `MemoryMax=820M` on a 1 GB box (600M until the 60 km world:
   boot peaked at exactly 600M and stalled, though steady state is 434 MB).
   `SYDNEY_COLLISION_CAP_MB=64` and `SYDNEY_LANES_CAP_MB=90` make the hex
-  residency actually bind — at their 450/300 defaults the whole 19.3 km
+  residency actually bind (`SYDNEY_STATIC_CARS_CAP_MB` needs no box override: its
+  24 MB default already binds at about half the city, and it is RSS rather than
+  heap — see the environment table) — at their 450/300 defaults the whole 19.3 km
   world fit under the cap, the residency never evicted, and RSS pinned to
   the cgroup ceiling: the kernel then reclaimed *inside* the cgroup, so bun
   re-faulted its own pages off disk 825 times a second and a 60 Hz tick

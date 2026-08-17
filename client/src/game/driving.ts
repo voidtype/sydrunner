@@ -8,11 +8,11 @@
  * in this file running identically in the browser and on the server.
  *
  * ---------------------------------------------------------------------------
- * 1. WHAT A "CAR" IS, AND WHY IT IS A TRAFFIC CAR AND NOT A KERB CAR.
+ * 1. WHAT A "CAR" IS: BOTH FLEETS, SINCE WORKSTREAM S.
  *
  * There are two fleets of cars in Sydney and they look the same on purpose:
  *
- *   - the **static** fleet, ~875,000 of them baked into `<tile>.cars.bin` and
+ *   - the **static** fleet, 1,402,623 of them baked into `<tile>.cars.bin` and
  *     drawn by `world/cars.buildTileCars`. Scenery. Never moves.
  *   - the **schedule** fleet, a closed-form lookup over `<tile>.lanes.bin`
  *     (`game/traffic.poseCar`), which since the park stages landed spends a good
@@ -20,23 +20,31 @@
  *     `world/cars.ts`' own header says it is "indistinguishable from the 23,020
  *     already at that kerb".
  *
- * The brief asked for both to be stealable. Only the second one is, and the
- * reason is not laziness -- it is that **the server has no idea the first one
- * exists.** `server/world.ts` streams two layers per hexagon, collision prisms
- * and lane sidecars; `.cars.bin` is a renderer file and is never read outside
- * the browser. Making a kerb car stealable server-authoritatively means a third
- * streaming layer over 13,362 files and 14 MB of parked cars on a 1 GB box, and
- * making it stealable *without* that means the client naming a car the server
- * cannot see -- which is a client that can conjure a vehicle.
+ * **Both are takeable now, and this paragraph used to say the opposite.** What
+ * it said, for three rounds, was that only a schedule car could be stolen
+ * because *"the server has no idea the first one exists"* -- `.cars.bin` was a
+ * renderer file, `server/world.ts` streamed prisms and lane sidecars and nothing
+ * else, and a client naming a car the server could not see is a client that can
+ * conjure a vehicle. It also said what the fix would cost: *"a third streaming
+ * layer over 13,362 files"*. The owner's report -- *"i also seem to no longer be
+ * able to steal cars"* -- is what that deviation actually felt like from inside
+ * the game. `server/take-check.ts` measured the take at 188 grants out of 188
+ * presses; the cars a player walks up to are the twenty-three thousand, not the
+ * forty, so the feature was green and unreachable.
  *
- * So every takeable car is a schedule car, and the rule is the brief's own
- * second clause: **stopped or under `TAKEABLE_SPEED`**. That catches a car in a
- * park stage at the kerb (speed exactly 0, and visually a parked car), a car
- * held at a red light, and a car easing out of a bay. `world/cars.TrafficMovers`
- * reports about 41 kerb-parked schedule cars inside its 420 m draw radius at a
- * measured moment in town, which is one every 4,300 m^2 -- so "walk down the
- * street and press E at a car" holds, even though "any car you can see" does
- * not. See the report; this is the one deliberate deviation in the workstream.
+ * So the third layer exists: `game/staticcars.ts` holds the decoder and the
+ * field, `server/world.ts`' `HexResidency` streams `.cars.bin` per hexagon under
+ * `SYDNEY_STATIC_CARS_CAP_MB` beside the prisms and the lanes, and
+ * `resolveTake` below asks **two** sources at the same instant and takes the
+ * nearer answer. The anti-cheat story does not change by a word: `INPUT` still
+ * carries ten bytes of buttons and a look direction, there is still no field in
+ * which a client could name a car, and a take is still a question asked with a
+ * button and answered against the server's own copy of the world.
+ *
+ * The schedule fleet's rule is unchanged -- **stopped or under `TAKEABLE_SPEED`**,
+ * which catches a car in a park stage at the kerb, one held at a red light and
+ * one easing out of a bay. A static car has no speed at all: it is furniture,
+ * and every one of them qualifies.
  *
  * ---------------------------------------------------------------------------
  * 2. THE CAR YOU ARE DRIVING IS NOT A NEW BODY. IT IS YOUR BODY, GEARED.
@@ -99,6 +107,23 @@
  * route id and the departure -- exactly the "route id + departure" the brief
  * asked the record to carry, already computed, already agreed by every process
  * that read the same world.
+ *
+ * **A static car is suppressed by the same predicate and it is even simpler**,
+ * because a static car is not a lookup that keeps producing: it is an instance
+ * matrix in a tile's `InstancedMesh` and a row in a `StaticCarField`. Its
+ * identity is `traffic.staticCarIdentity(tileKey, index)`, which goes on the same
+ * `DrivenCar.carId` and through the same `MSG.CARS` `u32`, so every consumer of
+ * `suppressed` covers it with no new code: `world/carlod.CarModelFleet` folds the
+ * box flat (`hideSuppressedStatics`, which is the one *new* consumer, because a
+ * box has to be un-drawn where a lookup only has to be not-asked),
+ * `traffic.LaneObstacles` already tests `o.identity` against `suppress` for its
+ * static half, and `resolveTake` refuses an identity somebody has.
+ *
+ * And when the record is recycled (`recycleFarthest`, section 6) the static car
+ * is simply **there again**, in its bay, at the identity it always had -- no
+ * state, no respawn, nothing to restore beyond the instance matrix `revoke`
+ * writes back. That is the same "handed back rather than deleted" property the
+ * schedule fleet has, arrived at from the other direction.
  *
  * ---------------------------------------------------------------------------
  * 4. WHO OWNS WHAT.
@@ -186,6 +211,10 @@ import {
   createCarPose,
   forEachCarNear,
 } from './traffic.ts';
+// WORKSTREAM S: the parked fleet, as a source `resolveTake` can ask. A type-only
+// import, so nothing about this file's dependency graph changes -- the *field*
+// lives in `game/staticcars.ts` and is constructed by whoever owns a world.
+import type { StaticCarSource } from './staticcars.ts';
 
 // --- The handling ---------------------------------------------------------------
 
@@ -1336,9 +1365,15 @@ export function headingYaw(dx: number, dz: number): number {
 
 // --- What is takeable ----------------------------------------------------------------
 
-/** One schedule car somebody could get into, as `resolveTake` hands it over. */
+/** One car somebody could get into, as `resolveTake` hands it over. */
 export interface TakeableCar {
-  /** `traffic.identityOf(route, slot)`. The car's name in every process. */
+  /**
+   * `traffic.identityOf(route, slot)` for a schedule car and
+   * `traffic.staticCarIdentity(tileKey, index)` for a parked one. The car's name
+   * in every process, and the same 32-bit space either way -- `MSG.CARS` carries
+   * it as a `u32` (`protocol.encodeCars`, `setUint32`), so the full range of both
+   * hashes fits and the wire needed no change for workstream S.
+   */
   identity: number;
   body: number;
   colour: number;
@@ -1356,22 +1391,154 @@ export function createTakeable(): TakeableCar {
 }
 
 /**
+ * The running best of a take arbitration. **Two fleets, one comparison.**
+ *
+ * Exists as a value rather than as three local variables inside `resolveTake`
+ * because since workstream S there are two *sources* of candidate -- the
+ * timetable and the parked fleet -- and the whole property that makes a take
+ * predictable is that the winner is decided by one rule over the union of them
+ * rather than by "schedule first, then statics if nothing" (which would make the
+ * answer depend on the order the sources were asked in, and therefore on which
+ * process was asking).
+ *
+ * It is also what makes the arbitration *testable* without a baked world:
+ * `verifyDriving` drives `beginTake`/`offerTake` with hand-placed candidates from
+ * both fleets, which is the one part of the take a boot-time check can assert.
+ * `server/take-check.ts` covers the rest against the real city.
+ */
+export interface TakeQuery {
+  /** Where the person pressing E is standing. Set by `beginTake`. */
+  x: number;
+  feetY: number;
+  z: number;
+  found: boolean;
+  /** Squared plan distance to the best so far, or `TAKE_RADIUS^2` with none. */
+  bestD2: number;
+  bestIdentity: number;
+}
+
+export function createTakeQuery(): TakeQuery {
+  return { x: 0, feetY: 0, z: 0, found: false, bestD2: 0, bestIdentity: 0 };
+}
+
+/** Open an arbitration at a point. Nothing offered yet, the radius as the bound. */
+export function beginTake(q: TakeQuery, x: number, feetY: number, z: number): void {
+  q.x = x;
+  q.feetY = feetY;
+  q.z = z;
+  q.found = false;
+  q.bestD2 = TAKE_RADIUS * TAKE_RADIUS;
+  q.bestIdentity = 0;
+}
+
+/**
+ * Offer one candidate car to an open arbitration. True if it is the new best.
+ *
+ * The whole of the gate, in the order it was in when it was inline in
+ * `resolveTake`, and unchanged:
+ *
+ *   - the **vertical gate** first, `bikes.MOUNT_HEIGHT`'s argument: a plan-only
+ *     test lets somebody on the Cahill Expressway take a car on Alfred Street
+ *     eight metres below them;
+ *   - then the radius and strictly-nearer test, squared, no `sqrt`;
+ *   - then **ties break on identity rather than on the float distance**, which is
+ *     `BikeField.nearestFree`'s rule and is here for its reason: two cars at the
+ *     same range have to resolve the same way on the client predicting the take
+ *     and on the server granting it, and an integer comparison is a rule both can
+ *     state where a float comparison is one two builds can disagree about. It
+ *     matters more now than it did: a static car and a schedule car in the same
+ *     bay row *are* the same-distance case, and they come from different files.
+ *
+ * The caller has already applied whatever is true of its own fleet -- the speed
+ * clause for the timetable, nothing for the parked fleet -- and the suppression
+ * predicate. Those are per-source and this is not.
+ */
+export function offerTake(
+  q: TakeQuery,
+  out: TakeableCar,
+  identity: number,
+  body: number,
+  colour: number,
+  cx: number,
+  cy: number,
+  cz: number,
+  yaw: number,
+  parked: boolean,
+): boolean {
+  const dy = cy - q.feetY;
+  if (dy > TAKE_HEIGHT || dy < -TAKE_HEIGHT) return false;
+  const dx = cx - q.x;
+  const dz = cz - q.z;
+  const d2 = dx * dx + dz * dz;
+  if (d2 > q.bestD2) return false;
+  if (q.found && (d2 > q.bestD2 || (d2 === q.bestD2 && identity >= q.bestIdentity))) return false;
+  q.found = true;
+  q.bestD2 = d2;
+  q.bestIdentity = identity;
+  out.identity = identity;
+  out.body = body;
+  out.colour = colour;
+  out.x = cx;
+  out.y = cy;
+  out.z = cz;
+  out.yaw = yaw;
+  out.parked = parked;
+  return true;
+}
+
+/**
+ * Scratch for `resolveTake`'s arbitration, allocated once for the life of the
+ * process.
+ *
+ * Module state, on `traffic._obstacleBay`'s contract: not reentrant, and it does
+ * not need to be. `resolveTake` is synchronous with no await and no callback that
+ * can re-enter it -- the two closures it passes are its own -- so the only way to
+ * observe this would be two `resolveTake` calls interleaved, which no caller on
+ * either end does. The alternative, a `TakeQuery` on `createDrivingScratch()`,
+ * would have changed the signature every existing caller passes.
+ */
+const _takeQuery: TakeQuery = createTakeQuery();
+
+/**
  * The nearest car at this point that somebody could get into, or false.
  *
  * Runs on the server to grant a steal and in the browser to predict one and to
- * draw the prompt, off the same `TrafficField` lookup at the same whole tick,
- * which is what makes the prompt honest: if the HUD says "E -- take the car" the
- * server will agree, because both asked `poseCar` the same question.
+ * draw the prompt, off the same lookups at the same whole tick, which is what
+ * makes the prompt honest: if the HUD says "E -- take the car" the server will
+ * agree, because both asked the same two questions.
  *
- * **Ties break on identity rather than on the float distance**, which is
- * `BikeField.nearestFree`'s rule and is here for its reason: two cars at the
- * same range have to resolve the same way on the client predicting the take and
- * on the server granting it, and an integer comparison is a rule both can state
- * where a float comparison is one two builds can disagree about.
+ * ---------------------------------------------------------------------------
+ * TWO SOURCES, AND WHAT AGREEMENT BETWEEN THE ENDS RESTS ON.
+ *
+ *   1. **The timetable**, `forEachCarNear` over a `TrafficField`. A closed-form
+ *      function of the tick, asserted identical between the ends by
+ *      `integration-check.checkTraffic`.
+ *   2. **The parked fleet**, `statics`, or null for a process that has none.
+ *      Both ends decode the same `.cars.bin` bytes into the same
+ *      `StaticCarField`, so the *positions* and the *identities* are equal by
+ *      construction rather than by agreement -- there is no clock in them at all.
+ *
+ * Where the two ends can still differ is residency and height, and both are
+ * bounded rather than hoped about:
+ *
+ *   - **Residency.** The server's `.cars.bin` layer is wanted at
+ *     `world.STATIC_CARS_NEED_MARGIN_M` (2,000 m) of any participant, and a
+ *     hexagon is 6 km across; the browser holds a tile's cars only while the tile
+ *     itself is built, which is a ring of a few hundred metres. So the server's
+ *     set is a strict superset of the client's around any player, which is the
+ *     direction that matters: the client cannot offer a car the server has not
+ *     got. The reverse -- the server holding a car the client's tile has not
+ *     arrived yet -- shows up as `E` working where no prompt was drawn, which is
+ *     a keypress that did something rather than one that did nothing.
+ *   - **Height.** See `game/staticcars.ts` section 3: two ground functions, a
+ *     +/- `TAKE_HEIGHT` gate, and the server's answer wins.
  *
  * `taken` is the suppression predicate -- a car somebody is already driving is
  * not takeable, and without this clause two players would both "take" the same
- * identity and the second would get a record pointing at a suppressed ghost.
+ * identity and the second would get a record pointing at a suppressed ghost. It
+ * is asked of both fleets, off the one `CarField.bySource` map, because
+ * `DrivenCar.carId` does not record which fleet it came from and does not need
+ * to.
  */
 export function resolveTake(
   field: TrafficField,
@@ -1383,37 +1550,35 @@ export function resolveTake(
   pose: CarPose,
   taken: (identity: number) => boolean,
   out: TakeableCar,
+  /**
+   * The parked fleet, or null.
+   *
+   * **Last and optional** so that every existing call site keeps compiling and
+   * means what it always meant: a check with no world, `verifyDriving`, and any
+   * process that has not been given a `StaticCarField` simply sees the schedule
+   * fleet, which is the behaviour that shipped before workstream S.
+   */
+  statics: StaticCarSource | null = null,
 ): boolean {
-  let bestD2 = TAKE_RADIUS * TAKE_RADIUS;
-  let bestIdentity = 0;
-  let found = false;
+  const q = _takeQuery;
+  beginTake(q, x, feetY, z);
   forEachCarNear(field, x, z, TAKE_RADIUS, tick, scratch, pose, (p) => {
     if (p.speed > TAKEABLE_SPEED) return;
     if (taken(p.identity)) return;
-    // The vertical gate. `bikes.MOUNT_HEIGHT`'s argument: a plan-only test lets
-    // somebody on the Cahill Expressway take a car on Alfred Street eight metres
-    // below them.
-    const dy = p.y - feetY;
-    if (dy > TAKE_HEIGHT || dy < -TAKE_HEIGHT) return;
-    const dx = p.x - x;
-    const dz = p.z - z;
-    const d2 = dx * dx + dz * dz;
-    if (d2 > bestD2) return;
-    // Strictly nearer, or the same distance and a lower identity. See the header.
-    if (found && (d2 > bestD2 || (d2 === bestD2 && p.identity >= bestIdentity))) return;
-    found = true;
-    bestD2 = d2;
-    bestIdentity = p.identity;
-    out.identity = p.identity;
-    out.body = p.body;
-    out.colour = p.colour;
-    out.x = p.x;
-    out.y = p.y;
-    out.z = p.z;
-    out.yaw = headingYaw(p.dx, p.dz);
-    out.parked = p.stage === CAR_STAGE_PARKED_IN || p.stage === CAR_STAGE_PARKED_OUT;
+    offerTake(
+      q, out, p.identity, p.body, p.colour, p.x, p.y, p.z, headingYaw(p.dx, p.dz),
+      p.stage === CAR_STAGE_PARKED_IN || p.stage === CAR_STAGE_PARKED_OUT,
+    );
   });
-  return found;
+  if (statics !== null) {
+    statics.forEachStaticNear(x, feetY, z, TAKE_RADIUS, (c) => {
+      // No speed clause: a static car is furniture and its speed is zero by
+      // definition. And `parked` is unconditionally true -- it *is* the kerb.
+      if (taken(c.identity)) return;
+      offerTake(q, out, c.identity, c.body, c.colour, c.x, c.y, c.z, c.yaw, true);
+    });
+  }
+  return q.found;
 }
 
 // --- The field ------------------------------------------------------------------------
@@ -1969,6 +2134,13 @@ function approach(v: number, target: number, step: number): number {
  *   - **A car that despawned anyway.** The owner asked for cars that stay. The
  *     hour-long check below is what stops a five-minute clock creeping back in
  *     under another name.
+ *   - **WORKSTREAM S: a parked car that cannot win the take.** The two fleets are
+ *     arbitrated by one rule over the union of them (`beginTake`/`offerTake`), and
+ *     a second source whose candidates are always rejected leaves the reported
+ *     bug exactly as it was with a green check beside it. The block at the bottom
+ *     of this function drives that arbitration with hand-placed candidates from
+ *     both fleets, including the tie -- which a bay row in Surry Hills genuinely
+ *     is, and which two builds must break the same way.
  */
 export function verifyDriving(): string[] {
   const failures: string[] = [];
@@ -2709,10 +2881,11 @@ export function verifyDriving(): string[] {
     failures.push(`traffic.HOLD_GAP is ${HOLD_GAP} m, which is not a car stopping behind another car.`);
   }
 
-  // --- `resolveTake` is not exercised here -- it needs a `TrafficField` with a
-  //     real lane sidecar in it, which is `server/integration-check.ts`' job.
-  //     What *is* checkable without one is that the two radii it uses are the
-  //     bikes', because "E has one reach" is a rule and not a coincidence.
+  // --- `resolveTake` end to end is not exercised here -- it needs a
+  //     `TrafficField` with a real lane sidecar in it, which is
+  //     `server/take-check.ts`' job. What *is* checkable without one is that the
+  //     two radii it uses are the bikes', because "E has one reach" is a rule and
+  //     not a coincidence.
   if (TAKE_RADIUS !== 2.2 || TAKE_HEIGHT !== 2.5) {
     failures.push(
       `A car is taken from ${TAKE_RADIUS} m and ${TAKE_HEIGHT} m up, where a bike is taken from 2.2 and 2.5. ` +
@@ -2721,6 +2894,100 @@ export function verifyDriving(): string[] {
   }
   if (!(TAKEABLE_SPEED > 0 && TAKEABLE_SPEED < DRIVE_TOP_SPEED)) {
     failures.push(`TAKEABLE_SPEED is ${TAKEABLE_SPEED}, which is not "a car that has nearly stopped".`);
+  }
+
+  // --- WORKSTREAM S: the arbitration between the two fleets, which *is*
+  //     checkable here because `beginTake`/`offerTake` were split out of
+  //     `resolveTake` precisely so that it would be.
+  //
+  // What this catches, and none of it needs a baked world:
+  //
+  //   - **A static car that cannot win.** The bug this workstream exists to fix
+  //     wearing a disguise: the arbitration is asked twice, and a second source
+  //     whose candidates are always rejected leaves the feature exactly as
+  //     broken as it was, with a green check beside it.
+  //   - **A schedule car that can no longer win.** The other direction. A parked
+  //     car is at the kerb and a schedule car easing out of the bay beside it is
+  //     50 cm nearer; if the second source overwrote rather than *competed*, the
+  //     player would get whichever file was consulted last.
+  //   - **A tie broken on the source rather than on the identity.** A static and
+  //     a schedule car at exactly the same range is not hypothetical -- it is
+  //     what a bay row in Surry Hills is -- and the two ends ask the two sources
+  //     in the same order only by convention. The identity rule is what makes it
+  //     a rule.
+  //   - **A vertical gate that stopped applying to one of the fleets.** The
+  //     Cahill/Alfred Street case, for the fleet that is actually parked on the
+  //     Cahill.
+  {
+    const q = createTakeQuery();
+    const out = createTakeable();
+    // Standing at the origin, feet at 0. All four candidates are in reach in
+    // plan; only the heights and the ranges differ.
+    const SCHEDULE = 0x1000_0000;
+    const STATIC_NEAR = 0x2000_0000;
+    const STATIC_FAR = 0x3000_0000;
+    // One static car, nothing else. The whole workstream in three lines.
+    beginTake(q, 0, 0, 0);
+    offerTake(q, out, STATIC_NEAR, 0, 0, 1, 0, 0, 0, true);
+    if (!q.found || out.identity !== STATIC_NEAR) {
+      failures.push(
+        'A parked car one metre away, offered to an empty arbitration, was not taken. That is the ' +
+          'reported bug -- 23,020 cars at the kerb and E does nothing -- with the world removed.',
+      );
+    }
+    if (!out.parked) failures.push('A car out of the parked fleet came back with `parked` false.');
+    // A schedule car nearer than a static one wins, and the other way round.
+    beginTake(q, 0, 0, 0);
+    offerTake(q, out, STATIC_NEAR, 0, 0, 1.5, 0, 0, 0, true);
+    offerTake(q, out, SCHEDULE, 1, 1, 0.5, 0, 0, 0, false);
+    if (out.identity !== SCHEDULE) {
+      failures.push(
+        `A schedule car 0.5 m away lost to a parked car 1.5 m away (took ${out.identity}). The two ` +
+          'fleets compete on distance; they do not take turns.',
+      );
+    }
+    if (out.body !== 1 || out.colour !== 1) {
+      failures.push('The winning candidate did not carry its own body and colour out.');
+    }
+    beginTake(q, 0, 0, 0);
+    offerTake(q, out, SCHEDULE, 0, 0, 1.5, 0, 0, 0, false);
+    offerTake(q, out, STATIC_NEAR, 0, 0, 0.5, 0, 0, 0, true);
+    if (out.identity !== STATIC_NEAR) {
+      failures.push('A parked car 0.5 m away lost to a schedule car 1.5 m away.');
+    }
+    // **The tie.** Same range, either order offered, lower identity wins both
+    // times -- which is the only version two processes can agree on.
+    beginTake(q, 0, 0, 0);
+    offerTake(q, out, STATIC_FAR, 0, 0, 1, 0, 0, 0, true);
+    offerTake(q, out, SCHEDULE, 0, 0, 1, 0, 0, 0, false);
+    const firstOrder = out.identity;
+    beginTake(q, 0, 0, 0);
+    offerTake(q, out, SCHEDULE, 0, 0, 1, 0, 0, 0, false);
+    offerTake(q, out, STATIC_FAR, 0, 0, 1, 0, 0, 0, true);
+    if (firstOrder !== out.identity || out.identity !== SCHEDULE) {
+      failures.push(
+        `A static car and a schedule car at the same range resolved to ${firstOrder} asked one way and ` +
+          `${out.identity} asked the other; the rule is the lower identity (${SCHEDULE}), whatever the ` +
+          'order. Two builds that disagree here disagree about which car a player got into.',
+      );
+    }
+    // The radius, and the vertical gate, on a parked candidate.
+    beginTake(q, 0, 0, 0);
+    if (offerTake(q, out, STATIC_NEAR, 0, 0, TAKE_RADIUS + 0.1, 0, 0, 0, true)) {
+      failures.push(`A parked car ${TAKE_RADIUS + 0.1} m away was inside a ${TAKE_RADIUS} m reach.`);
+    }
+    beginTake(q, 0, 0, 0);
+    if (offerTake(q, out, STATIC_NEAR, 0, 0, 1, TAKE_HEIGHT + 0.1, 0, 0, true)) {
+      failures.push(
+        `A parked car ${TAKE_HEIGHT + 0.1} m overhead was takeable. That is the Cahill Expressway ` +
+          'reaching down into Alfred Street.',
+      );
+    }
+    beginTake(q, 0, 0, 0);
+    if (offerTake(q, out, STATIC_NEAR, 0, 0, 1, -(TAKE_HEIGHT + 0.1), 0, 0, true)) {
+      failures.push('The vertical gate only applies in one direction.');
+    }
+    if (q.found) failures.push('A refused candidate still marked the arbitration as found.');
   }
 
   // --- The witness sees over open ground, not through walls, and not the fallen.

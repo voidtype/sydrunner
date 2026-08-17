@@ -2953,6 +2953,20 @@ export class Simulation {
         scratch.pose,
         (identity) => this.cars.suppressed(identity),
         scratch.take,
+        // --- WORKSTREAM S: and the parked fleet, which is 23,020 of the cars
+        //     within a player's reach against the timetable's forty.
+        //
+        // The residency's own field, held per hexagon at
+        // `world.STATIC_CARS_NEED_MARGIN_M`. `?? null` rather than a required
+        // field because a hand-built test city has no sidecars and no streets --
+        // see `ServerWorld.staticCars` -- and null there means exactly what the
+        // server did before this workstream.
+        //
+        // Nothing else in this function changes. The anti-cheat story is the one
+        // in the doc comment above, word for word: the client still cannot name a
+        // car, and the answer is still this process's own evaluation of its own
+        // copy of the world at its own tick.
+        this.world.staticCars ?? null,
       )
     ) {
       return;

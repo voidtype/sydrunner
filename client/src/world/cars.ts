@@ -114,6 +114,19 @@ import {
 } from '../game/driving.ts';
 import type { CarLightSink } from './nightlights.ts';
 import type { CarModelSink } from './carlod.ts';
+// --- WORKSTREAM S: the sidecar's *decode* now lives three-free.
+//
+// `decodeCars`, the `TileCars` shape, the 16-byte stride and the carriageway
+// clearance moved to `game/staticcars.ts` so the Bun server can read a
+// `.cars.bin` and let a player steal a parked car -- see that file's section 1,
+// which retires `game/driving.ts`' stated "the server never reads `.cars.bin`".
+// This module keeps everything that *draws* one and re-exports the decoder
+// below, because a reader looking for it will look here.
+import {
+  STATIC_CAR_CLEARANCE_Y as CARRIAGEWAY_Y,
+  decodeCars,
+  type TileCars,
+} from '../game/staticcars.ts';
 
 /** Must match `parking.SEDAN` .. `parking.VAN` in the pipeline. */
 export const BODY_COUNT = 5;
@@ -122,16 +135,6 @@ const HATCH = 1;
 const SUV = 2;
 const UTE = 3;
 const VAN = 4;
-
-/** Bytes per instance in a `.cars.bin` sidecar. Set by `tiles.write_parking`. */
-const CAR_STRIDE = 16;
-
-/**
- * Carriageway clearance above the ground, metres. Must match
- * `streets.CARRIAGEWAY_Y` in the pipeline: a parked car stands on the road, and
- * the road is 2 cm over the terrain the sidecar's position is sampled against.
- */
-const CARRIAGEWAY_Y = 0.02;
 
 // --- The palette --------------------------------------------------------------
 
@@ -624,23 +627,17 @@ export class CarAssets {
 
 // --- The sidecar --------------------------------------------------------------
 
-/** One tile's cars, decoded from `<key>.cars.bin` as a structure of arrays. */
-export interface TileCars {
-  count: number;
-  /** Tile-local metres, renderer axes. */
-  x: Float32Array;
-  z: Float32Array;
-  /** Radians, applied as the instance's Y rotation. */
-  heading: Float32Array;
-  body: Uint8Array;
-  colour: Uint8Array;
-  seed: Uint16Array;
-  /**
-   * Who each of these cars *is*, as a stable 32-bit number. See
-   * `staticCarIdentity`; empty when `decodeCars` was not told the tile key.
-   */
-  identity: Uint32Array;
-}
+/**
+ * One tile's cars, and the decoder that reads them.
+ *
+ * **Both now live in `game/staticcars.ts` and are re-exported here**, on exactly
+ * the terms `staticCarIdentity` below is: this is where a reader looks for them,
+ * and they had to move because the Bun server needs them and this module imports
+ * three. Nothing about the format changed in the move; see that file's section 1
+ * for why the server suddenly cares about a renderer file.
+ */
+export type { TileCars };
+export { decodeCars };
 
 /**
  * Who a parked car is, as a stable well-distributed 32-bit number.
@@ -656,46 +653,15 @@ export interface TileCars {
 export { staticCarIdentity };
 
 /**
- * Decode a `.cars.bin`. Returns `null` for anything that is not one, because a
- * tile with no cars must be indistinguishable from a tile whose sidecar is
- * missing -- see `streamer.ts`.
+ * How many paints the fleet has, for the three-free decoder's clamp.
+ *
+ * `game/staticcars.decodeCars` clamps a colour index against its own
+ * `STATIC_PAINT_COUNT`, because it may not import this module. This is the
+ * number that has to agree, handed *out* on `carBodySizes()`' terms rather than
+ * imported the other way, and `verifyStaticCars` is passed it at boot -- see
+ * that function on what a disagreement does to a tile's draw call.
  */
-export function decodeCars(buffer: ArrayBuffer, tileKey = ''): TileCars | null {
-  if (buffer.byteLength < 4) return null;
-  const view = new DataView(buffer);
-  const count = view.getUint32(0, true);
-  if (count === 0 || buffer.byteLength < 4 + count * CAR_STRIDE) return null;
-
-  const out: TileCars = {
-    count,
-    x: new Float32Array(count),
-    z: new Float32Array(count),
-    heading: new Float32Array(count),
-    body: new Uint8Array(count),
-    colour: new Uint8Array(count),
-    seed: new Uint16Array(count),
-    // Filled only when the caller named the tile. The sidecar carries no
-    // identity of its own -- it does not need to, because the tile key is
-    // already the file's own name and the index is already the order the bytes
-    // are in. See `staticCarIdentity`.
-    identity: new Uint32Array(tileKey === '' ? 0 : count),
-  };
-  if (tileKey !== '') {
-    for (let i = 0; i < count; i++) out.identity[i] = staticCarIdentity(tileKey, i);
-  }
-  for (let i = 0; i < count; i++) {
-    const o = 4 + i * CAR_STRIDE;
-    out.x[i] = view.getFloat32(o, true);
-    out.z[i] = view.getFloat32(o + 4, true);
-    out.heading[i] = view.getFloat32(o + 8, true);
-    // Clamped rather than trusted: an out-of-range index would read past the
-    // geometry or palette table and take the whole tile out with it.
-    out.body[i] = Math.min(view.getUint8(o + 12), BODY_COUNT - 1);
-    out.colour[i] = Math.min(view.getUint8(o + 13), PAINT.length - 1);
-    out.seed[i] = view.getUint16(o + 14, true);
-  }
-  return out;
-}
+export const CAR_PAINT_COUNT = PAINT.length;
 
 // --- Instancing ---------------------------------------------------------------
 

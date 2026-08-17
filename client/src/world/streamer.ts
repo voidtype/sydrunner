@@ -153,6 +153,11 @@ import {
 } from './birds.ts';
 import { CarAssets, buildTileCars, decodeCars, type TileCars } from './cars.ts';
 import type { ParkedCarSink } from './carlod.ts';
+// WORKSTREAM S: the same tile's parked cars, again, to the three-free field
+// `game/driving.resolveTake` asks when a player presses E. A *second* sink rather
+// than a second job for the model fleet, because that one is optional -- see
+// `StaticCarSink`.
+import type { StaticCarSink } from '../game/staticcars.ts';
 import { decodeLanes, type TrafficField } from '../game/traffic.ts';
 import type { PedestrianField } from '../game/pedestrians.ts';
 import { createContactMaterial } from './contact.ts';
@@ -1096,6 +1101,18 @@ export class TileStreamer implements LampSource {
    */
   private parkedCars: ParkedCarSink | null = null;
   /**
+   * WORKSTREAM S: whoever holds the parked fleet as *takeable cars*.
+   *
+   * The same `TileCars` the sink above is handed and the same two call sites,
+   * with none of the mesh coupling: this one gets data and an origin. Null is a
+   * working configuration and means the browser's take prompt only ever offers a
+   * schedule car, which is exactly what shipped before this workstream.
+   *
+   * Separate from `parkedCars` because that object is built behind a deadline and
+   * may be null; see `game/staticcars.StaticCarSink`.
+   */
+  private staticCars: StaticCarSink | null = null;
+  /**
    * The far city, or null before `main.ts` supplies one -- and null is a working
    * configuration, not a broken one: it means every slab draws always, which is
    * exactly what this world did before the far layer had a residency rule. See
@@ -1504,6 +1521,20 @@ export class TileStreamer implements LampSource {
    */
   setParkedCarSink(sink: ParkedCarSink): void {
     this.parkedCars = sink;
+  }
+
+  /**
+   * And whoever holds them as cars a player can get into. WORKSTREAM S.
+   *
+   * On `setParkedCarSink`'s terms exactly, minus its one asymmetry: this sink
+   * holds no reference into the tile's buffers, so `drop` is bookkeeping rather
+   * than a use-after-free guard. It is still called from `dispose`, because a
+   * field holding a tile the streamer has thrown away would offer a take at a car
+   * that is no longer drawn -- which the *server* would also grant (its residency
+   * is far wider), so the car would be real and invisible.
+   */
+  setStaticCarSink(sink: StaticCarSink): void {
+    this.staticCars = sink;
   }
 
   /**
@@ -3505,6 +3536,19 @@ export class TileStreamer implements LampSource {
         );
       }
 
+      // --- WORKSTREAM S: and the same cars again, as cars a player can steal.
+      //
+      // Beside the model sink rather than inside it: the two have different
+      // optionality (see `staticCars`) and the field must be fed even on a client
+      // whose car models never loaded. The origin pair is the tile group's
+      // translation, which is what turns the sidecar's tile-local metres into the
+      // world metres the server's own copy of this field already holds -- the two
+      // ends fold the identical offset into the identical bytes, which is what
+      // makes a predicted take and an authoritative one the same car.
+      if (parkedCars !== null) {
+        this.staticCars?.adopt(entry.key, parkedCars, group.position.x, group.position.z);
+      }
+
       // One array for both kinds of luminaire, because `nearestLamps` is asking
       // "what can light what I am standing next to" and a column and a pole lamp
       // are the same answer. Concatenated rather than kept as two lists so the
@@ -4104,6 +4148,10 @@ export class TileStreamer implements LampSource {
     // that outlived its mesh would write into a disposed buffer the next time
     // the car left the near field. See `world/carlod.ts` section 3.
     this.parkedCars?.release(key);
+    // WORKSTREAM S. Order does not matter for this one -- it holds no buffer
+    // reference -- but it is here beside its twin so the two lifecycles stay
+    // visibly the same pair of calls.
+    this.staticCars?.drop(key);
     this.root.remove(tile.group);
     // And the far layer takes the tile back. Paired with the line in `loadTile`;
     // between them a building is drawn by exactly one of the two systems at

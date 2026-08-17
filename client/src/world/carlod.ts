@@ -865,6 +865,70 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
   suppress: ((identity: number) => boolean) | null = null;
 
   /**
+   * Every car anybody in this room is driving, by identity. WORKSTREAM S.
+   *
+   * ---------------------------------------------------------------------------
+   * WHY A SECOND FEED, WHEN `suppress` AND `drivenClaims` ARE ALREADY HERE.
+   *
+   * Suppressing a *schedule* car is the absence of an action: `poseCar` is a
+   * lookup, so not asking it is the whole of the fix, and `suppress` above is a
+   * predicate consulted inside a loop that was already running.
+   *
+   * A **parked** car is not a lookup. It is an instance matrix in a tile's
+   * `InstancedMesh`, written once by `buildTileCars` when the tile arrived, and
+   * it keeps drawing until somebody writes over it. So the box of a car a player
+   * has driven away has to be *un-drawn*, which is an action, which needs a
+   * handle on the tile and the instance index -- and the only handle a driven
+   * record carries is its identity.
+   *
+   * `drivenClaims` cannot serve: it is range-gated by
+   * `drivencars.DrivenCarView.near` so that the draw loop does not pose four
+   * hundred cars in Penrith, and a box that stopped being hidden when its driver
+   * went out of range would reappear at the kerb *while somebody was driving it*.
+   * This feed is every record in the field, ungated, and it is walked at
+   * `SWEEP_HZ` over a list counted in ones.
+   *
+   * Default is "nobody is driving anything", which is what a check and a client
+   * with no `CarField` wired up mean.
+   */
+  drivenIdentities: (visit: (identity: number) => void) => void = () => {};
+
+  /**
+   * Boxes currently folded flat because somebody is driving that car, and the
+   * matrix each one had before it was.
+   *
+   * Keyed on identity, so the *restore* is exact: a car recycled back onto its
+   * kerb (`driving.CarField.recycleFarthest`) has to come back at the height, the
+   * heading, the grade pitch and the size jitter `buildTileCars` sampled for it,
+   * and the only copy of those five facts is the matrix that was there. Read out
+   * of the buffer at hide time rather than recomputed, which is exactly what
+   * `ParkedClaim.restore` already does one screen up and for the same reason.
+   */
+  private readonly hiddenStatics = new Map<number, {
+    tile: ParkedTile;
+    mesh: InstancedMesh;
+    index: number;
+    restore: Matrix4;
+  }>();
+
+  /**
+   * Identities this file has looked for and not found in any resident tile.
+   *
+   * The great majority of driven records are **schedule** cars, whose identities
+   * come out of `traffic.carHash` and can never appear in a `.cars.bin`. Without
+   * this set every one of them would cost a full scan of every resident tile
+   * every sweep -- 23,000 comparisons times the number of stolen cars, five times
+   * a second, to learn nothing.
+   *
+   * Cleared whenever the resident tile set changes, which is the only event that
+   * can turn a miss into a hit: a car stolen by somebody else in a tile this
+   * client had not built yet. That costs a re-scan per tile arrival over a list
+   * of stolen cars counted in ones, and it is the difference between "the box
+   * goes when you get close enough to see it" and "the box never goes".
+   */
+  private readonly notStatic = new Set<number>();
+
+  /**
    * The cars a player is driving, so they can be models too.
    *
    * Set by the caller alongside `suppress` and walked at the end of the sweep.
@@ -1053,6 +1117,100 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     return true;
   }
 
+  /**
+   * Fold the box of every stolen parked car flat, and put back the ones that came
+   * home. WORKSTREAM S.
+   *
+   * ---------------------------------------------------------------------------
+   * WHAT THIS IS FIXING, AND WHY IT IS NOT A PREDICATE.
+   *
+   * See `drivenIdentities`: a schedule car is suppressed by *not asking* a
+   * lookup, and a parked car has to be un-drawn. `game/driving.ts` section 3 now
+   * names this function as the one new consumer of `suppressed` the static fleet
+   * needed -- everything else about suppression (the traffic obstacle roster, the
+   * hit test, the model claim) was already a predicate in a loop.
+   *
+   * The failure it removes is unmistakable and would have shipped otherwise: you
+   * press `E`, get into a car, drive off -- and the car is *also still parked
+   * where it was*, because the instance matrix nobody rewrote is still in the
+   * buffer. Two of your car, one of them furniture.
+   *
+   * ---------------------------------------------------------------------------
+   * THE SCAN, AND WHY A LINEAR ONE IS THE RIGHT ANSWER.
+   *
+   * Locating an identity means finding a tile and an instance index, and the only
+   * index that exists is the `Uint32Array` per tile. A `Map<identity, ...>` over
+   * the resident ring would be 23,000 entries and a couple of megabytes of
+   * browser heap held permanently, to serve a query that fires **once per theft**
+   * -- a player steals a handful of cars a session. So: a full scan, about 20
+   * microseconds, guarded by `notStatic` so the schedule fleet's identities do not
+   * pay for it repeatedly. This is the same trade `sweep` itself makes with its
+   * per-tile bounds rejection, one radius wider.
+   *
+   * O(driven + hidden) per sweep in the steady state, which is O(ones).
+   */
+  private syncSuppressedStatics(): void {
+    // Who is driving what, this sweep. Reused rather than allocated: at 5 Hz a
+    // fresh `Set` per call is 300 an hour for a list that is usually empty.
+    const driving = this.drivingScratch;
+    driving.clear();
+    this.drivenIdentities((identity) => { driving.add(identity); });
+
+    for (const identity of driving) {
+      if (this.hiddenStatics.has(identity)) continue;
+      if (this.notStatic.has(identity)) continue;
+      if (!this.hideStatic(identity)) this.notStatic.add(identity);
+    }
+
+    // And the ones that came back: a record removed by `recycleFarthest`, or a
+    // car whose driver's client left the room. The box goes back exactly as it
+    // was, which is the whole of "the static car reappears in its bay" -- there
+    // is no state to restore beyond this matrix.
+    if (this.hiddenStatics.size === 0) return;
+    for (const [identity, held] of [...this.hiddenStatics]) {
+      if (driving.has(identity)) continue;
+      held.mesh.setMatrixAt(held.index, held.restore);
+      held.mesh.instanceMatrix.needsUpdate = true;
+      this.hiddenStatics.delete(identity);
+    }
+  }
+
+  /**
+   * Find one parked car by identity and fold its instance flat. False if no
+   * resident tile holds it.
+   *
+   * Any *parked* model claim on it is revoked first, restoring the real matrix
+   * before this reads it -- otherwise the matrix in the buffer is `_zero`, which
+   * `consider` wrote when it claimed the car, and the restore would put back
+   * nothing. A **driven** claim (`parked === null`) is left alone: that is the
+   * model of the car the player is now steering, which is the one car in the city
+   * where a model rather than a box matters most.
+   */
+  private hideStatic(identity: number): boolean {
+    for (const tile of this.tiles.values()) {
+      for (let i = 0; i < tile.count; i++) {
+        if (tile.identity[i] !== identity) continue;
+        const mesh = tile.mesh[i];
+        // A body with no instanced set: nothing was ever drawn here, so there is
+        // nothing to hide -- but the car *is* a static one, so it must not go on
+        // the `notStatic` list and be scanned for forever.
+        if (mesh === null) return true;
+        const existing = this.byIdentity.get(identity);
+        if (existing !== undefined && existing.parked !== null) this.revoke(existing, true);
+        const restore = new Matrix4();
+        mesh.getMatrixAt(tile.index[i], restore);
+        mesh.setMatrixAt(tile.index[i], _zero);
+        mesh.instanceMatrix.needsUpdate = true;
+        this.hiddenStatics.set(identity, { tile, mesh, index: tile.index[i], restore });
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Scratch for `syncSuppressedStatics`. See there on why it is not allocated per sweep. */
+  private readonly drivingScratch = new Set<number>();
+
   bandBox(identity: number): Readonly<CarModelBox> | null {
     return this.byIdentity.get(identity)?.slot.box ?? null;
   }
@@ -1083,6 +1241,14 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
   sweep(field: TrafficField, tick: number, x: number, z: number): void {
     const at = performance.now();
     this.sweepNo++;
+
+    // --- WORKSTREAM S, and it runs **first**, before any claim is taken.
+    //
+    // Order matters for one specific reason: hiding a box revokes whatever parked
+    // claim was standing on it, and `drivenClaims` below is about to take a
+    // *driven* claim for the same identity. Doing it the other way round would
+    // revoke the claim that had just been taken.
+    this.syncSuppressedStatics();
 
     // --- The schedule fleet, in every stage including the parked ones. A car
     // sitting in a kerb bay between runs is indistinguishable from the 23,020
@@ -1117,7 +1283,14 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
         const dx = tile.x[i] - x;
         const dz = tile.z[i] - z;
         if (dx * dx + dz * dz > claimSq) continue;
-        this.consider(tile.identity[i], tile.x[i], tile.z[i], tile.body[i], tile.colour[i], tile, i, null);
+        // WORKSTREAM S: a parked car somebody has driven away is not standing
+        // here, so it gets no model claim -- the same clause the schedule fleet's
+        // loop above has carried since suppression existed. Its *box* is folded
+        // flat by `syncSuppressedStatics`; this is the other half, and without it
+        // the car would be drawn as a model at the kerb it left from.
+        const identity = tile.identity[i];
+        if (this.suppress !== null && this.suppress(identity)) continue;
+        this.consider(identity, tile.x[i], tile.z[i], tile.body[i], tile.colour[i], tile, i, null);
       }
     }
 
@@ -1357,6 +1530,9 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
       }
     }
     this.tiles.set(tileKey, tile);
+    // WORKSTREAM S: a tile arriving can turn a miss into a hit -- somebody else's
+    // stolen car may be parked in it. See `notStatic`.
+    this.notStatic.clear();
 
     // --- And the same cars again, as obstacles the moving fleet steers round.
     //
@@ -1402,6 +1578,16 @@ export class CarModelFleet implements CarModelSink, ParkedCarSink {
     if (tile === undefined) return;
     // Without restoring: the meshes are about to be disposed with the tile.
     for (const claim of [...tile.claims]) this.revoke(claim, false);
+    // WORKSTREAM S: and any folded box in this tile is forgotten rather than
+    // restored, for exactly the reason the claims above are -- writing to a
+    // buffer that is about to be freed is a use-after-free. The car is still
+    // suppressed and still driven; if the tile comes back, `syncSuppressedStatics`
+    // folds the fresh instance flat again on the next sweep, which is what
+    // clearing `notStatic` in `adopt` is for.
+    for (const [identity, held] of [...this.hiddenStatics]) {
+      if (held.tile === tile) this.hiddenStatics.delete(identity);
+    }
+    this.notStatic.clear();
     this.tiles.delete(tileKey);
     // The obstacles go with them. Keyed separately from the tile's *lanes* inside
     // `LaneObstacles`, because the two are held on different clocks -- see

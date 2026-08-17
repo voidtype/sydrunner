@@ -50,7 +50,7 @@ import { WaterLevels, verifyWading } from './world/wading.ts';
 import { loadFarWater, verifyWater } from './world/water.ts';
 import { atlasTextureSize } from './world/params-atlas.ts';
 import { TileStreamer, type WorldIndex } from './world/streamer.ts';
-import { TrafficMovers, carBodySizes } from './world/cars.ts';
+import { BODY_COUNT, CAR_PAINT_COUNT, TrafficMovers, carBodySizes } from './world/cars.ts';
 // --- Workstream Q: nothing appears or disappears while you are looking at it.
 import { ViewLatch, verifyViewLatch } from './game/viewlatch.ts';
 import { SWEEP_HZ, loadCarModels } from './world/carlod.ts';
@@ -294,6 +294,10 @@ import {
   type DriveSteering,
   type DriverView,
 } from './game/driving.ts';
+// --- WORKSTREAM S: the parked fleet, as something a player can steal. The field
+// is fed by the streamer (`setStaticCarSink`) and asked by `resolveTake`; see
+// `game/staticcars.ts` and `game/driving.ts` section 1, which this retires.
+import { StaticCarField, verifyStaticCars } from './game/staticcars.ts';
 import {
   DrivenCarView,
   HonkWatch,
@@ -816,6 +820,14 @@ async function main(): Promise<void> {
   // unit is a car that everybody reports as "feeling slow". See
   // `game/driving.ts` and `world/drivencars.ts`.
   const drivingFailures = timed('driving', verifyDriving);
+  // --- WORKSTREAM S. The parked fleet's decoder, its yaw convention and the
+  // residency's byte accounting. `BODY_COUNT`/`CAR_PAINT.length` are handed in
+  // rather than imported by that module, on `verifyTraffic(carBodySizes())`'s
+  // terms and for the identical reason: `game/staticcars.ts` compiles into the
+  // Bun server and must not pull three in behind it, so the renderer's own table
+  // sizes have to arrive from this side. A disagreement repaints the fleet or
+  // kills a tile's draw call; see `verifyStaticCars`.
+  const staticCarFailures = timed('static cars', () => verifyStaticCars(BODY_COUNT, CAR_PAINT_COUNT));
   const drivenCarFailures = timed('drivencars', verifyDrivenCars);
   // And the plume off a broken bonnet, which fails in the way every closed-form
   // effect in this renderer fails: a perfectly good frame with nothing in it.
@@ -1147,6 +1159,7 @@ async function main(): Promise<void> {
     spawnFailures.length ||
     bikeFailures.length ||
     drivingFailures.length ||
+    staticCarFailures.length ||
     drivenCarFailures.length ||
     carSmokeFailures.length ||
     damageGradeFailures.length ||
@@ -1214,6 +1227,7 @@ async function main(): Promise<void> {
           ...spawnFailures,
           ...bikeFailures,
           ...drivingFailures,
+          ...staticCarFailures,
           ...drivenCarFailures,
           ...carSmokeFailures,
           ...damageGradeFailures,
@@ -2676,6 +2690,18 @@ async function main(): Promise<void> {
   // the tiles that arrived first would have no bays in it.
   traffic.obstacles.wanted = true;
   streamer.setTrafficField(traffic);
+  // --- WORKSTREAM S. The parked fleet, as cars a player can steal.
+  //
+  // The browser's half of the third residency layer: the streamer hands this the
+  // same `.cars.bin` it hands the model fleet, in the same two places, and
+  // `resolveTake` asks it beside the timetable. Set here rather than beside
+  // `carModels` because that object is optional and this is not -- see
+  // `staticcars.StaticCarSink` -- and before the streamer adopts anything, for the
+  // reason the obstacle roster above is: tiles that arrived first would be missing.
+  //
+  // `groundAt` is attached a thousand lines down, where `groundHeightAt` exists.
+  const staticCars = new StaticCarField();
+  streamer.setStaticCarSink(staticCars);
   const trafficMovers = new TrafficMovers(streamer.cars);
   for (const mesh of trafficMovers.meshes) scene.add(mesh);
   // --- Workstream Q: the (dis)appearance latch, and the obstacle roster.
@@ -3407,6 +3433,19 @@ async function main(): Promise<void> {
    */
   const groundHeightAt = (x: number, z: number, feetY: number): number =>
     groundOn(x, z, feetY, railSolidField);
+  // --- WORKSTREAM S: and the ground a parked car stands on.
+  //
+  // The full composition, which is the same call `server/world.loadWorld` gives
+  // its own copy of this field (`groundFor(world).groundHeight`) -- so both ends
+  // put a parked car at the same height by asking the same question of the same
+  // terrain, rather than by agreeing. `game/staticcars.ts` section 3 argues why
+  // the height is a query at take time rather than a seventh array.
+  //
+  // Only ever asked for cars already inside `driving.TAKE_RADIUS`, so the
+  // `lastGround` this writes is the player's own patch of road -- which is the one
+  // case where writing it is harmless. See `wildGround` for the callers where it
+  // is not.
+  staticCars.groundAt = groundHeightAt;
 
   /**
    * The ground a bird stands on, and the ground a **viaduct pier** stands on.
@@ -4266,6 +4305,12 @@ async function main(): Promise<void> {
   if (carModels) {
     carModels.suppress = drivenCars.suppress;
     carModels.drivenClaims = drivenCars.claims;
+    // --- WORKSTREAM S: every driven record, ungated, so the *box* of a stolen
+    // parked car is folded flat wherever it is. `drivenClaims` above is range
+    // gated and cannot serve; see `carlod.CarModelFleet.drivenIdentities`.
+    carModels.drivenIdentities = (visit) => {
+      for (const car of carWorld().all()) visit(car.carId);
+    };
   }
   /**
    * Is this bike the one the local player has *predicted* they are on?
@@ -6583,6 +6628,11 @@ async function main(): Promise<void> {
         takeScratch.pose,
         (identity) => cars.suppressed(identity),
         takeScratch.take,
+        // WORKSTREAM S: and the parked fleet, which is the twenty-three thousand
+        // cars a player is actually standing next to. `sim.tryTakeCar` passes its
+        // own copy of the same field, decoded from the same bytes, at the same
+        // instant -- so this is a prediction rather than a second opinion.
+        staticCars,
       )
     ) {
       return;
@@ -7176,6 +7226,10 @@ async function main(): Promise<void> {
           takeScratch.pose,
           (identity) => cars.suppressed(identity),
           takeScratch.take,
+          // WORKSTREAM S. The prompt has to ask the identical question the take
+          // will: a pill that says "E — take the car" over a parked car the
+          // prediction would refuse is the reported bug's other half.
+          staticCars,
         );
       }
     }
@@ -11053,6 +11107,13 @@ async function main(): Promise<void> {
         latched: trafficMovers.latched,
         ghosted: trafficMovers.ghosted,
         obstacles: { bays: traffic.obstacles.bays, statics: traffic.obstacles.statics },
+        // --- WORKSTREAM S. How many parked cars this client could actually steal,
+        // which is the one number that separates "the streamer never wired the
+        // sink up" from "there is nothing parked near you" -- the same picture and
+        // completely different bugs, exactly as `carlod.parkedTiles` says of its
+        // own pair. A zero here with a non-zero `obstacles.statics` means the take
+        // is offering nothing while the traffic steers round the same cars.
+        takeableStatics: { tiles: staticCars.tileCount, cars: staticCars.carCount },
         laneTiles: traffic.tileCount,
         routesResident: traffic.routes().length,
         liveNearby: found.length,
