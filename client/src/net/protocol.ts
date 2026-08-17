@@ -584,6 +584,21 @@ export const MSG = {
  * traffic, metro gangways -- cost the wire nothing, which is the shape a
  * feature here is supposed to have.
  */
+/*
+ * v15: `WELCOME` grows a flags byte (35 -> 36), whose first bit says the spawn
+ * in the frame is the spot this account logged off at rather than a point in
+ * the spawn disc. One byte, and it needs a bump rather than being a tolerated
+ * tail because `decodeWelcome` refuses a frame shorter than `WELCOME_BYTES`: a
+ * v14 client would refuse a v15 welcome outright, which is a join that silently
+ * does not happen.
+ *
+ * **The number below is deliberately still 14 on this branch.** The workstream
+ * that grew the field does not own the version -- the lead bumps it once, when
+ * the batch is merged, because two branches that each bumped would merge to a
+ * version neither of them describes. See v12's note, which is the same
+ * situation from the other side. `server/integration-check.ts` asserts the
+ * number and is the thing that will notice if it is forgotten.
+ */
 export const PROTOCOL_VERSION = 14;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
@@ -1192,7 +1207,7 @@ export function quantisePing(ms: number): number {
 // --- Server -> client ---------------------------------------------------------
 
 /**
- * The join reply, 35 bytes.
+ * The join reply, 36 bytes.
  *
  *     u8   type = MSG.WELCOME
  *     u16  protocol version
@@ -1204,6 +1219,19 @@ export function quantisePing(ms: number): number {
  *     i32  spawn x mm, y mm, z mm  (the eye, as `PlayerState.position` is)
  *     u16  spawn yaw
  *     f64  the server's wall clock v11: new
+ *     u8   flags                   v15: new -- bit 0 is `restored`
+ *
+ * **`restored` says the spawn above is somewhere you have been**, rather than a
+ * point in the spawn disc. One bit, and it is here rather than derived on the
+ * client because the client cannot derive it: "is this position inside Sydney
+ * Park's dither disc" is a test that says yes to anybody who happened to log off
+ * in Sydney Park, and no to a restore that fell back to the disc because the old
+ * spot was built over. The server is the only thing that knows which of the two
+ * happened, and the sentence the player reads -- *"back where you left off"* --
+ * is wrong in both directions if it is guessed.
+ *
+ * A flags byte rather than a bool, so the next fact of this shape costs no
+ * bytes. See `WELCOME_FLAG`.
  *
  * **The clock is the sky's, and it is not the tick.** `tick` is the simulation's
  * count of 60 Hz steps since this *room* started and says nothing about what
@@ -1239,7 +1267,19 @@ export function quantisePing(ms: number): number {
  * reason: so the "invite a friend" link it builds names the room it is actually
  * standing in. See `server/index.ts`'s `/rooms`.
  */
-export const WELCOME_BYTES = 35;
+export const WELCOME_BYTES = 36;
+
+/**
+ * The bits in `WELCOME`'s last byte. One so far.
+ *
+ * A named constant rather than a literal `1`, on `BTN`'s argument: a bit that is
+ * only ever written as a number is a bit whose meaning lives in a comment, and
+ * the comment is not what the decoder reads.
+ */
+export const WELCOME_FLAG = {
+  /** The spawn in this frame is where you logged off, not the spawn disc. v15. */
+  RESTORED: 1,
+} as const;
 
 export interface Welcome {
   version: number;
@@ -1260,6 +1300,16 @@ export interface Welcome {
    * note above and `PROTOCOL_VERSION`'s v11 paragraph.
    */
   clockMs: number;
+  /**
+   * Is the spawn above the spot this account logged off at? v15.
+   *
+   * False for every guest, for every account with no saved spot, and for an
+   * account whose spot no longer passes `game/spawn.restoreSpawnPoint` -- the
+   * last of which is the case worth naming, because the position in the frame is
+   * then a perfectly ordinary spawn and only this bit says the difference. See
+   * the layout note.
+   */
+  restored: boolean;
 }
 
 export function encodeWelcome(w: Welcome): ArrayBuffer {
@@ -1282,6 +1332,7 @@ export function encodeWelcome(w: Welcome): ArrayBuffer {
   // epoch constant that both ends have to keep agreeing about, which is the
   // class of bug this field exists to remove rather than to add.
   v.setFloat64(27, w.clockMs, true);
+  v.setUint8(35, w.restored ? WELCOME_FLAG.RESTORED : 0);
   return buffer;
 }
 
@@ -1301,6 +1352,7 @@ export function decodeWelcome(buffer: ArrayBuffer): Welcome | null {
     z: dequantisePos(v.getInt32(21, true)),
     yaw: dequantiseYaw(v.getUint16(25, true)),
     clockMs: v.getFloat64(27, true),
+    restored: (v.getUint8(35) & WELCOME_FLAG.RESTORED) !== 0,
   };
 }
 
@@ -4348,7 +4400,7 @@ export function verifyNet(): string[] {
 
   // --- Welcome, pong and bye.
   {
-    const w: Welcome = { version: PROTOCOL_VERSION, id: 3, colourway: 5, snapshotHz: SNAPSHOT_HZ, room: 7, tick: 4000000000, x: -812.34, y: 15.5, z: 1420.99, yaw: 4.2, clockMs: 1_800_000_123_456 };
+    const w: Welcome = { version: PROTOCOL_VERSION, id: 3, colourway: 5, snapshotHz: SNAPSHOT_HZ, room: 7, tick: 4000000000, x: -812.34, y: 15.5, z: 1420.99, yaw: 4.2, clockMs: 1_800_000_123_456, restored: false };
     const got = decodeWelcome(encodeWelcome(w));
     if (!got || got.id !== 3 || got.tick !== 4000000000 || Math.abs(got.x - w.x) > 0.01 || Math.abs(got.z - w.z) > 0.01) {
       failures.push('A WELCOME did not round-trip. A tick over 2^31 is the usual cause -- it is a u32.');
@@ -4371,6 +4423,22 @@ export function verifyNet(): string[] {
           `encoding of an epoch millisecond either wraps or needs a second epoch constant both ends ` +
           `have to agree about -- which is the disagreement this field exists to remove.`,
       );
+    }
+    /* v15's flag, both ways round.
+     *
+     * Both directions rather than the true one, because the failure that is
+     * actually easy to write here is a decoder that answers `true` for every
+     * frame -- a `getUint8` of the wrong offset over the clock's last byte, say
+     * -- and a check that only asserts the set case passes it happily. What that
+     * ships is *"back where you left off"* over the spawn disc, told to every
+     * guest in the city, once per join.
+     */
+    if (got?.restored !== false) failures.push('A WELCOME with no restore came back restored; every joiner would be told they were.');
+    const back = decodeWelcome(encodeWelcome({ ...w, restored: true }));
+    if (back?.restored !== true) failures.push('A restored WELCOME lost its flag; a returning player is never told why they are where they are.');
+    // And the flag must not have eaten anything on its way in.
+    if (!back || back.clockMs !== w.clockMs || Math.abs(back.x - w.x) > 0.01) {
+      failures.push('Setting the WELCOME flag disturbed the clock or the spawn; the byte is at the end for a reason.');
     }
     const late = decodeWelcome(encodeWelcome({ ...w, clockMs: 4_102_444_800_000 }));
     if (!late || late.clockMs !== 4_102_444_800_000) {

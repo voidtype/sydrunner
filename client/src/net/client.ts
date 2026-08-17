@@ -1620,8 +1620,15 @@ export class NetClient {
     }
   }
 
-  /** Filled by WELCOME. `main.ts` reads it once to place its predicted body. */
-  welcome: { id: number; x: number; y: number; z: number; yaw: number } | null = null;
+  /**
+   * Filled by WELCOME. `main.ts` reads it once to place its predicted body.
+   *
+   * `restored` is protocol v15's flag: the position beside it is where this
+   * account logged off rather than a point in the spawn disc. Kept on the whole
+   * record rather than lifted to a field of its own because it is a fact *about
+   * this position* -- see `game/carry.ts`, which is the only reader.
+   */
+  welcome: { id: number; x: number; y: number; z: number; yaw: number; restored: boolean } | null = null;
 
   /** Filled by the POWERUPS message at join. `main.ts` drains it into its field. */
   powerupsDown: Array<{ tileKey: string; index: number; respawnT: number }> | null = null;

@@ -78,6 +78,11 @@ import { verifyTraffic } from '../client/src/game/traffic.ts';
 // browser, and each for the reason given at its own entry in the table below.
 import { verifyHandsPose } from '../client/src/game/hands-pose.ts';
 import { verifyLevelHud } from '../client/src/game/levelhud.ts';
+// WORKSTREAM N (carry): the restore sentence, and the spawn rules this process
+// has always run without checking. Both three-free, so this process runs the
+// same checks the browser does. See `client/src/game/carry.ts`.
+import { verifyCarry } from '../client/src/game/carry.ts';
+import { verifySpawn } from '../client/src/game/spawn.ts';
 import { verifyCashDrops } from '../client/src/game/cashnote.ts';
 import { verifySpatialHash } from '../client/src/game/spatialhash.ts';
 import { verifyMovementBasis } from '../client/src/player/controller.ts';
@@ -160,6 +165,8 @@ import {
   defaultAccountPath,
   handleAuthRequest,
   verifyAccounts,
+  // WORKSTREAM N (carry): the shape the auth routes ask this file for a body in.
+  type LiveLookup,
 } from './accounts.ts';
 import { verifyRewind } from './rewind.ts';
 import { verifySim } from './sim.ts';
@@ -422,6 +429,22 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // ladder on the wrong day, and a token expiry that is not enforced makes
     // every session on the box permanent. See `client/src/net/accounts.ts`.
     ['verifyAccounts', verifyAccounts()],
+    // WORKSTREAM N (carry): the sentence a restored session is visible as. Run
+    // here as well as in the browser for `verifyLevelHud`'s reason one line up
+    // -- this process decides *whether* a join was a restore and puts the bit on
+    // the welcome, so a client that composed the sentence wrongly and a server
+    // that set the bit wrongly are the same feature failing, and both ends
+    // should refuse to start over it. See `client/src/game/carry.ts`.
+    ['verifyCarry', verifyCarry()],
+    // And the spawn rules, which this process has always *run* and never
+    // checked -- `main.ts` has had `verifySpawn` in its boot list since the
+    // feature landed and this side never did, which is backwards: the server
+    // draws every join's spot (`Simulation.joinSpot`) and, since workstream N,
+    // decides whether a remembered one is still standable
+    // (`game/spawn.restoreSpawnPoint`). A validator that accepted a spot with a
+    // building on it would put a returning player inside a warehouse, and the
+    // only process that would have noticed is the one that was not looking.
+    ['verifySpawn', verifySpawn()],
   ];
   const failed = checks.filter(([, f]) => f.length > 0);
   if (failed.length > 0) {
@@ -541,6 +564,48 @@ console.log(
     `(${ROOM_COUNT * ROOM_CAP} players this process), ${BOT_COUNT} bot(s) per room — ` +
     `${(performance.now() - tRooms).toFixed(0)} ms`,
 );
+
+/*
+ * --- WORKSTREAM N (carry): how the HTTP routes find a body.
+ *
+ * `/auth/signup` has to carry a guest's level and location onto the new account,
+ * and `/auth/logout` has to save the spot of whoever is logging out. Both are
+ * HTTP requests arriving beside a socket that is already open, and both
+ * therefore need to reach a live `Participant` from a route -- which
+ * `server/accounts.ts` deliberately cannot do: it is an HTTP file with no world
+ * in it, and an `AccountStore` that imported the simulation could not be
+ * constructed without one (see `LiveLookup`'s header for the whole argument).
+ *
+ * So the lookup lives here, where both halves are already in scope, and the two
+ * questions are the only two that file asks:
+ *
+ *   - `guest(room, playerId)` is the sign-up carry. It refuses a bot and refuses
+ *     anybody who is **already logged in**, because "carry my guest progress" is
+ *     not a thing an account can ask for and letting it would be a way to move
+ *     one account's position onto another.
+ *   - `ofAccount(id)` is the logout save. O(players) over the host rather than
+ *     an index, because it is called on a route a person hits once and the
+ *     alternative is a second map to keep in step on every join and leave -- see
+ *     `AccountStore.tokenIndex`, which is an index for the opposite reason: that
+ *     one is on the join path.
+ */
+const liveBodies: LiveLookup = {
+  guest(room: number, playerId: number) {
+    const found = host.get(room);
+    if (!found) return null;
+    const p = found.sim.participants.get(playerId);
+    if (!p || p.bot !== null || p.account !== null) return null;
+    return found.sim.carryOf(p);
+  },
+  ofAccount(accountId: string) {
+    for (const r of host.rooms) {
+      for (const p of r.sim.participants.values()) {
+        if (p.accountId === accountId) return r.sim.carryOf(p);
+      }
+    }
+    return null;
+  },
+};
 
 /**
  * Global chat, which is the one channel that belongs to the **host** rather than
@@ -783,7 +848,10 @@ const server = Bun.serve<Conn>({
      */
     if (url.pathname.startsWith('/auth/')) {
       const ip = srv.requestIP(req)?.address ?? 'unknown';
-      return handleAuthRequest(req, url, ip, accounts, authGuards, wallets);
+      // WORKSTREAM N (carry): `liveBodies` is how sign-up finds the guest whose
+      // level and location it is carrying, and how logout finds the body whose
+      // spot it is saving. See its definition above.
+      return handleAuthRequest(req, url, ip, accounts, authGuards, wallets, liveBodies);
     }
     /*
      * `/bug` -- a player's bug report, with the picture that makes it worth

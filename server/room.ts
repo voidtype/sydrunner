@@ -883,6 +883,15 @@ export class Room {
          * time of day is a property of the *host*, and every room on it shows
          * the same sky. */
         clockMs: Date.now(),
+        /* **Is that spawn somewhere they have been?** Protocol v15; workstream
+         * N. `Simulation.join` decided it -- an account with a spot from this
+         * week that still passes `game/spawn.restoreSpawnPoint` starts on it --
+         * and this is the only thing that reads the flag off the participant.
+         *
+         * On the welcome rather than in the pill because the client has to do
+         * something with it that the server cannot: name the suburb. See
+         * `client/src/game/carry.ts`. */
+        restored: p.restored,
       }),
     );
     // Spec 8.3's currently-taken points, so a joiner's icons match everybody
