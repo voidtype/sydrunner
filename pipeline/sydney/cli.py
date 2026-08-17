@@ -5317,6 +5317,11 @@ def cmd_collision_fit_audit(args: argparse.Namespace) -> int:
     preserve_topology=False)`, run over the same rings in the same process. It
     must add solid, because if it does not then this build's footprints are all
     boxes and the pass says nothing about the fix.
+
+    The ceiling is inclusive: `added <= --max-added` is a pass, because summing
+    shapely's `difference` areas over a million footprints carries a
+    floating-point residual that is positive even when no footprint adds real
+    solid, and a residual over a 0.0 ceiling would report a pass as a fail.
     """
     keys = _emitted_tile_keys()
     con = ledger.connect()
@@ -5380,7 +5385,12 @@ def cmd_collision_fit_audit(args: argparse.Namespace) -> int:
         print("\n  FAIL: the control added nothing, so this build has no re-entrant "
               "footprint and the pass above is vacuous")
         ok = False
-    if added > args.max_added:
+    # The ceiling is inclusive: `added <= max_added` is a pass. The comparison
+    # tolerates floating-point noise because summing shapely's `difference`
+    # areas over a million footprints leaves a residual that is positive even
+    # when no footprint adds real solid (the count above is zero), and a
+    # positive residual over a 0.0 ceiling would report a pass as a fail.
+    if added > args.max_added + 1e-9:
         print(f"\n  FAIL: {added:,.1f} m2 of invisible wall, over a ceiling of "
               f"{args.max_added}")
         ok = False
