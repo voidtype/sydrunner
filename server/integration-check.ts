@@ -2993,7 +2993,7 @@ async function checkBikes(): Promise<void> {
   // spawn and no clock, and a v11 client reading a v10 one reads eight bytes
   // that are not there. See `protocol.PROTOCOL_VERSION`, `WELCOME_BYTES` and
   // `ABOARD_BYTES`.
-  check(PROTOCOL_VERSION === 12, `the protocol is at version ${PROTOCOL_VERSION}`);
+  check(PROTOCOL_VERSION === 13, `the protocol is at version ${PROTOCOL_VERSION}`);
   check(
     WELCOME_BYTES === 35,
     `  and a WELCOME is ${WELCOME_BYTES} bytes: 27 through v10, plus v11's f64 clock. A field added ` +

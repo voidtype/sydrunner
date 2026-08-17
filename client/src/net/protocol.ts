@@ -569,7 +569,15 @@ export const MSG = {
  * after it needs all of it, so there is no version between 11 and 12 that
  * would have described a real build.
  */
-export const PROTOCOL_VERSION = 12;
+/*
+ * v13: accounts and car damage. `HELLO` grows an optional token tail after the
+ * name (a guest's hello is byte-identical to v12's), `ROSTER` entries carry a
+ * `level` u8 (11 -> 12 bytes), and a `CARS` record carries `health` (26 -> 27
+ * bytes). One bump for the three: a v12 client reading a v13 roster would
+ * mis-stride every entry after the first, which is a scoreboard of garbage
+ * names, so this is not a change either side can be lenient about.
+ */
+export const PROTOCOL_VERSION = 13;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
