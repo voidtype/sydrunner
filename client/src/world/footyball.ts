@@ -84,6 +84,11 @@ import {
 import { BALL_RADIUS } from '../game/footy.ts';
 import { BONE } from '../player/animation.ts';
 import { CharacterActor, CharacterAssets, SELF_SHADOW_LAYER } from '../player/character.ts';
+// The breath the bat's viewmodel has, which this file used to have four
+// slightly-different lines of. See `player/viewmodel-idle.ts`: the owner asked for
+// the held ball to *"idle breathe like the bat"*, and the only way to make that
+// true tomorrow as well as today is for the two of them to call one function.
+import { type IdleSway, viewmodelIdle, verifyViewmodelIdle } from '../player/viewmodel-idle.ts';
 import type { WarmupPart } from './warmup.ts';
 
 // --- Proportions ---------------------------------------------------------------
@@ -597,6 +602,12 @@ export class FootyPool {
  *
  * Not a simulation number, and **the ordering it used to rest on has inverted**.
  *
+ * *(Read the paragraph about `BALL_RECHARGE` at the end of this comment with
+ * `FootyViewmodel.update`'s own note about `sinceThrow` beside it: this window is
+ * driven by `combat.throwT`, which counts from a throw and from nothing else. It
+ * used to be driven by `ballT`, which the refill consumes, and the whole of this
+ * comment's "outside a burst" reasoning was quietly false because of it.)*
+ *
  * It used to read: `game/combat.BALL_COOLDOWN` is 0.55 s and this is 0.34, so
  * the hand is back at rest with a fresh ball in it a fifth of a second before
  * the next throw is allowed, because a viewmodel still recovering when the
@@ -651,6 +662,31 @@ const REST_AT: readonly [number, number, number] = [-0.26, -0.235, -0.35];
 const THROW_AT: readonly [number, number, number] = [-0.04, 0.03, -0.74];
 
 /**
+ * How the ball sits in the hand in first person, as three fixed angles.
+ *
+ *   > *"stop the football rotating in the hand, make it idle breathe like the
+ *   > bat"*
+ *
+ * The Y here used to be `clock * 0.35` -- a lazy roll about the ball's own long
+ * axis, put there so the laces would not be a static decal in the corner of the
+ * frame all session. The reasoning was sound and the result was not: a roll about
+ * the long axis moves the silhouette nowhere, so what the player actually sees is
+ * the *lacing* crawling around a ball that is otherwise still, which reads as the
+ * ball spinning in a closed hand. Nobody rotates a football they are holding.
+ *
+ * So it is a constant, and 0.62 rad is the value: far enough round from zero that
+ * the seam and its four laces are across the visible face of the ball rather than
+ * hidden behind the girth, which is the whole of what the roll was chasing. The X
+ * and Z are the previous pose's own numbers -- the Z of -0.72 is the one that
+ * matters, and `update` explains it -- so the resting silhouette is unchanged.
+ *
+ * Named for `FootyProp`'s `HOLD_ROTATION` deliberately: the third-person ball has
+ * been a fixed cradle in the wrist since it was written, and after this the
+ * first-person one is the same kind of object.
+ */
+const VIEW_HOLD_ROTATION: readonly [number, number, number] = [0.34, 0.62, -0.72];
+
+/**
  * How far the first-person ball is scaled down.
  *
  * Viewmodels are always smaller than the object they represent -- see
@@ -681,6 +717,8 @@ export class FootyViewmodel {
 
   private clock = 0;
   private stride = 0;
+  /** Where `viewmodelIdle` writes. Owned rather than allocated per frame. */
+  private readonly idle: IdleSway = { x: 0, y: 0 };
 
   constructor(assets: FootyAssets) {
     const mesh = new Mesh(assets.geometry, assets.material);
@@ -707,15 +745,27 @@ export class FootyViewmodel {
   /**
    * Pose the ball for this frame.
    *
-   * `sinceThrow` is the local player's own predicted `combat.ballT`, so the
+   * `sinceThrow` is the local player's own predicted `combat.throwT`, so the
    * release starts on the frame the button goes down rather than on the next
    * round trip -- the same argument `BatViewmodel` makes about reading the
    * predicted phase.
+   *
+   * **It was `combat.ballT` until this round, and that was the "recharge
+   * animation" the owner asked to have removed.** `ballT` is the *supply's* clock
+   * and the refill **consumes** it -- `advance` does `ballT -= BALL_RECHARGE` every
+   * time a ball comes back -- so it returns to zero every 1.6 s while the bar is
+   * filling, and every one of those wraps looked exactly like a throw to this
+   * function. What the player saw was the ball flinging itself out of frame and a
+   * new one appearing, twice, after every single throw, with no input: the release
+   * below is a perfectly good animation being fired by a clock that was not
+   * measuring what its reader thought. `combat.throwT` is the second clock added
+   * for this, counted from a throw and never consumed, and its header carries the
+   * argument for why the two genuinely are different numbers.
    */
   update(
     dt: number,
     state: {
-      /** Seconds since the last throw. `combat.ballT`. */
+      /** Seconds since the last throw. `combat.throwT` -- **not** `ballT`. */
       sinceThrow: number;
       /** Balls left. With none there is nothing in the hand to draw. */
       charges: number;
@@ -749,10 +799,15 @@ export class FootyViewmodel {
 
     const gait = Math.min(1, state.speed / 8.2);
     const bob = Math.sin(this.stride * 2) * 0.022 * gait;
-    // A slow drift when standing still, on two periods that do not divide each
-    // other -- `animation.clipIdle`'s trick, one object down.
-    const idleX = Math.sin(this.clock * 0.67) * 0.007 * (1 - gait);
-    const idleY = Math.sin(this.clock * 0.91 + 0.8) * 0.009 * (1 - gait);
+    // A slow drift when standing still, and **it is now the bat's own, from the
+    // one module both viewmodels call**. It used to be four lines here on 0.67 and
+    // 0.91 Hz against the bat's 0.71 and 0.94 -- nobody chose that difference, and
+    // two nearly-equal periods on two objects that share the frame beat against
+    // each other over about half a minute. See `player/viewmodel-idle.ts`, and
+    // `verifyFootyBall`, which asserts this is what is applied rather than a copy.
+    const idle = viewmodelIdle(this.clock, gait, this.idle);
+    const idleX = idle.x;
+    const idleY = idle.y;
 
     // The release: 90 ms from the resting hand to out of frame, eased so the
     // ball is already moving fast on the first frame. A linear launch reads as
@@ -764,20 +819,28 @@ export class FootyViewmodel {
       REST_AT[1] + (THROW_AT[1] - REST_AT[1]) * eased + bob + idleY,
       REST_AT[2] + (THROW_AT[2] - REST_AT[2]) * eased,
     );
-    // Turning over as it goes, and a lazy roll in the hand at rest so the laces
-    // are not a static decal in the corner of the frame all session.
+    // Turning over as it goes, and **nothing at all in the hand**: the ball sits
+    // at `VIEW_HOLD_ROTATION` until a throw tips it out, and the only thing that
+    // moves it at rest is the walk.
     //
-    // The **Z** is what lays the ball diagonally across the corner, and it is
-    // the one of the three that decides whether this reads as a football at all:
-    // the long axis is the mesh's local +Y, so the Y rotation here is a roll
-    // about the ball's own length and moves the silhouette nowhere -- it only
-    // turns the laces, which is exactly what it is for. Left upright by a Z of
-    // zero the ball is an egg standing on end, which is the one pose a real one
-    // never holds in a hand.
+    // The Y used to be `clock * 0.35` and the owner asked for it to stop; the
+    // constant's own comment carries that argument. What is left is:
+    //
+    //   **X** tips the ball forward through the release. `eased` is zero for every
+    //   frame that is not part of a throw, so this term is the release and nothing
+    //   else -- there is no clock in it.
+    //   **Y** is a fixed roll about the ball's own long axis (the mesh's local +Y),
+    //   which moves the silhouette nowhere and only decides where the laces face.
+    //   **Z** is what lays the ball diagonally across the corner, and it is the one
+    //   of the three that decides whether this reads as a football at all: left
+    //   upright by a Z of zero the ball is an egg standing on end, which is the one
+    //   pose a real one never holds in a hand. The stride term on it is the same
+    //   walk-driven roll `BatViewmodel` has, and like the bat's it is exactly zero
+    //   standing still.
     this.group.rotation.set(
-      0.34 - eased * 1.5,
-      this.clock * 0.35,
-      -0.72 + Math.sin(this.stride) * 0.05 * gait,
+      VIEW_HOLD_ROTATION[0] - eased * 1.5,
+      VIEW_HOLD_ROTATION[1],
+      VIEW_HOLD_ROTATION[2] + Math.sin(this.stride) * 0.05 * gait,
     );
     // Shrinking as it leaves, which does the work a motion blur would: at 26 m/s
     // a real ball covers its own length in 11 ms, so a viewmodel that stayed
@@ -821,7 +884,11 @@ export function footyWarmupParts(assets: FootyAssets): WarmupPart[] {
  *             console.log(verifyFootyBall())"
  */
 export function verifyFootyBall(): string[] {
-  const failures: string[] = [];
+  // The shared breath, from here as well as from `verifyBat`. Running it twice
+  // costs a millisecond and means the ball's check is complete on its own: this
+  // file's claim is "the held ball breathes like the bat", and half of that claim
+  // is that the function it calls is sane.
+  const failures: string[] = [...verifyViewmodelIdle()];
   const assets = new FootyAssets();
 
   // --- Budget. Not a spec number, but the figure carrying it is 440 triangles
@@ -981,6 +1048,116 @@ export function verifyFootyBall(): string[] {
     if (view.group.visible) failures.push('The first-person football is drawn with an empty bar.');
     view.update(1 / 60, { sinceThrow: 10, charges: 3, speed: 0, down: true, hitstop: false });
     if (view.group.visible) failures.push('The first-person football is drawn over a knocked-out player.');
+  }
+
+  // --- The held ball is **still**, and the supply refilling does not move it.
+  //
+  //   > *"remove the recharge animation for the football, and stop the football
+  //   > rotating in the hand, make it idle breathe like the bat"*
+  //
+  // Three claims, and all three are silent in this repo's sense: every one of them
+  // draws a perfectly good frame, and the previous version of this file drew two
+  // of them for the whole life of the feature.
+  //
+  //   1. **No spin.** The rotation of a ball in the hand is a constant. It was
+  //      `clock * 0.35` about the long axis, which turned the lacing without moving
+  //      the outline -- a ball rotating inside a closed hand.
+  //   2. **No recharge motion.** This is the one that was a *wiring* bug rather
+  //      than a taste one: the release was driven by `combat.ballT`, which the
+  //      refill consumes, so the ball threw itself out of frame every 1.6 s with no
+  //      input. Asserted by driving a bar that is filling against one that is
+  //      already full and requiring the two poses to be identical to the bit.
+  //   3. **The breath is the bat's**, from the shared module and not a copy.
+  {
+    const idleView = new FootyViewmodel(assets);
+    const rest = new FootyViewmodel(assets);
+    const want: IdleSway = { x: 0, y: 0 };
+    // 3 s at 50 ms, which is 60 frames and two and a half of the 1.6 s recharge
+    // the owner's note is about.
+    const STEP = 0.05;
+    const FRAMES = 60;
+    let clock = 0;
+    let worstIdle = 0;
+    let spun = 0;
+    let refillMoved = 0;
+    for (let i = 0; i < FRAMES; i++) {
+      clock += STEP;
+      // The filling bar: one ball at 1.6 s and another at 3.2, and a throw clock
+      // that keeps counting because a refill is not a throw. This is exactly the
+      // state a player is in for the three seconds after they throw one ball.
+      idleView.update(STEP, {
+        sinceThrow: 2 + clock,
+        charges: clock >= 3.2 ? 3 : clock >= 1.6 ? 2 : 1,
+        speed: 0,
+        down: false,
+        hitstop: false,
+      });
+      // And the same three seconds with a full bag: nothing recharging at all.
+      rest.update(STEP, { sinceThrow: 2 + clock, charges: 3, speed: 0, down: false, hitstop: false });
+
+      // (1) The rotation is the hold pose, exactly, with no clock in it.
+      const r = idleView.group.rotation;
+      if (
+        r.x !== VIEW_HOLD_ROTATION[0] ||
+        r.y !== VIEW_HOLD_ROTATION[1] ||
+        r.z !== VIEW_HOLD_ROTATION[2]
+      ) {
+        spun++;
+      }
+      // (2) The refill changed nothing. `Object.is` rather than a tolerance,
+      // because the two runs are the same arithmetic on the same clock and any
+      // difference at all is a term keyed to the supply.
+      const a = idleView.group.position;
+      const b = rest.group.position;
+      if (!Object.is(a.x, b.x) || !Object.is(a.y, b.y) || !Object.is(a.z, b.z)) refillMoved++;
+      if (idleView.group.visible !== rest.group.visible) refillMoved++;
+      // (3) The position is the rest pose plus the shared idle and nothing else.
+      viewmodelIdle(clock, 0, want);
+      worstIdle = Math.max(
+        worstIdle,
+        Math.abs(a.x - REST_AT[0] - want.x),
+        Math.abs(a.y - REST_AT[1] - want.y),
+        Math.abs(a.z - REST_AT[2]),
+      );
+    }
+    if (spun > 0) {
+      failures.push(
+        `Over 3 s of standing still holding a ball, the viewmodel's rotation left the hold pose on ` +
+          `${spun} of ${FRAMES} frames. A held football does not turn in the hand -- see ` +
+          `VIEW_HOLD_ROTATION, which is what the owner asked for by name.`,
+      );
+    }
+    if (refillMoved > 0) {
+      failures.push(
+        `The ball moved on ${refillMoved} of ${FRAMES} frames purely because the supply bar was ` +
+          `refilling. That is the "recharge animation": the release must be driven by combat.throwT, ` +
+          `which counts from a throw, and never by ballT, which the refill consumes.`,
+      );
+    }
+    if (worstIdle > 1e-9) {
+      failures.push(
+        `At rest the held ball's offset differs from viewmodelIdle by ${(worstIdle * 1000).toFixed(2)} mm ` +
+          `-- so it is not breathing with the bat. Both viewmodels call ` +
+          `player/viewmodel-idle.ts; a copy of those four lines here is the drift that module exists ` +
+          `to stop.`,
+      );
+    }
+    // And the bar emptying does not move it either, which is the same failure
+    // wearing the other sign: the last ball leaving the hand is a throw and the
+    // *count* going to zero is not.
+    rest.update(0, { sinceThrow: 9, charges: 3, speed: 0, down: false, hitstop: false });
+    const held: [number, number, number] = [rest.group.position.x, rest.group.position.y, rest.group.position.z];
+    rest.update(0, { sinceThrow: 9, charges: 1, speed: 0, down: false, hitstop: false });
+    if (
+      !Object.is(rest.group.position.x, held[0]) ||
+      !Object.is(rest.group.position.y, held[1]) ||
+      !Object.is(rest.group.position.z, held[2])
+    ) {
+      failures.push(
+        'The number of balls in the bar moves the one in the hand. The count is the HUD bar\'s job; ' +
+          'the viewmodel only knows whether there is a ball at all.',
+      );
+    }
   }
 
   return failures;

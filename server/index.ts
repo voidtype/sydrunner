@@ -86,6 +86,10 @@ import { verifySpawn } from '../client/src/game/spawn.ts';
 import { verifyCashDrops } from '../client/src/game/cashnote.ts';
 import { verifySpatialHash } from '../client/src/game/spatialhash.ts';
 import { verifyMovementBasis } from '../client/src/player/controller.ts';
+// WORKSTREAM O (feel): the one breath both viewmodels apply. Three-free, which is
+// why it can be run here at all -- `verifyBat` and `verifyFootyBall` cannot be,
+// because they build geometry. See the entry in the list below.
+import { verifyViewmodelIdle } from '../client/src/player/viewmodel-idle.ts';
 import {
   MAX_PLAYERS,
   MAX_REWIND_MS,
@@ -309,6 +313,16 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // arrives after the hit test did, which reads as lag rather than as a
     // timing bug. See `client/src/game/hands-pose.ts`.
     ['verifyHandsPose', verifyHandsPose()],
+    // --- WORKSTREAM O: the shared viewmodel breath, which the browser runs inside
+    // `verifyBat` and `verifyFootyBall` (both of which import three and cannot run
+    // in this process). It is here for the reason every other shared arithmetic
+    // check is: **it is a number two files agree about**, and the way this repo
+    // keeps two files agreeing is to check them in both runtimes. The failure it
+    // catches is silent and was live -- the bat breathed on 0.71/0.94 Hz and the
+    // football on 0.67/0.91, which are close enough to beat against each other over
+    // half a minute with both objects on screen. See
+    // `client/src/player/viewmodel-idle.ts`.
+    ['verifyViewmodelIdle', verifyViewmodelIdle()],
     // The level line and the XP bar. Run **here** because this process is the
     // one that owns the ladder -- it counts the kills, it decides the level,
     // and it puts both on the roster -- so an off-by-one between

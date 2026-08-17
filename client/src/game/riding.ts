@@ -196,6 +196,59 @@ import { STATION_HALF_WIDTH } from '../world/rail-cut.ts';
  */
 export const RIDER_EYE_HEIGHT = 1.68;
 
+/**
+ * How much lower the **camera** sits than the eye while aboard a train, metres.
+ *
+ *   > *"make the camera slightly lower when on the train"*
+ *
+ * 0.12 m, and the important half of this constant is everything it deliberately
+ * is not. It is **not** a change to `RIDER_EYE_HEIGHT`, which stays 1.68 and is
+ * pinned by `verifyGangway` below. That number is a *simulation* quantity in four
+ * places at once -- it is where the stored local position of a rider is measured
+ * from (`enterLocal`/`projectAboard`), it is the height the gangway header is
+ * cleared by (`gangwayAdmits`), it is what puts a boarding player's eye over the
+ * vestibule floor and over `PLATFORM_TOP_M`, and it is restated from
+ * `controller.EYE_HEIGHT` and asserted equal to it. Lowering it by 12 cm to lower
+ * the view would move a rider's body 12 cm down inside the carriage on both ends,
+ * change what the wire carries, and shave the gangway's clearance -- for a
+ * camera note.
+ *
+ * So this is a **view** term, applied by the one caller that composes a camera
+ * from a rider's eye (`main.ts`, at `riderViewEye`), and it composes with the
+ * knockout drop and the third-person boom the same way every other camera-only
+ * term in that loop does: after the simulation is finished and correct, and never
+ * written back into `PlayerState`. `game/feedback.ts`'s header states that rule
+ * and the shake obeys it; this is the same seam.
+ *
+ * Why 12 cm rather than 5 or 30. A seated adult's eye is about 30 cm below their
+ * standing one, and this is explicitly *not* seating anybody: the rider still
+ * walks the carriage at full speed and their body is still a standing capsule, so
+ * a 30 cm view drop would read as a bug the first time a player walked past a
+ * window whose sill they now saw from underneath. What 12 cm buys is the thing the
+ * note is about -- the horizon of a moving room sits a little lower, the way it
+ * does when you are braced against a seat back rather than standing to attention
+ * -- while staying inside the range a player reads as *posture* rather than as a
+ * height change. It is also small enough that aim is unaffected in any way that
+ * matters: the hit test is composed from the body's eye and its yaw and pitch, not
+ * from the camera, and at 20 m the parallax between the two is 0.34 degrees.
+ */
+export const RIDER_VIEW_DROP_M = 0.12;
+
+/**
+ * The camera height for an eye, given whether its owner is aboard a train.
+ *
+ * A function rather than a bare subtraction at the call site, for one reason: the
+ * *condition* is the part that goes wrong. A drop applied unconditionally is a
+ * player who walks around Newtown 12 cm shorter than the server thinks they are,
+ * and a drop applied to the stored position rather than to the camera is the
+ * simulation change the constant above exists to avoid. Both are silent. With the
+ * rule in one pure line, `verifyGangway` can assert it is the identity on foot and
+ * exactly `RIDER_VIEW_DROP_M` aboard, which is the whole contract.
+ */
+export function riderViewEye(eyeY: number, aboardTrain: boolean): number {
+  return aboardTrain ? eyeY - RIDER_VIEW_DROP_M : eyeY;
+}
+
 /** `controller.PLAYER_RADIUS`, restated. See section 2. */
 export const RIDER_RADIUS = 0.34;
 
@@ -3589,6 +3642,108 @@ export function verifyGangway(): string[] {
             `being a velocity two ends have to agree about, which is the bug the whole file is ` +
             `shaped to avoid.`,
         );
+      }
+    }
+  }
+
+  // --- 5. THE CAMERA DROP, AND EVERY PLACE IT MUST NOT HAVE REACHED.
+  //
+  //   > *"make the camera slightly lower when on the train"*
+  //
+  // A view term added to a file whose other numbers are all simulation, which is
+  // the whole risk in it: the cheapest way to lower a rider's view is to lower
+  // `RIDER_EYE_HEIGHT`, and that renders perfectly while moving every rider's
+  // *body* down 12 cm on both ends, changing what the wire carries and eating an
+  // eighth of the gangway's headroom. So the constant is pinned, the drop is
+  // bounded, the rule is asserted to be conditional, and the clearance test is
+  // driven at the boundary to prove the 12 cm did not arrive there.
+  {
+    // (a) The eye itself has not moved. A literal rather than a derivation,
+    // because the entire point is that this number is the one `verifyRiding`
+    // compares against `controller.EYE_HEIGHT` -- a drift here is a drift in the
+    // simulation, and the pin is what makes "the view moved and nothing else did"
+    // a checkable sentence.
+    if (RIDER_EYE_HEIGHT !== 1.68) {
+      bad.push(
+        `RIDER_EYE_HEIGHT is ${RIDER_EYE_HEIGHT} m and must be 1.68. The train's lower view is ` +
+          `RIDER_VIEW_DROP_M, applied to the camera only; changing the eye instead moves every ` +
+          `rider's body, the wire's local position and the gangway clearance with it.`,
+      );
+    }
+    // (b) The drop is a posture note and not a change of stature. Under 8 cm
+    // nobody can tell it is there, which makes it a term that costs a line and
+    // buys nothing; over 20 cm the player is looking at window sills from
+    // underneath while walking at full speed, which reads as a bug.
+    if (!(RIDER_VIEW_DROP_M >= 0.08 && RIDER_VIEW_DROP_M <= 0.2)) {
+      bad.push(
+        `RIDER_VIEW_DROP_M is ${RIDER_VIEW_DROP_M} m. Outside 0.08..0.20 it is either invisible or ` +
+          `it reads as the player having shrunk rather than as a braced view.`,
+      );
+    }
+    // (c) The rule is conditional, exact, and only ever downward.
+    const eye = 1.23 + RIDER_EYE_HEIGHT;
+    if (riderViewEye(eye, false) !== eye) {
+      bad.push(
+        `riderViewEye moved a walker's camera to ${riderViewEye(eye, false)} m from ${eye}. On foot ` +
+          `it has to be the identity, or every player in Sydney is 12 cm shorter than the server ` +
+          `has them.`,
+      );
+    }
+    if (Math.abs(eye - riderViewEye(eye, true) - RIDER_VIEW_DROP_M) > 1e-12) {
+      bad.push(
+        `riderViewEye dropped a rider's camera by ${(eye - riderViewEye(eye, true)).toFixed(4)} m ` +
+          `rather than by RIDER_VIEW_DROP_M ${RIDER_VIEW_DROP_M}.`,
+      );
+    }
+    // (d) And the view still clears the floor by a person's worth of height. The
+    // failure this catches is a drop that grew until the camera was inside the
+    // vestibule floor, which draws as the carriage disappearing.
+    const mid = interiorFor(`${METROPOLIS}:mid`);
+    if (mid !== null) {
+      const view = riderViewEye(mid.vestibuleY + RIDER_EYE_HEIGHT, true) - mid.vestibuleY;
+      if (view < 1.2) {
+        bad.push(
+          `a rider's camera sits ${view.toFixed(2)} m over the vestibule floor. Under about 1.2 m ` +
+            `the view is at a child's height in a room built for the 1.68 m eye beside it.`,
+        );
+      }
+    }
+    // (e) **The gangway header is still cleared by the eye and not by the
+    // camera**, and the clearance is *measured* rather than compared against the
+    // constant it is meant to be. That distinction is the whole test. Probing two
+    // heights either side of `floor + GANGWAY_HEIGHT_M - RIDER_EYE_HEIGHT` proves
+    // nothing, because a `gangwayAdmits` that had quietly picked up the 12 cm
+    // would move the boundary and both probes with it and pass. So the boundary is
+    // *found* -- swept in millimetres until the aperture shuts -- and the height
+    // it implies is compared with the eye. A leaked drop shows up here as a
+    // gangway that admits somebody 12 cm too tall, which draws as a passenger
+    // walking through a bulkhead's worth of steel with their head inside it.
+    if (mid !== null && mid.gangway !== null) {
+      const floor = mid.vestibuleY;
+      let tallest = -Infinity;
+      for (let mm = 0; mm <= 3000; mm++) {
+        const probe = floor + PLATFORM_STEP_M + mm / 1000;
+        if (!gangwayAdmits(mid, 1, 0, probe, RIDER_RADIUS)) break;
+        tallest = mm / 1000;
+      }
+      if (tallest === -Infinity) {
+        bad.push(
+          `a rider standing flat on the vestibule floor was refused the gangway outright. The ` +
+            `header is ${GANGWAY_HEIGHT_M} m over a ${RIDER_EYE_HEIGHT} m eye; nobody can cross.`,
+        );
+      } else {
+        // What the aperture behaved as though a rider measures: the tallest head
+        // it let through, over the floor.
+        const implied = GANGWAY_HEIGHT_M - tallest;
+        if (Math.abs(implied - RIDER_EYE_HEIGHT) > 0.002) {
+          bad.push(
+            `the gangway admitted a rider whose head is ${implied.toFixed(3)} m over the floor, ` +
+              `against the ${RIDER_EYE_HEIGHT} m eye it is written for -- a difference of ` +
+              `${((implied - RIDER_EYE_HEIGHT) * 100).toFixed(1)} cm, and RIDER_VIEW_DROP_M is ` +
+              `${(RIDER_VIEW_DROP_M * 100).toFixed(0)}. The camera's drop is a view term and must ` +
+              `never reach the clearance test: the view is lower, the head is not.`,
+          );
+        }
       }
     }
   }

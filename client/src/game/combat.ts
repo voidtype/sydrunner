@@ -278,6 +278,17 @@ export const BALL_CHARGES = 3;
 /** Seconds per ball returned, counted from the last throw. See above. */
 export const BALL_RECHARGE = 1.6;
 export const BALL_COOLDOWN = 0.22;
+/**
+ * Where `CombatantState.throwT` stops counting, seconds.
+ *
+ * A ceiling rather than an unbounded accumulator, for the reason every other
+ * clock in this file has one somewhere: a match runs for hours, this is a float
+ * that no reader cares about past half a second, and a number that only ever grows
+ * is a number that eventually loses its own precision. Sixty seconds is four
+ * orders of magnitude past the longest window anybody tests against
+ * (`sim.THROW_FLAG_SECONDS`, 0.34), and it keeps the field readable in a dump.
+ */
+export const THROW_CLOCK_CAP = 60;
 
 /**
  * How long being hit takes control away, in seconds.
@@ -441,16 +452,46 @@ export interface CombatantState {
    */
   ballCharges: number;
   /**
-   * Seconds since the last throw. Drives both of the supply's clocks.
+   * The **supply's** clock: seconds of credit toward the next ball.
    *
-   * One number rather than two, and it is the same shape `staminaT` is: the
-   * per-throw cooldown is "is this over 0.55" and the refill is "is this over
-   * 4", measured from the same instant, so a second field would only ever be the
-   * first one copied. It is also what the animation reads -- a thrower is
-   * mid-throw for the first fraction of a second of it -- which is why the
-   * snapshot carries no separate clock for the pose.
+   * Two clocks rather than one now (see `throwT`), and it is worth being precise
+   * about what this one is, because it has been described as "seconds since the
+   * last throw" -- by its own header, until this round -- while doing something
+   * else. The per-throw cooldown is
+   * "is this over `BALL_COOLDOWN`" and the refill is "is this over
+   * `BALL_RECHARGE`" -- and the refill **consumes** it: `advance` does
+   * `ballT -= BALL_RECHARGE` each time a ball comes back, so that partial progress
+   * survives and eight seconds of accrued clock is two balls. Which means this
+   * number returns to nearly zero every 1.6 s while the bar is filling, and it is
+   * therefore "seconds since the last throw *or refill*". That is exactly right
+   * for a supply and exactly wrong for an animation.
    */
   ballT: number;
+  /**
+   * Seconds since the last throw, and **only** since a throw.
+   *
+   * The second clock this record has for the ranged weapon, added because the
+   * first one's own header used to claim a second field "would only ever be the
+   * first one copied" -- which was true when it was written and stopped being true
+   * the moment the refill started consuming `ballT`. The report that found it was
+   * *"remove the recharge animation for the football"*: both viewmodels, the
+   * third-person prop and the wire's `FLAG.THROWING` all read `ballT`, so every
+   * 1.6 s of a filling bar looked to all four of them like a throw. The football threw itself out of the player's hand, the
+   * bat dipped to get out of its way, and the ball on every *other* player's model
+   * blinked out and back -- twice per thrown ball, with no input, on both ends.
+   *
+   * Never consumed, never reset by anything but a throw or a respawn, and capped
+   * at `THROW_CLOCK_CAP` so it is bounded for a player who has not thrown all
+   * session. Not on the wire: what a remote needs from it is one bit
+   * (`FLAG.THROWING`, derived in `sim.snapshot`), which is what the wire already
+   * carried.
+   *
+   * Readers: `world/footyball.FootyViewmodel` (the release), `player/bat.ts` (the
+   * dip out of the way), `main.ts`'s own third-person prop, and `sim.ts`'s
+   * snapshot flag. Every one of them is asking "did this person just throw", which
+   * is a question `ballT` could not answer.
+   */
+  throwT: number;
   /**
    * The lime e-bike this combatant is riding, or 0 for on foot.
    *
@@ -705,6 +746,10 @@ export function createCombatant(id: number, x = 0, z = 0): CombatantState {
     // At the refill threshold rather than at zero, for `staminaT`'s reason: a
     // combatant is not born inside a cooldown they never spent.
     ballT: BALL_RECHARGE,
+    // And nobody is born mid-throw. At the cap rather than at zero, which is the
+    // same decision one line up said differently: zero here means "threw a ball
+    // this instant", so a joiner would spawn with the ball leaving their hand.
+    throwT: THROW_CLOCK_CAP,
     // On foot, and untuned. Both are session state a joiner starts without.
     ridingBike: 0,
     bikeTuned: false,
@@ -913,6 +958,13 @@ export function advance(
   // returned one would silently make the refill depend on how often `advance`
   // was called.
   c.ballT += dt;
+  // And the *animation's* clock beside it, which is not the same number and is the
+  // whole of `throwT`'s reason for existing: this one is never consumed by the
+  // refill below, so "did this person just throw" stays answerable. Capped rather
+  // than left to run -- see `THROW_CLOCK_CAP`. It advances here rather than beside
+  // `staminaT` so that the two supply clocks are read together, and it advances on
+  // every live tick including a flinch, because a flinch does not un-throw a ball.
+  if (c.throwT < THROW_CLOCK_CAP) c.throwT = Math.min(THROW_CLOCK_CAP, c.throwT + dt);
   while (c.ballCharges < BALL_CHARGES && c.ballT + PHASE_EPSILON >= BALL_RECHARGE) {
     c.ballCharges += 1;
     c.ballT -= BALL_RECHARGE;
@@ -940,6 +992,11 @@ export function advance(
     if (c.ballCharges > 0 && c.ballT + PHASE_EPSILON >= BALL_COOLDOWN) {
       c.ballCharges -= 1;
       c.ballT = 0;
+      // The one place `throwT` is ever zeroed, which is the property that makes it
+      // mean what its name says. Note that `ballT` is zeroed on the same line and
+      // the two then diverge immediately: the refill above will pull `ballT` back
+      // to zero again in 1.6 s and will never touch this.
+      c.throwT = 0;
       events.ballThrown = true;
     } else {
       events.ballRefused = true;
@@ -1516,6 +1573,11 @@ export function respawnAt(c: CombatantState, x: number, y: number, z: number, ya
   // spend the next twelve unarmed at range.
   c.ballCharges = BALL_CHARGES;
   c.ballT = BALL_RECHARGE;
+  // ...and you do not come back mid-throw. The animation clock does not advance
+  // while a body is on the pavement (the ko branch of `advance` returns before it),
+  // so a player knocked out 100 ms after a throw would otherwise stand up three
+  // seconds later with the ball still leaving their hand.
+  c.throwT = THROW_CLOCK_CAP;
   // You come back on foot. The bike you were on is already parked where you fell
   // -- `bikes.BikeField.follow` did that on the tick `applyHit` cleared this --
   // and respawning 30 m away still holding it would teleport it across Redfern.
@@ -1984,6 +2046,77 @@ export function verifyCombat(): string[] {
         `A combatant who has not thrown for 16 s has banked ${d.ballT.toFixed(1)} s of refill ` +
           `credit. The clock has to be pinned at the cap.`,
       );
+    }
+
+    // --- **The two clocks are two clocks**, and this is the check the report
+    // *"remove the recharge animation for the football"* is really about.
+    //
+    // `ballT` is the supply's and the refill consumes it; `throwT` is the
+    // animation's and nothing but a throw touches it. Four readers key on the
+    // second one -- the first-person ball's release, the bat's dip out of its way,
+    // the third-person prop in the hand, and `FLAG.THROWING` on the wire -- and
+    // while they all read the first one, every one of them fired twice more per
+    // thrown ball, 1.6 s apart, with no input. It renders perfectly: a ball leaves
+    // your hand and a new one appears, which is *plausible* enough that it survived
+    // a whole feature's life as "the recharge animation".
+    //
+    // Driven through one throw and the two refills that follow it, asserting the
+    // property directly: after the throw the animation clock only ever grows.
+    {
+      const e = createCombatant(2);
+      const press: CombatInput = { ...rest, throwBall: true };
+      advance(e, press, STEP_DT, FLAT_WORLD);
+      if (e.throwT > STEP_DT + 1e-9) {
+        failures.push(`A thrown ball left throwT at ${e.throwT.toFixed(3)} s; a throw zeroes it.`);
+      }
+      let last = e.throwT;
+      let wentBack = 0;
+      let refilled = 0;
+      // Past two whole recharges, which is where `ballT` wraps twice.
+      for (let i = 0; i < Math.round((BALL_RECHARGE * 2.5) / STEP_DT); i++) {
+        const before = e.ballCharges;
+        advance(e, rest, STEP_DT, FLAT_WORLD);
+        if (e.ballCharges > before) refilled++;
+        if (e.throwT < last - 1e-9) wentBack++;
+        last = e.throwT;
+      }
+      if (refilled < 1) {
+        failures.push(
+          'The probe for the two clocks never saw a refill, so it proves nothing. The bar has to ' +
+            'come back inside 2.5 recharges of a single throw.',
+        );
+      }
+      if (wentBack > 0) {
+        failures.push(
+          `throwT went backwards on ${wentBack} tick(s) inside 4 s of a single throw. It is the ` +
+            `clock four animations ask "did this person just throw" -- the refill consuming it is ` +
+            `exactly the bug that made the football throw itself out of the hand every ` +
+            `${BALL_RECHARGE} s. That is what ballT is for and this is not ballT.`,
+        );
+      }
+      if (Math.abs(last - BALL_RECHARGE * 2.5) > 0.05) {
+        failures.push(
+          `4 s after a throw, throwT reads ${last.toFixed(2)} s. It counts wall-clock seconds since ` +
+            `the throw and nothing else.`,
+        );
+      }
+      // And it is bounded, or a long session accumulates a float nobody wanted.
+      e.throwT = THROW_CLOCK_CAP - STEP_DT / 2;
+      for (let i = 0; i < 5; i++) advance(e, rest, STEP_DT, FLAT_WORLD);
+      if (e.throwT > THROW_CLOCK_CAP) {
+        failures.push(`throwT ran past THROW_CLOCK_CAP to ${e.throwT}. It is meant to stop there.`);
+      }
+      // A knockout does not leave somebody standing up mid-throw three seconds
+      // later, which is the one path that does not run the line above at all.
+      const f = createCombatant(3);
+      advance(f, press, STEP_DT, FLAT_WORLD);
+      respawnAt(f, 0, 0, 0, 0);
+      if (f.throwT < 1) {
+        failures.push(
+          `A player knocked out just after a throw respawned with throwT at ${f.throwT.toFixed(2)} s, ` +
+            `so they stand up with the ball still leaving their hand.`,
+        );
+      }
     }
   }
 

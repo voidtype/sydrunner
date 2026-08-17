@@ -448,6 +448,9 @@ import {
   rideBanner,
   rideEnter,
   rideExit,
+  // Workstream O: the train's slightly lower view, which is a camera term and
+  // touches nothing the simulation reads. See `game/riding.RIDER_VIEW_DROP_M`.
+  riderViewEye,
   RIDE_ON,
   spanFlagsAt,
   stopPlatform,
@@ -8112,6 +8115,20 @@ async function main(): Promise<void> {
     }
 
     applyToCamera(player, camera);
+    // --- Workstream O: aboard a train the **view** sits 0.12 m lower.
+    //
+    //   > *"make the camera slightly lower when on the train"*
+    //
+    // A camera term and nothing else, in the same seam as the knockout drop below
+    // and the third-person boom further down: the simulation is finished and
+    // correct by this line, and what is being changed is only where it is looked at
+    // from. Nothing here is written back into `PlayerState` -- so the body, the
+    // capsule, the gangway clearance, the boarding heights and the wire are all
+    // untouched, which is `game/riding.RIDER_VIEW_DROP_M`'s whole argument. The
+    // condition is the level test every other ride term in this loop uses rather
+    // than an event, because a ride can end for reasons nothing fires for.
+    const rideView = isAboard(playerCombat.aboard);
+    camera.position.y = riderViewEye(camera.position.y, rideView);
     if (net) {
       net.update(frameDt);
       // The eased correction, on the **camera** and on nothing else.
@@ -8293,7 +8310,12 @@ async function main(): Promise<void> {
       // it asks. It runs once a frame against a grid query that is already the
       // cheapest thing in `collision.ts`.
       const headX = player.position.x;
-      const headY = player.position.y;
+      // Workstream O: the boom pivots about the *camera's* eye, which aboard a
+      // train is `RIDER_VIEW_DROP_M` under the body's -- see `riderViewEye` above.
+      // The march and the placement have to agree about where the camera is going
+      // or the boom ducks for walls it is nowhere near, which is the argument
+      // `chaseLift` already makes one `const` up.
+      const headY = riderViewEye(player.position.y, rideView);
       const headZ = player.position.z;
       /** Is the boom clear at `d` metres back? */
       const blockedAt = (d: number): boolean => {
@@ -9326,12 +9348,18 @@ async function main(): Promise<void> {
     // Your own body's football, which the camera excludes -- so what this
     // contributes to a frame is a ball-shaped shadow beside your bat's, and its
     // absence while one is in the air.
-    selfFooty.set(playerCombat.ballCharges > 0 && playerCombat.ballT >= THROW_SECONDS);
+    //
+    // Workstream O: `throwT` rather than `ballT`, here and on the three lines
+    // below. `ballT` is consumed by the refill, so it read as a fresh throw every
+    // 1.6 s while the bar was filling -- and this line is one of the four that
+    // believed it. The shadow of the ball blinked out of your own hand twice per
+    // ball you threw. See `combat.throwT`.
+    selfFooty.set(playerCombat.ballCharges > 0 && playerCombat.throwT >= THROW_SECONDS);
     // And every dummy's, on exactly the rule `poseRemote` applies to a remote:
     // in hand while they have one and are not mid-throw. Offline this is the
     // only place the "somebody else is carrying" read can be seen at all.
     for (const [dummy, prop] of dummyFooties) {
-      prop.set(dummy.combat.ballCharges > 0 && dummy.combat.ballT >= THROW_SECONDS);
+      prop.set(dummy.combat.ballCharges > 0 && dummy.combat.throwT >= THROW_SECONDS);
     }
     // And the bat in front of the eye, on the frame delta for the same reason
     // every actor is: the simulation is fixed so prediction and rewind agree,
@@ -9356,7 +9384,10 @@ async function main(): Promise<void> {
       // `BatViewmodel.update`: it is one number, and without it the bat sits
       // rock-steady in the corner of the frame through a throw that is visibly
       // a whole-body action, which reads as two unrelated animations.
-      throwT: playerCombat.ballT,
+      // Workstream O: the animation clock, not the supply's. See `combat.throwT`
+      // -- read off `ballT` this dipped the bat out of the way of a throw that was
+      // not happening, every 1.6 s, for as long as the bag was refilling.
+      throwT: playerCombat.throwT,
     });
     // --- Workstream I: and your hands, on the same frame delta and the same
     // predicted phase. Posed **unconditionally**, whether or not fists are
@@ -9377,7 +9408,10 @@ async function main(): Promise<void> {
     // predicted clock -- so the release starts on the frame the button goes down
     // rather than on the next round trip.
     footyViewmodel.update(frameDt, {
-      sinceThrow: playerCombat.ballT,
+      // Workstream O: `throwT`, which counts from a throw and is never consumed by
+      // the refill. This one line is the "recharge animation" the owner asked to
+      // have removed -- see `FootyViewmodel.update`.
+      sinceThrow: playerCombat.throwT,
       charges: playerCombat.ballCharges,
       speed: Math.hypot(player.velocity.x, player.velocity.z),
       down: playerCombat.phase === 'ko',

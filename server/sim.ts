@@ -4012,11 +4012,20 @@ export class Simulation {
           (c.body.onGround ? FLAG.ON_GROUND : 0) |
           // Read straight off the combatant's own throw clock rather than from a
           // separate countdown on the participant, which is what the raygun's
-          // "drawn" flag needed. `ballT` is already exactly "seconds since the
-          // last throw" and is already maintained by `combat.advance` on both
-          // ends, so a second field here would only ever be this one copied --
-          // and would be the copy that drifted.
-          (c.ballT < THROW_FLAG_SECONDS ? FLAG.THROWING : 0) |
+          // "drawn" flag needed. `combat.advance` maintains it on both ends, so a
+          // countdown here would only ever be this one copied -- and would be the
+          // copy that drifted.
+          //
+          // **`throwT` and not `ballT`, which is what this line said until the
+          // report *"remove the recharge animation for the football"*.** `ballT` is
+          // the supply's clock and the refill *consumes* it, so it returns to zero
+          // every `BALL_RECHARGE` while a bar is filling -- and this flag went up
+          // with it. The symptom on the wire was every other player's football
+          // blinking out of their hand and back twice per ball they threw, at
+          // 1.6 s intervals, on every client watching them. See
+          // `CombatantState.throwT`, which exists for this line and three in the
+          // browser.
+          (c.throwT < THROW_FLAG_SECONDS ? FLAG.THROWING : 0) |
           // The two v6 bits. `RIDING` drives everybody's seated pose and the
           // bike drawn under it; `TUNED` is mostly for its owner and is the only
           // way a client ever learns it has been unlocked -- see
