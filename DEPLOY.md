@@ -116,11 +116,20 @@ if (location.protocol === 'https:') return `wss://${location.host}/ws`;
 > addresses, so it is not personal data — but it is credentials, and it must not
 > be committed, rsynced into `dist/`, or copied anywhere public.
 
+After that one-off, the site block carries a `handle /auth/* { reverse_proxy
+127.0.0.1:8787 }` block for the accounts routes, beside `/ws`, `/rooms` and
+`/health`.
+
 From the repo root on the Mac, after `npm run build` **and the precompress step**:
 
 ```bash
 scripts/precompress-dist.sh   # writes .zst/.br sidecars beside every asset
 ```
+
+The client build must be done with `client/public/world` absent — in a worktree,
+remove the symlink — or `vite build` copies the 12 GB world into `dist/`. The
+world is deliberately excluded from the rsync anyway (see *What the box actually
+needs*), so a build that pulls it in only bloats a tree that is never shipped.
 
 The full runbook is **build → precompress → rsync → restart**. When the pipeline
 has rebuilt the world, `scripts/publish-world.sh` goes **first** — it stamps the
@@ -186,6 +195,10 @@ Note `$SSHOPT` is only ever passed to `rsync -e`, which splits it itself. A bare
 `$SSHOPT root@host …` does **not** word-split under zsh and fails with `no such
 file or directory` — it bit twice during the 60 km ship.
 
+The SSH host key is only known as `oxford-tractor.bnr.la`, so rsync and ssh go to
+that name; `sydrunner.3rp.uk` is the site, not the box, and the box does not
+answer to it.
+
 ### What the box actually needs
 
 | | size | who reads it |
@@ -220,6 +233,12 @@ If `client/package.json` changed, refresh the one dependency:
 ssh -i ~/.ssh/sydney_deploy root@oxford-tractor.bnr.la \
   'cd /opt/sydney/client && /root/.bun/bin/bun install --production'
 ```
+
+The systemd drop-in `/etc/systemd/system/sydney.service.d/state.conf` sets
+`Environment=SYDNEY_STATE_DIR=/var/lib/sydney`, which holds `wallets.json` and
+`accounts.json`. It must survive a redeploy: the rsync targets `/opt/sydney`, so
+the state dir sits outside it, and a `--delete` that ever reached it would erase
+every registered handle — never rsync over it.
 
 ## Caching the world
 
