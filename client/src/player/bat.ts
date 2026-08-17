@@ -56,7 +56,7 @@
  *
  * **This makes the blade longer than Law 5 allows, proportionally, and that is
  * the intended answer rather than an accident.** A real bat is 66% blade; this one
- * is 83% measured shoulder-to-toe. The earlier version of this essay argued the
+ * is 81% measured shoulder-to-toe. The earlier version of this essay argued the
  * 66% at length and it was arguing for the wrong thing -- the model is looked at
  * from 45 cm away, over the bottom-right corner of the frame, where the grip is
  * *off the bottom of the screen* and the only part of the handle a player ever
@@ -68,10 +68,10 @@
  *
  * So, in the order the eye uses them:
  *
- *   - **Five sixths of the bat is blade.** 0.688 m of a 0.828 m bat, against
- *     0.550 m before and 0.485 m before that. The handle came down from 0.278 m
- *     to 0.140 m to pay for it and nothing at the toe moved, so the swing's reach
- *     is the number it always was.
+ *   - **The blade is 81% of the bat.** 0.585 m of a 0.725 m bat, after the owner
+ *     cut 15% of the blade (0.103 m) on 2026-08-17; the handle is still 0.140 m
+ *     and nothing at the grip moved, so the swing's reach is the number it always
+ *     was.
  *   - **A rubber grip that covers the handle and nothing else.** 0.120 m of
  *     rubber over a 0.140 m handle -- 86% of it, which is what a real sleeve
  *     covers -- against 0.203 m over 0.278 m before. The grip still stops above
@@ -317,14 +317,14 @@ const SHOULDER_Y = -0.112;
  */
 const SHOULDER_FULL_Y = SHOULDER_Y - 0.025;
 /** Where the toe's back bevel starts. The last 45 mm lose depth, not width. */
-const TOE_BEVEL_Y = -0.755;
+const TOE_BEVEL_Y = -0.6518;
 /** The toe. Overall length is `GRIP_CAP_Y - TOE_Y`. */
-const TOE_Y = -0.8;
+const TOE_Y = -0.6968;
 
-/** Overall length, grip cap to toe, metres. 0.83 m on a 1.70 m figure. */
+/** Overall length, grip cap to toe, metres. 0.725 m on a 1.70 m figure. */
 export const BAT_LENGTH = GRIP_CAP_Y - TOE_Y;
 /**
- * Blade length, shoulder to toe. **83% of the bat**, where a real one is 66%.
+ * Blade length, shoulder to toe. **81% of the bat**, where a real one is 66%.
  *
  * The header carries the argument; in one line, it is what the owner's third
  * report asked for and it is a first-person read rather than a Law 5 measurement.
@@ -724,10 +724,13 @@ export class BatAssets {
     //                     -0.341 is a third of this one. Left at -0.46 the
     //                     section would have been ramping over the top half of
     //                     the blade and flat over the bottom.
-    //   -0.62             106% deep -- the spine swells over the middle of the
+    //   -0.5438          106% deep -- the spine swells over the middle of the
     //                     blade, which is where a real bat carries its wood and
     //                     is the bulge you see side-on. Width is untouched: the
-    //                     back is a roof, and a roof gets taller, not wider.
+    //                     back is a roof, and a roof gets taller, not wider. The
+    //                     ring is the old -0.62 scaled 0.85 from the shoulder so
+    //                     the spine keeps its place in the blade the owner cut
+    //                     15% shorter on 2026-08-17.
     //   `TOE_BEVEL_Y`     the depth starts to go.
     //   `TOE_Y`           98.5% wide and 42% deep. **A squared toe.** The blade
     //                     keeps its width to the very end and loses only its
@@ -741,7 +744,7 @@ export class BatAssets {
         { y: SHOULDER_Y, sx: 0.4, sz: 0.5 },
         { y: SHOULDER_FULL_Y, sx: 1, sz: 0.88 },
         { y: SHOULDER_Y - (SHOULDER_Y - TOE_Y) / 3, sx: 1, sz: 1 },
-        { y: -0.62, sx: 1, sz: 1.06 },
+        { y: -0.5438, sx: 1, sz: 1.06 },
         { y: TOE_BEVEL_Y, sx: 1, sz: 0.86 },
         { y: TOE_Y, sx: 0.985, sz: 0.42 },
       ],
@@ -1478,7 +1481,9 @@ export function verifyBat(): string[] {
       }
       return back;
     };
-    const middle = depthAt(-0.63, -0.61);
+    // The band tracks the spine's ring, which moved with the blade the owner cut
+    // 15% shorter on 2026-08-17.
+    const middle = depthAt(-0.549, -0.539);
     const nearToe = depthAt(TOE_BEVEL_Y - 0.002, TOE_BEVEL_Y + 0.002);
     if (!(middle > nearToe * 1.05)) {
       failures.push(
@@ -1500,7 +1505,7 @@ export function verifyBat(): string[] {
     //    rather than from `SHOULDER_Y`. **The band moved from 0.60..0.72 to
     //    0.80..0.88 on the third report** -- *"way too long a handle, it's like 2x
     //    too long"* -- and it is worth being clear that this is no longer a real
-    //    bat's proportion: Law 5 is 66% and this is 80% of full width, 83% counted
+    //    bat's proportion: Law 5 is 66% and this is 77% of full width, 81% counted
     //    shoulder to toe. The file header carries the argument. What the band
     //    still catches is the two ways this can go wrong from here: a handle
     //    creeping back toward the third of the bat the owner rejected, and a bat
@@ -1510,11 +1515,13 @@ export function verifyBat(): string[] {
       if (spanAt(y - 0.0026, y + 0.0026) >= full * 0.95) bladeTop = y;
     }
     const bladeFraction = (bladeTop - TOE_Y) / (GRIP_CAP_Y - TOE_Y);
-    if (bladeFraction < 0.8 || bladeFraction > 0.88) {
+    // The owner cut 15% of blade on 2026-08-17, so the full-width fraction dropped
+    // from 80% to 77%; the band moved down with it.
+    if (bladeFraction < 0.75 || bladeFraction > 0.85) {
       failures.push(
         `The blade is ${(bladeFraction * 100).toFixed(0)}% of the bat's length at full width. The ` +
           `owner asked for a handle half as long as the 34% one this model used to have, which puts ` +
-          `this between 80 and 88%; under that the handle is back to the length that was reported ` +
+          `this between 75 and 85%; under that the handle is back to the length that was reported ` +
           `twice, and over it there is no handle to see.`,
       );
     }
@@ -1523,10 +1530,11 @@ export function verifyBat(): string[] {
     //    measurements of one property, 25 mm of ramp apart -- kept separate because
     //    the geometric one can be defeated by a ring that moved and this one
     //    cannot, and because `BLADE_LENGTH` is an export somebody might tidy.
-    if (BLADE_LENGTH / BAT_LENGTH < 0.8) {
+    if (BLADE_LENGTH / BAT_LENGTH < 0.79) {
       failures.push(
         `BLADE_LENGTH is ${(BLADE_LENGTH / BAT_LENGTH * 100).toFixed(0)}% of BAT_LENGTH. The handle ` +
-          `is meant to be 0.140 m of a 0.828 m bat -- half what it was -- which is 83% blade.`,
+          `is meant to be 0.140 m of a 0.725 m bat -- half what it was -- which is 81% blade; the ` +
+          `owner cut 15% of blade on 2026-08-17.`,
       );
     }
     //    ...and the handle itself, in metres, because "half as long" is the whole
@@ -1639,7 +1647,8 @@ export function verifyBat(): string[] {
     // player's own feet on its way through. Demanding daylight at every phase
     // would mean pinning the arm rather than letting the clip run. Measured
     // clearances at the time of writing: 0.38 m carried, 0.06 m at the bottom of
-    // the swing arc.
+    // the swing arc. The owner cut 15% of blade on 2026-08-17, so the toe clears
+    // more; the -0.05 m floor is unchanged and the swing pivot is untouched.
     if (lowest < -0.05) {
       failures.push(
         `Through "${name}" the bat's toe goes ${(-lowest * 100).toFixed(1)} cm under the ` +
@@ -1662,7 +1671,9 @@ export function verifyBat(): string[] {
   // players report as lag. Falling a long way **short** is the milder one, and
   // some shortfall is correct -- the fist this replaced landed 0.3 m beyond
   // where the mitt got, on exactly this measurement, and the game shipped that
-  // way. So: most of the way there, and never beyond.
+  // way. So: most of the way there, and never beyond. The owner cut 15% of blade
+  // on 2026-08-17, so the toe reaches less; the band and REACH (1.55 m) are
+  // untouched because the swing pivot is shared with the server.
   if (furthest > MEASURED_REACH_TARGET) {
     failures.push(
       `The bat's toe reaches ${furthest.toFixed(2)} m from the eye, past the ` +
@@ -1747,6 +1758,8 @@ export function verifyBat(): string[] {
         }
       }
     }
+    // The owner cut 15% of blade on 2026-08-17, so the viewmodel reaches less;
+    // MAX_VIEW_REACH (0.9 m) is unchanged and the single-pass claim still holds.
     if (furthestVertex > MAX_VIEW_REACH) {
       failures.push(
         `The viewmodel reaches ${furthestVertex.toFixed(2)} m from the eye, past the ` +
