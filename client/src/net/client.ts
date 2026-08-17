@@ -526,14 +526,38 @@ export class NetClient {
     return this.levels.get(id) ?? 1;
   }
 
+  /**
+   * And the kills under it. `levels`' twin, filled in the same pass and pruned
+   * by the same rule -- see `rememberNames`.
+   *
+   * A **second map rather than a `{level, kills}` record in one**, which looks
+   * like the obvious tidy-up and is not: `levels` is read once per remote per
+   * frame by the nameplate loop and this is read once per frame in total, by
+   * the HUD, for the local player only. A shared record would put an object
+   * allocation (or a pair of property reads) on the hot side to save a `Map` on
+   * the cold one. `names` and `levels` are already two maps for exactly this
+   * reason and this follows them.
+   */
+  private readonly kills = new Map<number, number>();
+
+  /** This player's ladder kills, or 0. See `RosterEntry.kills`. */
+  killsOf(id: number): number {
+    return this.kills.get(id) ?? 0;
+  }
+
   /** The local player's own name, as the server actually assigned it. */
   get myName(): string {
     return this.names.get(this.id) ?? '';
   }
 
-  /** The local player's own level, for the HUD's `lvl N` beside the balance. */
+  /** The local player's own level, for the HUD's `LVL n` beside the balance. */
   get myLevel(): number {
     return this.levelOf(this.id);
+  }
+
+  /** And the kills under it, for the XP bar. See `game/levelhud.ts`. */
+  get myKills(): number {
+    return this.killsOf(this.id);
   }
 
   /** The board, in the order it is drawn. See `protocol.rankRoster`. */
@@ -1579,7 +1603,10 @@ export class NetClient {
     // The levels go in the same pass rather than a second loop, and they are
     // pruned by the same rule below. A level for an id nobody can name is a
     // level nothing will ever draw.
-    for (const e of entries) this.levels.set(e.id, e.level);
+    for (const e of entries) {
+      this.levels.set(e.id, e.level);
+      this.kills.set(e.id, e.kills);
+    }
     if (this.names.size > 128) {
       const live = new Set(entries.map((e) => e.id));
       for (const id of [...this.names.keys()]) {
@@ -1587,6 +1614,7 @@ export class NetClient {
         if (!live.has(id)) {
           this.names.delete(id);
           this.levels.delete(id);
+          this.kills.delete(id);
         }
       }
     }
@@ -3198,8 +3226,8 @@ export function verifyNetClient(): string[] {
     const net = new NetClient('', silentHandlers(), { transport });
     net.id = 1;
     const roster: RosterEntry[] = [
-      { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 3, downs: 1, ping: 21, level: 1 },
-      { id: 2, colourway: 1, bot: true, name: 'Shazza', kos: 4, downs: 0, ping: 0, level: 1 },
+      { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 3, downs: 1, ping: 21, level: 1, kills: 3 },
+      { id: 2, colourway: 1, bot: true, name: 'Shazza', kos: 4, downs: 0, ping: 0, level: 1, kills: 4 },
     ];
     transport.onframe?.(encodeRoster(roster));
     if (net.nameOf(2) !== 'Shazza') failures.push(`A roster's name did not reach nameOf: got ${net.nameOf(2)}.`);
@@ -3343,9 +3371,9 @@ export function verifyNetClient(): string[] {
     // it, whether or not they can be seen.
     transport.onframe?.(
       encodeRoster([
-        { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 20, level: 4 },
-        { id: 2, colourway: 4, bot: false, name: 'Shazza', kos: 0, downs: 0, ping: 30, level: 2 },
-        { id: 3, colourway: 5, bot: true, name: 'Davo', kos: 0, downs: 0, ping: 0, level: 1 },
+        { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 20, level: 4, kills: 31 },
+        { id: 2, colourway: 4, bot: false, name: 'Shazza', kos: 0, downs: 0, ping: 30, level: 2, kills: 14 },
+        { id: 3, colourway: 5, bot: true, name: 'Davo', kos: 0, downs: 0, ping: 0, level: 1, kills: 0 },
       ]),
     );
     // A JOIN for somebody across town. A feed line, and **no body**.

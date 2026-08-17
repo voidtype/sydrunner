@@ -350,27 +350,48 @@ export function starRow(stars: number): string {
 }
 
 /**
- * The label for a level, or `''` -- which draws nothing.
+ * The label for a level. Never empty -- **every plate carries one now.**
  *
- * **Empty at level 1**, and that is the same decision `starRow` makes about
- * zero stars, for the same reason stated there: every guest and every bot in
- * the city is level 1, so a `lvl 1` under every name in the street would be
- * five times the ink to say the thing that is already true of everybody. The
- * row appears when it means something.
+ * This used to return `''` at level 1, on the same argument `starRow` makes
+ * about zero stars: every guest and every bot in the city is level 1, so a
+ * `lvl 1` under every name in the street was five times the ink to say the
+ * thing that was already true of everybody.
  *
- * Rasterised through the **same atlas cache the names use**, which is what
- * makes this cost almost nothing: `slotFor` keys on the string, so a lobby
- * where nine people are level 3 occupies one atlas row between them. The
- * distinct strings are bounded by the levels actually present in a room, which
- * in practice is a handful; and the cache evicts least-recently-asked-for
- * rather than failing if it is ever more (see `slotFor`).
+ * That was reversed on a direct report -- *"i cant se my level or XP anywhere.
+ * to be clear player level and wanted level are different"* -- and the reversal
+ * is worth stating rather than quietly making, because the old argument is not
+ * wrong, it is answering a different question. It is right that `lvl 1` conveys
+ * no information *about that player*. It is wrong that the badge is therefore
+ * worthless: the thing a new player has to learn is **that levels exist and
+ * that this row is where they live**, and a row that only appears once you are
+ * already level 2 teaches that to nobody who has not already worked it out.
+ * `game/levelhud.ts` makes the same argument at length about the HUD.
+ *
+ * The `starRow` half of the comparison is **not** reversed, and the asymmetry is
+ * the second half of the same report. Stars mean *"the police are coming"*; the
+ * absence of stars is the normal state of the world and drawing `☆☆☆☆☆` over
+ * every pedestrian's head would be five glyphs of nothing. A level is a fact
+ * about a person that is always true. So: the level always, the stars only when
+ * there are any -- which is also what keeps the two from reading as one badge,
+ * since a plate now shows `lvl 1` alone in the overwhelming majority of cases
+ * and `lvl 4 ★★☆☆☆` only during a chase.
+ *
+ * **What this costs**, since the old note was partly a cost argument: one atlas
+ * row. `slotFor` keys on the string, so every level-1 player in a lobby shares
+ * a single rasterisation of `lvl 1` -- and the previous behaviour drew a
+ * degenerate zero-area quad in that slot's place anyway (see the badge row's
+ * `else` branch), so the *quad* count per plate has not moved at all. The
+ * distinct strings are bounded by the levels present in a room, which is a
+ * handful, and the cache evicts least-recently-asked-for if it is ever more.
  *
  * Clamped to the `u8` the roster carries, so a decode error draws a wrong
- * number rather than "lvl undefined".
+ * number rather than "lvl undefined", and floored at 1 rather than at 2 --
+ * level 0 is a number the ladder cannot produce and `RosterEntry.level` already
+ * refuses it on the way in.
  */
 export function levelRow(level: number): string {
-  if (!(level > 1)) return '';
-  return `lvl ${Math.max(2, Math.min(255, Math.round(level)))}`;
+  if (!Number.isFinite(level)) return 'lvl 1';
+  return `lvl ${Math.max(1, Math.min(255, Math.round(level)))}`;
 }
 
 const VERTS_PER_QUAD = 4;
@@ -949,6 +970,14 @@ export class NameplateField {
       let cursor = -total / 2;
       // The level first, so it reads "lvl 4 ★★☆☆☆" left to right -- who they
       // are, then how wanted they are.
+      //
+      // **Left and right is the whole of what keeps them apart**, and the
+      // report *"player level and wanted level are different"* is what that
+      // sentence is answering. The level is now drawn for everybody (see
+      // `levelRow`) and the stars still only for somebody being chased, so the
+      // ordinary plate is `lvl 1` alone on the left and the right-hand slot is
+      // an empty quad. The two are only ever adjacent during a pursuit, which
+      // is the one moment a player is already reading both.
       if (levelSlot !== null && levelW > 0) {
         const w = levelW * squeeze;
         const v0 = levelSlot.row * SLOT_HEIGHT;
@@ -1095,19 +1124,36 @@ export function verifyNameplates(maxHealth: number): string[] {
     failures.push(`A plate writes ${5 + (MAX_PIPS - 1)} quads but ${QUADS_PER_PLATE} are budgeted; the index buffer's layout is wrong.`);
   }
 
-  // --- The level label. Distinct at every level, absent at 1, and clamped.
+  // --- The level label. Present at every level including 1, distinct at each,
+  //     and clamped.
   //
-  // What this catches: a `levelRow` that returned something at level 1 would put
-  // a badge under every guest and every bot in the city, which is exactly the
-  // failure the star row's own check exists for. A label that did not clamp
-  // would rasterise "lvl undefined" under somebody's name off a decode error --
-  // and it would render perfectly, which is this repo's definition of a silent
-  // failure.
+  // **The level-1 case is inverted from what this check used to assert**, and
+  // the inversion is the point rather than a relaxation: the old case read
+  // `levelRow(1) !== ''` is a failure, on the argument that a badge under every
+  // guest in the city is ink for nothing. The report *"i cant se my level or XP
+  // anywhere"* is that argument's cost, and `levelRow`'s header carries the
+  // reasoning. The check is kept and pointed the other way so that a future pass
+  // that restores the suppression has to argue with this line rather than
+  // silently un-fix the report.
+  //
+  // A label that did not clamp would rasterise "lvl undefined" under somebody's
+  // name off a decode error -- and it would render perfectly, which is this
+  // repo's definition of a silent failure.
   {
-    if (levelRow(1) !== '') failures.push('A level-1 player is given a level badge; every plate in the city would carry one.');
-    if (levelRow(0) !== '' || levelRow(-3) !== '') failures.push('A level below the floor produced a badge.');
+    if (levelRow(1) !== 'lvl 1') {
+      failures.push(
+        `A level-1 player's badge is ${JSON.stringify(levelRow(1))}. Every plate carries a level now: ` +
+          `"i cant se my level or XP anywhere" was the report, and level 1 is the case that was hidden.`,
+      );
+    }
+    // Below the floor is not "no badge" any more, it is the floor. A level of 0
+    // or -3 comes off a truncated frame and the honest thing to draw is the
+    // lowest real level rather than nothing, which would look like the old bug.
+    if (levelRow(0) !== 'lvl 1' || levelRow(-3) !== 'lvl 1') {
+      failures.push(`A level below the floor drew ${JSON.stringify(levelRow(0))}/${JSON.stringify(levelRow(-3))} rather than the floor.`);
+    }
     const seen = new Set<string>();
-    for (let n = 2; n <= 12; n++) {
+    for (let n = 1; n <= 12; n++) {
       const row = levelRow(n);
       if (row === '') {
         failures.push(`A level-${n} player is given no badge.`);
@@ -1120,6 +1166,24 @@ export function verifyNameplates(maxHealth: number): string[] {
       failures.push(`A level past the u8 drew ${JSON.stringify(levelRow(9000))} rather than being clamped.`);
     }
     if (/undefined|NaN/.test(levelRow(NaN))) failures.push('A NaN level rasterised its own error into the atlas.');
+    // --- And the second half of the report: **the level and the stars must not
+    //     read as one badge.** "player level and wanted level are different".
+    //
+    // The badge row draws the level on the left and the stars on the right (see
+    // the `starRise` block), so the thing that keeps them apart at plate
+    // distance is that the right-hand half is *absent* for everybody who is not
+    // being chased. That is a property of `starRow` rather than of the layout,
+    // and it is asserted here beside the level because it is the pair of them
+    // that is being defended: a `starRow` that started drawing five hollow stars
+    // at zero heat would put `lvl 1 ☆☆☆☆☆` over every head in the city, which is
+    // precisely the conflation that was reported.
+    if (starRow(0) !== '') {
+      failures.push(
+        `A player with no heat draws ${JSON.stringify(starRow(0))} beside their level. The badge row ` +
+          `is level-left/stars-right, and the stars being absent is what stops the two reading as ` +
+          `one number -- see the report "player level and wanted level are different".`,
+      );
+    }
   }
 
   // --- The star row. Six distinct strings, all five glyphs wide, and a row for

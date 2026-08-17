@@ -55,12 +55,13 @@
  */
 
 import type { Camera, Scene } from 'three/webgpu';
-import {
-  BufferGeometry,
-  CylinderGeometry,
-  Mesh,
-  MeshStandardNodeMaterial,
-} from 'three/webgpu';
+// --- Workstream I: the piles of cash are fanned Australian fifties now.
+//
+// The three meshes and two geometry constructors this import used to bring in
+// built the stubby gold cylinder that stood for a bundle; all of that -- the
+// pool, the spin, the placement -- has moved to `world/cashnote.ts`, which is
+// one class and one `update` call. Nothing else in this file changed.
+import { CashNotePiles } from './world/cashnote.ts';
 
 import type { Capture } from './bugreport.ts';
 import type { Hud } from './hud.ts';
@@ -277,16 +278,6 @@ export interface MoneyHooks {
   };
 }
 
-/**
- * How many bundle meshes are kept.
- *
- * `cash.MAX_BUNDLES`, allocated once at install and shown or hidden per frame
- * rather than created and destroyed. Forty-eight small meshes is nothing to
- * hold and everything to not allocate in a frame loop -- the same pooling
- * `Minimap`'s marker records and `net/client.ts`'s remotes use.
- */
-const BUNDLE_POOL = 48;
-
 export function installMoney(deps: MoneyDeps): MoneyHooks {
   const hands = defaultHands();
 
@@ -406,33 +397,19 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
    */
   let mapFromPhone = false;
 
-  // --- The piles of cash in the street.
+  // --- Workstream I: the piles of cash in the street.
   //
-  // A stubby cylinder rather than a modelled bundle of notes: it is 30 cm
-  // across, it exists for thirty seconds, and what it has to do is read as
-  // "something on the ground worth walking to" from the far side of a street.
-  // The gold is the HUD balance's and both maps' Centrelink dot's -- money is
-  // one colour in this game.
-  const bundleGeometry: BufferGeometry = new CylinderGeometry(0.15, 0.17, 0.07, 12);
-  const bundleMaterial = new MeshStandardNodeMaterial({
-    color: 0xd6b260,
-    emissive: 0xd6b260,
-    // Faintly lit, so a bundle in a night-time laneway is findable. Well under
-    // the phone screen's 1.4: this is a hint, not a light source.
-    emissiveIntensity: 0.35,
-    roughness: 0.6,
-    metalness: 0.2,
-  });
-  const bundleMeshes: Mesh[] = [];
-  for (let i = 0; i < BUNDLE_POOL; i++) {
-    const mesh = new Mesh(bundleGeometry, bundleMaterial);
-    mesh.name = 'cash-bundle';
-    mesh.castShadow = true;
-    mesh.receiveShadow = false;
-    mesh.visible = false;
-    deps.scene.add(mesh);
-    bundleMeshes.push(mesh);
-  }
+  // Was a stubby gold cylinder, allocated 48-deep at install and shown or hidden
+  // per frame; is now a fanned stack of Australian fifties, on the instruction
+  // *"as its ausie make it look like aussie $50s"*. The whole of the geometry,
+  // the texture, the pooling and the lift-and-vanish on pickup is
+  // `world/cashnote.ts`; this is the one line that owns it.
+  //
+  // The pool is keyed by bundle id in there rather than by index into the wallet
+  // frame, which fixed a bug the cylinder had and nobody had noticed: the
+  // server's list *compacts* when somebody collects, so an index-keyed pool
+  // teleports every pile after the collected one. See `CashNotePiles`.
+  const piles = new CashNotePiles(deps.scene);
 
   // --- And the compass, put where the starting loadout says before a frame is
   // drawn.
@@ -502,25 +479,10 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
     //    -- see `Hud.money` for why `$0` and "no answer yet" must differ.
     deps.hud.money(net !== null && net.status === 'online' ? wallet.balance : null);
 
-    // 2. The piles. Pool entries beyond the live count are hidden rather than
-    //    removed; see `BUNDLE_POOL`.
-    for (let i = 0; i < bundleMeshes.length; i++) {
-      const bundle = wallet.bundles[i];
-      const mesh = bundleMeshes[i];
-      if (bundle === undefined) {
-        if (mesh.visible) mesh.visible = false;
-        continue;
-      }
-      mesh.visible = true;
-      // Half the cylinder's height above the ground the server sent, so the
-      // pile sits *on* the footpath rather than half in it.
-      mesh.position.set(bundle.x, bundle.y + 0.035, bundle.z);
-      // A slow turn, off the wall clock and the bundle's own id, so two piles
-      // side by side are not in lockstep. Cosmetic and never simulated -- the
-      // pickup is the server's and is a plan distance, so this cannot affect
-      // it.
-      mesh.rotation.y = (performance.now() / 1000) * 0.6 + bundle.id;
-    }
+    // 2. The piles. One call: `CashNotePiles` owns the meshes, the slow turn and
+    //    the lift a collected pile makes on its way out. Nothing about them can
+    //    affect the pickup, which is the server's and is a plan distance.
+    piles.update(dt, wallet.bundles);
 
     // 3. The handset, and what the other two hands are holding.
     //

@@ -74,6 +74,11 @@ import { verifySwat } from '../client/src/game/swat.ts';
 import { verifyPowerups } from '../client/src/game/powerups.ts';
 import { verifyDamageGrade, verifyDriving } from '../client/src/game/driving.ts';
 import { verifyTraffic } from '../client/src/game/traffic.ts';
+// --- Workstream I. Three three-free modules, all run here as well as in the
+// browser, and each for the reason given at its own entry in the table below.
+import { verifyHandsPose } from '../client/src/game/hands-pose.ts';
+import { verifyLevelHud } from '../client/src/game/levelhud.ts';
+import { verifyCashDrops } from '../client/src/game/cashnote.ts';
 import { verifySpatialHash } from '../client/src/game/spatialhash.ts';
 import { verifyMovementBasis } from '../client/src/player/controller.ts';
 import {
@@ -290,6 +295,27 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // that does not answer is your own car driving off to Ashfield beside you,
     // running people down on the way. See `client/src/game/driving.ts`.
     ['verifyDriving', verifyDriving()],
+    // The first-person punch's pose curve. Run **here** as well as in the
+    // browser because it is three-free and because it is timed off the same
+    // `animation.PUNCH_*` envelope this process adjudicates a swing with: a
+    // curve that stopped lining up with the phase machine is a fist that
+    // arrives after the hit test did, which reads as lag rather than as a
+    // timing bug. See `client/src/game/hands-pose.ts`.
+    ['verifyHandsPose', verifyHandsPose()],
+    // The level line and the XP bar. Run **here** because this process is the
+    // one that owns the ladder -- it counts the kills, it decides the level,
+    // and it puts both on the roster -- so an off-by-one between
+    // `accounts.levelFor` and the fraction drawn under it is this side's fault
+    // and is silent: the bar simply reads 10/10 on somebody who just levelled.
+    // See `client/src/game/levelhud.ts`.
+    ['verifyLevelHud', verifyLevelHud()],
+    // What a knocked-over NPC is worth, how fast a player may be paid it, and
+    // what the note looks like. Run **here** first and foremost because this
+    // process *is* the mint: the drop table and the rate bank are enforced in
+    // `Simulation.dropNpcCash` and nowhere else, and a bank that does not bank
+    // has no picture at all -- the money simply arrives and whoever is testing
+    // is delighted. See `client/src/game/cashnote.ts`.
+    ['verifyCashDrops', verifyCashDrops()],
     // The crash damage's *visual* grading -- how far a car is folded, how dark
     // the paint goes, how fast the plume runs, whether a headlight is out. Run
     // here as well as in the browser because it is three-free and because the

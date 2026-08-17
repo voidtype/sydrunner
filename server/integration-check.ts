@@ -750,11 +750,17 @@ function checkNames(): void {
     // length that shifts the entry behind it, and a level that was the same on
     // every row would be the one field that could not detect the shift.
     level: 1 + i,
+    // The same argument, one field further on -- and `kills` is now the *last*
+    // thing in the fixed part of a record, so it is the field a short
+    // `ROSTER_ENTRY_BYTES` corrupts first. Deliberately not `i * 3` (which `kos`
+    // already is): the two are different numbers about the same player and a
+    // check where they matched could not tell a swapped pair apart.
+    kills: 7 + i * 13,
   }));
   const back = decodeRoster(encodeRoster(entries));
   check(back !== null && back.length === entries.length, `a ${entries.length}-entry roster round-tripped through the wire (${back?.length} back)`);
   check(
-    back !== null && back.every((r, i) => r.id === entries[i].id && r.name === entries[i].name && r.kos === entries[i].kos && r.downs === entries[i].downs && r.ping === entries[i].ping && r.bot === entries[i].bot),
+    back !== null && back.every((r, i) => r.id === entries[i].id && r.name === entries[i].name && r.kos === entries[i].kos && r.downs === entries[i].downs && r.ping === entries[i].ping && r.bot === entries[i].bot && r.level === entries[i].level && r.kills === entries[i].kills),
     'every field of every entry survived, including the ones behind a multi-byte name',
   );
 

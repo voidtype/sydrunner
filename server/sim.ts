@@ -274,6 +274,11 @@ import {
   type CentrelinkOffice,
   type WalletRecord,
 } from '../client/src/game/cash.ts';
+// --- Workstream I: what a knocked-over NPC is worth, and how fast. One import,
+// one field on the participant, and one call from `hitNpc`. The table, the rate
+// bank and the note's design are all in the three-free module so
+// `verifyCashDrops` can assert them on both ends. See `game/cashnote.ts`.
+import { bankAllow, createNpcCashBank, npcDropAmount, type NpcCashBank } from '../client/src/game/cashnote.ts';
 import { type DrivingLookup } from '../client/src/game/driving-contract.ts';
 import { createFare, stepFare, type FareContext, type FareJob } from './fares.ts';
 import { moveBalance, type WalletStore } from './wallets.ts';
@@ -458,6 +463,16 @@ export interface Participant {
    * an evening. This is written on join and on the two events that can move it.
    */
   level: number;
+  /**
+   * This player's NPC income over the last minute, so a spawn cannot be farmed.
+   *
+   * Three numbers on the participant rather than a `Map` on the simulation,
+   * because the alternative is a map that has to be cleaned on leave and a
+   * lookup on the knockout path -- and because the lifetime being asked for is
+   * exactly a participant's. See `game/cashnote.NpcCashBank`, which owns the
+   * arithmetic and states why it is a two-bucket sliding counter.
+   */
+  npcCash: NpcCashBank;
   /**
    * Has this guest already been asked to sign up, this session, for each reason?
    *
@@ -1212,6 +1227,10 @@ export class Simulation {
       // The ladder, off the record if there is one. A guest and a bot are both
       // level 1 and stay there for the session; see `RosterEntry.level`.
       level: bot === null && account !== null ? account.level : 1,
+      // Made for bots too, and it costs three numbers: a bot swinging at
+      // pedestrians would otherwise be the one participant with no cap, and
+      // `dropNpcCash` refuses a bot on the wallet test rather than on this one.
+      npcCash: createNpcCashBank(),
       prompted: 0,
     };
     // The bot holds the combatant rather than the other way round, so `think()`
@@ -1322,11 +1341,30 @@ export class Simulation {
     for (const p of this.participants.values()) {
       let s = out[n];
       if (s === undefined) {
-        s = { id: 0, colourway: 0, bot: false, name: '', kos: 0, downs: 0, ping: 0, level: 1 };
+        s = { id: 0, colourway: 0, bot: false, name: '', kos: 0, downs: 0, ping: 0, level: 1, kills: 0 };
         out.push(s);
       }
       s.id = p.id;
       s.level = p.level;
+      // The ladder's own kill count, which the HUD's XP bar fills from.
+      //
+      // **The account's persisted weekly count if there is one, and the session
+      // KOs if there is not.** Both branches are the truth about the player they
+      // describe: an account's ladder position is `AccountRecord.kills` and
+      // survives a reconnect, and a guest has nowhere durable to keep one, so
+      // what their bar shows is what they have done since they joined. The
+      // guest's bar is clamped full at ten and labelled "sign up to level up" --
+      // see `game/levelhud.levelLine` -- so it is never claiming progress that
+      // is not happening.
+      //
+      // Read off `p.account` rather than mirrored onto the participant the way
+      // `level` is, and the asymmetry is deliberate: `level` was mirrored
+      // because it changes a few times an evening and this runs several times a
+      // second, but `kills` changes on *every knockout* -- so a mirror would be
+      // a second field to keep in step with the record beside it, updated on the
+      // same path, to save one nullable dereference per player per refresh. The
+      // dereference is the cheaper of the two.
+      s.kills = p.account !== null ? p.account.kills : p.kos;
       s.colourway = p.colourway;
       s.bot = p.bot !== null;
       s.name = p.name;
@@ -1580,6 +1618,65 @@ export class Simulation {
     this.bundleVersion++;
     victim.walletVersion++;
     victim.walletNote = `-${formatMoney(amount)} dropped`;
+  }
+
+  /**
+   * A bundle of fifties out of a knocked-over NPC, at their feet.
+   *
+   * *"killing npc should drop cash"*. `dropCash` above is the player-versus-
+   * player version and the two are deliberately **not** merged, because they are
+   * different transactions wearing the same object: a death drop *moves* money
+   * from one wallet to the pavement and this one **mints** it. That single
+   * difference is the whole reason this function has a rate cap and that one
+   * does not -- a player farming other players is redistributing a fixed pool,
+   * and a player farming ibis at a spawn is printing.
+   *
+   * Four refusals, in the order they are cheapest:
+   *
+   *   - **A bot.** Bots have no wallet and no economy; a bot wandering into a
+   *     pedestrian would otherwise carpet the CBD in money nobody dropped.
+   *   - **A kind that is worth nothing.** Wildlife and the three vehicle kinds.
+   *     See `cashnote.npcDropAmount` for why the birds pay zero.
+   *   - **The bank.** `bankAllow` takes what it can and returns it, so the last
+   *     $30 of a minute still buys a bundle. Zero means the minute is spent.
+   *   - **`MAX_BUNDLES`.** The room's cap, and it loses the money rather than
+   *     queueing it, on `dropCash`'s stated argument: a cap that queued would do
+   *     nothing under exactly the conditions it exists for.
+   *
+   * **The bank is charged before the cap is tested**, and that ordering is
+   * deliberate: a room already carrying 48 bundles is a room in the middle of a
+   * riot, and letting the 49th knockout also be free would mean the cap became a
+   * way to reset the minute. The money is lost either way; what must not happen
+   * is that losing it is *cheaper* than earning it.
+   *
+   * `from` is 0 -- nobody. The field names whoever dropped it so a feed line can
+   * say "Bazza's cash", and there is no player to name here: the money came out
+   * of a constable. Zero is the sentinel `CashBundle.from` already documents.
+   */
+  private dropNpcCash(actor: NpcActor, p: Participant): void {
+    if (p.bot) return;
+    const worth = npcDropAmount(actor.kind);
+    if (worth <= 0) return;
+    const amount = bankAllow(p.npcCash, worth, Date.now());
+    if (amount <= 0) return;
+    if (this.bundles.length >= MAX_BUNDLES) return;
+    this.bundles.push({
+      id: this.nextBundleId,
+      x: actor.x,
+      // `NpcActor.y` is already **feet** -- see the record -- so unlike
+      // `dropCash`, which is handed an eye, there is nothing to subtract here.
+      // That asymmetry is the one thing in this function worth reading twice:
+      // `tickBundles` gates the pickup on the collector's feet against this
+      // number, and an eye height's worth of error is a bundle floating at head
+      // height that nobody can pick up.
+      y: actor.y,
+      z: actor.z,
+      amount,
+      from: 0,
+      ttl: BUNDLE_SECONDS,
+    });
+    this.nextBundleId = this.nextBundleId >= 65535 ? 1 : this.nextBundleId + 1;
+    this.bundleVersion++;
   }
 
   /**
@@ -3663,6 +3760,21 @@ export class Simulation {
     } else if (reason !== REASON.NONE) {
       this.reportIfWitnessed(p, actor.x, actor.z, reason);
     }
+    // --- Workstream I: the money falls out of the body.
+    //
+    // **On `strike.down` and nowhere else**, which is the "max one drop per NPC
+    // per KO" clause enforced by construction rather than by a guard: `strikeNpc`
+    // owns the re-hit guard, so an actor already on the ground reports
+    // `down: false` for every subsequent swing and this line never runs twice
+    // for one body. That is the same property `creditKo` relies on for the
+    // scoreboard, and it is why there is no `alreadyPaid` flag on `NpcActor` --
+    // a flag would be a second answer to a question the framework already
+    // answers.
+    //
+    // Placed here rather than beside the `EVENT.HIT` push below because it has
+    // to happen for *every* downed NPC, and that block is only for the kinds
+    // that do not score a knockout.
+    if (strike.down) this.dropNpcCash(actor, p);
     if (strike.down && def && !def.scoresKo) {
       // No leaderboard movement, deliberately: a scoreboard is a record of what
       // players did to each other, and a downed officer is not a player. The

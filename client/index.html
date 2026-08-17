@@ -728,13 +728,31 @@
          gold, because gold in this interface means money and a level is not
          money -- it is the same tone `#help`'s descriptions use, which is the
          "this is a label" voice established at the top of this stylesheet. */
-      #level {
+      #level { margin-top: calc(2px * var(--vitals-scale)); }
+      #level-text {
         font-size: calc(9px * var(--vitals-scale));
         letter-spacing: .16em; text-transform: uppercase;
         color: #93a8bc; text-shadow: 0 1px 3px rgba(0,0,0,.9);
-        line-height: 1; margin-top: calc(2px * var(--vitals-scale));
+        line-height: 1;
       }
-      #level:empty { display: none; }
+      /* The XP track. Deliberately the *thinnest* bar in the cluster -- one
+         scaled pixel against the stamina's two and the car's three -- because
+         it is the only one here that is not about the next ten seconds. Health,
+         stamina, footballs and a car's condition are all things you act on
+         while reading them; a level is something you notice. It gets the same
+         blue as the label above it rather than the money gold, for `#level`'s
+         original reason: gold in this interface means dollars.
+         The fill is written by `client/src/hud.ts`'s `level` from
+         `game/levelhud.xpBarWidth`, which clamps -- and `overflow: hidden` is
+         the belt to that braces, because a fill wider than its track in a box
+         that did not clip would push the whole vitals cluster sideways. */
+      #level-xp {
+        width: calc(56px * var(--vitals-scale)); height: calc(1px * var(--vitals-scale));
+        background: rgba(147,168,188,.20);
+        box-shadow: 0 1px 2px rgba(0,0,0,.85); overflow: hidden;
+        margin-top: calc(2px * var(--vitals-scale));
+      }
+      #level-xp i { display: block; height: 100%; width: 0; background: #93a8bc; }
 
 
       /* ---------------------------------------------------------------------
@@ -1649,10 +1667,18 @@
            a number that moved up the screen when a Flat White expired would be
            a number you have to look for. -->
       <div id="money"></div>
-      <!-- The level, under the balance. Empty at level 1 and offline; see
-           `client/src/hud.ts`'s `level` for why a `lvl 1` on every screen in
-           the city would be a label rather than information. -->
-      <div id="level"></div>
+      <!-- The level and the XP under it, below the balance. Empty only when
+           there is no ladder at all (offline, or the second before the first
+           roster lands) -- level 1 draws `LVL 1 - 0/10`, which is the whole of
+           the report "i cant se my level or XP anywhere". See
+           `client/src/game/levelhud.ts` for why the old level-1 suppression was
+           right about a bare label and wrong about a ladder, and note that this
+           is deliberately nowhere near the wanted stars over the investigation
+           banner: they are different numbers and the layout has to say so. -->
+      <div id="level" style="display:none">
+        <div id="level-text"></div>
+        <div id="level-xp"><i></i></div>
+      </div>
       <div id="effects"></div>
       <div id="pips"></div>
       <div id="stamina"></div>
@@ -1956,11 +1982,15 @@
       <h1>Sydney</h1>
       <table>
         <thead>
-          <!-- `lvl` sits second, next to the name, because it is a property of
-               the *person* where the three columns after it are properties of
-               the session. See `client/src/net/accounts.ts` for the ladder and
-               why it resets every Monday. -->
-          <tr><th>name</th><th>lvl</th><th>kos</th><th>downs</th><th>ping</th></tr>
+          <!-- `lvl` and `xp` sit second and third, next to the name, because
+               they are properties of the *person* where the three columns after
+               them are properties of the session. `xp` is the ladder's own kill
+               count -- this week's for an account, this session's for a guest --
+               and it is not `kos`: see `protocol.RosterEntry.kills` for why one
+               record carries both and when they differ. See
+               `client/src/net/accounts.ts` for the ladder and why it resets
+               every Monday. -->
+          <tr><th>name</th><th>lvl</th><th>xp</th><th>kos</th><th>downs</th><th>ping</th></tr>
         </thead>
         <tbody id="leaderboard-rows"></tbody>
       </table>
