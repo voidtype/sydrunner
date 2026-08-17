@@ -599,7 +599,12 @@ export const MSG = {
  * situation from the other side. `server/integration-check.ts` asserts the
  * number and is the thing that will notice if it is forgotten.
  */
-export const PROTOCOL_VERSION = 14;
+/*
+ * v15: `WELCOME` carries a `restored` flag (36 bytes) -- an account rejoining
+ * inside the same ISO week is put back where it logged off, and the client is
+ * told so it can say so.
+ */
+export const PROTOCOL_VERSION = 15;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
