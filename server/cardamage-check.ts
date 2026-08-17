@@ -11,7 +11,7 @@
  * `carRecord` putting the byte on the wire -- rather than only when each of
  * those is called by hand.
  *
- *   bun run server/cardamage.tmp.ts
+ *   bun run server/cardamage-check.ts
  *
  * Delete before the branch is merged.
  */
@@ -205,10 +205,10 @@ function run(): number {
   }
 
   if (failures.length === 0) {
-    console.log('\ncardamage.tmp: OK');
+    console.log('\ncardamage-check: OK');
     return 0;
   }
-  console.log(`\ncardamage.tmp: ${failures.length} failure(s)`);
+  console.log(`\ncardamage-check: ${failures.length} failure(s)`);
   for (const f of failures) console.log(`  - ${f}`);
   return 1;
 }
