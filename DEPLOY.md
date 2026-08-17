@@ -481,6 +481,122 @@ points the ref at a SHA that cannot exist — that costs exactly one probe reque
 and then serves the entire world from the origin, which is what a jsDelivr
 outage would look like.
 
+## The runbook, end to end (read this first)
+
+Everything above is the reasoning; this is the order of operations, written
+after a night in which every one of these steps was rediscovered the hard way.
+There are **three independent things** that can ship, and they ship
+separately: the **app** (client bundle + shared modules + server), the **world
+the browser streams** (R2), and the **world the server reads** (sidecars on the
+box). A code change touches only the first. A retile touches the last two, and
+they must move together or the server and the CDN disagree about the ground.
+
+### A. Code deploy (every feature batch)
+
+```bash
+# 0. In a worktree of the commit you are shipping. Symlink node_modules and
+#    data as usual, but make sure client/public/world is ABSENT here — vite
+#    copies public/ into dist/, and the world is 12 GB. (`rm client/public/world`
+#    if it is a symlink; restore it afterwards.)
+export PATH="$HOME/.nvm/versions/node/v22.12.0/bin:$PATH"   # bare PATH has node v4
+(cd client && npm run build)          # tsc --noEmit + vite build (~5 s, 70 MB dist)
+scripts/precompress-dist.sh           # .zst/.br sidecars beside every asset
+
+# 1. Ship. The host key is only known as oxford-tractor.bnr.la; sydrunner.3rp.uk
+#    is the site name, not the box.
+SSHOPT="ssh -i ~/.ssh/sydney_deploy -o BatchMode=yes -o ServerAliveInterval=30"
+BOX=root@oxford-tractor.bnr.la
+rsync -a --partial --delete --exclude 'world/' -e "$SSHOPT" client/dist/ $BOX:/opt/sydney/dist/
+rsync -az --partial --delete -e "$SSHOPT" client/src/ $BOX:/opt/sydney/client/src/
+rsync -az --partial --delete --exclude node_modules -e "$SSHOPT" server/ $BOX:/opt/sydney/server/
+ssh -i ~/.ssh/sydney_deploy $BOX 'chown -R root:root /opt/sydney && systemctl restart sydney'
+
+# 2. Gate. Boot takes ~60 s (rail corridors adopt before the socket opens).
+until curl -sf https://sydrunner.3rp.uk/health >/dev/null; do sleep 5; done
+curl -s https://sydrunner.3rp.uk/health | grep -o '"protocol":[0-9]*'
+```
+
+Before step 1, the merged tree must pass: `tsc --noEmit` on both ends; a local
+boot (`SYDNEY_PORT=8799 SYDNEY_STATE_DIR=/tmp/x bun run server/index.ts`) with
+every `verify*` in the self-check line; `bun run server/accounts-check.ts` (with
+`SYDNEY_CHECK_URL` pointed at that local server for phase B/C);
+`bun run server/cardamage-check.ts`; and `RIDE_GANGWAY=only bun run
+server/ride-acceptance.ts` when trains changed. These are the repeatable,
+cheap tests that replaced browser-driven checking; add to them rather than
+around them. If the protocol shape changed, bump `PROTOCOL_VERSION` **once**
+and fix the assertion in `server/integration-check.ts` in the same commit.
+
+The box side that code depends on and that a rsync does not carry:
+`/etc/systemd/system/sydney.service.d/{memory,state}.conf`
+(`SYDNEY_LANES_CAP_MB=60`, `SYDNEY_STATE_DIR=/var/lib/sydney`), the Caddy
+`handle /auth/*` block, and `/var/lib/sydney/{wallets,accounts}.json`, which
+must never be rsynced over.
+
+### B. World publish after a retile
+
+A retile writes new tiles into `client/public/world`, rewrites **every** region
+bundle (5,302 of them, most byte-identical), and rewrites `index.json` with a
+new `built` (which is the `?v=` every asset carries) — and drops the `cdn`
+block from it. So:
+
+1. **Snapshot before you build.** `cp` the tiles/collision you are about to
+   overwrite (`data/scratch/<round>/before/`) and hash the region bundles
+   (`data/scratch/station-round/regions-before.json` is the shape). Without
+   this there is no byte-diff and no way to avoid re-uploading 5.7 GB of
+   unchanged regions.
+2. **Verify** the emitted tiles: the four audits (`station-clear-audit`,
+   `collision-fit-audit`, `rail-veg-audit`, `fence-road-audit`; scoped runs
+   take `--only @file`), and `cmp` every rebuilt `.terr.bin` against its
+   snapshot — terrain must be byte-identical unless the round meant to change
+   it. Read the audits' *numbers*, not only their exit codes: an unscoped
+   audit over a partial re-emit counts the tiles you did not touch, and
+   `collision-fit-audit` currently exits 1 on "0.0 m² over a ceiling of 0.0".
+3. **Restore region mtimes** for bundles whose hash did not change
+   (`data/scratch/station-round/restore-region-mtimes.py`), so a
+   size-and-mtime uploader sends only the ones that did.
+4. **Upload to R2**, one of two ways:
+   - `SYDNEY_SECRETS=~/.config/sydney/r2.env scripts/publish-world-r2.sh --hex <id>`
+     per hexagon (the script defaults to `/etc/sydney/secrets.env`, which is
+     the box's path, not the Mac's). This needs a **live S3 API token** with
+     Object Read & Write on `sydrunner-world`. **The token in `r2.env` was
+     rolled on 2026-08-16 and now returns 403 on both read and write** — until
+     a new one is minted in the Cloudflare dashboard and written there, this
+     path does not work, and the script's success check will tell you so.
+   - `npx wrangler@latest r2 object put "sydrunner-world/<key>" --file <path>
+     --remote --content-type <ct> --cache-control "public, max-age=31536000,
+     immutable"` per changed file, 8 in parallel, using the OAuth login
+     (`wrangler whoami`). **`--remote` is mandatory**: without it wrangler
+     writes to a local simulated bucket and reports success having sent
+     nothing. Prove one object landed with `curl -sI https://world.3rp.uk/<key>`
+     before running the bulk. Pivots (`index.json`, `root.json`) go last, with
+     `--cache-control no-cache`, after re-stamping
+     `"cdn": {"base": "https://world.3rp.uk"}` into `index.json`.
+   The client honours the CDN only if the origin's `index.json` carries the
+   `cdn` block and R2's CORS allows the site origin
+   (`wrangler r2 bucket cors set sydrunner-world --file <rules.json> --force`;
+   moving domains without this = a 404 storm and a client that falls back to
+   the origin for the whole world).
+5. **Ship the server's copy of the same tiles** — `.lanes.bin`, `.terr.bin`,
+   `.pow.bin` and `collision/` for exactly the rebuilt tile ids, plus the
+   pivots and the far layer, with `rsync --files-from` (never `--delete`,
+   never `.glb`, never `regions/`), then `systemctl restart sydney`. Server and
+   CDN must always describe the same ground.
+6. Only then ship the client bundle (§A) if `client/src` changed too.
+
+`data/scratch/station-round/` holds the scripts from the 2026-08-17 station
+round (382 tiles, 36 hexagons): tile→hex mapping, before/after audits, the
+terrain diff, and the wrangler uploader. Reuse them.
+
+### C. Who does what
+
+Planning and gating happen in the lead session. Mechanical, well-specified
+legs — audits, byte-diffs, uploads, rsyncs, doc updates — go to a detached
+sub-agent via the `agent-handoff` skill (receipt + verify gate + `blocked.md`;
+it correctly refused to publish when the R2 token was dead). Design-heavy
+work — anything in `protocol.ts`, `sim.ts`, the renderers, or with invariants
+to reason about — goes to Opus subagents with a written brief that pre-assigns
+wire ids and forbids browser-driven testing (see `CLAUDE.md`).
+
 ## Rooms, and scaling past one process
 
 PERFORMANCE.md phase 3. The server is now a **host of R rooms** rather than one
