@@ -175,6 +175,22 @@ export function sunScreaming(state: SunState, nowMs: number): boolean {
   return nowMs < state.screamUntilMs;
 }
 
+/**
+ * The scream's level for this frame, or `null` for silence.
+ *
+ * Pure and three-free, so the server can run it too: a level of 1 by day when the
+ * sun is screaming, a linear fade to 0 across the two degrees either side of the
+ * horizon, and `null` when the sun is not screaming or is below −2°. The altitude
+ * is the same `main.ts` hands `SunFeature.update`, so the scream and the face fade
+ * together rather than one outlasting the other.
+ */
+export function sunScreamMix(screaming: boolean, sunAltDeg: number): { level: number } | null {
+  if (!screaming) return null;
+  const level = Math.min(1, Math.max(0, (sunAltDeg + 2) / 4));
+  if (level <= 0) return null;
+  return { level };
+}
+
 /** Would the button take a press right now, ignoring where the presser is? */
 export function sunReady(state: SunState, nowMs: number): boolean {
   return nowMs >= state.cooldownUntilMs;
@@ -402,6 +418,25 @@ export function verifySunButton(): string[] {
       if (text.trim() === '' || text.startsWith('0 min')) {
         bad.push(`sunCooldownText(${ms}) said "${text}", which tells a player nothing.`);
       }
+    }
+  }
+
+  /* --- 5. The scream mix: full by day, a linear fade to silence across the
+   *        horizon, and silent when the sun is not screaming. The audio is
+   *        driven from this, so a wrong level is a scream that is too loud or
+   *        never fades at sunset. */
+  {
+    const full = sunScreamMix(true, 30);
+    if (!full || full.level !== 1) {
+      bad.push(`sunScreamMix(true, 30) returned ${JSON.stringify(full)}; it must be level 1 by day.`);
+    }
+    const below = sunScreamMix(true, -5);
+    if (below !== null) {
+      bad.push(`sunScreamMix(true, -5) returned ${JSON.stringify(below)}; below -2° it must be null.`);
+    }
+    const quiet = sunScreamMix(false, 30);
+    if (quiet !== null) {
+      bad.push(`sunScreamMix(false, 30) returned ${JSON.stringify(quiet)}; not screaming must be null.`);
     }
   }
 
