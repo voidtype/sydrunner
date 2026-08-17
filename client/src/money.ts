@@ -15,10 +15,11 @@
  *   - the four weapon slots and the number row that picks them;
  *   - the phone -- the handset in your hand, the viewmodel in front of your
  *     eye, and the overlay it opens;
- *   - **both maps**, which are now things you hold: the big one is the phone's
- *     Map app and nothing else, and the compass is on the screen only while the
- *     phone is in a hand. `M` survives as a shortcut *through* the phone. See
- *     `game/phone.ts`, which is where those rules are written and checked;
+  *   - **both maps**: the big one is the phone's Map app and is also `M`, which
+  *     toggles it directly, and the compass is on the screen only while the phone
+  *     is in a hand. `M` used to equip the phone; the owner reversed that -- the
+  *     map is a glance, not a loadout change. See `game/phone.ts`, which is where
+  *     those rules are written and checked;
  *   - **the camera**: the viewfinder, the shutter, and the album on the phone;
  *   - the cash bundles lying in the street, drawn from the wallet frame;
  *   - the Centrelink prompt and the `E` that claims;
@@ -80,11 +81,11 @@ import {
   Gallery,
   SLOT,
   SLOT_NAME,
-  applyMapKey,
   defaultHands,
   minimapScale,
   photoCaption,
   selectSlot,
+  toggleMap,
   type PhotoStore,
   type Slot,
 } from './game/phone.ts';
@@ -387,13 +388,15 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
   });
   let online = false;
   /**
-   * Did this feature open the map that is currently up?
+   * Did the phone's Map app open the map that is currently up?
    *
    * The flag is what lets Escape mean *back to the phone* rather than merely
-   * *close*, and it is a flag rather than an assumption because the map is still
-   * reachable from `sydney.bigmap.toggle()` on a console. When it is stale --
-   * the map was closed by Tab, or by the control list -- `deps.mapVisible()` is
-   * false and the branch is skipped, so a stale true cannot do any harm.
+   * *close*: the map is reached **through** the phone, so leaving it lands where
+   * it was entered from. `M` does not set it -- `M` toggles the map directly and
+   * Escape just closes it -- so this is only the phone's Map app path. It is a
+   * flag rather than an assumption because the map is still reachable from
+   * `sydney.bigmap.toggle()` on a console, and when it is stale `deps.mapVisible()`
+   * is false and the branch is skipped, so a stale true cannot do any harm.
    */
   let mapFromPhone = false;
 
@@ -563,11 +566,9 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
   /**
    * Rebuild what the hands mean, after something has moved them.
    *
-   * Split out from `equip` because the **`M` key** also changes hands, through
-   * `game/phone.applyMapKey` -- which is the checked version of that transition
-   * and must be the one that runs, rather than a second copy of the rule written
-   * out here. So the two callers share the consequences and differ only in how
-   * they decided.
+   * Split out from `equip` because the number row and the `equip` helper share
+   * the consequences and differ only in how they decided. `M` no longer changes
+   * hands -- it toggles the map -- so this is called only by the number row.
    */
   function handsChanged(): void {
     const wantProp = hands.primary === SLOT.PHONE || hands.secondary === SLOT.PHONE;
@@ -609,29 +610,23 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
         return true;
       }
       /**
-       * `M`: the map shortcut, which now goes through the phone.
+       * `M`: the map shortcut, which toggles the big map and touches no hand.
        *
        * **This branch replaced the `KeyM` block in `main.ts`**, which called
        * `bigmap.toggle()` directly. It has to be here rather than there because
-       * the key's job changed: it is no longer "show the map", it is "get the
-       * phone out and use its Map app", and the hands are this module's.
+       * the key's job is a decision about the panels, and the panels are this
+       * module's.
        *
-       * It **opens** rather than toggling, which is a deliberate change from the
-       * key's old behaviour and is the one thing about it a returning player
-       * will notice. The reason is that the press now potentially moves a slot:
-       * a toggle whose second press closed the map would leave the phone in your
-       * hand and the bat on the ground, so the key would not be its own undo. It
-       * is Escape that closes the map now -- back to the phone's home screen,
-       * and then away -- which is the ladder the whole device is on. See
-       * `Phone.goBack`.
-       *
-       * `applyMapKey` is the checked transition; `handsChanged` is what a moved
-       * slot costs on the body. Consumed, so `main.ts` sees nothing.
+       * It **toggles** rather than only opening, which is the owner's reversal:
+       * the map is a glance, not a loadout change, so the key that opened it must
+       * be the one that closes it. Press once to open, press again to close, and
+       * nothing in the hands moves -- no phone is equipped and no slot changes.
+       * `toggleMap` is the checked transition; `deps.openMap` and `deps.closeMap`
+       * are what the panel costs. Consumed, so `main.ts` sees nothing.
        */
       if (code === 'KeyM') {
-        if (applyMapKey(hands)) handsChanged();
-        deps.openMap();
-        mapFromPhone = true;
+        if (toggleMap(deps.mapVisible())) deps.openMap();
+        else deps.closeMap();
         return true;
       }
       /**
@@ -639,24 +634,26 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
        *
        * Three rungs, tried in the order a player would expect to leave them: a
        * screen inside the phone (a photograph, the gallery, the viewfinder),
-       * then a big map the phone opened, then the phone itself. Only the last of
-       * those existed before this pass, when the phone was one screen deep.
+       * then the big map, then the phone itself. Only the last of those existed
+       * before this pass, when the phone was one screen deep.
        *
-       * The middle rung is the brief's, in as many words: *Esc closes the map
-       * back to the phone home; a second Esc puts the phone away.* Reopening the
-       * phone rather than merely closing the map is what makes it a step back --
-       * the map was reached **through** the phone, so leaving it should land
-       * where it was entered from.
+       * The middle rung closes the map whenever it is up -- whether `M` opened it
+       * or the phone's Map app did. It reopens the phone home only when the
+       * phone's Map app opened it (`mapFromPhone`), because then the map was
+       * reached **through** the phone and leaving it should land where it was
+       * entered from; `M` opened it directly, so leaving it just closes it.
        *
        * `main.ts` calls this before its own Escape branch, which is what keeps
        * the press that leaves the map from also opening the suggestions box.
        */
       if (code === 'Escape') {
         if (phone.goBack()) return true;
-        if (mapFromPhone && deps.mapVisible()) {
+        if (deps.mapVisible()) {
           deps.closeMap();
-          mapFromPhone = false;
-          phone.setOpen(true);
+          if (mapFromPhone) {
+            mapFromPhone = false;
+            phone.setOpen(true);
+          }
           return true;
         }
         if (phone.visible) {

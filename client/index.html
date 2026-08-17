@@ -1877,12 +1877,14 @@
              never puts something up while something is up. -->
         <div><kbd>esc</kbd>close panels, or open suggestions</div>
         <div><kbd>tab</kbd>scores, held</div>
-        <!-- `m` no longer opens the map directly: it equips the phone and opens
-             the phone's Map app, because the maps are the phone's now. Kept as a
-             binding rather than removed, so a player with the key in their
-             fingers still gets there. See `client/src/game/phone.ts`'s
-             `applyMapKey` and `client/src/money.ts`'s keydown. -->
-        <div><kbd>m</kbd>phone map</div>
+        <!-- `m` toggles the big map directly -- press once to open, press again
+             to close -- and touches no hand: no phone is equipped and no slot
+             moves. The owner reversed the old behaviour, which equipped the phone
+             and opened its Map app; the map is a glance, not a loadout change.
+             The phone's Map app is a second way in. See
+             `client/src/game/phone.ts`'s `toggleMap` and `client/src/money.ts`'s
+             keydown. -->
+        <div>m — map</div>
         <!-- The map takes the wheel off the camera while it is open, which is
              why this line says "with the map open" and the one under `movement`
              does not. See `bigmap.onWheel`. -->
@@ -1925,7 +1927,7 @@
              picks up a bat and a football and finds the map gone has no way to
              discover that their hands did it. See `client/src/minimap.ts`. -->
         <div>the corner map is on while the phone is in a hand — bigger when it is raised</div>
-        <div><kbd>m</kbd>gets the phone out and opens the map</div>
+        <div><kbd>m</kbd>toggles the map — without touching your hands</div>
         <div>camera: <kbd>left click</kbd>shoots · the gallery keeps 12 · save, or send one to the bug box</div>
         <div><kbd>e</kbd>claim $100 at a Centrelink, once a week per office</div>
         <div>you drop 10% of your cash when you go down — anyone can take it</div>

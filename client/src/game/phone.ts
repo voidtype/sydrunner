@@ -85,16 +85,27 @@
  * shapes are 30 px blocks.
  *
  * ---------------------------------------------------------------------------
- * `M` IS STILL A KEY, AND IT NOW GOES THROUGH THE PHONE
+ * `M` IS STILL A KEY, AND THE OWNER REVERSED WHAT IT DID
  *
  * A binding that simply stopped working would be the worst version of "maps are
  * on the phone now": every existing player has `M` in their fingers and would
- * find the map gone with nothing to say where it went. So `M` is kept and
- * **re-pointed**: it puts the phone in your hand if it is not already in one and
- * then opens the map. See `applyMapKey`, which is the state transition and is
- * checked, because the failure that matters is silent in the ordinary way --
- * pressing `M` with the phone already in your off hand must not yank it across
- * to your right hand and drop the bat you were holding.
+ * find the map gone with nothing to say where it went. So `M` is kept.
+ *
+ * It used to be **re-pointed** at the phone: it put the phone in your hand if
+ * it was not already in one and then opened the map, so the key was a loadout
+ * change as much as a map. The owner reversed that -- "i should still be able to
+ * use m to switch the map" and "the map should no longer force equip phone".
+ * The map is a **glance**, not a loadout change: a player running with a bat and
+ * a football should not have to put the bat down to look at the map, and a map
+ * shortcut that dropped a weapon to hold a phone was a shortcut that cost a
+ * weapon. So `M` now **toggles the big map** -- press once to open, press again
+ * to close -- and touches no hand: no phone is equipped and no slot moves. The
+ * phone's Map app is a second way in, and Escape still closes the map.
+ *
+ * The only thing `M` does is `toggleMap`, a pure function of the map's own
+ * state, which is checked, because the failure that matters is silent in the
+ * ordinary way -- a map shortcut that moved a hand would be found out in the
+ * next fight, not when the key was pressed.
  */
 
 import { clockLabel, cycleInstant, cyclePhase } from '../sky/cycle.ts';
@@ -195,36 +206,20 @@ export function minimapScale(hands: Hands, raised: boolean): number {
   return raised && hands.primary === SLOT.PHONE ? MINIMAP_RAISED : MINIMAP_CORNER;
 }
 
-// --- The `M` key ------------------------------------------------------------------
+ // --- The `M` key ------------------------------------------------------------------
 
-/**
- * Would pressing `M` have to fetch the phone out?
- *
- * Split out from the transition below so the check can assert the *question*
- * separately from the mutation -- and because `money.ts` wants it for the HUD
- * line, which says something different depending on whether a hand changed.
- */
-export function mapKeyNeedsPhone(hands: Hands): boolean {
-  return hands.primary !== SLOT.PHONE && hands.secondary !== SLOT.PHONE;
-}
-
-/**
- * `M`: get the phone into a hand if it is not in one, and report whether
- * anything moved. The caller opens the map either way.
- *
- * **It goes in the primary hand, and only when neither hand has it.** Both
- * halves are load-bearing. Putting it in the primary is what makes `M` a
- * complete gesture for a player who has never touched the number row -- the
- * phone comes up, the overlay is one click away, the map is already open. And
- * leaving an *off-hand* phone where it is, is what stops the key being
- * destructive: a player carrying bat-primary and phone-secondary has chosen that
- * pair, and a map shortcut that dropped their bat to hold a phone they were
- * already holding would be a shortcut that costs a weapon.
- */
-export function applyMapKey(hands: Hands): boolean {
-  if (!mapKeyNeedsPhone(hands)) return false;
-  return selectSlot(hands, SLOT.PHONE, 'primary');
-}
+ /**
+  * `M`: toggle the big map, and report the map's new state.
+  *
+  * A pure function of the map's own open/closed state and nothing else -- it
+  * takes no `hands`, so it cannot move a hand, which is the whole of the owner's
+  * reversal. `money.ts` reads it to decide whether to open or close the panel,
+  * and the check below asserts the toggle is a toggle: one press flips it and
+  * two return to where you started.
+  */
+ export function toggleMap(open: boolean): boolean {
+   return !open;
+ }
 
 // --- The photographs ---------------------------------------------------------------
 
@@ -549,9 +544,9 @@ export function photoCaption(suburb: string, clockMs: number): string {
  *   - A **minimap rule that is inverted** hides the compass exactly when the
  *     phone is out, which reads as the map being broken rather than as a rule.
  *     There is no error and nothing in the console.
- *   - An **`M` that grabs an off-hand phone** drops the bat the player was
- *     holding, on a key they pressed to look at a map, and they find out in the
- *     next fight.
+  *   - An **`M` that moves a hand** drops the bat the player was holding, on a
+  *     key they pressed to look at a map, and they find out in the next fight.
+  *     The owner reversed it: the map is a glance, not a loadout change.
  *   - A **gallery that does not cap** fills the origin's quota and then throws
  *     on every subsequent photograph -- so the camera works twenty times and
  *     then stops, which nobody will attribute to the twenty.
@@ -658,33 +653,42 @@ export function verifyPhoneModel(): string[] {
     }
   }
 
-  // --- `M`, which must fetch the phone out and must not steal it back.
+  // --- `M` is now the map itself, and it touches no hand.
+  //
+  // The owner reversed the old behaviour: the map is a glance, not a loadout
+  // change, so `M` toggles the big map and moves nothing. `toggleMap` takes no
+  // `hands`, so a press cannot move a hand -- but the two loadouts are asserted
+  // anyway, because the failure that matters is silent in the ordinary way and a
+  // map shortcut that dropped a weapon would be found out in the next fight.
   {
-    const empty = defaultHands();
-    if (!mapKeyNeedsPhone(empty)) failures.push('M thought a bat/footy loadout already had a phone.');
-    if (!applyMapKey(empty)) failures.push('M did not equip the phone from a bat/footy loadout.');
-    if (empty.primary !== SLOT.PHONE) failures.push(`M left ${SLOT_NAME[empty.primary]} in the right hand.`);
-    // The **off hand is untouched**, which is `selectSlot`'s ordinary
-    // behaviour and is worth asserting here rather than assuming: the swap only
-    // fires when the slot being asked for is in the *other* hand, and the phone
-    // was in neither. So the bat is put down and the football stays where it
-    // was, which is exactly what pressing `3` does and is what makes `M` "press
-    // 3, then open the map" rather than a second, subtly different, gesture.
-    if (empty.secondary !== SLOT.FOOTY) {
-      failures.push(`M disturbed the off hand; it holds ${SLOT_NAME[empty.secondary]} rather than the footy.`);
+    // bat/footy: M does not move a hand.
+    const fighting = defaultHands();
+    const startF = { primary: fighting.primary, secondary: fighting.secondary };
+    toggleMap(false);
+    toggleMap(true);
+    if (fighting.primary !== startF.primary || fighting.secondary !== startF.secondary) {
+      failures.push('M moved the bat/footy loadout; it should only toggle the map.');
     }
-
-    // THE ONE THAT MATTERS: an off-hand phone is left exactly where it is.
+    // phone-secondary: an off-hand phone is left exactly where it is.
     const offHand: Hands = { primary: SLOT.BAT, secondary: SLOT.PHONE };
-    if (mapKeyNeedsPhone(offHand)) failures.push('M thought an off-hand phone was not a phone.');
-    if (applyMapKey(offHand)) failures.push('M moved a phone that was already in a hand.');
-    if (offHand.primary !== SLOT.BAT || offHand.secondary !== SLOT.PHONE) {
-      failures.push(`M rearranged an off-hand phone into ${SLOT_NAME[offHand.primary]}/${SLOT_NAME[offHand.secondary]}.`);
+    const startO = { primary: offHand.primary, secondary: offHand.secondary };
+    toggleMap(false);
+    toggleMap(true);
+    if (offHand.primary !== startO.primary || offHand.secondary !== startO.secondary) {
+      failures.push('M moved the off-hand phone; it should only toggle the map.');
     }
+  }
 
-    // And a phone already raised: nothing at all happens except the map.
-    const raised: Hands = { primary: SLOT.PHONE, secondary: SLOT.FOOTY };
-    if (applyMapKey(raised)) failures.push('M moved a phone that was already the primary.');
+  // --- The map toggle is a toggle: one press flips it, two return to the start.
+  {
+    for (const start of [true, false]) {
+      if (toggleMap(start) === start) {
+        failures.push(`A single map press from ${start} did not flip the map.`);
+      }
+      if (toggleMap(toggleMap(start)) !== start) {
+        failures.push(`Two map presses from ${start} did not return to ${start}.`);
+      }
+    }
   }
 
   // --- The album, over a fake storage. See `PhotoStore`.
