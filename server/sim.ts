@@ -102,6 +102,9 @@ import {
   WITNESS_RADIUS,
   bystanderSeen,
   carCrashClosing,
+  // WORKSTREAM T: a driven car against the timetable, which `carCrashClosing`
+  // cannot express because only one of the two parties has a record.
+  crashIntoTraffic,
   crashDamage,
   createDrivingScratch,
   resolveTake,
@@ -692,6 +695,18 @@ export class Simulation {
    */
   private readonly carRoutes: LaneRoute[] = [];
   private readonly carPose: CarPose = createCarPose();
+  /**
+   * `CarField.suppressed` as a value, bound once. WORKSTREAM T.
+   *
+   * `carHitting`'s call site builds this closure inline once per player per
+   * tick, which was affordable when it was the only caller. `stepCars`'
+   * crash-into-the-timetable sweep is a second one, per *driven car* per tick,
+   * and a closure per car per tick is exactly the per-tick allocation
+   * `carRoutes` and `carPose` exist to avoid. An arrow property rather than a
+   * `bind`, on `world/drivencars.DrivenCarView.suppress`' precedent -- the
+   * client passes the identical shape into the identical parameter.
+   */
+  private readonly suppressCar = (identity: number): boolean => this.cars.suppressed(identity);
   private readonly snapshotBalls: SnapshotBall[] = [];
   /**
    * The last hit, for the event that follows it.
@@ -3086,7 +3101,12 @@ export class Simulation {
    *   3. **The crashes**, which is new: a wall or a kerb arrives on the
    *      combatant as `carCrashDv` (`combat.advance` filled it), car against car
    *      is decided here because it is the one collision that needs two records,
-   *      and both go through `CarField.damage` so the cooldown has one owner.
+   *      car against the *ambient* fleet is decided here too because the other
+   *      party has no record at all (`driving.crashIntoTraffic`, workstream T),
+   *      and all three go through `CarField.damage` so the cooldown has one
+   *      owner. None of them touches the driver: a player inside a car is never
+   *      knocked down by a car, which is `traffic.canBeRunDown`'s rule and is
+   *      what sweep 2 above now obeys.
    *   4. **The clocks**, every tick. What used to be a 1 Hz expiry sweep is now
    *      `CarField.age`, which removes nothing -- see `game/driving.ts` section
    *      6, where the five-minute abandonment became a budget.
@@ -3183,6 +3203,51 @@ export class Simulation {
       }
     }
 
+    const tick = trafficTick(Date.now());
+
+    // --- And into the **ambient fleet**. WORKSTREAM T, and the third of the
+    // three ways two cars can meet.
+    //
+    // The owner's report -- *"I still get knocked out of cars when crashing into
+    // another car, the actual action should be damage to both cars"* -- is
+    // mostly about this one, because the ambient fleet is six thousand cars and
+    // the driven one is at most sixteen. What used to happen had two halves and
+    // both were wrong: the traffic knockdown found the driver's *body* inside
+    // the ambient car's box and threw it over the bonnet (`traffic.canBeRunDown`
+    // now refuses that, on both ends), and nothing at all charged the car for
+    // the impact, because an ambient car is not in the collision world and so
+    // never reaches `combat.crashFromClamp`. Driving into a bus was a knockout
+    // and a free repair.
+    //
+    // **Occupied cars only**, which is what keeps this O(players) rather than
+    // O(records): a `forEachCarNear` per driven car per tick is exactly the
+    // broadphase the player sweep already runs per player per tick, and the
+    // budget is the sixteen-player cap however many wrecks are parked around the
+    // city. A car standing empty in a lane is left out on purpose and it costs
+    // nothing to leave out -- `traffic.resolveHeld` already stops the timetable
+    // six metres behind anything in `publishBlockers`' roster, so the ambient
+    // fleet queues behind an abandoned car instead of driving into it.
+    //
+    // The scratch is `drivenPose` and `carPose`/`carRoutes`, all three reused
+    // from earlier in this tick: the player sweep finished with `carPose` two
+    // phases ago and the run-over sweep below refills `drivenPose` on its own
+    // first line, so nothing here holds a pose across a call. See their headers.
+    for (const car of this.cars.all()) {
+      if (car.driverId === 0) continue;
+      const dv = crashIntoTraffic(
+        this.world.traffic, car, tick, this.carRoutes, this.drivenPose, this.carPose, this.suppressCar,
+      );
+      if (dv <= 0) continue;
+      // **One car and not two.** A schedule car has no record and no health --
+      // see `crashIntoTraffic`' header -- so it carries on down its timetable
+      // with the dent it cannot store, and the driven one pays. Through the same
+      // `CarField.damage` the wall and the car-on-car test use, so the 0.5 s
+      // cooldown has one owner and grinding along a queue of traffic costs one
+      // impact per half second rather than one per car.
+      const hit = this.cars.damage(car.id, crashDamage(dv));
+      if (hit !== null) this.carChanges.push(hit);
+    }
+
     for (const car of this.cars.follow(this.driverViews, this.carSweep)) {
       // A car whose driver has just got out (or been thrown out) is snapped into
       // a kerb bay if it stopped beside one. See `parkOnLeave`.
@@ -3190,8 +3255,9 @@ export class Simulation {
       this.carChanges.push(car);
     }
 
-    // --- What the driven fleet ran over.
-    const tick = trafficTick(Date.now());
+    // --- What the driven fleet ran over. `tick` is the one taken above, so the
+    // crash sweep and the knockdown sweep are asking about the same instant of
+    // the same timetable.
     for (const car of this.cars.all()) {
       if (car.driverId === 0) continue;
       const speed = car.speed < 0 ? -car.speed : car.speed;
@@ -3213,6 +3279,14 @@ export class Simulation {
         // Nobody on a train is run over by a stolen Camry, on exactly the
         // clause the ambient fleet has thirty lines up and for its reason.
         if (isAboard(victim.combat.aboard)) continue;
+        // ...and nobody **in a car** is run over by one either, which is
+        // workstream T and is inside `canBeRunDown` rather than beside this line
+        // for the reason its header gives. This is where the owner's report bit
+        // for a driven pair: two players in two cars, one drives into the other,
+        // and the stationary driver's *capsule* was found inside the moving
+        // car's box and thrown over its bonnet. The contact is adjudicated
+        // thirty lines above instead, by `carCrashClosing`, and it costs both
+        // cars health rather than costing one player their vehicle.
         if (!canBeRunDown(victim.combat)) continue;
         if (!carOverlaps(pose, victim.combat)) continue;
         const ko = applyCarHit(victim.combat, pose);

@@ -283,6 +283,8 @@ import {
   PARK_SNAP_RADIUS,
   createDrivingScratch,
   crashDamage,
+  // WORKSTREAM T: driving into the ambient fleet is a crash, not an ejection.
+  crashIntoTraffic,
   snapToBay,
   verifyDamageGrade,
   resolveTake,
@@ -2793,6 +2795,16 @@ async function main(): Promise<void> {
   /** Scratch for the per-tick hit query, so a fixed step allocates nothing. */
   const carRoutes: LaneRoute[] = [];
   const carPose: CarPose = createCarPose();
+  /**
+   * WORKSTREAM T: the driven car's own box, for `driving.crashIntoTraffic`.
+   *
+   * A second pose because a crash has two cars in it and the iterator owns
+   * `carPose` for the ambient one. Here rather than in the block that uses it
+   * for `carRoutes`' reason exactly -- that block runs every fixed step and a
+   * `createCarPose()` inside it would be an allocation per tick.
+   * `server/sim.drivenPose` is the same field on the other end.
+   */
+  const carCrashPose: CarPose = createCarPose();
   /**
    * How many times a car has knocked somebody over this session, and when the
    * last one was. Diagnostics only, and the only observable this feature has:
@@ -7604,6 +7616,33 @@ async function main(): Promise<void> {
           audio.carCrunch(Math.min(1, dv / DRIVE_TOP_SPEED));
         } else {
           audio.carScrape();
+        }
+      }
+      // WORKSTREAM T: and the same again for the **ambient fleet**, which the
+      // wall path above cannot see. A schedule car is a closed-form lookup and
+      // not a collision prism, so `combat.crashFromClamp` never notices one --
+      // driving into a bus used to be free, and the only thing that happened was
+      // that `traffic.applyCarHit` threw you out of your own car, which is the
+      // owner's report. `traffic.canBeRunDown` ended the second half; this is
+      // the first. `server/sim.stepCars` runs the identical call with the
+      // identical arguments, so this is a prediction and not a second opinion --
+      // and the server's `MSG.CARS` corrects it either way (`CarField.adopt`).
+      //
+      // The local player's car only, exactly like the wall above it: another
+      // player's crash is theirs to predict and arrives here as a health byte.
+      if (c.drivingCar !== 0) {
+        const mine = cars.get(c.drivingCar);
+        if (mine !== undefined) {
+          const into = crashIntoTraffic(
+            traffic, mine, trafficTick(Date.now()), carRoutes, carCrashPose, carPose, drivenCars.suppress,
+          );
+          if (into > 0) {
+            if (cars.damage(mine.id, crashDamage(into)) !== null) {
+              audio.carCrunch(Math.min(1, into / DRIVE_TOP_SPEED));
+            } else {
+              audio.carScrape();
+            }
+          }
         }
       }
       // The clocks. `CarField.age` removes nothing -- see `game/driving.ts`

@@ -201,6 +201,9 @@
 import type { InputSnapshot } from '../player/controller.ts';
 import { CAR_HEALTH_FULL } from '../net/protocol.ts';
 import {
+  // WORKSTREAM T: `verifyDriving` derives `CRASH_QUERY_RADIUS` from the body
+  // table rather than trusting the literal, so a sixth body cannot outgrow it.
+  CAR_BODY_SIZE,
   CAR_HEALTH_FULL_POSE,
   CAR_STAGE_PARKED_IN,
   CAR_STAGE_PARKED_OUT,
@@ -209,6 +212,9 @@ import {
   type LaneRoute,
   type TrafficField,
   createCarPose,
+  // WORKSTREAM T: `crashIntoTraffic` fills a driven car's box from the same
+  // function the knockdown test does, so "a car hit a car" is one geometry.
+  drivenCarPose,
   forEachCarNear,
 } from './traffic.ts';
 // WORKSTREAM S: the parked fleet, as a source `resolveTake` can ask. A type-only
@@ -1326,10 +1332,70 @@ export function carCrashClosing(
   a: { x: number; z: number; yaw: number; speed: number; halfLength: number },
   b: { x: number; z: number; yaw: number; speed: number; halfLength: number },
 ): number {
-  const rx = b.x - a.x;
-  const rz = b.z - a.z;
+  // `yaw` 0 faces -Z, `controller.step`'s convention, and the two
+  // transcendentals that turns into are the whole reason this wrapper exists
+  // separately from `ambientCrashClosing`: the ambient fleet carries its heading
+  // as a unit vector already (`CarPose.dx/dz`) and must not pay for a yaw it
+  // never had.
+  return closingAlong(
+    a.x, a.z, -Math.sin(a.yaw), -Math.cos(a.yaw), a.speed, a.halfLength,
+    b.x, b.z, -Math.sin(b.yaw), -Math.cos(b.yaw), b.speed, b.halfLength,
+  );
+}
+
+/**
+ * The same question asked of a **driven car and an ambient one**. WORKSTREAM T.
+ *
+ * The owner's report was one sentence -- *"I still get knocked out of cars when
+ * crashing into another car, the actual action should be damage to both cars"*
+ * -- and the half of it that `carCrashClosing` could not answer is this one.
+ * `carCrashClosing` needs two `DrivenCar` records and there is only ever one
+ * when a player drives into the timetable: the other car is a closed-form
+ * lookup, it has no record, no health and no driver, and it *carries on* -- see
+ * `crashIntoTraffic` for what that means and why it is right.
+ *
+ * Both sides arrive as a **unit heading** rather than as a yaw, which is what
+ * makes this the cheap one of the pair: `traffic.poseCar` and
+ * `traffic.drivenCarPose` have both already produced `(dx, dz)`, so this runs on
+ * the shared prediction path with no `Math.sin`/`Math.cos` in it at all and the
+ * two ends cannot disagree about a transcendental. That is the determinism rule
+ * from `game/footy.ts`' header, applied to the one new function in this change
+ * that both ends evaluate.
+ *
+ * `speed` is **signed on the driven side and unsigned on the ambient one**, and
+ * the asymmetry is not sloppiness: a player reversing into a bus at 5 m/s has
+ * crashed at 5 m/s, so the driven side has to keep its sign, where a `CarPose`'s
+ * speed is a magnitude along a heading it is always travelling forwards down.
+ * `crashIntoTraffic` is the one caller and it states which is which.
+ */
+export function ambientCrashClosing(
+  a: { x: number; z: number; dx: number; dz: number; speed: number; halfLength: number },
+  b: { x: number; z: number; dx: number; dz: number; speed: number; halfLength: number },
+): number {
+  return closingAlong(
+    a.x, a.z, a.dx, a.dz, a.speed, a.halfLength,
+    b.x, b.z, b.dx, b.dz, b.speed, b.halfLength,
+  );
+}
+
+/**
+ * The shared body of the two above: overlap in plan, then closing speed.
+ *
+ * Twelve scalars rather than two objects, on `CarField.recycleFarthest`'s
+ * argument about its flat `[x, z, ...]`: this runs once per moving car per
+ * record near it on the server's hot path, and building two literals per call
+ * would be two allocations for a function whose body is eight multiplies and a
+ * square root. The readable shapes live in the two wrappers, where they cost
+ * nothing because the compiler never has to allocate them.
+ */
+function closingAlong(
+  ax: number, az: number, adx: number, adz: number, aSpeed: number, aHalf: number,
+  bx: number, bz: number, bdx: number, bdz: number, bSpeed: number, bHalf: number,
+): number {
+  const rx = bx - ax;
+  const rz = bz - az;
   const d2 = rx * rx + rz * rz;
-  const reach = a.halfLength + b.halfLength;
+  const reach = aHalf + bHalf;
   if (d2 >= reach * reach) return 0;
   // Exactly on top of each other: no direction to close along, and no answer
   // that is not a divide by zero. Two records at one point is a take that
@@ -1339,12 +1405,95 @@ export function carCrashClosing(
   const nx = rx * inv;
   const nz = rz * inv;
   // Each car's velocity along its own heading, projected onto the line between
-  // them. `yaw` 0 faces -Z, `controller.step`'s convention.
-  const av = a.speed * (-Math.sin(a.yaw) * nx + -Math.cos(a.yaw) * nz);
-  const bv = b.speed * (-Math.sin(b.yaw) * nx + -Math.cos(b.yaw) * nz);
+  // them.
+  const av = aSpeed * (adx * nx + adz * nz);
+  const bv = bSpeed * (bdx * nx + bdz * nz);
   // Positive when `a` is moving toward `b` faster than `b` is moving away.
   const closing = av - bv;
   return closing > CRASH_FREE_SPEED ? closing : 0;
+}
+
+/**
+ * How far from a driven car an ambient one has to be to be worth testing, metres.
+ *
+ * `traffic.HIT_QUERY_RADIUS`' number and *not* its derivation, which is why it
+ * is written out again rather than imported. That one is a box against a capsule
+ * -- the longest car plus a player's radius -- and this is a box against a box:
+ * the widest reach `closingAlong` can return non-zero for is the driven half
+ * length (a van, 5.4 / 2 = 2.7, at `drivenCarPose`'s scale of exactly 1) plus
+ * the ambient half length (the same van at the 4 % jitter plus `HIT_MARGIN`,
+ * 2.91), which is 5.61. Six covers it with room and is a broadphase radius, so
+ * it stays one number rather than being derived per candidate -- `carHitting`'s
+ * header states that rule and it holds here for its reason. `verifyDriving`
+ * asserts the six is still bigger than the widest pair `CAR_BODY_SIZE` allows.
+ */
+export const CRASH_QUERY_RADIUS = 6;
+
+/**
+ * What a driven car has crashed into out of the ambient fleet, as a delta-v.
+ * Zero for the overwhelmingly common case of not having hit anything.
+ *
+ * **The ambient car is not damaged and does not react**, and that is a decision
+ * rather than an omission. A schedule car has no record, no health field and no
+ * existence between two queries of `traffic.poseCar` -- it is a closed-form
+ * function of the clock, which is the whole reason a fleet of six thousand costs
+ * zero bytes of protocol (`game/traffic.ts` section 1). Giving one a dent would
+ * mean giving it a record, and a record per car anybody has ever nudged is the
+ * per-NPC city state the performance budget exists to forbid. So the timetable
+ * carries on and the player pays; the read is that you bounced off a bus.
+ *
+ * The **first** car found wins, which is `carHitting`'s rule and is here for its
+ * reason: `forEachCarNear` has one fixed iteration order in every process, so
+ * "the first" is a thing two processes can agree on where "the hardest" would
+ * make them agree only if their floats did.
+ *
+ * Two poses because there are two cars: `mine` is filled here from the record
+ * and `theirs` is the iterator's own scratch. Both are the caller's, reused
+ * across ticks, so this allocates nothing.
+ */
+export function crashIntoTraffic(
+  field: TrafficField,
+  car: DrivenCar,
+  tick: number,
+  scratch: LaneRoute[],
+  mine: CarPose,
+  theirs: CarPose,
+  /** `CarField.suppress`. Without it your own ambient ghost crashes into you. */
+  suppressed: (identity: number) => boolean,
+): number {
+  // The identical box the knockdown test uses, from the identical function --
+  // `traffic.drivenCarPose`' whole argument, which is that a driven car reusing
+  // the ambient geometry is the only way "a car hit a car" means one thing.
+  drivenCarPose(car, mine);
+  // ...with one field put back. `drivenCarPose` publishes an **unsigned** speed
+  // because everything downstream of a pose treats it as a magnitude, and a
+  // crash is the one consumer that must not: reversing into the car behind you
+  // is a crash and a magnitude would score it as driving away. See
+  // `ambientCrashClosing`.
+  mine.speed = car.speed;
+  let dv = 0;
+  forEachCarNear(field, car.x, car.z, CRASH_QUERY_RADIUS, tick, scratch, theirs, (p) => {
+    // Your own ghost, skipped exactly as `carHitting` skips it and for the same
+    // reason: the ambient copy of the car you stole is still on the timetable
+    // and would otherwise crash into the seat you are sitting in.
+    if (suppressed(p.identity)) return;
+    // **The viaduct gate**, and it is here because the first run of
+    // `server/cardamage-check.ts`' section (c) crashed a car on the ground into
+    // one twelve and a half metres below it and reported 48 hp of damage for it.
+    // `traffic.carOverlaps` has this clause, `sim.stepCars`' driven-against-
+    // driven loop has it, and `traffic.resolveHeld` has it: a car on the Cahill
+    // Expressway is not in the car on Alfred Street underneath, and every test
+    // in this game that asks whether two things are in the same place has to say
+    // so or the whole viaduct is a hazard to the street below. `TAKE_HEIGHT` is
+    // the project's one answer to "the same piece of road".
+    const dy = p.y - car.y;
+    if (dy > TAKE_HEIGHT || dy < -TAKE_HEIGHT) return;
+    const closing = ambientCrashClosing(mine, p);
+    if (closing <= 0) return;
+    dv = closing;
+    return true;
+  });
+  return dv;
 }
 
 /**
@@ -2493,6 +2642,15 @@ export function verifyDriving(): string[] {
     if (other.x !== 100) failures.push('An empty car moved when somebody else drove past.');
 
     // Knocked out: `combat.applyHit` clears the field and the sweep does the rest.
+    //
+    // **Which hits those are is smaller than it was.** WORKSTREAM T removed the
+    // car from the list: a bat, a footy, a fall, a respawn, pressing E and a
+    // disconnect all still clear `drivingCar` and this sweep still leaves the
+    // car standing where the body was, but a *car* no longer does -- see
+    // `traffic.canBeRunDown`. This case is about what `follow` does once the
+    // field is clear and is unchanged by that; the case that *did* encode the
+    // old behaviour was in `server/sim.ts`, where the driven-car sweep threw a
+    // rival driver out of their own car, and it is gated now.
     driver.drivingCar = 0;
     const changed = field.follow([driver]);
     if (changed.length !== 1 || changed[0].id !== car.id) {
@@ -2796,6 +2954,83 @@ export function verifyDriving(): string[] {
     // And a gentle touch is inside the free allowance.
     const gentle = { x: 0, z: 0, yaw: 0, speed: CRASH_FREE_SPEED, ...box };
     if (carCrashClosing(gentle, ahead) !== 0) failures.push('Parking against another car at the free speed was a crash.');
+  }
+
+  // --- Car against the **ambient fleet**. WORKSTREAM T, and the whole point of
+  //     it is that this is the *same* rule in the other party's coordinates: an
+  //     ambient car has a unit heading rather than a yaw, so the two wrappers
+  //     have to agree number for number or the crash a driver feels depends on
+  //     which fleet they hit.
+  {
+    const box = { halfLength: 2.3 };
+    // The same rear-ender as the block above, stated both ways. `yaw` 0 faces
+    // -Z, so its heading is (0, -1) and this is the identity `closingAlong` is
+    // factored out to make checkable.
+    const yawForm = carCrashClosing(
+      { x: 0, z: 0, yaw: 0, speed: 5, ...box },
+      { x: 0, z: -4, yaw: 0, speed: 0, ...box },
+    );
+    const headingForm = ambientCrashClosing(
+      { x: 0, z: 0, dx: 0, dz: -1, speed: 5, ...box },
+      { x: 0, z: -4, dx: 0, dz: -1, speed: 0, ...box },
+    );
+    if (Math.abs(yawForm - headingForm) > 1e-9) {
+      failures.push(
+        `The same crash scored ${yawForm.toFixed(4)} from two yaws and ${headingForm.toFixed(4)} from two ` +
+          'headings. `carCrashClosing` and `ambientCrashClosing` must be one function in two coordinates.',
+      );
+    }
+
+    // A stationary driven car with a bus arriving at 12 m/s. This is the case
+    // the owner reported -- it used to end with the driver on the tarmac -- and
+    // it is *symmetric*: the closing speed does not care which of the two was
+    // doing the moving, which is what makes "a crash" one number rather than a
+    // rule about fault.
+    const parked = { x: 0, z: 0, dx: 0, dz: -1, speed: 0, ...box };
+    const arriving = { x: 0, z: -4, dx: 0, dz: 1, speed: 12, ...box };
+    const rammed = ambientCrashClosing(parked, arriving);
+    if (Math.abs(rammed - 12) > 1e-6) {
+      failures.push(`A bus arriving at 12 m/s into a stopped car reported ${rammed.toFixed(2)} m/s of closing.`);
+    }
+    // ...and it is the same number seen from the bus.
+    const fromTheBus = ambientCrashClosing(arriving, parked);
+    if (Math.abs(fromTheBus - rammed) > 1e-9) {
+      failures.push(`One crash scored ${rammed.toFixed(4)} from one car and ${fromTheBus.toFixed(4)} from the other.`);
+    }
+
+    // Reversing into the car behind you is a crash, which is the clause
+    // `crashIntoTraffic` puts the signed speed back for. `drivenCarPose`
+    // publishes an unsigned speed and a magnitude here would score this as
+    // driving *away* at 5 m/s, which is nothing.
+    const backing = { x: 0, z: 0, dx: 0, dz: -1, speed: -5, ...box };
+    const behind = { x: 0, z: 4, dx: 0, dz: -1, speed: 0, ...box };
+    const reversed = ambientCrashClosing(backing, behind);
+    if (Math.abs(reversed - 5) > 1e-6) {
+      failures.push(`Reversing at 5 m/s into the car behind reported ${reversed.toFixed(2)} m/s; a crash keeps its sign.`);
+    }
+
+    // Overtaking a car doing the same speed in the next lane is not a crash,
+    // however close it is. `carCrashClosing`'s convoy case, laterally.
+    const alongside = ambientCrashClosing(
+      { x: 0, z: 0, dx: 0, dz: -1, speed: 20, ...box },
+      { x: 3, z: -1, dx: 0, dz: -1, speed: 20, ...box },
+    );
+    if (alongside !== 0) failures.push(`Two cars abreast at one speed crashed at ${alongside.toFixed(2)} m/s.`);
+
+    // The broadphase radius has to be wider than the widest pair the body table
+    // can produce, or a van into a van is a crash the query never finds. See
+    // `CRASH_QUERY_RADIUS`, whose derivation this is.
+    let widest = 0;
+    for (const size of CAR_BODY_SIZE) if (size.length > widest) widest = size.length;
+    // The driven side at `drivenCarPose`'s scale of 1, the ambient side at
+    // `poseCar`'s 1.04 jitter ceiling plus its hit margin (0.1).
+    const reach = widest * 0.5 + (widest * 0.5 * 1.04 + 0.1);
+    if (CRASH_QUERY_RADIUS < reach) {
+      failures.push(
+        `CRASH_QUERY_RADIUS is ${CRASH_QUERY_RADIUS} m and two vans can touch at ${reach.toFixed(2)} m. ` +
+          'The broadphase would miss the biggest crash in the game.',
+      );
+    }
   }
 
   // --- The budget, and the rule for what gives. Section 6.
