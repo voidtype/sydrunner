@@ -391,6 +391,21 @@ function runCrashes(): string[] {
    */
   const runUpFor = (speed: number): number => speed * speed / (2 * DRIVE_ACCELERATION);
 
+  /**
+   * How long to keep stepping **after** the crash lands, ticks.
+   *
+   * Not padding. The crash and the ejection were never the same tick:
+   * `carCrashClosing` fires the moment two 2.3 m boxes overlap, at 4.6 m centre
+   * to centre, and `traffic.carOverlaps` needs the victim's *capsule* inside the
+   * moving car's box, which is 2.7 m -- eight more ticks at 15 m/s. The first
+   * draft of section (a) stopped watching on the tick the health moved and
+   * therefore reported that nobody was thrown out of anything, on code that
+   * throws people out of cars. Three quarters of a second is well past the
+   * knockdown window and past `CRASH_COOLDOWN_MS`, so what it also proves is
+   * that a car resting against another car is not being billed every tick.
+   */
+  const SETTLE = 45;
+
   console.log('\n--- WORKSTREAM T: a car-on-car crash damages both cars and throws nobody out');
 
   // === (a) Two driven cars. The mover arrives at about 15 m/s under its own
@@ -414,10 +429,13 @@ function runCrashes(): string[] {
       sim.step(out);
       if (carA.health < CAR_HEALTH_MAX || carB.health < CAR_HEALTH_MAX) break;
     }
+    // ...and keep going, because the ejection happens later than the crash. See
+    // `SETTLE`.
+    for (let i = 0; i < SETTLE; i++) sim.step(out);
     a.input.forward = 0;
     console.log(
       `  (a) driven into driven, ${gap.toFixed(1)} m of run-up, ${atImpact.toFixed(2)} m/s at impact, ` +
-        `after ${ticks + 1} ticks:\n` +
+        `${SETTLE} ticks of settling after it:\n` +
         `      mover:      car ${carA.health.toFixed(1)} hp, drivingCar ${a.combat.drivingCar}, ` +
         `health ${a.combat.health.toFixed(1)}, phase '${a.combat.phase}'\n` +
         `      stationary: car ${carB.health.toFixed(1)} hp, drivingCar ${b.combat.drivingCar}, ` +
@@ -511,10 +529,11 @@ function runCrashes(): string[] {
         sim.step(out);
         if (car.health < before) break;
       }
+      for (let i = 0; i < SETTLE; i++) sim.step(out);
       a.input.forward = 0;
       console.log(
         `  (b) driven into a stationary ambient car at (${t.x.toFixed(1)}, ${t.z.toFixed(1)}), ` +
-          `${atImpact.toFixed(2)} m/s at impact, after ${ticks + 1} ticks:\n` +
+          `${atImpact.toFixed(2)} m/s at impact, ${SETTLE} ticks of settling after it:\n` +
           `      car ${before} -> ${car.health.toFixed(1)} hp, drivingCar ${a.combat.drivingCar}, ` +
           `health ${a.combat.health.toFixed(1)}, phase '${a.combat.phase}'`,
       );
@@ -566,6 +585,13 @@ function runCrashes(): string[] {
           },
         );
         if (car.health < before || b.combat.drivingCar === 0) break;
+      }
+      // The same settle, still on the wall clock, so the ambient car that landed
+      // the crash has time to arrive on top of the driver afterwards. See
+      // `SETTLE`.
+      for (let i = 0; i < SETTLE; i++) {
+        Bun.sleepSync(REAL_TIME_STEP_MS);
+        sim.step(out);
       }
       console.log(
         `  (c) an ambient car at ${t.speed.toFixed(1)} m/s arriving at a driven car standing in its lane, ` +
