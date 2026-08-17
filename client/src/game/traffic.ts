@@ -3880,9 +3880,38 @@ export function carOverlaps(pose: CarPose, c: CombatantState): boolean {
  * *re-hit guard*, and it needs no new state because a victim thrown by a car is
  * in the flinch this module put them in for the next 0.85 s, by which time the
  * car is thirty metres up the street.
+ *
+ * **And neither can somebody who is inside a car. WORKSTREAM T.** The owner's
+ * report was *"I still get knocked out of cars when crashing into another car,
+ * the actual action should be damage to both cars"*, and this line is the whole
+ * of the first half of that. What used to happen is exactly what the code said:
+ * this test asked whether a *body* was targetable, `carOverlaps` found that body
+ * inside the box of the car that had just hit the car it was sitting in, and
+ * `applyCarHit` threw it over the bonnet -- so every crash ended with the driver
+ * on the tarmac and the car standing in the road. Three call sites reached it
+ * from two ends (the ambient sweep in `server/sim.ts` and its prediction in
+ * `main.ts`, and the driven-on-driven sweep in `sim.stepCars`) and all three
+ * came through here, which is why the rule is stated here once rather than
+ * gated three times.
+ *
+ * Here and not at the call sites, unlike `isAboard` -- and the two really are
+ * different questions. A train passenger is excluded by the *caller* because
+ * that is a fact about a body's frame of reference that `carHitting` has no
+ * business knowing; being in a car is a fact about whether this combatant is a
+ * pedestrian at all, which is precisely what this function is for. A car-on-car
+ * contact is a **crash** and is adjudicated as one: `driving.carCrashClosing`
+ * for two driven cars, `driving.crashIntoTraffic` for a driven one against the
+ * timetable, both landing on `driving.CarField.damage` under its cooldown. The
+ * driver keeps the seat, keeps `drivingCar`, and takes no health from it -- a
+ * car written off at 0 has a dead throttle, and that is the consequence.
+ *
+ * A **cyclist is still knocked off**, which is the same clause it always was:
+ * `ridingBike` is not tested here, `applyCarHit` still clears it, and being hit
+ * by a car is the canonical way to come off a bike. A bike is not a box with a
+ * closing speed; it is a person on a frame.
  */
 export function canBeRunDown(c: CombatantState): boolean {
-  return isTargetable(c) && c.phase !== 'flinch';
+  return isTargetable(c) && c.phase !== 'flinch' && c.drivingCar === 0;
 }
 
 /**
@@ -4083,11 +4112,24 @@ export function applyCarHit(victim: CombatantState, pose: CarPose): boolean {
   // parks any bike whose rider has stopped riding, so nothing here needs to know
   // that class exists.
   victim.ridingBike = 0;
-  // And out of the car, on the identical argument. Being T-boned by a bus while
-  // driving is the second canonical way to lose a vehicle, and
-  // `driving.CarField.follow` leaves yours in the road where the body landed.
-  victim.drivingCar = 0;
-  victim.carSpeed = 0;
+  // **And *not* out of the car, which is the line workstream T deleted.**
+  //
+  // What stood here was `victim.drivingCar = 0; victim.carSpeed = 0;`, with an
+  // essay arguing that being T-boned by a bus is the second canonical way to
+  // lose a vehicle. It is a good argument about films and a bad one about this
+  // game: the owner's report was *"I still get knocked out of cars when crashing
+  // into another car, the actual action should be damage to both cars"*, and
+  // every car-on-car contact in Sydney ended with the driver face down in the
+  // road and their car abandoned two metres away.
+  //
+  // The clearing is *gone* rather than left in as a defensive no-op, and that is
+  // deliberate. `canBeRunDown` now refuses a combatant who is driving, so no
+  // caller can reach this line with `drivingCar` set -- and if a future one ever
+  // skips that gate, the failure should be a driver who visibly survives a hit
+  // this function had no business adjudicating, not a driver silently ejected by
+  // a line nobody remembers is here. The crash itself is
+  // `driving.crashIntoTraffic` and `sim.stepCars`, on the car and not on the
+  // person.
 
   const ko = victim.health <= 0;
   if (ko) {
@@ -4375,6 +4417,45 @@ export function verifyTraffic(
           failures.push('A victim in a car flinch can be run down again this instant; the re-hit guard is not working.');
         }
       }
+    }
+  }
+
+  // --- **A driver is not a pedestrian.** WORKSTREAM T, and the owner's report:
+  //     *"I still get knocked out of cars when crashing into another car, the
+  //     actual action should be damage to both cars"*.
+  //
+  //     Stated against the same scripted victim standing in the same lane at the
+  //     same tick as the knockdown case above, with one field changed, so the
+  //     failure this would catch is unambiguous: if `carHitting` starts
+  //     answering for a driver again, the *only* difference from a check that
+  //     passes is `drivingCar`.
+  {
+    const driver = syntheticVictim();
+    const at = createCarPose();
+    if (!poseCar(route, 0, trafficSeconds(300), at)) {
+      failures.push('The synthetic car was not live at tick 300; the driver-immunity check could not run.');
+    } else {
+      driver.body.position.set(at.x, at.y + EYE_HEIGHT, at.z);
+      driver.drivingCar = 4;
+      // The geometry is untouched: the car really is on top of them, and that is
+      // the point -- what changed is what the game does about it.
+      if (!carOverlaps(at, driver)) {
+        failures.push('A driver standing exactly on a car was not overlapped by it; the immunity check proves nothing.');
+      }
+      if (canBeRunDown(driver)) {
+        failures.push('Somebody sitting in a car can be run down. A car-on-car contact is a crash, not a knockdown.');
+      }
+      const health = driver.health;
+      if (carHitting(field, driver, 300, scratch, pose) !== null) {
+        failures.push('`carHitting` found a driver to run over. They are in a car; the crash is on the cars.');
+      }
+      if (driver.drivingCar !== 4) failures.push('A driver was ejected from their car by the traffic sweep.');
+      if (driver.health !== health) failures.push('A driver lost health to a car hitting the car they are in.');
+      if (driver.phase !== 'idle') failures.push(`A driver was put into '${driver.phase}' by a car-on-car contact.`);
+      // ...and the instant they step out they are a pedestrian again, which is
+      // the clause that stops this becoming permanent immunity.
+      driver.drivingCar = 0;
+      if (!canBeRunDown(driver)) failures.push('Somebody who got out of a car still cannot be run down.');
     }
   }
 
@@ -6112,8 +6193,17 @@ const SYNTHETIC_PARKED_TICK = Math.round((SYNTHETIC_HEADWAY - 1) * 60);
  * exercise the fallback rather than the feature. One way, the centreline of the
  * same street the route's lane is offset from, at the residential width
  * `parking.py` builds its bays against.
+ *
+ * **Exported for the drivers, not for the game.** Nothing in `client/` or
+ * `server/` that ships imports this; `server/cardamage-check.ts` does, because
+ * workstream T's whole question is what happens when a *driven* car meets an
+ * *ambient* one and `verifyDriving`'s pure unit cases cannot answer it -- that
+ * needs a real `TrafficField` with a real timetable in it, put through the real
+ * `Simulation.step`. Building the bytes a second time in the driver was the
+ * alternative and it is the worse one: a check whose fixture is a copy of the
+ * fixture is a check that can pass while the format moves.
  */
-function syntheticTile(
+export function syntheticTile(
   offset: number,
   originX = 0,
   originZ = 0,
@@ -6150,6 +6240,19 @@ function syntheticTile(
    */
   phase = 0,
   rid = 0x5eed,
+  /**
+   * How high the street is, metres. Defaulted to the -12.5 every check written
+   * before workstream T read, so none of them sees a different fixture.
+   *
+   * It is a parameter because `server/cardamage-check.ts` puts *players* on this
+   * street, and a player's feet are wherever `server/world.groundFor` says the
+   * ground is -- which in an empty test city is 0. A lane twelve and a half
+   * metres under the ground is a lane every vertical gate in this file correctly
+   * refuses to let anybody touch: `carOverlaps` returns false, the knockdown
+   * cannot happen, and the check quietly measures nothing. Rather than teach the
+   * driver to fake a heightfield, the street is allowed to be at ground level.
+   */
+  laneY = -12.5,
 ): TileLanes {
   // Five vertices, the middle one doubled for a red light. World axes: north is
   // -Z, so the lane runs from z = 0 to z = -200, and the left of that is -X.
@@ -6162,10 +6265,10 @@ function syntheticTile(
       const gap = legs[i] - legs[i - 1];
       t += gap === 0 ? SYNTHETIC_DWELL : gap / speed;
     }
-    pts.push([-offset, -12.5, -legs[i], t]);
+    pts.push([-offset, laneY, -legs[i], t]);
   }
   // The way: the same street's centreline, at x = 0, over the same 200 m.
-  const wayPts: Array<[number, number, number]> = [[0, -12.5, 0], [0, -12.5, -200]];
+  const wayPts: Array<[number, number, number]> = [[0, laneY, 0], [0, laneY, -200]];
 
   const bytes = new ArrayBuffer(16 + (16 + wayPts.length * 12) + 40 + pts.length * 16);
   const v = new DataView(bytes);
