@@ -558,10 +558,14 @@ block from it. So:
    - `SYDNEY_SECRETS=~/.config/sydney/r2.env scripts/publish-world-r2.sh --hex <id>`
      per hexagon (the script defaults to `/etc/sydney/secrets.env`, which is
      the box's path, not the Mac's). This needs a **live S3 API token** with
-     Object Read & Write on `sydrunner-world`. **The token in `r2.env` was
-     rolled on 2026-08-16 and now returns 403 on both read and write** — until
-     a new one is minted in the Cloudflare dashboard and written there, this
-     path does not work, and the script's success check will tell you so.
+     Object Read & Write on `sydrunner-world`; `r2.env` carries
+     `R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY` (re-issued 2026-08-17 after the
+     previous pair was rolled — verified list/write/delete that evening) plus a
+     permanent `R2_API_TOKEN` for the Cloudflare API. The endpoint is derived
+     from the account id inside the script; the file does not need to set it.
+     A 403 from rclone/aws on both read and write means the pair has been
+     rolled again — probe with `rclone lsf R2:sydrunner-world --max-depth 1`
+     (env configured exactly as the script does) before blaming anything else.
    - `npx wrangler@latest r2 object put "sydrunner-world/<key>" --file <path>
      --remote --content-type <ct> --cache-control "public, max-age=31536000,
      immutable"` per changed file, 8 in parallel, using the OAuth login

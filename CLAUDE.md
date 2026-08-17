@@ -15,8 +15,8 @@ match that voice, and read the header of any file before changing it.
   publish after a retile (snapshot → audits + terrain byte-diff → restore
   region mtimes → R2 upload → server sidecars), and every trap already hit:
   the box is `oxford-tractor.bnr.la` for ssh (`sydrunner.3rp.uk` is the site),
-  the R2 S3 token in `~/.config/sydney/r2.env` is dead (403) so uploads go
-  through `wrangler … --remote` until a new token exists, `wrangler r2 object`
+  the R2 S3 credentials live in `~/.config/sydney/r2.env` (never print them;
+  if they ever 403, probe before blaming the script), `wrangler r2 object`
   without `--remote` silently writes to a local bucket, `SYDNEY_STATE_DIR` on
   the box holds accounts/wallets and must never be rsynced over, and the
   Caddy `/auth/*` handle.
