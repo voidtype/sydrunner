@@ -1005,7 +1005,14 @@ export function decodeLanes(
     route.parkT1 = bayT1;
     routes.push(route);
   }
-  for (const route of routes) buildParkPhases(route);
+  for (const route of routes) {
+    buildParkPhases(route);
+    // And the bounds have to cover where the cars actually *stand*, not just
+    // where the polyline runs. See `coverBays`: this is the line that makes a car
+    // parked in a kerb bay visible to `TrafficField.near`, and therefore to the
+    // take, the prompt, the knockdown test and the renderer.
+    coverBays(route);
+  }
   return { ways, routes };
 }
 
@@ -1362,6 +1369,164 @@ function buildParkPhases(r: LaneRoute): void {
  */
 function clampDwell(cap: number): number {
   return cap > 0 ? cap : 0;
+}
+
+/**
+ * Grow a route's plan bounds to cover the two bays its cars park in.
+ *
+ * ---------------------------------------------------------------------------
+ * THE BUG THIS IS, AND WHY IT LOOKED LIKE "I CAN NO LONGER STEAL CARS".
+ *
+ * `minX`..`maxZ` are computed in `decodeLanes` from the route **polyline**, and
+ * they are what `TrafficField.index` buckets a route by and what
+ * `TrafficField.near` culls with. Every consumer of `forEachCarNear` -- the take,
+ * the prompt, the knockdown test, the horn, the renderer -- therefore sees a
+ * route only if its *polyline* box reaches the query.
+ *
+ * A parked car is not on its polyline. `poseCar` displaces it into its bay by
+ * `(kerbOffX, kerbOffZ) * lateral`, which is the lane-to-bay vector `bays.py`
+ * arbitrated (typically 2 to 4 m out to the kerb face) or the 0.6 m
+ * `KERBLESS_LANE_SHIFT` at an end `synthesiseLaneBay` had to invent. So a car
+ * standing in a kerb bay can be several metres *outside* the box that decides
+ * whether anything is allowed to see it -- and a route running due north has a
+ * box with no width in x at all, where the whole of the bay offset is outside it.
+ *
+ * The consequence, measured against the shipped bake over 229 stopped cars at
+ * six centres, asking `resolveTake` from eight approach angles at each of four
+ * standing distances: **1.0 % of presses at 1.0 m from the car's centre see
+ * nothing, rising to 3.1 % at 2.1 m -- and 4.0 % of the presses at a car parked
+ * in a bay**, which is where every one of the misses lives. `near(2.2)` did not
+ * return the route, so `forEachCarNear` never posed the car, so `resolveTake`
+ * refused a car the player was standing against. No prompt, and `E` does
+ * nothing. It is not the whole of the owner's report -- see `server/take-check.ts`
+ * -- but it is a real gate refusing a real car, and it is the gate furthest from
+ * anywhere anybody would look, because the take, the prompt and the prediction
+ * all agree perfectly: all three ask the same culled question.
+ *
+ * `game/driving.ts` section 1's own density note is what makes the rate matter
+ * rather than being a rounding error: takeable cars are a *thin* fleet among the
+ * scenery, about 40 in a 420 m radius, so a car that does not answer is not
+ * shrugged off -- it is one of the few the player had.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THE BOUNDS AND NOT THE QUERY.
+ *
+ * The other fix on offer is a pad at the call site -- `near(x, z, radius + 4)`
+ * inside `forEachCarNear`. It is wrong twice. It would not work: the grid is
+ * bucketed by these same bounds, so a route whose parked car reaches into the
+ * next cell is not *in* that cell's bucket and a wider scan still would not find
+ * it reliably. And it would cost the whole city: a fixed pad widens the
+ * renderer's 420 m query and the pedestrian bands as much as the take's 2.2 m
+ * one, where this pays only for routes that actually have a bay and only by
+ * their own offsets -- a couple of metres on boxes tens to hundreds of metres
+ * across.
+ *
+ * Componentwise and exact rather than a radius: the pose is a point on the
+ * polyline (inside the box by construction) plus `(offX, offZ) * lateral` with
+ * `lateral` in [0, 1] and `(offX, offZ)` one of the two bay vectors or zero, so
+ * each coordinate moves by at most that vector's own component. `Math.abs` on
+ * both sides because a bay may be on either side of either axis.
+ *
+ * Called from `decodeLanes` immediately after `buildParkPhases`, which is where
+ * the offsets become final (it zeroes them for an end with no bay), and
+ * **before** anything indexes the route -- the bounds have to be frozen by the
+ * time `TrafficField.index` reads them, because `unindex` recomputes the same
+ * cells from the same numbers. It is after `scaleHeadway` on purpose: that
+ * function reads the box to find out how busy this part of town is, and moving
+ * its input would re-time every car in Sydney.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT IS DELIBERATELY NOT COVERED: `HOLD_MAX_LAG`.
+ *
+ * `resolveHeld` shifts a held car up to 30 m back along its own heading, which
+ * near a route's own start leaves the box for the same reason a bay does. It is
+ * not padded here and the trade is stated rather than hidden: 30 m on every box
+ * in the city would roughly double what a 2.2 m query returns, for a case that
+ * needs somebody to have abandoned a car in that particular lane, and whose
+ * shift is backwards along a polyline that usually still exists behind the car.
+ * A bay offset is unconditional and applies to every parked car in Sydney; a
+ * hold is rare and mostly self-covering.
+ */
+function coverBays(r: LaneRoute): void {
+  const outX = Math.max(Math.abs(r.kerbOffX0), Math.abs(r.kerbOffX1));
+  const outZ = Math.max(Math.abs(r.kerbOffZ0), Math.abs(r.kerbOffZ1));
+  if (outX === 0 && outZ === 0) return;
+  r.minX -= outX;
+  r.maxX += outX;
+  r.minZ -= outZ;
+  r.maxZ += outZ;
+}
+
+/**
+ * **Every bay a route's cars park in is inside that route's plan bounds.**
+ *
+ * `coverBays`' property, stated as a test rather than as a comment, and it is
+ * stated this way round on purpose: the *symptom* is a short-range query
+ * returning nothing, and a check written against the symptom needs a fixture
+ * whose bay offset happens to exceed the query radius or it passes while the bug
+ * is present. That is not a hypothetical -- the first version of this assertion
+ * queried 2.2 m from the synthetic bay, and the synthetic bay is only 0.9 m
+ * outside its route's box, so it passed with `coverBays` stubbed out.
+ *
+ * The invariant has no such blind spot: containment is containment at any
+ * magnitude, and it is exactly what `TrafficField.near` relies on. Anything the
+ * bounds do not cover is a car nothing can see at close range.
+ *
+ * Exported so a driver can point it at a real bake -- `server/take-check.ts`
+ * runs it over every resident route in the shipped world, which is the only way
+ * to state it about the 23,734 routes a player actually walks past rather than
+ * about four synthetic ones.
+ *
+ * ---------------------------------------------------------------------------
+ * FIVE CENTIMETRES OF SLACK, AND IT IS `Float32` AND NOTHING ELSE.
+ *
+ * `decodeLanes` accumulates the bounds from the **float64 sum** `f32 + originX`
+ * and then stores that sum into a `Float32Array`, which rounds it. So a route's
+ * own vertices can sit a fraction of a float32 ULP outside its own box, and a
+ * bay inherits that. Measured over the shipped bake: 175 bays are outside by
+ * more than a nanometre and the worst is **1.6 mm**, at (-38,312, -13,953) --
+ * where one float32 ULP is 3.9 mm, which is the whole of the explanation.
+ *
+ * Fixing it at the source would mean taking the bounds from the stored values
+ * instead, and that is deliberately not done: `scaleHeadway` reads the box to
+ * decide how busy this part of town is, so moving the box by half a millimetre
+ * could re-time cars city-wide for no benefit at all.
+ *
+ * 5 cm is thirty times the measured worst case and a twelfth of the smallest
+ * real offset this could ever have to catch (`KERBLESS_LANE_SHIFT`, 0.6 m), so
+ * the band it cannot see into is a band nothing lives in.
+ */
+export function verifyBayBounds(routes: readonly LaneRoute[], label: string): string[] {
+  const failures: string[] = [];
+  const probe = createBayPose();
+  const slack = 0.05;
+  let bad = 0;
+  let worst = 0;
+  for (const r of routes) {
+    for (const which of [0, 1]) {
+      if (!(which === 0 ? r.bay0 : r.bay1)) continue;
+      bayPose(r, which, probe);
+      const outside = Math.max(
+        r.minX - probe.x,
+        probe.x - r.maxX,
+        r.minZ - probe.z,
+        probe.z - r.maxZ,
+      );
+      if (outside > slack) {
+        bad++;
+        if (outside > worst) worst = outside;
+      }
+    }
+  }
+  if (bad > 0) {
+    failures.push(
+      `${bad} bay(s) on ${label} sit outside their own route's plan bounds, by up to ` +
+        `${worst.toFixed(3)} m. \`TrafficField.near\` culls by those bounds, so a car parked in one is ` +
+        'invisible to every close-range query: the take, the HUD prompt, the knockdown test and the horn. ' +
+        'See `coverBays`.',
+    );
+  }
+  return failures;
 }
 
 // --- The bay the arbitration could not give us ----------------------------------
@@ -4075,6 +4240,11 @@ export function verifyTraffic(
           'A car snapped there would be parked on top of the schedule fleet.',
       );
     }
+
+    // And the bay is inside the box that decides who is allowed to ask. See
+    // `verifyBayBounds`, which is the whole of the property and is asserted over
+    // every fixture in this file.
+    for (const f of verifyBayBounds([r], 'the bay fixture')) failures.push(f);
   }
 
   // --- THE RESIDENCY. v3, and the user's report: "cars dont persist. they stop
@@ -4297,6 +4467,13 @@ export function verifyResidency(offset = 1.875, fixture?: TileLanes): string[] {
     }
     for (const f of sweepLife(city, 'the synthetic city')) failures.push(f);
     if (fixture) for (const f of sweepLife(fixture.routes, 'the supplied tile')) failures.push(f);
+    // And every one of those bays is somewhere a query can reach. Run here
+    // rather than in its own section because this is the widest set of routes
+    // this function builds -- four headways against four bay-flag combinations,
+    // which is the only place the kerbless offsets and the arbitrated ones are
+    // both present. See `verifyBayBounds`.
+    for (const f of verifyBayBounds(city, 'the synthetic city')) failures.push(f);
+    if (fixture) for (const f of verifyBayBounds(fixture.routes, 'the supplied tile')) failures.push(f);
   }
 
   // --- (e) TWO FIELDS OVER ONE FILE NAME THE SAME OCCUPANT.
