@@ -6,16 +6,18 @@ a Python pipeline out of open geodata, projected into EPSG:7856 and emitted as g
 that the client streams as you walk. Melee combat, vehicles and a football are simulated
 identically on the client and on an authoritative Bun server.
 
-Live at **<https://oxford-tractor.bnr.la>**.
+Live at **<https://sydrunner.3rp.uk>**.
 
 Built to [`sydney-fps-build-spec.md`](sydney-fps-build-spec.md). This file records what exists,
-how to run it, and — importantly — what does not exist yet.
+how to run it, and — importantly — what does not exist yet. Read [`CLAUDE.md`](CLAUDE.md) for the
+rules agents must follow in this repo, and [`DEPLOY.md`](DEPLOY.md)'s runbook for how a build
+reaches players.
 
 The world itself is not in this repository. It is ~620 MB of generated geometry, published
-to a separate data repo — [voidtype/sydrunner-world](https://github.com/voidtype/sydrunner-world)
-— and streamed by players from jsDelivr's CDN, which is what keeps a 20 GB/month box serving
-a city. See [Data and attribution](#data-and-attribution) below, and [`DEPLOY.md`](DEPLOY.md)
-for how a build gets there.
+to Cloudflare R2 and served to players from `https://world.3rp.uk`; the client reads the
+`cdn` block in `world/index.json` to find it, and falls back to the origin if R2 is down.
+That is what keeps a 20 GB/month box serving a city. See [Data and attribution](#data-and-attribution)
+below, and [`DEPLOY.md`](DEPLOY.md) for how a build gets there.
 
 ---
 
@@ -76,6 +78,33 @@ npm run world:middle
 ```
 
 Coverage extends in place — tiles already emitted are not rebuilt.
+
+---
+
+## What exists now
+
+- **Accounts.** A native handle-and-password login, with a level that resets every Monday; each
+  level is ten kills, and signing up carries your level and your spot.
+- **Money.** Cash in your pocket, a Centrelink payment you claim once a week per office, and
+  SydRide fares for the rideshare jobs.
+- **Cars.** You can take a stopped car and drive it, with damage that accumulates and a condition
+  that persists; a car left in the street is anybody's.
+- **The heat ladder.** One to five stars — a highway patrol car at three, an RBT at four, Polair's
+  spotlight at five.
+- **Characters.** Five Sydney characters, each with its own verbs and idles, out of the same
+  ambient tier.
+- **Ambient events.** The street crowd, the flocks and the illegal raves, all pure functions of
+  position and tick.
+- **Trains.** You can ride the trains, and the Metro sets have open walk-through gangways between
+  the carriages.
+- **The phone.** Four hand slots — bat, footy, phone, fists — in either hand, with left and right
+  click using each.
+- **Maps and the camera.** The maps live on the phone only — the corner compass comes up while the
+  phone is in a hand — and the phone's camera shoots photos into a twelve-photo gallery.
+- **The button in Sydney Park.** A button on the second hill west of the kilns that makes the sun
+  scream until sunset, for everyone on the server.
+- **The fight.** A bat, a footy and fists — and the bat can swat a footy out of the air.
+- **Night.** Night lighting, with a torch that comes on by itself at dusk.
 
 ---
 
