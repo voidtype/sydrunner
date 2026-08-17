@@ -11,6 +11,10 @@
     uv run python -m sydney water-audit
     uv run python -m sydney landmark-audit
     uv run python -m sydney clearance-audit
+    uv run python -m sydney station-clear-audit
+    uv run python -m sydney collision-fit-audit
+    uv run python -m sydney rail-veg-audit
+    uv run python -m sydney fence-road-audit
     uv run python -m sydney reset --kind tile
 
 Resumable throughout: every tile emission is a ledger unit, so an interrupted
@@ -54,6 +58,7 @@ from . import (
     parking,
     power,
     powerups,
+    railenv,
     regions,
     roadgrade,
     rows,
@@ -348,6 +353,67 @@ def _read_buildings_table(con) -> list[merge.Building]:
     return out
 
 
+def _clear_stations(
+    buildings: list[merge.Building], rail
+) -> tuple[list[merge.Building], dict[str, list[float]]]:
+    """Delete every footprint that overlaps a station envelope. No exceptions.
+
+    `STATIONS.md` step 4 -- *"existing buildings on the plot are removed ...
+    deleted at bake time, not hidden at runtime"* -- taken at the owner's word:
+    *"blanket delete please, we can rebuild the stations when we sort the other
+    BS out."*
+
+    **The station building goes too**, which is the part that looks like a bug
+    and is the instruction. Central comes out as platforms in the open. That is
+    intended scaffolding: a station building that is a Microsoft roof trace
+    dropped over the platforms is what has been putting a wall across the
+    concourse, and the generated one that replaces it (step 5) cannot be placed
+    while the traced one is standing on its plot.
+
+    Returns the survivors and what was removed, keyed by station, so the report
+    below can name the twenty biggest rather than print a total nobody can
+    check against a map.
+    """
+    from shapely.geometry import Polygon
+
+    if not rail.loaded:
+        return buildings, {}
+    removed: dict[str, list[float]] = defaultdict(list)
+    keep: list[merge.Building] = []
+    for b in buildings:
+        ring = mesh._ring_open(b.ring)
+        if len(ring) < 3:
+            keep.append(b)
+            continue
+        # ENU east/north to the world frame the bake is in: the identity on
+        # east, negated on north. Done inline for the reason
+        # `rail.corridor_paving` does it inline -- this and `railenv` are the
+        # only places in the build that need a footprint in the client's frame.
+        poly = Polygon(np.column_stack((ring[:, 0], -ring[:, 1])))
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+        if poly.is_empty or poly.geom_type != "Polygon":
+            keep.append(b)
+            continue
+        hit = rail.station_hit(poly)
+        if hit is None:
+            keep.append(b)
+        else:
+            removed[hit].append(float(b.area))
+    return keep, dict(removed)
+
+
+def _report_station_clear(removed: dict[str, list[float]], rail) -> None:
+    if not rail.loaded:
+        return
+    total = sum(len(v) for v in removed.values())
+    area = sum(sum(v) for v in removed.values())
+    print(f"    {total:,} buildings deleted off {len(removed):,} station envelopes"
+          f" ({area / 1e4:,.2f} ha of footprint)")
+    for name, areas in sorted(removed.items(), key=lambda kv: -len(kv[1]))[:20]:
+        print(f"      {name:28} {len(areas):5,}  {sum(areas):9,.0f} m2")
+
+
 def cmd_build(args: argparse.Namespace) -> int:
     stage = config.STAGE_BY_NAME[args.stage]
     config.ensure_dirs()
@@ -394,6 +460,17 @@ def cmd_build(args: argparse.Namespace) -> int:
     buildings, elevated_report = elevated.resolve(buildings, roads, terrain)
     _report_elevated(elevated_report)
 
+    # The railway, in plan, read off the bake. Two passes need it and both are
+    # deletions, so it goes in here -- **before the tile bucketing**, for the
+    # reason `landmarks.suppress` goes in before it: the tiles, the collision
+    # payload and `far.bin` are all derived from this one list, so a building
+    # dropped here is dropped from all three and there is no fourth place to
+    # remember. See `railenv.py` for the ordering against `rail-bake`.
+    print("  reading the rail envelope ...")
+    rail = railenv.load()
+    buildings, station_removed = _clear_stations(buildings, rail)
+    _report_station_clear(station_removed, rail)
+
     by_tile: dict[str, list[merge.Building]] = defaultdict(list)
     for b in buildings:
         by_tile[b.tile].append(b)
@@ -432,7 +509,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     _report_decks(deck_network)
 
     print("  reading parks and mapped trees ...")
-    veg_network = vegetation.VegetationNetwork.load(stage.radius_m, street_network)
+    veg_network = vegetation.VegetationNetwork.load(stage.radius_m, street_network, rail)
     print(
         f"    {veg_network.green_count:,} green polygons"
         f" ({veg_network.green_area / 1e4:,.0f} ha),"
@@ -580,7 +657,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     # tile it has actually emitted -- so a narrowed run would otherwise ship an
     # index listing five tiles and delete the other 218 from the client's world,
     # with all 218 still sitting on disk.
-    only = {k.strip() for k in (args.only or "").split(",") if k.strip()}
+    only = _only_keys(args.only)
     if only:
         unknown = only - set(keys)
         if unknown:
@@ -726,6 +803,18 @@ def cmd_build(args: argparse.Namespace) -> int:
         names_contract,
         regions_contract,
     )
+    # The tree keep-out, counted where it fired rather than where it was
+    # declared. `VegetationNetwork` tallies per tile as `instances` runs, so
+    # this number is trees that would have been *written to a sidecar* and were
+    # not -- which is the only definition a player could check.
+    if veg_network.rail_dropped:
+        by_source = ", ".join(
+            f"{k} {v:,}" for k, v in sorted(veg_network.rail_dropped.items())
+        )
+        print(f"  rail keep-out: {sum(veg_network.rail_dropped.values()):,} trees dropped "
+              f"for standing inside the corridor ({by_source})")
+    elif rail.loaded:
+        print("  rail keep-out: no tree stood inside the corridor")
     _report_street_names(all_results)
     _report_name_bundle(names_contract)
     _report_regions(regions_contract)
@@ -1367,7 +1456,17 @@ def _report_fences(net: fences.FenceNetwork) -> None:
         f" {s['drop_deep']:,} set back over {fences.MAX_SETBACK} m,"
         f" {s['drop_short_frontage']:,} frontage under {fences.MIN_FRONTAGE} m,"
         f" {s['drop_skew']:,} skewed into the footpath,"
-        f" {s['drop_neighbour']:,} would run through a building"
+        f" {s['drop_neighbour']:,} would run through a building,"
+        f" {s['drop_all_in_road']:,} entirely inside a carriageway"
+    )
+    # The corner blocks, which is what `_clip_to_kerb` exists for. Reported
+    # apart from the withheld list above because a clipped fence is a fence
+    # that got built -- the number to watch is that it is a few per cent and
+    # not a third, because a third would mean the property line is wrong
+    # rather than that Sydney has corners.
+    print(
+        f"    {s['clipped_at_a_road']:,} clipped where a second street crossed the"
+        f" frontage ({100 * s['clipped_at_a_road'] / max(total, 1):.1f}% of candidates)"
     )
     if net.setbacks:
         q = np.percentile(net.setbacks, [10, 50, 90])
@@ -3067,7 +3166,7 @@ def cmd_road_grade_audit(args: argparse.Namespace) -> int:
 
     only = None
     if args.only:
-        only = {k.strip() for part in args.only for k in part.split(",") if k.strip()}
+        only = _only_keys(args.only)
         missing = only - keys
         if missing:
             raise SystemExit(f"--only names tiles the index does not have: {sorted(missing)}")
@@ -4505,7 +4604,7 @@ def cmd_clearance_audit(args: argparse.Namespace) -> int:
         raise AuditUnresolved(f"no {config.INDEX_PATH}; there is no world to audit")
     index = json.loads(config.INDEX_PATH.read_text())
     keys = [t["key"] if isinstance(t, dict) else t for t in index["tiles"]]
-    only = {k.strip() for spec in (args.only or []) for k in spec.split(",") if k.strip()}
+    only = _only_keys(args.only)
     if only:
         missing = only - set(keys)
         if missing:
@@ -5002,6 +5101,542 @@ def cmd_hex_pack(args: argparse.Namespace) -> int:
     return 0
 
 
+# --- The four rules of the station round, each as an audit ------------------------
+#
+# Written with the round that introduced them, and the reason each is a command
+# rather than a line in the build report is `_audit`'s own: a rule enforced only
+# where it is applied is a rule a later refactor can drop in silence. Every one
+# of these reads the **shipped world** back off disk -- the tiles, the collision
+# payloads and the sidecars -- and compares it against the same `railenv` the
+# build consumed, so what is asserted is the artefact and not the intention.
+#
+# Each carries a negative control, and the controls are all of the same shape:
+# the identical test, run against something that is known to violate the rule.
+# A control that stays quiet means the audit cannot see the defect it is claiming
+# not to find, which is the failure `_audit`'s header is about one level up.
+
+
+def _world_footprint(ring: np.ndarray):
+    """One ENU ring as a valid world-frame polygon, or None."""
+    from shapely.geometry import Polygon
+
+    ring = mesh._ring_open(np.asarray(ring, dtype=np.float64))
+    if len(ring) < 3:
+        return None
+    poly = Polygon(np.column_stack((ring[:, 0], -ring[:, 1])))
+    if not poly.is_valid:
+        poly = poly.buffer(0)
+    if poly.is_empty or poly.geom_type != "Polygon":
+        return None
+    return poly
+
+
+def _emitted_tile_keys() -> list[str]:
+    index = json.loads(config.INDEX_PATH.read_text())
+    return [t["key"] for t in index["tiles"]]
+
+
+def _only_keys(spec: str | list[str] | None) -> set[str]:
+    """A `--only` argument as a set of tile keys, with `@file` expansion.
+
+    Every `--only` in this file already took a comma-separated list, and that
+    was fine while the narrowed runs were five tiles wide. The station round
+    is 382 -- every 500 m tile a **surface** station envelope touches, plus the
+    tiles that hold the centroid of a footprint the envelope deletes -- and
+    2.7 kB of tile keys pasted into four commands is a list that will be wrong
+    in one of them. So a leading `@` reads the keys out of a file instead, one
+    per line, blank lines and `#` comments ignored.
+
+    Takes both shapes because both are already in use: `build` and
+    `fence-road-audit` declare a plain string, `clearance-audit` and
+    `road-grade-audit` declare `action="append"`. Normalising here rather than
+    changing four declarations keeps every existing invocation working.
+    """
+    if not spec:
+        return set()
+    parts = [spec] if isinstance(spec, str) else list(spec)
+    out: set[str] = set()
+    for part in parts:
+        for token in str(part).split(","):
+            token = token.strip()
+            if not token:
+                continue
+            if token.startswith("@"):
+                text = Path(token[1:]).expanduser().read_text()
+                out |= {
+                    line.strip()
+                    for line in text.splitlines()
+                    if line.strip() and not line.lstrip().startswith("#")
+                }
+            else:
+                out.add(token)
+    return out
+
+
+@_audit
+def cmd_station_clear_audit(args: argparse.Namespace) -> int:
+    """RULE 1. No building stands on a station.
+
+    Reads every emitted **collision payload** rather than the ledger, and that
+    is the whole point: the ledger is what the build was given and the payload
+    is what the server will stop a player against. A delete that happened in
+    `_clear_stations` and not in `write_collision` is a station with invisible
+    buildings on it, which is worse than the buildings.
+
+    THE CONTROL is the ledger's own table, which still holds every footprint
+    the build deleted -- `_clear_stations` filters a list, it does not write to
+    the database. So the same overlap test, run over the source rather than
+    over the output, must report the buildings that were removed. Zero there
+    means the envelope is empty or the test is blind, and either way the pass
+    above means nothing.
+
+    **A COLLISION PAYLOAD IS NOT A LIST OF BUILDINGS**, which the first version
+    of this audit assumed and which cost it its verdict. `write_collision`
+    appends the landmark rings and `decks.DeckNetwork.prisms` into the same
+    array under the same count word -- deliberately, because *"a landmark prism
+    is a prism"* -- so a viaduct deck flying over a station is in the payload
+    and is not something `_clear_stations` can delete. Measured on the pre-fix
+    world: **1,922 prisms inside an envelope, of which 1,519 are buildings.**
+    Rolled into one number the audit could never go green.
+
+    So an offending prism is matched against the ledger by plan centroid.
+    Matched means a building the delete missed, which is a failure; unmatched
+    means a deck or a landmark, which is reported beside it and is a different
+    defect with a different fix. The two are counted apart so neither can hide
+    behind the other.
+
+    **AND THE MIXING IS ITSELF A DEFECT, INDEPENDENT OF THIS ROUND.** Not that
+    the prisms share a file -- `write_collision`'s header argues that case and
+    is right, a landmark prism is a prism and the server should not need to know
+    which module drew it. The defect is that **nothing downstream can tell them
+    apart**, so no rule that is about buildings can be *asserted* over the
+    payload without a side-channel, and this audit needs the ledger to supply
+    one. A viaduct deck flying over a station is a real thing to fix and it is
+    not fixable by a building rule; it needs `decks.py` to know a station is
+    under it. Recorded here rather than filed as a `TODO` in a file nobody
+    reads, because the audit is the thing that will keep meeting it.
+    """
+    env = railenv.load(log=lambda _m: None)
+    if not env.loaded:
+        raise AuditUnresolved(
+            f"no rail bake at {railenv.BAKE_PATH}, so there is no envelope to audit against"
+        )
+    keys = _emitted_tile_keys()
+    surface = [s for s in env.stations if s.surface]
+    print(f"{len(keys):,} emitted tiles against {len(surface):,} station envelopes")
+
+    # Every footprint the build was offered, by rounded plan centroid. The
+    # table still holds the deleted ones, so a hit here says "this prism is a
+    # building" and not "this prism survived".
+    con = ledger.connect()
+    ledger_centroids: set[tuple[int, int]] = set()
+    control = Counter()
+    for r in con.execute("SELECT geometry FROM buildings"):
+        poly = _world_footprint(json.loads(r["geometry"])["ring"])
+        if poly is None:
+            continue
+        ledger_centroids.add((round(poly.centroid.x * 10), round(poly.centroid.y * 10)))
+        hit = env.station_hit(poly)
+        if hit is not None:
+            control[hit] += 1
+
+    offenders: list[tuple] = []
+    other = 0
+    prisms = 0
+    for key in keys:
+        path = config.COLLISION_DIR / f"{key}.bin"
+        if not path.exists():
+            continue
+        tx, tz = (int(v) for v in key.split("_"))
+        oe, on = tx * config.TILE_SIZE, tz * config.TILE_SIZE
+        for _base, pts in _collision_prisms(path.read_bytes()):
+            prisms += 1
+            if len(pts) < 3:
+                continue
+            # Tile-local renderer axes back to ENU, which is what
+            # `_world_footprint` takes: `write_collision` writes `east - oe` and
+            # `-(north - on)`, so this inverts exactly those two lines.
+            poly = _world_footprint(
+                np.column_stack((oe + pts[:, 0], on - pts[:, 1]))
+            )
+            if poly is None:
+                continue
+            hit = env.station_hit(poly)
+            if hit is None:
+                continue
+            key_c = (round(poly.centroid.x * 10), round(poly.centroid.y * 10))
+            if key_c in ledger_centroids:
+                offenders.append((hit, key, float(poly.centroid.x), float(poly.centroid.y),
+                                  float(poly.area)))
+            else:
+                other += 1
+    if prisms == 0:
+        raise AuditUnresolved("read no collision prisms at all")
+
+    print(f"  {prisms:,} collision prisms read")
+    print(f"  {len(offenders):,} BUILDINGS stand inside a station envelope")
+    print(f"  {other:,} other prisms do too -- landmark rings and bridge decks, which "
+          f"`_clear_stations` does not touch and which are a different defect")
+    for row in offenders[: args.worst]:
+        print(f"      {row[0]:24} tile {row[1]:>9}  {row[2]:9.0f}, {row[3]:9.0f}  {row[4]:7.0f} m2")
+    print(f"  CONTROL: the same test over the ledger's {sum(control.values()):,} un-deleted "
+          f"footprints across {len(control):,} stations")
+    for name, n in control.most_common(5):
+        print(f"      {name:24} {n:5,}")
+
+    ok = True
+    if sum(control.values()) == 0:
+        print("\n  FAIL: the control found nothing, so this audit cannot see a building on a "
+              "station and the line above is vacuous")
+        ok = False
+    if offenders:
+        print(f"\n  FAIL: {len(offenders):,} buildings still stand on a station")
+        ok = False
+    if ok:
+        print("\n  PASS: nothing the server can stop a player against stands on a station, "
+              "and the control proves the test can see one")
+    return EXIT_PASS if ok else EXIT_FAIL
+
+
+@_audit
+def cmd_collision_fit_audit(args: argparse.Namespace) -> int:
+    """RULE 2. The collision prism adds no solid the mesh does not draw.
+
+    The player's *"random invisible walls that slow me down, no pattern"*, as a
+    number. For every building the world emits, the collision polygon must be
+    contained in the drawn footprint: solid outside the drawing is a wall
+    nobody can see, and it has no pattern precisely because Douglas-Peucker
+    bridges a re-entrant corner wherever it finds one.
+
+    Asymmetric on purpose. `lost` -- drawn footprint the collision does not
+    cover -- is reported and is **not** a failure: a player brushing through
+    the corner of a wall is a much smaller defect than being stopped by nothing,
+    and `COLLISION_MAX_VERTS` can only ever produce the harmless direction.
+
+    THE CONTROL is the rule this replaced, `simplify(0.9,
+    preserve_topology=False)`, run over the same rings in the same process. It
+    must add solid, because if it does not then this build's footprints are all
+    boxes and the pass says nothing about the fix.
+    """
+    keys = _emitted_tile_keys()
+    con = ledger.connect()
+    by_id: dict[str, np.ndarray] = {}
+    for r in con.execute("SELECT id, geometry FROM buildings"):
+        by_id[r["id"]] = np.asarray(json.loads(r["geometry"])["ring"], dtype=np.float64)
+    print(f"{len(keys):,} emitted tiles, {len(by_id):,} footprints in the ledger")
+
+    from shapely.geometry import Polygon
+
+    added = lost = 0.0
+    n_added = 0
+    worst = (0.0, "")
+    control_added = 0.0
+    control_n = 0
+    checked = 0
+    for ring in by_id.values():
+        pts = mesh._ring_open(ring)
+        if len(pts) < 3:
+            continue
+        drawn = Polygon(pts)
+        if not drawn.is_valid:
+            drawn = drawn.buffer(0)
+        if drawn.is_empty or drawn.geom_type != "Polygon":
+            continue
+        checked += 1
+        emitted = tiles.collision_ring(pts)
+        if emitted is None:
+            continue
+        got = Polygon(emitted)
+        if not got.is_valid:
+            got = got.buffer(0)
+        a = got.difference(drawn).area
+        added += a
+        lost += drawn.difference(got).area
+        if a > 1e-9:
+            n_added += 1
+        if a > worst[0]:
+            worst = (a, f"{pts[0][0]:.0f}, {-pts[0][1]:.0f}")
+        old = drawn.simplify(0.9, preserve_topology=False)
+        if old.geom_type == "Polygon" and not old.is_empty:
+            oldp = Polygon(mesh._ring_open(np.asarray(old.exterior.coords))[:255])
+            if oldp.is_valid and not oldp.is_empty:
+                c = oldp.difference(drawn).area
+                control_added += c
+                if c > 1e-9:
+                    control_n += 1
+
+    if checked == 0:
+        raise AuditUnresolved("read no footprints at all")
+    print(f"  {checked:,} footprints checked")
+    print(f"  solid the collision adds and the mesh does not draw: {added:,.1f} m2 "
+          f"over {n_added:,} footprints (worst {worst[0]:.1f} m2 at {worst[1]})")
+    print(f"  drawn footprint the collision does not cover: {lost:,.1f} m2 "
+          f"-- reported, not asserted; see this audit's docstring")
+    print(f"  CONTROL: the rule this replaced adds {control_added:,.0f} m2 over "
+          f"{control_n:,} footprints")
+
+    ok = True
+    if control_added <= 0.0:
+        print("\n  FAIL: the control added nothing, so this build has no re-entrant "
+              "footprint and the pass above is vacuous")
+        ok = False
+    if added > args.max_added:
+        print(f"\n  FAIL: {added:,.1f} m2 of invisible wall, over a ceiling of "
+              f"{args.max_added}")
+        ok = False
+    if ok:
+        print("\n  PASS: no collision prism stands where nothing is drawn, and the control "
+              "proves the old rule did")
+    return EXIT_PASS if ok else EXIT_FAIL
+
+
+@_audit
+def cmd_rail_veg_audit(args: argparse.Namespace) -> int:
+    """RULE 3. No tree stands inside the rail corridor.
+
+    Over the `.veg.bin` sidecars, which is what the client instances -- the same
+    read `vegetation-audit` makes, asked a different question.
+
+    THE CONTROL is a tree this audit invents, at the midpoint of a real track
+    segment, and it must be reported inside. That is a stronger control than a
+    wider envelope: a wider envelope proves the arithmetic runs, and a trunk on
+    the railhead proves the *frame* is right, which is the thing that would
+    silently make this pass -- an ENU/world sign error puts every tree in
+    Sydney's mirror image and finds nothing there either.
+
+    ---------------------------------------------------------------------------
+    **THE ENVELOPE IS `FENCE_OFFSET`, 6.4 m, AND THE WIDTH IS THE WHOLE ANSWER.**
+    This round was briefed on *"1,602 of 1,757,469 trees stand inside the rail
+    clearance envelope"*. The tree total is exact -- it is this build's -- and
+    **1,602 does not reproduce under any width**, so the number is recorded here
+    with what does, rather than quietly replaced:
+
+    | half-width | non-tunnel track | tunnel spans included |
+    |---|---:|---:|
+    | 5.4 m (`CUT_HALF_WIDTH`, the plain carve) |   361 | 1,717 |
+    | **6.4 m (`FENCE_OFFSET`, what this asserts)** | **448** | 1,971 |
+    | 9.4 m (`STATION_HALF_WIDTH`, the carve at a platform) | 897 | 2,851 |
+    | 14.0 m (`rail.PAVING_REACH_M`) | 2,101 | 4,475 |
+
+    Two choices make the difference and both are stated rather than tuned.
+    **Tunnel spans are excluded**, because a bore has no surface expression
+    (RAIL-VERTICAL.md §3.1) and a tree over one is a tree in a park -- including
+    them nearly quadruples the count and every one of the extras is innocent.
+    **6.4 m rather than 5.4** because the boundary fence stands at
+    `rail-geo.FENCE_OFFSET` and a tree between the fence and the rim is inside
+    the railway's own fence, not beside it.
+
+    The brief also named a tree at (-11831, 12522). **There is none** -- the
+    nearest instance in this build is 18 m away -- so the coordinate is not
+    chased. The two real ones at Oatley are named below and are 0.65 m and
+    1.35 m from the rails, which is a trunk between the running lines.
+    """
+    env = railenv.load(log=lambda _m: None)
+    if not env.loaded:
+        raise AuditUnresolved(
+            f"no rail bake at {railenv.BAKE_PATH}, so there is no corridor to audit against"
+        )
+    keys = _emitted_tile_keys()
+    # `--only`, on exactly `fence-road-audit`'s terms and for exactly its
+    # reason: a partial re-emit fixes the tiles it re-emits and no others, so
+    # the whole-world count answers a question the run did not ask. Scoped, the
+    # verdict is "no tree stands in the corridor **in the tiles this build
+    # wrote**", which is a claim a partial build can actually earn. The
+    # unscoped run is still the default and is still the one that answers for
+    # the shipped world -- see the note this prints when the scope is narrowed.
+    only = _only_keys(args.only)
+    if only:
+        keys = [k for k in keys if k in only]
+        missing = only - set(keys)
+        print(f"  --only: {len(keys):,} tiles in scope"
+              + (f" ({len(missing):,} named but not emitted)" if missing else ""))
+        print("  NOTE: this is a scoped verdict. Trees in the corridor outside these"
+              " tiles are not counted and are not fixed by the run that wrote them.")
+    print(f"{len(keys):,} emitted tiles, {env.track_km:,.0f} km of non-tunnel track "
+          f"at {railenv.FENCE_OFFSET:.1f} m")
+
+    inside: list[tuple] = []
+    total = 0
+    for key in keys:
+        tx, tz = (int(v) for v in key.split("_"))
+        oe, on = tx * config.TILE_SIZE, tz * config.TILE_SIZE
+        for x, z, height, radius, sp in _veg_instances(key):
+            total += 1
+            east = oe + x
+            north = on - z
+            if env.in_corridor(east, north):
+                inside.append((key, east, -north, height, radius))
+    if total == 0:
+        raise AuditUnresolved("read no tree instances at all")
+
+    # The control: a trunk on the rails.
+    bake = railenv.load_bake()
+    segs = railenv._open_segments(railenv.track_polylines(bake))
+    ax, az, bx, bz = segs[len(segs) // 2]
+    cx, cz = (ax + bx) * 0.5, (az + bz) * 0.5
+    control = env.in_corridor(cx, -cz)
+
+    print(f"  {total:,} trees emitted, {len(inside):,} inside the corridor")
+    for row in inside[: args.worst]:
+        print(f"      tile {row[0]:>9}  {row[1]:9.0f}, {row[2]:9.0f}  h={row[3]:.1f} r={row[4]:.1f}")
+
+    # The two the round was named for, checked by coordinate rather than by
+    # rank, so a run that removed 446 of 448 and left these two would say so.
+    # See the docstring: the (-11831, 12522) the brief gave is not a tree in
+    # this build and these are what is actually there.
+    OATLEY = ((-11824.9, 12538.9, 0.65), (-11831.0, 12552.1, 1.35))
+    oatley_left = []
+    for ox_, oz_, dist in OATLEY:
+        still = any(abs(r[1] - ox_) < 1.5 and abs(r[2] - oz_) < 1.5 for r in inside)
+        print(f"      Oatley, {dist:.2f} m from the rails at {ox_:.1f}, {oz_:.1f}: "
+              f"{'STILL STANDING' if still else 'gone'}")
+        if still:
+            oatley_left.append((ox_, oz_))
+    print(f"  CONTROL: a trunk planted on the track at {cx:.0f}, {cz:.0f} reads as "
+          f"{'inside' if control else 'OUTSIDE'} the corridor")
+
+    ok = True
+    if not control:
+        print("\n  FAIL: a tree standing on the rails is not reported inside the corridor. "
+              "The frame or the envelope is wrong and the count above means nothing")
+        ok = False
+    if len(inside) > args.max_trees:
+        print(f"\n  FAIL: {len(inside):,} trees in the corridor, over a ceiling of "
+              f"{args.max_trees}")
+        ok = False
+    if oatley_left:
+        print(f"\n  FAIL: the Oatley trees this round was named for are still standing "
+              f"at {oatley_left}")
+        ok = False
+    if ok:
+        print("\n  PASS: no tree the client will instance stands inside the railway, and a "
+              "planted one would be found")
+    return EXIT_PASS if ok else EXIT_FAIL
+
+
+#: The three material slots `fences.py` emits into. Restated here rather than
+#: imported for the reason the audit exists: a slot renamed in `fences.py` and
+#: not here should make this audit go quiet, and going quiet is what the
+#: `checked` guard below turns into an UNRESOLVED.
+FENCE_SLOTS = (fences.SLOT_MASONRY, fences.SLOT_IRON, fences.SLOT_TIMBER)
+
+
+@_audit
+def cmd_fence_road_audit(args: argparse.Namespace) -> int:
+    """RULE 4. No front fence stands in a carriageway.
+
+    `checkPavedIntegrity` counts this from the other end of the pipeline and
+    named `fences.py` for 6,231 of its 16,901 in-road triangles. This is the
+    same claim asked where it can be fixed, and over the drawn triangles rather
+    than over a model of them.
+
+    The road is taken from the **lane sidecars** and not from a rebuilt
+    `StreetNetwork`, deliberately: `.lanes.bin` is the artefact the client and
+    the server both read, `checkPavedIntegrity` reads it too, and an audit that
+    rebuilt the network would be comparing the fence against a road nobody
+    ships. `ROAD_KERB_SLACK_M` is that check's own 1.5 m and is restated for its
+    stated reason -- an OSM `width` is a tag rather than a survey.
+
+    THE CONTROL is a triangle this audit invents on a carriageway centreline. It
+    must be reported in the road.
+    """
+    from shapely.geometry import LineString, Point
+    from shapely.ops import unary_union
+
+    ROAD_KERB_SLACK_M = 1.5
+    index = json.loads(config.INDEX_PATH.read_text())
+    _require_readable_geometry(index)
+    keys = [t["key"] for t in index["tiles"]]
+    only = _only_keys(args.only)
+    if only:
+        keys = [k for k in keys if k in only]
+    print(f"{len(keys):,} tiles, every fence triangle against the metalled carriageway")
+
+    inroad = 0
+    checked = 0
+    tiles_with_fence = 0
+    worst: list[tuple] = []
+    control_ok = False
+    for key in keys:
+        lanes_path = config.TILE_DIR / f"{key}.lanes.bin"
+        if not lanes_path.exists():
+            continue
+        tx, tz = (int(v) for v in key.split("_"))
+        # Tile-local renderer axes to world. `write_vegetation` writes a local z
+        # of `-(north - on)`, so world z is `local_z - tz * TILE_SIZE`, which is
+        # the `bounds[1] + tile_size` the TypeScript decoder is handed.
+        ox = tx * config.TILE_SIZE
+        oz = -(tz * config.TILE_SIZE)
+        decoded = _decode_lanes(key)
+        if not isinstance(decoded, dict):
+            continue
+        ways = decoded["ways"]
+        strips = []
+        centres = []
+        for w in ways:
+            half = max(0.6, float(w["half"]) - ROAD_KERB_SLACK_M)
+            pts = w["p"]
+            if len(pts) < 2:
+                continue
+            plan = [(ox + float(p[0]), oz + float(p[2])) for p in pts]
+            line = LineString(plan)
+            if line.length < 1e-6:
+                continue
+            strips.append(line.buffer(half, cap_style=2))
+            centres.append(line)
+        if not strips:
+            continue
+        road = unary_union(strips)
+        if road.is_empty:
+            continue
+        if not control_ok and centres:
+            mid = centres[0].interpolate(0.5, normalized=True)
+            control_ok = road.contains(Point(mid.x, mid.y))
+        seen_here = False
+        for material, pos, tri, _normals, _q in _glb_primitives(
+            config.TILE_DIR / f"{key}.glb"
+        ):
+            if material not in FENCE_SLOTS:
+                continue
+            seen_here = True
+            a, b, c = pos[tri[:, 0]], pos[tri[:, 1]], pos[tri[:, 2]]
+            cx = ox + (a[:, 0] + b[:, 0] + c[:, 0]) / 3.0
+            cz = oz + (a[:, 2] + b[:, 2] + c[:, 2]) / 3.0
+            for i in range(len(cx)):
+                checked += 1
+                if road.contains(Point(float(cx[i]), float(cz[i]))):
+                    inroad += 1
+                    if len(worst) < args.worst:
+                        worst.append((key, float(cx[i]), float(cz[i]), material))
+        if seen_here:
+            tiles_with_fence += 1
+
+    if checked == 0:
+        raise AuditUnresolved(
+            f"read no triangles in any of {FENCE_SLOTS}. Either this build emits no "
+            f"front fences or the slot names here have drifted from fences.py"
+        )
+    print(f"  {checked:,} fence triangles over {tiles_with_fence:,} tiles")
+    print(f"  {inroad:,} stand in a carriageway, more than {ROAD_KERB_SLACK_M} m inside its kerb")
+    for row in worst:
+        print(f"      tile {row[0]:>9}  {row[1]:9.0f}, {row[2]:9.0f}  {row[3]}")
+    print(f"  CONTROL: a triangle on a carriageway centreline reads as "
+          f"{'in the road' if control_ok else 'CLEAR OF IT'}")
+
+    ok = True
+    if not control_ok:
+        print("\n  FAIL: a point on a road centreline is not reported in the road, so the "
+              "count above means nothing")
+        ok = False
+    if inroad > args.max_triangles:
+        print(f"\n  FAIL: {inroad:,} fence triangles in a carriageway, over a ceiling of "
+              f"{args.max_triangles:,}")
+        ok = False
+    if ok:
+        print("\n  PASS: no front fence stands in the part of the road a car drives down")
+    return EXIT_PASS if ok else EXIT_FAIL
+
+
 def cmd_reset(args: argparse.Namespace) -> int:
     con = ledger.connect()
     print(f"reset {ledger.reset(con, args.kind):,} '{args.kind}' units to pending")
@@ -5034,7 +5669,10 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument(
         "--only",
         default="",
-        help="comma-separated tile keys to emit, e.g. '0_3,0_4,1_2'. Everything else"
+        help="comma-separated tile keys to emit, e.g. '0_3,0_4,1_2', or"
+        " `@FILE` to read them one to a line -- see `_only_keys`, and use the"
+        " file form past a handful, because a 382-tile station round pasted"
+        " into a shell is a list that will be wrong somewhere. Everything else"
         " keeps the tiles and the index entries it already has -- see"
         " `_carry_index_tiles`. For verifying a local change without a citywide"
         " rebuild.",
@@ -5321,6 +5959,75 @@ def main(argv: list[str] | None = None) -> int:
     )
     ca.add_argument("--worst", type=int, default=12, help="offenders to name")
     ca.set_defaults(func=cmd_clearance_audit)
+
+    # --- The station round's four rules, one audit each ------------------------
+    #
+    # Registered together because they are one round and because they share a
+    # source: `railenv`, which is `data/scratch/rail`. Each one is UNRESOLVED
+    # rather than PASS when the bake is missing, which is the distinction
+    # `_audit`'s header exists for -- "there is no railway to check against" is
+    # not "no building stands on a station".
+    sc = sub.add_parser(
+        "station-clear-audit",
+        help="no emitted collision prism stands inside a station envelope",
+        description=cmd_station_clear_audit.__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    sc.add_argument("--worst", type=int, default=20, help="offenders to name")
+    sc.set_defaults(func=cmd_station_clear_audit)
+
+    cf = sub.add_parser(
+        "collision-fit-audit",
+        help="no collision prism adds solid the mesh does not draw",
+        description=cmd_collision_fit_audit.__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    # Zero, and it is a zero rather than a ceiling because the rule is satisfied
+    # by construction -- the collision ring IS the drawn ring. The argument
+    # exists so a future change that trades a little solid for a lot of vertices
+    # can be measured against a stated number instead of by editing the audit.
+    cf.add_argument("--max-added", type=float, default=0.0,
+                    help="m2 of solid the collision may add over the whole build")
+    cf.set_defaults(func=cmd_collision_fit_audit)
+
+    rv = sub.add_parser(
+        "rail-veg-audit",
+        help="no emitted tree stands inside the rail corridor",
+        description=cmd_rail_veg_audit.__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    rv.add_argument("--max-trees", type=int, default=0,
+                    help="trees the corridor may still hold")
+    # Added for the station round's partial re-emit, in `fence-road-audit`'s
+    # words and for its reason: 382 tiles were rebuilt and 17,731 were not, so
+    # the unscoped count measures the world and not the run. Scoping it does
+    # not make the rest of the corridor clean and the command says so when it
+    # is narrowed -- see `cmd_rail_veg_audit`.
+    rv.add_argument("--only", default="",
+                    help="comma-separated tile keys, or @FILE for one key a line,"
+                    " for checking a partial re-emit without reading the whole world")
+    rv.add_argument("--worst", type=int, default=12, help="offenders to name")
+    rv.set_defaults(func=cmd_rail_veg_audit)
+
+    fr = sub.add_parser(
+        "fence-road-audit",
+        help="no front fence stands in a carriageway",
+        description=cmd_fence_road_audit.__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    fr.add_argument("--only", default="",
+                    help="comma-separated tile keys, or @FILE for one key a line,"
+                    " for checking one change without reading the whole world")
+    # Not zero, and the number is a measurement rather than a target. A fence
+    # is clipped against the carriageway ribbons `streets.py` draws, and
+    # `.lanes.bin` carries the same ways at the same widths -- but the two are
+    # buffered by different code with different join rules, so a fence panel
+    # that stops exactly on one kerb can have its centroid a centimetre inside
+    # the other. Set from the run that ships and tightened when it can be.
+    fr.add_argument("--max-triangles", type=int, default=0,
+                    help="fence triangles allowed in a carriageway")
+    fr.add_argument("--worst", type=int, default=12, help="offenders to name")
+    fr.set_defaults(func=cmd_fence_road_audit)
 
     # --- The rail service core -------------------------------------------------
     #

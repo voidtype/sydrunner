@@ -957,7 +957,47 @@ def _group_levels(bodies: list[WaterBody]) -> list[WaterLevel]:
 # --- The conformance -----------------------------------------------------------
 
 
-def conform(heights: np.ndarray, p0: int, q0: int, spacing: float, field: WaterField) -> dict:
+def _shore_distance(pts, boundary, reach: float, fast: bool) -> np.ndarray:
+    """Metres from each post to the waterline, or `+inf` past `reach`.
+
+    `fast=False` is the form this replaced -- every post against the whole
+    boundary -- kept callable rather than deleted, because it is the reference
+    `verify_conform_fast` compares against and a reference nobody can run is a
+    claim rather than a check.
+    """
+    if not fast:
+        return shapely.distance(pts, boundary)
+    # `dwithin(pts, boundary, reach)` on a bare (Multi)LineString is NOT indexed:
+    # GEOS extracts every line component and runs pointToSegment for every post,
+    # so it is cheaper than `distance` by a constant and no better in order --
+    # still posts × coastline. Sampled on the tidal level of the 60 km field
+    # (a 121 × 121 km bounding box, ~11.5 M posts, one boundary of ~5,800
+    # rings), the stack sat in `dwithin_func -> computeFacetDistance ->
+    # pointToSegment` for a quarter of an hour without returning. That is why a
+    # one-tile proof build was paying an hour of setup before emitting anything.
+    #
+    # So the near band is found from an index instead. The boundary is split into
+    # its constituent line parts, filed in an STRtree, and each post asks the tree
+    # for the parts within `reach` -- a logarithmic query. Only the posts with a
+    # hit ever pay for a real distance, and that distance is against the whole
+    # boundary as before, so the value is identical; only the *work* to decide
+    # who needs it has changed. Bit-for-bit results are asserted by
+    # `verify_conform_fast` against the reference above.
+    parts = shapely.get_parts(boundary)
+    if len(parts) == 0:
+        return np.full(len(pts), np.inf)
+    tree = shapely.STRtree(parts)
+    hit_pts = np.unique(tree.query(pts, predicate="dwithin", distance=reach)[0])
+    dist = np.full(len(pts), np.inf)
+    if len(hit_pts):
+        dist[hit_pts] = shapely.distance(pts[hit_pts], boundary)
+    return dist
+
+
+def conform(
+    heights: np.ndarray, p0: int, q0: int, spacing: float, field: WaterField,
+    fast: bool = True,
+) -> dict:
     """Cut the bed in, and hold the land at the waterline. In place.
 
     `heights[qi, pi]` is the post at east `(p0 + pi) * spacing`, north
@@ -1015,8 +1055,49 @@ def conform(heights: np.ndarray, p0: int, q0: int, spacing: float, field: WaterF
         ex = grid_e[sub].ravel()
         en = grid_n[sub].ravel()
 
+        # --- THE BOUNDING BOX IS THE RIGHT FILTER FOR A POND AND NO FILTER AT
+        #     ALL FOR THE OCEAN, and that is what made this the slowest call in
+        #     the build.
+        #
+        # The comment above is about a pond, and for a pond it is exact. The
+        # tidal level is the Pacific: its bounding box is the whole extent, so
+        # `ex, en` is every post in the lattice -- ~11.5 M at 60 km, not the
+        # 986 k the note was written against -- and the two calls below then ran
+        # every one of them against the entire coastline. Four stack samples
+        # twenty minutes apart during a five-tile `--only` run all landed inside
+        # this `distance`, and the setup had not finished at 49 minutes.
+        #
+        # **The distance is only ever read where it is small.** `u` clips at
+        # `FEATHER_IN_M` and `wants_hold` needs `dist <= FEATHER_OUT_M`, so a
+        # post further than that from the shore has its distance computed,
+        # smoothstepped and thrown away. Everything beyond the band is
+        # `+inf`, which the two consumers already handle exactly right: `u`
+        # clips to 1 -- full depth, which is what a post in the middle of the
+        # ocean gets -- and `dist <= FEATHER_OUT_M` is false. So this is a
+        # filter, not an approximation, and `verify_conform_fast` asserts the
+        # two forms agree element-wise on the real field rather than arguing it.
+        #
+        # `reach` rather than `max(FEATHER_IN_M, FEATHER_OUT_M)`: it is the band
+        # the correctness argument needs times 1.5, it is already the number the
+        # bounding box was widened by, and the margin means no tie between
+        # `dwithin`'s predicate and `distance`'s arithmetic can land on the one
+        # post where `wants_hold` would flip.
+        pts = shapely.points(ex, en)
+        boundary = lvl.geom.boundary
+
+        # Prepared, and this is the other half of the cost. `contains_xy` over
+        # eleven million posts against an unprepared ocean is a linear scan of
+        # its rings per post; prepared, it is an index lookup. The predicate is
+        # the same predicate -- preparing changes what it costs, never what it
+        # answers -- so `inside` stays exact over the whole disc, which it has
+        # to: `wants_bed` is true for most of the extent and there is no band to
+        # restrict it to.
+        if fast:
+            shapely.prepare(lvl.geom)
+            shapely.prepare(boundary)
+
         inside = shapely.contains_xy(lvl.geom, ex, en)
-        dist = shapely.distance(shapely.points(ex, en), lvl.geom.boundary)
+        dist = _shore_distance(pts, boundary, reach, fast)
 
         # Inside: the bed, ramping from the shore clearance at the boundary to
         # full depth one post in. Smoothstep rather than linear so the bed is C1
@@ -1069,6 +1150,44 @@ def conform(heights: np.ndarray, p0: int, q0: int, spacing: float, field: WaterF
         "lifted_max": float(lifted.max()) if lifted.size else 0.0,
         "levels": len(field.levels),
     }
+
+
+def verify_conform_fast(
+    field: WaterField, heights: np.ndarray, p0: int, q0: int, spacing: float
+) -> list[str]:
+    """The near-boundary filter changes what `conform` costs and nothing else.
+
+    Runs the shipped path and the form it replaced over the **same lattice from
+    the same field**, and compares the conformed heights, the wet mask, the held
+    mask and every reported statistic. Not "close" -- `np.array_equal` on the
+    heights, which is bit equality, because the whole claim is that a post more
+    than `reach` from the shore reads its distance through two clamps that
+    saturate, so the filter is exact rather than tolerable.
+
+    A tolerance here would be the wrong instrument twice over: it would pass a
+    filter that is subtly wrong at the shore, and it would pass one that is
+    catastrophically wrong in the deep ocean, where `u` clips to 1 either way
+    and any error hides.
+
+    Returns the failures, empty when the two agree.
+    """
+    out: list[str] = []
+    a = heights.copy()
+    b = heights.copy()
+    stats_fast = conform(a, p0, q0, spacing, field, fast=True)
+    stats_ref = conform(b, p0, q0, spacing, field, fast=False)
+    if not np.array_equal(a, b):
+        bad = int(np.count_nonzero(a != b))
+        worst = float(np.abs(a.astype(np.float64) - b.astype(np.float64)).max())
+        out.append(
+            f"{bad:,} of {a.size:,} conformed posts differ between the filtered and "
+            f"unfiltered distance, worst {worst:.6f} m"
+        )
+    for key in sorted(set(stats_fast) | set(stats_ref)):
+        if stats_fast.get(key) != stats_ref.get(key):
+            out.append(f"stat {key}: filtered {stats_fast.get(key)!r} against "
+                       f"unfiltered {stats_ref.get(key)!r}")
+    return out
 
 
 # --- The sheets ----------------------------------------------------------------

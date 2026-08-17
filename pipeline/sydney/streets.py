@@ -480,6 +480,32 @@ class StreetNetwork:
         """Indices of ways whose bounds intersect `geom`."""
         return [int(i) for i in self._tree.query(geom)]
 
+    def carriageways_near(self, geom: BaseGeometry) -> list[Polygon]:
+        """The **metalled** ribbons of every street way near `geom`.
+
+        Carriageways only -- no footways, and no footpath band. A front fence
+        stands a metre inside the property line, which is the far edge of the
+        paving, so a test against the band would report every fence in Sydney.
+        What this exists to find is the part of the road a car drives down, and
+        `checkPavedIntegrity`'s `metalled` deck asks the identical question from
+        the other end of the pipeline.
+
+        The same `_ribbon` the tile surfaces are unioned from, so a caller
+        clipping against this is clipping against the asphalt that gets drawn
+        rather than against a second estimate of where it is.
+        """
+        out: list[Polygon] = []
+        for i in self._tree.query(geom):
+            i = int(i)
+            if self._roads[i].is_foot:
+                continue
+            # A bridge deck is not on the ground -- `decks.py` took it off --
+            # so a fence under a viaduct is not standing in its carriageway.
+            if getattr(self._roads[i], "bridge", False):
+                continue
+            out.append(self._ribbon(i))
+        return out
+
     def buildings_near(self, geom: BaseGeometry) -> list[Polygon]:
         """Building footprints whose bounds intersect `geom`."""
         return [self._obstacles[int(i)] for i in self._obstacle_tree.query(geom)]

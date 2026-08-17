@@ -88,7 +88,8 @@ from collections import Counter
 from dataclasses import dataclass
 
 import numpy as np
-from shapely.geometry import Point, Polygon
+from shapely.geometry import LineString, Point, Polygon
+from shapely.ops import unary_union
 
 from . import mesh, streets
 from .merge import Building
@@ -448,12 +449,73 @@ class FenceNetwork:
             gate = float(np.clip(np.dot(centroid - front.p0, along), 0.0, front.seg))
             self.stats["gate_on_centroid"] += 1
 
-        _emit_fence(slots, style, a, c, front.outward, gate, origin, terrain)
+        runs = self._clip_to_kerb(a, c)
+        if not runs:
+            self.stats["drop_all_in_road"] += 1
+            return
+        if len(runs) != 1 or runs[0][0] > MIN_STATION or runs[0][1] < front.seg - MIN_STATION:
+            self.stats["clipped_at_a_road"] += 1
 
-        self.stats["fences"] += 1
-        self.stats["metres"] += round(front.seg)
-        self.styles[style.name] += 1
+        run = c - a
+        length = float(np.hypot(run[0], run[1]))
+        for s0, s1 in runs:
+            p = a + run * (s0 / length)
+            q = a + run * (s1 / length)
+            # The gate belongs to whichever surviving leaf contains it. A leaf
+            # that does not contain it gets none rather than one at its own
+            # midpoint: a second gateway onto a side street is a gate into
+            # traffic, and the door it would be aligned with is round the
+            # corner.
+            g = gate - s0 if s0 <= gate <= s1 else -1.0
+            _emit_fence(slots, style, p, q, front.outward, g, origin, terrain)
+            self.stats["fences"] += 1
+            self.stats["metres"] += round(s1 - s0)
+            self.styles[style.name] += 1
         self.setbacks.append(offset)
+
+    def _clip_to_kerb(self, a: np.ndarray, c: np.ndarray) -> list[tuple[float, float]]:
+        """The parts of the fence line that are not in a carriageway.
+
+        `(s0, s1)` pairs, metres along the line from `a`.
+
+        THE DEFECT THIS EXISTS FOR. The property line is derived from **one**
+        street -- the one `DoorNetwork.front_edge` chose, whose footpath width
+        is subtracted in `_property_line` -- and a corner block fronts two. The
+        setback that puts the fence a metre inside the kerb of its own street
+        says nothing at all about the street running across the end of the
+        frontage, so the fence marches straight over it. `checkPavedIntegrity`
+        counted 6,231 front-fence triangles standing in a travelled way, more
+        than 1.5 m inside its kerb, and named this module.
+
+        `_property_line`'s existing three-sample minimum is the near miss that
+        makes this look already-handled and is not: it measures against
+        `front.way`'s own centreline at both ends of the wall, so it catches a
+        wall skewed to *its own* street and cannot see a different one.
+
+        Clipped rather than dropped, because the frontage either side of a
+        corner is real and a house on a corner does have a fence. A leaf shorter
+        than `MIN_FRONTAGE` is dropped -- a 40 cm stub of palisade beside a
+        driveway is noise with two posts on it.
+        """
+        line = LineString([tuple(a), tuple(c)])
+        roads = self._streets.carriageways_near(line)
+        if not roads:
+            return [(0.0, line.length)]
+        blocked = unary_union(roads)
+        keep = line.difference(blocked)
+        if keep.is_empty:
+            return []
+        pieces = list(keep.geoms) if keep.geom_type == "MultiLineString" else [keep]
+        out: list[tuple[float, float]] = []
+        for piece in pieces:
+            if piece.length < MIN_FRONTAGE:
+                continue
+            cs = list(piece.coords)
+            s0 = line.project(Point(cs[0]))
+            s1 = line.project(Point(cs[-1]))
+            out.append((min(s0, s1), max(s0, s1)))
+        out.sort()
+        return out
 
     def _property_line(self, front: mesh.FrontEdge) -> tuple[float, float]:
         """`(setback at the middle of the wall, setback the fence is built at)`.
@@ -579,7 +641,15 @@ def _emit_fence(
     half = GATE_WIDTH * 0.5
     lo = half + GATE_MIN_LEAF
     hi = run - half - GATE_MIN_LEAF
-    if lo <= hi:
+    if gate < 0.0:
+        # No gate on this leaf. `FenceNetwork._clip_to_kerb` cut the frontage at
+        # a side street and the way in is on the other piece; a second opening
+        # here would be a garden gate onto a carriageway. One unbroken panel and
+        # no posts, which is the same trade the header makes about end posts --
+        # a post is only worth its ten triangles when it frames an opening.
+        pieces = ((0.0, run),)
+        posts = ()
+    elif lo <= hi:
         gate = float(min(max(gate, lo), hi))
         pieces = ((0.0, gate - half), (gate + half, run))
         posts = (gate - half, gate + half)

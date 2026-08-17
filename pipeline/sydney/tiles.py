@@ -516,6 +516,90 @@ def write_params(path: Path, params: list[list[float]]) -> int:
     return len(arr) * 4
 
 
+#: The most vertices one prism may carry. The format's count word is a `u16`,
+#: but `client/src/player/collision.ts` walks every vertex of every prism in the
+#: cell on each query, so this is a cost bound rather than a format one.
+COLLISION_MAX_VERTS = 255
+
+
+def collision_ring(ring: np.ndarray) -> np.ndarray | None:
+    """The plan ring one building's collision prism is built from.
+
+    **The drawn footprint, unsimplified**, and the change of mind is worth the
+    paragraph because the code said the opposite for a year:
+
+    > Simplify hard -- collision wants the fewest planes that still stop a
+    > player at the wall. A 1 m tolerance is invisible at walking speed.
+
+    It is not invisible, because Douglas-Peucker does not only move a wall --
+    where a footprint is re-entrant it **bridges the notch**, and the collision
+    polygon then fills an alcove the mesh draws as open. That is solid the
+    player is stopped by with nothing drawn there, which is the report
+    *"random invisible walls that slow me down, no pattern"*. Measured over all
+    1,299,318 footprints in this build:
+
+    | rule | solid added | footprints | worst | ring vertices |
+    |---|---:|---:|---:|---:|
+    | `simplify(0.9, preserve_topology=False)` | 324,912 m2 | 155,186 | 583.5 m2 | 7,030,828 |
+    | `simplify(0.9, preserve_topology=True)`  | 324,674 m2 | 155,158 | 583.5 m2 | 7,031,058 |
+    | `simplify(0.3, preserve_topology=True)`  |  27,980 m2 |  53,353 | 129.1 m2 | 7,458,449 |
+    | the drawn ring                           |       0 m2 |       0 |   0.0 m2 | 7,631,044 |
+
+    **`preserve_topology=True` fixes nothing** -- 324,674 against 324,912 -- and
+    that is the one result here that overturns the obvious diagnosis. The flag
+    stops the simplifier producing an *invalid* polygon; it does not stop a
+    valid one swallowing a courtyard. What was doing the damage was the
+    tolerance, and the honest end of reducing a tolerance until the error is
+    small is to stop introducing the error.
+
+    So the ring is not simplified at all, and the invariant is by construction
+    rather than by threshold: **the collision polygon IS the drawn polygon**,
+    so there is nothing for the two to disagree about. The standoff it removes
+    is 0.49 m at the median over the 113,489 footprints that had one, 0.74 m at
+    p90 and 1.03 m at worst.
+
+    The price is 7,631,044 ring vertices against 7,030,828, **8.5%**, and it is
+    small because the median footprint is a 4-vertex box that Douglas-Peucker
+    never touched. Only 5 footprints in the whole build exceed
+    `COLLISION_MAX_VERTS`, and those are the one case that still has to be
+    reduced -- reduced by a rule that cannot add, see below.
+    """
+    from shapely.geometry import Polygon
+
+    if len(ring) < 3:
+        return None
+    if len(ring) <= COLLISION_MAX_VERTS:
+        return ring
+
+    # The five footprints that cannot be carried whole. Truncating the ring --
+    # which is what the old code did after simplifying -- closes the polygon
+    # early across whatever it cut off, and that is the same defect at 200 m
+    # instead of at 0.9. Simplify until it fits, then **intersect with the
+    # drawn footprint**, so whatever the reduction does it can only ever remove
+    # solid and never add it.
+    poly = Polygon(ring)
+    if not poly.is_valid:
+        poly = poly.buffer(0)
+    if poly.is_empty or poly.geom_type != "Polygon":
+        return None
+    for tol in (0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0):
+        simple = poly.simplify(tol, preserve_topology=True)
+        if simple.is_empty or simple.geom_type != "Polygon":
+            continue
+        clipped = simple.intersection(poly)
+        if clipped.is_empty:
+            continue
+        if clipped.geom_type != "Polygon":
+            clipped = max(clipped.geoms, key=lambda g: g.area)
+        pts = mesh._ring_open(np.asarray(clipped.exterior.coords))
+        if 3 <= len(pts) <= COLLISION_MAX_VERTS:
+            return pts
+    # Nothing reduced it. Keep the first 255 vertices rather than emit nothing,
+    # and it is the one place in this function where the collision can stand
+    # where nothing is drawn. Zero footprints reach it on this build.
+    return ring[:COLLISION_MAX_VERTS]
+
+
 def write_collision(
     path: Path,
     buildings: list[Building],
@@ -571,29 +655,33 @@ def write_collision(
         if len(ring) >= 3:
             landmark_rings.append((float(p.height), float(p.base), ring[:255]))
 
-    out = bytearray(struct.pack("<I", len(buildings) + len(landmark_rings)))
+    # And the building rings on the same terms, for the same reason: a footprint
+    # that degenerates to two points is dropped, and the count word has to be
+    # the number actually emitted rather than the number offered. The old code
+    # promised `len(buildings)` and then `continue`d past the empty ones, which
+    # left the server parsing a prism out of the next building's header.
+    building_rings = []
+    for i, b in enumerate(buildings):
+        # THE COLLISION POLYGON IS THE DRAWN POLYGON. There is no simplify call
+        # here and there must not be one: a tolerance that moves a wall also
+        # bridges a re-entrant corner, and the collision then fills an alcove
+        # the mesh draws as open. `preserve_topology=True` is a placebo against
+        # it -- it recovers 238 m2 of 324,912 -- and the vertex saving a
+        # tolerance buys is 8.5% on a build whose median footprint is a
+        # four-vertex box that Douglas-Peucker never touched. See
+        # `collision_ring` for the whole table before re-adding one.
+        pts = collision_ring(mesh._ring_open(b.ring))
+        if pts is None:
+            continue
+        building_rings.append((float(b.height), 0.0 if bases is None else float(bases[i]), pts))
+
+    out = bytearray(struct.pack("<I", len(building_rings) + len(landmark_rings)))
     for height, base, ring in landmark_rings:
         out += struct.pack("<ffH", height, base, len(ring))
         for e, n in ring:
             out += struct.pack("<ff", float(e - oe), float(-(n - on)))
-    for i, b in enumerate(buildings):
-        ring = mesh._ring_open(b.ring)
-        # Simplify hard -- collision wants the fewest planes that still stop a
-        # player at the wall. A 1 m tolerance is invisible at walking speed.
-        from shapely.geometry import Polygon
-
-        poly = Polygon(ring)
-        if not poly.is_valid:
-            poly = poly.buffer(0)
-        if poly.is_empty:
-            continue
-        simple = poly.simplify(0.9, preserve_topology=False)
-        pts = mesh._ring_open(np.asarray(simple.exterior.coords)) if simple.geom_type == "Polygon" else ring
-        if len(pts) < 3:
-            pts = ring
-        pts = pts[:255]
-        base = 0.0 if bases is None else float(bases[i])
-        out += struct.pack("<ffH", float(b.height), base, len(pts))
+    for height, base, pts in building_rings:
+        out += struct.pack("<ffH", height, base, len(pts))
         for e, n in pts:
             out += struct.pack("<ff", float(e - oe), float(-(n - on)))
     path.parent.mkdir(parents=True, exist_ok=True)
