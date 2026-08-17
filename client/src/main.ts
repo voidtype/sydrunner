@@ -25,7 +25,7 @@ import { BOARD_HINT_M, DoorMarker, verifyDoorMarker } from './world/doormarker.t
 // --- The screaming sun and the button in Sydney Park. One feature, two files:
 //     the rules (shared with the server) and the renderer. See
 //     `game/sunbutton.ts` for where the button is and why it is there.
-import { verifySunButton } from './game/sunbutton.ts';
+import { sunScreaming, sunScreamMix, verifySunButton } from './game/sunbutton.ts';
 import { SunFeature, verifySunButtonRenderer } from './world/sunbutton.ts';
 import { EXPOSURE } from './sky/calibration.ts';
 import { SydneySky } from './sky/sky.ts';
@@ -9477,6 +9477,14 @@ async function main(): Promise<void> {
               rotorOrbit: polair.orbitPhase,
             },
       );
+      // The screaming sun's own sound, beside the siren and the rotor: one call a
+      // frame with whatever the sun is doing, which is `audio.heatUpdate`'s
+      // arrangement. The clock and the altitude are the same the face is drawn
+      // from, so the scream and the face can never be a frame apart.
+      const clockMs = sky.now.nowMs;
+      const sunAltDeg = sky.solar.altitude;
+      const screaming = sunButton.state ? sunScreaming(sunButton.state, clockMs) : false;
+      audio.sunScreamUpdate(sunScreamMix(screaming, sunAltDeg));
     }
 
     // Every actor -- three dummies and the player's own body -- on the frame
