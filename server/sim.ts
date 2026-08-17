@@ -233,7 +233,6 @@ import {
   createCarFrame,
   createCarriageStand,
   dirOf,
-  exitLocal,
   interiorOfCar,
   isAboard,
   nextCall,
@@ -246,6 +245,7 @@ import {
   type Vec3Out,
   boardHere,
   rideEnter,
+  rideExit,
   RIDE_ON,
   RIDE_TRIP_GONE,
 } from '../client/src/game/riding.ts';
@@ -3394,12 +3394,30 @@ export class Simulation {
     }
   }
 
-  /** Compose the stepped body back into the world. The other half of `enterCarriage`. */
+  /**
+   * Compose the stepped body back into the world. The other half of `enterCarriage`.
+   *
+   * `riding.rideExit` rather than `exitLocal`, and the difference is the gangway:
+   * a rider who has walked past a coupling plane changes carriage here, inside
+   * the fixed step, before the composition -- so the frame their world position
+   * is derived from is the carriage they are in at the end of the tick and the
+   * `aboard` section of the next snapshot names it. The client runs the identical
+   * call on the identical inputs and predicts the same crossing; see
+   * `net/client.reconcileAboard` for the hundred milliseconds in between.
+   *
+   * **The yaw delta it hands back is dropped here, and only here.** On a reversal
+   * the carriage frame turns through half a turn and a rider's local heading has
+   * to turn with it; the browser owns that number because the browser owns the
+   * mouse accumulator it has to be added to (`main.ts`, `wasAboard`). This end
+   * has no accumulator -- the next `INPUT` arrives already turned -- and
+   * `crossGangway` has already put the turn on `aboard.yaw`, which is what this
+   * tick's snapshot is written from.
+   */
   private exitCarriage(p: Participant): void {
     const f = this.carriageFrame;
     if (f === null) return;
     this.carriageFrame = null;
-    exitLocal(p.combat.aboard, p.combat.body, f);
+    rideExit(this.world.rail ?? null, p.combat.aboard, p.combat.body, this.railT, f);
   }
 
   /**

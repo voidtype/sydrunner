@@ -155,6 +155,7 @@ import {
   localToWorld,
   localToWorldDir,
   projectAboard,
+  reframeAcross,
   type CarFrame,
   type CarriageInterior,
   type CarriageMove,
@@ -800,6 +801,15 @@ export class NetClient {
   private replayInterior: CarriageInterior | null = null;
   private readonly replayMove: CarriageMove = { x: 0, z: 0, hit: false };
   private readonly localScratch = { x: 0, y: 0, z: 0 };
+  /**
+   * The server's carriage-local position, moved into the carriage this client
+   * thinks it is in. See `reconcileAboard`.
+   *
+   * A field rather than a literal, on `localScratch`' own terms: this runs once
+   * per snapshot for every rider and an object per snapshot is garbage in the one
+   * path the whole riding design exists to keep allocation-free.
+   */
+  private readonly reframeScratch = { x: 0, y: 0, z: 0 };
 
   /**
    * Called by `main.ts` on the frame it predicts a board or an alight.
@@ -2234,7 +2244,18 @@ export class NetClient {
     const now = railSeconds(this.nowMs());
     const trip = this.resolveTrip(dir, now, server.tripLow);
     if (trip === null) return;
-    if (a.line === server.line && a.dir === server.dir && a.trip === trip && a.car === server.car) {
+    // **The carriage is deliberately not in this test.** Adoption exists for the
+    // ride -- being put on a train, or taken off one -- and it is a hard reset:
+    // it overwrites the local offset, throws the input queue away and clears the
+    // correction. The carriage index changes for a much cheaper reason now, which
+    // is somebody walking through a gangway, and it changes on the client a
+    // hundred milliseconds before the snapshot that agrees. Re-adopting on it
+    // would yank a walking rider back into the carriage they just left, on every
+    // snapshot, until they stopped walking. `reconcileAboard` reframes the
+    // mismatch instead, and the crossing is a pure function of the position it
+    // reconciles -- so a client that crossed when the server did not walks back
+    // out of its own accord.
+    if (a.line === server.line && a.dir === server.dir && a.trip === trip) {
       return;
     }
     // The frame first, and no adoption at all without one. Writing the identity
@@ -2277,6 +2298,28 @@ export class NetClient {
    * of every player who is not riding and the one or two ticks either side of a
    * boarding.
    *
+   * ---------------------------------------------------------------------------
+   * **THE CARRIAGE INDEX IS NOT PART OF THAT AGREEMENT, AND IT CANNOT BE.**
+   *
+   * It used to be: a snapshot naming a different carriage fell through to the
+   * world-space replay below, which sets the body's world position -- and moving
+   * a rider's body in world space is precisely how `riding.enterLocal` is told
+   * the ride is over. Before the Metro had open gangways that only ever happened
+   * for a tick either side of a boarding and was covered by `aboardPredictedAt`.
+   * With them it happens **every time anybody walks through a bellows**: the
+   * client predicts the crossing on the tick the plane is passed and the snapshot
+   * in hand was taken a hundred milliseconds earlier, so for those few ticks the
+   * server's honest answer names the carriage behind. Falling through there would
+   * end the ride, mid-train, at line speed, and would read as being thrown off a
+   * Metro for walking about on it.
+   *
+   * So a mismatch is **reframed rather than refused**. Both indices name
+   * carriages of one consist and `riding.reframeAcross` is the change of basis
+   * between them -- the same function `crossGangway` is built on, which is why it
+   * is an export and not a paragraph of algebra copied to this file. The server's
+   * authority is a physical point in a train; expressing it in the room the
+   * client is standing in loses nothing.
+   *
    * The correction handed back to the camera is the local error **rotated into
    * world**, because that is the frame `main.ts` applies it in. Rotated rather
    * than composed: it is a displacement, not a point.
@@ -2286,17 +2329,30 @@ export class NetClient {
     const server = this.serverAboard;
     const a = local.aboard;
     if (bake === null || server === null || !isAboard(a)) return false;
-    if (a.line !== server.line || a.dir !== server.dir || a.car !== server.car) return false;
+    if (a.line !== server.line || a.dir !== server.dir) return false;
     const dir = dirOf(bake, a.line, a.dir);
     if (dir === null) return false;
     if (this.resolveTrip(dir, railSeconds(this.nowMs()), server.tripLow) !== a.trip) return false;
-    const it = interiorOfCar(consistOf(dir, a.trip), a.car);
+    const consist = consistOf(dir, a.trip);
+    const it = interiorOfCar(consist, a.car);
     if (it === null) return false;
     this.replayInterior = it;
 
     const body = this.replayBody;
-    // The server's own carriage-local position for the input it acknowledged.
-    body.position.set(server.x, server.y, server.z);
+    // The server's own carriage-local position for the input it acknowledged,
+    // in **this client's** carriage. See the header: the two indices differ for
+    // the few ticks a crossing is in flight, and the reframe is what keeps those
+    // ticks on the carriage-local path instead of dropping them into a world
+    // replay that would end the ride.
+    if (server.car !== a.car) {
+      this.reframeScratch.x = server.x;
+      this.reframeScratch.y = server.y;
+      this.reframeScratch.z = server.z;
+      if (!reframeAcross(consist, server.car, a.car, this.reframeScratch)) return false;
+      body.position.set(this.reframeScratch.x, this.reframeScratch.y, this.reframeScratch.z);
+    } else {
+      body.position.set(server.x, server.y, server.z);
+    }
     if (this.ackedVelocityKnown) body.velocity.copy(this.ackedVelocity);
     else body.velocity.set(a.vx, a.vy, a.vz);
     body.onGround = true;

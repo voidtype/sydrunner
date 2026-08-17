@@ -177,6 +177,7 @@ import {
   consistOf,
   consistOffset,
   createCarFrame,
+  interiorFor,
   spanFlagsAt,
   type ConsistCar,
 } from '../game/riding.ts';
@@ -185,7 +186,14 @@ import {
   SALOON_INTERIOR_RE,
   SALOON_PANEL_RE,
   TRAIN_END_CAPACITY,
+  DOOR_SPILL_LEVEL,
+  METRO_NIGHT_INTERIOR_GAIN,
+  SALOON_INTERIOR_GLOW,
+  SALOON_PANEL_LEVEL,
+  TANGARA_NIGHT_INTERIOR_GAIN,
   TRAIN_LIGHT_CAPACITY,
+  WINDOW_LEVEL,
+  interiorNightGain,
   nightLevelNow,
   paintSaloonInterior,
   paintSaloonPanels,
@@ -215,6 +223,18 @@ const IMPOSTOR_CAPACITY = 900;
 
 /** How long a door takes to open, and to close again at the end of the dwell. */
 const DOOR_SECONDS = 1.6;
+
+/**
+ * The gap between two carriage bodies, metres. `pitch - COUPLER_GAP_M` is a car.
+ *
+ * The number `drawImpostor` scales its box by, `solidifyTrain` sizes its prism
+ * from, and `lightCar` hangs the end kits off, all of which used to write `0.9`
+ * out by hand. Named because a fourth caller arrived that is *about* the gap
+ * rather than about the body: the bellows between two Metro carriages is exactly
+ * this long, and a bellows built from a second literal is a bellows that stops
+ * meeting the carriages the day somebody re-preps a model.
+ */
+const COUPLER_GAP_M = 0.9;
 
 
 // --- The manifest ------------------------------------------------------------------
@@ -315,6 +335,8 @@ const _colour = /*#__PURE__*/ new Color();
 /** The night's copy of a carriage matrix, and the shift out to a train's end. */
 const _lit = /*#__PURE__*/ new Matrix4();
 const _endShift = /*#__PURE__*/ new Matrix4();
+/** The coupling's own matrix, which is a carriage matrix at a point between two. */
+const _couple = /*#__PURE__*/ new Matrix4();
 /**
  * A half turn about Y, built once: what puts a door wedge on the other bodyside.
  *
@@ -511,7 +533,53 @@ function isReallyTranslucent(map: Texture): boolean {
  */
 const materialCache = new Map<Material, MeshStandardNodeMaterial>();
 
-function convertMaterial(source: Material, label: string): MeshStandardNodeMaterial {
+/**
+ * Every Metropolis interior surface the night has to dim, and its daytime level.
+ *
+ * ---------------------------------------------------------------------------
+ * *"it is too bright at night in the metro"*, and this list is how the answer
+ * reaches the picture. `nightlights.interiorNightGain` is the rule and its block
+ * carries the whole argument; what is *this* file's is that the rule has to be
+ * applied to a **material** rather than to an instance, because the ceiling
+ * luminaires and the saloon lining are `emissiveIntensity` on a GLB material set
+ * once at load and there is no per-carriage anything to hang it on.
+ *
+ * So the two Metropolis materials are remembered here with the level
+ * `paintSaloonPanels` and `paintSaloonInterior` gave them, and `update` writes
+ * `base * gain` into them once a frame. Two uniform writes for the whole fleet,
+ * against the alternative -- a per-carriage emissive uniform on a 115,000-triangle
+ * material -- which is a per-fragment cost in the largest interior in the build
+ * to express a number that is the same for every carriage in the city.
+ *
+ * **The Tangara's materials are deliberately not in this list.** Its gain is 1 by
+ * `TANGARA_NIGHT_INTERIOR_GAIN`, so writing it every frame would be writing the
+ * value that is already there -- and a list that held both would make it look as
+ * though the two trains were being treated the same, which is exactly the thing
+ * this change is not doing.
+ */
+const metroInteriorLit: Array<{ material: MeshStandardNodeMaterial; base: number }> = [];
+
+/** What `applyMetroInteriorGain` last wrote, so a still frame writes nothing. */
+let metroInteriorGain = 1;
+
+/**
+ * Dim (or restore) the Metro's interior for the state of the sky. Idempotent.
+ *
+ * Guarded on the value rather than called unconditionally, because a
+ * `MeshStandardNodeMaterial`'s `emissiveIntensity` is a node uniform and writing
+ * one is not free the way writing a number is -- and this is asked sixty times a
+ * second for a ramp that takes twelve minutes of Sydney clock to cross. Through
+ * the whole of the day and the whole of the night it writes nothing at all.
+ */
+function applyMetroInteriorGain(gain: number): void {
+  if (gain === metroInteriorGain) return;
+  metroInteriorGain = gain;
+  for (const lit of metroInteriorLit) lit.material.emissiveIntensity = lit.base * gain;
+}
+
+function convertMaterial(
+  source: Material, label: string, metro: boolean,
+): MeshStandardNodeMaterial {
   const hit = materialCache.get(source);
   if (hit) return hit;
   const src = source as Material & {
@@ -559,13 +627,31 @@ function convertMaterial(source: Material, label: string): MeshStandardNodeMater
   // The saloon ceiling luminaires, made luminous. The rule and the level live
   // in `nightlights.ts` with the rest of what a lit carriage looks like -- see
   // section 5 of this file's header -- and this is the only thing that calls it.
-  if (paintSaloonPanels(m, source.name)) saloonPanelsPainted++;
+  if (paintSaloonPanels(m, source.name)) {
+    saloonPanelsPainted++;
+    // The tubes dim with the room they light. Remembered at the level the rule
+    // above just gave them, so `applyMetroInteriorGain` scales the decision
+    // rather than replacing it -- if `SALOON_PANEL_LEVEL` moves, this moves with
+    // it and there is no second copy of the number here. See `metroInteriorLit`.
+    if (metro) metroInteriorLit.push({ material: m, base: m.emissiveIntensity });
+  }
   // And the room they light, which is the other half of the same job and is the
   // half the exterior sprite band was standing in for. Called **after** the line
   // above and gated on a regex that excludes the luminaires, so no material can
   // take both -- see `SALOON_INTERIOR_RE`. It reads `m.map`, which is why it is
   // here and not up beside the base-colour assignment.
-  if (paintSaloonInterior(m, source.name)) saloonInteriorsPainted++;
+  if (paintSaloonInterior(m, source.name)) {
+    saloonInteriorsPainted++;
+    if (metro) metroInteriorLit.push({ material: m, base: m.emissiveIntensity });
+  }
+  // A material painted at its day level while the sky is already dark stays a
+  // stop too bright until something asks for a *change* -- and
+  // `applyMetroInteriorGain` is guarded on the value, so nothing ever would.
+  // Invalidating the cached gain makes the next `update` write the live one over
+  // the whole list, this material included. The alternative is the models
+  // finishing their 10.5 MB download at nine in the evening and the metro
+  // arriving at its daytime brightness until dawn.
+  if (metro) metroInteriorGain = Number.NaN;
   materialCache.set(source, m);
   return m;
 }
@@ -602,6 +688,12 @@ function splitModel(
   warnings: string[],
 ): Map<string, CarTemplate> {
   scene.updateMatrixWorld(true);
+  // Which of the two shipped models this is, from the file name, which is the
+  // only thing here that knows. The carriage keys cannot answer it -- both files
+  // call their intermediate car `mid`, which is the collision `load` namespaces
+  // away two hundred lines down -- and the interior night gain has to know,
+  // because it is a Metro-only change. See `metroInteriorLit`.
+  const metro = spec.file.replace(/\.glb$/, '') === METROPOLIS;
 
   interface Bucket {
     body: Map<Material, BufferGeometry[]>;
@@ -639,7 +731,7 @@ function splitModel(
     local.makeTranslation(-car.centreX, -car.railY, -(car.box.minZ + car.box.maxZ) / 2);
     const geometry = bakeGeometry(mesh, local);
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    const material = convertMaterial(materials[0], car.key);
+    const material = convertMaterial(materials[0], car.key, metro);
 
     // A door leaf, and which way it slides. The clip's own displacement where
     // the prep script found one; otherwise out along the carriage axis away from
@@ -839,6 +931,8 @@ export interface TrainFleetStats {
   litEnds: number;
   /** Lit carriages or ends refused for want of capacity. Must stay 0. */
   lightOverflows: number;
+  /** Concertinas between Metro carriages drawn this frame. See `buildBellows`. */
+  bellows: number;
 }
 
 /**
@@ -915,6 +1009,7 @@ export class TrainFleet {
     litUnderground: 0,
     litEnds: 0,
     lightOverflows: 0,
+    bellows: 0,
   };
   /** Anything the split or the load could not do. Printed once at boot. */
   readonly warnings: string[] = [];
@@ -924,6 +1019,10 @@ export class TrainFleet {
   private readonly pool = new Map<string, CarInstance[]>();
   private readonly used = new Map<string, number>();
   private readonly impostor: InstancedMesh;
+  /** The concertinas between Metro carriages. One draw for the whole fleet. */
+  private readonly bellows: InstancedMesh;
+  /** The coupling's own frame, which is sampled from the railway between two cars. */
+  private readonly couplingFrame = createCarFrame();
   private readonly pose: TrainPose = createTrainPose();
   private readonly pitches = new Map<string, number>();
   private readonly triangles = new Map<string, number>();
@@ -964,6 +1063,35 @@ export class TrainFleet {
     // Without it every box train draws white forever. See section 5.
     this.impostor.setColorAt(0, _colour.setRGB(1, 1, 1));
     this.group.add(this.impostor);
+
+    // --- The bellows. See the block over `buildBellows`.
+    //
+    // Its own material rather than the impostor's, and the reason is the colour
+    // buffer: the box train carries its livery in `instanceColor` and every
+    // instance of that mesh is a whole carriage, so a bellows sharing it would
+    // have to be given a livery to be black. Two materials is two draws and
+    // buys the rib its own roughness, which is what stops a rubber concertina
+    // reading as painted steel.
+    const bellowsMaterial = new MeshStandardNodeMaterial();
+    bellowsMaterial.name = 'train_bellows';
+    bellowsMaterial.color = new Color(BELLOWS_COLOUR[0], BELLOWS_COLOUR[1], BELLOWS_COLOUR[2]);
+    bellowsMaterial.roughness = 0.95;
+    bellowsMaterial.metalness = 0.0;
+    // Both faces: a rider walks through this, so the inside of the tube is in
+    // frame for the whole of a crossing and the outside is in frame from the
+    // platform. See `buildBellows`.
+    bellowsMaterial.side = DoubleSide;
+    this.bellows = new InstancedMesh(buildBellows(), bellowsMaterial, BELLOWS_CAPACITY);
+    this.bellows.name = 'train_bellows';
+    this.bellows.count = 0;
+    this.bellows.frustumCulled = false;
+    // No shadow: it is 0.9 m of black rubber between two carriages that are both
+    // casting, so what it would contribute to the sun's depth map is a seam in a
+    // shadow that is already there.
+    this.bellows.castShadow = false;
+    this.bellows.receiveShadow = true;
+    this.bellows.setColorAt(0, _colour.setRGB(1, 1, 1));
+    this.group.add(this.bellows);
 
     // --- And the night, which rides in this group rather than in the night
     // rig's. Two reasons, and the second is the one that matters.
@@ -1123,6 +1251,14 @@ export class TrainFleet {
     this.impostor.setMatrixAt(0, _matrix);
     this.impostor.instanceMatrix.needsUpdate = true;
     this.impostor.count = 1;
+    // The bellows goes through the same pass for the identical reason, and it is
+    // a *worse* case than the box train's: this set draws nothing at all until
+    // the player is within `MODEL_RADIUS` of a Metro, so an uncompiled pipeline
+    // here is a hitch on the frame a Metro pulls into the platform in front of
+    // them rather than one somewhere in the first minute.
+    this.bellows.setMatrixAt(0, _matrix);
+    this.bellows.instanceMatrix.needsUpdate = true;
+    this.bellows.count = 1;
     await precompile(this.group);
     // **And visible again**, which is not housekeeping. `precompileGroup` in
     // `main.ts` is written for a *tile*: it shows the group for the walk and
@@ -1134,6 +1270,7 @@ export class TrainFleet {
     // right, `modelDraws` said 224, and the platform was empty.
     this.group.visible = true;
     this.impostor.count = 0;
+    this.bellows.count = 0;
     for (const instance of parked) instance.root.visible = false;
     this.release();
   }
@@ -1156,6 +1293,14 @@ export class TrainFleet {
     // than recomputed here. A carriage in a bore overrides it; see section 5 and
     // `nightLevelNow`, which explains why one frame of staleness is invisible.
     this.night = nightLevelNow();
+    // And how much of its daytime saloon a Metro keeps at that hour, written
+    // into the two materials that carry it. One guarded assignment for the whole
+    // fleet -- see `applyMetroInteriorGain`, and see `interiorNightGain`'s block
+    // in `nightlights.ts` for why the Metro dims after dark and the Tangara does
+    // not. The third term, the real light in the ridden carriage, is handed the
+    // same number by `solidifyTrain`.
+    this.metroInterior = interiorNightGain(true, this.night);
+    applyMetroInteriorGain(this.metroInterior);
     // Where the player is, for the two things in `lightCar` that are a function
     // of distance: how much of the sprite band a hero carriage wears, and which
     // single open doorway in the city gets the one real light. Stashed rather
@@ -1164,6 +1309,7 @@ export class TrainFleet {
     this.px = x;
     this.pz = z;
     trainLights.begin();
+    this.bellowsAt = 0;
     // Last frame's carriages come out of the index **before** this frame's
     // matrices are written into the same eight floats. The prism records are
     // pooled and rewritten in place -- see `solidAt` -- so leaving them
@@ -1229,6 +1375,10 @@ export class TrainFleet {
         const built = this.drawModel(bake, row.dir, row.s, row.age, consist);
         draws += built.draws;
         triangles += built.triangles;
+        // And the gangways between its carriages, hero tier only. See
+        // `buildBellows`: 0.9 m of concertina at 300 m is a third of a pixel, so
+        // a box train is offered none and pays nothing for the decision.
+        if (consist.metro) this.drawBellows(bake, row.dir, row.s, consist);
       } else {
         impostors = this.drawImpostor(bake, row.dir, row.s, consist, impostors);
       }
@@ -1247,6 +1397,13 @@ export class TrainFleet {
     this.impostor.count = impostors;
     this.impostor.instanceMatrix.needsUpdate = true;
     if (this.impostor.instanceColor) this.impostor.instanceColor.needsUpdate = true;
+    // The gangways, on the impostor set's own terms: `count` is the frame's, the
+    // buffer is flagged whenever either this frame or the last one drew anything,
+    // and nothing is ever hidden by `visible`.
+    if (this.bellowsAt > 0 || this.bellows.count > 0) {
+      this.bellows.instanceMatrix.needsUpdate = true;
+    }
+    this.bellows.count = this.bellowsAt;
     trainLights.end();
 
     this.stats.modelTrains = modelled.size;
@@ -1261,6 +1418,7 @@ export class TrainFleet {
     this.stats.litUnderground = trainLights.drawnUnderground;
     this.stats.litEnds = trainLights.ends;
     this.stats.lightOverflows = trainLights.overflowed;
+    this.stats.bellows = this.bellowsAt;
     this.stats.updateMs = performance.now() - started;
   }
 
@@ -1294,6 +1452,8 @@ export class TrainFleet {
 
   /** How dark the city is this frame. See `update`. */
   private night = 0;
+  /** And what that costs a Metropolis interior this frame. See `interiorNightGain`. */
+  private metroInterior = 1;
   /** Whether the last `levelAt` answered for a carriage in a bore. */
   private bore = false;
 
@@ -1340,12 +1500,16 @@ export class TrainFleet {
     bake: RailBake,
     dir: RailDirection,
     s: number,
-    consist: { cars: readonly ConsistCar[]; pitch: number },
+    // `metro` for the one line at the bottom of the aboard branch: the real light
+    // in the carriage the player is standing in is the third of the three
+    // interior terms the night dims, and this is the only place in the file that
+    // knows both which carriage that is and what it is made of.
+    consist: { cars: readonly ConsistCar[]; pitch: number; metro: boolean },
     px: number,
     pz: number,
     at: number,
   ): number {
-    const halfLen = (consist.pitch - 0.9) / 2;
+    const halfLen = (consist.pitch - COUPLER_GAP_M) / 2;
     const hw = CAR_SOLID_HALF_WIDTH;
     let cursor = at;
     for (let k = 0; k < consist.cars.length; k++) {
@@ -1374,7 +1538,10 @@ export class TrainFleet {
         // player standing in it. The plan position is the player's own; the
         // height is this carriage's railhead, which is what makes the light
         // climb the Meadowbank bridge with the train it is in.
-        trainLights.rider(px, oy, pz, this.levelAt(bake, dir, centre));
+        trainLights.rider(
+          px, oy, pz, this.levelAt(bake, dir, centre),
+          consist.metro ? this.metroInterior : interiorNightGain(false, this.night),
+        );
         return -1;
       }
       const prism = this.solidAt(cursor);
@@ -1516,6 +1683,58 @@ export class TrainFleet {
     return { draws, triangles };
   }
 
+  /**
+   * The concertina at every coupling of one walk-through consist.
+   *
+   * ---------------------------------------------------------------------------
+   * **Sampled at the coupling rather than hung off either carriage**, and that is
+   * the whole of the placement. A tube translated along carriage k's own +X by
+   * half a pitch is straight where the railway is not: at Redfern it stands
+   * 2.5 cm off the end of carriage k+1, which is a visible seam at the exact
+   * distance -- two metres, standing in the gangway -- this thing exists to be
+   * seen at. `carFrameAt` at the midpoint samples the *bogies either side of the
+   * coupling*, so the tube takes the curve and the grade of the track the two
+   * carriages are actually standing on and meets both of them.
+   *
+   * That is two `sampleAlong` binary searches a coupling, five couplings a Metro,
+   * and at most two Metros in the model tier: twenty searches in the worst frame
+   * the fleet can produce, against the several hundred it already makes.
+   *
+   * `flip` is false throughout: the tube is symmetric end for end and about its
+   * own axis, so which way round the frame is built cannot be seen -- and picking
+   * one is one fewer thing to get wrong than deriving it from the carriage ahead.
+   */
+  private drawBellows(
+    bake: RailBake,
+    dir: RailDirection,
+    s: number,
+    consist: { cars: readonly ConsistCar[]; pitch: number },
+  ): void {
+    const n = consist.cars.length;
+    for (let k = 0; k + 1 < n; k++) {
+      if (this.bellowsAt >= BELLOWS_CAPACITY) return;
+      // Halfway between carriage k and carriage k + 1, in arc length, which is
+      // the same point `game/riding.ts` reframes a rider at -- `consistOffset`
+      // puts the two centres a pitch apart and the crossing plane is
+      // `pitch / 2` from each. One geometry, one plane, no disagreement.
+      const mid = consistOffset(s, k, n, consist.pitch) - consist.pitch / 2;
+      if (mid < 0) continue;
+      carFrameAt(bake, dir, mid, false, this.couplingFrame);
+      const f = this.couplingFrame;
+      _f.set(f.fx, f.fy, f.fz);
+      _u.set(f.ux, f.uy, f.uz);
+      _r.set(f.rx, f.ry, f.rz);
+      _couple.makeBasis(_f, _u, _r);
+      _couple.setPosition(f.ox, f.oy, f.oz);
+      _couple.scale(_v.set(COUPLER_GAP_M, 1, 1));
+      this.bellows.setMatrixAt(this.bellowsAt, _couple);
+      this.bellowsAt++;
+    }
+  }
+
+  /** How many bellows were written into the set this frame. See `update`. */
+  private bellowsAt = 0;
+
   private drawImpostor(
     bake: RailBake,
     dir: RailDirection,
@@ -1545,7 +1764,7 @@ export class TrainFleet {
       this.lightCar(bake, dir, centre, k, consist, false, 0, EMPTY_DOORWAYS);
       // The box is built at unit length; the consist's own pitch scales it, so a
       // Metro car is 22 m and a Tangara 20.4 without a second geometry.
-      _matrix.scale(_v.set(consist.pitch - 0.9, 1, 1));
+      _matrix.scale(_v.set(consist.pitch - COUPLER_GAP_M, 1, 1));
       this.impostor.setMatrixAt(at, _matrix);
       this.impostor.setColorAt(at, _colour);
       at++;
@@ -1590,7 +1809,7 @@ export class TrainFleet {
   ): void {
     const level = this.levelAt(bake, dir, centre);
     if (level <= 0) return;
-    const body = consist.pitch - 0.9;
+    const body = consist.pitch - COUPLER_GAP_M;
     const underground = this.bore;
     // How far the player is from this carriage, from the frame that has just been
     // built rather than from a second `poseTrain`. The plan distance and not the
@@ -1746,6 +1965,170 @@ function buildInstance(template: CarTemplate): CarInstance {
   return { root, doors, template };
 }
 
+/* ---------------------------------------------------------------------------
+ * THE BELLOWS, WHICH IS WHAT AN OPEN GANGWAY LOOKS LIKE FROM EITHER SIDE.
+ *
+ *   > *"u should be able to move between carriages on metro when the train is
+ *   > moving"*
+ *
+ * `game/riding.ts` makes it walkable and this makes it a place. Without it the
+ * feature is a rider stepping through a bulkhead into open air and arriving in
+ * the next carriage, which reads as a hole in the train rather than as a train
+ * you can walk down -- and from *outside*, standing on a platform beside a Metro,
+ * the 0.9 m between two carriages has always been a slot you can see the ballast
+ * through, which is the one thing an articulated train never shows you.
+ *
+ * **Straight, and only on the hero tier.** The two carriages either side of a
+ * coupling are placed from their own bogies and a real concertina shears and
+ * compresses between them; what is drawn here is a tube on the *coupling's own
+ * frame*, sampled from the railway at the midpoint, so it takes the curve and the
+ * grade of the track it is standing on and does not take the last few centimetres
+ * of articulation. At a 400 m radius the two ends of a 0.9 m tube are a
+ * millimetre out of line with the carriages they meet. A box train gets none:
+ * 0.9 m at 300 m is a third of a pixel.
+ *
+ * **A rib is six triangles and the concertina is what sells it.** A smooth tube
+ * between two carriages reads as a rubber sock and a ribbed one reads as a
+ * gangway, and the difference is one alternating radius in the ring loop. Ten
+ * rings, twelve points around: 264 triangles a bellows, five a Metro, two Metros
+ * -- 2,640 triangles against the 190,000 one carriage costs.
+ *
+ * **And a floor plate**, which is the half that is not decoration:
+ * `riding.carriageFloor` answers `vestibuleY` across the gap already (a
+ * Metropolis has `deck === null`, so its floor function has no bounds in x at
+ * all), so a rider *is* standing on something -- but nothing was drawn under
+ * them, and a solid floor you can see through is worse than no feature. The
+ * height is read off `riding.interiorFor` rather than typed, so the plate and the
+ * collision floor cannot be two numbers.
+ * ------------------------------------------------------------------------- */
+
+/** Outside the aperture: how far the concertina reaches across and how tall. */
+const BELLOWS_HALF_WIDTH = 1.22;
+const BELLOWS_FLOOR_HALF = 0.72;
+const BELLOWS_TOP = 3.3;
+/** Rings along it, and how far the troughs pull in. See the block above. */
+const BELLOWS_RINGS = 10;
+const BELLOWS_TROUGH = 0.9;
+/** Dark, and dark by its own colour: there is nothing in a gangway to shade it. */
+const BELLOWS_COLOUR: readonly [number, number, number] = [0.035, 0.035, 0.04];
+
+/**
+ * How many bellows can be drawn at once.
+ *
+ * Only the model tier offers any, so the worst frame is `MAX_MODEL_TRAINS` Metros
+ * of `METRO.length - 1` couplings -- ten -- and this is that with room for a
+ * longer consist. Overflow is silent and would present as one carriage of one
+ * train having a hole beside it, so it is bounded here rather than counted.
+ */
+const BELLOWS_CAPACITY = 24;
+
+/**
+ * The floor of a Metropolis, read off the interior table rather than restated.
+ *
+ * `game/riding.ts` is the authority for where a rider's feet are and this is the
+ * plate they stand on; two numbers here is a plate a player's shoes sink into or
+ * hover over, at the one moment they are looking straight down at a gap between
+ * two carriages. Falls back to the Tangara-ish 1.2 if the key ever moves, which
+ * cannot happen without `verifyRiding` failing first.
+ */
+const BELLOWS_FLOOR_Y = /*#__PURE__*/ (interiorFor(`${METROPOLIS}:mid`)?.vestibuleY ?? 1.2);
+
+/**
+ * One concertina, in the coupling's own frame: unit length on X, y = 0 the
+ * railhead, +Z across.
+ *
+ * Unit length for `buildImpostorCar`'s reason -- the instance matrix scales X by
+ * `COUPLER_GAP_M`, so the tube meets whatever the two carriages leave between
+ * them and there is no second place the gap is written down.
+ *
+ * The cross-section is a twelve-point ring fitted to the bodyside: a flat floor,
+ * two uprights and a curved shoulder, which is the profile of the rubber ring on
+ * the real vehicle. Rings alternate between full and `BELLOWS_TROUGH` of full,
+ * scaled about the centre of the section so the floor pinches with everything
+ * else -- a concertina whose floor stayed put would read as a tube with dents in
+ * it. `DoubleSide` on the material rather than two windings here: a rider walks
+ * *through* this, so both faces are in frame within a second of each other, and
+ * doubling 264 triangles is cheaper than the paragraph explaining which way each
+ * one faces.
+ */
+function buildBellows(): BufferGeometry {
+  // The section, once, as offsets from its own centre.
+  const cy = (BELLOWS_FLOOR_Y + BELLOWS_TOP) / 2;
+  const w = BELLOWS_HALF_WIDTH;
+  const fw = BELLOWS_FLOOR_HALF;
+  const lo = BELLOWS_FLOOR_Y;
+  const hi = BELLOWS_TOP;
+  const mid = lo + (hi - lo) * 0.72;
+  const section: ReadonlyArray<readonly [number, number]> = [
+    [-fw, lo], [fw, lo],
+    [w, lo + 0.25], [w, mid],
+    [w * 0.72, hi], [w * 0.26, hi + 0.1],
+    [-w * 0.26, hi + 0.1], [-w * 0.72, hi],
+    [-w, mid], [-w, lo + 0.25],
+  ];
+  const ring = section.length;
+
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  const index: number[] = [];
+
+  const put = (x: number, y: number, z: number, u: number, v: number): void => {
+    positions.push(x, y, z);
+    // Radially outward from the section's own centre, which is what a ring is.
+    // Not computed from the triangles: a ribbed surface's face normals alternate
+    // and would light the tube as a row of bright bands, which is the one thing
+    // a black rubber gangway does not do.
+    const ny = y - cy;
+    const len = Math.hypot(z, ny) || 1;
+    normals.push(0, ny / len, z / len);
+    uvs.push(u, v);
+  };
+
+  for (let r = 0; r < BELLOWS_RINGS; r++) {
+    const t = r / (BELLOWS_RINGS - 1);
+    const x = t - 0.5;
+    const pinch = r % 2 === 1 ? BELLOWS_TROUGH : 1;
+    for (let i = 0; i < ring; i++) {
+      const [sz, sy] = section[i];
+      put(x, cy + (sy - cy) * pinch, sz * pinch, t, i / ring);
+    }
+  }
+  for (let r = 0; r + 1 < BELLOWS_RINGS; r++) {
+    for (let i = 0; i < ring; i++) {
+      const a = r * ring + i;
+      const b = r * ring + ((i + 1) % ring);
+      const c = (r + 1) * ring + ((i + 1) % ring);
+      const d = (r + 1) * ring + i;
+      index.push(a, b, c, a, c, d);
+    }
+  }
+
+  // And the plate, at the height the collision floor already answers. Its own
+  // four vertices with an up normal, because the ring's radial normals would
+  // point it sideways and a floor lit from the side is a floor you cannot see.
+  const base = positions.length / 3;
+  const plate: ReadonlyArray<readonly [number, number]> = [
+    [-0.5, -BELLOWS_FLOOR_HALF], [0.5, -BELLOWS_FLOOR_HALF],
+    [0.5, BELLOWS_FLOOR_HALF], [-0.5, BELLOWS_FLOOR_HALF],
+  ];
+  for (const [x, z] of plate) {
+    positions.push(x, BELLOWS_FLOOR_Y, z);
+    normals.push(0, 1, 0);
+    uvs.push(x + 0.5, z);
+  }
+  index.push(base, base + 1, base + 2, base, base + 2, base + 3);
+
+  const g = new BufferGeometry();
+  g.name = 'train_bellows';
+  g.setAttribute('position', new BufferAttribute(new Float32Array(positions), 3));
+  g.setAttribute('normal', new BufferAttribute(new Float32Array(normals), 3));
+  g.setAttribute('uv', new BufferAttribute(new Float32Array(uvs), 2));
+  g.setIndex(new BufferAttribute(new Uint16Array(index), 1));
+  g.computeBoundingSphere();
+  return g;
+}
+
 /**
  * The box train's one carriage: a unit-length body with a shouldered roof.
  *
@@ -1890,6 +2273,140 @@ export function verifyTrainLights(): string[] {
         `this is a train being driven from the guard's end with its head lamps pointing at the ` +
         `train behind it.`,
     );
+  }
+
+  // --- 2b. **THE METRO'S NIGHT INTERIOR**, which is a number nobody can check
+  //         from a screenshot taken at the wrong hour.
+  //
+  //   > *"it is too bright at night in the metro"*
+  //
+  // Three interior terms move together after dark and one constant governs all
+  // three (`nightlights.interiorNightGain`; its block carries the argument). What
+  // is asserted here is the shape of the answer rather than the taste of it,
+  // because the taste is the owner's: the metro's night interior is at most half
+  // its own day interior, it is no brighter than the Tangara's night interior,
+  // the ramp is monotone and it is exactly 1 at noon -- a gain that dimmed the
+  // saloon in daylight would be a lit carriage at midday going grey, which is a
+  // different bug wearing this one's clothes.
+  {
+    const day = interiorNightGain(true, 0);
+    const night = interiorNightGain(true, 1);
+    if (day !== 1) {
+      failures.push(
+        `a Metro's interior gain at noon is ${day} rather than 1. This ramp exists to take the ` +
+          `saloon down at night; at midday the carriage must be exactly what it was before the ` +
+          `change, or the fix is a regression in daylight that nobody asked for.`,
+      );
+    }
+    if (!(night <= 0.5 * day)) {
+      failures.push(
+        `a Metro's interior at full night is ${night} of its daytime level, which is not the "at ` +
+          `most half" the report was answered with. METRO_NIGHT_INTERIOR_GAIN is ` +
+          `${METRO_NIGHT_INTERIOR_GAIN}.`,
+      );
+    }
+    if (!(night <= interiorNightGain(false, 1))) {
+      failures.push(
+        `a Metro's interior at full night is ${night} against a Tangara's ` +
+          `${interiorNightGain(false, 1)}. The complaint is *relative* -- the Metro reads brighter ` +
+          `than the trains and the platforms around it -- so a fix that leaves it over the Tangara ` +
+          `has not answered it. TANGARA_NIGHT_INTERIOR_GAIN is ${TANGARA_NIGHT_INTERIOR_GAIN}.`,
+      );
+    }
+    let previous = Infinity;
+    for (let n = 0; n <= 1.0001; n += 0.05) {
+      const g = interiorNightGain(true, n);
+      if (g > previous + 1e-9) {
+        failures.push(
+          `the Metro's interior gain rises with the dark at night level ${n.toFixed(2)}. A ramp ` +
+            `that is not monotone is a saloon that brightens as the sun goes down, which reads as ` +
+            `flicker over the twelve minutes of dusk rather than as a bug.`,
+        );
+        break;
+      }
+      previous = g;
+    }
+    // And that both terms it multiplies are still real numbers on the other side
+    // of it: an interior gain applied to a level of zero is a change with no
+    // picture, which is what a future refactor of `paintSaloonInterior` would
+    // quietly produce.
+    if (!(SALOON_INTERIOR_GLOW * night > 0) || !(SALOON_PANEL_LEVEL * night > 0)) {
+      failures.push(
+        `the Metro's night saloon comes out at ${(SALOON_INTERIOR_GLOW * night).toFixed(3)} on the ` +
+          `room and ${(SALOON_PANEL_LEVEL * night).toFixed(3)} on the tubes. Dimmer was asked for; ` +
+          `dark was not -- an unlit interior behind glass is what shipped before either constant ` +
+          `existed and it read as a black box.`,
+      );
+    }
+  }
+
+  // --- 2c. **THE TWO NUMBERS THIS ROUND MUST NOT HAVE TOUCHED**, pinned.
+  //
+  // The exterior window band and the wedge an open door lays on the platform were
+  // both tuned last round, both against a player's own screenshot of a train
+  // clipping to white, and both are about what a train looks like from *outside*
+  // -- which is not what "too bright at night in the metro" is about. They are
+  // pinned rather than commented because the failure mode of the interior change
+  // creeping into them is a regression in the thing the previous round fixed,
+  // reported in the same words, three weeks later.
+  {
+    const pinned: ReadonlyArray<readonly [string, number, number, string]> = [
+      ['WINDOW_LEVEL', WINDOW_LEVEL, 0.4, 'the sprite band a train wears past 150 m'],
+      ['DOOR_SPILL_LEVEL', DOOR_SPILL_LEVEL, 0.34, 'the wedge an open door lays on the deck'],
+    ];
+    for (const [name, got, want, what] of pinned) {
+      if (got !== want) {
+        failures.push(
+          `${name} is ${got} and was pinned at ${want}. It is ${what}, it was tuned against a ` +
+            `screenshot, and the metro interior round had no business moving it. If this is a ` +
+            `deliberate change, move the pin with it and say what the new number is for.`,
+        );
+      }
+    }
+  }
+
+  // --- 2d. The bellows, which is geometry and is therefore checkable.
+  //
+  // Not how it looks -- that is a human's job, and the report says so -- but the
+  // three things about it that are arithmetic and are invisible when wrong from
+  // any single angle: it is a metre of tube and not a kilometre of one, its floor
+  // plate is at the height `game/riding.ts` puts a rider's feet, and there is a
+  // slot in the set for every coupling the model tier can offer.
+  {
+    const g = buildBellows();
+    const p = g.getAttribute('position');
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let plate = 0;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (Math.abs(p.getY(i) - BELLOWS_FLOOR_Y) < 1e-6) plate++;
+    }
+    if (Math.abs(maxX - minX - 1) > 1e-6) {
+      failures.push(
+        `the bellows is ${(maxX - minX).toFixed(3)} coupling gaps long. It is built at unit length ` +
+          `and scaled by COUPLER_GAP_M exactly as the impostor box is scaled by the pitch, so ` +
+          `anything but 1 is a concertina the length of a carriage.`,
+      );
+    }
+    if (plate < 4) {
+      failures.push(
+        `the bellows has ${plate} vertices at ${BELLOWS_FLOOR_Y} m, which is where ` +
+          `game/riding.ts stands a rider crossing between two Metro carriages. Without a plate ` +
+          `there they are standing on a collision floor with the ballast drawn under it.`,
+      );
+    }
+    const worst = MAX_MODEL_TRAINS * (METRO.length - 1);
+    if (BELLOWS_CAPACITY < worst) {
+      failures.push(
+        `BELLOWS_CAPACITY is ${BELLOWS_CAPACITY} against a worst case of ${worst} -- ` +
+          `${MAX_MODEL_TRAINS} model trains of ${METRO.length} carriages. What overflows is one ` +
+          `coupling of one train with a hole beside it, which reads as a modelling mistake.`,
+      );
+    }
+    g.dispose();
   }
 
   // --- 3. The underground rule, against a hand-built polyline: 200 m in the

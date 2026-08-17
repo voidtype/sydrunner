@@ -28,16 +28,33 @@
  * `/platform`. There is no client-side teleport anywhere in it, because the
  * previous harness had one and that is precisely why the feature shipped
  * broken.
+ *
+ * ---------------------------------------------------------------------------
+ * SECTION 0 IS OFFLINE, AND ON PURPOSE.
+ *
+ * The gangway case below the imports runs **before anything opens a socket**,
+ * against the shipped bake and nothing else, and `RIDE_GANGWAY=only` runs it and
+ * exits. That is not a shortcut around the networked half; it is what the case
+ * actually needs. Walking the length of a Metropolis between stations requires a
+ * Metro that is *moving*, and the online harness is built round waiting ninety
+ * seconds for a train to *stop* -- so the two want opposite halves of the same
+ * timetable, and solving for a moving train is a division rather than a wait.
+ * What it drives is the real seam either way: `rideEnter`, `combat.advance`,
+ * `rideExit`, tick by tick, which is the same three calls `sim.step` makes.
  */
 import { NetClient } from '../client/src/net/client.ts';
-import { TICK_HZ } from '../client/src/net/protocol.ts';
+import {
+  ABOARD_STEP_M, TICK_HZ, createSnapshot, decodeSnapshot, encodeSnapshot,
+  quantiseAcross, quantiseAlong, quantiseRise,
+  type SnapshotAboard,
+} from '../client/src/net/protocol.ts';
 import { advance, createCombatant } from '../client/src/game/combat.ts';
 import { EYE_HEIGHT } from '../client/src/player/controller.ts';
-import { decodeRail, railSeconds } from '../client/src/game/rail.ts';
+import { createTrainPose, decodeRail, poseTrain, railSeconds } from '../client/src/game/rail.ts';
 import {
-  RIDE_ON, aboardFrame, aboardPose, boardHere, clearAboard, consistOf, createBoardOffer, createCarFrame,
-  createCarriageStand, dirOf, exitLocal, interiorOfCar, isAboard, nextDwell, rideEnter,
-  worldToLocal,
+  RIDE_ON, aboardFrame, aboardPose, boardHere, clearAboard, consistOf, consistOffset,
+  createBoardOffer, createCarFrame, createCarriageStand, carSign, dirOf, interiorOfCar, isAboard,
+  nextDwell, projectAboard, rideEnter, rideExit, verifyGangway, worldToLocal,
 } from '../client/src/game/riding.ts';
 import type { CombatWorld } from '../client/src/game/combat.ts';
 
@@ -46,6 +63,191 @@ const FROM = process.env.SYDNEY_RIDE_FROM ?? 'St Peters';
 const FIXED_DT = 1 / TICK_HZ;
 
 const bake = decodeRail(await Bun.file('./client/public/rail/rail.bin').arrayBuffer());
+
+/** Scratch pose for section 0's solve. `game/rail.ts` never allocates one either. */
+const posePad = createTrainPose();
+
+const say = (s: string): void => { console.log(s); };
+
+// --- 0. The gangway: walking a Metropolis end to end while it is moving.
+//
+// See the header for why this is offline and why it is first. `RIDE_GANGWAY=off`
+// skips it, `RIDE_GANGWAY=only` runs it and stops.
+if ((process.env.RIDE_GANGWAY ?? 'on') !== 'off') {
+  say('--- 0. walking between Metro carriages, between stations ---');
+  const failures = verifyGangway();
+  say(`riding.verifyGangway: ${failures.length === 0 ? 'clean' : `${failures.length} failure(s)`}`);
+  for (const f of failures) say(`  ! ${f}`);
+
+  // A real Metro trip on the real bake, at an instant it is **moving**. Solved
+  // rather than polled, on `nextDwell`'s own argument: a Metro's doors are open
+  // for fifteen seconds in every couple of minutes, so stepping the clock a
+  // second at a time from now until `poseTrain` says the train is running with
+  // its doors shut and real speed under it is one short loop and no waiting.
+  const FIXED = 1 / TICK_HZ;
+  let found: { li: number; di: number; trip: number; t: number } | null = null;
+  const now = railSeconds(Date.now());
+  outer: for (let li = 0; li < bake.lines.length && found === null; li++) {
+    const line = bake.lines[li];
+    if (!line.metro) continue;
+    for (const dir of line.dirs) {
+      const live = Math.floor(dir.duration / line.period) + 2;
+      for (let j = 0; j <= live; j++) {
+        const trip = Math.floor((now - dir.offset) / line.period) - j;
+        for (let dt = 0; dt < 240; dt += 1) {
+          const t = now + dt;
+          if (!poseTrain(bake, dir, trip, t, posePad)) continue;
+          // Moving, doors shut, and far enough into the run that a 132 m consist
+          // is entirely on the line -- `consistOffset` clamps a carriage whose
+          // centre is behind the start and a clamped carriage is not a carriage
+          // anybody can walk into.
+          if (posePad.doorsOpen || posePad.speed < 20 || posePad.s < 200) continue;
+          // And it has to stay between stations for the whole walk. A rider
+          // covers 4.4 m/s and a six-car Metropolis is 132 m, so the walk is
+          // thirty seconds; sampled rather than swept because `doorsOpen` is a
+          // fifteen-second phase and four probes ten seconds apart cannot miss
+          // one. A train that pulls in halfway through is not a wrong answer, it
+          // is a weaker one -- the request was for a walk on a moving train.
+          let stays = true;
+          for (let ahead = 10; ahead <= 40 && stays; ahead += 10) {
+            stays = poseTrain(bake, dir, trip, t + ahead, posePad) && !posePad.doorsOpen;
+          }
+          if (!stays) continue;
+          found = { li, di: dir.index, trip, t };
+          break outer;
+        }
+      }
+    }
+  }
+
+  if (found === null) {
+    say('  ! no Metro service in the bake is between stations in the next four minutes');
+  } else {
+    const dir = dirOf(bake, found.li, found.di)!;
+    const consist = consistOf(dir, found.trip);
+    const n = consist.cars.length;
+    const combat = createCombatant(0, 0, 0);
+    const a = combat.aboard;
+    const frame = createCarFrame();
+    const stand = createCarriageStand();
+    const it0 = interiorOfCar(consist, n - 1)!;
+    a.line = found.li;
+    a.dir = found.di;
+    a.trip = found.trip;
+    // The rear driving car, standing at its cab end, facing down the train. A
+    // local yaw of pi/2 is a forward of (-1, 0) in the carriage's own plan --
+    // `controller.step`'s `(-sin yaw, -cos yaw)` -- so "hold W" walks -X.
+    a.car = n - 1;
+    a.x = it0.xMax - 1;
+    a.y = it0.vestibuleY + EYE_HEIGHT;
+    a.z = 0;
+    a.yaw = Math.PI / 2;
+    if (!aboardFrame(bake, a, found.t, frame)) throw new Error('the trip vanished');
+    projectAboard(a, combat.body, frame);
+    combat.body.onGround = true;
+
+    const input = {
+      forward: 1, right: 0, jump: false, sprint: false,
+      yaw: a.yaw, pitch: 0, speedScale: 1, jumpScale: 1,
+      punch: false, throwBall: false, mount: false,
+    };
+    const snap = createSnapshot();
+    const wire: SnapshotAboard[] = [{
+      id: 1, line: 0, dir: 0, tripLow: 0, car: 0, x: 0, y: 0, z: 0,
+    }];
+
+    let ticks = 0;
+    let crossings = 0;
+    let lastCar = a.car;
+    let lastArc = -Infinity;
+    let arcBackwards = 0;
+    let offConsist = 0;
+    let skipped = 0;
+    let wireBad = 0;
+    let wireCarBad = 0;
+    let minSpeed = Infinity;
+    let ended = '';
+    const startArc = (() => {
+      const p = aboardPose(bake, a, found.t)!;
+      return consistOffset(p.s, a.car, n, consist.pitch) + carSign(consist, a.car) * a.x - p.s;
+    })();
+    let endArc = startArc;
+
+    // 4.4 m/s over 132 m of train, with room for the two cab ends and a margin.
+    for (; ticks < 2600; ticks++) {
+      const t = found.t + ticks * FIXED;
+      const got = rideEnter(bake, a, combat.body, t, frame, stand);
+      if (got !== RIDE_ON) { ended = `rideEnter said ${got}`; break; }
+      advance(combat, input, FIXED, stand as unknown as CombatWorld);
+      input.yaw += rideExit(bake, a, combat.body, t, frame);
+
+      const pose = aboardPose(bake, a, t);
+      if (pose === null) { ended = 'the trip stopped running'; break; }
+      if (pose.speed < minSpeed) minSpeed = pose.speed;
+
+      // (a) never off the end of the consist, and one coupling at a time.
+      if (a.car < 0 || a.car >= n) { offConsist++; break; }
+      if (a.car !== lastCar) {
+        crossings++;
+        if (Math.abs(a.car - lastCar) !== 1) skipped++;
+        lastCar = a.car;
+      }
+      // (b) the carriage index and the position along the train move together:
+      //     the rider's arc length relative to the train's own reference point
+      //     never goes backwards while they hold W.
+      const arc =
+        consistOffset(pose.s, a.car, n, consist.pitch) + carSign(consist, a.car) * a.x - pose.s;
+      if (arc < lastArc - 1e-6) arcBackwards++;
+      lastArc = arc;
+      endArc = arc;
+
+      // (c) the wire carries the change. Encoded and decoded every tick, so the
+      //     three bits of carriage are exercised at every index the walk visits
+      //     rather than at the one it finishes on.
+      wire[0].line = a.line;
+      wire[0].dir = a.dir;
+      wire[0].tripLow = a.trip & 0xff;
+      wire[0].car = a.car;
+      wire[0].x = a.x;
+      wire[0].y = a.y;
+      wire[0].z = a.z;
+      const back = decodeSnapshot(encodeSnapshot(ticks, 0, [], [], [], wire), snap);
+      const rec = back?.aboard[0];
+      if (!rec || rec.car !== a.car) wireCarBad++;
+      else if (
+        Math.abs(rec.x - quantiseAlong(a.x) * ABOARD_STEP_M) > 1e-9 ||
+        Math.abs(rec.y - quantiseRise(a.y) * ABOARD_STEP_M) > 1e-9 ||
+        Math.abs(rec.z - quantiseAcross(a.z) * ABOARD_STEP_M) > 1e-9
+      ) wireBad++;
+
+      if (a.car === 0 && a.x > (interiorOfCar(consist, 0)!.xMax - 1.5)) {
+        ended = 'reached the leading cab';
+        break;
+      }
+    }
+
+    const walked = endArc - startArc;
+    say(
+      `  ${bake.lines[found.li].id} trip ${found.trip}, ${n} cars at ` +
+        `${(minSpeed * 3.6).toFixed(0)} km/h minimum: walked ${walked.toFixed(1)} m of train in ` +
+        `${ticks} ticks (${(ticks * FIXED).toFixed(1)} s), ${crossings} gangway crossing(s) -- ${ended}`,
+    );
+    say(
+      `  carriage ${n - 1} -> ${a.car}; skipped couplings ${skipped}, left the consist ` +
+        `${offConsist} time(s), went backwards along the train ${arcBackwards} tick(s)`,
+    );
+    say(
+      `  the wire round-tripped the rider on ${ticks - wireCarBad - wireBad}/${ticks} ticks ` +
+        `(${wireCarBad} wrong carriage, ${wireBad} outside the 2.5 cm quantiser)`,
+    );
+    const ok =
+      crossings === n - 1 && skipped === 0 && offConsist === 0 && arcBackwards === 0 &&
+      wireCarBad === 0 && wireBad === 0 && a.car === 0;
+    say(`  gangway walk: ${ok ? 'PASS' : 'FAILED'}`);
+    if (!ok) process.exit(1);
+  }
+  if ((process.env.RIDE_GANGWAY ?? 'on') === 'only') process.exit(0);
+}
 
 /** The city, as far as a headless pilot needs one: flat, and never consulted aboard. */
 let lastGround = -55;
@@ -115,7 +317,16 @@ class Pilot {
       lastGround = this.pos.y - EYE_HEIGHT;
     }
     advance(this.combat, this.input, FIXED_DT, world);
-    if (world !== city) exitLocal(this.combat.aboard, this.combat.body, this.frame);
+    // `rideExit` rather than `exitLocal`, which is the browser's own line and the
+    // server's: the crossing between two Metro carriages happens here, inside the
+    // step, before the composition. The yaw delta goes on `input.yaw` because
+    // while aboard that field *is* the rider's carriage-local heading, exactly as
+    // it is in `main.ts` -- see `riding.crossGangway`.
+    if (world !== city) {
+      this.input.yaw += rideExit(
+        bake, this.combat.aboard, this.combat.body, railSeconds(Date.now()), this.frame,
+      );
+    }
     this.net.sendInput(this.input, this.combat.body.velocity);
     this.net.update(FIXED_DT);
 
@@ -158,7 +369,6 @@ class Pilot {
   }
 }
 
-const say = (s: string): void => { console.log(s); };
 const until = async (want: () => boolean, ms: number): Promise<boolean> => {
   const end = Date.now() + ms;
   while (Date.now() < end) { if (want()) return true; await Bun.sleep(20); }
