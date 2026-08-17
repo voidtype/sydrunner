@@ -2680,7 +2680,11 @@ async function checkBikes(): Promise<void> {
             // always is: both fields exist on every pose since the crash damage
             // and the queueing landed, and neither means anything to
             // `applyCarHit`.
+            // ...and unswerved, and in the middle of its life: the pass offset
+            // and the two life stamps arrived with the obstacle rule and mean
+            // nothing to `applyCarHit` either. See `traffic.resolveLaneShare`.
             stage: CAR_STAGE_DRIVING, routeT: 0, speed: 12, identity: 0, damage: 0, held: 0,
+            swerve: 0, bornAgo: 30, endsIn: 30,
           });
         },
       },
@@ -4435,6 +4439,407 @@ async function checkTraffic(): Promise<void> {
     }
   }
 
+  // --- NOTHING DRIVES THROUGH ANYTHING, MEASURED ON THE SHIPPED BYTES.
+  //
+  // The owner's report was *"there are still cars parked that never move that
+  // other cars just pass thru.... cars should never pass thru each other"*, and
+  // this is that sentence as a census. `verifyTraffic`'s own obstacle sections
+  // prove the *rule* against synthetic fixtures at every boot; what only this
+  // process can do is count how much interpenetration is actually left in the
+  // city, because that needs the real lane graph and the real static fleet.
+  //
+  // Three claims, and the third is the one a future change will break:
+  //
+  //   1. the roster is populated -- a bay per reachable route end, and the
+  //      client's static fleet is *not* here (it never is: `.cars.bin` is a
+  //      renderer file and `server/world.ts` does not open it, which is why the
+  //      pass a static car provokes is lateral-only -- see
+  //      `traffic.LaneObstacles.adoptStatics`);
+  //   2. the count of bodies inside other bodies is down, and by how much;
+  //   3. the walk still fits the budget: **under 0.5 ms of server tick at 500
+  //      visible cars**, which is the number this feature was allowed to spend.
+  {
+    const obstacles = world.traffic.obstacles;
+    // **A server holds no roster at all**, and that is the shipped arrangement
+    // rather than an accident of this check: 136,993 registered bays measure 35 MB
+    // of RSS in Bun, every effect an obstacle has is a sideways offset of at most
+    // `PASS_SHIFT_M`, and the static half of the roster is a renderer file the
+    // server never opens anyway. The whole argument is on
+    // `traffic.LaneObstacles.wanted`.
+    check(
+      obstacles.size === 0 && !obstacles.live,
+      'a server holds no obstacle roster (0 bays, 0 statics) -- it is 35 MB on a 1 GB box for a rule ' +
+        'whose every effect is lateral, so the client builds it and the server places every car at ' +
+        'the same along-route position either way',
+    );
+    // So this check *is* the client for the rest of this section: the same
+    // `adoptRoutes` the browser calls, over the ring the census walks.
+    let ringTiles = 0;
+    obstacles.wanted = true;
+    for (const entry of world.index.tiles) {
+      const ox = entry.bounds[0];
+      const oz = entry.bounds[1] + world.index.tile_size;
+      const cx = ox + world.index.tile_size / 2;
+      const cz = oz - world.index.tile_size / 2;
+      if (cx * cx + cz * cz > 2400 * 2400) continue;
+      const buf = await readFile(join(root, 'tiles', `${entry.key}.lanes.bin`)).catch(() => null);
+      if (buf === null) continue;
+      const decoded = one.decodeLanes(
+        buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer,
+        ox,
+        oz,
+      );
+      if (decoded === null) continue;
+      obstacles.adoptRoutes(entry.key, decoded.routes);
+      ringTiles++;
+    }
+    say(
+      `  obstacles: ${obstacles.bays.toLocaleString()} bays registered as a browser would over ` +
+        `${ringTiles} tiles of the inner ring, in ${obstacles.cellCount.toLocaleString()} cells`,
+    );
+    check(
+      obstacles.bays > ringTiles,
+      'the roster a browser builds is populated -- a route has two ends and both are registered ' +
+        'unless the bay is more than `OBSTACLE_REACH_M` off its own driving line',
+    );
+
+    // --- The census. One ring, an hour of simulated time, sampled.
+    //
+    // The ring rather than the extent because this is quadratic in the cars it
+    // holds, and the inner ring is both the densest kerb in the build and the
+    // ground players actually stand on. Interpenetration is measured as the
+    // Minkowski overlap of two *nominal* bodies -- the 0.1 m hit margin taken off
+    // each and a further 0.3 m required on both axes -- so two cars touching
+    // bumpers in a queue is not counted as one car inside another.
+    const RING = 1500;
+    const inRing = routes.filter((r) => {
+      const cx = (r.minX + r.maxX) * 0.5;
+      const cz = (r.minZ + r.maxZ) * 0.5;
+      return cx * cx + cz * cz <= RING * RING;
+    });
+    const CELL = 8;
+    const cellOf = (x: number, z: number): number =>
+      (Math.floor(x / CELL) + 4096) * 8192 + (Math.floor(z / CELL) + 4096);
+    interface Body {
+      x: number; z: number; dx: number; dz: number; hl: number; hw: number; y: number;
+      rid: number; moving: boolean;
+    }
+    const census = (resolve: boolean): { same: number; cross: number; parked: number; samples: number; peak: number; swerving: number; held: number; live: number } => {
+      const pose = one.createCarPose();
+      let same = 0;
+      let cross = 0;
+      let parked = 0;
+      let samples = 0;
+      let peak = 0;
+      let swerving = 0;
+      let held = 0;
+      let live = 0;
+      const tick0 = one.trafficTick(Date.now());
+      for (let step = 0; step < 3600; step += 12) {
+        const now = one.trafficSeconds(tick0 + step * 60);
+        samples++;
+        const bodies: Body[] = [];
+        for (const r of inRing) {
+          const last = Math.floor((now - r.phase + r.dwellCap) / r.headway);
+          const first = Math.floor((now - r.phase - r.duration - r.dwellCap) / r.headway) + 1;
+          for (let slot = first; slot <= last; slot++) {
+            if (!one.poseCar(r, slot, now, pose)) continue;
+            // The rule itself, called exactly as `forEachCarNear` calls it. The
+            // "before" pass simply does not call it, which is the only honest way
+            // to measure what it is worth.
+            if (resolve) one.resolveLaneShare(r, slot, now, pose, obstacles, 4);
+            live++;
+            if (pose.swerve !== 0) swerving++;
+            if (pose.held !== 0) held++;
+            bodies.push({
+              x: pose.x, z: pose.z, y: pose.y, dx: pose.dx, dz: pose.dz,
+              hl: pose.halfLength, hw: pose.halfWidth, rid: pose.route,
+              moving: pose.stage !== one.CAR_STAGE_PARKED_IN && pose.stage !== one.CAR_STAGE_PARKED_OUT,
+            });
+          }
+        }
+        if (bodies.length > peak) peak = bodies.length;
+        const grid = new Map<number, number[]>();
+        for (let i = 0; i < bodies.length; i++) {
+          const k = cellOf(bodies[i].x, bodies[i].z);
+          const bucket = grid.get(k);
+          if (bucket === undefined) grid.set(k, [i]);
+          else bucket.push(i);
+        }
+        for (let i = 0; i < bodies.length; i++) {
+          const a = bodies[i];
+          const cx = Math.floor(a.x / CELL);
+          const cz = Math.floor(a.z / CELL);
+          for (let u = -1; u <= 1; u++) {
+            for (let w = -1; w <= 1; w++) {
+              const bucket = grid.get((cx + u + 4096) * 8192 + (cz + w + 4096));
+              if (bucket === undefined) continue;
+              for (const j of bucket) {
+                if (j <= i) continue;
+                const b = bodies[j];
+                // The vertical gate, for `carOverlaps`' reason: the Cahill
+                // Expressway is directly over Alfred Street in plan all day.
+                if (Math.abs(a.y - b.y) > 3) continue;
+                const rx = b.x - a.x;
+                const rz = b.z - a.z;
+                const ahead = Math.abs(rx * a.dx + rz * a.dz);
+                const across = Math.abs(rx * a.dz - rz * a.dx);
+                if (ahead > a.hl + b.hl - 0.5 || across > a.hw + b.hw - 0.5) continue;
+                if (a.moving && b.moving) {
+                  if (a.rid === b.rid) same++;
+                  else cross++;
+                } else if (a.moving !== b.moving) parked++;
+              }
+            }
+          }
+        }
+      }
+      return { same, cross, parked, samples, peak, swerving, held, live };
+    };
+
+    const before = census(false);
+    const after = census(true);
+    const per = (n: number, s: number): string => (n / s).toFixed(2);
+    say(
+      `  census @${RING} m (${inRing.length.toLocaleString()} routes, ${before.peak.toLocaleString()} ` +
+        `live cars at the peak, ${before.samples} samples of an hour), interpenetrating pairs per instant:`,
+    );
+    say(
+      `    a moving car inside a parked one: ${per(before.parked, before.samples)} -> ` +
+        `${per(after.parked, after.samples)}`,
+    );
+    say(
+      `    two moving cars on one route:     ${per(before.same, before.samples)} -> ` +
+        `${per(after.same, after.samples)}`,
+    );
+    say(
+      `    two moving cars, different routes: ${per(before.cross, before.samples)} -> ` +
+        `${per(after.cross, after.samples)}  (not addressed -- see \`resolveLaneShare\`)`,
+    );
+    say(
+      `    and ${((after.swerving / after.live) * 100).toFixed(1)}% of cars are passing something at ` +
+        `any instant, ${((after.held / after.live) * 100).toFixed(2)}% are queued behind one`,
+    );
+    // The claim that matters, and it is a *ratio* rather than a figure: the right
+    // absolute number is a property of the shipped world, and a check written
+    // against today's would fire on a retile that made the city busier.
+    check(
+      after.same === 0,
+      `no two cars on one route are ever inside each other (was ${per(before.same, before.samples)} ` +
+        'pairs per instant) -- the follower chain is what closed it',
+    );
+    check(
+      after.parked <= before.parked * 0.35,
+      'and a moving car inside a parked one is down by at least two thirds ' +
+        `(${per(before.parked, before.samples)} -> ${per(after.parked, after.samples)} per instant); ` +
+        'what is left is the bodies sitting within a quarter of a metre of a driving line, which ' +
+        '`PASS_SHIFT_M` cannot fully clear -- see `PASS_RESIDUAL_M`',
+    );
+
+    // --- AND THE SAME CENSUS AS THE CLIENT SEES IT, WITH THE STATIC FLEET IN.
+    //
+    // The dominant case, and the one the server structurally cannot check for
+    // itself: 23,020 parked cars live in `.cars.bin`, `server/world.ts` never
+    // opens it, and this process does (it has a disk and no frame budget). So the
+    // static fleet is registered into the roster here exactly as
+    // `carlod.CarModelFleet.adopt` registers it in the browser, the census is run
+    // again, and the roster is put back as it was.
+    //
+    // This is where the owner's report actually lives. The line above it in this
+    // section's output -- 123.8 moving-on-static overlapping pairs per instant --
+    // has been true since `parking.py` was written and is the geometry: a lane on a
+    // 7.5 m street runs 0.83 m from the kerb bay beside it and two cars need 1.9 m.
+    {
+      let loaded = 0;
+      const keys: string[] = [];
+      for (const entry of world.index.tiles) {
+        const ox = entry.bounds[0];
+        const oz = entry.bounds[1] + world.index.tile_size;
+        const cx = ox + world.index.tile_size / 2;
+        const cz = oz - world.index.tile_size / 2;
+        if (cx * cx + cz * cz > (RING + 400) * (RING + 400)) continue;
+        const buf = await readFile(join(root, 'tiles', `${entry.key}.cars.bin`)).catch(() => null);
+        if (buf === null) continue;
+        const v = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+        const n = Math.min(v.getUint32(0, true), Math.max(0, Math.floor((buf.byteLength - 4) / 16)));
+        if (n === 0) continue;
+        const xs = new Float32Array(n);
+        const zs = new Float32Array(n);
+        const ys = new Float32Array(n);
+        const body = new Uint8Array(n);
+        const seed = new Uint16Array(n);
+        for (let i = 0; i < n; i++) {
+          const o = 4 + i * 16;
+          xs[i] = v.getFloat32(o, true);
+          zs[i] = v.getFloat32(o + 4, true);
+          body[i] = Math.min(v.getUint8(o + 12), one.CAR_BODY_SIZE.length - 1);
+          seed[i] = v.getUint16(o + 14, true);
+          // `world/cars.buildTileCars`' own height for the instance: the tile's
+          // terrain grid plus the carriageway bias. The browser reads it off the
+          // instance matrix; here it is the same query the mesh was built from.
+          ys[i] = world.terrain.height(xs[i] + ox, zs[i] + oz) + 0.02;
+        }
+        obstacles.adoptStatics(entry.key, n, xs, zs, ys, body, seed, new Uint32Array(0), ox, oz);
+        keys.push(entry.key);
+        loaded += n;
+      }
+      const withStatics = census(true);
+      say(
+        `  census with the client's static fleet in (${loaded.toLocaleString()} parked cars over ` +
+          `${keys.length} tiles, ${obstacles.statics.toLocaleString()} of them registered):`,
+      );
+      say(
+        `    a moving car inside a parked one: ${per(before.parked, before.samples)} -> ` +
+          `${per(withStatics.parked, withStatics.samples)} (schedule residents only -- the static ` +
+          'fleet is not in the census bodies, only in the roster)',
+      );
+      say(
+        `    and ${((withStatics.swerving / withStatics.live) * 100).toFixed(1)}% of cars are passing ` +
+          `something at any instant against ${((after.swerving / after.live) * 100).toFixed(1)}% ` +
+          'without the static fleet -- which is the size of the case the browser is fixing and the ' +
+          'server is not',
+      );
+      check(
+        withStatics.swerving > after.swerving * 2,
+        'the static fleet is the dominant obstacle by a wide margin, which is why the pass it ' +
+          'provokes is lateral-only and never a stop: a hold the server did not know about would ' +
+          "move the server's copy of a car metres from the browser's, and the server's is the one " +
+          'that knocks people over',
+      );
+      for (const key of keys) obstacles.dropStatics(key);
+      check(
+        obstacles.statics === 0,
+        'and the roster is exactly as it was afterwards, so the budget below is measured on a ' +
+          "server's own roster rather than on a browser's",
+      );
+    }
+
+    // --- And the budget, at the busiest 420 m in the ring.
+    {
+      const probe = one.createCarPose();
+      const scratchR: (typeof routes)[number][] = [];
+      const tick0 = one.trafficTick(Date.now());
+      let bx = 0;
+      let bz = 0;
+      let peak = 0;
+      for (const r of inRing) {
+        let n = 0;
+        one.forEachCarNear(world.traffic, r.x[0], r.z[0], 420, tick0, scratchR, probe, () => { n++; });
+        if (n > peak) { peak = n; bx = r.x[0]; bz = r.z[0]; }
+      }
+      const timed = (live: boolean): { ms: number; cars: number } => {
+        const saved = obstacles.live;
+        obstacles.live = live ? saved : false;
+        let cars = 0;
+        for (let t = 0; t < 40; t++) {
+          one.forEachCarNear(world.traffic, bx, bz, 420, tick0 + t, scratchR, probe, () => {});
+        }
+        const REPS = 200;
+        const started = performance.now();
+        for (let t = 0; t < REPS; t++) {
+          one.forEachCarNear(world.traffic, bx, bz, 420, tick0 + t * 37, scratchR, probe, () => { cars++; });
+        }
+        const ms = (performance.now() - started) / REPS;
+        obstacles.live = saved;
+        return { ms, cars: cars / REPS };
+      };
+      // Warmed and measured twice, because the first pass through a cold JIT on a
+      // walk this small is dominated by the compile.
+      timed(true);
+      const off = timed(false);
+      const on = timed(true);
+      const usPerCar = (on.ms * 1000) / Math.max(1, on.cars);
+      const at500 = usPerCar * 500;
+      say(
+        `  cost @busiest 420 m: ${on.cars.toFixed(0)} cars, ${off.ms.toFixed(3)} ms without the ` +
+          `obstacle rule and ${on.ms.toFixed(3)} ms with it (${usPerCar.toFixed(2)} us a car, ` +
+          `${(at500 / 1000).toFixed(3)} ms at 500 visible cars)`,
+      );
+      check(
+        at500 < 500,
+        `which is inside the 0.5 ms budget for a server tick at 500 visible cars ` +
+          `(${(at500 / 1000).toFixed(3)} ms)`,
+      );
+    }
+
+    // --- And it is bit-identical in the other instance, which is the whole
+    // reason it is stateless. See `resolveLaneShare`'s own argument: the server
+    // resolves a handful of cars near a player once a tick and the browser
+    // resolves five hundred a frame, so anything that remembered how often it had
+    // been asked would put the two copies of a car metres apart.
+    {
+      const a = one.createCarPose();
+      const b = two.createCarPose();
+      const twin = new two.TrafficField();
+      // A browser too, and over **exactly the tiles instance one's roster covers**:
+      // two processes that had registered different bays would be a fair comparison
+      // of two different cities. That is the same reason `checkLaneLoadPath` is
+      // careful about adoption order.
+      twin.obstacles.wanted = true;
+      let adopted = 0;
+      for (const entry of world.index.tiles) {
+        const ox = entry.bounds[0];
+        const oz = entry.bounds[1] + world.index.tile_size;
+        const cx = ox + world.index.tile_size / 2;
+        const cz = oz - world.index.tile_size / 2;
+        if (cx * cx + cz * cz > 2400 * 2400) continue;
+        const buf = await readFile(join(root, 'tiles', `${entry.key}.lanes.bin`)).catch(() => null);
+        if (buf === null) continue;
+        const decoded = two.decodeLanes(
+          buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer,
+          ox,
+          oz,
+        );
+        if (decoded === null) continue;
+        twin.adopt(entry.key, decoded);
+        adopted++;
+      }
+      const twinRoutes = twin.routes();
+      let compared = 0;
+      let differing = 0;
+      let exercised = 0;
+      const tick0 = one.trafficTick(Date.now());
+      for (let step = 0; step < 40; step++) {
+        const now = one.trafficSeconds(tick0 + step * 313);
+        for (const r of twinRoutes) {
+          // The matching route in instance one's field, by rid. Both decoded the
+          // same tile, so the rid is the same 32-bit name -- that is what
+          // `LaneRoute.rid` is for.
+          const mine = inRing.find((c) => c.rid === r.rid);
+          if (mine === undefined) continue;
+          const slot = Math.floor((now - r.phase) / r.headway);
+          if (!one.poseCar(mine, slot, now, a)) continue;
+          one.resolveLaneShare(mine, slot, now, a, world.traffic.obstacles, 4);
+          if (!two.poseCar(r, slot, now, b)) { differing++; continue; }
+          two.resolveLaneShare(r, slot, now, b, twin.obstacles, 4);
+          compared++;
+          if (a.swerve !== 0 || a.held !== 0) exercised++;
+          if (a.x !== b.x || a.z !== b.z || a.held !== b.held || a.swerve !== b.swerve || a.speed !== b.speed) {
+            differing++;
+          }
+        }
+        if (compared > 20000) break;
+      }
+      check(
+        differing === 0 && compared > 0,
+        `${compared.toLocaleString()} cars are placed bit-identically by two module instances over ` +
+          `${adopted} independently decoded tiles, hold and pass offset included ` +
+          `(${exercised.toLocaleString()} of them were actually avoiding something)` +
+          (differing > 0 ? ` -- ${differing} disagree` : ''),
+      );
+      check(
+        exercised > 0,
+        'and the comparison actually exercised the rule rather than comparing empty streets',
+      );
+    }
+  }
+
+  // And the world is handed on exactly as it was found: the roster above was this
+  // check standing in for a browser, and `checkLaneLoadPath` below asserts that a
+  // dropped hexagon leaves nothing behind.
+  world.traffic.obstacles.clear();
+  world.traffic.obstacles.wanted = false;
+
   await checkLaneLoadPath(world, one, two);
 }
 
@@ -5203,6 +5608,14 @@ if (only === 'ridingOnline') {
   process.exit(failures.length === 0 ? 0 : 1);
 } else if (only === 'seam') {
   await checkVesselSeam();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'traffic') {
+  // The living traffic. Added with the obstacle round, because the census and the
+  // budget line in it are exactly the kind of thing that is developed in a loop:
+  // the whole file is 45 minutes against the built world and this section is one.
+  await checkTraffic();
   for (const f of failures) say(`  - ${f}`);
   say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
   process.exit(failures.length === 0 ? 0 : 1);

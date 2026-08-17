@@ -236,18 +236,30 @@
  * `net/client.ts`'s existing correction absorbs exactly as it absorbs any other.
  *
  * ---------------------------------------------------------------------------
- * CARS DO NOT COLLIDE WITH ANYTHING. THEY PLOUGH THROUGH.
+ * CARS DO NOT COLLIDE WITH THE PLAYER. THEY PLOUGH THROUGH.
  *
- * Not with each other, not with the player, not with a building. That is the
- * point rather than a shortcut: the thing the user asked for is *being knocked
- * over*, and a car that braked for you would never do it. Conceptually these are
- * trams on rails.
+ * Not with the player, not with a building. That is the point rather than a
+ * shortcut: the thing the user asked for is *being knocked over*, and a car that
+ * braked for you would never do it. Conceptually these are trams on rails.
  *
- * Two cars never occupy the same place anyway, and it is the *pipeline* that
- * guarantees it rather than anything here: routes are an edge-disjoint
- * decomposition of the lane graph, so no two share a lane, and within one route
- * the departure headway is strictly greater than the longest red on it, which is
- * the condition for two cars on one timetable never to meet. See `lanes.py`.
+ * **With each other they do, since v4, and the paragraph that used to be here
+ * was wrong.** It said two cars never occupy the same place anyway, and that the
+ * pipeline guaranteed it: routes are an edge-disjoint decomposition of the lane
+ * graph, and within one route the headway is longer than the longest red on it.
+ * The first half is true and the second half is a claim about the *timetable*
+ * rather than about the road. A car standing four seconds at a red is a car the
+ * one behind it closes fifty metres on, and measured over an hour of the shipped
+ * world inside a 1.5 km ring there were **7.24 pairs of same-route cars inside
+ * each other at any instant**, plus 5.35 pairs of a moving car inside a parked
+ * one and 3.62 pairs from crossing routes. The owner's report -- *"there are
+ * still cars parked that never move that other cars just pass thru"* -- was all
+ * three of those at once.
+ *
+ * `resolveLaneShare` is what answers it, and its own section carries the
+ * measurements, the reason a car goes *round* a parked one rather than stopping
+ * for it (the shipped geometry puts the driving line about a metre from the
+ * parked row, where two cars need 1.9 m), and the reason the rule is stateless
+ * where `HoldLedger` is not.
  *
  * ---------------------------------------------------------------------------
  * **This file imports nothing from three.** `game/footy.ts` set that precedent
@@ -870,6 +882,32 @@ export interface CarPose {
    * agree about it and so the dev overlay can count the cars that are queued.
    */
   held: number;
+  /**
+   * How far sideways this car has pulled to get round something standing in its
+   * lane, metres, positive to its own left. See `resolveLaneShare`.
+   *
+   * Zero for every car that has nothing to pass. Applied to `x`/`z` before the
+   * caller sees them, exactly as `held` is, and exposed for the same two
+   * reasons: a check can assert two processes agree about it, and the dev
+   * overlay can count the cars that are currently overtaking a parked one.
+   */
+  swerve: number;
+  /**
+   * Seconds since this car came into existence, and seconds until it stops.
+   *
+   * Both are pure functions of the same `age` the five stages are cut from --
+   * `bornAgo = age + dwellIn`, `endsIn = duration + dwellOut - age` -- so they
+   * cost two adds and are exact on both engines.
+   *
+   * They exist for `game/viewlatch.ts`, which has to tell "this car has just
+   * been created" from "this car has just driven into range": the first must not
+   * be drawn while the player is looking at the spot, and the second must be
+   * drawn immediately. Nothing about a position can distinguish those two, and
+   * the answer is a property of the *schedule* rather than of the picture, so it
+   * is computed here where the schedule is rather than guessed there.
+   */
+  bornAgo: number;
+  endsIn: number;
 }
 
 export function createCarPose(): CarPose {
@@ -877,6 +915,7 @@ export function createCarPose(): CarPose {
     route: 0, slot: 0, x: 0, y: 0, z: 0, dx: 0, dz: 1,
     body: 0, colour: 0, scale: 1, halfLength: 0, halfWidth: 0, height: 0,
     stage: CAR_STAGE_DRIVING, routeT: 0, speed: 0, identity: 0, damage: 0, held: 0,
+    swerve: 0, bornAgo: 0, endsIn: 0,
   };
 }
 
@@ -1684,6 +1723,16 @@ export class TrafficField {
    */
   readonly held = new HoldLedger();
 
+  /**
+   * Which stationary cars are standing in a carriageway. See `LaneObstacles`.
+   *
+   * On the field for `held`'s reason and filled from `adopt`/`drop` for a second
+   * one: a tile's bays must arrive and leave with its routes, and a caller who
+   * had to remember to register them separately is a caller who will forget on
+   * one of the four code paths that adopt a tile.
+   */
+  readonly obstacles = new LaneObstacles();
+
   private readonly tiles = new Map<string, TileLanes>();
   private flat: LaneRoute[] = [];
   private readonly grid = new Map<number, LaneRoute[]>();
@@ -1695,8 +1744,14 @@ export class TrafficField {
     // the grid with nothing left holding a reference to take them out.
     const previous = this.tiles.get(tileKey);
     if (previous !== undefined) this.unindex(previous.routes);
+    // The bays too, and in the same order: out with the old tile's, in with the
+    // new one's. `LaneObstacles.drop` is keyed by the tile rather than by the
+    // routes, so a re-adopt cannot leave a bay behind pointing at a route
+    // nothing holds any more.
+    if (previous !== undefined) this.obstacles.drop(tileKey);
     this.tiles.set(tileKey, tile);
     this.index(tile.routes);
+    this.obstacles.adoptRoutes(tileKey, tile.routes);
     this.flatDirty = true;
   }
 
@@ -1705,6 +1760,7 @@ export class TrafficField {
     if (previous === undefined) return;
     this.tiles.delete(tileKey);
     this.unindex(previous.routes);
+    this.obstacles.drop(tileKey);
     this.flatDirty = true;
   }
 
@@ -2118,6 +2174,12 @@ export function poseCar(route: LaneRoute, slot: number, now: number, out: CarPos
   // described may well have been a wreck queued behind somebody's Camry.
   out.damage = 0;
   out.held = 0;
+  out.swerve = 0;
+  // How old this car is and how long it has left, both off the same `age` the
+  // stages were cut from. See `CarPose.bornAgo`: `game/viewlatch.ts` needs to
+  // know that a car was *created* here rather than that it drove in.
+  out.bornAgo = age + dwellIn;
+  out.endsIn = route.duration + dwellOut - age;
   // Who this is. `h` and not a fresh hash of it: every other per-car choice
   // below is drawn from this same number, so a consumer keying a 3D model off
   // the identity is keying off the same draw the body type came from -- and a
@@ -2218,10 +2280,25 @@ export function forEachCarNear(
   const now = trafficSeconds(tick);
   const range: SlotRange = { first: 0, last: -1 };
   const held = field.held;
+  const obstacles = field.obstacles;
   for (const route of field.near(x, z, radius, scratch)) {
     liveSlots(route, now, range);
     for (let slot = range.first; slot <= range.last; slot++) {
       if (!poseCar(route, slot, now, pose)) continue;
+      // **Nothing drives through anything that is standing still**, applied here
+      // for the same reason the hold below is: this is the one iterator the box
+      // fleet, the model fleet, the knockdown test and the server all go
+      // through, so a rule installed here gives all four *one* answer rather
+      // than four that have to agree. Before the driven hold, because a car
+      // going round a parked one and a car queueing behind a stolen one are
+      // different questions and the second is asked about where the first left
+      // the car. See `resolveLaneShare`.
+      // Unconditional rather than gated on `obstacles.live`, unlike the hold:
+      // half of this rule is the car in front on this car's own route, which is
+      // arithmetic rather than an index and is what stops a queue at a red light
+      // stacking into one box -- 7.24 interpenetrating pairs per instant in the
+      // measured ring, and not one of them needs an obstacle to be registered.
+      resolveLaneShare(route, slot, now, pose, obstacles, CHAIN_DEPTH);
       // **The queue behind a car somebody left in the lane, applied here and
       // nowhere else.** See `resolveHeld`: putting it inside the one iterator
       // every consumer already goes through is the whole of how the box fleet,
@@ -2673,6 +2750,782 @@ export function resolveHeld(pose: CarPose, ledger: HoldLedger, tick: number): nu
  * asserts the two agree.
  */
 const TAKE_HEIGHT_GATE = 2.5;
+
+// --- Every car is an obstacle to every other car ---------------------------------
+
+/**
+ * WHY THIS EXISTS, AND WHAT WAS MEASURED BEFORE IT WAS WRITTEN.
+ *
+ * The owner's report was two sentences: *"there are still cars parked that never
+ * move that other cars just pass thru.... car spawing and de spawning should
+ * always happen off camera and cars should never pass thru each other"*. The
+ * first clause is this section; the second is `game/viewlatch.ts`.
+ *
+ * Measured on the shipped world, 647 routes and 4,966 static parked cars inside
+ * a 1.5 km ring of Town Hall, at the real tick:
+ *
+ *   | thing standing in a carriageway                    | count |
+ *   |----------------------------------------------------|------:|
+ *   | static parked cars within 1.85 m of a driving line | 2,600 (52.4 %) |
+ *   | ...whose modal distance from that line is          | **0.75-1.00 m** |
+ *   | kerb bays (schedule residents) likewise            | 1,054 of 1,263 |
+ *   | lane-edge bays (`synthesiseLaneBay`) likewise       | 31 of 31 (all, by construction) |
+ *
+ * The modal number is the whole diagnosis and it is not a bug in this file. Two
+ * cars abreast need 1.9 m between their centres; `lanes.LANE_FRACTION` puts the
+ * driving line 1.875 m off the centreline of a 7.5 m residential street and
+ * `parking.KERB_OFFSET` puts the parked row 2.70 m off it, which is **0.83 m of
+ * separation where 1.9 m is needed**. Every residential street in Sydney is
+ * built with its traffic lane overlapping its own parked cars by about a metre,
+ * has been since `parking.py` was written, and `checkTraffic`'s bay sweep
+ * already excludes exactly this case in as many words. So "cars pass through
+ * parked cars" is not an occasional collision failure -- it is the geometry, all
+ * day, on every street, and no amount of *braking* fixes it: a car that stopped
+ * for the parked row would never move again.
+ *
+ * A census of what actually interpenetrates, over an hour at 1 Hz on the same
+ * ring (2,720 live cars at the peak, bodies overlapping by at least 0.3 m on
+ * both axes, per instant):
+ *
+ *   | pairs inside each other, per instant | before |
+ *   |-------------------------------------|-------:|
+ *   | a moving car inside a parked one     |   5.35 |
+ *   | two moving cars, same route          |   7.24 |
+ *   | two moving cars, different routes    |   3.62 |
+ *
+ * The middle row is the surprise and it disproves half of this file's own
+ * header. `lanes.py` guarantees two cars on one route never meet *in the
+ * timetable*, and that is not the same claim as never meeting *in space*: a car
+ * held four seconds at a red is a car the one behind it closes 50 m on. The
+ * headway keeps their departures apart and nothing kept their bumpers apart.
+ *
+ * ---------------------------------------------------------------------------
+ * SO THE RULE IS: PULL OUT AND GO ROUND, AND ONLY QUEUE WHEN YOU CANNOT.
+ *
+ * A driver passing a car parked at the kerb of a narrow street does not stop.
+ * They put a wheel over the centreline and go round, which is what
+ * `PASS_SHIFT_M` is. Queueing -- the longitudinal hold this section shares with
+ * `resolveHeld` -- is what is left for the cases a shift cannot clear: something
+ * standing in the middle of the lane, or the car in front having stopped.
+ *
+ * ---------------------------------------------------------------------------
+ * AND IT IS STATELESS, WHICH IS A DELIBERATE DEPARTURE FROM `HoldLedger`.
+ *
+ * The brief for this change asked for the ledger to be extended so that
+ * `resolveHeld` saw parked ambient cars as well as driven ones. It is not built
+ * that way, and the reason is the one property this whole file is organised
+ * around.
+ *
+ * `HoldLedger` accumulates: an entry remembers how far behind a car has fallen
+ * and the recovery is integrated forward from it. That is *necessary* for a car
+ * a player abandoned, because how long it has been there is not derivable from
+ * anything either process has. It is also *safe* there, because it only ever
+ * runs while somebody has a car out.
+ *
+ * An ambient obstacle is the opposite on both counts. Where it is, is in the
+ * sidecar both ends already hold, so the hold behind it needs no memory: it is a
+ * pure function of `(lanes bytes, tick)`, computed fresh, identical in the
+ * browser and in Bun with nothing on the wire -- which is `poseCar`'s own
+ * argument extended one layer out. And accumulated state here would be *unsafe*,
+ * because the two ends resolve different sets of cars: the client resolves
+ * everything within `cars.TRAFFIC_DRAW_RADIUS` every frame and the server only
+ * the handful within `HIT_QUERY_RADIUS` of a player, once a tick. A ledger entry
+ * the client had been growing for twenty seconds and the server started from
+ * zero the moment a player walked up would put the two copies of a car tens of
+ * metres apart -- and the server's copy is the one that knocks people over. A
+ * stateless rule cannot diverge that way: both ends evaluate the same function
+ * of the same tick and get the same answer however long either has been
+ * watching.
+ *
+ * The price is that a queue does not *build*: the hold is derived from where
+ * things are now rather than from how long they have been there. That is paid
+ * for by the chain (`CHAIN_DEPTH`), which resolves the car in front, and the car
+ * in front of that, by arithmetic rather than by memory -- on one route the car
+ * ahead is `slot - 1` and needs no spatial query at all.
+ */
+
+/**
+ * The most a car will pull sideways to get past something in its lane, metres.
+ *
+ * A 3.5 m lane around a 1.9 m car has 0.8 m of slack in it, so anything past
+ * about a metre is over the centreline -- which is exactly what a driver does
+ * here and is why this is 1.5 rather than 0.9. The measured need is
+ * `1.9 + PASS_CLEAR_M - the obstacle's own offset`, and at the modal 0.83 m of
+ * separation on a residential street that is 1.17 m: inside this, so the
+ * overwhelming majority of parked cars are passed rather than queued behind.
+ *
+ * **What it costs is stated rather than hidden.** At full shift the body's
+ * outside edge sits about 0.6 m over the centreline of a 7.5 m street, so a car
+ * passing a parked one at the same instant an oncoming car is abreast of it can
+ * clip that car by up to 0.6 m for the fraction of a second they overlap. The
+ * brief asked for the pass to be gated on the opposite lane being clear for
+ * `2 * HOLD_GAP`; it is not, because an oncoming car is on a *different route*
+ * and finding it needs a spatial query over moving cars -- which is the one
+ * thing this section refuses to spend (see `resolveLaneShare`'s cost note). The
+ * trade is measured in `checkTraffic`'s census: passing removes far more
+ * interpenetration than it introduces, and the pairs it introduces are two
+ * moving cars brushing shoulders for a tick where the pairs it removes are a car
+ * driving through a stationary one for as long as you watch.
+ */
+export const PASS_SHIFT_M = 1.5;
+
+/**
+ * Air left between two bodies that are passing, metres.
+ *
+ * Ten centimetres, which is `HIT_MARGIN` -- the hit boxes already carry it, so a
+ * pass that clears by this much clears by the same margin the knockdown test
+ * uses and cannot be a hit.
+ */
+const PASS_CLEAR_M = 0.1;
+
+/**
+ * WHY A CAR NEVER *QUEUES* BEHIND SOMETHING PARKED, AND WHAT THAT LEAVES.
+ *
+ * The brief asked for the follower to wait when the opposite lane is not clear,
+ * with `HOLD_MAX_LAG` as the ceiling on the wait. Waiting is not implemented for
+ * a stationary obstacle, and the reason is that in a *stateless* rule there is
+ * no way out of it that is not worse than the thing it fixes.
+ *
+ * A resident in a bay is there for as long as its bay window lasts, which since
+ * the residency round is very nearly a whole headway -- minutes on a quiet
+ * street. A car pinned `HOLD_GAP` behind it has exactly two futures. It can be
+ * released when its own timetable has swept past the obstacle, which teleports
+ * it twelve metres up the road; or it can be released gradually, which walks it
+ * *through* the obstacle on the way (the arithmetic is in this file's history and
+ * it is unavoidable: the release has to give back the whole gap, and the only
+ * road available to give it back on is the road the obstacle is standing on).
+ * Both are worse than the residual below, and an accumulating hold -- which is
+ * what would actually be needed to wait properly -- is the thing this section
+ * exists not to have (see the stateless argument above).
+ *
+ * So a car always goes round, and what is left over is stated: at a full
+ * `PASS_SHIFT_M` the worst case is an obstacle sitting **exactly** on the
+ * driving line, where 1.5 m of shift against 2.0 m of wanted clearance leaves
+ * **0.5 m of body still overlapping** for the second or so the two are abreast.
+ * Measured on the shipped world, that is the 83 bay ends in 1,294 and 28 static
+ * cars in 4,966 whose centre is within 0.25 m of a driving line -- `bays.py`'s
+ * last-resort *lane* claim, mostly, which is a car legitimately parked in the
+ * traffic lane. Everything offset further than a quarter of a metre is passed
+ * with full clearance and touches nothing.
+ *
+ * The one hold this section does apply is behind a **moving** car (the chain
+ * below), and that one has a way out by construction: the car in front drives
+ * away, the gap opens, and the follower is back on its timetable with no
+ * discontinuity anywhere -- while it is held it moves at exactly the leader's
+ * speed, which is what following is.
+ */
+export const PASS_RESIDUAL_M = 0.5;
+
+/**
+ * How far either side of the obstacle the lean is fully out, and how far out the
+ * lean begins, metres.
+ *
+ * **`PASS_FULL_M` is a measurement and not a taste.** Two cars nose to tail touch
+ * when their centres are `halfLength + halfLength` apart, which for the longest
+ * body against the longest body is 5.6 m -- so a lean that was still on its way in
+ * at five metres would put the follower's bonnet through the obstacle's boot
+ * before it had moved half the distance it needed to. The first version of this
+ * had the shift complete at 2.5 m and `verifyLaneShare` caught it immediately:
+ * 1.12 m of body still overlapping at an along-distance of 4.4 m. So the shift is
+ * complete *before the bodies can touch, on both sides*, and the ramp is
+ * symmetric: a car leans out over `[PASS_LOOK_M, PASS_FULL_M]` on the way in, sits
+ * at full offset while it is abreast, and leans back over the mirror image of that
+ * on the way out.
+ *
+ * `PASS_LOOK_M` is then how far ahead a driver starts moving over, and it is also
+ * what `OBSTACLE_QUERY` has to cover. Twelve metres at a residential 11.1 m/s is
+ * six tenths of a second of lean, which is a driver drifting out rather than
+ * swerving; on a 25 m/s arterial it is a quarter of a second, which is faster than
+ * a real lane change and is the price of not carrying a per-car lateral velocity
+ * (which would be state, which is the thing this section does not have).
+ */
+const PASS_FULL_M = 5.6;
+const PASS_LOOK_M = 12;
+
+/**
+ * Grid cell for the obstacle index, metres.
+ *
+ * `HOLD_CELL`'s 32, and for `HOLD_CELL`'s reason read the other way round: the
+ * population here is dense where the driven roster never is (1,294 bay ends and
+ * about 5,000 static cars inside a 1.5 km ring), so what matters is not how many
+ * candidates a cell holds but how many *cells* a query touches -- and a cell
+ * wider than twice `OBSTACLE_QUERY` keeps that at the two-by-two minimum. A 16 m
+ * cell was measured slower for exactly that reason: nine cells of two candidates
+ * costs more in map lookups than four cells of eight costs in distance tests.
+ */
+const OBSTACLE_CELL = 32;
+
+/**
+ * How far from a pose an obstacle can be and still matter, metres.
+ *
+ * **Exactly the window `resolveLaneShare` tests and not a metre more**, because
+ * this number is what decides how many cells a query walks and the static fleet
+ * is dense: an obstacle has to be inside `+/-PASS_LOOK_M` along the car and
+ * `+/-HOLD_LANE_HALF` across it, so the furthest one that can matter is
+ * `sqrt(144 + 6.76) = 12.3 m` away. Thirteen is that plus slack, and
+ * `OBSTACLE_CELL` is then sized so the walk stays a two-by-two block of cells --
+ * measured at 0.3 us a car on top of the walk that was already happening.
+ */
+const OBSTACLE_QUERY = 13;
+
+/**
+ * How far off its own driving line a bay may sit and still be registered, metres.
+ *
+ * Two metres, and it is a memory bound rather than a rule: a car parked more
+ * than this from the line cannot be reached by a car driving it (0.99 m of
+ * parked body plus 0.99 m of moving body), so registering it would cost the
+ * server a record for nothing. 143,862 bay ends city-wide at ~90 bytes is 13 MB
+ * on a 1 GB box; this filter takes about 14 % off, and what it *cannot* see is
+ * the neighbouring lane of a dual carriageway -- a bay 2.5 m off its own line
+ * may be 1 m off the line beside it. That case is stated here and left, because
+ * finding it needs a lane-to-lane proximity pass the decoder has no index for.
+ */
+const OBSTACLE_REACH_M = 2.0;
+
+/**
+ * How many cars deep a queue resolves. See `resolveLaneShare`.
+ *
+ * Each level is one `poseCar` and one obstacle query for the car in front, and
+ * the recursion stops early the moment the car in front is far enough away not
+ * to matter -- which it is for every car in the city that is not in a queue. So
+ * four is four levels of *cost* only where there really are four cars nose to
+ * tail, and the measured mean is barely above one. Past four the fifth car
+ * closes on the fourth exactly as every car did before this rule existed.
+ */
+const CHAIN_DEPTH = 4;
+
+/** One thing standing in a carriageway that traffic must not drive through. */
+export interface LaneObstacle {
+  x: number;
+  y: number;
+  z: number;
+  /**
+   * The route end whose bay this is, or null for a static parked car.
+   *
+   * A bay is a *candidate*: whether anybody is standing in it at a given tick is
+   * `bayOccupant`'s answer, and where exactly they are standing is `poseCar`'s,
+   * so this record carries no pose of its own beyond the bay point it is
+   * bucketed by. A static car has no schedule and is therefore its own answer.
+   */
+  route: LaneRoute | null;
+  which: number;
+  /** Half extents, metres, already scaled. Statics only; a bay's come from its occupant. */
+  halfLength: number;
+  halfWidth: number;
+  /** `staticCarIdentity`, so a static a player has driven away is not an obstacle. */
+  identity: number;
+}
+
+/**
+ * Where the stationary cars are, as a spatial index both ends build from the
+ * same bytes.
+ *
+ * Built at `TrafficField.adopt` from the sidecar's park block -- so the server
+ * gets it for free and neither end can be holding a different set for a tile
+ * they both have -- plus, **on the client only**, the static fleet out of
+ * `.cars.bin` (see `adoptStatics` for why that asymmetry is safe).
+ *
+ * `live` is the whole cost for a world with no lanes in it: one comparison per
+ * pose, exactly as `HoldLedger.live` is.
+ */
+export class LaneObstacles {
+  /** False until something has been registered. One comparison per pose. */
+  live = false;
+
+  /**
+   * Whether this process wants a bay roster at all. **False on the server.**
+   *
+   * ---------------------------------------------------------------------------
+   * WHY THE SERVER DOES NOT BUILD ONE, WHICH IS A MEMORY DECISION AND A MEASURED
+   * ONE.
+   *
+   * 136,993 of the extent's 143,862 bay ends are close enough to a driving line to
+   * be worth registering, and the server holds the *whole* lane graph. Measured in
+   * Bun on this world: a record per bay in a 32 m grid is **35 MB of RSS**, and
+   * every cheaper shape that still supports incremental adopt and drop is 15 MB or
+   * more -- the `Map` of 62,000-plus populated cells is 12 MB of it on its own,
+   * because bays are spread thinly over 19 km of city. Against
+   * `PERFORMANCE.md`'s 1 GB box, where the whole world load is already 310 MB of
+   * live heap, that is 10 % of the lane graph's own footprint.
+   *
+   * What it would buy is nothing the server can use, and that is the actual
+   * argument. **Every effect an obstacle has is lateral**: `resolveLaneShare` pulls
+   * a car up to `PASS_SHIFT_M` sideways and never stops it (see `PASS_RESIDUAL_M`
+   * for why waiting is not on the menu). So a server without the roster places
+   * every car in the city at exactly the along-route position a server with one
+   * would -- the timetable, the queue behind the car in front, `HOLD_MAX_LAG`, the
+   * knockdown's timing -- and differs only in a sideways offset of at most 1.5 m
+   * on the 15 % of cars that are passing something at any instant. That is the
+   * same *kind* of divergence the file header already accepts for clock skew, on
+   * the same terms: the server decides whether a car hit you and the browser
+   * predicts it, and `net/client.ts`'s correction absorbs the difference.
+   *
+   * It is also the only consistent choice, because the static half of the roster
+   * is *already* client-only -- `.cars.bin` is a renderer file -- and the statics
+   * cause ten times as many passes as the bays do (15.4 % of cars against 1.4 %,
+   * measured in `checkTraffic`). A server that held bays but not statics would be
+   * paying 35 MB to close a tenth of a gap it cannot close.
+   *
+   * The client turns it on in `main.ts` before the streamer adopts anything; the
+   * self-checks turn it on for their own fixtures. Off, `adoptRoutes` is a return
+   * and `live` stays false, so a pose costs one comparison.
+   */
+  wanted = false;
+
+  private readonly grid = new Map<number, LaneObstacle[]>();
+  private readonly byTile = new Map<string, LaneObstacle[]>();
+  /** How many of each kind are held. Diagnostics, `checkTraffic` and the leak check. */
+  bays = 0;
+  statics = 0;
+
+  /**
+   * Every bay of every route in a tile that a car driving that route could hit.
+   *
+   * Called by `TrafficField.adopt`, so a tile's obstacles arrive and leave with
+   * its routes and no third party has to remember to do it.
+   */
+  adoptRoutes(tileKey: string, routes: readonly LaneRoute[]): void {
+    if (!this.wanted) return;
+    // Keyed `r:` against `adoptStatics`' `c:`, because the two arrive and leave
+    // on different clocks: the client holds a tile's parked cars for as long as
+    // its meshes are alive and its lanes for as long as `TrafficField` wants
+    // them, and dropping one must not take the other with it.
+    tileKey = `r:${tileKey}`;
+    const probe = _obstacleBay;
+    for (const route of routes) {
+      for (let which = 0; which < 2; which++) {
+        if (which === 0 ? !route.bay0 : !route.bay1) continue;
+        // See `OBSTACLE_REACH_M`: a bay further out than this cannot be reached
+        // by a car on its own line, and the record would be memory spent on a
+        // query that can never return it.
+        const shift = which === 0 ? route.kerbShift0 : route.kerbShift1;
+        if (shift > OBSTACLE_REACH_M) continue;
+        bayPose(route, which, probe);
+        this.push(tileKey, {
+          x: probe.x, y: probe.y, z: probe.z,
+          route, which, halfLength: 0, halfWidth: 0, identity: 0,
+        });
+        this.bays++;
+      }
+    }
+    this.live = this.grid.size > 0;
+  }
+
+  /**
+   * And the 23,020 parked cars in `.cars.bin`, **on the client only**.
+   *
+   * ---------------------------------------------------------------------------
+   * WHY AN ASYMMETRY IS ACCEPTABLE HERE AND NOWHERE ELSE IN THIS FILE.
+   *
+   * `.cars.bin` is a renderer file: `server/world.ts` deliberately never opens
+   * it and `game/driving.ts`'s header says so in as many words. Making the
+   * server read it means a new hexagon layer, its own residency cap and 1.4 M
+   * cars' worth of decode on a 1 vCPU box, for a fleet that never moves.
+   *
+   * So the static fleet is registered by the client and not by the server, and
+   * the divergence that buys is bounded to **one pass shift, laterally, and
+   * never a stop**: `resolveLaneShare` will pull a car up to `PASS_SHIFT_M`
+   * sideways to get round a static car, and it will not queue behind one
+   * (`pinnable` is false for a static). So the two processes agree about how far
+   * along its route every car in the city is, always, and can differ by at most
+   * 1.5 m across it. That is the same *kind* of error the file header already
+   * accepts for clock skew and it is absorbed the same way -- the server decides
+   * whether a car hit you, the client predicts it, and `net/client.ts`'s
+   * correction covers the difference. A player standing exactly in the parked
+   * row can be knocked down by a car that visibly went round them; they are also
+   * standing inside a parked car, which is the honest reason that band is not
+   * worth a hexagon layer.
+   *
+   * The longitudinal rules -- the queue, the chain, `HOLD_MAX_LAG` -- run only
+   * on obstacles both ends can see, which is what keeps them authoritative.
+   *
+   * `x`/`z` arrive tile-local, as `TileCars` holds them; `originX`/`originZ` are
+   * the tile group's translation, the same pair `carlod.CarModelFleet.adopt`
+   * takes.
+   */
+  adoptStatics(
+    tileKey: string,
+    count: number,
+    /** Tile-local metres, as `world/cars.TileCars` holds them. */
+    x: Float32Array,
+    z: Float32Array,
+    /** Absolute world height per car -- the y the instance is actually drawn at. */
+    y: Float32Array,
+    body: Uint8Array,
+    seed: Uint16Array,
+    identity: Uint32Array,
+    originX: number,
+    originZ: number,
+  ): void {
+    for (let i = 0; i < count; i++) {
+      // A height the caller could not establish. Skipped rather than registered
+      // at zero or at NaN: the vertical gate in `resolveLaneShare` is what keeps
+      // a car parked on a flyover out of the lane underneath it, and an obstacle
+      // with no height would defeat it in the one direction that matters.
+      if (!Number.isFinite(y[i])) continue;
+      const wx = x[i] + originX;
+      const wz = z[i] + originZ;
+      // `world/cars.buildTileCars`' own per-instance jitter, to the bit:
+      // `0.96 + 0.08 * hash(seed, 11)`, where that module's private `hash` is
+      // `carHash`'s mixer and its divisor is `0xffffffff` rather than `unit`'s
+      // 2^32. Written out in that module's form rather than through `unit`
+      // because this footprint has to match a *drawn* body, and a reader
+      // comparing the two files should find the same expression in both. It
+      // matters: the scale takes the longest body from 5.4 m to 5.62 m, which is
+      // 21 cm of car a nominal footprint would drive through.
+      const scale = 0.96 + 0.08 * (carHash(seed[i] | 0, 11) / 0xffffffff);
+      const size = CAR_BODY_SIZE[body[i]] ?? CAR_BODY_SIZE[0];
+      this.push(`c:${tileKey}`, {
+        x: wx, y: y[i], z: wz,
+        route: null, which: 0,
+        halfLength: size.length * 0.5 * scale,
+        halfWidth: size.width * 0.5 * scale,
+        identity: identity.length === count ? identity[i] : 0,
+      });
+      this.statics++;
+    }
+    this.live = this.grid.size > 0;
+  }
+
+  /** One tile's static fleet, out again. Its lanes may well still be resident. */
+  dropStatics(tileKey: string): void {
+    this.dropKey(`c:${tileKey}`);
+  }
+
+  /**
+   * Which cars a player has taken, and which are therefore not standing there.
+   *
+   * `driving.CarField.suppressed`, handed over as a bare predicate exactly as
+   * `cars.TrafficMovers.suppress` takes it and for the same reason: a car
+   * somebody has driven away is not an obstacle, and the one place that fact
+   * lives is the driven roster. Null is the whole of the "nobody has taken
+   * anything" case and costs one comparison per candidate.
+   */
+  suppress: ((identity: number) => boolean) | null = null;
+
+  /** A tile's *bays*, out again. Called by `TrafficField.drop`. */
+  drop(tileKey: string): void {
+    this.dropKey(`r:${tileKey}`);
+  }
+
+  private dropKey(tileKey: string): void {
+    const held = this.byTile.get(tileKey);
+    if (held === undefined) return;
+    this.byTile.delete(tileKey);
+    for (const o of held) {
+      if (o.route === null) this.statics--;
+      else this.bays--;
+      const key = obstacleCell(o.x, o.z);
+      const bucket = this.grid.get(key);
+      if (bucket === undefined) continue;
+      const at = bucket.indexOf(o);
+      if (at >= 0) bucket.splice(at, 1);
+      // Empty buckets are deleted rather than left, for `TrafficField.unindex`'s
+      // reason: a map that grows one entry per cell the player has ever walked
+      // through and never shrinks is the whole city by teatime.
+      if (bucket.length === 0) this.grid.delete(key);
+    }
+    this.live = this.grid.size > 0;
+  }
+
+  /** Every obstacle whose cell could reach `(x, z)`. Allocation-free. */
+  forEachNear(x: number, z: number, visit: (o: LaneObstacle) => void): void {
+    const c0 = Math.floor((x - OBSTACLE_QUERY) / OBSTACLE_CELL);
+    const c1 = Math.floor((x + OBSTACLE_QUERY) / OBSTACLE_CELL);
+    const r0 = Math.floor((z - OBSTACLE_QUERY) / OBSTACLE_CELL);
+    const r1 = Math.floor((z + OBSTACLE_QUERY) / OBSTACLE_CELL);
+    for (let cx = c0; cx <= c1; cx++) {
+      for (let cz = r0; cz <= r1; cz++) {
+        const bucket = this.grid.get(cellKey(cx, cz));
+        if (bucket === undefined) continue;
+        for (const o of bucket) visit(o);
+      }
+    }
+  }
+
+  /** How many cells are occupied, and how many records in all. Diagnostics. */
+  get cellCount(): number {
+    return this.grid.size;
+  }
+
+  get size(): number {
+    return this.bays + this.statics;
+  }
+
+  /** Empty it. The self-checks, and a room being torn down. */
+  clear(): void {
+    this.grid.clear();
+    this.byTile.clear();
+    this.bays = 0;
+    this.statics = 0;
+    this.live = false;
+  }
+
+  private push(tileKey: string, o: LaneObstacle): void {
+    const key = obstacleCell(o.x, o.z);
+    const bucket = this.grid.get(key);
+    if (bucket === undefined) this.grid.set(key, [o]);
+    else bucket.push(o);
+    const tile = this.byTile.get(tileKey);
+    if (tile === undefined) this.byTile.set(tileKey, [o]);
+    else tile.push(o);
+  }
+}
+
+/** Scratch for `adoptRoutes`, so adopting a tile allocates one bay pose in all. */
+const _obstacleBay: BayPose = createBayPose();
+
+/** The obstacle grid's cell key. `cellKey`'s packing at `OBSTACLE_CELL`. */
+function obstacleCell(x: number, z: number): number {
+  return cellKey(Math.floor(x / OBSTACLE_CELL), Math.floor(z / OBSTACLE_CELL));
+}
+
+/**
+ * Poses for the chain, one per level, allocated once for the life of the process.
+ *
+ * `resolveLaneShare` recurses into the car in front and needs a pose per level;
+ * a pose allocated per level per car per frame is 500 objects a frame at the
+ * draw radius. Indexed by depth, which is bounded by `CHAIN_DEPTH`, so the
+ * recursion cannot outrun the pool. Not reentrant, which is the same contract
+ * `_bayProbe` and `SLOT_RANGE` already have in this file.
+ */
+const _chainPose: CarPose[] = [];
+
+/**
+ * How much of the pass shift is applied at an along-distance of `ahead`.
+ *
+ * Smoothstep, so the sideways *velocity* is zero at both ends of the lean as
+ * well as the offset -- `buildParkPhases`' squared lateral blend makes the same
+ * argument in the same words, and for the same reason: the eye finds the kink,
+ * not the offset.
+ */
+function passRamp(ahead: number): number {
+  const d = ahead < 0 ? -ahead : ahead;
+  if (d <= PASS_FULL_M) return 1;
+  if (d >= PASS_LOOK_M) return 0;
+  const s = (PASS_LOOK_M - d) / (PASS_LOOK_M - PASS_FULL_M);
+  return s * s * (3 - 2 * s);
+}
+
+/**
+ * Hold and steer this car round whatever is standing in its lane. Returns the
+ * lag applied, metres.
+ *
+ * **Mutates the pose in place** and writes `held` and `swerve`, which is the
+ * contract every other function in this file that touches a `CarPose` has.
+ *
+ * ---------------------------------------------------------------------------
+ * THE THREE THINGS IT LOOKS AT, AND WHAT EACH COSTS.
+ *
+ *   1. **Obstacles**, out of `LaneObstacles`: a bay whose occupant is standing
+ *      in it at this tick, or a static parked car. One grid walk over a 12 m
+ *      query, then one `bayOccupant` and one `poseCar` per bay candidate -- the
+ *      occupant is *posed* rather than assumed to be at the bay point, because a
+ *      car halfway out of a bay is where it is and not where it was.
+ *   2. **The car in front on the same route**, which needs no query at all: on
+ *      one route the car ahead is `slot - 1`, by the headway arithmetic. It is
+ *      posed and *itself resolved* against its obstacles, to `CHAIN_DEPTH`, so a
+ *      car stopped behind a car stopped behind a parked car ends up in the right
+ *      place with no memory of how it got there.
+ *   3. **Nothing else.** A car on a *different* route crossing this one is the
+ *      remaining 3.62 interpenetrations per instant measured in the ring, and it
+ *      is left alone deliberately: finding it means a spatial query over moving
+ *      cars, which is either an index of every route vertex in the extent (about
+ *      3 M entries, which a 1 GB box does not have) or a per-car scan of every
+ *      nearby route's live slots (measured at 30 `poseCar` calls per car, which
+ *      is 15,000 a frame at the draw radius and blows the 0.5 ms server budget
+ *      on its own). The honest home for it is `lanes.py`, which already holds
+ *      the node graph and could bake a conflict block into the sidecar. That is
+ *      a retile, and this change deliberately does not need one.
+ */
+export function resolveLaneShare(
+  route: LaneRoute,
+  slot: number,
+  now: number,
+  pose: CarPose,
+  obstacles: LaneObstacles,
+  depth: number,
+): number {
+  // A parked car does not go round anything: it is stationary, it is where the
+  // arbitration put it, and there is nowhere else for it to be. Its own bay is
+  // in the index and it would otherwise queue behind itself.
+  if (pose.stage === CAR_STAGE_PARKED_IN || pose.stage === CAR_STAGE_PARKED_OUT) return 0;
+
+  const dx = pose.dx;
+  const dz = pose.dz;
+  // Left of a heading (dx, dz) is (dz, -dx): `carOverlaps`' axes, `lanes.py`'s
+  // axes, and the side of the road a car pulls over on in a country that drives
+  // on the left. Every `across` below is measured on it.
+  const lx = dz;
+  const lz = -dx;
+
+  // --- 1. The nearest thing standing in the lane, and what to do about it.
+  let bestAhead = Infinity;
+  let bestAcross = 0;
+  let bestHalfWidth = 0;
+  if (obstacles.live) {
+    const occupant = chainPose(depth);
+    const suppress = obstacles.suppress;
+    obstacles.forEachNear(pose.x, pose.z, (o) => {
+      // Its own bay, and its own body. Skipped before anything is posed: this is
+      // the car whose bay it is, on the tick it is pulling out of it.
+      let ox = o.x;
+      let oy = o.y;
+      let oz = o.z;
+      let halfWidth = o.halfWidth;
+      if (o.route !== null) {
+        const k = bayOccupant(o.route, o.which, now);
+        if (k === null) return;
+        if (o.route.rid === route.rid && k === slot) return;
+        if (!poseCar(o.route, k, now, occupant)) return;
+        // The occupant has to actually be *at* this end. `bayOccupant`'s window
+        // covers the ramp, and a car three seconds into its pull-out is a car in
+        // the lane rather than in the bay -- which is fine, because it is posed:
+        // what is excluded here is the driving stage, where the car is somewhere
+        // else entirely and this bay is empty.
+        if (occupant.stage === CAR_STAGE_DRIVING) return;
+        // And a car somebody has stolen is not standing in its bay. Asked here
+        // rather than at the draw, because the traffic behind it has to agree
+        // with the picture about whether there is anything there.
+        if (suppress !== null && suppress(occupant.identity)) return;
+        ox = occupant.x;
+        oy = occupant.y;
+        oz = occupant.z;
+        halfWidth = occupant.halfWidth;
+      } else if (suppress !== null && o.identity !== 0 && suppress(o.identity)) {
+        // A *static* car somebody has driven away, on the same rule: the parked
+        // fleet is takeable too (see `game/driving.ts`), and a car that is not
+        // there does not push the traffic sideways.
+        return;
+      }
+      const rx = ox - pose.x;
+      const rz = oz - pose.z;
+      const ahead = rx * dx + rz * dz;
+      if (ahead > PASS_LOOK_M || ahead < -PASS_LOOK_M) return;
+      const across = rx * lx + rz * lz;
+      if (across > HOLD_LANE_HALF || across < -HOLD_LANE_HALF) return;
+      // The vertical gate, `carOverlaps`' own: a car parked on the Cahill
+      // Expressway is not in the lane of Alfred Street eight metres below it.
+      const dy = oy - pose.y;
+      if (dy > TAKE_HEIGHT_GATE || dy < -TAKE_HEIGHT_GATE) return;
+      // The *nearest* rather than the first, for `resolveHeld`'s reason: two
+      // cars parked nose to tail are a thing this city is full of, and going
+      // round the far one would drive through the near one.
+      if (ahead >= bestAhead) return;
+      bestAhead = ahead;
+      bestAcross = across;
+      bestHalfWidth = halfWidth;
+    });
+  }
+
+  let lag = 0;
+  let swerve = 0;
+  if (bestAhead !== Infinity) {
+    // How much sideways room this car is short of, and which way to find it.
+    const want = pose.halfWidth + bestHalfWidth + PASS_CLEAR_M;
+    const have = bestAcross < 0 ? -bestAcross : bestAcross;
+    const need = want - have;
+    if (need > 0) {
+      // Away from the obstacle, which is toward the road centre when the thing
+      // in the way is parked at the kerb -- and toward the kerb when somebody has
+      // stopped on the crown of the road, which is equally correct and is why the
+      // sign is read off the obstacle rather than assumed.
+      const dir = bestAcross > 0 ? -1 : 1;
+      const shift = need > PASS_SHIFT_M ? PASS_SHIFT_M : need;
+      swerve = dir * shift * passRamp(bestAhead);
+    }
+  }
+
+  // --- 2. And the car in front, which on one route is arithmetic.
+  //
+  // Resolved recursively so that a queue stands where a queue stands: the car
+  // ahead is placed against *its* obstacles before this car is placed against
+  // it. Bounded by `CHAIN_DEPTH` and, much more to the point, bounded by
+  // distance -- the leader is only worth resolving if it is close enough to
+  // matter, which for every car in Sydney that is not in a queue it is not.
+  if (depth > 0) {
+    const leader = chainPose(depth);
+    if (poseCar(route, slot - 1, now, leader)) {
+      const rx0 = leader.x - pose.x;
+      const rz0 = leader.z - pose.z;
+      // A cheap plan-distance gate before the recursion, and it is measured on
+      // the leader's **schedule** position because that is what is free here.
+      //
+      // The resolved leader is never further away than its schedule position --
+      // a hold only ever moves a car backwards, which is toward this one -- so
+      // the gate has to allow for however far the chain in front could have moved
+      // it. Three gaps covers a leader that is itself held two cars deep, which
+      // is as deep as any queue measured in the shipped city; past that the
+      // fourth car closes on the third exactly as every car did before this rule
+      // existed, and `checkTraffic`'s census is what says whether that is
+      // happening (it is not: zero same-route overlaps over an hour).
+      const reach = 3 * HOLD_GAP;
+      if (rx0 * rx0 + rz0 * rz0 <= reach * reach) {
+        resolveLaneShare(route, slot - 1, now, leader, obstacles, depth - 1);
+        // **The leader is measured without its own pass offset**, and this is the
+        // line that makes the queue independent of the roster.
+        //
+        // A pass is lateral and a roster is not the same on both ends -- the
+        // server has none at all (`LaneObstacles.wanted`) and two browsers hold
+        // whatever tiles they have streamed. If the follower measured the leader
+        // where the leader had *leaned to*, a leader 1.2 m round a curve plus a
+        // 1.5 m lean would fall outside `HOLD_LANE_HALF` and the follower would
+        // release a hold the server was still applying: a longitudinal
+        // disagreement, which is the one kind that matters. Taking the lean back
+        // off -- along the leader's own left, which is where it was applied -- makes
+        // `held` a pure function of the lane bytes and the tick, and nothing else.
+        const leaderSwerve = leader.swerve;
+        const rx = leader.x - leader.dz * leaderSwerve - pose.x + dx * lag;
+        const rz = leader.z + leader.dx * leaderSwerve - pose.z + dz * lag;
+        const ahead = rx * dx + rz * dz;
+        const across = rx * lx + rz * lz;
+        if (
+          ahead <= HOLD_GAP && ahead >= -HOLD_INSIDE &&
+          across <= HOLD_LANE_HALF && across >= -HOLD_LANE_HALF
+        ) {
+          const extra = HOLD_GAP - ahead;
+          if (extra > 0) lag += extra;
+        }
+      }
+    }
+  }
+
+  // --- 3. Apply it.
+  //
+  // `HOLD_MAX_LAG` is the ceiling and this form satisfies it by construction
+  // rather than by clamping: every term above is bounded by `HOLD_GAP` and the
+  // chain adds at most `CHAIN_DEPTH` of them, which is 24 m against the 30 m
+  // `resolveHeld` gives up at. There is nothing to give up on here, because
+  // nothing accumulated.
+  if (lag > HOLD_MAX_LAG) lag = HOLD_MAX_LAG;
+  if (lag !== 0) {
+    pose.x -= dx * lag;
+    pose.z -= dz * lag;
+    // Stopped, and therefore harmless: `carHitStrength` reads this, and a car
+    // that has been stopped by the queue in front of it must not knock over the
+    // pedestrian who walks past it. Below a quarter of a metre the "queue" is a
+    // car easing up behind another, which really is still moving.
+    if (lag > 0.25) pose.speed = 0;
+    pose.held = lag;
+  }
+  if (swerve !== 0) {
+    pose.x += lx * swerve;
+    pose.z += lz * swerve;
+    pose.swerve = swerve;
+  }
+  return lag;
+}
+
+/** The chain's pose for one level, grown on demand and then reused forever. */
+function chainPose(depth: number): CarPose {
+  const at = CHAIN_DEPTH - depth;
+  let pose = _chainPose[at];
+  if (pose === undefined) {
+    pose = createCarPose();
+    _chainPose[at] = pose;
+  }
+  return pose;
+}
 
 // --- The kerb bays, as a query ----------------------------------------------------
 
@@ -4096,6 +4949,463 @@ export function verifyTraffic(
   //       frame except by driving out of it or by being parked when it goes.
   for (const f of verifyResidency(NORTH_LANE_OFFSET)) failures.push(f);
 
+  // --- NOTHING DRIVES THROUGH ANYTHING. v4, and the user's report: "there are
+  //     still cars parked that never move that other cars just pass thru ...
+  //     cars should never pass thru each other".
+  for (const f of verifyLaneShare(NORTH_LANE_OFFSET)) failures.push(f);
+
+  return failures;
+}
+
+/**
+ * The v4 obstacle rule, as five assertions. Split out for length, exactly as
+ * `verifyResidency` is, and called from one place.
+ *
+ * What these guard, and why none of them is visible in a screenshot: every one of
+ * them is a *relationship* between two cars over time. A car standing inside
+ * another car renders as a car. A queue standing in one parking space renders as
+ * a car. A follower that has quietly stopped respecting its leader looks exactly
+ * like traffic until the frame it drives through it, and that frame is one in
+ * sixty.
+ *
+ *   (a) a resident parked at a lane edge is passed rather than driven through,
+ *       and passed on the correct side;
+ *   (b) two cars on one route never overlap, over an hour of ticks, on a route
+ *       with a red light in the middle of it -- which is the case the pipeline's
+ *       headway proof does *not* cover and the case that was measured failing
+ *       7.34 times per instant in the shipped city;
+ *   (c) the pass is continuous: no car ever steps sideways, and the offset is
+ *       zero at both ends of the lean;
+ *   (d) the rule is a pure function of the tick -- the same field asked twice, and
+ *       two fields over the same bytes, give the same answer, which is the whole
+ *       of what lets the server and the browser agree without a byte on the wire;
+ *   (e) it costs nothing when there is nothing to avoid.
+ */
+export function verifyLaneShare(offset = 1.875): string[] {
+  const failures: string[] = [];
+
+  // A street whose ends `bays.py` could not claim, so both bays are the lane-edge
+  // fallback `synthesiseLaneBay` invents -- `KERBLESS_LANE_SHIFT` off the driving
+  // line, which is to say **in the lane**, which is to say exactly the car the
+  // user reported. A long headway so the resident is standing there for minutes.
+  const laneTile = syntheticTile(offset, 0, 0, UNIFORM_CROWD, 90, 0);
+  const laneRoute = laneTile.routes[0];
+  const field = new TrafficField();
+  // A browser, for the length of this check: see `LaneObstacles.wanted`.
+  field.obstacles.wanted = true;
+  field.adopt('lane-edge', laneTile);
+  if (!laneRoute.laneBay1) {
+    failures.push(
+      'The lane-edge fixture did not get a synthesised bay at its far end, so the obstacle sections ' +
+        'below are testing nothing. See `synthesiseLaneBay`.',
+    );
+    return failures;
+  }
+
+  const a = createCarPose();
+  const b = createCarPose();
+
+  // --- (a) A CAR STANDING IN THE LANE IS PASSED, NOT DRIVEN THROUGH.
+  //
+  // Both kinds of obstacle, against a **hand-posed** follower, and the reason it
+  // is hand-posed is worth stating because it is a property of the fixture rather
+  // than a convenience. A route's two bays sit at its two *ends*, and the ends are
+  // exactly where its own pull-out and pull-in ramps are; a second route laid on
+  // the same 200 m of asphalt therefore reaches its driving stage forty metres
+  // past the bay it was supposed to pass. In the city that never happens -- the
+  // car standing in your lane is at somebody else's route end, or is one of the
+  // 23,020 in `.cars.bin` -- so the honest fixture is a car placed on the lane
+  // centre at a known distance behind the obstacle, driving at it. Everything
+  // downstream of the placement is the shipped code: the obstacle index, the
+  // occupancy test, the clearance arithmetic and the ramp.
+  {
+    const cases: Array<{ label: string; obstacle: CarPose | null }> = [];
+
+    // (i) A schedule car resident in its lane-edge bay -- `synthesiseLaneBay`'s
+    // 0.6 m off the driving line, which is a car stopped in the mouth of a side
+    // street and is the 2.2 % of route ends `bays.py` came back empty on.
+    {
+      let resident: CarPose | null = null;
+      for (let tick = 0; tick < 200 * 60 && resident === null; tick += 30) {
+        const now = trafficSeconds(tick);
+        const k = bayOccupant(laneRoute, 1, now);
+        if (k === null) continue;
+        if (!poseCar(laneRoute, k, now, a)) continue;
+        if (a.stage !== CAR_STAGE_PARKED_OUT) continue;
+        resident = a;
+      }
+      cases.push({ label: 'a schedule car resident in a lane-edge bay', obstacle: resident });
+    }
+
+    for (const { label, obstacle } of cases) {
+      if (obstacle === null) {
+        failures.push(`(a) never found ${label} to test against.`);
+        continue;
+      }
+      // The lane point the obstacle is offset from, and therefore the line the
+      // follower is driving down. Taken by *removing* the bay's own offset vector
+      // rather than by re-deriving the polyline, so the follower is exactly on the
+      // line `poseCar` would put a driving car on.
+      const laneX = obstacle.x - laneRoute.kerbOffX1;
+      const laneZ = obstacle.z - laneRoute.kerbOffZ1;
+      let worstOverlap = 0;
+      let sawSwerve = false;
+      let wrongSide = 0;
+      let steps = 0;
+      // Backwards along the heading from ten metres in front to eight behind, in
+      // ten-centimetre steps: the whole of the approach, the pass and the return.
+      for (let d = 10; d >= -8; d -= 0.1) {
+        const follower = b;
+        // A sedan at a residential speed, on the lane centre, pointed the way the
+        // obstacle is pointed -- which is the way the road goes.
+        follower.x = laneX - obstacle.dx * d;
+        follower.z = laneZ - obstacle.dz * d;
+        follower.y = obstacle.y;
+        follower.dx = obstacle.dx;
+        follower.dz = obstacle.dz;
+        follower.stage = CAR_STAGE_DRIVING;
+        follower.speed = 11.1;
+        follower.held = 0;
+        follower.swerve = 0;
+        follower.halfLength = CAR_BODY_SIZE[0].length * 0.5 + HIT_MARGIN;
+        follower.halfWidth = CAR_BODY_SIZE[0].width * 0.5 + HIT_MARGIN;
+        follower.identity = 0x0f0f0f0f;
+        // Depth 0: the obstacle rule alone. The chain has its own section and a
+        // leader posed off `laneRoute` would be a second obstacle in the same
+        // sweep, which would make a failure here ambiguous.
+        resolveLaneShare(laneRoute, 12345, trafficSeconds(0), follower, field.obstacles, 0);
+        steps++;
+        const rx = obstacle.x - follower.x;
+        const rz = obstacle.z - follower.z;
+        const ahead = rx * follower.dx + rz * follower.dz;
+        const across = rx * follower.dz - rz * follower.dx;
+        const along = obstacle.halfLength + follower.halfLength - (ahead < 0 ? -ahead : ahead);
+        const side = obstacle.halfWidth + follower.halfWidth - (across < 0 ? -across : across);
+        if (along > 0 && side > 0 && side > worstOverlap) worstOverlap = side;
+        if (ahead < 3 && ahead > -3) {
+          if (follower.swerve !== 0) sawSwerve = true;
+          // The pass has to be *away* from the thing being passed. Getting this
+          // sign wrong steers into the parked car, which is the one failure here
+          // that would look deliberate.
+          if (follower.swerve !== 0 && (follower.swerve > 0) === (across > 0)) wrongSide++;
+        }
+      }
+      if (steps === 0) failures.push(`(a) swept nothing against ${label}.`);
+      if (!sawSwerve) {
+        failures.push(
+          `A car drew level with ${label} and did not pull round it at all. That is the report this ` +
+            'rule exists to answer: it drove straight through.',
+        );
+      }
+      if (wrongSide > 0) {
+        failures.push(
+          `A car passing ${label} steered ${wrongSide} times *into* it rather than away from it. ` +
+            'See `resolveLaneShare`: the sign comes off the obstacle.',
+        );
+      }
+      // A lane-edge bay is `KERBLESS_LANE_SHIFT` (0.6 m) off the line and two cars
+      // want about 1.9 m of separation, so the shift needed is 1.3 m -- inside
+      // `PASS_SHIFT_M`, which means this case has to come out *clean* rather than
+      // merely better than it was. `PASS_RESIDUAL_M` is the bound for the ones
+      // that cannot.
+      if (worstOverlap > 0.01) {
+        failures.push(
+          `A car passing ${label} still had ${worstOverlap.toFixed(2)} m of body inside it. ` +
+            `${PASS_SHIFT_M} m of shift clears a body ${KERBLESS_LANE_SHIFT} m off the line with room ` +
+            'to spare, so this is the pass not being applied rather than not being enough.',
+        );
+      }
+    }
+  }
+
+  // --- (b) TWO CARS ON ONE ROUTE NEVER OVERLAP, OVER AN HOUR.
+  //
+  // The claim the pipeline cannot make. `lanes._headway` keeps two *departures*
+  // apart and the header used to argue from that to two *cars* being apart, which
+  // is false the moment one of them stops: the fixture's middle vertex is doubled
+  // for a five-second red, and a car held there is a car the one behind it closes
+  // fifty-five metres on. Measured in the shipped city before this rule: 7.34
+  // interpenetrating same-route pairs per instant inside a 1.5 km ring.
+  //
+  // A busy street, so the headway is short enough for the queue to actually form.
+  {
+    // Four seconds, against a five-second red at the middle vertex. `lanes.py`
+    // refuses to bake that -- `_headway` keeps a headway longer than the longest
+    // dwell on the route -- and `scaleHeadway` will not squeeze into it either;
+    // it is written straight into the fixture's bytes because the *arithmetic*
+    // has to hold for it anyway, and because a real route with two reds ten
+    // seconds apart reaches the same state by a route this fixture cannot take.
+    const busyTile = syntheticTile(offset, 0, 0, UNIFORM_CROWD, 4, 3);
+    const busy = busyTile.routes[0];
+    const busyField = new TrafficField();
+    busyField.obstacles.wanted = true;
+    busyField.adopt('busy', busyTile);
+    let worst = 0;
+    let worstTick = -1;
+    let pairs = 0;
+    let queued = 0;
+    // An hour of ticks at 6 Hz. At 60 Hz this is 216,000 poses per pair and the
+    // check runs at every boot; a tenth of that is still ten samples per second
+    // of a queue that forms over five, and nothing in the arithmetic is
+    // frame-rate dependent -- it is a closed form of the tick.
+    for (let tick = 0; tick < 3600 * 60; tick += 10) {
+      const now = trafficSeconds(tick);
+      for (let slot = -2; slot <= 4; slot++) {
+        if (!poseCar(busy, slot, now, a)) continue;
+        resolveLaneShare(busy, slot, now, a, busyField.obstacles, CHAIN_DEPTH);
+        if (a.held > 0) queued++;
+        if (!poseCar(busy, slot + 1, now, b)) continue;
+        resolveLaneShare(busy, slot + 1, now, b, busyField.obstacles, CHAIN_DEPTH);
+        pairs++;
+        const rx = a.x - b.x;
+        const rz = a.z - b.z;
+        const ahead = rx * b.dx + rz * b.dz;
+        const across = rx * b.dz - rz * b.dx;
+        const along = a.halfLength + b.halfLength - (ahead < 0 ? -ahead : ahead);
+        const side = a.halfWidth + b.halfWidth - (across < 0 ? -across : across);
+        const overlap = along < side ? along : side;
+        if (along > 0 && side > 0 && overlap > worst) {
+          worst = overlap;
+          worstTick = tick;
+        }
+      }
+    }
+    if (pairs === 0) failures.push('The busy fixture produced no pair of cars at all, so (b) tested nothing.');
+    if (queued === 0) {
+      failures.push(
+        'No car on the busy fixture was ever held behind the car in front of it. The red light in the ' +
+          'middle of that route means one of them stops for five seconds, so a queue must form.',
+      );
+    }
+    if (worst > 0.01) {
+      failures.push(
+        `Two cars on one route are ${worst.toFixed(2)} m inside each other at tick ${worstTick}. ` +
+          'The follower must never overlap its leader -- see `resolveLaneShare`\'s chain.',
+      );
+    }
+  }
+
+  // --- (c) THE PASS IS CONTINUOUS.
+  //
+  // A car that stepped sideways would read as a glitch rather than as a
+  // manoeuvre, and the offset is a smoothstep of the along-distance precisely so
+  // that it cannot. Asserted as a *rate*: the largest change in the lateral
+  // offset between two consecutive ticks, against what a car at this street's
+  // 11.1 m/s could plausibly move sideways in a sixtieth of a second.
+  {
+    let worstStep = 0;
+    let last = NaN;
+    let lastTick = -2;
+    const arrive = laneRoute.duration;
+    for (let tick = Math.floor((arrive - 12) * 60); tick <= Math.floor((arrive + 20) * 60); tick++) {
+      const now = trafficSeconds(tick);
+      if (!poseCar(laneRoute, 1, now, b)) { last = NaN; continue; }
+      resolveLaneShare(laneRoute, 1, now, b, field.obstacles, CHAIN_DEPTH);
+      if (!Number.isNaN(last) && tick === lastTick + 1) {
+        const step = Math.abs(b.swerve - last);
+        if (step > worstStep) worstStep = step;
+      }
+      last = b.swerve;
+      lastTick = tick;
+    }
+    // 11.1 m/s along the ramp, which is 0.185 m of along-distance per tick; the
+    // steepest a smoothstep gets is 1.5, so the offset can move at most
+    // `1.5 * PASS_SHIFT_M * 0.185 / PASS_BEHIND_M` = 7 cm in a tick on the way
+    // out and rather less on the way in. A tenth of a metre is that with room.
+    if (worstStep > 0.1) {
+      failures.push(
+        `A passing car moved ${worstStep.toFixed(3)} m sideways in one tick. The lean is a smoothstep ` +
+          'of the along-distance for exactly this reason -- see `passRamp`.',
+      );
+    }
+  }
+
+  // --- (d) IT IS A PURE FUNCTION OF THE TICK.
+  //
+  // The property the whole zero-bandwidth design rests on, and the reason this
+  // rule is stateless where `HoldLedger` is not: the server resolves a handful of
+  // cars near a player once a tick and the browser resolves five hundred every
+  // frame, so an answer that depended on *how often it had been asked* would put
+  // the two copies of a car metres apart -- and the server's copy is the one that
+  // knocks people over.
+  //
+  // Two ways round, both bit-for-bit: the same field asked twice at the same
+  // tick, and a second field over the same bytes.
+  {
+    const twin = new TrafficField();
+    twin.obstacles.wanted = true;
+    twin.adopt('lane-edge', syntheticTile(offset, 0, 0, UNIFORM_CROWD, 90, 0));
+    const twinRoute = twin.routes()[0];
+    let repeats = 0;
+    let differing = 0;
+    let twinDiffering = 0;
+    const arrive = laneRoute.duration;
+    for (let tick = Math.floor((arrive - 15) * 60); tick <= Math.floor((arrive + 15) * 60); tick += 3) {
+      const now = trafficSeconds(tick);
+      if (!poseCar(laneRoute, 1, now, a)) continue;
+      resolveLaneShare(laneRoute, 1, now, a, field.obstacles, CHAIN_DEPTH);
+      // Again, into a fresh pose, from the same field.
+      if (!poseCar(laneRoute, 1, now, b)) continue;
+      resolveLaneShare(laneRoute, 1, now, b, field.obstacles, CHAIN_DEPTH);
+      repeats++;
+      if (a.x !== b.x || a.z !== b.z || a.held !== b.held || a.swerve !== b.swerve) differing++;
+      // And out of the other field's own decode of the same bytes.
+      if (!poseCar(twinRoute, 1, now, b)) continue;
+      resolveLaneShare(twinRoute, 1, now, b, twin.obstacles, CHAIN_DEPTH);
+      if (a.x !== b.x || a.z !== b.z || a.held !== b.held || a.swerve !== b.swerve) twinDiffering++;
+    }
+    if (repeats === 0) failures.push('(d) compared nothing.');
+    if (differing > 0) {
+      failures.push(
+        `Asking for the same car at the same tick twice gave ${differing} different answers. The ` +
+          'obstacle rule has state in it that it must not have.',
+      );
+    }
+    if (twinDiffering > 0) {
+      failures.push(
+        `Two fields over the same bytes disagree about ${twinDiffering} poses. The client and the ` +
+          'server would draw the traffic in different places.',
+      );
+    }
+
+    // --- And the queue is independent of the roster, which is the invariant the
+    // asymmetry rests on.
+    //
+    // The server registers **no obstacles at all** and a browser registers
+    // whatever it has streamed, so the two rosters are never the same set. What
+    // has to survive that is the *longitudinal* answer: how far along its route a
+    // car is, which is what the knockdown is a function of. Every effect an
+    // obstacle has is lateral by construction, and the chain measures its leader
+    // with the lean taken back off, so `held` must come out identical on a field
+    // whose roster is empty. If this ever fails, the server and the browser
+    // disagree about whether a car has reached you.
+    const busyTile = syntheticTile(offset, 0, 0, UNIFORM_CROWD, 4, 3);
+    const withRoster = new TrafficField();
+    withRoster.obstacles.wanted = true;
+    withRoster.adopt('busy', busyTile);
+    const bareField = new TrafficField();
+    bareField.adopt('busy', syntheticTile(offset, 0, 0, UNIFORM_CROWD, 4, 3));
+    const busyA = withRoster.routes()[0];
+    const busyB = bareField.routes()[0];
+    let heldCompared = 0;
+    let heldDiffering = 0;
+    let heldSeen = 0;
+    for (let tick = 0; tick < 600 * 60; tick += 11) {
+      const now = trafficSeconds(tick);
+      for (let slot = -1; slot <= 3; slot++) {
+        if (!poseCar(busyA, slot, now, a)) continue;
+        resolveLaneShare(busyA, slot, now, a, withRoster.obstacles, CHAIN_DEPTH);
+        if (!poseCar(busyB, slot, now, b)) continue;
+        resolveLaneShare(busyB, slot, now, b, bareField.obstacles, CHAIN_DEPTH);
+        heldCompared++;
+        if (a.held !== 0) heldSeen++;
+        if (a.held !== b.held) heldDiffering++;
+      }
+    }
+    if (heldCompared === 0 || heldSeen === 0) {
+      failures.push('The roster-independence comparison never found a held car, so it tested nothing.');
+    }
+    if (heldDiffering > 0) {
+      failures.push(
+        `A field with an obstacle roster and a field without one disagree about how far ` +
+          `${heldDiffering} cars are held. The hold must be a pure function of the lane bytes and ` +
+          'the tick, because the server has no roster at all -- see `LaneObstacles.wanted`.',
+      );
+    }
+  }
+
+  // --- (e) AND IT COSTS NOTHING WHERE THERE IS NOTHING TO AVOID.
+  //
+  // A field with no obstacles registered at all must leave every pose exactly
+  // where `poseCar` put it, because that is what makes the 99 % of Sydney nobody
+  // is queueing in free -- and because a rule that nudged cars for no reason
+  // would have shifted the entire fleet off its own lane centres.
+  {
+    const bare = new TrafficField();
+    const bareTile = syntheticTile(offset, 0, 0, UNIFORM_CROWD, 90, 3);
+    const bareRoute = bareTile.routes[0];
+    // Adopted so the routes are indexed, then the obstacle roster is emptied --
+    // which is the state a client is in before `carlod` has handed anything over.
+    bare.obstacles.wanted = true;
+    bare.adopt('bare', bareTile);
+    bare.obstacles.clear();
+    let moved = 0;
+    for (let tick = 0; tick < 60 * 60; tick += 7) {
+      const now = trafficSeconds(tick);
+      if (!poseCar(bareRoute, 0, now, a)) continue;
+      poseCar(bareRoute, 0, now, b);
+      resolveLaneShare(bareRoute, 0, now, b, bare.obstacles, CHAIN_DEPTH);
+      if (a.x !== b.x || a.z !== b.z || b.swerve !== 0) moved++;
+    }
+    if (moved > 0) {
+      failures.push(
+        `${moved} cars were moved by the obstacle rule on a street with no obstacles on it. ` +
+          'An empty roster must be exactly the identity.',
+      );
+    }
+    if (bare.obstacles.live) {
+      failures.push('An emptied obstacle roster still says it is live, so every pose pays for the walk.');
+    }
+  }
+
+  // --- (f) THE VIRTUAL ARRIVAL IS REAL: NOTHING'S FIRST DEPARTURE IS A SPAWN.
+  //
+  // The residency round's promise, restated as the thing that can actually be
+  // asserted. There is no "first" departure: slot `k` runs over **every integer**,
+  // negative ones included, so a bay's occupant at any tick is one of an
+  // arithmetic progression with no beginning -- which is what the brief's arrival
+  // "at t = -infinity" means in this file's terms. What has to be true for it not
+  // to be a spawn is that the tick before *every* departure has that car standing
+  // in its bay, at both ends of the route and for a slot chosen far from zero.
+  {
+    for (const [label, tileFor] of [
+      ['kerb bays', () => syntheticTile(offset, 0, 0, UNIFORM_CROWD, 90, 3)],
+      ['lane-edge bays', () => syntheticTile(offset, 0, 0, UNIFORM_CROWD, 90, 0)],
+    ] as const) {
+      const t = tileFor();
+      const r = t.routes[0];
+      for (const slot of [-1000, -7, 0, 1, 9999]) {
+        const departure = r.phase + slot * r.headway;
+        // One tick before it moves. `dwellCap0` is the whole bay window and the
+        // fixture's headway makes it tens of seconds, so this is squarely inside
+        // the parked stage rather than on its edge.
+        const tick = Math.floor(departure * 60) - 1;
+        if (!poseCar(r, slot, trafficSeconds(tick), a)) {
+          failures.push(
+            `On the ${label} fixture, slot ${slot} does not exist on the tick before it departs. ` +
+              'That is a car appearing at a standing start in the middle of the road.',
+          );
+          continue;
+        }
+        if (a.stage !== CAR_STAGE_PARKED_IN) {
+          failures.push(
+            `On the ${label} fixture, slot ${slot} is in stage ${a.stage} on the tick before it ` +
+              'departs, where it should be parked in its bay.',
+          );
+        }
+        if (a.speed !== 0) {
+          failures.push(
+            `On the ${label} fixture, slot ${slot} is doing ${a.speed} m/s on the tick before it ` +
+              'departs. A car about to pull out is stationary.',
+          );
+        }
+      }
+      // And the far end, the other way round: the tick after a car arrives it is
+      // still there, which is the same guarantee read from the other side.
+      const arrival = r.phase + r.duration;
+      if (poseCar(r, 0, trafficSeconds(Math.floor(arrival * 60) + 1), a)) {
+        if (a.stage !== CAR_STAGE_PARKED_OUT) {
+          failures.push(
+            `On the ${label} fixture, a car is in stage ${a.stage} the tick after it arrives, ` +
+              'where it should be standing in the far bay.',
+          );
+        }
+      } else {
+        failures.push(`On the ${label} fixture, a car stops existing the tick after it arrives.`);
+      }
+    }
+  }
+
   return failures;
 }
 
@@ -4649,6 +5959,20 @@ function syntheticTile(
    * car into a lane at road speed.
    */
   bayFlags = 3,
+  /**
+   * The route's phase and its `rid`, both defaulted to what every check written
+   * before v4 read.
+   *
+   * The obstacle sections need a **second route on the same street**: a car
+   * parked in one route's bay is an obstacle to the traffic of every route whose
+   * lane it is standing in, and that cross-route case is the one the owner
+   * actually reported (a static or resident car nobody's own timetable knows
+   * about). Two adopts of these bytes at one origin with different phases is that
+   * street, and the `rid` has to differ too or the two routes are one car twice
+   * over -- `identityOf` is a hash of exactly that pair.
+   */
+  phase = 0,
+  rid = 0x5eed,
 ): TileLanes {
   // Five vertices, the middle one doubled for a red light. World axes: north is
   // -Z, so the lane runs from z = 0 to z = -200, and the left of that is -X.
@@ -4686,12 +6010,12 @@ function syntheticTile(
     v.setFloat32(o + 8, z, true);
     o += 12;
   }
-  v.setUint32(o, 0x5eed, true);
+  v.setUint32(o, rid, true);
   v.setUint8(o + 4, 10); // residential
   v.setUint8(o + 5, bayFlags); // which ends `bays.py` managed to claim
   v.setUint16(o + 6, pts.length, true);
   v.setFloat32(o + 8, headway, true);
-  v.setFloat32(o + 12, 0, true); // phase
+  v.setFloat32(o + 12, phase, true);
   o += 16;
   // The park block, standing in for `bays.py`.
   //

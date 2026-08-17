@@ -51,6 +51,8 @@ import { loadFarWater, verifyWater } from './world/water.ts';
 import { atlasTextureSize } from './world/params-atlas.ts';
 import { TileStreamer, type WorldIndex } from './world/streamer.ts';
 import { TrafficMovers, carBodySizes } from './world/cars.ts';
+// --- Workstream Q: nothing appears or disappears while you are looking at it.
+import { ViewLatch, verifyViewLatch } from './game/viewlatch.ts';
 import { SWEEP_HZ, loadCarModels } from './world/carlod.ts';
 import {
   CAR_BODY_SIZE,
@@ -769,6 +771,11 @@ async function main(): Promise<void> {
   // `carBodySizes()` is handed in rather than imported by that module, because
   // it compiles into the Bun server and must not pull three in behind it.
   const trafficFailures = timed('traffic', () => verifyTraffic(carBodySizes()));
+  // --- Workstream Q. The (dis)appearance latch is a four-state machine over a
+  // bounded table, and every one of its failures is invisible in a screenshot: a
+  // car hidden forever, a ghost that never retires, a car that flickers as you
+  // turn your head. See `game/viewlatch.ts`.
+  const viewLatchFailures = timed('view latch', verifyViewLatch);
   const wadingFailures = timed('wading', verifyWading);
   const waterFailures = timed('water', verifyWater);
   // The release CDN's half of a two-repo contract. If this file and
@@ -1116,6 +1123,7 @@ async function main(): Promise<void> {
     locatorFailures.length ||
     carryFailures.length ||
     trafficFailures.length ||
+    viewLatchFailures.length ||
     wadingFailures.length ||
     waterFailures.length ||
     cdnFailures.length ||
@@ -1181,6 +1189,7 @@ async function main(): Promise<void> {
           ...locatorFailures,
           ...carryFailures,
           ...trafficFailures,
+          ...viewLatchFailures,
           ...wadingFailures,
           ...waterFailures,
           ...cdnFailures,
@@ -2640,9 +2649,22 @@ async function main(): Promise<void> {
   // instanced set in this project that is: a car crosses a tile boundary every
   // few seconds. See `TrafficMovers` for the float32 argument that allows it.
   const traffic = new TrafficField();
+  // --- Workstream Q. This process wants the obstacle roster: it is what stops the
+  // moving fleet driving through the parked one, and it is the *client's* to build
+  // -- the server deliberately does not, because every effect it has is a sideways
+  // offset of at most 1.5 m and the roster is 35 MB on a 1 GB box. See
+  // `traffic.LaneObstacles.wanted`. Set before the streamer adopts anything, or
+  // the tiles that arrived first would have no bays in it.
+  traffic.obstacles.wanted = true;
   streamer.setTrafficField(traffic);
   const trafficMovers = new TrafficMovers(streamer.cars);
   for (const mesh of trafficMovers.meshes) scene.add(mesh);
+  // --- Workstream Q: the (dis)appearance latch, and the obstacle roster.
+  //
+  // The latch is per client by construction -- "in view" is not a fact the server
+  // has -- and it is handed to the one loop that already poses every car in view.
+  // See `game/viewlatch.ts`.
+  trafficMovers.latch = new ViewLatch();
   // Where the headlights go. The traffic already computes a pose for every car
   // in view every frame and the night rig has to draw its lights at exactly
   // those poses, so the sink is fed from inside that one loop rather than from a
@@ -2673,6 +2695,11 @@ async function main(): Promise<void> {
   if (carModels) {
     for (const mesh of carModels.meshes) scene.add(mesh);
     trafficMovers.models = carModels;
+    // --- Workstream Q. The parked fleet, as obstacles the moving fleet steers
+    // round: `carlod` is the one place in the client that brackets a tile's
+    // parked cars exactly, and the static half of the obstacle roster is the
+    // client's alone. See `traffic.LaneObstacles.adoptStatics`.
+    carModels.obstacles = traffic.obstacles;
     streamer.setParkedCarSink(carModels);
     console.debug(
       `[carlod] ${carModels.loadedFiles.length} car models over pools ` +
@@ -4192,6 +4219,9 @@ async function main(): Promise<void> {
   // fleet's own `lights`/`models` because `drivenCars` is declared here, and it
   // is declared here because it needs `player` and `net`.
   trafficMovers.suppress = drivenCars.suppress;
+  // --- Workstream Q: a car somebody has taken is not standing in the road, so
+  // the traffic must not steer round where it used to be either.
+  traffic.obstacles.suppress = drivenCars.suppress;
   trafficMovers.driven = drivenCars.source;
   if (carModels) {
     carModels.suppress = drivenCars.suppress;
@@ -8823,6 +8853,15 @@ async function main(): Promise<void> {
       trafficTick(Date.now()) + accumulator / FIXED_DT,
       player.position.x,
       player.position.z,
+      // --- Workstream Q: where the camera is and which way it points, which is
+      // what the latch needs and what the draw radius above deliberately is not.
+      // The forward is read out of the camera's own world matrix rather than
+      // rebuilt from the yaw, so a cutscene, a vehicle camera or a shoulder cam
+      // all answer correctly without this line knowing they exist.
+      camera.position.x,
+      camera.position.z,
+      -camera.matrixWorld.elements[8],
+      -camera.matrixWorld.elements[10],
     );
     // **After** the movers, and it is not optional: `claimed()` writes a claimed
     // car's matrix into the instance buffer from inside that loop, and `end()`
@@ -10913,6 +10952,17 @@ async function main(): Promise<void> {
         // what `game/traffic.ts`'s park stages bought.
         parked: trafficMovers.parked,
         costMs: Math.round(trafficMovers.costMs * 1000) / 1000,
+        // --- Workstream Q. The three numbers that say the obstacle rule and the
+        // (dis)appearance latch are doing anything, without anybody having to look
+        // at the street: how many cars are being held out of the picture because
+        // they came into existence in front of you, how many are being drawn after
+        // their schedule ended because they stopped existing in front of you, and
+        // how big the roster of things they steer round is. A zero in `obstacles`
+        // is the whole feature switched off (a client whose car models never
+        // loaded -- see `carlod.CarModelFleet.obstacles`).
+        latched: trafficMovers.latched,
+        ghosted: trafficMovers.ghosted,
+        obstacles: { bays: traffic.obstacles.bays, statics: traffic.obstacles.statics },
         laneTiles: traffic.tileCount,
         routesResident: traffic.routes().length,
         liveNearby: found.length,

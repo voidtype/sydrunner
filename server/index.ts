@@ -74,6 +74,10 @@ import { verifySwat } from '../client/src/game/swat.ts';
 import { verifyPowerups } from '../client/src/game/powerups.ts';
 import { verifyDamageGrade, verifyDriving } from '../client/src/game/driving.ts';
 import { verifyTraffic } from '../client/src/game/traffic.ts';
+// --- Workstream Q. A client presentation rule, checked here anyway: see the
+// header of `game/viewlatch.ts` for why a rule about what the *browser* draws is
+// tested in Bun, and `PREAMBLE`'s rule that a `verify*` runs in both boot lists.
+import { verifyViewLatch } from '../client/src/game/viewlatch.ts';
 // --- Workstream I. Three three-free modules, all run here as well as in the
 // browser, and each for the reason given at its own entry in the table below.
 import { verifyHandsPose } from '../client/src/game/hands-pose.ts';
@@ -343,6 +347,12 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // argument is omitted because `world/cars.ts` imports three and can never
     // be loaded in this process -- see `verifyTraffic`'s own signature.
     ['verifyTraffic', verifyTraffic()],
+    // The (dis)appearance latch. Nothing in this process draws a car, and the
+    // reason it is here is that nothing in this process draws a car: the latch is
+    // a four-state machine over a bounded table, its failures are a car hidden
+    // forever or a ghost that never retires, and a state machine is exactly the
+    // thing a headless check can prove.
+    ['verifyViewLatch', verifyViewLatch()],
     // The suggestions box's week arithmetic, sanitiser, order and codecs.
     // Run **here** rather than only in the browser because the server is the
     // side that keeps the ledger, and every failure in that file is silent in
