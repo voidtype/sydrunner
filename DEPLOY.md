@@ -591,6 +591,18 @@ block from it. So:
 round (382 tiles, 36 hexagons): tile→hex mapping, before/after audits, the
 terrain diff, and the wrangler uploader. Reuse them.
 
+**Partial retile helpers.** The 2026-08-17 station round's scratch scripts are
+now in `scripts/world-round/`, so the next partial retile does not rediscover
+them. `restore-region-mtimes.py` takes `--before`/`--world` and, with
+`--snapshot`, hashes **every** region bundle (not only the hexagons the last
+round touched) before putting the unchanged ones' mtimes back so a
+size-and-mtime uploader sends only the ones that changed; `map-tiles-to-hexes.py`
+takes `--tiles`/`--hexes` and reports which hexagons the retiled tiles land in;
+and `upload-one.sh` is the wrangler `--remote` per-object uploader, which
+`publish-world-r2.sh` supersedes when the S3 token works. All three default to
+the station round's paths, so they run unchanged and take explicit args for the
+next round.
+
 ### C. Who does what
 
 Planning and gating happen in the lead session. Mechanical, well-specified
