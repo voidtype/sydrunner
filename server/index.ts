@@ -73,6 +73,7 @@ import { verifyFooty } from '../client/src/game/footy.ts';
 import { verifySwat } from '../client/src/game/swat.ts';
 import { verifyPowerups } from '../client/src/game/powerups.ts';
 import { verifyDamageGrade, verifyDriving } from '../client/src/game/driving.ts';
+import { verifyTraffic } from '../client/src/game/traffic.ts';
 import { verifySpatialHash } from '../client/src/game/spatialhash.ts';
 import { verifyMovementBasis } from '../client/src/player/controller.ts';
 import {
@@ -283,6 +284,20 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // four renderers that consume it must agree with the bands this process is
     // authoritative for. See `game/driving.damageGrade`.
     ['verifyDamageGrade', verifyDamageGrade()],
+    // The ambient fleet, in the process that decides whether one of them ran
+    // you over. Run here as well as in the browser -- `main.ts` has always run
+    // it and this side never did, which is a gap: `sim.ts` evaluates `poseCar`
+    // and `carHitting` at the same tick the browser does and the whole
+    // zero-bandwidth argument is that the two agree, so the check belongs in
+    // both runtimes or the claim is only half tested.
+    //
+    // Its v3 sections are the ones that would fail here first: a bay's occupant
+    // is a `Math.ceil` of a division and a car's residency in it is measured in
+    // minutes, and a JavaScriptCore that rounded either differently from V8
+    // would park a car where the browser drew empty gutter. The body-table
+    // argument is omitted because `world/cars.ts` imports three and can never
+    // be loaded in this process -- see `verifyTraffic`'s own signature.
+    ['verifyTraffic', verifyTraffic()],
     // The suggestions box's week arithmetic, sanitiser, order and codecs.
     // Run **here** rather than only in the browser because the server is the
     // side that keeps the ledger, and every failure in that file is silent in

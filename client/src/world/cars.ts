@@ -1000,6 +1000,18 @@ const liveried = policeLiveried;
  * bounded by the headway, so halving the headways citywide would roughly double
  * this population. `checkTraffic` measures the peak against this ceiling so that
  * change fails a check rather than silently dropping cars out of the world.
+ *
+ * Traffic v3 -- cars staying in their bays for the whole time the bay is free
+ * rather than for a hashed six-to-eighteen seconds -- moved that population and
+ * the number is measured rather than argued: over twenty simulated minutes of
+ * the densest 420 m in the CBD, the peak inside this radius went from 520 cars
+ * to 536, of which 151 are parked. That is 7 %, it is **bounded** rather than
+ * open-ended (a slot's life grew by the slack in two dwells and the live count
+ * per route tends to `duration / headway + 2` however long the headway gets --
+ * see `game/traffic.ts`'s `dwellCap` derivation), and the busiest body type at
+ * 30 % of the mix is therefore about 161 instances against this 384. The set
+ * that did **not** move is the lit one: parked cars have their lights off, so
+ * `nightlights.CAR_LIGHT_CAPACITY`'s population is unchanged at a measured 403.
  */
 const MOVER_CAPACITY = 384;
 
