@@ -2375,6 +2375,15 @@ export class CarLights implements CarLightSink {
     // this a schedule car in its dwell is a parked car with its headlights
     // blazing into the terrace in front of it, which is the one thing in this
     // file a player would actually stop and look at.
+    //
+    // **This line carries much more weight since traffic v3.** A car now holds
+    // its bay for the whole of the time the bay is free rather than for a hashed
+    // six-to-eighteen seconds, so a kerb bay has a car standing in it 80 % of
+    // the time against 54 % before, and the parked share of the fleet in frame
+    // went from 134 to 151 of the peak 536. All of that arrives here and leaves
+    // again on this one comparison, which is why the *lit* population is
+    // unchanged at a measured 403 and `CAR_LIGHT_CAPACITY` needed no revisiting.
+    // See `game/traffic.ts`'s residency section.
     if (pose.stage === CAR_STAGE_PARKED_IN || pose.stage === CAR_STAGE_PARKED_OUT) return;
 
     // The heading, on `world/cars.ts`'s half-angle form: the car's local +X is

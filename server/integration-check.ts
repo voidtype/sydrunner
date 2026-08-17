@@ -3289,29 +3289,49 @@ async function checkTraffic(): Promise<void> {
     // Reported rather than asserted at a figure, because the right number is a
     // property of the shipped world; the gate is the last line, which is what
     // fires if the arbitration ever starts starving.
+    //
+    // Four buckets since v3, not three: `traffic.synthesiseLaneBay` now catches
+    // the ends the arbitration missed and parks their cars at the left edge of
+    // the lane, so `!bay0` is no longer the "owns nothing" signal -- `laneBay0`
+    // is. Counting the synthesised ones as kerb bays would read as the
+    // arbitration having suddenly solved the last 2 %, which is the opposite of
+    // what happened: it still misses them and the client now covers for it.
     {
       let bayless = 0;
       let inLane = 0;
+      let synth = 0;
       for (const route of routes) {
-        if (!route.bay0) bayless++;
-        else if (route.kerbShift0 === 0) inLane++;
-        if (!route.bay1) bayless++;
-        else if (route.kerbShift1 === 0) inLane++;
+        for (const [has, isSynth, shift] of [
+          [route.bay0, route.laneBay0, route.kerbShift0],
+          [route.bay1, route.laneBay1, route.kerbShift1],
+        ] as const) {
+          if (!has) bayless++;
+          else if (isSynth) synth++;
+          else if (shift === 0) inLane++;
+        }
       }
       const ends = routes.length * 2;
-      const kerb = ends - bayless - inLane;
+      const kerb = ends - bayless - inLane - synth;
       say(
         `  kerbs: ${kerb.toLocaleString()} of ${ends.toLocaleString()} route ends own a kerb bay, ` +
           `${inLane.toLocaleString()} own the lane spot they drive through ` +
-          `(${((inLane / ends) * 100).toFixed(1)}%, \`bays.py\`'s last resort), and ` +
+          `(${((inLane / ends) * 100).toFixed(1)}%, \`bays.py\`'s last resort), ` +
+          `${synth.toLocaleString()} (${((synth / ends) * 100).toFixed(1)}%) got nothing from the ` +
+          'arbitration and park at the left edge of their own lane instead, and ' +
           `${bayless.toLocaleString()} (${((bayless / ends) * 100).toFixed(1)}%) own nothing and have ` +
           'no park stage at all',
       );
       check(
-        bayless < ends * 0.1,
-        `at least nine route ends in ten own a bay outright ` +
-          `(${(((ends - bayless) / ends) * 100).toFixed(1)}%) -- an end that owns nothing is a car ` +
-          'that winks in mid-lane at road speed, which is the artefact the park stages exist to remove',
+        bayless === 0,
+        `no route end is left with no park stage at all (${bayless}) -- an end that owns nothing is a ` +
+          'car that winks in mid-lane at road speed, which is the artefact the park stages exist to ' +
+          'remove, and `synthesiseLaneBay` is what closed the last of it',
+      );
+      check(
+        synth < ends * 0.1,
+        `at least nine route ends in ten own a bay the pipeline arbitrated ` +
+          `(${(((ends - synth) / ends) * 100).toFixed(1)}%) -- a lane-edge bay is a fallback, not a ` +
+          'claim, and this number going up is `bays.py` starving',
       );
     }
     // The datum puts sea level at y = -71.075. A lane whose height lookup missed
@@ -3860,12 +3880,24 @@ async function checkTraffic(): Promise<void> {
     {
       const bayBox = one.createCarPose();
       const bays: Box[] = [];
+      let laneEdge = 0;
       for (const route of routes) {
-        for (const [has, when, label] of [
-          [route.bay0, route.phase, 'near'],
-          [route.bay1, route.phase + route.duration - 1e-4, 'far'],
+        for (const [has, synth, when, label] of [
+          [route.bay0, route.laneBay0, route.phase, 'near'],
+          [route.bay1, route.laneBay1, route.phase + route.duration - 1e-4, 'far'],
         ] as const) {
           if (!has) continue;
+          // **Lane-edge bays are excluded from both invariants below**, and the
+          // exclusion is the honest one rather than a convenience. Sections 1
+          // and 2 assert what `bays.py` *arbitrated*; a bay
+          // `traffic.synthesiseLaneBay` invented is by definition a place the
+          // arbitration found nothing free, so testing it against the ledger
+          // asks whether the fallback is a claim, which it is not and never
+          // said it was. `KERBLESS_INSET_M` has the measurement of what it
+          // costs -- 5.7 % of these ends put a parked car inside a static one --
+          // and that number is reported here rather than asserted at zero,
+          // because driving it to zero is a `bays.py` change and a retile.
+          if (synth) { laneEdge++; continue; }
           if (!one.poseCar(route, 0, when, bayBox)) continue;
           bays.push({
             x: bayBox.x, z: bayBox.z, y: bayBox.y, dx: bayBox.dx, dz: bayBox.dz,
@@ -3903,6 +3935,11 @@ async function checkTraffic(): Promise<void> {
         `${bays.length.toLocaleString()} kerb bays are claimed across the extent and no two of their ` +
           `reserved ${(RESERVE_HL * 2).toFixed(1)} x ${(RESERVE_HW * 2).toFixed(1)} m rectangles ` +
           `overlap (${doubled} did` + (worstPair ? `, first ${worstPair}` : '') + ')',
+      );
+      say(
+        `  a further ${laneEdge.toLocaleString()} route ends got nothing from the arbitration and park ` +
+          'at the left edge of their own lane; they are excluded from the two invariants below because ' +
+          'they were never arbitrated -- see `traffic.KERBLESS_INSET_M`',
       );
       // The reservation has to be big enough to be worth reserving: it must
       // cover the largest car the client will ever draw in it, or the pipeline
@@ -4057,11 +4094,12 @@ async function checkTraffic(): Promise<void> {
       pool: readonly typeof routes[number][],
       now: number,
       pose: ReturnType<typeof one.createCarPose>,
-      out: { occupant: Box[]; ramp: Box[]; driving: Box[] },
+      out: { occupant: Box[]; ramp: Box[]; driving: Box[]; laneEdge: Box[] },
     ): void => {
       out.occupant.length = 0;
       out.ramp.length = 0;
       out.driving.length = 0;
+      out.laneEdge.length = 0;
       for (const route of pool) {
         const first =
           Math.floor((now - route.phase - route.duration - route.dwellCap) / route.headway) + 1;
@@ -4075,7 +4113,17 @@ async function checkTraffic(): Promise<void> {
             tag: `r${pose.route}s${pose.slot}/stage${pose.stage}`,
           };
           if (pose.stage === one.CAR_STAGE_PARKED_IN || pose.stage === one.CAR_STAGE_PARKED_OUT) {
-            out.occupant.push(box);
+            // **A lane-edge park is not a bay occupancy**, and the two are kept
+            // apart here rather than at the assertion so the reported counts
+            // stay honest as well. See `traffic.KERBLESS_INSET_M`: these are the
+            // ends `bays.py` could not fill at all, so the client stops the car
+            // at the left edge of its own lane inside `parking.CLEAR_OF_JUNCTION`
+            // -- ground the arbitration never cleared and, at 5.7 % of them,
+            // ground a static car is already standing on. Asserting the bay
+            // invariant over them would be asserting a claim nobody made.
+            if (pose.stage === one.CAR_STAGE_PARKED_IN ? route.laneBay0 : route.laneBay1) {
+              out.laneEdge.push(box);
+            } else out.occupant.push(box);
           } else if (pose.stage === one.CAR_STAGE_DRIVING) out.driving.push(box);
           else out.ramp.push(box);
         }
@@ -4083,7 +4131,9 @@ async function checkTraffic(): Promise<void> {
     };
 
     const scratchPose = one.createCarPose();
-    const buckets = { occupant: [] as Box[], ramp: [] as Box[], driving: [] as Box[] };
+    const buckets = { occupant: [] as Box[], ramp: [] as Box[], driving: [] as Box[], laneEdge: [] as Box[] };
+    let laneEdgeCars = 0;
+    let laneEdgeStatic = 0;
     let occupantStatic = 0;
     let occupantOccupant = 0;
     let rampPairs = 0;
@@ -4189,6 +4239,18 @@ async function checkTraffic(): Promise<void> {
           if (overlap(a, b)) rampPairs++;
         }
       }
+      // The lane-edge parks, reported on the same terms and for the reason
+      // `carsAt` gives: the number that matters is what fraction of them are
+      // standing inside a static car, and `traffic.KERBLESS_INSET_M`'s own
+      // measurement puts it at 5.7 % against 61 % for the six-metre inset the
+      // brief for that change originally asked for. Watching it here is how a
+      // future `bays.py` pass -- which is the real fix -- would show up.
+      laneEdgeCars += buckets.laneEdge.length;
+      for (const a of buckets.laneEdge) {
+        for (const b of staticGrid.get(cellOf(a.x, a.z)) ?? []) {
+          if (overlap(a, b)) { laneEdgeStatic++; break; }
+        }
+      }
     }
     const sweepMs = performance.now() - started;
     say(
@@ -4228,6 +4290,14 @@ async function checkTraffic(): Promise<void> {
         'must sweep through the space in front of it. That is what a parallel park is',
     );
     for (const w of movingWorst) say(`    at ${w}`);
+    say(
+      `  lane-edge parks (reported, not asserted): ${(laneEdgeCars / per).toFixed(0)} per sampled ` +
+        `instant at the ${((laneEdgeStatic / Math.max(laneEdgeCars, 1)) * 100).toFixed(1)}% of them ` +
+        'standing inside a static car. These are the ends `bays.py` gave nothing at all; before v3 ' +
+        'their cars winked in and out mid-lane at road speed instead. The inset is chosen to sit ' +
+        'inside `parking.CLEAR_OF_JUNCTION`, which is what keeps this number near 5% rather than ' +
+        'near 60% -- see `traffic.KERBLESS_INSET_M`',
+    );
 
     // --- 4. The negative control: does the sweep above actually see anything?
     //
@@ -4256,7 +4326,11 @@ async function checkTraffic(): Promise<void> {
         );
         if (copy === null) continue;
         for (const route of copy.routes) {
-          if (!route.bay0 || route.dwellCap0 <= 0) continue;
+          // A lane-edge bay is skipped, because `carsAt` sorts its occupants
+          // into `laneEdge` rather than `occupant` and this control measures the
+          // `occupant` bucket. Dragging one of those would show the instrument
+          // *not* firing and prove the opposite of what this section exists for.
+          if (!route.bay0 || route.laneBay0 || route.dwellCap0 <= 0) continue;
           const probe = one.createCarPose();
           if (!one.poseCar(route, 0, route.phase - 0.25, probe)) continue;
           if (probe.stage !== one.CAR_STAGE_PARKED_IN) continue;
@@ -4273,7 +4347,7 @@ async function checkTraffic(): Promise<void> {
           // route. Same function, same buckets, same overlap test -- which is
           // the whole point of a negative control: what is being shown to fire
           // has to be the instrument, not a re-implementation of it.
-          const scratch = { occupant: [] as Box[], ramp: [] as Box[], driving: [] as Box[] };
+          const scratch = { occupant: [] as Box[], ramp: [] as Box[], driving: [] as Box[], laneEdge: [] as Box[] };
           const sweepOne = (): number => {
             carsAt([route], route.phase - 0.25, one.createCarPose(), scratch);
             let hits = 0;
