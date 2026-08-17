@@ -93,18 +93,19 @@ Coverage extends in place — tiles already emitted are not rebuilt.
   spotlight at five.
 - **Characters.** Five Sydney characters, each with its own verbs and idles, out of the same
   ambient tier.
-- **Ambient events.** The street crowd, the flocks and the illegal raves, all pure functions of
-  position and tick.
+- **Ambient events.** Fender-benders, standoffs, bin-night ibis riots, car-park burnouts and
+  trackwork queues, scheduled on the density field as pure functions of the day and the tick — plus
+  the street crowd, the wildlife and the illegal raves.
 - **Trains.** You can ride the trains, and the Metro sets have open walk-through gangways between
   the carriages.
 - **The phone.** Four hand slots — bat, footy, phone, fists — in either hand, with left and right
   click using each.
-- **Maps and the camera.** The maps live on the phone only — the corner compass comes up while the
-  phone is in a hand — and the phone's camera shoots photos into a twelve-photo gallery.
+- **Maps and the camera.** `M` toggles the big map; the corner compass comes up while the phone is
+  in a hand, and the phone's camera shoots photos into a twelve-photo gallery.
 - **The button in Sydney Park.** A button on the second hill west of the kilns that makes the sun
   scream until sunset, for everyone on the server.
 - **The fight.** A bat, a footy and fists — and the bat can swat a footy out of the air.
-- **Night.** Night lighting, with a torch that comes on by itself at dusk.
+- **Night.** Street lights, car headlights, lit trains and a torch on `F`; the sky is on a real solar arc and the server owns the clock.
 
 ---
 
