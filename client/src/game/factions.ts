@@ -1266,10 +1266,34 @@ export const SHOT_DAMAGE = 0.5;
  * server and in an offline browser and cannot be dodged by a client that stops
  * sending inputs -- which is the whole reason it is a hash of the tick rather
  * than a `Math.random()`.
+ *
+ * ---------------------------------------------------------------------------
+ * **THE THREE COEFFICIENTS, AND WHY THEY ARE ARGUMENTS NOW.**
+ *
+ * `game/polair.ts` needed a miss model for a marksman braced in the door of a
+ * helicopter 250 m away, and there were two ways to give it one. The obvious one
+ * is a second function in that file. This is the other one: the *shape* of the
+ * answer -- hit probability is a line in range, clamped at both ends -- is a
+ * claim about pacing that this build makes once, and a feature that wrote its own
+ * would be a second answer to "did that round land" whose relationship to the
+ * first nobody could state. So the shape stays here and the coefficients travel.
+ *
+ * The **defaults are the police numbers, untouched**, so every existing call
+ * site is unchanged to the bit and `verifyPolice`'s assertions below still test
+ * exactly what they tested: 55% at 15 m, monotone, floored at 12%, ceilinged at
+ * 85%. `verifyPolair` asserts the 15 m number a second time from the other side,
+ * because "somebody parametrised the ladder's miss model and moved its defaults"
+ * is precisely the change that would be invisible in a diff of the airborne
+ * feature.
  */
-export function hitChance(range: number): number {
-  const p = 0.85 - 0.02 * range;
-  return p < 0.12 ? 0.12 : p > 0.85 ? 0.85 : p;
+export function hitChance(
+  range: number,
+  pointBlank = 0.85,
+  perMetre = 0.02,
+  floor = 0.12,
+): number {
+  const p = pointBlank - perMetre * range;
+  return p < floor ? floor : p > pointBlank ? pointBlank : p;
 }
 
 /** How long a batted officer stays down, seconds. They are hardy; they get up. */

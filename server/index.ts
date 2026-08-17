@@ -116,6 +116,13 @@ import { verifyUnstuck } from '../client/src/game/unstuck.ts';
 // the top of the ladder -- lands on players in a session and never in a
 // browser's console. See `client/src/game/heat.ts`'s check for the list.
 import { verifyHeat } from '../client/src/game/heat.ts';
+// Polair's orbit, beam schedule and marksman. Run **here** as well as in the
+// browser because this process is the one that rolls the shot: `stepHeat` calls
+// `polairPose` for the slant range, and every failure in that file is silent in
+// this repo's sense -- a beam that never leaves the player is the old ceiling
+// lamp, and an accuracy curve at the ground officers' floor is free damage from
+// something a player cannot fight. See `client/src/game/polair.ts`.
+import { verifyPolair } from '../client/src/game/polair.ts';
 // --- Workstream E. Three self-checks, all three of them shared modules being
 // run in the second runtime -- which is the premise this whole block exists to
 // test. See the comment above the list.
@@ -299,6 +306,7 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // looking. See `client/src/game/sunbutton.ts`.
     ['verifySunButton', verifySunButton()],
     ['verifyHeat', verifyHeat()],
+    ['verifyPolair', verifyPolair()],
     // Taking a car and driving it. Run **here** as well as in the browser
     // because the integrator, the claim and the suppression key are all this
     // side's authority and every failure in that file renders: a handbrake that
