@@ -15,6 +15,11 @@
  *   - the four weapon slots and the number row that picks them;
  *   - the phone -- the handset in your hand, the viewmodel in front of your
  *     eye, and the overlay it opens;
+ *   - **both maps**, which are now things you hold: the big one is the phone's
+ *     Map app and nothing else, and the compass is on the screen only while the
+ *     phone is in a hand. `M` survives as a shortcut *through* the phone. See
+ *     `game/phone.ts`, which is where those rules are written and checked;
+ *   - **the camera**: the viewfinder, the shutter, and the album on the phone;
  *   - the cash bundles lying in the street, drawn from the wallet frame;
  *   - the Centrelink prompt and the `E` that claims;
  *   - the Centrelink and SydRide markers on both maps;
@@ -57,6 +62,7 @@ import {
   MeshStandardNodeMaterial,
 } from 'three/webgpu';
 
+import type { Capture } from './bugreport.ts';
 import type { Hud } from './hud.ts';
 import type { NetClient } from './net/client.ts';
 import type { MarkerSink } from './minimap.ts';
@@ -69,7 +75,20 @@ import {
   formatMoney,
   officeAt,
 } from './game/cash.ts';
-import { Phone, SLOT, SLOT_NAME, defaultHands, selectSlot, type Slot } from './phone.ts';
+import {
+  Gallery,
+  SLOT,
+  SLOT_NAME,
+  applyMapKey,
+  defaultHands,
+  minimapScale,
+  photoCaption,
+  selectSlot,
+  type PhotoStore,
+  type Slot,
+} from './game/phone.ts';
+import { Phone } from './phone.ts';
+import { composePhoto } from './photo.ts';
 import { PhoneAssets, PhoneProp, PhoneViewmodel } from './world/phone.ts';
 
 /**
@@ -105,8 +124,55 @@ export interface MoneyDeps {
   firstPerson(): boolean;
   /** Is the player on a bike? Suppresses the Centrelink prompt; see the header. */
   riding(): boolean;
-  /** Open the big map. The phone's Map app and nothing else calls this. */
+  /**
+   * Open the big map, and close whatever else was covering the screen.
+   *
+   * **The phone's Map app and the `M` shortcut are the only two callers, and
+   * they are now the only two ways into that map at all.** The key used to open
+   * it directly from `main.ts`'s keydown listener; that block is gone and this
+   * is what replaced it. See `MAPS ARE THINGS YOU HOLD` in `game/phone.ts`.
+   */
   openMap(): void;
+  /** Put the big map away. Escape from a map the phone opened; see `keydown`. */
+  closeMap(): void;
+  /** Is the big map up? Sampled before Escape decides what a press meant. */
+  mapVisible(): boolean;
+  /**
+   * How large the compass should be drawn this frame, or 0 for not at all.
+   *
+   * A push rather than a pull for `setWeaponVisible`'s reason exactly: it keeps
+   * `main.ts`'s frame loop at the one `money.frame(dt)` line it already has,
+   * where a predicate would need a second call beside `minimap.update`. The
+   * value is `game/phone.minimapScale`, which is where the rule is written and
+   * checked.
+   */
+  setMinimapScale(scale: number): void;
+  /**
+   * The compass's bitmap, for the handset's screen. Null on a page without one.
+   *
+   * `Minimap.canvas`. The handset shows the map that is already being drawn
+   * rather than a second one -- see `world/phone.PhoneAssets`, which is written
+   * about why that is one rasterisation and not two.
+   */
+  minimapCanvas(): HTMLCanvasElement | null;
+  /**
+   * Ask the render loop for the next presented frame.
+   *
+   * `FrameGrabber.request`, the bug box's. There is exactly one thing in this
+   * client that can read a WebGPU canvas and this is it -- see
+   * `client/src/photo.ts` for the whole argument.
+   */
+  capture(): Promise<Capture>;
+  /** The suburb the locator is showing, or '' before the sidecar lands. */
+  suburb(): string;
+  /** The **server's** clock, for the photograph's in-game timestamp. */
+  clockMs(): number;
+  /** Open the bug box with an image already attached. The photo's "share". */
+  shareToBugBox(dataUrl: string, note: string): void;
+  /** The shutter click. `game/audio.CombatAudio.shutter`. */
+  shutter(): void;
+  /** `canvas.requestPointerLock()`, from inside a click. See `Phone.setCamera`. */
+  lockPointer(): void;
   /** Register a marker source with the minimap, which the big map reads through. */
   addMarkerSource(source: (sink: MarkerSink, cx: number, cz: number, radius: number) => void): void;
   /**
@@ -137,6 +203,16 @@ export interface MoneyHooks {
   mousedown(button: number): boolean;
   /** Which of `BTN.PUNCH` / `BTN.THROW` this button maps to, given the slots. */
   isPhoneVisible(): boolean;
+  /**
+   * Is the viewfinder up?
+   *
+   * A separate question from `isPhoneVisible`, because the two are never true
+   * at once: raising the camera hides the overlay. Exposed so a future caller
+   * -- a screenshot key, a cinematic mode -- can tell "the player is composing a
+   * shot" from "the player is reading their wallet", which look the same from
+   * outside and want opposite things from the interface.
+   */
+  cameraActive(): boolean;
   /** Put the phone away. `main.ts`'s Escape branch calls this first. */
   closePhone(): void;
   /** The slot in each hand. Read by the phone's own prop logic and by checks. */
@@ -178,7 +254,26 @@ export interface MoneyHooks {
     open(): void;
     close(): void;
     equip(slot: Slot, hand?: 'primary' | 'secondary'): string;
-    report(): { hands: string[]; balance: number; bundles: number; fare: string; online: boolean };
+    /**
+     * Take a photograph from the console, with no viewfinder and no click.
+     *
+     * The camera's own path needs a pointer, a raised phone and a left button,
+     * which is three preconditions a headless or embedded session cannot meet --
+     * the same argument `open()` above makes about the overlay. This is the way
+     * in from there, and it is also how a photograph gets taken while something
+     * that would be dismissed by a click is on screen.
+     */
+    photo(): Promise<string>;
+    report(): {
+      hands: string[];
+      balance: number;
+      bundles: number;
+      fare: string;
+      online: boolean;
+      /** How many photographs are in the album, and whether they can be kept. */
+      photos: number;
+      photoStorage: string;
+    };
   };
 }
 
@@ -195,13 +290,81 @@ const BUNDLE_POOL = 48;
 export function installMoney(deps: MoneyDeps): MoneyHooks {
   const hands = defaultHands();
 
-  // --- The handset, in the hand and in front of the eye.
-  const phoneAssets = new PhoneAssets();
+  // --- The handset, in the hand and in front of the eye, with the compass on
+  // its screen. See `world/phone.PhoneAssets`.
+  const phoneAssets = new PhoneAssets(deps.minimapCanvas());
   const viewmodel = new PhoneViewmodel(phoneAssets);
   deps.camera.add(viewmodel.group);
   // The prop on your own body is created and destroyed with the slot, unlike
   // the bat's, which is never put away. See `PhoneProp`.
   let prop: PhoneProp | null = null;
+
+  /**
+   * The album, and the storage it is kept in.
+   *
+   * `localStorage` is reached through a `try` rather than named directly,
+   * because a browser can throw on the *property access* -- not on `setItem`,
+   * on `window.localStorage` itself -- when storage is disabled by policy, and
+   * an exception here would be an exception in the middle of `installMoney` and
+   * therefore no money, no slots and no phone. A null store is a working
+   * gallery that does not persist, which `Gallery` is written to handle and
+   * `verifyPhoneModel` checks.
+   */
+  const photoStore = ((): PhotoStore | null => {
+    try {
+      return window.localStorage;
+    } catch {
+      return null;
+    }
+  })();
+  const gallery = new Gallery(photoStore);
+
+  /**
+   * One photograph at a time.
+   *
+   * The capture is two awaits deep -- a frame, then an encode -- and a player
+   * leaning on the button would otherwise queue a dozen overlapping grabs, each
+   * holding a full-size canvas. The dropped presses are not a loss: they were
+   * all going to be the same picture.
+   */
+  let shooting = false;
+
+  /**
+   * Take the photograph the viewfinder just asked for.
+   *
+   * The sound goes first and is not awaited on anything, because a shutter that
+   * arrived after the picture would be a shutter that arrived after the moment.
+   * Everything after it can fail, and each failure says which one it was: a
+   * blank readback is `FrameGrabber`'s own sentence (see `bugreport.ts`, which
+   * is written at length about why that check exists), and an encode that throws
+   * is a browser without a 2D context or without JPEG.
+   */
+  async function takePhoto(): Promise<string> {
+    if (shooting) return '';
+    shooting = true;
+    deps.shutter();
+    try {
+      const shot = await deps.capture();
+      if (!shot.ok) {
+        deps.hud.notice(shot.why);
+        return '';
+      }
+      const caption = photoCaption(deps.suburb(), deps.clockMs());
+      const photo = await composePhoto(shot.dataUrl, caption);
+      gallery.add(photo.thumb, photo.full, caption, Date.now());
+      phone.photoFiled();
+      // The count is in the line because the cap is the one thing about this
+      // feature a player has to know and nobody reads a gallery footer until
+      // something has already gone missing.
+      deps.hud.notice(`photo taken — ${gallery.count} in the gallery`);
+      return photo.full;
+    } catch (err) {
+      deps.hud.notice(`the photo would not save (${String(err).slice(0, 60)})`);
+      return '';
+    } finally {
+      shooting = false;
+    }
+  }
 
   const phone = new Phone({
     wallet: () => walletOf(deps),
@@ -209,6 +372,13 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
     position: () => deps.position(),
     online: () => online,
     claim: (officeId) => deps.net()?.claimCentrelink(officeId),
+    gallery,
+    shoot: () => {
+      void takePhoto();
+    },
+    share: (dataUrl, note) => deps.shareToBugBox(dataUrl, note),
+    notice: (text) => deps.hud.notice(text),
+    lockPointer: () => deps.lockPointer(),
     setOnline: (on) => {
       // Echoed locally so the button flips on the frame it is pressed. The
       // server has the last word and there is nothing to correct it *with* --
@@ -219,9 +389,22 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
       online = on;
       deps.net()?.setRideshareOnline(on);
     },
-    openMap: () => deps.openMap(),
+    openMap: () => {
+      deps.openMap();
+      mapFromPhone = true;
+    },
   });
   let online = false;
+  /**
+   * Did this feature open the map that is currently up?
+   *
+   * The flag is what lets Escape mean *back to the phone* rather than merely
+   * *close*, and it is a flag rather than an assumption because the map is still
+   * reachable from `sydney.bigmap.toggle()` on a console. When it is stale --
+   * the map was closed by Tab, or by the control list -- `deps.mapVisible()` is
+   * false and the branch is skipped, so a stale true cannot do any harm.
+   */
+  let mapFromPhone = false;
 
   // --- The piles of cash in the street.
   //
@@ -250,6 +433,17 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
     deps.scene.add(mesh);
     bundleMeshes.push(mesh);
   }
+
+  // --- And the compass, put where the starting loadout says before a frame is
+  // drawn.
+  //
+  // `frame` pushes this every frame anyway, so this call is only about the gap
+  // between construction and the first one: `Minimap` starts laid out (it has to
+  // be, or its constructor measures a `display: none` element and sizes the
+  // bitmap wrong -- see the field comment on `scaleFactor`), so without this
+  // there is exactly one composited frame with a map on it that the default
+  // bat/footy loadout should not have.
+  deps.setMinimapScale(minimapScale(hands, false));
 
   // --- The markers, on one source that both maps read. See `Minimap.collect`.
   deps.addMarkerSource((sink, cx, cz, radius) => {
@@ -336,6 +530,7 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
     // for why this is a push rather than a pull.
     deps.setWeaponVisible(hands.primary === SLOT.BAT, hands.secondary === SLOT.FOOTY);
     const angles = deps.angles();
+    const raised = hands.primary === SLOT.PHONE && deps.firstPerson();
     viewmodel.update(dt, {
       out: hands.primary === SLOT.PHONE,
       speed: deps.speed(),
@@ -343,6 +538,19 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
       pitch: angles.pitch,
       firstPerson: deps.firstPerson(),
     });
+
+    // And the glass, which shows whatever the compass last drew. One boolean
+    // write when there is no phone out, which is most frames of most sessions.
+    if (prop !== null || raised) phoneAssets.refreshScreen();
+
+    // 3b. And the compass, which is a thing on the phone now.
+    //
+    // The same pair the viewmodel's raise is gated on -- primary and first
+    // person -- so the disc grows on exactly the frames the handset comes up in
+    // front of the eye. `Minimap.setScale` is a class toggle and a boolean
+    // compare when nothing has changed, which is every frame but the two a
+    // number key produces. See `game/phone.minimapScale`.
+    deps.setMinimapScale(minimapScale(hands, raised));
 
     // 4. The Centrelink prompt, and the fare line, sharing one pill.
     //
@@ -387,6 +595,19 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
    */
   function equip(slot: Slot, hand: 'primary' | 'secondary'): void {
     if (!selectSlot(hands, slot, hand)) return;
+    handsChanged();
+  }
+
+  /**
+   * Rebuild what the hands mean, after something has moved them.
+   *
+   * Split out from `equip` because the **`M` key** also changes hands, through
+   * `game/phone.applyMapKey` -- which is the checked version of that transition
+   * and must be the one that runs, rather than a second copy of the rule written
+   * out here. So the two callers share the consequences and differ only in how
+   * they decided.
+   */
+  function handsChanged(): void {
     const wantProp = hands.primary === SLOT.PHONE || hands.secondary === SLOT.PHONE;
     if (wantProp && prop === null) {
       prop = new PhoneProp(phoneAssets, deps.selfActor, hands.primary === SLOT.PHONE ? 'right' : 'left');
@@ -425,9 +646,62 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
         equip(digit as Slot, shift ? 'secondary' : 'primary');
         return true;
       }
-      if (code === 'Escape' && phone.visible) {
-        phone.close();
+      /**
+       * `M`: the map shortcut, which now goes through the phone.
+       *
+       * **This branch replaced the `KeyM` block in `main.ts`**, which called
+       * `bigmap.toggle()` directly. It has to be here rather than there because
+       * the key's job changed: it is no longer "show the map", it is "get the
+       * phone out and use its Map app", and the hands are this module's.
+       *
+       * It **opens** rather than toggling, which is a deliberate change from the
+       * key's old behaviour and is the one thing about it a returning player
+       * will notice. The reason is that the press now potentially moves a slot:
+       * a toggle whose second press closed the map would leave the phone in your
+       * hand and the bat on the ground, so the key would not be its own undo. It
+       * is Escape that closes the map now -- back to the phone's home screen,
+       * and then away -- which is the ladder the whole device is on. See
+       * `Phone.goBack`.
+       *
+       * `applyMapKey` is the checked transition; `handsChanged` is what a moved
+       * slot costs on the body. Consumed, so `main.ts` sees nothing.
+       */
+      if (code === 'KeyM') {
+        if (applyMapKey(hands)) handsChanged();
+        deps.openMap();
+        mapFromPhone = true;
         return true;
+      }
+      /**
+       * Escape: **one step back**, and the ladder is the phone's.
+       *
+       * Three rungs, tried in the order a player would expect to leave them: a
+       * screen inside the phone (a photograph, the gallery, the viewfinder),
+       * then a big map the phone opened, then the phone itself. Only the last of
+       * those existed before this pass, when the phone was one screen deep.
+       *
+       * The middle rung is the brief's, in as many words: *Esc closes the map
+       * back to the phone home; a second Esc puts the phone away.* Reopening the
+       * phone rather than merely closing the map is what makes it a step back --
+       * the map was reached **through** the phone, so leaving it should land
+       * where it was entered from.
+       *
+       * `main.ts` calls this before its own Escape branch, which is what keeps
+       * the press that leaves the map from also opening the suggestions box.
+       */
+      if (code === 'Escape') {
+        if (phone.goBack()) return true;
+        if (mapFromPhone && deps.mapVisible()) {
+          deps.closeMap();
+          mapFromPhone = false;
+          phone.setOpen(true);
+          return true;
+        }
+        if (phone.visible) {
+          phone.close();
+          return true;
+        }
+        return false;
       }
       // `E` at a Centrelink. Not consumed -- the mount bit still goes out on
       // this press; see the header for why the two can share the key.
@@ -439,6 +713,19 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
       return false;
     },
     mousedown(button) {
+      // The viewfinder takes **both** buttons and gives neither back. Left is
+      // the shutter, which is the whole point; right is consumed and does
+      // nothing, because a player composing a shot with a football in their off
+      // hand would otherwise throw it down the street while framing.
+      //
+      // `main.ts` has already checked pointer lock before reaching here, which
+      // is why the click that re-locks after leaving the phone overlay does not
+      // also fire the shutter -- see its `locked` guard, and `Phone.setCamera`
+      // for why the viewfinder asks for the lock on the way in.
+      if (phone.cameraActive) {
+        if (button === 0) phone.shoot();
+        return true;
+      }
       // The phone answers whichever button its hand is on, so a player who put
       // the phone in the off hand opens it with the right button. Consumed, so
       // `main.ts` does not also arm a swing with it.
@@ -450,6 +737,7 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
       return true;
     },
     isPhoneVisible: () => phone.visible,
+    cameraActive: () => phone.cameraActive,
     showsBat: () => hands.primary === SLOT.BAT,
     showsFooty: () => hands.secondary === SLOT.FOOTY,
     closePhone: () => phone.close(),
@@ -461,12 +749,18 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
         equip(slot, hand);
         return `${SLOT_NAME[hands.primary]} · ${SLOT_NAME[hands.secondary]}`;
       },
+      photo: () => takePhoto(),
       report: () => ({
         hands: [SLOT_NAME[hands.primary], SLOT_NAME[hands.secondary]],
         balance: walletOf(deps).balance,
         bundles: walletOf(deps).bundles.length,
         fare: fareOf(deps).state,
         online,
+        photos: gallery.count,
+        // Empty when the album is persisting normally, which is the answer to
+        // "why did my photos not come back" in one field rather than in a
+        // console session.
+        photoStorage: photoStore === null ? 'no storage in this browser' : gallery.storageNote,
       }),
     },
     onMoney(note) {

@@ -128,6 +128,11 @@ import {
 // every room, and the fake-driving hatch that makes the fare loop exercisable
 // before the driving workstream lands.
 import { verifyCash } from '../client/src/game/cash.ts';
+// The phone's model -- the slots, the two map rules and the photo album. None of
+// it is the server's business at run time and all of it is checkable here; see
+// `client/src/game/phone.ts`, which exists precisely so this import does not
+// drag a `document` in behind it.
+import { verifyPhoneModel } from '../client/src/game/phone.ts';
 import { PHONE_OP, decodePhone, verifyCashWire } from '../client/src/net/cash.ts';
 import { verifyDrivingContract } from '../client/src/game/driving-contract.ts';
 import { verifyFares } from './fares.ts';
@@ -344,6 +349,17 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifyWallets', verifyWallets()],
     ['verifyFares', verifyFares()],
     ['verifyDrivingContract', verifyDrivingContract()],
+    // The phone's model. Run **here** despite the server having no opinion
+    // about which hand a bat is in, because the interesting half of that file
+    // is the photo album and every one of its failures is silent: an album that
+    // does not cap fills the origin's quota and the camera stops working after
+    // twenty shots; a quota fallback that drops the newest deletes the
+    // photograph the player just took; a caption on the real clock stamps the
+    // wrong time of day on a picture whose whole content is the time of day.
+    // This process is a second runtime with no browser in it, which is exactly
+    // what the album's injected storage exists to be checkable in. See
+    // `client/src/game/phone.ts`.
+    ['verifyPhoneModel', verifyPhoneModel()],
     // The accounts, the handles and the ladder. Run **here** as well as in the
     // browser because this process is the authority for every one of them and
     // every failure in that file is silent in this repo's sense: a handle fold

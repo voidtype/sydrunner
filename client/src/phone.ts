@@ -1,48 +1,11 @@
 /**
- * What is in your hands, and the phone that is one of the things it can be.
+ * The phone's screen: the overlay, the six apps, the viewfinder and the album.
  *
- * Two features in one file because they are one idea: the phone is a **weapon
- * slot** that happens to open a screen instead of hitting somebody, and
- * splitting "the slots" from "the phone UI" would put the rule that pressing
- * `3` raises a handset in one file and the handset in another.
- *
- * ---------------------------------------------------------------------------
- * THE SLOTS
- *
- * Four of them -- bat, footy, phone, fists -- and **two hands**. `1..4` picks
- * the primary (right hand, left mouse button); `shift+1..4` picks the secondary
- * (off hand, right mouse button). The default arrangement is bat primary, footy
- * secondary, which is exactly what the game did before this file existed:
- * `main.ts` has always drawn a bat in the right hand and a football in the
- * left, swung on LMB and thrown on RMB. **Nothing about the default changes**,
- * and that is a requirement rather than a nicety -- every player's muscle
- * memory is that pair of buttons, and a slot system that rearranged them on
- * first load would be a slot system nobody asked for.
- *
- * What the slots buy is the three arrangements the default cannot express:
- * a phone in your hand, bare fists (which punch, because `combat`'s strike is a
- * punch whatever is drawn), and the footy in your *right* hand for anybody who
- * wants to throw on LMB.
- *
- * **Primary and secondary cannot be the same slot, except fists.** One bat,
- * one football; you may however have nothing in both hands, which is the state
- * `4` / `shift+4` puts you in and is the closest thing this game has to
- * holstering. The constraint is enforced by *swapping* rather than refusing --
- * asking for the bat in your off hand when it is in your right hand moves it,
- * and whatever was in the off hand goes to the right. A refusal would be a key
- * that does nothing with nothing on screen to say why.
- *
- * **Selection is client-side and is not on the wire.** This was a real
- * decision. The server adjudicates the punch, the swing and the throw already,
- * from `BTN.PUNCH` and `BTN.THROW` -- and those two bits are what the mouse
- * buttons are *mapped to*, which is the only thing the slots change. So a
- * player with the footy primary sends `THROW` on LMB and the server sees
- * exactly what it saw when they pressed RMB, which is correct without knowing
- * anything about slots. What the server does *not* learn is which model is in
- * which hand on a remote body, so a remote player holding a phone is drawn
- * holding a bat -- that is a cosmetic gap, it costs a protocol field to close,
- * and this pass is not spending one on it. The phone's actual *actions* travel
- * on `MSG.PHONE`, which the server does validate.
+ * The slots that decide whether you are holding one, the rules about where the
+ * map is drawn, and the album's own arithmetic all left this file when the
+ * server started checking them -- they are in `game/phone.ts`, which is
+ * DOM-free, and the reason is written down there. What is here is everything
+ * that touches an element, plus the three string helpers the panel needs.
  *
  * ---------------------------------------------------------------------------
  * THE PHONE DOES NOT STOP TIME, AND IT DOES RELEASE THE POINTER
@@ -61,21 +24,35 @@
  * would fight the two bindings it sits between. A gaze-driven phone (aim at a
  * tile, click) is a different feature.
  *
- * So opening the phone is the same gesture the suggestions panel already is:
- * the cursor comes back, the world keeps running behind it, `wasd` keeps
- * walking, and drag-to-look still turns the camera. Clicking anywhere outside
- * the phone puts it away and re-locks, which is `main.ts`'s existing canvas
- * click doing what it always did.
+ * **The camera is the one screen that takes the pointer back**, and it is the
+ * exception that proves the rule rather than a contradiction of it: a viewfinder
+ * has nothing to click, and what it needs instead is the mouse turning your head
+ * so you can aim the shot. Opening it from the Camera tile is a click, which is
+ * a user gesture, which is the only thing `requestPointerLock` will accept -- so
+ * the tile that opens the viewfinder is also the gesture that re-locks. See
+ * `setCamera`.
  *
  * ---------------------------------------------------------------------------
- * ESCAPE, AND WHY THE ORDER MATTERS
+ * ESCAPE UNWINDS ONE STEP, WHICH IT DID NOT USED TO
  *
  * Escape opens the suggestions box when nothing else is open (`main.ts`), and
  * the phone has to take precedence when it is up -- otherwise the press that
  * puts the phone away also opens a panel, which is the exact failure `main.ts`'s
- * `anyOpen` comment is written about. `visible` is what `main.ts` samples, and
- * the phone is closed before the `anyOpen` branch is evaluated. See the
- * `install` return value.
+ * `anyOpen` comment is written about.
+ *
+ * What changed with the map and the camera is that the phone now has **depth**.
+ * It used to be one screen deep, so Escape could only mean "put it away". It is
+ * now up to three -- a photograph, inside the gallery, inside the phone; or a
+ * full-screen map that the phone opened -- and a key that closed the whole
+ * device from the bottom of that would throw away two steps of navigation on a
+ * press the player meant as "back".
+ *
+ * So `back()` unwinds exactly one level and reports whether it found one, and
+ * `money.ts` composes the rest: back out of the phone's own screens, then out of
+ * a map the phone opened, and only then put the phone away. The brief states the
+ * rule for the map -- *"Esc closes it back to the phone home; a second Esc puts
+ * the phone away"* -- and this is that rule generalised, because a device where
+ * one screen goes back and the others close is a device you have to learn.
  */
 
 import {
@@ -85,57 +62,8 @@ import {
   nearestOffices,
   type CentrelinkOffice,
 } from './game/cash.ts';
+import { GALLERY_MAX, type Gallery, verifyPhoneModel } from './game/phone.ts';
 import type { FareFrame, WalletFrame } from './net/cash.ts';
-
-// --- The slots ------------------------------------------------------------------
-
-/** The four things a hand can hold. The index is the number key minus one. */
-export const SLOT = {
-  BAT: 0,
-  FOOTY: 1,
-  PHONE: 2,
-  FISTS: 3,
-} as const;
-
-export type Slot = 0 | 1 | 2 | 3;
-
-/** What the HUD and the help list call them. Lower case, like every string here. */
-export const SLOT_NAME: readonly string[] = ['bat', 'footy', 'phone', 'fists'];
-
-/**
- * Which slot is in which hand.
- *
- * A two-field record rather than an array, because the two hands are not
- * interchangeable: one is bound to the left mouse button and one to the right,
- * and indexing them by number would make every read `hands[0]` with a comment
- * beside it saying which hand that is.
- */
-export interface Hands {
-  primary: Slot;
-  secondary: Slot;
-}
-
-/** Bat right, footy left -- exactly what the game did before slots existed. */
-export function defaultHands(): Hands {
-  return { primary: SLOT.BAT, secondary: SLOT.FOOTY };
-}
-
-/**
- * Put `slot` in one hand, moving whatever was there if it has to.
- *
- * The swap rather than a refusal, and fists exempt from the uniqueness rule --
- * see the header. Returns whether anything changed, so the caller can skip the
- * model rebuild on a key that asked for what is already held.
- */
-export function selectSlot(hands: Hands, slot: Slot, hand: 'primary' | 'secondary'): boolean {
-  const other = hand === 'primary' ? 'secondary' : 'primary';
-  if (hands[hand] === slot) return false;
-  // Fists are not an object, so both hands may be empty at once. Everything
-  // else is one physical thing and moves rather than duplicating.
-  if (hands[other] === slot && slot !== SLOT.FISTS) hands[other] = hands[hand];
-  hands[hand] = slot;
-  return true;
-}
 
 // --- What the phone is shown -----------------------------------------------------
 
@@ -172,13 +100,53 @@ export interface PhoneSource {
   claim(officeId: string): void;
   /** Clock on or off. */
   setOnline(on: boolean): void;
-  /** Open the big map (M). The phone's Map app is a shortcut to the real one. */
+  /**
+   * Open the big map. **The only route to it**, as of this pass: the `M` key is
+   * a shortcut that equips the phone and calls the same tile. See `money.ts`.
+   */
   openMap(): void;
+  /**
+   * The album, owned by `money.ts`.
+   *
+   * Handed in rather than constructed here because a photograph is taken from
+   * the *viewfinder*, which is a state of this class, and filed by the capture
+   * path, which is not -- so the one object both of them touch has to belong to
+   * whoever owns both, which is the installer.
+   */
+  gallery: Gallery;
+  /**
+   * Take a photograph of the frame after this one.
+   *
+   * Fire-and-forget: the capture is two awaits deep (a frame, then an encode)
+   * and the phone has nothing useful to do while it happens. What comes back is
+   * `photoFiled` or a line on the HUD.
+   */
+  shoot(): void;
+  /**
+   * Hand a photograph to the bug box with the image already attached.
+   *
+   * The whole of "share": there is no other outbound path in this client and
+   * inventing one for photographs would mean a second uploader, a second server
+   * route and a second thing to moderate. What this does have is the property
+   * the brief asked for -- a photograph of something broken becomes a report in
+   * two clicks -- which is the case that actually matters.
+   */
+  share(dataUrl: string, note: string): void;
+  /** Say something in the HUD's notice pill. Saves, deletions, refusals. */
+  notice(text: string): void;
+  /**
+   * Ask for pointer lock, from inside a click handler.
+   *
+   * Only the viewfinder uses it, and only ever from the Camera tile's own click
+   * -- see `setCamera`. A browser refuses this from anything that is not a user
+   * gesture, so it cannot be called from a timer or from the frame loop.
+   */
+  lockPointer(): void;
 }
 
 // --- The overlay -------------------------------------------------------------------
 
-type AppId = 'wallet' | 'centrelink' | 'sydride' | 'map';
+type AppId = 'wallet' | 'centrelink' | 'sydride' | 'map' | 'camera' | 'gallery';
 
 interface AppDef {
   id: AppId;
@@ -189,20 +157,29 @@ interface AppDef {
 /**
  * The home screen, in the order the tiles are drawn.
  *
- * Four apps and no more. Every one of them is something the player can only do
- * from here (the balance history, the claim countdown, the shift toggle) or is
- * the one shortcut worth having (the map). A Camera app was in the brief as an
- * optional and is **not built**: the artifact CSP story around a
- * script-initiated download is genuinely annoying, the browser's own screenshot
- * key already exists on every platform, and a tile that opened a dialog nobody
- * could dismiss under pointer lock would be the worst thing on this screen.
+ * Six now, in two rows of three. Four of them were here before this pass; the
+ * two new ones are the halves of one feature -- a camera that takes photographs
+ * and a gallery that keeps them -- and they are two tiles rather than one
+ * because they are two *modes*: one hides the phone and gives you back the
+ * mouse, the other is a grid you scroll. A single tile that did both would have
+ * to guess which you meant, and would guess wrong for whichever of the two you
+ * had just used.
+ *
+ * The **Map** tile is the entry point to the big map and, since this pass, the
+ * only one there is. `M` still works and goes through here; see
+ * `game/phone.applyMapKey`.
  */
 const APPS: readonly AppDef[] = [
   { id: 'wallet', glyph: '$', label: 'wallet' },
   { id: 'centrelink', glyph: '¢', label: 'centrelink' },
   { id: 'sydride', glyph: '⌁', label: 'sydride' },
   { id: 'map', glyph: '◎', label: 'map' },
+  { id: 'camera', glyph: '◉', label: 'camera' },
+  { id: 'gallery', glyph: '▤', label: 'gallery' },
 ];
+
+/** How long the viewfinder flashes white after the shutter, milliseconds. */
+const FLASH_MS = 80;
 
 export class Phone {
   private readonly root = document.getElementById('phone');
@@ -211,15 +188,38 @@ export class Phone {
   private readonly body = document.getElementById('phone-appbody');
   private readonly clock = document.getElementById('phone-clock');
   private readonly back = document.getElementById('phone-back');
+  /** The corner brackets and the shutter hint. Null on an older `index.html`. */
+  private readonly viewfinder = document.getElementById('viewfinder');
+  private readonly flashEl = document.getElementById('viewfinder-flash');
 
   private readonly source: PhoneSource;
   private open = false;
   private app: AppId | null = null;
+  /** The photograph being looked at full-screen inside the phone, or null. */
+  private viewing = 0;
+  /** Is the viewfinder up? The overlay is hidden while it is. See `setCamera`. */
+  private camera = false;
   private readonly log: Transaction[] = [];
   /** What was last drawn, so a 4 Hz refresh is a string compare. See `tick`. */
   private drawn = '';
   private sinceRedraw = 0;
   private readonly offices: Array<{ office: CentrelinkOffice; distance: number }> = [];
+  /**
+   * The gallery's markup, cached, and the stamp that says whether it is stale.
+   *
+   * The only screen here that needs this. Every other app is a few hundred bytes
+   * of rows and the `drawn` string compare below costs nothing; the gallery is
+   * twelve base64 thumbnails and is a **quarter of a megabyte of string**, which
+   * is not something to rebuild and compare four times a second for a screen
+   * that changes when a photograph is taken or deleted and at no other time.
+   *
+   * Caching it also makes the compare free rather than merely cheap: the same
+   * string *reference* comes back out, so `html === this.drawn` is a pointer
+   * compare instead of a quarter-megabyte `memcmp`.
+   */
+  private galleryHtml = '';
+  private galleryStamp = '';
+  private flashTimer = 0;
 
   constructor(source: PhoneSource) {
     this.source = source;
@@ -245,6 +245,11 @@ export class Phone {
     return this.open;
   }
 
+  /** Is the viewfinder up? A left click takes a photograph while it is. */
+  get cameraActive(): boolean {
+    return this.camera;
+  }
+
   /**
    * Show or hide it.
    *
@@ -255,6 +260,7 @@ export class Phone {
    * phone away is what re-locks, through `main.ts`'s existing canvas handler.
    */
   setOpen(open: boolean): void {
+    if (open) this.setCamera(false);
     if (this.open === open) return;
     this.open = open;
     this.root?.classList.toggle('shown', open);
@@ -269,7 +275,39 @@ export class Phone {
   }
 
   close(): void {
+    this.setCamera(false);
     this.setOpen(false);
+  }
+
+  /**
+   * One step out of wherever the player is. Returns false when there is nowhere
+   * left to go, which is `money.ts`'s signal to try the next thing (the map,
+   * then putting the phone away). See the header.
+   */
+  goBack(): boolean {
+    if (this.camera) {
+      this.setCamera(false);
+      this.setOpen(true);
+      return true;
+    }
+    // **Nothing on screen, nothing to go back from.** The guard is load-bearing
+    // rather than tidy: `app` keeps its value while the phone is shut, so
+    // without this an Escape pressed with the phone away would find a stale
+    // `wallet` in there, consume the key, and leave the player pressing Escape
+    // at a game that appears to ignore it -- the suggestions box would never
+    // open. See `money.keydown`, which treats a false here as "not mine".
+    if (!this.open) return false;
+    if (this.viewing !== 0) {
+      this.viewing = 0;
+      this.invalidate();
+      this.draw();
+      return true;
+    }
+    if (this.app !== null) {
+      this.openApp(null);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -283,6 +321,35 @@ export class Phone {
     if (note === '') return;
     this.log.unshift({ note, atMs: Date.now() });
     if (this.log.length > MAX_TRANSACTIONS) this.log.length = MAX_TRANSACTIONS;
+  }
+
+  /**
+   * A photograph landed in the album. Redraw if the gallery is what is on screen.
+   *
+   * Pushed rather than polled because the album is not this class's object and
+   * a 4 Hz poll of "has the list changed" over twelve records would be a
+   * comparison written to avoid one call.
+   */
+  photoFiled(): void {
+    this.invalidate();
+    if (this.app === 'gallery') this.draw();
+  }
+
+  /**
+   * Take the picture: flash the frame and ask for the capture.
+   *
+   * The flash is **before** the capture rather than after, and that is the whole
+   * reason it is 80 ms rather than something longer: the grab happens on the
+   * next rendered frame, so a flash that waited for the photograph to come back
+   * would fire a fifth of a second after the click and read as lag. Firing it on
+   * the press makes the click and the flash one event, which is what a shutter
+   * is -- and the DOM flash cannot appear in the photograph in any case, because
+   * the photograph is the canvas and the flash is an element over it.
+   */
+  shoot(): void {
+    if (!this.camera) return;
+    this.flash();
+    this.source.shoot();
   }
 
   /**
@@ -304,21 +371,77 @@ export class Phone {
     this.draw();
   }
 
+  /**
+   * The viewfinder: the phone goes away, the brackets come up, the pointer comes
+   * back.
+   *
+   * Hiding the overlay rather than drawing the viewfinder *through* it is the
+   * only arrangement that makes sense of "raising the camera": the phone is a
+   * 300 px panel in the lower right of the frame and a viewfinder is the frame.
+   * `open` goes **false** while the viewfinder is up, rather than being left
+   * true with the element hidden, and the reason is that `visible` is a
+   * question other code asks and the honest answer is no -- there is no overlay
+   * on the screen and nothing on it to click. What makes the camera a screen
+   * *of* the phone rather than a mode beside it is `goBack`, which puts the
+   * overlay back explicitly on the way out, so the back gesture lands where
+   * every other app's does.
+   *
+   * The pointer lock is asked for on the way in and not given up on the way out,
+   * which is deliberate asymmetry: coming in, the click on the tile is the
+   * gesture that permits it; going out, `setOpen(true)` releases it again
+   * because the phone needs a cursor. So the sequence camera -> back -> camera
+   * works, and each leg does the one thing it can legitimately do.
+   */
+  private setCamera(on: boolean): void {
+    if (this.camera === on) return;
+    this.camera = on;
+    this.viewfinder?.classList.toggle('shown', on);
+    if (!on) return;
+    this.open = false;
+    this.root?.classList.remove('shown');
+    this.source.lockPointer();
+  }
+
+  /** White for `FLASH_MS`, over the viewfinder and under nothing. */
+  private flash(): void {
+    const el = this.flashEl;
+    if (!el) return;
+    el.classList.add('on');
+    if (this.flashTimer !== 0) clearTimeout(this.flashTimer);
+    this.flashTimer = window.setTimeout(() => {
+      el.classList.remove('on');
+      this.flashTimer = 0;
+    }, FLASH_MS);
+  }
+
   private openApp(app: AppId | null): void {
     if (app === 'map') {
       // The Map app is a shortcut and not a screen: a 300 px map is not a map.
       // Opening the real one puts the phone away, because the big map is
       // full-screen and a phone on top of it would be covering the thing it
-      // just opened.
-      this.close();
+      // just opened. Escape brings the phone back at its home screen -- see
+      // `money.ts`'s Escape ordering, which is what makes that a *step back*
+      // rather than a dismissal.
+      this.setOpen(false);
       this.source.openMap();
       return;
     }
+    if (app === 'camera') {
+      this.setCamera(true);
+      return;
+    }
     this.app = app;
+    this.viewing = 0;
     this.root?.classList.toggle('app-open', app !== null);
     this.drawn = '';
     this.sinceRedraw = 1;
+    this.invalidate();
     this.draw();
+  }
+
+  /** The gallery's cached markup is stale. */
+  private invalidate(): void {
+    this.galleryStamp = '';
   }
 
   private draw(): void {
@@ -395,23 +518,165 @@ export class Phone {
         break;
       }
 
+      case 'gallery':
+        this.title.textContent = this.viewing === 0 ? 'gallery' : 'photo';
+        rows.push(this.galleryMarkup());
+        break;
+
       default:
         break;
     }
 
-    const html = rows.join('');
+    // `join` on a single-element array returns that element, so the gallery's
+    // cached string comes through by reference and the compare below is a
+    // pointer compare. See `galleryHtml`.
+    const html = rows.length === 1 ? rows[0] : rows.join('');
     if (html === this.drawn) return;
     this.drawn = html;
     this.body.innerHTML = html;
-    // Rebound after every rebuild, because the button is a new element each
-    // time. One listener on one button; a delegated listener on the body would
-    // be cheaper and would have to know which app is open to interpret a click.
-    const act = this.body.querySelector('[data-act="online"]');
-    act?.addEventListener('click', () => {
-      this.source.setOnline(!this.source.online());
-      this.drawn = '';
-      this.draw();
-    });
+    // Rebound after every rebuild, because the buttons are new elements each
+    // time. One delegated pass over `[data-act]` rather than a query per
+    // action: the gallery draws up to fourteen of them and a named query each
+    // would be a list this method has to be kept in step with.
+    for (const el of Array.from(this.body.querySelectorAll('[data-act]'))) {
+      const act = (el as HTMLElement).dataset.act ?? '';
+      const id = Number((el as HTMLElement).dataset.id ?? '0');
+      el.addEventListener('click', () => this.act(act, id));
+    }
+  }
+
+  /**
+   * What a button on the phone's body does.
+   *
+   * One switch rather than a closure per button, so every action this screen can
+   * take is in one list -- which is what makes it obvious that `delete` is the
+   * only destructive one and that it is the only one that redraws the list
+   * rather than a photograph.
+   */
+  private act(action: string, id: number): void {
+    switch (action) {
+      case 'online':
+        this.source.setOnline(!this.source.online());
+        this.drawn = '';
+        this.draw();
+        break;
+
+      case 'open':
+        this.viewing = id;
+        this.invalidate();
+        this.draw();
+        break;
+
+      case 'back':
+        this.goBack();
+        break;
+
+      case 'save': {
+        // `<a download>` and a synthetic click, which is the only way a page can
+        // hand a file to the person looking at it. A real browser writes it to
+        // the downloads folder; a sandboxed artifact viewer refuses the
+        // navigation entirely, which is irrelevant here and is noted only so
+        // nobody re-tests it there.
+        const full = this.source.gallery.full(id);
+        if (full === '') {
+          this.source.notice('that photo\'s original is gone — it was taken before a reload.');
+          return;
+        }
+        const a = document.createElement('a');
+        a.href = full;
+        a.download = photoFilename(this.captionOf(id));
+        a.click();
+        this.source.notice('saved to your downloads.');
+        break;
+      }
+
+      case 'share': {
+        const full = this.source.gallery.full(id);
+        const image = full === '' ? this.thumbOf(id) : full;
+        if (image === '') return;
+        this.source.share(image, `${this.captionOf(id)} · from the gallery`);
+        // The bug box is a full-screen panel; a phone on top of it would be
+        // covering the form it just filled in. Same call the map tile makes.
+        this.setOpen(false);
+        break;
+      }
+
+      case 'delete':
+        if (this.source.gallery.remove(id)) {
+          this.viewing = 0;
+          this.invalidate();
+          this.draw();
+          this.source.notice('photo deleted.');
+        }
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  /**
+   * The gallery, cached against a stamp of what is in it.
+   *
+   * The stamp is the ids and the open photograph, which is exactly the set of
+   * things that change the markup: the thumbnails themselves are immutable once
+   * taken, so a list with the same ids in the same order draws the same bytes.
+   * See `galleryHtml` for why this is worth doing at all.
+   */
+  private galleryMarkup(): string {
+    const photos = this.source.gallery.items;
+    const stamp = `${this.viewing}|${photos.map((p) => p.id).join(',')}`;
+    if (stamp === this.galleryStamp) return this.galleryHtml;
+    this.galleryStamp = stamp;
+
+    const out: string[] = [];
+    if (this.viewing !== 0) {
+      const thumb = this.thumbOf(this.viewing);
+      const full = this.source.gallery.full(this.viewing);
+      out.push(
+        `<img class="photo-full" alt="a photograph you took" src="${escape(full === '' ? thumb : full)}">`,
+      );
+      out.push(`<div class="phone-note">${escape(this.captionOf(this.viewing))}</div>`);
+      if (full === '') {
+        // Said plainly rather than by a greyed-out button. The album's header
+        // explains why the original cannot persist; this is the one place a
+        // player meets the consequence, and "save" quietly doing nothing would
+        // be the worst way to learn it.
+        out.push('<div class="phone-note">original lost on reload — only the thumbnail is left.</div>');
+      }
+      out.push('<div class="photo-acts">');
+      out.push(`<button class="phone-act" data-act="save" data-id="${this.viewing}">save</button>`);
+      out.push(`<button class="phone-act" data-act="share" data-id="${this.viewing}">to bug box</button>`);
+      out.push(`<button class="phone-act bad" data-act="delete" data-id="${this.viewing}">delete</button>`);
+      out.push('</div>');
+      out.push('<button class="phone-act" data-act="back">all photos</button>');
+    } else if (photos.length === 0) {
+      out.push('<div class="phone-note">no photos yet. open the camera and click.</div>');
+    } else {
+      out.push('<div class="photo-grid">');
+      for (const p of photos) {
+        out.push(
+          `<button class="photo-cell" data-act="open" data-id="${p.id}" title="${escape(p.caption)}">` +
+            `<img alt="${escape(p.caption)}" src="${escape(p.thumb)}"></button>`,
+        );
+      }
+      out.push('</div>');
+      out.push(`<div class="phone-note">${photos.length} of ${GALLERY_MAX} — the oldest goes when it is full.</div>`);
+      const trouble = this.source.gallery.storageNote;
+      if (trouble !== '') out.push(`<div class="phone-note">${escape(trouble)}</div>`);
+    }
+    this.galleryHtml = out.join('');
+    return this.galleryHtml;
+  }
+
+  private captionOf(id: number): string {
+    for (const p of this.source.gallery.items) if (p.id === id) return p.caption;
+    return '';
+  }
+
+  private thumbOf(id: number): string {
+    for (const p of this.source.gallery.items) if (p.id === id) return p.thumb;
+    return '';
   }
 }
 
@@ -426,13 +691,18 @@ function row(label: string, value: string): string {
  * The phone renders with `innerHTML` -- which is a deliberate choice for a
  * panel that is a list of rows rebuilt four times a second, where the
  * alternative is fifty `createElement` calls -- and `innerHTML` plus a string
- * from anywhere is how a panel becomes an injection. Two of the strings on this
- * screen come off the **wire**: `WalletFrame.note` is composed by the server
- * and an office name comes out of a generated table. Neither is player-supplied
- * today. `hud.investigation` has a comment making exactly this argument about a
- * string that is a lookup today and might not be tomorrow, and reaches the same
- * conclusion: escape it anyway, because the day one of these carries a player's
- * name is a day nobody will re-read this file.
+ * from anywhere is how a panel becomes an injection. Three of the strings on
+ * this screen come from outside: `WalletFrame.note` is composed by the server,
+ * an office name comes out of a generated table, and a photograph's caption
+ * carries a **suburb name out of an OSM sidecar**, which is arbitrary
+ * user-entered text that has travelled over the network. That last one is the
+ * reason this function's existing argument stopped being hypothetical: the
+ * caption is written into a `title=` attribute and an `alt=`, and an unescaped
+ * quote in a suburb name would end the attribute.
+ *
+ * `hud.investigation` has a comment making exactly this argument about a string
+ * that is a lookup today and might not be tomorrow, and reaches the same
+ * conclusion: escape it anyway.
  */
 function escape(text: string): string {
   return text
@@ -440,6 +710,25 @@ function escape(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/**
+ * A filename for a saved photograph.
+ *
+ * Built from the caption, which already carries the suburb and the in-game
+ * hour, so a folder full of these sorts into something a person can read:
+ * `sydrunner-newtown-1842.jpg`. Everything that is not a letter, a digit or a
+ * hyphen is collapsed, because a caption can contain a middle dot, a space and
+ * whatever punctuation a suburb name has in it -- and a `download` attribute is
+ * a filename on somebody else's filesystem.
+ */
+function photoFilename(caption: string): string {
+  const slug = caption
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+  return `${slug === '' ? 'sydrunner' : slug}.jpg`;
 }
 
 /** "just now", "2 min ago", "1 h ago". Real time, like the status bar's clock. */
@@ -453,91 +742,33 @@ function ago(ms: number): string {
 // --- The self-check ------------------------------------------------------------------
 
 /**
- * The slot rules and the two pure helpers, asserted at boot on the client.
+ * The whole phone, from the client's side: the model's checks plus the three
+ * string helpers that never left this file.
  *
- * The DOM half is deliberately not checked -- `verifyHud`'s own boundary -- but
- * every failure in the slot logic is silent in this repo's sense:
+ * `verifyPhoneModel` is where the slots, the map rules and the album are
+ * asserted, and it is run **again in the server process** -- see
+ * `server/index.ts`. It is folded in here rather than wired separately in
+ * `main.ts` so that `sydney.selfChecks()` and the boot list still have one call
+ * for "the phone", which is what a person looking for a phone failure will
+ * reach for.
  *
- *   - A **swap that duplicates** puts the bat in both hands, so the player is
- *     holding two bats and the off hand's throw does nothing, with no frame in
- *     which that reads as anything but a missing football.
- *   - A **uniqueness rule that catches fists** makes `4` / `shift+4` a pair of
- *     keys that fight each other, and there is no way to have empty hands.
- *   - And a **default that is not bat/footy** silently rearranges the mouse
- *     buttons for every existing player on the first load after this ships,
- *     which is the one thing this feature must not do.
+ * What is added here is only what needs a browser's string semantics and cannot
+ * run there:
+ *
+ *   - The **escaper**, on the one string that can reach it from outside. A
+ *     suburb name goes into a `title=` attribute now, so a stray quote is an
+ *     attribute break rather than a cosmetic wobble.
+ *   - The **filename**, because `<a download>` writes it to a filesystem and a
+ *     caption with a slash in it is a path.
+ *   - The **relative time**, which is the only arithmetic on the wallet screen.
  *
  *     bun -e "import {verifyPhone} from './client/src/phone.ts';
  *             console.log(verifyPhone())"
  */
 export function verifyPhone(): string[] {
-  const failures: string[] = [];
+  const failures: string[] = [...verifyPhoneModel()];
 
-  // --- The default is what the game already did.
-  {
-    const h = defaultHands();
-    if (h.primary !== SLOT.BAT || h.secondary !== SLOT.FOOTY) {
-      failures.push(
-        `The default hands are ${SLOT_NAME[h.primary]}/${SLOT_NAME[h.secondary]}, not bat/footy. ` +
-          'Every existing player has left click on the bat and right click on the footy.',
-      );
-    }
-  }
-
-  // --- Selecting what is already held changes nothing and says so.
-  {
-    const h = defaultHands();
-    if (selectSlot(h, SLOT.BAT, 'primary')) failures.push('Re-selecting the held slot reported a change.');
-    if (h.primary !== SLOT.BAT || h.secondary !== SLOT.FOOTY) failures.push('A no-op selection moved something.');
-  }
-
-  // --- The swap: asking for the bat in the off hand moves it, and the right
-  // hand takes what the off hand had.
-  {
-    const h = defaultHands();
-    if (!selectSlot(h, SLOT.BAT, 'secondary')) failures.push('Moving the bat to the off hand reported no change.');
-    if (h.secondary !== SLOT.BAT) failures.push(`The off hand holds ${SLOT_NAME[h.secondary]}, not the bat.`);
-    if (h.primary !== SLOT.FOOTY) {
-      failures.push(`After the swap the right hand holds ${SLOT_NAME[h.primary]}; it should have taken the footy.`);
-    }
-  }
-
-  // --- One bat. Never two, from any starting arrangement.
-  {
-    for (const slot of [SLOT.BAT, SLOT.FOOTY, SLOT.PHONE] as Slot[]) {
-      const h = defaultHands();
-      selectSlot(h, slot, 'primary');
-      selectSlot(h, slot, 'secondary');
-      if (h.primary === h.secondary) {
-        failures.push(`Both hands ended up holding the ${SLOT_NAME[slot]}.`);
-      }
-    }
-  }
-
-  // --- Fists are the exception: both hands may be empty.
-  {
-    const h = defaultHands();
-    selectSlot(h, SLOT.FISTS, 'primary');
-    selectSlot(h, SLOT.FISTS, 'secondary');
-    if (h.primary !== SLOT.FISTS || h.secondary !== SLOT.FISTS) {
-      failures.push('Fists in both hands was refused; there is no other way to hold nothing.');
-    }
-  }
-
-  // --- Every slot is reachable in both hands, which is the whole of what the
-  // number row promises.
-  {
-    for (const slot of [SLOT.BAT, SLOT.FOOTY, SLOT.PHONE, SLOT.FISTS] as Slot[]) {
-      for (const hand of ['primary', 'secondary'] as const) {
-        const h = defaultHands();
-        selectSlot(h, slot, hand);
-        if (h[hand] !== slot) failures.push(`Slot ${SLOT_NAME[slot]} could not be put in the ${hand} hand.`);
-      }
-    }
-    if (SLOT_NAME.length !== 4) failures.push(`${SLOT_NAME.length} slot names against four slots.`);
-  }
-
-  // --- The escaper, on the one string that can reach it from outside.
+  // --- The escaper.
   {
     const nasty = '<img src=x onerror="alert(1)">';
     if (escape(nasty).includes('<')) failures.push('The phone escaper let a tag through into innerHTML.');
@@ -546,9 +777,23 @@ export function verifyPhone(): string[] {
     // as text -- the classic double-escape, in the direction that is merely
     // ugly rather than dangerous, and still wrong.
     if (escape('<') !== '&lt;') failures.push(`escape('<') is ${escape('<')}; the ampersand pass must run first.`);
+    // The attribute case, which is new with the gallery: a caption goes into
+    // `title=` and `alt=`, and a quote in a suburb name would close it.
+    if (escape('St "Peters"').includes('"')) failures.push('The phone escaper left a quote in an attribute value.');
   }
 
-  // --- And the relative time, which is the only arithmetic on this screen.
+  // --- The filename, which is written to somebody's disk.
+  {
+    const name = photoFilename('sydrunner · Newtown · 18:42');
+    if (name !== 'sydrunner-newtown-18-42.jpg') failures.push(`A saved photo would be called "${name}".`);
+    if (photoFilename('').length === 0) failures.push('An empty caption produced an empty filename.');
+    // A path, which is the failure that matters: nothing may reach a filesystem
+    // with a separator or a traversal in it.
+    const nasty = photoFilename('../../etc/passwd');
+    if (nasty.includes('/') || nasty.includes('..')) failures.push(`A caption became the path "${nasty}".`);
+  }
+
+  // --- The relative time.
   {
     if (ago(0) !== 'just now') failures.push(`ago(0) is ${ago(0)}.`);
     if (ago(120_000) !== '2 min ago') failures.push(`ago(2 min) is ${ago(120_000)}.`);

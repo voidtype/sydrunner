@@ -1156,6 +1156,79 @@ export class CombatAudio {
       ping.stop(t + delay + 0.18);
     }
   }
+  // --- The phone's camera -------------------------------------------------------
+
+  /**
+   * The shutter: the phone's camera taking a photograph.
+   *
+   * Synthesised, obviously -- but the interesting part is *what is being
+   * synthesised*, because a smartphone has no shutter and the noise it makes is
+   * itself a synthesised imitation of a mechanical one. So this is a recording
+   * of a fake of a real thing, which means the target is not physics, it is the
+   * **convention**: two hard clicks about 45 ms apart, high, short and dry.
+   * Nobody has heard a real focal-plane shutter in twenty years and everybody
+   * knows exactly what that pair of clicks means.
+   *
+   * Two layers, on `thwack`'s structure at a twentieth of its size:
+   *
+   *   - each **click** is a noise burst through a tight bandpass at 3.4 kHz with
+   *     a 1 ms attack and a 22 ms decay. The attack is the whole thing, as it is
+   *     for the bat: what the ear reads as a mechanism is the rise time. A
+   *     bandpass rather than a highpass because an unfiltered burst reads as a
+   *     hi-hat, which is a cymbal and not a machine.
+   *   - a **tick** of body under the first one only: a 900 Hz sine for 18 ms at
+   *     a third of the level, which is the mirror going up. It is under the
+   *     first click and not the second because that is the asymmetry a real
+   *     mechanism has, and it is what stops the pair reading as a stutter.
+   *
+   * Unattenuated and not distance-scaled: the phone is in your hand. There is
+   * no remote version of this and there should not be -- a photograph is not an
+   * event in the world, and a city where you could hear other people taking
+   * pictures would be a city full of clicking.
+   */
+  shutter(): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    const noise = this.noise;
+    if (!ctx || !master || !noise) return;
+    const t = ctx.currentTime;
+
+    for (const [delay, level] of [
+      [0, 0.2],
+      [0.045, 0.16],
+    ] as Array<[number, number]>) {
+      const start = t + delay;
+      const burst = ctx.createBufferSource();
+      burst.buffer = noise;
+      // The second click is played a shade faster, which pitches it up: on a
+      // real mechanism the two halves are different masses moving at different
+      // speeds, and two identical clicks read as an echo rather than as a pair.
+      burst.playbackRate.value = delay === 0 ? 1 : 1.12;
+      const band = ctx.createBiquadFilter();
+      band.type = 'bandpass';
+      band.frequency.value = 3400;
+      band.Q.value = 2.2;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(level, start + 0.001);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.022);
+      burst.connect(band).connect(gain).connect(master);
+      burst.start(start);
+      burst.stop(start + 0.05);
+    }
+
+    const body = ctx.createOscillator();
+    body.type = 'sine';
+    body.frequency.setValueAtTime(900, t);
+    const bodyGain = ctx.createGain();
+    bodyGain.gain.setValueAtTime(0.0001, t);
+    bodyGain.gain.exponentialRampToValueAtTime(0.07, t + 0.002);
+    bodyGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.018);
+    body.connect(bodyGain).connect(master);
+    body.start(t);
+    body.stop(t + 0.04);
+  }
+
   /**
    * A bush turkey. **Synthesised**, like every impact in this file and unlike
    * the four voice clips: there are no wildlife WAVs in this build and there

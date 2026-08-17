@@ -210,11 +210,43 @@
          from under the heavier rim. Listed inner-first because the first layer
          in a `box-shadow` list is the one painted on top, so the ring stays
          crisp against the soft shadow rather than the other way round. */
+      /* THE DISC IS ON THE PHONE NOW, which is two classes and one number.
+
+         `minimap.ts`'s header carries the whole argument; the short version is
+         that the compass is a map, maps live on the phone, and what decides
+         whether this element is on the screen is whether the player is carrying
+         one. `Minimap.setScale` toggles these; nothing else may.
+
+         `.mapoff` is `display: none` rather than `visibility: hidden`, because a
+         hidden element is still laid out and still composited and this one is
+         off for whole fights at a time. The class is applied from the first
+         frame and never before -- the element is measured in `Minimap`'s
+         constructor and a `display: none` element measures zero, which would put
+         the bitmap on its 206 px fallback for the session.
+
+         `.raised` is `game/phone.MINIMAP_RAISED`, which is 1.55, and it appears
+         **twice more in this file** -- here, and as the locator's compensating
+         offset below. The three are one number and CSS cannot read a module, so
+         they are written down together and the check that keeps them honest is a
+         person reading these two rules. The origin is the top-right corner so
+         the disc grows down and to the left, away from the two window edges it
+         is inset from; growing from the centre would put it off screen.
+
+         The transition is on `transform` only. Animating `display` is not a
+         thing, and animating opacity as well would make a number key feel like a
+         menu -- the disc should appear with the phone, not fade in after it. */
+      #minimap.mapoff, #locator.mapoff { display: none; }
+      #minimap.raised { transform: scale(1.55); transform-origin: 100% 0; }
+      /* 210 px of disc becoming 325 leaves the strip 115.5 px too high, and it
+         has to scale with the map or it is 11px type under a 325px picture. */
+      #locator.raised { transform: translateY(115.5px) scale(1.55); transform-origin: 100% 0; }
+
       #minimap {
         position: fixed; top: 12px; right: 14px;
         width: 210px; height: 210px;
         border: 2px solid rgba(207,226,242,.55); border-radius: 50%;
         background: rgba(10,14,20,.55);
+        transition: transform .12s ease-out;
         /* Prefixed as well as not, because Safari only dropped the prefix at 18
            and an unprefixed-only rule fails by silently doing nothing. */
         -webkit-backdrop-filter: blur(2px);
@@ -262,6 +294,7 @@
       #locator {
         position: fixed; top: 228px; right: 14px;
         width: 210px; text-align: right;
+        transition: transform .12s ease-out;
         font-size: 11px; line-height: 1.4; letter-spacing: .02em;
         color: #cfe2f2; text-shadow: 0 1px 2px rgba(0,0,0,.85);
         display: -webkit-box; -webkit-box-orient: vertical;
@@ -812,6 +845,104 @@
         padding: 6px 11px 2px; font-size: 10px; color: #55697c; letter-spacing: .06em;
         text-align: center;
       }
+      /* The gallery: a grid of thumbnails, then one photograph with three things
+         you can do to it. `client/src/phone.ts` builds both.
+
+         Three across, which is the home screen's own grid and is therefore the
+         one column count this screen does not have to justify: at a 300px phone
+         with 10px of padding a cell is 84px, and a 320px thumbnail scaled into
+         it is legible as "that street at dusk" without being legible as a
+         street. That is the right amount for a picker.
+
+         `aspect-ratio` on the cell rather than on the image, with `object-fit:
+         cover` over it, because the frames are whatever shape the window was --
+         a 21:9 monitor and a portrait laptop both take photographs here, and a
+         grid whose rows changed height per photo would be a grid that reflows
+         every time somebody deletes one. */
+      .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+      .photo-cell {
+        padding: 0; border: 1px solid rgba(207,226,242,.14); border-radius: 7px;
+        background: rgba(207,226,242,.06); cursor: pointer; overflow: hidden;
+        aspect-ratio: 1 / 1;
+      }
+      .photo-cell:hover { border-color: rgba(207,226,242,.45); }
+      .photo-cell img { display: block; width: 100%; height: 100%; object-fit: cover; }
+      /* One photograph, full width of the screen. `auto` height, because this is
+         the one place the frame's real shape should be visible. */
+      .photo-full {
+        display: block; width: 100%; height: auto; border-radius: 8px;
+        border: 1px solid rgba(207,226,242,.14);
+      }
+      /* The three actions, side by side. `.phone-act` is the shared button and
+         this only lays them out -- except `delete`, which is the one destructive
+         control on the device and is the interface's one red. */
+      .photo-acts { display: flex; gap: 6px; }
+      .photo-acts .phone-act { font-size: 11px; padding: 8px 4px; letter-spacing: .02em; }
+      .phone-act.bad {
+        background: rgba(240,169,160,.14); border-color: rgba(240,169,160,.45);
+      }
+      .phone-act.bad:hover { background: rgba(240,169,160,.26); }
+
+      /* ---------------------------------------------------------------------
+         THE VIEWFINDER. Up while the phone's Camera app is raised, and the
+         phone overlay is hidden behind it -- see `client/src/phone.ts`.
+
+         **Four corner brackets and a line of text, and nothing else.** Every
+         instinct here is to draw a frame, a grid, a level, a battery. All of
+         them would be in the photograph's way, and the photograph is the point:
+         what a viewfinder has to say is "the picture is this rectangle and the
+         button is the left one", which is four corners and eight words.
+
+         The brackets are inset from the window rather than drawn at its edge,
+         because the captured frame is the **whole canvas** -- there is no crop
+         -- so a bracket on the edge would be a bracket that implied one. Inset,
+         they read as an aiming aid rather than as a boundary, which is honest.
+
+         `pointer-events: none` throughout: this element is over the canvas and
+         the canvas is what has to receive the click. The shutter is
+         `main.ts`'s mousedown listener going through `money.mousedown`, not a
+         button in here -- a DOM button would need the cursor back, and the whole
+         reason the viewfinder takes pointer lock is so the mouse aims. */
+      #viewfinder {
+        position: fixed; inset: 0; z-index: 45; display: none; pointer-events: none;
+      }
+      #viewfinder.shown { display: block; }
+      #viewfinder i {
+        position: absolute; width: 34px; height: 34px;
+        border: 2px solid rgba(207,226,242,.72);
+        /* The drop shadow is not decoration: a pale bracket over a bright sky at
+           midday has no contrast on its outer edge, which is the same problem
+           `#minimap`'s rim solves with a dark ring. */
+        filter: drop-shadow(0 1px 3px rgba(0,0,0,.9));
+      }
+      /* Each corner keeps two of its four borders. Written out rather than
+         rotated, because a rotation would also rotate the shadow. */
+      #viewfinder i:nth-child(1) { top: 7vh; left: 7vw; border-right: 0; border-bottom: 0; }
+      #viewfinder i:nth-child(2) { top: 7vh; right: 7vw; border-left: 0; border-bottom: 0; }
+      #viewfinder i:nth-child(3) { bottom: 7vh; left: 7vw; border-right: 0; border-top: 0; }
+      #viewfinder i:nth-child(4) { bottom: 7vh; right: 7vw; border-left: 0; border-top: 0; }
+      /* The hint, under the bottom brackets and centred: the one thing on this
+         screen that is text, so it goes where text goes in this interface --
+         `#hint`'s own font, size and shadow. */
+      #viewfinder b {
+        position: absolute; bottom: calc(7vh - 26px); left: 0; right: 0;
+        text-align: center; font-weight: 400;
+        font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: .06em; color: #cfe2f2; text-shadow: 0 1px 3px rgba(0,0,0,.9);
+      }
+      /* The shutter flash: white over everything for 80 ms.
+         `client/src/phone.ts` adds `.on` and takes it off on a timer.
+
+         Over the brackets and under nothing, and it **cannot** be in the
+         photograph: the picture is a read of the WebGPU canvas and this is a DOM
+         element in front of it. The transition is on the way *out* only -- the
+         flash has to arrive on the frame of the click, and easing in would make
+         a shutter feel like a fade. */
+      #viewfinder-flash {
+        position: absolute; inset: 0; background: #fff; opacity: 0;
+        transition: opacity .16s ease-out;
+      }
+      #viewfinder-flash.on { opacity: .82; transition: none; }
 
       /* Spec 8.3's active effects, beside the pips. Terminal-plain on purpose:
          a bordered label and a whole number of seconds, in the interface's one
@@ -1720,7 +1851,12 @@
              never puts something up while something is up. -->
         <div><kbd>esc</kbd>close panels, or open suggestions</div>
         <div><kbd>tab</kbd>scores, held</div>
-        <div><kbd>m</kbd>city map</div>
+        <!-- `m` no longer opens the map directly: it equips the phone and opens
+             the phone's Map app, because the maps are the phone's now. Kept as a
+             binding rather than removed, so a player with the key in their
+             fingers still gets there. See `client/src/game/phone.ts`'s
+             `applyMapKey` and `client/src/money.ts`'s keydown. -->
+        <div><kbd>m</kbd>phone map</div>
         <!-- The map takes the wheel off the camera while it is open, which is
              why this line says "with the map open" and the one under `movement`
              does not. See `bigmap.onWheel`. -->
@@ -1756,7 +1892,15 @@
         <div><kbd>left click</kbd>use what is in your right hand</div>
         <div><kbd>right click</kbd>use what is in your off hand</div>
         <div><kbd>3</kbd>then <kbd>left click</kbd>opens the phone — the world keeps moving</div>
-        <div>the phone has your wallet, the nearest Centrelink and SydRide</div>
+        <div>the phone has your wallet, Centrelink, SydRide, the map and a camera</div>
+        <!-- The compass moved onto the phone with everything else, and this is
+             the only place that says so. It is a loadout consequence rather than
+             a binding, which is exactly why it needs writing down: a player who
+             picks up a bat and a football and finds the map gone has no way to
+             discover that their hands did it. See `client/src/minimap.ts`. -->
+        <div>the corner map is on while the phone is in a hand — bigger when it is raised</div>
+        <div><kbd>m</kbd>gets the phone out and opens the map</div>
+        <div>camera: <kbd>left click</kbd>shoots · the gallery keeps 12 · save, or send one to the bug box</div>
         <div><kbd>e</kbd>claim $100 at a Centrelink, once a week per office</div>
         <div>you drop 10% of your cash when you go down — anyone can take it</div>
       </section>
@@ -1793,9 +1937,19 @@
               <div id="phone-appbody"></div>
             </div>
           </div>
-          <div id="phone-foot">esc to put it away</div>
+          <div id="phone-foot">esc — back, then away</div>
         </div>
       </div>
+    </div>
+
+    <!-- The viewfinder, up while the phone's Camera app is raised and the phone
+         itself is hidden behind it. Four brackets, a hint and a flash pane; the
+         CSS above says why there is nothing else in it. `client/src/phone.ts`
+         toggles `shown` here and `on` on the flash. -->
+    <div id="viewfinder">
+      <i></i><i></i><i></i><i></i>
+      <b>left click — take photo · esc — back</b>
+      <div id="viewfinder-flash"></div>
     </div>
 
     <div id="leaderboard">

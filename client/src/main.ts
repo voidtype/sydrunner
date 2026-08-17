@@ -4946,7 +4946,40 @@ async function main(): Promise<void> {
     speed: () => Math.sqrt(player.velocity.x * player.velocity.x + player.velocity.z * player.velocity.z),
     firstPerson: () => !thirdPerson,
     riding: () => playerCombat.ridingBike !== 0,
-    openMap: () => bigmap.toggle(),
+    // --- Both maps and the camera. See `client/src/game/phone.ts`.
+    //
+    // The `KeyM` block that used to sit in the keydown listener below is gone:
+    // the key equips the phone and opens its Map app now, which is a decision
+    // about the *hands* and therefore `money.ts`'s. What is left here is the
+    // three lines that key needs -- open, close, and is it up -- plus the panel
+    // housekeeping the old block did, which is unchanged and is still this
+    // file's business because `hud` and `suggestions` are.
+    openMap: () => {
+      if (!bigmap.visible) bigmap.toggle();
+      hud.setHelp(false);
+      hud.setLeaderboard(false);
+      suggestions.close();
+    },
+    closeMap: () => bigmap.close(),
+    mapVisible: () => bigmap.visible,
+    setMinimapScale: (scale) => minimap.setScale(scale),
+    minimapCanvas: () => minimap.canvas,
+    // The bug box's frame grabber, which is the only thing in this client that
+    // can read the WebGPU canvas -- see `client/src/photo.ts`.
+    capture: () => grabber.request(),
+    suburb: () => locator.stats().suburb ?? '',
+    clockMs: () => sky.now.nowMs,
+    shareToBugBox: (dataUrl, note) => {
+      suggestions.open();
+      suggestions.showTab('bug');
+      bug.attachImage(dataUrl, note);
+    },
+    shutter: () => audio.shutter(),
+    // Only the viewfinder asks, and only from the click on the Camera tile --
+    // which is the user gesture a browser requires. See `Phone.setCamera`.
+    lockPointer: () => {
+      if (!locked) void canvas.requestPointerLock();
+    },
     addMarkerSource: (source) => minimap.addMarkerSource(source),
     // Which weapon viewmodels the slots want drawn this frame.
     //
@@ -5512,25 +5545,13 @@ async function main(): Promise<void> {
       renderScale = Math.max(0.5, Math.min(1.0, renderScale + (e.code === 'Equal' ? 0.05 : -0.05)));
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * renderScale);
     }
-    // `M` opens the city map, which is what this key is now for: the minimap it
-    // used to hide is permanent, because it is the compass. See `bigmap.ts`.
-    //
-    // Edge-triggered on `held` like the swings and the control list, or key
-    // repeat flickers a full-screen panel on and off at the repeat rate.
-    //
-    // Opening it closes the other two panels rather than drawing over them --
-    // `hud.setLeaderboard`'s own rule, applied in the same direction: of two
-    // panels wanting the screen, the one being asked for *now* wins. The board
-    // is held on a key, so it can only be up here if the player is holding Tab
-    // and pressing M, and the map is the deliberate act of the two.
-    if (e.code === 'KeyM' && !held) {
-      bigmap.toggle();
-      if (bigmap.visible) {
-        hud.setHelp(false);
-        hud.setLeaderboard(false);
-        suggestions.close();
-      }
-    }
+    // `M` used to open the city map from here. **It is handled in
+    // `money.keydown` now** -- called at the top of this listener, and consuming
+    // the key -- because the map is the phone's and the key's first job is to
+    // get the phone into a hand. The panel housekeeping that was in this block
+    // moved with it, into the `openMap` dep beside `installMoney`. See
+    // `client/src/game/phone.ts` and `client/src/money.ts`.
+
     // The diagnostics, moved off `Tab` this pass to make room for the board.
     // The backquote is the console key in every game that has one and is not
     // bound to anything a player does.
@@ -10288,8 +10309,12 @@ async function main(): Promise<void> {
      * five times the footprints Alexandria does inside the same 160 m.
      *
      * `addMarkerSource(fn)` is where a remote player list goes when there is
-     * one; see `minimap.ts`. It has no `toggle` any more -- `M` opens the big
-     * map below, and this one is permanent.
+     * one; see `minimap.ts`. It has no `toggle`: what decides whether this disc
+     * is on the screen is **whether the phone is in one of your hands**, which
+     * is `setScale` and is pushed every frame from `money.frame`. So
+     * `stats().visible` and `stats().scale` are the two fields to read when the
+     * compass is not where it used to be -- and `sydney.money.equip(2)` is how
+     * to put it back from a console.
      */
     minimap,
 
@@ -11142,10 +11167,16 @@ async function main(): Promise<void> {
      *     sydney.money.report()          what is in each hand, and the balance
      *     sydney.money.equip(2)          raise the phone (0 bat, 1 footy, 3 fists)
      *     sydney.money.open()            open the phone's overlay
+     *     await sydney.money.photo()     take a photograph, no viewfinder
      *
      * `open()` is the one that earns its place: the phone needs a cursor, a
      * cursor needs pointer lock to have been released, and a browser that
      * refuses pointer lock outright has no click sequence that gets there.
+     * `photo()` is the same argument one step further -- the camera needs a
+     * raised phone, a released pointer *and* a left click -- and it resolves
+     * with the full-size JPEG data URL, so a session can grab one and inspect
+     * it without ever opening the gallery. It also files it, so
+     * `report().photos` moves.
      */
     money: money.debug,
 

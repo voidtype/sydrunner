@@ -346,6 +346,28 @@ export class BugReportForm {
   }
 
   /**
+   * Attach an image this form did not obtain, and say where it came from.
+   *
+   * The one public door onto `attach`, opened for the **phone's camera**: a
+   * photograph in the gallery has a "to bug box" button, and what it does is
+   * open this panel with the picture already on the form. Two clicks from
+   * "that looks wrong" to a report with a picture of it, which is the whole
+   * value of having a camera in a game whose defects are mostly visual -- see
+   * this file's header, which says a week of them were only ever legible as a
+   * picture.
+   *
+   * Deliberately does **not** touch the title or the body. A photograph is
+   * evidence and not a report; the player still has to say what is wrong with
+   * it, and a form that arrived pre-filled with "photo from the gallery" would
+   * be a title nobody edits.
+   */
+  attachImage(dataUrl: string, note: string): void {
+    if (dataUrl === '') return;
+    this.attach(dataUrl, note);
+    this.say('attached — now say what is wrong with it.', 'ok');
+  }
+
+  /**
    * Grab the frame behind the panel.
    *
    * The panel stays open while this happens and that is on purpose: what the

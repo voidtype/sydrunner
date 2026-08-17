@@ -49,7 +49,10 @@
 import {
   BufferAttribute,
   BufferGeometry,
+  CanvasTexture,
+  ClampToEdgeWrapping,
   Group,
+  LinearFilter,
   Mesh,
   MeshStandardNodeMaterial,
 } from 'three/webgpu';
@@ -96,14 +99,48 @@ const SCREEN_COLOUR = 0xcfe2f2;
  */
 const SCREEN_GLOW = 1.4;
 
-/** Geometry and materials, built once and shared by every phone in the world. */
+/**
+ * Geometry and materials, built once and shared by every phone in the world.
+ *
+ * ---------------------------------------------------------------------------
+ * THE SCREEN SHOWS THE MAP, AND IT IS THE MINIMAP'S OWN BITMAP
+ *
+ * "Maps live on the phone" is a claim about the interface, and the object in
+ * your hand should not contradict it by being a blank glowing rectangle. So the
+ * screen is textured with `Minimap.canvas` -- the 2D canvas the compass is
+ * already rasterising into, fifteen times a second, whether or not this exists.
+ * There is no second draw, no second clear and no second `prismsWithin`: this is
+ * a `CanvasTexture` over the same bitmap, uploaded on the frames it changed.
+ *
+ * **It is the `emissiveMap` and not the `map`.** The screen is a light source at
+ * night, which is the whole reason it reads as a phone in a dark street, and an
+ * albedo texture is not lit by anything at 2 am. Driving the *emission* with the
+ * map means the pale ink glows and the transparent parts of the minimap canvas
+ * -- everything outside the disc, which is most of the corners -- emit nothing
+ * and read as dark glass. That is what a phone showing a dark map looks like.
+ *
+ * The square canvas lands in the **top** of a portrait screen and the bottom
+ * stays dark, which is done in the UVs rather than by compositing a second
+ * canvas: `quad` puts v = 1 at the top edge and lets v run negative below the
+ * square, and `ClampToEdgeWrapping` extends the canvas's bottom row -- which is
+ * outside the disc and therefore transparent -- down to the chin. A stretched
+ * compass would have been the alternative and it is not one: a rotating map at a
+ * 2:1 vertical stretch is unreadable and, worse, wrong.
+ *
+ * A phone with no canvas handed in keeps the flat emissive screen it had before
+ * this pass, and that is a working configuration rather than an error path --
+ * see `verifyPhoneModel`'s counterpart argument about a `Gallery` with no
+ * storage. It is also what a caller gets in a test.
+ */
 export class PhoneAssets {
   readonly body: BufferGeometry;
   readonly screen: BufferGeometry;
   readonly bodyMaterial: MeshStandardNodeMaterial;
   readonly screenMaterial: MeshStandardNodeMaterial;
+  /** The map on the glass, or null on a phone that was given no canvas. */
+  private readonly screenTexture: CanvasTexture | null;
 
-  constructor() {
+  constructor(screenCanvas: HTMLCanvasElement | null = null) {
     this.body = slab(WIDTH, HEIGHT, DEPTH);
     // A flat quad rather than a second slab: the glass has no thickness worth
     // drawing and a box here would be twelve triangles instead of two.
@@ -123,6 +160,53 @@ export class PhoneAssets {
       roughness: 0.9,
       metalness: 0,
     });
+
+    let texture: CanvasTexture | null = null;
+    if (screenCanvas !== null) {
+      try {
+        texture = new CanvasTexture(screenCanvas);
+        // Clamped, because the UVs deliberately run outside [0,1] below the
+        // square -- see the header. Repeating would tile the compass down the
+        // chin of the phone, and mirroring would put an upside-down one there.
+        texture.wrapS = ClampToEdgeWrapping;
+        texture.wrapT = ClampToEdgeWrapping;
+        // No mipmaps: this bitmap is replaced fifteen times a second and
+        // regenerating a chain each time is the one cost that would make this
+        // arrangement expensive. Linear both ways is right for an object that is
+        // 7 cm across and never seen at a distance where a mip would help.
+        texture.generateMipmaps = false;
+        texture.minFilter = LinearFilter;
+        texture.magFilter = LinearFilter;
+        this.screenMaterial.emissiveMap = texture;
+        // The albedo stays the flat screen colour. Only the emission is the map;
+        // see the header for why that is the readable half.
+      } catch {
+        // A renderer or a canvas that will not make a texture. The phone keeps
+        // its plain lit screen, which is exactly what it had before this pass.
+        texture = null;
+      }
+    }
+    this.screenTexture = texture;
+  }
+
+  /**
+   * The map on the glass has changed. Called from the frame loop.
+   *
+   * A flag rather than an upload: three re-uploads the canvas at the next draw
+   * that uses the material, so setting this every frame costs one boolean write
+   * and setting it never means a screen frozen on the first frame the phone was
+   * drawn. It is set unconditionally rather than gated on the minimap's own
+   * 15 Hz clock because the two clocks are not synchronised and a missed frame
+   * would be a visibly stuttering screen -- the upload is the same bitmap and
+   * the driver's own dirty tracking is the thing that makes it cheap.
+   */
+  refreshScreen(): void {
+    if (this.screenTexture !== null) this.screenTexture.needsUpdate = true;
+  }
+
+  /** Is the handset showing the compass, or a blank lit rectangle? */
+  get screenIsMap(): boolean {
+    return this.screenTexture !== null;
   }
 
   get triangles(): number {
@@ -403,7 +487,30 @@ function slab(w: number, h: number, d: number): BufferGeometry {
   return geometry;
 }
 
-/** A single front-facing quad at `z`, for the glass. */
+/**
+ * A single front-facing quad at `z`, for the glass -- with UVs that put a
+ * **square** texture in the top of a portrait screen.
+ *
+ * The one piece of arithmetic in this file that is not obvious, so it is worth
+ * deriving. The screen is `w` by `h` metres with `h > w`, and the thing being
+ * mapped onto it is a square bitmap (the compass). Filling the quad with
+ * v ∈ [0, 1] would stretch that square to the screen's 1 : `h/w` aspect, which
+ * for this handset is 1 : 2.16 -- a rotating map two-and-a-bit times taller than
+ * it is wide, which is not a map.
+ *
+ * So the square is laid into the **top** of the screen at the screen's own
+ * width, occupying `w / h` of its height, and the UVs are chosen to make that
+ * true: v = 1 at the top edge (three's `flipY` puts the image's first row
+ * there), and v = 1 − h/w at the bottom, which is negative for any portrait
+ * screen. Everything below the square samples outside the texture and is
+ * `ClampToEdgeWrapping`'d to the bitmap's bottom row -- which, on a circular
+ * minimap in a square canvas, is fully transparent, so the chin of the phone
+ * emits nothing and reads as dark glass. See `PhoneAssets`.
+ *
+ * A quad with no texture on it ignores all of this, which is why the attribute
+ * is written unconditionally rather than only when a canvas was handed in: one
+ * geometry, shared, and eight floats is not a cost.
+ */
 function quad(w: number, h: number, z: number): BufferGeometry {
   const x = w / 2;
   const y = h / 2;
@@ -415,6 +522,13 @@ function quad(w: number, h: number, z: number): BufferGeometry {
   geometry.setAttribute(
     'normal',
     new BufferAttribute(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]), 3),
+  );
+  // Vertices are (bottom-left, bottom-right, top-right, top-left); see the
+  // positions above.
+  const vBottom = 1 - h / w;
+  geometry.setAttribute(
+    'uv',
+    new BufferAttribute(new Float32Array([0, vBottom, 1, vBottom, 1, 1, 0, 1]), 2),
   );
   geometry.setIndex([0, 1, 2, 0, 2, 3]);
   return geometry;

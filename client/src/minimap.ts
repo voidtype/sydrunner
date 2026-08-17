@@ -180,6 +180,32 @@
  * So the toggle is gone rather than merely unbound. What replaced it is
  * `collect`, which hands the big map this one's marker sources so the two can
  * never disagree about what is in the world.
+ *
+ * ---------------------------------------------------------------------------
+ * AND THEN IT MOVED ONTO THE PHONE, WHICH IS NOT THE SAME AS BEING TOGGLED.
+ *
+ * The paragraphs above argue that this disc must be permanent, and the argument
+ * is still right about the thing it was made about: **a key** that dismissed the
+ * compass would take navigation away mid-fight to save 0.017 ms, and no such key
+ * exists now either.
+ *
+ * What decides it instead is what the player is **carrying**. The owner's line
+ * was "maps should be accessible thru phone only", and the compass is a map. So
+ * the disc is on the screen while the phone is in one of your two hands and not
+ * otherwise -- which is a state the player chose on the number row, can see in
+ * their own hands, and trades for something (a bat *and* a football is two
+ * weapons and no map). That is a loadout decision rather than an interface
+ * option, and it is the one shape of "the map can be off" this file's own
+ * argument does not rule out.
+ *
+ * Mechanically it is one method, `setScale`, and everything it does is a class
+ * on two elements plus an early return in `update`. The **size** is a CSS
+ * transform rather than a second bitmap: this class derives `size`, `dpr` and
+ * `scale` once in its constructor from the element's content box, so a genuinely
+ * larger map would mean re-deriving all three and re-rasterising at a new pixel
+ * density -- for a picture whose content is 30 px blocks and reads perfectly
+ * well re-sampled. See `game/phone.MINIMAP_RAISED` for the number and
+ * `index.html` for the two rules that consume it.
  */
 
 import type { CollisionWorld, Prism } from './player/collision.ts';
@@ -535,6 +561,14 @@ const TIMING_SAMPLES = 60;
 
 export class Minimap implements MarkerSink {
   private readonly ctx: CanvasRenderingContext2D;
+  /**
+   * The element itself, kept as well as its context.
+   *
+   * For two things this class did not used to do: `setScale` toggles classes on
+   * it, and `canvas` hands it out so `world/phone.ts` can use the same bitmap as
+   * the handset's screen texture -- one rasterisation, drawn twice.
+   */
+  private readonly element: HTMLCanvasElement;
   private readonly collision: CollisionWorld;
   private readonly sources: MarkerSource[] = [];
   /**
@@ -584,6 +618,18 @@ export class Minimap implements MarkerSink {
    */
   private readonly prismKinds: Array<HazardKind | null> = [];
 
+  /**
+   * How large the disc is drawn, or 0 for not drawn at all. See `setScale`.
+   *
+   * **1 rather than 0 at construction**, and it is not a preference: the element
+   * is measured in the constructor and a `display: none` element has a
+   * `clientWidth` of zero, which would put this map on its 206 px fallback for
+   * the whole session. So it starts laid out, and the first frame -- which runs
+   * before anything is composited -- puts it where the player's hands say. See
+   * `money.frame`, which pushes the scale every frame.
+   */
+  private scaleFactor = 1;
+
   /** Where `mark` culls against, set at the top of each redraw. */
   private centreX = 0;
   private centreZ = 0;
@@ -610,6 +656,7 @@ export class Minimap implements MarkerSink {
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) throw new Error('The minimap canvas would not give a 2D context.');
     this.ctx = ctx;
+    this.element = canvas;
     this.collision = collision;
     this.readout = readout;
 
@@ -640,6 +687,70 @@ export class Minimap implements MarkerSink {
    */
   addMarkerSource(source: MarkerSource): void {
     this.sources.push(source);
+  }
+
+  /**
+   * The bitmap this class rasterises into.
+   *
+   * Handed out for exactly one purpose: `world/phone.ts` wraps it in a
+   * `CanvasTexture` so the handset's screen shows the map that is already being
+   * drawn. One rasterisation, two surfaces -- which is the only version of "the
+   * map is on the phone screen" that does not double the 15 Hz cost this file's
+   * header spends four paragraphs justifying.
+   *
+   * The element and not the context, because a texture wants the element; and
+   * read-only by convention, because a second writer would be a second thing
+   * clearing it.
+   */
+  get canvas(): HTMLCanvasElement {
+    return this.element;
+  }
+
+  /**
+   * How large to draw the disc, or 0 to take it off the screen entirely.
+   *
+   * Pushed every frame by `money.frame` from `game/phone.minimapScale`, which is
+   * where the rule lives; this method is only the consequence. A boolean compare
+   * when nothing has changed, which is every frame but the two a number key
+   * produces.
+   *
+   * **The locator strip goes with the disc**, both ways. "King Street, Newtown"
+   * with no plan above it is a caption with no picture, and a strip that stayed
+   * behind when the map left would sit against the top-right edge looking like a
+   * label for the sky.
+   *
+   * A hidden map **stops redrawing**, which is the one part of this that is not
+   * purely cosmetic: `update` returns before `draw`, so a player fighting with a
+   * bat and a football pays nothing at all for a map they are not carrying --
+   * no `prismsWithin`, no path build, no fill. That is the answer to the header's
+   * old worry about what a toggle would save. It saves 0.017 ms and the point
+   * was never the microseconds.
+   */
+  setScale(scale: number): void {
+    if (scale === this.scaleFactor) return;
+    const wasOff = this.scaleFactor <= 0;
+    this.scaleFactor = scale;
+    // Coming back on, redraw on the **next** frame rather than at the next tick
+    // of the 15 Hz clock. The bitmap still holds whatever was on it when the
+    // phone went away, which may be a different suburb entirely, and up to 66 ms
+    // of a map of somewhere else is exactly the kind of wrong a player would
+    // read as the map being broken. One redraw, on the frame a number key was
+    // pressed.
+    if (wasOff && scale > 0) this.clock = REDRAW_DT;
+    const off = scale <= 0;
+    // `raised` is a single class rather than an inline `transform`, so the two
+    // elements' transforms -- the disc's scale and the strip's compensating
+    // offset, which are one number in two places -- stay in `index.html` beside
+    // the layout they are derived from.
+    this.element.classList.toggle('mapoff', off);
+    this.element.classList.toggle('raised', scale > 1);
+    this.readout?.classList.toggle('mapoff', off);
+    this.readout?.classList.toggle('raised', scale > 1);
+  }
+
+  /** Is the compass on the screen? For the console handle and the checks. */
+  get shown(): boolean {
+    return this.scaleFactor > 0;
   }
 
   /**
@@ -772,6 +883,12 @@ export class Minimap implements MarkerSink {
    * this is a picture of the present and there is nothing to catch up on.
    */
   update(dt: number, x: number, z: number, yaw: number): void {
+    // Not on the screen, not drawn. See `setScale`: the map is the phone's now,
+    // and a player carrying a bat and a football is carrying no map -- so this
+    // is the frame loop's cheapest possible answer rather than a redraw nobody
+    // can see. The marker sources are unaffected: `collect` is a separate path
+    // and the big map still reads them.
+    if (this.scaleFactor <= 0) return;
     this.clock += dt;
     if (this.clock < REDRAW_DT) return;
     this.clock = 0;
@@ -1030,6 +1147,8 @@ export class Minimap implements MarkerSink {
    */
   stats(): {
     visible: boolean;
+    /** 0 off, 1 in the corner, `MINIMAP_RAISED` with the phone up. */
+    scale: number;
     mapKey: string;
     readout: string;
     hz: number;
@@ -1061,12 +1180,13 @@ export class Minimap implements MarkerSink {
     const sorted = Array.from(this.timings.subarray(0, n)).sort((a, b) => a - b);
     const round = (v: number): number => Math.round(v * 1000) / 1000;
     return {
-      // Always. The disc and the strip under it are permanent as of the pass
-      // that gave `M` to the big map -- the field and the toggle behind this are
-      // gone, and the key is reported so a console session can see which map it
-      // belongs to now. See the header.
-      visible: true,
-      mapKey: 'M opens the big map; this one is permanent',
+      // Whether the phone is in a hand, which is the whole of what decides it
+      // now. Reported rather than assumed because a compass that is off looks
+      // exactly like a compass that is broken, and this is the one field that
+      // tells the two apart from a console. See `setScale`.
+      visible: this.shown,
+      scale: this.scaleFactor,
+      mapKey: 'M equips the phone and opens its map; the compass follows the phone',
       // The last line handed to the strip. Reported here as well as in
       // `locator.stats()` because this is the end of the pipe: a readout that
       // is right in the locator and blank on screen is a missing `#locator`
