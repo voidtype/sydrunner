@@ -2670,7 +2670,11 @@ async function checkBikes(): Promise<void> {
             // At a road speed, because the knockback now scales with it: a car
             // in one of its parked stages is stationary and shoves nobody, and
             // this case is a *run-down*. See `traffic.carHitStrength`.
-            stage: CAR_STAGE_DRIVING, routeT: 0, speed: 12, identity: 0,
+            // Undamaged and unheld, which is what an ambient car at a road speed
+            // always is: both fields exist on every pose since the crash damage
+            // and the queueing landed, and neither means anything to
+            // `applyCarHit`.
+            stage: CAR_STAGE_DRIVING, routeT: 0, speed: 12, identity: 0, damage: 0, held: 0,
           });
         },
       },

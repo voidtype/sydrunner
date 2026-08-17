@@ -2595,6 +2595,7 @@ export function decodeBikes(buffer: ArrayBuffer): BikeRecord[] | null {
  *       i32  x, y, z    millimetres, as every position on this wire is
  *       u16  yaw
  *       i16  speed      centimetres per second, signed
+ *       u8   health     0..100, `driving.CAR_HEALTH_MAX` down to a write-off
  *
  * **Upsert semantics with an explicit delete**, which is the one place this
  * diverges from `MSG.BIKES` one section up, and the divergence is forced. A bike
@@ -2618,8 +2619,20 @@ export function decodeBikes(buffer: ArrayBuffer): BikeRecord[] | null {
  * derived from nothing at all, and the frame a car is **taken**, where the
  * record arrives before the driver's next snapshot does.
  *
+ * **The health byte is the crash damage**, and it is a byte on the record rather
+ * than a message of its own because it changes on exactly the ticks a record was
+ * going to be sent anyway. A crash is a change to a car, the car is already an
+ * upsert, and a `MSG.CAR_DAMAGE` would be a second way to say the same thing
+ * that a client could receive out of order with the first. It is *not* derived
+ * on the client for the reason nothing else here is: the server decides how hard
+ * you hit the wall, and a client that decided its own would be a client that
+ * repaired its own car. See `driving.CarField.damage`.
+ *
  * At a plausible worst case -- a dozen cars taken in a busy room -- the join
- * message is 316 B, and a single theft is 30 B.
+ * message is 328 B, and a single theft is 31 B. At `driving.MAX_DRIVEN_CARS`,
+ * which is the ceiling now that cars no longer expire, a joiner's full set is
+ * 12.4 kB -- sent once, on a connection that has just streamed a megabyte of
+ * collision prisms.
  */
 export interface CarRecord {
   id: number;
@@ -2635,9 +2648,30 @@ export interface CarRecord {
   yaw: number;
   /** Signed, m/s. */
   speed: number;
+  /**
+   * Condition, 0..100. `driving.CAR_HEALTH_MAX` is a car nobody has crashed and
+   * 0 is a write-off.
+   *
+   * **Optional on the way in and always present on the way out**, which is the
+   * shape every field added to a record on this wire after the fact should have:
+   * a caller that predates the crash damage -- `sim.carDelta`'s removal rows,
+   * the self-check below -- means "undamaged" rather than "written off", and
+   * `encodeCars` supplies the default so there is one place that decision is
+   * made rather than one per call site.
+   */
+  health?: number;
   /** True for "this record is gone", and then every field but `id` is meaningless. */
   removed?: boolean;
 }
+
+/**
+ * A car nobody has crashed. `driving.CAR_HEALTH_MAX`, repeated here for the
+ * reason `traffic.TRAFFIC_EPOCH_MS` is repeated in `traffic.ts`: the *encoder*
+ * needs it before it has read anything, and `net/protocol.ts` may not import
+ * `game/driving.ts` -- the dependency runs the other way. `verifyDriving`
+ * asserts the two agree.
+ */
+export const CAR_HEALTH_FULL = 100;
 
 /** Header flag: this message is the whole set and replaces whatever the client had. */
 export const CARS_FULL = 1 << 0;
@@ -2645,8 +2679,8 @@ export const CARS_FULL = 1 << 0;
 export const CAR_REMOVED = 1 << 0;
 
 export const CARS_HEADER_BYTES = 4;
-/** 2 + 4 + 2 + 1 + 1 + 4 + 4 + 4 + 2 + 2. Asserted in `verifyNet`, which is how it got right. */
-export const CAR_RECORD_BYTES = 26;
+/** 2 + 4 + 2 + 1 + 1 + 4 + 4 + 4 + 2 + 2 + 1. Asserted in `verifyNet`, which is how it got right. */
+export const CAR_RECORD_BYTES = 27;
 
 export function carsBytes(count: number): number {
   return CARS_HEADER_BYTES + count * CAR_RECORD_BYTES;
@@ -2662,6 +2696,13 @@ export function carsBytes(count: number): number {
 function quantiseCarSpeed(v: number): number {
   const cm = Math.round(v * 100);
   return cm < -32768 ? -32768 : cm > 32767 ? 32767 : cm;
+}
+
+/** A health as a `u8`. `undefined` is a car nobody has crashed. See `CarRecord.health`. */
+function clampHealth(v: number | undefined): number {
+  if (v === undefined) return CAR_HEALTH_FULL;
+  const n = Math.round(v);
+  return n < 0 ? 0 : n > 255 ? 255 : n;
 }
 
 export function encodeCars(cars: readonly CarRecord[], full = false): ArrayBuffer {
@@ -2685,6 +2726,11 @@ export function encodeCars(cars: readonly CarRecord[], full = false): ArrayBuffe
     v.setInt32(p + 18, quantisePos(c.z), true);
     v.setUint16(p + 22, quantiseYaw(c.yaw), true);
     v.setInt16(p + 24, quantiseCarSpeed(c.speed), true);
+    // Rounded and clamped rather than trusted, on the model nibble's rule one
+    // block up: the damage curve produces a float and a `setUint8` handed 101.4
+    // writes 101, while one handed -1 writes 255 -- a written-off car that comes
+    // out of the wire in better condition than it went in.
+    v.setUint8(p + 26, clampHealth(c.health));
     p += CAR_RECORD_BYTES;
   }
   return buffer;
@@ -2716,6 +2762,7 @@ export function decodeCars(buffer: ArrayBuffer): { cars: CarRecord[]; full: bool
       z: dequantisePos(v.getInt32(p + 18, true)),
       yaw: dequantiseYaw(v.getUint16(p + 22, true)),
       speed: v.getInt16(p + 24, true) / 100,
+      health: v.getUint8(p + 26),
     });
     p += CAR_RECORD_BYTES;
   }
@@ -4066,8 +4113,8 @@ export function verifyNet(): string[] {
   //     the HUD says is doing -1,100 km/h.
   {
     const cars: CarRecord[] = [
-      { id: 1, carId: 0xdeadbeef, driver: 0, body: 4, colour: 7, x: -364.25, y: -31.75, z: 2682.5, yaw: 0.75, speed: -6.6 },
-      { id: 65535, carId: 1, driver: 65535, body: 0, colour: 0, x: 3999.99, y: -70.125, z: -3999.99, yaw: 6.28, speed: 22 },
+      { id: 1, carId: 0xdeadbeef, driver: 0, body: 4, colour: 7, x: -364.25, y: -31.75, z: 2682.5, yaw: 0.75, speed: -6.6, health: 0 },
+      { id: 65535, carId: 1, driver: 65535, body: 0, colour: 0, x: 3999.99, y: -70.125, z: -3999.99, yaw: 6.28, speed: 22, health: 37 },
       { id: 74, carId: 0x80000000, driver: 12, body: 2, colour: 3, x: 0, y: 0, z: 0, yaw: 0, speed: 0, removed: true },
     ];
     const frame = encodeCars(cars, true);
@@ -4098,6 +4145,16 @@ export function verifyNet(): string[] {
         if (Math.abs(b.speed - a.speed) > 0.02) {
           failures.push(`Car ${a.id}: speed ${a.speed} came back as ${b.speed}; the tolerance is 2 cm/s.`);
         }
+        // **A `u8` and therefore exact**, unlike every other field on this
+        // record. A tolerance here would hide the one failure that matters: a
+        // written-off car (0) is not "about zero", it is the difference between
+        // an engine that turns over and one that does not, and a health that
+        // came back as 255 because a negative was written unclamped is a car
+        // that repaired itself on the wire.
+        const wantHealth = a.health ?? CAR_HEALTH_FULL;
+        if (b.health !== wantHealth) {
+          failures.push(`Car ${a.id}: health ${wantHealth} came back as ${b.health}.`);
+        }
         for (const [axis, want, back] of [['x', a.x, b.x], ['y', a.y, b.y], ['z', a.z, b.z]] as Array<[string, number, number]>) {
           if (Math.abs(back - want) > 0.01) {
             failures.push(`Car ${a.id}: ${axis} ${want} came back as ${back}; the tolerance is 1 cm.`);
@@ -4117,6 +4174,28 @@ export function verifyNet(): string[] {
     const partial = decodeCars(short);
     if (partial === null || partial.cars.length !== 1) {
       failures.push(`A CARS message truncated mid-record decoded ${partial?.cars.length ?? 'null'} cars, not 1.`);
+    }
+    // A record written by a caller that predates the health byte comes back
+    // undamaged rather than written off. See `CarRecord.health`: this is the
+    // clause that stops `sim.carDelta`'s zeroed removal rows -- and any other
+    // caller that omits the field -- from describing a fleet of wrecks.
+    const bare = decodeCars(encodeCars([
+      { id: 3, carId: 9, driver: 0, body: 1, colour: 1, x: 0, y: 0, z: 0, yaw: 0, speed: 0 },
+    ]));
+    if (bare === null || bare.cars[0]?.health !== CAR_HEALTH_FULL) {
+      failures.push(
+        `A record encoded with no health came back at ${bare?.cars[0]?.health}; an omitted health is ` +
+          `a car nobody has crashed, not a write-off.`,
+      );
+    }
+    // And a health outside the byte is clamped rather than wrapped: `setUint8`
+    // given -1 writes 255, which is a wreck arriving in better condition than
+    // any car in the city.
+    const wild = decodeCars(encodeCars([
+      { id: 4, carId: 9, driver: 0, body: 1, colour: 1, x: 0, y: 0, z: 0, yaw: 0, speed: 0, health: -1 },
+    ]));
+    if (wild === null || wild.cars[0]?.health !== 0) {
+      failures.push(`A negative health came back as ${wild?.cars[0]?.health}, not 0. The byte wrapped.`);
     }
   }
 

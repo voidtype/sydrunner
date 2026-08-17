@@ -664,13 +664,41 @@ export interface CarPose {
    * the matching function for the static fleet.
    */
   identity: number;
+  /**
+   * How wrecked this car is, 0 (nobody has touched it) to 1 (written off).
+   *
+   * **Always zero for a schedule car and never anything else**, and that is the
+   * whole reason it lives on this record rather than on `driving.DrivenCar`
+   * where the number actually is. Everything that draws a car in this client --
+   * the box fleet in `world/cars.ts`, the model fleet in `world/carlod.ts`, the
+   * headlights in `world/nightlights.ts` -- takes a `CarPose` and asks it no
+   * questions about where it came from, which is `drivenCarPose`'s whole
+   * argument. A dent that had to travel by any other route would be a second
+   * draw path for driven cars only, which is exactly the "the car you steer does
+   * not look like traffic" that `world/drivencars.ts` exists to avoid.
+   *
+   * A *fraction* rather than the record's 0..100 because every consumer is a
+   * renderer multiplying something by it. `driving.damageFraction` is the one
+   * place the conversion happens.
+   */
+  damage: number;
+  /**
+   * How far behind its timetable this car is being held, metres. See `resolveHeld`.
+   *
+   * Zero for every car in the city that is not stuck behind something a player
+   * left in the lane. Written by `forEachCarNear` *after* `poseCar` has placed
+   * the car, and the position on this record has already had it applied -- this
+   * field is what the hold is, exposed so a check can assert two `TrafficField`s
+   * agree about it and so the dev overlay can count the cars that are queued.
+   */
+  held: number;
 }
 
 export function createCarPose(): CarPose {
   return {
     route: 0, slot: 0, x: 0, y: 0, z: 0, dx: 0, dz: 1,
     body: 0, colour: 0, scale: 1, halfLength: 0, halfWidth: 0, height: 0,
-    stage: CAR_STAGE_DRIVING, routeT: 0, speed: 0, identity: 0,
+    stage: CAR_STAGE_DRIVING, routeT: 0, speed: 0, identity: 0, damage: 0, held: 0,
   };
 }
 
@@ -1274,6 +1302,21 @@ export function compareRoutes(a: LaneRoute, b: LaneRoute): number {
  * code than a second incremental structure nobody queries.
  */
 export class TrafficField {
+  /**
+   * Which cars a player has left standing in the road, and how far behind the
+   * traffic behind them is. See `HoldLedger`.
+   *
+   * **On the field rather than passed to every query**, and that is the whole
+   * reason the hold reaches every consumer: `forEachCarNear` is the one iterator
+   * the box fleet, the model fleet, the knockdown test and the server all go
+   * through, and it can only apply a rule it can reach. A parameter would have
+   * meant editing four call sites and hoping a fifth never appeared.
+   *
+   * A fresh field's ledger is not live and costs one boolean per pose, which is
+   * what makes a room where nobody has stolen a car pay nothing at all.
+   */
+  readonly held = new HoldLedger();
+
   private readonly tiles = new Map<string, TileLanes>();
   private flat: LaneRoute[] = [];
   private readonly grid = new Map<number, LaneRoute[]>();
@@ -1650,6 +1693,13 @@ export function poseCar(route: LaneRoute, slot: number, now: number, out: CarPos
   const z1 = route.z[lo + 1];
   out.route = route.rid;
   out.slot = slot;
+  // A schedule car is never dented and is never held **by this function**: the
+  // hold is applied one layer out, by `forEachCarNear`, because it needs the
+  // driven roster and this function is a pure lookup over the sidecar. Cleared
+  // here rather than left, because the pose object is reused and the last car it
+  // described may well have been a wreck queued behind somebody's Camry.
+  out.damage = 0;
+  out.held = 0;
   // Who this is. `h` and not a fresh hash of it: every other per-car choice
   // below is drawn from this same number, so a consumer keying a 3D model off
   // the identity is keying off the same draw the body type came from -- and a
@@ -1749,16 +1799,523 @@ export function forEachCarNear(
 ): void {
   const now = trafficSeconds(tick);
   const range: SlotRange = { first: 0, last: -1 };
+  const held = field.held;
   for (const route of field.near(x, z, radius, scratch)) {
     liveSlots(route, now, range);
     for (let slot = range.first; slot <= range.last; slot++) {
       if (!poseCar(route, slot, now, pose)) continue;
+      // **The queue behind a car somebody left in the lane, applied here and
+      // nowhere else.** See `resolveHeld`: putting it inside the one iterator
+      // every consumer already goes through is the whole of how the box fleet,
+      // the model fleet, the knockdown test and the server get *one* answer
+      // rather than four that have to agree. The radius test below runs on the
+      // held position, which is the position the car is actually at.
+      if (held.live) resolveHeld(pose, held, tick);
       const dx = pose.x - x;
       const dz = pose.z - z;
       if (dx * dx + dz * dz > radius * radius) continue;
       if (visit(pose) === true) return;
     }
   }
+}
+
+// --- Yielding to a car somebody left in the lane --------------------------------
+
+/**
+ * How far behind a blocker a held car stands, centre to centre, metres.
+ *
+ * The brief's 6, and it is centre-to-centre rather than bumper-to-bumper because
+ * that is the number this file can state without knowing which of five bodies
+ * either car is. Two sedans at 4.6 m leave 1.4 m of gap, which is a car stopped
+ * behind another car; a van behind a van leaves 0.6 m, which is a car stopped
+ * behind another car in Surry Hills.
+ */
+export const HOLD_GAP = 6;
+
+/**
+ * How far to either side of its own route a car looks for a blocker, metres.
+ *
+ * A lane is 3.5 m and a car is 1.9 m at its widest, so 2.6 m of half-width is
+ * "in my lane, or far enough into it to matter" and excludes the oncoming lane
+ * -- which is the case this number exists for. Sydney's lanes are 3.5 m centres
+ * apart, so a car parked in the opposing lane sits at 3.5 m of lateral offset
+ * and is correctly ignored: traffic does not queue behind a car on the other
+ * side of the road.
+ */
+const HOLD_LANE_HALF = 2.6;
+
+/**
+ * How far *past* a blocker a car may be and still count as inside it, metres.
+ *
+ * The brief's "(or inside)". Half of the longest body plus a little: a car whose
+ * centre is within this of the blocker's centre is interpenetrating it, and the
+ * answer to interpenetration is to put the car behind, not to let it carry on
+ * through.
+ */
+const HOLD_INSIDE = 3;
+
+/**
+ * The most a car will fall behind its timetable before the hold gives up,
+ * metres.
+ *
+ * **A ceiling and not a tuning knob**, and it is the one place this feature
+ * lies. A held car's timetable keeps running while the car stands still, so the
+ * lag grows at the class speed for as long as the blocker is there -- a car left
+ * in Broadway overnight would otherwise hold the 8 a.m. traffic 400 km behind
+ * schedule, and every car on the route would be stacked in one three-metre box
+ * because this rule only knows about *driven* blockers and not about the queue
+ * it is building.
+ *
+ * Past this the hold is abandoned and the car resumes its timetable -- which
+ * means it drives through the wreck, exactly as every car in this city did
+ * before this rule existed. That is a much smaller lie than five cars in one
+ * parking space, and it is bounded: at a residential 12.5 m/s a blocker holds
+ * the car behind it for 2.4 s and then the street goes back to being a street.
+ */
+const HOLD_MAX_LAG = 30;
+
+/**
+ * The fastest a car closes the gap on its own timetable, m/s, on top of the
+ * schedule speed it is already doing.
+ *
+ * Bounded twice, and the second bound is the brief's: `min(this, 0.5 x the
+ * car's current schedule speed)`, so a recovering car's ground speed is at most
+ * 1.5x what its class allows and a car stopped at a red does not catch up at
+ * all -- it is stopped. The absolute cap is what stops a motorway car making up
+ * 30 m in a second and a half, which reads as a teleport with extra steps.
+ */
+const HOLD_CATCH_UP = 4;
+
+/**
+ * How many identities the ledger remembers, and how stale an entry may be.
+ *
+ * Bounded because the alternative is a map keyed on every car that has ever
+ * queued behind anything in a session -- `world/drivencars.ts`' `lastSpeed` map
+ * makes the same argument in the same words. 5 s is twenty times the interval
+ * between two evaluations of the same car at the worst frame rate this client
+ * tolerates, so nothing live is ever evicted.
+ */
+const HOLD_LEDGER_MAX = 256;
+const HOLD_EVICT_TICKS = 300;
+
+/** One car's place in the queue. See `HoldLedger`. */
+interface HoldEntry {
+  /** Metres behind the timetable, as measured at `atTick`. */
+  lag: number;
+  /** The tick `lag` was measured at. The catch-up is a closed form from here. */
+  atTick: number;
+  /** The last tick this identity was looked at, for eviction. */
+  seen: number;
+}
+
+/** What `resolveHeld` needs to know about a car somebody is driving or has left. */
+export interface HoldBlocker {
+  x: number;
+  y: number;
+  z: number;
+  /** Half the body's length, metres. The caller has `CAR_BODY_SIZE`; this file will not guess. */
+  halfLength: number;
+}
+
+/**
+ * Grid cell for the blocker index, metres. See `HoldLedger.forEachBlocker`.
+ *
+ * 32 m rather than the route grid's 256, because the query radius is a car
+ * length plus the gap and not a route's plan bounds: a 32 m cell means the
+ * two-by-two block a query touches is almost always empty, which is the whole
+ * cost of this feature for the 99.9 % of Sydney nobody has left a car in.
+ */
+const HOLD_CELL = 32;
+
+/**
+ * How far from a pose a blocker can be and still hold it, metres.
+ *
+ * The gap, plus the longest body, plus slack. **Much tighter than the brief's
+ * 120 m spatial gate**, and deliberately: 120 m is a budget ("no car further
+ * than this is ever tested") and this is the geometry ("no car further than this
+ * can possibly matter"). A gate that is stricter than the budget satisfies the
+ * budget.
+ */
+const HOLD_QUERY = 14;
+
+/**
+ * Which cars are standing in the road, and how far behind them everybody is.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS IS STATE IN A FILE WHOSE WHOLE ARGUMENT IS THAT IT HAS NONE.
+ *
+ * The header of this file says a car is a lookup and that nothing here is
+ * stepped, and that is still true of `poseCar`: the timetable is untouched. What
+ * this class holds is the *difference* between the timetable and where the car
+ * has been forced to stand, and there is no closed form for it -- how far behind
+ * a car is depends on how long the thing in front of it has been there, which is
+ * a fact about a player's Camry and not about the sidecar.
+ *
+ * So the state is admitted rather than smuggled, and it is made to obey the
+ * determinism rule the rest of the file obeys, by three properties:
+ *
+ *   1. **Its inputs are on the wire.** The blockers are `MSG.CARS` records,
+ *      which both ends hold identically (`driving.CarField`), and the tick is
+ *      the shared traffic clock. Two processes handed the same roster at the
+ *      same tick compute the same hold.
+ *   2. **The recovery is a closed form.** An entry stores the lag and the tick
+ *      it was measured at, and the catch-up is `lag - rate x elapsed` evaluated
+ *      fresh -- not an integration, which would depend on how often it was
+ *      sampled. The client draws at 144 Hz and the server steps at 60 and they
+ *      agree to the tick.
+ *   3. **It is bounded and self-healing.** `HOLD_MAX_LAG` caps how wrong it can
+ *      get and `HOLD_EVICT_TICKS` throws away anything nobody has asked about,
+ *      so a divergence -- a client that dropped frames through the moment a
+ *      blocker appeared -- is a fraction of a metre and is gone within seconds.
+ *
+ * `live` is the whole of the cost for a room where nobody has taken a car: one
+ * boolean compared once per pose. `world/cars.TrafficMovers.suppress` is null
+ * for the same reason and states it in the same words.
+ */
+export class HoldLedger {
+  /** False when nobody has left a car anywhere. One comparison per pose. */
+  live = false;
+
+  private readonly grid = new Map<number, HoldBlocker[]>();
+  private readonly entries = new Map<number, HoldEntry>();
+
+  /**
+   * Replace the roster of things traffic yields to.
+   *
+   * Called once a tick on the server and once a frame on the client, from the
+   * same `CarField.all()`. A rebuild rather than a diff because the set is at
+   * most `driving.MAX_DRIVEN_CARS` and a diff over 400 entries costs more than
+   * clearing a map that is usually empty.
+   */
+  setBlockers(cars: Iterable<HoldBlocker>): void {
+    this.grid.clear();
+    let any = false;
+    for (const car of cars) {
+      any = true;
+      const key = holdCell(car.x, car.z);
+      const bucket = this.grid.get(key);
+      if (bucket === undefined) this.grid.set(key, [car]);
+      else bucket.push(car);
+    }
+    if (!any) {
+      // Nobody has a car out. The ledger is cleared as well as the grid, because
+      // an entry left behind would go on holding a car behind a blocker that no
+      // longer exists until it aged out five seconds later.
+      this.entries.clear();
+    }
+    this.live = any;
+  }
+
+  /** Every blocker whose cell could reach `(x, z)`. Allocation-free. */
+  forEachBlocker(x: number, z: number, visit: (b: HoldBlocker) => void): void {
+    const c0 = Math.floor((x - HOLD_QUERY) / HOLD_CELL);
+    const c1 = Math.floor((x + HOLD_QUERY) / HOLD_CELL);
+    const r0 = Math.floor((z - HOLD_QUERY) / HOLD_CELL);
+    const r1 = Math.floor((z + HOLD_QUERY) / HOLD_CELL);
+    for (let cx = c0; cx <= c1; cx++) {
+      for (let cz = r0; cz <= r1; cz++) {
+        const bucket = this.grid.get(cellKey(cx, cz));
+        if (bucket === undefined) continue;
+        for (const b of bucket) visit(b);
+      }
+    }
+  }
+
+  /** This identity's lag, or 0. Read by `resolveHeld` and by the checks. */
+  lagOf(identity: number, tick: number, speed: number): number {
+    const entry = this.entries.get(identity);
+    if (entry === undefined) return 0;
+    // The closed form. See the class header, property 2: the rate is read fresh
+    // off the car's *current* schedule speed, which is itself a pure function of
+    // the tick, so two processes at the same tick get the same number without
+    // either having integrated anything.
+    const rate = Math.min(HOLD_CATCH_UP, 0.5 * (speed > 0 ? speed : 0));
+    const lag = entry.lag - rate * ((tick - entry.atTick) / TRAFFIC_HZ);
+    return lag > 0 ? lag : 0;
+  }
+
+  /** Write a measured lag back. `resolveHeld`'s only mutation. */
+  record(identity: number, lag: number, tick: number): void {
+    let entry = this.entries.get(identity);
+    if (entry === undefined) {
+      entry = { lag, atTick: tick, seen: tick };
+      this.entries.set(identity, entry);
+      if (this.entries.size > HOLD_LEDGER_MAX) this.evict(tick);
+      return;
+    }
+    entry.lag = lag;
+    entry.atTick = tick;
+    entry.seen = tick;
+  }
+
+  /** This identity has caught up, or was never behind. */
+  forget(identity: number): void {
+    this.entries.delete(identity);
+  }
+
+  /** Note that this identity is still being looked at, so eviction leaves it alone. */
+  touch(identity: number, tick: number): void {
+    const entry = this.entries.get(identity);
+    if (entry !== undefined) entry.seen = tick;
+  }
+
+  /** How many cars are queued. The dev overlay, and `verifyTraffic`. */
+  get size(): number {
+    return this.entries.size;
+  }
+
+  /** Empty it. A respawn of the room, and the self-checks. */
+  clear(): void {
+    this.grid.clear();
+    this.entries.clear();
+    this.live = false;
+  }
+
+  private evict(tick: number): void {
+    for (const [identity, entry] of this.entries) {
+      // `Math.abs`, because a client whose clock went backwards across a
+      // resynchronisation would otherwise have every entry look fresh forever.
+      if (Math.abs(tick - entry.seen) > HOLD_EVICT_TICKS) this.entries.delete(identity);
+    }
+  }
+}
+
+/** Two signed cell indices for the blocker grid. `cellKey`'s packing at a different size. */
+function holdCell(x: number, z: number): number {
+  return cellKey(Math.floor(x / HOLD_CELL), Math.floor(z / HOLD_CELL));
+}
+
+/**
+ * Hold this car behind whatever a player has left in its lane, and move it back
+ * up to its timetable once the lane is clear. Returns the lag applied, metres.
+ *
+ * **Mutates the pose in place**, which is the contract every other function that
+ * touches a `CarPose` in this file has, and is what lets `forEachCarNear` apply
+ * it to every consumer at once.
+ *
+ * The shift is along the car's own **heading** rather than back along its route
+ * polyline, and that is an approximation with a stated error. Doing it properly
+ * would mean inverting the timetable -- finding the route-time whose arc length
+ * is `lag` metres earlier -- which is a second binary search per car per frame
+ * for a car that is, by definition, stopped. Over the ten metres this rule ever
+ * moves anything, a straight shift leaves the car off the arc by
+ * `lag^2 / (2 x radius)`: 12 cm on a 400 m main-road bend and 60 cm on the
+ * tightest corner in the CBD, on a car standing still in a queue. The visible
+ * failure of the exact version -- a queue that curves round a corner correctly
+ * while costing twice as much -- is not one anybody has ever asked for.
+ *
+ * A held car's `speed` is set to zero, which is not cosmetic: `carHitStrength`
+ * reads it, and a car that has been stopped by the traffic in front of it must
+ * not knock over the pedestrian who walks in front of it. A car *catching up*
+ * keeps its schedule speed, because it really is moving.
+ */
+export function resolveHeld(pose: CarPose, ledger: HoldLedger, tick: number): number {
+  // Where the car is *now*, which is its timetable position less whatever it was
+  // already behind. The blocker test runs from here rather than from the
+  // schedule position, because the thing that can be blocked is the car, and the
+  // car is where the last hold left it.
+  let lag = ledger.lagOf(pose.identity, tick, pose.speed);
+  if (lag > 0) {
+    pose.x -= pose.dx * lag;
+    pose.z -= pose.dz * lag;
+  }
+
+  // The nearest thing in this car's own lane, ahead of it or inside it. The
+  // *nearest* rather than the first, because two cars abandoned nose to tail is
+  // a thing a player will absolutely do and queueing behind the far one would
+  // park this car inside the near one.
+  let closest = Infinity;
+  ledger.forEachBlocker(pose.x, pose.z, (b) => {
+    const rx = b.x - pose.x;
+    const rz = b.z - pose.z;
+    const ahead = rx * pose.dx + rz * pose.dz;
+    if (ahead > HOLD_GAP || ahead < -HOLD_INSIDE) return;
+    // Left of a heading (dx, dz) is (dz, -dx), the same axes `carOverlaps` and
+    // `lanes.py` use. This is what keeps a car from queueing behind something
+    // abandoned in the *oncoming* lane 3.5 m away.
+    const across = rx * pose.dz - rz * pose.dx;
+    if (across > HOLD_LANE_HALF || across < -HOLD_LANE_HALF) return;
+    // The vertical gate, `carOverlaps`' own and for its reason: a car abandoned
+    // on the Cahill Expressway does not stop the traffic on Alfred Street eight
+    // metres below it.
+    const dy = b.y - pose.y;
+    if (dy > TAKE_HEIGHT_GATE || dy < -TAKE_HEIGHT_GATE) return;
+    if (ahead < closest) closest = ahead;
+  });
+
+  if (closest !== Infinity) {
+    const extra = HOLD_GAP - closest;
+    const wanted = lag + extra;
+    if (wanted >= HOLD_MAX_LAG) {
+      // The ceiling. See `HOLD_MAX_LAG`: the hold is abandoned rather than
+      // clamped, so the car resumes its timetable and drives through, which is
+      // what every car in this city did before this rule existed.
+      ledger.forget(pose.identity);
+      pose.x += pose.dx * lag;
+      pose.z += pose.dz * lag;
+      pose.held = 0;
+      return 0;
+    }
+    pose.x -= pose.dx * extra;
+    pose.z -= pose.dz * extra;
+    lag = wanted;
+    ledger.record(pose.identity, lag, tick);
+    // Stopped, and therefore harmless. See the header.
+    pose.speed = 0;
+    pose.held = lag;
+    return lag;
+  }
+
+  if (lag <= 0) {
+    // Nothing in the way and nothing owed. The common case for every car in
+    // Sydney, and it costs one map lookup and four `Math.floor`s.
+    ledger.forget(pose.identity);
+    pose.held = 0;
+    return 0;
+  }
+  ledger.touch(pose.identity, tick);
+  pose.held = lag;
+  return lag;
+}
+
+/**
+ * `TAKE_HEIGHT` from `game/driving.ts`, which this file may not import.
+ *
+ * Two and a half metres of vertical tolerance is "the same piece of road" for
+ * every purpose this project has -- taking a car, being run over by one, and now
+ * queueing behind one -- and the number is repeated rather than shared because
+ * `driving.ts` imports this file and not the other way round. `verifyDriving`
+ * asserts the two agree.
+ */
+const TAKE_HEIGHT_GATE = 2.5;
+
+// --- The kerb bays, as a query ----------------------------------------------------
+
+/** Where a kerb bay is and which way a car parked in it points. `nearestBay` fills one. */
+export interface BayPose {
+  x: number;
+  y: number;
+  z: number;
+  /** Unit heading, the same convention `CarPose` uses. */
+  dx: number;
+  dz: number;
+}
+
+export function createBayPose(): BayPose {
+  return { x: 0, y: 0, z: 0, dx: 0, dz: 1 };
+}
+
+/**
+ * The nearest kerb bay to a point, or false.
+ *
+ * The bays are the ones `pipeline/sydney/bays.py` arbitrated and baked into the
+ * sidecar -- see `LANES_VERSION` -- so this is a *lookup of an existing ledger*
+ * rather than a new opinion about where a car may park. That matters: the whole
+ * v2 contract is that one bay holds one car, and a function that invented a
+ * parking spot near a kerb would put a player's abandoned Camry on top of one of
+ * the 23,020 static cars.
+ *
+ * What it is for is the moment a driver gets out: a car left within reach of a
+ * bay is snapped into it, so it reads as *parked* rather than as abandoned at a
+ * slight angle a metre out from the gutter. See `driving.ts` and the brief's
+ * second clause.
+ *
+ * Ties break on `(rid, which)` rather than on the float distance, which is
+ * `resolveTake`'s rule and is here for its reason: the server snaps the car and
+ * the client is told about it, but `?offline` runs this in the browser and the
+ * two builds must not disagree about which of two equidistant bays won.
+ */
+export function nearestBay(
+  field: TrafficField,
+  x: number,
+  z: number,
+  radius: number,
+  scratch: LaneRoute[],
+  out: BayPose,
+): boolean {
+  let bestD2 = radius * radius;
+  let bestKey = 0;
+  let found = false;
+  const probe = _bayProbe;
+  for (const route of field.near(x, z, radius, scratch)) {
+    for (let which = 0; which < 2; which++) {
+      if (which === 0 ? !route.bay0 : !route.bay1) continue;
+      bayPose(route, which, probe);
+      const dx = probe.x - x;
+      const dz = probe.z - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > bestD2) continue;
+      const key = route.rid * 2 + which;
+      if (found && (d2 > bestD2 || (d2 === bestD2 && key >= bestKey))) continue;
+      found = true;
+      bestD2 = d2;
+      bestKey = key;
+      out.x = probe.x;
+      out.y = probe.y;
+      out.z = probe.z;
+      out.dx = probe.dx;
+      out.dz = probe.dz;
+    }
+  }
+  return found;
+}
+
+/** Scratch for `nearestBay`, so a query in a tick loop allocates nothing. */
+const _bayProbe: BayPose = createBayPose();
+
+/**
+ * Where one end of a route's bay is, in world metres.
+ *
+ * The lane point at the route-time the car rests at, plus the kerb offset vector
+ * the pipeline measured *at the bay* -- which is exactly what `poseCar` composes
+ * in its two parked stages, and is deliberately the same arithmetic rather than
+ * a second opinion about it. A bay this function disagreed with `poseCar` about
+ * would be a player's car snapped to a spot the ambient fleet then parks on top
+ * of.
+ */
+export function bayPose(route: LaneRoute, which: number, out: BayPose): BayPose {
+  const t = which === 0 ? route.parkT0 : route.parkT1;
+  let lo = 0;
+  let hi = route.count - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (route.t[mid] <= t) lo = mid;
+    else hi = mid;
+  }
+  const span = route.t[lo + 1] - route.t[lo];
+  const u = span > 0 ? (t - route.t[lo]) / span : 0;
+  const x0 = route.x[lo];
+  const z0 = route.z[lo];
+  const x1 = route.x[lo + 1];
+  const z1 = route.z[lo + 1];
+  out.x = x0 + u * (x1 - x0) + (which === 0 ? route.kerbOffX0 : route.kerbOffX1);
+  out.y = route.y[lo] + u * (route.y[lo + 1] - route.y[lo]);
+  out.z = z0 + u * (z1 - z0) + (which === 0 ? route.kerbOffZ0 : route.kerbOffZ1);
+  // The heading, on `poseCar`'s own walk: a parked bay very often sits on a
+  // zero-length segment (the dwell is two copies of one vertex), so the
+  // direction has to be taken from the nearest segment that has one.
+  let hx = x1 - x0;
+  let hz = z1 - z0;
+  let d2 = hx * hx + hz * hz;
+  for (let step = lo + 1; d2 < 1e-12 && step < route.count - 1; step++) {
+    hx = route.x[step + 1] - route.x[step];
+    hz = route.z[step + 1] - route.z[step];
+    d2 = hx * hx + hz * hz;
+  }
+  for (let step = lo - 1; d2 < 1e-12 && step >= 0; step--) {
+    hx = route.x[step + 1] - route.x[step];
+    hz = route.z[step + 1] - route.z[step];
+    d2 = hx * hx + hz * hz;
+  }
+  if (d2 < 1e-12) {
+    out.dx = 0;
+    out.dz = 1;
+  } else {
+    const inv = 1 / Math.sqrt(d2);
+    out.dx = hx * inv;
+    out.dz = hz * inv;
+  }
+  return out;
 }
 
 // --- Being run over ------------------------------------------------------------
@@ -1920,7 +2477,16 @@ export function carHitting(
  * the identical hatch beside it is a difference nobody could ever attribute.
  */
 export function drivenCarPose(
-  car: { carId: number; body: number; colour: number; x: number; y: number; z: number; yaw: number; speed: number },
+  car: {
+    carId: number; body: number; colour: number;
+    x: number; y: number; z: number; yaw: number; speed: number;
+    /**
+     * 0..`CAR_HEALTH_FULL_POSE`. Optional, and absent means undamaged -- which is
+     * what every caller written before the crash damage meant, and is still true
+     * of the two self-checks at the bottom of this file.
+     */
+    health?: number;
+  },
   out: CarPose,
 ): CarPose {
   const size = CAR_BODY_SIZE[car.body] ?? CAR_BODY_SIZE[0];
@@ -1946,8 +2512,21 @@ export function drivenCarPose(
   // and a car reversing at 5 m/s hits just as hard as one going forwards.
   out.speed = car.speed < 0 ? -car.speed : car.speed;
   out.identity = car.carId;
+  // The dents. See `CarPose.damage` for why this number travels on a pose the
+  // ambient fleet also fills, and `driving.CAR_HEALTH_MAX` for the scale.
+  const health = car.health ?? CAR_HEALTH_FULL_POSE;
+  out.damage = health >= CAR_HEALTH_FULL_POSE ? 0 : health <= 0 ? 1 : 1 - health / CAR_HEALTH_FULL_POSE;
+  // A driven car is never *held*: it is the thing other cars are held behind.
+  out.held = 0;
   return out;
 }
+
+/**
+ * `driving.CAR_HEALTH_MAX`, which this file may not import -- `driving.ts`
+ * imports *this* one. `verifyDriving` asserts the two agree, which is the same
+ * arrangement `driving.SPRINT_SPEED` has with the controller.
+ */
+export const CAR_HEALTH_FULL_POSE = 100;
 
 /**
  * One pip, one flight over the bonnet, and 0.85 s of not being in charge.
@@ -2635,6 +3214,373 @@ export function verifyTraffic(
           break;
         }
       }
+    }
+  }
+
+  // --- THE HOLD. Traffic yielding to a car somebody left in the lane.
+  //
+  // What this catches that a typecheck cannot, and all four are things that
+  // render perfectly:
+  //
+  //   - **A queue that never forms.** The whole feature silently absent, which
+  //     looks exactly like the version of this game that shipped last week --
+  //     cars driving through the wreck you left in Broadway.
+  //   - **A queue that never clears.** A car held forever behind a blocker that
+  //     was recycled an hour ago, standing in the middle of a lane.
+  //   - **A queue in the oncoming lane.** The lateral gate failing means every
+  //     car on the other side of the road stops too, which reads as the city
+  //     freezing rather than as traffic yielding.
+  //   - **Two ends that disagree.** The one failure that is not visual at all:
+  //     the server hit-tests a car six metres from where the client drew it, and
+  //     a player is run over by nothing.
+  {
+    const one = syntheticTile(NORTH_LANE_OFFSET);
+    const held = new TrafficField();
+    held.adopt('hold', one);
+    const r = held.routes()[0];
+    const probe = createCarPose();
+    // A car mid-route and **moving**, and the second half is not pedantry: the
+    // synthetic route has a five-second red in the middle of it, and a car
+    // sitting at that light is already stationary -- holding it proves nothing
+    // and it can never catch up, because a car stopped at a light is not behind
+    // schedule, it is at a light. The tick is searched for rather than assumed
+    // for the reason `SYNTHETIC_PARKED_TICK`'s own comment gives about the v2
+    // dwell rule: a constant here would rot the moment a headway changed.
+    const driving = createCarPose();
+    let live = false;
+    let holdTick = SYNTHETIC_PARKED_TICK;
+    for (let t = 0; t < 600 && !live; t += 5) {
+      const at = SYNTHETIC_PARKED_TICK + t;
+      forEachCarNear(held, r.x[0], r.z[0], 400, at, scratch, probe, (p) => {
+        if (p.stage !== CAR_STAGE_DRIVING || p.speed < 4) return;
+        Object.assign(driving, p);
+        live = true;
+        holdTick = at;
+        return true;
+      });
+    }
+    if (!live) {
+      failures.push('The hold check found no driving car on the synthetic route to queue.');
+    } else {
+      const clean = { x: driving.x, z: driving.z };
+      // A blocker `HOLD_GAP / 2` ahead, in this car's own lane.
+      held.held.setBlockers([
+        { x: driving.x + driving.dx * (HOLD_GAP / 2), y: driving.y, z: driving.z + driving.dz * (HOLD_GAP / 2), halfLength: 2.3 },
+      ]);
+      const after = createCarPose();
+      let seen = false;
+      forEachCarNear(held, r.x[0], r.z[0], 400, holdTick, scratch, probe, (p) => {
+        if (p.identity !== driving.identity) return;
+        Object.assign(after, p);
+        seen = true;
+        return true;
+      });
+      if (!seen) {
+        failures.push('The car being held stopped being found by the broadphase once it was held.');
+      } else {
+        if (!(after.held > 0)) {
+          failures.push('A car with somebody\'s Camry three metres in front of it was not held at all.');
+        }
+        // It stands exactly `HOLD_GAP` behind the blocker, along its own route.
+        const bx = clean.x + driving.dx * (HOLD_GAP / 2);
+        const bz = clean.z + driving.dz * (HOLD_GAP / 2);
+        const gap = Math.sqrt((bx - after.x) * (bx - after.x) + (bz - after.z) * (bz - after.z));
+        if (Math.abs(gap - HOLD_GAP) > 0.05) {
+          failures.push(`A held car stood ${gap.toFixed(2)} m behind the blocker, not ${HOLD_GAP}.`);
+        }
+        // And it is *stopped*, which is what stops it running down the player
+        // who walked in front of it while it queued.
+        if (after.speed !== 0) failures.push(`A held car is still doing ${after.speed.toFixed(2)} m/s.`);
+        if (carHitStrength(after) !== 0) failures.push('A car stopped in a queue could still knock somebody over.');
+      }
+
+      // **The oncoming lane.** The same blocker, moved sideways by a lane width.
+      // Left of a heading (dx, dz) is (dz, -dx).
+      held.held.clear();
+      held.held.setBlockers([
+        {
+          x: clean.x + driving.dx * (HOLD_GAP / 2) + driving.dz * 3.5,
+          y: driving.y,
+          z: clean.z + driving.dz * (HOLD_GAP / 2) - driving.dx * 3.5,
+          halfLength: 2.3,
+        },
+      ]);
+      let across = createCarPose();
+      forEachCarNear(held, r.x[0], r.z[0], 400, holdTick, scratch, probe, (p) => {
+        if (p.identity !== driving.identity) return;
+        across = { ...p };
+        return true;
+      });
+      if (across.held !== 0) {
+        failures.push(`A car queued behind something abandoned 3.5 m away in the oncoming lane (lag ${across.held.toFixed(2)} m).`);
+      }
+
+      // **A blocker behind it** is not a blocker.
+      held.held.clear();
+      held.held.setBlockers([
+        { x: clean.x - driving.dx * 8, y: driving.y, z: clean.z - driving.dz * 8, halfLength: 2.3 },
+      ]);
+      let behind = createCarPose();
+      forEachCarNear(held, r.x[0], r.z[0], 400, holdTick, scratch, probe, (p) => {
+        if (p.identity !== driving.identity) return;
+        behind = { ...p };
+        return true;
+      });
+      if (behind.held !== 0) failures.push('A car was held by something eight metres behind it.');
+
+      // **The catch-up.** Hold it, take the blocker away, and it must close the
+      // gap over the following seconds rather than teleporting back onto its
+      // timetable -- and it must actually get there.
+      held.held.clear();
+      held.held.setBlockers([
+        { x: clean.x + driving.dx * (HOLD_GAP / 2), y: driving.y, z: clean.z + driving.dz * (HOLD_GAP / 2), halfLength: 2.3 },
+      ]);
+      let lag0 = 0;
+      forEachCarNear(held, r.x[0], r.z[0], 400, holdTick, scratch, probe, (p) => {
+        if (p.identity !== driving.identity) return;
+        lag0 = p.held;
+        return true;
+      });
+      held.held.setBlockers([]);
+      // `setBlockers([])` clears the ledger outright, which is the release path
+      // a recycled record takes; re-arm the entry by holding it again and then
+      // stepping the tick forward with the blocker moved out of range instead.
+      held.held.setBlockers([
+        { x: clean.x + driving.dx * (HOLD_GAP / 2), y: driving.y, z: clean.z + driving.dz * (HOLD_GAP / 2), halfLength: 2.3 },
+      ]);
+      forEachCarNear(held, r.x[0], r.z[0], 400, holdTick, scratch, probe, (p) => {
+        if (p.identity !== driving.identity) return;
+        lag0 = p.held;
+        return true;
+      });
+      held.held.setBlockers([{ x: clean.x + 10_000, y: driving.y, z: clean.z, halfLength: 2.3 }]);
+      const lagAt = (dTicks: number): number => {
+        let out = -1;
+        forEachCarNear(held, r.x[0], r.z[0], 400, holdTick + dTicks, scratch, probe, (p) => {
+          if (p.identity !== driving.identity) return;
+          out = p.held;
+          return true;
+        });
+        return out;
+      };
+      if (!(lag0 > 0)) {
+        failures.push('The catch-up check could not get the car held in the first place.');
+      } else {
+        const quarter = lagAt(15);
+        if (!(quarter >= 0 && quarter < lag0)) {
+          failures.push(`A quarter-second after the blocker left, the lag was ${quarter} against ${lag0.toFixed(2)}; it must fall.`);
+        }
+        if (quarter === 0) {
+          failures.push('The lag went to zero in a quarter of a second. That is a teleport, which is the thing the catch-up exists to avoid.');
+        }
+        // ...and it does get home. `HOLD_CATCH_UP` is at most 4 m/s, so three
+        // metres of lag is gone inside a second; three seconds is generous and
+        // still well inside the car's remaining run.
+        const home = lagAt(180);
+        if (home > 0) failures.push(`Three seconds after the blocker left, the car was still ${home.toFixed(2)} m behind.`);
+      }
+
+      // **It never gets closer than the gap, over a whole approach.** The
+      // single-sample check above says the clamp is right at one instant; this
+      // says it holds while the timetable keeps running underneath it, which is
+      // the case that actually matters -- a held car whose lag stopped growing
+      // would creep forward into the blocker at the class speed.
+      {
+        const bx = clean.x + driving.dx * (HOLD_GAP / 2);
+        const bz = clean.z + driving.dz * (HOLD_GAP / 2);
+        held.held.clear();
+        held.held.setBlockers([{ x: bx, y: driving.y, z: bz, halfLength: 2.3 }]);
+        let closest = Infinity;
+        let sampled = 0;
+        for (let t = 0; t < 180; t += 2) {
+          forEachCarNear(held, r.x[0], r.z[0], 400, holdTick + t, scratch, probe, (p) => {
+            if (p.identity !== driving.identity) return;
+            sampled++;
+            const d = Math.sqrt((p.x - bx) * (p.x - bx) + (p.z - bz) * (p.z - bz));
+            if (d < closest) closest = d;
+            return true;
+          });
+        }
+        if (sampled === 0) {
+          failures.push('The held car was never found over the three-second approach sweep.');
+        } else if (closest < HOLD_GAP - 0.05) {
+          failures.push(
+            `Over three seconds of being held, a car got to ${closest.toFixed(2)} m of the blocker against a ` +
+              `gap of ${HOLD_GAP}. It is creeping into the car in front of it.`,
+          );
+        }
+      }
+
+      // **The catch-up never exceeds 1.5x the class speed.** The brief's number,
+      // and the property is measured rather than asserted from the constants:
+      // the lag is closed at `min(HOLD_CATCH_UP, 0.5 x schedule speed)`, so the
+      // ground speed is the schedule speed plus that, and the ratio can only
+      // exceed 1.5 if the clamp is wrong.
+      {
+        held.held.clear();
+        held.held.setBlockers([{ x: clean.x + driving.dx * (HOLD_GAP / 2), y: driving.y, z: clean.z + driving.dz * (HOLD_GAP / 2), halfLength: 2.3 }]);
+        // Arm it: the visit has to run *for our car*, so the predicate matches
+        // the identity rather than stopping at whichever car the broadphase
+        // happens to reach first.
+        let armed = 0;
+        forEachCarNear(held, r.x[0], r.z[0], 400, holdTick, scratch, probe, (p) => {
+          if (p.identity !== driving.identity) return;
+          armed = p.held;
+          return true;
+        });
+        if (!(armed > 0)) failures.push('The catch-up ceiling check could not get the car held.');
+        held.held.setBlockers([{ x: clean.x + 10_000, y: driving.y, z: clean.z, halfLength: 2.3 }]);
+        let worst = 0;
+        let prevX = 0;
+        let prevZ = 0;
+        let prevSpeed = 0;
+        let have = false;
+        const step = 3;
+        for (let t = 0; t <= 120; t += step) {
+          forEachCarNear(held, r.x[0], r.z[0], 400, holdTick + t, scratch, probe, (p) => {
+            if (p.identity !== driving.identity) return;
+            if (have && p.speed > 0.5) {
+              const moved = Math.sqrt((p.x - prevX) * (p.x - prevX) + (p.z - prevZ) * (p.z - prevZ));
+              const ground = moved / (step / TRAFFIC_HZ);
+              // Against the *schedule* speed at the start of the interval, which
+              // is what "class speed" means for a car at this point on its route.
+              const ratio = prevSpeed > 0.5 ? ground / prevSpeed : 0;
+              if (ratio > worst) worst = ratio;
+            }
+            prevX = p.x;
+            prevZ = p.z;
+            prevSpeed = p.speed;
+            have = true;
+            return true;
+          });
+        }
+        if (worst > 1.55) {
+          failures.push(
+            `A car catching up with its timetable reached ${worst.toFixed(2)}x its class speed. The brief's ` +
+              `ceiling is 1.5x, and past it the recovery reads as a teleport with extra steps.`,
+          );
+        }
+        if (worst < 1.01) {
+          failures.push(
+            `A car released from a hold never exceeded ${worst.toFixed(2)}x its class speed, so it is not ` +
+              `catching up at all -- it is permanently behind schedule.`,
+          );
+        }
+      }
+
+      // **Two fields, same inputs, same pose.** The acceptance the brief names,
+      // and the only failure here that is invisible on screen.
+      const left = new TrafficField();
+      const right = new TrafficField();
+      left.adopt('hold', syntheticTile(NORTH_LANE_OFFSET));
+      right.adopt('hold', syntheticTile(NORTH_LANE_OFFSET));
+      const blockers = [
+        { x: clean.x + driving.dx * (HOLD_GAP / 2), y: driving.y, z: clean.z + driving.dz * (HOLD_GAP / 2), halfLength: 2.3 },
+      ];
+      left.held.setBlockers(blockers);
+      right.held.setBlockers(blockers);
+      const sample = (f: TrafficField, tick: number): string => {
+        let out = 'none';
+        const s: LaneRoute[] = [];
+        const pose = createCarPose();
+        forEachCarNear(f, r.x[0], r.z[0], 400, tick, s, pose, (p) => {
+          if (p.identity !== driving.identity) return;
+          out = `${p.x.toFixed(6)},${p.z.toFixed(6)},${p.held.toFixed(6)},${p.speed.toFixed(6)}`;
+          return true;
+        });
+        return out;
+      };
+      // Walked forward through the hold and out the other side, both fields in
+      // step -- which is what the two ends do, sixty times a second.
+      let diverged = 0;
+      for (let t = 0; t < 240; t += 3) {
+        if (t === 120) {
+          left.held.setBlockers([{ x: clean.x + 10_000, y: driving.y, z: clean.z, halfLength: 2.3 }]);
+          right.held.setBlockers([{ x: clean.x + 10_000, y: driving.y, z: clean.z, halfLength: 2.3 }]);
+        }
+        const a = sample(left, holdTick + t);
+        const b = sample(right, holdTick + t);
+        if (a !== b) diverged++;
+      }
+      if (diverged !== 0) {
+        failures.push(
+          `Two TrafficFields handed the same blockers at the same ticks disagreed about a held car on ` +
+            `${diverged} of 80 samples. The server would hit-test it somewhere the client did not draw it.`,
+        );
+      }
+    }
+
+    // A field with no blockers costs one boolean and holds nothing at all.
+    const idle = new TrafficField();
+    idle.adopt('hold', syntheticTile(NORTH_LANE_OFFSET));
+    if (idle.held.live) failures.push('A field nobody has stolen a car in reports a live hold ledger.');
+    idle.held.setBlockers([]);
+    if (idle.held.live) failures.push('An empty blocker roster left the hold ledger live.');
+  }
+
+  // --- THE BAYS, as a query. `nearestBay` against the same synthetic route the
+  //     park stages are checked on above.
+  //
+  // The failure this catches is a car snapped to a spot that is not a bay: the
+  // whole v2 contract is that `bays.py` arbitrated one bay to one car, and a
+  // query that returned a point the ambient fleet does not park in would put a
+  // player's abandoned Camry on top of one of the 23,020 static cars.
+  {
+    const bays = new TrafficField();
+    bays.adopt('bay', syntheticTile(NORTH_LANE_OFFSET));
+    const r = bays.routes()[0];
+    const want = createBayPose();
+    bayPose(r, 0, want);
+    const got = createBayPose();
+    if (!nearestBay(bays, want.x, want.z, 3, scratch, got)) {
+      failures.push('nearestBay found nothing standing exactly on a bay.');
+    } else if (Math.abs(got.x - want.x) > 1e-6 || Math.abs(got.z - want.z) > 1e-6) {
+      failures.push(`nearestBay returned (${got.x}, ${got.z}) for a query standing on (${want.x}, ${want.z}).`);
+    }
+    // The heading is a unit vector, or the snap points a parked car at nothing.
+    const len = Math.sqrt(got.dx * got.dx + got.dz * got.dz);
+    if (Math.abs(len - 1) > 1e-6) failures.push(`A bay's heading has length ${len.toFixed(4)}, not 1.`);
+    // A kilometre away finds nothing, rather than the nearest bay in the city.
+    if (nearestBay(bays, want.x + 1000, want.z, 3, scratch, got)) {
+      failures.push('nearestBay answered for a point a kilometre from any bay.');
+    }
+    // **The three-metre rule, both ways.** This is what decides whether a car
+    // somebody got out of reads as *parked* or as abandoned in the lane, and the
+    // two answers have to be crisp: a car stopped two metres from a bay is
+    // parked in it, and one stopped ten metres away stays exactly where it was
+    // left so the traffic queues behind it. `driving.PARK_SNAP_RADIUS` is the 3.
+    if (!nearestBay(bays, want.x + 2, want.z, 3, scratch, got)) {
+      failures.push('A car left two metres from a bay found no bay to be snapped into.');
+    }
+    if (nearestBay(bays, want.x + 10, want.z, 3, scratch, got)) {
+      failures.push(
+        'A car left ten metres from a bay was offered one. Outside the snap radius a car stays in the ' +
+          'lane, which is the half of this feature the traffic queues behind.',
+      );
+    }
+    // Ties resolve the same way twice, which is what stops the server snapping a
+    // car into one bay while an offline client picks the other.
+    const a = createBayPose();
+    const b = createBayPose();
+    nearestBay(bays, want.x + 1, want.z + 1, 5, scratch, a);
+    nearestBay(bays, want.x + 1, want.z + 1, 5, scratch, b);
+    if (a.x !== b.x || a.z !== b.z) failures.push('nearestBay chose differently on two identical queries.');
+    // And the bay is where `poseCar` actually parks the car -- the one property
+    // that makes this a lookup of an existing ledger rather than a new opinion.
+    const parked = createCarPose();
+    let matched = false;
+    forEachCarNear(bays, r.x[0], r.z[0], 400, SYNTHETIC_PARKED_TICK, scratch, parked, (p) => {
+      if (p.stage !== CAR_STAGE_PARKED_IN) return;
+      const dx = p.x - want.x;
+      const dz = p.z - want.z;
+      if (dx * dx + dz * dz < 0.01) matched = true;
+      return true;
+    });
+    if (!matched) {
+      failures.push(
+        'The bay `nearestBay` reports is not where `poseCar` parks the car in its own PARKED_IN stage. ' +
+          'A car snapped there would be parked on top of the schedule fleet.',
+      );
     }
   }
 

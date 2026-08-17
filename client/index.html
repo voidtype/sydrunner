@@ -644,6 +644,32 @@
       #balls div i { display: block; height: 100%; width: 0; background: rgba(196,84,52,.55); }
       #balls div.full i { width: 100%; background: #c8563a; }
 
+      /* The car's condition, under the footy supply and under the speed chip.
+         One continuous bar rather than blocks, which is the opposite of every
+         other bar in this cluster and is the point: the pips, the stamina and
+         the balls are all *counted* resources -- five, four, three -- and a car's
+         health is a hundred-point scale nobody counts. Blocks would imply a
+         granularity the damage curve does not have, where crashDamage produces
+         18 hp and 6 hp and 60 hp.
+         Wider than the others because it is the only bar in the block with no
+         gaps in it and would otherwise read as shorter than the stamina above
+         it at the same width. Three bands: interface blue while the car is
+         merely dented, amber once it smokes (which is when the *handling*
+         changes, so it is the only threshold worth marking), and the loading
+         screen's failure red at a write-off -- the same red as the last health
+         pip, which in this interface means exactly one thing.
+         See `client/src/world/drivencars.ts`' `carHealthWidth`/`carHealthClass`
+         for why the width and the class are computed by checked pure functions
+         rather than in `hud.ts`. */
+      #carhealth {
+        width: calc(80px * var(--vitals-scale)); height: calc(3px * var(--vitals-scale));
+        background: rgba(207,226,242,.16);
+        box-shadow: 0 1px 2px rgba(0,0,0,.85); overflow: hidden;
+      }
+      #carhealth i { display: block; height: 100%; width: 100%; background: #9fc4e2; }
+      #carhealth.dented i { background: #d6b260; }
+      #carhealth.wrecked i { background: #f0a9a0; }
+
       /* The balance, at the top of the vitals cluster.
          Scales with `--vitals-scale` like everything else in here, one rung
          larger than an effect chip's type because it is the only number in the
@@ -1500,6 +1526,12 @@
       <div id="pips"></div>
       <div id="stamina"></div>
       <div id="balls"></div>
+      <!-- The car's condition, at the bottom of the cluster and hidden unless
+           you are driving. `client/src/hud.ts`'s `carHealth` says why it is a
+           `display` toggle rather than `:empty`: it has a child, so `:empty`
+           cannot reach it, and a row that reserved its height on foot would
+           move the pips every time somebody got out of a car. -->
+      <div id="carhealth" style="display:none"><i></i></div>
     </div>
     <div id="hint">loading</div>
 

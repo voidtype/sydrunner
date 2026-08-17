@@ -145,9 +145,13 @@ import {
   CAR_BODY_SIZE,
   CAR_STAGE_PARKED_IN,
   CAR_STAGE_PARKED_OUT,
+  createCarPose,
   type CarPose,
   type LaneWay,
 } from '../game/traffic.ts';
+// One headlight out on a dented car. The threshold is the rules', not this
+// file's -- see `game/driving.damageGrade`.
+import { CAR_DENTED_HEALTH, createDamageGrade, damageFraction, damageGrade } from '../game/driving.ts';
 
 type Rgb = readonly [number, number, number];
 
@@ -886,6 +890,17 @@ export const CAR_LIGHT_CAPACITY = 384;
 export const CAR_BRAKE_CAPACITY = 48;
 
 /**
+ * The damage grading, shared with the box fleet, the model fleet and the plume.
+ *
+ * Asked once per lit car per frame and never allocated. See
+ * `game/driving.damageGrade` for why the four systems that draw a damaged car
+ * take their thresholds from one three-free function rather than each keeping
+ * its own: a headlight that went out at a health the paint had not darkened at
+ * would be four systems with four opinions about what "dented" means.
+ */
+const _damage = /*#__PURE__*/ createDamageGrade();
+
+/**
  * The headlight beam: where it starts on the car, how far it throws, and how
  * wide it gets.
  *
@@ -1208,11 +1223,30 @@ function buildStreetLamp(): BufferGeometry {
   return m.build('street_lamp');
 }
 
-/** The headlights, their beams and the road pool, anchored at the nose centre. */
-function buildCarHeadLights(): BufferGeometry {
+/**
+ * The headlights, their beams and the road pool, anchored at the nose centre.
+ *
+ * `sides` is which lamps the car still has. Both, normally; **one** for the
+ * variant a dented car is drawn with -- see `CarLights.add` and
+ * `driving.CAR_DENTED_HEALTH`. A second geometry rather than a second instance
+ * with half the pair hidden, because there is no way to hide half of an
+ * instance: the pair is baked into the vertices, and the whole reason this fleet
+ * is two draws for the entire city is that it is two `InstancedMesh` sets over
+ * one material. A third set is one more draw call and the same material, and it
+ * costs nothing at all on the 99 % of nights when nobody has crashed anything --
+ * `mesh.count` is zero and the draw is skipped.
+ *
+ * The **road pool is kept in both variants**, and deliberately: a car with one
+ * headlight still lights the road in front of it, just less evenly, and dropping
+ * the pool would make a dented car at night invisible from the front rather than
+ * lopsided. What says "one lamp is out" is the pair of lens blobs resolving into
+ * one as it comes toward you, which is the same silhouette argument
+ * `BIKE_LIGHT_CAPACITY`'s header makes about a bicycle.
+ */
+function buildCarHeadLights(sides: readonly number[] = [-1, 1]): BufferGeometry {
   const m = new Emissive();
 
-  for (const side of [-1, 1]) {
+  for (const side of sides) {
     const z = side * LAMP_HALF_SPACING;
     blob(m, 0, LAMP_Y, z, HEADLAMP_HALF, scaled(BEAM_COLOUR, HEADLAMP_LEVEL));
 
@@ -1330,7 +1364,7 @@ function buildCarHeadLights(): BufferGeometry {
       [b.x, b.y, b.half], [b.x, b.y, b.half * 0.45], [c0, edge, edge, c1]);
   }
 
-  return m.build('car_headlights');
+  return m.build(sides.length === 1 ? 'car_headlight_broken' : 'car_headlights');
 }
 
 /** The tail lights, anchored at the tail centre. Two blobs and nothing else. */
@@ -2150,6 +2184,8 @@ export class CarLights implements CarLightSink {
   readonly material: MeshBasicNodeMaterial;
   readonly headGeometry: BufferGeometry;
   readonly tailGeometry: BufferGeometry;
+  /** The one-lamp head kit a dented car is drawn with. See `buildCarHeadLights`. */
+  readonly brokenGeometry: BufferGeometry;
   /** Cars lit last frame. Read by the dev handle. */
   drawn = 0;
   /**
@@ -2164,10 +2200,15 @@ export class CarLights implements CarLightSink {
   private count = 0;
   /** Brake lamps this frame. Its own counter, because its own set is never gated on night. */
   private brakeCount = 0;
+  /** Cars drawn with a lamp out this frame. Its own set, so its own count. */
+  private brokenCount = 0;
+  /** And the ones with both lamps. `count` less `brokenCount`, tracked rather than derived. */
+  private pairedCount = 0;
 
   constructor() {
     this.material = nightMaterial('car_lights', false);
     this.headGeometry = buildCarHeadLights();
+    this.brokenGeometry = buildCarHeadLights([-1]);
     this.tailGeometry = buildCarTailLights();
     this.meshes = [this.headGeometry, this.tailGeometry].map((geometry, i) => {
       const mesh = new InstancedMesh(geometry, this.material, CAR_LIGHT_CAPACITY);
@@ -2217,6 +2258,28 @@ export class CarLights implements CarLightSink {
       brakes.visible = true;
       this.meshes.push(brakes);
     }
+    // --- And the one-lamp set, fourth. Appended for the brake set's reason
+    // exactly -- `main.ts` adds, warms and disposes everything in `meshes` -- and
+    // gated on the night like the head and tail kits are, because a broken
+    // headlight is still a headlight. Sized against
+    // `driving.MAX_DRIVEN_CARS`... which it is not: only the cars *in view* are
+    // ever added, and the view is bounded by `TRAFFIC_DRAW_RADIUS` and therefore
+    // by the same `CAR_LIGHT_CAPACITY` the whole fleet shares. Sharing the
+    // constant costs 96 kB of instance buffer for a set that will hold two
+    // entries, which is the same trade `CAR_BRAKE_CAPACITY` refuses -- so this
+    // one takes the brake set's smaller number, on the identical argument: the
+    // cars with a lamp out are the cars a *player* has crashed, and the wire
+    // caps those at forty.
+    {
+      const broken = new InstancedMesh(this.brokenGeometry, this.material, CAR_BRAKE_CAPACITY);
+      broken.name = 'car_headlights_broken';
+      broken.count = 0;
+      broken.frustumCulled = false;
+      broken.castShadow = false;
+      broken.receiveShadow = false;
+      broken.visible = true;
+      this.meshes.push(broken);
+    }
   }
 
   /**
@@ -2232,10 +2295,16 @@ export class CarLights implements CarLightSink {
     this.live = live;
     this.meshes[0].visible = live;
     this.meshes[1].visible = live;
+    // The one-lamp set is a *head* kit and is gated with the other two. Index 2
+    // is skipped: see the header above -- a brake light is on because somebody
+    // is standing on the pedal, which is as true at noon as at midnight.
+    this.meshes[3].visible = live;
   }
 
   begin(): boolean {
     this.count = 0;
+    this.brokenCount = 0;
+    this.pairedCount = 0;
     return this.live;
   }
 
@@ -2290,7 +2359,7 @@ export class CarLights implements CarLightSink {
    * why the distinction is a named getter rather than a slice at each call site.
    */
   get nightSets(): readonly InstancedMesh[] {
-    return [this.meshes[0], this.meshes[1]];
+    return [this.meshes[0], this.meshes[1], this.meshes[3]];
   }
 
   endBrakes(): void {
@@ -2326,9 +2395,31 @@ export class CarLights implements CarLightSink {
     const reach = size.length * 0.5 * pose.scale;
     const n = this.count;
 
+    // --- Which head kit. A car a player has dented enough to break a lamp goes
+    // into the one-lamp set instead of the pair -- see `buildCarHeadLights` and
+    // `driving.CAR_DENTED_HEALTH`. Zero for every ambient car in the city, so
+    // the branch is one float compare and the third set stays at count zero.
+    //
+    // The **tail** lamps are unchanged and stay on the shared count, because
+    // they are in the shared set and because a dented car's tail lights are not
+    // what the brief broke: "one headlight out at night" is a front-of-car read,
+    // and a car with no tail lights at all would be a car you cannot see from
+    // behind, which is a different and much worse effect.
     _position.set(pose.x + pose.dx * reach, pose.y, pose.z + pose.dz * reach);
     _matrix.compose(_position, _quaternion, _carScale);
-    this.meshes[0].setMatrixAt(n, _matrix);
+    if (damageGrade(pose.damage, _damage).headlightOut && this.brokenCount < CAR_BRAKE_CAPACITY) {
+      this.meshes[3].setMatrixAt(this.brokenCount, _matrix);
+      this.brokenCount++;
+    } else {
+      // **Its own index**, and this is the one thing this branch could not
+      // share: both sets are filled front to back and packed, so a car that
+      // went into the broken set must not leave a hole in the paired one --
+      // `mesh.count` is what bounds the draw, and an unwritten instance inside
+      // that bound is last frame's matrix, which is a pair of headlights
+      // hanging in the air where a car used to be.
+      this.meshes[0].setMatrixAt(this.pairedCount, _matrix);
+      this.pairedCount++;
+    }
 
     _position.set(pose.x - pose.dx * reach, pose.y, pose.z - pose.dz * reach);
     _matrix.compose(_position, _quaternion, _carScale);
@@ -2338,13 +2429,20 @@ export class CarLights implements CarLightSink {
   }
 
   end(): void {
-    // Indices rather than a walk, for `setLive`'s reason: the brake set has its
-    // own count and its own bracket.
-    for (let i = 0; i < 2; i++) {
-      const mesh = this.meshes[i];
-      if (this.count > 0 || mesh.count > 0) mesh.instanceMatrix.needsUpdate = true;
-      mesh.count = this.count;
-    }
+    // Three sets, three counts, and they are deliberately not one number: the
+    // tail lamps are on every lit car (set 1, `count`), the head lamps are on
+    // the ones with both (set 0, `pairedCount`) and the rest are in the one-lamp
+    // set (set 3, `brokenCount`). Index 2 is the brakes and has its own bracket,
+    // which is why this was never a walk over `this.meshes` -- see `setLive`.
+    const head = this.meshes[0];
+    if (this.pairedCount > 0 || head.count > 0) head.instanceMatrix.needsUpdate = true;
+    head.count = this.pairedCount;
+    const tail = this.meshes[1];
+    if (this.count > 0 || tail.count > 0) tail.instanceMatrix.needsUpdate = true;
+    tail.count = this.count;
+    const broken = this.meshes[3];
+    if (this.brokenCount > 0 || broken.count > 0) broken.instanceMatrix.needsUpdate = true;
+    broken.count = this.brokenCount;
     this.drawn = this.count;
   }
 
@@ -2352,6 +2450,7 @@ export class CarLights implements CarLightSink {
   dispose(): void {
     for (const mesh of this.meshes) mesh.dispose();
     this.headGeometry.dispose();
+    this.brokenGeometry.dispose();
     this.tailGeometry.dispose();
     this.material.dispose();
   }
@@ -4999,6 +5098,93 @@ export function verifyNightLights(): string[] {
   // 7. The instanced budgets, which are the other half of "no surprises at
   //    night": a capacity under the fleet ceiling is cars that are drawn and not
   //    lit, which looks like a bug in the traffic rather than in the lights.
+  // --- The broken headlight, which is the one thing in `CarLights` that can
+  //     leave an instance buffer describing a car that is not there.
+  //
+  // Three claims, and the second is the one that would ship: a dented car goes
+  // into the one-lamp set, the *paired* set is packed with no hole where it
+  // went, and both sets go back to zero on a frame with nothing in them. A hole
+  // in the pair set is last frame's matrix inside this frame's count -- a pair
+  // of headlights hanging in the air where a car used to be, which is exactly
+  // the artefact `TrafficMovers`' own "only upload what changed" rule is written
+  // around.
+  {
+    const lights = new CarLights();
+    const pose = createCarPose();
+    pose.dx = 1;
+    pose.dz = 0;
+    pose.scale = 1;
+    pose.body = 0;
+    lights.setLive(true);
+    lights.begin();
+    // Two healthy cars, one dented, one healthy -- interleaved, because the
+    // packing bug only shows when a broken car is not last.
+    for (const [x, damage] of [[0, 0], [10, 0.5], [20, 0], [30, 0.9]] as Array<[number, number]>) {
+      pose.x = x;
+      pose.damage = damage;
+      lights.add(pose);
+    }
+    lights.end();
+    const [head, tail, , broken] = lights.meshes;
+    if (broken.count !== 2) failures.push(`Two dented cars produced ${broken.count} one-lamp instances.`);
+    if (head.count !== 2) failures.push(`Two undamaged cars produced ${head.count} paired-lamp instances.`);
+    if (tail.count !== 4) failures.push(`Four lit cars produced ${tail.count} tail-lamp instances; every car has tail lamps.`);
+    // The pair set is packed: instance 0 and 1 are the two healthy cars at x = 0
+    // and x = 20, and neither is at x = 10 or 30.
+    const at = (mesh: typeof head, i: number): number => {
+      const m = new Matrix4();
+      mesh.getMatrixAt(i, m);
+      return m.elements[12];
+    };
+    // The lamp kit is anchored half a body length ahead of the car's centre.
+    const nose = CAR_BODY_SIZE[0].length * 0.5;
+    if (Math.abs(at(head, 0) - nose) > 0.01 || Math.abs(at(head, 1) - (20 + nose)) > 0.01) {
+      failures.push(
+        `The paired headlight set has a hole in it: instances 0 and 1 are at x = ${at(head, 0).toFixed(1)} and ` +
+          `${at(head, 1).toFixed(1)}, and the two undamaged cars are at 0 and 20. A slot inside the count that ` +
+          `nobody wrote draws last frame's matrix -- headlights hanging in the air where a car used to be.`,
+      );
+    }
+    // An empty frame empties all three.
+    lights.begin();
+    lights.end();
+    if (head.count !== 0 || tail.count !== 0 || broken.count !== 0) {
+      failures.push(`An empty frame left ${head.count}/${tail.count}/${broken.count} car lamp instances drawn.`);
+    }
+    // The night switch reaches the one-lamp set. A broken headlight is still a
+    // headlight and must not burn through the daylight.
+    lights.setLive(false);
+    if (broken.visible) failures.push('The one-lamp headlight set stayed visible in daylight.');
+    lights.setLive(true);
+    if (!broken.visible) failures.push('The one-lamp headlight set did not come back at dusk.');
+    if (!lights.nightSets.includes(broken)) {
+      failures.push('`nightSets` does not include the one-lamp set, so the dusk probe would not check it.');
+    }
+    // And the threshold is the *rules'*. A car one point above
+    // `CAR_DENTED_HEALTH` keeps both lamps and one exactly on it does not, which
+    // is `damageGrade`'s answer and not a number this file chose.
+    {
+      const probe = new CarLights();
+      probe.setLive(true);
+      probe.begin();
+      pose.x = 0;
+      pose.damage = damageFraction(CAR_DENTED_HEALTH + 1);
+      probe.add(pose);
+      pose.damage = damageFraction(CAR_DENTED_HEALTH);
+      probe.add(pose);
+      probe.end();
+      if (probe.meshes[0].count !== 1 || probe.meshes[3].count !== 1) {
+        failures.push(
+          `A car on ${CAR_DENTED_HEALTH + 1} hp and one on ${CAR_DENTED_HEALTH} produced ` +
+            `${probe.meshes[0].count} paired and ${probe.meshes[3].count} one-lamp kits. The headlight goes ` +
+            `out at exactly the health game/driving.ts calls dented, and nowhere else.`,
+        );
+      }
+      probe.dispose();
+    }
+    lights.dispose();
+  }
+
   if (CAR_LIGHT_CAPACITY < 384) {
     failures.push(
       `CAR_LIGHT_CAPACITY is ${CAR_LIGHT_CAPACITY}, under the 384 world/cars.ts sizes its own ` +

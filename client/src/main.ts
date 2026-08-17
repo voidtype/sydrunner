@@ -53,14 +53,17 @@ import { TileStreamer, type WorldIndex } from './world/streamer.ts';
 import { TrafficMovers, carBodySizes } from './world/cars.ts';
 import { SWEEP_HZ, loadCarModels } from './world/carlod.ts';
 import {
+  CAR_BODY_SIZE,
   CAR_STAGE_PARKED_IN,
   CAR_STAGE_PARKED_OUT,
   TrafficField,
   applyCarHit,
   carHitStrength,
   carHitting,
+  createBayPose,
   createCarPose,
   forEachCarNear,
+  nearestBay,
   trafficTick,
   verifyTraffic,
   type CarPose,
@@ -259,9 +262,16 @@ import {
 // server) and `world/drivencars.ts` (the picture). See either header.
 import {
   CarField,
+  CAR_HEALTH_MAX,
   DRIVE_CAM_DISTANCE,
   DRIVE_CAM_LIFT,
+  DRIVE_TOP_SPEED,
+  MAX_DRIVEN_CARS,
+  PARK_SNAP_RADIUS,
   createDrivingScratch,
+  crashDamage,
+  snapToBay,
+  verifyDamageGrade,
   resolveTake,
   shapeDriveSteering,
   verifyDriving,
@@ -273,11 +283,18 @@ import {
 } from './game/driving.ts';
 import {
   DrivenCarView,
+  HonkWatch,
+  carHealthClass,
+  carHealthWidth,
   speedText,
   takePrompt,
   verifyDrivenCars,
   type DriverPose,
 } from './world/drivencars.ts';
+// --- Workstream H: crash damage, cars that stay, and the queue behind them. The
+// smoke rig is the only new mesh; everything else in the workstream reaches the
+// screen through modules this file already wires. See `world/carsmoke.ts`.
+import { CarSmoke, verifyCarSmoke } from './world/carsmoke.ts';
 import {
   BIKE_LEAN,
   BikeAssets,
@@ -758,6 +775,19 @@ async function main(): Promise<void> {
   // `game/driving.ts` and `world/drivencars.ts`.
   const drivingFailures = timed('driving', verifyDriving);
   const drivenCarFailures = timed('drivencars', verifyDrivenCars);
+  // And the plume off a broken bonnet, which fails in the way every closed-form
+  // effect in this renderer fails: a perfectly good frame with nothing in it.
+  // A count left at zero is no smoke at all, a count left high is twelve stale
+  // quads hanging over a street where a wreck used to be, and a phase that
+  // stopped depending on the car is every wreck in the city puffing on the same
+  // beat. See `world/carsmoke.ts`.
+  const carSmokeFailures = timed('carsmoke', verifyCarSmoke);
+  // And the grading the four of them share -- the box fleet, the model fleet,
+  // the headlights and the plume. Three-free, so the server runs it too, and it
+  // is the whole of how the *visual* half of the crash damage is checked without
+  // a renderer: a car that is never dented, or four systems with four opinions
+  // about what dented means, are both perfectly good frames.
+  const damageGradeFailures = timed('damagegrade', verifyDamageGrade);
   // And where the camera is looking from, which fails in this project's shape
   // exactly: every broken version of a zoom draws a perfectly good frame. A
   // ladder that cannot reach the far end is the reported bug -- *"cant zoom out
@@ -1064,6 +1094,8 @@ async function main(): Promise<void> {
     bikeFailures.length ||
     drivingFailures.length ||
     drivenCarFailures.length ||
+    carSmokeFailures.length ||
+    damageGradeFailures.length ||
     cameraFailures.length ||
     bikeMeshFailures.length ||
     bikeGlowFailures.length ||
@@ -1125,6 +1157,8 @@ async function main(): Promise<void> {
           ...bikeFailures,
           ...drivingFailures,
           ...drivenCarFailures,
+          ...carSmokeFailures,
+          ...damageGradeFailures,
           ...cameraFailures,
           ...bikeMeshFailures,
           ...bikeGlowFailures,
@@ -4054,9 +4088,57 @@ async function main(): Promise<void> {
     out.z = remote.position.z;
     out.yaw = remote.yaw;
     return true;
-  }, () => playerCombat.drivingCar);
+  }, () => playerCombat.drivingCar, (x, z) => {
+    // --- Workstream H: the range gate. See `DrivenCarView`'s `near`.
+    //
+    // Cars stopped despawning, so the field now holds up to
+    // `driving.MAX_DRIVEN_CARS` records spread over sixty kilometres of Sydney
+    // rather than the two or three a five-minute clock allowed -- and this loop
+    // runs twice a frame. The radius is `TRAFFIC_DRAW_RADIUS` with slack, so a
+    // driven car is gated on exactly the terms the ambient fleet around it is.
+    const dx = x - player.position.x;
+    const dz = z - player.position.z;
+    return dx * dx + dz * dz < DRIVEN_DRAW_RADIUS * DRIVEN_DRAW_RADIUS;
+  });
   /** Is this remote at the wheel? The parked-bike draw consults it -- see below. */
   const isDriving = (id: number): boolean => carWorld().carOf(id) !== 0;
+  // --- Workstream H: crash damage, cars that stay, and the traffic behind them.
+  // One contiguous block, on the preamble's rule; every line of logic is in
+  // `game/driving.ts`, `game/traffic.ts` (the hold) and `world/carsmoke.ts`.
+  /**
+   * How far a driven car is posed from, metres.
+   *
+   * `world/cars.TRAFFIC_DRAW_RADIUS` plus a margin, because the gate is applied
+   * to the *record's* stored position and an occupied car's record is as stale
+   * as the last `MSG.CARS` -- a driver doing 22 m/s covers 22 m in the second
+   * between two broadcasts of a car nobody has touched.
+   */
+  const DRIVEN_DRAW_RADIUS = 460;
+  /** The plume off every smoking bonnet in view. One draw call. */
+  const carSmoke = new CarSmoke();
+  scene.add(carSmoke.mesh);
+  /** Whether a car has honked at the player for standing in the road. */
+  const honkWatch = new HonkWatch();
+  /** Scratch for it, so a query asked sixty times a second allocates nothing. */
+  const honkScratch = createDrivingScratch();
+  /**
+   * The blocker roster the ambient traffic yields to, rebuilt in place each
+   * frame. `server/sim.publishBlockers` is the identical sweep -- see
+   * `traffic.HoldLedger` for why both ends run it from the same `CarField`.
+   */
+  const carBlockers: Array<{ x: number; y: number; z: number; halfLength: number }> = [];
+  /** Scratch for the bay snap when the offline player gets out. `sim.bayProbe`'s twin. */
+  const carBayProbe = createBayPose();
+  /**
+   * The car health the last frame drew, so the write-off notice fires on the
+   * *edge* rather than on the level.
+   *
+   * `world/drivencars.takePrompt`'s header is the argument for deriving state
+   * rather than setting it, and this is the one case that genuinely is an event:
+   * "you wrote it off" is a thing that happened once, not a thing that is true.
+   * An edge on a number the server owns is the cheapest honest way to say so.
+   */
+  let lastCarHealth = CAR_HEALTH_MAX;
   // And the four properties that are the whole of drawing a driven car: through
   // the loop that already draws every other car in Sydney, at the same LOD, in
   // the same material, with the same headlights. `world/drivencars.ts`' header
@@ -6300,6 +6382,19 @@ async function main(): Promise<void> {
     ) {
       return;
     }
+    // --- Workstream H: make room, if the room is out of records.
+    //
+    // `sim.tryTakeCar` runs the identical two lines in the identical place. It
+    // is a *prediction* here in both senses: online the next `MSG.CARS` will
+    // carry the same removal and the same take, and offline this is the
+    // authority. The player list is the local player alone, which offline is
+    // every player there is and online is a client's honest best answer -- and a
+    // client that recycles a record the server keeps is corrected by the very
+    // next snapshot, which is a car re-appearing 250 m away that nobody is
+    // looking at.
+    if (cars.size >= MAX_DRIVEN_CARS) {
+      if (cars.recycleFarthest([player.position.x, player.position.z]) === 0) return;
+    }
     const taken = cars.take(takeScratch.take, playerCombat.id);
     if (taken === null) return;
     playerCombat.drivingCar = taken.id;
@@ -6740,9 +6835,34 @@ async function main(): Promise<void> {
     const armed = playerCombat.ridingBike === 0 && playerCombat.drivingCar === 0;
     if (playerCombat.drivingCar !== 0 && punchBuffer > 0 && honkT <= 0) {
       honkT = HONK_SECONDS;
-      audio.thwack(false);
+      // A real horn, at last. This was `audio.thwack(false)` -- the driving
+      // workstream's stand-in, flagged as such -- and it is now two detuned
+      // squares under a lowpass, which is what a car horn actually is. See
+      // `audio.carHorn`.
+      audio.carHorn();
     }
     honkT = Math.max(0, honkT - dt);
+    // --- Workstream H: and the horn from the *other* side. A car stuck behind
+    // somebody standing in its lane leans on it after a second. Client-side and
+    // deliberately so -- see `world/drivencars.HonkWatch`: a horn is a sound and
+    // nothing else, and the client is the only process that knows where the
+    // player's ears are.
+    if (
+      honkWatch.update(
+        traffic,
+        player.position.x,
+        player.position.z,
+        trafficTick(Date.now()),
+        dt,
+        playerCombat.drivingCar === 0 && playerCombat.ridingBike === 0,
+        honkScratch.routes,
+        honkScratch.pose,
+      )
+    ) {
+      // At a short distance rather than at zero: it is somebody else's horn, a
+      // few metres behind you, and `carHorn`'s attenuation is what says so.
+      audio.carHorn(4);
+    }
     input.punch = armed && punchBuffer > 0;
     input.throwBall = armed && throwBuffer > 0;
     if (playerCombat.ridingBike !== 0 && (punchBuffer > 0 || throwBuffer > 0) && rideNudgeT <= 0) {
@@ -7158,10 +7278,13 @@ async function main(): Promise<void> {
     // server corrects, and sweeping it here would be this client inventing state
     // the next `MSG.CARS` would contradict.
     //
-    // The knockdown and the five-minute expiry are deliberately *not* predicted.
-    // Both are consequences with a name attached -- a crime reported, a record
-    // deleted -- and a client that guessed either would be a client that undid
-    // its guess when the server disagreed.
+    // The knockdown and the recycling are deliberately *not* predicted. Both are
+    // consequences with a name attached -- a crime reported, a record deleted --
+    // and a client that guessed either would be a client that undid its guess
+    // when the server disagreed. (The **crash damage** is the exception and is
+    // predicted, one block down: it is a number the driver's own integrator
+    // already produced, and 50 ms of the health bar not moving on the frame you
+    // hit the wall is exactly the lag the prediction exists to remove.)
     if (!online && localCars.size > 0) {
       driverViews.length = 0;
       for (const f of fighters) {
@@ -7176,7 +7299,78 @@ async function main(): Promise<void> {
           yaw: c.body.yaw,
         });
       }
-      localCars.follow(driverViews);
+      for (const car of localCars.follow(driverViews)) {
+        // A car left within reach of a kerb bay is snapped into it, so it reads
+        // as parked rather than as abandoned at an angle. `sim.parkOnLeave` runs
+        // the identical two calls in the identical place; offline this *is* the
+        // authority. See `traffic.nearestBay`.
+        const bay = nearestBay(traffic, car.x, car.z, PARK_SNAP_RADIUS, takeScratch.routes, carBayProbe);
+        snapToBay(car, bay ? carBayProbe : null);
+      }
+    }
+
+    // --- Workstream H, on the shared path: the crash damage, the health mirror
+    // and the roster the traffic yields to. All three run **online as well**,
+    // which is the one thing that separates this block from the offline sweep
+    // above it, and each has its own reason:
+    //
+    //   - the **health mirror** is read by `stepCarSpeed` inside
+    //     `combat.advance`, so a damaged car has to be slow in the prediction or
+    //     the driver rubber-bands every time they touch the throttle. The number
+    //     comes from whichever field is authoritative -- `net.cars` online -- so
+    //     this is a copy and never an opinion. See `driving.DriveState.carHealth`.
+    //   - the **crash damage** is drained off the combatant that `advance` filled
+    //     and applied to the local mirror through the same `CarField.damage` and
+    //     the same `crashDamage` curve the server runs, so the bar moves on the
+    //     frame of the impact and the next `MSG.CARS` confirms it. Online the
+    //     server's answer wins unconditionally (`CarField.adopt`).
+    //   - the **blockers** feed `traffic.HoldLedger`, and both ends must publish
+    //     the same roster from the same records or the client draws a queue the
+    //     server does not hit-test. `sim.publishBlockers` is the identical sweep.
+    {
+      const cars = carWorld();
+      const c = playerCombat;
+      c.carHealth = c.drivingCar === 0 ? CAR_HEALTH_MAX : cars.get(c.drivingCar)?.health ?? CAR_HEALTH_MAX;
+      const dv = c.carCrashDv;
+      c.carCrashDv = 0;
+      if (dv > 0 && c.drivingCar !== 0) {
+        const cost = crashDamage(dv);
+        // The sound is on the **delta-v** and not on whether the damage landed,
+        // which is deliberate: the cooldown swallows the four ticks of grinding
+        // after a crash but the player still touched something, and silence
+        // there would read as the collision not having happened. A hit inside
+        // the cooldown gets the scrape; a hit that costs health gets the crunch.
+        // See `audio.carCrunch`.
+        if (cost > 0 && cars.damage(c.drivingCar, cost) !== null) {
+          audio.carCrunch(Math.min(1, dv / DRIVE_TOP_SPEED));
+        } else {
+          audio.carScrape();
+        }
+      }
+      // The clocks. `CarField.age` removes nothing -- see `game/driving.ts`
+      // section 6 -- and online the cooldown it advances is the *prediction's*,
+      // which is why it runs on the mirror as well as on the authority.
+      cars.age(FIXED_DT * 1000);
+      // Rebuilt **in place**, on `sim.publishBlockers`' argument exactly: this
+      // runs every tick over up to four hundred records and an array of four
+      // hundred object literals a tick is the only thing in the block that could
+      // allocate.
+      let n = 0;
+      for (const car of cars.all()) {
+        const size = CAR_BODY_SIZE[car.body] ?? CAR_BODY_SIZE[0];
+        const slot = carBlockers[n];
+        if (slot === undefined) {
+          carBlockers.push({ x: car.x, y: car.y, z: car.z, halfLength: size.length * 0.5 });
+        } else {
+          slot.x = car.x;
+          slot.y = car.y;
+          slot.z = car.z;
+          slot.halfLength = size.length * 0.5;
+        }
+        n++;
+      }
+      carBlockers.length = n;
+      traffic.held.setBlockers(carBlockers);
     }
 
     if (!online) {
@@ -8077,6 +8271,22 @@ async function main(): Promise<void> {
     if (playerCombat.drivingCar !== 0) {
       powerupChips.unshift({ name: `DRIVING · ${speedText(playerCombat.carSpeed)}`, seconds: 0 });
     }
+    // --- Workstream H: "you wrote it off", on the **edge** of the health
+    // reaching zero.
+    //
+    // The one thing in this feature that genuinely is an event rather than a
+    // state, which is why it is not derived the way `takePrompt` is: a car being
+    // written off happens once, and a level test would repost the pill every
+    // frame for as long as you sat in the wreck. The health comes from whichever
+    // field is authoritative, so this fires on the server's answer online and on
+    // the prediction's offline, and never twice for one crash.
+    {
+      const health = playerCombat.drivingCar === 0
+        ? CAR_HEALTH_MAX
+        : carWorld().get(playerCombat.drivingCar)?.health ?? CAR_HEALTH_MAX;
+      if (health <= 0 && lastCarHealth > 0) hud.notice('you wrote it off');
+      lastCarHealth = health;
+    }
     if (playerCombat.ridingBike !== 0) {
       powerupChips.push({
         name: `RIDING x${bikeSpeedScale(playerCombat.bikeTuned).toFixed(1)}`,
@@ -8134,6 +8344,13 @@ async function main(): Promise<void> {
       ballRecharge: Math.min(1, playerCombat.ballT / BALL_RECHARGE),
       respawnIn: playerCombat.phase === 'ko' ? playerCombat.respawnT : 0,
       effects: powerupChips,
+      // --- Workstream H: the car's condition, under the speed chip. Null on
+      // foot, which collapses the row. `lastCarHealth` was written a few dozen
+      // lines up from the same authoritative field, so this costs nothing and
+      // cannot disagree with the notice that fired off it.
+      carHealth: playerCombat.drivingCar === 0
+        ? null
+        : { width: carHealthWidth(lastCarHealth), band: carHealthClass(lastCarHealth) },
     });
 
     // The scoreboard, while `Tab` is held.
@@ -8431,6 +8648,15 @@ async function main(): Promise<void> {
       playerCombat.carSpeed,
       frameDt > 1e-5 ? driveSteering.yawDelta / frameDt / RIDE_TURN_RATE : 0,
       frameDt,
+      // --- Workstream H: the plume, fed from inside the walk that already poses
+      // every driven car this frame. `TrafficMovers.lights` is handed over the
+      // same way and for the same reason: the car you see smoking has to be the
+      // car that is there, and a second pass that had to agree with this one is
+      // how a plume ends up hanging over an empty parking space.
+      carSmoke,
+      camera.position.x,
+      camera.position.y,
+      camera.position.z,
     );
 
     trafficMovers.update(
@@ -9990,6 +10216,16 @@ async function main(): Promise<void> {
         drawn: drivenCars.drawn,
         camRoll: Number(drivenCars.camRoll.toFixed(4)),
         prompt: takePrompt(takeableNear, playerCombat.drivingCar !== 0, playerCombat.phase),
+        // --- Workstream H. `budget` is the room's ceiling now that nothing
+        // expires, `smoking` is how many plumes are drawn, and `queued` is how
+        // many ambient cars are being held behind something somebody left in a
+        // lane -- which is the one number in this feature with no visual tell of
+        // its own when it is *wrong* (a queue that never clears looks exactly
+        // like traffic that is stopped at a light you cannot see).
+        budget: `${carWorld().size}/${MAX_DRIVEN_CARS}`,
+        smoking: carSmoke.drawn,
+        queued: traffic.held.size,
+        blockedFor: Number(honkWatch.standing.toFixed(2)),
         all: carWorld().all().map((c) => ({
           id: c.id,
           carId: c.carId,
@@ -9998,6 +10234,7 @@ async function main(): Promise<void> {
           x: Math.round(c.x * 10) / 10,
           z: Math.round(c.z * 10) / 10,
           speed: Math.round(c.speed * 10) / 10,
+          health: Math.round(c.health),
           emptyS: Math.round(c.emptyMs / 1000),
         })),
       }),

@@ -72,7 +72,7 @@ import { verifyFooty } from '../client/src/game/footy.ts';
 // `client/src/game/swat.ts`.
 import { verifySwat } from '../client/src/game/swat.ts';
 import { verifyPowerups } from '../client/src/game/powerups.ts';
-import { verifyDriving } from '../client/src/game/driving.ts';
+import { verifyDamageGrade, verifyDriving } from '../client/src/game/driving.ts';
 import { verifySpatialHash } from '../client/src/game/spatialhash.ts';
 import { verifyMovementBasis } from '../client/src/player/controller.ts';
 import {
@@ -272,6 +272,12 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // that does not answer is your own car driving off to Ashfield beside you,
     // running people down on the way. See `client/src/game/driving.ts`.
     ['verifyDriving', verifyDriving()],
+    // The crash damage's *visual* grading -- how far a car is folded, how dark
+    // the paint goes, how fast the plume runs, whether a headlight is out. Run
+    // here as well as in the browser because it is three-free and because the
+    // four renderers that consume it must agree with the bands this process is
+    // authoritative for. See `game/driving.damageGrade`.
+    ['verifyDamageGrade', verifyDamageGrade()],
     // The suggestions box's week arithmetic, sanitiser, order and codecs.
     // Run **here** rather than only in the browser because the server is the
     // side that keeps the ledger, and every failure in that file is silent in
