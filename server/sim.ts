@@ -1061,6 +1061,12 @@ export class Simulation {
     this.heatWorld = {
       lanes: world.traffic,
       rideStop: (id) => this.rideStop(id),
+      // And who is a bot, which only Polair's marksman asks: a helicopter firing
+      // rounds at a bot is a pip nobody sees taken off somebody nobody is
+      // playing. Bots still climb the ladder and still get cars, roadblocks and
+      // converging officers, because those are all visible to the people who are
+      // playing. See `game/heat.HeatWorld.isBot`.
+      isBot: (id) => (this.participants.get(id)?.bot ?? null) !== null,
     };
     // The handle `factions.accuse`'s crime funnel reaches this field through.
     // One authority per process; see `heat.installHeat`.

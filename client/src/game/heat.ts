@@ -131,8 +131,14 @@
  *            deterministically placed from where you were and which way you
  *            were facing on the tick the rung was reached. Driving through it
  *            is `REASON.RBT_EVADE`. Stopping at it and standing still is worse.
- *   5 stars  **Polair.** Not a helicopter mesh -- a spotlight from the sky, a
- *            rotor thump overhead, and every officer inside 300 m converging.
+ *   5 stars  **Polair.** A helicopter on a wide, lagging orbit 180-260 m up,
+ *            a searchlight that hunts you rather than holding you, every
+ *            officer inside 300 m converging -- and a marksman who takes one
+ *            badly-aimed shot at you each time the beam finds you. The orbit,
+ *            the beam schedule and the shot schedule are all
+ *            `game/polair.ts`, which is three-free and which this file steps;
+ *            the airframe, the light and the puffs of grit are
+ *            `world/highway-patrol.ts`. Nothing about any of it is on the wire.
  *
  * ---------------------------------------------------------------------------
  * 5. WHAT IS IN THIS FILE AND WHAT IS NOT.
@@ -193,8 +199,22 @@ import {
   type NpcActor,
   type Witness,
 } from './factions.ts';
-import { createBeatPose, forEachPoliceNear, type BeatPose } from './factions.ts';
+import { createBeatPose, forEachPoliceNear, SHOT_DAMAGE, type BeatPose } from './factions.ts';
 import { createPedPose, type PedBand, type PedPose } from './pedestrians.ts';
+// The fifth rung's geometry and schedule. Three-free, so this file stays
+// importable by the Bun server, and every function in it is pure except the
+// trail -- see its header, section 3, for why the *hit* is decided here and the
+// *presentation* is recomputed on the client rather than sent.
+import {
+  PolairTrail,
+  createPolairPose,
+  polairCycle,
+  polairHitChance,
+  polairPose,
+  polairRoll,
+  polairShotFired,
+  type PolairPose,
+} from './polair.ts';
 import { carHash, type LaneRoute, type TrafficField } from './traffic.ts';
 
 // --- The ladder ------------------------------------------------------------------
@@ -349,6 +369,18 @@ export const POLAIR_CONVERGE_M = 300;
 /** And how many it will pull in, over the ordinary pursuit target. */
 export const POLAIR_PURSUIT_TARGET = 8;
 
+/**
+ * The marksman's damage, in pips. **The ground officers' own number.**
+ *
+ * `factions.SHOT_DAMAGE` rather than a constant of its own, and the reuse is the
+ * design: a round is a round. What makes the helicopter a lesser threat than a
+ * constable is that it *misses* -- see `polair.polairHitChance`, about 8% falling
+ * to 2% against a constable's 55% at fifteen metres -- and not that its rounds
+ * are made of foam. A separate, smaller damage would have been two dials
+ * expressing one intent, and the honest one to turn is the accuracy.
+ */
+export const POLAIR_SHOT_DAMAGE = SHOT_DAMAGE;
+
 /** The patrol car's capsule, for `strikeNpc` and the shot test. A sedan on its side. */
 const PATROL_RADIUS = 1.15;
 const PATROL_HEIGHT = 1.5;
@@ -498,6 +530,22 @@ interface HeatState {
   rbtStandTicks: number;
   /** Patrol car actors chasing this player. Ids; length is the count. */
   cars: number[];
+  /**
+   * Where this player has been, for Polair's orbit to lag behind. **Null unless
+   * they are at the top rung.**
+   *
+   * Created on the tick they reach five stars and dropped the tick they leave
+   * it, which is what keeps the memory bounded by the number of people currently
+   * at the top of the ladder rather than by everybody who ever was -- the same
+   * bargain `cars` and `rbtActor` already make one field up. Twenty slots of
+   * three floats is 240 bytes, so a room of sixteen simultaneous five-star
+   * players is under four kilobytes and the 1 GB box does not notice.
+   *
+   * It is also the **only** state this feature has: everything else about the
+   * helicopter is a pure function of `(playerId, tick)` and of this. See
+   * `game/polair.ts` section 6.
+   */
+  polairTrail: PolairTrail | null;
 }
 
 function createHeatState(playerId: number): HeatState {
@@ -515,6 +563,7 @@ function createHeatState(playerId: number): HeatState {
     rbtPosts: [],
     rbtStandTicks: 0,
     cars: [],
+    polairTrail: null,
   };
 }
 
@@ -592,6 +641,9 @@ export class HeatField {
   /** Diagnostics for the overlay. */
   patrolCarsSpawned = 0;
   rbtsPlaced = 0;
+  /** Rounds Polair has fired, and how many of them landed. The overlay and the check. */
+  polairShots = 0;
+  polairHits = 0;
 
   // Scratch, allocated once for the life of the field. `step` allocates nothing.
   private readonly bands: PedBand[] = [];
@@ -599,6 +651,38 @@ export class HeatField {
   private readonly beat: BeatPose = createBeatPose();
   private readonly witness: Witness = createWitness();
   private readonly routes: LaneRoute[] = [];
+  /**
+   * Polair's pose, and the record `damagePlayer` is handed when a round lands.
+   *
+   * **One of each for the whole field**, which is `sim.ts`' own reuse pattern:
+   * `stepPolair` fills the pose, reads it and is done with it inside one
+   * iteration, so four five-star players share one record and the step allocates
+   * nothing. The actor is a *stand-in* rather than a promoted one -- it is never
+   * in `field.actors`, never encoded, never hittable -- and it exists because
+   * `FactionCtx.damagePlayer` takes an `NpcActor` and reads exactly one field off
+   * it: `kind`, for the kill-feed line. `NPC_KIND.POLICE` is the right answer to
+   * "who did this" and gives "got done by the cops", which is what being shot out
+   * of a helicopter by the police is. See `verifyHeat`, which still asserts that
+   * `NPC_KIND.POLAIR` is *not* registered: this is not a helicopter on the wire
+   * and must not become one by accident.
+   */
+  private readonly polair: PolairPose = createPolairPose();
+  private readonly marksman: NpcActor = {
+    id: 0,
+    kind: NPC_KIND.POLICE,
+    x: 0, y: 0, z: 0, dx: 0, dz: 1,
+    state: NPC_STATE.FIRE,
+    health: 1,
+    downTicks: 0,
+    stateTicks: 0,
+    target: -1,
+    homeX: 0, homeZ: 0,
+    fireCooldown: 0,
+    shotsFired: 0,
+    barkedAt: 0,
+    struckAt: 0,
+    seen: 0,
+  };
   private readonly witnessCtx = {
     peds: null as FactionCtx['peds'],
     collision: null as FactionCtx['collision'],
@@ -657,6 +741,11 @@ export class HeatField {
     if (h === undefined) return;
     if (h.stars > 0) this.version++;
     for (const id of h.cars) this.drives.delete(id);
+    // The trail goes with them. It is 240 bytes and the row is being dropped
+    // anyway, but naming it here is what keeps `polairTrail`'s "null unless they
+    // are at the top rung" claim true from every exit rather than only from the
+    // one `escalate` takes.
+    h.polairTrail = null;
     this.heat.delete(playerId);
   }
 
@@ -864,9 +953,21 @@ export class HeatField {
       this.placeRbt(h, suspect, ctx, world);
     }
 
-    // --- 5 stars: Polair. The spotlight and the rotor are the client's --
+    // --- 5 stars: Polair's marksman. **The one thing about the helicopter that
+    // is the authority's**, because it is the only thing that can hurt you; the
+    // airframe, the beam and the puffs are all recomputed on the client from the
+    // same pure functions. See `stepPolair` and `game/polair.ts` section 3.
+    //
+    // Outside the `ctx.peds` gate below on purpose: the convergence needs the
+    // pedestrian field to find officers to promote, and a browser or a check
+    // running with no bands would then also lose the marksman -- which is the
+    // class of accident that makes a rung silently do nothing.
+    if (h.stars >= 5) this.stepPolair(h, suspect, ctx, world);
+    else h.polairTrail = null;
+
+    // --- And the convergence. The spotlight and the rotor are the client's --
     // `world/highway-patrol.ts` draws them off the star count alone, which is
-    // why there is no actor here. What the authority owes is the convergence.
+    // why there is no actor here. What the authority owes is the officers.
     if (h.stars >= 5 && ctx.peds) {
       let onIt = 0;
       for (const a of ctx.field.actors) {
@@ -887,6 +988,75 @@ export class HeatField {
         );
       }
     }
+  }
+
+  /**
+   * One tick of the helicopter, for one five-star player.
+   *
+   * Three lines of work and a paragraph of reasoning for each of them.
+   *
+   * **The trail** is pushed from the *authoritative* position, which is the whole
+   * reason this is here rather than only on the client: the orbit is centred on
+   * where the player was three seconds ago, and "where they were" has to be the
+   * server's answer or a client could fly the helicopter somewhere convenient by
+   * lying about its history. The client keeps its own trail off its predicted
+   * position and lands within a metre or two of this one -- see `game/polair.ts`
+   * section 3, which names that seam and prices it at six thousandths of a per
+   * cent of hit chance.
+   *
+   * **The pose** is computed because the marksman's range is a *slant* range and
+   * the slant range needs to know where the machine is. It is thrown away
+   * afterwards; nothing about it is stored, sent or remembered.
+   *
+   * **The shot** is one round on the tick `polairShotFired` names, rolled against
+   * `polairHitChance` of the slant, and paid through `ctx.damagePlayer` -- the
+   * identical door the ground officers and the patrol car use, so the pip, the
+   * knockout, the kill-feed line, the respawn and the ladder wipe are one machine
+   * with one spelling. There is deliberately **no event and no message**: the
+   * client is already computing the same schedule and draws the flash, the grit
+   * and the delayed report itself.
+   *
+   * Bots are excluded. A helicopter shooting at a bot is a pip nobody sees taken
+   * off somebody nobody is playing, and the convergence above already spends
+   * real actors on them; adding rounds would be spending the authority's tick
+   * budget on theatre with no audience. `HeatWorld.isBot` is optional so that the
+   * offline browser -- which has no bots at all -- needs no change.
+   */
+  private stepPolair(h: HeatState, suspect: CombatantState, ctx: FactionCtx, world: HeatWorld): void {
+    if (world.isBot?.(h.playerId) === true) {
+      h.polairTrail = null;
+      return;
+    }
+    const sx = suspect.body.position.x;
+    const sy = suspect.body.position.y;
+    const sz = suspect.body.position.z;
+    // Created on the tick the rung is reached; `PolairTrail.push` back-fills its
+    // whole history with this one point, so the first lap is flown around where
+    // the player is and settles into its arrears over the next few seconds --
+    // which is what a machine arriving on station looks like. See `push`.
+    let trail = h.polairTrail;
+    if (trail === null) {
+      trail = new PolairTrail();
+      h.polairTrail = trail;
+    }
+    trail.push(ctx.tick, sx, sy, sz);
+    if (suspect.phase === 'ko' || suspect.health <= 0) return;
+    if (!polairShotFired(h.playerId, ctx.tick)) return;
+
+    polairPose(h.playerId, ctx.tick, sx, sy, sz, trail, this.polair);
+    this.polairShots++;
+    const cycle = polairCycle(ctx.tick);
+    if (polairRoll(h.playerId, cycle) >= polairHitChance(this.polair.slant)) return;
+    this.polairHits++;
+    // The stand-in actor, posed at the airframe so that anything which ever does
+    // read a position off it reads the honest one.
+    this.marksman.x = this.polair.x;
+    this.marksman.y = this.polair.y;
+    this.marksman.z = this.polair.z;
+    this.marksman.dx = this.polair.dx;
+    this.marksman.dz = this.polair.dz;
+    this.marksman.target = h.playerId;
+    ctx.damagePlayer(suspect.id, POLAIR_SHOT_DAMAGE, this.marksman);
   }
 
   /**
@@ -1433,6 +1603,20 @@ export interface HeatWorld {
    * already resolve this every tick for their own reasons.
    */
   rideStop(playerId: number): number;
+  /**
+   * Is this player a bot? **Optional**, and absent means "nobody here is".
+   *
+   * Only Polair's marksman asks (see `stepPolair`), and it is optional purely so
+   * that the offline browser's `HeatWorld` -- which is built in `main.ts` and has
+   * no bots to distinguish -- does not have to grow a member that would always
+   * answer false. `server/sim.ts` supplies it in one line beside `rideStop`.
+   *
+   * Note what this deliberately does *not* do: bots still climb the ladder, still
+   * get patrol cars and RBTs, and still pull officers in at five stars, because
+   * all of those are visible to the people playing. What they do not get is a
+   * round fired at them, which nobody would see.
+   */
+  isBot?(playerId: number): boolean;
 }
 
 // --- The entry points other files call ----------------------------------------------
@@ -1523,7 +1707,12 @@ export const HEAT_LINES: readonly string[] = [
   'they are shooting now',
   'the highway patrol has joined the chat',
   'rbt ahead. nobody has ever passed one',
-  'polair has you',
+  // Not "polair has you" any more, and the edit is a correction rather than a
+  // polish: as of `game/polair.ts` the beam *does not* have you -- it holds you for
+  // a second or two every twelve and hunts the ground you came over the rest of the
+  // time. A line that promised otherwise would have the interface telling a player
+  // the opposite of what the light is doing.
+  'polair is up. it is looking for you',
 ];
 
 /** And what it says on the way back down. One line, whatever the rung. */
@@ -1733,6 +1922,11 @@ export function verifyHeat(): string[] {
   // --- And the ladder driven end to end, over a synthetic field with no world
   //     behind it. This is the one part of the check that runs the real `step`.
   failures.push(...verifyLadder());
+  // Plus the fifth rung's marksman, driven through the same synthetic field.
+  // `game/polair.verifyPolair` owns the geometry and the schedule; this owns the
+  // *wiring* -- that a five-star player is shot at, a four-star one is not, and a
+  // bot never is.
+  failures.push(...verifyMarksman());
 
   return failures;
 }
@@ -1845,6 +2039,121 @@ function verifyLadder(): string[] {
     installHeat(was);
   }
   return failures;
+}
+
+/**
+ * Polair's marksman, wired up and driven for half an hour of ticks.
+ *
+ * What this owns is the **wiring**, and each of its four assertions is a way the
+ * feature fails while looking finished:
+ *
+ *   - **No rounds at all** is the whole third of the brief silently absent. The
+ *     beam still hunts, the helicopter still flies, and nothing ever shoots -- and
+ *     the only symptom is a player saying it feels safe up there.
+ *   - **Rounds at four stars** is a helicopter that is not there shooting at
+ *     somebody, which presents as random unexplained damage.
+ *   - **Rounds at a bot** is the tick budget spent on theatre with no audience.
+ *   - **A hit rate nowhere near the curve** means the roll and the threshold have
+ *     come apart -- the classic version being a comparison the wrong way round,
+ *     which turns a 5% marksman into a 95% one and is invisible in a diff.
+ *
+ * Thirty minutes of ticks is about a hundred and forty locks, so the observed
+ * hit rate has enough samples to be worth an assertion but nowhere near enough to
+ * be tight; the band is deliberately wide (0 exclusive to 25%) and it is the
+ * *sign* of the comparison it is really testing.
+ */
+function verifyMarksman(): string[] {
+  const failures: string[] = [];
+  const heat = new HeatField();
+  const was = installHeat(heat);
+  try {
+    const combatant = stubCombatant(11);
+    const field = stubField();
+    let damage = 0;
+    const ctx = stubCtx(field, [combatant]);
+    ctx.damagePlayer = (_id, pips) => {
+      damage += pips;
+    };
+    // The player runs a wide reversing path so the trail's travel bias and the
+    // lag both do something. `debugSet` every tick because the check's world has
+    // no police in it at all, so the player is permanently hidden and would
+    // otherwise shed the rung inside a couple of minutes.
+    //
+    // The five-star leg is twenty minutes -- about a hundred locks, which is
+    // enough samples for the hit-rate band below to mean something -- and the two
+    // negative legs are three, because proving a zero needs no statistics. The
+    // whole check is under thirty milliseconds and it runs at every boot on both
+    // ends, so the minutes are a budget rather than a preference.
+    const drive = (world: HeatWorld, stars: number, minutes: number): void => {
+      for (let i = 0; i < minutes * 60 * 60; i++) {
+        ctx.tick++;
+        combatant.body.position.x = 500 * triangleFor(i / 613);
+        combatant.body.position.z = 400 * triangleFor(i / 419 + 0.4);
+        heat.debugSet(11, stars, ctx.tick);
+        heat.step(ctx, world);
+      }
+    };
+
+    const world: HeatWorld = { lanes: null, rideStop: () => -2 };
+    drive(world, 5, 20);
+    if (heat.polairShots === 0) {
+      failures.push(
+        'Twenty minutes at five stars and Polair never fired a round. The marksman is not wired into the step, ' +
+          'so the fifth rung is a light and a noise again.',
+      );
+    }
+    if (heat.polairHits > 0 && damage <= 0) {
+      failures.push('Polair scored hits and no damage reached the player; the round is going nowhere.');
+    }
+    if (heat.polairShots > 0) {
+      const rate = heat.polairHits / heat.polairShots;
+      if (!(rate > 0 && rate < 0.25)) {
+        failures.push(
+          `Polair landed ${heat.polairHits} of ${heat.polairShots} rounds, a ${(rate * 100).toFixed(1)}% hit ` +
+            `rate. The curve says about ${(polairHitChance(240) * 100).toFixed(1)}% at a typical slant; a rate ` +
+            'at zero or past a quarter means the roll and the threshold are compared the wrong way round.',
+        );
+      }
+    }
+
+    // --- Four stars: nothing at all.
+    heat.reset(11);
+    const before = heat.polairShots;
+    drive(world, 4, 3);
+    if (heat.polairShots !== before) {
+      failures.push(
+        `${heat.polairShots - before} rounds were fired at a four-star player. Polair is the fifth rung and ` +
+          'there is no helicopter over a four-star pursuit to have fired them.',
+      );
+    }
+
+    // --- And a bot: nothing either, even at five.
+    heat.reset(11);
+    const beforeBot = heat.polairShots;
+    drive({ lanes: null, rideStop: () => -2, isBot: () => true }, 5, 3);
+    if (heat.polairShots !== beforeBot) {
+      failures.push(
+        `${heat.polairShots - beforeBot} rounds were fired at a bot. HeatWorld.isBot is not being consulted, ` +
+          'so the authority is spending its tick budget shooting at nobody.',
+      );
+    }
+  } finally {
+    installHeat(was);
+  }
+  return failures;
+}
+
+/**
+ * A triangle wave, for the check's synthetic path only.
+ *
+ * Named apart from `polair.triangle` deliberately: importing that one would make
+ * this check's *input* depend on the module under test, and a path generator that
+ * broke in the same way as the thing it is driving would hide the failure rather
+ * than find it.
+ */
+function triangleFor(u: number): number {
+  const f = u - Math.floor(u);
+  return f < 0.5 ? 4 * f - 1 : 3 - 4 * f;
 }
 
 /** A combatant-shaped record with nothing behind it. The check's only body. */

@@ -377,9 +377,14 @@ import {
   HighwayPatrolAssets,
   HighwayPatrolFleet,
   Polair,
+  createPolairView,
   highwayPatrolWarmupParts,
   verifyHighwayPatrol,
 } from './world/highway-patrol.ts';
+// Workstream R: the helicopter's orbit, its beam schedule and its marksman. Pure,
+// three-free and shared with the authority, which is why nothing about Polair is
+// on the wire -- see `game/polair.ts` section 3.
+import { verifyPolair } from './game/polair.ts';
 // The illegal raves, on the same two-file split as everything ambient in this
 // build: `game/rave.ts` is the arithmetic every client agrees about -- which
 // warehouse, viaduct or park is live tonight, what is on the decks, where forty
@@ -901,6 +906,15 @@ async function main(): Promise<void> {
   // by `HighwayPatrolAssets` -- and is the one that would otherwise ship a
   // patrol car with a hole in one flank.
   const heatFailures = timed('heat', verifyHeat);
+  // And the fifth rung's own geometry and schedule, which `verifyHeat` deliberately
+  // does not own: it checks the *wiring* (a five-star player is shot at, a four-star
+  // one is not), and this drives ten minutes of ticks over the orbit and asserts the
+  // keep-out, the lock duty cycle, the shot cadence and the two-instance
+  // determinism. Every failure in it renders a plausible night -- a beam that never
+  // leaves the player is the old ceiling lamp, and a marksman at the ground
+  // officers' 12% floor is free damage from something you cannot fight. See
+  // `game/polair.verifyPolair`.
+  const polairFailures = timed('polair', verifyPolair);
   // And the street factions, on the same two halves again.
   //
   // The **rules** half has its own four: an anchor outside the built extent puts
@@ -1132,6 +1146,7 @@ async function main(): Promise<void> {
     pedModelFailures.length ||
     policeFailures.length ||
     heatFailures.length ||
+    polairFailures.length ||
     streetFailures.length ||
     wildlifeFailures.length ||
     characterFailures.length ||
@@ -1197,6 +1212,7 @@ async function main(): Promise<void> {
           ...pedModelFailures,
           ...policeFailures,
           ...heatFailures,
+          ...polairFailures,
           ...streetFailures,
           ...wildlifeFailures,
           ...characterFailures,
@@ -2801,8 +2817,29 @@ async function main(): Promise<void> {
   /** The patrol cars and the RBTs in view, from whichever authority is running. */
   const patrolFleet = new HighwayPatrolFleet(patrolAssets);
   scene.add(patrolFleet.group);
-  /** Polair: a spotlight, a disc and a rotor. Not a helicopter. See its header. */
+  /**
+   * Polair: an airframe on a lagging orbit, a searchlight that hunts, three nav
+   * lamps and a marksman who misses. See `game/polair.ts` and section 4 of
+   * `world/highway-patrol.ts`, which is the argument that changed.
+   *
+   * `Polair` adds its own group to the scene, because a helicopter is not parented
+   * to a tile and never was.
+   */
   const polair = new Polair(scene, patrolAssets);
+  /**
+   * The record the frame loop hands it. Built **once**, with its three hooks bound,
+   * and mutated below -- which is why the frame-loop block for this feature is six
+   * field writes and one call however much the helicopter grows.
+   *
+   * `resolve` is the collision world's, used once per round to keep a missed shot's
+   * puff of grit out of the inside of a terrace.
+   */
+  const polairView = createPolairView(
+    (x, z) => groundHeightAt(x, z, player.position.y),
+    (distance) => audio.gunshot(distance),
+    (slant) => audio.polairReport(slant),
+    collision ? (fx, fz, tx, tz, r, y) => collision.resolve(fx, fz, tx, tz, r, y) : undefined,
+  );
   /** What the star row last read, so `hud.notice` fires on the edge and not the level. */
   let heatShown = 0;
 
@@ -9276,17 +9313,26 @@ async function main(): Promise<void> {
       // name: it is "wherever the promoted actors are", and each renderer
       // filters the kinds it draws itself.
       patrolFleet.update(policeField(), frameDt, player.position.x, player.position.z);
-      // And Polair, which needs no actor at all: it is a light aimed at the
-      // wanted player and the only thing it reads is their star count. Five is
-      // the top rung; see `game/heat.ts` section 4.
-      polair.update(
-        frameDt,
-        stars >= HEAT_MAX,
-        player.position.x,
-        player.position.y,
-        player.position.z,
-        groundHeightAt(player.position.x, player.position.z, player.position.y),
-      );
+      // And Polair, which still needs no actor and nothing on the wire: the orbit,
+      // the beam schedule and the shot schedule are pure functions of the player's
+      // id and the shared tick, so this browser draws the identical machine the
+      // authority rolled the marksman's round against. Five is the top rung; see
+      // `game/heat.ts` section 4 and `game/polair.ts` section 3.
+      //
+      // The id is **the authority's**, not this process's: `net.id` online, the
+      // offline combatant's otherwise. A local id passed online would seed a
+      // different orbit from the server's and the helicopter would be drawn flying
+      // a circle nobody was shooting from.
+      polairView.tick = trafficTick(Date.now());
+      polairView.dt = frameDt;
+      polairView.on = stars >= HEAT_MAX;
+      polairView.playerId = net ? net.id : playerCombat.id;
+      polairView.x = player.position.x;
+      polairView.y = player.position.y;
+      polairView.z = player.position.z;
+      polairView.groundY = groundHeightAt(player.position.x, player.position.z, player.position.y);
+      polairView.night = sky.now.night;
+      polair.update(polairView);
       // The siren and the rotor. One call a frame with whatever is out there,
       // which is `audio.raveUpdate`'s arrangement: one place decides what is
       // audible and there is no state anywhere else. The siren's distance is to
@@ -9301,10 +9347,20 @@ async function main(): Promise<void> {
         const d = Math.sqrt(dx * dx + dz * dz);
         if (d < nearestSiren) nearestSiren = d;
       }
+      // The rotor is a distance now as well as a level -- the machine flies a real
+      // orbit, so the slant range, the closing rate and the lap phase are all
+      // things it knows. See `audio.HeatMix.rotorDistance`, which is the paragraph
+      // that used to argue there was no distance to have.
       audio.heatUpdate(
         nearestSiren === Infinity && polair.intensity <= 0.01
           ? null
-          : { sirenDistance: nearestSiren, rotor: polair.intensity },
+          : {
+              sirenDistance: nearestSiren,
+              rotor: polair.intensity,
+              rotorDistance: polair.slant,
+              rotorClosing: polair.closing,
+              rotorOrbit: polair.orbitPhase,
+            },
       );
     }
 

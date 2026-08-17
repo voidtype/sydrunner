@@ -1674,17 +1674,122 @@ export class CombatAudio {
     const sweep = SIREN_SWEEP_HZ * (sirenWanted ? Math.max(0.35, 1 - d / SIREN_RANGE) : 0.35);
     chain.sirenSweep.gain.setTargetAtTime(sweep, t, 0.2);
 
-    // --- The rotor. A level rather than a distance; see the doc above.
+    // --- The rotor. A level **and** a distance now; see `HeatMix.rotorDistance`
+    // for the paragraph that used to argue there was no distance to have.
     const rotor = rotorWanted ? mix.rotor : 0;
-    chain.rotorOut.gain.setTargetAtTime(ROTOR_GAIN * rotor, t, 0.25);
-    // The pan wanders slowly across the head, which is what makes it read as
-    // *overhead and circling* rather than as a machine bolted to the camera.
-    // A triangle, on `game/streetlife.triangle`'s argument: a sine spends most
-    // of its time at the ends of the stroke and a helicopter does not.
+    // The three optional members, defaulted to what the positionless version did:
+    // the reference range (so the gain is unchanged), no closing rate (so no
+    // pitch shift) and the old free-running pan clock. A caller that has not been
+    // updated therefore sounds exactly as it did, which is what makes this
+    // interface safe to widen in a batch five agents are editing at once.
+    const slant = mix?.rotorDistance ?? ROTOR_REFERENCE_M;
+    const closing = mix?.rotorClosing ?? 0;
+    const ratio = ROTOR_REFERENCE_M / Math.max(40, slant);
+    // Inverse square about the reference, clamped. See `ROTOR_REFERENCE_M`.
+    const near = Math.min(ROTOR_GAIN_CEILING, ratio * ratio);
+    chain.rotorOut.gain.setTargetAtTime(ROTOR_GAIN * rotor * near, t, 0.25);
+
+    // The Doppler, on the blade chop and the airframe thump together -- they are
+    // one machine and shifting only one of them would separate the thump you feel
+    // from the chop you hear. `setTargetAtTime` rather than `value` because at 60
+    // fps a stepped frequency on a running oscillator is a zipper, which is the
+    // same lesson `raveUpdate` learned about its lowpass corner.
+    const shift = Math.min(
+      ROTOR_PITCH_MAX,
+      Math.max(ROTOR_PITCH_MIN, 1 + (ROTOR_DOPPLER * closing) / 343),
+    );
+    chain.rotorBlade.frequency.setTargetAtTime(ROTOR_BLADE_HZ * shift, t, 0.15);
+    chain.rotorThump.frequency.setTargetAtTime(ROTOR_THUMP_HZ * shift, t, 0.15);
+
+    // The pan crosses the head **with the orbit** rather than on a clock of its
+    // own, so the sound goes past your left ear when the machine goes past your
+    // left shoulder. Still a triangle over the phase, on
+    // `game/streetlife.triangle`'s argument: a sine spends most of its time at the
+    // ends of the stroke and a helicopter does not.
     if (chain.rotorPan) {
-      const f = (t * ROTOR_ORBIT_HZ) % 1;
-      chain.rotorPan.pan.setTargetAtTime(f < 0.5 ? f * 4 - 1 : 3 - f * 4, t, 0.3);
+      const f = mix?.rotorOrbit ?? ((t * ROTOR_ORBIT_HZ) % 1);
+      const u = f - Math.floor(f);
+      chain.rotorPan.pan.setTargetAtTime(u < 0.5 ? u * 4 - 1 : 3 - u * 4, t, 0.3);
     }
+  }
+
+  /**
+   * The **report** of a rifle fired from a helicopter a quarter of a kilometre
+   * away, arriving three quarters of a second after the muzzle flash.
+   *
+   * A separate method from `gunshot` rather than a parameter on it, and the split
+   * is about what the two sounds *are*. `gunshot` is a pistol at conversational
+   * range: a 1.5 ms crack with no bottom to it, a short muzzle blast, and 260 ms
+   * of street. This is the same event heard from 250 m through a quarter of a
+   * kilometre of air, which does three things to it that no distance parameter on
+   * the other curve would:
+   *
+   *   - **the crack loses its top.** Air absorbs high frequencies with distance
+   *     -- that is why thunder near you snaps and thunder far away rumbles -- so
+   *     the highpass comes down from 1400 Hz to 600 and a lowpass goes over it at
+   *     3 kHz. What is left is a flat *whump* rather than a snap;
+   *   - **the tail becomes the sound.** At 250 m across a city the direct path is
+   *     a fraction of what reaches you; the rest is a second of slapback off
+   *     everything between. So the tail is 0.9 s at a third of the level rather
+   *     than 0.26 s at a tenth;
+   *   - **it has no muzzle blast at all**, because a 60 Hz thump does not survive
+   *     the trip and putting one in made it sound like a door closing.
+   *
+   * The **caller owns the delay.** `world/highway-patrol.Polair` counts down
+   * `slant / POLAIR_SOUND_SPEED` and then calls this, because the delay is a fact
+   * about where the helicopter is and this file has no idea where anything is --
+   * which is the same division of labour `heatUpdate` has with the siren.
+   */
+  polairReport(distance = 250): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    const noise = this.noise;
+    if (!ctx || !master || !noise) return;
+    const t = ctx.currentTime;
+    // A gentler curve even than `gunshot`'s, because a rifle in the open at 250 m
+    // is genuinely loud and the whole point of the sound is that you hear it after
+    // the round has already landed near you.
+    const gain = 1 / (1 + Math.max(0, distance) / 240);
+    if (gain < 0.02) return;
+
+    // --- The body of the report: a band of noise with its top taken off.
+    const crack = ctx.createBufferSource();
+    crack.buffer = noise;
+    crack.playbackRate.value = 1.1;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 600;
+    hp.Q.value = 0.6;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 3000;
+    lp.Q.value = 0.5;
+    const crackGain = ctx.createGain();
+    // A 6 ms attack rather than 1.5: the wavefront has been smeared by the trip,
+    // and the version with the pistol's attack read as somebody firing next to you.
+    crackGain.gain.setValueAtTime(0.0001, t);
+    crackGain.gain.exponentialRampToValueAtTime(0.55 * gain, t + 0.006);
+    crackGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+    crack.connect(hp).connect(lp).connect(crackGain).connect(master);
+    crack.start(t);
+    crack.stop(t + 0.14);
+
+    // --- And the city answering, which at this range is most of what you hear.
+    const tail = ctx.createBufferSource();
+    tail.buffer = noise;
+    tail.playbackRate.value = 0.55;
+    const roll = ctx.createBiquadFilter();
+    roll.type = 'lowpass';
+    roll.Q.value = 0.5;
+    roll.frequency.setValueAtTime(1600, t);
+    roll.frequency.exponentialRampToValueAtTime(240, t + 0.85);
+    const tailGain = ctx.createGain();
+    tailGain.gain.setValueAtTime(0.0001, t);
+    tailGain.gain.exponentialRampToValueAtTime(0.3 * gain, t + 0.04);
+    tailGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    tail.connect(roll).connect(tailGain).connect(master);
+    tail.start(t);
+    tail.stop(t + 0.95);
   }
 
   /** Fade out, stop the elements and drop the graph. Idempotent. */
@@ -1827,7 +1932,7 @@ export class CombatAudio {
       node.start(now);
       sources.push(node);
     }
-    return { sirenOut, sirenSweep, rotorOut, rotorPan, sources };
+    return { sirenOut, sirenSweep, rotorOut, rotorPan, rotorBlade: blade, rotorThump: thump, sources };
   }
 
   raveUpdate(mix: RaveMix | null): void {
@@ -2753,6 +2858,40 @@ export interface HeatMix {
   sirenDistance: number;
   /** Polair's beam, 0..1. `Polair.intensity`. */
   rotor: number;
+  /**
+   * Slant metres to the airframe, or absent.
+   *
+   * **This is the paragraph above being revised.** It used to say that making the
+   * rotor a distance would mean inventing a helicopter position for a helicopter
+   * that does not exist -- and that was true right up until `game/polair.ts` gave
+   * it one. The machine now flies a 90-160 m orbit at 180-260 m of altitude, so
+   * the slant range genuinely varies from about 200 m on the near side to 305 on
+   * the far, and refusing to model that would be throwing away the one cue that
+   * tells a player, without looking up, that it is coming back round.
+   *
+   * The three new members are **optional** rather than required, and that is
+   * merge discipline rather than indecision: this interface is constructed in
+   * exactly one place in `main.ts`, five agents are editing that file at once,
+   * and a caller that has not been updated should keep sounding exactly as it did
+   * -- see the defaults in `heatUpdate`.
+   */
+  rotorDistance?: number;
+  /**
+   * Metres a second the airframe is closing at, positive inbound. `Polair.closing`.
+   *
+   * Drives a real Doppler shift on the blade and thump frequencies. At the 40 m/s
+   * an orbit reaches that is about twelve per cent, which is a semitone and is
+   * comfortably audible -- and it is the difference between a helicopter and a fan.
+   */
+  rotorClosing?: number;
+  /**
+   * 0..1 round the lap. `Polair.orbitPhase`.
+   *
+   * Replaces the free-running triangle the pan used to wander on. Same shape, but
+   * tied to the actual orbit, so the sound crosses the head when the machine
+   * crosses in front of you rather than on a clock of its own.
+   */
+  rotorOrbit?: number;
 }
 
 /** The live siren and rotor graph. Built by `heatBuild`, dropped by `heatSilence`. */
@@ -2763,6 +2902,17 @@ interface HeatChain {
   rotorOut: GainNode;
   /** Null on an engine with no `StereoPannerNode`. The orbit is a nicety. */
   rotorPan: StereoPannerNode | null;
+  /**
+   * The blade chop and the airframe thump, held so their frequencies can be
+   * Doppler-shifted as the orbit closes and opens.
+   *
+   * Held on the chain rather than rebuilt, because these are the *same*
+   * oscillators for the life of the pursuit and retriggering them to change a
+   * pitch would be a click every frame. `setTargetAtTime` on a running
+   * oscillator's frequency is what a real pitch bend is.
+   */
+  rotorBlade: OscillatorNode;
+  rotorThump: OscillatorNode;
   /** Every node that has to be stopped on teardown. */
   sources: AudioScheduledSourceNode[];
 }
@@ -2816,3 +2966,38 @@ const ROTOR_THUMP_HZ = 27;
 const ROTOR_GAIN = 0.22;
 /** How fast the pan wanders across the head, cycles a second. Slow: it is circling. */
 const ROTOR_ORBIT_HZ = 0.055;
+
+/**
+ * The rotor's distance model: the slant range `ROTOR_GAIN` was tuned at, and the
+ * clamp on how much louder it may get.
+ *
+ * **Inverse square about a reference range**, so 250 m sounds exactly as loud as
+ * the old positionless version did and everything else is relative to it. Two
+ * reasons for that shape rather than the `1/(1 + d/half)` curve the siren and the
+ * rave use:
+ *
+ *   - the *band* is narrow. The orbit only produces 200-305 m, and a hyperbolic
+ *     falloff over that span moves the level by a fifth -- barely audible, so the
+ *     whole point of adding a distance would be lost. Inverse square over the same
+ *     span is a factor of two and a half, which you can hear from inside a
+ *     pursuit without looking up;
+ *   - there is no range at which it cuts out. The siren cuts at 300 m because a
+ *     car three suburbs away should not be a running node; the helicopter is
+ *     *yours* and is always inside 320 m by construction, so there is nothing to
+ *     cut and the clamp is only there to stop a future close pass from
+ *     overdriving the master.
+ */
+const ROTOR_REFERENCE_M = 250;
+const ROTOR_GAIN_CEILING = 2.4;
+/**
+ * How much of a Doppler shift the closing rate is worth.
+ *
+ * One, meaning the physical amount: `f * (1 + closing / c)`. It is written as a
+ * constant anyway so that the two people who will inevitably want it exaggerated
+ * have somewhere to do it, and clamped either side because a closing rate that
+ * ever went stupid would otherwise put the blade chop into the audible-tone range
+ * and turn the rotor into a siren.
+ */
+const ROTOR_DOPPLER = 1;
+const ROTOR_PITCH_MIN = 0.82;
+const ROTOR_PITCH_MAX = 1.22;
