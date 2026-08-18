@@ -210,7 +210,7 @@ import { verifySuggestions } from './net/suggestions.ts';
 import { SuggestionsPanel, clientId } from './suggestions.ts';
 // --- WORKSTREAM V: teams and talents. The contract (the 42 nodes and the two
 // names), the aura fold, the wire, and the panel. See `game/teams.ts`.
-import { EMPTY_MASK, TEAM, verifyTeams } from './game/teams.ts';
+import { EMPTY_MASK, TEAM, TEAM_NAME, verifyTeams, type Team } from './game/teams.ts';
 import { verifyTeamField } from './game/teamfield.ts';
 import { verifyTeamsWire } from './net/teams.ts';
 import { TalentsPanel, verifyTalentsPanel } from './teams.ts';
@@ -238,7 +238,6 @@ import {
 import { NameplateField, nameplateWarmupParts, verifyNameplates, type PlateInput } from './world/nameplates.ts';
 // --- WORKSTREAM X: teams you can see. One import block; the wiring is one
 // contiguous section beside the local player's body and two lines in the loop.
-import { TEAM, TEAM_NAME, type Team } from './game/teams.ts';
 import { AURA_RING_M, GROUP_RING_M, MAX_RINGS, SLAM_SECONDS, teamMarkerKind, verifyTeamLook } from './game/teamlook.ts';
 import { groupSizeFor, hasAura, hasBigNight, hasTeamSource, teamOf } from './world/teamview.ts';
 import {

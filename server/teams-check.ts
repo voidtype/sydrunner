@@ -303,12 +303,12 @@ async function run(): Promise<void> {
   {
     const before = countBits(hero.talents);
     clearPill(hero);
-    sim.teamOp(hero.id, TEAM_OP.RESET_ALL);
+    sim.teamOp(hero.id, TEAM_OP.RESET_ALL, 0);
     check(countBits(hero.talents) === 0, `reset gave back all ${before} points`, String(countBits(hero.talents)));
     check(countBits(record.talents) === 0, 'and the record went with it');
     sim.teamOp(hero.id, TEAM_OP.TAKE, bigNight);
     clearPill(hero);
-    sim.teamOp(hero.id, TEAM_OP.RESET_ALL);
+    sim.teamOp(hero.id, TEAM_OP.RESET_ALL, 0);
     check(hasNode(hero.talents, bigNight), 'a second reset in the same in-game day is refused');
     check(/one reset a day/.test(pill(sim, hero)), 'and says so', JSON.stringify(hero.walletNote));
   }
