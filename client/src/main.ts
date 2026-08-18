@@ -208,7 +208,7 @@ import {
 import { verifyTeleport } from './game/teleport.ts';
 import { verifySuggestions } from './net/suggestions.ts';
 import { SuggestionsPanel, clientId } from './suggestions.ts';
-import { ChangelogFeed, verifyChangelog } from './changelog.ts';
+import { ChangelogFeed, verifyChangelog, verifyChangeFeed } from './changelog.ts';
 import { BugReportForm, FrameGrabber, verifyBugReport } from './bugreport.ts';
 // --- Accounts, handles and the level ladder. Workstream G.
 //
@@ -739,7 +739,7 @@ async function main(): Promise<void> {
   // tell from a real frame. `verifyBugReport` carries the negative control that
   // keeps a legitimately dark screenshot attachable. See `changelog.ts` and
   // `bugreport.ts`; the server runs neither, because neither has a server half.
-  const changelogFailures = timed('change feed', verifyChangelog);
+  const changelogFailures = timed('change feed', () => [...verifyChangelog(), ...verifyChangeFeed()]);
   const bugFailures = timed('bug box', verifyBugReport);
   // And the map readout, on the same criterion again. Every way this breaks
   // leaves a plausible street name under the map: the street behind you, the

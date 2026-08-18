@@ -1410,14 +1410,28 @@
         color: #5f7285; font-size: 10px; margin-top: 4px;
         border-top: 1px solid rgba(207,226,242,.10); padding-top: 5px;
       }
-      /* --- "what's new": three commits, in the suggestions rows' own type.
+      /* --- "what's new": a scrollable column, in the suggestions rows' own type.
 
          Deliberately not a new visual language. A change entry and a suggestion
          are the same shape -- a line of prose, a paragraph under it, a dim
          metadata line with an identifier in it -- so they share `.title`,
-         `.body` and `.meta` verbatim and the only thing this block adds is the
-         row's own border and spacing. */
+         `.body` and `.meta` verbatim. What this block adds is the row's own
+         border, the filter bar, and the collapse: a row is one line until it is
+         hovered or focused, when the paragraph and metadata appear under it.
+         The colours are the panel's own, so the feed reads as part of the panel
+         and not as a second interface bolted on. */
       #changelog-note { color: #93a8bc; margin-bottom: 8px; }
+      #changelog-filter { display: flex; gap: 6px; margin-bottom: 6px; }
+      #changelog-filter .toggle {
+        background: none; border: 1px solid rgba(207,226,242,.18);
+        color: #93a8bc; font: inherit; font-size: 10px; padding: 2px 8px;
+        cursor: pointer; border-radius: 3px;
+      }
+      #changelog-filter .toggle:hover { color: #cfe2f2; }
+      #changelog-filter .toggle.on {
+        background: rgba(207,226,242,.12); border-color: rgba(207,226,242,.34);
+        color: #cfe2f2;
+      }
       #changelog-list { overflow-y: auto; flex: 1 1 auto; min-height: 0;
         border-top: 1px solid rgba(207,226,242,.18); }
       #changelog-list .empty { color: #7f95ab; padding: 10px 0; }
@@ -1427,6 +1441,27 @@
       #suggestions .change .title { cursor: default; }
       #suggestions .change .title:hover { color: #cfe2f2; }
       #suggestions .change .body { margin: 4px 0 3px; }
+      /* The changelog rows are the same `.change` shape but collapse to one
+         line: a `.collapsed` line that is always shown, and an `.expanded`
+         block that appears on hover or focus. The list's own rule wins over
+         the shared one above for the padding, because the rows are denser. */
+      #changelog-list .change { padding: 6px 0; }
+      #changelog-list .change .collapsed {
+        display: flex; align-items: baseline; gap: 6px;
+      }
+      /* The date and the subject, clipped to the row width, with the badge
+         after it kept whole -- a truncated "suggestion" would read as a bug. */
+      #changelog-list .change .collapsed .line {
+        flex: 1 1 auto; min-width: 0;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      #changelog-list .change .badge {
+        flex: 0 0 auto; color: #93a8bc; font-size: 9px;
+        border: 1px solid rgba(207,226,242,.18); border-radius: 3px; padding: 0 4px;
+      }
+      #changelog-list .change .expanded { display: none; margin-top: 4px; }
+      #changelog-list .change:hover .expanded,
+      #changelog-list .change:focus .expanded { display: block; }
       #changelog-foot {
         color: #5f7285; font-size: 10px; margin-top: 6px;
         border-top: 1px solid rgba(207,226,242,.10); padding-top: 5px;
@@ -2041,11 +2076,12 @@
         <div id="suggestions-foot"></div>
       </section>
 
-      <!-- The three most recent commits, written into `public/changelog.json`
-           by `scripts/changelog.mjs` at build time. Rows are built in
-           `client/src/changelog.ts`: how many there are, and whether there are
-           any at all, is a fact about the build rather than about this
-           document. -->
+      <!-- The recent changes, written into `public/changelog.json` by
+           `scripts/changelog.mjs` at build time. The list is an infinitely
+           scrollable column and the rows collapse to one line until hovered or
+           focused; both are built in `client/src/changelog.ts`, and how many
+           there are, and whether there are any at all, is a fact about the
+           build rather than about this document. -->
       <section id="panel-new" class="tabpane">
         <div id="changelog-note">what has changed in the game lately</div>
         <div id="changelog-list"></div>

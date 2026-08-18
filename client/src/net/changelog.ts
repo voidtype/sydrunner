@@ -24,6 +24,10 @@ export interface ChangeEntry {
   title: string;
   /** The first paragraph of the body, clipped. May be empty. */
   detail: string;
+  /** The commit closed a player's suggestion. False on an old file. */
+  suggestion: boolean;
+  /** The issue number the suggestion closed; `0` when none was found. */
+  issue: number;
 }
 
 export interface Changelog {
@@ -37,8 +41,15 @@ export interface Changelog {
 /** Nothing known. Distinguishable from "known to be empty" only by `entries`. */
 export const NO_CHANGELOG: Changelog = { build: '', dirty: false, entries: [] };
 
-/** How many are ever drawn, whatever the file holds. */
-export const SHOWN = 3;
+/**
+ * How many rows the feed draws at a time. The list is an infinitely scrollable
+ * column: the first page is drawn on load, and each time the reader nears the
+ * bottom the next page is appended, until the filtered entries are exhausted.
+ */
+export const PAGE_SIZE = 30;
+
+/** How near the bottom (in px) counts as "nearing", before the next page loads. */
+export const NEAR_BOTTOM = 200;
 
 /**
  * Turn whatever came back into a changelog, or into nothing.
@@ -72,8 +83,17 @@ export function parseChangelog(raw: unknown): Changelog {
     // A hash *and* a title, both. An entry with neither is a row that says
     // nothing; an entry with a hash and no title is a row that says a hash.
     if (hash === '' || title === '') continue;
-    entries.push({ hash, at: text(e.at, 10), title, detail: text(e.detail, 200) });
-    if (entries.length >= SHOWN) break;
+    // `suggestion` and `issue` read with defaults, so a file written by an
+    // older generator (before the two existed) still renders: a missing flag is
+    // false and a missing number is zero, neither of which draws a row wrong.
+    entries.push({
+      hash,
+      at: text(e.at, 10),
+      title,
+      detail: text(e.detail, 200),
+      suggestion: e.suggestion === true,
+      issue: num(e.issue),
+    });
   }
   if (entries.length === 0) return NO_CHANGELOG;
   return { build: text(obj.build, 12), dirty: obj.dirty === true, entries };
@@ -92,6 +112,19 @@ function text(value: unknown, max: number): string {
   if (typeof value !== 'string') return '';
   const cleaned = value.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\ufeff]/g, ' ').replace(/\s+/g, ' ').trim();
   return [...cleaned].slice(0, max).join('');
+}
+
+/**
+ * An issue number, or `0`.
+ *
+ * The number the row links to, and the one thing a malformed file could hand
+ * the renderer: a string, a negative, a NaN. Every one of those is "no number",
+ * which is the same as a missing field, so they all fall to `0` rather than
+ * drawing a link to `.../issues/NaN`.
+ */
+function num(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return 0;
+  return Math.floor(value);
 }
 
 /**
@@ -118,6 +151,64 @@ export function whenText(at: string, now = new Date()): string {
   return then.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
 }
 
+/** The two things the filter bar can show. */
+export type FeedFilter = 'all' | 'suggestion';
+
+/**
+ * The one line a row shows until it is hovered or focused.
+ *
+ * The date first, then the subject, and nothing else: `2026-08-17 · the
+ * railway is visible`. The date is the raw `at` and not a relative "yesterday",
+ * because a collapsed line is a list a player scans, and a scan reads dates
+ * better than it reads "4 days ago" repeated down a column. The renderer draws
+ * this and lets CSS clip it to the row width; the function only decides the
+ * text, so it can be checked without a DOM.
+ */
+export function collapsedLine(entry: ChangeEntry): string {
+  return `${entry.at} · ${entry.title}`;
+}
+
+/**
+ * Which rows the filter shows.
+ *
+ * `all` is the whole feed; `suggestion` is only the rows the generator marked as
+ * a player's suggestion. Pure, so the pager can run over the same list the
+ * renderer does and the two cannot disagree about how many rows there are.
+ */
+export function filterEntries(entries: ChangeEntry[], filter: FeedFilter): ChangeEntry[] {
+  return filter === 'suggestion' ? entries.filter((e) => e.suggestion) : entries;
+}
+
+/**
+ * The next page of rows, or the empty array when there is no more to append.
+ *
+ * The pager is a slice, not a window: `rendered` is how many rows the column
+ * already holds, and this returns the next `PAGE_SIZE` after them. It returns
+ * `[]` rather than throwing when the feed is exhausted, because the caller's
+ * only job then is to stop listening for scroll and an empty array is the
+ * cleanest way to say "stop".
+ */
+export function pagerNext(entries: ChangeEntry[], rendered: number): ChangeEntry[] {
+  if (rendered >= entries.length) return [];
+  return entries.slice(rendered, rendered + PAGE_SIZE);
+}
+
+/**
+ * The issue number a subject or body names, or `null`.
+ *
+ * The same test the generator runs over a commit's subject and body
+ * (`scripts/changelog.mjs`), kept here so the self-check can assert it without a
+ * git. A row is a suggestion when the text carries `(suggestion #N)`,
+ * `suggestion #N`, or a `closes`/`fixes`/`resolves #N` trailer; the number is
+ * what the row links to. `#4 platform` and `suggested by` are not: the first
+ * has no keyword before the number, the second has a word that is not the
+ * keyword.
+ */
+export function suggestMatch(text: string): number | null {
+  const m = /(suggestion|closes|fixes|resolves)\s+#(\d+)/i.exec(text);
+  return m ? Number(m[2]) : null;
+}
+
 /**
  * The self-check, on `verifySuggestions`' criterion: **every way this breaks
  * produces text**, and text renders perfectly.
@@ -133,8 +224,9 @@ export function whenText(at: string, now = new Date()): string {
  *     "today" when it is read at 01:00 the next morning, so the newest entry is
  *     dated wrong exactly when somebody is looking to see whether their fix
  *     shipped.
- *   - **More than three entries** drawn from a file that happens to hold more
- *     turns a compact feed into a scrolling list of the whole history.
+ *   - A **file that holds more entries than the panel shows** used to be a bug;
+ *     now the feed is a scrollable column, so the parser holds them all and the
+ *     pager (checked in `verifyChangeFeed`) decides how many to draw at a time.
  *   - A **clip that counts UTF-16 units** cuts an emoji in a commit subject in
  *     half, which renders as a black diamond and looks like a corrupt file.
  *
@@ -173,7 +265,8 @@ export function verifyChangelog(): string[] {
     }
   }
 
-  // --- A real file, and the cap.
+  // --- A real file, with no cap: every entry is held, and the new fields
+  // default.
   {
     const many = {
       build: '7555009',
@@ -186,12 +279,17 @@ export function verifyChangelog(): string[] {
       })),
     };
     const got = parseChangelog(many);
-    if (got.entries.length !== SHOWN) {
-      failures.push(`a file with 9 entries produced ${got.entries.length}, not ${SHOWN}.`);
+    if (got.entries.length !== 9) {
+      failures.push(`a file with 9 entries produced ${got.entries.length}, not 9.`);
     }
     if (got.build !== '7555009') failures.push(`the build hash came back as "${got.build}".`);
     if (got.entries[0]?.hash !== 'abcdef0') {
-      failures.push('the first entry is not the first in the file; the feed would show the oldest three.');
+      failures.push('the first entry is not the first in the file; the feed would show the oldest entries.');
+    }
+    // A file written before `suggestion`/`issue` existed still renders: a missing
+    // flag is false and a missing number is zero, neither of which draws wrong.
+    if (got.entries.some((e) => e.suggestion || e.issue !== 0)) {
+      failures.push('an entry without suggestion/issue did not default to false and 0.');
     }
   }
 
@@ -237,6 +335,97 @@ export function verifyChangelog(): string[] {
     const old = whenText('2026-06-01', lateNight);
     if (old === '' || /ago/.test(old)) failures.push(`an old commit reads as "${old}", which is not a date.`);
     if (whenText('not a date') !== '') failures.push('a malformed date produced something rather than nothing.');
+  }
+
+  return failures;
+}
+
+/**
+ * The self-check for the feed's new half: the suggestion regex, the collapsed
+ * line, the filter and the pager.
+ *
+ * `verifyChangelog` above covers the parser and the dates; this covers the four
+ * things added when the feed became a scrollable column with a suggestion
+ * filter. All of them are pure, so the server can run this too, and the one
+ * most likely to be wrong -- the regex, which the generator and this module
+ * each keep a copy of -- is the one asserted against named samples.
+ *
+ *     bun -e "import {verifyChangeFeed} from './client/src/net/changelog.ts';
+ *             console.log(verifyChangeFeed())"
+ */
+export function verifyChangeFeed(): string[] {
+  const failures: string[] = [];
+
+  // --- The suggestion regex, on five named samples.
+  {
+    const positives: [string, number][] = [
+      ['(suggestion #4)', 4],
+      ['closes #12', 12],
+      ['resolves #5', 5],
+    ];
+    for (const [text, want] of positives) {
+      const got = suggestMatch(text);
+      if (got !== want) failures.push(`suggestMatch(${JSON.stringify(text)}) is ${got}, not ${want}.`);
+    }
+    const negatives: string[] = ['#4 platform', 'suggested by'];
+    for (const text of negatives) {
+      if (suggestMatch(text) !== null) {
+        failures.push(`suggestMatch(${JSON.stringify(text)}) matched, but it should not.`);
+      }
+    }
+  }
+
+  // --- The collapsed line: date first, then the subject, and nothing else.
+  {
+    const got = collapsedLine({
+      hash: 'abc1234', at: '2026-08-17', title: 'the railway is visible', detail: '', suggestion: false, issue: 0,
+    });
+    if (got !== '2026-08-17 · the railway is visible') {
+      failures.push(`collapsedLine is "${got}", not "2026-08-17 · the railway is visible".`);
+    }
+  }
+
+  // --- The filter: all, and only-suggestions.
+  {
+    const entries: ChangeEntry[] = [
+      { hash: 'a', at: '2026-08-17', title: 'x', detail: '', suggestion: true, issue: 1 },
+      { hash: 'b', at: '2026-08-17', title: 'y', detail: '', suggestion: false, issue: 0 },
+      { hash: 'c', at: '2026-08-17', title: 'z', detail: '', suggestion: true, issue: 2 },
+    ];
+    if (filterEntries(entries, 'all').length !== 3) {
+      failures.push(`the "all" filter returned ${filterEntries(entries, 'all').length}, not 3.`);
+    }
+    const only = filterEntries(entries, 'suggestion');
+    if (only.length !== 2 || !only.every((e) => e.suggestion)) {
+      failures.push(`the "suggestion" filter returned ${only.length} rows, some not a suggestion.`);
+    }
+  }
+
+  // --- The pager: 30, then 30 more, then the rest, then nothing.
+  {
+    const entries: ChangeEntry[] = Array.from({ length: 65 }, (_, i) => ({
+      hash: `h${i}`, at: '2026-08-17', title: `change ${i}`, detail: '', suggestion: false, issue: 0,
+    }));
+    const first = pagerNext(entries, 0);
+    if (first.length !== PAGE_SIZE) {
+      failures.push(`the first page returned ${first.length}, not ${PAGE_SIZE}.`);
+    }
+    const second = pagerNext(entries, PAGE_SIZE);
+    if (second.length !== PAGE_SIZE) {
+      failures.push(`the second page returned ${second.length}, not ${PAGE_SIZE}.`);
+    }
+    // The two pages must not overlap and must be in order.
+    if (first[0]?.hash !== 'h0' || second[0]?.hash !== 'h30') {
+      failures.push('the pages are not the right slice of the feed, in order.');
+    }
+    const rest = pagerNext(entries, 2 * PAGE_SIZE);
+    if (rest.length !== 5) {
+      failures.push(`the third page returned ${rest.length}, not 5 (65 - 60).`);
+    }
+    // Past the end it is empty, and stays empty: that is the signal to stop.
+    if (pagerNext(entries, 65).length !== 0 || pagerNext(entries, 1000).length !== 0) {
+      failures.push('the pager did not return an empty page past the end.');
+    }
   }
 
   return failures;

@@ -54,8 +54,31 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** Three, because the panel shows three. See `client/src/changelog.ts`. */
-const ENTRIES = 3;
+/**
+ * How many commits the feed carries. The panel used to show three; now it is an
+ * infinitely scrollable column (see `client/src/changelog.ts`), so the file
+ * holds the whole recent history the player can scroll through. The number is a
+ * ceiling, not a promise: a repository with fewer commits yields fewer entries.
+ */
+const ENTRIES = 200;
+
+/**
+ * The already-shipped suggestions, by short hash.
+ *
+ * The feed marks a row as a suggestion when a commit's subject or body carries
+ * `(suggestion #N)`, `suggestion #N`, or a `closes`/`fixes`/`resolves #N`
+ * trailer -- but the first four shipped before that convention existed, so their
+ * numbers are kept here by hand. **Future commits should carry `(suggestion
+ * #N)` in the subject** and can be dropped from this map, because the regex
+ * below then finds them on its own. The value is the issue number, which the
+ * row links to on `github.com/voidtype/sydrunner`.
+ */
+const SHIPPED_SUGGESTIONS = {
+  '82fae87': 1, // the bat swats the footy
+  '388e401': 4, // SydRide, the crazy-taxi rideshare
+  '45417ba': 3, // the railway
+  '408b968': 5, // the screaming sun
+};
 
 /**
  * The character budgets, and the reason there are two of them.
@@ -67,16 +90,6 @@ const ENTRIES = 3;
  */
 const TITLE_CHARS = 120;
 const DETAIL_CHARS = 150;
-
-/**
- * The whole file's ceiling, asserted rather than assumed.
- *
- * The requirement was "a few hundred bytes", and the way a file like this grows
- * past that is not a bad decision -- it is one commit with a 900-character
- * subject line. So the budget is enforced after composition: details are
- * dropped, newest last, until it fits. Three titles and three dates always fit.
- */
-const MAX_BYTES = 1400;
 
 /** Repo root, from this file's own location. `scripts/` is one below it. */
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -186,6 +199,27 @@ function firstBodyParagraph(body) {
 }
 
 /**
+ * Whether a commit is a shipped suggestion, and which issue it closed.
+ *
+ * A row is a suggestion when the subject or body carries `(suggestion #N)`,
+ * `suggestion #N`, or a `closes`/`fixes`/`resolves #N` trailer -- the same
+ * regex `net/changelog.ts` asserts in `verifyChangeFeed`, kept identical here so
+ * the two ends cannot disagree. The four that shipped before the convention
+ * exist in `SHIPPED_SUGGESTIONS` instead: their subject says nothing of the
+ * number, so the regex would miss them and the map fills the gap. The issue
+ * number is what the row links to; `0` means "no number was found".
+ */
+function detectSuggestion(subject, body, hash) {
+  const m = /(suggestion|closes|fixes|resolves)\s+#(\d+)/i.exec(`${subject}\n${body}`);
+  if (m) return { suggestion: true, issue: Number(m[2]) };
+  // `%h` is at least seven characters; the map keys are seven, so a longer
+  // abbreviation still matches its own prefix.
+  const mapped = SHIPPED_SUGGESTIONS[hash] ?? SHIPPED_SUGGESTIONS[hash.slice(0, 7)];
+  if (mapped !== undefined) return { suggestion: true, issue: mapped };
+  return { suggestion: false, issue: 0 };
+}
+
+/**
  * The log, parsed with separators that cannot occur in a commit message.
  *
  * `%x1e` between records and `%x1f` between fields: git will emit them
@@ -202,18 +236,27 @@ function readLog() {
     if (record.trim() === '') continue;
     const [hash, iso, subject, body = ''] = record.split('\u001f');
     if (!hash || !iso) continue;
+    // `--no-merges` already drops real merges; this also drops a plain commit
+    // whose subject is a merge, the one case that one does not catch.
+    if (subject.trim().startsWith('Merge ')) continue;
     const subjectText = plain(subject ?? '');
     const detailText = firstBodyParagraph(body);
     // The promotion: an empty or generic subject hands the title to the body,
     // and then there is no detail left to show under it -- which is correct.
     // Showing the same sentence twice is worse than showing it once.
     const promote = subjectText === '' || (uninformative(subjectText) && detailText !== '');
-    entries.push({
+    const { suggestion, issue } = detectSuggestion(subject ?? '', body, hash.trim());
+    const entry = {
       hash: hash.trim(),
       at: iso.slice(0, 10),
       title: clip(promote ? detailText : subjectText, TITLE_CHARS),
       detail: promote ? '' : clip(detailText, DETAIL_CHARS),
-    });
+      suggestion,
+    };
+    // The issue number is only meaningful when a number was found, so it is
+    // omitted rather than written as a zero the reader would have to ignore.
+    if (issue > 0) entry.issue = issue;
+    entries.push(entry);
   }
   return entries;
 }
@@ -246,16 +289,25 @@ function main() {
     entries,
   };
 
-  // The budget, spent newest-first: the top entry keeps its detail longest,
-  // because it is the one being read.
-  let text = JSON.stringify(file);
-  for (let i = file.entries.length - 1; i >= 0 && Buffer.byteLength(text) > MAX_BYTES; i--) {
-    file.entries[i].detail = '';
-    text = JSON.stringify(file);
-  }
-  for (let i = file.entries.length - 1; i >= 0 && Buffer.byteLength(text) > MAX_BYTES; i--) {
-    file.entries[i].title = clip(file.entries[i].title, 60);
-    text = JSON.stringify(file);
+  // No byte budget: the feed is a scrollable column of up to two hundred rows,
+  // not a few hundred bytes, so the file is written whole. Idempotency below is
+  // what keeps it from being rewritten when nothing changed.
+  const text = JSON.stringify(file);
+
+  // `--print` shows the entries the file holds, whether or not the run below
+  // rewrites it, so it runs before the idempotent early return.
+  if (process.argv.includes('--print')) {
+    for (const e of file.entries) {
+      console.log(`  ${e.at}  ${e.hash}  ${e.title}`);
+      if (e.detail) console.log(`                      ${e.detail}`);
+      // The marker is written as it appears in the JSON, so a `grep` for the
+      // flag over this output and over the file agree.
+      if (e.suggestion) {
+        console.log(
+          `                      "suggestion": true${e.issue ? ` · issue #${e.issue}` : ''}`,
+        );
+      }
+    }
   }
 
   // Idempotent to the byte, `generated` excepted -- which is why the comparison
@@ -287,13 +339,6 @@ function main() {
   } catch (err) {
     console.log(`[changelog] could not write ${OUT}: ${String(err)}`);
     return;
-  }
-
-  if (process.argv.includes('--print')) {
-    for (const e of file.entries) {
-      console.log(`  ${e.at}  ${e.hash}  ${e.title}`);
-      if (e.detail) console.log(`                      ${e.detail}`);
-    }
   }
 }
 
