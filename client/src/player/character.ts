@@ -211,12 +211,27 @@ import {
 type Rgb = readonly [number, number, number];
 
 /**
- * What a vertex is made of. Five roles is the whole wardrobe, and it is what
- * lets one geometry serve seven kits: a vertex records *which* colour it takes,
- * and the colourway decides what that colour is.
+ * What a vertex is made of. Seven roles is the whole wardrobe, and it is what
+ * lets one geometry serve seven kits and both team tints: a vertex records
+ * *which* colour it takes, and the colourway decides what that colour is.
+ *
+ * **`BAND` and `TRIM` were added for the teams pass and cost the untinted figure
+ * nothing**, which is the property that made this the cheap way to do it. A team
+ * tint had to reach the body without a second material -- this file's header
+ * spends a page on why seven materials would be seven pipeline compiles at the
+ * exact moment a match starts -- so the tint is a *colour attribute*, the same
+ * mechanism the seven colourways already are. A kit that does not set `band` or
+ * `trim` gets skin and singlet respectively, which is the figure exactly as it
+ * was, byte for byte. See `roleColour`, and `game/teamlook.teamKit` for what a
+ * teamed kit puts in those two fields.
+ *
+ * Exported because `world/teamlook.ts` builds the Big Night cactus against the
+ * same roles and the same rig: a second private enum there would be two files
+ * agreeing about which number means skin, which is the failure this repo keeps
+ * catching.
  */
-const ROLE = { SKIN: 0, SINGLET: 1, SHORTS: 2, SHOE: 3, EYE: 4 } as const;
-type Role = (typeof ROLE)[keyof typeof ROLE];
+export const ROLE = { SKIN: 0, SINGLET: 1, SHORTS: 2, SHOE: 3, EYE: 4, BAND: 5, TRIM: 6 } as const;
+export type Role = (typeof ROLE)[keyof typeof ROLE];
 
 export interface Colourway {
   readonly name: string;
@@ -224,6 +239,19 @@ export interface Colourway {
   readonly shorts: Rgb;
   readonly skin: Rgb;
   readonly shoe: Rgb;
+  /**
+   * The forearm band. Absent means "the same as skin", which is every one of the
+   * seven player kits and is a band nobody can see -- deliberately, because a
+   * guest is not on a side and must look exactly as they did before teams
+   * existed. See `game/teamlook.teamKit`.
+   */
+  readonly band?: Rgb;
+  /**
+   * The singlet's trim: the disc that closes the chest under the head, which is
+   * a collar. Absent means "the same as the singlet", which is again the
+   * untouched figure.
+   */
+  readonly trim?: Rgb;
 }
 
 /**
@@ -300,7 +328,7 @@ export const COLOURWAYS: readonly Colourway[] = [
   },
 ];
 
-function roleColour(kit: Colourway, role: number): Rgb {
+export function roleColour(kit: Colourway, role: number): Rgb {
   switch (role) {
     case ROLE.SINGLET:
       return kit.singlet;
@@ -310,6 +338,12 @@ function roleColour(kit: Colourway, role: number): Rgb {
       return kit.shoe;
     case ROLE.EYE:
       return EYE;
+    // The two team roles fall back to the surface they sit on, which is what
+    // makes them free on an untinted kit -- see `ROLE`.
+    case ROLE.BAND:
+      return kit.band ?? kit.skin;
+    case ROLE.TRIM:
+      return kit.trim ?? kit.singlet;
     default:
       return kit.skin;
   }
@@ -317,7 +351,7 @@ function roleColour(kit: Colourway, role: number): Rgb {
 
 // --- Geometry -----------------------------------------------------------------
 
-type Point = readonly [number, number, number];
+export type Point = readonly [number, number, number];
 
 /**
  * A vertex's bone binding: `[boneA, boneB, weightOfA]`.
@@ -329,12 +363,12 @@ type Point = readonly [number, number, number];
  * because `skinIndex`/`skinWeight` are `vec4` attributes in the shader and there
  * is no narrower form, but nothing here has to reason about them.
  */
-type Skin = readonly [number, number, number];
+export type Skin = readonly [number, number, number];
 
 /** One bone, rigidly. */
-const w1 = (bone: number): Skin => [bone, bone, 1];
+export const w1 = (bone: number): Skin => [bone, bone, 1];
 /** A joint: `t` of `a`, the rest of `b`. */
-const w2 = (a: number, b: number, t: number): Skin => [a, b, t];
+export const w2 = (a: number, b: number, t: number): Skin => [a, b, t];
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 const ICO_VERTS: Point[] = [
@@ -362,7 +396,7 @@ const ICO_FACES: Array<[number, number, number]> = [
  * baked face normals triples the vertex count for exactly the same triangles and
  * exactly the same look.
  */
-class Parts {
+export class Parts {
   readonly position: number[] = [];
   readonly normal: number[] = [];
   readonly role: number[] = [];
@@ -370,7 +404,15 @@ class Parts {
   readonly skinWeight: number[] = [];
   readonly index: number[] = [];
 
-  private vertex(p: Point, n: Point, role: Role, skin: Skin): void {
+  /**
+   * One vertex, appended. Public because `world/teamlook.ts` builds the Big
+   * Night cactus and the sausage-sizzle tent out of this same accumulator and
+   * needs a plain quad -- a striped valance is eight independently coloured
+   * quads and there is no `tube` or `box` that produces one. Nothing in this
+   * file calls it from outside the class; the four builders below are still the
+   * only way anything in *here* makes geometry.
+   */
+  vertex(p: Point, n: Point, role: Role, skin: Skin): void {
     this.position.push(p[0], p[1], p[2]);
     this.normal.push(n[0], n[1], n[2]);
     this.role.push(role);
@@ -589,7 +631,24 @@ const SHOULDER_X = 0.185;
 const HIP_X = 0.105;
 
 /** Sides on a limb tube. Eight, and the reason is the punch camera. */
-const LIMB_SIDES = 8;
+export const LIMB_SIDES = 8;
+
+/**
+ * The forearm band: where it sits and how deep it is, in metres of world height.
+ *
+ * The forearm runs from the elbow at y 0.81 to the wrist at y 0.50, so this is a
+ * 6 cm cuff at just past the middle of it. **Mid-forearm rather than at the
+ * wrist**, which was the first instinct: a wristband is hidden by the mitt from
+ * every angle a fight is seen at -- `MITT_RADII` is 0.095 against a 0.04 m wrist
+ * and the hand is the thing in front of it -- and the whole job of this band is
+ * to say which side somebody is on while their arms are moving.
+ *
+ * It costs the untinted figure 64 triangles (two extra rings per arm) and shows
+ * nothing, because a kit with no `band` colours it skin. That is the trade this
+ * was picked for: one geometry, one material, no branch at draw time.
+ */
+const BAND_TOP_Y = 0.68;
+const BAND_BOTTOM_Y = 0.62;
 
 /**
  * Build the figure, once, in the bind pose.
@@ -638,7 +697,13 @@ function buildFigure(): Parts {
   // and again at the sternum, and a disc closing the top under the head.
   p.tube([0, 0.755, 0], [0, 0.99, 0], 0.155, 0.163, LIMB_SIDES, ROLE.SINGLET, waist, chestMid);
   p.tube([0, 0.99, 0], [0, 1.155, 0], 0.163, 0.175, LIMB_SIDES, ROLE.SINGLET, chestMid, w1(BONE.CHEST));
-  p.disc([0, 1.155, 0], 0.175, LIMB_SIDES, true, ROLE.SINGLET, w1(BONE.CHEST));
+  // The disc closing the chest is the **collar**, and it is `TRIM` rather than
+  // `SINGLET` so a team tint has somewhere to put its ink. On an untinted kit
+  // `roleColour` hands back the singlet colour and this is the same eight
+  // triangles it always was; on a teamed one it is a white or near-black ring at
+  // the neck, which is the detail that keeps a solid-colour top from reading as
+  // a bib. See `ROLE`.
+  p.disc([0, 1.155, 0], 0.175, LIMB_SIDES, true, ROLE.TRIM, w1(BONE.CHEST));
 
   // --- Shorts. Flared at the hem, over the bottom of the singlet, with the hem
   // closed by a down-facing disc the thighs pass through -- otherwise the figure
@@ -665,7 +730,23 @@ function buildFigure(): Parts {
 
     p.lobe([x, 1.14, 0], [0.068, 0.062, 0.062], ROLE.SKIN, shoulderJoint);
     p.tube([x, 1.14, 0], [x, 0.81, 0], ARM_UPPER_R, ARM_LOWER_R, LIMB_SIDES, ROLE.SKIN, shoulderJoint, elbowJoint);
-    p.tube([x, 0.81, 0], [x, 0.5, 0], ARM_LOWER_R, ARM_WRIST_R, LIMB_SIDES, ROLE.SKIN, elbowJoint, wristJoint);
+    // The forearm, in three tubes rather than one, because the middle one is the
+    // team band. See `BAND_TOP_Y`.
+    //
+    // The two new rings bind **rigidly to the elbow** rather than to a blend.
+    // The single tube this replaces ran from `elbowJoint` to `wristJoint`, which
+    // are bindings on two different bone *pairs* -- (shoulder, elbow) and
+    // (elbow, wrist) -- so there is no meaningful weight to interpolate between
+    // them, and the shader was never interpolating weights anyway: it
+    // interpolates skinned *positions* across a triangle. Rigid-to-elbow is what
+    // the middle of a forearm actually is, and it keeps `verifyCharacterRig`'s
+    // "weights sum to 1" invariant trivially true.
+    const armR = (y: number): number =>
+      ARM_LOWER_R + ((ARM_WRIST_R - ARM_LOWER_R) * (0.81 - y)) / (0.81 - 0.5);
+    const bandSkin = w1(elbow);
+    p.tube([x, 0.81, 0], [x, BAND_TOP_Y, 0], ARM_LOWER_R, armR(BAND_TOP_Y), LIMB_SIDES, ROLE.SKIN, elbowJoint, bandSkin);
+    p.tube([x, BAND_TOP_Y, 0], [x, BAND_BOTTOM_Y, 0], armR(BAND_TOP_Y), armR(BAND_BOTTOM_Y), LIMB_SIDES, ROLE.BAND, bandSkin);
+    p.tube([x, BAND_BOTTOM_Y, 0], [x, 0.5, 0], armR(BAND_BOTTOM_Y), ARM_WRIST_R, LIMB_SIDES, ROLE.SKIN, bandSkin, wristJoint);
     // The mitt. Centred below the wrist joint and rigid to it, so the swing's
     // 1.10x stretch arrives here as a smear along the arm rather than as a joint
     // that has to be reasoned about. It is also what the cricket bat hangs off:

@@ -115,6 +115,7 @@ import {
   decodeRoster,
   decodeSnapshot,
   decodeSun,
+  decodeTeamEvent,
   decodeWelcome,
   encodeHello,
   encodeSunPress,
@@ -409,6 +410,18 @@ export interface NetHandlers {
    * would be a `SunState` that silently changed under whoever held it.
    */
   onSun?(state: { screamUntilMs: number; cooldownUntilMs: number }): void;
+  /**
+   * A team ability happened somewhere: a Sunday Rush tent went up, or a mega
+   * slammed. See `protocol.MSG.TEAM_EVENT` and `world/teamlook.ts`.
+   *
+   * Optional like `onSun`, and passed **out** rather than mirrored here on
+   * exactly `onSun`'s argument: the state has one owner on this end -- the tent
+   * and shockwave lists in `main.ts`, which sweep them by their own expiry --
+   * and a mirror beside it would be a second copy of a list with no rule about
+   * which one the renderer draws. The record is freshly allocated per message
+   * because it is handed to a caller that keeps it, a few times a session.
+   */
+  onTeamEvent?(event: { kind: number; x: number; y: number; z: number; untilMs: number }): void;
   /**
    * The balance moved, and the server's own sentence saying why -- "+$34 fare".
    *
@@ -1489,6 +1502,19 @@ export class NetClient {
       case MSG.SUN: {
         const sun = decodeSun(frame);
         if (sun) this.handlers.onSun?.(sun);
+        return;
+      }
+      /**
+       * A tent or a slam, with a place and an expiry. See `MSG.TEAM_EVENT`.
+       *
+       * Passed straight out on `MSG.SUN`'s argument, and `decodeTeamEvent`
+       * refuses an unknown kind rather than falling through -- so a frame from a
+       * newer server carrying a third kind draws nothing here instead of putting
+       * a gazebo wherever that feature fired.
+       */
+      case MSG.TEAM_EVENT: {
+        const event = decodeTeamEvent(frame);
+        if (event) this.handlers.onTeamEvent?.(event);
         return;
       }
       case MSG.HEAT: {

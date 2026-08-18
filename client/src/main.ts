@@ -219,7 +219,7 @@ import { BugReportForm, FrameGrabber, verifyBugReport } from './bugreport.ts';
 // compute a level, and the whole arrangement only works if the two runs agree.
 import { JoinGate } from './accounts.ts';
 import { verifyAccounts } from './net/accounts.ts';
-import { ANIM, PROTOCOL_VERSION, SNAPSHOT_INTERVAL, sanitiseName, suggestName, verifyNames, verifyNet } from './net/protocol.ts';
+import { ANIM, PROTOCOL_VERSION, SNAPSHOT_INTERVAL, TEAM_EVENT_KIND, sanitiseName, suggestName, verifyNames, verifyNet } from './net/protocol.ts';
 import {
   FootyAssets,
   FootyPool,
@@ -230,6 +230,22 @@ import {
   verifyFootyBall,
 } from './world/footyball.ts';
 import { NameplateField, nameplateWarmupParts, verifyNameplates, type PlateInput } from './world/nameplates.ts';
+// --- WORKSTREAM X: teams you can see. One import block; the wiring is one
+// contiguous section beside the local player's body and two lines in the loop.
+import { TEAM, TEAM_NAME, type Team } from './game/teams.ts';
+import { AURA_RING_M, GROUP_RING_M, MAX_RINGS, SLAM_SECONDS, teamMarkerKind, verifyTeamLook } from './game/teamlook.ts';
+import { groupSizeFor, hasAura, hasBigNight, hasTeamSource, teamOf } from './world/teamview.ts';
+import {
+  BigNightKit,
+  HornProp,
+  TeamRingField,
+  TentSet,
+  setHorns,
+  setTeamBody,
+  teamLookWarmupParts,
+  verifyBigNightKit,
+  type TentSpec,
+} from './world/teamlook.ts';
 import {
   RenderGuard,
   auditSceneTextures,
@@ -1008,6 +1024,20 @@ async function main(): Promise<void> {
   // `world/nameplates.ts`. `MAX_HEALTH` is handed in so the bar's pip ticks
   // cannot drift from the number of pips there actually are.
   const nameplateFailures = timed('nameplates', () => verifyNameplates(MAX_HEALTH));
+  // --- WORKSTREAM X: teams you can see.
+  //
+  // Two checks and they are deliberately in two files. `verifyTeamLook` is
+  // three-free and runs in **both** boot lists -- it owns the numbers: the tint
+  // measured against `character.COLOURWAYS`' two-tone rule, the ring's pulse,
+  // the slam's radius over time and the tent's headroom. `verifyBigNightKit`
+  // needs three, so it is here only, and it owns the *geometry*: the triangle
+  // budgets, the winding of four hand-built solids, the cactus's bone bindings
+  // and bounds, and the one thing measurement in the other file cannot prove --
+  // that the tinted colours actually reach the buffer a player draws from.
+  //
+  // Every failure in both renders. See their headers.
+  const teamLookFailures = timed('teamlook', verifyTeamLook);
+  const bigNightFailures = timed('bignight', () => verifyBigNightKit(characters));
   // And the render guard, which is the only check here about the *loop* rather
   // than about the world. It earns its place the way the HUD's does: it covers
   // something that already shipped broken. A render exception used to abort the
@@ -1180,6 +1210,8 @@ async function main(): Promise<void> {
     walletFailures.length ||
     accountFailures.length ||
     nameplateFailures.length ||
+    teamLookFailures.length ||
+    bigNightFailures.length ||
     guardFailures.length ||
     hudFailures.length ||
     wallFailures.length ||
@@ -1248,6 +1280,8 @@ async function main(): Promise<void> {
           ...walletFailures,
           ...accountFailures,
           ...nameplateFailures,
+          ...teamLookFailures,
+          ...bigNightFailures,
           ...guardFailures,
           ...hudFailures,
           ...wallFailures,
@@ -2139,6 +2173,16 @@ async function main(): Promise<void> {
    * is the whole reason this can be warmed at all. See `world/nameplates.ts`.
    */
   const nameplates = new NameplateField();
+  // WORKSTREAM X: the team look's shared geometry, built here for the same
+  // reason the plate field is -- so the warm-up below can reach it. The horns
+  // and the tent are the character material against a **non-skinned** attribute
+  // layout, which nothing else in this client produces, and the ring is a new
+  // material outright; without warming them, the first Marita to walk round a
+  // corner and the first mega to fire each compile a pipeline on the frame they
+  // land. The rest of the wiring is two thousand lines down, beside the local
+  // player's own body, where the actors it dresses exist.
+  const bigNight = new BigNightKit(characters);
+  const teamRings = new TeamRingField();
 
   // --- Shader warm-up, and this is the one thing on the boot path that exists
   // purely because of how a real player described the game.
@@ -2228,6 +2272,9 @@ async function main(): Promise<void> {
         ...characterWarmupParts(characterAssets),
         ...eventWarmupParts(eventAssets),
         ...nameplateWarmupParts(nameplates),
+        // WORKSTREAM X: the tinted body, the cactus, the horns, the tent and
+        // the ground rings. See `teamLookWarmupParts`.
+        ...teamLookWarmupParts(bigNight, characters, teamRings),
         // The rave's booth banner, which is the one thing in that whole feature
         // a stand-in can warm: everything else it draws is instanced, and
         // `world/rave.ts` section 2 sets out why that means twelve pipelines
@@ -4130,6 +4177,174 @@ async function main(): Promise<void> {
   const footyViewmodel = new FootyViewmodel(footies);
   camera.add(footyViewmodel.group);
 
+  // --- WORKSTREAM X: teams you can see. ------------------------------------
+  //
+  // Everything this block does lives in `world/teamlook.ts` and
+  // `game/teamlook.ts`; what is here is the wiring, and it is deliberately one
+  // contiguous piece plus two lines in the frame loop.
+  //
+  // Who is on which side is read through `world/teamview.ts` rather than off
+  // `net`, because the roster's `team` byte and the talent mirror belong to the
+  // framework workstream and land on their own branch. `setTeamSource` is the
+  // seam: until somebody calls it, `teamOf` answers `TEAM.NONE` for everybody
+  // and this whole feature draws exactly the game that was here before -- which
+  // is also, permanently, what offline looks like, because there are no accounts
+  // without a server.
+  //
+  // **The one line the framework workstream adds at merge** is here, and it is
+  // written out rather than left to be worked out from `teamview.ts`'s header:
+  //
+  //     setTeamSource({ teamOf: (id) => net?.teamOf(id) ?? TEAM.NONE,
+  //                     talentsOf: (id) => net?.talentsOf(id) ?? EMPTY_MASK });
+  //
+  // Until it lands, `hasTeamSource()` is false, every `teamOf` answers
+  // `TEAM.NONE`, and this whole section draws the game that was here before --
+  // which is also what offline looks like permanently, since there are no
+  // accounts and therefore no sides without a server. `sydney.teamlook()`
+  // reports which of the two states the client is in.
+  scene.add(teamRings.mesh);
+  const tents = new TentSet(bigNight, characters);
+  scene.add(tents.mesh);
+  /** Tents standing, from `MSG.TEAM_EVENT`. At most a handful; swept by `untilMs`. */
+  const liveTents: TentSpec[] = [];
+  /** Slam shockwaves, as (x, y, z, team, when). Swept the same way. */
+  const liveSlams: Array<{ x: number; y: number; z: number; team: Team; atMs: number }> = [];
+  /** The local player's horns, and every remote's, made and unmade on the talent. */
+  let selfHorns: HornProp | null = null;
+  const remoteHorns = new Map<number, HornProp>();
+  /** Reused per frame: everybody visible, so the aura rings can find a teammate. */
+  const teamedBodies: Array<{ id: number; team: Team; x: number; y: number; z: number; aura: boolean; group: number }> = [];
+
+  /**
+   * One character's body and horns brought into line with their talents.
+   *
+   * Idempotent by construction -- it sets the geometry the three facts imply
+   * rather than reacting to a change -- so a level-up, a refund, a reconnect and
+   * a team choice all arrive here as the same assignment and there is no
+   * transition to get wrong. See `teamlook.setTeamBody`.
+   */
+  function dressForTeam(actor: CharacterActor, id: number, horns: HornProp | null, isSelf: boolean): HornProp | null {
+    const team = teamOf(id);
+    const big = hasBigNight(id);
+    setTeamBody(actor, bigNight, team, big);
+    const next = setHorns(horns, big && team === TEAM.MARITA, bigNight, characters, actor);
+    // The local player's own horns are on the shadow layer with the rest of
+    // their body, or they hang in front of their own eyes. `BatProp` documents
+    // why this is a separate call: three does not inherit layers.
+    if (isSelf && next !== null && next !== horns) next.castShadowOnly();
+    return next;
+  }
+
+  /**
+   * The whole team look for one frame: bodies, horns, rings and tents.
+   *
+   * Called once from the loop, after the nameplates, because it reads the same
+   * final world transforms they do and because the ring under somebody's feet
+   * has to agree with the plate over their head about which side they are on.
+   */
+  function updateTeamLook(nowMs: number): void {
+    const seconds = nowMs / 1000;
+    selfHorns = dressForTeam(self, net?.id ?? 0, selfHorns, true);
+
+    teamedBodies.length = 0;
+    if (net) {
+      for (const r of net.remotes.values()) {
+        if (r.fresh) continue;
+        const entry = remotes.get(r.id);
+        if (!entry) continue;
+        const horns = dressForTeam(entry.actor, r.id, remoteHorns.get(r.id) ?? null, false);
+        if (horns) remoteHorns.set(r.id, horns);
+        else remoteHorns.delete(r.id);
+        const team = teamOf(r.id);
+        if (team !== TEAM.NONE) {
+          teamedBodies.push({ id: r.id, team, x: r.position.x, y: r.position.y, z: r.position.z, aura: hasAura(r.id), group: groupSizeFor(r.id) });
+        }
+      }
+      const myTeam = teamOf(net.id);
+      if (myTeam !== TEAM.NONE) {
+        teamedBodies.push({
+          id: net.id, team: myTeam, x: player.position.x, y: player.position.y, z: player.position.z,
+          aura: hasAura(net.id), group: groupSizeFor(net.id),
+        });
+      }
+    }
+
+    // The rings. An aura ring is drawn **only while a teammate is inside it**
+    // -- the brief's condition, and the thing that stops a brawl becoming a
+    // field of overlapping circles: within twelve metres of a fight everybody
+    // is in somebody's aura, so an unconditional ring would say nothing. The
+    // neighbour test is O(n^2) over at most sixteen bodies, which is 256
+    // distance checks a frame and is not worth a spatial hash.
+    teamRings.begin();
+    for (const b of teamedBodies) {
+      if (!b.aura && b.group === 0) continue;
+      let mates = 0;
+      let close = 0;
+      for (const o of teamedBodies) {
+        if (o.id === b.id || o.team !== b.team) continue;
+        const dx = o.x - b.x;
+        const dz = o.z - b.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 <= AURA_RING_M * AURA_RING_M) close++;
+        if (d2 <= GROUP_RING_M * GROUP_RING_M) mates++;
+      }
+      if (b.aura && close > 0) teamRings.addAura(b.x, characterGround(b.x, b.z), b.z, b.team, seconds);
+      if (b.group > 0 && mates >= b.group) teamRings.addGroup(b.x, characterGround(b.x, b.z), b.z, b.team, seconds);
+    }
+    for (let i = liveSlams.length - 1; i >= 0; i--) {
+      const s = liveSlams[i];
+      const age = (nowMs - s.atMs) / 1000;
+      if (age > SLAM_SECONDS) {
+        liveSlams.splice(i, 1);
+        continue;
+      }
+      teamRings.addSlam(s.x, s.y, s.z, s.team, age);
+    }
+    teamRings.end();
+
+    // The tents. Swept here rather than in `TentSet`, which is deliberately
+    // declarative -- it stands what it is given and takes down the rest, and
+    // owning the list here is what makes a reconnect drop every tent rather
+    // than leaving one standing in a car park forever.
+    for (let i = liveTents.length - 1; i >= 0; i--) if (liveTents[i].untilMs <= nowMs) liveTents.splice(i, 1);
+    tents.set(liveTents, nowMs, characterGround);
+  }
+
+  /**
+   * `MSG.TEAM_EVENT` arrived: a tent went up, or somebody slammed.
+   *
+   * The gameplay workstream emits these and this end only draws them, which is
+   * why nothing here decides anything -- an event is filed and swept by its own
+   * `untilMs`. A tent at a place a tent is already standing replaces it rather
+   * than stacking, because a mega is once per in-game day and two records for
+   * one gazebo is a z-fight.
+   */
+  function dropRemoteHorns(id: number): void {
+    remoteHorns.get(id)?.dispose();
+    remoteHorns.delete(id);
+  }
+
+  function onTeamEvent(kind: number, x: number, y: number, z: number, untilMs: number): void {
+    if (kind === TEAM_EVENT_KIND.TENT) {
+      const near = liveTents.findIndex((t) => Math.abs(t.x - x) < 1 && Math.abs(t.z - z) < 1);
+      if (near >= 0) liveTents[near] = { x, y, z, untilMs };
+      else liveTents.push({ x, y, z, untilMs });
+      return;
+    }
+    // A slam's `untilMs` is the instant the ring finishes, so the moment it
+    // *started* is that less the ring's own duration -- which keeps the wire's
+    // one time field meaning the same thing for both kinds.
+    // **Neutral rather than the caster's colour**, and it is a wire decision
+    // rather than a taste one: the twenty-byte record carries a place and an
+    // expiry and no owner, so colouring the ring teal would be this end guessing
+    // -- and guessing wrong half the time, because both teams have a mega that
+    // slams (`Newtown Standoff` and `Cronulla Line`). A grey shockwave is also
+    // the honest read: it is a hit landing, not a buff holding, and every other
+    // team-coloured thing in this feature is the second sort.
+    liveSlams.push({ x, y, z, team: TEAM.NONE, atMs: untilMs - SLAM_SECONDS * 1000 });
+  }
+  // --- end WORKSTREAM X ------------------------------------------------------
+
   // --- The lime e-bikes.
   //
   // `game/bikes.ts` decides everything; this is the wiring and the geometry.
@@ -4457,6 +4672,11 @@ async function main(): Promise<void> {
     entry.footy.dispose();
     entry.bat.dispose();
     entry.bike?.dispose();
+    // WORKSTREAM X: and their horns, which are parented to a bone of a mesh that
+    // is about to leave the scene. Removing the body would leave the prop
+    // attached to an orphan rather than leaking it, but the `Map` entry would
+    // outlive the player and be handed to whoever next took that id.
+    dropRemoteHorns(id);
     entry.actor.mesh.removeFromParent();
     // The geometry and the material belong to `CharacterAssets` and are shared by
     // every actor in the game, so nothing here disposes either -- the same
@@ -4950,7 +5170,11 @@ async function main(): Promise<void> {
   minimap.addMarkerSource((sink) => {
     if (!net) return;
     for (const r of net.remotes.values()) {
-      sink.mark(r.position.x, r.position.z, 'combatant', r.yaw);
+      // WORKSTREAM X: in their team's colour where they have one, and in the
+      // combatant red where they do not. `teamMarkerKind` is the whole of the
+      // decision and both maps read one shared `markerInk` switch, so the dot on
+      // the compass and the dot on the big map cannot disagree.
+      sink.mark(r.position.x, r.position.z, teamMarkerKind(teamOf(r.id)), r.yaw);
     }
   });
 
@@ -6369,6 +6593,10 @@ async function main(): Promise<void> {
        */
       onSun(state) {
         sunButton.adopt(state, player.position.x, player.position.z);
+      },
+      /** WORKSTREAM X: a Sunday Rush tent, or a mega's shockwave. */
+      onTeamEvent(event) {
+        onTeamEvent(event.kind, event.x, event.y, event.z, event.untilMs);
       },
       /** "+$34 fare". The pill, and the phone's wallet history. */
       onMoney(note, balance) {
@@ -9797,6 +10025,10 @@ async function main(): Promise<void> {
         // standing with the police, and both belong under the name rather than
         // only on a board you have to hold Tab to read.
         plate.level = net.levelOf(r.id);
+        // WORKSTREAM X: and which side they are on, under the name once, on a
+        // pill in the team's colour. `teamOf` answers TEAM.NONE until the
+        // framework wires a source, which is also what offline is forever.
+        plate.team = teamOf(r.id);
         nameplates.add(plate, net.id);
       }
     } else {
@@ -9824,6 +10056,12 @@ async function main(): Promise<void> {
       }
     }
     nameplates.end();
+
+    // WORKSTREAM X: the bodies, the horns, the ground rings and the tents, on
+    // the same argument the plates are here for -- this reads other objects'
+    // final transforms, and a ring under somebody's feet has to agree with the
+    // plate over their head about which side they are on.
+    updateTeamLook(Date.now());
 
     // **Guarded, and this is the one call in the client that has to be.**
     //
@@ -10384,6 +10622,25 @@ async function main(): Promise<void> {
       ride: railHarness.ride,
       state: railHarness.state,
       keys: () => ({ down: [...keys], mountHeld }),
+      /**
+       * WORKSTREAM X: what the team look is drawing, and the seam it reads from.
+       *
+       * `sydney.teamlook()` answers the three questions this feature can be
+       * wrong about from outside: whether anybody has wired a team source at all
+       * (offline and pre-merge, nobody has, and everything below is meant to be
+       * zero), how many rings and tents are up, and what the local player is
+       * currently wearing. `source: false` with a teamed roster is the one
+       * failure that has no picture -- the whole feature simply does not appear
+       * and looks like it was never merged.
+       */
+      teamlook: () => ({
+        source: hasTeamSource(),
+        me: { team: TEAM_NAME[teamOf(net?.id ?? 0)], bigNight: hasBigNight(net?.id ?? 0), horns: selfHorns !== null },
+        rings: { drawn: teamRings.live, dropped: teamRings.dropped, cap: MAX_RINGS },
+        tents: { standing: tents.live, queued: liveTents.length },
+        slams: liveSlams.length,
+        triangles: { horns: bigNight.hornTriangles, cactus: bigNight.cactusTriangles, tent: bigNight.tentTriangles },
+      }),
       /**
        * The corridor as closed solids: what was swept, and what is under a point.
        *

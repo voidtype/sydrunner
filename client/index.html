@@ -9,6 +9,46 @@
         color-scheme: dark;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       }
+      /* --- The two teams, as interface tokens.
+         --------------------------------------------------------------------
+         The level-2 join panel, the talent tree, the phone tile and anything
+         else that needs to say "Marita" or "DeFAULT" in colour reads these
+         rather than a hex, because these four values are also a singlet on a
+         body (`player/character.ts` through `game/teamlook.teamKit`), a
+         nameplate pill (`world/nameplates.ts`) and two dots on both maps
+         (`minimap.markerInk`), and a stylesheet with its own idea of teal is a
+         fifth owner of a colour with four already.
+
+         They are `game/teams.TEAM_COLOUR` written out: Marita is teal with
+         white ink, DeFAULT is yellow with black. `verifyTeams` fails the boot if
+         either hex moves in the contract, which is what makes copying them here
+         safe -- the copy is checkable against the original rather than merely
+         hoped to match.
+
+         The two `-dim` variants are the panel's resting state: a card that is
+         not the one you are hovering, a tree that is not the one you are
+         spending in. A flat 22% of the colour over the page's own `#0b0d10`,
+         which is the same relationship the HUD's inactive rows already have to
+         their active ones. */
+      :root {
+        --team-marita: #018D96;
+        --team-marita-ink: #ffffff;
+        --team-marita-dim: #073a3d;
+        --team-default: #FECA12;
+        --team-default-ink: #111111;
+        --team-default-dim: #3d3308;
+        /* The neutral a guest, an unchosen card or a locked tier takes. The
+           interface's existing dim ink, restated as a team token so a panel can
+           write one rule for three states. */
+        --team-none: #888888;
+        --team-none-ink: #e6eef6;
+        /* Talent tiers, for the tree's rungs: taken, affordable, locked. Named
+           by what they mean rather than by their colour so the panel does not
+           have to know that "affordable" is currently the team colour itself. */
+        --tier-taken: #e6eef6;
+        --tier-open: rgba(230, 238, 246, 0.55);
+        --tier-locked: rgba(230, 238, 246, 0.22);
+      }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { height: 100%; overflow: hidden; background: #0b0d10; }
       #viewport { display: block; width: 100vw; height: 100vh; cursor: crosshair; }

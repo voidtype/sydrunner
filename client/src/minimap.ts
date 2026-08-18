@@ -214,6 +214,10 @@ import {
   hatchPattern,
   type HazardKind,
 } from './world/invisible-walls.ts';
+// The two team dots take the teams' own colours, from the one place they are
+// written. A hex copied into this file would be a second owner of a colour that
+// is also on a body, a nameplate pill and a stylesheet variable.
+import { TEAM, TEAM_COLOUR } from './game/teams.ts';
 
 /**
  * Whoever knows which prisms are solid-but-undrawn.
@@ -282,7 +286,25 @@ export type MarkerKind =
    * that drew them in one colour would be a map you have to read.
    */
   | 'fare-pickup'
-  | 'fare-dropoff';
+  | 'fare-dropoff'
+  /**
+   * A player who is on a side. See `game/teamlook.teamMarkerKind`.
+   *
+   * **Two kinds rather than a `combatant` with a colour argument**, and the
+   * reason is this union's own header two paragraphs up: it is closed so that a
+   * typo in a provider is a compile error rather than an invisible dot, and
+   * `markerInk` is the one shared switch both maps read. Threading a colour
+   * through `MarkerSink.mark` would have added a parameter to every provider in
+   * the client -- powerups, bikes, raves, events, Centrelink, fares -- to serve
+   * one of them.
+   *
+   * They keep the combatant's *size* and its heading tick, because that is what
+   * they are: somebody who can hit you. What changes is the hue, which is the
+   * single most useful thing a map of a two-team melee can tell you and is
+   * exactly the read the body tint gives in the street.
+   */
+  | 'team-marita'
+  | 'team-default';
 
 /**
  * One thing on the map, in world metres.
@@ -479,6 +501,10 @@ const HEADING_TICK = 5;
  */
 export function markerInk(kind: MarkerKind): string {
   switch (kind) {
+    case 'team-marita':
+      return TEAM_COLOUR[TEAM.MARITA].css;
+    case 'team-default':
+      return TEAM_COLOUR[TEAM.DEFAULT].css;
     case 'training':
       return TRAINING_DOT;
     case 'flat-white':
@@ -1063,7 +1089,11 @@ export class Minimap implements MarkerSink {
         ctx.strokeStyle = ink;
       }
 
-      const r = m.kind === 'combatant' ? COMBATANT_DOT_R : m.kind === 'bike' ? BIKE_DOT_R : POWERUP_DOT_R;
+      // A teamed player is a combatant with a hue, so they take the combatant's
+      // radius: the ranking this file sets out -- somebody who can hit you is the
+      // biggest dot -- is about what a marker *is*, not about which side it is on.
+      const combatant = m.kind === 'combatant' || m.kind === 'team-marita' || m.kind === 'team-default';
+      const r = combatant ? COMBATANT_DOT_R : m.kind === 'bike' ? BIKE_DOT_R : POWERUP_DOT_R;
       ctx.beginPath();
       ctx.arc(sx, sy, r, 0, TAU);
       ctx.fill();

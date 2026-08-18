@@ -1661,6 +1661,11 @@ export function verifyBigMap(): string[] {
     const kinds: MarkerKind[] = [
       'training', 'flat-white', 'combatant', 'bike', 'rave', 'event',
       'centrelink', 'fare-pickup', 'fare-dropoff',
+      // The two team dots. In this list for the reason every other kind is: a
+      // kind with no branch of its own falls through to the combatant red, and a
+      // Marita drawn as "somebody unaffiliated who can hit you" is a read the
+      // whole team tint exists to give and this would silently take away.
+      'team-marita', 'team-default',
     ];
     const seen = new Map<string, MarkerKind>();
     for (const kind of kinds) {

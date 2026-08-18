@@ -85,6 +85,7 @@ import type { WarmupPart } from './warmup.ts';
 import { texture } from 'three/tsl';
 import { FIGURE_HEIGHT } from '../player/animation.ts';
 import { registerTexture, unregisterTexture } from './texture-audit.ts';
+import { TEAM, TEAM_COLOUR, TEAM_NAME, type Team } from '../game/teams.ts';
 
 // --- Sizes, in world metres ---------------------------------------------------
 
@@ -288,15 +289,73 @@ const FONT_STACK = 'ui-monospace, SFMono-Regular, Menlo, monospace';
 export const MAX_PLATES = 24;
 
 /**
- * Backing, fill, two ticks, name, stars, **level**. See the header.
+ * Backing, fill, two ticks, **team label**, level, stars, **pill**, name. See
+ * the header.
  *
- * Seven since workstream G. The count has to be a constant rather than a
- * function of what a plate happens to carry, because the index buffer is built
- * once at construction with a fixed six indices per quad per slot -- so a plate
- * with no stars and no level still writes two degenerate quads rather than
- * skipping them. `verifyNameplates` asserts the arithmetic both ways.
+ * Nine since the teams pass; seven before it. The count has to be a constant
+ * rather than a function of what a plate happens to carry, because the index
+ * buffer is built once at construction with a fixed six indices per quad per
+ * slot -- so a plate with no stars, no team and no level still writes three
+ * degenerate quads rather than skipping them. `verifyNameplates` asserts the
+ * arithmetic both ways, and asserts it *across* a teamed and an untamed plate,
+ * which is the direction that can overflow.
  */
-export const QUADS_PER_PLATE = 7;
+export const QUADS_PER_PLATE = 9;
+
+/**
+ * The pill behind the name, and why the name did not simply change colour.
+ *
+ * The order was "the name draws on a team-coloured pill". A tinted *name* was
+ * the cheaper thing to build -- no extra quad -- and it is wrong for a reason
+ * this file has already been through once with the bar: Sydney at 3 pm is the
+ * brightest surface this game has, and coloured text on a sunlit sandstone wall
+ * has no edge. A filled pill gives the name a ground of its own, which is the
+ * same argument `BAR_BORDER` makes two hundred lines up, and it is also the only
+ * form in which a team colour is *big enough to read at forty metres* -- glyph
+ * strokes at that distance are a pixel wide and carry no hue at all.
+ *
+ * The padding is generous horizontally and tight vertically so the pill reads as
+ * a label rather than as a box: 0.055 m of colour either side of a name at
+ * plate scale is about a character's width.
+ */
+const PILL_PAD_X = 0.055;
+const PILL_PAD_Y = 0.022;
+/** The pill is nearly solid. It is a ground, and a translucent ground is a smudge. */
+const PILL_ALPHA = 0.88;
+
+/**
+ * The team's own name under the player's, at this fraction of a name's height.
+ *
+ * **On the badge line rather than on a line of its own**, which is the whole
+ * layout decision here and it is `BADGE_GAP`'s argument repeated: the plate must
+ * not get taller. `verifyNameplates` measures the worst-case plate against the
+ * figure it belongs to and refuses anything over 45% of it; a row of its own
+ * would have added a sixth of a name's height to every plate belonging to
+ * somebody on a side, which is nearly everybody past level 2, and would have
+ * failed that budget. The badge line already reads left to right as *who they
+ * are, then how wanted they are*, so the side they are on goes on the front of
+ * it: `Marita lvl 4 ★★☆☆☆`.
+ *
+ * Drawn in the team's colour rather than in the badge row's white, because it is
+ * the one item on that line whose *hue* is the information.
+ */
+const TEAM_LABEL_SCALE = 0.62;
+
+/**
+ * The label under a name. **The only place a team is spelt in this file**, and
+ * it is a function rather than an inlined `TEAM_NAME[team]` so there is exactly
+ * one call site to look at.
+ *
+ * `game/teams.ts` opens by insisting on this: the owner's spelling is Marita and
+ * DeFAULT, `verifyTeams` greps the contract's strings for every wrong casing,
+ * and the renderer is asked to draw `TEAM_NAME[team]` rather than a literal so
+ * there is one place the spelling lives. A guest draws nothing at all -- not
+ * "none", not a dash -- because a plate over somebody with no side should look
+ * like the plate this feature drew before teams existed.
+ */
+export function teamLabel(team: Team | undefined): string {
+  return team === undefined ? '' : TEAM_NAME[team];
+}
 
 /**
  * The star row's height, as a fraction of the name's, and the gap over it.
@@ -489,6 +548,16 @@ export interface PlateInput {
    * which draws nothing at 1.
    */
   level?: number;
+  /**
+   * Which side they are on. `world/teamview.teamOf`, or absent.
+   *
+   * Optional and defaulting to `TEAM.NONE` on `stars`' argument exactly: the
+   * callers are the remotes online and the dummies offline, a training dummy has
+   * no side, and offline there are no accounts and therefore no sides at all.
+   * Absent draws the plate this feature drew before teams existed -- no pill, no
+   * label, and the two degenerate quads that keep the buffer layout constant.
+   */
+  team?: Team;
 }
 
 /** A copy of a `PlateInput`, plus its range. Pooled; see `NameplateField.pending`. */
@@ -559,7 +628,7 @@ export class NameplateField {
    * record here is what lets the caller pass one scratch object for everybody.
    */
   private readonly pending: PendingPlate[] = Array.from({ length: MAX_PLATES }, () => ({
-    id: 0, name: '', health: 0, headX: 0, headY: 0, headZ: 0, down: false, stars: 0, level: 1, distance: 0,
+    id: 0, name: '', health: 0, headX: 0, headY: 0, headZ: 0, down: false, stars: 0, level: 1, team: TEAM.NONE as Team, distance: 0,
   }));
   private pendingCount = 0;
 
@@ -728,6 +797,7 @@ export class NameplateField {
     slot.down = input.down;
     slot.stars = input.stars ?? 0;
     slot.level = input.level ?? 1;
+    slot.team = input.team ?? TEAM.NONE;
     slot.distance = distance;
   }
 
@@ -945,29 +1015,53 @@ export class NameplateField {
     // with no heat gets a centred `lvl 4` rather than one shoved to the left of
     // where five stars would have been.
     let starRise = 0;
+    const team = input.team ?? TEAM.NONE;
     {
+      const teamText = teamLabel(team);
       const levelText = levelRow(input.level ?? 1);
       const starText = starRow(input.stars ?? 0);
-      // Rasterised (or found in the atlas) before either is placed, because the
-      // group's width -- and therefore where each of them starts -- needs both.
+      // Rasterised (or found in the atlas) before any of them is placed, because
+      // the group's width -- and therefore where each of them starts -- needs
+      // all three.
+      const teamSlot = teamText === '' ? null : this.slotFor(teamText);
       const levelSlot = levelText === '' ? null : this.slotFor(levelText);
       const starSlot = starText === '' ? null : this.slotFor(starText);
       const badgeH = NAME_HEIGHT * STAR_HEIGHT_SCALE * scale;
+      const teamH = NAME_HEIGHT * TEAM_LABEL_SCALE * scale;
+      const teamW = teamSlot && teamSlot.widthPx > 0 ? teamH * (teamSlot.widthPx / SLOT_HEIGHT) : 0;
       const levelW = levelSlot && levelSlot.widthPx > 0 ? badgeH * (levelSlot.widthPx / SLOT_HEIGHT) : 0;
       const starW = starSlot && starSlot.widthPx > 0 ? badgeH * (starSlot.widthPx / SLOT_HEIGHT) : 0;
       const gap = levelW > 0 && starW > 0 ? BADGE_GAP * scale : 0;
-      let total = levelW + gap + starW;
+      const teamGap = teamW > 0 && levelW > 0 ? BADGE_GAP * scale : 0;
+      let total = teamW + teamGap + levelW + gap + starW;
       let height = badgeH;
       const cap = NAME_MAX_WIDTH * scale;
-      // Both shrink together rather than the wider one being clipped, which is
+      // All three shrink together rather than the widest being clipped, which is
       // the same bargain the name makes one block down: a badge row that was
       // squashed on one side would read as two different type sizes.
       const squeeze = total > cap && total > 0 ? cap / total : 1;
       total *= squeeze;
       height *= squeeze;
       const bottom = barH + border + STAR_GAP * scale;
-      c.setRGB(1, 1, 1);
+      // The side they are on, first, in the team's own colour -- see
+      // `TEAM_LABEL_SCALE`. Written before the white is set, because it is the
+      // one item on this line that is not white and setting the tint after it
+      // would colour the level as well.
       let cursor = -total / 2;
+      if (teamSlot !== null && teamW > 0) {
+        const w = teamW * squeeze;
+        const v0 = teamSlot.row * SLOT_HEIGHT;
+        c.setHex(TEAM_COLOUR[team].hex, SRGBColorSpace);
+        this.quad(anchor, cursor, cursor + w, bottom, bottom + teamH * squeeze, 0, v0, teamSlot.widthPx, v0 + SLOT_HEIGHT, c, alpha);
+        cursor += w + teamGap * squeeze;
+      } else {
+        // Absent: still a quad. See the note on the degenerate fill -- the quad
+        // count per plate has to be constant or the index buffer's fixed layout,
+        // and every budget check that reads it, stops being true.
+        c.setRGB(1, 1, 1);
+        this.quad(anchor, 0, 0, 0, 0, 0, 0, 0, 0, c, 0);
+      }
+      c.setRGB(1, 1, 1);
       // The level first, so it reads "lvl 4 ★★☆☆☆" left to right -- who they
       // are, then how wanted they are.
       //
@@ -999,7 +1093,13 @@ export class NameplateField {
       if (total > 0) starRise = height + STAR_GAP * scale;
     }
 
-    // --- The name, centred over the bar.
+    // --- The pill and the name over it, centred over the bar.
+    //
+    // Two quads and they have to be written in this order: the material does not
+    // depth-test, so within one plate the later quad simply composites over the
+    // earlier one -- which is the whole of how the name gets a ground. Both are
+    // written unconditionally, the pill degenerate for a guest, because the quad
+    // count per plate is a constant the index buffer's layout depends on.
     const slot = this.slotFor(input.name);
     if (slot.widthPx > 0) {
       let nameH = NAME_HEIGHT * scale;
@@ -1015,12 +1115,32 @@ export class NameplateField {
       const u1 = slot.widthPx;
       const v0 = slot.row * SLOT_HEIGHT;
       const v1 = v0 + SLOT_HEIGHT;
-      // White, so the canvas's own colours pass through untouched.
-      c.setRGB(1, 1, 1);
+      if (team === TEAM.NONE) {
+        this.quad(anchor, 0, 0, 0, 0, 0, 0, 0, 0, c, 0);
+      } else {
+        const padX = PILL_PAD_X * scale;
+        const padY = PILL_PAD_Y * scale;
+        c.setHex(TEAM_COLOUR[team].hex, SRGBColorSpace);
+        this.quad(
+          anchor, -nameW / 2 - padX, nameW / 2 + padX, bottom - padY, bottom + nameH + padY,
+          0, 0, WHITE_PATCH, WHITE_PATCH, c, alpha * PILL_ALPHA,
+        );
+      }
+      // White off a pill, so the canvas's own colours pass through untouched;
+      // **the team's ink on one**, which is what that field on `TEAM_COLOUR`
+      // exists for. The atlas glyph is a light fill with a near-black stroke, so
+      // multiplying by Marita's white leaves it exactly as it was and
+      // multiplying by DeFAULT's near-black collapses fill and stroke together
+      // into one solid dark glyph -- which is the readable thing on yellow, and
+      // is why the ink is read from the contract rather than a second white
+      // being assumed here.
+      if (team === TEAM.NONE) c.setRGB(1, 1, 1);
+      else c.set(TEAM_COLOUR[team].ink);
       this.quad(anchor, -nameW / 2, nameW / 2, bottom, bottom + nameH, u0, v0, u1, v1, c, alpha);
     } else {
-      // No name: still six quads. See the note on the degenerate fill.
+      // No name: still the full quad count. See the note on the degenerate fill.
       c.setRGB(1, 1, 1);
+      this.quad(anchor, 0, 0, 0, 0, 0, 0, 0, 0, c, 0);
       this.quad(anchor, 0, 0, 0, 0, 0, 0, 0, 0, c, 0);
     }
     return true;
@@ -1120,8 +1240,32 @@ export function verifyNameplates(maxHealth: number): string[] {
   // exactly `QUADS_PER_PLATE`. Everything else in a plate is one quad each:
   // the backing, the fill, the level, the star row and the name -- five, and
   // every one of them written unconditionally even when it is degenerate.
-  if (QUADS_PER_PLATE !== 5 + (MAX_PIPS - 1)) {
-    failures.push(`A plate writes ${5 + (MAX_PIPS - 1)} quads but ${QUADS_PER_PLATE} are budgeted; the index buffer's layout is wrong.`);
+  if (QUADS_PER_PLATE !== 7 + (MAX_PIPS - 1)) {
+    failures.push(`A plate writes ${7 + (MAX_PIPS - 1)} quads but ${QUADS_PER_PLATE} are budgeted; the index buffer's layout is wrong.`);
+  }
+
+  // --- The two names, spelt the owner's way, and drawn from the contract.
+  //
+  // This is a *spelling* check in a rendering file, and it is here rather than
+  // left to `verifyTeams` because that one greps the strings inside the contract
+  // and this file is a separate opportunity to get it wrong: a nameplate that
+  // built its own label -- "MARITA", "Default" -- would draw perfectly and would
+  // be the most-read wrong spelling in the game, since it is over every head in
+  // the street. See `teamLabel`.
+  if (teamLabel(TEAM.MARITA) !== 'Marita' || teamLabel(TEAM.DEFAULT) !== 'DeFAULT') {
+    failures.push(
+      `A plate's team label is ${JSON.stringify(teamLabel(TEAM.MARITA))}/${JSON.stringify(teamLabel(TEAM.DEFAULT))}. ` +
+        'The owner\'s spelling is Marita and DeFAULT, and it comes from TEAM_NAME rather than from a literal.',
+    );
+  }
+  if (teamLabel(TEAM.NONE) !== '' || teamLabel(undefined) !== '') {
+    failures.push('A player with no side is given a team label; every guest and bot in the city would carry one.');
+  }
+  if (!(TEAM_LABEL_SCALE > 0.3 && TEAM_LABEL_SCALE < 1)) {
+    failures.push(`The team label is ${TEAM_LABEL_SCALE} of a name's height; at 1 it is a second name.`);
+  }
+  if (!(PILL_ALPHA > 0.6 && PILL_ALPHA <= 1)) {
+    failures.push(`The name pill is ${PILL_ALPHA} opaque; a translucent ground is a smudge rather than a ground.`);
   }
 
   // --- The level label. Present at every level including 1, distinct at each,
@@ -1386,6 +1530,43 @@ export function verifyNameplates(maxHealth: number): string[] {
     const winding = checkWinding(field, drawn);
     if (winding) failures.push(winding);
 
+    // --- The same plate on a side. **The quad count must not move**, which is
+    // the whole reason the pill and the team label are written degenerate for a
+    // guest: the index buffer is laid out once at construction with a fixed
+    // stride per plate, and a plate that wrote eight quads where the layout
+    // budgets nine would slide every plate after it in the buffer by one quad.
+    // That renders -- as somebody else's name on your health bar.
+    for (const team of [TEAM.MARITA, TEAM.DEFAULT] as const) {
+      field.begin(camera);
+      field.add({ id: 8, name: 'Davo', health: 2, headX: 0, headY: 0, headZ: -10, down: false, stars: 3, level: 4, team }, 7);
+      field.end();
+      const quads = field.mesh.geometry.drawRange.count / INDICES_PER_QUAD;
+      if (quads !== QUADS_PER_PLATE) {
+        failures.push(`A ${TEAM_NAME[team]} plate drew ${quads} quads, not ${QUADS_PER_PLATE}; the buffer layout has slipped.`);
+      }
+      const teamWinding = checkWinding(field, quads);
+      if (teamWinding) failures.push(`On a ${TEAM_NAME[team]} plate: ${teamWinding}`);
+      // The pill has to have area and to be the team's colour, or the name is
+      // sitting on nothing and the whole point of the pill is gone. It is quad 6
+      // -- backing, fill, two ticks, team, level, stars, pill, name -- and its
+      // colour is written into the buffer with `PLATE_GAIN` already applied.
+      const pillWidth = quadWidth(field, QUADS_PER_PLATE - 2);
+      if (!(pillWidth > 0.1)) failures.push(`A ${TEAM_NAME[team]} name pill is ${pillWidth} m wide; the name has no ground under it.`);
+      const want = new Color().setHex(TEAM_COLOUR[team].hex, SRGBColorSpace);
+      const colours = field.mesh.geometry.getAttribute('color');
+      const at = (QUADS_PER_PLATE - 2) * VERTS_PER_QUAD;
+      if (Math.abs(colours.getX(at) - want.r * PLATE_GAIN) > 1e-4 || Math.abs(colours.getY(at) - want.g * PLATE_GAIN) > 1e-4) {
+        failures.push(`A ${TEAM_NAME[team]} name pill is not ${TEAM_COLOUR[team].css}; the colour never reached the buffer.`);
+      }
+    }
+    // And a guest's pill is degenerate rather than a white box over their name.
+    field.begin(camera);
+    field.add({ id: 8, name: 'Davo', health: 2, headX: 0, headY: 0, headZ: -10, down: false }, 7);
+    field.end();
+    if (quadWidth(field, QUADS_PER_PLATE - 2) > 1e-6) {
+      failures.push('A player with no side was given a name pill; guests are meant to look exactly as they did before teams.');
+    }
+
     // --- Range. Nothing past the fade, everything inside it.
     field.begin(camera);
     field.add({ id: 9, name: 'Macca', health: 3, headX: 0, headY: 0, headZ: -(FADE_OUT + 5), down: false }, 7);
@@ -1491,6 +1672,20 @@ function fillWidth(field: NameplateField): number {
   const pos = field.mesh.geometry.getAttribute('position');
   // Vertices 4 and 5 are the fill's bottom-left and bottom-right.
   return Math.abs(pos.getX(5) - pos.getX(4));
+}
+
+/**
+ * Any quad's width in metres, off the buffer, by its index within the plate.
+ *
+ * The general form of `fillWidth`, added for the pill. Reads the *positions*
+ * rather than trusting the layout arithmetic, which is the point: a check that
+ * recomputed where the pill should be would agree with a `write` that put it in
+ * the wrong place, because both would be running the same wrong sum.
+ */
+function quadWidth(field: NameplateField, quad: number): number {
+  const pos = field.mesh.geometry.getAttribute('position');
+  const b = quad * VERTS_PER_QUAD;
+  return Math.abs(pos.getX(b + 1) - pos.getX(b));
 }
 
 /**

@@ -88,6 +88,9 @@ import { verifyViewLatch } from '../client/src/game/viewlatch.ts';
 // browser, and each for the reason given at its own entry in the table below.
 import { verifyHandsPose } from '../client/src/game/hands-pose.ts';
 import { verifyLevelHud } from '../client/src/game/levelhud.ts';
+// WORKSTREAM X (teams you can see): the three-free half of the team look. The
+// geometry half (`verifyBigNightKit`) imports three and runs in the browser only.
+import { verifyTeamLook } from '../client/src/game/teamlook.ts';
 // WORKSTREAM N (carry): the restore sentence, and the spawn rules this process
 // has always run without checking. Both three-free, so this process runs the
 // same checks the browser does. See `client/src/game/carry.ts`.
@@ -353,6 +356,18 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // and is silent: the bar simply reads 10/10 on somebody who just levelled.
     // See `client/src/game/levelhud.ts`.
     ['verifyLevelHud', verifyLevelHud()],
+    // --- WORKSTREAM X: how a team looks, as arithmetic.
+    //
+    // Run **here** as well as in the browser on this list's own premise -- a
+    // shared module has to behave identically in both runtimes -- and because
+    // the numbers it guards are the kind this process is the natural home for:
+    // they are pure functions of the contract in `game/teams.ts`, which this
+    // process also owns the persistence of. Every failure in it renders. A tint
+    // that flattened a colourway into one tone is a player who cannot be told
+    // from the wall behind them; a slam ring that stopped short of eight metres
+    // is a shockwave lying about a knockdown this process already adjudicated.
+    // See `client/src/game/teamlook.ts`.
+    ['verifyTeamLook', verifyTeamLook()],
     // What a knocked-over NPC is worth, how fast a player may be paid it, and
     // what the note looks like. Run **here** first and foremost because this
     // process *is* the mint: the drop table and the rate bank are enforced in

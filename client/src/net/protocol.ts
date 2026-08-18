@@ -478,6 +478,34 @@ export const MSG = {
    * each of about six state changes a trip.
    */
   FARE: 0x90,
+  /**
+   * A team ability happened *somewhere*, and the renderer should draw it there.
+   * See `encodeTeamEvent` and `world/teamlook.ts`.
+   *
+   * **0x94, pre-assigned.** Teams landed as three workstreams built in parallel
+   * against one contract, so the ids were handed out in the briefs before any of
+   * them was written -- 0x93 is the framework's `TALENTS`, this is the
+   * renderer's, and neither branch could take "the next free number" and both be
+   * right. `HEAT`'s record two entries up explains the same arrangement from the
+   * last batch; a hole in a table of bytes costs nothing and two features
+   * decoding each other's frames costs a session.
+   *
+   * **A message of its own rather than an `EVENT`**, which was the tempting
+   * option: `encodeEvents` already carries "something happened to somebody" and
+   * a mega is exactly that. Two reasons against. An event record is a pair of
+   * player ids and a reason code -- it carries no *place*, because everything it
+   * describes happens at a player who is already in the snapshot -- and both
+   * things here are places: a tent stands in a car park for sixty seconds after
+   * the DeFAULT who dropped it has run off, and a slam ring is drawn at the spot
+   * the knockdown was adjudicated rather than wherever the mega's owner is by
+   * the time the frame lands. And an event is a one-frame notification, where
+   * this carries an **expiry**: a client that joins mid-tent needs to be told
+   * about it, which is a thing with a lifetime rather than a thing that happened.
+   *
+   * Twenty bytes, on the layout `TEAM_EVENT_BYTES` sets out, and sent a handful
+   * of times a session per player -- a mega is once per in-game day.
+   */
+  TEAM_EVENT: 0x94,
 } as const;
 
 /**
@@ -3039,6 +3067,98 @@ export function decodeSun(
   };
 }
 
+// --- Team events -------------------------------------------------------------------
+
+/**
+ * What a `MSG.TEAM_EVENT` is about. One byte, and the values are frozen: the
+ * gameplay workstream emits them and the renderer draws them, and the two ends
+ * of that agreement are in different files on different branches.
+ *
+ * `TENT` is `FX.MEGA_SIZZLE_TENT` -- the Sunday Rush gazebo, standing until its
+ * expiry. `SLAM` is `FX.MEGA_SLAM`'s shockwave, whose expiry is the 0.4 s the
+ * ring takes to reach 8 m. Both are *places*, which is the whole argument for
+ * this message existing rather than being an `EVENT`.
+ *
+ * 0 is deliberately not a kind. An all-zero frame off a truncated read decodes
+ * as `kind 0` and `decodeTeamEvent` refuses it, rather than dropping a tent at
+ * the ENU origin -- which is Town Hall, and which would render perfectly.
+ */
+export const TEAM_EVENT_KIND = { TENT: 1, SLAM: 2 } as const;
+export type TeamEventKind = (typeof TEAM_EVENT_KIND)[keyof typeof TEAM_EVENT_KIND];
+
+/**
+ * `MSG.TEAM_EVENT`, twenty bytes:
+ *
+ *     u8   type = MSG.TEAM_EVENT
+ *     u8   kind        one of TEAM_EVENT_KIND
+ *     i32  x           millimetres, `quantisePos`
+ *     i32  z           millimetres, `quantisePos`
+ *     i16  y           **decimetres**
+ *     f64  untilMs     absolute epoch milliseconds
+ *
+ * **Twenty bytes exactly**, and the one interesting thing in the layout is why
+ * `y` is not the `i32` its two siblings are. Twenty is the budget the parallel
+ * briefs set, an `f64` clock is eight of it on `MSG.SUN`'s argument -- an
+ * absolute instant, never a countdown somebody has to run down in a backgrounded
+ * tab -- and a message header plus three `i32`s plus that clock is twenty-two.
+ *
+ * So `y` is a decimetre `i16`: +/- 3,276.7 m against a city whose highest ground
+ * is under 250 m, at a precision of 10 cm. That is the right field to spend,
+ * because **the height is the only one of the three the client does not need**:
+ * a tent stands on the ground and the client already has a better ground height
+ * for that spot than the server's, so the value is a sanity anchor and a fallback
+ * for the frames before the tile has streamed in. `x` and `z` stay millimetre
+ * `i32`s because they are the *place*, and a tent 30 cm into a wall is a tent
+ * you cannot walk under.
+ *
+ * A tent is dropped once per in-game day per player and a slam likewise, so the
+ * whole feature is a handful of twenty-byte frames a session. It is deliberately
+ * **not** interest-filtered by this layout -- the filtering, if the emitter wants
+ * any, is a decision about who to send it to and not about what a frame is.
+ */
+export const TEAM_EVENT_BYTES = 20;
+
+export function encodeTeamEvent(
+  kind: TeamEventKind,
+  x: number,
+  y: number,
+  z: number,
+  untilMs: number,
+  buffer = new ArrayBuffer(TEAM_EVENT_BYTES),
+): ArrayBuffer {
+  const v = new DataView(buffer);
+  v.setUint8(0, MSG.TEAM_EVENT);
+  v.setUint8(1, kind);
+  v.setInt32(2, quantisePos(x), true);
+  v.setInt32(6, quantisePos(z), true);
+  // Decimetres, clamped rather than wrapped: a height off the end of the field
+  // should put the prop on the wrong ridge, visibly, rather than 6.5 km below
+  // the harbour where nobody will ever find it.
+  v.setInt16(10, Math.max(-32767, Math.min(32767, Math.round((Number.isFinite(y) ? y : 0) * 10))), true);
+  v.setFloat64(12, untilMs, true);
+  return buffer;
+}
+
+export function decodeTeamEvent(
+  buffer: ArrayBuffer,
+): { kind: TeamEventKind; x: number; y: number; z: number; untilMs: number } | null {
+  if (buffer.byteLength < TEAM_EVENT_BYTES) return null;
+  const v = new DataView(buffer);
+  if (v.getUint8(0) !== MSG.TEAM_EVENT) return null;
+  const kind = v.getUint8(1);
+  // An unknown kind is refused rather than drawn. A renderer that fell through
+  // to "tent" on a byte it did not recognise would put a gazebo wherever the
+  // next feature fired, and it would look like the tent feature was broken.
+  if (kind !== TEAM_EVENT_KIND.TENT && kind !== TEAM_EVENT_KIND.SLAM) return null;
+  return {
+    kind: kind as TeamEventKind,
+    x: dequantisePos(v.getInt32(2, true)),
+    z: dequantisePos(v.getInt32(6, true)),
+    y: v.getInt16(10, true) / 10,
+    untilMs: v.getFloat64(12, true),
+  };
+}
+
 // --- Heat ------------------------------------------------------------------------
 
 /**
@@ -4742,6 +4862,63 @@ export function verifyNet(): string[] {
       failures.push(
         `Six players with two balls and eight officers on them is ${(six / 1000).toFixed(1)} kbit/s.`,
       );
+    }
+  }
+
+  /* --- A team event: a tent that stands for a minute, a slam ring that lasts
+   * four hundred milliseconds, and the place each of them is.
+   *
+   * What this catches. The **height field is an `i16` of decimetres** and
+   * nothing else on this wire is -- every other coordinate in the file is a
+   * millimetre `i32` -- so the failure mode is a reader that assumes the common
+   * layout and puts a tent 3 km in the air, or an encoder that forgets the x10
+   * and puts it in the harbour. Both draw. And the **expiry is an absolute
+   * `f64`**, on `MSG.SUN`'s reasoning: a tent is sent once and is still being
+   * compared against a minute later, so a field that lost its low bits would
+   * make the gazebo vanish at a plausible-looking wrong second. Tested at a real
+   * epoch instant, which needs 41 bits and is where an `f32` would fail. */
+  {
+    const until = 1_800_000_123_456;
+    const sent = encodeTeamEvent(TEAM_EVENT_KIND.TENT, -4213.117, 43.2, 9018.004, until);
+    if (sent.byteLength !== TEAM_EVENT_BYTES) {
+      failures.push(`A TEAM_EVENT is ${sent.byteLength} bytes, not ${TEAM_EVENT_BYTES}.`);
+    }
+    const got = decodeTeamEvent(sent);
+    if (!got) {
+      failures.push('A TEAM_EVENT did not decode at all.');
+    } else {
+      if (got.kind !== TEAM_EVENT_KIND.TENT) failures.push(`A tent came back as kind ${got.kind}.`);
+      if (Math.abs(got.x - -4213.117) > 0.001 || Math.abs(got.z - 9018.004) > 0.001) {
+        failures.push(`A TEAM_EVENT's place came back as (${got.x}, ${got.z}); x and z are millimetre-exact.`);
+      }
+      if (Math.abs(got.y - 43.2) > 0.05) {
+        failures.push(`A TEAM_EVENT's height came back as ${got.y} m from 43.2; the field is decimetres.`);
+      }
+      if (got.untilMs !== until) {
+        failures.push(
+          `A TEAM_EVENT's expiry came back as ${got.untilMs} rather than ${until}. It is an absolute ` +
+            'epoch instant, sent once, and still compared against sixty seconds later.',
+        );
+      }
+    }
+    const slam = decodeTeamEvent(encodeTeamEvent(TEAM_EVENT_KIND.SLAM, 0, 0, 0, 0));
+    if (!slam || slam.kind !== TEAM_EVENT_KIND.SLAM) failures.push('A slam at the origin with a zero expiry did not survive the wire.');
+    // An unknown kind must be refused rather than fall through to a tent, and a
+    // short read must not decode at all -- both would put a gazebo somewhere
+    // nobody asked for one, which renders.
+    const wrongKind = new Uint8Array(TEAM_EVENT_BYTES);
+    wrongKind[0] = MSG.TEAM_EVENT;
+    wrongKind[1] = 0x7f;
+    if (decodeTeamEvent(wrongKind.buffer) !== null) failures.push('An unknown TEAM_EVENT kind decoded rather than being refused.');
+    wrongKind[1] = 0;
+    if (decodeTeamEvent(wrongKind.buffer) !== null) failures.push('An all-zero TEAM_EVENT body decoded; kind 0 is not a kind.');
+    if (decodeTeamEvent(new ArrayBuffer(TEAM_EVENT_BYTES - 1)) !== null) failures.push('A truncated TEAM_EVENT decoded.');
+    // Every kind in the table survives its own round trip, so adding one and
+    // forgetting the decoder's guard list is a boot failure rather than a frame
+    // that silently does nothing.
+    for (const [name, kind] of Object.entries(TEAM_EVENT_KIND)) {
+      const back = decodeTeamEvent(encodeTeamEvent(kind, 1, 2, 3, 4));
+      if (!back || back.kind !== kind) failures.push(`TEAM_EVENT_KIND.${name} does not round-trip; the decoder's guard list is missing it.`);
     }
   }
 
