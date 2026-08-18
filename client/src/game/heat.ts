@@ -216,6 +216,20 @@ import {
   type PolairPose,
 } from './polair.ts';
 import { carHash, type LaneRoute, type TrafficField } from './traffic.ts';
+// WORKSTREAM W: one read, in `report`. See `game/teamfx.ts`.
+import {
+  fxHeatFrozen,
+  fxPatrolCannotRam,
+  fxPatrolRangeM,
+  fxPoliceHitScale,
+  fxRbtAheadM,
+  fxRbtImmune,
+  fxRbtStandS,
+  fxAbsorbKnockdown,
+  fxBoardShedsStar,
+  fxNow,
+  STAGGER_SECONDS,
+} from './teamfx.ts';
 
 // --- The ladder ------------------------------------------------------------------
 
@@ -341,6 +355,15 @@ export const PATROL_HIT_M = 2.6;
 export const PATROL_REPICK_TICKS = 15;
 /** How far around itself a car looks for the lane graph, metres. */
 export const PATROL_LANE_REACH = 70;
+/**
+ * --- WORKSTREAM W: how far a patrol car will chase before it gives up, metres.
+ *
+ * The number `Ghost Plates`' tooltip is written against ("pursuit range
+ * 300 -> 200 m against you"), and until that talent existed this file had no
+ * such rule at all -- a car stood down when its suspect dropped below 3 stars
+ * and never because they had simply got away. See `driveCars`.
+ */
+export const PATROL_PURSUIT_M = 300;
 /** One patrol car per suspect. Two is a roadblock nobody asked for. */
 export const PATROL_CARS_PER_SUSPECT = 1;
 
@@ -724,6 +747,12 @@ export class HeatField {
    */
   report(playerId: number, reason: number, witness: number): void {
     if (!Number.isFinite(playerId) || playerId < 0) return;
+    // --- WORKSTREAM W: `Cash Rules`' summoned ride freezes the ladder for a
+    // minute. Checked here because this is the one funnel every crime in the
+    // game passes through -- `factions.accuse` calls it and nothing else does --
+    // so a freeze that missed a path would be a mega that worked for car theft
+    // and not for assault. Always false with no `TeamLookup` installed.
+    if (fxHeatFrozen(playerId)) return;
     this.pending.push({ playerId, reason, witness });
   }
 
@@ -765,6 +794,36 @@ export class HeatField {
    * that nothing on the server side ever calls it. See `main.ts`, where the
    * param is read and is gated on `!online`.
    */
+  /**
+   * --- WORKSTREAM W: multiply a player's heat points, and re-derive the stars.
+   *
+   * Both mobility megas end "...with all heat halved", and that is a *points*
+   * operation rather than a star one: the ladder is a points bar with five
+   * thresholds on it (`STAR_POINTS`), so halving the stars would be halving a
+   * number that is already a rounding of the thing the player actually has, and
+   * a 3★ player at 380 points and one at 619 would come out identically.
+   *
+   * Distinct from `debugSet` above, which is the offline cheat and sets an exact
+   * rung. This is a live gameplay effect, so it does **not** drop the pending
+   * queue: a crime reported on the tick you teleport still lands, and it lands
+   * on the halved bar, which is the honest order.
+   *
+   * The version bump is gated on the star count actually moving, exactly as
+   * `debugSet`'s is: `MSG.HEAT` carries stars, and halving 620 to 310 is a real
+   * change to the bar with nothing on the wire to say.
+   */
+  scalePoints(playerId: number, factor: number): void {
+    if (!(factor >= 0)) return;
+    const h = this.heat.get(playerId);
+    if (h === undefined) return;
+    h.points = h.points * factor;
+    const n = starsFor(h.points);
+    if (h.stars !== n) {
+      h.stars = n;
+      this.version++;
+    }
+  }
+
   debugSet(playerId: number, stars: number, tick: number): void {
     const n = Math.max(0, Math.min(HEAT_MAX, Math.round(stars)));
     // **Anything already queued against this player is dropped**, and finding
@@ -907,6 +966,19 @@ export class HeatField {
       // Boarding. Halved on the spot -- the doors closing on a pursuit is worth
       // paying for immediately.
       h.points *= TRAIN_BOARD_KEEP;
+      // --- WORKSTREAM W: `Opal Hop`'s "boarding a train sheds one heat star
+      // instantly", *on top of* the halving everybody gets.
+      //
+      // A whole star is a drop to just below the current tier's threshold rather
+      // than a subtraction of points, which is the same rule the station-passed
+      // edge below uses and is here for its reason: "one star" has to mean the
+      // same thing at every rung. Applied after the halving, so at 5 stars the
+      // talent is worth whatever the halving did not already cover.
+      if (fxBoardShedsStar(h.playerId)) {
+        const stars = starsFor(h.points);
+        const floor = stars > 0 ? STAR_POINTS[stars - 1] : 0;
+        if (h.points > floor) h.points = Math.max(0, floor - 1);
+      }
       // And the hide starts now: nobody on a platform is looking through a
       // carriage wall at you.
       h.hiddenTicks = HIDDEN_TICKS;
@@ -1056,7 +1128,19 @@ export class HeatField {
     this.marksman.dx = this.polair.dx;
     this.marksman.dz = this.polair.dz;
     this.marksman.target = h.playerId;
-    ctx.damagePlayer(suspect.id, POLAIR_SHOT_DAMAGE, this.marksman);
+    // --- WORKSTREAM W: `Blue Line`'s "police shots against you miss 2x as
+    // often", which this file expresses as a scale on the *damage* rather than
+    // on the roll.
+    //
+    // Two ways to spend the multiplier and this is the cheaper and the more
+    // honest of them. The roll has already happened -- `polairHitChance` decided
+    // this round lands and the tracer, the crack and the muzzle flash are all
+    // downstream of that decision -- so re-rolling it here would mean threading
+    // the scale into `polairShotFired`, which is a **pure function of the tick**
+    // that both ends evaluate independently (see `game/polair.ts`) and must stay
+    // that way. Scaling the pips is the same expected damage per second, it is
+    // one multiply, and it keeps the shot a shared closed form.
+    ctx.damagePlayer(suspect.id, POLAIR_SHOT_DAMAGE * fxPoliceHitScale(suspect.id), this.marksman);
   }
 
   /**
@@ -1186,8 +1270,13 @@ export class HeatField {
     // section 6, before copying this line anywhere else.
     const fx = -Math.sin(suspect.body.yaw);
     const fz = -Math.cos(suspect.body.yaw);
-    const aimX = sx + fx * RBT_AHEAD_M;
-    const aimZ = sz + fz * RBT_AHEAD_M;
+    // WORKSTREAM W: `Toll Dodger` sets the roadblock 300 m ahead instead of 150,
+    // which is the half of that talent that is a *number*. The other half -- it
+    // shows on your minimap -- is `teamfx.fxRbtMinimap`, a marker source the
+    // draw reads; there is no minimap in this file.
+    const ahead = fxRbtAheadM(h.playerId, RBT_AHEAD_M);
+    const aimX = sx + fx * ahead;
+    const aimZ = sz + fz * ahead;
 
     // Loose numbers, on `spawnPatrolCar`'s reason one method up.
     let found = false;
@@ -1347,6 +1436,24 @@ export class HeatField {
       const dz = tz - actor.z;
       const d2 = dx * dx + dz * dz;
 
+      // --- WORKSTREAM W: `Ghost Plates`' "highway patrol pursuit range
+      // 300 -> 200 m against you".
+      //
+      // A stand-down at a distance, which this file did not have before: a car
+      // gave up when the *rung* dropped and never because the suspect had simply
+      // got away. `PATROL_PURSUIT_M` is the default and is the number the
+      // tooltip is written against, so with no talent installed this changes
+      // behaviour for anybody who gets 300 m clear of a patrol car -- which is
+      // an improvement on its own terms (a car that chases you across Sydney
+      // forever is the bug the rung test was half of) and is the only place the
+      // key has a home. Stated here because it is a behaviour change to the
+      // untalented game and the lead should know that.
+      const pursuit = fxPatrolRangeM(actor.target, PATROL_PURSUIT_M);
+      if (d2 > pursuit * pursuit) {
+        actor.health = -2;
+        continue;
+      }
+
       // --- Arrived. Stop, and put two officers out. Once.
       if (d2 <= PATROL_STOP_M * PATROL_STOP_M) {
         drive.speed = 0;
@@ -1428,6 +1535,18 @@ export class HeatField {
       // --- Contact. The same knockdown a Camry gives, through the authority's
       // own damage door so the KO, the feed and the respawn are one machine.
       if (d2 <= PATROL_HIT_M * PATROL_HIT_M && suspect.phase !== 'ko' && suspect.health > 0) {
+        // --- WORKSTREAM W: `Right of Way` / `Sirens Are Music`: highway patrol
+        // cannot ram you. The pip still lands -- being clipped by a Camry at
+        // 25 m/s is not nothing -- and what the talent removes is the
+        // *knockdown*, which in this game is the flight (see
+        // `combat.KNOCKDOWN_LOCKOUT`). `fxAbsorbKnockdown` is spent on the same
+        // terms every other absorbed hit spends it, so a player with both
+        // Sirens Are Music and Big Night does not get two free ones from the
+        // same car.
+        if (fxPatrolCannotRam(suspect.id)) {
+          fxAbsorbKnockdown(suspect.id, fxNow());
+          suspect.flinchS = STAGGER_SECONDS;
+        }
         ctx.damagePlayer(suspect.id, 1, actor);
       }
     }
@@ -1489,11 +1608,23 @@ export class HeatField {
         h.rbtStandTicks = 0;
         continue;
       }
+      // --- WORKSTREAM W: `Blue Line`'s "RBTs never arrest you: you drive
+      // through for 1 pip". The pip is the clause above, which already runs for
+      // everybody; what this skips is the arrest below. Placed after the
+      // drive-through rather than before it so the talent is exactly what the
+      // tooltip says -- one pip, no arrest -- rather than an RBT that does
+      // nothing at all.
+      if (fxRbtImmune(h.playerId)) {
+        h.rbtStandTicks = 0;
+        continue;
+      }
 
       // --- Or stopped at it. Five seconds of standing still and they take you.
       if (speed2 <= RBT_STILL_SPEED * RBT_STILL_SPEED) {
         h.rbtStandTicks++;
-        if (h.rbtStandTicks >= RBT_STAND_SECONDS * 60) {
+        // WORKSTREAM W: `Sirens Are Music` makes the arrest take 8 s instead of
+        // 5. Absolute and max-wins.
+        if (h.rbtStandTicks >= fxRbtStandS(h.playerId, RBT_STAND_SECONDS) * 60) {
           h.rbtStandTicks = 0;
           // Enough to drop anybody. The feed line is the kind's own `feedKo`,
           // which is how the joke reaches the kill feed without this file

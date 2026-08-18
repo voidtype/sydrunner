@@ -178,9 +178,18 @@ export const DROP_MINIMUM = 5;
  * bundle would be worth less than the walk to it and the feed line would be
  * noise. `Math.floor` after the multiply, so $54 drops $5 and not $5.40.
  */
-export function dropOnDeath(balance: number): number {
+export function dropOnDeath(balance: number, fraction = DROP_FRACTION): number {
   if (balance < DROP_MINIMUM) return 0;
-  return Math.max(DROP_MINIMUM, Math.floor(balance * DROP_FRACTION));
+  // --- WORKSTREAM W: `fraction` is a parameter, defaulting to the constant.
+  //
+  // `Tap On` halves it to 5% and `Warranty`/`Cash Rules` set it to zero, and the
+  // zero is the case that decides the shape of this clause: it is tested for
+  // *before* the minimum, because `Math.max(DROP_MINIMUM, 0)` is five dollars
+  // and a talent that says "you drop nothing" must not drop five. The caller
+  // gets the fraction from `teamfx.fxDeathDropFraction`, which is the one place
+  // that knows a zero there is real.
+  if (!(fraction > 0)) return 0;
+  return Math.max(DROP_MINIMUM, Math.floor(balance * fraction));
 }
 
 /**
@@ -372,11 +381,15 @@ export function nearestOffices(
  * clamped to the full period rather than trusted, so the worst a bad clock can
  * do is make somebody wait seven days.
  */
-export function claimWaitMs(lastClaimMs: number, nowMs: number): number {
+export function claimWaitMs(lastClaimMs: number, nowMs: number, periodMs = CENTRELINK_PERIOD_MS): number {
   if (!(lastClaimMs > 0)) return 0;
   const since = nowMs - lastClaimMs;
-  if (since < 0) return CENTRELINK_PERIOD_MS;
-  return since >= CENTRELINK_PERIOD_MS ? 0 : CENTRELINK_PERIOD_MS - since;
+  // --- WORKSTREAM W: `periodMs` is a parameter, defaulting to the constant.
+  // `Tap On` shortens it to six in-game days and `Click & Collect` to five. The
+  // caller multiplies `teamfx.fxCentrelinkDays` by `cycle.CYCLE_MS`; this file
+  // stays free of the sky for the reason `game/teamfx.ts` gives.
+  if (since < 0) return periodMs;
+  return since >= periodMs ? 0 : periodMs - since;
 }
 
 // --- SydRide -------------------------------------------------------------------
@@ -438,13 +451,38 @@ export const FARE_COOLDOWN_SECONDS = 10;
  * there is no division -- it is a rule: a trip that took no time is a trip that
  * did not happen, and the only way to produce one is a bug or a teleport.
  */
-export function farePayout(metres: number, seconds: number, knockedSomeoneDown: boolean): number {
+export function farePayout(
+  metres: number,
+  seconds: number,
+  knockedSomeoneDown: boolean,
+  /**
+   * --- WORKSTREAM W: the talent multiplier, and the tip.
+   *
+   * `Surge` is +40% between sunset and sunrise, `Tradie Rates` +25% from sunrise
+   * to 15:00, and `Tip Jar` is a flat +10% on everything -- all three arrive as
+   * one number from `teamfx.fxFareScale`, because the day/night question belongs
+   * to the caller (this file is three-free *and* sky-free) and because one
+   * multiplier is one place the rounding happens.
+   *
+   * The **tip is added after the rounding rather than before**, and that is the
+   * one deviation from this function's "one rounding, at the very end" rule. A
+   * tip is a whole number of dollars a passenger hands you; running it through
+   * the fast-bonus multiplier would make `Surge`'s $10 worth $15 on a quick trip
+   * and $5 on a rough one, which is not what "passengers tip $10 if you got
+   * there quickly" says. It is also gated on the same `seconds < target` test the
+   * fast bonus uses, so there is one definition of "quickly".
+   */
+  scale = 1,
+  tip = 0,
+): number {
   const km = Math.max(0, metres) / 1000;
   let pay = FARE_BASE + FARE_PER_KM * km;
   const target = metres / FARE_TARGET_SPEED;
-  if (seconds > 0 && seconds < target) pay *= FARE_FAST_BONUS;
+  const quick = seconds > 0 && seconds < target;
+  if (quick) pay *= FARE_FAST_BONUS;
   if (knockedSomeoneDown) pay *= FARE_ROUGH_PENALTY;
-  return Math.max(1, Math.round(pay));
+  pay *= scale;
+  return Math.max(1, Math.round(pay)) + (quick && tip > 0 ? Math.round(tip) : 0);
 }
 
 /**

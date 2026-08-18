@@ -206,6 +206,14 @@ import {
   verifyUnstuck,
 } from './game/unstuck.ts';
 import { verifyTeleport } from './game/teleport.ts';
+// --- WORKSTREAM W: talent effects. One import block and three call sites (the
+// self-check below, the tick clock in the frame loop, and `tickTalentKeys` in
+// the fixed step); all of the logic is in the three modules named here. Every
+// hook is the identity until something calls `setTeamLookup`, which is the
+// framework workstream's job -- so this block changes nothing on its own.
+import { verifyAbilities } from './game/abilities.ts';
+import { fxSetNow, verifyTeamFx } from './game/teamfx.ts';
+import { tickTalentKeys, vIsAnAbility, LOCAL_ID } from './game/talentkeys.ts';
 import { verifySuggestions } from './net/suggestions.ts';
 import { SuggestionsPanel, clientId } from './suggestions.ts';
 import { ChangelogFeed, verifyChangelog, verifyChangeFeed } from './changelog.ts';
@@ -930,6 +938,15 @@ async function main(): Promise<void> {
   // by `HighwayPatrolAssets` -- and is the one that would otherwise ship a
   // patrol car with a hole in one flank.
   const heatFailures = timed('heat', verifyHeat);
+  // Talents into numbers, and the four ability buttons. Run **here** as well as
+  // on the server (`server/index.ts`) because every number in them is evaluated
+  // on both ends and has to agree: the swing damage this process predicts and
+  // that one adjudicates, the take radius both arbitrate, the crash multiplier
+  // this side uses to move its own health bar on the frame you hit the wall.
+  // Every failure is silent in this repo's sense -- a talent that composed wrong
+  // renders a perfectly good frame and simply plays slightly differently on the
+  // two machines. See `game/teamfx.ts`.
+  const teamFxFailures = timed('teamfx', () => [...verifyTeamFx(), ...verifyAbilities()]);
   // And the fifth rung's own geometry and schedule, which `verifyHeat` deliberately
   // does not own: it checks the *wiring* (a five-star player is shot at, a four-star
   // one is not), and this drives ten minutes of ticks over the orbit and asserts the
@@ -1172,6 +1189,7 @@ async function main(): Promise<void> {
     pedModelFailures.length ||
     policeFailures.length ||
     heatFailures.length ||
+    teamFxFailures.length ||
     polairFailures.length ||
     streetFailures.length ||
     wildlifeFailures.length ||
@@ -5736,7 +5754,15 @@ async function main(): Promise<void> {
     // a continuous scalar rather than a jump to a fixed boom -- you get back the
     // camera you were zoomed to, not somebody's default.
     if (e.code === 'KeyV' && !held) {
-      setCameraDistance(toggleCameraDistance(cameraDistance, lastThirdDistance));
+      // --- WORKSTREAM W: `V` is also the talent dash, and the ability wins when
+      // the player has one. See `game/talentkeys.ts`' header: this is the one
+      // key collision in the batch, it is flagged for the owner rather than
+      // decided quietly, and it is one line to reverse. Everybody without Bolt
+      // or Merge Late -- which is every guest and everybody below level 2 --
+      // keeps the camera key they have always had.
+      if (!vIsAnAbility(LOCAL_ID)) {
+        setCameraDistance(toggleCameraDistance(cameraDistance, lastThirdDistance));
+      }
     }
     // `E`: get on the bike beside you, or off the one you are on.
     //
@@ -7077,6 +7103,10 @@ async function main(): Promise<void> {
   };
 
   function simulate(dt: number): void {
+    // WORKSTREAM W: the tick's wall clock, before anything reads a talent. The
+    // browser's copy of the same line `Simulation.step` opens with -- see
+    // `game/teamfx.fxSetNow` for why exactly one talent needs it.
+    fxSetNow(Date.now());
     // Every input first, from the state as it stands at the top of the tick. A
     // dummy that thought *during* the loop would be reacting to a player who had
     // already moved this step -- half a tick of clairvoyance no remote player
@@ -7278,6 +7308,23 @@ async function main(): Promise<void> {
     input.mount = keys.has('KeyE');
     if (input.mount && !mountHeld && playerCombat.phase !== 'ko') pressMount();
     mountHeld = input.mount;
+
+    // --- WORKSTREAM W: the three talent keys, in the same place and for the
+    // same reasons as `E` above -- after reconciliation, before the step.
+    //
+    // The level bits go on the wire (`net/client.ts` packs them into `buttons`)
+    // and the server does every decision. **The one thing predicted here is the
+    // dash impulse**, which is `game/abilities.ts`' rule: a dash is 300 ms of
+    // travel and the only ability whose whole point is that it is instant. The
+    // impulse goes into `playerCombat.body.velocity`, which `combat.advance` is
+    // about to integrate through the collision world on this same tick, and
+    // `net.reconcile` corrects it from the next snapshot exactly as it corrects
+    // a mount.
+    //
+    // `V` is shared with the third-person camera toggle, and the ability wins
+    // when the player has one -- see the key handler for why that is a question
+    // for the owner rather than a decision this workstream should be making.
+    tickTalentKeys(playerCombat, input, keys);
 
     // --- Redfern, offline.
     //

@@ -80,7 +80,18 @@ const SPRINT_SPEED = 8.2;
  */
 export const ACCELERATION = 48;
 const AIR_ACCELERATION = 9;
-const FRICTION = 34;
+/**
+ * Exported, and only that -- the value is untouched, on `GRAVITY`'s argument
+ * below and for a second reader with the same need.
+ *
+ * `game/abilities.ts` sizes the talent dash from it: a body launched with no key
+ * held is steered to a stop at exactly this rate, so `v^2 / (2 * FRICTION)` is
+ * how far a dash of a given speed carries, and a dash sized against a duplicated
+ * 34 would silently become five metres or seven the day this number moved.
+ * Reading it rather than copying it is what makes "a 6 m dash" a fact about this
+ * controller rather than a coincidence.
+ */
+export const FRICTION = 34;
 const AIR_FRICTION = 1.5;
 /**
  * Exported, and only that -- the value is untouched.

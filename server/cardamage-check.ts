@@ -35,10 +35,15 @@ import {
   type LaneRoute,
 } from '../client/src/game/traffic.ts';
 import { PedestrianField } from '../client/src/game/pedestrians.ts';
+// WORKSTREAM W: the talent fixture. `fakeTeamLookup` is exported by `teamfx.ts`
+// precisely so the drivers can install one without building a real roster.
+import { fakeTeamLookup, setTeamLookup } from '../client/src/game/teamfx.ts';
+import { FX, TEAM, type TeamLookup } from '../client/src/game/teams.ts';
 import { MAX_HEALTH } from '../client/src/game/combat.ts';
 import { EYE_HEIGHT } from '../client/src/player/controller.ts';
 import {
   CAR_HEALTH_MAX,
+  CRASH_COOLDOWN_MS,
   CAR_SMOKING_HEALTH,
   CAR_SMOKING_SCALE,
   CRASH_DAMAGE_MAX,
@@ -657,8 +662,118 @@ function runCrashes(): string[] {
   return failures;
 }
 
+/**
+ * --- WORKSTREAM W: the same wall, with `Ute Life` taken.
+ *
+ * The one thing `verifyTeamFx` cannot answer: `fxCrashDamageScale` is a number,
+ * and this is whether that number *arrives* -- through `combat.advance` filling
+ * `carCrashDv` from the nose probe, `sim.stepCars` draining it,
+ * `driving.crashDamage` sizing it and `CarField.damage` reading the talent off
+ * `car.driverId` at the moment of impact. Every one of those is a place the
+ * driver's identity could be lost, and losing it renders a perfectly good frame
+ * with a health bar that simply moves the wrong amount.
+ *
+ * **Two runs, same wall, same speed, one lookup apart.** Comparing a talented
+ * run against a stock one rather than against a literal is what makes this
+ * robust to the tuning constants moving: if `CRASH_DAMAGE_PER_SPEED` changes
+ * tomorrow both numbers change together and the ratio is still 0.7.
+ *
+ * The lookup carries **only** `CRASH_DAMAGE_TAKEN`, deliberately. Real `Ute
+ * Life` also carries `CAR_HEALTH`, and `fxCarDamageScale` folds the two into one
+ * multiplier -- so a fixture with the whole node would measure 0.7 / 1.25 = 0.56
+ * and would not tell you which half was wrong. The second run adds the health
+ * clause back and asserts the product.
+ */
+function runUteLife(): string[] {
+  const failures: string[] = [];
+  console.log('\n--- WORKSTREAM W: the same wall with Ute Life, through Simulation.step');
+
+  /** One car, one wall, one lookup. Returns the health the crash cost. */
+  const crashOnce = (lookup: TeamLookup | null): number => {
+    setTeamLookup(lookup);
+    const sim = new Simulation(emptyWorld());
+    const p = sim.join(0, null);
+    const out: TickOutput = { tick: 0, events: [], snapshot: null };
+    p.combat.body.position.set(0, EYE_HEIGHT, 0);
+    p.combat.body.yaw = 0;
+    p.input.yaw = 0;
+    p.history.seed(sim.tick, 0, EYE_HEIGHT, 0, 0);
+    const car = sim.cars.take(
+      { identity: 0xc0ffee, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: 0, parked: true },
+      p.combat.id,
+    )!;
+    p.combat.drivingCar = car.id;
+    const before = car.health;
+    p.input.forward = 1;
+    // Short of the cap: `CRASH_DAMAGE_MAX` is 60 and a top-speed wall clips it,
+    // which would make both runs report exactly 60 and the check vacuous. Half
+    // the run-up puts the car into the wall well under the ceiling.
+    for (let i = 0; i < 1800; i++) {
+      sim.step(out);
+      if (car.health < before) break;
+    }
+    p.input.forward = 0;
+    setTeamLookup(null);
+    return before - car.health;
+  };
+
+  // A crash short enough to stay under the cap, so the multiplier is visible.
+  // The wall is at `RUN_UP` and the car accelerates from rest; breaking on the
+  // first tick the health moves is the impact and nothing after it.
+  const stock = crashOnce(null);
+  const armoured = crashOnce(fakeTeamLookup({ [FX.CRASH_DAMAGE_TAKEN]: 0.3 }, TEAM.DEFAULT));
+  console.log(`  stock: ${stock.toFixed(2)} hp   ute life: ${armoured.toFixed(2)} hp`);
+  if (!(stock > 0)) {
+    failures.push('The stock car took no damage at all; the run is not reaching the wall.');
+  } else if (Math.abs(armoured / stock - 0.7) > 0.02) {
+    failures.push(
+      `Ute Life's -30% crash damage came out as x${(armoured / stock).toFixed(3)}, not x0.7. ` +
+        `The driver's talent is not reaching CarField.damage.`,
+    );
+  }
+
+  // And the whole node, health clause included: 0.7 / 1.25 = 0.56.
+  const whole = crashOnce(
+    fakeTeamLookup({ [FX.CRASH_DAMAGE_TAKEN]: 0.3, [FX.CAR_HEALTH]: 0.25 }, TEAM.DEFAULT),
+  );
+  console.log(`  whole node: ${whole.toFixed(2)} hp  (expected x0.56 of stock)`);
+  if (stock > 0 && Math.abs(whole / stock - 0.56) > 0.02) {
+    failures.push(
+      `The whole Ute Life node came out as x${(whole / stock).toFixed(3)} of stock, not x0.56. ` +
+        `See teamfx.fxCarDamageScale: +25% health is a divisor on the damage.`,
+    );
+  }
+
+  // And the crash cooldown, which is the other half of the node and is a
+  // property of the record rather than of the arithmetic.
+  setTeamLookup(fakeTeamLookup({ [FX.CRASH_COOLDOWN_S]: 0.3 }, TEAM.DEFAULT));
+  const sim = new Simulation(emptyWorld(false));
+  const p = sim.join(0, null);
+  const car = sim.cars.take(
+    { identity: 0xbeef, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: 0, parked: true },
+    p.combat.id,
+  )!;
+  sim.cars.damage(car.id, 5);
+  if (Math.abs(car.damageCooldownMs - 300) > 1) {
+    failures.push(`Ute Life left a ${car.damageCooldownMs} ms crash cooldown, not 300.`);
+  }
+  setTeamLookup(null);
+  const stockSim = new Simulation(emptyWorld(false));
+  const sp = stockSim.join(0, null);
+  const sc = stockSim.cars.take(
+    { identity: 0xbeef, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: 0, parked: true },
+    sp.combat.id,
+  )!;
+  stockSim.cars.damage(sc.id, 5);
+  if (Math.abs(sc.damageCooldownMs - CRASH_COOLDOWN_MS) > 1) {
+    failures.push(`A stock car's crash cooldown is ${sc.damageCooldownMs} ms, not ${CRASH_COOLDOWN_MS}.`);
+  }
+
+  return failures;
+}
+
 function main(): number {
-  const failures = [...run(), ...runCrashes()];
+  const failures = [...run(), ...runCrashes(), ...runUteLife()];
   if (failures.length === 0) {
     console.log('\ncardamage-check: OK');
     return 0;

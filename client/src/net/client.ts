@@ -1044,7 +1044,13 @@ export class NetClient {
           (input.throwBall ? BTN.THROW : 0) |
           (input.jump ? BTN.JUMP : 0) |
           (input.sprint ? BTN.SPRINT : 0) |
-          (input.mount === true ? BTN.MOUNT : 0),
+          (input.mount === true ? BTN.MOUNT : 0) |
+          // WORKSTREAM W: the three talent keys, level like their neighbours.
+          // See `protocol.BTN.ABILITY_V` for why three bits rather than a
+          // selector, and `game/abilities.ts` for what each one means.
+          (input.abilityV === true ? BTN.ABILITY_V : 0) |
+          (input.abilityG === true ? BTN.ABILITY_G : 0) |
+          (input.abilityT === true ? BTN.ABILITY_T : 0),
         forward: input.forward,
         right: input.right,
         yaw: input.yaw,
