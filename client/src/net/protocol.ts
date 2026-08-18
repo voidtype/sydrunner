@@ -707,7 +707,14 @@ export const MSG = {
  * same situation. `server/integration-check.ts` asserts the number and is the
  * thing that will notice if it is forgotten.
  */
-export const PROTOCOL_VERSION = 16;
+/*
+ * v17: Marita and DeFAULT. `ROSTER` entries carry `team` (u8, 14 -> 15 bytes),
+ * `INPUT` gains three ability bits (`BTN.ABILITY_V/G/T`), and three messages
+ * arrive: `TEAM` (0x11, choose / take / refund / reset), `TALENTS` (0x93, who is
+ * on which side and what they have spent) and `TEAM_EVENT` (0x94, a tent or a
+ * slam happened here). One bump for the lot.
+ */
+export const PROTOCOL_VERSION = 17;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;

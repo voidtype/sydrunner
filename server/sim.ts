@@ -353,7 +353,7 @@ import {
   tryAbility,
   type Ability,
 } from '../client/src/game/abilities.ts';
-import { FX, TEAM } from '../client/src/game/teams.ts';
+import { FX } from '../client/src/game/teams.ts';
 import {
   CENTRELINK_NEARBY_M,
   DROP_TRAP_DOLLARS,
@@ -389,9 +389,10 @@ import {
   forgetPlayer as forgetTeamFx,
   teamLookup,
   setStarsReader,
+  setTeamLookup,
   setWalletReader,
 } from '../client/src/game/teamfx.ts';
-import { CYCLE_MS, cyclePhase } from '../client/src/sky/cycle.ts';
+import { cyclePhase } from '../client/src/sky/cycle.ts';
 
 export const FIXED_DT = 1 / TICK_HZ;
 
@@ -1288,6 +1289,10 @@ export class Simulation {
     // lookup and the wallet is a field on a record this class already holds.
     setStarsReader((id) => this.heat.starsOf(id));
     setWalletReader((id) => this.participants.get(id)?.wallet?.balance ?? 0);
+    // And the talent lookup itself. Module-level like the wallet handle, and
+    // for the same reason it is re-pointed every tick in `stepFactions` beside
+    // `setWallet`: a host runs several rooms, each its own `Simulation`.
+    setTeamLookup(this.teams);
 
     // The bikes, laid out from the same tile index every client reads and
     // snapped to the same ground the players walk on.
@@ -3373,6 +3378,7 @@ export class Simulation {
     // room is its own `Simulation` with its own participant ids -- a wallet
     // handle set once would debit room 0's player 7 for room 3's mugging.
     setWallet(this.walletLookup);
+    setTeamLookup(this.teams);
     stepCharacters(ctx);
     stepEvents(ctx);
     // An investigation that ran out changes what the wire has to say, and

@@ -212,7 +212,7 @@ import { verifyTeleport } from './game/teleport.ts';
 // hook is the identity until something calls `setTeamLookup`, which is the
 // framework workstream's job -- so this block changes nothing on its own.
 import { verifyAbilities } from './game/abilities.ts';
-import { fxSetNow, verifyTeamFx } from './game/teamfx.ts';
+import { fxSetNow, setTeamLookup, verifyTeamFx } from './game/teamfx.ts';
 import { tickTalentKeys, vIsAnAbility, LOCAL_ID } from './game/talentkeys.ts';
 import { verifySuggestions } from './net/suggestions.ts';
 import { SuggestionsPanel, clientId } from './suggestions.ts';
@@ -247,7 +247,7 @@ import { NameplateField, nameplateWarmupParts, verifyNameplates, type PlateInput
 // --- WORKSTREAM X: teams you can see. One import block; the wiring is one
 // contiguous section beside the local player's body and two lines in the loop.
 import { AURA_RING_M, GROUP_RING_M, MAX_RINGS, SLAM_SECONDS, teamMarkerKind, verifyTeamLook } from './game/teamlook.ts';
-import { groupSizeFor, hasAura, hasBigNight, hasTeamSource, teamOf } from './world/teamview.ts';
+import { groupSizeFor, hasAura, hasBigNight, hasTeamSource, setTeamSource, teamOf } from './world/teamview.ts';
 import {
   BigNightKit,
   HornProp,
@@ -4278,6 +4278,10 @@ async function main(): Promise<void> {
   // which is also what offline looks like permanently, since there are no
   // accounts and therefore no sides without a server. `sydney.teamlook()`
   // reports which of the two states the client is in.
+  setTeamSource({
+    teamOf: (id) => net?.teamOf(id) ?? TEAM.NONE,
+    talentsOf: (id) => net?.talentsOf(id) ?? EMPTY_MASK,
+  });
   scene.add(teamRings.mesh);
   const tents = new TentSet(bigNight, characters);
   scene.add(tents.mesh);
@@ -4978,6 +4982,10 @@ async function main(): Promise<void> {
     ]);
     if (settled) {
       net = client;
+      // The talent hooks predict off the same `TeamField` the server folds --
+      // the client's copy is refilled from the TALENTS mirror once a frame.
+      // Offline there is no team and the hooks keep reading `NO_TEAMS`.
+      setTeamLookup(client.teams);
       // The timetable, so remote riders are composed rather than interpolated.
       // Handed over rather than fetched again: it is the same 1 MB the renderer
       // already holds, and two decodes would be two objects that could disagree
