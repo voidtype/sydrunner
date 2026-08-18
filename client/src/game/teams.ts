@@ -18,10 +18,11 @@
  * ---------------------------------------------------------------------------
  * THE SHAPE, and why.
  *
- * - **A team is a per-account choice made once, at level 2, and it survives the
- *   weekly reset.** Level and talent points reset with the week (as level always
- *   has); the side you picked does not. Guests have no team, because guests
- *   cannot reach level 2 (`net/accounts.ts`).
+ * - **A team is a per-account choice made at level 2, and it goes with the
+ *   week.** Level, talent points and the side all reset on Monday
+ *   (`net/accounts.resetIfNewWeek`), so the interstitial comes back every week
+ *   and the rivalry is re-rolled -- the owner's call on 2026-08-19. Guests have
+ *   no team, because guests cannot reach level 2 (`net/accounts.ts`).
  * - **One talent point per level, levels 1..10**, granted retroactively when the
  *   team is chosen (so a fresh level 2 has 2 to spend). Ten is the cap because
  *   ten is where the ladder's numbers stop meaning anything at "10 kills a
@@ -67,7 +68,7 @@ export const TEAM_COLOUR: Readonly<Record<Team, { hex: number; css: string; ink:
   [TEAM.DEFAULT]: { hex: 0xfeca12, css: '#FECA12', ink: '#111111' },
 };
 
-/** The level at which the choice is forced. */
+/** The level at which the choice is forced. It is asked again after every weekly reset. */
 export const TEAM_CHOICE_LEVEL = 2;
 /** One point per level, up to this many. */
 export const TALENT_MAX_POINTS = 10;

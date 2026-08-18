@@ -111,7 +111,7 @@
  * rule and the parser; that one owns the ground.
  */
 
-import { EMPTY_MASK, NODE_COUNT, TEAM, type TalentMask, type Team } from '../game/teams.ts';
+import { EMPTY_MASK, NODE_COUNT, TEAM, TEAM_NAME, type TalentMask, type Team } from '../game/teams.ts';
 import { MAX_NAME_CHARS, sanitiseName } from './protocol.ts';
 import { weekKey } from './suggestions.ts';
 
@@ -486,11 +486,16 @@ export function resetIfNewWeek(record: AccountRecord, at: number | Date = Date.n
   // there is exactly one Monday in this feature -- see the header.
   record.lastPos = null;
   // And the talents, for the reason `AccountRecord.talents` gives: a point is a
-  // level and the levels have just gone back to one. **`record.team` is
-  // deliberately not touched** -- it is the one field here that outlives the
-  // week, and the two lines being adjacent is the point: whoever adds the third
-  // per-account field has to decide which of the two it is, right here.
+  // level and the levels have just gone back to one.
   record.talents = { lo: 0, hi: 0 };
+  // **And the side.** The owner's call, 2026-08-19: a week is a clean slate,
+  // including which of Marita and DeFAULT you are on. The level-2 interstitial
+  // therefore comes back every Monday, which is the feature rather than a cost
+  // -- the rivalry is re-rolled, nobody is stuck behind a choice they made a
+  // fortnight ago, and a player who wants the other side does not have to ask
+  // anybody. `TEAM.NONE` is 0 and `Simulation.teamOp` re-opens `CHOOSE` on it
+  // with no extra branch.
+  record.team = 0;
   return true;
 }
 
@@ -1015,8 +1020,8 @@ export function verifyAccounts(): string[] {
     }
   }
 
-  // --- The side, and the points. One survives the week and one does not, and
-  // there is no way to notice getting that backwards until a Monday.
+  // --- The side and the points, which both go on Monday. There is no way to
+  // notice getting this wrong until a Monday, so it is asserted here.
   {
     const now = Date.UTC(2026, 7, 19, 3, 0, 0);
     const record = fakeAccount(now);
@@ -1028,8 +1033,11 @@ export function verifyAccounts(): string[] {
     if (record.talents.lo !== 0b1001) failures.push('A same-week reset cleared the talents anyway.');
     record.levelWeek = '2020-W01';
     resetIfNewWeek(record, now);
-    if (record.team !== TEAM.MARITA) {
-      failures.push('A weekly reset took the team away; the side you picked is the one thing that outlives the week.');
+    // Read through a widened local: TypeScript narrowed the field to `MARITA`
+    // at the assignment above and cannot see that `resetIfNewWeek` moved it.
+    const sideAfter = record.team as Team;
+    if (sideAfter !== TEAM.NONE) {
+      failures.push(`A weekly reset left the account on ${TEAM_NAME[sideAfter]}; the side goes with the level, so Monday asks again.`);
     }
     if (record.talents.lo !== 0 || record.talents.hi !== 0) {
       failures.push(`A weekly reset left ${JSON.stringify(record.talents)} spent on a level-1 character.`);

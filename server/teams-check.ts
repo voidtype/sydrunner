@@ -19,7 +19,7 @@
  *     sentence coming back through the pill;
  *   - the mega gate, which is two conditions (six in the tree **and** level 8)
  *     that are easy to satisfy one at a time;
- *   - the weekly flip clearing the points and **keeping the side**, which is the
+ *   - the weekly flip clearing the points **and the side**, which is the
  *     one asymmetry in this feature and is invisible until a Monday;
  *   - a restart, because a build that does not survive one is not a build;
  *   - and an aura reaching a teammate five metres away through the real spatial
@@ -328,7 +328,7 @@ async function run(): Promise<void> {
     await reloaded.close();
   }
 
-  // --- The weekly flip: the points go, the side stays.
+  // --- The weekly flip: the points go, and so does the side.
   {
     record.levelWeek = '2020-W01';
     clearPill(hero);
@@ -336,13 +336,19 @@ async function run(): Promise<void> {
     check(hero.level === 1 && record.level === 1, 'a new week is level 1 again', `level ${hero.level}`);
     check(countBits(record.talents) === 0, 'the talents went with the level', JSON.stringify(record.talents));
     check(countBits(hero.talents) === 0, 'and the body stopped playing last week’s build');
-    check(record.team === TEAM.MARITA, 'and the side did **not**', TEAM_NAME[record.team]);
-    check(hero.team === TEAM.MARITA, 'on the body either');
+    check(record.team === TEAM.NONE, 'and the side went with them', TEAM_NAME[record.team] || 'none');
+    check(hero.team === TEAM.NONE, 'on the body too');
     check(record.levelWeek === weekOf(), 'stamped into this week', record.levelWeek);
-    // And a second CHOOSE is still refused, which is the whole reason the side
-    // is not reset: a player does not get to change sides by waiting.
+    // And the choice is open again, which is the point of resetting it: a new
+    // week is a clean slate and the interstitial comes back at level 2. The
+    // gate is the level, so it is refused until the ladder is climbed again.
     sim.teamOp(hero.id, TEAM_OP.CHOOSE, TEAM.DEFAULT);
-    check(hero.team === TEAM.MARITA, 'a new week does not reopen the choice');
+    check(hero.team === TEAM.NONE, 'and a level-1 account still cannot choose', TEAM_NAME[hero.team] || 'none');
+    hero.level = 2;
+    record.level = 2;
+    sim.teamOp(hero.id, TEAM_OP.CHOOSE, TEAM.DEFAULT);
+    check(hero.team === TEAM.DEFAULT, `a new week lets you pick again (${TEAM_NAME[TEAM.DEFAULT]})`, TEAM_NAME[hero.team]);
+    check(record.team === TEAM.DEFAULT, 'and the record moved with it');
   }
 
   // --- Auras, through the tick that fills the real index.

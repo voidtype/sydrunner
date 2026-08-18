@@ -97,6 +97,7 @@ import {
 import { BONE, FOOT_HALF_WIDTH, FOOT_HEEL, FOOT_THICKNESS, FOOT_TOE } from '../player/animation.ts';
 import {
   COLOURWAYS,
+  CharacterAssets,
   LIMB_SIDES,
   Parts,
   ROLE,
@@ -105,7 +106,6 @@ import {
   w1,
   w2,
   type CharacterActor,
-  type CharacterAssets,
   type Colourway,
   type Point,
   type Role,
@@ -1081,9 +1081,22 @@ export function teamLookWarmupParts(kit: BigNightKit, assets: CharacterAssets, r
  * `verifyTeamView`'s failures are folded in here because that adapter is only
  * ever wrong in this feature's terms; see its header.
  */
-export function verifyBigNightKit(assets: CharacterAssets): string[] {
+/**
+ * `assets` is optional, and the reason is a boot crash this check caused.
+ *
+ * `main.ts` runs every `verify*` in one block **before** it builds anything,
+ * and `CharacterAssets` is constructed six hundred lines later -- so passing it
+ * in read a `const` inside its temporal dead zone and threw
+ * `Cannot access 'characters' before initialization` on the second frame of
+ * every load. The check does not need the caller's copy: it reads geometry
+ * budgets and windings off a kit, and a kit built from its own assets is the
+ * same kit. When nothing is passed it builds one and disposes it with the rest.
+ */
+export function verifyBigNightKit(assets?: CharacterAssets): string[] {
   const failures: string[] = [...verifyTeamView()];
-  const kit = new BigNightKit(assets);
+  const own = assets ? null : new CharacterAssets();
+  const rig = assets ?? own!;
+  const kit = new BigNightKit(rig);
   try {
     // --- Budgets.
     if (kit.hornTriangles > TRI_BUDGET.horns) {
@@ -1142,8 +1155,8 @@ export function verifyBigNightKit(assets: CharacterAssets): string[] {
       // frame mid-swing. See `CharacterAssets`.
       const bounds = cactus.boundingSphere;
       if (!bounds) failures.push('The cactus has no bounding sphere.');
-      else if (bounds.radius < assets.bounds.radius) {
-        failures.push(`The cactus's bounds (${bounds.radius.toFixed(2)} m) are tighter than the character's inflated ${assets.bounds.radius.toFixed(2)} m; it would be culled while on screen.`);
+      else if (bounds.radius < rig.bounds.radius) {
+        failures.push(`The cactus's bounds (${bounds.radius.toFixed(2)} m) are tighter than the character's inflated ${rig.bounds.radius.toFixed(2)} m; it would be culled while on screen.`);
       }
       // A cactus is still a person-shaped thing standing on the ground. Sole at
       // zero and crown around the figure's height, or the body floats.
@@ -1191,7 +1204,7 @@ export function verifyBigNightKit(assets: CharacterAssets): string[] {
     // the other file and put a whole team in the wrong shirt.
     for (const team of [TEAM.MARITA, TEAM.DEFAULT] as const) {
       const tinted = kit.bodyFor(0, team);
-      const base = assets.geometries[0];
+      const base = rig.geometries[0];
       if (tinted === base) {
         failures.push(`A ${TEAM_NAME[team]} draws the untinted kit geometry; the tint never reaches the body.`);
         continue;
@@ -1211,7 +1224,7 @@ export function verifyBigNightKit(assets: CharacterAssets): string[] {
       // per player and would look exactly like a memory leak, because it is one.
       if (kit.bodyFor(0, team) !== tinted) failures.push(`bodyFor is not cached; a ${TEAM_NAME[team]} would allocate a geometry every frame.`);
     }
-    if (kit.bodyFor(2, TEAM.NONE) !== assets.geometries[2]) {
+    if (kit.bodyFor(2, TEAM.NONE) !== rig.geometries[2]) {
       failures.push('A guest is not drawing the shared kit geometry; teams have changed how somebody with no team looks.');
     }
 
@@ -1258,7 +1271,7 @@ export function verifyBigNightKit(assets: CharacterAssets): string[] {
 
     // --- The tents: expiry is honoured and the cap holds.
     {
-      const tents = new TentSet(kit, assets);
+      const tents = new TentSet(kit, rig);
       try {
         const now = 1_800_000_000_000;
         tents.set([{ x: 0, y: 0, z: 0, untilMs: now + 1000 }, { x: 5, y: 0, z: 0, untilMs: now - 1 }], now);
@@ -1282,6 +1295,10 @@ export function verifyBigNightKit(assets: CharacterAssets): string[] {
     }
   } finally {
     kit.dispose();
+    // `CharacterAssets` has no dispose -- it is built once per session by design
+    // (see its header); the throwaway one here is a few geometries and one
+    // material, dropped on the floor for the GC when this returns.
+    void own;
   }
   return failures;
 }

@@ -1074,7 +1074,7 @@ async function main(): Promise<void> {
   //
   // Every failure in both renders. See their headers.
   const teamLookFailures = timed('teamlook', verifyTeamLook);
-  const bigNightFailures = timed('bignight', () => verifyBigNightKit(characters));
+  const bigNightFailures = timed('bignight', () => verifyBigNightKit());
   // And the render guard, which is the only check here about the *loop* rather
   // than about the world. It earns its place the way the HUD's does: it covers
   // something that already shipped broken. A render exception used to abort the
