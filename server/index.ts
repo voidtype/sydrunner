@@ -168,6 +168,14 @@ import { verifyCash } from '../client/src/game/cash.ts';
 // drag a `document` in behind it.
 import { verifyPhoneModel } from '../client/src/game/phone.ts';
 import { PHONE_OP, decodePhone, verifyCashWire } from '../client/src/net/cash.ts';
+// --- WORKSTREAM V: teams and talents. Three files and three checks: the
+// contract (the 42 nodes, the tier gates, the two names), the lookup that folds
+// auras in, and the wire. All three are three-free and all three run in both
+// boot lists -- see `client/src/game/teams.ts`, whose header is emphatic about
+// the one thing a check can catch here that a person cannot: the spelling.
+import { verifyTeams } from '../client/src/game/teams.ts';
+import { verifyTeamField } from '../client/src/game/teamfield.ts';
+import { decodeTeamOp, verifyTeamsWire } from '../client/src/net/teams.ts';
 import { verifyDrivingContract } from '../client/src/game/driving-contract.ts';
 import { verifyFares } from './fares.ts';
 import { WalletStore, defaultWalletPath, verifyWallets } from './wallets.ts';
@@ -317,6 +325,25 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifySunButton', verifySunButton()],
     ['verifyHeat', verifyHeat()],
     ['verifyPolair', verifyPolair()],
+    // --- WORKSTREAM V. `verifyTeams` is the contract's own and is here for a
+    // reason the rest of this list does not have: it is a **spelling** check.
+    // The owner's instruction was *"always follow the capitalisation Marita and
+    // DeFAULT -- in absolutely any case"*, and a name typed wrongly in a node's
+    // effect text renders perfectly and is seen by every player. It also asserts
+    // the shape of the trees, which is the thing the whole ten-point economy
+    // rests on: a tier gate that opened one point early is a mega on a
+    // half-tree, and nothing anywhere reports it.
+    ['verifyTeams', verifyTeams()],
+    // The aura fold, which is this side's authority: every number it produces is
+    // adjudicated here and predicted in the browser off the same class, so a
+    // disagreement is a swing that lands in one runtime and not the other. See
+    // `game/teamfield.ts`, which cross-checks its own fold against the
+    // contract's `ownScalar` over randomised masks.
+    ['verifyTeamField', verifyTeamField()],
+    // And the bytes. A talent mask is a `u32` pair and `1 << 31` is negative in
+    // JavaScript: an encoder that forgot `>>> 0` hands a player back a build
+    // with one node missing, which reads as the game taking a talent away.
+    ['verifyTeamsWire', verifyTeamsWire()],
     // Taking a car and driving it. Run **here** as well as in the browser
     // because the integrator, the claim and the suppression key are all this
     // side's authority and every failure in that file renders: a handbrake that
@@ -1319,6 +1346,33 @@ const server = Bun.serve<Conn>({
             return;
           }
           room.sim.setOnline(p.id, req.op === PHONE_OP.ONLINE);
+          return;
+        }
+
+        /**
+         * Teams and talents: pick a side, spend a point, take one back, start
+         * again. See `client/src/net/teams.ts` for why four operations are one
+         * message id, and `Simulation.teamOp` for the rules.
+         *
+         * Emphatically the **room's**, like `PHONE` above it and unlike `CHAT`
+         * and `SUGGEST`: the answer is a broadcast to everybody standing in this
+         * copy of Sydney, because a team is a colour on a body and the bodies
+         * are here.
+         *
+         * No flood guard, on `SUN_PRESS`' argument and `PHONE`'s: every branch
+         * inside `teamOp` is idempotent or refused by a rule, the whole of what
+         * a hammered key costs is a walk of 42 nodes and one string compare, and
+         * the expensive thing in this feature -- folding auras across the room
+         * -- happens on the tick and cannot be provoked from here at all.
+         */
+        case MSG.TEAM: {
+          const p = conn.participant;
+          if (!p) return;
+          const req = decodeTeamOp(frame, MSG.TEAM);
+          if (!req) return;
+          const room = host.get(conn.room);
+          if (!room) return;
+          room.sim.teamOp(p.id, req.op, req.value);
           return;
         }
 

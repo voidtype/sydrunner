@@ -86,6 +86,7 @@ import {
   tokenShaped,
   weekOf,
 } from '../client/src/net/accounts.ts';
+import { EMPTY_MASK, TEAM, type TalentMask, type Team } from '../client/src/game/teams.ts';
 import { FloodGuard } from './suggestions.ts';
 import { type WalletStore } from './wallets.ts';
 
@@ -427,6 +428,13 @@ export class AccountStore {
       level: levelFor(kills),
       levelWeek: weekOf(now),
       lastPos: spot,
+      // No side and nothing spent. A guest cannot have chosen -- the choice is
+      // gated at level 2 and a guest cannot reach it -- so there is nothing to
+      // carry across here the way the kills and the spot are, and a fresh
+      // account being asked at its first level 2 is the whole of the feature.
+      // See `AccountRecord.team`.
+      team: TEAM.NONE,
+      talents: { ...EMPTY_MASK },
     };
     // Re-checked **after** the await. Hashing is tens of milliseconds and this
     // process is single-threaded but not single-*task*: two sign-ups for one
@@ -624,6 +632,61 @@ export class AccountStore {
     record.lastSeenMs = now;
     this.touch();
     return { level: record.level, levelled: record.level > before, reset };
+  }
+
+  // --- The side, and the points spent on it. Workstream V.
+
+  /**
+   * Write a side onto a record, once and never again.
+   *
+   * **The "once" is enforced here rather than at the call site**, and that is
+   * the whole reason this is a method on the store instead of two lines in
+   * `Simulation.teamOp`. A team is the only field on an account that is
+   * permanent, so the code that refuses to overwrite it has to be the code that
+   * owns the file -- a rule kept in the simulation would be a rule that a second
+   * caller (a future admin route, a migration, a check) could simply not know
+   * about. It returns whether it wrote, so the caller can say the right sentence
+   * without asking a second question.
+   *
+   * Rolled into the week first, on `creditKill`'s argument: a choice made at
+   * 00:00:01 on Monday belongs to the new week, and stamping the record after
+   * the roll rather than before means the talents that come with the choice are
+   * this week's.
+   *
+   * Debounced, like the kills. A lost write costs a re-choice at the next level
+   * 2, which is the same size of loss the ladder already accepts; see
+   * `ACCOUNT_SAVE_DEBOUNCE_MS` for why sign-up is the only path that does not.
+   */
+  chooseTeam(record: AccountRecord, team: Team, now = Date.now()): boolean {
+    if (resetIfNewWeek(record, now)) this.touch();
+    if (record.team !== TEAM.NONE) return false;
+    if (team !== TEAM.MARITA && team !== TEAM.DEFAULT) return false;
+    record.team = team;
+    // Cleared rather than left, because a record that somehow carried a mask
+    // with no side is a record whose points are already spent -- see
+    // `sanitiseAccount`, which refuses the same combination off disk.
+    record.talents = { ...EMPTY_MASK };
+    record.lastSeenMs = now;
+    this.touch();
+    return true;
+  }
+
+  /**
+   * Write a new spent-mask onto a record.
+   *
+   * Deliberately dumb: it does no validation at all, because every rule about
+   * what may be spent lives in `game/teams.takeRefusal` and `refundRefusal` and
+   * is applied by `Simulation.teamOp` before this is called. A second opinion
+   * here would be a second copy of the tier gates, on the file-writing side,
+   * where nothing renders when it disagrees.
+   *
+   * The mask is **copied** rather than aliased. The caller's object is very
+   * often the participant's live one, and a record on disk that shares an object
+   * with a body in the simulation is a record that changes under the serialiser.
+   */
+  writeTalents(record: AccountRecord, mask: Readonly<TalentMask>): void {
+    record.talents = { lo: mask.lo >>> 0, hi: mask.hi >>> 0 };
+    this.touch();
   }
 
   /** Roll a record into this week and report whether it moved. For the minute check. */

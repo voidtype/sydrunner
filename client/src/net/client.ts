@@ -140,6 +140,17 @@ import {
   type SnapshotNpc,
   type SnapshotPlayer,
 } from './protocol.ts';
+// Teams and talents. Workstream V: the contract, the aura fold, and the wire.
+import {
+  EMPTY_MASK,
+  TEAM,
+  countBits,
+  pointsFor,
+  type TalentMask,
+  type Team,
+} from '../game/teams.ts';
+import { TeamField } from '../game/teamfield.ts';
+import { TEAM_OP, decodeTalents, encodeTeamOp, type TalentsRecord } from './teams.ts';
 import { railSeconds, tripIndexAt, type RailBake, type RailDirection } from '../game/rail.ts';
 import {
   aboardFrame,
@@ -418,6 +429,17 @@ export interface NetHandlers {
    * paid a minute ago. See `net/cash.WalletFrame.note`.
    */
   onMoney?(note: string, balance: number): void;
+  /**
+   * Somebody's side or spent mask changed -- including this client's own.
+   *
+   * Optional like `onChat`. It carries **nothing**, which is the one thing worth
+   * saying about it: the state is already filed on this object (see the
+   * `MSG.TALENTS` case), and the only listener is a panel that redraws itself
+   * from the whole set. A callback that carried the records would be a second
+   * copy of a mirror that is one property read away, held by a panel that is
+   * shut for all but a minute of the session.
+   */
+  onTalents?(): void;
 }
 
 interface PendingInput {
@@ -558,6 +580,136 @@ export class NetClient {
   /** And the kills under it, for the XP bar. See `game/levelhud.ts`. */
   get myKills(): number {
     return this.killsOf(this.id);
+  }
+
+  // --- Teams and talents. Workstream V; see `game/teams.ts`, the contract. ---
+
+  /**
+   * Everybody's side and spent mask, keyed by player id, as the server last
+   * said. A plain mirror of `MSG.TALENTS`.
+   *
+   * Filed here rather than passed straight out, which is `MSG.WALLET`'s call
+   * rather than `SUGGEST_LIST`'s and for the same reason: this is a fact about
+   * the *world* that every frame needs -- the renderer tints a body with it, the
+   * HUD draws the side beside the level, and the aura fold below reads it for
+   * everybody in the working set -- rather than a fact about a panel that
+   * happens to be open.
+   *
+   * A **replacement, not an upsert**, matching the message. See `decodeTalents`.
+   */
+  private readonly talents = new Map<number, TalentsRecord>();
+
+  /**
+   * The aura-resolved lookup, for the client's own predictions.
+   *
+   * The **same class the server runs** (`game/teamfield.ts`), fed from the
+   * mirror above plus the interpolated positions this client already holds --
+   * which is the whole point. A prediction folded by a second implementation
+   * would be a swing the browser thinks lands and the room does not, corrected a
+   * tick later as a rubber-band; folded by this one it is the same arithmetic
+   * over a slightly older world, which is exactly the error reconciliation
+   * already exists to absorb.
+   *
+   * Refilled by `updateTeams`, which `client/src/teams.ts` calls once a frame.
+   * A client that never calls it has an empty field that answers 0 to
+   * everything, which is `NO_TEAMS` and is the right answer offline.
+   */
+  readonly teams = new TeamField();
+  private teamTick = 0;
+
+  /** This player's side, for the HUD chip and the panel. */
+  get myTeam(): Team {
+    return this.teamOf(this.id);
+  }
+
+  /** Anybody's, for the tint and the nameplate. `TEAM.NONE` for a guest or a bot. */
+  teamOf(playerId: number): Team {
+    return this.talents.get(playerId)?.team ?? TEAM.NONE;
+  }
+
+  /** Anybody's spent mask. Empty for anybody the server has not described. */
+  talentsOf(playerId: number): Readonly<TalentMask> {
+    const r = this.talents.get(playerId);
+    return r === undefined ? EMPTY_MASK : { lo: r.lo, hi: r.hi };
+  }
+
+  /** This player's own, for the panel. */
+  get myTalents(): Readonly<TalentMask> {
+    return this.talentsOf(this.id);
+  }
+
+  /**
+   * Points earned minus points spent, which is what the HUD's "· 2 to spend"
+   * says and what makes the panel worth opening.
+   *
+   * Off the `TALENTS` record's own level rather than the roster's, deliberately:
+   * the two messages have different cadences and the one that carries the mask
+   * is the one whose level belongs beside it. See `MSG.TALENTS`.
+   */
+  get myUnspent(): number {
+    const r = this.talents.get(this.id);
+    if (r === undefined || r.team === TEAM.NONE) return 0;
+    return Math.max(0, pointsFor(r.level) - countBits({ lo: r.lo, hi: r.hi }));
+  }
+
+  /** The level the talent panel budgets against. See `myUnspent`. */
+  get myTalentLevel(): number {
+    return this.talents.get(this.id)?.level ?? this.myLevel;
+  }
+
+  /**
+   * Refill the aura field from the mirror and from where bodies are *now*.
+   *
+   * Called once a frame with the local player's position, because that is the
+   * one body this object does not hold -- `main.ts` owns it and predicts it, and
+   * a client that folded its own auras against a 100 ms-old interpolated copy of
+   * itself would be a client whose own Tip Jar came and went as it walked.
+   *
+   * Remotes come out of `this.remotes`, which is already the interpolated set
+   * this frame drew. That is the honest input: the aura a player *sees* should
+   * be resolved against the bodies they can see.
+   */
+  updateTeams(selfX: number, selfZ: number): void {
+    const field = this.teams;
+    field.begin(++this.teamTick);
+    if (this.id !== 0) {
+      const mine = this.talents.get(this.id);
+      field.place({
+        id: this.id,
+        x: selfX,
+        z: selfZ,
+        team: mine?.team ?? TEAM.NONE,
+        mask: mine === undefined ? EMPTY_MASK : { lo: mine.lo, hi: mine.hi },
+      });
+    }
+    for (const [id, r] of this.remotes) {
+      const rec = this.talents.get(id);
+      if (rec === undefined) continue;
+      field.place({ id, x: r.position.x, z: r.position.z, team: rec.team, mask: { lo: rec.lo, hi: rec.hi } });
+    }
+  }
+
+  /** Pick a side. Refused by the server unless this account is level 2 and unaligned. */
+  chooseTeam(team: Team): void {
+    if (!this.transport.open) return;
+    this.transport.send(encodeTeamOp(MSG.TEAM, TEAM_OP.CHOOSE, team));
+  }
+
+  /** Spend a point on a node, or take one back. `game/teams.ts` owns whether it may. */
+  takeTalent(nodeId: number): void {
+    if (!this.transport.open) return;
+    this.transport.send(encodeTeamOp(MSG.TEAM, TEAM_OP.TAKE, nodeId));
+  }
+
+  refundTalent(nodeId: number): void {
+    if (!this.transport.open) return;
+    this.transport.send(encodeTeamOp(MSG.TEAM, TEAM_OP.REFUND, nodeId));
+  }
+
+  /** Everything back. Once per in-game day; the server says so if it is not. */
+  resetTalents(): void {
+    if (!this.transport.open) return;
+    this.transport.send(encodeTeamOp(MSG.TEAM, TEAM_OP.RESET_ALL));
   }
 
   /** The board, in the order it is drawn. See `protocol.rankRoster`. */
@@ -1512,6 +1664,27 @@ export class NetClient {
         // authority says so.
         this.heat.clear();
         for (const r of records) this.heat.set(r.playerId, r);
+        return;
+      }
+      /*
+       * Who is on which side and what they have spent. See `net/teams.ts`.
+       *
+       * A replacement rather than an upsert, on `MSG.HEAT`'s argument one case
+       * up and one sharper: a departed id whose record survived would keep its
+       * horns drawn, and the *next* joiner handed that id would inherit them.
+       *
+       * Nothing is predicted here and nothing runs down locally. A talent is a
+       * fact, not a countdown -- the panel greys a node out optimistically off
+       * `takeRefusal` in the shared contract, which is a *rule* rather than a
+       * guess about what the server will say, and the frame this case writes is
+       * what turns the click into a spent point.
+       */
+      case MSG.TALENTS: {
+        const records = decodeTalents(frame);
+        if (!records) return;
+        this.talents.clear();
+        for (const r of records) this.talents.set(r.playerId, r);
+        this.handlers.onTalents?.();
         return;
       }
       case MSG.BYE: {
@@ -3233,8 +3406,8 @@ export function verifyNetClient(): string[] {
     const net = new NetClient('', silentHandlers(), { transport });
     net.id = 1;
     const roster: RosterEntry[] = [
-      { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 3, downs: 1, ping: 21, level: 1, kills: 3 },
-      { id: 2, colourway: 1, bot: true, name: 'Shazza', kos: 4, downs: 0, ping: 0, level: 1, kills: 4 },
+      { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 3, downs: 1, ping: 21, level: 1, kills: 3, team: 0 },
+      { id: 2, colourway: 1, bot: true, name: 'Shazza', kos: 4, downs: 0, ping: 0, level: 1, kills: 4, team: 0 },
     ];
     transport.onframe?.(encodeRoster(roster));
     if (net.nameOf(2) !== 'Shazza') failures.push(`A roster's name did not reach nameOf: got ${net.nameOf(2)}.`);
@@ -3378,9 +3551,9 @@ export function verifyNetClient(): string[] {
     // it, whether or not they can be seen.
     transport.onframe?.(
       encodeRoster([
-        { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 20, level: 4, kills: 31 },
-        { id: 2, colourway: 4, bot: false, name: 'Shazza', kos: 0, downs: 0, ping: 30, level: 2, kills: 14 },
-        { id: 3, colourway: 5, bot: true, name: 'Davo', kos: 0, downs: 0, ping: 0, level: 1, kills: 0 },
+        { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 20, level: 4, kills: 31, team: 1 },
+        { id: 2, colourway: 4, bot: false, name: 'Shazza', kos: 0, downs: 0, ping: 30, level: 2, kills: 14, team: 2 },
+        { id: 3, colourway: 5, bot: true, name: 'Davo', kos: 0, downs: 0, ping: 0, level: 1, kills: 0, team: 0 },
       ]),
     );
     // A JOIN for somebody across town. A feed line, and **no body**.

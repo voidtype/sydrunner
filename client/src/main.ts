@@ -208,6 +208,12 @@ import {
 import { verifyTeleport } from './game/teleport.ts';
 import { verifySuggestions } from './net/suggestions.ts';
 import { SuggestionsPanel, clientId } from './suggestions.ts';
+// --- WORKSTREAM V: teams and talents. The contract (the 42 nodes and the two
+// names), the aura fold, the wire, and the panel. See `game/teams.ts`.
+import { EMPTY_MASK, TEAM, verifyTeams } from './game/teams.ts';
+import { verifyTeamField } from './game/teamfield.ts';
+import { verifyTeamsWire } from './net/teams.ts';
+import { TalentsPanel, verifyTalentsPanel } from './teams.ts';
 import { ChangelogFeed, verifyChangelog, verifyChangeFeed } from './changelog.ts';
 import { BugReportForm, FrameGrabber, verifyBugReport } from './bugreport.ts';
 // --- Accounts, handles and the level ladder. Workstream G.
@@ -728,6 +734,21 @@ async function main(): Promise<void> {
   // server runs this same function before it opens its socket, which is what
   // makes it worth having: it keeps the ledger. See `net/suggestions.ts`.
   const suggestionFailures = timed('suggestions', verifySuggestions);
+  // --- WORKSTREAM V. Four checks for one feature, and the split is by what
+  // each one can see. `verifyTeams` is the contract's: the tier arithmetic the
+  // whole ten-point economy rests on, and the **spelling** of the two names,
+  // which renders perfectly when it is wrong and is seen by every player.
+  // `verifyTeamField` is the aura fold, cross-checked against the contract's own
+  // `ownScalar` over randomised masks -- it runs here as well as on the server
+  // because this side *predicts* with it and a disagreement is a swing that
+  // lands in one runtime and not the other. `verifyTeamsWire` is the bytes.
+  // `verifyTalentsPanel` is the only one of the four that is browser-only, and
+  // it exists for one reason: the panel has player-facing copy that
+  // `verifyTeams` cannot grep. See `client/src/teams.ts`.
+  const teamFailures = timed('teams', verifyTeams);
+  const teamFieldFailures = timed('team auras', verifyTeamField);
+  const teamWireFailures = timed('teams wire', verifyTeamsWire);
+  const talentPanelFailures = timed('talents panel', verifyTalentsPanel);
   // And the two tabs beside it, on the same criterion a fourth and fifth time.
   // The change feed's failures are all *text*: a parser that trusts the shape
   // draws "undefined" three times on any host that answers a missing file with
@@ -1196,6 +1217,10 @@ async function main(): Promise<void> {
     unstuckFailures.length ||
     teleportFailures.length ||
     suggestionFailures.length ||
+    teamFailures.length ||
+    teamFieldFailures.length ||
+    teamWireFailures.length ||
+    talentPanelFailures.length ||
     changelogFailures.length ||
     bugFailures.length ||
     cashFailures.length ||
@@ -1264,6 +1289,10 @@ async function main(): Promise<void> {
           ...unstuckFailures,
           ...teleportFailures,
           ...suggestionFailures,
+          ...teamFailures,
+          ...teamFieldFailures,
+          ...teamWireFailures,
+          ...talentPanelFailures,
           ...cashFailures,
           ...phoneFailures,
           ...changelogFailures,
@@ -3992,6 +4021,36 @@ async function main(): Promise<void> {
     { changelog, bug },
   );
 
+  /*
+   * --- WORKSTREAM V: teams and talents, the level-2 takeover.
+   *
+   * `SuggestionsPanel` above is the shape: a panel that owns its own DOM, its
+   * own listeners and its own Escape discipline, handed closures rather than
+   * objects so a connection that settles after this line is picked up without
+   * rebuilding anything. Everything the panel does -- opening itself at level 2,
+   * refusing to close before a side is picked, the trees, the tooltips -- is in
+   * `client/src/teams.ts`; this is the wiring and nothing else.
+   *
+   * `?? ...` on every reader is the offline path, on the suggestions panel's own
+   * argument: `?offline` has no ladder, so the panel asks, gets "no team, level
+   * 1, not online", and never opens.
+   */
+  const talents = new TalentsPanel({
+    signedIn: () => joinGate.signedIn,
+    online: () => net !== null,
+    team: () => net?.myTeam ?? TEAM.NONE,
+    mask: () => net?.myTalents ?? EMPTY_MASK,
+    level: () => net?.myTalentLevel ?? 1,
+    choose: (team) => net?.chooseTeam(team),
+    take: (nodeId) => net?.takeTalent(nodeId),
+    refund: (nodeId) => net?.refundTalent(nodeId),
+    resetAll: () => net?.resetTalents(),
+    // The typing interlock. While the panel is up, `hud.typing` is true and the
+    // keydown listener below returns at its first statement -- so WASD does not
+    // walk and `f` does not swing under a modal with a cursor on it.
+    setModal: (open) => { hud.talentsOpen = open; },
+  });
+
   // --- The nameplates: a name and a large health bar over every other player.
   //
   // A user-ordered feature that overrules spec 8.2's "no world-space health
@@ -5150,6 +5209,17 @@ async function main(): Promise<void> {
       hud.setLeaderboard(false);
       suggestions.close();
     },
+    // --- Workstream V. The phone's seventh tile, on the Map tile's terms
+    // exactly: the panel is full-screen, so the handset goes away and the same
+    // panel housekeeping runs. `TalentsPanel.show` is the one place that refuses
+    // it for a guest and offline.
+    openTalents: () => {
+      hud.setHelp(false);
+      hud.setLeaderboard(false);
+      bigmap.close();
+      suggestions.close();
+      talents.show();
+    },
     closeMap: () => bigmap.close(),
     mapVisible: () => bigmap.visible,
     setMinimapScale: (scale) => minimap.setScale(scale),
@@ -5866,6 +5936,12 @@ async function main(): Promise<void> {
     // through `hud.suggestTyping`, which is why closing it *from the textarea* is
     // handled in `suggestions.ts` rather than here.
     if (e.code === 'Escape') {
+      // The talents panel is deliberately **not** in this list and never reaches
+      // this line: while it is up `hud.talentsOpen` makes `hud.typing` true and
+      // this listener returned at its first statement, and the panel's own
+      // capture-phase listener has already decided what the key means. See
+      // `client/src/teams.ts` -- before a side is picked, Escape does nothing at
+      // all, which is the one modal thing in this interface.
       const anyOpen = hud.helpVisible || bigmap.visible || hud.leaderboardVisible || suggestions.visible;
       hud.setHelp(false);
       bigmap.close();
@@ -6373,6 +6449,10 @@ async function main(): Promise<void> {
       /** "+$34 fare". The pill, and the phone's wallet history. */
       onMoney(note, balance) {
         money.onMoney(note, balance);
+      },
+      /** Somebody's side or build moved. Workstream V; the panel redraws itself. */
+      onTalents() {
+        talents.invalidate();
       },
     };
   }
@@ -8712,7 +8792,27 @@ async function main(): Promise<void> {
     //
     // Cheap every frame on `hud.money`'s terms: the composed string and the bar
     // width are compared as one key before anything is written.
-    hud.level(net ? { level: net.myLevel, kills: net.myKills, guest: !joinGate.signedIn } : null);
+    //
+    // --- Workstream V: the side, and the points that have not been spent.
+    //
+    // Both off `NetClient`'s `MSG.TALENTS` mirror rather than the roster, which
+    // is the message they belong to -- see `MSG.TALENTS` on why the level rides
+    // there as well. `hud.level` composes the whole line, chip included, from
+    // one record, so the sentence and the chip can never disagree for a frame.
+    hud.level(net
+      ? {
+        level: net.myLevel,
+        kills: net.myKills,
+        guest: !joinGate.signedIn,
+        team: net.myTeam,
+        unspent: net.myUnspent,
+      }
+      : null);
+    // The talents panel: refill the aura lookup from where bodies are this
+    // frame, then let it open itself at level 2 and redraw if anything moved.
+    // Both are one comparison in the ordinary case; see `TalentsPanel.frame`.
+    net?.updateTeams(player.position.x, player.position.z);
+    talents.frame();
 
     // The map, on the frame delta and redrawing on its own 15 Hz clock inside.
     // `player.yaw` rather than `input.yaw`, and the difference is visible: the

@@ -296,6 +296,30 @@ import type { WalletFrame } from '../client/src/net/cash.ts';
 // which wallet a joiner opens, what a knockout does to the ladder, and the
 // sentence a guest is shown when they cross $100.
 import { levelFor } from '../client/src/net/accounts.ts';
+// Teams and talents. The contract (`game/teams.ts`) is data and pure rules; the
+// lookup (`game/teamfield.ts`) folds auras in and is the thing the gameplay
+// hooks read; the wire (`net/teams.ts`) is the sub-ops and the broadcast. This
+// file is the authority that sits between the three -- see `teamOp`.
+import {
+  EMPTY_MASK,
+  TEAM,
+  TEAM_CHOICE_LEVEL,
+  TEAM_NAME,
+  countBits,
+  pointsFor,
+  refundRefusal,
+  takeRefusal,
+  withNode,
+  withoutNode,
+  type TalentMask,
+  type Team,
+} from '../client/src/game/teams.ts';
+import { TeamField } from '../client/src/game/teamfield.ts';
+import { TEAM_OP, type TalentsRecord } from '../client/src/net/teams.ts';
+// The in-game day, for the once-a-day respec. `game/sunbutton.ts` and
+// `game/characters.ts` already read this pair on this side of the tree, so it
+// is a known-three-free import rather than a new dependency.
+import { CYCLE_EPOCH_MS, CYCLE_MS } from '../client/src/sky/cycle.ts';
 import type { AccountRecord, AccountStore, LiveSpot } from './accounts.ts';
 
 export const FIXED_DT = 1 / TICK_HZ;
@@ -330,6 +354,21 @@ function carRecord(c: DrivenCar): CarRecord {
 
 /** The "nothing changed" answer from `carDelta`, so a quiet tick allocates nothing. */
 const EMPTY_CARS: readonly CarRecord[] = [];
+
+/**
+ * Which in-game day a wall-clock instant falls in. One real hour, per
+ * `sky/cycle.CYCLE_MS`.
+ *
+ * `Math.floor` off the cycle epoch rather than `Date.now() / 3600000`, so that
+ * "once per in-game day" means the same day boundary the sun, the Centrelink
+ * cooldown and every mega's once-a-day clause are on. A day number rather than
+ * an elapsed-milliseconds comparison because the thing being asked is "have you
+ * already done this *today*", and a rolling hour would let somebody respec at
+ * 00:59 and again at 01:01 -- twice inside a fight.
+ */
+function inGameDay(nowMs: number): number {
+  return Math.floor((nowMs - CYCLE_EPOCH_MS) / CYCLE_MS);
+}
 
 const JOIN_RING = 9;
 const JOIN_PER_RING = 8;
@@ -501,6 +540,45 @@ export interface Participant {
    * answered them.
    */
   prompted: number;
+
+  // --- Teams and talents. See `client/src/game/teams.ts`, the contract.
+  /**
+   * Which side this body is on. `TEAM.NONE` for every guest and every bot.
+   *
+   * Mirrored off `account.team` rather than read through it, on exactly the
+   * argument `level` above makes: `roster()` runs several times a second over
+   * every participant in the room and is on PERFORMANCE.md's allocation-free
+   * path, and the renderer's tint reads it once per body per frame. A nullable
+   * dereference per player per refresh to read a field that changes **once per
+   * account, ever**, would be the worst trade in this record.
+   */
+  team: Team;
+  /**
+   * What they have spent, as `game/teams.TalentMask`.
+   *
+   * Mirrored too, and here the reasoning is the opposite of the one that left
+   * `kills` on the record: a mask is read by `TeamField` for *every* player
+   * every tick that anybody queries a talent, which is the hottest read in this
+   * feature, and it moves a handful of times a week. The mirror is written in
+   * exactly three places -- `join`, `teamOp` and `rollWeeks` -- and every one of
+   * them writes the store in the same breath.
+   *
+   * A **copy**, not the record's object: `AccountStore.writeTalents` copies on
+   * the way in for the same reason, so that a file being serialised on the
+   * debounce cannot be a file changing under the serialiser.
+   */
+  talents: TalentMask;
+  /**
+   * When this participant last spent everything back, as an in-game day number.
+   *
+   * `RESET_ALL` is free and therefore has to be rare -- a build you can rewrite
+   * in front of the thing you are fighting is a menu, not a build. In-game days
+   * rather than milliseconds because that is the clock every other
+   * once-per-day thing in this game is on (`FX.MEGA_TELEPORT`, Centrelink) and
+   * because one in-game day is one real hour, which is the right size of "not
+   * again for a while". -1 means never.
+   */
+  lastRespecDay: number;
 }
 
 /**
@@ -803,6 +881,31 @@ export class Simulation {
    * runs offline, from the same file, which is the property `checkPolice` exists
    * to keep true.
    */
+  /**
+   * The teams lookup the gameplay hooks read. Workstream V's contract to W.
+   *
+   * Public and readonly because it *is* the interface: `sim.teams.scalar(id,
+   * FX.SWING_DAMAGE)` is what a hook calls, and it is the same class the client
+   * runs off its `MSG.TALENTS` mirror -- so a swing the client predicts and the
+   * swing this process adjudicates are folded by one implementation rather than
+   * by two that agree by inspection. See `game/teamfield.ts`.
+   *
+   * Refilled at the top of the tick, next to `buildLiveIndex`, and folded
+   * lazily: a room where nobody has picked a side costs one `clear` and N
+   * `insert`s a tick and nothing else.
+   */
+  readonly teams = new TeamField();
+  /**
+   * Bumped whenever anybody's side, level or spent mask changes -- **and by a
+   * join or a departure**, because the set itself is what the message carries.
+   *
+   * That last clause is the reason `Room.sendTalents` needs no refresh timer,
+   * unlike the heat channel beside it: a joiner is a change to the set by
+   * construction, so the frame that tells them about everybody else is the same
+   * frame the version bump already produces. See `MSG.TALENTS`.
+   */
+  talentsVersion = 1;
+
   readonly factions = new FactionField();
   /**
    * The graded response: how wanted every player is, and everything the ladder
@@ -1313,6 +1416,15 @@ export class Simulation {
       // that computed it, and `Room.welcome`, which is the only reader.
       restored,
       prompted: 0,
+      // The side and the points, off the record if there is one. A guest and a
+      // bot have neither and never will: the choice is gated at level 2 and a
+      // guest cannot reach it. The mask is **copied**, for `Participant.talents`'
+      // reason.
+      team: bot === null && account !== null ? account.team : TEAM.NONE,
+      talents: bot === null && account !== null
+        ? { lo: account.talents.lo >>> 0, hi: account.talents.hi >>> 0 }
+        : { ...EMPTY_MASK },
+      lastRespecDay: -1,
     };
     // The bot holds the combatant rather than the other way round, so `think()`
     // writes the same `input` object the tick loop reads -- one record, as
@@ -1325,6 +1437,10 @@ export class Simulation {
     this.participants.set(id, participant);
     this.dirty = true;
     this.rosterVersion++;
+    // A join is a change to the talents *set*, which is what makes the joiner's
+    // own first `TALENTS` frame fall out of the ordinary change path rather than
+    // needing a refresh timer. See `talentsVersion`.
+    this.talentsVersion++;
     this.events.push({
       kind: EVENT.JOIN,
       id,
@@ -1475,11 +1591,15 @@ export class Simulation {
     for (const p of this.participants.values()) {
       let s = out[n];
       if (s === undefined) {
-        s = { id: 0, colourway: 0, bot: false, name: '', kos: 0, downs: 0, ping: 0, level: 1, kills: 0 };
+        s = { id: 0, colourway: 0, bot: false, name: '', kos: 0, downs: 0, ping: 0, level: 1, kills: 0, team: 0 };
         out.push(s);
       }
       s.id = p.id;
       s.level = p.level;
+      // The side, off the mirrored field rather than through `p.account`, for
+      // the reason `Participant.team` gives: this loop runs several times a
+      // second over the whole room.
+      s.team = p.team;
       // The ladder's own kill count, which the HUD's XP bar fills from.
       //
       // **The account's persisted weekly count if there is one, and the session
@@ -1666,6 +1786,10 @@ export class Simulation {
       // from 6 to 1 in the middle of a fight with no explanation on screen.
       attacker.level = account.level;
       this.rosterVersion++;
+      // `AccountStore.creditKill` rolled the record, which cleared the mask (see
+      // `resetIfNewWeek`); the mirror has to follow or this body keeps playing
+      // last week's build against a record that has forgotten it.
+      this.syncTalents(attacker);
       this.note(attacker.id, 'new week. everyone is level 1 again.');
       return;
     }
@@ -1676,8 +1800,38 @@ export class Simulation {
       // refresh -- which is exactly long enough for the pill to say "level 3"
       // over a plate that still says 2.
       this.rosterVersion++;
-      this.note(attacker.id, `level ${out.level}`);
+      // And a level is a talent point, so the panel's "points left" has to move
+      // on the same tick. The level rides on `MSG.TALENTS` precisely so that the
+      // point and the tree it can be spent in arrive together -- see that
+      // message's note.
+      this.talentsVersion++;
+      this.note(attacker.id, out.level === TEAM_CHOICE_LEVEL && attacker.team === TEAM.NONE
+        // The one level-up sentence that is not just a number. The panel opens
+        // itself on the client the moment the roster says 2 (see
+        // `client/src/teams.ts`), and this is the pill that says why in case it
+        // was dismissed -- or in case the client is an old one that has no panel.
+        ? `level ${out.level} — pick a side`
+        : `level ${out.level}`);
     }
+  }
+
+  /**
+   * Copy an account's side and mask back onto the body, and tell the room.
+   *
+   * The one place the mirror is refreshed *from* the record, as opposed to
+   * written to it, and it exists because the record can move underneath a
+   * participant: `resetIfNewWeek` is called from five places (see its header)
+   * and any of them can clear the talents while somebody is standing in the
+   * street with them. A mirror is only safe if there is exactly one function
+   * that re-establishes it.
+   */
+  private syncTalents(p: Participant): void {
+    const account = p.account;
+    p.team = account === null ? TEAM.NONE : account.team;
+    p.talents = account === null
+      ? { ...EMPTY_MASK }
+      : { lo: account.talents.lo >>> 0, hi: account.talents.hi >>> 0 };
+    this.talentsVersion++;
   }
 
   /**
@@ -1701,9 +1855,187 @@ export class Simulation {
       if (!this.accounts.rollWeek(p.account, nowMs)) continue;
       p.level = p.account.level;
       this.rosterVersion++;
+      // The talents went with the level -- see `resetIfNewWeek` -- and the team
+      // did not, which is the whole of what `syncTalents` re-establishes here.
+      this.syncTalents(p);
       this.note(p.id, 'new week. everyone is level 1 again.');
     }
   }
+
+  // --- Teams and talents -----------------------------------------------------
+
+  /**
+   * One `MSG.TEAM` operation, adjudicated. Workstream V.
+   *
+   * **Every rule this applies comes out of `game/teams.ts` and none of them are
+   * written here**, which is the single most important property of this method
+   * and the reason the contract is a separate file at all. `takeRefusal` and
+   * `refundRefusal` are the same two functions the browser greys a node out
+   * with, so the panel and the authority cannot disagree about whether Big Night
+   * opens tier 2 -- and when they do disagree (a stale tab, a hand-built
+   * client), the refusal the player reads is the *server's* sentence rather than
+   * a second copy of the rule that happens to be nearby.
+   *
+   * O(1) per operation in the sense that matters: `countBits` and `spentInTree`
+   * walk 42 nodes, which is a constant, and nothing here touches another player
+   * or the world. It is not rate limited, on `MSG.SUN_PRESS`' argument -- every
+   * branch is idempotent or refused, a hammered `TAKE` costs one 42-node walk
+   * and one string compare, and the expensive thing in this feature (the aura
+   * fold) is on the tick and cannot be provoked from here.
+   *
+   * A **guest is refused silently**. There is no account to write to and
+   * therefore no way to keep an answer; a sentence saying so would be a prompt
+   * to sign up, and this game already has exactly one of those and shows it
+   * once (`PROMPTED.LEVEL`). Arguing with the decision a second time from a
+   * screen the guest cannot open is the wall the whole accounts design refuses
+   * to be.
+   */
+  teamOp(playerId: number, op: number, value: number, nowMs = Date.now()): void {
+    const p = this.participants.get(playerId);
+    if (!p) return;
+    const account = p.account;
+    // A bot has no account by construction and a guest has none by choice. The
+    // store can also be absent -- `verifySim`'s fixture and `?offline` both run
+    // a `Simulation` with no persistence -- and a build that could not be saved
+    // is a build that would vanish at the next deploy, which the ladder already
+    // refuses for the same reason.
+    if (account === null || this.accounts === null) return;
+
+    if (op === TEAM_OP.CHOOSE) {
+      // The gate, in one line and in the contract's constant. Checked against
+      // the *account's* level rather than the participant's: they are the same
+      // number by `join` and `creditLadder`, and the one that is authoritative
+      // is the one on disk.
+      if (account.level < TEAM_CHOICE_LEVEL) {
+        this.note(playerId, `level ${TEAM_CHOICE_LEVEL} first`);
+        return;
+      }
+      if (p.team !== TEAM.NONE) {
+        this.note(playerId, `you are ${TEAM_NAME[p.team]}`);
+        return;
+      }
+      const team = value === TEAM.MARITA || value === TEAM.DEFAULT ? (value as Team) : TEAM.NONE;
+      if (team === TEAM.NONE) return; // a byte nobody's client sends
+      if (!this.accounts.chooseTeam(account, team, nowMs)) {
+        // Lost a race with itself -- two tabs, one account, both clicking. The
+        // store is the referee and this is the loser being told what it is
+        // rather than being told nothing.
+        this.syncTalents(p);
+        this.note(playerId, `you are ${TEAM_NAME[account.team]}`);
+        return;
+      }
+      this.syncTalents(p);
+      // The roster carries the team, so the colour over this body has to be
+      // invalidated with it or everybody else keeps drawing them grey for up to
+      // two seconds -- the same reason a level-up bumps it.
+      this.rosterVersion++;
+      this.note(playerId, `${TEAM_NAME[team]}. ${pointsFor(p.level)} to spend`);
+      return;
+    }
+
+    if (op === TEAM_OP.RESET_ALL) {
+      if (countBits(p.talents) === 0) return;
+      const day = inGameDay(nowMs);
+      if (p.lastRespecDay === day) {
+        this.note(playerId, 'one reset a day');
+        return;
+      }
+      p.lastRespecDay = day;
+      p.talents = { ...EMPTY_MASK };
+      this.accounts.writeTalents(account, p.talents);
+      this.talentsVersion++;
+      this.note(playerId, `${pointsFor(p.level)} to spend`);
+      return;
+    }
+
+    if (op === TEAM_OP.TAKE) {
+      const refusal = takeRefusal(p.talents, p.team, p.level, value);
+      if (refusal !== '') {
+        this.note(playerId, refusal);
+        return;
+      }
+      p.talents = withNode(p.talents, value);
+    } else if (op === TEAM_OP.REFUND) {
+      const refusal = refundRefusal(p.talents, p.team, value);
+      if (refusal !== '') {
+        this.note(playerId, refusal);
+        return;
+      }
+      p.talents = withoutNode(p.talents, value);
+    } else {
+      return;
+    }
+    this.accounts.writeTalents(account, p.talents);
+    this.talentsVersion++;
+    // Silence on success, on `MSG.PHONE`'s rule exactly: the `TALENTS` frame
+    // that follows on the next tick *is* the acknowledgement, the panel redraws
+    // off it, and a pill saying "took Big Night" would be the game narrating a
+    // click the player just made.
+  }
+
+  /**
+   * Everybody's side and spent mask, as `net/teams.encodeTalents` wants it.
+   *
+   * Pooled and written in place, which is `roster()`'s contract and is stated
+   * again because it is the same trap: the returned array is owned by this
+   * object and reused, so serialise before the next call.
+   *
+   * **Everybody, including guests and bots**, rather than only the players who
+   * have a side. A record with `team: 0` and an empty mask is four bytes of
+   * zeros an entry, and leaving them out would mean the client could not tell
+   * "this player has no team" from "this player's record has not arrived yet" --
+   * which for a replacement-not-upsert message is the difference between drawing
+   * nothing and drawing last minute's horns.
+   */
+  talentsRecords(): TalentsRecord[] {
+    const out = this.talentsPool;
+    let n = 0;
+    for (const p of this.participants.values()) {
+      let s = out[n];
+      if (s === undefined) {
+        s = { playerId: 0, team: TEAM.NONE, level: 1, lo: 0, hi: 0 };
+        out.push(s);
+      }
+      s.playerId = p.id;
+      s.team = p.team;
+      s.level = p.level;
+      s.lo = p.talents.lo >>> 0;
+      s.hi = p.talents.hi >>> 0;
+      n++;
+    }
+    out.length = n;
+    return out;
+  }
+
+  private readonly talentsPool: TalentsRecord[] = [];
+
+  /**
+   * Refill the aura index with where everybody is standing, this tick.
+   *
+   * Called from `step` immediately after `buildLiveIndex`, and for the identical
+   * reason that one is where it is: everything below that line reads the
+   * positions the tick just produced, and an aura resolved against last tick's
+   * positions would be a Tip Jar that pays somebody who has walked away.
+   *
+   * O(players) with no allocation once the records exist, and the fold behind it
+   * is lazy -- see `game/teamfield.ts`. A room with nobody on a side pays one
+   * `clear` and N `insert`s.
+   */
+  private buildTeamIndex(): void {
+    this.teams.begin(this.tick);
+    for (const p of this.participants.values()) {
+      const at = p.combat.body.position;
+      this.teamScratch.id = p.id;
+      this.teamScratch.x = at.x;
+      this.teamScratch.z = at.z;
+      this.teamScratch.team = p.team;
+      this.teamScratch.mask = p.talents;
+      this.teams.place(this.teamScratch);
+    }
+  }
+
+  /** One record, rewritten per player per tick. `TeamField.place` copies what it needs. */
+  private readonly teamScratch = { id: 0, x: 0, z: 0, team: TEAM.NONE as Team, mask: EMPTY_MASK as Readonly<TalentMask> };
 
   // --- Money ---------------------------------------------------------------
 
@@ -2068,6 +2400,11 @@ export class Simulation {
       // history of the session -- spec 12 has no persistence and a board that
       // kept the departed would be inventing one.
       this.rosterVersion++;
+      // And their build, on the same argument and one sharper: `MSG.TALENTS` is
+      // a replacement rather than an upsert, so a departure that did not bump
+      // the version would leave horns drawn on an id that has left -- and the
+      // next joiner to be handed that id would inherit them.
+      this.talentsVersion++;
       departed = true;
     }
     if (departed || this.dirty) this.rebuild();
@@ -2165,6 +2502,10 @@ export class Simulation {
     // built here rather than the melee's historical one.
     t = performance.now();
     this.buildLiveIndex();
+    // And the aura index, off the same positions and in the same phase. See
+    // `buildTeamIndex`, and `game/teamfield.ts` for why filling it is cheap even
+    // when nothing reads it.
+    this.buildTeamIndex();
     this.phaseMs.index += performance.now() - t;
 
     // --- Every football in the air, after every combatant has moved.

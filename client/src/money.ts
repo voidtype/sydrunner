@@ -135,6 +135,17 @@ export interface MoneyDeps {
    * is what replaced it. See `MAPS ARE THINGS YOU HOLD` in `game/phone.ts`.
    */
   openMap(): void;
+  /**
+   * Open the talents panel. Workstream V; `openMap`'s shape and its reasons.
+   *
+   * The phone's Talents tile is the only caller. It is `openMap`'s twin in every
+   * respect -- a full-screen thing the handset gets out of the way for -- but it
+   * deliberately does **not** set `mapFromPhone`'s equivalent: the panel owns its
+   * own Escape (it refuses to close before a side is picked, see
+   * `client/src/teams.ts`), so there is no back-to-the-phone step for this file
+   * to compose.
+   */
+  openTalents(): void;
   /** Put the big map away. Escape from a map the phone opened; see `keydown`. */
   closeMap(): void;
   /** Is the big map up? Sampled before Escape decides what a press meant. */
@@ -385,6 +396,7 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
       deps.openMap();
       mapFromPhone = true;
     },
+    openTalents: () => deps.openTalents(),
   });
   let online = false;
   /**

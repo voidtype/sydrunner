@@ -286,6 +286,27 @@ export const MSG = {
    * five branches landing beside this one wants a low id. See `net/cash.ts`.
    */
   PHONE: 0x0e,
+  /**
+   * Pick a side, spend a point, take one back, or start again. One id with a
+   * sub-op byte; see `net/teams.TEAM_OP` and `game/teams.ts` (the contract).
+   *
+   * `SUGGEST` and `PHONE`'s arrangement for their reasons exactly -- four
+   * operations that are one conversation, held from one screen, a handful of
+   * times a week. Four ids would be four cases in `server/index.ts` for one
+   * feature and four things to rate-limit separately.
+   *
+   * **0x11 rather than 0x0f**, and the gap is `HEAT`'s: this feature landed in
+   * a batch built in parallel against one table, and the ids were handed out in
+   * the briefs before any of them was written so that two branches could not
+   * both take "the next free number" and both be right. 0x0f and 0x10 are other
+   * people's. It is deliberately **not** `0x13` (which would be `TALENTS &
+   * 0x7f`, the halves convention `CHAT_SAY` states): the reply this produces is
+   * a **room-global broadcast** rather than an answer to the asker -- everybody
+   * has to be told which side you joined so they can draw your colour -- so
+   * there is no request/reply pair to preserve, which is the same exemption
+   * `SUN_PRESS` claims one entry up.
+   */
+  TEAM: 0x11,
 
   WELCOME: 0x81,
   SNAPSHOT: 0x82,
@@ -478,6 +499,37 @@ export const MSG = {
    * each of about six state changes a trip.
    */
   FARE: 0x90,
+  /**
+   * Who is on which side and what they have spent. See `net/teams.encodeTalents`.
+   *
+   * **0x93, which `Simulation.note`'s header reserved for a `MSG.NOTE` that was
+   * argued out of existence** -- that paragraph says "0x93 was reserved for this
+   * workstream" and then explains why the note rode the wallet frame instead. The
+   * number went back in the pot and this feature took it.
+   *
+   * A message of its own rather than more fields on `ROSTER`, and the split is
+   * the same one `HEAT` makes against `INVESTIGATION`. The **team** is on the
+   * roster (one byte, wanted for everybody at once, changes once a week at
+   * most) because that is exactly the shape of the level byte beside it. The
+   * **talent mask** is not: it is eight bytes a player, it is only interesting
+   * for people whose bodies are on screen or whose auras are reaching you, and
+   * the roster is re-sent every two seconds for the ping column -- so folding it
+   * in would be 1 kB every two seconds at a full room to carry a number that
+   * moves ten times a week. This goes out on change and on nothing else.
+   *
+   * **Room-global rather than interest-filtered**, on `HEAT`'s argument: the
+   * renderer draws horns and cactus arms on a body that is already in front of
+   * you, so a filter here would recompute on the server, per client, a decision
+   * the renderer makes for free -- and the *aura* half is adjudicated on the
+   * server anyway, so nothing about correctness depends on who was told.
+   *
+   * The **level rides on it as well as on the roster**, which is a duplicated
+   * byte and is deliberate: this message is what the talent panel is drawn from,
+   * and a panel whose "points left" came from one message and whose spent set
+   * came from another would show eleven points spent out of ten for the one
+   * frame between the two arriving.
+   */
+  TALENTS: 0x93,
 } as const;
 
 /**
@@ -611,6 +663,21 @@ export const MSG = {
  * server would predict different cars. Same bytes, different arithmetic, so a
  * bump. Everything else in the batch (Polair, the lane-share pass, the
  * viewmodel fixes, the map key) is client-derived or pure.
+ */
+/*
+ * v17: teams and talents. `ROSTER` entries carry a `team` u8 (14 -> 15 bytes an
+ * entry), and two new ids appear -- `TEAM` (0x11, client to server, four
+ * sub-ops) and `TALENTS` (0x93, server to client). The roster widening is the
+ * half that cannot be tolerated: a v16 client reading a v17 roster mis-strides
+ * every entry after the first, which is a scoreboard of garbage names, so this
+ * is not a change either side can be lenient about.
+ *
+ * **The number below is deliberately still 16 on this branch.** The workstream
+ * that grew the field does not own the version -- the lead bumps it once, when
+ * the batch is merged, because two branches that each bumped would merge to a
+ * version neither of them describes. See v12's and v15's notes, which are the
+ * same situation. `server/integration-check.ts` asserts the number and is the
+ * thing that will notice if it is forgotten.
  */
 export const PROTOCOL_VERSION = 16;
 
@@ -3170,6 +3237,7 @@ export function decodeHeat(buffer: ArrayBuffer, now: number): HeatRecord[] | nul
  *       u8   name length in bytes
  *       u8   level            1..255; see `accounts.levelFor`
  *       u16  kills            toward the next level; see `RosterEntry.kills`
+ *       u8   team             0 none, 1 Marita, 2 DeFAULT; see `game/teams.ts`
  *       ...  the name, UTF-8
  *
  * The **level rides here rather than on a message of its own**, which is the
@@ -3264,6 +3332,27 @@ export interface RosterEntry {
    * reader that wanted "how close are they to levelling" wants this.
    */
   kills: number;
+  /**
+   * Which side this player is on: `game/teams.TEAM` -- 0 none, 1 Marita, 2
+   * DeFAULT. **0 for every guest and every bot**, always.
+   *
+   * On the roster rather than only on `MSG.TALENTS`, and that is the one thing
+   * the roster gained for this feature. A team is a *colour drawn over a body*
+   * -- the nameplate, the minimap dot, the kit tint -- so it is wanted for
+   * everybody at once, it is wanted for people who are not currently visible
+   * (the board), and it changes once per account for the life of the account.
+   * That is the same shape of fact as `level` two fields up, argued out in this
+   * record's own header, so it goes in the same place for the same reasons.
+   *
+   * The **talents** deliberately do not: eight bytes a player on a message
+   * re-sent every two seconds for the ping column, to carry a mask that moves a
+   * handful of times a week. See `MSG.TALENTS`.
+   *
+   * Drawn through `game/teams.TEAM_NAME` and `TEAM_COLOUR` and never as a
+   * literal -- that file's header is emphatic about the spelling and is the only
+   * place the two names exist.
+   */
+  team: number;
 }
 
 /**
@@ -3289,9 +3378,15 @@ export const ROSTER_HEADER_BYTES = 3;
 /**
  * Everything in an entry except the name itself. 11 through v12; 12 with the
  * level byte the accounts pass added on the end; 14 with the `u16` of kills the
- * XP bar needs. See the record's own note.
+ * XP bar needs; 15 with the team byte. See the record's own note.
+ *
+ * Every widening has gone on the **end of the fixed part** and this one is no
+ * exception, for the reason the level byte's paragraph gives: the name length
+ * has been at `p + 10` since v8, so appending means the diff is one constant,
+ * one write and one read rather than five renumbered offsets that all have to
+ * be right at once.
  */
-export const ROSTER_ENTRY_BYTES = 14;
+export const ROSTER_ENTRY_BYTES = 15;
 
 export function rosterBytes(entries: readonly RosterEntry[]): number {
   let total = ROSTER_HEADER_BYTES;
@@ -3329,10 +3424,31 @@ export function encodeRoster(entries: readonly RosterEntry[]): ArrayBuffer {
     // as well, because `e.kills` is handed over by four call sites and one of
     // them is a guest's session count that has never been through `Math.round`.
     v.setUint16(p + 12, Math.max(0, Math.min(65535, Math.round(e.kills || 0))), true);
+    // Clamped to the three values the enum has, on the level byte's rule and
+    // for a sharper version of its reason: the *renderer* indexes
+    // `TEAM_COLOUR` with this, so a 7 arriving off a hand-built client would be
+    // an undefined lookup and a thrown exception inside the nameplate loop --
+    // which takes the frame and every frame after it. Out-of-range folds to
+    // "no team", which draws nothing and is the honest answer.
+    v.setUint8(p + 14, e.team === 1 || e.team === 2 ? e.team : 0);
     bytes.set(name, p + ROSTER_ENTRY_BYTES);
     p += ROSTER_ENTRY_BYTES + name.length;
   }
   return buffer;
+}
+
+/**
+ * A team byte off the wire, folded to one of the three values that exist.
+ *
+ * Exported because `net/teams.decodeTalents` needs exactly the same fold and
+ * two copies of "is this 1 or 2" is two copies that can disagree about what a
+ * 9 means. It deliberately does not import `game/teams.TEAM`: this file is the
+ * bottom of the import graph on both ends and nothing else here reaches sideways
+ * into `game/`, so the numbers are written out and `verifyTeamsWire` asserts
+ * they are the enum's.
+ */
+export function teamByte(raw: number): number {
+  return raw === 1 || raw === 2 ? raw : 0;
 }
 
 export function decodeRoster(buffer: ArrayBuffer): RosterEntry[] | null {
@@ -3366,6 +3482,9 @@ export function decodeRoster(buffer: ArrayBuffer): RosterEntry[] | null {
       // nothing here to distinguish "absent" from "none", and inventing a floor
       // would be inventing progress.
       kills: v.getUint16(p + 12, true),
+      // Refused rather than passed through, for the encoder's reason: this
+      // number indexes a colour table on the far side.
+      team: teamByte(v.getUint8(p + 14)),
       name: nameLen > 0 ? NAME_DECODER.decode(new Uint8Array(buffer, p + ROSTER_ENTRY_BYTES, nameLen)) : '',
     });
     p += ROSTER_ENTRY_BYTES + nameLen;
@@ -4774,7 +4893,7 @@ export function verifyNet(): string[] {
     }
     // Which half each one belongs in, named here rather than inferred from a
     // prefix: a list is checkable and a naming convention is not.
-    const clientToServer = ['HELLO', 'INPUT', 'PING', 'CHAT_SAY', 'SUGGEST', 'SUN_PRESS', 'PHONE'];
+    const clientToServer = ['HELLO', 'INPUT', 'PING', 'CHAT_SAY', 'SUGGEST', 'SUN_PRESS', 'PHONE', 'TEAM'];
     for (const [name, id] of Object.entries(MSG)) {
       const wantsLow = clientToServer.includes(name);
       if (wantsLow && id >= 0x80) {
@@ -4889,14 +5008,14 @@ export function verifyNames(): string[] {
   // leaderboard of players nobody has ever seen.
   {
     const entries: RosterEntry[] = [
-      { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 7, downs: 2, ping: 34, level: 3, kills: 27 },
-      { id: 2, colourway: 3, bot: true, name: 'Shazza', kos: 0, downs: 11, ping: 0, level: 1, kills: 0 },
-      { id: 200, colourway: 6, bot: false, name: 'Bazza (2)', kos: 65535, downs: 3, ping: 65535, level: 255, kills: 65535 },
+      { id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 7, downs: 2, ping: 34, level: 3, kills: 27, team: 1 },
+      { id: 2, colourway: 3, bot: true, name: 'Shazza', kos: 0, downs: 11, ping: 0, level: 1, kills: 0, team: 0 },
+      { id: 200, colourway: 6, bot: false, name: 'Bazza (2)', kos: 65535, downs: 3, ping: 65535, level: 255, kills: 65535, team: 2 },
       // The empty name is reachable: a client that sends nothing is given one by
       // the server, but the *record* has to survive a zero-length string or the
       // decoder walks off the end of the entry before it.
-      { id: 15, colourway: 1, bot: false, name: '', kos: 1, downs: 1, ping: 999, level: 1, kills: 1 },
-      { id: 9, colourway: 2, bot: false, name: 'Kev 🦘', kos: 2, downs: 0, ping: 12, level: 12, kills: 119 },
+      { id: 15, colourway: 1, bot: false, name: '', kos: 1, downs: 1, ping: 999, level: 1, kills: 1, team: 0 },
+      { id: 9, colourway: 2, bot: false, name: 'Kev 🦘', kos: 2, downs: 0, ping: 12, level: 12, kills: 119, team: 2 },
     ];
     const frame = encodeRoster(entries);
     if (frame.byteLength !== rosterBytes(entries)) {
@@ -4932,14 +5051,30 @@ export function verifyNames(): string[] {
         if (b.kills !== a.kills) {
           failures.push(`Roster entry ${a.id}: ${a.kills} kills came back as ${b.kills}.`);
         }
+        // And the team, which is v17's addition and sits last in the fixed part
+        // -- so it is now the field that a `ROSTER_ENTRY_BYTES` left at 14
+        // silently eats, taking the name's start with it. Every colour drawn
+        // over a body comes off this byte.
+        if (b.team !== a.team) {
+          failures.push(`Roster entry ${a.id}: team ${a.team} came back as ${b.team}.`);
+        }
       }
+    }
+    // A team byte nothing can produce, folded rather than passed through: the
+    // renderer indexes `game/teams.TEAM_COLOUR` with this, and an undefined
+    // lookup inside the nameplate loop takes the frame and every frame after it.
+    const alien = decodeRoster(
+      encodeRoster([{ id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 0, level: 1, kills: 0, team: 9 }]),
+    );
+    if (!alien || alien[0].team !== 0) {
+      failures.push(`A team of 9 came back as ${alien?.[0].team} rather than folding to none.`);
     }
     // A kill count no week can produce. `u16`, clamped rather than wrapped, on
     // the level's own argument: 65536 & 0xffff is 0, and a bar that empties
     // itself at the top of the ladder is the one failure a progress bar cannot
     // survive.
     const farmed = decodeRoster(
-      encodeRoster([{ id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 0, level: 255, kills: 90000 }]),
+      encodeRoster([{ id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 0, level: 255, kills: 90000, team: 0 }]),
     );
     if (!farmed || farmed[0].kills !== 65535) {
       failures.push(`90,000 kills came back as ${farmed?.[0].kills} rather than being clamped to 65535.`);
@@ -4947,13 +5082,13 @@ export function verifyNames(): string[] {
     // A level the encoder should never be handed. Clamped rather than masked:
     // 256 & 0xff is 0, and "lvl 0" is a number the ladder cannot produce.
     const silly = decodeRoster(
-      encodeRoster([{ id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 0, level: 4000, kills: 0 }]),
+      encodeRoster([{ id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 0, level: 4000, kills: 0, team: 0 }]),
     );
     if (!silly || silly[0].level !== 255) {
       failures.push(`A level of 4000 came back as ${silly?.[0].level} rather than being clamped to 255.`);
     }
     const zero = decodeRoster(
-      encodeRoster([{ id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 0, level: 0, kills: 0 }]),
+      encodeRoster([{ id: 1, colourway: 0, bot: false, name: 'Bazza', kos: 0, downs: 0, ping: 0, level: 0, kills: 0, team: 0 }]),
     );
     if (!zero || zero[0].level !== 1) {
       failures.push(`A level of 0 came back as ${zero?.[0].level} rather than the floor of 1.`);
@@ -4975,10 +5110,10 @@ export function verifyNames(): string[] {
   // --- The order the leaderboard is drawn in.
   {
     const rows: RosterEntry[] = [
-      { id: 1, colourway: 0, bot: false, name: 'Davo', kos: 2, downs: 1, ping: 0, level: 1, kills: 2 },
-      { id: 2, colourway: 0, bot: false, name: 'Bazza', kos: 5, downs: 9, ping: 0, level: 1, kills: 5 },
-      { id: 3, colourway: 0, bot: false, name: 'Macca', kos: 2, downs: 0, ping: 0, level: 1, kills: 2 },
-      { id: 4, colourway: 0, bot: false, name: 'Shazza', kos: 0, downs: 0, ping: 0, level: 1, kills: 0 },
+      { id: 1, colourway: 0, bot: false, name: 'Davo', kos: 2, downs: 1, ping: 0, level: 1, kills: 2, team: 0 },
+      { id: 2, colourway: 0, bot: false, name: 'Bazza', kos: 5, downs: 9, ping: 0, level: 1, kills: 5, team: 1 },
+      { id: 3, colourway: 0, bot: false, name: 'Macca', kos: 2, downs: 0, ping: 0, level: 1, kills: 2, team: 2 },
+      { id: 4, colourway: 0, bot: false, name: 'Shazza', kos: 0, downs: 0, ping: 0, level: 1, kills: 0, team: 0 },
     ];
     const order = rankRoster(rows).map((r) => r.name).join(',');
     // Bazza leads on kills despite being knocked down nine times -- the board is
