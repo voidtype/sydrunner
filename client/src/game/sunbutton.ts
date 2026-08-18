@@ -191,6 +191,21 @@ export function sunScreamMix(screaming: boolean, sunAltDeg: number): { level: nu
   return { level };
 }
 
+/**
+ * The gap, in seconds, between the end of one scream clip and the start of the
+ * next.
+ *
+ * `u1`, `u2` and `u3` are three independent uniform draws in [0, 1), and the
+ * gap is `1 + 9 × max(u1, u2, u3)`; the maximum of three uniforms is a
+ * Beta(3, 1), whose mean is 3/4 and whose mode is 1, so the gap's mean is
+ * 1 + 9 × 3/4 = 7.75 s and its mode is 10 s -- the owner's "biased to 10 s" in
+ * one sentence. Pure and three-free, so a client that cannot play audio still
+ * draws the same schedule the server would.
+ */
+export function screamGap(u1: number, u2: number, u3: number): number {
+  return 1 + 9 * Math.max(u1, u2, u3);
+}
+
 /** Would the button take a press right now, ignoring where the presser is? */
 export function sunReady(state: SunState, nowMs: number): boolean {
   return nowMs >= state.cooldownUntilMs;
@@ -437,6 +452,50 @@ export function verifySunButton(): string[] {
     const quiet = sunScreamMix(false, 30);
     if (quiet !== null) {
       bad.push(`sunScreamMix(false, 30) returned ${JSON.stringify(quiet)}; not screaming must be null.`);
+    }
+  }
+
+  /* --- 6. The scream gap: the gap between one clip's end and the next's start,
+    *        `1 + 9 × max(u1, u2, u3)`. The endpoints are the two things a player
+    *        would notice most -- a gap that never reaches 10 s is a sun that
+    *        never stops, and a gap that never reaches 1 s is a sun that never
+    *        rests -- and the distribution must sit between them, biased to the
+    *        long end. */
+  {
+    if (screamGap(0, 0, 0) !== 1) {
+      bad.push(`screamGap(0,0,0) returned ${screamGap(0, 0, 0)}; the floor must be 1 s.`);
+    }
+    if (screamGap(1, 0, 0) !== 10) {
+      bad.push(`screamGap(1,0,0) returned ${screamGap(1, 0, 0)}; the ceiling must be 10 s.`);
+    }
+    // Monotone in max(u): a larger draw never gives a smaller gap. The other two
+    // are held at 0, so the max is the one that moves.
+    let prev = screamGap(0, 0, 0);
+    for (const m of [0.1, 0.25, 0.5, 0.75, 1]) {
+      const g = screamGap(m, 0, 0);
+      if (g < prev) {
+        bad.push(`screamGap(${m},0,0)=${g} fell below ${prev}; it must be monotone in max(u).`);
+        break;
+      }
+      prev = g;
+    }
+    // Over a scripted PRNG the mean must land on the Beta(3,1) centre of 7.75 s,
+    // well inside the [7.4, 8.1] band the brief allows. Mulberry32, fixed seed,
+    // so the answer is the same on every boot and on the server that runs this
+    // same check.
+    let a = 0x1234567;
+    const rand = (): number => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    let sum = 0;
+    const N = 10_000;
+    for (let i = 0; i < N; i++) sum += screamGap(rand(), rand(), rand());
+    const mean = sum / N;
+    if (mean < 7.4 || mean > 8.1) {
+      bad.push(`screamGap's mean over ${N} draws was ${mean.toFixed(3)}; it must be in [7.4, 8.1].`);
     }
   }
 
