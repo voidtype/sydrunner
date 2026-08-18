@@ -61,6 +61,7 @@
  */
 
 import type { RailAnnounceMix, RailVoice } from './rail-audio.ts';
+import { screamGap } from './sunbutton.ts';
 
 /**
  * How hard a crash has to be before glass breaks. `CombatAudio.carCrunch`'s
@@ -116,10 +117,14 @@ export class CombatAudio {
    * question was never whether to synthesise speech -- it was whether to play the
    * files that exist, and the answer to that is obviously yes.
    *
-   * So this path exists for **voice only**, and it is deliberately narrow: fetch,
-   * decode, cache, play at a distance gain with a cooldown. No streaming, no
-   * sprite sheet, no loader class, and no way to reach it for a sound that could
-   * have been arithmetic.
+   * The screaming sun's four clips are the second user of this path, and they
+   * settle the same question the same way: a recorded scream is not two
+   * oscillators and an envelope, so it is played rather than synthesised. The
+   * officers' barks play at a distance gain with a cooldown; the sun's clips play
+   * at a level gain with no distance and no cooldown, because the sun is
+   * everywhere and a scream that faded with distance would be a scream that was
+   * not a scream. No streaming, no sprite sheet, no loader class, and no way to
+   * reach it for a sound that could have been arithmetic.
    */
   private readonly clips = new Map<string, AudioBuffer>();
   /** URLs currently being fetched, so a bark on two ticks does not fetch twice. */
@@ -1622,8 +1627,13 @@ export class CombatAudio {
   /** `ctx.currentTime` that beat index maps to. Re-anchored on drift. */
   private raveAnchor = 0;
 
-  /** The live scream chain, or null when the sun is not screaming. */
-  private sunScream: SunScreamChain | null = null;
+  // --- The screaming sun's clip schedule. See `sunScreamUpdate`.
+  /** Whether a scream is currently being scheduled. */
+  private sunScreamActive = false;
+  /** `ctx.currentTime` at which the next clip starts. */
+  private sunScreamNextAt = 0;
+  /** The index of the last clip played, so the next is never the same. */
+  private sunScreamLastClip = -1;
 
   /**
    * Drive the sound system for this frame, or pass `null` for silence.
@@ -2621,11 +2631,17 @@ export class CombatAudio {
   // enforce -- with the consequence that the whole schedule can be re-derived on
   // the Bun server by a process with no `AudioContext` in it.
   //
-  // A looping, procedural "AAAAAAAA": three detuned sawtooths around 190-260 Hz,
-  // a slow vibrato, two formant peaks for the shouted vowel, and a slow amplitude
-  // wobble so it breathes. It is `raveUpdate`'s shape exactly -- one call a frame
-  // with a mix or `null`, the chain built on the first frame it is wanted and
-  // faded out and dropped when it is not.
+  // Four recorded screams, played one-shot and at random. A clip is not two
+  // oscillators and an envelope, so it is played rather than synthesised, on
+  // `clips`' argument; the four are fetched and decoded lazily on the first frame
+  // a scream is wanted, through the very `loadClip` the officers' barks use, and
+  // nothing is fetched until the sun is screaming. One-shot rather than looping,
+  // because a loop a player can hear is a loop a player can recognise, and four
+  // clips at a random gap is a scream that does not settle into a hum.
+  //
+  // The gap between the end of one clip and the start of the next is drawn from
+  // `game/sunbutton.screamGap`, a Beta(3, 1) over 1-10 s biased to the long end,
+  // so the sun screams, rests, and screams again rather than holding a tone.
 
   /**
    * Drive the screaming sun for this frame, or pass `null` for silence.
@@ -2638,6 +2654,12 @@ export class CombatAudio {
    * The level is **not distance-attenuated**: the sun is everywhere, so a scream
    * that faded with distance would be a scream that was not a scream. See
    * `SUN_SCREAM_GAIN`.
+   *
+   * While `mix` is non-null the first clip is scheduled at once and each
+   * subsequent one after a gap drawn from `screamGap`, never the same clip twice
+   * in a row. When `mix` goes `null` the schedule stops and the clip already
+   * playing is left to finish -- a scream cut dead is a click, and the gap is the
+   * rest, not a fade.
    */
   sunScreamUpdate(mix: { level: number } | null): void {
     const ctx = this.ctx;
@@ -2645,131 +2667,64 @@ export class CombatAudio {
     if (!ctx || !master) return;
 
     if (mix === null || mix.level <= 0.01) {
-      this.sunScreamSilence();
+      // Silence: stop scheduling. A clip already playing finishes on its own, and
+      // there is no pending schedule to cancel because the schedule is per-frame.
+      this.sunScreamActive = false;
       return;
     }
 
-    const chain = this.sunScream ?? this.sunScreamBuild(ctx, master);
-    if (!chain) return;
-    this.sunScream = chain;
+    if (!this.sunScreamActive) {
+      this.sunScreamActive = true;
+      this.sunScreamNextAt = ctx.currentTime;
+      for (const url of SUN_SCREAM_CLIPS) this.loadClip(url);
+    }
+
     const t = ctx.currentTime;
-    // A ramp rather than a set: at 60 fps a stepped gain on a running chain is a
-    // zipper, and the sun's altitude moves the level across the two degrees either
-    // side of the horizon.
-    chain.out.gain.setTargetAtTime(SUN_SCREAM_GAIN * mix.level, t, 0.1);
+    if (t < this.sunScreamNextAt) return;
+
+    const idx = this.sunScreamPick();
+    const buffer = this.clips.get(SUN_SCREAM_CLIPS[idx]);
+    if (!buffer) {
+      // Not decoded yet: start it and try again a little later. Deliberately not
+      // queued to play on arrival -- a scream that lands two seconds after the
+      // thing it was about is worse than a rest.
+      this.loadClip(SUN_SCREAM_CLIPS[idx]);
+      this.sunScreamNextAt = t + 0.1;
+      return;
+    }
+
+    this.sunScreamPlay(buffer, t, mix.level);
+    this.sunScreamLastClip = idx;
+    // The next one starts after this clip's end plus the drawn gap.
+    this.sunScreamNextAt = t + buffer.duration + screamGap(Math.random(), Math.random(), Math.random());
   }
 
-  /** Fade out over 0.5 s, stop the oscillators and drop the graph. Idempotent. */
-  private sunScreamSilence(): void {
-    const chain = this.sunScream;
-    if (!chain) return;
-    this.sunScream = null;
-    const ctx = this.ctx;
-    if (ctx) {
-      // A ramp rather than a disconnect: a scream cut dead is a click, and 0.5 s
-      // is the fade the brief asks for.
-      chain.out.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.15);
-    }
-    // Stopped and disconnected on a timer, so the fade above is heard. The
-    // oscillators are single-use nodes and the chain is rebuilt from scratch the
-    // next time the sun is wanted, which is how the Web Audio API is meant to be
-    // used and costs nothing at one scream a day.
-    setTimeout(() => {
-      try {
-        for (const node of chain.sources) node.stop();
-      } catch {
-        // Already stopped by a context teardown. Nothing to do.
-      }
-      try {
-        chain.out.disconnect();
-        chain.vibrato.disconnect();
-        chain.wobble.disconnect();
-      } catch {
-        // Likewise.
-      }
-    }, 500);
+  /** A random clip index, uniform over the four and never the one just played. */
+  private sunScreamPick(): number {
+    const n = SUN_SCREAM_CLIPS.length;
+    let pick = Math.floor(Math.random() * n);
+    while (pick === this.sunScreamLastClip) pick = Math.floor(Math.random() * n);
+    return pick;
   }
 
   /**
-   * Build the scream.
+   * Play one scream clip at `at`, at `SUN_SCREAM_GAIN × level`.
    *
-   * **Three detuned sawtooths** at 190, 225 and 260 Hz, summed: the spacing is a
-   * fifth and a fourth rather than a third, so the sum is rough and unvoiced
-   * rather than a chord -- a scream is a voice with the consonant out of it, and a
-   * sawtooth under a closing filter is the crudest possible vocal-tract model,
-   * `oof`'s argument.
-   *
-   * **The vibrato** is a slow sine at 5.5 Hz driving the carriers' frequency
-   * through a gain that is the depth in hertz, `heatBuild`'s wail moved from a
-   * triangle to a sine and down to 5.5 Hz. Modulating the *frequency* rather than
-   * retriggering an envelope is what makes it a continuous wobble rather than a
-   * sequence of chirps.
-   *
-   * **The two formants** are peaking filters at 900 and 1,400 Hz, the two
-   * resonances that turn a buzz into a shouted "a". Two rather than one because a
-   * single peak reads as a wah, and the pair is what a vowel has.
-   *
-   * **The breath** is a slow amplitude wobble, ±20 % at 0.7 s, so the scream
-   * rises and falls rather than holding flat -- a held scream is a synthesiser, a
-   * breathing one is a throat.
+   * A plain value rather than a ramp, on `bark`'s argument: a recording has its
+   * own attack, and an envelope over the top of it would be a fade, which is the
+   * one thing that makes a scream sound like a game asset. Not distance-attenuated
+   * and not on a cooldown, because the sun is everywhere and the gap is the rest.
    */
-  private sunScreamBuild(ctx: AudioContext, master: GainNode): SunScreamChain | null {
-    const sources: OscillatorNode[] = [];
-
-    // --- The output. The target is set by `sunScreamUpdate`.
-    const out = ctx.createGain();
-    out.gain.value = 0.0001;
-    out.connect(master);
-
-    // --- The two formants: a peak at 900 and one at 1,400.
-    const formantA = ctx.createBiquadFilter();
-    formantA.type = 'peaking';
-    formantA.frequency.value = 900;
-    formantA.Q.value = 1.2;
-    formantA.gain.value = 8;
-    const formantB = ctx.createBiquadFilter();
-    formantB.type = 'peaking';
-    formantB.frequency.value = 1400;
-    formantB.Q.value = 1.4;
-    formantB.gain.value = 6;
-    formantA.connect(formantB).connect(out);
-
-    // --- The breath: a slow amplitude wobble, ±20 % at 0.7 s.
-    const wobble = ctx.createGain();
-    wobble.gain.value = 1;
-    wobble.connect(formantA);
-    const wobbleOsc = ctx.createOscillator();
-    wobbleOsc.type = 'sine';
-    wobbleOsc.frequency.value = SUN_SCREAM_WOBBLE_HZ;
-    const wobbleDepth = ctx.createGain();
-    wobbleDepth.gain.value = SUN_SCREAM_WOBBLE_DEPTH;
-    wobbleOsc.connect(wobbleDepth).connect(wobble.gain);
-    sources.push(wobbleOsc);
-
-    // --- The vibrato: ±3 % at 5.5 Hz, driving the carriers' frequency.
-    const vibrato = ctx.createGain();
-    vibrato.gain.value = SUN_SCREAM_VIBRATO_DEPTH_HZ;
-    const vibratoOsc = ctx.createOscillator();
-    vibratoOsc.type = 'sine';
-    vibratoOsc.frequency.value = SUN_SCREAM_VIBRATO_RATE;
-    vibratoOsc.connect(vibrato);
-    sources.push(vibratoOsc);
-
-    // --- The three detuned sawtooths, 190-260 Hz.
-    for (const hz of SUN_SCREAM_CARRIERS) {
-      const osc = ctx.createOscillator();
-      osc.type = 'sawtooth';
-      osc.frequency.value = hz;
-      vibrato.connect(osc.frequency);
-      const g = ctx.createGain();
-      g.gain.value = 1 / SUN_SCREAM_CARRIERS.length;
-      osc.connect(g).connect(wobble);
-      sources.push(osc);
-    }
-
-    const now = ctx.currentTime;
-    for (const node of sources) node.start(now);
-    return { out, vibrato, wobble, sources };
+  private sunScreamPlay(buffer: AudioBuffer, at: number, level: number): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    const g = ctx.createGain();
+    g.gain.value = SUN_SCREAM_GAIN * level;
+    source.connect(g).connect(master);
+    source.start(at);
   }
 }
 
@@ -3079,18 +3034,6 @@ interface HeatChain {
   sources: AudioScheduledSourceNode[];
 }
 
-/** The live scream graph. Built by `sunScreamBuild`, dropped by `sunScreamSilence`. */
-interface SunScreamChain {
-  /** The final gain. Its target is `SUN_SCREAM_GAIN * level`. */
-  out: GainNode;
-  /** The vibrato's depth in hertz, driving the carriers' frequency. */
-  vibrato: GainNode;
-  /** The amplitude wobble, base 1 plus ±20 %. */
-  wobble: GainNode;
-  /** Every oscillator that has to be stopped on teardown. */
-  sources: OscillatorNode[];
-}
-
 /**
  * How far a siren carries, metres, and where it is half as loud.
  *
@@ -3189,20 +3132,12 @@ const ROTOR_PITCH_MAX = 1.22;
 const SUN_SCREAM_GAIN = 0.12;
 
 /**
- * The three detuned carriers, hertz.
- *
- * 190, 225 and 260: the spacing is a fifth and a fourth rather than a third, so
- * the sum is rough and unvoiced rather than a chord. A scream is a voice with the
- * consonant out of it, and a detuned sawtooth under a closing filter is the
- * crudest possible vocal-tract model.
+ * The four scream clips, by URL. Loaded lazily on the first frame a scream is
+ * wanted, through `loadClip`, and nothing is fetched until the sun is screaming.
  */
-const SUN_SCREAM_CARRIERS: readonly number[] = [190, 225, 260];
-
-/** The vibrato's rate, cycles a second. 5.5 is in the brief's 5-6 Hz. */
-const SUN_SCREAM_VIBRATO_RATE = 5.5;
-/** The vibrato's depth, hertz. About 3 % of the carriers; see the brief. */
-const SUN_SCREAM_VIBRATO_DEPTH_HZ = 7;
-/** The breath's rate, cycles a second. 0.7 s is the brief's period. */
-const SUN_SCREAM_WOBBLE_HZ = 1 / 0.7;
-/** The breath's depth, a fraction of the level. ±20 %; see the brief. */
-const SUN_SCREAM_WOBBLE_DEPTH = 0.2;
+const SUN_SCREAM_CLIPS: readonly string[] = [
+  '/audio/sun/scream_1.mp3',
+  '/audio/sun/scream_2.mp3',
+  '/audio/sun/scream_3.mp3',
+  '/audio/sun/scream_4.mp3',
+];
