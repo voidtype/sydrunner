@@ -887,6 +887,58 @@ export class CombatAudio {
   }
 
   /**
+   * A level: four notes up, and a low swell underneath them.
+   *
+   * `pickupTraining`'s argument, one step further. A pickup is good news that
+   * happens twenty times a session, so it is 400 ms and gone; a level happens
+   * ten times a *week* and is the only moment the game stops to tell you
+   * something about you rather than about the street. So it is the same major
+   * shape -- nothing else in the mix is tonal -- but a fourth note, a longer
+   * ring, and a sine an octave and a half below that swells under the arpeggio
+   * and outlasts it, which is what makes it read as an arrival rather than as a
+   * bigger pickup.
+   *
+   * D-F#-A-D (587.33, 739.99, 880, 1174.66) at 95 ms, against a 146.83 Hz sine.
+   * Deliberately a different root from the pickup's A so the two are not the
+   * same gesture at different lengths.
+   */
+  levelUp(): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+    const t = ctx.currentTime;
+
+    const notes = [587.33, 739.99, 880, 1174.66];
+    for (let i = 0; i < notes.length; i++) {
+      const start = t + i * 0.095;
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(notes[i], start);
+      const gain = ctx.createGain();
+      const fall = i === notes.length - 1 ? 0.85 : 0.19;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(i === notes.length - 1 ? 0.34 : 0.26, start + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + fall);
+      osc.connect(gain).connect(master);
+      osc.start(start);
+      osc.stop(start + fall + 0.05);
+    }
+
+    // The swell. It starts with the first note and is still going when the last
+    // one has died, so the beat has a floor under it rather than four pings.
+    const bed = ctx.createOscillator();
+    bed.type = 'sine';
+    bed.frequency.setValueAtTime(146.83, t);
+    const bedGain = ctx.createGain();
+    bedGain.gain.setValueAtTime(0.0001, t);
+    bedGain.gain.exponentialRampToValueAtTime(0.18, t + 0.18);
+    bedGain.gain.exponentialRampToValueAtTime(0.0001, t + 1.25);
+    bed.connect(bedGain).connect(master);
+    bed.start(t);
+    bed.stop(t + 1.3);
+  }
+
+  /**
    * Spec 8.3's Training pickup: a rising three-note chime.
    *
    * The one sound in this file that is *pitched*, and that is the whole design.

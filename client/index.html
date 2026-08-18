@@ -1744,12 +1744,17 @@
         transition: transform .12s ease, box-shadow .12s ease;
       }
       .tcard:hover, .tcard:focus-visible { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,.45); }
-      .tcard .tname { font-size: 34px; line-height: 1; font-weight: 800; text-transform: uppercase; letter-spacing: .02em; }
+      /* No `text-transform` on anything that draws a team's name. The owner's rule is
+         that the two names are spelt exactly `Marita` and `DeFAULT` "in absolutely any
+         case", and CSS uppercase turned them into MARITA and DEFAULT on the very screen
+         where a player learns them. Every rule below that touches a name is a font-size
+         and a weight and nothing else; the shouty look comes from the display face. */
+      .tcard .tname { text-transform: none; font-size: 34px; line-height: 1; font-weight: 800; letter-spacing: .02em; }
       .tcard .ttag { font-size: 9px; letter-spacing: .22em; text-transform: uppercase; opacity: .85; margin-top: 6px; }
       .tcard p { margin: 10px 0 0; max-width: 44ch; opacity: .95; }
       .tcard .tpick {
         display: inline-block; margin-top: 12px; font-size: 10px; letter-spacing: .18em;
-        text-transform: uppercase; border: 2px solid currentColor; padding: 7px 11px; border-radius: 3px;
+        border: 2px solid currentColor; padding: 7px 11px; border-radius: 3px;
       }
       #talents-locknote { margin-top: 12px; font-size: 11px; letter-spacing: .06em; color: #ff8f5a; }
       /* The points bar. */
@@ -1760,7 +1765,7 @@
       #talents-bar .pts { font-size: 24px; font-weight: 800; }
       #talents-bar .pts small { font-size: 10px; letter-spacing: .14em; color: #9aa3ad; margin-left: 6px; }
       #talents-who {
-        font-size: 10px; letter-spacing: .18em; text-transform: uppercase; padding: 6px 10px; border-radius: 3px;
+        font-size: 10px; letter-spacing: .18em; padding: 6px 10px; border-radius: 3px;
       }
       #talents-who.none { border: 1px solid #2a2f37; color: #9aa3ad; }
       #talents-bar .hint { color: #9aa3ad; font-size: 11px; margin-left: auto; }
@@ -1818,7 +1823,8 @@
         padding: 11px 12px 10px; font-size: 12.5px; line-height: 1.45;
       }
       #talents-tip .th { font-weight: 800; font-size: 14px; line-height: 1.2; margin-bottom: 4px; }
-      #talents-tip .tchips { display: flex; gap: 6px; margin: 0 0 8px; font-size: 9px; letter-spacing: .16em; text-transform: uppercase; }
+      /* The last chip is the team's name -- no uppercase here either. */
+      #talents-tip .tchips { display: flex; gap: 6px; margin: 0 0 8px; font-size: 9px; letter-spacing: .16em; }
       #talents-tip .tchips span { padding: 3px 6px; border-radius: 2px; background: #232830; color: #9aa3ad; }
       #talents-tip .te { margin: 0 0 8px; }
       #talents-tip .tf { color: #9aa3ad; font-style: italic; margin: 0 0 6px; }
@@ -1840,7 +1846,48 @@
          it. The chip's colours are set inline from `game/teams.TEAM_COLOUR`,
          for the reason the talent nodes' are: the two hex triples are the
          contract's and a copy here would be a copy that goes stale. */
+      /* --- The level-up beat -------------------------------------------------
+         Centre screen, 1.7 s, then it is gone. Deliberately restrained: a scale
+         from 0.86 with a fade, a hairline rule that widens under the words, and
+         nothing that covers the street. `prefers-reduced-motion` gets the text
+         and no movement. */
+      #levelup {
+        position: fixed; left: 0; right: 0; top: 34%; z-index: 55;
+        display: none; flex-direction: column; align-items: center; gap: 6px;
+        pointer-events: none; text-align: center;
+      }
+      #levelup.shown { display: flex; }
+      #levelup b {
+        font-size: 46px; font-weight: 800; letter-spacing: .06em; line-height: 1;
+        color: #ffe9a8; text-shadow: 0 2px 18px rgba(0, 0, 0, .8), 0 0 34px rgba(255, 200, 90, .35);
+        animation: levelup-pop 1.7s ease-out forwards;
+      }
+      #levelup span {
+        font-size: 12px; letter-spacing: .22em; color: #cfe0ef;
+        text-shadow: 0 1px 10px rgba(0, 0, 0, .9);
+        animation: levelup-sub 1.7s ease-out forwards;
+      }
+      #levelup b::after {
+        content: ''; display: block; height: 2px; margin: 10px auto 0;
+        background: linear-gradient(90deg, transparent, #ffd479, transparent);
+        animation: levelup-rule 1.7s ease-out forwards;
+      }
+      @keyframes levelup-pop {
+        0% { opacity: 0; transform: scale(.86); }
+        12% { opacity: 1; transform: scale(1.04); }
+        24% { transform: scale(1); }
+        76% { opacity: 1; }
+        100% { opacity: 0; transform: scale(1.02); }
+      }
+      @keyframes levelup-sub { 0%, 18% { opacity: 0; } 34% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
+      @keyframes levelup-rule { 0% { width: 0; } 30% { width: 240px; } 100% { width: 240px; opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) {
+        #levelup b, #levelup span, #levelup b::after { animation: none; opacity: 1; }
+        #levelup b::after { width: 240px; }
+      }
+
       #level-team {
+        text-transform: none;
         display: none; margin-left: 6px; padding: 1px 5px; border-radius: 2px;
         font-weight: 700; font-style: normal; letter-spacing: .06em;
       }
@@ -2375,6 +2422,11 @@
          cannot grep this document. The trees are 42 nodes of data in the same
          file, so writing them here would be a second copy of the contract in a
          language nothing typechecks. -->
+    <!-- The level-up beat. One element, shown for 1.7 s by `client/src/teams.ts`
+         before the talents panel opens, so hitting a level is a moment rather than
+         a modal appearing out of nowhere. Team names are never uppercased here or
+         anywhere else; see the `.tcard .tname` rule. -->
+    <div id="levelup" aria-hidden="true"><b id="levelup-line"></b><span id="levelup-sub"></span></div>
     <div id="talents"></div>
     <div id="talents-tip"></div>
 

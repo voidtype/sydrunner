@@ -4113,6 +4113,9 @@ async function main(): Promise<void> {
     // keydown listener below returns at its first statement -- so WASD does not
     // walk and `f` does not swing under a modal with a cursor on it.
     setModal: (open) => { hud.talentsOpen = open; },
+    // The level-up chime, which is the audible half of the beat the panel plays
+    // before it opens. See `client/src/teams.TalentsPanel.beat`.
+    fanfare: () => audio.levelUp(),
   });
 
   // --- The nameplates: a name and a large health bar over every other player.

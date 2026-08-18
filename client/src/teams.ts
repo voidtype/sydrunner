@@ -103,6 +103,8 @@ export interface TalentsSource {
   resetAll(): void;
   /** The typing interlock, so no game key fires while this is up. `hud.talentsOpen`. */
   setModal(open: boolean): void;
+  /** The level-up chime. `game/audio.levelUp`; optional so a fixture needs nothing. */
+  fanfare?(): void;
 }
 
 /**
@@ -115,6 +117,9 @@ export interface TalentsSource {
  * paragraphs of prose it has no use for. Keyed by team so `TEAM_NAME` stays the
  * only place a name is spelt; `verifyTalentsPanel` greps them anyway.
  */
+/** How long the level-up beat runs, ms. Matches `#levelup`'s keyframes exactly. */
+const LEVELUP_MS = 1700;
+
 const BLURB: Readonly<Record<Team, string>> = {
   [TEAM.NONE]: '',
   [TEAM.MARITA]:
@@ -146,6 +151,19 @@ export class TalentsPanel {
    * two.
    */
   private forced = false;
+  /**
+   * The last level this panel saw, and when the beat it started ends.
+   *
+   * The owner's note: "the transition to the levelling screen should be more
+   * clear, i expect a celebretory animation, sound, message that i hit lvl 2.
+   * not ott but something before the ui". So a level-up is now its own moment --
+   * `LEVELUP_MS` of a centre-screen line and a chime -- and the panel waits for
+   * it rather than replacing the street with a modal on the frame the kill
+   * landed. `-1` is "no level seen yet", which is what stops the beat firing on
+   * the first frame of a session for a level the player earned last night.
+   */
+  private lastLevel = -1;
+  private beatUntil = 0;
   /** What was last drawn, so the frame loop's refresh is a string compare. */
   private drawn = '';
   private readonly nodeEls = new Map<number, HTMLElement>();
@@ -205,13 +223,59 @@ export class TalentsPanel {
    * callback would have asked it once, at the wrong moment, and never again.
    */
   frame(): void {
+    const level = this.source.level();
+    const now = performance.now();
+
+    // --- The beat. Any level, not only the second: the same four notes and the
+    //     same line, because "you went up" is the news either way. The first
+    //     level this panel ever sees is adopted silently -- a page load is not
+    //     an achievement.
+    if (this.lastLevel < 0) {
+      this.lastLevel = level;
+    } else if (level > this.lastLevel) {
+      this.lastLevel = level;
+      const choosing = level >= TEAM_CHOICE_LEVEL && this.source.team() === TEAM.NONE && this.source.signedIn();
+      this.beat(level, choosing);
+    }
+
     if (!this.forced && this.source.online() && this.source.signedIn()) {
-      if (this.source.level() >= TEAM_CHOICE_LEVEL && this.source.team() === TEAM.NONE) {
-        this.forced = true;
-        this.setOpen(true);
+      if (level >= TEAM_CHOICE_LEVEL && this.source.team() === TEAM.NONE) {
+        // Wait for the beat to finish. `beatUntil` is 0 for a player who was
+        // already level 2 when they signed in, so that case opens immediately
+        // -- there was no level-up to celebrate.
+        if (now >= this.beatUntil) {
+          this.forced = true;
+          this.setOpen(true);
+        }
       }
     }
     if (this.open) this.paint();
+  }
+
+  /**
+   * Show the level-up line and play the chime. 1.7 s, matching the CSS.
+   *
+   * The DOM is two elements and a class; the animation is entirely in
+   * `index.html` so the timing lives next to the keyframes rather than being
+   * two numbers in two files that drift. Nothing here blocks: the world keeps
+   * running under it, which is the difference between a beat and a cutscene.
+   */
+  private beat(level: number, choosing: boolean): void {
+    const root = document.getElementById('levelup');
+    const line = document.getElementById('levelup-line');
+    const sub = document.getElementById('levelup-sub');
+    this.beatUntil = performance.now() + LEVELUP_MS;
+    this.source.fanfare?.();
+    if (!root || !line || !sub) return;
+    // Lower case, like every other sentence this game says to you.
+    line.textContent = `level ${level}`;
+    sub.textContent = choosing ? 'pick a side' : 'a talent point is yours';
+    // Restart the animation on a second level-up inside the same session: a
+    // class that is already on does not replay a keyframe.
+    root.classList.remove('shown');
+    void root.offsetWidth;
+    root.classList.add('shown');
+    window.setTimeout(() => root.classList.remove('shown'), LEVELUP_MS);
   }
 
   /** Redraw on the next `frame` -- what `NetClient.onTalents` calls. */
@@ -629,6 +693,32 @@ function tierLabel(tier: number): string {
  */
 export function verifyTalentsPanel(): string[] {
   const failures: string[] = [];
+
+  // --- The names are never uppercased by CSS. The owner shipped a screenshot of
+  //     MARITA and DEFAULT on the very panel where a player learns the two
+  //     spellings: `text-transform: uppercase` on the card heading. `textContent`
+  //     cannot catch that -- the DOM still says "Marita" -- so this asks the
+  //     browser what it would actually paint, on the elements that carry a name.
+  if (typeof document !== 'undefined' && typeof getComputedStyle === 'function') {
+    for (const [what, cls] of [['the card heading', 'tname'], ['the choose button', 'tpick']] as const) {
+      const probe = document.createElement('div');
+      probe.className = cls;
+      const card = document.createElement('div');
+      card.className = 'tcard';
+      card.appendChild(probe);
+      card.style.position = 'absolute';
+      card.style.visibility = 'hidden';
+      document.body.appendChild(card);
+      const transform = getComputedStyle(probe).textTransform;
+      card.remove();
+      if (transform === 'uppercase' || transform === 'lowercase' || transform === 'capitalize') {
+        failures.push(
+          `${what} paints its text \`${transform}\`, so ${TEAM_NAME[TEAM.MARITA]} and ${TEAM_NAME[TEAM.DEFAULT]} ` +
+            'reach the screen mis-spelt. The two names are drawn exactly as the contract spells them.',
+        );
+      }
+    }
+  }
 
   // The same regex `verifyTeams` uses, over the strings that file cannot see.
   const wrong = /\b(marita|MARITA|Default|default|DEFAULT|Defaut|DeFault|Marrita)\b/;
