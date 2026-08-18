@@ -1634,6 +1634,12 @@ export class CombatAudio {
   private sunScreamNextAt = 0;
   /** The index of the last clip played, so the next is never the same. */
   private sunScreamLastClip = -1;
+  /**
+   * When the clip now playing started and ends, in `ctx.currentTime` seconds --
+   * the window the sun's mouth is open for. See `sunScreamLevel`.
+   */
+  private sunScreamClipStart = 0;
+  private sunScreamClipEnd = 0;
 
   /**
    * Drive the sound system for this frame, or pass `null` for silence.
@@ -2669,7 +2675,10 @@ export class CombatAudio {
     if (mix === null || mix.level <= 0.01) {
       // Silence: stop scheduling. A clip already playing finishes on its own, and
       // there is no pending schedule to cancel because the schedule is per-frame.
+      // The mouth closes now rather than at the clip's end -- the face is what
+      // went away, so the level goes with it.
       this.sunScreamActive = false;
+      this.sunScreamClipEnd = 0;
       return;
     }
 
@@ -2695,8 +2704,35 @@ export class CombatAudio {
 
     this.sunScreamPlay(buffer, t, mix.level);
     this.sunScreamLastClip = idx;
+    this.sunScreamClipStart = t;
+    this.sunScreamClipEnd = t + buffer.duration;
     // The next one starts after this clip's end plus the drawn gap.
     this.sunScreamNextAt = t + buffer.duration + screamGap(Math.random(), Math.random(), Math.random());
+  }
+
+  /**
+   * How open the sun's mouth is right now, 0..1: the envelope of the clip that
+   * is playing, or 0 between clips and whenever nothing is scheduled.
+   *
+   * Not an `AnalyserNode`. The clips are one-shot buffers whose start and length
+   * this class chose, so the honest envelope is the *window*: a 60 ms attack
+   * from the scheduled start, 1 while the clip runs, and a 120 ms release after
+   * its end -- and 0 the instant `sunScreamUpdate(null)` was called. An analyser
+   * would give a real RMS for the same shape at the cost of a tap on the graph
+   * and a render-thread read every frame, for a mouth that is 30 pixels wide.
+   * `world/sunbutton.drawScreamFace` reads this and opens the jaw by it, so the
+   * mouth moves only while there is a scream to move it (the owner's ask).
+   */
+  sunScreamLevel(): number {
+    const ctx = this.ctx;
+    if (!ctx || this.sunScreamClipEnd <= 0) return 0;
+    const t = ctx.currentTime;
+    const start = this.sunScreamClipStart;
+    const end = this.sunScreamClipEnd;
+    if (t < start || t > end + SUN_SCREAM_RELEASE_S) return 0;
+    if (t < start + SUN_SCREAM_ATTACK_S) return (t - start) / SUN_SCREAM_ATTACK_S;
+    if (t > end) return 1 - (t - end) / SUN_SCREAM_RELEASE_S;
+    return 1;
   }
 
   /** A random clip index, uniform over the four and never the one just played. */
@@ -3130,6 +3166,9 @@ const ROTOR_PITCH_MAX = 1.22;
  * 0.55 * 0.12 = 0.066 against the compressor's -8 dB threshold of 0.398.
  */
 const SUN_SCREAM_GAIN = 0.12;
+/** The mouth's attack and release around a clip's window, seconds. See `sunScreamLevel`. */
+const SUN_SCREAM_ATTACK_S = 0.06;
+const SUN_SCREAM_RELEASE_S = 0.12;
 
 /**
  * The four scream clips, by URL. Loaded lazily on the first frame a scream is

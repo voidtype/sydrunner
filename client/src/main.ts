@@ -8876,6 +8876,9 @@ async function main(): Promise<void> {
       sky.solar.altitude,
       player.position.x,
       player.position.z,
+      // The mouth follows the scream that is actually playing -- 0 between
+      // clips -- so the face mouths nothing while the sun is quiet.
+      audio.sunScreamLevel(),
     );
 
     // The night rig, after the streamer -- so a tile that arrived this frame

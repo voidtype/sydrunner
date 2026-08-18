@@ -202,6 +202,24 @@ export function sunScreamMix(screaming: boolean, sunAltDeg: number): { level: nu
  * one sentence. Pure and three-free, so a client that cannot play audio still
  * draws the same schedule the server would.
  */
+/**
+ * How open the sun's jaw is, 0..1, from how loud the scream is right now.
+ *
+ * `mouth` is `audio.sunScreamLevel()` -- the envelope of the clip that is
+ * playing, 0 between clips -- and `wobble` is the renderer's aperiodic jitter,
+ * 0..1. The rule the owner asked for is that **the mouth only opens when the
+ * scream noise is playing**, so the wobble is a multiplier on the level and
+ * never a term of its own: at `mouth = 0` the jaw is `JAW_CLOSED`, a thin line
+ * rather than a hole, whatever the wobble does. At `mouth = 1` it is wide open,
+ * breathing by up to 15 % with the wobble so a held scream still moves.
+ */
+export const JAW_CLOSED = 0.1;
+export function jawOpen(mouth: number, wobble: number): number {
+  const m = mouth < 0 ? 0 : mouth > 1 ? 1 : mouth;
+  const w = wobble < 0 ? 0 : wobble > 1 ? 1 : wobble;
+  return JAW_CLOSED + (1 - JAW_CLOSED) * m * (0.85 + 0.15 * w);
+}
+
 export function screamGap(u1: number, u2: number, u3: number): number {
   return 1 + 9 * Math.max(u1, u2, u3);
 }
@@ -327,6 +345,22 @@ export function sunReadoutText(state: SunState, nowMs: number): string {
  */
 export function verifySunButton(): string[] {
   const bad: string[] = [];
+  // --- The jaw opens by the scream and by nothing else. What this catches: a
+  //     renderer that let the wobble open the mouth on its own would have the sun
+  //     mouthing along between clips, which is exactly the thing the owner asked
+  //     to stop ("make sure the mouth only opens when scream noise playing").
+  if (jawOpen(0, 0) > 0.12 || jawOpen(0, 1) > 0.12) {
+    bad.push(`The jaw is ${jawOpen(0, 1).toFixed(3)} open with no scream playing; the wobble alone opened it.`);
+  }
+  if (jawOpen(1, 1) < 0.95) bad.push(`A full scream only opens the jaw to ${jawOpen(1, 1).toFixed(3)}.`);
+  for (let k = 1; k <= 10; k++) {
+    if (jawOpen(k / 10, 0.5) < jawOpen((k - 1) / 10, 0.5)) {
+      bad.push('jawOpen is not monotone in the scream level.');
+      break;
+    }
+  }
+  if (jawOpen(2, 0) !== jawOpen(1, 0) || jawOpen(-1, 0) !== jawOpen(0, 0)) bad.push('jawOpen does not clamp its inputs.');
+
 
   /* --- 1. The sunset boundary. Walk a whole cycle in 200 steps and require
    *        that every instant maps to a sunset that is (a) in the future,

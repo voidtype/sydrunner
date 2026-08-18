@@ -79,6 +79,7 @@ import {
   sunRefusalText,
   sunScreaming,
   trySunPress,
+  jawOpen,
   type SunState,
 } from '../game/sunbutton.ts';
 import { registerTexture, unregisterTexture } from './texture-audit.ts';
@@ -244,6 +245,8 @@ export class SunFeature extends Group {
   /** Animation clocks. Frame-rate driven, cosmetic, read by nothing shared. */
   private ringPhase = 0;
   private facePhase = 0;
+  /** The `mouth` the last redraw used; 0 means the canvas shows a closed mouth. See `update`. */
+  private faceLastMouth = 1;
   private faceRedrawDue = 0;
 
   /** Last ground answer we believed. See `SunFeatureDeps.groundAt`. */
@@ -546,6 +549,7 @@ export class SunFeature extends Group {
     solarAltitudeDeg: number,
     px: number,
     pz: number,
+    mouth = 0,
   ): void {
     const now = this.deps.clockMs();
     const dx = px - SUN_BUTTON_X;
@@ -625,8 +629,16 @@ export class SunFeature extends Group {
       // from being backgrounded must not run twenty redraws to catch up on an
       // animation nobody watched.
       if (this.faceRedrawDue < 0) this.faceRedrawDue = 1 / FACE_REDRAW_HZ;
-      drawScreamFace(this.faceCtx, FACE_TEXTURE_PX, this.facePhase);
-      this.faceTex.needsUpdate = true;
+      // A closed mouth does not need repainting fifteen times a second: between
+      // clips the only thing that would move is the wobble, and the wobble no
+      // longer moves the mouth (`game/sunbutton.jawOpen`). Skip the redraw when
+      // this frame and the last drawn one are both silent; the eyes' squint is
+      // static too, so nothing on the canvas would change.
+      if (mouth > 0 || this.faceLastMouth > 0) {
+        drawScreamFace(this.faceCtx, FACE_TEXTURE_PX, this.facePhase, mouth);
+        this.faceTex.needsUpdate = true;
+        this.faceLastMouth = mouth;
+      }
     }
   }
 
@@ -749,7 +761,7 @@ function roundRect(
  * is a canvas on one client, driven by that client's own frame clock, and
  * nothing about it crosses the wire. What crosses the wire is two integers.
  */
-function drawScreamFace(ctx: CanvasRenderingContext2D | null, size: number, t: number): void {
+function drawScreamFace(ctx: CanvasRenderingContext2D | null, size: number, t: number, mouth = 1): void {
   if (!ctx) return;
   const c = size / 2;
   const discR = (size * DISC_SHARE) / 2;
@@ -825,12 +837,16 @@ function drawScreamFace(ctx: CanvasRenderingContext2D | null, size: number, t: n
     ctx.stroke();
   }
 
-  /* --- The mouth. The jaw is the whole animation: a 0.7 s loop between a wide
-   *     open howl and a slightly narrower one, never closing, with a faster
-   *     jitter on top so it does not read as a metronome. */
+  /* --- The mouth. The jaw follows the *sound*: `mouth` is the envelope of the
+   *     scream clip that is playing (0 between clips), and `jawOpen` maps it to
+   *     the opening with the old 0.7 s cycle and the faster jitter surviving only
+   *     as a wobble that breathes a held scream by up to 15 %. With no scream the
+   *     mouth is a thin closed line -- the owner's rule: it only opens when the
+   *     noise is playing. */
   const cycle = (t % JAW_PERIOD_S) / JAW_PERIOD_S;
-  const jaw = 0.62 + 0.38 * (0.5 - 0.5 * Math.cos(cycle * Math.PI * 2));
-  const jitter = 1 + 0.06 * Math.sin(t * 17.3);
+  const wobble = 0.5 - 0.5 * Math.cos(cycle * Math.PI * 2);
+  const jaw = jawOpen(mouth, wobble);
+  const jitter = 1 + 0.06 * Math.sin(t * 17.3) * mouth;
   const mouthW = discR * 0.52;
   const mouthH = discR * 0.56 * jaw * jitter;
   const mouthY = c + discR * 0.34;
