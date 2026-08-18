@@ -1695,6 +1695,164 @@
       #suggestions-compose[hidden], #bug-title[hidden], #bug-body[hidden],
       #bug-attach[hidden], #bug-row[hidden] { display: none; }
 
+      /* --- Teams and talents: the level-2 takeover. Workstream V.
+         `client/src/teams.ts` builds every element inside `#talents` and this
+         block only styles them, which is deliberate rather than lazy: the two
+         team names have exactly one home (`game/teams.TEAM_NAME`) and
+         `verifyTeams` greps that file for the wrong casing. A name typed into
+         this document would be a third spelling nothing checks.
+
+         The look is the mock at `scratchpad/factions-talents.html`, folded onto
+         this document's palette where the two disagreed -- the mock's own
+         `--bg`/`--ink` are within a few points of the loading screen's, so what
+         actually changed is the type stack (this file has no display face) and
+         the panel chrome, which is the join panel's.
+
+         `pointer-events: auto` and `inset: 0`, which makes this the one overlay
+         here that is genuinely modal. `#suggestions`' comment states the rule it
+         is an exception to -- a panel that swallows a click swallows the one
+         that re-locks the pointer -- and the exception is the same one: it is
+         `display: none` when shut, so it is not in the hit test at all. While it
+         is open the pointer lock is deliberately released and the click that
+         would re-lock is the one that picks a side. */
+      #talents {
+        position: fixed; inset: 0; z-index: 46; display: none;
+        pointer-events: auto; overflow-y: auto;
+        background: rgba(9,11,14,.92);
+        -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+        color: #e9e6df; font-size: 13px; line-height: 1.5;
+      }
+      #talents.shown { display: block; }
+      #talents-inner { max-width: 1180px; margin: 0 auto; padding: 26px 20px 60px; }
+      #talents .eyebrow {
+        font-size: 9px; letter-spacing: .28em; text-transform: uppercase; color: #93a8bc;
+      }
+      /* The takeover block, shown only while nobody has chosen. */
+      #talents-choose {
+        border: 1px solid #2a2f37; background: linear-gradient(180deg,#14171c,#0f1114);
+        padding: 22px 22px 18px; margin-bottom: 18px;
+      }
+      #talents-choose .big {
+        font-size: 30px; line-height: 1.05; text-transform: uppercase;
+        letter-spacing: .02em; margin: 8px 0 6px; font-weight: 800;
+      }
+      #talents-choose .sub { color: #9aa3ad; margin: 0 0 16px; }
+      #talents-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .tcard {
+        border: 0; border-radius: 6px; padding: 18px 18px 14px; cursor: pointer;
+        text-align: left; font: inherit; display: block; width: 100%;
+        transition: transform .12s ease, box-shadow .12s ease;
+      }
+      .tcard:hover, .tcard:focus-visible { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+      .tcard .tname { font-size: 34px; line-height: 1; font-weight: 800; text-transform: uppercase; letter-spacing: .02em; }
+      .tcard .ttag { font-size: 9px; letter-spacing: .22em; text-transform: uppercase; opacity: .85; margin-top: 6px; }
+      .tcard p { margin: 10px 0 0; max-width: 44ch; opacity: .95; }
+      .tcard .tpick {
+        display: inline-block; margin-top: 12px; font-size: 10px; letter-spacing: .18em;
+        text-transform: uppercase; border: 2px solid currentColor; padding: 7px 11px; border-radius: 3px;
+      }
+      #talents-locknote { margin-top: 12px; font-size: 11px; letter-spacing: .06em; color: #ff8f5a; }
+      /* The points bar. */
+      #talents-bar {
+        display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+        margin: 0 0 12px; padding: 10px 12px; border: 1px solid #2a2f37; background: #171a1f;
+      }
+      #talents-bar .pts { font-size: 24px; font-weight: 800; }
+      #talents-bar .pts small { font-size: 10px; letter-spacing: .14em; color: #9aa3ad; margin-left: 6px; }
+      #talents-who {
+        font-size: 10px; letter-spacing: .18em; text-transform: uppercase; padding: 6px 10px; border-radius: 3px;
+      }
+      #talents-who.none { border: 1px solid #2a2f37; color: #9aa3ad; }
+      #talents-bar .hint { color: #9aa3ad; font-size: 11px; margin-left: auto; }
+      #talents-bar button {
+        background: none; border: 1px solid #2a2f37; color: #e9e6df; font: inherit;
+        font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
+        padding: 6px 10px; cursor: pointer; border-radius: 3px;
+      }
+      #talents-bar button:hover { border-color: #9aa3ad; }
+      /* The three trees. */
+      #talents-trees { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+      .ttree { border: 1px solid #2a2f37; background: #171a1f; padding: 12px 10px 10px; position: relative; }
+      .ttree.locked { opacity: .78; }
+      .ttree h3 { margin: 0 0 2px; font-size: 19px; line-height: 1; text-transform: uppercase; font-weight: 800; }
+      .ttree .tdesc { color: #9aa3ad; font-size: 11.5px; margin: 0 0 8px; min-height: 34px; }
+      .ttree .tspent { position: absolute; top: 10px; right: 10px; font-size: 10px; color: #9aa3ad; }
+      .ttier { margin: 8px 0 0; padding-top: 8px; border-top: 1px dashed #2a2f37; position: relative; }
+      .ttier .treq {
+        position: absolute; top: -7px; left: 0; background: #171a1f; padding-right: 6px;
+        font-size: 9px; letter-spacing: .1em; color: #5d6672;
+      }
+      .trow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+      .trow.mega { grid-template-columns: 1fr; }
+      .tnode {
+        position: relative; border: 1px solid #2a2f37; background: #1d2127;
+        padding: 8px 9px 7px; cursor: pointer; min-height: 62px; text-align: left;
+        font: inherit; color: inherit; -webkit-user-select: none; user-select: none;
+      }
+      .tnode:hover, .tnode:focus-visible { border-color: #9aa3ad; }
+      .tnode .tn { font-weight: 700; font-size: 12.5px; line-height: 1.2; }
+      .tnode .tk { font-size: 9px; letter-spacing: .16em; text-transform: uppercase; color: #9aa3ad; margin-top: 4px; }
+      .tnode .tcost { position: absolute; top: 5px; right: 7px; font-size: 11px; font-weight: 700; color: #5d6672; }
+      .tnode.avail { border-color: #9aa3ad; }
+      .tnode.taken { background: #242a31; }
+      .tnode.taken .tcost { color: #e9e6df; }
+      .tnode.dead { opacity: .45; cursor: not-allowed; }
+      .tnode.megan { min-height: 70px; background: linear-gradient(180deg,#232830,#1a1e24); }
+      .tnode.megan .tn { font-size: 14px; }
+      .tnode .tbest { position: absolute; bottom: 5px; right: 7px; font-size: 8.5px; letter-spacing: .08em; color: #ff8f5a; }
+      /* The tint on a taken node is the team's, set inline from
+         `game/teams.TEAM_COLOUR` rather than by a class per team: the colours
+         are the contract's and a second copy of two hex triples in a stylesheet
+         is a second copy that goes stale the day the owner changes one. */
+      #talents-summary { margin-top: 14px; border: 1px solid #2a2f37; background: #171a1f; padding: 10px 12px; }
+      #talents-summary h4 { margin: 0 0 6px; font-size: 15px; text-transform: uppercase; font-weight: 800; }
+      #talents-build { margin: 0; padding-left: 18px; font-size: 12px; }
+      #talents-build li { margin: 2px 0; }
+      #talents-build .tmuted { color: #9aa3ad; }
+      #talents-look { margin-top: 8px; font-size: 11px; letter-spacing: .04em; color: #ff8f5a; }
+      /* The tooltip. `position: fixed` and `pointer-events: none`, so it can
+         never be the thing a click lands on -- the node under it is. */
+      #talents-tip {
+        position: fixed; z-index: 47; pointer-events: none; width: 320px; display: none;
+        background: #0b0d10; border: 1px solid #2a2f37; box-shadow: 0 12px 40px rgba(0,0,0,.6);
+        padding: 11px 12px 10px; font-size: 12.5px; line-height: 1.45;
+      }
+      #talents-tip .th { font-weight: 800; font-size: 14px; line-height: 1.2; margin-bottom: 4px; }
+      #talents-tip .tchips { display: flex; gap: 6px; margin: 0 0 8px; font-size: 9px; letter-spacing: .16em; text-transform: uppercase; }
+      #talents-tip .tchips span { padding: 3px 6px; border-radius: 2px; background: #232830; color: #9aa3ad; }
+      #talents-tip .te { margin: 0 0 8px; }
+      #talents-tip .tf { color: #9aa3ad; font-style: italic; margin: 0 0 6px; }
+      #talents-tip .tr { font-size: 10.5px; letter-spacing: .06em; color: #ff8f5a; }
+      #talents-tip .tr.ok { color: #4fd18b; }
+      @media (max-width: 860px) { #talents-trees, #talents-cards { grid-template-columns: 1fr; } }
+      /* The talents entry in the Escape panel's tab strip. Deliberately **not**
+         `.tab`: `SuggestionsPanel` binds every `#panel-tabs .tab` to a pane
+         switch, and this button opens a different panel entirely. Same type as
+         a tab so the strip still reads as one row. */
+      #panel-tabs .taboff {
+        background: none; border: none; padding: 0; cursor: pointer; margin-left: auto;
+        font: inherit; font-size: 9px; letter-spacing: .28em; text-transform: uppercase;
+        color: #93a8bc; line-height: 1.6;
+      }
+      #panel-tabs .taboff:hover { color: #ffffff; }
+
+      /* The team chip beside `LVL 3 · 7/10`, and the unspent-points nudge after
+         it. The chip's colours are set inline from `game/teams.TEAM_COLOUR`,
+         for the reason the talent nodes' are: the two hex triples are the
+         contract's and a copy here would be a copy that goes stale. */
+      #level-team {
+        display: none; margin-left: 6px; padding: 1px 5px; border-radius: 2px;
+        font-weight: 700; font-style: normal; letter-spacing: .06em;
+      }
+      #level-team.shown { display: inline-block; }
+      #level-spend {
+        display: none; margin-left: 6px; font-style: normal; cursor: pointer;
+        color: #ffd479; letter-spacing: .04em;
+      }
+      #level-spend.shown { display: inline; }
+      #level-spend:hover { color: #ffffff; }
+      #level-team.clickable { cursor: pointer; }
+
       #loading {
         position: fixed; inset: 0; display: grid; place-items: center;
         background: #0b0d10; z-index: 10; transition: opacity .4s ease;
@@ -1750,8 +1908,18 @@
            right about a bare label and wrong about a ladder, and note that this
            is deliberately nowhere near the wanted stars over the investigation
            banner: they are different numbers and the layout has to say so. -->
+      <!-- The level line, and beside it the side you are on. The chip and the
+           "2 to spend" nudge are both written by `hud.level` and are both
+           clickable — `client/src/teams.ts` binds them, because the panel owns
+           what a click on them means and the HUD owns none of it. Empty and
+           collapsed for a guest, for a bot, and for anybody who has not chosen,
+           which is most of the city most of the time. -->
       <div id="level" style="display:none">
-        <div id="level-text"></div>
+        <div id="level-text">
+          <span id="level-line"></span
+          ><b id="level-team"></b
+          ><i id="level-spend"></i>
+        </div>
         <div id="level-xp"><i></i></div>
       </div>
       <div id="effects"></div>
@@ -1822,7 +1990,7 @@
            and 363px, and it fits. See `client/src/suggestions.ts` for the three
            tabs it names and `#help.hidden` above for the two moments in a
            session it is not on the screen. -->
-      <div class="more wrap">esc — suggestions · what's new · report a bug</div>
+      <div class="more wrap">esc — suggestions · what's new · report a bug · talents</div>
       <!-- The slots and the phone. Its own line for the same reason the escape
            line has one: a player has no way to discover that the number row
            does anything, and "3 phone" is the entry point to the wallet, the
@@ -1942,6 +2110,20 @@
         <div>three tabs: suggestions, what's new, report a bug</div>
         <div>4 votes a week, one per suggestion</div>
         <div>the top one each week gets built</div>
+      </section>
+      <!-- Teams and talents. There is deliberately **no key** for it: the panel
+           opens itself the moment an account reaches level 2 and cannot be
+           dismissed until a side is picked, so a player never has to find it —
+           and after that it is a click on the level line, a tile on the phone
+           and a word in the Escape strip, which is three ways in for something
+           opened a handful of times a week. See `client/src/teams.ts`. -->
+      <section>
+        <h2>teams</h2>
+        <div>level 2 — the game asks you to pick a side</div>
+        <div>a point a level, ten of them, spent in three trees</div>
+        <div>click a talent to take it · shift-click to refund</div>
+        <div>reopen it from the level line, the phone or <kbd>esc</kbd></div>
+        <div>the week resets your points; your side stays</div>
       </section>
       <section>
         <h2>interface</h2>
@@ -2089,6 +2271,12 @@
         <button class="tab on" type="button" data-tab="suggest" role="tab">suggestions</button>
         <button class="tab" type="button" data-tab="new" role="tab">what&rsquo;s new</button>
         <button class="tab" type="button" data-tab="bug" role="tab">report a bug</button>
+        <!-- The fourth thing in the strip and the one that is not a tab: it
+             opens the talents panel, which is full-screen and modal and cannot
+             be a pane in a 400 px box. See the `.taboff` rule in the stylesheet
+             for why it does not wear the `.tab` class. `client/src/teams.ts`
+             binds it. -->
+        <button class="taboff" id="panel-talents" type="button">talents</button>
       </div>
 
       <section id="panel-suggest" class="tabpane on">
@@ -2162,6 +2350,18 @@
         <div id="bug-foot">goes to github as an issue labelled <span class="issue">bug</span></div>
       </section>
     </div>
+
+    <!-- Teams and talents. Workstream V; the whole of the inside is built by
+         `client/src/teams.ts`, which is where the two names live.
+
+         An empty shell rather than markup, and that is the one decision worth
+         recording here: the panel draws `game/teams.TEAM_NAME[team]` and never a
+         literal, because `verifyTeams` greps that file for the wrong casing and
+         cannot grep this document. The trees are 42 nodes of data in the same
+         file, so writing them here would be a second copy of the contract in a
+         language nothing typechecks. -->
+    <div id="talents"></div>
+    <div id="talents-tip"></div>
 
     <!-- The landing panel. Two ways in, and `client/src/accounts.ts` owns every
          listener on it: `hud.ts` only hides it, on a fatal error.

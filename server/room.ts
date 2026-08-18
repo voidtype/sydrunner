@@ -106,6 +106,8 @@ import {
   type SnapshotNpc,
   type SnapshotPlayer,
 } from '../client/src/net/protocol.ts';
+// The talents broadcast. Workstream V; see `MSG.TALENTS` and `sendTalents`.
+import { encodeTalents } from '../client/src/net/teams.ts';
 // The shared wall-clock tick. The heat channel's deadlines are denominated in
 // it, exactly as `sim.stepFactions`' are -- see `sendHeat`.
 import { trafficTick } from '../client/src/game/traffic.ts';
@@ -693,6 +695,12 @@ export class Room {
   /** The heat channel's watched version and refresh clock. See `sendHeat`. */
   private heatSent = -1;
   private heatTick = 0;
+  /**
+   * The talents channel's watched version. **No refresh clock beside it**, which
+   * is where it differs from every other version-driven channel in this file --
+   * see `sendTalents`.
+   */
+  private talentsSent = -1;
 
   // --- Measurement. Per room, because a host with one busy room and seven quiet
   // ones has to be able to say so.
@@ -1164,6 +1172,7 @@ export class Room {
     this.sendRoster();
     this.sendInvestigations();
     this.sendHeat();
+    this.sendTalents();
     this.sendBikes();
     this.sendCars();
     this.sendWallets();
@@ -1306,6 +1315,45 @@ export class Room {
     // at. `trafficTick(Date.now())` is the same clock `stepFactions` reads and
     // the same one every client runs -- see `protocol.encodeHeat`.
     const frame = encodeHeat(sim.heatRecords(), trafficTick(Date.now()));
+    for (const ws of this.conns) {
+      if (!ws.data.participant) continue;
+      ws.send(frame);
+      this.bytesSent += frame.byteLength;
+      this.logBytes += frame.byteLength;
+    }
+  }
+
+  /**
+   * Who is on which side and what they have spent: **room-global, one encode,
+   * on change, and never on a timer.**
+   *
+   * The one channel in this room with no refresh clock, and that is a decision
+   * rather than an omission. Every other version-driven message here also
+   * re-sends on a slow tick, each for a reason of its own: the roster's is the
+   * ping column, which moves continuously; the heat channel's is a joiner, who
+   * would otherwise see no stars on anybody until the next arrest. This one has
+   * neither problem. Nothing in it moves on its own -- a team is chosen once per
+   * account and a mask a handful of times a week -- and the joiner case is
+   * covered exactly rather than approximately, because **a join bumps the
+   * version**: the set is what the message carries, so a new member of the set
+   * *is* a change to it. See `Simulation.talentsVersion`, which says the same
+   * from the other end.
+   *
+   * What that buys is the difference between 1.5 kB every two seconds at a full
+   * room (6 kbit/s, forever, to re-send numbers nobody has touched) and 1.5 kB
+   * on the handful of ticks a week where something actually happens.
+   *
+   * Not interest-filtered, on `sendHeat`'s argument: the renderer only draws
+   * horns on a body that is already in front of you, so a filter here would be
+   * re-deciding on the server what the frustum decides for free -- and the aura
+   * arithmetic that actually matters is adjudicated in this process anyway, so
+   * nothing about correctness depends on who was told.
+   */
+  private sendTalents(): void {
+    const sim = this.sim;
+    if (sim.talentsVersion === this.talentsSent) return;
+    this.talentsSent = sim.talentsVersion;
+    const frame = encodeTalents(sim.talentsRecords());
     for (const ws of this.conns) {
       if (!ws.data.participant) continue;
       ws.send(frame);

@@ -9,6 +9,11 @@
 // The one place a balance becomes text. See `game/cash.formatMoney` for why
 // it is not `Intl.NumberFormat`.
 import { formatMoney } from './game/cash.ts';
+// The two team names and their two colours, from the one file they are spelt
+// in. Workstream V; see `game/teams.ts`, whose `verifyTeams` is what makes
+// drawing `TEAM_NAME[team]` rather than a literal a rule with a check behind it.
+import { TEAM, TEAM_COLOUR, TEAM_NAME, type Team } from './game/teams.ts';
+
 // The level line and the XP bar's width, both of them pure. This file cannot be
 // imported outside a browser -- it reaches for `document` in a field
 // initialiser -- so every string and every number it draws that is worth
@@ -18,6 +23,27 @@ import { levelLine, xpBarWidth } from './game/levelhud.ts';
 import type { Vector3 } from 'three/webgpu';
 import type { SolarPosition } from './sky/solar.ts';
 import { type RosterEntry } from './net/protocol.ts';
+
+/**
+ * What `Hud.level` is handed: the four facts drawn on one line about one player.
+ *
+ * `team` and `unspent` are part of *this* record rather than a second
+ * `hud.team(...)` call, and that is the decision worth recording: they are drawn
+ * on the same line, they move on the same events, and two setters writing one
+ * line is two setters that disagree for a frame -- which here would be a chip
+ * saying Marita over a sentence saying level 1 in a week where the reset has
+ * just cleared both.
+ */
+export interface LevelHudState {
+  level: number;
+  kills: number;
+  /** No account. Changes the sentence, not the chip. See `game/levelhud.levelLine`. */
+  guest: boolean;
+  /** `game/teams.TEAM.*`. `NONE` collapses the chip. */
+  team: Team;
+  /** Points earned and not yet spent. 0 draws nothing at all. */
+  unspent: number;
+}
 
 export interface HudState {
   /** Median recent frame time in milliseconds. More honest than a frame count. */
@@ -530,7 +556,20 @@ export class Hud {
    * of this class makes that `index.html` and this file ship together.
    */
   private readonly levelEl = document.getElementById('level')!;
-  private readonly levelLabel = document.getElementById('level-text')!;
+  /**
+   * The sentence, the side and the nudge -- three spans inside `#level-text`
+   * rather than one, since workstream V.
+   *
+   * `#level-line` is what `levelLine` writes and is unchanged; `#level-team` is
+   * the coloured chip and `#level-spend` is *"· 2 to spend"*. Split because the
+   * chip carries a *background colour* that the sentence must not, and because
+   * `client/src/teams.ts` binds a click to the last two and a click target has
+   * to be an element. Non-null-asserted on the same bet the rest of this file
+   * makes about `index.html`.
+   */
+  private readonly levelLine = document.getElementById('level-line')!;
+  private readonly levelTeam = document.getElementById('level-team')!;
+  private readonly levelSpend = document.getElementById('level-spend')!;
   private readonly levelBarFill = document.getElementById('level-xp')!.firstElementChild as HTMLElement;
   private readonly ko = document.getElementById('ko')!;
   private readonly investigationEl = document.getElementById('investigation')!;
@@ -925,8 +964,26 @@ export class Hud {
    */
   suggestTyping = false;
 
+  /**
+   * The talents panel has the screen. Workstream V.
+   *
+   * A third flag beside the two above rather than a shared one, on
+   * `suggestTyping`'s argument: they go false at different moments, and this one
+   * is not about *typing* at all -- it is a modal overlay with a cursor, whose
+   * whole point is that WASD must not walk and `f` must not swing while it is
+   * up. It rides in `typing` because that is the one interlock `main.ts`'s
+   * keydown listener already returns on, and adding a fourth condition to that
+   * line for every panel would be four conditions that drift.
+   *
+   * Written by `client/src/teams.ts` directly, on open and on close, rather than
+   * mirrored every frame from `main.ts` the way `suggestTyping` is. The panel
+   * holds this object and there is nothing to sample: the two moments it changes
+   * are two function calls.
+   */
+  talentsOpen = false;
+
   get typing(): boolean {
-    return this.chatTyping || this.suggestTyping || this.prompt.classList.contains('shown');
+    return this.chatTyping || this.suggestTyping || this.talentsOpen || this.prompt.classList.contains('shown');
   }
 
   setLocked(locked: boolean): void {
@@ -1114,8 +1171,8 @@ export class Hud {
   private moneyText = '\u0000';
 
   /**
-   * `LVL 1 · 3/10` and a thin bar under it, in the vitals cluster beside the
-   * balance.
+   * `LVL 1 · 3/10`, the side, and a thin bar under it, in the vitals cluster
+   * beside the balance.
    *
    * **Beside the dollars rather than under the name on the leaderboard alone**,
    * because a level that is only visible when you hold Tab is a level you
@@ -1144,13 +1201,37 @@ export class Hud {
    * rather than compared separately so the two can never be written out of
    * step, which would be a bar that disagrees with the number above it.
    */
-  level(state: { level: number; kills: number; guest: boolean } | null): void {
+  level(state: LevelHudState | null): void {
     const text = state === null ? '' : levelLine(state.level, state.kills, state.guest);
     const width = state === null ? '0' : xpBarWidth(state.level, state.kills);
-    const key = text + '|' + width;
+    // The side and the unspent points ride in the same key as the sentence and
+    // the bar, on the width's argument exactly: three things that describe one
+    // player must be written together or a frame exists where the chip says
+    // Marita and the line says level 1. `TEAM_NAME` rather than a literal --
+    // `game/teams.ts`'s header is emphatic and this is the HUD it is about.
+    const team = state === null ? TEAM.NONE : state.team;
+    const spend = state === null || state.unspent <= 0 ? 0 : state.unspent;
+    const key = `${text}|${width}|${team}|${spend}`;
     if (key === this.levelText) return;
     this.levelText = key;
-    this.levelLabel.textContent = text;
+    this.levelLine.textContent = text;
+    const chip = this.levelTeam;
+    const showTeam = text !== '' && team !== TEAM.NONE;
+    chip.textContent = showTeam ? TEAM_NAME[team] : '';
+    chip.classList.toggle('shown', showTeam);
+    if (showTeam) {
+      // Inline from the contract rather than a class per team, for the reason
+      // `index.html`'s rule says: the colours live in one file and a stylesheet
+      // copy of them is a copy that goes stale.
+      chip.style.background = TEAM_COLOUR[team].css;
+      chip.style.color = TEAM_COLOUR[team].ink;
+    }
+    // "· 2 to spend", which is the whole of what makes the panel worth
+    // reopening. Nothing at all when there is nothing to spend, rather than
+    // "· 0 to spend": a permanent zero is a label that says nothing, which is
+    // the argument `levelLine`'s own header makes about a bare `lvl 1`.
+    this.levelSpend.textContent = spend > 0 ? ` · ${spend} to spend` : '';
+    this.levelSpend.classList.toggle('shown', spend > 0);
     // The row is hidden explicitly rather than through `#level:empty`, which is
     // how `#money` next to it collapses: an element with children is never
     // `:empty`, and this one has a label and a bar in it now. One `display`

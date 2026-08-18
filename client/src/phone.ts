@@ -106,6 +106,17 @@ export interface PhoneSource {
    */
   openMap(): void;
   /**
+   * Open the talents panel. Workstream V; `openMap`'s shape and its reasons.
+   *
+   * Optional, unlike the rest of this interface, because a `PhoneSource` is also
+   * built by checks and by `?offline` -- and offline there is no ladder, so a
+   * tile that did nothing is the honest behaviour rather than a hole. The tile
+   * itself is always drawn: `TalentsPanel.show` refuses for a guest and offline,
+   * in one place, and a tile that appeared and disappeared with the account
+   * state would be a home screen that rearranges itself.
+   */
+  openTalents?(): void;
+  /**
    * The album, owned by `money.ts`.
    *
    * Handed in rather than constructed here because a photograph is taken from
@@ -146,7 +157,7 @@ export interface PhoneSource {
 
 // --- The overlay -------------------------------------------------------------------
 
-type AppId = 'wallet' | 'centrelink' | 'sydride' | 'map' | 'camera' | 'gallery';
+type AppId = 'wallet' | 'centrelink' | 'sydride' | 'map' | 'camera' | 'gallery' | 'talents';
 
 interface AppDef {
   id: AppId;
@@ -176,6 +187,20 @@ const APPS: readonly AppDef[] = [
   { id: 'map', glyph: '◎', label: 'map' },
   { id: 'camera', glyph: '◉', label: 'camera' },
   { id: 'gallery', glyph: '▤', label: 'gallery' },
+  /**
+   * Workstream V. A **shortcut, not a screen**, exactly like Map above it: the
+   * talent trees are six columns of forty-two nodes and a 300 px handset cannot
+   * draw one of them, so the tile puts the phone away and opens the full-screen
+   * panel. The Escape ordering `money.ts` owns brings the phone back at its home
+   * screen afterwards, which is what makes it a step rather than a dismissal.
+   *
+   * Seventh tile, so the grid is now three rows: two of three and one of one.
+   * That is uglier than six and is still the right place for it -- the phone is
+   * where a player already goes to look at things about themselves, and the
+   * alternative entry points (the level line, the Escape strip) are both places
+   * you have to already know about.
+   */
+  { id: 'talents', glyph: '✦', label: 'talents' },
 ];
 
 /** How long the viewfinder flashes white after the shutter, milliseconds. */
@@ -428,6 +453,13 @@ export class Phone {
     }
     if (app === 'camera') {
       this.setCamera(true);
+      return;
+    }
+    if (app === 'talents') {
+      // The Map tile's move, for the Map tile's reason: the panel is
+      // full-screen and a handset on top of it would cover what it just opened.
+      this.setOpen(false);
+      this.source.openTalents?.();
       return;
     }
     this.app = app;

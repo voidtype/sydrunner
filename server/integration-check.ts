@@ -756,11 +756,16 @@ function checkNames(): void {
     // already is): the two are different numbers about the same player and a
     // check where they matched could not tell a swapped pair apart.
     kills: 7 + i * 13,
+    // And the team, which is v17's addition and is now the last field in the
+    // fixed part -- so it takes over from `kills` as the one a short
+    // `ROSTER_ENTRY_BYTES` corrupts first. Cycled rather than constant, on the
+    // level's argument.
+    team: i % 3,
   }));
   const back = decodeRoster(encodeRoster(entries));
   check(back !== null && back.length === entries.length, `a ${entries.length}-entry roster round-tripped through the wire (${back?.length} back)`);
   check(
-    back !== null && back.every((r, i) => r.id === entries[i].id && r.name === entries[i].name && r.kos === entries[i].kos && r.downs === entries[i].downs && r.ping === entries[i].ping && r.bot === entries[i].bot && r.level === entries[i].level && r.kills === entries[i].kills),
+    back !== null && back.every((r, i) => r.id === entries[i].id && r.name === entries[i].name && r.kos === entries[i].kos && r.downs === entries[i].downs && r.ping === entries[i].ping && r.bot === entries[i].bot && r.level === entries[i].level && r.kills === entries[i].kills && r.team === entries[i].team),
     'every field of every entry survived, including the ones behind a multi-byte name',
   );
 

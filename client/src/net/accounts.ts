@@ -111,6 +111,7 @@
  * rule and the parser; that one owns the ground.
  */
 
+import { EMPTY_MASK, NODE_COUNT, TEAM, type TalentMask, type Team } from '../game/teams.ts';
 import { MAX_NAME_CHARS, sanitiseName } from './protocol.ts';
 import { weekKey } from './suggestions.ts';
 
@@ -413,6 +414,45 @@ export interface AccountRecord {
    * (0, 0, 0) is a real point in this world -- it is Town Hall.
    */
   lastPos: LastPos | null;
+  /**
+   * Marita, DeFAULT, or neither. **The one thing on this record that outlives
+   * the week.**
+   *
+   * `game/teams.ts`'s header states the rule and it is worth restating from the
+   * persistence side, because the field sits three lines from two that behave
+   * the opposite way: the level resets on Monday, the talents reset on Monday,
+   * and **the side you picked does not**. A team that reset weekly would be a
+   * choice made at level 2 every Tuesday, which is a menu rather than an
+   * allegiance -- and the whole of what the choice is worth is that your mates
+   * can see it from across the street next week too.
+   *
+   * `TEAM.NONE` until it is chosen, and chosen at most once ever, which is
+   * enforced in `Simulation.teamOp` rather than here: this file owns the shape
+   * of the record and the calendar, and `server/sim.ts` owns the rules.
+   *
+   * A guest has no record and therefore no team. That falls out of accounts
+   * existing at all rather than being a rule of its own, and it is why
+   * `TEAM_CHOICE_LEVEL` is 2: a guest cannot reach level 2 (see
+   * `Simulation.creditLadder`), so a guest is never asked to choose.
+   */
+  team: Team;
+  /**
+   * Which talents are spent, as a 64-bit mask in two halves. **Reset by the
+   * week, with the kills and the level.**
+   *
+   * The opposite lifetime to `team` one field up, and for the reason that file
+   * argues: a point is granted per level and the levels go back to one on
+   * Monday, so talents that survived would be ten points spent on a level-1
+   * character. `resetIfNewWeek` clears this in the same three lines that zero
+   * the kills, which is what makes "there is one Monday in this game" true
+   * rather than hoped.
+   *
+   * Stored as `{lo, hi}` rather than a `BigInt` for `game/teams.TalentMask`'s
+   * reason, and it survives `JSON.stringify` as two ordinary numbers -- which a
+   * `BigInt` does not, at all: `JSON.stringify(1n)` throws, and it would have
+   * thrown inside `AccountStore.save`, on the debounce, with nothing on screen.
+   */
+  talents: TalentMask;
 }
 
 /** What the file on disk looks like. Versioned, on `WalletFile`'s terms. */
@@ -445,6 +485,12 @@ export function resetIfNewWeek(record: AccountRecord, at: number | Date = Date.n
   // the same three lines as the ladder rather than in a rule of its own, so
   // there is exactly one Monday in this feature -- see the header.
   record.lastPos = null;
+  // And the talents, for the reason `AccountRecord.talents` gives: a point is a
+  // level and the levels have just gone back to one. **`record.team` is
+  // deliberately not touched** -- it is the one field here that outlives the
+  // week, and the two lines being adjacent is the point: whoever adds the third
+  // per-account field has to decide which of the two it is, right here.
+  record.talents = { lo: 0, hi: 0 };
   return true;
 }
 
@@ -527,8 +573,20 @@ export function sanitiseAccount(value: unknown, now = Date.now()): AccountRecord
     // missing spot as a bad row would have refused the whole file on the deploy
     // that introduced it.
     lastPos: sanitiseLastPos(raw.lastPos),
+    // **Absent is the ordinary case here too**, and more so than for `lastPos`:
+    // every account written before teams existed has neither field, and a
+    // parser that refused a row without them would have refused the whole file
+    // on the deploy that introduced the feature.
+    team: sanitiseTeam(raw.team),
+    talents: sanitiseTalents(raw.talents),
   };
   record.level = levelFor(record.kills);
+  // Talents without a side are talents nobody can have spent -- a hand-edited
+  // row, or a `team` that was cleared without the mask beside it. Dropped here
+  // rather than left for `TeamField`, which would refuse them silently on the
+  // team test and leave the *count* of spent points wrong, which is a panel
+  // that says "no points left" over an empty tree.
+  if (record.team === TEAM.NONE) record.talents = { lo: 0, hi: 0 };
   // A spot from a week that has ended, on a row whose `levelWeek` says
   // otherwise. `resetIfNewWeek` below cannot catch this one -- it compares the
   // *label* -- and the case is real: a hand-edited file, and a file written by a
@@ -538,6 +596,44 @@ export function sanitiseAccount(value: unknown, now = Date.now()): AccountRecord
   // weekend does not serve last week's ladder for the first minute of this one.
   resetIfNewWeek(record, now);
   return record;
+}
+
+/**
+ * A team off disk, or `TEAM.NONE`.
+ *
+ * `sanitiseAccount`'s discipline applied to one number, and the reason it is a
+ * function rather than a ternary inline is the same one `sanitiseLastPos` gives:
+ * the failure is silent and downstream. A `3` in this field reaches
+ * `TEAM_COLOUR[3]`, which is `undefined`, which is a property read on undefined
+ * inside the nameplate loop -- the frame, and every frame after it.
+ */
+export function sanitiseTeam(value: unknown): Team {
+  const n = Number(value);
+  return n === TEAM.MARITA || n === TEAM.DEFAULT ? (n as Team) : TEAM.NONE;
+}
+
+/**
+ * A talent mask off disk, with anything that is not a real node dropped.
+ *
+ * Both halves coerced through `>>> 0` because a hand-edited `1e30` or a `-1`
+ * would otherwise reach `hasNode`'s shift arithmetic, where a non-integer
+ * produces answers that are stable, wrong and completely invisible: the mask
+ * would report nodes nobody took and `countBits` would say the points are
+ * spent.
+ *
+ * The high half is masked to the bits that are actually nodes, on
+ * `net/teams.decodeTalents`' argument -- a bit past the last node is a point
+ * `countBits` charges for and nothing anywhere draws.
+ */
+export function sanitiseTalents(value: unknown): TalentMask {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return { ...EMPTY_MASK };
+  const raw = value as Partial<TalentMask>;
+  const lo = Number(raw.lo);
+  const hi = Number(raw.hi);
+  if (!Number.isFinite(lo) || !Number.isFinite(hi)) return { ...EMPTY_MASK };
+  const hiMask = NODE_COUNT <= 32 ? 0 : (0xffffffff >>> (64 - NODE_COUNT)) | 0;
+  const loMask = NODE_COUNT >= 32 ? -1 : (0xffffffff >>> (32 - NODE_COUNT)) | 0;
+  return { lo: (Math.trunc(lo) & loMask) >>> 0, hi: (Math.trunc(hi) & hiMask) >>> 0 };
 }
 
 // --- What the routes answer with ---------------------------------------------------
@@ -919,6 +1015,64 @@ export function verifyAccounts(): string[] {
     }
   }
 
+  // --- The side, and the points. One survives the week and one does not, and
+  // there is no way to notice getting that backwards until a Monday.
+  {
+    const now = Date.UTC(2026, 7, 19, 3, 0, 0);
+    const record = fakeAccount(now);
+    record.team = TEAM.MARITA;
+    record.talents = { lo: 0b1001, hi: 1 };
+    record.kills = 34;
+    record.level = levelFor(34);
+    if (resetIfNewWeek(record, now)) failures.push('A record already in the current week was reset.');
+    if (record.talents.lo !== 0b1001) failures.push('A same-week reset cleared the talents anyway.');
+    record.levelWeek = '2020-W01';
+    resetIfNewWeek(record, now);
+    if (record.team !== TEAM.MARITA) {
+      failures.push('A weekly reset took the team away; the side you picked is the one thing that outlives the week.');
+    }
+    if (record.talents.lo !== 0 || record.talents.hi !== 0) {
+      failures.push(`A weekly reset left ${JSON.stringify(record.talents)} spent on a level-1 character.`);
+    }
+
+    // The parser, on the rows a file can really contain -- including every row
+    // written before this feature existed, which has neither field.
+    const old = sanitiseAccount(
+      { id: 'x', handle: 'Bazza', passwordHash: '$argon2id$x', kills: 0, levelWeek: weekOf(now) },
+      now,
+    );
+    if (!old) failures.push('An account written before teams existed was refused off disk.');
+    else if (old.team !== TEAM.NONE || old.talents.lo !== 0 || old.talents.hi !== 0) {
+      failures.push(`A pre-teams row came back as team ${old.team} / ${JSON.stringify(old.talents)}.`);
+    }
+    const chosen = sanitiseAccount(
+      { ...fakeAccount(now), team: 2, talents: { lo: 5, hi: 2 } },
+      now,
+    );
+    if (chosen?.team !== TEAM.DEFAULT || chosen.talents.lo !== 5 || chosen.talents.hi !== 2) {
+      failures.push(`A chosen side and a spent mask came back as ${chosen?.team} / ${JSON.stringify(chosen?.talents)}.`);
+    }
+    // And the rows a text editor produces.
+    for (const [raw, want] of [[3, TEAM.NONE], [-1, TEAM.NONE], ['Marita', TEAM.NONE], [1, TEAM.MARITA]] as Array<[unknown, Team]>) {
+      if (sanitiseTeam(raw) !== want) failures.push(`sanitiseTeam(${JSON.stringify(raw)}) is ${sanitiseTeam(raw)}, not ${want}.`);
+    }
+    for (const raw of [null, 'all of them', [], { lo: Number.NaN, hi: 0 }, { lo: 1e300, hi: 0 }]) {
+      const mask = sanitiseTalents(raw);
+      if (!Number.isInteger(mask.lo) || !Number.isInteger(mask.hi) || mask.lo < 0 || mask.hi < 0) {
+        failures.push(`sanitiseTalents(${JSON.stringify(raw)}) gave ${JSON.stringify(mask)}, which is not a pair of u32s.`);
+      }
+    }
+    // Bits past the last real node are points `countBits` would charge for and
+    // nothing would ever draw.
+    const wide = sanitiseTalents({ lo: 0xffffffff, hi: 0xffffffff });
+    if (wide.hi >= 2 ** (NODE_COUNT - 32)) {
+      failures.push(`A mask with bits past node ${NODE_COUNT - 1} survived as ${wide.hi.toString(16)}.`);
+    }
+    // A mask with no side behind it is not a build.
+    const orphan = sanitiseAccount({ ...fakeAccount(now), team: 0, talents: { lo: 0xff, hi: 0 } }, now);
+    if (orphan?.talents.lo !== 0) failures.push('Talents survived on a record with no team; they are points nobody can have spent.');
+  }
+
   // --- The landing panel's state machine, and the gate's.
   {
     const panes: Array<[boolean, 'quick' | 'account', JoinPane]> = [
@@ -980,5 +1134,7 @@ function fakeAccount(now: number): AccountRecord {
     level: 1,
     levelWeek: weekOf(now),
     lastPos: null,
+    team: TEAM.NONE,
+    talents: { ...EMPTY_MASK },
   };
 }
