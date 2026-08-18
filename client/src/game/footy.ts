@@ -113,8 +113,10 @@ import { EYE_HEIGHT, GRAVITY } from '../player/controller.ts';
 import {
   CAPSULE_HEIGHT,
   CAPSULE_RADIUS,
+  FLINCH_LOCKOUT,
   KNOCKBACK_HORIZONTAL,
   KNOCKBACK_VERTICAL,
+  KNOCKDOWN_LOCKOUT,
   KO_SECONDS,
   feetY,
   isTargetable,
@@ -124,6 +126,19 @@ import {
   type HitReport,
 } from './combat.ts';
 import { damageScale } from './powerups.ts';
+// --- WORKSTREAM W (talent effects): four reads, all of which are the identity
+// with no `TeamLookup` installed. See `game/teamfx.ts`.
+import {
+  KNOCKDOWN,
+  STAGGER_SECONDS,
+  fxAbsorbKnockdown,
+  fxDamageTakenScale,
+  fxFarHitKnockdownM,
+  fxSwingDamageScale,
+  fxThrowRangeScale,
+  fxThrowRiseScale,
+  fxThrowSpeedScale,
+} from './teamfx.ts';
 import { NO_WATER } from '../world/wading.ts';
 import type { SpatialHash } from './spatialhash.ts';
 
@@ -616,8 +631,13 @@ export function spawnFooty(thrower: CombatantState, id: number, out: Footy): Foo
   // The view direction, as `combat.viewDirection` builds it. Written out rather
   // than called because that function wants a `Vector3` to write into and this
   // module does not have one -- see the header.
+  // --- WORKSTREAM W: `Set Shot`'s flatter arc, applied to the loft *before* the
+  // vector is normalised, which is the only place it can go. `LAUNCH_RISE` is
+  // the upward nudge that turns a straight-ahead look into a throw with a shape;
+  // dividing it is literally what "flatter" means, and doing it here rather than
+  // to the finished velocity keeps the launch a unit direction times a speed.
   let dx = -sinY * cp;
-  let dy = Math.sin(body.pitch) + LAUNCH_RISE;
+  let dy = Math.sin(body.pitch) + LAUNCH_RISE * fxThrowRiseScale(thrower.id);
   let dz = -cosY * cp;
   const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
   // A view direction is a unit vector plus a positive loft, so this cannot be
@@ -642,9 +662,19 @@ export function spawnFooty(thrower: CombatantState, id: number, out: Footy): Foo
   out.x = body.position.x + cosY * RELEASE_RIGHT - sinY * RELEASE_FORWARD;
   out.y = body.position.y - RELEASE_DOWN;
   out.z = body.position.z - sinY * RELEASE_RIGHT - cosY * RELEASE_FORWARD;
-  out.vx = dx * LAUNCH_SPEED;
-  out.vy = dy * LAUNCH_SPEED;
-  out.vz = dz * LAUNCH_SPEED;
+  // --- WORKSTREAM W: `Long Bomb` (+25% speed) and `Set Shot` (+25% range).
+  //
+  // One multiply for both, and they are *maxed* rather than summed, which is the
+  // one composition in this workstream that is not the obvious one. They are on
+  // opposite teams, so no player can hold both; if a future aura ever granted
+  // one across a group the sum would be +50% on a projectile whose whole balance
+  // is that it can be dodged at range, and the max degrades to the same number
+  // in the case that actually exists today.
+  const speedScale = Math.max(fxThrowSpeedScale(thrower.id), fxThrowRangeScale(thrower.id));
+  const launch = LAUNCH_SPEED * speedScale;
+  out.vx = dx * launch;
+  out.vy = dy * launch;
+  out.vz = dz * launch;
   out.age = 0;
   out.bounces = 0;
   out.alive = true;
@@ -1034,6 +1064,8 @@ export function applyFootyHit(
   victim: CombatantState,
   ball: Footy,
   out: HitReport,
+  /** WORKSTREAM W: wall ms, for the clock talents. `combat.applyHit`'s argument. */
+  nowMs = 0,
 ): HitReport {
   let ix = ball.vx;
   let iy = ball.vy;
@@ -1061,21 +1093,53 @@ export function applyFootyHit(
   // reading exempts it -- which would make a Flat White strictly better than no
   // powerup at all and give a Training player a reason to switch weapons to
   // dodge their own penalty. One rule for all damage has no such seam.
-  victim.health = Math.max(0, victim.health - BALL_DAMAGE * damageScale(owner));
+  //
+  // WORKSTREAM W adds the talent multiplier and the victim's armour on the same
+  // argument this comment already makes: one rule for all damage has no seam.
+  // `fxSwingDamageScale` is named for the bat and is read here anyway --
+  // `FX.SWING_DAMAGE` is what Front Bar and Bouncer carry, and a talent that
+  // made your bat hit harder but not your football would be the seam.
+  victim.health = Math.max(
+    0,
+    victim.health - BALL_DAMAGE * damageScale(owner) * fxSwingDamageScale(owner.id) * fxDamageTakenScale(victim.id),
+  );
   // `applyHit`'s femto-pip clamp. It matters here for the same reason: sums
   // like 3 - 1.4 - 1.4 - 0.2 miss zero by a few times 1e-16.
   if (victim.health < 1e-9) victim.health = 0;
 
+  // --- WORKSTREAM W: `Set Shot`'s far hit, and whatever the victim has to
+  // absorb it with.
+  //
+  // The distance is **thrower to victim at the moment of impact**, on the plan,
+  // rather than the length of the ball's flight. The flight is the honest
+  // reading and it would cost two more floats on a pooled record that is
+  // allocated once per ball and copied into every snapshot; the throw that this
+  // talent is written about is a long one across a park, where the thrower has
+  // moved a couple of metres during a 20 m flight and the two numbers agree to
+  // within the width of a footpath. A thrower who sprints at their own ball can
+  // shave the distance, which is a strictly harder way to play.
+  const kdx = victim.body.position.x - owner.body.position.x;
+  const kdz = victim.body.position.z - owner.body.position.z;
+  const far = Math.sqrt(kdx * kdx + kdz * kdz) >= fxFarHitKnockdownM(owner.id);
+  const staggered =
+    victim.health > 0 && fxAbsorbKnockdown(victim.id, nowMs) === KNOCKDOWN.STAGGER;
+
   const h = KNOCKBACK_HORIZONTAL * BALL_KNOCKBACK_SCALE;
-  victim.body.velocity.set(
-    ix * h,
-    Math.min(KNOCKBACK_VERTICAL, rise * h + KNOCKBACK_VERTICAL * BALL_KNOCKBACK_SCALE),
-    iz * h,
-  );
-  // The line `combat.applyHit`'s header calls load-bearing: without it the
-  // first tick after the hit charges the victim ground friction for a metre of
-  // flight they spend in the air.
-  victim.body.onGround = false;
+  if (!staggered) {
+    victim.body.velocity.set(
+      ix * h,
+      Math.min(KNOCKBACK_VERTICAL, rise * h + KNOCKBACK_VERTICAL * BALL_KNOCKBACK_SCALE),
+      iz * h,
+    );
+    // The line `combat.applyHit`'s header calls load-bearing: without it the
+    // first tick after the hit charges the victim ground friction for a metre of
+    // flight they spend in the air.
+    victim.body.onGround = false;
+  }
+  // `KNOCKDOWN_LOCKOUT` for a hit from past the talent's range, the short
+  // stagger if it was absorbed, the ordinary flinch otherwise. See
+  // `combat.KNOCKDOWN_LOCKOUT` for what those two words mean in this game.
+  victim.flinchS = staggered ? STAGGER_SECONDS : far ? KNOCKDOWN_LOCKOUT : FLINCH_LOCKOUT;
   // And off the bike, exactly as `combat.applyHit` does it and for the same
   // reason. Restated rather than shared because this function is deliberately a
   // parallel adjudication of a different weapon -- see the damage note above --

@@ -167,6 +167,8 @@
 
 import { hitChance } from './factions.ts';
 import { carHash } from './traffic.ts';
+// WORKSTREAM W: one read, in two places that must agree. See `game/teamfx.ts`.
+import { fxPolairLockScale } from './teamfx.ts';
 
 // --- The orbit ---------------------------------------------------------------------
 
@@ -750,11 +752,30 @@ export function polairCycle(tick: number): number {
   return Math.floor(tick / POLAIR_LOCK_CYCLE_TICKS);
 }
 
-/** Is the beam holding this player at this tick? Pure; no trail needed. */
-export function polairLocked(playerId: number, tick: number): boolean {
+/**
+ * Is the beam holding this player at this tick? Pure; no trail needed.
+ *
+ * --- WORKSTREAM W: `slow` is `Toll Dodger` / `Kings Cross Getaway`'s "Polair
+ * takes 2x longer to lock you", and it is applied to the **start** of the lock
+ * rather than to its length.
+ *
+ * That is the whole of the design decision here and it is worth a paragraph,
+ * because the obvious reading -- divide the length -- is wrong twice. This is a
+ * *pure function of (player, tick)* that both ends evaluate independently with
+ * nothing on the wire (see this file's header and `game/footy.ts`'s determinism
+ * rule), so whatever the talent does has to keep it closed-form; and "takes
+ * longer to lock" is about the acquire, not about how long the beam stays on you
+ * once it has you. Pushing the start later inside the same cycle does both: the
+ * beam comes on later and therefore holds you for less of the cycle, and the
+ * arithmetic is one multiply on a number that was already there.
+ *
+ * `slow` defaults to 1, so every existing caller -- `polairPose`, `verifyPolair`,
+ * the renderer -- is unchanged to the bit.
+ */
+export function polairLocked(playerId: number, tick: number, slow = 1): boolean {
   const seed = polairSeed(playerId);
   const cycle = polairCycle(tick);
-  const start = lockStart(seed, cycle);
+  const start = slow > 1 ? lockStart(seed, cycle) * slow : lockStart(seed, cycle);
   const into = tick - cycle * POLAIR_LOCK_CYCLE_TICKS;
   return into >= start && into < start + lockLength(seed, cycle);
 }
@@ -785,7 +806,11 @@ export function polairShotFired(playerId: number, tick: number): boolean {
   // Only while locked. The aim offset is inside every legal lock length, so this
   // is true by construction -- and it is tested rather than assumed, because the
   // constant it rests on is one somebody will retune.
-  if (!polairLocked(playerId, tick)) return false;
+  // WORKSTREAM W: the same `slow` the pose uses, so the shot and the beam
+  // agree about whether this player is held. Read here rather than passed in
+  // because `polairShotFired` is called from four places and none of them has
+  // any other reason to know talents exist.
+  if (!polairLocked(playerId, tick, fxPolairLockScale(playerId))) return false;
   const previous = polairShotTick(playerId, cycle - 1);
   const seed = polairSeed(playerId);
   const span = POLAIR_SHOT_MAX_TICKS - POLAIR_SHOT_MIN_TICKS;
@@ -931,7 +956,14 @@ export function polairPose(
 
   // --- The beam: locked on you, or hunting where you were.
   const cycle = polairCycle(tick);
-  const start = lockStart(seed, cycle);
+  // WORKSTREAM W: `Toll Dodger` / `Kings Cross Getaway` push the acquire later
+  // in the cycle. Restated here rather than calling `polairLocked` because this
+  // block needs `start` and `length` for `lockT` as well, and two evaluations of
+  // the same closed form is exactly the sort of thing that drifts. See
+  // `polairLocked` for the argument about why the *start* moves and not the
+  // length.
+  const slow = fxPolairLockScale(playerId);
+  const start = slow > 1 ? lockStart(seed, cycle) * slow : lockStart(seed, cycle);
   const length = lockLength(seed, cycle);
   const into = tick - cycle * POLAIR_LOCK_CYCLE_TICKS;
   const locked = into >= start && into < start + length;

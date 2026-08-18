@@ -1058,6 +1058,27 @@ export const BTN = {
    * does with a dropped one.
    */
   MOUNT: 1 << 4,
+  /**
+   * --- WORKSTREAM W: the three talent-ability keys, `V`, `G` and `T`.
+   *
+   * Three bits rather than one "ability" bit plus a selector byte, and that is
+   * the cheaper of the two: the byte is already there, `buttons` had three spare
+   * bits, and a selector would have needed a value on the wire *and* a rule
+   * about what an unknown value means. What each key does depends on which
+   * talents the player has taken, and the server decides that from the talent
+   * mask it already holds -- see `game/abilities.abilityForV` and friends. A
+   * client cannot ask for an ability it has not bought, because it does not name
+   * one; it names a key.
+   *
+   * **Level-triggered, like every bit here**, and read three different ways:
+   * `V` and `T` are edges (`Simulation` keeps the previous tick's bit, exactly
+   * as `MOUNT` does and for `MOUNT`'s reason), and `G` is fed to
+   * `abilities.feedG` every tick because a two-second *hold* is not a thing an
+   * edge can express. See that function.
+   */
+  ABILITY_V: 1 << 5,
+  ABILITY_G: 1 << 6,
+  ABILITY_T: 1 << 7,
 } as const;
 
 /**
@@ -3944,6 +3965,15 @@ export function verifyNet(): string[] {
       // perfectly offline, which is the most annoying shape a netcode bug has.
       { seq: 1, buttons: BTN.MOUNT, forward: 0, right: 0, yaw: 1, pitch: 0 },
       { seq: 2, buttons: BTN.PUNCH | BTN.THROW | BTN.JUMP | BTN.SPRINT | BTN.MOUNT, forward: 1, right: 1, yaw: 2, pitch: 0.5 },
+      // --- WORKSTREAM W: the three talent keys, on their own and with the whole
+      // byte set. Bits 5, 6 and 7 take `buttons` to the top of its `u8`, which is
+      // the case worth having a row for: a decoder that sign-extended or an
+      // encoder that used `setInt8` would round-trip 0xff as -1 and every ability
+      // in the game would fire on every tick for anybody holding sprint.
+      { seq: 3, buttons: BTN.ABILITY_V, forward: 0, right: 0, yaw: 0, pitch: 0 },
+      { seq: 4, buttons: BTN.ABILITY_G, forward: 0, right: 0, yaw: 0, pitch: 0 },
+      { seq: 5, buttons: BTN.ABILITY_T, forward: 0, right: 0, yaw: 0, pitch: 0 },
+      { seq: 6, buttons: 0xff, forward: -1, right: -1, yaw: 5, pitch: -1 },
     ];
     for (const c of cases) {
       const got = decodeInput(encodeInput(c), scratch);

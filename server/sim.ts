@@ -83,6 +83,7 @@ import {
   trafficTick,
   createBayPose,
   CAR_BODY_SIZE,
+  HOLD_GAP,
   type BayPose,
   type CarPose,
   type LaneRoute,
@@ -97,6 +98,7 @@ import {
   PARK_SNAP_RADIUS,
   PEDESTRIAN_DAMAGE,
   RUN_DOWN_SPEED,
+  TAKEABLE_SPEED,
   TAKE_HEIGHT,
   TAKE_RADIUS,
   WITNESS_RADIUS,
@@ -266,6 +268,8 @@ import {
 // a knockout, a pickup, a claim and a tick.
 import {
   CENTRELINK_PAYMENT,
+  CENTRELINK_PERIOD_MS,
+  DROP_FRACTION,
   CLAIM_RADIUS_M,
   MAX_BUNDLES,
   BUNDLE_SECONDS,
@@ -321,6 +325,73 @@ import { TEAM_OP, type TalentsRecord } from '../client/src/net/teams.ts';
 // is a known-three-free import rather than a new dependency.
 import { CYCLE_EPOCH_MS, CYCLE_MS } from '../client/src/sky/cycle.ts';
 import type { AccountRecord, AccountStore, LiveSpot } from './accounts.ts';
+// --- WORKSTREAM W: talent effects. One import block; every hook below is a
+// one-line read and every one of them is the identity with no `TeamLookup`
+// installed, which is the property that let this land before the framework did.
+// `client/src/game/teamfx.ts` owns all of the arithmetic.
+import {
+  ABILITY,
+  ABILITY_COST,
+  CAR_BURST_SLIDE_M,
+  G_RESULT,
+  SLAM_PIPS,
+  SLAM_RADIUS_M,
+  TENT_CLEARS_UNDER_STARS,
+  TENT_RADIUS_M,
+  TENT_SECONDS,
+  SUMMON_HEAT_FREEZE_S,
+  abilityForG,
+  abilityForGHold,
+  abilityForPhone4,
+  abilityForT,
+  abilityForV,
+  abilityPenaltyRunning,
+  dashSpeedFor,
+  expireAbilityWindow,
+  feedG,
+  forgetAbilities,
+  tryAbility,
+  type Ability,
+} from '../client/src/game/abilities.ts';
+import { FX, TEAM } from '../client/src/game/teams.ts';
+import {
+  CENTRELINK_NEARBY_M,
+  DROP_TRAP_DOLLARS,
+  fxBreakGhostPlates,
+  fxCarTakeRefusal,
+  fxCentrelinkAmount,
+  fxCentrelinkDays,
+  fxCentrelinkNearby,
+  fxDeathDropFraction,
+  fxDropScale,
+  fxDropTrap,
+  fxEarnScale,
+  fxFareUteLifeS,
+  fxFreezeHeat,
+  fxGrantUteLife,
+  fxKarenReportsSteal,
+  fxMaxPips,
+  fxNoteCarStolen,
+  fxNoteCombat,
+  fxNow,
+  fxParkSnapM,
+  fxRegenTick,
+  fxReturnServeDouble,
+  fxScalar,
+  fxSetNow,
+  fxTakeRadiusM,
+  fxTakeRespawnInPlace,
+  fxTakeableSpeed,
+  fxTheftReported,
+  fxTrafficHoldGapM,
+  DROP_TRAP_PIPS,
+  fxCarNeverRecycles,
+  forgetPlayer as forgetTeamFx,
+  teamLookup,
+  setStarsReader,
+  setWalletReader,
+} from '../client/src/game/teamfx.ts';
+import { CYCLE_MS, cyclePhase } from '../client/src/sky/cycle.ts';
 
 export const FIXED_DT = 1 / TICK_HZ;
 
@@ -435,6 +506,17 @@ export interface Participant {
    * `protocol.BTN.MOUNT` for why the edge is detected here rather than sent.
    */
   mountHeld: boolean;
+  /**
+   * --- WORKSTREAM W: the same latch for `V` and `T`, and why `G` has none.
+   *
+   * V (a dash, a burst) and T (a teleport) are one-shot presses and are read on
+   * the rising edge, exactly as `mountHeld` reads `E` and for its reason. G is
+   * both a tap and a two-second hold, which no edge can distinguish, so its
+   * level bit goes to `abilities.feedG` every tick and that function keeps the
+   * moment the key went down. See `protocol.BTN.ABILITY_V`.
+   */
+  abilityVHeld: boolean;
+  abilityTHeld: boolean;
   /** Set when the socket closes; the combatant leaves on the next tick. */
   gone: boolean;
 
@@ -1086,6 +1168,9 @@ export class Simulation {
     playerId: 0, tick: 0, dt: FIXED_DT, nowMs: 0,
     x: 0, z: 0, speed: 0, inCar: false, ko: false,
     peds: null as unknown as PedestrianField, bands: this.fareBands,
+    // WORKSTREAM W: the in-game hour, for `Surge` and `Tradie Rates`. Rewritten
+    // once per `stepFares` from the same `Date.now()` everything else uses.
+    phase: 0.5,
   };
 
   /**
@@ -1189,6 +1274,20 @@ export class Simulation {
     // The handle `factions.accuse`'s crime funnel reaches this field through.
     // One authority per process; see `heat.installHeat`.
     installHeat(this.heat);
+
+    // --- WORKSTREAM W: the two readers the talent hooks need and cannot import.
+    //
+    // `STAR_DAMAGE` has to know how wanted you are and `CASH_IS_STATS` has to
+    // know how much money you have, and `game/teamfx.ts` can import neither the
+    // heat field (which imports `game/combat.ts`, which imports it: a cycle) nor
+    // the wallet store (which is this process only). So they are injected here,
+    // where both are in scope, on exactly the pattern `installHeat` above and
+    // `factions.setHeatReader` already set.
+    //
+    // Both are read on the damage path, so both must be O(1): `starsOf` is a map
+    // lookup and the wallet is a field on a record this class already holds.
+    setStarsReader((id) => this.heat.starsOf(id));
+    setWalletReader((id) => this.participants.get(id)?.wallet?.balance ?? 0);
 
     // The bikes, laid out from the same tile index every client reads and
     // snapped to the same ground the players walk on.
@@ -1380,6 +1479,13 @@ export class Simulation {
       // server's rewind is not in the path at all, and `Conn` does not exist.
       viewTicks: 0,
       mountHeld: false,
+      // WORKSTREAM W: the same rising-edge latch, for V and T. On the
+      // participant rather than the combatant for `mountHeld`'s reason exactly:
+      // it is a fact about this connection's keyboard, nothing replays it, and
+      // it must not be in a snapshot. G needs no latch -- `abilities.feedG`
+      // keeps the press instant itself, because a hold is not an edge.
+      abilityVHeld: false,
+      abilityTHeld: false,
       gone: false,
       // **The wallet is opened here and only here**, by name, and only for a
       // person. `WalletStore.for` creates on first sight, so a new name's first
@@ -1651,7 +1757,22 @@ export class Simulation {
    * their own scoreboard off a wall; not counting the down would lose it from
    * the only column that says what happened.
    */
-  private creditKo(attackerId: number, victimId: number): void {
+  private creditKo(
+    attackerId: number,
+    victimId: number,
+    /**
+     * --- WORKSTREAM W: how many kills this one knockout is worth to the
+     * attacker. `Long Bomb`'s "a returned-serve KO scores double kills".
+     *
+     * Only the **attacker's** side is multiplied. The victim's `downs` is a
+     * record of what happened to them and it happened once; the heat wipe, the
+     * cash drop and the fare's rough flag are all facts about one event and are
+     * outside the branch. Calling this function twice would have got the kills
+     * right and every one of those wrong, which is why the weight is a
+     * parameter rather than a loop at the call site.
+     */
+    weight = 1,
+  ): void {
     const victim = this.participants.get(victimId);
     if (victim) victim.downs++;
     // **The heat ladder's terminal state, and this is the one funnel every
@@ -1665,7 +1786,7 @@ export class Simulation {
     if (attackerId !== victimId) {
       const attacker = this.participants.get(attackerId);
       if (attacker) {
-        attacker.kos++;
+        attacker.kos += weight;
         // --- The ladder. *"10 kills levels u up"*, and the one place kills are
         // counted for it.
         //
@@ -2059,7 +2180,10 @@ export class Simulation {
   private dropCash(victim: Participant): void {
     const wallet = victim.wallet;
     if (wallet === null) return;
-    const amount = dropOnDeath(wallet.balance);
+    // WORKSTREAM W: `Tap On` halves it, `Warranty` and `Cash Rules` zero it.
+    // `fxDeathDropFraction` is the one place a zero there is known to be real
+    // rather than an absent key -- see its header note.
+    const amount = dropOnDeath(wallet.balance, fxDeathDropFraction(victim.id, DROP_FRACTION));
     if (amount <= 0) return;
     if (this.bundles.length >= MAX_BUNDLES) return;
     if (moveBalance(wallet, -amount) === 0) return;
@@ -2123,7 +2247,17 @@ export class Simulation {
     if (p.bot) return;
     const worth = npcDropAmount(actor.kind);
     if (worth <= 0) return;
-    const amount = bankAllow(p.npcCash, worth, Date.now());
+    // --- WORKSTREAM W: `DROP_BONUS` (Tap On, Click & Collect, Sizzle Aura) and
+    // `TEAM_EARN` (Tip Jar's collective cut).
+    //
+    // Applied **before** the rate bank rather than after, which is the one
+    // ordering decision here and it goes the way the bank's own header argues:
+    // the bank is a cap on how much a player may be *paid* per minute, so a
+    // talent that makes each ibis worth more should run out of minute sooner
+    // rather than get a bigger share of the same minute. Rounded here so the
+    // bank only ever sees whole dollars, which is what it was written for.
+    const bonused = Math.round(worth * fxDropScale(p.id) * fxEarnScale(p.id));
+    const amount = bankAllow(p.npcCash, bonused, Date.now());
     if (amount <= 0) return;
     if (this.bundles.length >= MAX_BUNDLES) return;
     this.bundles.push({
@@ -2374,6 +2508,10 @@ export class Simulation {
    */
   step(out: TickOutput): TickOutput {
     this.tick++;
+    // --- WORKSTREAM W: the tick's wall clock, installed once, before anything
+    // reads a talent. See `teamfx.fxSetNow` for why exactly one talent needs a
+    // module-level clock and why threading it was the worse option.
+    fxSetNow(Date.now());
     this.events.length = 0;
     this.bikeChanges.length = 0;
     this.carChanges.length = 0;
@@ -2395,6 +2533,11 @@ export class Simulation {
         this.investigationVersion++;
       }
       this.seenRiding.delete(p.id);
+      // WORKSTREAM W: and their talent clocks and ability cooldowns, so the two
+      // maps stay bounded by the room rather than by the session. Both are
+      // no-ops for a player who never triggered one.
+      forgetTeamFx(p.id);
+      forgetAbilities(p.id);
       this.events.push({ kind: EVENT.LEAVE, id: p.id, colourway: p.colourway, bot: p.bot ? 1 : 0 });
       // Their row goes with them. The scoreboard is the *current* world, not a
       // history of the session -- spec 12 has no persistence and a board that
@@ -2439,6 +2582,11 @@ export class Simulation {
     // the speed, rather than the one after.
     for (const p of this.ordered) {
       this.resolveMount(p);
+      // --- WORKSTREAM W: V, G and T, beside the mount and for its reason -- the
+      // tick you press on is the tick you get it, rather than the one after.
+      // A dash resolved here is integrated by the `advance` below, which is what
+      // makes it a movement through the collision world rather than a teleport.
+      this.resolveAbilities(p);
     }
 
     // --- Advance, in ascending id. See `main.ts`: the order is the tick order
@@ -2451,6 +2599,14 @@ export class Simulation {
       // or moves this body into its carriage's coordinates and hands back the
       // carriage. See `game/riding.ts`'s header for why the whole feature is one
       // change of basis around one unchanged `advance`.
+      // --- WORKSTREAM W: `Off Your Face`'s three-second slump, in which "you
+      // lose a pip and cannot swing". The swing is taken away by clearing the
+      // button on the input the authority is about to run, which is the same
+      // shape `combat.advance` already uses for a flinch (`locked`) -- rather
+      // than a fourth branch in that phase machine for a state only this file
+      // knows about. The player keeps their movement and their look; the pip is
+      // charged once, by `stepTalents`, on the tick the window closed.
+      if (abilityPenaltyRunning(p.id, fxNow())) p.input.punch = false;
       const events = advance(p.combat, p.input, FIXED_DT, this.enterCarriage(p));
       this.exitCarriage(p);
 
@@ -2461,6 +2617,11 @@ export class Simulation {
       // which resolved a hit test on this line.
       if (events.ballThrown) this.balls.add(p.combat);
 
+      // --- WORKSTREAM W: the two talent clocks that tick, per player, after
+      // their body has moved. Out-of-combat regeneration (`Sizzle Aura`,
+      // `Sunday Rush`) and the pip a G ability charges on the way out.
+      this.stepTalents(p);
+
       if (events.respawnDue) {
         // And off the train, here rather than one tick later. `enterLocal` would
         // catch the teleport `respawnAt` is about to do and end the ride on the
@@ -2468,7 +2629,14 @@ export class Simulation {
         // one tick later is one snapshot in which a body standing in Redfern is
         // also listed as being in carriage 4 of a train through Strathfield.
         clearAboard(p.combat.aboard);
-        const spot = pickRespawn(p.combat.body.position.x, p.combat.body.position.z, p.world);
+        // --- WORKSTREAM W: `Warranty`'s "once per 5 minutes you respawn where
+        // you fell". Asked before the search, because a talent that put you back
+        // on the spot has no interest in what `pickRespawn` would have found,
+        // and the ask *consumes* the cooldown -- see `fxTakeRespawnInPlace`.
+        const inPlace = fxTakeRespawnInPlace(p.id, fxNow());
+        const spot = inPlace
+          ? null
+          : pickRespawn(p.combat.body.position.x, p.combat.body.position.z, p.world);
         if (spot) {
           respawnAt(p.combat, spot.x, spot.y, spot.z, p.combat.body.yaw);
         } else {
@@ -2592,8 +2760,19 @@ export class Simulation {
       // air and it is nobody's property any more; refusing the hit would make
       // leaving a way to un-throw.
       if (!owner) continue;
-      applyFootyHit(owner.combat, e.victim, e.ball, this.ballReport);
-      if (this.ballReport.ko) this.creditKo(owner.id, e.victim.id);
+      applyFootyHit(owner.combat, e.victim, e.ball, this.ballReport, fxNow());
+      if (this.ballReport.ko) {
+        // --- WORKSTREAM W: `Long Bomb`'s double kill.
+        //
+        // A **returned serve** is a ball whose current owner is not the person
+        // who threw it -- `game/swat.ts` moves `Footy.owner` to whoever batted
+        // it back and leaves `Footy.thrower` alone, which is exactly the
+        // distinction the tooltip needs and is already on the record. So this is
+        // a comparison of two fields and no new state.
+        const returned = e.ball.owner !== e.ball.thrower;
+        const weight = returned && fxReturnServeDouble(owner.id) ? 2 : 1;
+        this.creditKo(owner.id, e.victim.id, weight);
+      }
       this.events.push({
         kind: EVENT.HIT,
         attacker: owner.id,
@@ -2748,6 +2927,33 @@ export class Simulation {
       // screen. An event as well would be the same fact on the wire twice, and
       // `EVENT.PICKUP` above is only an event because a powerup's *world state*
       // (the icon, the respawn clock) is client-side and this is not.
+      // --- WORKSTREAM W: `Loan Shark`. "A non-Marita who picks one up loses $20
+      // to you and takes 1 pip. Marita who pick it up hand it straight back."
+      //
+      // Asked of the *dropper* (`bundle.from`, which is 0 for an NPC drop and so
+      // never a trap) and answered against the picker's team. Three outcomes,
+      // and the order matters: your own bundle is always just money, a
+      // teammate's is money that goes back to you, and an enemy's costs them.
+      const from = e.bundle.from;
+      const picker = e.combatant.id;
+      if (from !== 0 && from !== picker && fxDropTrap(from)) {
+        const lookup = teamLookup();
+        if (lookup.teamOf(picker) === lookup.teamOf(from) && lookup.teamOf(from) !== TEAM.NONE) {
+          // "hand it straight back": the bundle's own value goes to the dropper
+          // and the picker gets nothing. Not a theft -- they carried it home.
+          this.moveWallet(from, e.bundle.amount, 'handed back');
+          continue;
+        }
+        // The trap. The $20 comes out of the picker's own wallet on top of the
+        // bundle they just gained, so a trapped $5 bundle is a net loss, which
+        // is the point. `moveWallet` refuses to take a wallet below zero, and
+        // whatever it actually managed to move is what the dropper is paid.
+        this.moveWallet(picker, e.bundle.amount, 'found');
+        const taken = -this.moveWallet(picker, -DROP_TRAP_DOLLARS, 'trapped');
+        if (taken > 0) this.moveWallet(from, taken, 'loan shark');
+        this.hurt(picker, DROP_TRAP_PIPS);
+        continue;
+      }
       this.moveWallet(e.combatant.id, e.bundle.amount, 'found');
     }
     if (this.bundles.length !== this.bundlesLastCount) {
@@ -2763,6 +2969,10 @@ export class Simulation {
     // O(players) and one boolean test for anybody not on shift. The context
     // record is reused; see `server/fares.ts` on why nothing here allocates.
     this.stepFares();
+
+    // WORKSTREAM W: and the sizzle tents, beside the fares because they are the
+    // other thing a player bought with money this tick. See `stepTents`.
+    this.stepTents();
 
     // --- The bikes again, after everybody has moved and every hit has landed.
     //
@@ -2907,10 +3117,16 @@ export class Simulation {
         : Math.sqrt(c.body.velocity.x * c.body.velocity.x + c.body.velocity.z * c.body.velocity.z);
       ctx.inCar = carId !== 0;
       ctx.ko = c.phase === 'ko' || c.health <= 0;
+      // WORKSTREAM W: what time it is in Sydney, for `Surge` and `Tradie Rates`.
+      ctx.phase = cyclePhase(nowMs);
 
       const out = stepFare(job, ctx);
       if (out.paid > 0) {
         this.wallet.credit(p.id, out.paid, 'fare');
+        // WORKSTREAM W: `Tradie Rates` grants 30 s of `Ute Life` on every
+        // completed fare. A *granted* talent rather than a taken one, which the
+        // frozen `TeamLookup` cannot express -- see `teamfx.fxGrantUteLife`.
+        fxGrantUteLife(p.id, nowMs, fxFareUteLifeS(p.id));
         // The passenger's parting line, seeded off the fare so it is stable if
         // the frame is ever re-sent. Appended to the notice rather than
         // replacing it, because "+$27 fare" is the fact and the line is the
@@ -2953,10 +3169,37 @@ export class Simulation {
     // phone shows a list and the player picked a row -- and a claim that paid
     // the wrong office's timer would be a bug nobody could see.
     if (officeId !== '' && officeId !== office.id) return `you are at ${office.name.toLowerCase()}`;
-    const wait = claimWaitMs(p.wallet.centrelink[office.id] ?? 0, Date.now());
+    // --- WORKSTREAM W: `Tap On` ($150 every 6 days) and `Click & Collect`
+    //     ($100 every 5, and $20 to every DeFAULT within 200 m).
+    //
+    // The period is in in-game days and `CYCLE_MS` is one of them, which is the
+    // one conversion this feature needs and is done here rather than in
+    // `game/cash.ts` because that file is deliberately free of the sky.
+    const wait = claimWaitMs(
+      p.wallet.centrelink[office.id] ?? 0,
+      Date.now(),
+      fxCentrelinkDays(playerId, CENTRELINK_PERIOD_MS / CYCLE_MS) * CYCLE_MS,
+    );
     if (wait > 0) return 'nothing due here yet';
     this.wallets?.recordClaim(p.wallet, office.id, Date.now());
-    this.wallet.credit(playerId, CENTRELINK_PAYMENT, 'centrelink');
+    // `fxEarnScale` is `Tip Jar`'s aura on top, which the tooltip includes:
+    // "+10% on every fare, drop and Centrelink claim".
+    const paid = Math.round(fxCentrelinkAmount(playerId, CENTRELINK_PAYMENT) * fxEarnScale(playerId));
+    this.wallet.credit(playerId, paid, 'centrelink');
+    // And the teammates standing near enough to have come along. O(players) with
+    // the room's cap, on the tick a button was pressed -- not a sweep.
+    const cx = c.body.position.x;
+    const cz = c.body.position.z;
+    for (const other of this.ordered) {
+      if (other.id === playerId || other.wallet === null) continue;
+      const cut = fxCentrelinkNearby(other.id);
+      if (cut <= 0) continue;
+      if (teamLookup().teamOf(other.id) !== teamLookup().teamOf(playerId)) continue;
+      const dx = other.combat.body.position.x - cx;
+      const dz = other.combat.body.position.z - cz;
+      if (dx * dx + dz * dz > CENTRELINK_NEARBY_M * CENTRELINK_NEARBY_M) continue;
+      this.wallet.credit(other.id, cut, 'centrelink');
+    }
     return '';
   }
 
@@ -2997,6 +3240,41 @@ export class Simulation {
   }
 
   private readonly officeScratch: Array<{ office: CentrelinkOffice; distance: number }> = [];
+
+  /**
+   * --- WORKSTREAM W: how close the nearest witness to the last theft got.
+   *
+   * Written by `sawTheft` and read on the next line of `tryTakeCar`, which is
+   * the whole of its lifetime -- a field rather than a return value because
+   * `sawTheft` already returns the boolean every other caller wants and
+   * allocating a `{seen, range}` per theft would be an object on a path that
+   * runs whenever anybody presses `E`.
+   */
+  private theftWitnessM = Infinity;
+
+  /**
+   * --- WORKSTREAM W: takes refused because of `Park Anywhere`'s team lock,
+   * pending delivery. **The contract other workstreams read.**
+   *
+   * A refusal is a sentence and not an event: nothing happened in the world, the
+   * car is where it was, and the only thing to do with it is put it in front of
+   * the person who pressed `E`. So it is a small outbox the room drains once per
+   * tick, exactly as `carChanges` and `events` are, rather than a new message
+   * kind for a string. Cleared by `drainTakeRefusals`; bounded by one entry per
+   * player per tick, because `E` is edge-triggered.
+   *
+   * The text is composed by `teamfx.fxCarTakeRefusal`, which is the only place
+   * either team is named and names them through `TEAM_NAME`.
+   */
+  private readonly takeRefusals: Array<{ playerId: number; text: string }> = [];
+
+  /** Read and clear the refusals. See `takeRefusals`. */
+  drainTakeRefusals(out: Array<{ playerId: number; text: string }>): Array<{ playerId: number; text: string }> {
+    out.length = 0;
+    for (const r of this.takeRefusals) out.push(r);
+    this.takeRefusals.length = 0;
+    return out;
+  }
 
   /** This player's fare, or null for a bot and for an id that has left. */
   fareOf(playerId: number): FareJob | null {
@@ -3148,6 +3426,9 @@ export class Simulation {
     // `combat.applyWorldDamage`. See its header for why it is not `applyHit`
     // with the victim as their own attacker.
     const ko = applyWorldDamage(c, pips);
+    // WORKSTREAM W: being shot, run over or thrown off a train is combat, so the
+    // out-of-combat regeneration clock restarts here as well as on a bat hit.
+    fxNoteCombat(playerId, fxNow());
     if (ko) {
       this.creditKo(playerId, playerId);
       // The investigation ends with the player. Being shot by the police is the
@@ -3280,9 +3561,29 @@ export class Simulation {
     const c = p.combat;
     const feet = c.body.position.y - EYE_HEIGHT;
 
+    // --- WORKSTREAM W: this taker's reach and the speed they can pull somebody
+    //     out at. `Sticky Fingers` moves both; everybody else gets the constants.
+    const radius = fxTakeRadiusM(c.id, TAKE_RADIUS);
+    const takeable = fxTakeableSpeed(c.id, TAKEABLE_SPEED);
+
     // --- Somebody's abandoned getaway car, or your own.
-    const standing = this.nearestEmptyCar(c.body.position.x, feet, c.body.position.z);
+    const standing = this.nearestEmptyCar(c.body.position.x, feet, c.body.position.z, radius);
     if (standing !== null) {
+      // --- WORKSTREAM W: `Park Anywhere`'s lock. A car a DeFAULT left is not
+      // takeable by Marita, and the refusal names the team through `TEAM_NAME`
+      // (never a literal) -- see `teamfx.fxCarTakeRefusal`.
+      //
+      // Only the *standing* fleet can be locked, and that falls out of what the
+      // talent is about rather than being a simplification: `lastDriverId` is
+      // who left this car in this street, and a car on the timetable was left by
+      // nobody. Refused silently on the wire -- `E` does nothing, exactly as it
+      // does at a car somebody else already has -- with the sentence delivered
+      // through the same notice channel a refusal already uses.
+      const refusal = fxCarTakeRefusal(c.id, standing.lastDriverId);
+      if (refusal !== '') {
+        this.takeRefusals.push({ playerId: c.id, text: refusal });
+        return;
+      }
       standing.driverId = c.id;
       standing.emptyMs = 0;
       c.drivingCar = standing.id;
@@ -3323,6 +3624,10 @@ export class Simulation {
         // car, and the answer is still this process's own evaluation of its own
         // copy of the world at its own tick.
         this.world.staticCars ?? null,
+        // WORKSTREAM W: and this taker's radius and takeable speed. Last, on the
+        // `statics` parameter's own argument. See `driving.resolveTake`.
+        radius,
+        takeable,
       )
     ) {
       return;
@@ -3344,7 +3649,11 @@ export class Simulation {
       for (const other of this.ordered) {
         this.recycleScratch.push(other.combat.body.position.x, other.combat.body.position.z);
       }
-      const recycled = this.cars.recycleFarthest(this.recycleScratch);
+      // WORKSTREAM W: and the exemption `Park Anywhere` buys. See
+      // `driving.CarField.recycleFarthest`'s second parameter for why the
+      // predicate is supplied rather than read there, and why it evaporates when
+      // the player leaves.
+      const recycled = this.cars.recycleFarthest(this.recycleScratch, fxCarNeverRecycles);
       if (recycled === 0) return;
       this.carRemovals.push(recycled);
     }
@@ -3366,7 +3675,29 @@ export class Simulation {
     // Bots never steal cars (`Bot` never sets `BTN.MOUNT`), so there is no
     // clause here about them -- but a bot standing on the footpath *is* a
     // witness under `policeWitness`' promoted-actor tier, which is correct.
-    if (this.sawTheft(car.x, car.y, car.z)) reportCrime(c.id, REASON.CAR_THEFT);
+    // --- WORKSTREAM W: three talents meet on this line.
+    //
+    // `Ghost Plates` starts a 60 s window in which this car reports nothing at
+    // all, and `fxTheftReported` is the question; the window is broken early by
+    // hitting somebody, which `resolveStrike` does. `Sticky Fingers` and
+    // `Karen Rapport` decide whether a *bystander* counts, and they are asked
+    // with the distance to the nearest witness because the tooltip is about
+    // whether somebody saw your face.
+    //
+    // The order is: start the window, then decide. Starting it first means the
+    // theft that opened it is itself covered, which is what "a car you steal
+    // reports no CAR_THEFT for the first 60 s" says.
+    fxNoteCarStolen(c.id, fxNow());
+    if (
+      fxTheftReported(c.id, fxNow()) &&
+      // `sawTheft` before the Karen gate, because it is what fills
+      // `theftWitnessM`. Short-circuiting the other way round would ask how far
+      // away the witness of the *previous* theft was.
+      this.sawTheft(car.x, car.y, car.z) &&
+      fxKarenReportsSteal(c.id, this.theftWitnessM)
+    ) {
+      reportCrime(c.id, REASON.CAR_THEFT);
+    }
   }
 
   /**
@@ -3378,9 +3709,10 @@ export class Simulation {
    * predicts this same choice and an integer comparison is a rule both ends can
    * state.
    */
-  private nearestEmptyCar(x: number, feetY: number, z: number): DrivenCar | null {
+  private nearestEmptyCar(x: number, feetY: number, z: number, radius = TAKE_RADIUS): DrivenCar | null {
     let best: DrivenCar | null = null;
-    let bestD2 = TAKE_RADIUS * TAKE_RADIUS;
+    // WORKSTREAM W: the taker's reach rather than the constant. See `tryTakeCar`.
+    let bestD2 = radius * radius;
     for (const car of this.cars.all()) {
       if (car.driverId !== 0) continue;
       const dy = car.y - feetY;
@@ -3406,7 +3738,16 @@ export class Simulation {
    * seam `factions.policeWitness` makes with its `ctx`.
    */
   private sawTheft(x: number, y: number, z: number): boolean {
-    if (policeWitness(x, z, trafficTick(Date.now()), this.witnessCtx, this.witness).seen) return true;
+    // WORKSTREAM W: how close the nearest witness got, for `Sticky Fingers`'
+    // "unless they saw your face (within 8 m)". Reset here and written by
+    // whichever branch below actually sees something, so it always describes
+    // *this* theft; `Infinity` is "nobody was near", which reads as a face
+    // nobody saw and is the honest answer when nothing reports anyway.
+    this.theftWitnessM = Infinity;
+    if (policeWitness(x, z, trafficTick(Date.now()), this.witnessCtx, this.witness).seen) {
+      this.theftWitnessM = this.witness.range;
+      return true;
+    }
     const peds = this.world.peds;
     if (peds === null) return false;
     const tick = trafficTick(Date.now());
@@ -3416,6 +3757,14 @@ export class Simulation {
       z,
       (visit) => {
         forEachPedestrianNear(peds, x, z, WITNESS_RADIUS, tick, this.witnessBands, this.witnessPed, (ped) => {
+          // The nearest one, whether or not the line of sight holds -- the
+          // sight test is `bystanderSeen`'s and it does not report a distance.
+          // Over-reporting closeness is the safe direction: it makes the talent
+          // fire less often, never more.
+          const dx = ped.x - x;
+          const dz = ped.z - z;
+          const d2 = dx * dx + dz * dz;
+          if (d2 < this.theftWitnessM * this.theftWitnessM) this.theftWitnessM = Math.sqrt(d2);
           visit(ped.x, ped.y, ped.z, ped.down);
         });
       },
@@ -3592,7 +3941,11 @@ export class Simulation {
     for (const car of this.cars.follow(this.driverViews, this.carSweep)) {
       // A car whose driver has just got out (or been thrown out) is snapped into
       // a kerb bay if it stopped beside one. See `parkOnLeave`.
-      this.parkOnLeave(car);
+      //
+      // WORKSTREAM W: `lastDriverId` rather than `driverId`, which the sweep has
+      // already zeroed -- `Park Anywhere` widens the snap for the person who
+      // just got out. See `driving.DrivenCar.lastDriverId`.
+      this.parkOnLeave(car, car.lastDriverId);
       this.carChanges.push(car);
     }
 
@@ -3696,14 +4049,29 @@ export class Simulation {
     let n = 0;
     for (const car of cars) {
       const size = CAR_BODY_SIZE[car.body] ?? CAR_BODY_SIZE[0];
+      // --- WORKSTREAM W: `Right of Way` / `Lane Ways`: "ambient traffic holds
+      // 9 m behind your car instead of 6".
+      //
+      // Added to the blocker's **half length** rather than plumbed into
+      // `traffic.HOLD_GAP`, and that is the cheap and the correct way round.
+      // `resolveHeld` measures the gap from the blocker's extent, so a car that
+      // declares itself two metres longer is a car the timetable stops two
+      // metres further back -- one addition here, nothing at all in the ambient
+      // fleet's hot loop, and no per-blocker gap field on a record the traffic
+      // module would then have to carry through `setBlockers`. It is only
+      // approximate in one respect: the inflation applies to the car's *rear* as
+      // well as its nose, which means traffic behind you also hangs back an extra
+      // three metres. That is what the tooltip describes anyway.
+      const extra = fxTrafficHoldGapM(car.driverId, HOLD_GAP) - HOLD_GAP;
+      const half = size.length * 0.5 + (extra > 0 ? extra : 0);
       const slot = this.blockers[n];
       if (slot === undefined) {
-        this.blockers.push({ x: car.x, y: car.y, z: car.z, halfLength: size.length * 0.5 });
+        this.blockers.push({ x: car.x, y: car.y, z: car.z, halfLength: half });
       } else {
         slot.x = car.x;
         slot.y = car.y;
         slot.z = car.z;
-        slot.halfLength = size.length * 0.5;
+        slot.halfLength = half;
       }
       n++;
     }
@@ -3731,9 +4099,337 @@ export class Simulation {
    * because the whole point of the other half of this feature is that the
    * traffic yields to it.
    */
-  private parkOnLeave(car: DrivenCar): void {
+  // --- WORKSTREAM W: the abilities -------------------------------------------------
+
+  /**
+   * `V`, `G` and `T`, on the authority, once per player per tick.
+   *
+   * The shape mirrors `resolveMount` exactly and for its reasons: the range
+   * tests, the cooldowns and the wallet are all this process's, `INPUT` carries
+   * three bits and nothing a client could lie with, and a knocked-out player
+   * gets nothing. What each key *means* is `game/abilities.abilityFor*`, which
+   * reads the installed `TeamLookup` -- so a client that has taken no talents
+   * presses V and the answer is `ABILITY.NONE` before any state is touched.
+   *
+   * **Nothing here is predicted except the dash**, which the browser applies
+   * locally on the same tick and `net/client.reconcile` corrects. See
+   * `game/abilities.ts`' header for why that is the only one worth predicting.
+   */
+  private resolveAbilities(p: Participant): void {
+    const c = p.combat;
+    const nowMs = fxNow();
+    // The in-game day, for the four once-a-day megas. `CYCLE_MS` is one in-game
+    // day (`sky/cycle.ts`), so this is a division and a floor -- see
+    // `abilities.tryAbility` on why the *index* rather than a timestamp.
+    const day = Math.floor(nowMs / CYCLE_MS);
+    const wallet = p.wallet?.balance ?? -1;
+
+    // --- V. Edge-triggered, `BTN.MOUNT`'s rule.
+    const vDown = p.input.abilityV === true;
+    const vRising = vDown && !p.abilityVHeld;
+    p.abilityVHeld = vDown;
+    // --- T, the same.
+    const tDown = p.input.abilityT === true;
+    const tRising = tDown && !p.abilityTHeld;
+    p.abilityTHeld = tDown;
+    // --- G, level, because a two-second hold is not an edge.
+    const g = feedG(p.id, p.input.abilityG === true, nowMs);
+
+    if (c.phase === 'ko') return;
+
+    if (vRising) {
+      const which = abilityForV(p.id);
+      const no = tryAbility(p.id, which, nowMs, day, wallet);
+      if (no === '' && (which === ABILITY.DASH || which === ABILITY.CAR_BURST)) {
+        this.launchDash(p, which);
+      }
+    }
+
+    if (g === G_RESULT.SLAM) {
+      const no = tryAbility(p.id, abilityForGHold(p.id), nowMs, day, wallet);
+      if (no === '') this.slam(p);
+    } else if (g === G_RESULT.TAP) {
+      // The refusal is dropped rather than reported, which is the one place this
+      // differs from a car take: `G` on cooldown is a thing the HUD's own
+      // cooldown pip already says, and a notice per press would be the game
+      // arguing with a key the player is holding.
+      tryAbility(p.id, abilityForG(p.id), nowMs, day, wallet);
+    }
+
+    if (tRising) {
+      const which = abilityForT(p.id);
+      const no = tryAbility(p.id, which, nowMs, day, wallet);
+      if (no === '' && which === ABILITY.MEGA_TELEPORT) this.megaTeleport(p);
+    }
+  }
+
+  /**
+   * The dash, and the car burst's on-foot half. **A velocity impulse, not a
+   * teleport**, which is the whole of why it is not a speed buff -- see
+   * `game/abilities.ts`.
+   *
+   * The direction is the player's *move* input where there is one and their
+   * facing where there is not, so "a 6 m dash in your move direction" means what
+   * it says and a standing player dashes forward. Set rather than added, on
+   * `combat.applyHit`'s argument exactly: a sprinting player who added 20 m/s
+   * would cover fourteen metres and the distance would stop being a thing anyone
+   * could learn.
+   *
+   * In a car V is a window rather than a shove -- `abilities.tryAbility` already
+   * opened it -- so there is nothing to launch and this returns.
+   */
+  private launchDash(p: Participant, which: Ability): void {
+    const c = p.combat;
+    if (c.drivingCar !== 0) return;
+    const metres =
+      which === ABILITY.DASH ? fxScalar(p.id, FX.DASH) : CAR_BURST_SLIDE_M;
+    if (!(metres > 0)) return;
+    const speed = dashSpeedFor(metres);
+    // The yaw basis, `player/controller.step`'s: forward is (-sin, -cos).
+    const sinY = Math.sin(c.body.yaw);
+    const cosY = Math.cos(c.body.yaw);
+    let dx = -sinY * p.input.forward + cosY * p.input.right;
+    let dz = -cosY * p.input.forward - sinY * p.input.right;
+    const len = Math.sqrt(dx * dx + dz * dz);
+    if (len < 1e-4) {
+      dx = -sinY;
+      dz = -cosY;
+    } else {
+      dx /= len;
+      dz /= len;
+    }
+    c.body.velocity.x = dx * speed;
+    c.body.velocity.z = dz * speed;
+  }
+
+  /**
+   * `MEGA_SLAM`: knock down every enemy within 8 m and take a pip from each.
+   *
+   * O(players), on the room's cap, once per in-game day per player. Through
+   * `hurt` rather than `applyWorldDamage` directly, so the knockout, the
+   * investigation and the `HIT` event are the ones every other cause produces --
+   * see `hurt`'s header on why that funnel exists.
+   *
+   * "Every non-Marita" / "every non-DeFAULT" is read off the lookup rather than
+   * off a team literal, and a slammer with no team hits nobody: `TEAM.NONE` on
+   * the caster means the framework has not landed, and a mega that hit the whole
+   * room in that state would be the worst possible failure mode.
+   */
+  private slam(p: Participant): void {
+    const lookup = teamLookup();
+    const mine = lookup.teamOf(p.id);
+    if (mine === TEAM.NONE) return;
+    const c = p.combat;
+    for (const other of this.ordered) {
+      if (other.id === p.id) continue;
+      if (lookup.teamOf(other.id) === mine) continue;
+      const o = other.combat;
+      if (o.phase === 'ko' || o.health <= 0) continue;
+      const dx = o.body.position.x - c.body.position.x;
+      const dz = o.body.position.z - c.body.position.z;
+      if (dx * dx + dz * dz > SLAM_RADIUS_M * SLAM_RADIUS_M) continue;
+      this.hurt(other.id, SLAM_PIPS);
+    }
+  }
+
+  /**
+   * `MEGA_TELEPORT`: the nearest station, with the heat halved.
+   *
+   * The nearest **platform site** rather than a forecourt or a car park, and
+   * that is the deviation this function makes from its tooltip: the server knows
+   * where every platform is (`world.platforms.sites`, built from the rail bake)
+   * and has no bake at all for forecourts or station car parks. A platform is
+   * within thirty metres of the forecourt of every station in the network, the
+   * ground query puts the body on whatever surface is actually there, and the
+   * player arrives at the station -- which is what the ability is for. Building
+   * a forecourt sidecar is a pipeline change and this pass may not make one.
+   *
+   * The car does **not** come with you, which is the second deviation. Both
+   * tooltips say "teleports you and your car"; moving a `DrivenCar` across the
+   * city means re-seating it against the collision world, re-running the take
+   * suppression at the far end and deciding what happens if it lands in the
+   * harbour, and none of that is one line. You arrive on foot; the car is left
+   * standing exactly as it is when you get out of one, which the sweep already
+   * handles. Listed in the report.
+   */
+  private megaTeleport(p: Participant): void {
+    const sites = this.world.platforms?.sites ?? null;
+    if (sites === null || sites.length === 0) return;
+    const c = p.combat;
+    let best: { x: number; z: number } | null = null;
+    let bestD2 = Infinity;
+    for (const site of sites) {
+      const dx = site.x - c.body.position.x;
+      const dz = site.z - c.body.position.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 >= bestD2) continue;
+      best = site;
+      bestD2 = d2;
+    }
+    if (best === null) return;
+    clearAboard(c.aboard);
+    c.drivingCar = 0;
+    c.carSpeed = 0;
+    c.ridingBike = 0;
+    const ground = p.world.groundHeight(best.x, best.z, -Infinity);
+    c.body.position.set(best.x, ground + EYE_HEIGHT, best.z);
+    c.body.velocity.set(0, 0, 0);
+    c.body.onGround = true;
+    // The rewind ring, seeded rather than left to fill -- `respawnAt`'s argument
+    // exactly: for the next 250 ms an unseeded history would rewind this player
+    // back across the city and a punch thrown at that spot would land here.
+    p.history.seed(this.tick, c.body.position.x, c.body.position.y, c.body.position.z, c.body.yaw);
+    // And the heat, halved. See `heat.HeatField.scalePoints` for why it is the
+    // points and not the stars.
+    this.heat.scalePoints(p.id, 0.5);
+  }
+
+  /**
+   * --- WORKSTREAM W: the two per-player talent clocks.
+   *
+   * Called once per player per tick from the advance loop, immediately after
+   * their body has moved. Both are early-outs for anybody with no talent: a
+   * player with no `REGEN_PIP_S` costs one map lookup and a comparison.
+   */
+  private stepTalents(p: Participant): void {
+    const c = p.combat;
+    const nowMs = fxNow();
+    // The pip a G ability charges on the way out, reported exactly once by
+    // `expireAbilityWindow`. Not armoured -- see `combat.applyWorldDamage`'s
+    // `armoured` parameter: paying for your own talent is not a hit.
+    const ended = expireAbilityWindow(p.id, nowMs);
+    if (ended !== ABILITY.NONE) {
+      const ko = applyWorldDamage(c, 1, false);
+      if (ko) this.creditKo(p.id, p.id);
+      this.events.push({
+        kind: EVENT.HIT,
+        attacker: p.id,
+        victim: p.id,
+        flags: ko ? EVENT_FLAG.KO : 0,
+        health: c.health,
+      });
+    }
+    if (c.phase === 'ko' || c.health <= 0) return;
+    // Out of combat regeneration, capped at this player's own maximum -- which
+    // is `MAX_HEALTH` plus whatever Big Night and a group are worth.
+    const pips = fxRegenTick(p.id, FIXED_DT, nowMs);
+    if (pips > 0) {
+      const max = fxMaxPips(p.id, MAX_HEALTH);
+      if (c.health < max) c.health = Math.min(max, c.health + pips);
+    }
+  }
+
+  /**
+   * --- WORKSTREAM W: the phone's `4`. **The contract the phone workstream calls.**
+   *
+   * Returns `''` if it fired and a lower-case refusal otherwise, which is the
+   * shape `claim` above already has and for its reason: the phone shows a row,
+   * the player picked it, and a row that does nothing is a row they decide is
+   * broken.
+   *
+   * Two abilities behind one key, resolved by which talent the player has --
+   * `abilities.abilityForPhone4`. Both cost $200 and both are once per in-game
+   * day, and both of those gates live in `tryAbility` so that the money is only
+   * debited after the day stamp has been checked.
+   */
+  useTalentPhone(playerId: number): string {
+    const p = this.participants.get(playerId);
+    if (!p) return 'no such player';
+    const c = p.combat;
+    if (c.phase === 'ko' || c.health <= 0) return 'not while you are on the ground';
+    const nowMs = fxNow();
+    const day = Math.floor(nowMs / CYCLE_MS);
+    const which = abilityForPhone4(playerId);
+    const wallet = p.wallet?.balance ?? -1;
+    const no = tryAbility(playerId, which, nowMs, day, wallet);
+    if (no !== '') return no;
+    const cost = ABILITY_COST[which] ?? 0;
+    if (cost > 0) this.wallet.debit(playerId, cost, which === ABILITY.MEGA_SUMMON_RIDE ? 'sydride' : 'sizzle tent');
+    if (which === ABILITY.MEGA_SIZZLE_TENT) {
+      this.tents.push({
+        ownerId: playerId,
+        team: teamLookup().teamOf(playerId),
+        x: c.body.position.x,
+        y: c.body.position.y - EYE_HEIGHT,
+        z: c.body.position.z,
+        ttl: TENT_SECONDS,
+      });
+      return '';
+    }
+    // --- `MEGA_SUMMON_RIDE`, and this is the brief's sanctioned fallback.
+    //
+    // The tooltip is "a SydRide that drives you anywhere on the map with heat
+    // frozen". A car on autopilot across sixty kilometres of Sydney is a
+    // pathfinder, a passenger seat and a failure mode in the harbour, and none
+    // of that is this workstream. What ships is the *outcome* of the ride: the
+    // heat is frozen for a minute and you are at the nearest station, which is
+    // where a ride would have dropped you. The destination is the station rather
+    // than the phone's map pin because the pin is the phone workstream's and
+    // does not reach this process. Listed in the report as a deviation.
+    fxFreezeHeat(playerId, nowMs, SUMMON_HEAT_FREEZE_S);
+    this.megaTeleport(p);
+    return '';
+  }
+
+  /**
+   * The sizzle tents on the ground, ticked once a second's worth of ticks.
+   *
+   * A plain array rather than a field class, because there is at most one per
+   * DeFAULT per in-game day and they live sixty seconds: the whole structure is
+   * bounded by the room's player count and the sweep below is O(tents x players)
+   * with both counted in ones. `PERFORMANCE.md`'s budget is O(players) per tick
+   * and this is inside it by two orders of magnitude.
+   *
+   * Not on the wire by this workstream. A tent nobody can see is a heal zone
+   * with no picture, which is honest about where the seam is: the renderer
+   * workstream draws props, and `tentRecords()` is the contract it reads.
+   */
+  private readonly tents: Array<{ ownerId: number; team: number; x: number; y: number; z: number; ttl: number }> = [];
+
+  /** Every live tent. Owned by this object; serialise before the next step. */
+  tentRecords(): ReadonlyArray<{ ownerId: number; team: number; x: number; y: number; z: number; ttl: number }> {
+    return this.tents;
+  }
+
+  /**
+   * "Any DeFAULT who touches it is healed to full and cleared of heat under 3★."
+   *
+   * Once per player per tent per tick, and healing to full is idempotent, so
+   * there is no "already used it" bookkeeping: a player standing in a tent is
+   * simply always at full health for the minute it is there, which is what a
+   * heal zone is.
+   */
+  private stepTents(): void {
+    if (this.tents.length === 0) return;
+    for (let i = this.tents.length - 1; i >= 0; i--) {
+      const tent = this.tents[i];
+      tent.ttl -= FIXED_DT;
+      if (tent.ttl <= 0) {
+        this.tents.splice(i, 1);
+        continue;
+      }
+      if (tent.team === TEAM.NONE) continue;
+      for (const p of this.ordered) {
+        if (teamLookup().teamOf(p.id) !== tent.team) continue;
+        const c = p.combat;
+        if (c.phase === 'ko' || c.health <= 0) continue;
+        const dx = c.body.position.x - tent.x;
+        const dz = c.body.position.z - tent.z;
+        if (dx * dx + dz * dz > TENT_RADIUS_M * TENT_RADIUS_M) continue;
+        const max = fxMaxPips(p.id, MAX_HEALTH);
+        if (c.health < max) c.health = max;
+        if (this.heat.starsOf(p.id) < TENT_CLEARS_UNDER_STARS) this.heat.reset(p.id);
+      }
+    }
+  }
+
+  private parkOnLeave(car: DrivenCar, driverId = 0): void {
     if (car.driverId !== 0) return;
-    const found = nearestBay(this.world.traffic, car.x, car.z, PARK_SNAP_RADIUS, this.bayScratch, this.bayProbe);
+    // WORKSTREAM W: `Park Anywhere` widens the snap 3 → 6 m. The id is the
+    // driver who *just got out*, which is not `car.driverId` -- that is already
+    // zero by the time this runs, which is what the guard above tests.
+    const radius = fxParkSnapM(driverId, PARK_SNAP_RADIUS);
+    const found = nearestBay(this.world.traffic, car.x, car.z, radius, this.bayScratch, this.bayProbe);
     // Two calls and no arithmetic here: the *geometry* of finding a bay is
     // `traffic.nearestBay`'s and is asserted in `verifyTraffic`, and the *rule*
     // about what to do with one is `driving.snapToBay`'s and is asserted in
@@ -4141,7 +4837,15 @@ export class Simulation {
     );
     const victim = resolveLiveById(hitTest(p.combat, targets), this.byId);
     if (victim) {
-      this.hitReport = applyHit(p.combat, victim);
+      // WORKSTREAM W: the clock the knockdown window is measured against, and
+      // the two bookkeeping calls that hang off a landed hit -- the regen clock
+      // for both parties (eight seconds out of combat, and this is combat), and
+      // Ghost Plates, whose tooltip ends "...unless you hit somebody".
+      const nowMs = fxNow();
+      this.hitReport = applyHit(p.combat, victim, undefined, nowMs);
+      fxNoteCombat(p.id, nowMs);
+      fxNoteCombat(victim.id, nowMs);
+      fxBreakGhostPlates(p.id);
       if (this.hitReport.ko) this.creditKo(p.id, victim.id);
       this.events.push({
         kind: EVENT.HIT,
@@ -4829,6 +5533,12 @@ export function applyButtons(input: CombatInput, buttons: number): void {
   // Level, like its neighbours. `Simulation.resolveMount` takes the edge; see
   // `protocol.BTN.MOUNT` for why that split is where it is.
   input.mount = (buttons & BTN.MOUNT) !== 0;
+  // WORKSTREAM W: the three talent keys, level like their neighbours.
+  // `resolveAbilities` takes the edges for V and T and feeds G's level bit to
+  // `abilities.feedG`, which is the only one of the three that needs the hold.
+  input.abilityV = (buttons & BTN.ABILITY_V) !== 0;
+  input.abilityG = (buttons & BTN.ABILITY_G) !== 0;
+  input.abilityT = (buttons & BTN.ABILITY_T) !== 0;
 }
 
 // --- The self-check -----------------------------------------------------------

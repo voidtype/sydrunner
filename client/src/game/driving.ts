@@ -221,6 +221,10 @@ import {
 // import, so nothing about this file's dependency graph changes -- the *field*
 // lives in `game/staticcars.ts` and is constructed by whoever owns a world.
 import type { StaticCarSource } from './staticcars.ts';
+// --- WORKSTREAM W (talent effects). Every read below is the identity with no
+// `TeamLookup` installed, which is why `verifyDriving` and `verifyDamageGrade`
+// needed no change. See `game/teamfx.ts`.
+import { fxCarDamageScale, fxCrashCooldownS, fxRamFreeCrash, fxWreckLimpSpeed } from './teamfx.ts';
 
 // --- The handling ---------------------------------------------------------------
 
@@ -1015,6 +1019,16 @@ export function stepCarSpeed(
   z: number,
   yaw: number,
   world: DrivingWorld | null,
+  /**
+   * --- WORKSTREAM W: who is driving, for `Ute Life`'s limp.
+   *
+   * `DriveState` deliberately carries no id -- it is the structural slice of a
+   * combatant this file is allowed to see, and adding one would make it a
+   * combatant. So the id arrives as an argument, from the one caller that has
+   * one (`combat.advance`, which passes `c.id`), and defaults to 0 for the
+   * self-checks that drive a bare `DriveState`.
+   */
+  driverId = 0,
 ): number {
   if (c.drivingCar === 0) {
     // Not driving. Zeroed rather than left, so a player who is knocked out of a
@@ -1033,10 +1047,19 @@ export function stepCarSpeed(
   // is slow off the line as well as slow at the top -- which is the difference
   // between a broken engine and a speed limiter.
   const health = c.carHealth;
-  const dead = health <= 0;
+  // --- WORKSTREAM W: `Ute Life`'s "written-off cars can still limp at 6 m/s".
+  //
+  // A wreck stops being written off *for the throttle* and becomes a car with a
+  // 6 m/s ceiling, which is the whole of the talent: the smoke, the soot, the
+  // dent grade and the health bar all still say write-off (they read the
+  // record's health, not this), and what changes is that you can drive it home.
+  // `limp` is 0 without the talent, so `dead` is exactly what it was.
+  const limp = health <= 0 ? fxWreckLimpSpeed(driverId) : 0;
+  const dead = health <= 0 && limp <= 0;
   const hurt = !dead && health <= CAR_SMOKING_HEALTH;
   const scale = hurt ? CAR_SMOKING_SCALE : 1;
-  const top = (rough ? DRIVE_TOP_SPEED_ROUGH : DRIVE_TOP_SPEED) * scale;
+  let top = (rough ? DRIVE_TOP_SPEED_ROUGH : DRIVE_TOP_SPEED) * scale;
+  if (limp > 0 && top > limp) top = limp;
   const floor = -top * DRIVE_REVERSE;
   let v = c.carSpeed;
 
@@ -1570,13 +1593,24 @@ export function createTakeQuery(): TakeQuery {
   return { x: 0, feetY: 0, z: 0, found: false, bestD2: 0, bestIdentity: 0 };
 }
 
-/** Open an arbitration at a point. Nothing offered yet, the radius as the bound. */
-export function beginTake(q: TakeQuery, x: number, feetY: number, z: number): void {
+/**
+ * Open an arbitration at a point. Nothing offered yet, the radius as the bound.
+ *
+ * --- WORKSTREAM W: `radius` is a parameter, defaulting to `TAKE_RADIUS`.
+ *
+ * `Sticky Fingers` raises the reach 2.2 → 3.2 m, and it does so **per player**,
+ * which is the whole reason this is an argument rather than a module-level read
+ * of the lookup: the server arbitrates every player's take through this one
+ * function on the same tick, so the radius has to arrive with the query rather
+ * than be a global that the last caller set. Every existing call site keeps the
+ * constant by omitting it.
+ */
+export function beginTake(q: TakeQuery, x: number, feetY: number, z: number, radius = TAKE_RADIUS): void {
   q.x = x;
   q.feetY = feetY;
   q.z = z;
   q.found = false;
-  q.bestD2 = TAKE_RADIUS * TAKE_RADIUS;
+  q.bestD2 = radius * radius;
   q.bestIdentity = 0;
 }
 
@@ -1708,11 +1742,23 @@ export function resolveTake(
    * fleet, which is the behaviour that shipped before workstream S.
    */
   statics: StaticCarSource | null = null,
+  /**
+   * --- WORKSTREAM W: this taker's reach and the speed they can pull somebody
+   * out at. `Sticky Fingers` moves both (2.2 → 3.2 m, 3 → 6 m/s).
+   *
+   * Last and optional, on the `statics` parameter's argument one line up: every
+   * existing call site keeps compiling and keeps meaning what it always meant.
+   * The caller supplies them rather than this function reading the lookup for
+   * the reason `beginTake` states -- a take is arbitrated per player and the
+   * radius belongs to the query.
+   */
+  radius = TAKE_RADIUS,
+  takeableSpeed = TAKEABLE_SPEED,
 ): boolean {
   const q = _takeQuery;
-  beginTake(q, x, feetY, z);
-  forEachCarNear(field, x, z, TAKE_RADIUS, tick, scratch, pose, (p) => {
-    if (p.speed > TAKEABLE_SPEED) return;
+  beginTake(q, x, feetY, z, radius);
+  forEachCarNear(field, x, z, radius, tick, scratch, pose, (p) => {
+    if (p.speed > takeableSpeed) return;
     if (taken(p.identity)) return;
     offerTake(
       q, out, p.identity, p.body, p.colour, p.x, p.y, p.z, headingYaw(p.dx, p.dz),
@@ -1720,7 +1766,7 @@ export function resolveTake(
     );
   });
   if (statics !== null) {
-    statics.forEachStaticNear(x, feetY, z, TAKE_RADIUS, (c) => {
+    statics.forEachStaticNear(x, feetY, z, radius, (c) => {
       // No speed clause: a static car is furniture and its speed is zero by
       // definition. And `parked` is unconditionally true -- it *is* the kerb.
       if (taken(c.identity)) return;
@@ -1779,6 +1825,21 @@ export interface DrivenCar {
    * limiter authoritative is not a trade this wire makes.
    */
   damageCooldownMs: number;
+  /**
+   * --- WORKSTREAM W: who was last at the wheel of this car, or 0.
+   *
+   * Unlike `driverId` this is **not** cleared when they get out -- it is the
+   * whole point of it. Two talents are about a car *you left*: `Park Anywhere`
+   * makes it unrecyclable while you are online and untakeable by the other team,
+   * and both questions are asked of a record whose `driverId` is already zero.
+   *
+   * Set on the take and on the sweep that empties a car, so it always names the
+   * person who put the car where it is standing. **Not on the wire**, on
+   * `damageCooldownMs`' argument one field up: the only readers are the
+   * authority's recycler and its take arbitration, and a client that
+   * mispredicted a refused take is corrected by the absence of a `CARS` frame.
+   */
+  lastDriverId: number;
 }
 
 /**
@@ -1849,6 +1910,8 @@ export class CarField implements DrivingLookup {
       yaw: source.yaw,
       speed: 0,
       driverId,
+      // WORKSTREAM W: the take *is* the last driver. See `lastDriverId`.
+      lastDriverId: driverId,
       emptyMs: 0,
       health: CAR_HEALTH_MAX,
       damageCooldownMs: 0,
@@ -1888,6 +1951,12 @@ export class CarField implements DrivingLookup {
       existing.yaw = record.yaw;
       existing.speed = record.speed;
       existing.driverId = record.driverId;
+      // WORKSTREAM W: a record adopted with somebody in it names them as the
+      // last driver too; one adopted empty keeps whoever it had. See
+      // `lastDriverId` -- the field is not on the wire, so this is the only way
+      // a client's mirror ever learns it, and the client only uses it to predict
+      // its own refusals.
+      if (record.driverId !== 0) existing.lastDriverId = record.driverId;
       // **The authority's health wins, always.** This is the line that corrects
       // a driver's prediction of their own crash, and it is unconditional for
       // the reason the position above it is: the server decided how hard you hit
@@ -1899,6 +1968,7 @@ export class CarField implements DrivingLookup {
     }
     const car: DrivenCar = {
       ...record,
+      lastDriverId: record.driverId,
       emptyMs: 0,
       health: record.health ?? CAR_HEALTH_MAX,
       damageCooldownMs: 0,
@@ -2037,6 +2107,9 @@ export class CarField implements DrivingLookup {
       // Left, thrown out, knocked out or disconnected. The position is whatever
       // the last `follow` wrote, which is where the driver was, which is where
       // the car should be standing.
+      // WORKSTREAM W: `lastDriverId` is deliberately *not* cleared here. See
+      // the field: it is the answer to "who left this car", which is exactly the
+      // question `Park Anywhere` asks about a car with no driver.
       car.driverId = 0;
       car.speed = 0;
       car.emptyMs = 0;
@@ -2089,13 +2162,27 @@ export class CarField implements DrivingLookup {
     if (car.damageCooldownMs > 0) return null;
     if (!(amount > 0)) return null;
     if (car.health <= 0) return null;
-    car.health -= amount;
+    // --- WORKSTREAM W. Three talents meet here and this is the only funnel every
+    // impact goes through -- a wall, another player's car, an ambient car and a
+    // kerb all arrive on this line -- which is why the hooks are here rather
+    // than at the four call sites.
+    //
+    // `driverId` is 0 for a car standing empty, and `fx*` of 0 is the identity,
+    // so a parked car shot at by a stray crash is billed exactly as it was.
+    const driver = car.driverId;
+    // Northern Beaches Tunnel: a ram under 20 m/s costs the car nothing at all.
+    // Above it the car pays in full, which is what stops the mega being a car
+    // that cannot be written off.
+    if (fxRamFreeCrash(driver, car.speed)) return null;
+    car.health -= amount * fxCarDamageScale(driver);
     // `applyCarHit`'s femto-pip clamp, and it matters here for its reason: a
     // health of 4e-15 is a car that is not written off, does not smoke black,
     // and has an engine that still turns over -- which is a car nobody can tell
     // apart from a wreck and which no player will ever manage to finish off.
     if (car.health < 1e-9) car.health = 0;
-    car.damageCooldownMs = CRASH_COOLDOWN_MS;
+    // WORKSTREAM W: `Ute Life` shortens the window 500 → 300 ms. Absolute and
+    // min-wins; the key is in seconds and this field is in ms.
+    car.damageCooldownMs = fxCrashCooldownS(driver, CRASH_COOLDOWN_MS / 1000) * 1000;
     this.dirty = true;
     return car;
   }
@@ -2120,13 +2207,27 @@ export class CarField implements DrivingLookup {
    * are all being driven, or all parked in the same suburb as the players, has
    * nothing it can give back, and the take upstream simply fails.
    */
-  recycleFarthest(playersXZ: readonly number[]): number {
+  recycleFarthest(
+    playersXZ: readonly number[],
+    /** WORKSTREAM W: is this car's last driver exempt? Null for "nobody is". */
+    neverRecycles: ((playerId: number) => boolean) | null = null,
+  ): number {
     if (this.byId.size === 0) return 0;
     let bestId = 0;
     let bestDistance = -1;
     let bestEmpty = -1;
     for (const car of this.all()) {
       if (car.driverId !== 0) continue;
+      // --- WORKSTREAM W: `Park Anywhere`'s "never recycles while you are
+      // online". Skipped outright rather than sorted to the back, because the
+      // talent is a promise and a car that is recycled *last* is still recycled.
+      //
+      // "While you are online" is `neverRecycles`, which the caller supplies:
+      // `game/teamfx.fxCarNeverRecycles` answers off the installed `TeamLookup`,
+      // and the framework's lookup returns nothing for an id that has left. That
+      // is what stops a departed player's fleet holding the room's four hundred
+      // records forever -- the exemption evaporates with them.
+      if (neverRecycles !== null && car.lastDriverId !== 0 && neverRecycles(car.lastDriverId)) continue;
       // Plan distance to the nearest person, squared until the comparison is
       // over -- the one `Math.sqrt` is taken after the winner is known, because
       // squares order the same way distances do.

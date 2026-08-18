@@ -196,6 +196,24 @@ import {
   jumpScale,
   speedScale,
 } from './powerups.ts';
+// --- WORKSTREAM W (talent effects). One import block and six one-line reads
+// below; the arithmetic and every composition rule live in `game/teamfx.ts`.
+// With no `TeamLookup` installed every one of these returns its base, which is
+// why `verifyCombat` needed no change: the punch is the punch it always was.
+import { abilityKnockdownImmune, abilityStaggerImmune, abilitySwingBonus } from './abilities.ts';
+import {
+  KNOCKDOWN,
+  fxAbsorbKnockdown,
+  fxBallRechargeS,
+  fxDamageTakenScale,
+  fxFistsKnockdown,
+  fxKnockbackExtraM,
+  fxMaxPips,
+  fxSwingDamageScale,
+  fxSwingUninterruptible,
+  fxSwingWindowMs,
+  STAGGER_SECONDS,
+} from './teamfx.ts';
 // The lime e-bikes. Third leg of the same cycle -- this module imports
 // `powerups.ts`, which imports this one -- and it obeys the same rule: nothing
 // in `game/bikes.ts` reads a powerup binding until it is called. See
@@ -301,6 +319,40 @@ export const THROW_CLOCK_CAP = 60;
  * would notice the other way round.
  */
 export const FLINCH_LOCKOUT = 0.3;
+
+/**
+ * --- WORKSTREAM W: what "knocked down" and "staggered" mean in a game whose
+ * only melee weapon is a cricket bat.
+ *
+ * Half a dozen talents in `game/teams.ts` are written in terms of a knockdown
+ * that staggers instead, or a stagger that knocks down: `FISTS_KNOCKDOWN`,
+ * `FIRST_KNOCKDOWN_IMMUNE_S`, `FAR_HIT_KNOCKDOWN_M`, `GROUP_NO_KNOCKDOWN`,
+ * `PATROL_CANNOT_RAM`, `BERSERK` and `BRACE`. This phase machine has no
+ * knockdown: it has `flinch`, which is 300 ms of no movement, and `ko`, which is
+ * a ragdoll and a respawn, and **every** landed bat hit already throws the
+ * victim the six to eight metres spec 8.2 asks for.
+ *
+ * Rather than invent a third phase -- a ragdoll that gets up, which needs a
+ * stand-up clip, a new snapshot field and a rule for what happens if you are hit
+ * during it -- the two words are mapped onto the two dials the machine already
+ * has, and the mapping is the whole of it:
+ *
+ *   - **a knockdown** is the flight plus a *long* lockout, `KNOCKDOWN_LOCKOUT`;
+ *   - **a stagger** is the damage with **no flight at all** and the short
+ *     `STAGGER_SECONDS` lockout.
+ *
+ * That makes the absorbing talents visible without a single new asset: a Big
+ * Night player eating the first hit of a fight stands exactly where they were
+ * while the swing that should have put them across the road lands, which is the
+ * clearest possible reading of "does nothing but stagger you". And it makes
+ * `FISTS_KNOCKDOWN` mean something in a game with no fists -- your swing pins
+ * them down for a second instead of a third of one, which is the difference
+ * between a trade and a follow-up.
+ *
+ * One second rather than two. Two is long enough to be a stun-lock with two
+ * attackers, and this talent sits at tier 1 of a tree everybody can reach.
+ */
+export const KNOCKDOWN_LOCKOUT = 1.0;
 
 /**
  * Frozen frames on a landed hit, in seconds, for both parties.
@@ -427,6 +479,23 @@ export interface CombatantState {
   respawnT: number;
   /** Seconds of frozen simulation remaining. See the header: per-combatant, never global. */
   hitstopT: number;
+  /**
+   * --- WORKSTREAM W: how long *this* flinch lasts, seconds.
+   *
+   * `FLINCH_LOCKOUT` for every hit in the game as it shipped, and the field
+   * exists because two talents move it in opposite directions: a `FISTS_KNOCKDOWN`
+   * attacker pins the victim for `KNOCKDOWN_LOCKOUT`, and a victim whose Big
+   * Night absorbed the hit is up again after `STAGGER_SECONDS`. See
+   * `KNOCKDOWN_LOCKOUT`.
+   *
+   * **Not on the wire**, and that is deliberate rather than an oversight. The
+   * snapshot carries the phase and the phase clock; a client that has been told
+   * "flinch, 0.4 s in" draws the right thing whatever the lockout was, and the
+   * moment the phase ends the next snapshot says `idle`. Adding a float per
+   * player per tick to carry a number only the authority's `advance` reads
+   * would be paying `PERFORMANCE.md`'s wire budget for nothing.
+   */
+  flinchS: number;
   /**
    * Spec 8.3's two powerups, as seconds remaining on each.
    *
@@ -626,6 +695,23 @@ export interface CombatInput extends InputSnapshot {
    * compiles and still means "not pressing E".
    */
   mount?: boolean;
+  /**
+   * --- WORKSTREAM W: `V`, `G` and `T`, the talent-ability keys.
+   *
+   * Deliberately **not** consumed by `advance`, on `mount`'s argument exactly:
+   * what V does depends on which talents this player has taken, which lives in
+   * `game/teams.ts` behind a `TeamLookup` that this file has no business
+   * resolving, and two of the three can *fail* (a cooldown, a wallet), which is
+   * a decision with a HUD notice attached rather than a movement. So `advance`
+   * carries the bits and the two callers that own an ability table
+   * (`Simulation.resolveAbilities` and the block in `main.ts`) do the deciding.
+   *
+   * All three optional, so every synthetic input in every self-check in this
+   * repo still compiles and still means "not pressing anything".
+   */
+  abilityV?: boolean;
+  abilityG?: boolean;
+  abilityT?: boolean;
 }
 
 /**
@@ -740,6 +826,9 @@ export function createCombatant(id: number, x = 0, z = 0): CombatantState {
     koT: 0,
     respawnT: 0,
     hitstopT: 0,
+    // WORKSTREAM W: the default flinch, which is every flinch until a talent
+    // says otherwise. See `CombatantState.flinchS`.
+    flinchS: FLINCH_LOCKOUT,
     trainingT: 0,
     flatWhiteT: 0,
     ballCharges: BALL_CHARGES,
@@ -778,6 +867,46 @@ export function createCombatant(id: number, x = 0, z = 0): CombatantState {
  */
 export function createHitReport(): HitReport {
   return { attacker: 0, victim: 0, ko: false, health: 0, point: new Vector3() };
+}
+
+/**
+ * --- WORKSTREAM W: how many pips this combatant's bar holds.
+ *
+ * `MAX_HEALTH` for everybody until a talent says otherwise, which is why this is
+ * a function rather than a second constant: `Big Night` is a permanent pip and
+ * `Sunday Rush` is a pip you have only while three of you are standing together,
+ * so "full" is a question with a different answer from one second to the next
+ * and the nameplate, the HUD, the respawn and every heal have to be asking the
+ * same one.
+ *
+ * The composition lives in `game/teamfx.fxMaxPips`; this is the seam that gives
+ * it the base. Everything that used to write `MAX_HEALTH` as a ceiling should
+ * write this instead; everything that uses `MAX_HEALTH` as *the shape of the
+ * bar* (the nameplate's pip count at join, `verifyCombat`'s arithmetic) is
+ * correct to keep the constant.
+ */
+export function maxHealthOf(c: CombatantState): number {
+  return fxMaxPips(c.id, MAX_HEALTH);
+}
+
+/**
+ * Top a combatant up to their (possibly new) maximum. True if it moved.
+ *
+ * Called on the tick a talent is spent, which is the brief's "heal to new max on
+ * take": a player who buys Big Night mid-fight should see the fourth pip arrive
+ * full rather than empty, because an empty new pip is a talent that made you
+ * *look* healthier and did nothing until you next died.
+ *
+ * A no-op for a knocked-out body -- `respawnAt` will do it in three seconds and
+ * healing a corpse to four pips while it is still ragdolling would put a live
+ * health bar over a crumpled one.
+ */
+export function refreshMaxHealth(c: CombatantState): boolean {
+  if (c.phase === 'ko' || c.health <= 0) return false;
+  const max = maxHealthOf(c);
+  if (c.health >= max) return false;
+  c.health = max;
+  return true;
 }
 
 /** Feet height, metres. The mesh origin, the capsule origin, and the ground query's argument. */
@@ -965,14 +1094,19 @@ export function advance(
   // `staminaT` so that the two supply clocks are read together, and it advances on
   // every live tick including a flinch, because a flinch does not un-throw a ball.
   if (c.throwT < THROW_CLOCK_CAP) c.throwT = Math.min(THROW_CLOCK_CAP, c.throwT + dt);
-  while (c.ballCharges < BALL_CHARGES && c.ballT + PHASE_EPSILON >= BALL_RECHARGE) {
+  // WORKSTREAM W: `Long Bomb` / `Set Shot` shorten the recharge 1.6 → 1.1 s.
+  // Read once into a local rather than at both comparisons, so a talent granted
+  // between the `while` and the pin below could not leave the clock above its
+  // own ceiling.
+  const recharge = fxBallRechargeS(c.id, BALL_RECHARGE);
+  while (c.ballCharges < BALL_CHARGES && c.ballT + PHASE_EPSILON >= recharge) {
     c.ballCharges += 1;
-    c.ballT -= BALL_RECHARGE;
+    c.ballT -= recharge;
   }
   // With a full bar the clock is pinned rather than left to run, so a player who
   // has not thrown for a minute is not carrying fifteen banked balls' worth of
   // credit into their next three throws.
-  if (c.ballCharges >= BALL_CHARGES && c.ballT > BALL_RECHARGE) c.ballT = BALL_RECHARGE;
+  if (c.ballCharges >= BALL_CHARGES && c.ballT > recharge) c.ballT = recharge;
 
   // --- The throw. Before the punch, and from any phase but flinch and ko.
   //
@@ -1029,9 +1163,16 @@ export function advance(
     }
   } else if (c.phase === 'active') {
     c.phaseT += dt;
-    if (c.phaseT + PHASE_EPSILON >= PUNCH_ACTIVE) {
+    // WORKSTREAM W: `FX.SWING_WINDOW_MS`. Front Bar and Glassing widen the
+    // ACTIVE window 100 → 130 ms, which is the only talent that changes a phase
+    // length. The *hit test* still fires exactly once, on the first tick of the
+    // window (above), so this buys the time the bat is out and not a second
+    // test -- see the header on why one test at a defined instant is the only
+    // thing two machines can agree about.
+    const active = fxSwingWindowMs(c.id, PUNCH_ACTIVE * 1000) / 1000;
+    if (c.phaseT + PHASE_EPSILON >= active) {
       c.phase = 'recovery';
-      c.phaseT = Math.max(0, c.phaseT - PUNCH_ACTIVE);
+      c.phaseT = Math.max(0, c.phaseT - active);
     }
   } else if (c.phase === 'recovery') {
     c.phaseT += dt;
@@ -1041,9 +1182,12 @@ export function advance(
     }
   } else if (c.phase === 'flinch') {
     c.phaseT += dt;
-    if (c.phaseT + PHASE_EPSILON >= FLINCH_LOCKOUT) {
+    // WORKSTREAM W: `c.flinchS` rather than the constant. It *is* the constant
+    // for every hit until a talent moves it; see `KNOCKDOWN_LOCKOUT`.
+    if (c.phaseT + PHASE_EPSILON >= c.flinchS) {
       c.phase = 'idle';
       c.phaseT = 0;
+      c.flinchS = FLINCH_LOCKOUT;
     }
   }
 
@@ -1112,6 +1256,10 @@ export function advance(
     c.body.position.z,
     movement.yaw,
     world ?? null,
+    // WORKSTREAM W: who is at the wheel, for `Ute Life`'s limp. See
+    // `driving.stepCarSpeed`'s last parameter for why it is passed rather than
+    // read off the `DriveState`.
+    c.id,
   );
   // And the car, last of all, on the bike's argument exactly: it multiplies the
   // scale rather than replacing it, it is read off the combatant because
@@ -1429,9 +1577,24 @@ const impulseDir = /*#__PURE__*/ new Vector3();
  * already uses, meaning "the world did this"), and `main.ts` does the same thing
  * offline by simply not emitting one.
  */
-export function applyWorldDamage(c: CombatantState, pips: number): boolean {
+export function applyWorldDamage(
+  c: CombatantState,
+  pips: number,
+  /**
+   * --- WORKSTREAM W: does the victim's armour apply?
+   *
+   * True for everything that is a *hit* -- a police round, a car, a footy -- and
+   * false for the two things that are not: the pip a G ability charges you on
+   * the way out, and the pip an RBT takes off `Blue Line` for driving through
+   * it. Armour that reduced the cost of your own talent would make Sober Up
+   * cheaper the more armour you stacked, which is not what any of those tooltips
+   * say. Defaulting to true keeps every existing call site meaning what it meant
+   * -- with no lookup installed the scale is 1 either way.
+   */
+  armoured = true,
+): boolean {
   if (c.phase === 'ko' || c.health <= 0) return false;
-  c.health = Math.max(0, c.health - pips);
+  c.health = Math.max(0, c.health - (armoured ? pips * fxDamageTakenScale(c.id) : pips));
   // `applyHit`'s float snap, for its reason: a victim alive by half a femto-pip
   // draws one pip on the HUD and cannot be knocked out by any finite number of
   // further hits.
@@ -1468,7 +1631,22 @@ export function applyWorldDamage(c: CombatantState, pips: number): boolean {
  * knockout off a kerb. Looking straight up or straight down flattens to nothing,
  * so that degenerate case falls back to attacker-to-victim.
  */
-export function applyHit(attacker: CombatantState, victim: CombatantState, out?: HitReport): HitReport {
+export function applyHit(
+  attacker: CombatantState,
+  victim: CombatantState,
+  out?: HitReport,
+  /**
+   * --- WORKSTREAM W: wall milliseconds, for the talents that are clocks.
+   *
+   * Optional and defaulting to zero so every existing call site -- three in
+   * `main.ts`, one in `server/sim.ts`, `verifyCombat` and `game/dummies.ts` --
+   * compiles and behaves exactly as it did: with no `TeamLookup` installed
+   * `fxAbsorbKnockdown` returns `FULL` whatever the clock says, and rule 1 of
+   * this file's header (nothing here reads a clock) survives, because the clock
+   * is still the caller's.
+   */
+  nowMs = 0,
+): HitReport {
   viewDirection(attacker, impulseDir);
   impulseDir.y = 0;
   if (impulseDir.lengthSq() < 1e-6) {
@@ -1486,7 +1664,19 @@ export function applyHit(attacker: CombatantState, victim: CombatantState, out?:
   // "6-8 m of flight" is what makes the distance a thing a player learns, and a
   // trained punch that threw someone 9 m would break the only spatial constant
   // in the fight. Training makes you hit harder, not further.
-  victim.health = Math.max(0, victim.health - damageScale(attacker));
+  //
+  // --- WORKSTREAM W, and the order of the three factors is the whole of it.
+  // The powerup multiplier is the *spec's*, the talent multiplier is the
+  // attacker's (Front Bar, the heat ladder, Cash Rules, a berserk window) and
+  // the armour is the victim's. They multiply rather than add because they are
+  // answers to three different questions -- what did you drink, what did you
+  // spend your points on, what did they spend theirs on -- and a sum would let
+  // one of them cancel another out.
+  const swing =
+    damageScale(attacker) *
+    (fxSwingDamageScale(attacker.id) + abilitySwingBonus(attacker.id, nowMs)) *
+    fxDamageTakenScale(victim.id);
+  victim.health = Math.max(0, victim.health - swing);
   // Snapped to zero a shade above it, and this is the float equivalent of
   // `PHASE_EPSILON`. 3 - 1.4 - 1.4 - 0.2 lands at 4.4e-16 in binary floats: a
   // victim who is alive by half a femto-pip, whose HUD draws `ceil(4.4e-16)` =
@@ -1495,15 +1685,49 @@ export function applyHit(attacker: CombatantState, victim: CombatantState, out?:
   // "0 pips" means the same thing to the knockout branch, to `isTargetable` and
   // to `powerups.tickPowerups`.
   if (victim.health < 1e-9) victim.health = 0;
-  victim.body.velocity.set(
-    impulseDir.x * KNOCKBACK_HORIZONTAL,
-    KNOCKBACK_VERTICAL,
-    impulseDir.z * KNOCKBACK_HORIZONTAL,
-  );
-  // The line the header calls load-bearing: without it the first tick after the
-  // punch charges the victim ground friction for a metre of flight they spend in
-  // the air.
-  victim.body.onGround = false;
+
+  // --- WORKSTREAM W: is this a knockdown, or did something absorb it?
+  //
+  // Asked *before* the impulse is set, because a stagger is defined as the
+  // damage without the flight -- see `KNOCKDOWN_LOCKOUT`. The order of the three
+  // clauses matters: an ability window (Off Your Face, Sober Up) is a thing the
+  // player spent a button on and it never touches Big Night's once-per-30-s, so
+  // it answers first; `fxAbsorbKnockdown` is the one that can *spend* something,
+  // so it is asked last and only when nothing free has already said no. A
+  // knockout is never absorbed: a body at zero pips goes down whatever it took.
+  const absorbed =
+    victim.health > 0 &&
+    (abilityKnockdownImmune(victim.id, nowMs) ||
+      abilityStaggerImmune(victim.id, nowMs) ||
+      fxAbsorbKnockdown(victim.id, nowMs) === KNOCKDOWN.STAGGER);
+  if (absorbed) {
+    // Staggered: they take the pip and stay standing. The velocity is left
+    // exactly as it was rather than zeroed, so a victim who was already running
+    // keeps running -- the talent removes the *punch's* impulse, not the
+    // victim's own momentum.
+    victim.flinchS = STAGGER_SECONDS;
+  } else {
+    // Knocked back, and `KNOCKBACK_HORIZONTAL` plus whatever Cronulla Line's
+    // group bonus adds. That key is in metres and the impulse is in m/s, so it
+    // is converted on the same arithmetic the header measures the flight with:
+    // a launch at v carries roughly v * 0.49 s of air plus the skid, which is
+    // 6.7 m at 11 m/s -- so a metre of extra reach is 11 / 6.7 m/s of extra
+    // launch. One multiply, stated here rather than hidden in `teamfx.ts`,
+    // because it is a fact about *this* file's numbers.
+    const extra = fxKnockbackExtraM(attacker.id);
+    const horizontal =
+      extra > 0 ? KNOCKBACK_HORIZONTAL * (1 + extra / 6.7) : KNOCKBACK_HORIZONTAL;
+    victim.body.velocity.set(
+      impulseDir.x * horizontal,
+      KNOCKBACK_VERTICAL,
+      impulseDir.z * horizontal,
+    );
+    // The line the header calls load-bearing: without it the first tick after the
+    // punch charges the victim ground friction for a metre of flight they spend in
+    // the air.
+    victim.body.onGround = false;
+    victim.flinchS = fxFistsKnockdown(attacker.id) ? KNOCKDOWN_LOCKOUT : FLINCH_LOCKOUT;
+  }
   // And you are off the bike. Getting batted at 26 m/s and staying seated would
   // be the one impact in this game with no consequence, and a rider who kept the
   // multiplier through the knockback would fly about eighty metres.
@@ -1532,6 +1756,21 @@ export function applyHit(attacker: CombatantState, victim: CombatantState, out?:
     victim.phase = 'ko';
     victim.koT = 0;
     victim.respawnT = KO_SECONDS;
+  } else if (
+    // --- WORKSTREAM W: `FX.SWING_UNINTERRUPTIBLE`. Bouncer and Neighbourhood
+    // Watch: "being hit while swinging does not cancel your swing." The only
+    // thing that *does* cancel it is this line assigning `flinch` over the
+    // phase machine, so the talent is the absence of the assignment -- the
+    // pip, the knockback and the hitstop all still land, and the swing runs on
+    // to its own window. Deliberately narrow: it protects a swing in progress
+    // and nothing else, so a Bouncer standing still is flinched exactly as
+    // anybody is.
+    fxSwingUninterruptible(victim.id) &&
+    (victim.phase === 'windup' || victim.phase === 'active')
+  ) {
+    // Phase untouched. `flinchS` was set above and is put back by the flinch
+    // branch of `advance` the next time one runs, so nothing leaks.
+    victim.flinchS = FLINCH_LOCKOUT;
   } else {
     victim.phase = 'flinch';
     victim.phaseT = 0;
@@ -1560,7 +1799,10 @@ export function respawnAt(c: CombatantState, x: number, y: number, z: number, ya
   c.body.onGround = true;
   c.body.yaw = yaw;
   c.body.pitch = 0;
-  c.health = MAX_HEALTH;
+  // WORKSTREAM W: full health is whatever full is for this player. Big Night is
+  // a permanent pip, so a respawn that handed back the module constant would
+  // take it away every three seconds. See `maxHealthOf`.
+  c.health = maxHealthOf(c);
   c.stamina = MAX_STAMINA;
   c.staminaT = STAMINA_RECOVERY;
   c.phase = 'idle';

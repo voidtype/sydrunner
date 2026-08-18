@@ -129,6 +129,14 @@ import { verifyUnstuck } from '../client/src/game/unstuck.ts';
 // the top of the ladder -- lands on players in a session and never in a
 // browser's console. See `client/src/game/heat.ts`'s check for the list.
 import { verifyHeat } from '../client/src/game/heat.ts';
+// --- WORKSTREAM W: the talent hooks and the ability table. One entry in this
+// list and one in `main.ts`, both running the same two functions, because every
+// number in them is evaluated on **both** ends -- the swing damage the browser
+// predicts and this process adjudicates, the take radius both arbitrate, the
+// crash multiplier the driver's client uses to move its own health bar. See
+// `client/src/game/teamfx.ts`.
+import { verifyTeamFx } from '../client/src/game/teamfx.ts';
+import { verifyAbilities } from '../client/src/game/abilities.ts';
 // Polair's orbit, beam schedule and marksman. Run **here** as well as in the
 // browser because this process is the one that rolls the shot: `stepHeat` calls
 // `polairPose` for the slant range, and every failure in that file is silent in
@@ -327,6 +335,13 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // looking. See `client/src/game/sunbutton.ts`.
     ['verifySunButton', verifySunButton()],
     ['verifyHeat', verifyHeat()],
+    // Talents into numbers, and the four ability buttons. Every failure in these
+    // two is silent in this repo's sense: a swing multiplier that composed wrong
+    // is a fight that feels slightly off, a take radius that did not move is a
+    // talent the player paid a point for and cannot tell is missing, and a
+    // once-per-day stamp that compares timestamps instead of day indices comes
+    // back at a different hour on every host. See `game/teamfx.ts`.
+    ['verifyTeamFx', [...verifyTeamFx(), ...verifyAbilities()]],
     ['verifyPolair', verifyPolair()],
     // --- WORKSTREAM V. `verifyTeams` is the contract's own and is here for a
     // reason the rest of this list does not have: it is a **spelling** check.

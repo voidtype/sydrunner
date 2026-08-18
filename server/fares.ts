@@ -61,6 +61,9 @@ import {
   type FareState,
 } from '../client/src/game/cash.ts';
 import type { PedBand } from '../client/src/game/pedestrians.ts';
+// WORKSTREAM W (talent effects): the fare multipliers. Both are the identity
+// with no `TeamLookup` installed. See `client/src/game/teamfx.ts`.
+import { fxFareRadiusM, fxFareScale, fxFareTip } from '../client/src/game/teamfx.ts';
 
 /**
  * The one thing this file wants from the footpath network.
@@ -161,6 +164,20 @@ export interface FareContext {
   peds: BandSource;
   /** Scratch for the band query. Owned by the caller, reused every call. */
   bands: PedBand[];
+  /**
+   * --- WORKSTREAM W: the day/night phase, `sky/cycle.cyclePhase(clockMs)`.
+   *
+   * `Surge` pays +40% between sunset and sunrise and `Tradie Rates` +25% from
+   * sunrise to 15:00, so the payout needs to know what time it is. It arrives on
+   * the context rather than being computed here because this file has no clock
+   * of its own -- `nowMs` beside it is wall time and the in-game hour is the
+   * server's `clockMs`, which only `Simulation` holds.
+   *
+   * Optional and defaulting to 0.5 -- the middle of the afternoon, which is
+   * inside neither window -- so `verifyFares` and every existing caller keep
+   * paying exactly what they paid.
+   */
+  phase?: number;
 }
 
 /** What a step did that the caller has to act on. */
@@ -279,7 +296,17 @@ export function stepFare(job: FareJob, ctx: FareContext): FareStepResult {
     case 'toDropoff': {
       if (!held(job, ctx, job.dx, job.dz, DROPOFF_STOP_M)) break;
       const seconds = Math.max(0, (ctx.nowMs - job.boardedMs) / 1000);
-      job.payout = farePayout(job.tripM, seconds, job.rough);
+      // --- WORKSTREAM W: the talent multiplier and the tip. `fxFareScale` folds
+      // Surge, Tradie Rates and Tip Jar's collective cut into one number; the
+      // tip is Surge's $10 and is only paid on a quick trip (`farePayout` gates
+      // it on the same test the fast bonus uses).
+      job.payout = farePayout(
+        job.tripM,
+        seconds,
+        job.rough,
+        fxFareScale(ctx.playerId, ctx.phase ?? 0.5),
+        fxFareTip(ctx.playerId),
+      );
       job.state = 'done';
       job.stopT = 0;
       job.cooldownT = FARE_COOLDOWN_SECONDS;
@@ -352,7 +379,11 @@ function reset(job: FareJob): void {
  */
 function offer(job: FareJob, ctx: FareContext): boolean {
   const seed = hash2(ctx.playerId, ctx.tick);
-  if (!pickKerbPoint(ctx.peds, ctx.x, ctx.z, PICKUP_MIN_M, PICKUP_MAX_M, seed, ctx.bands, point)) return false;
+  // WORKSTREAM W: `Surge` widens the pickup band 900 → 1400 m. Absolute and
+  // max-wins; the *minimum* is untouched, because a talent that made pickups
+  // start further away as well would be a downgrade dressed as a buff.
+  const pickupMax = fxFareRadiusM(ctx.playerId, PICKUP_MAX_M);
+  if (!pickKerbPoint(ctx.peds, ctx.x, ctx.z, PICKUP_MIN_M, pickupMax, seed, ctx.bands, point)) return false;
   const px = point.x;
   const pz = point.z;
   if (!pickKerbPoint(ctx.peds, px, pz, TRIP_MIN_M, TRIP_MAX_M, hash2(seed, 0x9e3779b9), ctx.bands, point)) {
@@ -372,7 +403,15 @@ function offer(job: FareJob, ctx: FareContext): boolean {
   job.rough = false;
   // What it would pay driven at the target pace with nobody run over: the
   // number the HUD shows while you decide whether to bother.
-  job.payout = farePayout(job.tripM, job.tripM / 12, false);
+  // The estimate carries the same multiplier the real payout will, or the HUD
+  // would offer $18 and pay $25 -- which reads as a bug rather than as a bonus.
+  job.payout = farePayout(
+    job.tripM,
+    job.tripM / 12,
+    false,
+    fxFareScale(ctx.playerId, ctx.phase ?? 0.5),
+    fxFareTip(ctx.playerId),
+  );
   job.state = 'offered';
   job.version++;
   return true;
