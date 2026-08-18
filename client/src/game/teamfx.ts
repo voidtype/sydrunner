@@ -141,7 +141,20 @@ let walletReader: (playerId: number) => number = () => 0;
  * self-check wants between cases and what an offline browser runs on.
  */
 export function setTeamLookup(l: TeamLookup | null): void {
+  if (pinned) return;
   lookup = l ?? NO_TEAMS;
+}
+/**
+ * A driver's override. `Simulation` re-points the lookup at its own `TeamField`
+ * every tick (a host runs several rooms), which would silently undo a check
+ * that installed a fake one; `pinTeamLookup` installs and holds it until
+ * `pinTeamLookup(null)`. Not for game code.
+ */
+let pinned = false;
+export function pinTeamLookup(l: TeamLookup | null): void {
+  pinned = false;
+  setTeamLookup(l);
+  pinned = l !== null;
 }
 /** The installed lookup, for the two hooks that need `teamOf` and nothing else. */
 export function teamLookup(): TeamLookup {

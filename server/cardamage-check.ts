@@ -37,7 +37,7 @@ import {
 import { PedestrianField } from '../client/src/game/pedestrians.ts';
 // WORKSTREAM W: the talent fixture. `fakeTeamLookup` is exported by `teamfx.ts`
 // precisely so the drivers can install one without building a real roster.
-import { fakeTeamLookup, setTeamLookup } from '../client/src/game/teamfx.ts';
+import { fakeTeamLookup, pinTeamLookup } from '../client/src/game/teamfx.ts';
 import { FX, TEAM, type TeamLookup } from '../client/src/game/teams.ts';
 import { MAX_HEALTH } from '../client/src/game/combat.ts';
 import { EYE_HEIGHT } from '../client/src/player/controller.ts';
@@ -690,7 +690,7 @@ function runUteLife(): string[] {
 
   /** One car, one wall, one lookup. Returns the health the crash cost. */
   const crashOnce = (lookup: TeamLookup | null): number => {
-    setTeamLookup(lookup);
+    pinTeamLookup(lookup);
     const sim = new Simulation(emptyWorld());
     const p = sim.join(0, null);
     const out: TickOutput = { tick: 0, events: [], snapshot: null };
@@ -713,7 +713,7 @@ function runUteLife(): string[] {
       if (car.health < before) break;
     }
     p.input.forward = 0;
-    setTeamLookup(null);
+    pinTeamLookup(null);
     return before - car.health;
   };
 
@@ -746,7 +746,7 @@ function runUteLife(): string[] {
 
   // And the crash cooldown, which is the other half of the node and is a
   // property of the record rather than of the arithmetic.
-  setTeamLookup(fakeTeamLookup({ [FX.CRASH_COOLDOWN_S]: 0.3 }, TEAM.DEFAULT));
+  pinTeamLookup(fakeTeamLookup({ [FX.CRASH_COOLDOWN_S]: 0.3 }, TEAM.DEFAULT));
   const sim = new Simulation(emptyWorld(false));
   const p = sim.join(0, null);
   const car = sim.cars.take(
@@ -757,7 +757,7 @@ function runUteLife(): string[] {
   if (Math.abs(car.damageCooldownMs - 300) > 1) {
     failures.push(`Ute Life left a ${car.damageCooldownMs} ms crash cooldown, not 300.`);
   }
-  setTeamLookup(null);
+  pinTeamLookup(null);
   const stockSim = new Simulation(emptyWorld(false));
   const sp = stockSim.join(0, null);
   const sc = stockSim.cars.take(

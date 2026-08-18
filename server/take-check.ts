@@ -143,7 +143,7 @@ import {
 import { decodeCars as decodeCarsWire, encodeCars } from '../client/src/net/protocol.ts';
 // WORKSTREAM W: the talent fixture and the two names. See the section at the
 // foot of this file.
-import { fakeTeamLookup, setTeamLookup } from '../client/src/game/teamfx.ts';
+import { fakeTeamLookup, pinTeamLookup } from '../client/src/game/teamfx.ts';
 import { FX, TEAM, TEAM_NAME } from '../client/src/game/teams.ts';
 
 const failures: string[] = [];
@@ -1405,7 +1405,7 @@ if (staticPool.length === 0) {
   // framework will implement, so the wiring under test is the real wiring.
   const owner = sim.join(0, null, 'owner');
   const thief = sim.join(0, null, 'thief2');
-  setTeamLookup({
+  pinTeamLookup({
     teamOf: (id) => (id === owner.id ? TEAM.DEFAULT : id === thief.id ? TEAM.MARITA : TEAM.NONE),
     scalar: (id, key) => (id === owner.id && key === FX.CAR_TEAM_LOCK ? 1 : 0),
     flag: (id, key) => id === owner.id && key === FX.CAR_TEAM_LOCK,
@@ -1472,7 +1472,7 @@ if (staticPool.length === 0) {
   // buys. Swept over the pool until one such point is found, and reported as
   // "not exercised" if the geometry never offers one -- a false pass is better
   // than a check that fails on a build where every car is flush to the gutter.
-  setTeamLookup(fakeTeamLookup({ [FX.TAKE_RADIUS_M]: 3.2, [FX.TAKEABLE_SPEED]: 6 }, TEAM.MARITA));
+  pinTeamLookup(fakeTeamLookup({ [FX.TAKE_RADIUS_M]: 3.2, [FX.TAKEABLE_SPEED]: 6 }, TEAM.MARITA));
   let reachedFar = 0;
   let stockRefused = 0;
   for (const c of staticPool.slice(0, 40)) {
@@ -1488,7 +1488,7 @@ if (staticPool.length === 0) {
     const spot = { x: c.x + (dx / len) * away, z: c.z + (dz / len) * away };
     if (bikeAnswersFirst(spot, c.groundY)) continue;
     // Stock first, with no lookup: 3.0 m is outside 2.2 and must refuse.
-    setTeamLookup(null);
+    pinTeamLookup(null);
     place(thief, spot, c.groundY, c.yaw);
     pressE(thief);
     if (thief.combat.drivingCar !== 0) {
@@ -1498,7 +1498,7 @@ if (staticPool.length === 0) {
     }
     stockRefused++;
     // Now with Sticky Fingers.
-    setTeamLookup(fakeTeamLookup({ [FX.TAKE_RADIUS_M]: 3.2, [FX.TAKEABLE_SPEED]: 6 }, TEAM.MARITA));
+    pinTeamLookup(fakeTeamLookup({ [FX.TAKE_RADIUS_M]: 3.2, [FX.TAKEABLE_SPEED]: 6 }, TEAM.MARITA));
     place(thief, spot, c.groundY, c.yaw);
     pressE(thief);
     if (thief.combat.drivingCar !== 0) {
@@ -1507,7 +1507,7 @@ if (staticPool.length === 0) {
       break;
     }
   }
-  setTeamLookup(null);
+  pinTeamLookup(null);
   if (stockRefused === 0) {
     say('  no standing point in the pool sat between 2.2 m and 3.2 m; the reach case is not exercised.');
   } else if (reachedFar === 0) {
