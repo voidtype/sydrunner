@@ -553,7 +553,7 @@ add to them rather than around them. If the protocol shape changed, bump `PROTOC
 and fix the assertion in `server/integration-check.ts` in the same commit.
 
 The box side that code depends on and that a rsync does not carry:
-`/etc/systemd/system/sydney.service.d/{memory,state}.conf`
+`/etc/systemd/system/sydney.service.d/{memory,state,boot-memory}.conf`
 (`SYDNEY_LANES_CAP_MB=60`, `SYDNEY_STATE_DIR=/var/lib/sydney`), the Caddy
 `handle /auth/*` block, and `/var/lib/sydney/{wallets,accounts}.json`, which
 must never be rsynced over.
@@ -887,6 +887,14 @@ welcome, ≥20 snapshots, a rising `ackSeq`, and a close code of 1000.
   city itself (about 190 MB), which is loaded once per *process* — so four host
   processes on one box is 760 MB before a single player joins, and that is the
   number to size against rather than the per-room one.
+- **Boot peaks over steady state, and the ceiling is sized for the peak.**
+  Loading the world (collision prisms, terrain grids, lanes, parked cars) peaks
+  at ~588 MB and then settles at ~250 MB. `MemoryHigh` was 560 M, so every
+  restart spent its last twenty seconds throttled and reclaiming inside its own
+  cgroup — the boot-time version of the disease the lanes cap fixed in play.
+  `boot-memory.conf` raises it to **640 M**, above the measured peak and still
+  60 M under `MemoryMax=700M`, so a real leak still restarts the service rather
+  than the box (2026-08-19).
 - **Restart policy** is `on-failure` with `RestartSec=2`. A clean exit is
   treated as intentional.
 - **Ports.** 80 and 443 only, plus the pre-existing 22. `ufw` is inactive on
