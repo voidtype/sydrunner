@@ -1861,6 +1861,48 @@
          it. The chip's colours are set inline from `game/teams.TEAM_COLOUR`,
          for the reason the talent nodes' are: the two hex triples are the
          contract's and a copy here would be a copy that goes stale. */
+      /* --- The build sheet. A scoreboard, not a modal: it appears under a held
+         key, takes no input, and is deliberately narrower than the talents panel
+         so the street stays visible around it. Team names are never uppercased
+         here (see `.tcard .tname`). */
+      #buildsheet {
+        position: fixed; left: 50%; top: 12%; transform: translateX(-50%);
+        z-index: 40; display: none; width: min(880px, 92vw);
+        background: rgba(12, 14, 17, .88); border: 1px solid #2a2f37;
+        padding: 12px 14px 10px; pointer-events: none;
+      }
+      #buildsheet.shown { display: block; }
+      #buildsheet-head {
+        display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+        font-size: 12px; color: #9aa3ad; letter-spacing: .04em;
+      }
+      #buildsheet-head b {
+        text-transform: none; font-size: 13px; font-weight: 700;
+        padding: 2px 7px; border-radius: 2px; letter-spacing: .04em;
+      }
+      #buildsheet-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+      #buildsheet .bcol { border-top: 2px solid #2a2f37; padding-top: 7px; min-width: 0; }
+      #buildsheet .bcol h4 {
+        margin: 0 0 6px; font-size: 13px; font-weight: 800; letter-spacing: .02em;
+        display: flex; justify-content: space-between; align-items: baseline;
+      }
+      #buildsheet .bcol h4 span { font-size: 10px; color: #7f95ab; font-weight: 600; }
+      #buildsheet .btaken { margin-bottom: 7px; }
+      #buildsheet .btaken b { font-size: 12px; font-weight: 700; color: #e9e6df; }
+      #buildsheet .bkind {
+        font-size: 8.5px; letter-spacing: .14em; color: #7f95ab; margin-left: 5px;
+      }
+      #buildsheet .btaken p { margin: 1px 0 0; font-size: 10.5px; line-height: 1.35; color: #9aa3ad; }
+      #buildsheet .bnone { margin: 0; font-size: 10.5px; color: #5f7285; font-style: italic; }
+      #buildsheet .bnext {
+        margin-top: 6px; padding-top: 5px; border-top: 1px dashed #2a2f37;
+        font-size: 10px; color: #ffd479;
+      }
+      #buildsheet-foot {
+        margin-top: 9px; padding-top: 7px; border-top: 1px solid #2a2f37;
+        font-size: 9.5px; letter-spacing: .12em; color: #5f7285;
+      }
+
       /* --- The level-up beat -------------------------------------------------
          Centre screen, 1.7 s, then it is gone. Deliberately restrained: a scale
          from 0.86 with a fade, a hairline rule that widens under the words, and
@@ -2037,7 +2079,7 @@
            Sharing this line rather than taking its own, because the camera
            bindings beside it are the same kind of thing — something in your
            hand rather than a panel. See `main.ts`'s keydown listener. -->
-      <div class="keys">wheel zoom out · v third person · f torch</div>
+      <div class="keys">wheel zoom out · c third person · f torch · b your build</div>
       <div class="more">h — all controls</div>
       <!-- The box behind Escape grew two more tabs — what's new, and report a
            bug — and this line still said "suggestions", so the one panel in the
@@ -2081,6 +2123,7 @@
              anybody who had bought one, which made this line true for some
              players and false for others. -->
         <div><kbd>wheel</kbd>zoom out to third person, to 12.8 m · <kbd>c</kbd>toggle</div>
+        <div><kbd>b</kbd>hold to read your talents without stopping · <kbd>esc</kbd> &gt; talents to spend a point</div>
       </section>
       <!-- WORKSTREAM W: the talent abilities. Its own section rather than lines
            under `movement`, because none of these keys does anything at all
@@ -2449,6 +2492,14 @@
          a modal appearing out of nowhere. Team names are never uppercased here or
          anywhere else; see the `.tcard .tname` rule. -->
     <div id="levelup" aria-hidden="true"><b id="levelup-line"></b><span id="levelup-sub"></span></div>
+    <!-- The build sheet: hold `b` to read what you have spent, without stopping.
+         Non-modal by construction -- no cursor, no `hud.typing`, the world keeps
+         running underneath. See `client/src/buildsheet.ts`. -->
+    <div id="buildsheet" aria-hidden="true">
+      <div id="buildsheet-head"></div>
+      <div id="buildsheet-body"></div>
+      <div id="buildsheet-foot">hold b to read · esc &gt; talents to spend</div>
+    </div>
     <div id="talents"></div>
     <div id="talents-tip"></div>
 

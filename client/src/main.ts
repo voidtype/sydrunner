@@ -233,6 +233,7 @@ import { EMPTY_MASK, TEAM, TEAM_NAME, verifyTeams, type Team } from './game/team
 import { verifyTeamField } from './game/teamfield.ts';
 import { verifyTeamsWire } from './net/teams.ts';
 import { TalentsPanel, verifyTalentsPanel } from './teams.ts';
+import { BuildSheet, verifyBuildSheet } from './buildsheet.ts';
 import { ChangelogFeed, verifyChangelog, verifyChangeFeed } from './changelog.ts';
 import { BugReportForm, FrameGrabber, verifyBugReport } from './bugreport.ts';
 // --- Accounts, handles and the level ladder. Workstream G.
@@ -797,6 +798,7 @@ async function main(): Promise<void> {
   const teamFieldFailures = timed('team auras', verifyTeamField);
   const teamWireFailures = timed('teams wire', verifyTeamsWire);
   const talentPanelFailures = timed('talents panel', verifyTalentsPanel);
+  const buildSheetFailures = timed('build sheet', verifyBuildSheet);
   // And the two tabs beside it, on the same criterion a fourth and fifth time.
   // The change feed's failures are all *text*: a parser that trusts the shape
   // draws "undefined" three times on any host that answers a missing file with
@@ -1305,6 +1307,7 @@ async function main(): Promise<void> {
     teamFieldFailures.length ||
     teamWireFailures.length ||
     talentPanelFailures.length ||
+    buildSheetFailures.length ||
     changelogFailures.length ||
     bugFailures.length ||
     cashFailures.length ||
@@ -1380,6 +1383,7 @@ async function main(): Promise<void> {
           ...teamFieldFailures,
           ...teamWireFailures,
           ...talentPanelFailures,
+          ...buildSheetFailures,
           ...cashFailures,
           ...phoneFailures,
           ...changelogFailures,
@@ -4135,12 +4139,17 @@ async function main(): Promise<void> {
    * argument: `?offline` has no ladder, so the panel asks, gets "no team, level
    * 1, not online", and never opens.
    */
-  const talents = new TalentsPanel({
-    signedIn: () => joinGate.signedIn,
+  // The read half of the talent state, hoisted so the modal panel and the
+  // hold-to-read build sheet cannot disagree about what you have spent.
+  const talentRead = {
     online: () => net !== null,
     team: () => net?.myTeam ?? TEAM.NONE,
     mask: () => net?.myTalents ?? EMPTY_MASK,
     level: () => net?.myTalentLevel ?? 1,
+  };
+  const talents = new TalentsPanel({
+    signedIn: () => joinGate.signedIn,
+    ...talentRead,
     choose: (team) => net?.chooseTeam(team),
     take: (nodeId) => net?.takeTalent(nodeId),
     refund: (nodeId) => net?.refundTalent(nodeId),
@@ -4153,6 +4162,17 @@ async function main(): Promise<void> {
     // before it opens. See `client/src/teams.TalentsPanel.beat`.
     fanfare: () => audio.levelUp(),
   });
+
+  /**
+   * The build sheet: hold `b` and read what you spent, without stopping.
+   *
+   * A sibling of the panel above and deliberately not part of it -- see
+   * `client/src/buildsheet.ts`'s header for why remembering and spending are
+   * two screens. It takes no input and sets no modal flag, so the keydown
+   * listener below does *not* gate on it: you can walk, drive and be shot at
+   * while it is up, which is the point.
+   */
+  const buildSheet = new BuildSheet(talentRead);
 
   // --- The nameplates: a name and a large health bar over every other player.
   //
@@ -6193,6 +6213,13 @@ async function main(): Promise<void> {
     // a continuous scalar rather than a jump to a fixed boom -- you get back the
     // camera you were zoomed to, not somebody's default.
     //
+    // `B`: hold to read your build. Not a toggle and not a modal -- see
+    // `client/src/buildsheet.ts`. It sits above the camera key because it is the
+    // same kind of thing: something you do *while* playing rather than instead
+    // of it. Edge-triggered like its neighbours; `keyup` and `blur` below put it
+    // away, and `blur` matters because alt-tabbing with a key held never sends
+    // the release.
+    if (e.code === 'KeyB' && !held) buildSheet.show();
     // --- WORKSTREAM Z: **this was `V` until now, and the move is the point.**
     //
     // Workstream W put the talent dash on `V` and resolved the collision by
@@ -6375,11 +6402,13 @@ async function main(): Promise<void> {
       e.preventDefault();
       hud.setLeaderboard(false);
     }
+    if (e.code === 'KeyB') buildSheet.hide();
   });
   // And on losing focus, which is the case a keyup never arrives for: alt-tabbing
   // out with the board up would otherwise leave it on screen for the rest of the
   // session, because the key it is held with is released in another window.
   window.addEventListener('blur', () => {
+    buildSheet.hide();
     keys.clear();
     hud.setLeaderboard(false);
   });
@@ -9354,6 +9383,7 @@ async function main(): Promise<void> {
     // Both are one comparison in the ordinary case; see `TalentsPanel.frame`.
     net?.updateTeams(player.position.x, player.position.z);
     talents.frame();
+    buildSheet.frame();
 
     // The map, on the frame delta and redrawing on its own 15 Hz clock inside.
     // `player.yaw` rather than `input.yaw`, and the difference is visible: the

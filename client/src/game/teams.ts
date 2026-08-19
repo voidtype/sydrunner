@@ -395,6 +395,61 @@ export const NO_TEAMS: TeamLookup = Object.freeze({
   flag: () => false,
 });
 
+/**
+ * Your build as rows, for the sheet you can read without stopping the game.
+ *
+ * The owner: *"need a way to view points in talents in normal play so i can see
+ * what ive spent an think about later"*. The talents panel is a modal with a
+ * cursor -- it is where you *spend*, and it stops you playing. This is the other
+ * half: a pure summary the HUD can draw behind a held key, with no DOM, no
+ * three and no `document` in sight, so `verifyTeams` can assert every line of
+ * it and the server could render the same thing into a log if it ever wanted to.
+ *
+ * Ordered the way the trees are drawn, so what you read here sits where you
+ * remember clicking it. A tree with nothing in it is still listed: the empty
+ * ones are the interesting half of "what could I do with the two points I have
+ * left", which is the sentence the owner actually asked for.
+ */
+export interface BuildRow {
+  tree: string;
+  spent: number;
+  /** Taken nodes, tier order: `{ name, kind, tier, effect }`. */
+  taken: Array<{ name: string; kind: NodeKind; tier: number; effect: string }>;
+  /** What a spare point could buy in this tree right now, by name. */
+  next: string[];
+}
+export interface BuildSummary {
+  team: Team;
+  teamName: string;
+  level: number;
+  spent: number;
+  unspent: number;
+  rows: BuildRow[];
+}
+export function buildSummary(team: Team, mask: Readonly<TalentMask>, level: number): BuildSummary {
+  const spent = countBits(mask);
+  const rows: BuildRow[] = [];
+  for (const tree of TREES) {
+    if (tree.team !== team) continue;
+    const taken: BuildRow['taken'] = [];
+    const next: string[] = [];
+    for (const nd of nodesFor(team, tree.index)) {
+      if (hasNode(mask, nd.id)) taken.push({ name: nd.name, kind: nd.kind, tier: nd.tier, effect: nd.effect });
+      else if (takeRefusal(mask, team, level, nd.id) === '') next.push(nd.name);
+    }
+    taken.sort((a, b) => a.tier - b.tier);
+    rows.push({ tree: tree.name, spent: spentInTree(mask, team, tree.index), taken, next });
+  }
+  return {
+    team,
+    teamName: TEAM_NAME[team],
+    level,
+    spent,
+    unspent: Math.max(0, pointsFor(level) - spent),
+    rows,
+  };
+}
+
 // --- Self-check --------------------------------------------------------------------------
 
 export function verifyTeams(): string[] {
@@ -448,5 +503,40 @@ export function verifyTeams(): string[] {
   const rech = withNode(withNode({ lo: 0, hi: 0 }, 15), 36);
   if (ownScalar(rech, FX.BALL_RECHARGE_S) !== 1.1) bad.push('min-wins key did not take the minimum.');
   if (hasNode(withNode({ lo: 0, hi: 0 }, 41), 41) !== true || hasNode(withNode({ lo: 0, hi: 0 }, 41), 40)) bad.push('The high half of the mask is wrong.');
+
+  // --- The build sheet. What this catches: a summary that lied about how many
+  //     points are left, or that offered a node the rule would refuse, is a
+  //     sheet a player plans against and then cannot spend.
+  {
+    const none = buildSummary(TEAM.NONE, { lo: 0, hi: 0 }, 5);
+    if (none.rows.length !== 0) bad.push('A player with no side was given trees to read.');
+    let m2: TalentMask = withNode({ lo: 0, hi: 0 }, bn.id); // Big Night, in Servo
+    const sheet = buildSummary(TEAM.MARITA, m2, 4);
+    if (sheet.rows.length !== 3) bad.push(`${TEAM_NAME[TEAM.MARITA]}'s sheet has ${sheet.rows.length} trees, not 3.`);
+    if (sheet.spent !== 1 || sheet.unspent !== 3) bad.push(`A level-4 with one point spent reads ${sheet.spent}/${sheet.unspent}; it should be 1 spent, 3 left.`);
+    const servo = sheet.rows.find((r) => r.spent === 1);
+    if (!servo || servo.taken.length !== 1 || servo.taken[0].name !== bigNightOf(TEAM.MARITA)!.name) {
+      bad.push('The sheet did not put Big Night in the tree it was spent in.');
+    }
+    for (const row of sheet.rows) {
+      for (const name of row.next) {
+        const nd = NODES.find((n) => n.name === name && n.team === TEAM.MARITA);
+        if (!nd || takeRefusal(m2, TEAM.MARITA, 4, nd.id) !== '') {
+          bad.push(`The sheet offered ${name} as a next pick, but the rule refuses it.`);
+        }
+      }
+    }
+    // Nothing is offered when there is nothing to spend.
+    const broke = buildSummary(TEAM.MARITA, m2, 1);
+    if (broke.unspent !== 0 || broke.rows.some((r) => r.next.length > 0)) {
+      bad.push('A player with no points left was still offered picks.');
+    }
+    // Taken nodes come back in tier order, so the sheet reads down the tree.
+    for (let i = 0; i < 5; i++) m2 = withNode(m2, nodesFor(TEAM.MARITA, 0)[i].id);
+    const ordered = buildSummary(TEAM.MARITA, m2, 10).rows.find((r) => r.tree === 'Streets');
+    if (!ordered || ordered.taken.some((t, i, all) => i > 0 && t.tier < all[i - 1].tier)) {
+      bad.push('The sheet listed a tier-3 talent above a tier-1 one.');
+    }
+  }
   return bad;
 }
