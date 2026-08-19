@@ -734,7 +734,14 @@ export const MSG = {
  * lead bumps it once for the whole batch, together with the assertion in
  * `server/integration-check.ts`.
  */
-export const PROTOCOL_VERSION = 18;
+/*
+ * v19: the talents that were only text now act, and one of them needed a bit.
+ * `INPUT`'s `buttons` is a u16 (10 -> 11 bytes) because bits 0-7 were full and
+ * the cafe ability wanted bit 8; `EVENT_FLAG.ALLY` marks a knockout an NPC
+ * fighting for you landed. A v18 server would read the new INPUT one byte short
+ * and mis-decode every button after the first, which is a bump.
+ */
+export const PROTOCOL_VERSION = 19;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
