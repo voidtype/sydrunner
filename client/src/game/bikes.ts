@@ -650,6 +650,27 @@ export class BikeField {
   private flat: Bike[] = [];
   private dirty = true;
 
+  /**
+   * WORKSTREAM AA: the ids of the bikes somebody is on.
+   *
+   * `follow` used to walk **every bike in the city** to find them -- 5,511
+   * objects a tick on the server, of which nought are ridden almost always. On
+   * its own that is a cheap loop; what made it 60 us a tick was the cache, not
+   * the branch. A 5,511-entry array of small objects is 5,511 pointer chases
+   * over about 250 kB, and once anything else in the tick had walked the
+   * pedestrian field the whole thing was cold again, so the sweep paid a miss
+   * per bike, every tick, to discover that nobody was riding.
+   *
+   * A set of the ids instead. It is written in exactly three places -- `claim`,
+   * `release` and `follow`'s own drop branch -- which are the only three lines
+   * in the project that assign `Bike.rider`, and `verifyBikes` asserts the two
+   * cannot drift apart over a randomised sequence of all three.
+   */
+  private readonly ridden = new Set<number>();
+
+  /** `follow`'s rider lookup, reused. One `Map` a tick, forever, was the other half. */
+  private readonly seen = new Map<number, RiderView>();
+
   /** Put a bike in the world, or move one already there. Returns it. */
   adopt(id: number, spot: BikeSpot): Bike {
     const existing = this.byId.get(id);
@@ -672,6 +693,17 @@ export class BikeField {
 
   get size(): number {
     return this.byId.size;
+  }
+
+  /**
+   * WORKSTREAM AA: the ridden set, ascending, for `verifyBikes`.
+   *
+   * Sorted and copied, so it is a snapshot to compare against rather than the
+   * live set -- and it exists for the check alone. Nothing in the tick calls
+   * it; `follow` iterates the set directly.
+   */
+  riddenIds(): number[] {
+    return [...this.ridden].sort((a, b) => a - b);
   }
 
   /** Every bike, in id order. Owned by this object and reused -- do not retain it. */
@@ -721,6 +753,13 @@ export class BikeField {
     if (!bike) return false;
     if (bike.rider !== 0 && bike.rider !== rider) return false;
     bike.rider = rider;
+    // WORKSTREAM AA: and into the ridden set, which is what `follow` walks
+    // instead of the city. `rider` is a participant id and is never 0 from any
+    // caller, but the zero case is handled rather than asserted -- a claim for
+    // nobody is a release, and a set that disagreed with the field would be a
+    // bike that could never be dropped.
+    if (rider === 0) this.ridden.delete(id);
+    else this.ridden.add(id);
     return true;
   }
 
@@ -729,6 +768,7 @@ export class BikeField {
     const bike = this.byId.get(id);
     if (!bike) return;
     bike.rider = 0;
+    this.ridden.delete(id);
     bike.x = x;
     bike.y = y;
     bike.z = z;
@@ -749,11 +789,28 @@ export class BikeField {
    */
   follow(riders: Iterable<RiderView>, changed: Bike[] = []): Bike[] {
     changed.length = 0;
-    const seen = new Map<number, RiderView>();
+    const seen = this.seen;
+    seen.clear();
     for (const r of riders) if (r.ridingBike !== 0) seen.set(r.ridingBike, r);
 
-    for (const bike of this.all()) {
-      if (bike.rider === 0) continue;
+    // WORKSTREAM AA: over the ridden set rather than over every bike in Sydney.
+    // See `ridden` for the measurement; the rule below is unchanged, and the
+    // set is exactly the bikes the old loop's `bike.rider === 0` guard let
+    // through.
+    //
+    // Deleting from a `Set` while iterating it is defined and safe -- the
+    // removed entry is simply not revisited -- which is what lets the drop
+    // branch keep the set honest inline rather than queueing the removals.
+    for (const id of this.ridden) {
+      const bike = this.byId.get(id);
+      if (bike === undefined || bike.rider === 0) {
+        // A bike that left the field, or one whose rider was cleared by
+        // something that did not go through `release`. Neither can happen
+        // today; both are cheap to be right about, and a stale id here would
+        // otherwise be a permanent phantom in the sweep.
+        this.ridden.delete(id);
+        continue;
+      }
       const rider = seen.get(bike.id);
       if (rider && rider.id === bike.rider) {
         // Still aboard: the bike is wherever the body is. Its yaw is the rider's,
@@ -768,8 +825,14 @@ export class BikeField {
       // position is whatever the last `follow` left, which is where the rider
       // was, which is where the bike should be.
       bike.rider = 0;
+      this.ridden.delete(id);
       changed.push(bike);
     }
+    // Ascending id, which is the order the old sweep produced because `all()`
+    // is sorted. `changed` is bounded by the number of people on bikes, so the
+    // sort is over single digits -- and the order is on the wire, in
+    // `Room.sendBikes`, so it is kept rather than argued about.
+    if (changed.length > 1) changed.sort((a, b) => a.id - b.id);
     return changed;
   }
 }
@@ -1095,6 +1158,68 @@ export function verifyBikes(): string[] {
     field.claim(1, 5);
     field.follow([]);
     if (field.get(1)?.rider !== 0) failures.push('A disconnected rider kept their bike forever.');
+  }
+
+  // --- WORKSTREAM AA: the ridden set cannot drift from the field.
+  //
+  // `follow` no longer walks every bike; it walks a set of ids maintained by
+  // `claim`, `release` and its own drop branch. If that set ever disagrees with
+  // `Bike.rider`, the failure is silent and specific and nasty: a bike missing
+  // from the set is a bike **nobody can be knocked off** -- it follows its
+  // rider forever, including after they disconnect, so it teleports across the
+  // city attached to nothing. An extra id in the set is harmless but is the
+  // same bug the other way round and is worth catching in the same place.
+  //
+  // So: a hundred bikes, a thousand randomised operations across all three
+  // writers, and after every one of them the set is compared against a full
+  // scan of the field -- which is precisely the scan `follow` used to do and no
+  // longer does. Deterministic PRNG, on `verifyPowerups`' terms: a check about
+  // exact agreement must fail reproducibly.
+  {
+    const field = new BikeField();
+    for (let i = 1; i <= 100; i++) field.adopt(i, { x: i, y: 0, z: 0, yaw: 0 });
+    let seed = 0x1bad5eed;
+    const rnd = (): number => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const views: RiderView[] = [];
+    let drift = '';
+    for (let op = 0; op < 1000 && drift === ''; op++) {
+      const id = 1 + Math.floor(rnd() * 100);
+      const roll = rnd();
+      if (roll < 0.4) {
+        field.claim(id, 1 + Math.floor(rnd() * 8));
+      } else if (roll < 0.6) {
+        field.release(id, rnd() * 10, 0, rnd() * 10, 0);
+      } else {
+        // A `follow` over whoever the field currently thinks is riding, minus a
+        // random one of them -- which is the disconnect case, and the only path
+        // that clears a rider from inside the sweep.
+        views.length = 0;
+        const dropped = 1 + Math.floor(rnd() * 100);
+        for (const b of field.all()) {
+          if (b.rider === 0 || b.id === dropped) continue;
+          views.push({ id: b.rider, ridingBike: b.id, x: 0, feetY: 0, z: 0, yaw: 0 });
+        }
+        field.follow(views);
+      }
+      // The full scan the sweep used to be, as the oracle.
+      const truth: number[] = [];
+      for (const b of field.all()) if (b.rider !== 0) truth.push(b.id);
+      const held = field.riddenIds();
+      if (truth.length !== held.length || truth.some((v, i) => v !== held[i])) {
+        drift = `after op ${op}: field says [${truth.join(',')}], the set says [${held.join(',')}]`;
+      }
+    }
+    if (drift !== '') {
+      failures.push(
+        `The ridden set drifted from the field ${drift}. ` +
+          `A bike missing from it can never be knocked off its rider and follows them forever.`,
+      );
+    }
   }
 
   // --- Mount, knockout, respawn: the sequence the bug report describes.

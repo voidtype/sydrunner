@@ -219,6 +219,10 @@ import {
 } from './accounts.ts';
 import { verifyRewind } from './rewind.ts';
 import { verifySim } from './sim.ts';
+// WORKSTREAM AA: the per-section profiler, whose breakdown rides the ten-second
+// line below. See `server/profile.ts` for why the ten `phaseMs` buckets it
+// replaces were not enough to catch a tenfold regression.
+import { topSections, verifyProfile } from './profile.ts';
 import {
   HEARTBEAT_MS,
   RoomHost,
@@ -479,6 +483,7 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // somebody nearby is a player invisible while punching you; see
     // `server/aoi.ts`, which asserts the rule against a brute-force scan.
     ['verifyAoi', verifyAoi()],
+    ['verifyProfile', verifyProfile()],
     ['verifySim', verifySim()],
     // --- Workstream E's three, and every one of them is here rather than only
     // in the browser because every one of them fails *silently and identically*
@@ -1591,6 +1596,35 @@ setInterval(() => {
       `working set ${set.toFixed(1)} avg (${snapshotBytes(Math.round(set))} B/snapshot)  ` +
       `dedup ${(framesEncoded === 0 ? 1 : framesSent / framesEncoded).toFixed(2)}x`,
   );
+  // --- WORKSTREAM AA: and where that median went.
+  //
+  // On its own line rather than appended to the one above, because the line
+  // above is already at the width of a terminal and a breakdown that wraps is a
+  // breakdown nobody reads. Six sections is what fits and is also about the
+  // point at which the tail stops being actionable; everything under them is in
+  // `rest` with the pump, the timers and the socket reads.
+  //
+  // **This is the line the regression this workstream fixed would have been
+  // caught by.** Nothing was wrong with the old measurement except that it was
+  // only visible to somebody who thought to `curl /stats` and knew what the
+  // numbers used to be. See `server/profile.ts`.
+  {
+    const phases: Record<string, number> = {};
+    let overhead = 0;
+    for (const r of host.rooms) {
+      r.logProfile.take(r.sim.profile, phases);
+      // Per tick, like everything else on this line: `lastOverheadMs` is the
+      // whole window and a window is six hundred ticks.
+      const t = r.logProfile.lastTicks;
+      overhead += t > 0 ? r.logProfile.lastOverheadMs / t : 0;
+    }
+    let accounted = 0;
+    for (const v of Object.values(phases)) accounted += v;
+    console.log(
+      `[sydney]   tick ${median.toFixed(2)} ms = ${topSections(phases, 6, median - accounted)}` +
+        `   (profiler ${(overhead * 1000).toFixed(2)} us/tick)`,
+    );
+  }
   // The board itself, per room, so a session leaves a record in the log it has
   // nowhere else to leave one -- there is no persistence and the scoreboard dies
   // with the process, which is spec 12's call and not this line's to change.

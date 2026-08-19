@@ -164,7 +164,7 @@ import {
   type NpcActor,
 } from './factions.ts';
 import { crowdMultiplier } from './density.ts';
-import { type PedBand, type PedestrianField } from './pedestrians.ts';
+import { PedestrianField, syntheticGrid, type PedBand } from './pedestrians.ts';
 import { triangle } from './streetlife.ts';
 import { TRAFFIC_EPOCH_MS, carHash, trafficSeconds } from './traffic.ts';
 import { CYCLE_EPOCH_MS, CYCLE_MS, SUNRISE_PHASE, SUNSET_PHASE } from '../sky/cycle.ts';
@@ -866,6 +866,21 @@ export function characterKey(kind: number, cx: number, cz: number, index: number
 interface Pool {
   bands: PedBand[];
   reach: number;
+  /**
+   * WORKSTREAM AA: the union of the pool's bands' bounding boxes.
+   *
+   * Everybody this pool ever places stands **on one of these bands**, so this
+   * box plus `POSE_SLOP` bounds where they can be -- exactly, rather than by
+   * the `CHARACTER_REACH` worst case the cell sweep has to assume. It is what
+   * lets `poseCharacter` refuse a person a kilometre away before it does the
+   * nearest-point search that finds out where they are. Empty pools keep the
+   * inverted box, which fails every test, and are already refused a line
+   * earlier.
+   */
+  minX: number;
+  minZ: number;
+  maxX: number;
+  maxZ: number;
 }
 
 interface PoolCache {
@@ -923,7 +938,20 @@ function cellBands(field: PedestrianField, key: number, x: number, z: number, ou
   const bands = [...out]
     .sort((a, b) => score(a) - score(b) || a.osmId - b.osmId || a.side - b.side || a.minX - b.minX)
     .slice(0, POOL_SIZE);
-  const pool: Pool = { bands, reach };
+  // The pool's own extent, folded once at build time and then cached with it.
+  // Bands do not move and the cache is invalidated by
+  // `PedestrianField.generation`, so this is as stable as the pool is.
+  let minX = Infinity;
+  let minZ = Infinity;
+  let maxX = -Infinity;
+  let maxZ = -Infinity;
+  for (const b of bands) {
+    if (b.minX < minX) minX = b.minX;
+    if (b.minZ < minZ) minZ = b.minZ;
+    if (b.maxX > maxX) maxX = b.maxX;
+    if (b.maxZ > maxZ) maxZ = b.maxZ;
+  }
+  const pool: Pool = { bands, reach, minX, minZ, maxX, maxZ };
   entry.byKey.set(key, pool);
   return pool;
 }
@@ -1098,8 +1126,40 @@ const KERB_LEAN: Readonly<Record<number, number>> = {
  */
 export const MAX_LATERAL = 0.9;
 
+
 /** How far across the footpath the third member of an eshay group stands. */
 const ESHAY_ACROSS = 0.45;
+
+/**
+ * How far off its band pool a posed character can finish, metres.
+ *
+ * **Derived from the three displacements `poseCharacter` applies**, on
+ * `CHARACTER_REACH`'s rule and for its reason: a gate tighter than the thing it
+ * gates does not fail to draw somebody, it deletes them. The three are the kerb
+ * lean (across the footpath, hashed sign), the eshay group's formation offset
+ * (along the kerb and a little across), and the idle drift (along the kerb,
+ * bounded by the amplitude table). Every one of them is applied to a unit
+ * direction, so each contributes its own magnitude and no more.
+ *
+ * Rounded **up** to a whole metre, which is not laziness. The number is used as
+ * a conservative bound and nothing else, so a slack metre costs a few extra
+ * pose evaluations at the boundary and buys the one property that matters: two
+ * runtimes summing three float constants cannot land either side of an integer
+ * that the true worst case is a whole metre short of. See `verifyCharacters`,
+ * which asserts the bound against the tables rather than against this line.
+ */
+export const POSE_SLOP = (() => {
+  let lean = 0;
+  for (const v of Object.values(KERB_LEAN)) if (v > lean) lean = v;
+  let idle = 0;
+  for (const v of Object.values(IDLE_AMPLITUDE)) if (v > idle) idle = v;
+  // The eshay formation: 1.15 along at most, `ESHAY_ACROSS` across at most.
+  // Added as a sum rather than as a hypotenuse, which is both an over-estimate
+  // (correct direction) and free of `Math.hypot` -- see `game/traffic.ts`'s
+  // header on why a shared module does not reach for it.
+  const group = 1.15 + ESHAY_ACROSS;
+  return Math.ceil(lean + idle + group);
+})();
 
 /**
  * One ambient character, or false if this cell has no band under it.
@@ -1125,6 +1185,14 @@ export function poseCharacter(
   now: number,
   scratch: PedBand[],
   out: CharacterPose,
+  // --- WORKSTREAM AA: the caller's query, for the early refusal below.
+  //
+  // Optional and defaulting to "no gate", so every existing call keeps its
+  // meaning; `forEachCharacterNear` is the only caller in the project and it
+  // always passes one.
+  qx = 0,
+  qz = 0,
+  qr = -1,
 ): boolean {
   const seed = charSeed(cx, cz);
   // The *group* is what searches for a footpath, so three eshays share one.
@@ -1135,6 +1203,37 @@ export function poseCharacter(
   const pool = cellBands(peds, carHash(seed, (kind * 32 + unit) ^ 0x2c1b), px, pz, scratch);
   const bands = pool.bands;
   if (bands.length === 0) return false;
+
+  // --- WORKSTREAM AA: is this person even in the neighbourhood?
+  //
+  // `forEachCharacterNear` has to sweep cells out to `CHARACTER_REACH` -- 1.3 km
+  // -- because a cell whose centre landed on a reservoir rescues its footpaths
+  // from up to `CELL_RESCUE_MAX` away, and the sweep cannot know which cells did
+  // that without asking. So a 9 m promotion scan enumerated about 250
+  // cell-and-kind pairs and posed everybody in all of them, then threw away
+  // every one further than 9 m. That was 0.23 ms a tick with one player on the
+  // server, the largest thing left in the tick after the pickups.
+  //
+  // The pool knows better than the sweep does. Its bands are where this person
+  // can actually stand, `POSE_SLOP` bounds how far off one they finish, and the
+  // box test below is therefore **exact in the only sense that matters**: it
+  // refuses nobody the full pose could have placed inside `qr`. What it skips is
+  // `nearestOnBand`'s walk over the band's vertices and `pointOnBand`'s binary
+  // search, which is nearly all of the cost.
+  //
+  // Box against box rather than disc against box, on `game/spatialhash.ts`'
+  // terms: the caller does its own exact circle test over a shorter list, and a
+  // conservative superset plus an unchanged exact test is identical output.
+  if (qr >= 0) {
+    const slop = qr + POSE_SLOP;
+    if (
+      pool.minX - qx > slop || qx - pool.maxX > slop ||
+      pool.minZ - qz > slop || qz - pool.maxZ > slop
+    ) {
+      return false;
+    }
+  }
+
   const band = bands[h % bands.length];
   // The point on this footpath nearest the cell, plus a hashed stroll along the
   // kerb. **Never a uniform fraction of the band** -- see `CELL_STROLL` for the
@@ -1240,6 +1339,55 @@ export const CHARACTER_REACH = CELL_RESCUE_MAX * 1.415 + CELL_STROLL + CHAR_CELL
  * cached against the resident set, so the second frame in a place costs nothing
  * at all.
  */
+// --- WORKSTREAM AA: `countIn`, memoised for the length of one tick ------------
+//
+// `countIn(kind, cell, day)` is a pure function of three things and **none of
+// them is the caller**, so every combatant in a room asks the same question of
+// the same 250-odd cell-and-kind pairs on the same tick and gets the same
+// answer. `stepCharacters` runs the sweep once per combatant; at eight players
+// that is eight identical evaluations of a census lookup, a bias curve and, for
+// the eshays at night, a scan of 267 stations.
+//
+// A direct-mapped table with a generation stamp, rather than a `Map`. That is
+// not micro-optimisation for its own sake: a `Map.get` is about 25 ns against
+// `countIn`'s 50-75, so a `Map` would pay for itself at two combatants and
+// still cost half the saving at eight. A slot read is two array loads.
+//
+// **Collisions are correct, not merely tolerated.** A slot holds the exact
+// integer identity of what is in it and a mismatch simply recomputes, so the
+// table is a cache in the strict sense: removing it changes nothing but the
+// time. `verifyCharacters` runs nine query points at one tick through this and
+// compares against the ungated sweep, which is exactly the shape that would
+// catch a key collision returning somebody else's count.
+const COUNT_SLOTS = 2048;
+const countKey = new Float64Array(COUNT_SLOTS);
+const countVal = new Int32Array(COUNT_SLOTS);
+const countStamp = new Int32Array(COUNT_SLOTS);
+let countTick = Number.NaN;
+let countGen = 0;
+
+function countInCached(kind: number, cx: number, cz: number, day: GameDay, tick: number): number {
+  if (tick !== countTick) {
+    countTick = tick;
+    countGen = (countGen + 1) | 0;
+    // The wrap, once every 400 days of uptime at 60 Hz. Without it a stamp
+    // could match a slot written two billion ticks ago, and the count of
+    // eshays at Redfern would be last year's for one tick. Cheap to be right.
+    if (countGen === 0) countStamp.fill(-1);
+  }
+  // Exact identity: cells are bounded by the city (a few hundred either way)
+  // and kinds by `NPC_KIND`, so this stays well inside the integers a double
+  // represents exactly.
+  const key = (cx * 4096 + cz) * 64 + kind;
+  const slot = (Math.imul(cx, 0x8da6b343) ^ Math.imul(cz, 0xd8163841) ^ Math.imul(kind, 0x2545f491)) & (COUNT_SLOTS - 1);
+  if (countStamp[slot] === countGen && countKey[slot] === key) return countVal[slot];
+  const n = countIn(kind, cx, cz, day);
+  countStamp[slot] = countGen;
+  countKey[slot] = key;
+  countVal[slot] = n;
+  return n;
+}
+
 export function forEachCharacterNear(
   peds: PedestrianField,
   x: number,
@@ -1249,6 +1397,14 @@ export function forEachCharacterNear(
   scratch: PedBand[],
   out: CharacterPose,
   visit: (pose: CharacterPose) => boolean | void,
+  /**
+   * WORKSTREAM AA: pass false to pose everybody the cell sweep enumerates,
+   * however far away, instead of letting `poseCharacter` refuse them off their
+   * band pool's extent. **For `verifyCharacters` only** -- it is the "before"
+   * of the comparison that proves the gate is exact, and nothing in the game
+   * ever turns it off. See `poseCharacter`.
+   */
+  poseGate = true,
 ): void {
   const now = trafficSeconds(tick);
   const day = dayAtTick(tick);
@@ -1264,12 +1420,14 @@ export function forEachCharacterNear(
       // this cell can be is half a diagonal plus the reach.
       const ddx = charCentre(cx) - x;
       const ddz = charCentre(cz) - z;
-      const gate = span + CHAR_CELL;
-      if (ddx * ddx + ddz * ddz > gate * gate) continue;
+      const cellGate = span + CHAR_CELL;
+      if (ddx * ddx + ddz * ddz > cellGate * cellGate) continue;
       for (const bias of CHARACTER_BIAS) {
-        const n = countIn(bias.kind, cx, cz, day);
+        const n = countInCached(bias.kind, cx, cz, day, tick);
         for (let i = 0; i < n; i++) {
-          if (!poseCharacter(peds, bias.kind, cx, cz, i, now, scratch, out)) continue;
+          // WORKSTREAM AA: the query goes in, so the pose can refuse before it
+          // does the expensive half. See `poseCharacter`.
+          if (!poseCharacter(peds, bias.kind, cx, cz, i, now, scratch, out, x, z, poseGate ? radius : -1)) continue;
           const dx = out.x - x;
           const dz = out.z - z;
           if (dx * dx + dz * dz > r2) continue;
@@ -2517,6 +2675,91 @@ export function verifyCharacters(): string[] {
   // The eshay formation's own reach, from the other end: three of them share one
   // band point, and the furthest of them must still be on the concrete.
   if (ESHAY_ACROSS > MAX_LATERAL) failures.push('An eshay group is wider than the footpath it stands on.');
+
+  // --- WORKSTREAM AA: the pose gate refuses nobody.
+  //
+  // `poseCharacter` now returns false, before it works out where somebody is,
+  // when their cell's band pool cannot reach the caller's query. That took
+  // `stepCharacters` from 0.23 ms a tick to a fifth of it, and it is only sound
+  // if it is **exact**: a person the ungated sweep would have found inside the
+  // radius and the gated one refuses is a character who is drawn by a client
+  // running one version and is not there on a server running the other -- an
+  // NPC you can walk through, or one who mugs you from nowhere.
+  //
+  // So both sweeps are run over a real `PedestrianField` -- the synthetic CBD
+  // grid `verifyPedestrians` measures its own density against -- at a spread of
+  // query points, radii and ticks, and the sets of keys are compared. The
+  // radii deliberately bracket the two real callers: `NOTICE_RANGE` (9 m, the
+  // promotion scan, which is where the cost was) and something near
+  // `CHARACTER_DRAW_RADIUS` (the renderer's, where the gate barely bites).
+  {
+    const grid = syntheticGrid();
+    if (grid === null) {
+      failures.push('verifyCharacters could not build its synthetic street grid; the pose gate is unproven.');
+    } else {
+      const peds = new PedestrianField();
+      peds.adopt('grid', grid);
+      const bands: PedBand[] = [];
+      const pose = createCharacterPose();
+      const keysWithin = (x: number, z: number, r: number, tick: number, gate: boolean): string => {
+        const found: string[] = [];
+        forEachCharacterNear(peds, x, z, r, tick, bands, pose, (p) => {
+          found.push(`${p.kind}:${p.cx},${p.cz}#${p.index}`);
+        }, gate);
+        // The visit order is the sweep's and is identical either way -- cells
+        // row-major, kinds in table order, slots ascending -- so the join is a
+        // comparison of order as well as of membership, which is the stronger
+        // statement and the one a promotion scan needs (it takes the first).
+        return found.join('|');
+      };
+      let mismatch = '';
+      // A day's worth of ticks at a coarse stride, so every bias's gate --
+      // night for the eshays, daylight for the Karens, Saturday for the agents
+      // -- is open at some point in the sweep.
+      outer: for (let tick = 0; tick < 240_000 && mismatch === ''; tick += 9_137) {
+        for (const r of [NOTICE_RANGE, 40, 150]) {
+          for (let q = 0; q < 9; q++) {
+            const x = -100 + (q % 3) * 180;
+            const z = -260 + Math.floor(q / 3) * 150;
+            const gated = keysWithin(x, z, r, tick, true);
+            const plain = keysWithin(x, z, r, tick, false);
+            if (gated !== plain) {
+              mismatch =
+                `at (${x}, ${z}) r=${r} tick=${tick}: gated found [${gated}], ungated found [${plain}]`;
+              break outer;
+            }
+          }
+        }
+      }
+      if (mismatch !== '') {
+        failures.push(
+          `The pose gate changed who is nearby ${mismatch}. POSE_SLOP (${POSE_SLOP} m) does not cover ` +
+            'everything `poseCharacter` displaces somebody by, so characters are being deleted rather than skipped.',
+        );
+      }
+    }
+  }
+
+  // --- ...and the bound it rests on, from the tables rather than from the
+  // fixture above. A synthetic grid exercises the kinds it happens to place; the
+  // arithmetic has to hold for all five whatever the fixture found.
+  {
+    let worst = 0;
+    for (const kind of Object.keys(KERB_LEAN)) {
+      const k = Number(kind);
+      const lean = Math.abs(KERB_LEAN[k] ?? 0);
+      const idle = IDLE_AMPLITUDE[k] ?? 0;
+      const group = k === NPC_KIND.ESHAY ? 1.15 + ESHAY_ACROSS : 0;
+      const sum = lean + idle + group;
+      if (sum > worst) worst = sum;
+    }
+    if (POSE_SLOP < worst) {
+      failures.push(
+        `POSE_SLOP is ${POSE_SLOP} m against a worst-case displacement of ${worst.toFixed(2)} m. ` +
+          'The pose gate would refuse somebody who is actually within range, which deletes them from the world.',
+      );
+    }
+  }
 
   // --- And the influencer's radius, which is the whole of her obstruction.
   if (INFLUENCER_RADIUS <= BODY_RADIUS) {

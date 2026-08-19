@@ -439,6 +439,10 @@ import {
   setWalletReader,
 } from '../client/src/game/teamfx.ts';
 import { cyclePhase } from '../client/src/sky/cycle.ts';
+// WORKSTREAM AA: the per-section profiler. See `server/profile.ts` for why the
+// ten `phaseMs` buckets this replaces were not enough to catch a tenfold
+// regression, and why the marks are a cursor rather than begin/end pairs.
+import { SEC, TickProfile } from './profile.ts';
 
 export const FIXED_DT = 1 / TICK_HZ;
 
@@ -803,29 +807,24 @@ export class Simulation {
   private readonly strikeProxies: RewoundProxy[] = [];
 
   /**
-   * Where the tick went, in milliseconds, accumulated since the last read.
+   * Where the tick went, section by section, accumulated since the last read.
    *
    * PERFORMANCE.md phase 1's deliverable is a capacity curve with a phase
    * breakdown, and a breakdown that is not measured in the process being
-   * measured is a guess. Nine `performance.now` pairs a tick is about 2 us
-   * against a 16,667 us budget, so this is on permanently rather than behind a
-   * flag: a profile you have to remember to enable is a profile that is not
-   * running the day something regresses.
+   * measured is a guess. This used to be ten fields written by nine
+   * `performance.now` pairs, and WORKSTREAM AA replaced it with thirty sections
+   * on a cursor for one reason: the ten buckets had quietly become containers.
+   * "powerups" held the pickups, the cash bundles, the fares and the tents;
+   * "npc" held seven separate ambient systems. A tick that had grown from
+   * 0.20 ms to 3.30 ms was being reported truthfully and unreadably.
    *
-   * Read and reset by `server/index.ts`'s `/stats`.
+   * The room borrows this object for its own send path, so the sections tile
+   * the whole of one room's tick rather than just the simulation's. See
+   * `server/profile.ts`.
+   *
+   * Read and reset by `server/index.ts`'s `/stats` and its ten-second line.
    */
-  readonly phaseMs = {
-    index: 0,
-    advance: 0,
-    melee: 0,
-    balls: 0,
-    traffic: 0,
-    powerups: 0,
-    bikes: 0,
-    cars: 0,
-    npc: 0,
-    history: 0,
-  };
+  readonly profile = new TickProfile();
 
   tick = 0;
   private nextId = 1;
@@ -2577,6 +2576,12 @@ export class Simulation {
    * 60 Hz loop from allocating two arrays a tick forever.
    */
   step(out: TickOutput): TickOutput {
+    // WORKSTREAM AA: the first mark of the simulation's half of the tick. A
+    // `Room` has already marked `input`; a check driver calling `step` directly
+    // has marked nothing, and this is where its tick begins.
+    const prof = this.profile;
+    prof.countTick();
+    prof.at(SEC.departures);
     this.tick++;
     // --- WORKSTREAM W: the tick's wall clock, installed once, before anything
     // reads a talent. See `teamfx.fxSetNow` for why exactly one talent needs a
@@ -2627,9 +2632,8 @@ export class Simulation {
 
     // --- The melee's candidate grid, before anybody has moved. See
     // `buildRewindIndex` for why the moment matters.
-    let t = performance.now();
+    prof.at(SEC.rewind);
     this.buildRewindIndex();
-    this.phaseMs.index += performance.now() - t;
 
     // --- Every input first, from the state as it stands at the top of the tick.
     //
@@ -2637,12 +2641,14 @@ export class Simulation {
     // would be reacting to a player who had already moved this step -- half a
     // tick of clairvoyance no remote player will ever have, and the kind of
     // asymmetry that only shows up as "the AI feels unfair".
+    prof.at(SEC.bots);
     for (const p of this.ordered) {
       if (p.bot) p.bot.think(this.combatants, FIXED_DT);
     }
 
     // --- The rail clock, once, before anything asks where a train is. See
     //     `railT`.
+    prof.at(SEC.mount);
     this.railT = railSeconds(this.railNowMs());
 
     // --- The bikes, before anybody moves.
@@ -2665,7 +2671,7 @@ export class Simulation {
     // --- Advance, in ascending id. See `main.ts`: the order is the tick order
     // and it is fixed rather than incidental, because two combatants who strike
     // on the same tick have to resolve in an order both ends agree on.
-    t = performance.now();
+    prof.at(SEC.advance);
     for (const p of this.ordered) {
       // The one seam trains put in this loop. `enterCarriage` either hands back
       // the city -- which is every tick of every player who is not on a train --
@@ -2735,19 +2741,17 @@ export class Simulation {
       }
     }
 
-    this.phaseMs.advance += performance.now() - t;
-
     // --- Where everybody finished. Everything below this line is deliberately
     // **not** rewound -- the balls, the pickups, the traffic and the factions
     // all read the positions the tick just produced -- so they share one index
     // built here rather than the melee's historical one.
-    t = performance.now();
+    prof.at(SEC.liveidx);
     this.buildLiveIndex();
     // And the aura index, off the same positions and in the same phase. See
     // `buildTeamIndex`, and `game/teamfield.ts` for why filling it is cheap even
     // when nothing reads it.
+    prof.at(SEC.teamidx);
     this.buildTeamIndex();
-    this.phaseMs.index += performance.now() - t;
 
     // --- Every football in the air, after every combatant has moved.
     //
@@ -2780,6 +2784,7 @@ export class Simulation {
     // grid lookup would cost more than the loop it saves at the sizes this
     // actually runs at, and `swingCatches` rejects on a plan distance before it
     // does any real work.
+    prof.at(SEC.swat);
     for (const p of this.ordered) {
       // **Bots do not swat**, and that is a deliberate line rather than an
       // oversight. `server/bots.ts` swings when somebody is in reach; it has no
@@ -2822,7 +2827,7 @@ export class Simulation {
       });
     }
 
-    t = performance.now();
+    prof.at(SEC.balls);
     for (const e of this.balls.step(FIXED_DT, this.ballWorld, this.combatants, this.ballEvents, this.liveIndex)) {
       if (e.kind !== 'hit' || !e.victim) continue;
       // The **owner**, not the thrower: a ball that was batted back belongs to
@@ -2900,7 +2905,6 @@ export class Simulation {
         if (actor !== null) this.hitNpc(actor, 1, owner);
       }
     }
-    this.phaseMs.balls += performance.now() - t;
 
     // --- The traffic, after every combatant has moved and before the pickups.
     //
@@ -2916,7 +2920,7 @@ export class Simulation {
     //
     // Bots are in `this.ordered` like anyone else and are run down like anyone
     // else, which is both correct and funny.
-    t = performance.now();
+    prof.at(SEC.traffic);
     {
       const tick = trafficTick(Date.now());
       for (const p of this.ordered) {
@@ -2962,8 +2966,6 @@ export class Simulation {
       }
     }
 
-    this.phaseMs.traffic += performance.now() - t;
-
     // --- Spec 8.3, after every combatant has moved, and authoritative. The
     // client no longer decides this at all while connected; it mirrors the
     // event. See `main.ts` for why the order within the tick matters.
@@ -2971,8 +2973,15 @@ export class Simulation {
     // The live index goes in because this pass was the largest single cost in
     // the tick before PERFORMANCE.md phase 1 -- 884 points times every player,
     // every tick. See `tickPowerups`.
-    t = performance.now();
-    for (const e of tickPowerups(this.world.points, this.combatants, FIXED_DT, this.pickups, this.liveIndex)) {
+    prof.at(SEC.powerups);
+    // WORKSTREAM AA: the sixth argument is the one that matters. Without it
+    // this line asked all 3,128 cafes in Sydney whether anybody was standing in
+    // them, sixty times a second, connected or not -- 0.46 ms, the largest
+    // single thing in the tick. With it, it asks each player which cafe they
+    // are standing in. See `game/powerups.tickPowerups` and `world.pointIndex`.
+    for (const e of tickPowerups(
+      this.world.points, this.combatants, FIXED_DT, this.pickups, this.liveIndex, this.world.pointIndex,
+    )) {
       const at = this.world.tileOf.get(tileKeyOf(e.point.id));
       this.events.push({
         kind: EVENT.PICKUP,
@@ -2991,6 +3000,7 @@ export class Simulation {
     //
     // `tickBundles` compacts the list in place, so this loop is over what was
     // *collected* and the survivors are already the whole list.
+    prof.at(SEC.bundles);
     for (const e of tickBundles(this.bundles, this.combatants, FIXED_DT, this.bundlePickups, this.liveIndex)) {
       this.bundleVersion++;
       // No `EVENT` for a collection, deliberately. The `WALLET` frame the
@@ -3041,10 +3051,12 @@ export class Simulation {
     //
     // O(players) and one boolean test for anybody not on shift. The context
     // record is reused; see `server/fares.ts` on why nothing here allocates.
+    prof.at(SEC.fares);
     this.stepFares();
 
     // WORKSTREAM W: and the sizzle tents, beside the fares because they are the
     // other thing a player bought with money this tick. See `stepTents`.
+    prof.at(SEC.tents);
     this.stepTents();
 
     // --- The bikes again, after everybody has moved and every hit has landed.
@@ -3061,9 +3073,7 @@ export class Simulation {
     // position the server just simulated -- never on a client's word. It is the
     // only line in this process that sets `bikeTuned`, which is what makes 3x
     // something you walk to rather than something you ask for.
-    this.phaseMs.powerups += performance.now() - t;
-
-    t = performance.now();
+    prof.at(SEC.bikes);
     this.riderViews.length = 0;
     for (const p of this.ordered) {
       const c = p.combat;
@@ -3104,13 +3114,12 @@ export class Simulation {
     // long as they kept riding -- which is a countdown that never runs out, and
     // the instruction was that it does. So the crime fires when they come into
     // view and again only after they have left it. See `seenRiding`.
+    prof.at(SEC.rideby);
     this.stepRideBy();
-    this.phaseMs.bikes += performance.now() - t;
 
     // --- And the cars, on the bikes' own terms one phase up.
-    t = performance.now();
+    prof.at(SEC.cars);
     this.stepCars();
-    this.phaseMs.cars += performance.now() - t;
 
     // --- The factions, after everything that could have started an
     // investigation and before the history is recorded.
@@ -3120,15 +3129,13 @@ export class Simulation {
     // chasing where the suspect was rather than where they are, which at
     // 6.4 m/s is 11 cm a tick and is the same argument the balls and the traffic
     // already make about their own placement in this loop.
-    t = performance.now();
     this.stepFactions();
-    this.phaseMs.npc += performance.now() - t;
 
     // --- History, at the *end* of the tick, which is where the position a
     // snapshot reports is taken from. Recording at the top would file each
     // sample under the tick before the one it belongs to, and every rewind in
     // the game would be one tick -- 8.3 ms, 7 cm at a sprint -- stale.
-    t = performance.now();
+    prof.at(SEC.history);
     for (const p of this.ordered) {
       p.history.record(
         this.tick,
@@ -3138,7 +3145,11 @@ export class Simulation {
         p.combat.body.yaw,
       );
     }
-    this.phaseMs.history += performance.now() - t;
+    // WORKSTREAM AA: close the cursor, so a `Simulation` stepped with no `Room`
+    // around it -- every check driver, and `server/tick-profile.ts` -- is
+    // self-contained and does not charge the gap between its steps to
+    // `history`. A `Room` re-opens with `SEC.send` on the next line.
+    prof.stop();
 
     out.tick = this.tick;
     out.events = this.events;
@@ -3424,6 +3435,12 @@ export class Simulation {
     // engine can inline through. Two of its members genuinely change and both
     // are assigned below; the other nine are stable references that were being
     // re-copied sixty times a second.
+    // WORKSTREAM AA: seven ambient systems run out of this one function and
+    // they used to share one `npc` bucket. Each gets its own mark, because the
+    // whole lesson of this file's regression is that a bucket with seven things
+    // in it hides the one that grew.
+    const prof = this.profile;
+    prof.at(SEC.factions);
     const ctx = this.factionCtx;
     ctx.tick = trafficTick(Date.now());
     ctx.combatants = this.combatants;
@@ -3435,11 +3452,13 @@ export class Simulation {
     // before anybody saw it -- which presents as meth heads who occasionally
     // charge in silence. See `stepStreetlife`, which states the same ordering
     // from the other side.
+    prof.at(SEC.streetlife);
     stepStreetlife(ctx);
     // And the wildlife's, in the same place and for the same reason. It wakes
     // the birds a player has walked up to and refuses at its own budget --
     // `WILDLIFE_BUDGET`, a third of the field -- so a park full of turkeys can
     // never be the reason an officer could not be dispatched to somebody.
+    prof.at(SEC.wildlife);
     stepWildlife(ctx, this.wildScratch, this.wildPose);
     // And the heat ladder, **after** the factions rather than before: the
     // crimes reported during the last tick are drained by `FactionField.step`,
@@ -3447,6 +3466,7 @@ export class Simulation {
     // first would put every crime a tick late and would make a 3-star
     // escalation arrive after the officers it is supposed to bring. See
     // `game/heat.stepHeat`, which states the same ordering from its own side.
+    prof.at(SEC.heat);
     stepHeat(ctx, this.heat, this.heatWorld);
     // --- And workstream E's two, in the same place and for the same reason.
     //
@@ -3462,6 +3482,7 @@ export class Simulation {
     // promotion below then spends -- the other way round, an event that ended on
     // the same tick a new one opened would hold its slot for one more tick every
     // tick, and the symptom would be the second event never getting anybody.
+    prof.at(SEC.events);
     sweepEvents(ctx);
     // The eshays roll a player for $20 through the characters module's
     // process-wide `wallet()` handle. Pointed at **this** simulation on every
@@ -3470,7 +3491,9 @@ export class Simulation {
     // handle set once would debit room 0's player 7 for room 3's mugging.
     setWallet(this.walletLookup);
     setTeamLookup(this.teams);
+    prof.at(SEC.characters);
     stepCharacters(ctx);
+    prof.at(SEC.events);
     stepEvents(ctx);
     // An investigation that ran out changes what the wire has to say, and
     // nothing inside the field can bump a version it does not know about.
@@ -5317,7 +5340,11 @@ export class Simulation {
 
   /** Spec 8.2's punch, against the attacker's own view of the world. */
   private resolveStrike(p: Participant): void {
-    const began = performance.now();
+    // WORKSTREAM AA: the one nested section in the tick. `melee` is charged for
+    // the duration of this call and `advance` -- the loop this is called from --
+    // is re-opened on the way out, which is the discipline `server/profile.ts`
+    // asks of anything that marks a section it did not open. See its header.
+    this.profile.at(SEC.melee);
     // PERFORMANCE.md phase 1. This used to rewind **every combatant in the
     // world** and hand the lot to `hitTest`, which then measured them all and
     // threw away everyone further than the bat's 1.55 m -- so a swing in a
@@ -5403,10 +5430,11 @@ export class Simulation {
     // actually saw it.
     this.strikeBystanders(p);
     this.strikeOfficers(p);
-    // The whole swing, players and bystanders and officers, in one number.
-    // Accumulated per strike rather than per tick because a swing is rare --
-    // `advance` above already carries the cost of everybody who did not swing.
-    this.phaseMs.melee += performance.now() - began;
+    // The whole swing, players and bystanders and officers, in one number, and
+    // the caller's section put back. Charged per strike rather than per tick
+    // because a swing is rare -- `advance` already carries the cost of
+    // everybody who did not swing.
+    this.profile.at(SEC.advance);
   }
 
   /**
@@ -6145,6 +6173,10 @@ export function verifySim(): string[] {
     // rather than the thing that throws on the first tick of a fresh server.
     peds: new PedestrianField(),
     points: [],
+    // WORKSTREAM AA: an index over nothing, which is what `ServerWorld` now
+    // requires and what a fixture with no powerups in it should hand back. See
+    // `game/powerups.PowerupField.residentIndex`.
+    pointIndex: new SpatialHash<number>(),
     tileOf: new Map(),
     bytes: { collision: 0, terrain: 0, powerups: 0, lanes: 0 },
     // No sidecars to re-adopt, because nothing here builds a second room. See

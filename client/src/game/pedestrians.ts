@@ -1909,7 +1909,17 @@ function syntheticTile(half: number, foot: number, wayY: number, points: number)
 }
 
 /** Eight 200 m streets on a 100 m pitch: four running north, four running east. */
-function syntheticGrid(originX = 0, originZ = 0): TileLanes | null {
+/**
+ * Eight streets 200 m long on a 100 m pitch: roughly a CBD block structure,
+ * encoded and decoded through the real format.
+ *
+ * **Exported for the checks, not for the game**, on `traffic.syntheticTile`'s
+ * terms and for its reason. `verifyCharacters` needs a `PedestrianField` with
+ * real bands in it to prove that WORKSTREAM AA's pose gate refuses nobody the
+ * ungated sweep would have found, and building the bytes a second time over
+ * there would be a check whose fixture is a copy of the fixture.
+ */
+export function syntheticGrid(originX = 0, originZ = 0): TileLanes | null {
   const ways: SyntheticWay[] = [];
   for (let i = 0; i < 4; i++) {
     ways.push({ x: i * 100, z: 0, dz: -300, half: 3.75, foot: 3, y: 0, points: 4, klass: 10 });

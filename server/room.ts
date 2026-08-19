@@ -134,6 +134,10 @@ import {
   type SunState,
 } from '../client/src/game/sunbutton.ts';
 import { EYE_HEIGHT } from '../client/src/player/controller.ts';
+// WORKSTREAM AA: the section cursor the room shares with its simulation, and
+// the two readers that subtract their own windows out of it. See
+// `server/profile.ts`.
+import { ProfileReader, SEC } from './profile.ts';
 
 /** What a socket in this room carries. Moved here whole from `server/index.ts`. */
 export interface Conn {
@@ -727,9 +731,16 @@ export class Room {
   logBytes = 0;
   logSnapshots = 0;
   rostersSent = 0;
-  encodeMs = 0;
-  broadcastMs = 0;
-  aoiMs = 0;
+  /**
+   * WORKSTREAM AA: the console line's own view of the section profile, beside
+   * `logBytes` and for exactly the reason stated above it -- a log line and a
+   * measurement instrument must not share a counter. `/stats` reads through
+   * `statsProfile` and neither can take the other's window, because the profile
+   * itself is monotonic and each reader subtracts what it last saw.
+   */
+  readonly logProfile = new ProfileReader();
+  /** `/stats`' view of the same profile. See `logProfile`. */
+  private readonly statsProfile = new ProfileReader();
   /** Frames sent and frames encoded, since the last `/stats` read. */
   framesSent = 0;
   framesEncoded = 0;
@@ -1047,6 +1058,13 @@ export class Room {
    */
   step(): void {
     const began = performance.now();
+    // WORKSTREAM AA: the room's half of the section cursor. The profile object
+    // belongs to the simulation and is borrowed here, so the sections tile the
+    // whole of a room's tick -- the input drain, the simulation, the reliable
+    // frames and the snapshots -- rather than stopping at the simulation's
+    // edge. See `server/profile.ts`.
+    const prof = this.sim.profile;
+    prof.at(SEC.input);
 
     // Take **one** input frame from each socket, before `sim.step` so the tick
     // sees it. The ack is recorded here rather than inside the simulation
@@ -1162,6 +1180,10 @@ export class Room {
 
     this.sim.step(this.out);
 
+    // Everything from here to the bottom of the tick is what this room *tells*
+    // people. `sendSnapshots` marks its own three sections inside.
+    prof.at(SEC.send);
+
     // --- Accounts, once a second's worth of ticks apart. Two cheap sweeps that
     // are not the simulation's business and are not worth a tick each.
     //
@@ -1195,6 +1217,7 @@ export class Room {
     // a snapshot interval rather than landing on one. See `snapshotPhase`.
     if ((this.sim.tick + this.snapshotPhase) % SNAPSHOT_INTERVAL === 0) this.sendSnapshots();
 
+    prof.stop();
     const cost = performance.now() - began;
     this.tickCost[this.costCursor] = cost;
     this.costCursor = (this.costCursor + 1) % this.tickCost.length;
@@ -1531,28 +1554,33 @@ export class Room {
    */
   private sendSnapshots(): void {
     const sim = this.sim;
-    let t = performance.now();
+    // WORKSTREAM AA: three sections on the shared cursor rather than three
+    // `performance.now` pairs, which halves the clock reads *and* stops the
+    // interest-delta frame below falling between two pairs and being reported
+    // as nothing. That leakage is now charged to `aoi`, which is where it
+    // belongs -- deciding who entered and left somebody's view is interest
+    // management whichever side of the encode it happens on.
+    const prof = sim.profile;
+    prof.at(SEC.aoi);
     const players = sim.snapshot(this.snapshotScratch);
     const balls = sim.ballSnapshot();
     const npcs = sim.npcSnapshot();
     const aboard = sim.aboardSnapshot();
     this.interest.begin(players, balls, npcs);
     this.groups.begin();
-    this.aoiMs += performance.now() - t;
 
     for (const ws of this.conns) {
       const conn = ws.data;
       const p = conn.participant;
       if (!p) continue;
 
-      t = performance.now();
+      prof.at(SEC.aoi);
       const x = p.combat.body.position.x;
       const z = p.combat.body.position.z;
       this.interest.select(x, z, conn.interest, this.setIds);
       this.interest.selectBalls(x, z, this.setBalls);
       this.interest.selectNpcs(x, z, this.setNpcs);
       const group = this.groups.intern(this.setIds, this.setBalls, this.setNpcs);
-      this.aoiMs += performance.now() - t;
 
       // --- The delta, before the bodies it identifies.
       conn.interest.update(this.setIds);
@@ -1596,7 +1624,7 @@ export class Room {
       }
 
       // --- The bodies. Encoded once per distinct set; see the header.
-      t = performance.now();
+      prof.at(SEC.encode);
       if (group.length === 0) {
         this.fill(players, balls, npcs, aboard, group.players, group.balls, group.npcs);
         group.reserve(snapshotBytes(
@@ -1607,12 +1635,10 @@ export class Room {
         );
         this.framesEncoded++;
       }
-      this.encodeMs += performance.now() - t;
 
-      t = performance.now();
+      prof.at(SEC.broadcast);
       patchSnapshotAck(group.view, p.ackSeq);
       ws.send(group.bytes.subarray(0, group.length));
-      this.broadcastMs += performance.now() - t;
       this.bytesSent += group.length;
       this.logBytes += group.length;
       this.snapshotsSent++;
@@ -1668,13 +1694,22 @@ export class Room {
     return { p50: at(0.5), p90: at(0.9), p99: at(0.99), max: this.worstTick };
   }
 
+  /**
+   * WORKSTREAM AA: `ticksInWindow` used to be the host's divisor for the phase
+   * breakdown and is now ignored -- the profile counts its own ticks, which is
+   * both more accurate (a room that joined late has run fewer) and the only
+   * divisor available to a reader that subtracts its own window. The parameter
+   * stays because `integration-check` and `/stats` both pass it and neither
+   * gains anything from the churn.
+   */
   stats(ticksInWindow: number): RoomStats {
+    void ticksInWindow;
     const humans = this.humans();
-    const phases: Record<string, number> = {};
-    for (const [k, v] of Object.entries(this.sim.phaseMs)) phases[k] = v / ticksInWindow;
-    phases.aoi = this.aoiMs / ticksInWindow;
-    phases.encode = this.encodeMs / ticksInWindow;
-    phases.broadcast = this.broadcastMs / ticksInWindow;
+    // WORKSTREAM AA: one folded profile instead of three hand-summed counters.
+    // `ticksInWindow` is the host's count rather than this room's, which is the
+    // same divisor the three lines this replaces used and is the right one --
+    // every room is stepped by the same pump on the same schedule.
+    const phases = this.statsProfile.take(this.sim.profile);
     return {
       id: this.id,
       players: humans,
@@ -1697,10 +1732,11 @@ export class Room {
 
   /** Called by `/stats` after a read, so each poll covers a disjoint window. */
   resetWindow(): void {
-    for (const k of Object.keys(this.sim.phaseMs)) (this.sim.phaseMs as Record<string, number>)[k] = 0;
-    this.aoiMs = 0;
-    this.encodeMs = 0;
-    this.broadcastMs = 0;
+    // WORKSTREAM AA: the section profile is deliberately **not** reset here.
+    // It is monotonic and `stats()` above has already taken its own window out
+    // of it through `statsProfile`; clearing it would take the console line's
+    // window as well, which is the bug the `logBytes`/`bytesSent` pair exists
+    // to avoid. See `server/profile.ts`.
     this.bytesSent = 0;
     this.snapshotsSent = 0;
     this.rostersSent = 0;

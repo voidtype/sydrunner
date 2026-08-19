@@ -22,6 +22,8 @@ import { CollisionWorld } from '../client/src/player/collision.ts';
 import { TerrainField } from '../client/src/world/terrain.ts';
 import { WaterLevels } from '../client/src/world/wading.ts';
 import { PowerupField } from '../client/src/game/powerups.ts';
+// WORKSTREAM AA: the empty index every `ServerWorld` fixture now needs.
+import { SpatialHash } from '../client/src/game/spatialhash.ts';
 import {
   CAR_HIT_FULL_SPEED,
   TrafficField,
@@ -127,6 +129,10 @@ function emptyWorld(wall = true): ServerWorld {
     traffic: new TrafficField(),
     peds: new PedestrianField(),
     points: [],
+    // WORKSTREAM AA: an index over nothing, which is what `ServerWorld` now
+    // requires and what a fixture with no powerups in it should hand back. See
+    // `game/powerups.PowerupField.residentIndex`.
+    pointIndex: new SpatialHash<number>(),
     tileOf: new Map(),
     bytes: { collision: 0, terrain: 0, powerups: 0, lanes: 0 },
     powerupSource: [],

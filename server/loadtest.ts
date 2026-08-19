@@ -998,7 +998,14 @@ function report(opt: Options, shards: ShardResult[], samples: StatsSample[]): vo
   const peak = (f: (s: StatsSample) => number): number =>
     warm.length === 0 ? 0 : Math.max(...warm.map(f));
 
-  const phaseKeys = ['advance', 'melee', 'balls', 'traffic', 'powerups', 'bikes', 'npc', 'history', 'index', 'encode', 'broadcast'];
+  // WORKSTREAM AA: taken from the samples and ordered by cost, rather than the
+  // hardcoded list of eleven that used to be here. That list was written when
+  // there were eleven phases and it silently kept printing eleven of the thirty
+  // `server/profile.ts` now reports -- which is the same failure mode, one
+  // layer out, as the coarse buckets that hid the regression in the first
+  // place. Descending, so the thing to fix is the first row.
+  const phaseKeys = Object.keys(warm[warm.length - 1]?.phaseMs ?? {})
+    .sort((a, b) => avg((s) => s.phaseMs[b] ?? 0) - avg((s) => s.phaseMs[a] ?? 0));
 
   const L: string[] = [];
   L.push('');
@@ -1054,10 +1061,18 @@ function report(opt: Options, shards: ShardResult[], samples: StatsSample[]): vo
   L.push('');
   L.push('    phase                 ms/tick     % of tick');
   const tickTotal = Math.max(1e-9, avg((s) => s.tickMs.p50));
+  let accounted = 0;
   for (const k of phaseKeys) {
     const v = avg((s) => s.phaseMs[k] ?? 0);
+    accounted += v;
+    if (v <= 0) continue;
     L.push(`      ${padR(k, 20)}${pad(fmt(v, 4), 8)}${pad(fmt((v / tickTotal) * 100, 1) + '%', 12)}`);
   }
+  // The pump, the timers and the socket reads: real, nobody's section, and
+  // reported rather than left as an unexplained gap between the sum and the
+  // tick. See `profile.topSections`.
+  const rest = tickTotal - accounted;
+  L.push(`      ${padR('rest', 20)}${pad(fmt(rest, 4), 8)}${pad(fmt((rest / tickTotal) * 100, 1) + '%', 12)}`);
   L.push('');
   L.push('  clients (what the sockets actually saw)');
   L.push(`    joined               ${joined} / ${requested}`);

@@ -102,7 +102,11 @@
 import * as combat from './combat.ts';
 import { MAX_HEALTH, type CombatInput, type CombatantState } from './combat.ts';
 import { EYE_HEIGHT } from '../player/controller.ts';
-import type { SpatialHash } from './spatialhash.ts';
+// WORKSTREAM AA: the value, not just the type. `PowerupField.residentIndex`
+// files the resident points into one so a server can ask "which cafes is
+// anybody standing in" instead of asking every cafe in Sydney whether anybody
+// is standing in it. See `tickPowerups`' `pointIndex` argument.
+import { SpatialHash } from './spatialhash.ts';
 
 /**
  * Candidates for one point's pickup test. See `tickPowerups`.
@@ -114,6 +118,14 @@ import type { SpatialHash } from './spatialhash.ts';
  * carry an answer from one into the other through it.
  */
 const pickupScratch: CombatantState[] = [];
+/**
+ * WORKSTREAM AA's two: the slots one body's query returned, and the ascending
+ * union of every body's. Module level on `pickupScratch`' terms -- this runs
+ * sixty times a second and two fresh arrays a tick is the allocation phase 1
+ * spent its budget removing. Neither survives a call.
+ */
+const slotScratch: number[] = [];
+const candidateScratch: number[] = [];
 
 // --- Kinds --------------------------------------------------------------------
 
@@ -331,62 +343,138 @@ export function tickPowerups(
   dt: number,
   out: PickupEvent[] = [],
   index: SpatialHash<CombatantState> | null = null,
+  pointIndex: SpatialHash<number> | null = null,
 ): PickupEvent[] {
   out.length = 0;
-  const radius2 = PICKUP_RADIUS * PICKUP_RADIUS;
 
-  for (const p of points) {
-    if (!p.active) {
-      p.respawnT -= dt;
-      // `EXPIRY_EPSILON` again, and for the same reason at six times the scale:
-      // 5,400 subtractions of `1/60` from 90 miss zero by a few times 1e-13, so
-      // without it a station comes back on tick 5,400 or 5,401 depending on
-      // which way the last rounding went.
-      if (p.respawnT > EXPIRY_EPSILON) continue;
-      p.respawnT = 0;
-      p.active = true;
-    }
-
-    // Everybody, or -- when the caller has built one -- only the bodies whose
-    // cell touches this point's 1.6 m disc.
-    //
-    // PERFORMANCE.md phase 1, and this is the single largest thing the spatial
-    // hash removes from the tick: the inner loop below runs once per point per
-    // combatant, which over the inner ring's 884 points is 14,000 distance
-    // tests a tick at sixteen players and **442,000 at five hundred** -- 26
-    // million a second, more than everything else in the tick put together.
-    // Almost all of it is a cafe in Newtown measuring its distance to somebody
-    // in Bondi.
-    //
-    // `collectWithin` returns a superset in ascending combatant order, which is
-    // exactly the order `combatants` is in, so the `break` below picks the same
-    // body it always did. See `game/spatialhash.ts` on why that ordering
-    // guarantee is what makes this identical rather than merely equivalent.
-    const near = index === null ? combatants : index.collectWithin(p.x, p.z, PICKUP_RADIUS, pickupScratch);
-    for (const c of near) {
-      // A knocked-out body slid 7 m into a cafe must not collect it, and a
-      // combatant on 0 pips is a body. `combat.isTargetable` asks exactly this
-      // question about a punch; it is the same question here and is deliberately
-      // not imported, because "can be hit" and "can pick up" are two ideas that
-      // happen to have the same answer today and should be free to stop.
-      if (c.phase === 'ko' || c.health <= 0) continue;
-
-      const dx = c.body.position.x - p.x;
-      const dz = c.body.position.z - p.z;
-      if (dx * dx + dz * dz > radius2) continue;
-      // `body.position` is the eye; the point's y is the ground it stands on.
-      const feet = c.body.position.y - EYE_HEIGHT;
-      if (Math.abs(feet - p.y) > PICKUP_HEIGHT) continue;
-
-      applyPowerup(c, p.kind);
-      p.active = false;
-      p.respawnT = respawnSeconds(p.kind);
-      out.push({ point: p, combatant: c });
-      break;
-    }
+  // --- The respawn clocks, over every point, and it has to be every point: a
+  // cafe in Penrith comes back on schedule whether or not anybody is there to
+  // see it, and a clock that only ticked near a player would be a respawn that
+  // depends on who is watching.
+  //
+  // Split out of the collection loop by WORKSTREAM AA. It is the one thing here
+  // that is genuinely O(the world) and it is now the *only* thing: an active
+  // point costs one property read and a branch, and the whole 3,128-point
+  // server-side sweep is about 6 us. What used to cost 460 us was the line
+  // below this one running for every one of them.
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    if (p.active) continue;
+    p.respawnT -= dt;
+    // `EXPIRY_EPSILON` again, and for the same reason at six times the scale:
+    // 5,400 subtractions of `1/60` from 90 miss zero by a few times 1e-13, so
+    // without it a station comes back on tick 5,400 or 5,401 depending on
+    // which way the last rounding went.
+    if (p.respawnT > EXPIRY_EPSILON) continue;
+    p.respawnT = 0;
+    p.active = true;
   }
 
+  // --- ...and the collection, over the points anybody could possibly reach.
+  //
+  // Two ways in, and they produce **identical output** rather than similar
+  // output; see `collectAt` and the argument below.
+  if (pointIndex === null) {
+    for (let i = 0; i < points.length; i++) collectAt(points[i], combatants, index, out);
+    return out;
+  }
+
+  // WORKSTREAM AA. The inversion, and the reason it is exact.
+  //
+  // PERFORMANCE.md phase 1 turned "every point against every player" into
+  // "every point against the players in its cell", which removed the quadratic
+  // term and left the linear one: 3,128 hash queries a tick on a server that
+  // holds the whole city resident, 0.46 ms, **the largest single thing in the
+  // tick** and entirely independent of whether anybody was playing. Almost all
+  // of it was a cafe in Newtown asking an empty grid cell whether anybody was
+  // standing in it.
+  //
+  // So the question is asked the other way round: which cafes is anybody within
+  // 1.6 m of. That is `players` queries instead of `points` queries -- three
+  // instead of three thousand -- against a hash of the points, which never move
+  // and so is built once rather than per tick. See `PowerupField.residentIndex`
+  // and `world.pointIndex`.
+  //
+  // **The candidate list is sorted ascending and de-duplicated**, and that is
+  // not tidiness: the loop above visits points in array order, and a point is
+  // taken by the first combatant in range, so the *order of `out`* is part of
+  // this function's contract -- a server pushes an `EVENT.PICKUP` per entry and
+  // the client applies them in the order they arrive. Visiting the same
+  // candidates in the same order makes this byte-identical to the linear sweep
+  // rather than merely equivalent, which is the same standard
+  // `game/spatialhash.ts` holds itself to and which `verifyPowerups` proves
+  // over randomised configurations.
+  const cand = candidateScratch;
+  cand.length = 0;
+  for (let ci = 0; ci < combatants.length; ci++) {
+    const at = combatants[ci].body.position;
+    const slots = pointIndex.collectWithin(at.x, at.z, PICKUP_RADIUS, slotScratch);
+    for (let si = 0; si < slots.length; si++) {
+      const slot = slots[si];
+      // Insertion into an ascending list. The list holds the points within
+      // 1.6 m of *somebody*, which is nought almost always and single digits in
+      // the pathological case of a crowd standing on the one cafe, so the
+      // insertion sort is cheaper than a sort call and allocates nothing.
+      let k = cand.length;
+      while (k > 0 && cand[k - 1] > slot) k--;
+      if (k > 0 && cand[k - 1] === slot) continue;
+      cand.splice(k, 0, slot);
+    }
+  }
+  for (let i = 0; i < cand.length; i++) collectAt(points[cand[i]], combatants, index, out);
+
   return out;
+}
+
+/**
+ * One point against the bodies that might be standing in it. Pushes to `out`.
+ *
+ * Lifted out of `tickPowerups` so the two ways in share it verbatim -- the
+ * whole claim being made about the point-indexed path is that it runs *this*
+ * function over a subset of the same points in the same order, and a second
+ * copy of the test would be a second place the rule could drift.
+ */
+function collectAt(
+  p: PowerupPoint,
+  combatants: readonly CombatantState[],
+  index: SpatialHash<CombatantState> | null,
+  out: PickupEvent[],
+): void {
+  if (!p.active) return;
+  // Everybody, or -- when the caller has built one -- only the bodies whose
+  // cell touches this point's 1.6 m disc.
+  //
+  // PERFORMANCE.md phase 1: the inner loop runs once per point per combatant,
+  // which over the inner ring's 884 points is 14,000 distance tests a tick at
+  // sixteen players and **442,000 at five hundred**.
+  //
+  // `collectWithin` returns a superset in ascending combatant order, which is
+  // exactly the order `combatants` is in, so the `break` below picks the same
+  // body it always did. See `game/spatialhash.ts` on why that ordering
+  // guarantee is what makes this identical rather than merely equivalent.
+  const near = index === null ? combatants : index.collectWithin(p.x, p.z, PICKUP_RADIUS, pickupScratch);
+  const radius2 = PICKUP_RADIUS * PICKUP_RADIUS;
+  for (const c of near) {
+    // A knocked-out body slid 7 m into a cafe must not collect it, and a
+    // combatant on 0 pips is a body. `combat.isTargetable` asks exactly this
+    // question about a punch; it is the same question here and is deliberately
+    // not imported, because "can be hit" and "can pick up" are two ideas that
+    // happen to have the same answer today and should be free to stop.
+    if (c.phase === 'ko' || c.health <= 0) continue;
+
+    const dx = c.body.position.x - p.x;
+    const dz = c.body.position.z - p.z;
+    if (dx * dx + dz * dz > radius2) continue;
+    // `body.position` is the eye; the point's y is the ground it stands on.
+    const feet = c.body.position.y - EYE_HEIGHT;
+    if (Math.abs(feet - p.y) > PICKUP_HEIGHT) continue;
+
+    applyPowerup(c, p.kind);
+    p.active = false;
+    p.respawnT = respawnSeconds(p.kind);
+    out.push({ point: p, combatant: c });
+    break;
+  }
 }
 
 // --- The field ----------------------------------------------------------------
@@ -418,6 +506,18 @@ export class PowerupField {
   private readonly residentKeys = new Set<string>();
   private readonly scratch: PowerupPoint[] = [];
   private scratchDirty = true;
+  /**
+   * How many times the resident set has changed.
+   *
+   * A second dirty flag would not work: `resident()` clears `scratchDirty` when
+   * it rebuilds, so `residentIndex` -- which calls it -- could never see one. A
+   * monotonic generation is the shape that survives being read after the thing
+   * it guards has already been refreshed.
+   */
+  private residency = 0;
+  /** WORKSTREAM AA: `resident()`'s points, filed by position. See `residentIndex`. */
+  private readonly index = new SpatialHash<number>();
+  private indexBuiltFor = -1;
 
   /**
    * Take (or retake) one tile's points, in sidecar order.
@@ -452,13 +552,17 @@ export class PowerupField {
     if (!this.residentKeys.has(tileKey)) {
       this.residentKeys.add(tileKey);
       this.scratchDirty = true;
+      this.residency++;
     }
     return points;
   }
 
   /** The tile's geometry has gone; stop ticking its points. Their state stays. */
   release(tileKey: string): void {
-    if (this.residentKeys.delete(tileKey)) this.scratchDirty = true;
+    if (this.residentKeys.delete(tileKey)) {
+      this.scratchDirty = true;
+      this.residency++;
+    }
   }
 
   /**
@@ -479,6 +583,30 @@ export class PowerupField {
       this.scratchDirty = false;
     }
     return this.scratch;
+  }
+
+  /**
+   * WORKSTREAM AA: `resident()`'s points filed by position, for
+   * `tickPowerups`' `pointIndex`.
+   *
+   * **Slots are indices into `resident()`**, not the points themselves, which
+   * is what lets the caller visit candidates in array order and stay
+   * byte-identical to the linear sweep. See `tickPowerups`.
+   *
+   * Rebuilt only when the resident set changes -- which on a server is never
+   * after boot, and on a client is a handful of times a second at a walk. A
+   * point never moves, so nothing else can invalidate it: the *state* of a
+   * point (taken, respawning) changes constantly and is not in here, because
+   * the collection pass re-reads `active` off the point it was handed.
+   */
+  residentIndex(): SpatialHash<number> {
+    const points = this.resident();
+    if (this.indexBuiltFor !== this.residency) {
+      this.index.clear();
+      for (let i = 0; i < points.length; i++) this.index.insert(i, points[i].x, points[i].z);
+      this.indexBuiltFor = this.residency;
+    }
+    return this.index;
   }
 
   /** For the dev handle and the debug overlay: how many, and how many are up. */
@@ -803,6 +931,97 @@ export function verifyPowerups(): string[] {
     const p = createPoint('ko', TRAINING, victim.body.position.x, 0, victim.body.position.z);
     if (tickPowerups([p], [victim], STEP_DT).length !== 0) {
       failures.push('A knocked-out combatant collected a powerup.');
+    }
+  }
+
+  // --- WORKSTREAM AA: the point index changes nothing.
+  //
+  // The claim the whole optimisation rests on is not "close enough": it is that
+  // running the collection over the candidates the point hash returns, in
+  // ascending array order, produces **the same events in the same order and
+  // leaves the same points taken** as the sweep over every point did. So this
+  // runs both, from identical state, over randomised configurations, and
+  // compares the whole outcome rather than a count -- which is exactly the
+  // standard `checkSpatialHash` holds the combatant hash to, and it is here
+  // rather than in `server/integration-check.ts` because a 45-minute check is
+  // not the thing that should be standing between a refactor and knowing.
+  //
+  // The generator is deliberately mean. Points are clustered tightly enough
+  // that several sit inside one 1.6 m disc and several combatants stand inside
+  // one point's, which is the only configuration where the *order* of `out` can
+  // differ between the two paths; a sparse random scatter would pass whatever
+  // this function did.
+  {
+    // A tiny deterministic PRNG. `Math.random` would make a failure here
+    // unreproducible, which for a check about exact equality is the one thing
+    // it must not be. Mulberry32; the constants are the published ones.
+    let seed = 0x5eed1234;
+    const rnd = (): number => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const digest = (pts: readonly PowerupPoint[], evs: readonly PickupEvent[]): string =>
+      evs.map((e) => `${e.point.id}>${e.combatant.id}`).join('|') +
+      '#' + pts.map((q) => `${q.active ? 1 : 0}:${q.respawnT.toFixed(6)}`).join(',');
+
+    for (let trial = 0; trial < 40 && failures.length === 0; trial++) {
+      const build = (): { pts: PowerupPoint[]; cs: CombatantState[] } => {
+        let n = 0;
+        const pts: PowerupPoint[] = [];
+        for (let i = 0; i < 24; i++) {
+          const q = createPoint(`p${i}`, (i % 2 === 0 ? TRAINING : FLAT_WHITE) as PowerupKind,
+            Math.round(rnd() * 12) - 6, 0, Math.round(rnd() * 12) - 6);
+          // A third of them start mid-respawn, so the clock sweep is exercised
+          // as well as the collection -- the two were one loop and are now two.
+          if (rnd() < 0.33) {
+            q.active = false;
+            q.respawnT = rnd() * 0.05;
+          }
+          pts.push(q);
+          n++;
+        }
+        const cs: CombatantState[] = [];
+        for (let i = 0; i < 5; i++) {
+          const c = createCombatant(i, Math.round(rnd() * 12) - 6, Math.round(rnd() * 12) - 6);
+          if (rnd() < 0.2) c.health = 0;
+          cs.push(c);
+        }
+        void n;
+        return { pts, cs };
+      };
+      // Two independent builds off the same seed state would diverge, so the
+      // second is a deep copy of the first rather than a re-roll.
+      const A = build();
+      const B = {
+        pts: A.pts.map((q) => {
+          const c = createPoint(q.id, q.kind, q.x, q.y, q.z);
+          c.active = q.active;
+          c.respawnT = q.respawnT;
+          return c;
+        }),
+        cs: A.cs.map((c) => {
+          const d = createCombatant(c.id, c.body.position.x, c.body.position.z);
+          d.health = c.health;
+          return d;
+        }),
+      };
+      const hash = new SpatialHash<number>();
+      for (let i = 0; i < B.pts.length; i++) hash.insert(i, B.pts[i].x, B.pts[i].z);
+      const bodies = new SpatialHash<CombatantState>();
+      for (const c of B.cs) bodies.insert(c, c.body.position.x, c.body.position.z);
+
+      const plain = digest(A.pts, tickPowerups(A.pts, A.cs, STEP_DT, []));
+      const hashed = digest(B.pts, tickPowerups(B.pts, B.cs, STEP_DT, [], bodies, hash));
+      if (plain !== hashed) {
+        failures.push(
+          `Trial ${trial}: the point-indexed pickup pass disagreed with the linear one.\n` +
+            `      linear: ${plain}\n      hashed: ${hashed}\n` +
+            `    Every pickup on the server goes through the hashed path; a difference here is ` +
+            `a powerup that exists on one machine and not the other.`,
+        );
+      }
     }
   }
 

@@ -97,6 +97,8 @@ import { CollisionWorld } from '../client/src/player/collision.ts';
 import { CUT_SUBDIVISION, TerrainField, decodeTerrain } from '../client/src/world/terrain.ts';
 import { decodePowerups } from '../client/src/world/powerups.ts';
 import { PowerupField, type PowerupPoint } from '../client/src/game/powerups.ts';
+// WORKSTREAM AA: the type of `ServerWorld.pointIndex`. See there.
+import type { SpatialHash } from '../client/src/game/spatialhash.ts';
 import { EYE_HEIGHT, PLAYER_RADIUS } from '../client/src/player/controller.ts';
 import { WaterLevels } from '../client/src/world/wading.ts';
 import { TrafficField, decodeLanes } from '../client/src/game/traffic.ts';
@@ -1783,6 +1785,16 @@ export interface ServerWorld {
   powerups: PowerupField;
   /** Every point, flat, in the order the fields were adopted. Ticked whole. */
   points: readonly PowerupPoint[];
+  /**
+   * WORKSTREAM AA: `points` filed by position, slots being indices into it.
+   *
+   * Built once, because on a server every tile is resident and the set never
+   * changes after boot. It is what turns the pickup pass from 3,128 hash
+   * queries a tick -- the largest single line in the tick, and one that ran at
+   * full cost with nobody connected -- into one query per player. See
+   * `game/powerups.tickPowerups` and `PowerupField.residentIndex`.
+   */
+  pointIndex: SpatialHash<number>;
   /** Tile keys that had a powerup sidecar, so a pickup can name its tile. */
   tileOf: Map<string, { tileX: number; tileZ: number }>;
   /**
@@ -2258,6 +2270,10 @@ export async function loadWorld(
     peds,
     staticCars,
     points,
+    // WORKSTREAM AA. Off the same field, in the same order, at the same moment
+    // -- the slots in here are indices into the array on the line above and the
+    // two must be taken together or the pickup pass reads the wrong cafe.
+    pointIndex: powerups.residentIndex(),
     tileOf,
     bytes,
     powerupSource,
@@ -2634,6 +2650,11 @@ export function roomWorld(shared: ServerWorld): ServerWorld {
     // this and the flat array can be taken as a guarantee rather than as an
     // implementation detail relied on from another package.
     points: [...powerups.resident()],
+    // And this room's own index over them. `roomWorld` gives every room its own
+    // `PowerupField` so a cafe taken in room 0 is still standing in room 3, and
+    // an index shared with another room's field would file this room's slots
+    // against that room's array. Same order, same length, different object.
+    pointIndex: powerups.residentIndex(),
   };
 }
 

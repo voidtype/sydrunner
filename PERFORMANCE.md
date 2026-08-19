@@ -244,6 +244,114 @@ now one pooled proxy with prototype getters), and the fresh `RosterEntry` per
 participant — which fires on every knockout, so at 500 players it was a
 500-object allocation at 60 Hz. RSS across the whole curve moved 132 → 158 MB.
 
+## Measured: the ambient tick, and the tenfold regression that hid in it
+*(workstream AA, 2026-08-20)*
+
+Phase 1's table above says **0.20 ms p50 at sixteen players**. Two years of
+merges later the production box was reporting `3.30 ms/host-tick median` with
+**one** player on it, and the same work measured 1.30 ms on an M-series laptop.
+Nothing had regressed in a single merge. A dozen workstreams had each added an
+ambient system that cost a tenth of a millisecond, every one defensible, and no
+number anywhere added them up: `/stats` still reported ten phases, but those ten
+buckets had quietly become containers — `powerups` held the pickups, the cash
+bundles, the fares and the tents; `npc` held seven separate systems.
+
+### What it actually was
+
+`server/profile.ts` replaced the ten `performance.now` pairs with **thirty
+sections on a cursor** — one clock read per boundary, the sections tiling the
+tick rather than sampling it, always on, and a top-six breakdown printed on the
+existing ten-second stats line. Its own cost, measured and reported on that
+line, is **1.0 µs/tick** — 0.006% of the budget. The first honest breakdown of
+the 1.30 ms tick was:
+
+    tick 1.30 ms = powerups 0.43, characters 0.43, bikes 0.17, streetlife 0.09,
+                   advance 0.05, wildlife 0.02, rest 0.11
+
+Four fixes, none of which changes behaviour:
+
+1. **The pickup sweep asked the wrong question.** `tickPowerups` walked all
+   3,128 powerups in Sydney and asked the combatant hash whether anybody was
+   standing in each one — 3,128 hash queries a tick, *at full cost with nobody
+   connected*. It now walks the players and asks a static hash of the points
+   which cafe each is standing in (`PowerupField.residentIndex`,
+   `ServerWorld.pointIndex`). The respawn clocks still tick over every point,
+   because a cafe in Penrith comes back whether or not anybody is watching, but
+   that is a property read and a branch. **0.43 → 0.005 ms.** `verifyPowerups`
+   proves the two paths byte-identical — same events, same order, same points
+   left taken — over 40 randomised clustered configurations.
+2. **`BikeField.follow` walked 5,511 bikes to find the nought that were
+   ridden**, and allocated a `Map` a tick doing it. It now walks a set of the
+   ridden ids, maintained by the only three lines in the project that assign
+   `Bike.rider`. The cost was never the branch, it was 5,511 pointer chases over
+   a quarter-megabyte that anything else in the tick evicted. **0.17 → 0.001 ms.**
+   `verifyBikes` runs a thousand randomised claim/release/follow operations and
+   compares the set against a full scan after every one.
+3. **The character promotion scan posed people a kilometre away and then threw
+   them out.** `forEachCharacterNear` must sweep cells out to `CHARACTER_REACH`
+   (1.3 km) because a cell whose centre landed on a reservoir rescues its
+   footpaths from up to 600 m away — but `poseCharacter` can now refuse off its
+   band pool's actual bounding box plus `POSE_SLOP`, before the nearest-point
+   search that is nearly all of the cost. **0.43 → 0.16 ms.** `verifyCharacters`
+   runs the gated and ungated sweeps over a real `PedestrianField` at nine query
+   points, three radii and a day of ticks, and compares the keys in order.
+4. **Every combatant asked the same cells the same question.** `countIn(kind,
+   cell, day)` is a pure function of three things and none of them is the
+   caller, so the eight-player sweep evaluated the identical census lookup and
+   bias curve eight times a tick for each of ~250 cell-and-kind pairs. It is now
+   memoised for the length of one tick in a 2,048-slot direct-mapped table with
+   a generation stamp — a slot read rather than a `Map.get`, because a `Map`
+   would have cost half the saving back. **0.16 → 0.07 ms at eight players.**
+
+
+### After
+
+| | 0 players | 1 player | 8 players |
+|---|---:|---:|---:|
+| `server/tick-profile.ts`, before | 0.157 ms | 0.485 ms | 0.793 ms |
+| `server/tick-profile.ts`, after | 0.012–0.015 ms | 0.035–0.038 ms | 0.152–0.168 ms |
+
+Live host, `bun run server/loadtest.ts`: **1.30 ms → 0.46 ms** median per host
+tick at one player (plus the room's two bots), and 1.17 ms → 0.78 ms at eight.
+On a box measured at ~2.5x this laptop that is about **1.2 ms** at one player,
+against the 3.30 ms it was.
+
+    tick 0.46 ms = characters 0.13, streetlife 0.07, advance 0.04, traffic 0.02,
+                   wildlife 0.02, powerups 0.02, rest 0.04
+
+### What is deliberately still expensive
+
+`stepCharacters` (0.13 ms) and `stepStreetlife` (0.07 ms) are the top two and
+both are the same shape: a per-combatant sweep of about 250 cell-and-kind pairs
+to find the ambient people within 9 m. After fixes 3 and 4 that enumeration *is*
+the floor — the poses are gone, the counts are shared across combatants, and
+what is left is walking the 8×8 block of cells the 1.3 km rescue radius forces
+`CHARACTER_REACH` to assume.
+
+`stepStreetlife` keeps the whole of its share because it never got fixes 3 and
+4: its scans go through `forEachMethheadNear` and the drunk sweep rather than
+`forEachCharacterNear`, and giving those the same two treatments is a
+straightforward second pass that was out of scope here. That is the cheapest
+0.07 ms left on the table.
+
+The only way past the enumeration itself is to run the promotion scan at 10 Hz
+instead of 60, which changes *when* an ambient NPC becomes solid and hittable by
+up to 100 ms. Declined: the tick is inside budget and that is a behaviour change
+nobody asked for. If a later pass wants the 0.2 ms, the honest place for the
+gate is the promotion loop inside each `step*` and not the whole function —
+`stepStreetlife`'s brawl response and ally expiry have to keep running every
+tick.
+
+### The check that stops it happening again
+
+`bun run server/tick-profile.ts` boots the shipped world, steps a real
+`Simulation` 3,000 times with 0, 1 and 8 participants, prints the full section
+table, and **exits 1** if the ambient tick passes 0.020 ms or the one-player
+tick passes 0.050 ms — the worst of six runs plus about a third. It
+takes about a minute. A budget raised quietly is how 0.20 ms became 3.30, so the
+file says in as many words: if it fails, fix the tick or record a fresh
+measurement here, but do not just move the number.
+
 ## Target hardware (with the egress arithmetic)
 
 **Rewritten against phase 4's measurements.** The original version of this table

@@ -49,6 +49,8 @@ import { MAX_HEALTH } from '../client/src/game/combat.ts';
 import { EYE_HEIGHT } from '../client/src/player/controller.ts';
 import { PedestrianField } from '../client/src/game/pedestrians.ts';
 import { FLAT_WHITE, PowerupField, createPoint, type PowerupPoint } from '../client/src/game/powerups.ts';
+// WORKSTREAM AA: the empty index every `ServerWorld` fixture now needs.
+import { SpatialHash } from '../client/src/game/spatialhash.ts';
 // WORKSTREAM Z: the four faction facts the new cases stand a body next to, and
 // the two `teamfx` reads they assert through rather than around.
 import { NPC_KIND, NPC_STATE, REASON } from '../client/src/game/factions.ts';
@@ -93,6 +95,10 @@ function emptyWorld(): ServerWorld {
     traffic: new TrafficField(),
     peds: new PedestrianField(),
     points: [],
+    // WORKSTREAM AA: an index over nothing, which is what `ServerWorld` now
+    // requires and what a fixture with no powerups in it should hand back. See
+    // `game/powerups.PowerupField.residentIndex`.
+    pointIndex: new SpatialHash<number>(),
     tileOf: new Map(),
     bytes: { collision: 0, terrain: 0, powerups: 0, lanes: 0 },
     powerupSource: [],
