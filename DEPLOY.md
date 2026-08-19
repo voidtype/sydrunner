@@ -553,7 +553,8 @@ add to them rather than around them. If the protocol shape changed, bump `PROTOC
 and fix the assertion in `server/integration-check.ts` in the same commit.
 
 The box side that code depends on and that a rsync does not carry:
-`/etc/systemd/system/sydney.service.d/{memory,state,boot-memory}.conf`
+`/etc/systemd/system/sydney.service.d/{memory,state,boot-memory,residency}.conf`,
+`/etc/sysctl.d/99-sydney-swap.conf`
 (`SYDNEY_LANES_CAP_MB=60`, `SYDNEY_STATE_DIR=/var/lib/sydney`), the Caddy
 `handle /auth/*` block, and `/var/lib/sydney/{wallets,accounts}.json`, which
 must never be rsynced over.
@@ -887,6 +888,21 @@ welcome, ≥20 snapshots, a rising `ackSeq`, and a close code of 1000.
   city itself (about 190 MB), which is loaded once per *process* — so four host
   processes on one box is 760 MB before a single player joins, and that is the
   number to size against rather than the per-room one.
+- **`vm.swappiness = 10`, and the reason is the page cache.** The server reads
+  the world off disk all day (collision, tiles, lanes, parked cars), which fills
+  the page cache, and at the default swappiness of 60 the kernel answered that
+  by paging *the game* out: measured 2026-08-20 at 322 MB of the process in
+  swap against 141 MB resident, with a 682 MB cache — a tick that page-faults
+  stalls for milliseconds, which is what "the server lags" looks like from a
+  player's seat. `/etc/sysctl.d/99-sydney-swap.conf` pins it at 10 so the kernel
+  drops cache (cheap: the files are still on disk) before it touches the
+  process. `swapoff -a && swapon -a` is the one-off that pulls an
+  already-swapped process back into RAM; it needs the cache to be droppable, so
+  `echo 3 > /proc/sys/vm/drop_caches` first if free memory is tight.
+- **Residency caps are sized so the process fits in RAM beside Caddy**, not so
+  it fits under `MemoryMax`: `residency.conf` holds
+  `SYDNEY_STATIC_CARS_CAP_MB=14` and `SYDNEY_LANES_CAP_MB=46` (2026-08-20).
+  Collision is left at 64 — it is what stops a player falling through the world.
 - **Boot peaks over steady state, and the ceiling is sized for the peak.**
   Loading the world (collision prisms, terrain grids, lanes, parked cars) peaks
   at ~588 MB and then settles at ~250 MB. `MemoryHigh` was 560 M, so every
