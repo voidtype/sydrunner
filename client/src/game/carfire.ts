@@ -271,6 +271,52 @@ export const BLAST_PED_MAX = 6;
 export const BOOM_RING_S = 0.55;
 export const SCORCH_S = 30;
 
+/**
+ * How wide the scorch mark is, metres **across** rather than in radius.
+ *
+ * Three and a half, which is between a sedan's length (4.6) and its width (1.8):
+ * a mark the size of the whole car reads as a shadow somebody forgot to remove
+ * and a mark the size of the engine bay is invisible from a car window at speed.
+ * What it has to say, ten minutes later and from across the street, is *a car
+ * died here* -- and the size that says that is "bigger than the thing that was
+ * standing on it, smaller than the lane".
+ *
+ * Stated as a diameter rather than as the radius the renderer actually scales by
+ * because every other measurement in this file is a thing you could pace out:
+ * `BLAST_M` is a reach and this is a width, and the one conversion lives at the
+ * single place that draws it (`world/carsmoke.SCORCH_R`).
+ *
+ * Here rather than in `world/carsmoke.ts` on `BOOM_RING_S`' own argument one
+ * paragraph up: the mark, the ring and the blast are one event, and a scorch
+ * that was wider than the ring that drew it would be a crater with a shockwave
+ * inside it.
+ */
+export const SCORCH_M = 3.5;
+
+/**
+ * How many chunks come off a car when it goes, and how long they are in the air.
+ *
+ * Fourteen at 0.9 s, and both halves are chosen against the same failure: debris
+ * is the part of an explosion a player only sees *if it is still there when they
+ * look up*. Fewer than about ten reads as litter rather than as a car coming
+ * apart; many more and the individual arcs stop being legible and the whole
+ * thing turns into a puff, which is what the plume is already for.
+ *
+ * Nine tenths of a second is the flight time of a chunk thrown at about 8 m/s
+ * with a bit of up in it -- long enough for the eye to follow one from the
+ * centre to where it lands, short enough that it is gone before the shockwave
+ * ring has finished (`BOOM_RING_S` is 0.55) plus a beat. Debris still bouncing
+ * around a wreck two seconds later would be the only part of this feature that
+ * outlives the bang, and the scorch is deliberately the thing that does that.
+ *
+ * Both are here rather than in the renderer for `SCORCH_M`'s reason, plus one of
+ * their own: the scatter has to be **the same on every client** -- it is a pure
+ * function of the blast's position and these two numbers -- and a count that
+ * lived in one file could not be the count another file's determinism rests on.
+ */
+export const DEBRIS_COUNT = 14;
+export const DEBRIS_LIFE_S = 0.9;
+
 // --- The rules, as pure functions -----------------------------------------------------
 
 /**
