@@ -824,6 +824,45 @@ export class HeatField {
     }
   }
 
+  /**
+   * --- WORKSTREAM Z: drop this player one rung. `Sausage Sizzle`'s third clause.
+   *
+   * The node: bystanders within 6 m "forget your last crime (witnessed reports
+   * drop one tier)". Read as **one star off the ladder**, landed on the bottom
+   * of the tier below rather than by subtracting a fixed number of points, and
+   * that distinction is the whole of this method. `STAR_POINTS` is not evenly
+   * spaced -- 100, 250, 380, 620, 900 -- so "one tier" as a subtraction would be
+   * two rungs at the bottom of the ladder and half a rung at the top, and the
+   * tooltip would mean something different depending on how wanted you were.
+   *
+   * `scalePoints` is the neighbouring method and is deliberately not reused: a
+   * factor is the right shape for the teleport's "heat halved" and the wrong one
+   * for a tier, for the identical reason.
+   *
+   * Landing on the *floor* of the tier below rather than in the middle of it
+   * matters: a player who sizzles twice in a row should reach zero rather than
+   * asymptote toward it, which is what any fractional retreat would do.
+   *
+   * A no-op for somebody with no heat and for somebody at zero stars, so the
+   * caller does not have to ask first. The version bump is gated on the star
+   * count actually moving, exactly as `scalePoints` and `debugSet` gate theirs.
+   */
+  dropTier(playerId: number): void {
+    const h = this.heat.get(playerId);
+    if (h === undefined || h.stars <= 0) return;
+    const to = h.stars - 1;
+    h.points = STAR_POINTS[to];
+    // The tier timer with it. Without this a player sizzled down from 3 to 2
+    // keeps the ninety seconds they had already served at 3, and the ladder's
+    // own escalation puts them straight back up -- which would make the clause
+    // do nothing at all for anybody the police were actually chasing.
+    h.tierTicks = 0;
+    if (h.stars !== to) {
+      h.stars = to;
+      this.version++;
+    }
+  }
+
   debugSet(playerId: number, stars: number, tick: number): void {
     const n = Math.max(0, Math.min(HEAT_MAX, Math.round(stars)));
     // **Anything already queued against this player is dropped**, and finding

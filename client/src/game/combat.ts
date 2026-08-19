@@ -733,6 +733,16 @@ export interface CombatInput extends InputSnapshot {
   abilityV?: boolean;
   abilityG?: boolean;
   abilityT?: boolean;
+  /**
+   * --- WORKSTREAM Z: `R`, the fourth of them, and the one with a *place*.
+   *
+   * `V`, `G` and `T` work anywhere; `R` only means anything while you are
+   * standing at a Flat White point, which is why it is the one ability key whose
+   * refusal is a sentence rather than a silent no-op (`Simulation.useFood`
+   * answers through `note`). Carried here on its three neighbours' terms and
+   * consumed by nothing in this file for their reason.
+   */
+  abilityR?: boolean;
 }
 
 /**

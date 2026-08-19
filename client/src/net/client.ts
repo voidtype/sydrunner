@@ -335,7 +335,21 @@ export interface RemoteBall {
 
 /** What `main.ts` needs to react to. Presentation, exactly as the offline path's is. */
 export interface NetHandlers {
-  onHit(attacker: number, victim: number, ko: boolean, footy: boolean, health: number, returned: boolean): void;
+  /**
+   * `ally` (WORKSTREAM Z) is `EVENT_FLAG.ALLY`: the knockout was landed by the
+   * attacker's `Meth-adone` ally rather than by the attacker. The scoreboard
+   * still moves -- the node says it counts as your assist -- and the only thing
+   * that changes is the feed line, which must not claim the player swung.
+   */
+  onHit(
+    attacker: number,
+    victim: number,
+    ko: boolean,
+    footy: boolean,
+    health: number,
+    returned: boolean,
+    ally: boolean,
+  ): void;
   /**
    * A bat sent a football back. See `game/swat.ts` and `protocol.SwatEvent`.
    *
@@ -1215,7 +1229,10 @@ export class NetClient {
           // selector, and `game/abilities.ts` for what each one means.
           (input.abilityV === true ? BTN.ABILITY_V : 0) |
           (input.abilityG === true ? BTN.ABILITY_G : 0) |
-          (input.abilityT === true ? BTN.ABILITY_T : 0),
+          (input.abilityT === true ? BTN.ABILITY_T : 0) |
+          // WORKSTREAM Z: and `R`, which is bit 8 and is the reason `buttons` is
+          // a `u16` since v19. See `protocol.BTN.ABILITY_R`.
+          (input.abilityR === true ? BTN.ABILITY_R : 0),
         forward: input.forward,
         right: input.right,
         yaw: input.yaw,
@@ -1855,6 +1872,7 @@ export class NetClient {
           (e.flags & EVENT_FLAG.FOOTY) !== 0,
           e.health,
           (e.flags & EVENT_FLAG.RETURNED) !== 0,
+          (e.flags & EVENT_FLAG.ALLY) !== 0,
         );
       } else if (e.kind === EVENT.SWAT) {
         this.handlers.onSwat(e.swinger, e.ball, e.x, e.y, e.z, e.vx, e.vy, e.vz);

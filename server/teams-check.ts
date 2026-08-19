@@ -45,9 +45,16 @@
  */
 
 import { CollisionWorld } from '../client/src/player/collision.ts';
+import { MAX_HEALTH } from '../client/src/game/combat.ts';
 import { EYE_HEIGHT } from '../client/src/player/controller.ts';
 import { PedestrianField } from '../client/src/game/pedestrians.ts';
-import { PowerupField } from '../client/src/game/powerups.ts';
+import { FLAT_WHITE, PowerupField, createPoint, type PowerupPoint } from '../client/src/game/powerups.ts';
+// WORKSTREAM Z: the four faction facts the new cases stand a body next to, and
+// the two `teamfx` reads they assert through rather than around.
+import { NPC_KIND, NPC_STATE, REASON } from '../client/src/game/factions.ts';
+import { EVENT, EVENT_FLAG } from '../client/src/net/protocol.ts';
+import { fxKarenReportsSteal, fxMaxPips } from '../client/src/game/teamfx.ts';
+import { WalletStore } from './wallets.ts';
 import { TerrainField } from '../client/src/world/terrain.ts';
 import { TrafficField } from '../client/src/game/traffic.ts';
 import { WaterLevels } from '../client/src/world/wading.ts';
@@ -66,7 +73,7 @@ import {
 } from '../client/src/game/teams.ts';
 import { TEAM_OP, decodeTalents, encodeTalents } from '../client/src/net/teams.ts';
 import { AccountStore } from './accounts.ts';
-import { Simulation, type Participant } from './sim.ts';
+import { Simulation, type Participant, type TickOutput } from './sim.ts';
 import type { ServerWorld } from './world.ts';
 
 const failures: string[] = [];
@@ -438,8 +445,455 @@ async function run(): Promise<void> {
     await Bun.$`rm -f ${accountPath}.aura`.quiet().nothrow();
   }
 
+  await runLiveTalents();
+
   await accounts.close();
   await Bun.$`rm -f ${accountPath}`.quiet().nothrow();
+}
+
+// --- WORKSTREAM Z: the nine that used to do nothing ------------------------------
+//
+// Every case below fails **silently** in this repo's sense, and in the sharpest
+// possible version of it: before this workstream all nine of these talents had a
+// `teamfx` helper, a tooltip and a bit on the wire, and the only thing missing
+// was a caller. The game played perfectly. `verifyTeamFx` passed, because the
+// helper it tests was correct; `verifyTalentLive` passes, because the arithmetic
+// it tests is correct. What neither of them can see is that nobody asks.
+//
+// So these are seam tests by construction: each one buys the node the way a
+// player buys it, puts a body in a place, runs the real `Simulation.step`, and
+// asserts the thing the tooltip promises. A talent that is unwired again fails
+// here and nowhere else.
+
+/**
+ * A level-10 account on a side, with a wallet and whatever build is asked for.
+ *
+ * Factored out because five of the cases below need one and the ceremony is
+ * four calls -- signup, kills, `chooseTeam`, join -- none of which is what the
+ * case is about. `NODES` is searched by name so the fixtures read the way the
+ * talent panel does; `nodeId` above does the same for the cases further up.
+ */
+async function liveHero(
+  room: Simulation,
+  store: AccountStore,
+  wallets: WalletStore,
+  handle: string,
+  team: number,
+  build: readonly string[],
+): Promise<Participant> {
+  await store.signup(handle, 'hunter2hunter2', '', wallets);
+  const rec = store.byHandle(handle);
+  if (!rec) throw new Error(`no ${handle}`);
+  rec.kills = 90;
+  rec.level = levelFor(rec.kills);
+  if (team !== TEAM.NONE) store.chooseTeam(rec, team as 1 | 2);
+  const p = room.join(0, null, rec.handle, rec);
+  for (const name of build) room.teamOp(p.id, TEAM_OP.TAKE, nodeId(team, name));
+  return p;
+}
+
+/**
+ * One press of `R`, down and **up again**.
+ *
+ * The release step is the whole reason this is a function. `BTN.ABILITY_R` is
+ * level-triggered and `resolveAbilities` takes the *rising* edge, so a case that
+ * set the bit, stepped, and then cleared the field without stepping would leave
+ * `abilityRHeld` true -- and the next press in the same fixture would not be a
+ * press at all. Three of the four assertions below were silently testing nothing
+ * before this existed, which is a fair advertisement for the edge rule.
+ */
+function pressR(room: Simulation, p: Participant, out: TickOutput): void {
+  p.input.abilityR = true;
+  room.step(out);
+  p.input.abilityR = false;
+  room.step(out);
+}
+
+/** Put a body somewhere and seed its rewind ring, as the aura block above does. */
+function stand(room: Simulation, p: Participant, x: number, z: number): void {
+  p.combat.body.position.set(x, EYE_HEIGHT, z);
+  p.combat.body.velocity.set(0, 0, 0);
+  p.history.seed(room.tick, x, EYE_HEIGHT, z, 0);
+}
+
+async function runLiveTalents(): Promise<void> {
+  const dir = process.env.SYDNEY_STATE_DIR ?? './data/state';
+  const path = `${dir}/teams-check-live.json`;
+  const walletPath = `${dir}/teams-check-live-wallets.json`;
+  await Bun.$`rm -f ${path} ${walletPath}`.quiet().nothrow();
+  const store = new AccountStore(path);
+  await store.load();
+  const wallets = new WalletStore(walletPath);
+  await wallets.load();
+  // Typed, unlike the three untyped literals further up this file: the ally case
+  // below reads `out.events` back, and an inferred `never[]` cannot be read.
+  const out: TickOutput = { tick: 0, events: [], snapshot: null };
+
+  // --- `Meth-adone`: the street does not pick you, and its knockouts are yours.
+  console.log('\n--- Meth-adone: the street is on your side ---');
+  {
+    const world = emptyWorld();
+    const room = new Simulation(world, { accounts: store, wallets });
+    // Big Night and Long Bomb open Bloodhouse's tier 2, which is where the node
+    // is. Bought through `teamOp` rather than written into the mask, because a
+    // build that skipped the gates is a build a player cannot have.
+    const hero = await liveHero(room, store, wallets, 'Methy', TEAM.MARITA, ['Front Bar', 'Long Bomb', 'Meth-adone']);
+    const plain = await liveHero(room, store, wallets, 'Plainy', TEAM.MARITA, ['Front Bar']);
+    check(hasNode(hero.talents, nodeId(TEAM.MARITA, 'Meth-adone')), 'the fixture bought Meth-adone', JSON.stringify(hero.walletNote));
+
+    stand(room, hero, 0, 0);
+    stand(room, plain, 60, 0);
+    room.step(out);
+    check(
+      room.teams.flag(hero.id, FX.METHHEAD_ALLY),
+      'and the fold hands the flag to the hook',
+      String(room.teams.flag(hero.id, FX.METHHEAD_ALLY)),
+    );
+    check(!room.teams.flag(plain.id, FX.METHHEAD_ALLY), 'and not to somebody who did not buy it');
+
+    // A drunk, promoted by hand and stood next to each of them in turn. By hand
+    // because the promotion scan needs a pedestrian field and this fixture is an
+    // empty city -- what is under test is `DRUNK.think`'s *choice*, which is the
+    // line the talent changes, and that runs against `ctx.combatants` alone.
+    const drunkAt = (x: number, z: number) => {
+      const a = room.factions.promote(NPC_KIND.DRUNK, x, 0, z, 0, 1, -1);
+      if (!a) throw new Error('the drunk would not promote');
+      a.state = NPC_STATE.WALK;
+      a.stateTicks = 0;
+      return a;
+    };
+    const onHero = drunkAt(1.5, 0);
+    // Long enough for `DRUNK_REACTION_TICKS` to elapse twice over.
+    for (let i = 0; i < 120; i++) room.step(out);
+    check(onHero.target !== hero.id, 'a drunk standing over a Meth-adone never snaps at them', `target ${onHero.target}`);
+
+    onHero.health = -2;
+    room.step(out);
+    const onPlain = drunkAt(61.5, 0);
+    for (let i = 0; i < 120; i++) room.step(out);
+    check(
+      onPlain.target === plain.id,
+      'and the same drunk beside somebody without it does snap',
+      `target ${onPlain.target} against ${plain.id}`,
+    );
+
+    // --- The assist. The hero swings at the plain one; the drunk beside them
+    // joins in; the drunk's punch is the knockout and the hero is credited.
+    //
+    // The ally is stood **seven** metres away rather than three, and the number
+    // is load-bearing in both directions: inside `ALLY_RECRUIT_M`'s eight so the
+    // swing reaches them, and outside `DRUNK_SNAP`'s four so they do not simply
+    // pick the victim on their own -- which would produce a knockout that looked
+    // exactly like the one under test and was credited to nobody.
+    onPlain.health = -2;
+    room.step(out);
+    // Back to full first. The drunk in the case above spent a hundred and twenty
+    // ticks swinging at this body, so "has their health moved" -- which is how
+    // the loop below detects a landed swing -- would answer yes before the hero
+    // had thrown one, and the assertion would run against a swing still in its
+    // wind-up. That is the shape of a check that passes for the wrong reason.
+    plain.combat.health = MAX_HEALTH;
+    for (let i = 0; i < 400 && plain.combat.phase === 'ko'; i++) room.step(out);
+    plain.combat.health = MAX_HEALTH;
+    const ally = drunkAt(7, 0);
+    let landed = false;
+    for (let i = 0; i < 400 && !landed; i++) {
+      // `squareUp`'s geometry, by hand: the hero at z = 1.1 facing -Z, the
+      // victim at the origin. Re-seeded every pass because the rewind ring is
+      // what the swing is adjudicated against.
+      stand(room, hero, 0, 1.1);
+      stand(room, plain, 0, 0);
+      hero.combat.body.yaw = 0;
+      hero.input.yaw = 0;
+      hero.viewTicks = 0;
+      hero.input.punch = true;
+      room.step(out);
+      hero.input.punch = false;
+      room.step(out);
+      landed = plain.combat.health < MAX_HEALTH;
+    }
+    check(landed, 'the hero landed a swing', `victim on ${plain.combat.health}`);
+    check(ally.target === plain.id, 'a swing within 8 m turns a drunk onto whoever you hit', `target ${ally.target}`);
+
+    // --- And the credit. The ally's own swing, through `DRUNK.think`'s real
+    // cadence rather than a poked health value: the whole point of the case is
+    // that `FactionCtx.damagePlayer` -> `Simulation.shoot` reads the register,
+    // and reaching past that would be testing the register instead of the seam.
+    const before = hero.kos;
+    plain.combat.health = 0.4;
+    let allyEvent: { attacker: number; victim: number; flags: number } | undefined;
+    for (let i = 0; i < 400 && plain.combat.phase !== 'ko'; i++) {
+      room.step(out);
+      for (const e of out.events) {
+        if (e.kind !== EVENT.HIT) continue;
+        if ((e.flags & EVENT_FLAG.ALLY) === 0) continue;
+        allyEvent = e as { attacker: number; victim: number; flags: number };
+      }
+    }
+    check(plain.combat.phase === 'ko', 'the ally put them down', plain.combat.phase);
+    check(hero.kos === before + 1, 'and the knockout is credited to the player', `${hero.kos} against ${before}`);
+    check(
+      allyEvent !== undefined && allyEvent.attacker === hero.id && allyEvent.victim === plain.id,
+      'and the feed is told it was an assist, not a bat',
+      JSON.stringify(allyEvent),
+    );
+  }
+
+  // --- `Tradie Rates` and `Karen Rapport`, the two DeFAULT "leave me alone"s.
+  console.log('\n--- the DeFAULT who nobody bothers ---');
+  {
+    const world = emptyWorld();
+    const room = new Simulation(world, { accounts: store, wallets });
+    const mate = await liveHero(room, store, wallets, 'Tradey', TEAM.DEFAULT, ['Big Night', 'Sausage Sizzle', 'Tradie Rates']);
+    const rort = await liveHero(room, store, wallets, 'Rorty', TEAM.DEFAULT, ['Bouncer', 'Set Shot', 'Karen Rapport']);
+    const plain = await liveHero(room, store, wallets, 'Nobody', TEAM.DEFAULT, ['Bouncer']);
+    stand(room, mate, 0, 0);
+    stand(room, rort, 40, 0);
+    stand(room, plain, 80, 0);
+    room.step(out);
+    check(room.teams.flag(mate.id, FX.TRADIE_ALLY), 'Tradie Rates is folded', String(room.teams.flag(mate.id, FX.TRADIE_ALLY)));
+    check(room.teams.flag(rort.id, FX.KAREN_IMMUNE), 'Karen Rapport is folded');
+    check(room.teams.flag(rort.id, FX.AGENT_CHEER), 'and so is its second clause');
+
+    // A tradie who has just been hit, standing in reach, targeting each of them.
+    const tradieAt = (x: number, z: number, target: number) => {
+      const a = room.factions.promote(NPC_KIND.TRADIE, x, 0, z, 0, 1, target);
+      if (!a) throw new Error('the tradie would not promote');
+      return a;
+    };
+    const health = mate.combat.health;
+    const t1 = tradieAt(1, 0, mate.id);
+    for (let i = 0; i < 30; i++) room.step(out);
+    check(mate.combat.health === health, 'a tradie never decks Tradie Rates', `${mate.combat.health} of ${health}`);
+    check(t1.target === -1, 'and drops the grudge rather than standing there', `target ${t1.target}`);
+
+    t1.health = -2;
+    room.step(out);
+    const plainHealth = plain.combat.health;
+    tradieAt(81, 0, plain.id);
+    for (let i = 0; i < 30; i++) room.step(out);
+    check(plain.combat.health < plainHealth, 'and decks somebody without it', `${plain.combat.health} of ${plainHealth}`);
+
+    // The Karen half, through the real witness gate: `fxKarenReportsSteal` is
+    // what `karenReport` consults, and immunity wins outright at any distance.
+    check(!fxKarenReportsSteal(rort.id, 1), 'a Karen at one metre does not report Karen Rapport');
+    check(fxKarenReportsSteal(plain.id, 1), 'and does report somebody without it');
+  }
+
+  // --- `Newtown Standoff`: the officers have to choose you, and pay for it.
+  console.log('\n--- Newtown Standoff: come on then ---');
+  {
+    const world = emptyWorld();
+    const room = new Simulation(world, { accounts: store, wallets });
+    const mega = await liveHero(room, store, wallets, 'Standoff', TEAM.MARITA, [
+      'Front Bar', 'Long Bomb', 'Meth-adone', 'Off Your Face', 'Sirens Are Music', 'Glassing', 'Newtown Standoff',
+    ]);
+    const bystander = await liveHero(room, store, wallets, 'Bystander', TEAM.MARITA, ['Front Bar']);
+    check(hasNode(mega.talents, nodeId(TEAM.MARITA, 'Newtown Standoff')), 'the mega fixture bought it', JSON.stringify(mega.walletNote));
+    stand(room, mega, 0, 0);
+    stand(room, bystander, 10, 0);
+    room.step(out);
+    check(room.teams.flag(mega.id, FX.POLICE_FOCUS), 'the mega is folded');
+    check(room.teams.flag(mega.id, FX.KO_OFFICER_HEALS), 'and so is its second clause');
+
+    // An officer already on the bystander, ten metres away and well inside the
+    // forty. Below three stars the mega is asleep, which is the half of the
+    // condition that is easiest to lose.
+    const officer = room.factions.promote(NPC_KIND.POLICE, 5, 0, 0, 0, 1, bystander.id);
+    if (!officer) throw new Error('the officer would not promote');
+    room.factions.accuse(bystander.id, REASON.ASSAULT, room.tick);
+    room.factions.accuse(mega.id, REASON.ASSAULT, room.tick);
+    room.heat.debugSet(mega.id, 2, room.tick);
+    room.step(out);
+    check(officer.target === bystander.id, 'at two stars the officer stays on the other player', `target ${officer.target}`);
+
+    room.heat.debugSet(mega.id, 3, room.tick);
+    room.step(out);
+    check(officer.target === mega.id, 'at three the mega takes them', `target ${officer.target}`);
+    // And keeps them: the sweep runs after `recruit`, so a fresh dispatch to the
+    // other player is stolen back on the tick it happens.
+    officer.target = bystander.id;
+    room.step(out);
+    check(officer.target === mega.id, 'and cannot be re-targeted while the condition holds', `target ${officer.target}`);
+
+    // An officer on nobody keeps patrolling, which is the starvation rule.
+    const patrol = room.factions.promote(NPC_KIND.POLICE, 6, 0, 0, 0, 1, -1);
+    if (!patrol) throw new Error('the patrol would not promote');
+    room.step(out);
+    check(patrol.target === -1, 'an officer with nobody to chase is not conscripted', `target ${patrol.target}`);
+
+  }
+
+  // --- `KO_OFFICER_HEALS`, in its own room and for a reason.
+  //
+  // The focus case above leaves its fixture at three stars with an officer
+  // shooting at them, and a player on half a pip in that state is a player who
+  // gets knocked out and **respawns at full** -- which is the same number this
+  // assertion is looking for and would have passed for entirely the wrong
+  // reason. A clean room, no heat, no investigation and one officer.
+  console.log('\n--- and the officer you put down ---');
+  {
+    const world = emptyWorld();
+    const room = new Simulation(world, { accounts: store, wallets });
+    const mega = await liveHero(room, store, wallets, 'Refill', TEAM.MARITA, [
+      'Front Bar', 'Long Bomb', 'Meth-adone', 'Off Your Face', 'Sirens Are Music', 'Glassing', 'Newtown Standoff',
+    ]);
+    stand(room, mega, 0, 1.1);
+    room.step(out);
+    check(room.teams.flag(mega.id, FX.KO_OFFICER_HEALS), 'the fixture has the heal');
+
+    const officer = room.factions.promote(NPC_KIND.POLICE, 0, 0, 0, 0, 1, -1);
+    if (!officer) throw new Error('the officer would not promote');
+    // Home is half a kilometre away. `promote` sets `homeX/homeZ` to where the
+    // actor was placed, and an officer with no investigation walks home and sets
+    // `health = -2` the instant it is within two metres of it -- so an officer
+    // promoted *at* its own home despawns on its first `think`, before any punch
+    // can reach it. That is `POLICE.think`'s RETURN branch working correctly and
+    // it is the whole reason this line exists.
+    officer.homeX = 500;
+    officer.homeZ = 500;
+    // One pip, so the fixture is one punch rather than three -- which keeps the
+    // player's half-pip out of range of the response their own swing provokes.
+    officer.health = 1;
+    mega.combat.health = 0.5;
+    const max = fxMaxPips(mega.id, MAX_HEALTH);
+    // Through the real swing, because the branch under test is in
+    // `Simulation.hitNpc` and the only thing that reaches it is a punch that
+    // connected. The officer is pinned each pass: with no investigation they are
+    // in `RETURN` and would otherwise walk out of reach.
+    // Looped until the **state** rather than the health says so: `strikeNpc`
+    // stands a downed officer's health back up to `maxHealth` on the way down --
+    // "hardy rather than immortal", see there -- so `health <= 0` is only ever
+    // true for a kind with no downtime at all, and an assertion on it would have
+    // spun this loop out and then failed on a knockout that did happen.
+    for (let i = 0; i < 60 && officer.state !== NPC_STATE.DOWN; i++) {
+      stand(room, mega, 0, 1.1);
+      mega.combat.body.yaw = 0;
+      mega.input.yaw = 0;
+      mega.viewTicks = 0;
+      officer.x = 0;
+      officer.y = 0;
+      officer.z = 0;
+      mega.input.punch = true;
+      room.step(out);
+      mega.input.punch = false;
+      room.step(out);
+    }
+    check(officer.state === NPC_STATE.DOWN, 'the officer went down to a bat', `state ${officer.state}`);
+    check(
+      Math.abs(mega.combat.health - max) < 1e-9,
+      'and the KO refilled the mega to their own maximum',
+      `${mega.combat.health} of ${max}`,
+    );
+  }
+
+  // --- `R` at a Flat White point: the pie, the wallet and the two refusals.
+  console.log('\n--- R, at a flat white ---');
+  {
+    const world = emptyWorld();
+    // One cafe at the origin. `emptyWorld` has an empty point table, which is
+    // exactly the "away from a point" case and is why the third assertion below
+    // moves the *player* rather than emptying this.
+    const cafes: PowerupPoint[] = [createPoint('cafe:0', FLAT_WHITE, 0, 0, 0)];
+    (world as unknown as { points: readonly PowerupPoint[] }).points = cafes;
+    const room = new Simulation(world, { accounts: store, wallets });
+    const eater = await liveHero(room, store, wallets, 'Piey', TEAM.MARITA, ['Big Night', 'Tap On', 'Servo Pie']);
+    check(hasNode(eater.talents, nodeId(TEAM.MARITA, 'Servo Pie')), 'the fixture bought Servo Pie', JSON.stringify(eater.walletNote));
+    if (!eater.wallet) {
+      check(false, 'the fixture has a wallet');
+      return;
+    }
+    stand(room, eater, 0.5, 0);
+    room.step(out);
+    check(room.teams.flag(eater.id, FX.EAT), 'and the fold hands the hook its flag');
+
+    // Broke, at the counter. Refused, and told why -- which is the whole reason
+    // `R`'s refusal goes through `note` when `G`'s does not.
+    eater.wallet.balance = 0;
+    eater.combat.health = 1;
+    clearPill(eater);
+    pressR(room, eater, out);
+    check(eater.wallet.balance === 0, 'a pie on $0 is refused', `$${eater.wallet.balance}`);
+    check(pill(room, eater) !== '', 'and the player is told', JSON.stringify(eater.walletNote));
+
+    // Twenty metres away, with the money. Refused for the other reason.
+    eater.wallet.balance = 50;
+    stand(room, eater, 20, 0);
+    clearPill(eater);
+    pressR(room, eater, out);
+    check(eater.wallet.balance === 50, 'a pie twenty metres from any point is refused', `$${eater.wallet.balance}`);
+    check(/flat white/.test(pill(room, eater)), 'and the reason names the place', JSON.stringify(eater.walletNote));
+
+    // At the counter, with the money. $6, and the pips arrive over four seconds
+    // rather than at once -- which is the pie's whole character.
+    stand(room, eater, 0.5, 0);
+    eater.combat.health = 1;
+    clearPill(eater);
+    pressR(room, eater, out);
+    check(eater.wallet.balance === 44, 'a pie at the counter costs $6', `$${eater.wallet.balance}`);
+    const rightAfter = eater.combat.health;
+    check(rightAfter < 1.2, 'and nothing has arrived on the first tick', String(rightAfter));
+    // Four seconds of ticks, and then one more so the last fraction lands.
+    for (let i = 0; i < 4 * 60 + 10; i++) room.step(out);
+    check(
+      Math.abs(eater.combat.health - 3) < 1e-6,
+      'and two pips are in by four seconds',
+      String(eater.combat.health),
+    );
+    // The borrowed pip: Big Night's four plus the pie's one.
+    check(
+      fxMaxPips(eater.id, MAX_HEALTH) === 5,
+      'and the pie is carrying an extra maximum pip',
+      String(fxMaxPips(eater.id, MAX_HEALTH)),
+    );
+  }
+
+  // --- The sausage, which is a different ability wearing the same key.
+  console.log('\n--- and the sausage, which is for everybody ---');
+  {
+    const world = emptyWorld();
+    const cafes: PowerupPoint[] = [createPoint('cafe:1', FLAT_WHITE, 0, 0, 0)];
+    (world as unknown as { points: readonly PowerupPoint[] }).points = cafes;
+    const room = new Simulation(world, { accounts: store, wallets });
+    const cook = await liveHero(room, store, wallets, 'Snagger', TEAM.DEFAULT, ['Sausage Sizzle']);
+    // A Marita standing beside the barbecue. The node says "bystanders", not
+    // "teammates", and this is the case that keeps it that way.
+    const other = await liveHero(room, store, wallets, 'Stranger', TEAM.MARITA, ['Front Bar']);
+    if (!cook.wallet) {
+      check(false, 'the sausage fixture has a wallet');
+      return;
+    }
+    cook.wallet.balance = 20;
+    stand(room, cook, 0.5, 0);
+    stand(room, other, 3, 0);
+    room.step(out);
+    check(room.teams.flag(cook.id, FX.SIZZLE), 'the fixture has Sausage Sizzle');
+
+    cook.combat.health = 1;
+    other.combat.health = 1;
+    // Four stars, which a pie would be refused at and a sausage is not -- the
+    // cheap node is the one that always works, which is the whole shape of the
+    // tier-1 / tier-2 split.
+    room.heat.debugSet(cook.id, 4, room.tick);
+    pressR(room, cook, out);
+    check(cook.wallet.balance === 17, 'a sausage costs $3', `$${cook.wallet.balance}`);
+    check(cook.combat.health >= 2, 'and one pip lands immediately', String(cook.combat.health));
+    check(other.combat.health >= 2, 'and a bystander three metres away gets one too', String(other.combat.health));
+    check(room.heat.starsOf(cook.id) === 3, 'and the crowd forgets one tier', `${room.heat.starsOf(cook.id)} stars`);
+    for (let i = 0; i < 6 * 60 + 10; i++) room.step(out);
+    // `>= 3 - 1e-6` rather than `>= 3`: the drip is a float accumulated over 360
+    // ticks and lands on 2.9999999999999996, which is two pips by any reading a
+    // player has. `verifyTeamFx`'s own food case uses the same epsilon.
+    check(
+      cook.combat.health >= 3 - 1e-6,
+      'and the second pip is in by six seconds',
+      String(cook.combat.health),
+    );
+  }
+
+  await store.close();
+  await wallets.close();
+  await Bun.$`rm -f ${path} ${walletPath}`.quiet().nothrow();
 }
 
 await run();

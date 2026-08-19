@@ -188,6 +188,15 @@ import {
 // used here and nothing else -- one tick of the ambient promotion scan, and the
 // rule about whether hitting one of them is a crime.
 import { stepStreetlife, strikeCrime } from '../client/src/game/streetlife.ts';
+// --- WORKSTREAM Z: the ally register, the cafe test and the two map layers.
+// Three-free on the same terms as everything above it; see that file's header
+// for why these three things are one module and the other six talents are not.
+import {
+  allyOwner,
+  foodPlaceRefusal,
+  grantAllies,
+  nearestFlatWhite2,
+} from '../client/src/game/talentlive.ts';
 // The heat ladder, on the same terms once more: `game/heat.ts` imports no three
 // and registers the two kind bytes `NPC_KIND` reserved for the highway patrol
 // and the RBT. Four entry points -- the field, one tick of it, the handle the
@@ -359,12 +368,23 @@ import {
   TENT_RADIUS_M,
   TENT_SECONDS,
   SUMMON_HEAT_FREEZE_S,
+  EAT_HEAL_PIPS,
+  EAT_HEAL_S,
+  EAT_TEMP_PIP_S,
+  SIZZLE_BYSTANDER_M,
+  SIZZLE_HEAL_NOW,
+  SIZZLE_HEAL_OVER,
+  SIZZLE_HEAL_S,
   abilityForG,
   abilityForGHold,
   abilityForPhone4,
+  // WORKSTREAM Z: `R`, the food key. This was `abilityForF` and had no caller
+  // at all; see that function for why the key moved off the torch.
+  abilityForR,
   abilityForT,
   abilityForV,
   abilityPenaltyRunning,
+  REFUSE_NONE,
   dashSpeedFor,
   expireAbilityWindow,
   feedG,
@@ -403,6 +423,13 @@ import {
   fxTakeableSpeed,
   fxTheftReported,
   fxTrafficHoldGapM,
+  // --- WORKSTREAM Z: the five talent reads that had no call site until now.
+  fxAgentCheerHealth,
+  fxFoodTick,
+  fxGrantTempPip,
+  fxKoOfficerHeals,
+  fxStartFoodHeal,
+  AGENT_CHEER_M,
   DROP_TRAP_PIPS,
   fxCarNeverRecycles,
   forgetPlayer as forgetTeamFx,
@@ -541,6 +568,11 @@ export interface Participant {
    */
   abilityVHeld: boolean;
   abilityTHeld: boolean;
+  /**
+   * WORKSTREAM Z: and `R`'s, on `mountHeld`'s terms exactly -- a fact about this
+   * connection's keyboard, never simulation state and never in a snapshot.
+   */
+  abilityRHeld: boolean;
   /** Set when the socket closes; the combatant leaves on the next tick. */
   gone: boolean;
 
@@ -1514,6 +1546,7 @@ export class Simulation {
       // keeps the press instant itself, because a hold is not an edge.
       abilityVHeld: false,
       abilityTHeld: false,
+      abilityRHeld: false,
       gone: false,
       // **The wallet is opened here and only here**, by name, and only for a
       // person. `WalletStore.for` creates on first sight, so a new name's first
@@ -1815,6 +1848,15 @@ export class Simulation {
       const attacker = this.participants.get(attackerId);
       if (attacker) {
         attacker.kos += weight;
+        // --- WORKSTREAM Z: `Karen Rapport`'s second clause. "Real-estate agents
+        // cheer for you (+1 pip when one is within 10 m of your KO)."
+        //
+        // Here rather than at the four places a knockout is adjudicated, because
+        // this is the funnel all four already pass through -- the comment
+        // immediately below says so about the kill ladder and the argument is
+        // identical. A pip granted per weapon would be a pip that stopped
+        // arriving the day somebody added a fifth.
+        this.cheerFor(attacker);
         // --- The ladder. *"10 kills levels u up"*, and the one place kills are
         // counted for it.
         //
@@ -3457,8 +3499,68 @@ export class Simulation {
    * snapshot either way.
    */
   private shoot(playerId: number, pips: number, actor: NpcActor): void {
-    void actor;
+    // --- WORKSTREAM Z: was this an ally's punch, and is anybody owed the KO?
+    //
+    // `Meth-adone`: "they count as your assist for kills". Asked **before**
+    // `hurt`, because `hurt` is what decides whether this hit was a knockout and
+    // the register has to be read while the actor is still the actor that threw
+    // the punch -- the expiry sweep runs on the next `stepStreetlife` and would
+    // otherwise be able to land between the damage and the credit.
+    //
+    // A negative `pips` is a heal (`characters.TRADIE`'s pickup goes through
+    // this same door) and is never a knockout, so the guard is the sign rather
+    // than a second question about what kind of actor this is.
+    const owner = pips > 0 ? allyOwner(actor.id, fxNow()) : -1;
+    if (owner >= 0 && owner !== playerId) {
+      this.hurtByAlly(playerId, pips, owner, actor);
+      return;
+    }
     this.hurt(playerId, pips);
+  }
+
+  /**
+   * A knockout landed by somebody's `Meth-adone` ally, credited to them.
+   *
+   * A near-copy of `hurt` rather than a flag on it, and the duplication is
+   * deliberate and small: `hurt`'s whole shape is "nobody is to blame" -- it
+   * emits a `HIT` whose attacker *is* its victim, which is the sentinel a car
+   * uses, and it credits the knockout to the victim themselves. This one has an
+   * attacker, so all four of those decisions are the other way round, and
+   * threading a nullable attacker through `hurt` would have put a branch on
+   * every one of them for the benefit of one talent. What is **not** duplicated
+   * is the damage itself: `combat.applyWorldDamage` is the shared machine and is
+   * still the only thing that spells a knockout.
+   *
+   * The victim still loses their investigation and their heat, exactly as they
+   * would to a police round -- being caught is being caught, whoever caught you.
+   */
+  private hurtByAlly(playerId: number, pips: number, ownerId: number, actor: NpcActor): void {
+    const p = this.participants.get(playerId);
+    if (!p) return;
+    const c = p.combat;
+    if (c.phase === 'ko' || c.health <= 0) return;
+    const ko = applyWorldDamage(c, pips);
+    fxNoteCombat(playerId, fxNow());
+    if (ko) {
+      // Through the one funnel, with the *player* as the attacker -- which is
+      // what makes the leaderboard, the level ladder and the agent's applause
+      // all treat this as a knockout the player landed. It is the whole of the
+      // node's "they count as your assist for kills".
+      this.creditKo(ownerId, playerId);
+      this.factions.clearInvestigation(playerId);
+      this.investigationVersion++;
+      this.seenRiding.set(playerId, false);
+    }
+    this.events.push({
+      kind: EVENT.HIT,
+      attacker: ownerId,
+      victim: playerId,
+      // `ALLY` is what turns the feed line from "%s batted %s" -- which did not
+      // happen -- into "%s and a meth head got %s". See `protocol.EVENT_FLAG`.
+      flags: ko ? EVENT_FLAG.KO | EVENT_FLAG.ALLY : 0,
+      health: c.health,
+    });
+    void actor;
   }
 
   /**
@@ -4387,6 +4489,10 @@ export class Simulation {
     const tDown = p.input.abilityT === true;
     const tRising = tDown && !p.abilityTHeld;
     p.abilityTHeld = tDown;
+    // --- WORKSTREAM Z: R, the same again. See `useFood`.
+    const rDown = p.input.abilityR === true;
+    const rRising = rDown && !p.abilityRHeld;
+    p.abilityRHeld = rDown;
     // --- G, level, because a two-second hold is not an edge.
     const g = feedG(p.id, p.input.abilityG === true, nowMs);
 
@@ -4416,6 +4522,105 @@ export class Simulation {
       const no = tryAbility(p.id, which, nowMs, day, wallet);
       if (no === '' && which === ABILITY.MEGA_TELEPORT) this.megaTeleport(p);
     }
+
+    // --- WORKSTREAM Z: R.
+    //
+    // The one ability key whose refusal is **reported**, which is the opposite
+    // of the rule the `G` branch above sets out and is right for the same
+    // underlying reason. `G` on cooldown is a thing the HUD's cooldown pip
+    // already says, so a notice per press would be the game arguing with a held
+    // key. `R` fails because of *where you are standing* and there is nothing on
+    // screen that says so -- a player at the wrong end of a laneway pressing R
+    // and getting silence has no way to learn that a cafe has a radius. So the
+    // sentence goes out, and `note` is the pill it goes out on.
+    if (rRising) {
+      const no = this.useFood(p);
+      if (no !== '') this.note(p.id, no);
+    }
+  }
+
+  /**
+   * `R` at a Flat White point: a $6 servo pie, or a $3 sausage sizzle.
+   *
+   * Returns `''` if it fired and a lower-case refusal otherwise, which is
+   * `useTalentPhone`'s shape and is here for its reason: a key that does nothing
+   * is a key a player decides is broken.
+   *
+   * ---------------------------------------------------------------------------
+   * THE ORDER OF THE GATES, which is the whole of this function.
+   *
+   *   1. **The place**, and the stars for the pie -- `talentlive.foodPlaceRefusal`.
+   *      First because it is by far the most common refusal and the only one whose
+   *      sentence tells the player what to do next.
+   *   2. **The cooldown and the wallet** -- `abilities.tryAbility`, which owns
+   *      both for every ability in the game and is not reimplemented here.
+   *   3. **The money**, debited only after (2) has said yes, which is the
+   *      property `tryAbility`'s "mutates on success only" contract exists for.
+   *
+   * Getting 1 and 2 the other way round would spend a player's twenty-second
+   * food cooldown on a press made in the wrong place, which is the kind of thing
+   * that reads as the ability being unreliable.
+   *
+   * ---------------------------------------------------------------------------
+   * WHAT EACH ONE DOES. Both tooltips split into a pip that arrives *now* and
+   * pips that arrive *over* a few seconds, and the split is honoured literally:
+   * the now half is an assignment here and the over half is a drip in
+   * `teamfx.fxStartFoodHeal`, ticked by `stepTalents`. The pie's extra pip for
+   * thirty seconds is a temporary *maximum* rather than temporary health --
+   * `teamfx.FxState.tempPipUntilMs` says why -- and the sausage's third clause
+   * reaches the bystanders and the heat ladder below.
+   */
+  private useFood(p: Participant): string {
+    const c = p.combat;
+    if (c.phase === 'ko' || c.health <= 0) return 'not while you are on the ground';
+    const which = abilityForR(p.id);
+    if (which === ABILITY.NONE) return REFUSE_NONE;
+    const nearest2 = nearestFlatWhite2(this.world.points, c.body.position.x, c.body.position.z);
+    const where = foodPlaceRefusal(which, this.heat.starsOf(p.id), nearest2);
+    if (where !== '') return where;
+
+    const nowMs = fxNow();
+    const day = Math.floor(nowMs / CYCLE_MS);
+    const wallet = p.wallet?.balance ?? -1;
+    const no = tryAbility(p.id, which, nowMs, day, wallet);
+    if (no !== '') return no;
+    const cost = ABILITY_COST[which] ?? 0;
+    if (cost > 0) this.wallet.debit(p.id, cost, which === ABILITY.EAT ? 'servo pie' : 'sausage');
+
+    const max = fxMaxPips(p.id, MAX_HEALTH);
+    if (which === ABILITY.EAT) {
+      // "Heal 2 pips over 4 s and carry one extra pip for 30 s." Nothing lands
+      // this instant, which is the pie's whole character against the sausage:
+      // it is the better heal and it is the one you cannot eat in a fight.
+      // The temporary pip is granted *before* the drip starts so the ceiling the
+      // drip fills toward already includes it.
+      fxGrantTempPip(p.id, nowMs, EAT_TEMP_PIP_S);
+      fxStartFoodHeal(p.id, EAT_HEAL_PIPS, EAT_HEAL_S);
+      return '';
+    }
+
+    // --- The sausage. One pip now...
+    c.health = Math.min(max, c.health + SIZZLE_HEAL_NOW);
+    fxStartFoodHeal(p.id, SIZZLE_HEAL_OVER, SIZZLE_HEAL_S);
+    // ...and one for everybody standing near it. **Any team**, deliberately: the
+    // node says "bystanders", the tooltip's joke is that a Bunnings sizzle is
+    // for whoever turns up, and a heal that checked sides would be the one
+    // charitable thing in this game with a membership test on it.
+    for (const other of this.ordered) {
+      if (other.id === p.id) continue;
+      const o = other.combat;
+      if (o.phase === 'ko' || o.health <= 0) continue;
+      const dx = o.body.position.x - c.body.position.x;
+      const dz = o.body.position.z - c.body.position.z;
+      if (dx * dx + dz * dz > SIZZLE_BYSTANDER_M * SIZZLE_BYSTANDER_M) continue;
+      o.health = Math.min(fxMaxPips(other.id, MAX_HEALTH), o.health + SIZZLE_HEAL_NOW);
+    }
+    // ..."and forget your last crime (witnessed reports drop one tier)". One
+    // rung off the ladder rather than a points subtraction -- `HeatField.dropTier`
+    // has the arithmetic and why it is not `scalePoints`. The version bump is
+    // that method's, so the star bar moves on the next refresh.
+    this.heat.dropTier(p.id);
+    return '';
   }
 
   /**
@@ -4455,6 +4660,47 @@ export class Simulation {
     }
     c.body.velocity.x = dx * speed;
     c.body.velocity.z = dz * speed;
+  }
+
+  /**
+   * --- WORKSTREAM Z: `Karen Rapport`'s applause. One pip, capped.
+   *
+   * Called from `creditKo` for every knockout with a live attacker, and an
+   * early-out costing one flag read for everybody who has not bought the node --
+   * which is everybody on the other team plus most of this one.
+   *
+   * **The promoted actor list rather than an ambient scan**, and the sliver that
+   * gives away is worth writing down. Characters become promoted actors at
+   * `characters.NOTICE_RANGE`, which is 9 m, and the node's radius is 10 -- so an
+   * agent standing between nine and ten metres away is still an ambient function
+   * and is not in this list. That is deliberate rather than tolerated: this file
+   * treats an ambient actor as scenery everywhere else (`npcHitTest` walks
+   * `field.actors` and nothing else, so an ambient agent cannot even be hit), and
+   * a talent that reached one metre further than the swing does would be the one
+   * thing in the game that interacts with a person who is not really there. The
+   * cost of the alternative is a `forEachCharacterNear` cell scan on every
+   * knockout in the room; the cost of this is a metre.
+   *
+   * The cap is `teamfx.fxAgentCheerHealth`'s -- see there for why a pip with no
+   * ceiling would make an auction crowd a fortress and do it invisibly.
+   */
+  private cheerFor(attacker: Participant): void {
+    const c = attacker.combat;
+    if (c.phase === 'ko' || c.health <= 0) return;
+    let seen = false;
+    for (const a of this.factions.actors) {
+      if (a.kind !== NPC_KIND.AGENT) continue;
+      const dx = a.x - c.body.position.x;
+      const dz = a.z - c.body.position.z;
+      if (dx * dx + dz * dz > AGENT_CHEER_M * AGENT_CHEER_M) continue;
+      seen = true;
+      break;
+    }
+    if (!seen) return;
+    // The flag lives inside the helper, so a room with no `TeamLookup` installed
+    // -- every self-check that is not about teams -- gets the health back
+    // unchanged and this is a walk of an empty actor list.
+    c.health = fxAgentCheerHealth(attacker.id, c.health, fxMaxPips(attacker.id, MAX_HEALTH));
   }
 
   /**
@@ -4571,6 +4817,20 @@ export class Simulation {
     if (pips > 0) {
       const max = fxMaxPips(p.id, MAX_HEALTH);
       if (c.health < max) c.health = Math.min(max, c.health + pips);
+    }
+    // --- WORKSTREAM Z: and the food going down, which is a *fraction* of a pip
+    // a tick rather than the whole one the regeneration hands over. See
+    // `teamfx.fxFoodTick` for why the two are different shapes.
+    //
+    // Capped against `fxMaxPips` on the same line as the regen and for the same
+    // reason -- which for a servo pie is the ceiling the pie itself just raised,
+    // because `fxGrantTempPip` was called before the drip started. A player who
+    // is over their maximum when the temporary pip lapses is simply not topped
+    // up until they are under it again; nothing takes health away.
+    const bite = fxFoodTick(p.id, FIXED_DT);
+    if (bite > 0) {
+      const max = fxMaxPips(p.id, MAX_HEALTH);
+      if (c.health < max) c.health = Math.min(max, c.health + bite);
     }
   }
 
@@ -5101,6 +5361,19 @@ export class Simulation {
       fxNoteCombat(p.id, nowMs);
       fxNoteCombat(victim.id, nowMs);
       fxBreakGhostPlates(p.id);
+      // --- WORKSTREAM Z: `Meth-adone` -- "they fight for you if you swing near
+      // them". Measured from **where the swing landed** rather than from the
+      // swinger, which is the tooltip's own wording and is also the version that
+      // does not recruit the bloke standing behind you. A no-op and a single
+      // flag read for anybody without the node; see `talentlive.grantAllies`.
+      grantAllies(
+        this.factions.actors,
+        p.id,
+        victim.id,
+        victim.body.position.x,
+        victim.body.position.z,
+        nowMs,
+      );
       if (this.hitReport.ko) this.creditKo(p.id, victim.id);
       this.events.push({
         kind: EVENT.HIT,
@@ -5281,6 +5554,28 @@ export class Simulation {
     // Placed here rather than beside the `EVENT.HIT` push below because it has
     // to happen for *every* downed NPC, and that block is only for the kinds
     // that do not score a knockout.
+    // --- WORKSTREAM Z: `Newtown Standoff`'s second clause. "Your KOs on
+    // officers reset your health to full."
+    //
+    // Both police kinds count -- an officer on foot and a highway patrol crew --
+    // because the tooltip says "officers" and a talent that paid out for the
+    // constable and not for the car would be a distinction the player has no way
+    // to learn. `HIGHWAY_PATROL` is registered in `game/heat.ts` as a *car*, and
+    // putting one down is putting its crew down; the feed line that kind carries
+    // says so.
+    //
+    // Full means **this player's** full, which is `MAX_HEALTH` plus Big Night,
+    // plus a group, plus a servo pie's borrowed pip. There is exactly one
+    // function that knows that and it is the one every other ceiling in this
+    // file goes through.
+    if (
+      strike.down &&
+      (actor.kind === NPC_KIND.POLICE || actor.kind === NPC_KIND.HIGHWAY_PATROL) &&
+      fxKoOfficerHeals(p.id) &&
+      p.combat.phase !== 'ko'
+    ) {
+      p.combat.health = fxMaxPips(p.id, MAX_HEALTH);
+    }
     if (strike.down) this.dropNpcCash(actor, p);
     if (strike.down && def && !def.scoresKo) {
       // No leaderboard movement, deliberately: a scoreboard is a record of what
@@ -5794,6 +6089,9 @@ export function applyButtons(input: CombatInput, buttons: number): void {
   input.abilityV = (buttons & BTN.ABILITY_V) !== 0;
   input.abilityG = (buttons & BTN.ABILITY_G) !== 0;
   input.abilityT = (buttons & BTN.ABILITY_T) !== 0;
+  // WORKSTREAM Z: and `R`, the food key, which is bit 8 and is why `buttons` is
+  // a `u16` since v19. Edge-triggered by `resolveAbilities` like `V` and `T`.
+  input.abilityR = (buttons & BTN.ABILITY_R) !== 0;
 }
 
 // --- The self-check -----------------------------------------------------------

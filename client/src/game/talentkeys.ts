@@ -1,5 +1,5 @@
 /**
- * The browser's half of the talent abilities: three keys, and one prediction.
+ * The browser's half of the talent abilities: four keys, and one prediction.
  *
  * ---------------------------------------------------------------------------
  * WHY THIS IS A FILE AND NOT TWENTY LINES IN `main.ts`.
@@ -13,7 +13,7 @@
  * ---------------------------------------------------------------------------
  * WHAT THE CLIENT DECIDES, WHICH IS ALMOST NOTHING.
  *
- * The three keys are sent as level bits (`protocol.BTN.ABILITY_V/G/T`) and
+ * The four keys are sent as level bits (`protocol.BTN.ABILITY_V/G/T/R`) and
  * `server/sim.resolveAbilities` does every decision: which ability the key is,
  * whether the cooldown is up, whether the wallet can pay, who gets knocked down.
  * That is not caution, it is the same rule the whole game runs on -- `INPUT`
@@ -40,19 +40,32 @@
  * what makes `?offline` a real test of the feel.
  *
  * ---------------------------------------------------------------------------
- * `V` IS ALREADY THE CAMERA TOGGLE, and this file does not resolve that.
+ * `V` WAS ALSO THE CAMERA TOGGLE. **IT IS NOT ANY MORE.** -- WORKSTREAM Z.
  *
- * `main.ts` has bound `V` to the third-person camera since long before talents
- * existed. The brief for this workstream assigns `V` to the dash. Both are
- * right and they cannot both have the key.
+ * `main.ts` bound `V` to the third-person camera long before talents existed,
+ * and the workstream that added the dash left the collision unresolved: the
+ * ability won when the player had one and `V` stayed the camera for everybody
+ * else. That shipped, and it is the wrong answer -- it means the same key does
+ * two different things depending on how you have spent your talent points, so
+ * the one binding nobody can be taught is the one every player uses.
  *
- * What ships is: **the ability wins when the player has one**, and `V` is the
- * camera for everybody else -- which is every player below level 2, every guest,
- * and everybody who did not spend a point on Bolt or Merge Late. That keeps the
- * key doing what it has always done for almost everybody, and it is reversible
- * in one line. It is flagged for the owner rather than decided quietly, because
- * "my camera key stopped working when I took a talent" is exactly the kind of
- * thing that reads as a bug.
+ * The owner's call: **the camera moves to `C`**, for everybody, always, and `V`
+ * is the ability alone. `C` was free, it is the mnemonic, and a player who has
+ * taken neither Bolt nor Merge Late now has nothing on `V` -- which is the point.
+ * A key that does nothing is honest; a key that does one of two things is not.
+ *
+ * The wheel still zooms out to third person and back, which is the binding that
+ * did the work anyway. See `client/index.html`'s controls list, which is where a
+ * player finds this out.
+ *
+ * ---------------------------------------------------------------------------
+ * `R` IS THE FOOD KEY, AND IT IS NOT `F` -- WORKSTREAM Z.
+ *
+ * `game/abilities.abilityForR` was written as `abilityForF` and never called.
+ * `F` is the torch and has been for as long as there has been a night, so a
+ * contextual `F` would be a key that does two things in the one place a player
+ * is most likely to be pressing it: standing at a cafe, after dark. `R` is free
+ * and is under the same hand. See `protocol.BTN.ABILITY_R` for the byte it cost.
  */
 
 import { EYE_HEIGHT } from '../player/controller.ts';
@@ -85,17 +98,7 @@ export function resetTalentKeys(): void {
 }
 
 /**
- * Does this player have something on `V` other than the camera?
- *
- * The question `main.ts`'s key handler asks before toggling the boom. See the
- * header: the ability wins, and everybody without one keeps their camera.
- */
-export function vIsAnAbility(playerId: number): boolean {
-  return abilityForV(playerId) !== ABILITY.NONE;
-}
-
-/**
- * Read the three keys into the input, and predict the dash.
+ * Read the four keys into the input, and predict the dash.
  *
  * Called once per fixed step from `main.ts`, immediately after the bike's `E`
  * and before `combat.advance` -- so an impulse set here is integrated by the
@@ -115,6 +118,13 @@ export function tickTalentKeys(
   input.abilityV = v;
   input.abilityG = g;
   input.abilityT = t;
+  // WORKSTREAM Z: `R`, level like its three neighbours. **Nothing about it is
+  // predicted** -- a serving of food is a wallet debit, a place test and a heat
+  // tier, every one of which is the authority's, and a browser that guessed at
+  // any of them would have to be corrected by the next snapshot in a way the
+  // player would read as the pie not working. So the bit goes out and
+  // `Simulation.useFood` answers, through `note`.
+  input.abilityR = keys.has('KeyR');
 
   const rising = v && !vHeld;
   vHeld = v;

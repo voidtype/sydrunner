@@ -304,7 +304,32 @@ export type MarkerKind =
    * exactly the read the body tint gives in the street.
    */
   | 'team-marita'
-  | 'team-default';
+  | 'team-default'
+  /**
+   * --- WORKSTREAM Z: a random breath test, for a player with `Toll Dodger`.
+   *
+   * A **place you must not drive into**, which is a category this map did not
+   * have: every other kind here is something you want (a coffee, a bike, a fare)
+   * or somebody who wants you (a combatant). It is drawn only for the player who
+   * bought the node -- `game/talentlive.markRbts` takes the gate as an argument
+   * so the layer cannot leak -- and the other half of that node, the roadblock
+   * being set 300 m ahead instead of 150, is `game/heat.placeRbt`'s.
+   */
+  | 'rbt'
+  /**
+   * The other side, seen through walls, for a player with `Neighbourhood Watch`.
+   *
+   * **Two kinds again, and they deliberately share their ink with the two solid
+   * team dots** -- which is the one place this file's "no two markers are the
+   * same colour" rule is broken on purpose, and `verifyBigMap` says so where it
+   * checks. The colour answers *which side*, and that has one right answer per
+   * team no matter how the dot was learned; what separates a player you can see
+   * from one the talent is showing you through a terrace is the *shape*, drawn
+   * hollow and a size down. A second hue for "the same enemy, but sensed" would
+   * be a legend entry for a distinction the player does not have to act on.
+   */
+  | 'enemy-marita'
+  | 'enemy-default';
 
 /**
  * One thing on the map, in world metres.
@@ -486,6 +511,18 @@ const COMBATANT_DOT_R = 3.5;
  * would make the map read as being mostly about bikes.
  */
 const BIKE_DOT_R = 2.6;
+/**
+ * --- WORKSTREAM Z: an enemy sensed through a wall, hollow and a size down.
+ *
+ * 2.8 px against the combatant's 3.5, and the shrink is the honest half of the
+ * feature: the dot is information you were *given* rather than information you
+ * have, it is up to twelve metres stale by the time you act on it
+ * (`Neighbourhood Watch` is an aura and the fold runs on the tick), and a
+ * through-wall marker drawn at full size next to somebody you can actually see
+ * would make the two look equally certain. Hollow is the other half; see the
+ * draw loop.
+ */
+const ENEMY_DOT_R = 2.8;
 /** How far a combatant's heading tick reaches past their dot, in pixels. */
 const HEADING_TICK = 5;
 
@@ -502,9 +539,15 @@ const HEADING_TICK = 5;
 export function markerInk(kind: MarkerKind): string {
   switch (kind) {
     case 'team-marita':
+    // WORKSTREAM Z: the hollow through-wall dots take their side's own colour.
+    // See `MarkerKind`'s note on why this is the one deliberate ink collision.
+    case 'enemy-marita':
       return TEAM_COLOUR[TEAM.MARITA].css;
     case 'team-default':
+    case 'enemy-default':
       return TEAM_COLOUR[TEAM.DEFAULT].css;
+    case 'rbt':
+      return RBT_DOT;
     case 'training':
       return TRAINING_DOT;
     case 'flat-white':
@@ -579,6 +622,27 @@ const CENTRELINK_DOT = 'rgb(214,178,96)';
  */
 const FARE_PICKUP_DOT = 'rgb(120,214,236)';
 const FARE_DROPOFF_DOT = 'rgb(64,124,142)';
+
+/**
+ * --- WORKSTREAM Z: the RBT, in the blue on the side of the car.
+ *
+ * The node says "blue/white" and this is the blue half; the white half is the
+ * ring the dot is stroked with, which is what makes it read as a *sign* rather
+ * than as one more coloured dot -- and is the only marker on either map drawn in
+ * two inks, because it is the only one that means "do not go there".
+ *
+ * The palette was nearly full before this and the fares took the last of the
+ * cyan, so the separation had to be argued rather than eyeballed. `rgb(96,148,255)`
+ * is a **violet**-blue: against `FARE_PICKUP_DOT`'s `rgb(120,214,236)` the green
+ * channel is 66 lower and the blue is 19 higher, which at 3 px is the difference
+ * between "sky" and "police", and against Marita's teal `#018D96` it is the far
+ * side of the wheel. It is also literally the colour of the light bar, which is
+ * the tie every legible marker on this map has -- the bike's lime, the rave's
+ * magenta -- and the reason none of them needs a legend.
+ */
+const RBT_DOT = 'rgb(96,148,255)';
+/** The white the RBT ring is stroked in. The other half of "blue/white". */
+const RBT_RING = 'rgba(255,255,255,0.85)';
 
 const TAU = Math.PI * 2;
 
@@ -1093,10 +1157,28 @@ export class Minimap implements MarkerSink {
       // radius: the ranking this file sets out -- somebody who can hit you is the
       // biggest dot -- is about what a marker *is*, not about which side it is on.
       const combatant = m.kind === 'combatant' || m.kind === 'team-marita' || m.kind === 'team-default';
-      const r = combatant ? COMBATANT_DOT_R : m.kind === 'bike' ? BIKE_DOT_R : POWERUP_DOT_R;
+      // WORKSTREAM Z: an enemy sensed through a wall is a size down from one you
+      // can see, and hollow. Both are the same read: it is somebody who can hit
+      // you, and you have not actually laid eyes on them.
+      const sensed = m.kind === 'enemy-marita' || m.kind === 'enemy-default';
+      const r = combatant ? COMBATANT_DOT_R : sensed ? ENEMY_DOT_R : m.kind === 'bike' ? BIKE_DOT_R : POWERUP_DOT_R;
       ctx.beginPath();
       ctx.arc(sx, sy, r, 0, TAU);
-      ctx.fill();
+      if (sensed) ctx.stroke();
+      else ctx.fill();
+      // And the RBT's white ring, the other half of its "blue/white". Written
+      // out here rather than folded into the run-of-like-markers style hoist
+      // above, because it is the one kind that needs a second stroke colour and
+      // hoisting it would cost every frame with no roadblock on screen -- which
+      // is every frame for everybody under four stars. The stroke style is put
+      // back so the next marker's heading tick is not white.
+      if (m.kind === 'rbt') {
+        ctx.strokeStyle = RBT_RING;
+        ctx.beginPath();
+        ctx.arc(sx, sy, r + 2, 0, TAU);
+        ctx.stroke();
+        ctx.strokeStyle = ink;
+      }
 
       if (m.yaw !== undefined) {
         // Forward is `(-sin, -cos)` in world (x, z) -- the controller's, not a

@@ -212,8 +212,19 @@ import { verifyTeleport } from './game/teleport.ts';
 // hook is the identity until something calls `setTeamLookup`, which is the
 // framework workstream's job -- so this block changes nothing on its own.
 import { verifyAbilities } from './game/abilities.ts';
-import { fxSetNow, setTeamLookup, verifyTeamFx } from './game/teamfx.ts';
-import { tickTalentKeys, vIsAnAbility, LOCAL_ID } from './game/talentkeys.ts';
+import { AGENT_CHEER_M, fxSetNow, setTeamLookup, verifyTeamFx } from './game/teamfx.ts';
+import { tickTalentKeys, LOCAL_ID } from './game/talentkeys.ts';
+// --- WORKSTREAM Z: the nine talents that had no call site. One import block;
+// two marker sources and two feed lines hang off it. See `game/talentlive.ts`.
+import {
+  allyKoLine,
+  allyNounNear,
+  enemyMarkerKind,
+  enemyMarkerRangeM,
+  markRbts,
+  rbtMarkersOn,
+  verifyTalentLive,
+} from './game/talentlive.ts';
 import { verifySuggestions } from './net/suggestions.ts';
 import { SuggestionsPanel, clientId } from './suggestions.ts';
 // --- WORKSTREAM V: teams and talents. The contract (the 42 nodes and the two
@@ -576,6 +587,7 @@ import {
   daylight,
   forEachCharacterNear,
   saturdayAt,
+  AGENT_APPLAUSE_LINE,
   KAREN_REPORT_LINE,
   POSTED_LINE,
   POSTED_LINE_BYSTANDER,
@@ -1001,7 +1013,10 @@ async function main(): Promise<void> {
   // Every failure is silent in this repo's sense -- a talent that composed wrong
   // renders a perfectly good frame and simply plays slightly differently on the
   // two machines. See `game/teamfx.ts`.
-  const teamFxFailures = timed('teamfx', () => [...verifyTeamFx(), ...verifyAbilities()]);
+  // WORKSTREAM Z adds a third term rather than folding into `verifyTeamFx`:
+  // `game/talentlive.ts` imports `teamfx.ts`, so `teamfx.ts` cannot import it
+  // back. See that file's check for the argument.
+  const teamFxFailures = timed('teamfx', () => [...verifyTeamFx(), ...verifyAbilities(), ...verifyTalentLive()]);
   // And the fifth rung's own geometry and schedule, which `verifyHeat` deliberately
   // does not own: it checks the *wiring* (a five-star player is shot at, a four-star
   // one is not), and this drives ten minutes of ticks over the orbit and asserts the
@@ -5392,6 +5407,43 @@ async function main(): Promise<void> {
     }
   });
 
+  /**
+   * --- WORKSTREAM Z: the two talent map layers, as one more source.
+   *
+   * `Toll Dodger`'s roadblocks and `Neighbourhood Watch`'s through-wall enemies.
+   * Both are gated on a talent the *local* player has, which is why they are one
+   * source and not two: the gate is the same question asked of the same id, and
+   * a second registration would be a second place to get "whose map is this"
+   * wrong. Both draw nothing at all -- one flag read and one scalar read -- for
+   * everybody who has not bought them, which is everybody below level 6.
+   *
+   * The RBTs come off the promoted-actor list rather than the heat field; see
+   * `game/talentlive.markRbts` for why that is the only source that exists on
+   * both ends. The enemies come off `net.remotes`, which is the same list the
+   * ordinary team dots two sources up are drawn from -- so a player who is
+   * *already* on the map inside the compass's 160 m gets a solid dot from there
+   * and a hollow one from here, and the hollow one under the solid one is
+   * invisible. That overlap is deliberate: the layer's whole value is the
+   * enemies you cannot see, and adding a "is this one visible" test would mean
+   * asking the renderer a question the map has no business asking.
+   */
+  minimap.addMarkerSource((sink) => {
+    const me = net ? net.id : LOCAL_ID;
+    markRbts(sink, policeField().actors, rbtMarkersOn(me));
+    const range = enemyMarkerRangeM(me);
+    if (range <= 0 || !net) return;
+    const mine = teamOf(me);
+    const range2 = range * range;
+    for (const r of net.remotes.values()) {
+      const kind = enemyMarkerKind(mine, teamOf(r.id));
+      if (kind === '') continue;
+      const dx = r.position.x - player.position.x;
+      const dz = r.position.z - player.position.z;
+      if (dx * dx + dz * dz > range2) continue;
+      sink.mark(r.position.x, r.position.z, kind);
+    }
+  });
+
   // --- The big map, on `M`.
   //
   // The city at up to nine kilometres, north-up, lettered with suburb and street
@@ -6117,7 +6169,7 @@ async function main(): Promise<void> {
       throwBuffer = PUNCH_BUFFER;
       enableAudio();
     }
-    // `V`: first person, and back to the distance you were last at. Edge-triggered
+    // `C`: first person, and back to the distance you were last at. Edge-triggered
     // like every other toggle here, or key repeat flips it thirty times a second.
     //
     // Through `setCameraDistance`, which the wheel goes through too -- see there
@@ -6127,16 +6179,18 @@ async function main(): Promise<void> {
     // nothing but one. `lastThirdDistance` is what makes the key a *toggle* over
     // a continuous scalar rather than a jump to a fixed boom -- you get back the
     // camera you were zoomed to, not somebody's default.
-    if (e.code === 'KeyV' && !held) {
-      // --- WORKSTREAM W: `V` is also the talent dash, and the ability wins when
-      // the player has one. See `game/talentkeys.ts`' header: this is the one
-      // key collision in the batch, it is flagged for the owner rather than
-      // decided quietly, and it is one line to reverse. Everybody without Bolt
-      // or Merge Late -- which is every guest and everybody below level 2 --
-      // keeps the camera key they have always had.
-      if (!vIsAnAbility(LOCAL_ID)) {
-        setCameraDistance(toggleCameraDistance(cameraDistance, lastThirdDistance));
-      }
+    //
+    // --- WORKSTREAM Z: **this was `V` until now, and the move is the point.**
+    //
+    // Workstream W put the talent dash on `V` and resolved the collision by
+    // letting the ability win when the player had one -- so the camera key
+    // worked for a guest, stopped working the moment they spent a point on Bolt,
+    // and worked again for their teammate who had not. One key, two behaviours,
+    // decided by a menu the player was not looking at. `C` is free, it is the
+    // mnemonic, and it is now the camera for everybody regardless of build.
+    // `game/talentkeys.ts`' header has the argument in full.
+    if (e.code === 'KeyC' && !held) {
+      setCameraDistance(toggleCameraDistance(cameraDistance, lastThirdDistance));
     }
     // `E`: get on the bike beside you, or off the one you are on.
     //
@@ -6545,6 +6599,33 @@ async function main(): Promise<void> {
     return net ? net.nameOf(id) : `player ${id}`;
   }
 
+  /**
+   * --- WORKSTREAM Z: the real-estate agent's applause, if one saw it.
+   *
+   * `Karen Rapport` grants a pip on a knockout with an agent within ten metres,
+   * and the pip is the server's -- this is only the sentence. The range test is
+   * repeated on this side rather than the fact being sent, which is the
+   * arrangement `TRADIE_HELP_LINE` and `POSTED_LINE_BYSTANDER` both already run
+   * on: there is no state byte for "applauding", adding one would be a protocol
+   * change for a line of text, and this client already has both its own position
+   * and every promoted actor near it.
+   *
+   * The two ends can therefore disagree in one direction -- the agent is on the
+   * server's promoted list and not yet on this client's, so the pip arrives and
+   * the line does not. That is a dropped sentence rather than a wrong one, which
+   * is the right way round for a cosmetic.
+   */
+  function noteAgentApplause(): void {
+    for (const actor of policeField().actors) {
+      if (actor.kind !== NPC_KIND.AGENT) continue;
+      const dx = actor.x - player.position.x;
+      const dz = actor.z - player.position.z;
+      if (dx * dx + dz * dz > AGENT_CHEER_M * AGENT_CHEER_M) continue;
+      hud.notice(AGENT_APPLAUSE_LINE);
+      return;
+    }
+  }
+
   function pushKill(line: string): void {
     kills.unshift(line);
     // Four lines. The debug overlay is already fourteen and a feed that grew
@@ -6564,7 +6645,7 @@ async function main(): Promise<void> {
    */
   function netHandlers(): ConstructorParameters<typeof NetClient>[1] {
     return {
-      onHit(attacker, victim, ko, footy, health, returned) {
+      onHit(attacker, victim, ko, footy, health, returned, ally) {
         // **An event whose attacker is its own victim is a car.**
         //
         // Nobody swung; the world did. There is no room in `net/protocol.ts`'s
@@ -6619,8 +6700,28 @@ async function main(): Promise<void> {
         // otherwise be indistinguishable from an ordinary peg. The flag is a
         // spare bit on a byte already on the wire -- see `EVENT_FLAG.RETURNED`.
         if (ko) {
+          // --- WORKSTREAM Z: a fourth line, and the only one with two people in
+          // it. `Meth-adone`'s assist is credited to the player -- the node says
+          // it counts as their kill -- but they did not swing, so "batted" would
+          // be the feed describing something that did not happen. The noun is
+          // guessed from who is standing over the body, because the kind byte is
+          // deliberately not on the wire; see `game/talentlive.allyNounNear`.
+          if (ally) {
+            const them = net?.remotes.get(victim);
+            const vx = them ? them.position.x : player.position.x;
+            const vz = them ? them.position.z : player.position.z;
+            const noun = allyNounNear(policeField().actors, vx, vz, (k) => npcKind(k)?.name ?? '');
+            pushKill(allyKoLine(who(attacker), noun, who(victim)));
+            return;
+          }
           const verb = footy ? (returned ? 'returned serve on' : 'pegged') : 'batted';
           pushKill(`${who(attacker)} ${verb} ${who(victim)}`);
+          // --- WORKSTREAM Z: and the agent's applause, if you were the one who
+          // landed it. The pip is the server's (`Simulation.cheerFor`); the line
+          // is the client's, off a range test rather than a wire message, which
+          // is exactly the arrangement `TRADIE_HELP_LINE` already runs on. See
+          // `characters.AGENT_APPLAUSE_LINE`.
+          if (mine) noteAgentApplause();
         }
       },
       /**

@@ -22,7 +22,7 @@
  *   G  `BERSERK` (Off Your Face) or `BRACE` (Sober Up); **held 2 s** it is
  *      `MEGA_SLAM` if you have Newtown Standoff or Cronulla Line
  *   T  `MEGA_TELEPORT` (Kings Cross Getaway / Northern Beaches Tunnel)
- *   F  at a Flat White point: `EAT` ($6) or `SIZZLE` ($3)
+ *   R  at a Flat White point: `EAT` ($6) or `SIZZLE` ($3)
  *   4  in the phone: `MEGA_SUMMON_RIDE` ($200) or `MEGA_SIZZLE_TENT` ($200)
  *
  * A player can only ever hold one of each pair -- they are on opposite teams --
@@ -102,9 +102,9 @@ export const ABILITY = {
   BRACE: 4,
   /** G held 2 s, either mega: knock down everyone within 8 m. Once per day. */
   MEGA_SLAM: 5,
-  /** F at a Flat White point, Marita: a $6 servo pie. */
+  /** R at a Flat White point, Marita: a $6 servo pie. */
   EAT: 6,
-  /** F at a Flat White point, DeFAULT: a $3 sausage. */
+  /** R at a Flat White point, DeFAULT: a $3 sausage. */
   SIZZLE: 7,
   /** T, either mobility mega: the nearest station, heat halved. Once per day. */
   MEGA_TELEPORT: 8,
@@ -153,7 +153,7 @@ export const BRACE_DAMAGE = 0.25;
 export const SLAM_HOLD_S = 2;
 export const SLAM_RADIUS_M = 8;
 export const SLAM_PIPS = 1;
-/** The two food abilities: a cooldown so F is not a health bar with a key. */
+/** The two food abilities: a cooldown so R is not a health bar with a key. */
 export const FOOD_CD_S = 20;
 /** What each ability costs, in dollars. Zero for the free ones. */
 export const ABILITY_COST: Readonly<Record<number, number>> = {
@@ -290,8 +290,18 @@ export function abilityForGHold(playerId: number): Ability {
 export function abilityForT(playerId: number): Ability {
   return fxFlag(playerId, FX.MEGA_TELEPORT) ? ABILITY.MEGA_TELEPORT : ABILITY.NONE;
 }
-/** What F at a Flat White point does. */
-export function abilityForF(playerId: number): Ability {
+/**
+ * What `R` at a Flat White point does.
+ *
+ * --- WORKSTREAM Z: **`R`, not `F`.** This was `abilityForF` and had no caller,
+ * which is how the collision went unnoticed: `F` is the torch and has been since
+ * long before talents, and a contextual `F` would be one key doing two things in
+ * the one place a player is most likely to be pressing it -- a cafe at night.
+ * `R` was free, it is under the same hand, and it is the key this genre puts
+ * "use the thing in front of you" on. See `protocol.BTN.ABILITY_R` for what it
+ * cost on the wire.
+ */
+export function abilityForR(playerId: number): Ability {
   if (fxFlag(playerId, FX.EAT)) return ABILITY.EAT;
   if (fxFlag(playerId, FX.SIZZLE)) return ABILITY.SIZZLE;
   return ABILITY.NONE;

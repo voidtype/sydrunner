@@ -146,6 +146,10 @@ import { createBeatPose, forEachPoliceNear } from './factions.ts';
 import { createPedPose, type PedBand, type PedPose, type PedestrianField } from './pedestrians.ts';
 import { carHash, trafficSeconds } from './traffic.ts';
 import { EYE_HEIGHT } from '../player/controller.ts';
+// WORKSTREAM Z: `Meth-adone`. The register is `game/talentlive.ts`' -- see that
+// file's header for why the ten-second window is not a field on `NpcActor`.
+import { streetIgnores, sweepAllies } from './talentlive.ts';
+import { fxNow } from './teamfx.ts';
 
 // --- The suburbs -------------------------------------------------------------------
 
@@ -2465,6 +2469,11 @@ export const DRUNK = registerNpcKind({
       let best2 = Infinity;
       for (const c of ctx.combatants) {
         if (!engageable(c)) continue;
+        // WORKSTREAM Z: `Meth-adone` -- "meth heads and drunks never aggro on
+        // you". Refused at the moment the target is *picked* rather than inside
+        // the chase, on `talentlive.streetIgnores`' argument: a drunk who
+        // noticed you and then changed their mind is a drunk who walked over.
+        if (streetIgnores(c.id)) continue;
         const dx = c.body.position.x - actor.x;
         const dz = c.body.position.z - actor.z;
         const d2 = dx * dx + dz * dz;
@@ -2693,12 +2702,38 @@ export function stepStreetlife(ctx: FactionCtx): void {
 
   respondToBrawls(ctx);
 
+  // --- WORKSTREAM Z: `Meth-adone`'s ten seconds, expired once a tick.
+  //
+  // Here rather than in either `think`, because the register is keyed by actor
+  // and a `think` only ever sees one -- and because an ally whose owner logged
+  // off has to stop chasing even though nothing is calling its `think` about it.
+  // It runs before the promotion scan so an ally that has just lapsed is a
+  // candidate for being recruited again on the same tick, which is what a player
+  // still swinging in the same doorway should get.
+  sweepAllies(field.actors, fxNow());
+
   let live = 0;
   for (const a of field.actors) if (isStreetKind(a.kind)) live++;
   if (live >= MAX_STREET_ACTORS) return;
 
   for (const c of ctx.combatants) {
     if (!engageable(c)) continue;
+    // --- WORKSTREAM Z: `Meth-adone`, and **only the meth heads' half of it**.
+    //
+    // A meth head is promoted *with a target* -- `promote(..., c.id)` below --
+    // and a meth head promoted with no target walks straight home again, so for
+    // a player the street ignores the whole promotion is an actor slot spent on
+    // somebody turning around. Skipped outright.
+    //
+    // The **drunks below are not skipped**, and that asymmetry is the feature
+    // rather than an inconsistency. Drunks promote passive (`target: -1`) and
+    // simply stand there swaying, and they are what the *second* half of the
+    // node has to recruit: "they fight for you if you swing near them" needs
+    // somebody to be standing near you, and a talent that emptied the footpath
+    // would have quietly disabled its own better half. Their snap at a passer-by
+    // is refused separately, inside `DRUNK.think`, which is the place a drunk
+    // chooses anybody.
+    const ignored = streetIgnores(c.id);
     const cx = c.body.position.x;
     const cy = c.body.position.y;
     const cz = c.body.position.z;
@@ -2711,7 +2746,7 @@ export function stepStreetlife(ctx: FactionCtx): void {
     // clear. That is the correct failure: an offline first second in which
     // nobody can see anything is worse than one in which somebody occasionally
     // sees through a tile that has not arrived.
-    forEachMethheadNear(peds, cx, cz, METH_SIGHT, ctx.tick, scanBands, scanPose, (p) => {
+    if (!ignored) forEachMethheadNear(peds, cx, cz, METH_SIGHT, ctx.tick, scanBands, scanPose, (p) => {
       if (live >= MAX_STREET_ACTORS) return true;
       if (occupied(field, NPC_KIND.METHHEAD, p.baseX, p.baseZ)) return;
       if (

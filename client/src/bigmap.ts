@@ -377,6 +377,17 @@ const DOT_R = 3;
 const BIKE_DOT_R = [2.6, 2.2, 1.7];
 /** How far a marker's heading tick reaches past its dot, in pixels. */
 const HEADING_TICK = 4.5;
+/**
+ * WORKSTREAM Z: the white the RBT's ring is stroked in.
+ *
+ * The same value as `minimap.RBT_RING` and deliberately **not** imported from
+ * it, on this file's own standing rule about the two maps: `markerInk` is shared
+ * because a hue that differed between the two would be a legend that changes on
+ * `M`, and a stroke alpha that differs by a hundredth would not. Importing a
+ * private constant would also mean exporting it, which is a wider surface than
+ * the fact deserves.
+ */
+const RBT_RING = 'rgba(255,255,255,0.85)';
 
 const TAU = Math.PI * 2;
 
@@ -1423,10 +1434,26 @@ export class BigMap implements MarkerSink {
         ctx.fillStyle = ink;
         ctx.strokeStyle = ink;
       }
+      // WORKSTREAM Z: the two through-wall enemy kinds are hollow here as well
+      // as on the compass, through the same one-line test rather than a second
+      // opinion about which kinds they are. Keeping the two maps' *shapes* in
+      // step matters for the reason `markerInk` keeps their colours in step: a
+      // dot that changes meaning when you press `M` is a legend that changes.
+      const sensed = d.kind === 'enemy-marita' || d.kind === 'enemy-default';
       const r = d.kind === 'bike' ? bikeR : DOT_R;
       ctx.beginPath();
       ctx.arc(sx, sy, r, 0, TAU);
-      ctx.fill();
+      if (sensed) ctx.stroke();
+      else ctx.fill();
+      // The RBT's white ring. See `minimap.RBT_RING`; the stroke goes back so
+      // the next marker's heading tick is drawn in its own colour.
+      if (d.kind === 'rbt') {
+        ctx.strokeStyle = RBT_RING;
+        ctx.beginPath();
+        ctx.arc(sx, sy, r + 2, 0, TAU);
+        ctx.stroke();
+        ctx.strokeStyle = markerInk(d.kind);
+      }
 
       // The name, for the one kind that has one. See `Marker.label`.
       //
@@ -1666,6 +1693,18 @@ export function verifyBigMap(): string[] {
       // Marita drawn as "somebody unaffiliated who can hit you" is a read the
       // whole team tint exists to give and this would silently take away.
       'team-marita', 'team-default',
+      // WORKSTREAM Z: the RBT. In this list for the same reason -- a roadblock
+      // that fell through to the combatant red would be a red dot on a map of a
+      // melee game, which reads as a player standing in the road.
+      //
+      // The two **hollow** enemy kinds are deliberately *not* in this list, and
+      // that is the one exception this check has. They are supposed to share
+      // their ink with the solid team dots -- the colour answers "which side"
+      // and the shape answers "seen or sensed", see `minimap.MarkerKind` -- so
+      // running them through a uniqueness test would fail a design decision
+      // rather than catch a bug. What they get instead is the assertion below,
+      // which is the *positive* form of the same claim: they must match.
+      'rbt',
     ];
     const seen = new Map<string, MarkerKind>();
     for (const kind of kinds) {
@@ -1675,6 +1714,28 @@ export function verifyBigMap(): string[] {
         failures.push(`Markers '${kind}' and '${clash}' are both drawn in ${ink}; one of them has no branch of its own.`);
       }
       seen.set(ink, kind);
+    }
+    if (markerInk('enemy-marita') !== markerInk('team-marita')) {
+      failures.push('A sensed Marita is not drawn in the Marita colour; the hollow dot answers "which side" by hue.');
+    }
+    if (markerInk('enemy-default') !== markerInk('team-default')) {
+      failures.push('A sensed DeFAULT is not drawn in the DeFAULT colour.');
+    }
+    // And the RBT is a blue, which is what ties it to the light bar. Parsed
+    // rather than string-compared, on the bike's own argument below.
+    {
+      const m = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(markerInk('rbt'));
+      if (m === null) {
+        failures.push(`The RBT marker is '${markerInk('rbt')}', which this check cannot read as an rgb triple.`);
+      } else {
+        const [r, g, b] = [Number(m[1]), Number(m[2]), Number(m[3])];
+        if (!(b > g && b > r * 1.4)) {
+          failures.push(
+            `The RBT marker is rgb(${r}, ${g}, ${b}), which is not a blue. The node says blue/white and the dot's ` +
+              `whole legibility is that it is the colour of the light bar it points at.`,
+          );
+        }
+      }
     }
     // And the bike's is a green, which is what ties the dot to the lime frame
     // and the lime beam it stands for. Parsed rather than string-compared, so

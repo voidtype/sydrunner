@@ -232,6 +232,35 @@ interface FxState {
   uteLifeUntilMs: number;
   /** Wall ms until which no crime this player commits reaches the heat ladder. */
   heatFrozenUntilMs: number;
+  /**
+   * --- WORKSTREAM Z: the food, in two numbers.
+   *
+   * `foodPipsLeft` is how much of a servo pie or a sausage is still to arrive
+   * and `foodRate` is how fast, in pips per second. Two numbers rather than a
+   * queue of servings because the two tooltips are "2 pips over 4 s" and "1 over
+   * 6 s" and there is a 20 s cooldown between them (`abilities.FOOD_CD_S`), so a
+   * second helping can only ever start after the first has finished; a player who
+   * somehow got one anyway simply replaces the drip, which is what eating a
+   * second pie while the first is still going down means.
+   *
+   * A **rate** rather than an end timestamp so the drip is integrated against
+   * the same `dt` the rest of the tick uses -- an authority running a catch-up
+   * step gives back the pips that step is worth, exactly as
+   * `TRADIE_HELP_SECONDS`' header argues about `stateTicks`.
+   */
+  foodPipsLeft: number;
+  foodRate: number;
+  /**
+   * Wall ms the servo pie's extra pip lasts to. 0: no temporary pip.
+   *
+   * Folded into `fxMaxPips` rather than into the health value, which is the only
+   * arrangement that behaves when it lapses: a temporary *pip of health* would
+   * have to be taken back off a bar the player may have spent, and the question
+   * "which pip was the temporary one" has no answer. A temporary **maximum**
+   * simply narrows again, and a player who is over the new ceiling is clamped by
+   * the regen's own `Math.min` on the next tick that hands anything back.
+   */
+  tempPipUntilMs: number;
 }
 
 /**
@@ -276,6 +305,9 @@ function fxState(playerId: number): FxState {
       ghostPlatesUntilMs: 0,
       uteLifeUntilMs: 0,
       heatFrozenUntilMs: 0,
+      foodPipsLeft: 0,
+      foodRate: 0,
+      tempPipUntilMs: 0,
     };
     state.set(playerId, s);
   }
@@ -307,9 +339,18 @@ export function fxTrackedPlayers(): number {
  * three of you are standing together, and a player with both should have five.
  * The framework returns 0 for `GROUP_PIPS` when the group is not there, which is
  * where the "while 3+ within 20 m" clause actually lives -- see `GROUP_M`.
+ *
+ * --- WORKSTREAM Z: the servo pie's thirty seconds are added here too, and here
+ * is the only place they could be. Every reader of a player's ceiling in the
+ * game already goes through this function -- the regen cap in
+ * `Simulation.stepTalents`, the food drip beside it, the HUD's pip row -- so a
+ * temporary pip added anywhere else would be a ceiling half the game did not
+ * know about. It is a *sum* with the two talent keys rather than a max, on the
+ * same argument `GROUP_PIPS` is: Big Night is a pip you have and a pie is a pip
+ * you bought, and somebody with both should be carrying five.
  */
 export function fxMaxPips(playerId: number, base: number): number {
-  return base + lookup.scalar(playerId, FX.MAX_PIPS) + lookup.scalar(playerId, FX.GROUP_PIPS);
+  return base + lookup.scalar(playerId, FX.MAX_PIPS) + lookup.scalar(playerId, FX.GROUP_PIPS) + fxTempPips(playerId);
 }
 
 /**
@@ -514,6 +555,130 @@ export function fxAgentCheer(playerId: number): boolean {
 }
 /** How far an agent has to be to cheer. Not a talent number; the node says 10 m. */
 export const AGENT_CHEER_M = 10;
+/** How many pips the applause is worth. The node's "+1 pip". */
+export const AGENT_CHEER_PIPS = 1;
+
+/**
+ * --- WORKSTREAM Z: what an agent's applause actually leaves you on.
+ *
+ * `Karen Rapport`'s second clause is "+1 pip when one is within 10 m of your
+ * KO", and the interesting half of that sentence is the half it does not say:
+ * **capped at your maximum**. A pip handed out with no ceiling would make a
+ * DeFAULT standing in an auction crowd unkillable, one knockout at a time, and
+ * would do it silently -- the HUD draws `Math.min(health, max)` pips either way,
+ * so the overflow would be invisible until somebody noticed a player taking nine
+ * punches.
+ *
+ * Written as "what should the health be" rather than "how many pips to add" so
+ * the cap lives in one place and the call site is an assignment. Returns the
+ * health unchanged when there is nothing to give -- no talent, or already full.
+ */
+export function fxAgentCheerHealth(playerId: number, health: number, maxPips: number): number {
+  if (!lookup.flag(playerId, FX.AGENT_CHEER)) return health;
+  const want = health + AGENT_CHEER_PIPS;
+  return want > maxPips ? (health > maxPips ? health : maxPips) : want;
+}
+
+/**
+ * Must every officer within `POLICE_FOCUS_M` be shooting at this player?
+ *
+ * `Newtown Standoff` is a *conditional* mega -- "**while you are 3★ or higher**,
+ * every police officer within 40 m has to choose you" -- and the star count is
+ * the caller's rather than the injected `starsReader`'s, deliberately. The
+ * retarget sweep in `game/factions.ts` is already walking every officer with the
+ * heat field in hand; asking this file to go and find the same number through a
+ * reader that defaults to zero would mean the mega quietly did nothing anywhere
+ * the reader had not been installed, which is precisely the failure this
+ * workstream exists to remove.
+ */
+export function fxPoliceFocusAt(playerId: number, stars: number): boolean {
+  return stars >= MEGA_STAR_GATE && lookup.flag(playerId, FX.POLICE_FOCUS);
+}
+
+// --- 1b. The food: a drip and a borrowed pip ------------------------------------------------
+
+/**
+ * Start a serving. `pips` over `seconds`, replacing anything still going down.
+ *
+ * The **replace** is stated because the alternative -- adding to what is left --
+ * is what a queue would do, and it is wrong for the same reason
+ * `fxGrantUteLife` takes a max rather than a sum: two servings inside one drip
+ * can only happen if the 20 s food cooldown has been bypassed, and the honest
+ * answer to "you are eating a second pie" is that you are eating a second pie,
+ * not that you are eating one and three-quarter pies at once.
+ *
+ * `seconds` of 0 or less is refused rather than divided by, which is the case a
+ * caller reaches by passing a tooltip's "1 now": the *now* half is the caller's
+ * own `health +=`, and this only ever owns the part that arrives over time.
+ */
+export function fxStartFoodHeal(playerId: number, pips: number, seconds: number): void {
+  if (!(pips > 0) || !(seconds > 0)) return;
+  const s = fxState(playerId);
+  s.foodPipsLeft = pips;
+  s.foodRate = pips / seconds;
+}
+
+/**
+ * The pips this tick's drip is worth, and it is a **fraction**.
+ *
+ * Health in this game is a float -- `factions.SHOT_DAMAGE` is 0.5 and the HUD
+ * draws partial pips -- so a servo pie arriving as 0.5 pips a second for four
+ * seconds is a bar that visibly fills, which is what "heal 2 pips over 4 s"
+ * describes. `fxRegenTick` above returns whole pips instead and the difference
+ * is deliberate: regeneration is a pip that *arrives* every twenty seconds and a
+ * meal is a bar going up.
+ *
+ * Allocation-free and an early-out for everybody who has not eaten, which is
+ * everybody, almost always: one map lookup and a comparison.
+ */
+export function fxFoodTick(playerId: number, dt: number): number {
+  const s = state.get(playerId);
+  if (s === undefined || s.foodPipsLeft <= 0) return 0;
+  let give = s.foodRate * dt;
+  // The float snap, on `combat.applyWorldDamage`'s own precedent and for the
+  // sharper version of its reason. Two pips at half a pip a second is 240 ticks
+  // of `1/120`, which is not representable, so the remainder lands a few parts
+  // in 10^16 either side of zero -- and on the low side the serving would
+  // otherwise never *finish*: the record would sit in the map for the life of
+  // the session dripping 1e-16 pips a tick, `fxFoodPending` would answer a
+  // number, and a second helping would be told it was replacing something.
+  if (give >= s.foodPipsLeft - 1e-9) {
+    give = s.foodPipsLeft;
+    s.foodPipsLeft = 0;
+    s.foodRate = 0;
+  } else {
+    s.foodPipsLeft -= give;
+  }
+  return give;
+}
+
+/** How much of the current serving has not arrived yet. Diagnostics and the check. */
+export function fxFoodPending(playerId: number): number {
+  return state.get(playerId)?.foodPipsLeft ?? 0;
+}
+
+/** Lend this player an extra maximum pip for `seconds`. The servo pie's thirty. */
+export function fxGrantTempPip(playerId: number, nowMs: number, seconds: number): void {
+  if (!(seconds > 0)) return;
+  const s = fxState(playerId);
+  const until = nowMs + seconds * 1000;
+  if (until > s.tempPipUntilMs) s.tempPipUntilMs = until;
+}
+
+/**
+ * The temporary pips on this player's ceiling right now: 1 or 0.
+ *
+ * Compared against the tick clock rather than a passed `nowMs`, on
+ * `uteLifeGranted`'s argument exactly -- the reader is `fxMaxPips`, whose
+ * signature is `(playerId, base)` and whose callers are four frames deep in
+ * things that have no clock. Zero until `fxSetNow` has been called, which is the
+ * correct answer for every self-check and for an offline browser that has not
+ * started its loop.
+ */
+export function fxTempPips(playerId: number): number {
+  const s = state.get(playerId);
+  return s !== undefined && tickNowMs > 0 && tickNowMs < s.tempPipUntilMs ? 1 : 0;
+}
 
 // --- 2. Footy -----------------------------------------------------------------------------
 
@@ -982,6 +1147,11 @@ export function verifyTeamFx(): string[] {
   const saveStars = starsReader;
   const saveWallet = walletReader;
   const saveState = new Map(state);
+  // WORKSTREAM Z: the tick clock too, because the borrowed-pip case below drives
+  // it. Leaving it where a check put it would make `fxTempPips` and
+  // `uteLifeGranted` answer off a clock forty seconds in the game's past for the
+  // rest of the process.
+  const saveNow = tickNowMs;
   const near = (a: number, b: number) => Math.abs(a - b) < 1e-9;
 
   try {
@@ -1204,6 +1374,89 @@ export function verifyTeamFx(): string[] {
     for (let i = 0; i < 16; i++) forgetPlayer(i);
     if (fxTrackedPlayers() !== 0) bad.push('forgetPlayer did not clear the clocks.');
 
+    // --- WORKSTREAM Z: the five reads that had no call site, and the two
+    //     clocks that arrived with them. Every one of these was *correct* before
+    //     this workstream and simply unreachable, which is why the cases below
+    //     are about the arithmetic rather than about the wiring -- the wiring is
+    //     `server/teams-check.ts`', which stands a body in a room and looks.
+
+    // The agent's applause, capped at the ceiling. Uncapped it makes a player
+    // standing in an auction crowd unkillable one knockout at a time, and it
+    // does it invisibly: the HUD draws `min(health, max)` pips either way.
+    setTeamLookup(fakeTeamLookup({ [FX.AGENT_CHEER]: 1 }));
+    if (fxAgentCheerHealth(1, 1, 4) !== 2) bad.push(`An agent's cheer took 1 pip to ${fxAgentCheerHealth(1, 1, 4)}, not 2.`);
+    if (fxAgentCheerHealth(1, 4, 4) !== 4) bad.push('An agent\'s cheer went past the maximum.');
+    if (fxAgentCheerHealth(1, 3.5, 4) !== 4) bad.push('An agent\'s cheer did not clamp a part-pip to the maximum.');
+    // Somebody already over their ceiling -- a servo pie whose temporary pip has
+    // just lapsed -- is left where they are rather than pulled down to it.
+    if (fxAgentCheerHealth(1, 5, 4) !== 5) bad.push('An agent\'s cheer took health away from somebody over their max.');
+    setTeamLookup(NO_TEAMS);
+    if (fxAgentCheerHealth(1, 1, 4) !== 1) bad.push('An agent cheered for somebody without Karen Rapport.');
+    if (AGENT_CHEER_M !== 10) bad.push(`The cheer reaches ${AGENT_CHEER_M} m; the node says 10.`);
+
+    // The police-focus predicate: both halves, and the star gate is the half
+    // that is easy to lose, because the flag alone reads as working.
+    setTeamLookup(fakeTeamLookup({ [FX.POLICE_FOCUS]: 1 }));
+    if (!fxPoliceFocusAt(1, MEGA_STAR_GATE)) bad.push(`Newtown Standoff was asleep at ${MEGA_STAR_GATE} stars.`);
+    if (!fxPoliceFocusAt(1, 5)) bad.push('Newtown Standoff was asleep at 5 stars.');
+    if (fxPoliceFocusAt(1, MEGA_STAR_GATE - 1)) bad.push(`Newtown Standoff was awake at ${MEGA_STAR_GATE - 1} stars.`);
+    if (fxPoliceFocusAt(1, 0)) bad.push('Newtown Standoff was awake at 0 stars.');
+    setTeamLookup(NO_TEAMS);
+    if (fxPoliceFocusAt(1, 5)) bad.push('A player without the mega focused the police anyway.');
+    if (POLICE_FOCUS_M !== 40) bad.push(`The focus reaches ${POLICE_FOCUS_M} m; the mega says 40.`);
+
+    // `Toll Dodger`'s distance: 150 -> 300, and the base untouched without it.
+    setTeamLookup(fakeTeamLookup({ [FX.RBT_MINIMAP]: 1 }, TEAM.DEFAULT));
+    if (fxRbtAheadM(1, 150) !== 300) bad.push(`Toll Dodger set the RBT ${fxRbtAheadM(1, 150)} m ahead, not 300.`);
+    if (!fxRbtMinimap(1)) bad.push('Toll Dodger did not turn the minimap layer on.');
+    setTeamLookup(NO_TEAMS);
+    if (fxRbtAheadM(1, 150) !== 150) bad.push('The RBT moved for somebody without Toll Dodger.');
+    if (fxRbtMinimap(1)) bad.push('The RBT layer was on for somebody without Toll Dodger.');
+
+    // The food drip. Two pips over four seconds is half a pip a second, it
+    // stops at exactly two, and it is a *fraction* per tick rather than the
+    // whole pip `fxRegenTick` hands over -- see both functions' headers.
+    state.clear();
+    setTeamLookup(NO_TEAMS);
+    if (fxFoodTick(1, 1 / 60) !== 0) bad.push('A player who has not eaten was fed.');
+    fxStartFoodHeal(1, 2, 4);
+    const oneTick = fxFoodTick(1, 1 / 60);
+    if (!near(oneTick, 0.5 / 60)) bad.push(`A servo pie gave ${oneTick} pips in one tick, not ${0.5 / 60}.`);
+    let eaten = oneTick;
+    for (let i = 1; i < 4 * 60; i++) eaten += fxFoodTick(1, 1 / 60);
+    if (!near(eaten, 2)) bad.push(`Four seconds of a servo pie gave ${eaten} pips, not 2.`);
+    if (fxFoodTick(1, 1 / 60) !== 0) bad.push('A finished serving kept feeding.');
+    if (fxFoodPending(1) !== 0) bad.push('A finished serving still had pips pending.');
+    // A long tick does not overshoot: the drip is capped at what is left.
+    fxStartFoodHeal(1, 1, 6);
+    if (!near(fxFoodTick(1, 60), 1)) bad.push('A catch-up step over-fed a sausage past its one pip.');
+    // Half of a serving, then another serving: the second replaces rather than
+    // adds. See `fxStartFoodHeal` for why that is the honest reading.
+    state.clear();
+    fxStartFoodHeal(2, 2, 4);
+    for (let i = 0; i < 2 * 60; i++) fxFoodTick(2, 1 / 60);
+    fxStartFoodHeal(2, 1, 6);
+    if (!near(fxFoodPending(2), 1)) bad.push(`A second serving stacked to ${fxFoodPending(2)} pips instead of replacing.`);
+
+    // The borrowed pip, on the ceiling rather than on the health, and gone when
+    // the thirty seconds are. The tick clock is the module's, so it is driven.
+    state.clear();
+    setTeamLookup(fakeTeamLookup({ [FX.MAX_PIPS]: 1 }));
+    fxSetNow(1_000);
+    if (fxMaxPips(3, 3) !== 4) bad.push('Big Night alone is not four pips.');
+    fxGrantTempPip(3, 1_000, 30);
+    if (fxTempPips(3) !== 1) bad.push('A servo pie did not lend a pip.');
+    if (fxMaxPips(3, 3) !== 5) bad.push(`Big Night plus a pie is ${fxMaxPips(3, 3)} pips, not 5.`);
+    fxSetNow(30_500);
+    if (fxMaxPips(3, 3) !== 5) bad.push('The borrowed pip expired before 30 s.');
+    fxSetNow(31_500);
+    if (fxTempPips(3) !== 0) bad.push('The borrowed pip did not expire at 30 s.');
+    if (fxMaxPips(3, 3) !== 4) bad.push('The ceiling did not come back down.');
+    // And zero with no clock at all, which is what every other self-check in
+    // this repo and an offline browser that has not started its loop must see.
+    fxSetNow(0);
+    if (fxTempPips(3) !== 0) bad.push('The borrowed pip was live with no tick clock installed.');
+
     // --- The two constants the contract owns are still the ones the hooks assume.
     if (AURA_M !== 12) bad.push(`AURA_M is ${AURA_M}; every aura tooltip says 12 m.`);
     if (GROUP_M !== 20) bad.push(`GROUP_M is ${GROUP_M}; every group tooltip says 20 m.`);
@@ -1211,6 +1464,7 @@ export function verifyTeamFx(): string[] {
     lookup = saveLookup;
     starsReader = saveStars;
     walletReader = saveWallet;
+    tickNowMs = saveNow;
     state.clear();
     for (const [k, v] of saveState) state.set(k, v);
   }
