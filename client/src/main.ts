@@ -343,6 +343,19 @@ import {
 // smoke rig is the only new mesh; everything else in the workstream reaches the
 // screen through modules this file already wires. See `world/carsmoke.ts`.
 import { CarSmoke, verifyCarSmoke } from './world/carsmoke.ts';
+// --- WORKSTREAM Y: and the end of a car's life. The rules are three-free and
+// live in `game/carfire.ts`; what this file wires is the notice, the countdown
+// chip, the boom and the shockwave. See that module's header.
+import {
+  BOOM_RING_S,
+  BURN_NOTICE,
+  createFireGrade,
+  fireChip,
+  fireGrade,
+  fuseExpired,
+  isBurning,
+  verifyCarFire,
+} from './game/carfire.ts';
 import {
   BIKE_LEAN,
   BikeAssets,
@@ -882,6 +895,12 @@ async function main(): Promise<void> {
   // stopped depending on the car is every wreck in the city puffing on the same
   // beat. See `world/carsmoke.ts`.
   const carSmokeFailures = timed('carsmoke', verifyCarSmoke);
+  // --- WORKSTREAM Y: and what happens to a car after it is finished. Three-free,
+  // so the server runs the identical check: the fuse, the ignition rules, the
+  // blast falloff and the wire round trip. Every failure in that file renders a
+  // perfectly good frame -- a fuse that never expires is a city full of burning
+  // cars and no explosions at all. See `game/carfire.ts`.
+  const carFireFailures = timed('carfire', verifyCarFire);
   // And the grading the four of them share -- the box fleet, the model fleet,
   // the headlights and the plume. Three-free, so the server runs it too, and it
   // is the whole of how the *visual* half of the crash damage is checked without
@@ -1231,6 +1250,7 @@ async function main(): Promise<void> {
     staticCarFailures.length ||
     drivenCarFailures.length ||
     carSmokeFailures.length ||
+    carFireFailures.length ||
     damageGradeFailures.length ||
     cameraFailures.length ||
     bikeMeshFailures.length ||
@@ -1306,6 +1326,7 @@ async function main(): Promise<void> {
           ...staticCarFailures,
           ...drivenCarFailures,
           ...carSmokeFailures,
+          ...carFireFailures,
           ...damageGradeFailures,
           ...cameraFailures,
           ...bikeMeshFailures,
@@ -4291,7 +4312,7 @@ async function main(): Promise<void> {
   /** Tents standing, from `MSG.TEAM_EVENT`. At most a handful; swept by `untilMs`. */
   const liveTents: TentSpec[] = [];
   /** Slam shockwaves, as (x, y, z, team, when). Swept the same way. */
-  const liveSlams: Array<{ x: number; y: number; z: number; team: Team; atMs: number }> = [];
+  const liveSlams: Array<{ x: number; y: number; z: number; team: Team; atMs: number; boom?: boolean }> = [];
   /** The local player's horns, and every remote's, made and unmade on the talent. */
   let selfHorns: HornProp | null = null;
   const remoteHorns = new Map<number, HornProp>();
@@ -4377,11 +4398,14 @@ async function main(): Promise<void> {
     for (let i = liveSlams.length - 1; i >= 0; i--) {
       const s = liveSlams[i];
       const age = (nowMs - s.atMs) / 1000;
-      if (age > SLAM_SECONDS) {
+      // WORKSTREAM Y: a car bomb's ring is a shade slower than a mega's, so the
+      // sweep asks the record which clock it is on. See `carfire.BOOM_RING_S`.
+      if (age > (s.boom ? BOOM_RING_S : SLAM_SECONDS)) {
         liveSlams.splice(i, 1);
         continue;
       }
-      teamRings.addSlam(s.x, s.y, s.z, s.team, age);
+      if (s.boom) teamRings.addBoom(s.x, s.y, s.z, age);
+      else teamRings.addSlam(s.x, s.y, s.z, s.team, age);
     }
     teamRings.end();
 
@@ -4412,6 +4436,28 @@ async function main(): Promise<void> {
       const near = liveTents.findIndex((t) => Math.abs(t.x - x) < 1 && Math.abs(t.z - z) < 1);
       if (near >= 0) liveTents[near] = { x, y, z, untilMs };
       else liveTents.push({ x, y, z, untilMs });
+      return;
+    }
+    // --- WORKSTREAM Y: a car went off. The ring, and the boom.
+    //
+    // Filed on the slam list rather than on one of its own, which is the whole
+    // reason the brief said to reuse `slamRing`: a shockwave is a shockwave, the
+    // list is already swept by its own age, and `TeamRingField.addBoom` is the
+    // one thing that differs -- a wider, slower, orange ring instead of a
+    // team-coloured one. `boom: true` is how the sweep tells the two apart, and
+    // it is a flag on the record rather than a second list because the sweeping,
+    // the expiring and the drawing are otherwise identical.
+    if (kind === TEAM_EVENT_KIND.CARBOOM) {
+      liveSlams.push({ x, y, z, team: TEAM.NONE, atMs: untilMs - BOOM_RING_S * 1000, boom: true });
+      // The sound, **here rather than in the sweep**, because it is an event and
+      // the ring is a state: a boom re-triggered every frame the ring is up
+      // would be half a second of continuous explosion. The distance and the
+      // delayed report are `audio.carBoom`'s own -- see it, and `polairReport`
+      // next door, for why a sound that arrives late from far away is the read.
+      const dx = x - player.position.x;
+      const dy = y - (player.position.y - EYE_HEIGHT);
+      const dz = z - player.position.z;
+      audio.carBoom(Math.sqrt(dx * dx + dy * dy + dz * dz));
       return;
     }
     // A slam's `untilMs` is the instant the ring finishes, so the moment it
@@ -4579,6 +4625,10 @@ async function main(): Promise<void> {
   /** The plume off every smoking bonnet in view. One draw call. */
   const carSmoke = new CarSmoke();
   scene.add(carSmoke.mesh);
+  // WORKSTREAM Y: and the additive tongues off a burning bonnet, which are a
+  // second set for the reason `world/carsmoke.ts`' header gives -- a flame is
+  // light and smoke is the absence of it, and no one material is both.
+  scene.add(carSmoke.flames);
   /** Whether a car has honked at the player for standing in the road. */
   const honkWatch = new HonkWatch();
   /** Scratch for it, so a query asked sixty times a second allocates nothing. */
@@ -4601,6 +4651,26 @@ async function main(): Promise<void> {
    * An edge on a number the server owns is the cheapest honest way to say so.
    */
   let lastCarHealth = CAR_HEALTH_MAX;
+  /**
+   * --- WORKSTREAM Y: whether the car the player is in was alight last frame.
+   *
+   * `lastCarHealth`'s twin and for its argument exactly: "it caught fire" is a
+   * thing that happens once, so the notice fires on the edge. Read again by the
+   * vitals block below, which is why it is a variable rather than a local.
+   */
+  let carWasBurning = false;
+  /** Scratch for the fire's grading. Asked once a frame; never allocated. */
+  const localFire = createFireGrade();
+  /**
+   * When the burning car last crackled, and how often it may.
+   *
+   * A quarter of a second, so a six-second fuse is about two dozen bursts --
+   * dense enough to read as a continuous fire and sparse enough that each one is
+   * audibly louder than the last, which is the whole point of ramping it. See
+   * the call site, and `carfire.fireGrade`'s `crackle`.
+   */
+  let lastCrackleMs = 0;
+  const CRACKLE_EVERY_MS = 250;
   // And the four properties that are the whole of drawing a driven car: through
   // the loop that already draws every other car in Sydney, at the same LOD, in
   // the same material, with the same headlights. `world/drivencars.ts`' header
@@ -7968,9 +8038,16 @@ async function main(): Promise<void> {
       const c = playerCombat;
       c.carHealth = c.drivingCar === 0 ? CAR_HEALTH_MAX : cars.get(c.drivingCar)?.health ?? CAR_HEALTH_MAX;
       const dv = c.carCrashDv;
+      // WORKSTREAM Y: the head-on-ness of that impact, drained with it. The
+      // *damage* is scaled by it and the *sound* deliberately is not -- a
+      // glancing hit at 40 m/s is still a loud noise even though it is a cheap
+      // one. `sim.stepCars` drains the identical pair; see
+      // `combat.CombatantState.carCrashHeadOn` and `driving.GLANCING_FLOOR`.
+      const headOn = c.carCrashHeadOn;
       c.carCrashDv = 0;
+      c.carCrashHeadOn = 1;
       if (dv > 0 && c.drivingCar !== 0) {
-        const cost = crashDamage(dv);
+        const cost = crashDamage(dv, headOn);
         // The sound is on the **delta-v** and not on whether the damage landed,
         // which is deliberate: the cooldown swallows the four ticks of grinding
         // after a crash but the player still touched something, and silence
@@ -8014,6 +8091,35 @@ async function main(): Promise<void> {
       // section 6 -- and online the cooldown it advances is the *prediction's*,
       // which is why it runs on the mirror as well as on the authority.
       cars.age(FIXED_DT * 1000);
+      // --- WORKSTREAM Y: **offline, this client is the authority for the bang.**
+      //
+      // Online the server owns it (`sim.stepCarFires`) and this end is told by a
+      // `CARS` removal plus a `CARBOOM`; offline there is no server, so the same
+      // two things have to happen here or a wreck in `?offline` burns quietly
+      // for the rest of the session and never goes off -- which would make the
+      // offline build a *different game* rather than the same one without a
+      // room, which is the property `game/driving.ts`' header calls out about
+      // `CarField` being the authority offline.
+      //
+      // Deliberately **not** the whole of `explodeCar`: there is nobody else to
+      // hurt in an offline session but the local player and the crowd, and the
+      // chain, the crime and the credit are all things only a room has. What is
+      // reproduced is the part a player can see -- the car ceases to exist, the
+      // identity stays scorched, and the boom and the ring fire through the same
+      // `onTeamEvent` the server would have driven.
+      if (!online) {
+        for (const car of cars.all()) {
+          if (!fuseExpired(car.burningMs)) continue;
+          cars.scorch(car.carId);
+          cars.remove(car.id);
+          if (playerCombat.drivingCar === car.id) {
+            playerCombat.drivingCar = 0;
+            playerCombat.carSpeed = 0;
+            playerCombat.carHealth = CAR_HEALTH_MAX;
+          }
+          onTeamEvent(TEAM_EVENT_KIND.CARBOOM, car.x, car.y, car.z, Date.now() + BOOM_RING_S * 1000);
+        }
+      }
       // Rebuilt **in place**, on `sim.publishBlockers`' argument exactly: this
       // runs every tick over up to four hundred records and an array of four
       // hundred object literals a tick is the only thing in the block that could
@@ -8974,11 +9080,40 @@ async function main(): Promise<void> {
     // field is authoritative, so this fires on the server's answer online and on
     // the prediction's offline, and never twice for one crash.
     {
-      const health = playerCombat.drivingCar === 0
-        ? CAR_HEALTH_MAX
-        : carWorld().get(playerCombat.drivingCar)?.health ?? CAR_HEALTH_MAX;
+      const mine = playerCombat.drivingCar === 0 ? undefined : carWorld().get(playerCombat.drivingCar);
+      const health = mine?.health ?? CAR_HEALTH_MAX;
       if (health <= 0 && lastCarHealth > 0) hud.notice('you wrote it off');
       lastCarHealth = health;
+      // --- WORKSTREAM Y: and the fire, which is the other genuine *event* on
+      // this record and is fired on the same kind of edge and for the same
+      // reason -- a level test would repost the pill sixty times a second for
+      // the whole six seconds you are meant to be spending getting out.
+      //
+      // The countdown beside it is the opposite and is deliberately *not* an
+      // edge: it is a chip rebuilt from the state every frame, on
+      // `drivencars.takePrompt`'s rule, so there is no line anywhere that has to
+      // remember to take it down when the car stops existing.
+      const burning = mine !== undefined && isBurning(mine.burningMs);
+      if (burning && !carWasBurning) hud.notice(BURN_NOTICE);
+      carWasBurning = burning;
+      if (burning && mine !== undefined) {
+        fireGrade(mine.burningMs, localFire);
+        powerupChips.unshift({ name: fireChip(localFire.fuseS), seconds: 0 });
+        // --- The crackle, and it is a *retrigger* rather than a loop.
+        //
+        // `game/audio.ts` builds looping chains for the two things that run for
+        // minutes -- the siren and the rave -- and each of them costs a graph
+        // that has to be faded and torn down. A fire lasts six seconds and is
+        // over, so a short burst every `CRACKLE_EVERY_MS`, at the level
+        // `carfire.fireGrade` says the fire is at, gets the rising urgency for
+        // four lines and nothing to dispose. `audio.carCrackle` is one filtered
+        // noise burst; twenty-four of them over a fuse is the sound.
+        const now = Date.now();
+        if (now - lastCrackleMs > CRACKLE_EVERY_MS) {
+          lastCrackleMs = now;
+          audio.carCrackle(localFire.crackle);
+        }
+      }
     }
     if (playerCombat.ridingBike !== 0) {
       powerupChips.push({
@@ -9043,7 +9178,14 @@ async function main(): Promise<void> {
       // cannot disagree with the notice that fired off it.
       carHealth: playerCombat.drivingCar === 0
         ? null
-        : { width: carHealthWidth(lastCarHealth), band: carHealthClass(lastCarHealth) },
+        // WORKSTREAM Y: the band is `burning` while the car is alight, whatever
+        // the health says -- a wreck on fire and a wreck that is merely finished
+        // are different situations and the bar is the only thing on screen that
+        // can say so at a glance. `index.html` pulses that class.
+        : {
+          width: carHealthWidth(lastCarHealth),
+          band: carHealthClass(lastCarHealth, carWasBurning),
+        },
     });
 
     // The scoreboard, while `Tab` is held.

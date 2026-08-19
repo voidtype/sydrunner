@@ -86,6 +86,8 @@ import {
   encodeBikes,
   encodeCars,
   encodeEvents,
+  // WORKSTREAM Y: a car exploding, as a place. See `sendTeamEvents`.
+  encodeTeamEvent,
   encodeInterestInto,
   decodeInput,
   encodeHeat,
@@ -1175,6 +1177,11 @@ export class Room {
     this.sendTalents();
     this.sendBikes();
     this.sendCars();
+    // WORKSTREAM Y: **after** the cars, deliberately. A car exploding is a
+    // removal row in the `CARS` frame and a `CARBOOM` here, and a client that
+    // was told about the bang before the wreck went away would draw a fireball
+    // over a car that is still standing for one frame.
+    this.sendTeamEvents();
     this.sendWallets();
     // Queued pill sentences, **after** the wallet frames rather than before: a
     // note that could not be written because the money already had the pill is
@@ -1406,6 +1413,37 @@ export class Room {
       ws.send(frame);
       this.bytesSent += frame.byteLength;
       this.logBytes += frame.byteLength;
+    }
+  }
+
+  /**
+   * Things that happened **somewhere**: for now, cars exploding.
+   *
+   * `MSG.TEAM_EVENT` is twenty bytes of place and expiry with no owner in it --
+   * see `protocol.TEAM_EVENT_KIND`, which is why a car bomb is a kind of this
+   * rather than a message of its own. The list is empty on essentially every
+   * tick of every session and this returns on the first line.
+   *
+   * **Room-global and not interest-filtered**, on `sendCars`' argument and one
+   * more that is specific to a bang: the whole point of an explosion is that the
+   * people who did *not* see the car catch fire hear it go off. A twenty-byte
+   * frame a few times an hour is not a filtering problem, and a client too far
+   * away to care draws a ring nobody is looking at for half a second. The
+   * attenuation is the *renderer's* -- `game/audio.ts` sizes the boom by
+   * distance and delays it like Polair's report -- which is the right place for
+   * it, because only the client knows where its own ears are.
+   */
+  private sendTeamEvents(): void {
+    const events = this.sim.teamEventDelta();
+    if (events.length === 0) return;
+    for (const e of events) {
+      const frame = encodeTeamEvent(e.kind, e.x, e.y, e.z, e.untilMs);
+      for (const ws of this.conns) {
+        if (!ws.data.participant) continue;
+        ws.send(frame);
+        this.bytesSent += frame.byteLength;
+        this.logBytes += frame.byteLength;
+      }
     }
   }
 

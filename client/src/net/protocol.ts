@@ -2799,6 +2799,7 @@ export function decodeBikes(buffer: ArrayBuffer): BikeRecord[] | null {
  *       u16  yaw
  *       i16  speed      centimetres per second, signed
  *       u8   health     0..100, `driving.CAR_HEALTH_MAX` down to a write-off
+ *       u8   fuse       **deciseconds until it explodes**, 0 = not on fire
  *
  * **Upsert semantics with an explicit delete**, which is the one place this
  * diverges from `MSG.BIKES` one section up, and the divergence is forced. A bike
@@ -2831,10 +2832,35 @@ export function decodeBikes(buffer: ArrayBuffer): BikeRecord[] | null {
  * you hit the wall, and a client that decided its own would be a client that
  * repaired its own car. See `driving.CarField.damage`.
  *
+ * **And the fuse byte is the fire**, added in the workstream that made a wreck
+ * catch light. It is *deciseconds remaining*, not a stamp, and the choice of
+ * quantity is the whole of why the record grew by one byte rather than by eight:
+ *
+ *   - a **stamp** would have to be on somebody's clock. The server's tick
+ *     counter is not a thing a client holds, and an absolute epoch instant is
+ *     the `f64` `MSG.SUN` spends because it is a thing that happens twice an
+ *     hour. A car fire is a six-second countdown; nobody needs it to the
+ *     microsecond and everybody needs it in one byte.
+ *   - **remaining, not elapsed**, because remaining is what the countdown on the
+ *     HUD says and what the renderer's crackle ramps against, and because a
+ *     client that joins mid-fire is told how long it has rather than being
+ *     handed a start time it has to subtract from a clock it does not share.
+ *   - **0 is "not burning"**, so every record written before this workstream and
+ *     every removal row means what it always meant. A car with less than a
+ *     decisecond left encodes as 1 rather than rounding to 0 -- see `clampFuse`,
+ *     where the alternative is a fire that goes out on the frame before the bang.
+ *
+ * A burning record is broadcast **once**, on the tick it ignites: both ends run
+ * `driving.CarField.age` from the same ignition, so the countdown is a shared
+ * closed form after that and the explosion itself arrives as a removal plus a
+ * `MSG.TEAM_EVENT` of kind `CARBOOM`. That is the same "one frame per event"
+ * property the health byte has, and it is why a car park full of fire costs the
+ * wire nothing per tick.
+ *
  * At a plausible worst case -- a dozen cars taken in a busy room -- the join
- * message is 328 B, and a single theft is 31 B. At `driving.MAX_DRIVEN_CARS`,
+ * message is 340 B, and a single theft is 32 B. At `driving.MAX_DRIVEN_CARS`,
  * which is the ceiling now that cars no longer expire, a joiner's full set is
- * 12.4 kB -- sent once, on a connection that has just streamed a megabyte of
+ * 12.8 kB -- sent once, on a connection that has just streamed a megabyte of
  * collision prisms.
  */
 export interface CarRecord {
@@ -2863,6 +2889,21 @@ export interface CarRecord {
    * made rather than one per call site.
    */
   health?: number;
+  /**
+   * Deciseconds until this car explodes, or 0 for a car that is not on fire.
+   *
+   * **Optional on the way in and always present on the way out**, on `health`'s
+   * rule one field up and for its reason: every caller written before cars could
+   * burn -- `sim.carDelta`'s removal rows, half the self-checks -- means "not
+   * burning" rather than "about to go off in your face", and `encodeCars`
+   * supplies the zero so that decision is made in one place.
+   *
+   * See `game/carfire.ts` for the countdown itself. A client turns this back
+   * into "how long since it caught" with `carfire.burningFromFuse`, and from
+   * then on ages it locally: the fuse is a shared closed form and not a thing
+   * the server re-sends sixty times a second.
+   */
+  fuse?: number;
   /** True for "this record is gone", and then every field but `id` is meaningless. */
   removed?: boolean;
 }
@@ -2882,8 +2923,20 @@ export const CARS_FULL = 1 << 0;
 export const CAR_REMOVED = 1 << 0;
 
 export const CARS_HEADER_BYTES = 4;
-/** 2 + 4 + 2 + 1 + 1 + 4 + 4 + 4 + 2 + 2 + 1. Asserted in `verifyNet`, which is how it got right. */
-export const CAR_RECORD_BYTES = 27;
+/** 2 + 4 + 2 + 1 + 1 + 4 + 4 + 4 + 2 + 2 + 1 + 1. Asserted in `verifyNet`, which is how it got right. */
+export const CAR_RECORD_BYTES = 28;
+
+/**
+ * The longest fuse this byte can carry, deciseconds. 25.5 s.
+ *
+ * Here rather than in `game/carfire.ts` for the reason `CAR_HEALTH_FULL` is here
+ * rather than in `game/driving.ts`: the *encoder* needs it and this file may not
+ * import the gameplay modules -- the dependency runs the other way.
+ * `verifyCarFire` asserts that `carfire.FUSE_S` fits inside it, which is the
+ * check that stops somebody lengthening the fuse to half a minute and getting a
+ * car that explodes the instant it catches.
+ */
+export const CAR_FUSE_MAX_DECIS = 255;
 
 export function carsBytes(count: number): number {
   return CARS_HEADER_BYTES + count * CAR_RECORD_BYTES;
@@ -2915,6 +2968,23 @@ function clampHealth(v: number | undefined): number {
   return n < 0 ? 0 : n > 255 ? 255 : n;
 }
 
+/**
+ * A fuse as a `u8` of deciseconds. `undefined` and 0 both mean "not burning".
+ *
+ * **Ceiling and not rounding**, and never down to zero from a positive value,
+ * which is the one interesting line in this function. A car with 40 ms left has
+ * `Math.round(0.4)` = 0 deciseconds, and 0 on this field is the sentinel for
+ * *not on fire* -- so a rounding encoder puts every burning car out for the last
+ * two frames before it explodes, on every client except the one that predicted
+ * it. The countdown reads better ceilinged anyway: "1" until it is actually
+ * gone, which is what a countdown on a HUD is expected to do.
+ */
+function clampFuse(v: number | undefined): number {
+  if (v === undefined || !(v > 0)) return 0;
+  const n = Math.ceil(v);
+  return n < 1 ? 1 : n > CAR_FUSE_MAX_DECIS ? CAR_FUSE_MAX_DECIS : n;
+}
+
 export function encodeCars(cars: readonly CarRecord[], full = false): ArrayBuffer {
   const buffer = new ArrayBuffer(carsBytes(cars.length));
   const v = new DataView(buffer);
@@ -2941,6 +3011,9 @@ export function encodeCars(cars: readonly CarRecord[], full = false): ArrayBuffe
     // writes 101, while one handed -1 writes 255 -- a written-off car that comes
     // out of the wire in better condition than it went in.
     v.setUint8(p + 26, clampHealth(c.health));
+    // The fire. See `clampFuse` for why a nearly-spent fuse encodes as 1 rather
+    // than rounding into the "not burning" sentinel.
+    v.setUint8(p + 27, clampFuse(c.fuse));
     p += CAR_RECORD_BYTES;
   }
   return buffer;
@@ -2973,6 +3046,7 @@ export function decodeCars(buffer: ArrayBuffer): { cars: CarRecord[]; full: bool
       yaw: dequantiseYaw(v.getUint16(p + 22, true)),
       speed: v.getInt16(p + 24, true) / 100,
       health: v.getUint8(p + 26),
+      fuse: v.getUint8(p + 27),
     });
     p += CAR_RECORD_BYTES;
   }
@@ -3174,11 +3248,22 @@ export function decodeSun(
  * ring takes to reach 8 m. Both are *places*, which is the whole argument for
  * this message existing rather than being an `EVENT`.
  *
+ * **`CARBOOM` is a car exploding, and it is here rather than in a message of its
+ * own on exactly that argument.** A burning car going off is a *place*: the
+ * blast, the ring, the debris and the scorch mark all belong to a point on the
+ * ground and to nobody in particular, and every client near it draws the same
+ * thing whether or not the car's driver was anybody they can see. An `EVENT` is
+ * an attacker and a victim; this has neither. The record already carries the
+ * three coordinates and an expiry, the renderer already sweeps a list of them by
+ * that expiry, and the alternative -- `MSG.CAR_EXPLODED`, with an id, a place and
+ * a clock -- would be twenty bytes of the same fields under a second name.
+ * `untilMs` is when the shockwave finishes, on `SLAM`'s convention.
+ *
  * 0 is deliberately not a kind. An all-zero frame off a truncated read decodes
  * as `kind 0` and `decodeTeamEvent` refuses it, rather than dropping a tent at
  * the ENU origin -- which is Town Hall, and which would render perfectly.
  */
-export const TEAM_EVENT_KIND = { TENT: 1, SLAM: 2 } as const;
+export const TEAM_EVENT_KIND = { TENT: 1, SLAM: 2, CARBOOM: 3 } as const;
 export type TeamEventKind = (typeof TEAM_EVENT_KIND)[keyof typeof TEAM_EVENT_KIND];
 
 /**
@@ -3244,7 +3329,11 @@ export function decodeTeamEvent(
   // An unknown kind is refused rather than drawn. A renderer that fell through
   // to "tent" on a byte it did not recognise would put a gazebo wherever the
   // next feature fired, and it would look like the tent feature was broken.
-  if (kind !== TEAM_EVENT_KIND.TENT && kind !== TEAM_EVENT_KIND.SLAM) return null;
+  if (
+    kind !== TEAM_EVENT_KIND.TENT &&
+    kind !== TEAM_EVENT_KIND.SLAM &&
+    kind !== TEAM_EVENT_KIND.CARBOOM
+  ) return null;
   return {
     kind: kind as TeamEventKind,
     x: dequantisePos(v.getInt32(2, true)),
@@ -4524,7 +4613,10 @@ export function verifyNet(): string[] {
   //     the HUD says is doing -1,100 km/h.
   {
     const cars: CarRecord[] = [
-      { id: 1, carId: 0xdeadbeef, driver: 0, body: 4, colour: 7, x: -364.25, y: -31.75, z: 2682.5, yaw: 0.75, speed: -6.6, health: 0 },
+      // A written-off car **on fire with four seconds left**, which is the state
+      // the fuse byte exists for and is also the commonest one in play: every
+      // write-off catches. See `game/carfire.ts`.
+      { id: 1, carId: 0xdeadbeef, driver: 0, body: 4, colour: 7, x: -364.25, y: -31.75, z: 2682.5, yaw: 0.75, speed: -6.6, health: 0, fuse: 40 },
       // `speed: 44` is `driving.DRIVE_TOP_SPEED` exactly, and it is the literal
       // rather than an import on `MEASURED_REACH_TARGET`'s standing argument in
       // `player/bat.ts`: a check that imported the constant would assert that a
@@ -4575,6 +4667,15 @@ export function verifyNet(): string[] {
         if (b.health !== wantHealth) {
           failures.push(`Car ${a.id}: health ${wantHealth} came back as ${b.health}.`);
         }
+        // And the fuse, on the health byte's terms exactly: a `u8`, therefore
+        // exact, and the difference between a car that is about to explode and
+        // one that is merely a wreck. A fuse that did not survive is every
+        // client but the one that predicted it drawing a quiet burnt-out shell
+        // and then being surprised by the bang.
+        const wantFuse = a.fuse ?? 0;
+        if (b.fuse !== wantFuse) {
+          failures.push(`Car ${a.id}: fuse ${wantFuse} came back as ${b.fuse}.`);
+        }
         for (const [axis, want, back] of [['x', a.x, b.x], ['y', a.y, b.y], ['z', a.z, b.z]] as Array<[string, number, number]>) {
           if (Math.abs(back - want) > 0.01) {
             failures.push(`Car ${a.id}: ${axis} ${want} came back as ${back}; the tolerance is 1 cm.`);
@@ -4607,6 +4708,35 @@ export function verifyNet(): string[] {
         `A record encoded with no health came back at ${bare?.cars[0]?.health}; an omitted health is ` +
           `a car nobody has crashed, not a write-off.`,
       );
+    }
+    // The same clause for the fuse, and the default runs the other way for the
+    // same reason: an omitted health is a car in perfect condition and an
+    // omitted fuse is a car that is not on fire. Both are "nothing has happened
+    // to this car", which is what a caller that predates a field means.
+    if (bare === null || bare.cars[0]?.fuse !== 0) {
+      failures.push(
+        `A record encoded with no fuse came back at ${bare?.cars[0]?.fuse}; an omitted fuse is a car ` +
+          `that is not burning, not one about to explode.`,
+      );
+    }
+    // A fuse below a decisecond survives as 1 rather than rounding into the
+    // "not burning" sentinel. See `clampFuse`: this is the two frames before
+    // every explosion in the game, and rounding them to zero puts the fire out
+    // on every client that did not predict it.
+    const dying = decodeCars(encodeCars([
+      { id: 5, carId: 9, driver: 0, body: 1, colour: 1, x: 0, y: 0, z: 0, yaw: 0, speed: 0, health: 0, fuse: 0.4 },
+    ]));
+    if (dying === null || dying.cars[0]?.fuse !== 1) {
+      failures.push(`A fuse of 0.4 deciseconds came back as ${dying?.cars[0]?.fuse}, not 1. The fire went out early.`);
+    }
+    // ...and one past the byte saturates rather than wrapping, which is the
+    // health field's `-1 -> 255` trap read the other way: a wrapped fuse is a
+    // car that explodes immediately.
+    const long = decodeCars(encodeCars([
+      { id: 6, carId: 9, driver: 0, body: 1, colour: 1, x: 0, y: 0, z: 0, yaw: 0, speed: 0, fuse: 4000 },
+    ]));
+    if (long === null || long.cars[0]?.fuse !== CAR_FUSE_MAX_DECIS) {
+      failures.push(`A 400 s fuse came back as ${long?.cars[0]?.fuse}, not the ${CAR_FUSE_MAX_DECIS} the byte holds.`);
     }
     // And a health outside the byte is clamped rather than wrapped: `setUint8`
     // given -1 writes 255, which is a wreck arriving in better condition than
@@ -5059,6 +5189,17 @@ export function verifyNet(): string[] {
     }
     const slam = decodeTeamEvent(encodeTeamEvent(TEAM_EVENT_KIND.SLAM, 0, 0, 0, 0));
     if (!slam || slam.kind !== TEAM_EVENT_KIND.SLAM) failures.push('A slam at the origin with a zero expiry did not survive the wire.');
+    // And the car bomb, at a place with a negative x and a real height, because
+    // that is what a car park in Pyrmont is. A `CARBOOM` that decoded as a
+    // `SLAM` would draw a teal-ish shockwave and no fireball; one that was
+    // refused outright would draw nothing at all, which is the failure this
+    // whole feature would be reported as ("cars just disappear").
+    const boom = decodeTeamEvent(encodeTeamEvent(TEAM_EVENT_KIND.CARBOOM, -1204.5, 6.3, 331.25, until));
+    if (!boom || boom.kind !== TEAM_EVENT_KIND.CARBOOM) {
+      failures.push(`A car explosion came back as kind ${boom?.kind}; it must be its own kind or it draws as a slam.`);
+    } else if (Math.abs(boom.x - -1204.5) > 0.001 || Math.abs(boom.z - 331.25) > 0.001) {
+      failures.push(`A car explosion's place came back as (${boom.x}, ${boom.z}).`);
+    }
     // An unknown kind must be refused rather than fall through to a tent, and a
     // short read must not decode at all -- both would put a gazebo somewhere
     // nobody asked for one, which renders.

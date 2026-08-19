@@ -81,6 +81,25 @@ import { screamGap } from './sunbutton.ts';
 const SHATTER_STRENGTH = 0.16;
 
 /**
+ * --- WORKSTREAM Y: how fast a car explosion's sound travels, m/s, and how long
+ * it may be in the air.
+ *
+ * 343 is `polair.POLAIR_SOUND_SPEED`'s number and is restated rather than
+ * imported for the reason `driving.SPRINT_SPEED` is restated: this file must not
+ * import a gameplay module, the dependency runs the other way, and the speed of
+ * sound is not a constant either of them can get wrong.
+ *
+ * The cap is the interesting one. At 343 m/s a bang at the far edge of the
+ * `MSG.TEAM_EVENT` fan-out -- which is room-global and therefore up to sixty
+ * kilometres -- would arrive nearly three minutes later, by which time it is not
+ * a sound, it is a mystery. Two and a half seconds is a bang you can still
+ * connect to a flash you saw on the horizon, and past that the gain has taken it
+ * under the floor anyway.
+ */
+const BOOM_SOUND_SPEED = 343;
+const BOOM_DELAY_MAX_S = 2.5;
+
+/**
  * The two diaphragms of a car horn, hertz. See `CombatAudio.carHorn`.
  *
  * 405 and 500 is a shade over a major third, which is what the pair in a
@@ -1115,6 +1134,193 @@ export class CombatAudio {
     rub.connect(band).connect(gain).connect(master);
     rub.start(t);
     rub.stop(t + 0.14);
+  }
+
+  /**
+   * --- WORKSTREAM Y: one crackle of a bonnet fire, at `level` of full roar.
+   *
+   * **Retriggered rather than looped**, which is the one structural decision in
+   * it. This file builds looping chains for the two things that run for minutes
+   * -- `heatUpdate`'s siren and `raveUpdate`'s music -- and each costs a graph
+   * that has to be faded out and torn down on a timer. A car fire lasts six
+   * seconds and then there is no car, so the caller fires one of these four
+   * times a second at the level `carfire.fireGrade` reports, and the *ramp* --
+   * the thing the brief asked for, a crackle that gets louder toward the fuse --
+   * falls out of the level rising rather than out of a gain automation.
+   *
+   * Two layers, and they are the two halves of what burning petrol sounds like:
+   * a **roar**, which is lowpassed noise with no attack to speak of, and a
+   * **spit**, a short bandpassed tick on top of it. The spit is the layer that
+   * makes it a fire rather than a distant motorway; it appears only past half
+   * strength, so a fire that has just caught whooshes and one that is about to
+   * go off snaps.
+   *
+   * Driver-local and unattenuated, on `carCrunch`'s rule: this is the car you
+   * are sitting in, and somebody else's fire thirty metres away is their
+   * client's business. What is *not* driver-local is the bang -- see `carBoom`.
+   */
+  carCrackle(level: number): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    const noise = this.noise;
+    if (!ctx || !master || !noise) return;
+    const k = level < 0 ? 0 : level > 1 ? 1 : level;
+    if (k < 0.02) return;
+    const t = ctx.currentTime;
+
+    const roar = ctx.createBufferSource();
+    roar.buffer = noise;
+    roar.playbackRate.value = 0.45;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 900;
+    lp.Q.value = 0.5;
+    const roarGain = ctx.createGain();
+    roarGain.gain.setValueAtTime(0.0001, t);
+    roarGain.gain.exponentialRampToValueAtTime(0.11 * k, t + 0.05);
+    // Held for the whole retrigger interval and then faded, so consecutive
+    // bursts overlap into something continuous rather than pulsing at 4 Hz.
+    roarGain.gain.setValueAtTime(0.11 * k, t + 0.2);
+    roarGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+    roar.connect(lp).connect(roarGain).connect(master);
+    roar.start(t);
+    roar.stop(t + 0.38);
+
+    if (k > 0.5) {
+      const spit = ctx.createBufferSource();
+      spit.buffer = noise;
+      spit.playbackRate.value = 1.7;
+      const band = ctx.createBiquadFilter();
+      band.type = 'bandpass';
+      band.frequency.value = 2600;
+      band.Q.value = 1.2;
+      const spitGain = ctx.createGain();
+      const at = t + 0.06;
+      spitGain.gain.setValueAtTime(0.0001, at);
+      spitGain.gain.exponentialRampToValueAtTime(0.09 * (k - 0.5) * 2, at + 0.004);
+      spitGain.gain.exponentialRampToValueAtTime(0.0001, at + 0.06);
+      spit.connect(band).connect(spitGain).connect(master);
+      spit.start(at);
+      spit.stop(at + 0.09);
+    }
+  }
+
+  /**
+   * --- WORKSTREAM Y: **a car exploding**, heard from `distance` metres.
+   *
+   * Three layers and a delay, and the delay is the most important of the four.
+   *
+   * `polairReport` next door already established the shape this borrows: a sound
+   * that has travelled a long way is not the near sound turned down, it is a
+   * *different* sound -- the top is absorbed by the air, the tail becomes most of
+   * what reaches you, and the whole thing arrives late. A rifle at 250 m is that
+   * file's example; a car going off at 200 m across Redfern is this one's, and
+   * the read is the same: **you see the flash and then you hear it**, which is
+   * the single cheapest way to make a world feel large.
+   *
+   * The difference from the rifle is the bottom end. A report is a crack with its
+   * top taken off and nothing underneath; a car is a fuel tank, so:
+   *
+   *   - the **blast** is a noise burst with a lowpass that closes as it goes,
+   *     which is the air absorption written as an envelope rather than as a
+   *     fixed filter -- the near part of the sound is bright and the part that
+   *     arrives a moment later is not;
+   *   - the **thump** is a sine falling from 90 Hz to 22 over most of a second.
+   *     Lower and much longer than `carCrunch`'s 130-to-38, because that layer
+   *     says "two tonnes stopped" and this one says "the tank went up". It is
+   *     also the only layer that survives a long trip, which is why a distant
+   *     explosion is mostly this;
+   *   - the **debris**, a short crackle of highpassed noise a fifth of a second
+   *     in, which is the part that tells you it was a *car* rather than a bomb:
+   *     glass and panels landing.
+   *
+   * `distance` attenuates on a gentler curve even than `polairReport`'s, and the
+   * `setTimeout` is the sound taking `distance / SOUND_SPEED` to arrive. The
+   * caller owns neither -- unlike Polair, where the helicopter counts its own
+   * delay down, because there the *emitter* knows where it is and here the event
+   * is a twenty-byte frame that arrived from a server.
+   */
+  carBoom(distance = 0): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    const noise = this.noise;
+    if (!ctx || !master || !noise) return;
+    const far = Math.max(0, distance);
+    // Audible a long way, which is the point of an explosion: 0.5 at 250 m and
+    // still 0.25 at 750. Under about 2% it is not worth the four nodes.
+    const gain = 1 / (1 + far / 250);
+    if (gain < 0.02) return;
+    // How far away a bang stops being an *event* and becomes weather. Past this
+    // the sound is scheduled but the ear will not connect it to anything, and
+    // the delay is capped so a boom on the far side of the city does not arrive
+    // ten seconds later as a mystery.
+    const delay = Math.min(BOOM_DELAY_MAX_S, far / BOOM_SOUND_SPEED);
+
+    const fire = (): void => {
+      // Re-read: the context can have gone away while the sound was in the air.
+      const now = this.ctx;
+      const out = this.master;
+      const source = this.noise;
+      if (!now || !out || !source) return;
+      const t = now.currentTime;
+
+      // --- The blast.
+      const blast = now.createBufferSource();
+      blast.buffer = source;
+      blast.playbackRate.value = 0.7;
+      const lp = now.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.Q.value = 0.4;
+      // Closing rather than fixed: the air absorption, as an envelope. A distant
+      // bang starts duller, which is the `far` term in the opening frequency.
+      lp.frequency.setValueAtTime(far > 60 ? 1800 : 5200, t);
+      lp.frequency.exponentialRampToValueAtTime(180, t + 0.7);
+      const blastGain = now.createGain();
+      blastGain.gain.setValueAtTime(0.0001, t);
+      blastGain.gain.exponentialRampToValueAtTime(0.75 * gain, t + 0.008);
+      blastGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.75);
+      blast.connect(lp).connect(blastGain).connect(out);
+      blast.start(t);
+      blast.stop(t + 0.8);
+
+      // --- The tank.
+      const body = now.createOscillator();
+      body.type = 'sine';
+      body.frequency.setValueAtTime(90, t);
+      body.frequency.exponentialRampToValueAtTime(22, t + 0.85);
+      const bodyGain = now.createGain();
+      bodyGain.gain.setValueAtTime(0.0001, t);
+      bodyGain.gain.exponentialRampToValueAtTime(0.5 * gain, t + 0.012);
+      bodyGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+      body.connect(bodyGain).connect(out);
+      body.start(t);
+      body.stop(t + 0.95);
+
+      // --- The debris, and only close enough for the top end to survive the
+      //     trip. Past a couple of hundred metres there is no glass in a bang.
+      if (far < 220) {
+        const bits = now.createBufferSource();
+        bits.buffer = source;
+        bits.playbackRate.value = 1.9;
+        const hp = now.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.value = 3200;
+        const bitsGain = now.createGain();
+        const at = t + 0.2;
+        bitsGain.gain.setValueAtTime(0.0001, at);
+        bitsGain.gain.exponentialRampToValueAtTime(0.22 * gain, at + 0.03);
+        bitsGain.gain.exponentialRampToValueAtTime(0.0001, at + 0.5);
+        bits.connect(hp).connect(bitsGain).connect(out);
+        bits.start(at);
+        bits.stop(at + 0.55);
+      }
+    };
+
+    // A boom you are standing next to is not scheduled at all, because a
+    // `setTimeout(0)` is still a frame of latency on the one sound that must
+    // land with the flash.
+    if (delay < 0.02) fire();
+    else setTimeout(fire, delay * 1000);
   }
 
   /**

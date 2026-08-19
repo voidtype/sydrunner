@@ -225,6 +225,30 @@ import type { StaticCarSource } from './staticcars.ts';
 // `TeamLookup` installed, which is why `verifyDriving` and `verifyDamageGrade`
 // needed no change. See `game/teamfx.ts`.
 import { fxCarDamageScale, fxCrashCooldownS, fxRamFreeCrash, fxWreckLimpSpeed } from './teamfx.ts';
+// --- WORKSTREAM Y (cars catch fire). The rules for what happens after a car is
+// finished, in a module of its own -- see `game/carfire.ts` section 1 for why it
+// is not more of this file, and section 2 for why the countdown is milliseconds
+// this file's `age` sweep walks rather than a stamp.
+//
+// **The dependency runs this way and only this way.** `carfire.ts` restates
+// `CAR_HEALTH_MAX` and `CAR_SMOKING_HEALTH` rather than importing them, because
+// the ignition rule lives inside `CarField.damage` -- the one funnel every
+// impact goes through -- and an import back the other way would be a cycle whose
+// consumers are top-level `const`s. `verifyDriving` cross-checks the restated
+// pair, which is the arrangement `SPRINT_SPEED` has with the controller.
+import {
+  BURN_HP_PER_S,
+  CAR_HEALTH_FULL_FIRE,
+  CAR_SMOKING_HEALTH_FIRE,
+  FUSE_MS,
+  IGNITE_LOCK_MS,
+  NOT_BURNING,
+  burningFromFuse,
+  canIgnite,
+  fuseExpired,
+  ignitesOnCrash,
+  isBurning,
+} from './carfire.ts';
 
 // --- The handling ---------------------------------------------------------------
 
@@ -428,7 +452,7 @@ export const CRIME_HEIGHT = 1.0;
  *
  * 400, and the number is set by the wire rather than by taste: a joiner is sent
  * every record in one `MSG.CARS`, at `protocol.CAR_RECORD_BYTES` apiece, and 400
- * is 12.4 kB -- one MTU-bounded burst on a socket that has just carried the
+ * is 12.8 kB (12.4 before the fire's fuse byte) -- one burst on a socket that has just carried the
  * whole collision stream. Ten times that would be a joiner stalling on a car
  * list, and a tenth of it would be a busy room recycling cars people can
  * remember parking.
@@ -476,66 +500,130 @@ export const PARK_SNAP_RADIUS = 3;
 export const CAR_HEALTH_MAX = 100;
 
 /**
- * Below this delta-v a collision costs nothing, m/s. The brief's 3.
+ * Below this delta-v a collision costs nothing, m/s. **Five, and it used to be
+ * three.**
  *
- * It is not "no damage below 3", it is **"3 m/s of every impact is free"** --
- * the curve is `(dv - 3) x 6` and not `dv x 6` above a threshold, so there is no
- * step at the boundary. That continuity is the same requirement
+ * It is not "no damage below 5", it is **"5 m/s of every impact is free"** --
+ * the curve is `(dv - 5) x 3.2` and not `dv x 3.2` above a threshold, so there
+ * is no step at the boundary. That continuity is the same requirement
  * `traffic.carHitStrength`'s header states for the knockdown and it is here for
  * the identical reason: a threshold makes the last centimetre of a nudge the
  * difference between nothing and a dent, and a player who kerbed at 3.1 m/s
  * twice and got two different answers is a player who thinks the damage is
  * random.
  *
- * 3 m/s is also, deliberately, the speed a car is allowed to be *taken* at
- * (`TAKEABLE_SPEED`): manoeuvring a car in and out of a space is free, and
- * anything you would describe as driving into something is not.
+ * **Why it moved.** The owner's report was *"the cars are too weak"*, and the
+ * free allowance is the half of that complaint nobody would think to name: at 3
+ * m/s, mounting a kerb at walking-plus pace, clipping a bollard while parking
+ * and easing into the car in front all cost real health, and a driver who never
+ * had a proper crash still arrived home smoking. Five is a shade over
+ * `TAKEABLE_SPEED`'s 3 with a margin: **manoeuvring is free, and so is being bad
+ * at manoeuvring.** Anything you would describe as driving into something is
+ * comfortably past it.
+ *
+ * The old paragraph tied this constant to `TAKEABLE_SPEED` exactly, and that tie
+ * is deliberately cut rather than quietly broken: the two answer different
+ * questions ("is this car standing still enough to steal" against "was that a
+ * crash"), and making one number serve both was what stopped the free allowance
+ * from being tuned when it needed to be.
  */
-export const CRASH_FREE_SPEED = 3;
+export const CRASH_FREE_SPEED = 5;
 
 /**
- * Health lost per metre per second of impact past the free allowance.
+ * Health lost per metre per second of impact past the free allowance. **3.2, and
+ * it used to be 6.**
  *
- * Six, which is the brief's, and the two numbers it is chosen to produce are:
- * a 6 m/s hit is 18 -- a scrape you can see and carry on from -- and a
- * `DRIVE_TOP_SPEED` wall is `(0.66 x 44 - 3) x 6 = 156`, clamped to
- * `CRASH_DAMAGE_MAX`... which is only 60, so a full-speed wall is *not* an
- * instant write-off from full health. That is intentional and it took a round
- * of thinking to keep: an instant write-off from one mistake makes the whole
- * feature a punishment, where the first heavy crash being a warning makes it a
- * thing you learn. The car ends up on exactly 40, which is where the smoke
- * starts.
+ * The middle number of the retune the owner's *"the cars are too weak"* asked
+ * for, and the three that moved together are worth reading as one change:
  *
- * And the curve compounds in the *forgiving* direction, which is worth stating
- * because it is not obvious from the constants. A car under 40 is capped at
- * `CAR_SMOKING_SCALE` of the top speed, so its *next* crash is slower than its
- * last: `server/cardamage-check.ts` drives the real thing at a wall and
- * measures 60 for the first, which leaves it smoking on exactly 40.
+ *     free speed   3    ->  5      kerbs and nudges are free
+ *     per m/s      6    ->  3.2    a real crash costs about half what it did
+ *     cap          60   ->  45     no single impact is most of a car
  *
- * **The doubling of `DRIVE_TOP_SPEED` changed the tail of that and is worth
- * recording, because the headline number did not move.** A top-speed wall was
- * 114 raw against a cap of 60 before and is 156 against the same 60 now -- the
- * curve saturated long before the old top speed and it saturates harder -- so
- * the *first* crash costs exactly what it always did and a full-health car is
- * still not written off by one mistake. What changed is the second one: a
- * smoking car is capped at 0.6 of the top speed, which used to be 13.2 m/s and a
- * 61 hp raw hit, and is now 26.4 and a 141 hp raw hit. Both clamp to 60, and 60
- * is more than the 40 a smoking car has left.
+ * What the pair (5, 3.2) is chosen to produce is a **15 m/s square wall costing
+ * 32 hp** -- `(15 - 5) x 3.2` -- against the 60 the old curve clamped that same
+ * impact to. Fifteen metres a second is 54 km/h, which is a genuine crash in a
+ * suburban street, and the difference between "a third of the car" and "most of
+ * the car" is the whole of the complaint: a careless driver now has a long
+ * afternoon and a reckless one still loses the vehicle.
  *
- * So a car is **two** heavy walls rather than three. That is a smaller change
- * than it sounds and it is left alone deliberately: the property the whole
- * feature is built on -- *the first heavy crash is a warning rather than the
- * end* -- is untouched, and it is the only one anybody experiences. Pulling
- * `CRASH_DAMAGE_PER_SPEED` down to restore the third run would make every
- * *light* knock cheaper too, which is the wrong end of the curve to pay from.
- * What *also* changed is how much road you need to reach the top at all -- see
- * `DRIVE_ACCELERATION` -- and 161 m of clear carriageway is rarer in this city
- * than 40 was.
+ * A light knock moves proportionally less, which is deliberate and is the
+ * opposite of the choice the old paragraph here defended. It argued against
+ * pulling this constant down because it "would make every light knock cheaper
+ * too, which is the wrong end of the curve to pay from". That was right when the
+ * free allowance was 3; with the allowance at 5 the light knocks are *free*
+ * rather than cheap, so the two changes together take the cost off exactly the
+ * impacts nobody thinks of as crashes and leave the ones they do.
+ *
+ * And the curve still compounds in the forgiving direction: a car under
+ * `CAR_SMOKING_HEALTH` is capped at `CAR_SMOKING_SCALE` of the top speed, so its
+ * next crash is slower than its last.
+ *
+ * **What this costs, stated plainly, because it is the one number that got
+ * worse:** a full-throttle wall is three runs rather than two. The nose probe
+ * reports two thirds of the speed as the delta-v (`NOSE_SHED`), so 44 m/s is
+ * 29 m/s of impact and `(29 - 5) x 3.2 = 77`, clamped to the 45 cap; the car
+ * lands on 55, then on 10, and the third run finishes it. That is the *intended*
+ * direction -- a car should take some killing -- and the drama the second half of
+ * the owner's sentence asked for is not in the health bar at all. It is
+ * `game/carfire.ts`: the run that takes the car to zero sets it alight, and six
+ * seconds later there is no car.
  */
-export const CRASH_DAMAGE_PER_SPEED = 6;
+export const CRASH_DAMAGE_PER_SPEED = 3.2;
 
-/** The most one impact can cost, however fast you were going. See above. */
-export const CRASH_DAMAGE_MAX = 60;
+/**
+ * The most one impact can cost, however fast you were going. **45, from 60.**
+ *
+ * The old value was chosen so that `CAR_HEALTH_MAX - CRASH_DAMAGE_MAX` landed
+ * exactly on `CAR_SMOKING_HEALTH` -- one maximal crash put a car precisely on the
+ * smoke threshold, which was a tidy property and is now gone. It is gone on
+ * purpose. The tidiness was doing no work a player could perceive, and what it
+ * *cost* was the thing they did perceive: the worst possible mistake taking 60%
+ * of the car meant two of them ended it, and two mistakes is not a long
+ * afternoon.
+ *
+ * 45 leaves a full-health car on 55 after the worst impact in the game -- still
+ * above the smoke line, still driving properly, and visibly dented. The warning
+ * is the dent and not the handling, and the handling change arrives on the
+ * second one.
+ */
+export const CRASH_DAMAGE_MAX = 45;
+
+/**
+ * How little a purely sideways impact costs, as a fraction of a square one.
+ *
+ * **The glancing-blow rule**, and the shortest statement of what it is for is
+ * the case it was written for: dragging a wing along the side of a building at
+ * 40 m/s is not the same event as driving into the end of it at 40 m/s, and
+ * before this constant existed the game charged the same for both.
+ *
+ * The multiplier is `|cos|` between the contact normal and the car's own
+ * heading, floored here so that even a pure scrape costs something -- a floor of
+ * zero would make a wall you were parallel to completely free, which is an
+ * exploit (drive down a street at full speed with one wing on the shopfronts)
+ * and also just wrong.
+ *
+ * **It multiplies the damage rather than the delta-v**, and that is the one
+ * decision in this rule worth arguing. Scaling the *speed* before the curve is
+ * the physically honest reading -- only the normal component of the closing
+ * velocity is destructive -- and it was rejected for two reasons. It interacts
+ * with the free allowance in a way nobody can predict from inside the game (a
+ * 14 m/s scrape would come out at exactly zero because `14 x 0.35` is under
+ * `CRASH_FREE_SPEED`, so a scrape at 13 and one at 15 are both free and one at
+ * 30 is not), and it makes `CRASH_DAMAGE_MAX` unreachable for any impact that is
+ * not perfectly square, which turns the cap into a constant that only describes
+ * one geometry. Multiplying the clamped damage keeps `crashDamage(dv, 1)`
+ * exactly the documented curve and makes the glancing factor a clean single
+ * multiplier that composes with `Ute Life` the way every other modifier does.
+ *
+ * **Only the wall path supplies one.** Car against car already carries its own
+ * cosine: `closingAlong` projects both velocities onto the line between the two
+ * cars, so a sideswipe reports a small closing speed by construction and
+ * applying the factor again would charge for the same angle twice. See
+ * `stepCarSpeed`'s nose probe, which is the one impact in this game that is
+ * detected as a boolean and therefore cannot tell a scrape from a head-on.
+ */
+export const GLANCING_FLOOR = 0.35;
 
 /**
  * How long after an impact the next one is free, milliseconds. The brief's 0.5 s.
@@ -594,17 +682,35 @@ export const CAR_SMOKING_PULL = 0.06;
 /**
  * The health lost to one impact of this delta-v. The whole damage model.
  *
- * `clamp((dv - CRASH_FREE_SPEED) x CRASH_DAMAGE_PER_SPEED, 0, CRASH_DAMAGE_MAX)`,
- * and it is a free function rather than a method because both the authority and
- * the prediction call it and neither has any business owning it. Four operations
- * and no transcendental, so the two ends produce the same number bit for bit --
- * see section 5.
+ * `clamp((dv - CRASH_FREE_SPEED) x CRASH_DAMAGE_PER_SPEED, 0, CRASH_DAMAGE_MAX)`
+ * times the impact's head-on-ness, and it is a free function rather than a
+ * method because both the authority and the prediction call it and neither has
+ * any business owning it. Six operations and no transcendental, so the two ends
+ * produce the same number bit for bit -- see section 5.
+ *
+ * `headOn` is `|cos|` between the contact normal and the car's heading, and it
+ * **defaults to 1** so that every call site which has no normal to offer -- car
+ * against car, car against the timetable, a pedestrian -- means exactly what it
+ * meant before the glancing rule existed. See `GLANCING_FLOOR` for why only the
+ * nose probe supplies one and why the factor multiplies the damage rather than
+ * the speed.
+ *
+ * The floor is applied here rather than trusted from the caller, on
+ * `CarSmoke.add`'s rule about grading inside the callee: a caller that handed
+ * over a raw cosine of 0.02 would produce a free crash, and there is exactly one
+ * place that decision should be made.
  */
-export function crashDamage(deltaV: number): number {
+export function crashDamage(deltaV: number, headOn = 1): number {
   const over = deltaV - CRASH_FREE_SPEED;
   if (!(over > 0)) return 0;
   const raw = over * CRASH_DAMAGE_PER_SPEED;
-  return raw > CRASH_DAMAGE_MAX ? CRASH_DAMAGE_MAX : raw;
+  const capped = raw > CRASH_DAMAGE_MAX ? CRASH_DAMAGE_MAX : raw;
+  // NaN-safe by construction: `!(headOn > GLANCING_FLOOR)` catches a NaN and
+  // falls to the floor, where `headOn < GLANCING_FLOOR ? ...` would let it
+  // through and multiply the whole crash by NaN. `damageGrade` clamps the same
+  // way and for the same reason.
+  const square = !(headOn > GLANCING_FLOOR) ? GLANCING_FLOOR : headOn > 1 ? 1 : headOn;
+  return capped * square;
 }
 
 /**
@@ -958,6 +1064,18 @@ export interface DriveState {
    * Meaningless when `drivingCar` is 0, and `stepCarSpeed` does not read it then.
    */
   carHealth: number;
+  /**
+   * How square the nose probe's last impact was, 0..1. **Written here, read by
+   * the car sweep**, and the second half of `combat.CombatantState.carCrashDv`'s
+   * one-tick outbox -- see that field, which carries the whole argument.
+   *
+   * **Optional on this interface and required on the combatant**, which is the
+   * asymmetry that lets `verifyDriving` keep driving three-field literals
+   * through `stepCarSpeed` while the real thing is a checked field on the state
+   * both processes reconcile. Written unconditionally on a hit and left alone
+   * otherwise, because whoever drains the outbox puts it back to 1.
+   */
+  carCrashHeadOn?: number;
 }
 
 /** What `stepCarSpeed`'s nose probe needs of the world. A subset of `combat.CombatWorld`. */
@@ -989,6 +1107,21 @@ export const NOSE_REACH = 1.8;
 
 /** And how wide the nose is, for the probe's own radius. */
 export const NOSE_RADIUS = 0.85;
+
+/**
+ * How much speed a car keeps on the tick its bonnet enters something.
+ *
+ * A third, and it was a bare `0.34` inside `stepCarSpeed` until
+ * `server/cardamage-check.ts` needed to predict the number: the check drives a
+ * car into a real wall at a chosen speed and asserts the health it loses, and
+ * that assertion is `crashDamage(speed * NOSE_SHED)` -- which is a *model* of the
+ * probe rather than a literal copied out of it, and only stays a model if the
+ * constant has a name. See the impulse paragraph inside `stepCarSpeed` for why
+ * two thirds in one tick rather than everything.
+ */
+export const NOSE_KEEP = 0.34;
+/** The other side of it: the fraction of the speed one bonnet-first tick sheds. */
+export const NOSE_SHED = 1 - NOSE_KEEP;
 
 // --- The integrator ------------------------------------------------------------------
 
@@ -1122,10 +1255,37 @@ export function stepCarSpeed(
       NOSE_RADIUS, feetY,
     );
     if (hit.hit) {
+      // --- **How square was it?** The glancing-blow rule, and this is the one
+      // impact in the game that needs it computed rather than implied.
+      //
+      // `resolve` hands back the point it pushed the probe out to, and the
+      // vector from where the probe *wanted* to be to where it *ended up* is the
+      // contact normal -- that is what a push-out is. Dotting it with the car's
+      // own heading gives `|cos|`: 1 for driving into the end of a building, and
+      // near zero for dragging a wing along the side of one. See
+      // `GLANCING_FLOOR`.
+      //
+      // A push of nothing is a degenerate answer -- the resolver reported a hit
+      // and moved the probe nowhere, which happens when the probe starts inside
+      // the prism -- and it falls back to 1 rather than to the floor, on the
+      // rule this file uses everywhere a query cannot answer: the *conservative*
+      // reading, which here is that it was a proper crash.
+      const pushX = hit.x - (x + fx * NOSE_REACH);
+      const pushZ = hit.z - (z + fz * NOSE_REACH);
+      const push2 = pushX * pushX + pushZ * pushZ;
+      if (push2 > 1e-8) {
+        // `Math.sqrt` and never `Math.hypot`, on section 5's determinism rule
+        // and `crashFromClamp`'s precedent one function down.
+        const inv = 1 / Math.sqrt(push2);
+        const dot = fx * pushX * inv + fz * pushZ * inv;
+        c.carCrashHeadOn = dot < 0 ? -dot : dot;
+      } else {
+        c.carCrashHeadOn = 1;
+      }
       // Not to zero: a hard stop at a kerb reads as the car being deleted. Two
       // thirds off per tick sheds 44 m/s in about 90 ms, which is a crunch.
       const before = v;
-      v *= 0.34;
+      v *= NOSE_KEEP;
       if (v < 0.2) v = 0;
       // **The impulse.** Two thirds of the speed in one tick is the whole of
       // what the car "lost to the wall", and it is the number `crashDamage`
@@ -1840,6 +2000,34 @@ export interface DrivenCar {
    * mispredicted a refused take is corrected by the absence of a `CARS` frame.
    */
   lastDriverId: number;
+  /**
+   * --- THE FIRE. Milliseconds since this car caught, or `carfire.NOT_BURNING`.
+   *
+   * Advanced by `age` on both ends, exactly as `emptyMs` and `damageCooldownMs`
+   * are, which is what makes the six-second countdown a shared closed form
+   * rather than two clocks that have to agree. `game/carfire.ts` section 2 is
+   * the whole argument for counting milliseconds here rather than stamping a
+   * tick, and `protocol.CarRecord.fuse` is the one byte this becomes on the
+   * wire.
+   *
+   * **On the wire, unlike the two clocks beside it**, and the difference is what
+   * the field *is*: `damageCooldownMs` is a rate limiter and `emptyMs` is a
+   * tie-break, both of which a client may quietly disagree about for a tick.
+   * This one decides when a car ceases to exist and how long everybody standing
+   * near it has to move, so every client draws it or the explosion is a surprise
+   * to all but one of them.
+   */
+  burningMs: number;
+  /**
+   * Milliseconds until this car may catch fire again. `carfire.IGNITE_LOCK_MS`.
+   *
+   * **Not on the wire**, on `damageCooldownMs`' argument two fields up: it is a
+   * rate limiter that exists to stop a fuse being re-stamped by a second blast
+   * (`game/carfire.ts` section 5), the authority's copy is the one that decides,
+   * and a client whose lock drifted by a tick mispredicts one ignition and is
+   * corrected by the next `MSG.CARS`.
+   */
+  igniteLockMs: number;
 }
 
 /**
@@ -1915,6 +2103,10 @@ export class CarField implements DrivingLookup {
       emptyMs: 0,
       health: CAR_HEALTH_MAX,
       damageCooldownMs: 0,
+      // A car nobody has crashed yet. See `game/carfire.ts` for why the sentinel
+      // is -1 and not 0.
+      burningMs: NOT_BURNING,
+      igniteLockMs: 0,
     };
     this.byId.set(id, car);
     this.bySource.set(car.carId, car);
@@ -1942,6 +2134,11 @@ export class CarField implements DrivingLookup {
     driverId: number;
     /** Optional so a caller that predates the crash damage means "undamaged". */
     health?: number;
+    /**
+     * Deciseconds of fuse remaining, or 0/absent for a car that is not on fire.
+     * `protocol.CarRecord.fuse`; optional on `health`'s argument one line up.
+     */
+    fuse?: number;
   }): DrivenCar {
     const existing = this.byId.get(record.id);
     if (existing) {
@@ -1963,6 +2160,19 @@ export class CarField implements DrivingLookup {
       // the wall, and a client that kept its own answer whenever it was lower
       // would be a client that repaired its car by mispredicting.
       if (record.health !== undefined) existing.health = record.health;
+      // **And the fire, on the health byte's terms with one clause added.** The
+      // authority's answer wins when it says the car is burning, because that is
+      // an event this end may not have predicted at all -- a chain ignition from
+      // somebody else's explosion has no local cause. It does *not* win when it
+      // says the car is not burning and this end thinks it is: a record re-sent
+      // for an unrelated reason (a driver getting out) carries a fuse that was
+      // quantised at the moment it was encoded, and a plain assignment would put
+      // out every fire the authority happened to mention in passing. The
+      // authority takes a burning car away by *removing* it, which is
+      // unambiguous.
+      if (record.fuse !== undefined && record.fuse > 0) {
+        existing.burningMs = burningFromFuse(record.fuse);
+      }
       if (record.driverId !== 0) existing.emptyMs = 0;
       return existing;
     }
@@ -1972,6 +2182,8 @@ export class CarField implements DrivingLookup {
       emptyMs: 0,
       health: record.health ?? CAR_HEALTH_MAX,
       damageCooldownMs: 0,
+      burningMs: burningFromFuse(record.fuse ?? 0),
+      igniteLockMs: 0,
     };
     this.byId.set(record.id, car);
     this.bySource.set(car.carId, car);
@@ -2040,8 +2252,45 @@ export class CarField implements DrivingLookup {
    * town -- and once per car near a combatant per tick by `traffic.carHitting`.
    */
   suppressed(identity: number): boolean {
-    return this.bySource.has(identity);
+    return this.bySource.has(identity) || this.scorched.has(identity);
   }
+
+  /**
+   * This ambient or parked car has been **destroyed** and must never come back.
+   *
+   * The one thing section 3 of the header did not have to answer until cars
+   * could explode. Suppression there is a *loan*: the record holds the identity,
+   * the timetable stops producing that car, and when the record is recycled the
+   * car is simply there again in its bay -- which is exactly right for a car
+   * somebody parked and walked away from.
+   *
+   * An exploded car is the other case, and it is the one the brief names: *"the
+   * static/ambient identity stays suppressed so a burnt car does not reappear at
+   * the kerb"*. `explode` removes the record, and a removal on its own hands the
+   * identity back -- so the Camry you just blew up would be standing in its
+   * parking space again on the very next frame, undamaged, in front of the
+   * scorch mark it left. That is the single most obviously wrong thing this
+   * feature could produce.
+   *
+   * So the identity goes into a set that is never emptied, and `suppressed`
+   * answers for it forever. The memory is one number per car anybody destroys in
+   * the life of a room; at a plausible worst case -- every one of
+   * `MAX_DRIVEN_CARS` records destroyed and re-taken repeatedly over a long
+   * session -- a few thousand entries, which is tens of kilobytes on the 1 GB
+   * box and is not a budget anybody has to think about. A `Set` rather than a
+   * flag on a record precisely because the record is the thing that goes away.
+   */
+  scorch(identity: number): void {
+    this.scorched.add(identity);
+  }
+
+  /** How many cars have been destroyed here. The dev overlay and the checks. */
+  get scorchedCount(): number {
+    return this.scorched.size;
+  }
+
+  /** See `scorch`. Never emptied except by `clear`, which is a whole new room. */
+  private readonly scorched = new Set<number>();
 
   /** `DrivingLookup`. Linear in driven cars, which are few by construction. */
   carOf(playerId: number): number {
@@ -2139,7 +2388,57 @@ export class CarField implements DrivingLookup {
         car.damageCooldownMs -= dtMs;
         if (car.damageCooldownMs < 0) car.damageCooldownMs = 0;
       }
+      if (car.igniteLockMs > 0) {
+        car.igniteLockMs -= dtMs;
+        if (car.igniteLockMs < 0) car.igniteLockMs = 0;
+      }
+      // --- The fuse, and the fire eating what is left of the car.
+      //
+      // **This is the whole of the countdown on both ends.** `game/carfire.ts`
+      // section 2: two processes that agree about when a car caught fire agree
+      // about when it explodes, because the only thing either of them does is
+      // add the same `dtMs` the same number of times. Nothing here removes a
+      // record -- `sim.stepCars` is the authority for the bang, on the same
+      // division of labour that makes `recycleFarthest` the only thing allowed
+      // to drop a record.
+      if (car.burningMs !== NOT_BURNING) {
+        car.burningMs += dtMs;
+        // The burn, applied **here rather than through `damage`** on purpose:
+        // `damage` is the impact funnel and carries the half-second cooldown,
+        // the talent multipliers and the ignition rules, none of which apply to
+        // a fire. See `carfire.BURN_HP_PER_S`. A car that is already at zero --
+        // which is nearly every burning car, because every write-off catches --
+        // takes the first branch and this costs one comparison.
+        if (car.health > 0) {
+          car.health -= (BURN_HP_PER_S * dtMs) / 1000;
+          if (car.health < 1e-9) car.health = 0;
+          this.dirty = true;
+        }
+      }
     }
+  }
+
+  /**
+   * Set this car alight. Returns the record if it caught, or null.
+   *
+   * Null covers three cases and no caller cares which: no such record, it is
+   * already burning, and its ignition lock is still running. See
+   * `carfire.canIgnite` -- the lock is the anti-re-stamp rule and its whole
+   * argument is section 5 of that file.
+   *
+   * **The one place a car ever catches fire**, on `damage`'s own argument: a
+   * crash arrives through `damage`, a chain reaction arrives through
+   * `sim.explodeCar`, and both come here, so "is this car on fire and when did
+   * it start" has exactly one answer rather than two that agree today.
+   */
+  ignite(carId: number): DrivenCar | null {
+    const car = this.byId.get(carId);
+    if (car === undefined) return null;
+    if (!canIgnite(car.burningMs, car.igniteLockMs)) return null;
+    car.burningMs = 0;
+    car.igniteLockMs = IGNITE_LOCK_MS;
+    this.dirty = true;
+    return car;
   }
 
   /**
@@ -2174,12 +2473,33 @@ export class CarField implements DrivingLookup {
     // Above it the car pays in full, which is what stops the mega being a car
     // that cannot be written off.
     if (fxRamFreeCrash(driver, car.speed)) return null;
-    car.health -= amount * fxCarDamageScale(driver);
+    // Kept for the ignition test below, which is a question about the condition
+    // the car was in **before** the impact -- see `carfire.ignitesOnCrash`, and
+    // `carfire.IGNITE_CRASH_HP` for why "already broken" is the reading.
+    const healthBefore = car.health;
+    const cost = amount * fxCarDamageScale(driver);
+    car.health -= cost;
     // `applyCarHit`'s femto-pip clamp, and it matters here for its reason: a
     // health of 4e-15 is a car that is not written off, does not smoke black,
     // and has an engine that still turns over -- which is a car nobody can tell
     // apart from a wreck and which no player will ever manage to finish off.
     if (car.health < 1e-9) car.health = 0;
+    // --- **And the fire.** The owner's second sentence, hung off the one funnel
+    // every impact in the game already goes through.
+    //
+    // Here rather than at the four call sites for exactly the reason the talent
+    // hooks above are here: a wall, another player's car, an ambient car, a kerb
+    // and the blast from a car that has already exploded all arrive on this
+    // line, and an ignition rule copied into five of them is five rules that
+    // agree today. It also means the chain reaction needed no code of its own --
+    // `sim.explodeCar` calls `damage` with `carfire.CHAIN_DAMAGE` and a car that
+    // was already broken catches, which is the feature.
+    //
+    // The **cost after the talent** is what is tested, deliberately: a `Ute Life`
+    // driver whose 45 hp wall was reduced to 31 took a 31 hp hit, and the fire
+    // should read off what actually happened to the car rather than off what
+    // would have happened to somebody else's.
+    if (ignitesOnCrash(healthBefore, car.health, cost)) this.ignite(car.id);
     // WORKSTREAM W: `Ute Life` shortens the window 500 → 300 ms. Absolute and
     // min-wins; the key is in seconds and this field is in ms.
     car.damageCooldownMs = fxCrashCooldownS(driver, CRASH_COOLDOWN_MS / 1000) * 1000;
@@ -2263,6 +2583,10 @@ export class CarField implements DrivingLookup {
   clear(): void {
     this.byId.clear();
     this.bySource.clear();
+    // The scorch ledger goes too, and it is the one place it ever does: `clear`
+    // means "this is a different world now", which is exactly when a car that
+    // was destroyed should be back at its kerb. See `scorch`.
+    this.scorched.clear();
     this.dirty = true;
   }
 
@@ -2682,11 +3006,39 @@ export function verifyDriving(): string[] {
     if (!(hitDv > 0)) {
       failures.push('The nose probe did not report driving into a wall.');
     }
-    if (Math.abs(hitDv - 20 * 0.66) > 0.5) {
+    if (Math.abs(hitDv - 20 * NOSE_SHED) > 0.5) {
       failures.push(
         `Driving into a wall at 20 m/s reported ${hitDv.toFixed(2)} m/s of delta-v; the probe sheds ` +
-          `two thirds, so it is about 13.2. This number is the crash damage.`,
+          `${NOSE_SHED.toFixed(2)} of it, so it is about ${(20 * NOSE_SHED).toFixed(1)}. This number is the crash damage.`,
       );
+    }
+    // --- **And how square it was.** The glancing-blow rule's one input, taken
+    // off the resolver's push-out. See `GLANCING_FLOOR` and the probe itself.
+    //
+    // Both fixtures above resolve to the probe's *origin*, which is a push
+    // straight back along the heading -- a car driving into the end of a wall --
+    // so the head-on-ness must be 1. A probe that reported a glancing hit here
+    // would make every wall in the city cost a third of what it should, and
+    // there is no frame that says so.
+    if (stopped.carCrashHeadOn === undefined || Math.abs(stopped.carCrashHeadOn - 1) > 1e-6) {
+      failures.push(`Driving square into a wall reported a head-on-ness of ${stopped.carCrashHeadOn}, not 1.`);
+    }
+    // A wall the car is running *alongside* pushes the probe sideways, and that
+    // is the impact the rule exists for: the same speed, a fraction of the cost.
+    // `yaw` 0 faces -Z, so forward is (0, -1) and a push along +X is a pure
+    // scrape down the side of a building.
+    {
+      const alongside: DrivingWorld = {
+        collision: { resolve: (_fx, _fz, tx, tz) => ({ x: tx + 0.4, z: tz, hit: true }) },
+      };
+      const scrape: DriveState = { drivingCar: 1, carSpeed: 20, carHealth: CAR_HEALTH_MAX };
+      stepCarSpeed(scrape, { forward: 1, jump: false }, 1 / 60, 0, 0, 0, 0, alongside);
+      if (scrape.carCrashHeadOn === undefined || scrape.carCrashHeadOn > 0.01) {
+        failures.push(
+          `Scraping along the side of a wall reported a head-on-ness of ${scrape.carCrashHeadOn}. The push-out ` +
+            'is perpendicular to the heading, so it is zero and the floor is applied by `crashDamage`.',
+        );
+      }
     }
     if (!(stopped.carSpeed < 20)) failures.push(`A car drove into a wall at ${stopped.carSpeed} m/s and did not slow.`);
     for (let i = 0; i < 60; i++) stepCarSpeed(stopped, { forward: 1, jump: false }, 1 / 60, 0, 0, 0, 0, wall);
@@ -2794,32 +3146,87 @@ export function verifyDriving(): string[] {
       failures.push(`A ${CRASH_FREE_SPEED} m/s bump cost ${crashDamage(CRASH_FREE_SPEED)} hp; that speed is free.`);
     }
     if (crashDamage(0) !== 0 || crashDamage(-9) !== 0) failures.push('A stationary or reversing car took crash damage.');
-    // The brief: "a 6 m/s hit is about 18 hp".
-    if (Math.abs(crashDamage(6) - 18) > 1e-9) failures.push(`A 6 m/s hit cost ${crashDamage(6)} hp, not 18.`);
-    // Continuous at the boundary: no step, so a kerb at 3.01 m/s is not a dent.
-    if (crashDamage(CRASH_FREE_SPEED + 0.01) > 0.1) {
-      failures.push('The damage curve has a step at the free allowance; a 3.01 m/s kerb was a real hit.');
+    // **The retune's headline number**, and the one the whole of "the cars are
+    // too weak" turns on: a square 15 m/s wall -- 54 km/h, a real crash in a
+    // suburban street -- is 32 hp where the old curve clamped the same impact to
+    // 60. See `CRASH_DAMAGE_PER_SPEED`.
+    if (Math.abs(crashDamage(15) - 32) > 1e-9) {
+      failures.push(`A square 15 m/s wall cost ${crashDamage(15)} hp, not 32. The retune has drifted.`);
     }
-    // And capped, so one wall is a warning rather than a write-off. See
-    // `CRASH_DAMAGE_MAX`: full throttle into a wall leaves the car on exactly
-    // the smoke threshold, which is the number that makes the second crash the
-    // one that ends it.
+    // Continuous at the boundary: no step, so a kerb at 5.01 m/s is not a dent.
+    if (crashDamage(CRASH_FREE_SPEED + 0.01) > 0.1) {
+      failures.push(`The damage curve has a step at the free allowance; a ${CRASH_FREE_SPEED + 0.01} m/s kerb was a real hit.`);
+    }
+    // And capped, so no single impact is most of a car. See `CRASH_DAMAGE_MAX`:
+    // full throttle into a wall leaves a healthy car on 55, above the smoke
+    // threshold and still driving properly, with a visible dent as the warning.
     if (crashDamage(DRIVE_TOP_SPEED) !== CRASH_DAMAGE_MAX) {
       failures.push(`A ${DRIVE_TOP_SPEED} m/s wall cost ${crashDamage(DRIVE_TOP_SPEED)} hp; the cap is ${CRASH_DAMAGE_MAX}.`);
     }
-    if (CAR_HEALTH_MAX - CRASH_DAMAGE_MAX !== CAR_SMOKING_HEALTH) {
+    if (!(CAR_HEALTH_MAX - CRASH_DAMAGE_MAX > CAR_SMOKING_HEALTH)) {
       failures.push(
-        `One maximum crash leaves a car on ${CAR_HEALTH_MAX - CRASH_DAMAGE_MAX} against a smoke threshold of ` +
-          `${CAR_SMOKING_HEALTH}. The two are meant to be the same number: the worst single crash is exactly ` +
-          `the one that starts the smoke.`,
+        `One maximum crash leaves a healthy car on ${CAR_HEALTH_MAX - CRASH_DAMAGE_MAX} against a smoke ` +
+          `threshold of ${CAR_SMOKING_HEALTH}. The worst single impact in the game must leave the car above ` +
+          `it: the first heavy crash is a warning, not a change of handling. This assertion used to demand ` +
+          `the two be *equal* and the retune deliberately broke that tidiness -- see CRASH_DAMAGE_MAX.`,
       );
     }
-    // Monotone, which is the property a player actually learns.
+    // --- The glancing-blow rule. See `GLANCING_FLOOR`.
+    //
+    // A pure scrape at 20 m/s costs 16.8 against the 48 the same speed costs
+    // square, which is the "a fraction of hitting it square" the rule is for.
+    // (The brief's worked example said about 12, which is what a floor of 0.25
+    // would produce; the floor it *also* specified is 0.35 and the floor is the
+    // load-bearing half, so the number below is the one the stated constant
+    // gives. Recorded here rather than quietly resolved.)
+    // Two speeds, because they exercise the two halves of the curve. Fifteen is
+    // under the cap and shows the linear part: 32 square, 11.2 scraped. Twenty
+    // is *past* it -- `(20 - 5) x 3.2` is 48 against a 45 cap -- and shows that
+    // the factor is applied to the *clamped* damage, so even a saturating impact
+    // is discounted for being sideways.
+    const square15 = crashDamage(15);
+    const scrape15 = crashDamage(15, GLANCING_FLOOR);
+    if (Math.abs(scrape15 - 32 * GLANCING_FLOOR) > 1e-9) {
+      failures.push(`A 15 m/s scrape cost ${scrape15} hp against the ${(32 * GLANCING_FLOOR).toFixed(2)} the floor implies.`);
+    }
+    const square20 = crashDamage(20);
+    const scrape20 = crashDamage(20, GLANCING_FLOOR);
+    if (square20 !== CRASH_DAMAGE_MAX) failures.push(`A square 20 m/s hit cost ${square20} hp; it is past the ${CRASH_DAMAGE_MAX} cap.`);
+    if (Math.abs(scrape20 - CRASH_DAMAGE_MAX * GLANCING_FLOOR) > 1e-9) {
+      failures.push(
+        `A 20 m/s scrape cost ${scrape20} hp against the ${(CRASH_DAMAGE_MAX * GLANCING_FLOOR).toFixed(2)} the ` +
+          'floor implies. The glancing factor multiplies the *clamped* damage; see GLANCING_FLOOR.',
+      );
+    }
+    if (!(scrape20 < square20 && scrape15 < square15)) failures.push('A scrape cost as much as a square hit.');
+    // The default is the identity, which is what makes every call site that has
+    // no contact normal -- car against car, the timetable, a pedestrian -- mean
+    // exactly what it meant before the rule existed.
+    if (crashDamage(15, 1) !== crashDamage(15)) failures.push('crashDamage(dv, 1) is not the same as crashDamage(dv).');
+    // The floor holds against a head-on-ness of zero and against a cosine that
+    // arrived as a NaN, which is the failure that would make every crash in the
+    // game free with nothing on screen to say so.
+    if (crashDamage(20, 0) !== scrape20) failures.push('A perfectly sideways impact was free; the floor is not holding.');
+    if (crashDamage(20, -1) !== scrape20) failures.push('A negative head-on-ness escaped the floor.');
+    if (crashDamage(20, NaN) !== scrape20) failures.push('A NaN head-on-ness multiplied the whole crash by NaN.');
+    if (crashDamage(20, 9) !== square20) failures.push('A head-on-ness over 1 made a crash worse than square.');
+    if (!(GLANCING_FLOOR > 0 && GLANCING_FLOOR < 1)) {
+      failures.push(`GLANCING_FLOOR is ${GLANCING_FLOOR}; at 0 a wall you are parallel to is free and at 1 the rule does nothing.`);
+    }
+    // Monotone in the delta-v, which is the property a player actually learns,
+    // and monotone in the head-on-ness too -- a hit that got *cheaper* the
+    // squarer it was would be unexplainable from inside the game.
     let last = -1;
     for (let dv = 0; dv <= 30; dv += 0.5) {
       const d = crashDamage(dv);
       if (d < last) failures.push(`crashDamage fell from ${last} to ${d} at ${dv} m/s; harder must never be cheaper.`);
       last = d;
+    }
+    let lastSquare = -1;
+    for (let k = 0; k <= 1.0001; k += 0.02) {
+      const d = crashDamage(20, k);
+      if (d < lastSquare - 1e-9) failures.push(`A 20 m/s hit got cheaper as it got squarer, at |cos| ${k.toFixed(2)}.`);
+      lastSquare = d;
     }
     // The fraction the renderers use runs the other way and hits both ends.
     if (damageFraction(CAR_HEALTH_MAX) !== 0) failures.push('An undamaged car has a non-zero damage fraction.');
@@ -3035,15 +3442,21 @@ export function verifyDriving(): string[] {
   // --- Car against car: overlap plus closing speed, and neither on its own.
   {
     const box = { halfLength: 2.3 };
-    // Head-on at 5 and 0: the mover crashes.
+    // Head-on at 8 and 0: the mover crashes.
+    //
+    // **Eight rather than the five this used to use**, and the reason is worth a
+    // line: `closingAlong` refuses anything at or under `CRASH_FREE_SPEED`, which
+    // the retune moved from 3 to 5 -- so a fixture at exactly 5 now measures the
+    // *threshold* rather than the geometry it was written for. Any speed clear of
+    // the allowance does; eight is a rear-ender nobody would call a nudge.
     const still = { x: 0, z: -4, yaw: 0, speed: 0, ...box };
-    const into = { x: 0, z: 0, yaw: Math.PI, speed: 5, ...box };
+    const into = { x: 0, z: 0, yaw: Math.PI, speed: 8, ...box };
     // yaw = PI faces +Z; the parked car is at -4, so this is driving *away*.
     if (carCrashClosing(into, still) !== 0) failures.push('A car driving away from another one crashed into it.');
-    const at = { x: 0, z: 0, yaw: 0, speed: 5, ...box };
+    const at = { x: 0, z: 0, yaw: 0, speed: 8, ...box };
     const ahead = { x: 0, z: -4, yaw: 0, speed: 0, ...box };
     const closing = carCrashClosing(at, ahead);
-    if (Math.abs(closing - 5) > 1e-6) failures.push(`A 5 m/s rear-ender reported ${closing.toFixed(2)} m/s of closing.`);
+    if (Math.abs(closing - 8) > 1e-6) failures.push(`An 8 m/s rear-ender reported ${closing.toFixed(2)} m/s of closing.`);
     // Far apart is nothing, whatever the speed.
     const far = { x: 0, z: -40, yaw: 0, speed: 0, ...box };
     if (carCrashClosing(at, far) !== 0) failures.push('Two cars forty metres apart crashed.');
@@ -3103,11 +3516,11 @@ export function verifyDriving(): string[] {
     // `crashIntoTraffic` puts the signed speed back for. `drivenCarPose`
     // publishes an unsigned speed and a magnitude here would score this as
     // driving *away* at 5 m/s, which is nothing.
-    const backing = { x: 0, z: 0, dx: 0, dz: -1, speed: -5, ...box };
+    const backing = { x: 0, z: 0, dx: 0, dz: -1, speed: -8, ...box };
     const behind = { x: 0, z: 4, dx: 0, dz: -1, speed: 0, ...box };
     const reversed = ambientCrashClosing(backing, behind);
-    if (Math.abs(reversed - 5) > 1e-6) {
-      failures.push(`Reversing at 5 m/s into the car behind reported ${reversed.toFixed(2)} m/s; a crash keeps its sign.`);
+    if (Math.abs(reversed - 8) > 1e-6) {
+      failures.push(`Reversing at 8 m/s into the car behind reported ${reversed.toFixed(2)} m/s; a crash keeps its sign.`);
     }
 
     // Overtaking a car doing the same speed in the next lane is not a crash,
@@ -3215,6 +3628,112 @@ export function verifyDriving(): string[] {
   }
   if (!(HOLD_GAP > 0 && HOLD_GAP < 20)) {
     failures.push(`traffic.HOLD_GAP is ${HOLD_GAP} m, which is not a car stopping behind another car.`);
+  }
+  // --- WORKSTREAM Y: the pair `game/carfire.ts` restates rather than imports.
+  //
+  // The cross-check has to live *here* and not in `verifyCarFire`, because the
+  // whole reason those two constants are restated is that `carfire.ts` may not
+  // import this file -- the ignition rule lives in `CarField.damage`, so the
+  // dependency runs the other way and an import back is a cycle. This is the
+  // same arrangement `CAR_HEALTH_FULL_POSE` and `SPRINT_SPEED` are kept honest
+  // by, and the failure it catches is silent in the usual way: a fire that lit
+  // cars at a health the smoke had not started at yet.
+  if (CAR_HEALTH_MAX !== CAR_HEALTH_FULL_FIRE) {
+    failures.push(
+      `CAR_HEALTH_MAX is ${CAR_HEALTH_MAX} and carfire.CAR_HEALTH_FULL_FIRE is ${CAR_HEALTH_FULL_FIRE}.`,
+    );
+  }
+  if (CAR_SMOKING_HEALTH !== CAR_SMOKING_HEALTH_FIRE) {
+    failures.push(
+      `CAR_SMOKING_HEALTH is ${CAR_SMOKING_HEALTH} and carfire.CAR_SMOKING_HEALTH_FIRE is ` +
+        `${CAR_SMOKING_HEALTH_FIRE}. The two decide the same thing about the same car: whether it is broken ` +
+        `enough for a heavy hit to set it alight.`,
+    );
+  }
+
+  // --- WORKSTREAM Y: the fire, through the field rather than through the pure
+  //     rules -- `verifyCarFire` owns those. What is checked here is the wiring:
+  //     that an impact reaches the ignition, that the clock reaches the fuse,
+  //     and that a destroyed identity never comes back.
+  {
+    const field = new CarField();
+    const car = field.take({ identity: 0xf1e, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: 0, parked: true }, 5)!;
+    if (isBurning(car.burningMs)) failures.push('A freshly taken car was already on fire.');
+    // **Every write-off catches**, which is the path essentially every fire in
+    // the game takes and is the owner's sentence in one assertion.
+    field.damage(car.id, CAR_HEALTH_MAX);
+    if (car.health !== 0) failures.push(`The fire check could not write the car off; it is on ${car.health}.`);
+    if (!isBurning(car.burningMs)) failures.push('A car driven to zero did not catch fire. Every write-off burns.');
+    if (car.burningMs !== 0) failures.push(`A car that caught fire this tick is ${car.burningMs} ms into its fuse.`);
+    // The fuse runs on the same sweep the other two clocks do, and it is *not*
+    // this class's job to remove the record when it expires -- `sim.stepCars` is
+    // the authority for the bang. A field that deleted its own records would be
+    // a client blowing cars up on its own prediction.
+    field.age(FUSE_MS - 100);
+    if (field.get(car.id) === undefined) failures.push('CarField.age removed a burning car. Only the authority explodes one.');
+    if (!fuseExpired(car.burningMs)) {
+      field.age(200);
+      if (!fuseExpired(car.burningMs)) failures.push(`A car ${car.burningMs} ms into a ${FUSE_MS} ms fuse had not expired.`);
+    } else {
+      failures.push('A fuse expired a tenth of a second early.');
+    }
+    // A burning car cannot be re-lit, which is the rule that stops a fuse being
+    // restarted forever by a car park full of explosions. See `carfire.canIgnite`.
+    const wasAt = car.burningMs;
+    if (field.ignite(car.id) !== null) failures.push('A car that was already alight was set alight again.');
+    if (car.burningMs !== wasAt) failures.push('A refused ignition still moved the fuse.');
+    // And the destroyed identity. `remove` alone hands the ambient car back --
+    // section 3 -- so a car that exploded would be standing in its bay again on
+    // the next frame, undamaged, in front of its own scorch mark.
+    field.scorch(car.carId);
+    field.remove(car.id);
+    if (!field.suppressed(0xf1e)) {
+      failures.push('An exploded car stopped suppressing its ambient copy. The burnt car reappears at the kerb.');
+    }
+    if (field.scorchedCount !== 1) failures.push(`The scorch ledger holds ${field.scorchedCount} identities, not 1.`);
+    // ...and a whole new world forgets. `clear` is the only thing that empties it.
+    field.clear();
+    if (field.suppressed(0xf1e)) failures.push('A cleared field still suppressed a destroyed car; that is a leak across rooms.');
+  }
+  // The ignition lock outlives one tick and dies with the fuse, which is the
+  // only thing about it a caller can observe through this class.
+  {
+    const field = new CarField();
+    const car = field.take({ identity: 0xf1f, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: 0, parked: true }, 6)!;
+    field.ignite(car.id);
+    if (car.igniteLockMs !== IGNITE_LOCK_MS) failures.push(`Igniting a car left a ${car.igniteLockMs} ms lock, not ${IGNITE_LOCK_MS}.`);
+    field.age(IGNITE_LOCK_MS + 100);
+    if (car.igniteLockMs !== 0) failures.push(`The ignition lock read ${car.igniteLockMs} ms after it should have run out.`);
+  }
+  // The burn eats what is left of a car that caught fire while it still had
+  // condition -- the `IGNITE_CRASH_HP` path -- and it does it without going
+  // through the impact cooldown, which would swallow all but two ticks of it.
+  {
+    const field = new CarField();
+    const car = field.take({ identity: 0xf20, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: 0, parked: true }, 7)!;
+    // Two hits with the cooldown cleared between them: 100 down to 39 -- under
+    // the smoke line -- and then a 30 hp hit, which is `IGNITE_CRASH_HP` exactly
+    // and lights the car **without finishing it**. That combination is the whole
+    // point of this fixture: the other ignition path (reaching zero) leaves
+    // nothing for the burn rate below to eat.
+    field.damage(car.id, 61);
+    if (!(car.health < CAR_SMOKING_HEALTH)) failures.push(`The burn fixture left the car on ${car.health}, not under the smoke line.`);
+    field.age(CRASH_COOLDOWN_MS);
+    field.damage(car.id, 30);
+    if (!isBurning(car.burningMs)) {
+      failures.push('A 30 hp hit on a car on 39 did not light it. That is the "already broken" ignition path.');
+    }
+    if (!(car.health > 0)) failures.push('The burn check needs a car that caught fire with condition left; it is at zero.');
+    const before = car.health;
+    field.age(1000);
+    const lost = before - car.health;
+    if (Math.abs(lost - BURN_HP_PER_S) > 1e-6) {
+      failures.push(`A second of burning took ${lost.toFixed(2)} hp against carfire.BURN_HP_PER_S's ${BURN_HP_PER_S}.`);
+    }
+    // ...and it stops at zero rather than going negative, which would invert
+    // every dent scale that reads this number.
+    field.age(60_000);
+    if (car.health !== 0) failures.push(`A minute of burning left the car on ${car.health}; the floor is 0.`);
   }
 
   // --- `resolveTake` end to end is not exercised here -- it needs a

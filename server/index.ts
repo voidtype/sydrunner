@@ -73,6 +73,12 @@ import { verifyFooty } from '../client/src/game/footy.ts';
 import { verifySwat } from '../client/src/game/swat.ts';
 import { verifyPowerups } from '../client/src/game/powerups.ts';
 import { verifyDamageGrade, verifyDriving } from '../client/src/game/driving.ts';
+// WORKSTREAM Y: a wrecked car catching fire and going off. Run **here** as well
+// as in the browser because the fuse, the blast and the chain are all this
+// side's authority and every failure in that file renders: a fuse that never
+// expires is a city of burning cars and no explosions, and a blast falloff with
+// a cliff in it is damage a player reads as random. See `game/carfire.ts`.
+import { verifyCarFire } from '../client/src/game/carfire.ts';
 // WORKSTREAM S: the parked fleet's decoder and residency accounting. Three-free
 // by rule -- this process now streams `.cars.bin` per hexagon so that the 23,020
 // cars at a kerb are takeable and not just the forty on the timetable. The body
@@ -369,6 +375,7 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // that does not answer is your own car driving off to Ashfield beside you,
     // running people down on the way. See `client/src/game/driving.ts`.
     ['verifyDriving', verifyDriving()],
+    ['verifyCarFire', verifyCarFire()],
     // And the fleet it can now steal from. See `game/staticcars.ts`: a decoder
     // that drifted from the pipeline's 16-byte stride puts every car in Sydney at
     // a plausible-looking wrong position, which renders perfectly and makes `E`

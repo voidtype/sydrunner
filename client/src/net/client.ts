@@ -1629,6 +1629,12 @@ export class NetClient {
             // client that kept the kinder of the two numbers would be a client
             // that repaired its car by mispredicting.
             health: r.health,
+            // WORKSTREAM Y: and the fire. Deciseconds remaining, and it is the
+            // *only* time this end is told about a car burning: the record is
+            // broadcast on the tick it ignites and both ends run the countdown
+            // from there off `CarField.age`. See `game/carfire.ts` section 2,
+            // and `CarField.adopt` for why a zero here does not put a fire out.
+            fuse: r.fuse,
           });
         }
         // Which car the server thinks *this* client is in. Derived rather than

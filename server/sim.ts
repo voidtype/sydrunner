@@ -42,6 +42,7 @@
  */
 
 import {
+  KO_SECONDS,
   MAX_HEALTH,
   advance,
   applyHit,
@@ -114,6 +115,22 @@ import {
   type DrivenCar,
   type DriverView,
 } from '../client/src/game/driving.ts';
+// WORKSTREAM Y: what happens after a car is finished -- the fuse, the blast and
+// the chain. Three-free on `game/driving.ts`' own terms, so this process runs
+// the exact file the browser draws the fire from. See `game/carfire.ts`.
+import {
+  BLAST_M,
+  BLAST_PED_MAX,
+  BOOM_RING_S,
+  BURN_PIPS_PER_S,
+  CHAIN_DAMAGE,
+  CHAIN_M,
+  applyBlastHit,
+  blastPips,
+  fuseDecis,
+  fuseExpired,
+  isBurning,
+} from '../client/src/game/carfire.ts';
 // The lime e-bikes. Pure, three-free, and the same file the browser runs -- which
 // is what makes a claim mean the same thing on both ends. See `game/bikes.ts`.
 import {
@@ -143,6 +160,8 @@ import {
   type SnapshotAboard,
   type SnapshotNpc,
   type SnapshotPlayer,
+  TEAM_EVENT_KIND,
+  type TeamEventKind,
 } from '../client/src/net/protocol.ts';
 // The factions. Pure, three-free on every path this file touches, and the same
 // file the browser runs -- which is what makes a witnessed crime mean the same
@@ -421,6 +440,10 @@ function carRecord(c: DrivenCar): CarRecord {
     yaw: c.yaw,
     speed: c.speed,
     health: c.health,
+    // WORKSTREAM Y: the fire, as deciseconds remaining. Zero for the
+    // overwhelming majority of records, which is what "not burning" is on this
+    // field -- see `protocol.CarRecord.fuse`.
+    fuse: fuseDecis(c.burningMs),
   };
 }
 
@@ -2521,6 +2544,9 @@ export class Simulation {
     this.bikeChanges.length = 0;
     this.carChanges.length = 0;
     this.carRemovals.length = 0;
+    // WORKSTREAM Y: the third outbox, on the same line as the other two so
+    // there is one place a tick's worth of "what to tell everybody" is emptied.
+    this.teamEvents.length = 0;
 
     // --- Departures, before anything reads the list.
     let departed = false;
@@ -3281,6 +3307,29 @@ export class Simulation {
     return out;
   }
 
+  /**
+   * --- WORKSTREAM Y: places something happened, for `MSG.TEAM_EVENT`.
+   *
+   * A per-tick outbox on `carChanges`' shape exactly, and it exists because a
+   * car exploding is a *place* rather than a thing that happened to a person --
+   * see `protocol.TEAM_EVENT_KIND`. `room.sendTeamEvents` drains it once a tick
+   * and encodes one twenty-byte frame per entry.
+   *
+   * Bounded by the number of cars that can explode on one tick, which is bounded
+   * by `MAX_DRIVEN_CARS` in the pathological case of a car park all going off
+   * together and is nought point nought in every real one. Cleared at the top of
+   * `step` with the other two outboxes.
+   */
+  private readonly teamEvents: Array<{ kind: TeamEventKind; x: number; y: number; z: number; untilMs: number }> = [];
+
+  /**
+   * What happened somewhere this tick. Owned by this object and reused, on
+   * `carDelta`'s contract: serialise it before the next `step`.
+   */
+  teamEventDelta(): readonly { kind: TeamEventKind; x: number; y: number; z: number; untilMs: number }[] {
+    return this.teamEvents;
+  }
+
   /** This player's fare, or null for a bot and for an id that has left. */
   fareOf(playerId: number): FareJob | null {
     return this.participants.get(playerId)?.fare ?? null;
@@ -3852,9 +3901,16 @@ export class Simulation {
     for (const p of this.ordered) {
       const c = p.combat;
       const dv = c.carCrashDv;
+      // WORKSTREAM Y: the head-on-ness travels with the delta-v and is put back
+      // to the identity with it. See `combat.CombatantState.carCrashHeadOn` and
+      // `driving.GLANCING_FLOOR` -- a wall taken along its length costs a
+      // fraction of one taken square, and the nose probe is the only impact in
+      // the game that needs telling which it was.
+      const headOn = c.carCrashHeadOn;
       c.carCrashDv = 0;
+      c.carCrashHeadOn = 1;
       if (dv <= 0 || c.drivingCar === 0) continue;
-      const cost = crashDamage(dv);
+      const cost = crashDamage(dv, headOn);
       if (cost <= 0) continue;
       const car = this.cars.damage(c.drivingCar, cost);
       if (car !== null) this.carChanges.push(car);
@@ -4033,7 +4089,200 @@ export class Simulation {
     // recycling tie and the crash cooldown that stops a scrape being fatal.
     // Every tick rather than every second because the cooldown is half a second
     // and a 1 Hz decrement cannot express it.
+    //
+    // WORKSTREAM Y: it is also the fuse. `age` advances `burningMs` and eats
+    // what is left of a burning car's condition; it deliberately removes
+    // nothing, because a client runs this same sweep on its mirror and a field
+    // that deleted its own records would be a browser blowing cars up on its own
+    // prediction. The bang is the authority's and is the block below.
     this.cars.age(1000 / TICK_HZ);
+    this.stepCarFires();
+  }
+
+  /**
+   * Cars that are on fire: what it costs the driver, and what happens when the
+   * fuse runs out.
+   *
+   * **Split out of `stepCars` rather than folded into its last sweep**, because
+   * it is the one part of the car tick that can *remove* records and hurt people
+   * who are nowhere near a car -- and both of those are things a reader of
+   * `stepCars` should not have to find inside a clock update. It runs after
+   * `age`, so a car that reached the end of its fuse on this tick explodes on
+   * this tick rather than on the next one.
+   *
+   * O(burning cars), and burning cars are a handful: the early-out on the first
+   * line is a comparison per record and a room with nothing alight pays exactly
+   * that. `game/carfire.ts` is every rule this function applies.
+   */
+  private stepCarFires(): void {
+    if (this.cars.size === 0) return;
+    for (const car of this.cars.all()) {
+      if (!isBurning(car.burningMs)) continue;
+
+      // --- What sitting in it costs. `carfire.BURN_PIPS_PER_S`, and it is
+      // applied here rather than in `game/carfire.ts`'s own sweep because the
+      // driver is a `Participant` and that module has never known what one is.
+      //
+      // Server-side only, unlike the car's own burn: a player's health is never
+      // predicted anywhere in this project and a quarter of a pip a second is
+      // not the place to start. See `BURN_PIPS_PER_S`.
+      if (car.driverId !== 0) {
+        const driver = this.participants.get(car.driverId);
+        // Only somebody who is actually still in it, and only somebody still
+        // standing: a knocked-out driver has already been swept out of the car
+        // by `follow` and a body on the road does not keep taking fire damage.
+        if (driver !== undefined && driver.combat.drivingCar === car.id && driver.combat.phase !== 'ko') {
+          const c = driver.combat;
+          c.health = Math.max(0, c.health - BURN_PIPS_PER_S / TICK_HZ);
+          // `combat.applyHit`'s femto-pip clamp. A driver alive by 4e-16 draws a
+          // full pip and cannot be finished off by anything.
+          if (c.health < 1e-9) c.health = 0;
+          if (c.health <= 0 && c.phase !== 'ko') {
+            // Burnt to death at the wheel, which is a knockout with no attacker
+            // -- the same shape as drowning. `EVENT.HIT` with an attacker of 0
+            // is what every self-inflicted knockout on this wire already looks
+            // like, so the kill feed and the client both need no new case.
+            c.phase = 'ko';
+            c.koT = 0;
+            c.respawnT = KO_SECONDS;
+            this.events.push({ kind: EVENT.HIT, attacker: 0, victim: c.id, flags: EVENT_FLAG.KO, health: 0 });
+          }
+        }
+      }
+
+      if (!fuseExpired(car.burningMs)) continue;
+      this.explodeCar(car);
+    }
+  }
+
+  /**
+   * A burning car reaches the end of its fuse. **The authority for the bang.**
+   *
+   * Five things happen and the order matters in exactly one place -- the record
+   * is removed *before* the chain is applied, so a car cannot damage itself and
+   * cannot be found by its own blast:
+   *
+   *   1. the identity is **scorched**, which is the difference between this and
+   *      every other way a record ends. `CarField.recycleFarthest` hands an
+   *      identity back on purpose: the ambient car it was made from was only
+   *      suppressed and the street gets its Camry again. An exploded car must
+   *      not come back, and `CarField.scorch` is that distinction. See its
+   *      header -- without it the car you just blew up is standing in its
+   *      parking space, undamaged, in front of its own scorch mark.
+   *   2. the record goes, through the same `carRemovals` path a recycle uses, so
+   *      every client is told in the frame it already had to send.
+   *   3. **people** within `BLAST_M` take a graded hit and go over, including a
+   *      driver who was still inside -- the one ejection left in this project.
+   *      See `game/carfire.ts` section 4.
+   *   4. **the crowd**, up to `BLAST_PED_MAX` of them, through the same
+   *      `runDownPedestrian` a car uses. Reusing it rather than adding an export
+   *      to `game/pedestrians.ts` is deliberate: a body flattened by a blast and
+   *      a body flattened by a bumper should be the same body, announced through
+   *      the same `PedestrianHit`, so the crime and the ragdoll are one code
+   *      path. The "box" handed to it is the blast itself.
+   *   5. **other driven cars** within `CHAIN_M` take `CHAIN_DAMAGE` through
+   *      `CarField.damage`, which means the chain reaction needed no code at all
+   *      -- a car that was already broken catches fire on the same rule a wall
+   *      would have lit it with.
+   *
+   * ...and then the place goes out as a `TEAM_EVENT`, so every client near it
+   * draws the same flash, ring and scorch.
+   */
+  private explodeCar(car: DrivenCar): void {
+    const x = car.x;
+    const y = car.y;
+    const z = car.z;
+    const driverId = car.lastDriverId;
+
+    this.cars.scorch(car.carId);
+    if (this.cars.remove(car.id)) this.carRemovals.push(car.id);
+
+    // --- Players and bots. Plan distance, on the argument every radius test in
+    // this file uses: a blast is a thing that happens on a street, and grading
+    // it by the height difference as well would mean somebody on a balcony two
+    // metres up taking less than somebody standing beside them.
+    //
+    // The vertical gate is still there, and it is `TAKE_HEIGHT`'s -- the project's
+    // one answer to "the same piece of road". A car exploding on the Cahill
+    // Expressway does not knock over the queue on Alfred Street underneath it.
+    for (const victim of this.ordered) {
+      const c = victim.combat;
+      if (c.phase === 'ko') continue;
+      if (isAboard(c.aboard)) continue;
+      const feet = c.body.position.y - EYE_HEIGHT;
+      const dy = feet - y;
+      if (dy > TAKE_HEIGHT || dy < -TAKE_HEIGHT) continue;
+      const dx = c.body.position.x - x;
+      const dz = c.body.position.z - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > BLAST_M * BLAST_M) continue;
+      const d = Math.sqrt(d2);
+      // Straight up and outward for somebody standing exactly on the car, which
+      // is a real case (the driver) and is the only one with no direction in it.
+      const nx = d > 1e-4 ? dx / d : 0;
+      const nz = d > 1e-4 ? dz / d : 0;
+      const ko = applyBlastHit(c, blastPips(d), nx, nz);
+      // Credited to whoever last drove it, exactly as a run-over is credited to
+      // the driver rather than to nobody: a car somebody stole, wrecked and left
+      // burning outside a pub is a thing they did. `lastDriverId` and not
+      // `driverId`, because the driver has usually got out by now -- see
+      // `driving.DrivenCar.lastDriverId`, which exists for questions of this
+      // shape.
+      if (ko && driverId !== 0 && driverId !== c.id) this.creditKo(driverId, c.id);
+      this.events.push({
+        kind: EVENT.HIT,
+        attacker: driverId,
+        victim: c.id,
+        flags: ko ? EVENT_FLAG.KO : 0,
+        health: c.health,
+      });
+    }
+
+    // --- The crowd. See point 4 above for why this is `runDownPedestrian` in a
+    // loop rather than a new export: one flattened pedestrian is one
+    // `PedestrianHit`, and the function deliberately downs the nearest standing
+    // one per call.
+    if (this.world.peds !== null) {
+      const tick = trafficTick(Date.now());
+      const blastBox = {
+        x, y, z,
+        // A square box the blast's own size, in the frame `runDownPedestrian`
+        // expects. The heading is arbitrary because the box is square -- which
+        // is the point: an explosion has no direction, where a car does.
+        dx: 1, dz: 0,
+        halfLength: BLAST_M,
+        halfWidth: BLAST_M,
+        height: 3,
+      };
+      for (let i = 0; i < BLAST_PED_MAX; i++) {
+        if (runDownPedestrian(this.world.peds, blastBox, driverId, tick, this.pedBands, this.pedPose) === null) break;
+      }
+    }
+
+    // --- And the chain. Wider than the blast on people, because a car is a
+    // bigger target -- `carfire.CHAIN_M`. Through `CarField.damage`, so a car
+    // that was already broken catches fire on the ignition rule that funnel
+    // already applies, and the per-car ignition lock is what stops a cluster
+    // re-stamping each other's fuses. See `game/carfire.ts` section 5.
+    for (const other of this.cars.all()) {
+      const dy = other.y - y;
+      if (dy > TAKE_HEIGHT || dy < -TAKE_HEIGHT) continue;
+      const dx = other.x - x;
+      const dz = other.z - z;
+      if (dx * dx + dz * dz > CHAIN_M * CHAIN_M) continue;
+      const hit = this.cars.damage(other.id, CHAIN_DAMAGE);
+      if (hit !== null) this.carChanges.push(hit);
+    }
+
+    // --- The place, for everybody's renderer. `untilMs` is when the shockwave
+    // finishes, on `TEAM_EVENT_KIND.SLAM`'s convention -- the client derives the
+    // instant it *started* by subtracting the ring's own duration, so the wire's
+    // one time field means the same thing for all three kinds.
+    this.teamEvents.push({
+      kind: TEAM_EVENT_KIND.CARBOOM,
+      x, y, z,
+      untilMs: Date.now() + BOOM_RING_S * 1000,
+    });
   }
 
   /**

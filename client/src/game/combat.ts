@@ -633,6 +633,27 @@ export interface CombatantState {
    */
   carCrashDv: number;
   /**
+   * How **square** the impact `carCrashDv` describes was: 1 for driving into a
+   * wall head on, down to `driving.GLANCING_FLOOR` for scraping along one.
+   *
+   * The second half of the same one-tick outbox and it travels with it: written
+   * by `driving.stepCarSpeed` from the contact normal its nose probe already
+   * gets back out of `collision.resolve`, read by the car sweep as the second
+   * argument to `driving.crashDamage`, and put back to 1 by whoever zeroes
+   * `carCrashDv`.
+   *
+   * It is here rather than folded into the delta-v because the delta-v has a
+   * *second* consumer that must not be scaled: `main.ts` sizes the crash sound
+   * off it, and a glancing hit at 40 m/s is still a loud noise even though it is
+   * a cheap one. See `driving.crashDamage`'s header for the whole argument about
+   * why the glancing rule multiplies the damage rather than the speed.
+   *
+   * **1 and not 0 is the identity**, which is why every reset below writes 1: a
+   * zeroed head-on-ness is a game in which no crash ever costs anything, and it
+   * is the one failure of this field that renders perfectly.
+   */
+  carCrashHeadOn: number;
+  /**
    * Whether this combatant has found the tuning stall in Redfern this session.
    *
    * Per session and never persisted, on spec 12's terms. It is on the combatant
@@ -850,6 +871,7 @@ export function createCombatant(id: number, x = 0, z = 0): CombatantState {
     // waiting for the first car they get into to inherit a dead engine.
     carHealth: CAR_HEALTH_MAX,
     carCrashDv: 0,
+    carCrashHeadOn: 1,
     // On foot. See `CombatantState.aboard`: the record is allocated here once
     // and mutated forever after, never replaced.
     aboard: createAboardSlot(),
@@ -1053,6 +1075,8 @@ export function advance(
     // is not billed to a car they are no longer in. See `carHealth`/`carCrashDv`.
     c.carHealth = CAR_HEALTH_MAX;
     c.carCrashDv = 0;
+    // ...and its head-on-ness back to the identity. See `CombatantState.carCrashHeadOn`.
+    c.carCrashHeadOn = 1;
     ragdollStep(c, dt, world);
     // Look is left alone. A dead camera that will not turn reads as a crash.
     // Clamped here rather than trusted, because this is the one path that does
@@ -1613,6 +1637,8 @@ export function applyWorldDamage(
   // is not billed to a car they are no longer in. See `carHealth`/`carCrashDv`.
   c.carHealth = CAR_HEALTH_MAX;
   c.carCrashDv = 0;
+  // ...and its head-on-ness back to the identity. See `CombatantState.carCrashHeadOn`.
+  c.carCrashHeadOn = 1;
   return true;
 }
 
@@ -1750,6 +1776,8 @@ export function applyHit(
   // is not billed to a car they are no longer in. See `carHealth`/`carCrashDv`.
   victim.carHealth = CAR_HEALTH_MAX;
   victim.carCrashDv = 0;
+  // ...and its head-on-ness back to the identity. See `CombatantState.carCrashHeadOn`.
+  victim.carCrashHeadOn = 1;
 
   const ko = victim.health <= 0;
   if (ko) {
@@ -1840,6 +1868,8 @@ export function respawnAt(c: CombatantState, x: number, y: number, z: number, ya
   // is not billed to a car they are no longer in. See `carHealth`/`carCrashDv`.
   c.carHealth = CAR_HEALTH_MAX;
   c.carCrashDv = 0;
+  // ...and its head-on-ness back to the identity. See `CombatantState.carCrashHeadOn`.
+  c.carCrashHeadOn = 1;
   // Spec 8.3 says nothing about death, and the only defensible reading is that
   // a coffee does not survive a knockout. Keeping them would make dying with 40
   // seconds of Training left a *cheap* way to reposition; clearing them makes

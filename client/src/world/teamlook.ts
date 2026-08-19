@@ -116,6 +116,8 @@ import {
   MAX_RINGS,
   RING_ALPHA,
   RING_THICKNESS,
+  SLAM_RADIUS_M,
+  SLAM_SECONDS,
   TENT,
   TENT_RED,
   TENT_WHITE,
@@ -127,6 +129,23 @@ import {
   type Rgb,
 } from '../game/teamlook.ts';
 import { TEAM, TEAM_COLOUR, TEAM_NAME, type Team } from '../game/teams.ts';
+// --- WORKSTREAM Y: a car exploding. Only two numbers of it reach this file --
+// how wide the shockwave gets and how long it takes -- and both live with the
+// rest of the fire's rules so the ring cannot disagree with the blast it draws.
+// See `game/carfire.ts`.
+import { BLAST_M, BOOM_RING_S } from '../game/carfire.ts';
+
+/**
+ * The car-bomb shockwave's colour, as a hex on this class's own terms.
+ *
+ * The flames' orange (`world/carsmoke.FLAME_COLOUR`, which is a linear triple
+ * and cannot be handed to a function that takes hexes) so that the ring, the
+ * fire that produced it and the scorch it leaves are one visual event. Restated
+ * rather than imported because `world/carsmoke.ts` is a sibling renderer with no
+ * business being in this file's import graph, and because the two are in
+ * different colour spaces anyway.
+ */
+const BOOM_RING_HEX = 0xff6b14;
 import { verifyTeamView } from './teamview.ts';
 import type { WarmupPart } from './warmup.ts';
 
@@ -971,6 +990,36 @@ export class TeamRingField {
     this.push(x, y, z, radius, team, alpha);
   }
 
+  /**
+   * --- WORKSTREAM Y: a **car explosion's** shockwave, `age` seconds after it
+   * went off.
+   *
+   * `addSlam` with two things changed, and the brief asked for exactly that
+   * reuse: a ring is a ring, and the alternative is a second instanced set, a
+   * second material and a second pool for an effect that lasts half a second.
+   *
+   *   - **The clock and the reach.** `slamRing` is written against the mega's
+   *     0.4 s and 8 m, so a car bomb's slightly slower 0.55 s over
+   *     `carfire.BLAST_M` arrives by rescaling the age into the mega's frame and
+   *     the radius out of it. The *shape* -- eased out, fast at the start and
+   *     slowing into the edge, with the alpha falling linearly -- is the one
+   *     `slamRing`'s header argues for, and it is the right shape here for the
+   *     same reason: the damage has already been adjudicated, so a wave that
+   *     accelerated outward would look like it was still deciding.
+   *   - **The colour.** Not a team's, and not the neutral grey `main.ts` gives a
+   *     slam either. A car exploding is fire, so the ring is the flames' own
+   *     orange (`world/carsmoke.ts`' `FLAME_COLOUR`, restated here as a hex
+   *     because this class speaks in hexes) -- which also means a car bomb and a
+   *     mega slam are told apart at a glance rather than by their radius.
+   */
+  addBoom(x: number, y: number, z: number, age: number): void {
+    const { radius, alpha } = slamRing((age / BOOM_RING_S) * SLAM_SECONDS);
+    if (alpha <= 0.004) return;
+    const reach = (radius / SLAM_RADIUS_M) * BLAST_M;
+    if (reach <= 0.01) return;
+    this.pushColour(x, y, z, reach, BOOM_RING_HEX, alpha);
+  }
+
   /** Hand the frame's rings to the renderer. */
   end(): void {
     this.mesh.count = this.written;
@@ -989,13 +1038,24 @@ export class TeamRingField {
   }
 
   private push(x: number, y: number, z: number, radius: number, team: Team, alpha: number): void {
+    this.pushColour(x, y, z, radius, TEAM_COLOUR[team].hex, alpha);
+  }
+
+  /**
+   * The body of `push`, with the colour handed in rather than looked up.
+   *
+   * Split out by workstream Y, because a car explosion has no side: it is not a
+   * buff, nobody cast it, and `TEAM_COLOUR[TEAM.NONE]` is the neutral grey a
+   * *slam* is deliberately drawn in. Passing a hex is the smallest possible
+   * change that lets one pool serve both -- see `addBoom`.
+   */
+  private pushColour(x: number, y: number, z: number, radius: number, hex: number, alpha: number): void {
     if (this.written >= MAX_RINGS) {
       this.dropped++;
       return;
     }
-    const hex = TEAM_COLOUR[team].hex;
-    // The team colour scaled by the ring's brightness. See the class header on
-    // why the alpha rides here.
+    // The colour scaled by the ring's brightness. See the class header on why
+    // the alpha rides here.
     const linear = hexToLinear(hex);
     this.colour.setRGB(linear[0] * alpha * RING_GAIN, linear[1] * alpha * RING_GAIN, linear[2] * alpha * RING_GAIN);
     // Scaled in x and z only. A uniform scale would multiply the 5 cm lift by

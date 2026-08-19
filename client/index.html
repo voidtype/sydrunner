@@ -742,6 +742,21 @@
       #carhealth i { display: block; height: 100%; width: 100%; background: #9fc4e2; }
       #carhealth.dented i { background: #d6b260; }
       #carhealth.wrecked i { background: #f0a9a0; }
+      /* WORKSTREAM Y: and a fourth band, which is not a health band at all --
+         `carHealthClass(health, burning)` returns it whatever the number says.
+         A wreck standing at a kerb and a wreck that is going to be a crater in
+         four seconds are the same 0 hp and are not the same situation, and this
+         bar is the only thing in the cluster that can say which one you are
+         sitting in. The flames' own orange, so the bar, the fire on the bonnet
+         and the shockwave when it goes are one colour. It **pulses**, which is
+         the only animated thing in this interface and is deliberate: the pulse
+         is the interface saying *get out*, and the countdown itself is a chip
+         above it (`carfire.fireChip`) because a number inside a 3 px bar cannot
+         be read. Two per second, which is fast enough to be an alarm and slow
+         enough not to be a strobe. */
+      @keyframes carburn { 0%, 100% { opacity: 1; } 50% { opacity: .34; } }
+      #carhealth.burning i { background: #ff6b14; animation: carburn .5s ease-in-out infinite; }
+      @media (prefers-reduced-motion: reduce) { #carhealth.burning i { animation: none; } }
 
       /* The balance, at the top of the vitals cluster.
          Scales with `--vitals-scale` like everything else in here, one rung

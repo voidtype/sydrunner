@@ -70,6 +70,10 @@ import {
   type TrafficField,
 } from '../game/traffic.ts';
 import { CAR_HEALTH_MAX, DRIVE_TOP_SPEED, carIsSmoking, type CarField } from '../game/driving.ts';
+// --- WORKSTREAM Y: the fire. Three-free rules, on `game/driving.ts`' terms; what
+// this file does with them is two lines of pose and one argument to the plume.
+// See `game/carfire.ts`.
+import { BURN_SETTLE_M, createFireGrade, fireGrade, isBurning } from '../game/carfire.ts';
 import type { DrivenCarSource } from './cars.ts';
 import type { CarLights } from './nightlights.ts';
 import type { CarSmoke } from './carsmoke.ts';
@@ -160,6 +164,13 @@ export class DrivenCarView {
   camDip = 0;
 
   private readonly pose: CarPose = createCarPose();
+  /**
+   * The fire's grading for the car being posed. Filled inside `forEach` and read
+   * by whoever the visitor is, which is `update` -- the plume needs the flame
+   * intensity and nothing else does. One record, reused, because this runs twice
+   * a frame over every driven car in range.
+   */
+  private readonly fire = createFireGrade();
   private readonly brakePose: CarPose = createCarPose();
   private readonly driverScratch: DriverPose = { x: 0, y: 0, z: 0, yaw: 0 };
   /** Last frame's speed per driver, for the deceleration test. See `BRAKE_THRESHOLD`. */
@@ -219,7 +230,7 @@ export class DrivenCarView {
    * the visitor by reference, which is the same contract `forEachCarNear` has
    * and for the same reason.
    */
-  private forEach(visit: (pose: CarPose) => void): void {
+  private forEach(visit: (pose: CarPose, burn: number) => void): void {
     let n = 0;
     for (const car of this.field().all()) {
       // The range gate, before the pose. See the `near` constructor argument:
@@ -247,8 +258,32 @@ export class DrivenCarView {
         out.dx = -Math.sin(d.yaw);
         out.dz = -Math.cos(d.yaw);
       }
+      // --- WORKSTREAM Y: what a burning car looks like, and it is deliberately
+      // two lines rather than a second draw path.
+      //
+      // `damage` is forced to 1 and the body is dropped `BURN_SETTLE_M`, which
+      // between them are the whole of "charred and sitting on its rims": the box
+      // fleet, the model fleet and the headlights all grade off `damage`
+      // (`driving.damageGrade`), so pinning it at the write-off end paints the
+      // paint at `CRUMPLE_DARKEN`, folds the body and puts both lights out in
+      // one assignment, in all four systems at once, with no new material and no
+      // second material to compile. A burning car is *always* a write-off or a
+      // few hit points from one, so this is a rounding of the truth rather than
+      // a lie -- see `carfire.ignitesOnCrash`.
+      //
+      // The drop is not eased. A car that sank smoothly over a second would need
+      // per-car state in the renderer, which is exactly what `world/carsmoke.ts`'
+      // header refuses at length, and the sag happens on the frame the flames
+      // appear so there is nothing to notice.
+      let burn = 0;
+      if (isBurning(car.burningMs)) {
+        fireGrade(car.burningMs, this.fire);
+        burn = this.fire.flame;
+        out.damage = 1;
+        out.y -= BURN_SETTLE_M;
+      }
       n++;
-      visit(out);
+      visit(out, burn);
     }
     this.drawn = n;
   }
@@ -289,7 +324,7 @@ export class DrivenCarView {
     lights.beginBrakes();
     if (smoke !== null) smoke.begin(dt, cameraX, cameraY, cameraZ);
     const live = new Set<number>();
-    this.forEach((pose) => {
+    this.forEach((pose, burn) => {
       // The identity is the source car's -- see `drivenCarPose` -- which is what
       // keys this map, and is stable for the life of the record.
       live.add(pose.identity);
@@ -298,7 +333,12 @@ export class DrivenCarView {
       // driven car: `CarSmoke.add` grades the pose through `driving.damageGrade`
       // and returns immediately for anything that is not smoking, so the
       // threshold lives in one place rather than here as well.
-      if (smoke !== null) smoke.add(pose);
+      // WORKSTREAM Y: `burn` is 0 for everything that is not alight, which is
+      // every car in Sydney bar the one somebody has just finished off, and
+      // `CarSmoke.add` treats it exactly as it treats the damage grade -- the
+      // threshold lives in one place and a caller that hands over every driven
+      // car gets flames on the one that has them.
+      if (smoke !== null) smoke.add(pose, burn);
       const was = this.lastSpeed.get(pose.identity);
       // `pose.speed` is a magnitude, which is exactly what the deceleration test
       // wants: shedding speed reads the same whichever way the car is pointing.
@@ -527,16 +567,29 @@ export function carHealthWidth(health: number): string {
 }
 
 /**
- * Which band the bar is in, as a class name: `''`, `'dented'` or `'wrecked'`.
+ * Which band the bar is in, as a class name: `''`, `'dented'`, `'wrecked'` or
+ * `'burning'`.
  *
- * Three names rather than a colour ramp, because the HUD in this project is
- * "four rectangles and a dot" (see `client/index.html`) and a continuously
- * interpolated bar would be the only gradient in it. The three names are the
+ * Names rather than a colour ramp, because the HUD in this project is "four
+ * rectangles and a dot" (see `client/index.html`) and a continuously
+ * interpolated bar would be the only gradient in it. The first three are the
  * three bands `game/driving.ts` already defines, so the bar changes colour on
  * exactly the health at which the car starts to smoke -- which is the moment the
  * *behaviour* changes, and is therefore the only moment worth marking.
+ *
+ * **`burning` outranks all three and is not a health band at all**, which is why
+ * it arrives as a second argument rather than being derived from the number. A
+ * wreck standing at a kerb and a wreck that is going to be a crater in four
+ * seconds are the same 0 hp and are not remotely the same situation, and the bar
+ * is the only thing on the HUD that can say which one you are sitting in. The
+ * class pulses in `index.html`; the countdown is a chip above it (see
+ * `carfire.fireChip`), because a number inside a 3 px bar is not readable.
+ *
+ * Defaulted to false so every existing caller -- and `verifyDrivenCars`' own
+ * band assertions -- keeps meaning what it always meant.
  */
-export function carHealthClass(health: number): string {
+export function carHealthClass(health: number, burning = false): string {
+  if (burning) return 'burning';
   if (health <= 0) return 'wrecked';
   if (carIsSmoking(health)) return 'dented';
   return '';
@@ -598,6 +651,23 @@ export function verifyDrivenCars(): string[] {
   }
   if (!carIsSmoking(30) || carHealthClass(30) !== 'dented') {
     failures.push('A smoking car\'s bar is not in the dented band. The two thresholds have drifted apart.');
+  }
+  // --- WORKSTREAM Y: the fourth band, which outranks the other three.
+  //
+  // The failure this catches is the one that renders: a burning car's bar
+  // sitting in the plain blue band because the health has not fallen yet, which
+  // is the `IGNITE_CRASH_HP` ignition -- a car on 35 hp that has just caught
+  // fire. That player has four seconds and no indication of it.
+  if (carHealthClass(0, true) !== 'burning') failures.push('A burning write-off\'s bar is not in the burning band.');
+  if (carHealthClass(35, true) !== 'burning') {
+    failures.push('A car on 35 hp that caught fire is drawn in the dented band. The fire outranks the health.');
+  }
+  if (carHealthClass(CAR_HEALTH_MAX, true) !== 'burning') {
+    failures.push('A full-health car that is somehow alight is drawn in the plain band.');
+  }
+  // ...and it is off by default, or every car in the city is on fire.
+  if (carHealthClass(CAR_HEALTH_MAX) === 'burning' || carHealthClass(0) === 'burning') {
+    failures.push('A car that is not burning was drawn in the burning band.');
   }
 
   // --- The horn. Nothing here needs a `TrafficField`, which is the point of

@@ -53,9 +53,36 @@
  * seen through, and the write-off variant is nearly black -- which against a
  * sunlit Sydney sky (Y' 247, `world/contact.ts` measured it) is the highest
  * contrast this renderer can produce without a second material.
+ *
+ * ---------------------------------------------------------------------------
+ * AND WHY THE FLAMES *ARE* A SECOND MATERIAL, WHEN THE SOOT IS NOT.
+ *
+ * `add` below accepts one visible compromise -- the last written-off car in a
+ * frame decides the plume colour for all of them -- on the grounds that a second
+ * WebGPU pipeline compiled at the moment somebody writes a car off is a hitch on
+ * a frame the player is watching. The fire (workstream Y) does not get the same
+ * answer, and the difference is the *blend*.
+ *
+ * Smoke is an alpha blend of a dark colour: grey and soot are two points on one
+ * ramp and one material can be walked between them. A flame is **additive
+ * light**, which is the opposite operation -- `world/bike.buildBikeGlow`'s whole
+ * argument -- and there is no colour you can put in an alpha-blended material
+ * that reads as fire against a sunlit Sydney sky. So there is a second
+ * `InstancedMesh` with an additive orange material, built in the same
+ * constructor and therefore reached by `world/warmup.ts`' scene walk before the
+ * first frame, which is what makes it free at the moment it is first needed.
+ *
+ * Additive is also the reason there is no point light in this feature. The brief
+ * asked for "a flickering point light at night"; a real light in this renderer
+ * is a per-car cost and a budget negotiation with `world/nightlights.ts`, and an
+ * additive quad is *already* a thing that is a tint at noon and a glow at dusk
+ * with no day/night term anywhere. That is the lime bike marker's exact
+ * argument, applied to a fire. What is genuinely lost is that a burning car does
+ * not light the wall beside it, and that is a thing only an eye can judge.
  */
 
 import {
+  AdditiveBlending,
   BufferAttribute,
   BufferGeometry,
   DoubleSide,
@@ -72,6 +99,10 @@ import { carHash, type CarPose } from '../game/traffic.ts';
 // the three-free rules file, so the four systems that draw a damaged car cannot
 // disagree about what "smoking" means. See `game/driving.damageGrade`.
 import { SMOKE_RATE_DEAD, createDamageGrade, damageGrade } from '../game/driving.ts';
+// --- WORKSTREAM Y: how thick a burning bonnet smokes. The flame *shape* is this
+// file's; the rate is the rules', so the plume, the wreck's pose and the crackle
+// cannot disagree about how far along a fire is. See `game/carfire.ts`.
+import { BURN_SMOKE_RATE } from '../game/carfire.ts';
 
 /**
  * How many puffs stand in one car's plume.
@@ -123,6 +154,43 @@ const PUFF_ALPHA = 0.34;
  */
 const VENT_FORWARD = 0.72;
 const VENT_HEIGHT = 0.9;
+
+/**
+ * How many flame tongues lick one burning bonnet.
+ *
+ * Eight against the plume's twelve, and fewer on purpose: a flame is bright and
+ * short where a puff is faint and tall, so eight overlapping additive quads
+ * inside a metre read as a fire where eight faint ones would read as a smudge.
+ * At the cap that is 192 instances in one extra draw call.
+ */
+const FLAMES_PER_CAR = 8;
+
+/** How high a tongue licks, metres, and how far it wanders doing it. A bonnet fire. */
+const FLAME_RISE = 1.1;
+const FLAME_DRIFT = 0.35;
+
+/**
+ * Its size at birth and at the top of its rise, metres.
+ *
+ * **Shrinking, where a puff of smoke grows.** That is the whole difference
+ * between the two effects and it is physics rather than taste: smoke expands as
+ * it cools and a flame narrows as it is consumed. Getting it the wrong way round
+ * makes a fire look like brown smoke lit orange.
+ */
+const FLAME_SIZE_FROM = 0.62;
+const FLAME_SIZE_TO = 0.16;
+
+/** How long one tongue takes to rise and go out, seconds. Fast: fire is not smoke. */
+const FLAME_LIFE = 0.45;
+
+/**
+ * Peak brightness of one tongue. Additive, so these stack -- eight at 0.5 is a
+ * white core with orange edges, which is what a fire looks like.
+ */
+const FLAME_ALPHA = 0.5;
+
+/** Orange, linear. Hot enough to bloom, not so hot it reads as a torch. */
+const FLAME_COLOUR: [number, number, number] = [1.0, 0.42, 0.08];
 
 /** Grey, for a car that is merely broken. Linear, and light enough to see sky through. */
 const SMOKE_GREY: [number, number, number] = [0.42, 0.42, 0.44];
@@ -176,12 +244,23 @@ function unit(h: number): number {
  */
 export class CarSmoke {
   readonly mesh: InstancedMesh;
+  /**
+   * WORKSTREAM Y: the flames, as a second additive set. Added to the scene by
+   * the same caller that adds `mesh` -- one more line in `main.ts` and one more
+   * draw call. See the header for why this is a second material where the soot
+   * is not.
+   */
+  readonly flames: InstancedMesh;
   /** Cars smoking last frame. The dev overlay, and `verifyCarSmoke`. */
   drawn = 0;
+  /** ...and cars *burning* last frame, which is a subset of them. */
+  alight = 0;
 
   private readonly geometry: BufferGeometry;
   private readonly material: MeshBasicNodeMaterial;
+  private readonly flameMaterial: MeshBasicNodeMaterial;
   private count = 0;
+  private flameCount = 0;
   /** Seconds since the rig was built. The plume's whole clock. */
   private clock = 0;
   /** Which way the camera is looking, for the billboard. See the header. */
@@ -224,6 +303,33 @@ export class CarSmoke {
     // carries the whole paragraph about why an invisible set is skipped by
     // three's `_projectObject` in `compileAsync` exactly as it is in `render`.
     this.mesh.visible = true;
+
+    // --- The flames. The same quad and the same billboard, additively blended
+    // and with no fog: fire is light, and a light source that faded into the
+    // distance haze the way its own smoke does would read as being *behind*
+    // the smoke. `world/bike.buildBikeGlow` makes the same two calls for the
+    // same reason.
+    const flame = new MeshBasicNodeMaterial();
+    flame.name = 'car_flame';
+    flame.transparent = true;
+    flame.depthWrite = false;
+    flame.blending = AdditiveBlending;
+    flame.side = DoubleSide;
+    flame.fog = false;
+    flame.toneMapped = true;
+    flame.opacity = FLAME_ALPHA;
+    flame.color.setRGB(FLAME_COLOUR[0], FLAME_COLOUR[1], FLAME_COLOUR[2]);
+    this.flameMaterial = flame;
+    this.flames = new InstancedMesh(this.geometry, flame, MAX_SMOKING_CARS * FLAMES_PER_CAR);
+    this.flames.name = 'car_flames';
+    this.flames.count = 0;
+    this.flames.frustumCulled = false;
+    this.flames.castShadow = false;
+    this.flames.receiveShadow = false;
+    // Over the world's opaque geometry and under the smoke, so a tongue is
+    // drawn *inside* the plume rising off it rather than over the top of it.
+    this.flames.renderOrder = 5;
+    this.flames.visible = true;
   }
 
   /**
@@ -236,6 +342,7 @@ export class CarSmoke {
   begin(dt: number, cameraX: number, cameraY: number, cameraZ: number): void {
     this.clock += dt;
     this.count = 0;
+    this.flameCount = 0;
     this.toCamera.set(cameraX, cameraY, cameraZ);
   }
 
@@ -250,13 +357,21 @@ export class CarSmoke {
    * caller that asked for a plume on an undamaged car gets nothing and costs one
    * comparison.
    */
-  add(pose: CarPose): void {
+  add(pose: CarPose, burn = 0): void {
     // **Before the counter**, which is the one ordering that matters here: both
     // the count and the instance block are packed front to back, and a car that
     // took the early return after claiming a slot would leave twelve unwritten
     // instances inside `mesh.count` -- last frame's matrices, which is a plume
     // hanging over a street where a wreck used to be.
-    const rate = damageGrade(pose.damage, _grade).smoke;
+    //
+    // WORKSTREAM Y: a burning car smokes at `carfire.BURN_SMOKE_RATE` rather
+    // than at the damage grade's rate, and the choice is a `Math.max` rather
+    // than a branch so that a fire can only ever make a plume *thicker*. A fire
+    // that thinned the smoke on a car that was already a write-off would read as
+    // the wreck recovering, which is `verifyDamageGrade`'s monotonicity argument
+    // arriving from a third direction.
+    const graded = damageGrade(pose.damage, _grade).smoke;
+    const rate = burn > 0 && BURN_SMOKE_RATE > graded ? BURN_SMOKE_RATE : graded;
     if (!(rate > 0)) return;
     if (this.count >= MAX_SMOKING_CARS) return;
     const car = this.count;
@@ -314,6 +429,49 @@ export class CarSmoke {
       this.mesh.setMatrixAt(car * PUFFS_PER_CAR + k, _matrix);
     }
 
+    // --- WORKSTREAM Y: the flames, on the plume's own closed form and at the
+    // same vent, with three numbers changed.
+    //
+    // The loop is deliberately the same shape rather than a second effect: a
+    // tongue is a puff that is faster (`FLAME_LIFE` against `PUFF_LIFE`),
+    // shorter (`FLAME_RISE`) and *narrows* as it rises instead of spreading --
+    // see `FLAME_SIZE_FROM`. Everything else -- the per-instance phase off the
+    // car's identity, the billboard quaternion, the "no pop" property of a
+    // closed form -- is inherited, which is what makes a burning car's fire
+    // resume where it would have been when the car comes back into range.
+    //
+    // The seed is offset from the smoke's `0x5307` so the tongues are not in
+    // lockstep with the puffs above them.
+    if (burn > 0 && this.flameCount < MAX_SMOKING_CARS) {
+      const flameSlot = this.flameCount;
+      this.flameCount = flameSlot + 1;
+      for (let k = 0; k < FLAMES_PER_CAR; k++) {
+        const seed = carHash(pose.identity, 0x7f1a + k);
+        const phase = unit(seed);
+        const t = (this.clock / FLAME_LIFE + phase) % 1;
+        const dirX = unit(carHash(seed, 1)) * 2 - 1;
+        const dirZ = unit(carHash(seed, 2)) * 2 - 1;
+        // Spread across the bonnet rather than all out of one point, because a
+        // fire is a surface burning and a plume is a hole venting.
+        const spreadX = (unit(carHash(seed, 3)) * 2 - 1) * pose.halfWidth * 0.7;
+        const spreadZ = (unit(carHash(seed, 4)) * 2 - 1) * pose.halfLength * 0.25;
+        const size = FLAME_SIZE_FROM + (FLAME_SIZE_TO - FLAME_SIZE_FROM) * t;
+        _position.set(
+          vx + spreadX + dirX * FLAME_DRIFT * t,
+          vy + t * FLAME_RISE,
+          vz + spreadZ + dirZ * FLAME_DRIFT * t,
+        );
+        // Fades in fast and out slower, which is the opposite of the smoke's
+        // gentle 10% ramp: a tongue *appears*. Scaled by `burn`, so the fire
+        // comes up over `carfire.FLAME_RISE_S` rather than switching on -- the
+        // artefact that makes every instanced effect look like a decal.
+        const fade = t < 0.05 ? t / 0.05 : 1 - (t - 0.05) / 0.95;
+        _scale.setScalar(size * fade * burn);
+        _matrix.compose(_position, _quaternion, _scale);
+        this.flames.setMatrixAt(flameSlot * FLAMES_PER_CAR + k, _matrix);
+      }
+    }
+
     // The soot. One material for the whole rig, so the *last* written-off car in
     // the frame decides the colour for all of them -- which is visibly wrong
     // only when a grey plume and a black one are in shot at once, and which
@@ -338,6 +496,14 @@ export class CarSmoke {
     if (n > 0 || this.mesh.count > 0) this.mesh.instanceMatrix.needsUpdate = true;
     this.mesh.count = n;
     this.drawn = this.count;
+    // The flames, on the plume's own rule: the count is set from what was
+    // written this frame, so a frame with nothing alight leaves no stale tongues
+    // burning over an empty parking space. That is the leak `verifyCarSmoke`
+    // exists to catch, one effect over.
+    const f = this.flameCount * FLAMES_PER_CAR;
+    if (f > 0 || this.flames.count > 0) this.flames.instanceMatrix.needsUpdate = true;
+    this.flames.count = f;
+    this.alight = this.flameCount;
     if (!this.sooty) {
       this.material.color.setRGB(SMOKE_GREY[0], SMOKE_GREY[1], SMOKE_GREY[2]);
     }
@@ -346,8 +512,10 @@ export class CarSmoke {
 
   dispose(): void {
     this.mesh.dispose();
+    this.flames.dispose();
     this.geometry.dispose();
     this.material.dispose();
+    this.flameMaterial.dispose();
   }
 }
 
@@ -531,6 +699,91 @@ export function verifyCarSmoke(): string[] {
     if (smoke.mesh.count > MAX_SMOKING_CARS * PUFFS_PER_CAR) {
       failures.push(`The instance count overran its buffer: ${smoke.mesh.count}.`);
     }
+  }
+
+  // --- WORKSTREAM Y: the flames. Same class of failure as the plume's and the
+  //     same shape of check, because it is the same closed form with three
+  //     numbers changed.
+  //
+  //   - **A fire nobody can see.** A `burn` of 0 reaching the loop, or a scale
+  //     that collapses, and the symptom is a car that explodes out of a clear
+  //     sky with no warning at all.
+  //   - **Flames on a car that is not on fire.** The mirror, and much worse: the
+  //     plume is handed *every* driven car in range, so a burn argument that was
+  //     ignored would set the whole city alight.
+  //   - **Tongues left burning over an empty street.** `flames.count` left high,
+  //     which is the leak the plume's own check exists for.
+  {
+    const fresh = new CarSmoke();
+    fresh.begin(0, 0, 10, 0);
+    fresh.add(pose(0xb00, 0, 1), 1);
+    fresh.end();
+    if (fresh.alight !== 1) failures.push(`One burning car reported ${fresh.alight} fires.`);
+    if (fresh.flames.count !== FLAMES_PER_CAR) {
+      failures.push(`One fire drew ${fresh.flames.count} tongues against ${FLAMES_PER_CAR}.`);
+    }
+    // A write-off that is *not* alight smokes and does not burn, which is the
+    // difference between a wreck at a kerb and a wreck about to be a crater.
+    fresh.begin(0, 0, 10, 0);
+    fresh.add(pose(0xb00, 0, 1));
+    fresh.end();
+    if (fresh.alight !== 0) failures.push('A write-off that is not on fire drew flames.');
+    if (fresh.flames.count !== 0) {
+      failures.push(`A frame with nothing alight left ${fresh.flames.count} tongues drawn over the street.`);
+    }
+    // The tongues have real size and are spread up the bonnet rather than
+    // stacked at one point, which is the "it is a fire and not a blob" property.
+    fresh.begin(0, 0, 10, 0);
+    fresh.add(pose(0xb01, 0, 1), 1);
+    fresh.end();
+    const m = new Matrix4();
+    const heights: number[] = [];
+    let visible = 0;
+    for (let i = 0; i < FLAMES_PER_CAR; i++) {
+      fresh.flames.getMatrixAt(i, m);
+      heights.push(m.elements[13]);
+      if (Math.sqrt(m.elements[0] ** 2 + m.elements[1] ** 2 + m.elements[2] ** 2) > 0.02) visible++;
+    }
+    if (visible < FLAMES_PER_CAR / 2) {
+      failures.push(`Only ${visible} of ${FLAMES_PER_CAR} tongues had any size; the fire is invisible.`);
+    }
+    if (Math.max(...heights) - Math.min(...heights) < FLAME_RISE * 0.25) {
+      failures.push('The flame tongues are all at one height; that is a disc, not a fire.');
+    }
+    // A fire coming up (`carfire.fireGrade`'s ramp) is smaller than an
+    // established one. This is the whole of "it does not switch on".
+    const early = new CarSmoke();
+    early.begin(0, 0, 10, 0);
+    early.add(pose(0xb02, 0, 1), 0.1);
+    early.end();
+    const late = new CarSmoke();
+    late.begin(0, 0, 10, 0);
+    late.add(pose(0xb02, 0, 1), 1);
+    late.end();
+    const a = new Matrix4();
+    const b = new Matrix4();
+    early.flames.getMatrixAt(0, a);
+    late.flames.getMatrixAt(0, b);
+    const scaleOf = (mm: Matrix4): number => Math.sqrt(mm.elements[0] ** 2 + mm.elements[1] ** 2 + mm.elements[2] ** 2);
+    if (!(scaleOf(a) < scaleOf(b))) {
+      failures.push(`A fire that has just caught (${scaleOf(a).toFixed(3)}) is not smaller than an established one (${scaleOf(b).toFixed(3)}).`);
+    }
+    // And a burning car smokes *thicker*, never thinner -- the `Math.max` in
+    // `add`. A fire that thinned the plume would read as the wreck recovering.
+    if (!(BURN_SMOKE_RATE > SMOKE_RATE_DEAD)) {
+      failures.push(`A burning car smokes at ${BURN_SMOKE_RATE} against a write-off's ${SMOKE_RATE_DEAD}.`);
+    }
+    // The cap holds on the flames as well, so a car park on fire cannot overrun
+    // the second instance buffer either.
+    fresh.begin(0, 0, 10, 0);
+    for (let i = 0; i < MAX_SMOKING_CARS * 3; i++) fresh.add(pose(i + 1, i * 5, 1), 1);
+    fresh.end();
+    if (fresh.flames.count > MAX_SMOKING_CARS * FLAMES_PER_CAR) {
+      failures.push(`The flame instance count overran its buffer: ${fresh.flames.count}.`);
+    }
+    fresh.dispose();
+    early.dispose();
+    late.dispose();
   }
 
   smoke.dispose();

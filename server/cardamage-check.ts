@@ -49,8 +49,22 @@ import {
   CRASH_DAMAGE_MAX,
   DRIVE_ACCELERATION,
   DRIVE_TOP_SPEED,
+  NOSE_SHED,
+  crashDamage,
   type DrivenCar,
 } from '../client/src/game/driving.ts';
+// --- WORKSTREAM Y: the fire. Every number the sections below assert about
+// burning, exploding and chaining comes from here rather than from a literal, so
+// a retune moves the check with the feature. See `game/carfire.ts`.
+import {
+  BLAST_M,
+  CHAIN_DAMAGE,
+  CHAIN_M,
+  FUSE_S,
+  SCORCH_S,
+  fuseRemainingS,
+  isBurning,
+} from '../client/src/game/carfire.ts';
 
 /**
  * How far down the road the wall is, metres.
@@ -188,8 +202,78 @@ function run(): string[] {
         `More than the cap means the 500 ms cooldown is not swallowing the grind after the impact.`,
     );
   }
-  if (car.health > CAR_SMOKING_HEALTH) {
-    failures.push(`The worst possible single crash left the car on ${car.health}, above the smoke threshold.`);
+  // **Above** the smoke threshold, which is the retune arriving here and is the
+  // opposite of what this line used to demand. `CRASH_DAMAGE_MAX` was chosen so
+  // one maximal crash landed a car exactly on 40; it is 45 now and lands it on
+  // 55, still driving properly, with the dent as the warning. See that constant.
+  if (car.health <= CAR_SMOKING_HEALTH) {
+    failures.push(
+      `The worst possible single crash left the car on ${car.health}, at or under the ${CAR_SMOKING_HEALTH} ` +
+        `smoke threshold. Since the retune the first heavy wall is a dent and not a change of handling.`,
+    );
+  }
+
+  // === 1b. **A 15 m/s wall**, which is the retune's headline number arriving
+  //         through the whole tick rather than through `crashDamage` alone.
+  //
+  // Two numbers, and the gap between them is worth stating because it is the
+  // one place the brief's arithmetic and the simulation's disagree.
+  // `crashDamage(15)` is 32 -- that is the *curve*, and `verifyDriving` asserts
+  // it. What a car doing 15 m/s into a wall actually reports is smaller, because
+  // the nose probe sheds `NOSE_SHED` of the speed in the tick it fires and the
+  // delta-v is what it shed: `crashDamage(15 x 0.66)` is about 16. Both are
+  // right; they are answers to different questions ("what does a 15 m/s impact
+  // cost" against "what does driving at 15 m/s into a wall cost"), and this
+  // section measures the second against a model of the first rather than against
+  // a literal, so a change to either constant moves the check with the feature.
+  {
+    const sim15 = new Simulation(emptyWorld());
+    const p15 = sim15.join(0, null);
+    const out15: TickOutput = { tick: 0, events: [], snapshot: null };
+    // Enough road to reach 15 m/s and no more. The wall's near face is at
+    // `-RUN_UP + 2` and the probe reaches `NOSE_REACH` past the driver, so the
+    // impact happens 3.8 m short of the prism's centre line.
+    const z0 = -RUN_UP + 3.8 + (15 * 15) / (2 * DRIVE_ACCELERATION);
+    p15.combat.body.position.set(0, EYE_HEIGHT, z0);
+    p15.combat.body.yaw = 0;
+    p15.input.yaw = 0;
+    p15.history.seed(sim15.tick, 0, EYE_HEIGHT, z0, 0);
+    const car15 = sim15.cars.take(
+      { identity: 0xf1feed, body: 0, colour: 0, x: 0, y: 0, z: z0, yaw: 0, parked: true },
+      p15.combat.id,
+    )!;
+    p15.combat.drivingCar = car15.id;
+    p15.input.forward = 1;
+    let atImpact = 0;
+    for (let i = 0; i < 900; i++) {
+      atImpact = p15.combat.carSpeed;
+      sim15.step(out15);
+      if (car15.health < CAR_HEALTH_MAX) break;
+    }
+    p15.input.forward = 0;
+    const cost15 = CAR_HEALTH_MAX - car15.health;
+    const want = crashDamage(atImpact * NOSE_SHED);
+    console.log(
+      `  run 1b: hit the wall at ${atImpact.toFixed(2)} m/s, cost ${cost15.toFixed(2)} hp ` +
+        `(model ${want.toFixed(2)}; the pure 15 m/s curve is ${crashDamage(15).toFixed(1)})`,
+    );
+    if (Math.abs(atImpact - 15) > 1.5) {
+      failures.push(`The 15 m/s section hit the wall at ${atImpact.toFixed(2)} m/s; the run-up is wrong, not the damage.`);
+    }
+    if (Math.abs(cost15 - want) > 1.5) {
+      failures.push(
+        `A ${atImpact.toFixed(1)} m/s wall cost ${cost15.toFixed(2)} hp against the ${want.toFixed(2)} the curve ` +
+          `predicts for a ${NOSE_SHED.toFixed(2)} shed. Either the probe or the curve has moved.`,
+      );
+    }
+    if (Math.abs(crashDamage(15) - 32) > 1e-9) {
+      failures.push(`The retuned curve puts a square 15 m/s impact at ${crashDamage(15)} hp, not 32.`);
+    }
+    // And it is a long way short of what the old curve charged for the same
+    // drive -- `(9.9 - 3) x 6` was 41. This is the complaint, measured.
+    if (!(cost15 < 25)) {
+      failures.push(`Driving into a wall at 15 m/s still costs ${cost15.toFixed(1)} hp. "The cars are too weak" is not fixed.`);
+    }
   }
 
   // === 2. Back up and do it again, until it is finished. A damaged car is
@@ -198,6 +282,8 @@ function run(): string[] {
   //        first heavy wall is a warning and the car gets progressively harder
   //        to finish off rather than more fragile.
   let runs = 1;
+  /** Has the smoking-handling assertion had its run yet? See below. */
+  let measuredSmoking = false;
   while (car.health > 0 && runs < 8) {
     place(0);
     const again = chargeTheWall(1800);
@@ -206,10 +292,17 @@ function run(): string[] {
       `  run ${runs}: top ${again.top.toFixed(2)} m/s, health ${again.healthBefore.toFixed(1)} -> ` +
         `${car.health.toFixed(1)}  (cost ${(again.healthBefore - car.health).toFixed(1)})`,
     );
-    if (runs === 2) {
-      // The degraded handling, measured on the first run after the smoke starts.
-      // This is the number that proves the health mirror reaches the integrator
-      // through the whole server tick rather than only in a unit check.
+    // The degraded handling, measured on **the first run that starts under the
+    // smoke threshold** rather than on run 2.
+    //
+    // It used to be run 2 unconditionally, and the retune broke that: the worst
+    // single crash is 45 now rather than 60, so a healthy car comes out of its
+    // first wall on 55 -- above the line -- and reaches the full top speed again
+    // on its second. Keying on the health the run *began* with is what makes
+    // this the check it was written to be (does the mirror reach the integrator)
+    // rather than a check on where the constants happen to land.
+    if (again.healthBefore <= CAR_SMOKING_HEALTH && !measuredSmoking) {
+      measuredSmoking = true;
       if (Math.abs(again.top - DRIVE_TOP_SPEED * CAR_SMOKING_SCALE) > 0.5) {
         failures.push(
           `A smoking car reached ${again.top.toFixed(2)} m/s against the ` +
@@ -219,9 +312,22 @@ function run(): string[] {
       }
     }
   }
-  console.log(`  written off after ${runs} runs at the wall, final health ${car.health}`);
+  if (!measuredSmoking) {
+    failures.push('No run at the wall ever started under the smoke threshold, so the degraded handling was never measured.');
+  }
+  console.log(
+    `  written off after ${runs} runs at the wall, final health ${car.health}, ` +
+      `burning ${isBurning(car.burningMs)} (${fuseRemainingS(car.burningMs).toFixed(2)} s of fuse left)`,
+  );
   if (car.health !== 0) failures.push(`Eight runs at a wall left the car on ${car.health}, not written off.`);
   if (runs < 2) failures.push('One crash wrote the car off. The first heavy wall is meant to be a warning.');
+  // **And it caught fire.** The owner's second sentence, measured through the
+  // whole tick: the wall filled `carCrashDv`, `stepCars` drained it,
+  // `crashDamage` sized it, `CarField.damage` applied it and `ignitesOnCrash`
+  // read the result. Every write-off burns -- see `game/carfire.ts`.
+  if (!isBurning(car.burningMs)) {
+    failures.push('A car driven into a wall until it was written off did not catch fire. Every write-off burns.');
+  }
 
   // === 3. The wreck. The engine is dead and the record stays.
   place(20);
@@ -251,21 +357,225 @@ function run(): string[] {
     failures.push('The wreck stopped suppressing its ambient copy, so the timetable now runs a car through it.');
   }
 
-  // === 4. And the record that goes on the wire carries the byte.
+  // === 4. And the record that goes on the wire carries both bytes.
   const wire = sim.carRecords().find((r) => r.id === car.id);
   console.log(`  wire record: ${JSON.stringify(wire)}`);
   if (!wire) failures.push('The written-off car is not in `carRecords()`.');
-  else if (wire.health !== 0) failures.push(`The wire record says health ${wire.health}, not 0.`);
+  else {
+    if (wire.health !== 0) failures.push(`The wire record says health ${wire.health}, not 0.`);
+    // WORKSTREAM Y: and the fuse, which is how every other client in the room
+    // learns there is about to be a hole in the street. Zero here is a car that
+    // burns on the authority and stands quietly on everybody's screen until it
+    // silently disappears.
+    if (!(wire.fuse !== undefined && wire.fuse > 0)) {
+      failures.push(`The wire record's fuse is ${wire.fuse}; the car is on fire and every client has to be told.`);
+    }
+  }
 
-  // === 5. Nothing expires. A minute of ticks with the player four kilometres
+  // === 5. **It explodes.** Let the fuse run out through the real tick, and the
+  //        record is gone -- but the identity is not handed back.
+  //
+  // The distinction in that last clause is the whole of `CarField.scorch`:
+  // `recycleFarthest` drops a record precisely so the ambient car comes back,
+  // and an exploded car must not. Without it, the Camry you just blew up is
+  // standing in its parking space again on the next frame, undamaged.
+  {
+    const identity = car.carId;
+    const wasFuse = fuseRemainingS(car.burningMs);
+    for (let i = 0; i < Math.ceil(FUSE_S * 60) + 30 && sim.cars.get(car.id) !== undefined; i++) sim.step(out);
+    console.log(
+      `  after the ${wasFuse.toFixed(1)} s fuse: record ${sim.cars.get(car.id) ? 'STILL THERE' : 'gone'}, ` +
+        `identity still suppressed ${sim.cars.suppressed(identity)}`,
+    );
+    if (sim.cars.get(car.id) !== undefined) failures.push(`A burning car was still there ${FUSE_S} s after it caught. The fuse never ran out.`);
+    if (!sim.cars.suppressed(identity)) {
+      failures.push('An exploded car handed its identity back. The burnt car is standing at the kerb again.');
+    }
+    // ...and it is still suppressed a good deal later, because the scorch is
+    // permanent and not a second clock somebody has to remember to wind.
+    for (let i = 0; i < SCORCH_S * 60; i++) sim.step(out);
+    if (!sim.cars.suppressed(identity)) {
+      failures.push(`An exploded car's identity came back ${SCORCH_S} s later. The scorch ledger is not permanent.`);
+    }
+  }
+
+  // === 6. Nothing expires. A minute of ticks with the player four kilometres
   //        away -- which under the old five-minute clock would have started the
   //        countdown, and under the budget does nothing at all.
+  //
+  // A **fresh, undamaged** car, which it did not used to need: the wreck this
+  // section used to reuse is a crater now, and a minute of ticks is ten fuses.
   place(4000);
+  const parked = sim.cars.take(
+    { identity: 0xdecaf, body: 0, colour: 0, x: 0, y: 0, z: 4000, yaw: 0, parked: true },
+    0,
+  )!;
   const before = sim.cars.size;
   for (let i = 0; i < 60 * 60; i++) sim.step(out);
   console.log(`  after a minute of ticks with the player 4 km away: ${sim.cars.size} record(s), was ${before}`);
-  if (sim.cars.size !== before) {
+  if (sim.cars.size !== before || sim.cars.get(parked.id) === undefined) {
     failures.push('A car standing empty 4 km from anybody was removed after a minute. Cars do not despawn.');
+  }
+  if (isBurning(parked.burningMs)) failures.push('A car nobody has touched caught fire on its own.');
+
+  return failures;
+}
+
+/**
+ * --- WORKSTREAM Y: **the bang.** A car written off, six seconds of burning, and
+ * what is left standing around it.
+ *
+ * The one thing `verifyCarFire` cannot answer. That check owns the rules -- the
+ * ignition test, the countdown, the falloff at 0/3.5/7/8 m -- and every one of
+ * them is a pure function of numbers handed to it. What it cannot see is whether
+ * the *whole server tick* joins them up: `CarField.age` advancing the fuse,
+ * `stepCarFires` noticing it has expired, `explodeCar` removing the record,
+ * scorching the identity, reaching every combatant in the radius through
+ * `applyBlastHit`, and reaching every car in `CHAIN_M` through the same
+ * `CarField.damage` a wall goes through. Every one of those is a place the chain
+ * could silently stop, and every failure is a car that quietly disappears.
+ *
+ * The write-off is applied with `CarField.damage` rather than by driving into a
+ * wall, and that is deliberate rather than lazy: the wall path is already
+ * measured three sections up (it is what proves the fire is *reached*), and what
+ * this section needs is a fire that starts at a **known instant and a known
+ * place**, with bystanders already standing where they are meant to be. Driving
+ * a car into a wall first and then teleporting people around it afterwards would
+ * spend most of the fuse doing the arranging.
+ *
+ * No wall in this world, on `runCrashes`' argument: a prism down the same street
+ * would put `crashFromClamp`'s answer into the middle of a measurement of the
+ * blast's.
+ */
+function runFire(): string[] {
+  const failures: string[] = [];
+  console.log('\n--- WORKSTREAM Y: a wreck catches fire, burns for six seconds and explodes');
+
+  const sim = new Simulation(emptyWorld(false));
+  const out: TickOutput = { tick: 0, events: [], snapshot: null };
+  const driver = sim.join(0, null);
+  const bystander = sim.join(0, null);
+  const distant = sim.join(0, null);
+
+  /** Put a body at (x, z) at rest, facing north. `runCrashes`' `put`. */
+  const put = (p: Participant, x: number, z: number): void => {
+    p.combat.body.position.set(x, EYE_HEIGHT, z);
+    p.combat.body.velocity.set(0, 0, 0);
+    p.combat.body.yaw = 0;
+    p.input.yaw = 0;
+    p.input.forward = 0;
+    p.input.right = 0;
+    p.combat.carSpeed = 0;
+    p.history.seed(sim.tick, x, EYE_HEIGHT, z, 0);
+  };
+
+  // The car that is about to go off, with its driver sitting in it, at the
+  // origin. **The driver stays in**, because "an explosion is the one thing that
+  // does eject you" is a clause of this feature that nothing else in the game
+  // does any more -- see `game/carfire.ts` section 4 -- and the only way to
+  // measure it is to have somebody there.
+  put(driver, 0, 0);
+  const doomed = sim.cars.take(
+    { identity: 0xb0bbed, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: 0, parked: true },
+    driver.combat.id,
+  )!;
+  driver.combat.drivingCar = doomed.id;
+  const identity = doomed.carId;
+
+  // A bystander four metres away: inside `BLAST_M`, so they lose pips and go
+  // over, and far enough out that the falloff is doing something.
+  put(bystander, 4, 0);
+  // ...and a control at twenty, who must be untouched. Without this the section
+  // cannot tell "the blast worked" from "everybody in the room was knocked down".
+  put(distant, 20, 0);
+
+  // A second **car** eight metres away: outside the seven-metre blast on people
+  // and inside the nine-metre chain, which is the gap those two constants exist
+  // to produce. Nobody in it, so this measures the chain and not a second driver.
+  const neighbour = sim.cars.take(
+    { identity: 0xc4a12, body: 0, colour: 0, x: 8, y: 0, z: 0, yaw: 0, parked: true },
+    0,
+  )!;
+
+  // Write it off through the one funnel every impact uses. It catches fire on
+  // this line -- `ignitesOnCrash`'s first clause -- and the fuse starts.
+  sim.cars.damage(doomed.id, CAR_HEALTH_MAX);
+  if (!isBurning(doomed.burningMs)) {
+    failures.push('Writing a car off through CarField.damage did not set it alight; the rest of this section is meaningless.');
+    return failures;
+  }
+  const driverHealthBefore = driver.combat.health;
+  const neighbourBefore = neighbour.health;
+
+  // --- Halfway through the fuse: still burning, still there, and the driver is
+  //     being cooked. `carfire.BURN_PIPS_PER_S`.
+  for (let i = 0; i < Math.round(FUSE_S * 60 * 0.5); i++) sim.step(out);
+  const midFuse = fuseRemainingS(doomed.burningMs);
+  const driverMid = driver.combat.health;
+  console.log(
+    `  half way: ${midFuse.toFixed(2)} s of fuse left, record still there ${sim.cars.get(doomed.id) !== undefined}, ` +
+      `driver ${driverHealthBefore.toFixed(2)} -> ${driverMid.toFixed(2)} pips`,
+  );
+  if (sim.cars.get(doomed.id) === undefined) failures.push('The car went off half way through its fuse.');
+  if (!(midFuse > 0 && midFuse < FUSE_S)) failures.push(`Half way through a ${FUSE_S} s fuse there were ${midFuse} s left.`);
+  if (!(driverMid < driverHealthBefore)) {
+    failures.push('Sitting in a burning car cost the driver nothing. The burn is the warning you can read on your own bar.');
+  }
+
+  // --- And out the other side.
+  for (let i = 0; i < Math.round(FUSE_S * 60 * 0.5) + 30; i++) sim.step(out);
+  console.log(
+    `  after the ${FUSE_S} s fuse:\n` +
+      `      record ${sim.cars.get(doomed.id) ? 'STILL THERE' : 'gone'}, identity suppressed ${sim.cars.suppressed(identity)}\n` +
+      `      driver (0 m):     ${driver.combat.health.toFixed(2)} pips, phase '${driver.combat.phase}', ` +
+      `drivingCar ${driver.combat.drivingCar}\n` +
+      `      bystander (4 m):  ${bystander.combat.health.toFixed(2)} pips, phase '${bystander.combat.phase}'\n` +
+      `      control (20 m):   ${distant.combat.health.toFixed(2)} pips, phase '${distant.combat.phase}'\n` +
+      `      car at 8 m:       ${neighbourBefore} -> ${neighbour.health.toFixed(1)} hp, burning ${isBurning(neighbour.burningMs)}`,
+  );
+
+  if (sim.cars.get(doomed.id) !== undefined) failures.push(`The car was still there ${FUSE_S} s after it caught fire.`);
+  if (!sim.cars.suppressed(identity)) {
+    failures.push('An exploded car handed its identity back to the timetable. A burnt car reappears at the kerb.');
+  }
+  // The driver: hurt, on the floor, and **out of the car**.
+  if (!(driver.combat.health < driverMid)) failures.push('The blast did not hurt the driver sitting in the car it destroyed.');
+  if (driver.combat.drivingCar !== 0) {
+    failures.push('The driver was still driving a car that no longer exists. An explosion is the one thing that ejects you.');
+  }
+  // The bystander: hurt, and by *less* than the driver, which is the falloff.
+  if (!(bystander.combat.health < MAX_HEALTH)) {
+    failures.push(`A bystander ${4} m from an explosion lost nothing; the blast reaches ${BLAST_M} m.`);
+  }
+  if (bystander.combat.phase === 'idle') failures.push('A bystander inside the blast was not knocked down.');
+  if (!(bystander.combat.health > driver.combat.health)) {
+    failures.push(
+      `The bystander at 4 m (${bystander.combat.health.toFixed(2)}) came off no better than the driver at 0 m ` +
+        `(${driver.combat.health.toFixed(2)}). The damage falls off with distance.`,
+    );
+  }
+  // The control: untouched. This is what stops the section passing on a blast
+  // that reached the whole room.
+  if (distant.combat.health !== MAX_HEALTH || distant.combat.phase !== 'idle') {
+    failures.push(
+      `Somebody ${20} m away lost health (${distant.combat.health}) or went down ('${distant.combat.phase}'). ` +
+        `The blast is ${BLAST_M} m.`,
+    );
+  }
+  // And the chain: 40 hp on the car at eight metres, which is inside `CHAIN_M`
+  // and outside `BLAST_M`.
+  const chained = neighbourBefore - neighbour.health;
+  if (Math.abs(chained - CHAIN_DAMAGE) > 0.01) {
+    failures.push(
+      `A car ${8} m from the explosion took ${chained.toFixed(1)} hp against carfire.CHAIN_DAMAGE's ` +
+        `${CHAIN_DAMAGE}. The chain reaches ${CHAIN_M} m.`,
+    );
+  }
+  if (isBurning(neighbour.burningMs)) {
+    failures.push(
+      `A healthy car took ${CHAIN_DAMAGE} hp from a blast and caught fire. Ignition is for a car that was ` +
+        'already broken, or one the hit finished off -- see carfire.ignitesOnCrash.',
+    );
   }
 
   return failures;
@@ -773,7 +1083,7 @@ function runUteLife(): string[] {
 }
 
 function main(): number {
-  const failures = [...run(), ...runCrashes(), ...runUteLife()];
+  const failures = [...run(), ...runCrashes(), ...runUteLife(), ...runFire()];
   if (failures.length === 0) {
     console.log('\ncardamage-check: OK');
     return 0;
