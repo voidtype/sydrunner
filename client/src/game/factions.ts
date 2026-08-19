@@ -163,6 +163,9 @@ import { carHash, trafficSeconds } from './traffic.ts';
 // world out of it; nothing on the hot path constructs one.
 import { CollisionWorld } from '../player/collision.ts';
 import { EYE_HEIGHT } from '../player/controller.ts';
+// WORKSTREAM Z: `Newtown Standoff`'s first clause. A statement about what the
+// police do, so it lives in this file -- see `FactionField.focusPolice`.
+import { POLICE_FOCUS_M, fxPoliceFocusAt } from './teamfx.ts';
 
 // --- The stations ---------------------------------------------------------------
 
@@ -2534,6 +2537,12 @@ export class FactionField {
     // --- 3. Officers, from the beat and then from the station.
     this.recruit(ctx);
 
+    // --- 3b. WORKSTREAM Z: and then `Newtown Standoff` takes them off whoever
+    // they were sent to. **After `recruit`, deliberately** -- an officer
+    // dispatched to another suspect this very tick is exactly the officer the
+    // mega is about taking.
+    this.focusPolice(ctx);
+
     // --- 4. Think, in ascending id.
     this.actors.sort((a, b) => a.id - b.id);
     for (const actor of this.actors) {
@@ -2616,6 +2625,78 @@ export class FactionField {
         inv.playerId,
       );
       if (actor !== null) this.lastReinforce = ctx.tick;
+    }
+  }
+
+  /**
+   * --- WORKSTREAM Z: `Newtown Standoff`. "While 3★+, every police officer
+   * within 40 m has to choose you: they stop shooting anyone else."
+   *
+   * **Why it is in this file at all.** It is a rule about who the police shoot,
+   * which is this module's whole business, and the alternative -- a talent
+   * module reaching into `FactionField.actors` and rewriting `target` from
+   * outside -- would put a second author of the one field `POLICE.think` reads
+   * to decide what it is doing. `policeHostileTo`'s header makes the identical
+   * argument one screen up: the faction that *is* the trouble states a fact, and
+   * the police decide what to do about it. Here the fact is a talent and it
+   * arrives through `teamfx.fxPoliceFocusAt`, which is one boolean.
+   *
+   * ---------------------------------------------------------------------------
+   * THE STARVATION RULE, which is the only interesting part.
+   *
+   * Read literally, "every officer within 40 m has to choose you" would take
+   * officers who are on nobody's case at all -- a beat pair promoted to move a
+   * drunk along, a constable walking home -- and point them at a player they
+   * have no investigation about. `POLICE.think` would then look the target up,
+   * find no investigation, drop it and walk home again, sixty times a second, so
+   * the mega's visible effect would be a squad of officers stuck in a loop.
+   *
+   * So the sweep takes an officer only when **both** of two things are true:
+   * they are already pursuing *a different player*, and this player is actually
+   * under investigation. The first is the tooltip's own wording ("they stop
+   * shooting anyone **else**"); the second is what makes the new target a target
+   * `think` can act on. An officer with nobody to chase keeps patrolling, which
+   * is the brief's requirement stated as a condition rather than as a hope.
+   *
+   * Line of sight is deliberately **not** tested. `POLICE.think` already chases
+   * a suspect it cannot see, and gating the *switch* on sight would mean the
+   * officer around the corner kept shooting your teammate -- which is precisely
+   * the outcome the mega is bought to prevent.
+   *
+   * ---------------------------------------------------------------------------
+   * COST. O(players x promoted officers) with `MAX_ACTORS` at 24 and the
+   * outer loop early-outing on one boolean for everybody without the mega, which
+   * is everybody below level 8. Allocation-free. `PERFORMANCE.md`'s budget is
+   * O(players) a tick and the officer count is a constant.
+   */
+  private focusPolice(ctx: FactionCtx): void {
+    if (this.actors.length === 0) return;
+    for (const c of ctx.combatants) {
+      // The star gate and the flag, in the order that costs least: `heatOf` is a
+      // map lookup through an injected reader and the flag is a walk of the
+      // talent list, so the *scalar* question goes second. `fxPoliceFocusAt`
+      // takes the stars as a parameter for exactly this reason -- see there.
+      if (c.phase === 'ko' || c.health <= 0) continue;
+      if (!fxPoliceFocusAt(c.id, heatOf(c.id))) continue;
+      // No investigation, nothing for an officer to be re-pointed *at*. See the
+      // starvation rule above.
+      if (!this.investigations.has(c.id)) continue;
+      for (const a of this.actors) {
+        if (a.kind !== NPC_KIND.POLICE) continue;
+        if (a.state === NPC_STATE.DOWN) continue;
+        // Already yours, or on nobody. Both are left alone.
+        if (a.target === c.id || a.target < 0) continue;
+        const dx = c.body.position.x - a.x;
+        const dz = c.body.position.z - a.z;
+        if (dx * dx + dz * dz > POLICE_FOCUS_M * POLICE_FOCUS_M) continue;
+        a.target = c.id;
+        // Straight into the chase rather than leaving whatever state they were
+        // in: an officer switched mid-`AIM` would otherwise spend the rest of
+        // that aim window pointed at the person they are no longer shooting, and
+        // fire the round they had already lined up into them.
+        a.state = NPC_STATE.CHASE;
+        a.stateTicks = 0;
+      }
     }
   }
 

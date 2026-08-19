@@ -170,6 +170,9 @@ import { TRAFFIC_EPOCH_MS, carHash, trafficSeconds } from './traffic.ts';
 import { CYCLE_EPOCH_MS, CYCLE_MS, SUNRISE_PHASE, SUNSET_PHASE } from '../sky/cycle.ts';
 import { EYE_HEIGHT } from '../player/controller.ts';
 import { wallet } from './wallet-contract.ts';
+// WORKSTREAM Z: `Tradie Rates`' third clause and `Karen Rapport`'s second. Both
+// are one question to the talent lookup; see `game/teamfx.ts`.
+import { fxTradieAlly } from './teamfx.ts';
 import type { CollisionWorld } from '../player/collision.ts';
 
 // --- The clock ------------------------------------------------------------------------
@@ -1382,6 +1385,19 @@ export const KAREN_DOWN_SECONDS = 14;
 export const TRADIE_HELP_SECONDS = 3;
 export const TRADIE_HELP_RANGE = 4;
 export const TRADIE_HELP_PIPS = 1;
+/**
+ * --- WORKSTREAM Z: how much sooner a tradie picks up somebody on `Tradie Rates`.
+ *
+ * One second off the three, which the node describes as "helps them up 1 s
+ * sooner". A second rather than instant, and the second that is left is the one
+ * that carries the read: the whole point of the delay is that he *finishes what
+ * he was doing*, and a tradie who teleported into a heal would be a pickup with
+ * a hard hat on. Two seconds is still visibly him walking over.
+ *
+ * Clamped in the branch that uses it so the number can never reach zero if
+ * somebody retunes `TRADIE_HELP_SECONDS` down.
+ */
+export const TRADIE_HELP_MATES_RATES_S = 1;
 /** And what he does if you hit him. Two pips, once, and then back to work. */
 export const TRADIE_DECK_DAMAGE = 2;
 export const TRADIE_DECK_TICKS = 90;
@@ -1447,6 +1463,24 @@ export const KAREN_REPORT_LINE = CHARACTER_LINES[NPC_KIND.KAREN][0];
 
 /** What the tradie says when he picks you up. Not in the rotation; it is a response. */
 export const TRADIE_HELP_LINE = 'you right mate';
+
+/**
+ * --- WORKSTREAM Z: what an agent says when `Karen Rapport` knocks somebody out
+ * within ten metres of them. Not in the rotation; it is a response, like the
+ * tradie's line above and drawn by the same path in `main.ts`.
+ *
+ * The pip is the server's -- `Simulation.cheerFor` -- and the *line* is the
+ * client's, off a range test rather than a wire message, which is the
+ * arrangement `TRADIE_HELP_LINE` already established: there is no state byte for
+ * "applauding", adding one would be a protocol change for a sentence, and the
+ * client already knows both that its own knockout landed and where every agent
+ * near it is standing.
+ *
+ * It is written as an agent's own reaction rather than as congratulation --
+ * "outstanding result" is a thing said about a *price*, and the joke of the node
+ * is that the man cheering has not understood what he just watched.
+ */
+export const AGENT_APPLAUSE_LINE = 'outstanding result. absolutely outstanding';
 
 /**
  * The influencer's KO line, and it took several goes.
@@ -1947,7 +1981,20 @@ export const TRADIE = registerNpcKind({
     // by the promotion path below rather than by him noticing anybody: a tradie
     // never starts anything.
     const target = targetOf(actor, ctx);
-    if (target && engageable(target)) {
+    // --- WORKSTREAM Z: `Tradie Rates` -- "tradies never deck you".
+    //
+    // The **whole strike branch** is skipped rather than only the damage line,
+    // and that is the difference between the talent working and the talent
+    // half-working: leaving the chase in would give a tradie who jogs across the
+    // road, stands in your face and does nothing, which reads as a bug in the
+    // tradie rather than as a talent on you. Dropping the target here drops him
+    // straight into the idle-and-help pass below on the same tick, which is
+    // exactly where a tradie who has decided not to bother belongs -- and it is
+    // the branch the node's *other* clause lives in, so a Marita who hits one
+    // and goes down gets picked up by the man they hit. That is the joke the
+    // node is making and it only lands if he is still standing there.
+    if (target && fxTradieAlly(target.id)) actor.target = -1;
+    else if (target && engageable(target)) {
       const dx = target.body.position.x - actor.x;
       const dz = target.body.position.z - actor.z;
       const d2 = dx * dx + dz * dz;
@@ -2008,7 +2055,16 @@ export const TRADIE = registerNpcKind({
         actor.state = NPC_STATE.IDLE;
         actor.stateTicks = 0;
       }
-      if (actor.stateTicks >= TRADIE_HELP_SECONDS * 60 && actor.fireCooldown <= 0) {
+      // --- WORKSTREAM Z: `Tradie Rates` -- "and helps them up 1 s sooner".
+      //
+      // Read off the **person on the ground** rather than off the tradie, which
+      // is the only reading that makes sense of a talent: it is a fact about who
+      // you are, not about which tradie found you. `Math.max` keeps it a delay
+      // rather than a teleport if `TRADIE_HELP_SECONDS` is ever tuned to one.
+      const wait = fxTradieAlly(c.id)
+        ? Math.max(1, TRADIE_HELP_SECONDS - TRADIE_HELP_MATES_RATES_S)
+        : TRADIE_HELP_SECONDS;
+      if (actor.stateTicks >= wait * 60 && actor.fireCooldown <= 0) {
         // A negative pip count is a heal. `FactionCtx.damagePlayer` is the only
         // door to a player's health that both authorities implement, and
         // routing the heal through it rather than writing `c.health` directly is

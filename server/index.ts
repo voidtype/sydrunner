@@ -143,6 +143,9 @@ import { verifyHeat } from '../client/src/game/heat.ts';
 // `client/src/game/teamfx.ts`.
 import { verifyTeamFx } from '../client/src/game/teamfx.ts';
 import { verifyAbilities } from '../client/src/game/abilities.ts';
+// WORKSTREAM Z: a third term rather than a fold into `verifyTeamFx`, because
+// `game/talentlive.ts` imports `teamfx.ts` and the reverse would be a cycle.
+import { verifyTalentLive } from '../client/src/game/talentlive.ts';
 // Polair's orbit, beam schedule and marksman. Run **here** as well as in the
 // browser because this process is the one that rolls the shot: `stepHeat` calls
 // `polairPose` for the slant range, and every failure in that file is silent in
@@ -347,7 +350,7 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // talent the player paid a point for and cannot tell is missing, and a
     // once-per-day stamp that compares timestamps instead of day indices comes
     // back at a different hour on every host. See `game/teamfx.ts`.
-    ['verifyTeamFx', [...verifyTeamFx(), ...verifyAbilities()]],
+    ['verifyTeamFx', [...verifyTeamFx(), ...verifyAbilities(), ...verifyTalentLive()]],
     ['verifyPolair', verifyPolair()],
     // --- WORKSTREAM V. `verifyTeams` is the contract's own and is here for a
     // reason the rest of this list does not have: it is a **spelling** check.

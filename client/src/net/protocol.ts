@@ -722,6 +722,18 @@ export const MSG = {
  * and draw the fleet at the wrong coordinates, so this is a bump rather than a
  * lenient read.
  */
+/*
+ * v19: the talents that had no call site get their keys. `INPUT`'s `buttons`
+ * widens from a `u8` to a `u16` (10 -> 11 bytes) so `BTN.ABILITY_R` can exist at
+ * all -- bits 0..7 were full -- and `EVENT_FLAG` gains `ALLY` (bit 2), which is
+ * what turns a knockout landed by a `Meth-adone` ally into "%s and a meth head
+ * got %s" instead of an anonymous world kill. The input widening moves every
+ * field after `buttons` by one byte, so a v18 server reading a v19 frame would
+ * take the movement axes out of the middle of the yaw: a bump, not a lenient
+ * read. **The number below is still 18 on this branch** -- see v16's note; the
+ * lead bumps it once for the whole batch, together with the assertion in
+ * `server/integration-check.ts`.
+ */
 export const PROTOCOL_VERSION = 18;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
@@ -1094,14 +1106,37 @@ export const BTN = {
   ABILITY_V: 1 << 5,
   ABILITY_G: 1 << 6,
   ABILITY_T: 1 << 7,
+  /**
+   * --- WORKSTREAM Z: `R`, the food key. **The bit that widened the field.**
+   *
+   * Bits 0..7 were full when this arrived, so `buttons` went from a `u8` to a
+   * `u16` and `INPUT_BYTES` from 10 to 11. That is a real wire change for one
+   * key and it is worth stating why it was preferred to the two alternatives.
+   *
+   * *Overloading an existing bit* -- eating on `MOUNT` while standing at a cafe,
+   * say -- was rejected on the same ground the key itself was: a button that
+   * does two things depending on where you are standing is a button the player
+   * cannot learn. *A selector byte* was rejected by `ABILITY_V`'s note three
+   * bits up, which is still the right argument: a value needs a rule for what an
+   * unknown value means and a bit does not.
+   *
+   * What it costs is one byte per input frame per player -- 60 B/s each, against
+   * the ~4 KB/s a player already receives (`PERFORMANCE.md`'s wire budget) -- and
+   * it buys eight more spare bits for the keys after this one, which the batch
+   * before this one exhausted in a single pass.
+   *
+   * Level-triggered like every bit here; `Simulation.resolveAbilities` takes the
+   * rising edge, exactly as it does for `V` and `T`.
+   */
+  ABILITY_R: 1 << 8,
 } as const;
 
 /**
- * One tick of a player's intent, 10 bytes.
+ * One tick of a player's intent, 11 bytes.
  *
  *     u8   type = MSG.INPUT
  *     u16  seq          wraps at 65536, which is 18 minutes at 60 Hz
- *     u8   buttons      BTN.*
+ *     u16  buttons      BTN.*  <- a u8 until v19; see BTN.ABILITY_R
  *     i8   forward      -100..100
  *     i8   right
  *     u16  yaw
@@ -1114,7 +1149,7 @@ export const BTN = {
  * exactly this reason. A client that sends where it thinks it is is a client
  * that can send where it would like to be.
  */
-export const INPUT_BYTES = 10;
+export const INPUT_BYTES = 11;
 
 export interface InputFrame {
   seq: number;
@@ -1129,11 +1164,12 @@ export function encodeInput(frame: InputFrame, buffer = new ArrayBuffer(INPUT_BY
   const v = new DataView(buffer);
   v.setUint8(0, MSG.INPUT);
   v.setUint16(1, frame.seq & 0xffff, true);
-  v.setUint8(3, frame.buttons);
-  v.setInt8(4, quantiseAxis(frame.forward));
-  v.setInt8(5, quantiseAxis(frame.right));
-  v.setUint16(6, quantiseYaw(frame.yaw), true);
-  v.setInt16(8, quantisePitch(frame.pitch), true);
+  // `setUint16` rather than `setUint8` since v19. See `BTN.ABILITY_R`.
+  v.setUint16(3, frame.buttons & 0xffff, true);
+  v.setInt8(5, quantiseAxis(frame.forward));
+  v.setInt8(6, quantiseAxis(frame.right));
+  v.setUint16(7, quantiseYaw(frame.yaw), true);
+  v.setInt16(9, quantisePitch(frame.pitch), true);
   return buffer;
 }
 
@@ -1142,11 +1178,11 @@ export function decodeInput(buffer: ArrayBuffer, out: InputFrame): InputFrame | 
   const v = new DataView(buffer);
   if (v.getUint8(0) !== MSG.INPUT) return null;
   out.seq = v.getUint16(1, true);
-  out.buttons = v.getUint8(3);
-  out.forward = dequantiseAxis(v.getInt8(4));
-  out.right = dequantiseAxis(v.getInt8(5));
-  out.yaw = dequantiseYaw(v.getUint16(6, true));
-  out.pitch = dequantisePitch(v.getInt16(8, true));
+  out.buttons = v.getUint16(3, true);
+  out.forward = dequantiseAxis(v.getInt8(5));
+  out.right = dequantiseAxis(v.getInt8(6));
+  out.yaw = dequantiseYaw(v.getUint16(7, true));
+  out.pitch = dequantisePitch(v.getInt16(9, true));
   return out;
 }
 
@@ -2420,6 +2456,23 @@ export const EVENT_FLAG = {
    * it to a spare bit in a byte already on the wire would be a strange economy.
    */
   RETURNED: 1 << 2,
+  /**
+   * --- WORKSTREAM Z: the knockout was landed by a `Meth-adone` ally.
+   *
+   * `attacker` is the **player who is credited**, not the meth head who threw
+   * the punch, because the credit is the whole of what the talent grants -- the
+   * node says "they count as your assist for kills" and the scoreboard has to
+   * agree with the feed. What this bit adds is the *sentence*: without it the
+   * line reads "%s batted %s" for a knockout the player did not personally
+   * land, which is the interface claiming something that did not happen.
+   *
+   * A bit rather than a cause byte, on `RETURNED`'s argument one field up and
+   * for the same economy: the byte is already on the wire with four values left
+   * in it, and a cause enumeration would be a protocol field serving one line of
+   * text. Only ever set with `KO`, and never with `FOOTY` -- an ally swings
+   * fists.
+   */
+  ALLY: 1 << 3,
 };
 
 export interface HitEvent {
@@ -4078,6 +4131,14 @@ export function verifyNet(): string[] {
       { seq: 4, buttons: BTN.ABILITY_G, forward: 0, right: 0, yaw: 0, pitch: 0 },
       { seq: 5, buttons: BTN.ABILITY_T, forward: 0, right: 0, yaw: 0, pitch: 0 },
       { seq: 6, buttons: 0xff, forward: -1, right: -1, yaw: 5, pitch: -1 },
+      // --- WORKSTREAM Z: `R`, which is bit 8 and therefore the first button
+      // that does not fit in the byte this field used to be. Two rows: the bit
+      // on its own, which fails outright against a `getUint8` decoder, and the
+      // whole `u16` set, which is the case that catches a *half*-migrated pair
+      // -- an encoder that widened and a decoder that did not reads 0x01ff back
+      // as 0xff, so `R` silently does nothing and every other key still works.
+      { seq: 7, buttons: BTN.ABILITY_R, forward: 0, right: 0, yaw: 0, pitch: 0 },
+      { seq: 8, buttons: 0x1ff, forward: 1, right: -1, yaw: 2.5, pitch: 0.9 },
     ];
     for (const c of cases) {
       const got = decodeInput(encodeInput(c), scratch);
