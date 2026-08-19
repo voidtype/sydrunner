@@ -3016,7 +3016,7 @@ async function checkBikes(): Promise<void> {
   // the bump is one line the lead changes here and in `protocol.ts` together.
   // See `PROTOCOL_VERSION`'s v15 note. If this line is still reading 14 after
   // the batch has landed, that is the bug this check exists to catch.
-  check(PROTOCOL_VERSION === 17, `the protocol is at version ${PROTOCOL_VERSION}`);
+  check(PROTOCOL_VERSION === 18, `the protocol is at version ${PROTOCOL_VERSION}`);
   check(
     WELCOME_BYTES === 36,
     `  and a WELCOME is ${WELCOME_BYTES} bytes: 27 through v10, plus v11's f64 clock, plus v15's ` +

@@ -714,7 +714,15 @@ export const MSG = {
  * on which side and what they have spent) and `TEAM_EVENT` (0x94, a tent or a
  * slam happened here). One bump for the lot.
  */
-export const PROTOCOL_VERSION = 17;
+/*
+ * v18: cars burn. A `CARS` record carries a `fuse` byte -- deciseconds until the
+ * car explodes, 0 for a car that is not alight (27 -> 28 bytes) -- and
+ * `TEAM_EVENT` gains kind 3, `CARBOOM`, so every client within sight draws the
+ * same blast at the same place. A v17 client would mis-stride the car roster
+ * and draw the fleet at the wrong coordinates, so this is a bump rather than a
+ * lenient read.
+ */
+export const PROTOCOL_VERSION = 18;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
