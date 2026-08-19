@@ -32,7 +32,16 @@
  * to exactly that, and a night feature that lit lamps as you approached them
  * would have been the most expensive possible version of it.
  *
- * So the three are constructed before `warmUpPipelines` runs, added to the scene
+ * (It is seven now, not three, and the paragraph above is the reason each one
+ * had to be argued for in writing before it was added: the saloon of the
+ * carriage the player is standing in, the nearest open train doorway, and -- the
+ * two newest -- the burning cars nearest the camera. `TrainLights` section 2,
+ * the door section and `FIRE_REAL_COUNT` carry those three arguments, and
+ * `verifyNightLights` asserts the count so that an eighth cannot arrive without
+ * somebody having read all of them. What has never changed is the rule: they are
+ * all built at boot and none of them is ever hidden.)
+ *
+ * So the seven are constructed before `warmUpPipelines` runs, added to the scene
  * there and then, and never touched again except through `position`, `color` and
  * `intensity` -- none of which is in any cache key. By day their intensity is
  * exactly zero and they are still on the list, still in every shader, costing
@@ -1008,6 +1017,158 @@ const TAIL_HALF = 0.17;
 const TAIL_LEVEL = 0.9;
 const TAIL_Y = 0.66;
 const TAIL_HALF_SPACING = 0.66;
+
+// --- The burning car ----------------------------------------------------------
+
+/**
+ * Real lights kept for cars that are on fire. The brief's two.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY A BURNING CAR GETS A REAL LIGHT WHEN A HEADLIGHT DOES NOT.
+ *
+ * Everything else in this file's third population is additive geometry, and
+ * `world/carsmoke.ts`' header made exactly that argument about the fire itself:
+ * an additive quad is a tint at noon and a glow at dusk with no day/night term
+ * anywhere, and the flames are already drawn that way. What it also said, in the
+ * one sentence this section exists because of, is what that costs -- *"a burning
+ * car does not light the wall beside it, and that is a thing only an eye can
+ * judge"*. An eye judged it.
+ *
+ * The distinction that makes this worth two lights when four hundred headlights
+ * get none is **how long the thing lasts and how close you are to it**. A
+ * headlight is on a car doing 14 m/s past you: it is in frame for two seconds,
+ * it points away from everything you are looking at, and the sprite sells it.
+ * A burning car stands still for six seconds in the middle of a fight you are
+ * having next to it, and the whole read of "get away from that" is the light it
+ * throws on the wall, the road and the people standing round it. That is a thing
+ * geometry cannot fake, because what is missing is not a glow -- it is the
+ * *shading of everything else*.
+ *
+ * ---------------------------------------------------------------------------
+ * AND WHY TWO, WHICH IS THE PART THAT IS A BUDGET.
+ *
+ * Read the file header first: the set of lights in the scene is in every
+ * material's cache key, so these two exist **from boot**, sit at zero intensity
+ * all day and every day, and are only ever moved and brightened. Nothing is
+ * created when a car catches fire and nothing is destroyed when it explodes;
+ * "releasing" a light here means writing 0 into its intensity, exactly as the
+ * lamps and the torch are released.
+ *
+ * Two, and not one: the case this feature is actually for is a *chain reaction*
+ * (`carfire.CHAIN_M` is nine metres and the brief calls a chain a feature), so
+ * one light would mean the second car in a pile burning without lighting
+ * anything and the pair of them flickering as the sort swapped between them.
+ * Two, and not four: every light on the list is `N.L` in every shader in the
+ * build, paid on every fragment of a sixty-kilometre city whether anything is
+ * burning or not, and a third and fourth would be paid for a case -- three cars
+ * alight within sixty metres of one camera -- that a session may never contain.
+ */
+export const FIRE_REAL_COUNT = 2;
+
+/** How far a burning car can be and still be worth a real light, metres. The brief's 60. */
+const FIRE_SEARCH_RADIUS = 60;
+
+/** x, y, z per fire in the buffer `FireSource` fills. */
+export const FIRE_RECORD_STRIDE = 3;
+
+/**
+ * The colour of a car fire, linear. The brief's `#ff7a2a`, warmed on purpose.
+ *
+ * `#ff7a2a` converted honestly out of sRGB is (1.0, 0.194, 0.023), which is not
+ * an orange -- it is a red, because the eye reads a hex swatch against a white
+ * page and a *light* against a dark street. Every colour in this file has been
+ * through the same correction: `LAMP_SODIUM_COLOUR` is (1.0, 0.48, 0.11) for a
+ * lamp whose swatch is far deeper than that, and `world/carsmoke.FLAME_COLOUR`
+ * is (1.0, 0.42, 0.08) for the flames this light is standing in for.
+ *
+ * So it is the flames' own triple, one step warmer in the green to carry the
+ * brief's `#ff7a2a` -- and being within a hair of `FLAME_COLOUR` is the point
+ * rather than a coincidence: the tongues on the bonnet and the light they throw
+ * on the wall behind them have to be the same fire.
+ */
+const FIRE_COLOUR: Rgb = [1.0, 0.45, 0.12];
+
+/**
+ * How bright a burning car is at full night, and how far the light reaches.
+ *
+ * `LAMP_INTENSITY` is 70 over `LAMP_DISTANCE`'s 32 m for a luminaire on a 7 m
+ * pole; a car fire is a smaller source than a street lamp and it is at knee
+ * height, so it is dimmer and much shorter -- 46 at 18 m puts roughly the lamp's
+ * own illuminance on a wall two metres away and essentially nothing on the far
+ * footpath. The shortness is doing real work: a fire that lit a whole
+ * intersection would flatten the street lamps it is standing between, and the
+ * read this is for is *local* -- the ground round the wreck and the faces of the
+ * people who did not get far enough away.
+ *
+ * Decay 2, like every other point light here, because that is what inverse
+ * square is and the whole calibration in `sky/calibration.ts` assumes it.
+ */
+const FIRE_INTENSITY = 46;
+const FIRE_DISTANCE = 18;
+
+/**
+ * The flicker: how far the intensity wanders either side of nominal and how
+ * fast. The brief's 0.7 to 1.3 at about 9 Hz.
+ *
+ * Twenty times the torch's `FLICKER` (`TORCH_FLICKER_MAX` is 6%) and that is the
+ * whole difference between the two effects: the torch's term is standing in for
+ * a hotspot rolling across a surface and *must not be readable as a flicker*,
+ * and this one is a fire, where the flicker is the entire tell. A car fire whose
+ * light was steady would read as somebody having left the headlights on.
+ *
+ * Two rates rather than one, on `SWAY_YAW`'s argument restated: a single sine at
+ * 9 Hz is a pulse, and a pulse is a machine. 9.0 and 14.3 Hz are incommensurate,
+ * so the pattern does not come round, and the amplitudes sum to **exactly**
+ * `FIRE_FLICKER_SWING` -- which is what lets the envelope be asserted rather
+ * than measured and hoped for. `verifyNightLights` sweeps ten minutes of it
+ * anyway, because "the amplitudes sum to 0.3" is a claim about two lines that a
+ * third line can quietly break.
+ *
+ * The per-light phase offset is the other half: two cars burning side by side
+ * flickering in step is the single thing that would make this read as a shader
+ * rather than as two fires. See `fireFlicker`.
+ */
+const FIRE_FLICKER: ReadonlyArray<readonly [number, number, number]> = [
+  // amplitude, rate (Hz), phase (rad)
+  [0.2, 9.0, 0.0],
+  [0.1, 14.3, 2.1],
+];
+export const FIRE_FLICKER_SWING = 0.3;
+/** How far apart in the cycle two fires are held, radians. Half a turn of the fast term. */
+const FIRE_FLICKER_STAGGER = 1.9;
+
+/**
+ * The intensity multiplier for fire `index` at time `t` seconds. 0.7 to 1.3.
+ *
+ * Pure and framework-free for `torchSway`'s reason exactly: it is a claim about
+ * an envelope, and an envelope is a thing a self-check can sweep ten minutes of
+ * in a loop rather than assert from the constants and hope.
+ */
+export function fireFlicker(t: number, index = 0): number {
+  let out = 1;
+  for (const [amplitude, rate, phase] of FIRE_FLICKER) {
+    out += amplitude * Math.sin(t * rate * Math.PI * 2 + phase + index * FIRE_FLICKER_STAGGER);
+  }
+  return out;
+}
+
+/**
+ * Where the two fire lights get their cars from.
+ *
+ * `LampSource`'s twin, and the same interface trick for the same reason: this
+ * file must not import `world/carsmoke.ts`, which is a renderer with its own
+ * opinions and its own imports, and what it hands back is world metres, which is
+ * all a `PointLight` needs. The implementer is `CarSmoke`, which is already
+ * handed every driven car in view once a frame together with whether it is
+ * alight -- so the list costs a second pass over nothing.
+ *
+ * The answer is expected to be **last frame's**: `main.ts` runs the night rig
+ * before it poses the driven cars. See `CarSmoke.nearestFires`.
+ */
+export interface FireSource {
+  /** Fill `out` with the nearest burning cars -- x, y, z -- and return how many. */
+  nearestFires(x: number, y: number, z: number, radius: number, out: Float32Array, max: number): number;
+}
 
 // --- Geometry construction ----------------------------------------------------
 
@@ -4284,6 +4445,12 @@ const LAMP_REPICK_INTERVAL = 1 / 6;
 export class NightLights {
   readonly torch: SpotLight;
   readonly lamps: PointLight[] = [];
+  /**
+   * The two that follow burning cars. See `FIRE_REAL_COUNT` for why there are
+   * two of them and why they are constructed here with everything else rather
+   * than when a car catches fire.
+   */
+  readonly fires: PointLight[] = [];
   readonly carLights = new CarLights();
   readonly bikeLights = new BikeLights();
 
@@ -4301,6 +4468,8 @@ export class NightLights {
   level = 0;
   /** How many of the two real lights found a lamp last re-pick. */
   lampsLit = 0;
+  /** ...and how many of the two fire lights found a burning car this frame. */
+  firesLit = 0;
 
   private readonly aim = new Vector3(0, 0, -1);
   private readonly forward = new Vector3();
@@ -4309,6 +4478,7 @@ export class NightLights {
   private readonly up = new Vector3();
   private readonly worldUp = new Vector3(0, 1, 0);
   private readonly found = new Float32Array(LAMP_REAL_COUNT * LAMP_RECORD_STRIDE);
+  private readonly foundFires = new Float32Array(FIRE_REAL_COUNT * FIRE_RECORD_STRIDE);
   private clock = 0;
   private repickIn = 0;
   /**
@@ -4398,6 +4568,23 @@ export class NightLights {
       scene.add(light);
     }
 
+    // --- And the fire lights, on exactly the lamps' terms: constructed here,
+    // once, for the life of the process, parked under the terrain until
+    // something catches, and never hidden. `FIRE_REAL_COUNT` carries the whole
+    // argument for why a burning car is worth two of these when four hundred
+    // headlights are worth none.
+    for (let i = 0; i < FIRE_REAL_COUNT; i++) {
+      const light = new PointLight(0xffffff, 0, FIRE_DISTANCE, 2);
+      light.castShadow = false;
+      light.name = `car_fire_${i}`;
+      // The colour never changes -- a fire is a fire -- so unlike a lamp it is
+      // set once here rather than on every re-pick.
+      light.color.setRGB(FIRE_COLOUR[0], FIRE_COLOUR[1], FIRE_COLOUR[2]);
+      light.position.set(0, -1000, 0);
+      this.fires.push(light);
+      scene.add(light);
+    }
+
     for (const mesh of this.carLights.meshes) scene.add(mesh);
     scene.add(this.bikeLights.mesh);
 
@@ -4440,6 +4627,7 @@ export class NightLights {
     speed: number,
     lamps: LampSource | null,
     mount: TorchMount | null = null,
+    fires: FireSource | null = null,
   ): void {
     const rig = nightRig(solarAltitudeDeg);
     this.level = rig.level;
@@ -4627,6 +4815,45 @@ export class NightLights {
     } else {
       for (const light of this.lamps) light.intensity = 0;
     }
+
+    // --- The burning cars.
+    //
+    // **Re-picked every frame**, where the lamps re-pick at 6 Hz, and the
+    // asymmetry is deliberate rather than an oversight. `LAMP_REPICK_INTERVAL`
+    // exists because reassignment is *visible*: there are five thousand lamps,
+    // the sort swaps between them constantly as the player walks, and a light
+    // jumping 40 m is a wall going dark. There are at most a couple of burning
+    // cars in a session and they do not move, so a swap is a rarity -- while the
+    // event this must be prompt about is the opposite one: a car **explodes**,
+    // and a warm orange light left standing over the hole for a sixth of a
+    // second after the wreck has gone is a thing you can see. Releasing the
+    // light is the same line as never having assigned it.
+    //
+    // The cost is a walk over at most `carsmoke.MAX_SMOKING_CARS` records, which
+    // is the cheapest thing in this function.
+    const fireCount =
+      fires === null || rig.level <= 0
+        ? 0
+        : fires.nearestFires(eye.x, eye.y, eye.z, FIRE_SEARCH_RADIUS, this.foundFires, FIRE_REAL_COUNT);
+    this.firesLit = fireCount;
+    for (let i = 0; i < FIRE_REAL_COUNT; i++) {
+      const light = this.fires[i];
+      if (i >= fireCount) {
+        // Intensity, never `visible`. The invariant this whole file rests on.
+        light.intensity = 0;
+        continue;
+      }
+      const o = i * FIRE_RECORD_STRIDE;
+      light.position.set(this.foundFires[o], this.foundFires[o + 1], this.foundFires[o + 2]);
+      // Gated on the night level like every other source in this file, through
+      // `rig.level` rather than through a second ramp -- `sky/calibration.ts`
+      // owns the one dusk curve in the build and a fire that came up on its own
+      // schedule would be the only light in Sydney that disagreed about when it
+      // gets dark. A burning car at noon is still drawn: its flames are additive
+      // geometry and they are visible all day. What it does not do at noon is
+      // put light on a wall, which is what a fire in daylight does not do.
+      light.intensity = FIRE_INTENSITY * rig.level * fireFlicker(this.clock, i);
+    }
   }
 
   /**
@@ -4638,7 +4865,7 @@ export class NightLights {
    * and not in this list is a light the self-check cannot see.
    */
   get realLights(): Object3D[] {
-    return [this.torch, trainLights.saloon, trainLights.doorLight, ...this.lamps];
+    return [this.torch, trainLights.saloon, trainLights.doorLight, ...this.lamps, ...this.fires];
   }
 
   /**
@@ -4769,14 +4996,17 @@ export function verifyNightLights(): string[] {
   //    about objects rather than about numbers.
   const probe = new NightLights(new Object3D());
   const real = probe.realLights;
-  // The torch, the saloon, the door and the lamps. The saloon was the fourth and
-  // `TrainLights` section 2 argues for it; the door spot is the fifth and the
-  // door section argues for *that*, including why it is one and not one per open
-  // doorway. What this number is guarding is that there is never a **sixth**
-  // without somebody having read both.
-  if (real.length !== 3 + LAMP_REAL_COUNT) {
+  // The torch, the saloon, the door, the lamps and the fires. The saloon was the
+  // fourth and `TrainLights` section 2 argues for it; the door spot is the fifth
+  // and the door section argues for *that*, including why it is one and not one
+  // per open doorway; the two fire lights are the sixth and seventh and
+  // `FIRE_REAL_COUNT` argues for them, including why a burning car earns one
+  // when four hundred headlights do not. What this number is guarding is that
+  // there is never an **eighth** without somebody having read all three.
+  const realWanted = 3 + LAMP_REAL_COUNT + FIRE_REAL_COUNT;
+  if (real.length !== realWanted) {
     failures.push(
-      `The night rig owns ${real.length} real lights, not ${3 + LAMP_REAL_COUNT}. That count is a ` +
+      `The night rig owns ${real.length} real lights, not ${realWanted}. That count is a ` +
         `shader constant: LightsNode.customCacheKey hashes every light on the render list, so ` +
         `changing it rebuilds and recompiles every pipeline in the scene.`,
     );
@@ -4798,6 +5028,147 @@ export function verifyNightLights(): string[] {
       );
     }
   }
+  /* --- The fire lights, which are the newest thing on that list and the one
+   * most likely to break it.
+   *
+   * Four claims, and every one of them renders a perfectly good frame when it is
+   * wrong: the flicker stays inside its envelope and is not the same in two
+   * lights at once, a burning car within range lights up after dark, the budget
+   * is two and they are the *nearest* two, and a car that stops burning -- or
+   * explodes, which is the same thing from here -- gives its light back on the
+   * very next frame rather than leaving an orange glow over an empty street.
+   */
+  {
+    // The envelope, swept over ten minutes at 120 Hz rather than asserted from
+    // the two amplitudes. `torchSway`'s check one section up, for its reason.
+    let lowest = Infinity;
+    let highest = -Infinity;
+    let sameAsOther = 0;
+    let samples = 0;
+    const step = 1 / 120;
+    for (let t = 0; t < 600; t += step) {
+      const a = fireFlicker(t, 0);
+      const b = fireFlicker(t, 1);
+      lowest = Math.min(lowest, a);
+      highest = Math.max(highest, a);
+      if (Math.abs(a - b) < 0.01) sameAsOther++;
+      samples++;
+    }
+    const floor = 1 - FIRE_FLICKER_SWING;
+    const ceiling = 1 + FIRE_FLICKER_SWING;
+    if (lowest < floor - 1e-9 || highest > ceiling + 1e-9) {
+      failures.push(
+        `A car fire's light runs from ${lowest.toFixed(3)} to ${highest.toFixed(3)} of nominal, ` +
+          `outside the ${floor}-${ceiling} the brief asks for. Past the top it blows out the wall ` +
+          `it is lighting on the peaks; below the bottom the fire visibly goes out and comes back.`,
+      );
+    }
+    // ...and it has to actually use the envelope. Two sines that cancelled would
+    // pass the bound above and be a light that does not flicker at all, which is
+    // a burning car that reads as somebody's headlights left on.
+    if (highest - lowest < FIRE_FLICKER_SWING) {
+      failures.push(
+        `A car fire's light only varies by ${(highest - lowest).toFixed(3)} over ten minutes ` +
+          `against a swing of ${FIRE_FLICKER_SWING} either way. The flicker is the whole tell.`,
+      );
+    }
+    if (sameAsOther > samples * 0.2) {
+      failures.push(
+        `Two burning cars flicker together on ${((sameAsOther / samples) * 100).toFixed(0)}% of ` +
+          `frames. Two fires in step is the one thing that reads as a shader rather than as fire; ` +
+          `see FIRE_FLICKER_STAGGER.`,
+      );
+    }
+
+    // And the rig, driven for real against a fixture. Three burning cars in a
+    // line, a camera at the origin, and the sun well down.
+    const fireCam = new PerspectiveCamera(70, 1.6, 0.1, 2000);
+    fireCam.position.set(0, 1.7, 0);
+    fireCam.updateMatrixWorld(true);
+    const burning: FireSource = {
+      nearestFires(x, y, z, radius, out, max) {
+        const at = [8, 20, 200];
+        let n = 0;
+        for (const cx of at) {
+          if (n >= max) break;
+          const d = Math.hypot(cx - x, y, z);
+          if (d > radius) continue;
+          out[n * FIRE_RECORD_STRIDE] = cx;
+          out[n * FIRE_RECORD_STRIDE + 1] = 0.9;
+          out[n * FIRE_RECORD_STRIDE + 2] = 0;
+          n++;
+        }
+        return n;
+      },
+    };
+    const none: FireSource = { nearestFires: () => 0 };
+
+    const fireRig = new NightLights(new Object3D());
+    const fireIdentity = (): string => fireRig.realLights.map((l) => `${l.id}:${l.visible ? 1 : 0}`).join(',');
+    const fireBefore = fireIdentity();
+    fireRig.update(1 / 60, fireCam, -20, 0, null, null, burning);
+    if (fireRig.firesLit !== FIRE_REAL_COUNT) {
+      failures.push(
+        `Three burning cars within 60 m lit ${fireRig.firesLit} of ${FIRE_REAL_COUNT} fire lights.`,
+      );
+    }
+    if (!(fireRig.fires[0].intensity > 0) || !(fireRig.fires[1].intensity > 0)) {
+      failures.push(
+        `A car burning 8 m away at midnight puts ${fireRig.fires[0].intensity} of light on the ` +
+          `street. The whole feature is the wall behind the wreck; a sprite already does the flames.`,
+      );
+    }
+    if (Math.abs(fireRig.fires[0].position.x - 8) > 1e-6 || Math.abs(fireRig.fires[1].position.x - 20) > 1e-6) {
+      failures.push(
+        `The two fire lights are on the cars at x ${fireRig.fires[0].position.x} and ` +
+          `${fireRig.fires[1].position.x} rather than on the nearest two at 8 and 20. Over the ` +
+          `budget it is the closest fires that get the lights, or a player standing next to a ` +
+          `burning car is lit by one two streets away.`,
+      );
+    }
+    // Warm, and the same fire the flames are. A white light on a car fire is a
+    // searchlight in a wreck.
+    if (!(fireRig.fires[0].color.r > fireRig.fires[0].color.g && fireRig.fires[0].color.g > fireRig.fires[0].color.b)) {
+      failures.push(
+        `A car fire's light is (${fireRig.fires[0].color.r}, ${fireRig.fires[0].color.g}, ` +
+          `${fireRig.fires[0].color.b}), which is not a warm orange.`,
+      );
+    }
+    // Dark by day, with the cars still burning: the gate is the shared level.
+    fireRig.update(1 / 60, fireCam, 57.11, 0, null, null, burning);
+    if (fireRig.fires[0].intensity !== 0) {
+      failures.push(
+        `A car burning at 3 pm is putting ${fireRig.fires[0].intensity} of real light on the road. ` +
+          `Every source in this file is gated on the shared night level, or the daytime ` +
+          `calibration in sky/calibration.ts is wrong by however much is burning.`,
+      );
+    }
+    // The fire goes out -- or the car explodes, which from here is the same
+    // event -- and the light is back on the frame after.
+    fireRig.update(1 / 60, fireCam, -20, 0, null, null, none);
+    if (fireRig.firesLit !== 0 || fireRig.fires[0].intensity !== 0 || fireRig.fires[1].intensity !== 0) {
+      failures.push(
+        `A car that exploded is still lighting the street (${fireRig.fires[0].intensity}, ` +
+          `${fireRig.fires[1].intensity}). The light has to be released on the frame the fire ends, ` +
+          `or there is a warm glow standing over the hole where the wreck was.`,
+      );
+    }
+    // A caller that knows nothing about fires -- the offline boot, the check
+    // above -- must leave them dark rather than at whatever they were.
+    fireRig.update(1 / 60, fireCam, -20, 0, null, null);
+    if (fireRig.fires[0].intensity !== 0) {
+      failures.push('An update with no fire source left a fire light burning.');
+    }
+    // ...and none of that moved the set of lights, which is the invariant.
+    if (fireIdentity() !== fireBefore) {
+      failures.push(
+        `Lighting and releasing a car fire changed the set of real lights to "${fireIdentity()}". ` +
+          `A fire light must be a light at zero intensity and never a hidden one.`,
+      );
+    }
+    fireRig.dispose();
+  }
+
   const day = nightRig(57.11);
   if (day.torchIntensity !== 0 || day.lampIntensity !== 0) {
     failures.push(

@@ -4473,6 +4473,13 @@ async function main(): Promise<void> {
       const dy = y - (player.position.y - EYE_HEIGHT);
       const dz = z - player.position.z;
       audio.carBoom(Math.sqrt(dx * dx + dy * dy + dz * dz));
+      // WORKSTREAM fire-look: the mark on the road and the chunks off the car,
+      // filed on the same event and for the same reason the sound is here rather
+      // than in the sweep -- they are one thing that happened, and `CarSmoke`
+      // ages them from there. The **client's own ground** rather than the wire's
+      // decimetre `y`, on `TentSet.set`'s argument one branch up: a scorch 5 cm
+      // under the road is a scorch nobody ever sees.
+      carSmoke.boom(x, characterGround(x, z), z);
       return;
     }
     // A slam's `untilMs` is the instant the ring finishes, so the moment it
@@ -4644,6 +4651,12 @@ async function main(): Promise<void> {
   // second set for the reason `world/carsmoke.ts`' header gives -- a flame is
   // light and smoke is the absence of it, and no one material is both.
   scene.add(carSmoke.flames);
+  // WORKSTREAM fire-look: and the third set, which is what a car leaves behind
+  // once it has gone off -- the scorch on the road and the chunks in the air,
+  // one pool and one draw call for both. Swept by the same `begin`/`end` bracket
+  // `drivenCars.update` already runs on this object every frame, so the only
+  // other line this feature costs `main.ts` is the `boom` in `onTeamEvent`.
+  scene.add(carSmoke.marks);
   /** Whether a car has honked at the player for standing in the road. */
   const honkWatch = new HonkWatch();
   /** Scratch for it, so a query asked sixty times a second allocates nothing. */
@@ -9569,6 +9582,14 @@ async function main(): Promise<void> {
       Math.hypot(player.velocity.x, player.velocity.z),
       streamer,
       torchMountNow,
+      // WORKSTREAM fire-look: which cars are alight, for the two real lights a
+      // burning car gets after dark. `CarSmoke` is the one thing in the client
+      // that already knows -- it is handed every driven car in view with its
+      // burn level once a frame -- and the answer it gives here is the previous
+      // frame's, because the driven cars are posed a hundred lines below this.
+      // See `nightlights.FireSource`; a frame of lag on a light being flickered
+      // at 9 Hz is not a thing that exists.
+      carSmoke,
     );
     // And the sprites, which are hidden all day for the fill they would
     // otherwise cost. One comparison on every frame but the two a day where the
