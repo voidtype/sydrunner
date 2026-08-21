@@ -467,11 +467,13 @@ export const MAX_BOUNCES = 30;
  * **What it costs on the wire, checked rather than assumed.** Sixteen players on
  * a 1.6 s recharge sustain ten throws a second, and a ball that averages eleven
  * means of the order of a hundred in the air across the room at once, against
- * the two the old numbers sustained. At `protocol.BALL_BYTES`' 20 B that would
- * be 2 kB a snapshot if every player got every ball. They do not:
+ * the two the old numbers sustained. At `protocol.BALL_BYTES`' 17 B that would
+ * be 1.7 kB a snapshot if every player got every ball. They do not:
  * `aoi.InterestIndex.selectBalls` filters balls **by the ball's own position**
- * against `AOI_LEAVE_RADIUS`, so what a player is sent is the handful within
- * interest of where they are standing, and a hundred balls spread over a 60 km
+ * against `AOI_BALL_RADIUS` and then caps the result at `AOI_MAX_BALLS` -- the
+ * cap being the half that survives a pileup, where a load run measured 105 of
+ * them inside forty metres -- so what a player is sent is the nearest forty at
+ * the very worst, and a hundred balls spread over a 60 km
  * disc is still a handful each. The cost lands on a brawl where sixteen people
  * are throwing at each other in one street, which is the one situation where a
  * player wants to see every ball.

@@ -251,6 +251,7 @@ import { BugReportForm, FrameGrabber, verifyBugReport } from './bugreport.ts';
 import { JoinGate } from './accounts.ts';
 import { verifyAccounts } from './net/accounts.ts';
 import { ANIM, PROTOCOL_VERSION, SNAPSHOT_INTERVAL, TEAM_EVENT_KIND, sanitiseName, suggestName, verifyNames, verifyNet } from './net/protocol.ts';
+import { verifySnapshotRate } from './net/snapshotrate.ts';
 import {
   FootyAssets,
   FootyPool,
@@ -783,6 +784,11 @@ async function main(): Promise<void> {
   const footyBallFailures = timed('footy model', verifyFootyBall);
   const netFailures = timed('net', verifyNet);
   const clientFailures = timed('net client', verifyNetClient);
+  // WORKSTREAM AD: and the snapshot rate's arithmetic, which is a statement
+  // about *this* side -- whether the 100 ms interpolation buffer still covers
+  // the interval the server is sending at. The server runs the same function
+  // before it opens its socket; it is the one that reads the environment.
+  const rateFailures = timed('snapshot rate', verifySnapshotRate);
   // And the names, on the same criterion as everything above it: every way this
   // breaks produces a *name*, which renders perfectly. A sanitiser that is not
   // idempotent gives a player one name in the prompt and another over their
@@ -1304,6 +1310,7 @@ async function main(): Promise<void> {
     footyBallFailures.length ||
     netFailures.length ||
     clientFailures.length ||
+    rateFailures.length ||
     nameFailures.length ||
     locatorFailures.length ||
     carryFailures.length ||
@@ -1383,6 +1390,7 @@ async function main(): Promise<void> {
           ...footyBallFailures,
           ...netFailures,
           ...clientFailures,
+          ...rateFailures,
           ...nameFailures,
           ...locatorFailures,
           ...carryFailures,

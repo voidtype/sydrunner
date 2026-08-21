@@ -34,6 +34,26 @@
  * the saving.
  *
  * ---------------------------------------------------------------------------
+ * ## And the same rule for the balls, which took a load run to notice
+ *
+ * WORKSTREAM AD. The paragraphs above are about *players*, and for four
+ * versions that was the whole of interest management: the ball section had a
+ * radius and no cap, which is half a rule. PERFORMANCE.md phase 4 found the
+ * other half missing the hard way -- a CBD pileup at 372 kbit/s a client, *"the
+ * rest is the ball section, which interest management does not bound in a
+ * pileup because all the balls are in the same place as all the people"* -- and
+ * a re-measurement on this tree found the section had since grown to **105
+ * balls in the air**, over 2 kB a snapshot, half of everything a client was
+ * being sent.
+ *
+ * So `selectBalls` is now the same shape as `select`: a radius
+ * (`AOI_BALL_RADIUS`, tighter, because a football is not a person), a cap
+ * (`AOI_MAX_BALLS`, the same forty), the same nearest-first insertion with the
+ * same tie-break, and the same ascending output order so the dedup below still
+ * groups. The two places it deliberately differs -- no hysteresis band, and
+ * your own throws dropped rather than privileged -- are argued at the method.
+ *
+ * ---------------------------------------------------------------------------
  * ## Why the query is one 220 m sweep and not the two the phase 1 note predicted
  *
  * `game/spatialhash.ts`'s header wrote the recipe down as
@@ -102,8 +122,10 @@
  */
 
 import {
+  AOI_BALL_RADIUS,
   AOI_ENTER_RADIUS,
   AOI_LEAVE_RADIUS,
+  AOI_MAX_BALLS,
   AOI_MAX_PLAYERS,
   type SnapshotBall,
   type SnapshotNpc,
@@ -119,6 +141,8 @@ export const AOI_CELL = 64;
 
 const ENTER2 = AOI_ENTER_RADIUS * AOI_ENTER_RADIUS;
 const LEAVE2 = AOI_LEAVE_RADIUS * AOI_LEAVE_RADIUS;
+/** The ball section's own radius, squared. See `InterestIndex.selectBalls`. */
+const BALL2 = AOI_BALL_RADIUS * AOI_BALL_RADIUS;
 
 /**
  * What one client currently holds, and what changed about it this snapshot.
@@ -228,6 +252,9 @@ export class InterestIndex {
   /** Distances and ids of the current selection, kept sorted nearest-first. */
   private readonly selD2: number[] = [];
   private readonly selId: number[] = [];
+  /** The same pair for the ball cap. See `selectBalls`. */
+  private readonly ballD2: number[] = [];
+  private readonly ballIdx: number[] = [];
 
   /** How many candidates the last `select` walk considered. For `/stats`. */
   candidatesSeen = 0;
@@ -340,28 +367,112 @@ export class InterestIndex {
   }
 
   /**
-   * Every ball within interest of `(x, z)`, as indices into the ball records.
+   * The balls one client is sent, as indices into this tick's ball records:
+   * within `AOI_BALL_RADIUS`, the `AOI_MAX_BALLS` nearest of those, and never
+   * one this client threw.
    *
-   * **Interest by the ball's own position, not by its thrower's**, which is the
-   * one thing about this filter worth stating. A ball is most interesting to the
-   * player it is about to reach, who by definition is nowhere near whoever threw
-   * it -- so filtering by thrower would hide precisely the ball that mattered.
-   * Filtering by where the ball *is* means it enters your stream as it crosses
-   * into your radius, which is 180 m of warning on an object that flies 30.
+   * **Interest by the ball's own position, not by its thrower's**, which was
+   * the first thing worth stating about this filter and still is. A ball is
+   * most interesting to the player it is about to reach, who by definition is
+   * nowhere near whoever threw it -- so filtering by thrower would hide
+   * precisely the ball that mattered. Filtering by where the ball *is* means it
+   * enters your stream as it crosses into your radius, which at 110 m and a
+   * 28 m/s launch is 3.9 seconds of warning.
    *
-   * No hysteresis, unlike the players, and it costs nothing: a ball that flapped
-   * across the boundary would be flapping 220 m away, where it is two pixels and
-   * has no identity anybody is holding. The 40 m band exists to stop a *remote
-   * actor* being built and disposed twenty times a second; a ball is a record in
-   * a map.
+   * ---------------------------------------------------------------------------
+   * ## WORKSTREAM AD: why the radius was never the bound, and the cap is
+   *
+   * PERFORMANCE.md phase 4's CBD pileup measured a client's downlink at
+   * 372 kbit/s and found *"mostly footballs, not people"* -- 67 balls in the
+   * air, about 60% of the stream. The radius above did nothing about it and
+   * could not have: the balls in a pileup are in the same forty metres as the
+   * people, so **every** radius in this file contains all of them. What the
+   * player section has and this one did not is the other half of the rule --
+   * the cap. `AOI_MAX_BALLS` is that half, and the selection is the same
+   * `k`-long insertion `select` uses, over the same total order (distance, then
+   * the record's own index for ties) so that two clients standing together
+   * agree byte for byte and the frame dedup still works.
+   *
+   * **The three differences from the player rule are all deliberate:**
+   *
+   *   - **No hysteresis band.** A ball that flapped across the boundary would
+   *     be flapping 110 m away, where it is two pixels and has no identity
+   *     anybody is holding. The band exists to stop a *remote actor* being
+   *     built and disposed twenty times a second; a ball is a record in a map,
+   *     rebuilt from the newest snapshot's list every frame by
+   *     `net/client.interpolateBalls`.
+   *   - **A tighter radius**, 110 m against the players' 220. Argued at
+   *     `AOI_BALL_RADIUS`: the floor is what a player could still *act* on
+   *     (11 m, four rewind windows of the fastest ball there is) and the
+   *     ceiling is what a player can still *see* (a football at 220 m is 2.2
+   *     pixels on a 1080p 60-degree view).
+   *   - **Your own throws are dropped, not privileged.** The obvious rule is
+   *     the opposite -- always keep the thrower's own ball, because it is what
+   *     corrects their prediction -- and this client does not work that way.
+   *     `net/client.interpolateBalls` opens with
+   *     `if (this.ownBall(b.thrower)) continue`, because `main.ts` flies its own
+   *     `localBalls` copy at present time and the wire's copy is 100 ms behind
+   *     it; the correction a thrower gets is the `MSG.SWAT` event instead. A
+   *     swat deliberately leaves `thrower` alone (`footy.Footy.owner` is the
+   *     field that changes), so the filter holds for the ball's whole life and
+   *     those records are seventeen bytes each that the receiver discards on
+   *     its first line. `verifyAoi` pins it, because it is the kind of saving
+   *     somebody would "fix" back.
+   *
+   * `ownId` is the selecting client's player id. Pass 0 for a viewer that threw
+   * nothing -- no live player is 0 (`protocol.AOI_ID_LIFECYCLE`), and a ball
+   * whose thrower has left carries `thrower === 0`, which is why the test is
+   * `ownId !== 0 &&` rather than a bare comparison: without it, every orphaned
+   * ball in the room would be hidden from everybody.
    */
-  selectBalls(x: number, z: number, out: number[]): number[] {
-    out.length = 0;
+  selectBalls(x: number, z: number, ownId: number, out: number[]): number[] {
+    const d2s = this.ballD2;
+    const idx = this.ballIdx;
+    d2s.length = 0;
+    idx.length = 0;
     for (let i = 0; i < this.balls.length; i++) {
       const b = this.balls[i];
+      if (ownId !== 0 && b.thrower === ownId) continue;
       const dx = b.x - x;
       const dz = b.z - z;
-      if (dx * dx + dz * dz <= LEAVE2) out.push(i);
+      const d2 = dx * dx + dz * dz;
+      if (d2 > BALL2) continue;
+      // The same `k`-long insertion `select` runs, and for the same two
+      // reasons: it is `SpatialHash.nearestK`'s selection over a candidate set
+      // already filtered, and the tie-break makes the result a total order so
+      // the dedup key is stable. A linear scan rather than a grid because
+      // `footy.MAX_BALLS` bounds the room's ball count in the low hundreds --
+      // the same argument `selectNpcs` makes about 24 actors.
+      if (idx.length === AOI_MAX_BALLS) {
+        const worstD2 = d2s[AOI_MAX_BALLS - 1];
+        if (d2 > worstD2 || (d2 === worstD2 && i > idx[AOI_MAX_BALLS - 1])) continue;
+      }
+      let k = idx.length < AOI_MAX_BALLS ? idx.length : AOI_MAX_BALLS - 1;
+      if (idx.length < AOI_MAX_BALLS) {
+        idx.push(i);
+        d2s.push(d2);
+      }
+      while (k > 0 && (d2s[k - 1] > d2 || (d2s[k - 1] === d2 && idx[k - 1] > i))) {
+        idx[k] = idx[k - 1];
+        d2s[k] = d2s[k - 1];
+        k--;
+      }
+      idx[k] = i;
+      d2s[k] = d2;
+    }
+    // Nearest-first became the selection; ascending-by-index is what goes on
+    // the wire, on `select`'s argument exactly -- two clients with the same set
+    // must produce the same bytes, so the order has to be a function of the set
+    // and not of where either of them is standing.
+    out.length = 0;
+    for (const i of idx) {
+      let k = out.length;
+      out.push(i);
+      while (k > 0 && out[k - 1] > i) {
+        out[k] = out[k - 1];
+        k--;
+      }
+      out[k] = i;
     }
     return out;
   }
@@ -824,7 +935,7 @@ export function verifyAoi(): string[] {
     ];
     index.begin([player(1, 0, 0)], balls, npcs);
     const out: number[] = [];
-    index.selectBalls(0, 0, out);
+    index.selectBalls(0, 0, 1, out);
     if (out.length !== 1 || out[0] !== 0) {
       failures.push(`A ball 400 m away was carried (got ${out.length} of 2). Interest is by the ball's own position.`);
     }
@@ -833,11 +944,107 @@ export function verifyAoi(): string[] {
       failures.push(`An officer 900 m away was carried (got ${out.length} of 2).`);
     }
     // And a ball flying toward somebody enters their stream while it is still
-    // 200 m off, which is the property the "no hysteresis" note rests on.
-    balls[1].x = 200;
+    // 100 m off, which is the property the "no hysteresis" note rests on: at a
+    // 28 m/s launch that is three and a half seconds of warning.
+    balls[1].x = 100;
     index.begin([player(1, 0, 0)], balls, npcs);
-    index.selectBalls(0, 0, out);
-    if (out.length !== 2) failures.push('A ball 200 m away was not carried; it arrives before it can be reacted to.');
+    index.selectBalls(0, 0, 1, out);
+    if (out.length !== 2) failures.push('A ball 100 m away was not carried; it arrives before it can be reacted to.');
+  }
+
+  // --- 8. WORKSTREAM AD: the ball cap, the ball radius and the own-ball rule.
+  //
+  // Every failure in here is a *bandwidth* failure rather than a visible one,
+  // which is why they need a check at all -- nothing on a screen goes wrong
+  // when this section quietly stops being bounded, and PERFORMANCE.md phase 4
+  // is the record of what that cost: 60% of a pileup's stream, discovered by a
+  // load run rather than by anybody playing.
+  {
+    const index = new InterestIndex();
+    const out: number[] = [];
+    const ball = (id: number, thrower: number, x: number, z: number): SnapshotBall =>
+      ({ id, thrower, x, y: 2, z, vx: 0, vy: 0, vz: 0, bounces: 0 });
+
+    // A pileup: a hundred balls inside forty metres, which is the shape phase 4
+    // measured and the one every radius in this file contains whole.
+    {
+      const balls: SnapshotBall[] = [];
+      for (let i = 0; i < 100; i++) {
+        const a = (i / 100) * Math.PI * 2;
+        balls.push(ball(i + 1, 500 + i, Math.cos(a) * (5 + (i % 20)), Math.sin(a) * (5 + (i % 20))));
+      }
+      index.begin([player(1, 0, 0)], balls, []);
+      index.selectBalls(0, 0, 1, out);
+      if (out.length !== AOI_MAX_BALLS) {
+        failures.push(
+          `A hundred balls inside forty metres put ${out.length} on the wire, not the ${AOI_MAX_BALLS} ` +
+            `cap. The radius does not bound a pileup -- all of the balls are where all of the people ` +
+            `are -- so the cap is the only thing that does.`,
+        );
+      }
+      // Ascending indices, or two clients standing together stop sharing a
+      // frame and the dedup halves.
+      for (let i = 1; i < out.length; i++) {
+        if (out[i - 1] >= out[i]) {
+          failures.push(`The ball selection came back as ${out.join(',')}; it must ascend, or the dedup key is unstable.`);
+          break;
+        }
+      }
+      // And it keeps the *nearest* forty. The nearest ball in the room being
+      // missing is the only version of this that a player could see.
+      const nearest = balls
+        .map((b, i) => ({ i, d2: b.x * b.x + b.z * b.z }))
+        .sort((a, b) => a.d2 - b.d2 || a.i - b.i)
+        .slice(0, AOI_MAX_BALLS)
+        .map((e) => e.i)
+        .sort((a, b) => a - b);
+      if (out.join(',') !== nearest.join(',')) {
+        failures.push('The ball cap kept a different forty from the nearest forty.');
+      }
+    }
+
+    // The radius, at both sides of it.
+    {
+      const balls = [
+        ball(1, 500, AOI_BALL_RADIUS - 1, 0),
+        ball(2, 500, AOI_BALL_RADIUS + 1, 0),
+      ];
+      index.begin([player(1, 0, 0)], balls, []);
+      index.selectBalls(0, 0, 1, out);
+      if (out.length !== 1 || out[0] !== 0) {
+        failures.push(
+          `The ball radius is ${AOI_BALL_RADIUS} m and a ball at ${AOI_BALL_RADIUS + 1} m ` +
+            `${out.length === 2 ? 'was still carried' : 'took the near one with it'}.`,
+        );
+      }
+    }
+
+    // The own-ball rule, and the orphan that must not be caught by it.
+    {
+      const balls = [
+        ball(1, 7, 5, 0),      // mine
+        ball(2, 9, 6, 0),      // somebody else's
+        ball(3, 0, 7, 0),      // thrown by somebody who has since left
+      ];
+      index.begin([player(7, 0, 0)], balls, []);
+      index.selectBalls(0, 0, 7, out);
+      if (out.includes(0)) {
+        failures.push(
+          'A client was sent a ball it threw itself. `net/client.interpolateBalls` discards those on ' +
+            'its first line, so they are pure wire cost -- see `selectBalls`.',
+        );
+      }
+      if (!out.includes(1) || !out.includes(2)) {
+        failures.push(
+          `A client was sent ${out.length} of the 2 balls it did not throw. The orphan (thrower 0, ` +
+            `whoever threw it has left) is the one the own-ball test must not swallow -- 0 is nobody, ` +
+            `and hiding it would hide every abandoned ball in the room from everybody.`,
+        );
+      }
+      // And a viewer with no id of its own still sees all three.
+      index.selectBalls(0, 0, 0, out);
+      if (out.length !== 3) failures.push(`A client with no id was sent ${out.length} of 3 balls.`);
+    }
   }
 
   return failures;

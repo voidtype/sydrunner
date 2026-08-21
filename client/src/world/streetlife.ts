@@ -636,7 +636,7 @@ const VISIBLE = 72;
  * How close a promoted actor has to be to an ambient anchor to claim it.
  *
  * The one piece of bookkeeping in this file, and it exists because **the wire
- * does not carry an actor's home**. `protocol.NPC_BYTES` is eighteen bytes of
+ * does not carry an actor's home**. `protocol.NPC_BYTES` is fourteen bytes of
  * id, kind, position, yaw and state, and every omission in it is deliberate --
  * so a connected client cannot ask a running meth head which laneway it came out
  * of, and therefore cannot know which ambient loiterer to stop drawing.
