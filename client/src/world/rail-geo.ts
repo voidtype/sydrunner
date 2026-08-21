@@ -742,7 +742,26 @@ export function railWarmupParts(assets: RailAssets): WarmupPart[] {
       casts: false,
     },
     {
-      geometry: warmupGeometry({ normal: true, uv: true }),
+      /*
+       * **Position only, because that is all the real wire carries.**
+       *
+       * The overhead wire is built at line ~1310 as a `BufferGeometry` with a
+       * position attribute and an index and nothing else -- no normal, no uv,
+       * because a 2 cm unlit line has no use for either. This part declared
+       * `{ normal: true, uv: true }`, and a pipeline is keyed on the *attribute
+       * layout* as well as the material (see `warmupSignature`, which mirrors
+       * three's `getGeometryCacheKey`). So the boot pass compiled a pipeline
+       * for a wire that does not exist, the real one was never warmed, and the
+       * first catenary to enter the frustum compiled inside `render` --
+       * `Pipelines.getForRender`'s blocking branch, on the frame it appears.
+       *
+       * That is a hitch you feel *while riding*, because rail chunks are built
+       * and disposed per 512 m and the wire is the thing strung along every
+       * electrified line in Sydney. `world/streamer.ts` already gets this right
+       * for the power lines, with a comment saying the same thing; this one was
+       * copied from the row above it instead.
+       */
+      geometry: warmupGeometry({}),
       material: assets.wire,
       owned: true,
       casts: false,
