@@ -340,6 +340,42 @@ export const BUILD_RADIUS = 1100;
  * fifteen-chunk ring in an eighth of a second.
  */
 export const BUILDS_PER_FRAME = 2;
+/**
+ * And a millisecond ceiling across those two, because the count alone was not
+ * the bound it reads as.
+ *
+ * The paragraph above sizes `BUILDS_PER_FRAME` against a *typical* chunk, and
+ * for a typical chunk it is right: the median build is 2.4 ms. But the
+ * distribution has a long tail — a chunk holding a station, a junction throat
+ * or a viaduct is a different object from a chunk of plain double track, and
+ * riding Emu Plains to Berowra measures **p95 26 ms and a worst frame of 85 ms**
+ * (`client/src/perf-harness.ts --coverage` prints the run). Two of the bad ones
+ * landing in the same frame is five frames dropped, and at 2.25 building frames
+ * per kilometre a rider meets one about every fifteen seconds. That is the
+ * "little freezes on the train" this constant exists to stop.
+ *
+ * **A check between builds, not a pre-emption** — the same shape, and the same
+ * honesty about its limit, as `world/streamer.ts`' `BUILD_BUDGET_MS`: the first
+ * chunk of a frame always runs, so a single expensive chunk is untouched by
+ * this. What it removes is the second one queued behind it.
+ *
+ * **And measurement says that is the smaller half.** Re-running the ride with
+ * this ceiling in place moved the worst frame not at all — 84.9 ms before,
+ * 85.8 ms after, inside the noise — while building frames went 214 → 224, which
+ * is the ceiling deferring work to later frames exactly as intended. Both
+ * numbers together say the worst frame is **one** chunk, not two stacking: a
+ * station throat or a junction is forty times the cost of plain double track
+ * and no per-frame count can divide it. Cutting that tail means splitting a
+ * single `buildChunk` across frames — its dozen `add(...)` calls are the
+ * natural seam — which is a real restructuring and wants its own pass. This
+ * constant is the cheap half, kept because it is correct and costs nothing.
+ *
+ * Deliberately under a frame at 60 Hz. The queue survives across frames — that
+ * is what `pending` is — so nothing is lost by stopping early; the ring simply
+ * fills a frame or two later, exactly as it already does behind a walking
+ * player.
+ */
+export const RAIL_BUILD_BUDGET_MS = 8;
 /** And disposed past this. The hysteresis is the streamer's own pattern. */
 export const KEEP_RADIUS = 1500;
 /** How many times a chunk is rebuilt waiting for terrain. See `retryProvisional`. */

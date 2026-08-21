@@ -193,6 +193,7 @@ import {
   BRIDGE_RAIL_H,
   BUILDS_PER_FRAME,
   BUILD_RADIUS,
+  RAIL_BUILD_BUDGET_MS,
   CANOPY_HALF_LENGTH,
   CANOPY_HEIGHT,
   CANOPY_OVERHANG,
@@ -920,6 +921,18 @@ export class RailWorld {
   }
   /** What the last chunk transition cost, milliseconds. */
   rebuildMs = 0;
+  /**
+   * How many times the millisecond ceiling stopped a frame short of
+   * `BUILDS_PER_FRAME`, for the run of a session.
+   *
+   * Reported rather than acted on, and it is the number that says whether
+   * `RAIL_BUILD_BUDGET_MS` is doing anything: zero over a long ride means every
+   * frame's builds fitted and the ceiling is inert, which is the expected
+   * reading on plain track. It climbs where the chunks are expensive -- station
+   * throats, junctions, the approaches to the Harbour Bridge -- and each count
+   * is one stall that became a chunk arriving a frame later instead.
+   */
+  rebuildDeferred = 0;
   /** Draw calls the chunk ring is currently contributing. */
   chunkDraws = 0;
   sleeperCount = 0;
@@ -1037,6 +1050,14 @@ export class RailWorld {
     if (this.pending.length > 0) {
       const started = performance.now();
       for (let n = 0; n < BUILDS_PER_FRAME && this.pending.length > 0; n++) {
+        // The first build of a frame always runs; every one after it has to ask
+        // first. See `RAIL_BUILD_BUDGET_MS` -- a station chunk and a plain-track
+        // chunk are the same unit to `BUILDS_PER_FRAME` and forty times apart in
+        // cost, and two expensive ones in one frame is the stall a rider feels.
+        if (n > 0 && performance.now() - started > RAIL_BUILD_BUDGET_MS) {
+          this.rebuildDeferred++;
+          break;
+        }
         const next = this.pending.pop()!;
         if (this.built.has(next) || !this.net.chunks.has(next)) continue;
         const [cx, cz] = next.split(',').map(Number);
