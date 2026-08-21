@@ -50,12 +50,17 @@
  * **v8 carries the players a client can see**, which is a function of local
  * density and not of the room. A working set is everybody within
  * `AOI_ENTER_RADIUS` (180 m), held until `AOI_LEAVE_RADIUS` (220 m), capped at
- * the `AOI_MAX_PLAYERS` (40) nearest, and the record grew a byte to 22:
+ * the `AOI_MAX_PLAYERS` (40) nearest. **WORKSTREAM AD then took the record from
+ * 22 bytes to 17** -- see `PLAYER_BYTES`, `POS_BYTES` and `quantiseYaw8` -- and
+ * the table below is the v8 shape at the current width:
  *
- *     alone in a street ->  12 +  1 x 22 =   34 B/snapshot ->  **5 kbit/s**
- *     a fight (6 in view) ->  12 +  6 x 22 =  144 B         -> **23 kbit/s**
- *     a busy block (18)   ->  12 + 18 x 22 =  408 B         -> **65 kbit/s**
- *     the cap (40)        ->  12 + 40 x 22 =  892 B         -> **143 kbit/s**
+ *     alone in a street   ->  13 +  1 x 17 =   30 B/snapshot ->  **5 kbit/s**
+ *     a fight (6 in view) ->  13 +  6 x 17 =  115 B          -> **18 kbit/s**
+ *     a busy block (18)   ->  13 + 18 x 17 =  319 B          -> **51 kbit/s**
+ *     the cap (40)        ->  13 + 40 x 17 =  693 B          -> **111 kbit/s**
+ *
+ * -- against 143 kbit/s at the cap before AD, which is a 22% cut on the section
+ * that sets the worst case.
  *
  * So spec 10's budget is now met at the counts the game is *played* at rather
  * than at the count it happens to hold, and -- the part that matters more --
@@ -67,7 +72,7 @@
  * that the mean is far under the cap: people spread out, and the mean working
  * set in a 128-player room is single digits.
  *
- * **Footballs are on top of that**, at 18 B each, and they are the one part of
+ * **Footballs are on top of that**, at 17 B each, and they are the one part of
  * this record not paid per player. **The two numbers behind the sum below both
  * moved** when the player asked for a ball that lasts ten times as long and a
  * supply that returns two and a half times faster, and the arithmetic is
@@ -82,39 +87,47 @@
  * the sustained count is nearer *seven* balls per player, and six players in one
  * street is forty balls, 800 B, rather than two and 36 B.
  *
- * Three things keep that from being forty balls in everyone's stream. The
- * `InterestIndex` filters balls **by the ball's own position** against
- * `AOI_LEAVE_RADIUS`, and a ball that has rolled two streets away is out of it.
- * The delta encoding in the note below closes a ball more cheaply than it
- * closes a player, because a ball's position moves a predictable distance along
- * a known velocity and the residual against a *ballistic* prediction is
- * centimetres -- and a *rolling* ball is the easiest case that encoding has,
- * since it is travelling in nearly a straight line at nearly constant speed.
- * And the tail of a ball's life is the cheap part by construction: it is slow,
- * it is predictable, and `footy.ARM_SPEED_SQ` means it is not even a hit test
- * any more.
+ * Four things keep that from being forty balls in everyone's stream, and
+ * **WORKSTREAM AD added the two that actually bound it**. The `InterestIndex`
+ * filters balls **by the ball's own position**, now against `AOI_BALL_RADIUS`
+ * (110 m) rather than the players' 220, and a ball that has rolled two streets
+ * away is out of it. The section is **capped at `AOI_MAX_BALLS` (40)**, which
+ * is what the radius alone could never do: PERFORMANCE.md phase 4's CBD pileup
+ * sustained 67 balls *inside forty metres*, where every radius in this file is
+ * the whole room. A ball is not sent to the client that threw it, which
+ * `net/client.ownBall` discards on arrival anyway. And the tail of a ball's
+ * life is the cheap part by construction: it is slow, it is predictable, and
+ * `footy.ARM_SPEED_SQ` means it is not even a hit test any more.
+ *
+ * The delta encoding in the note below would close a ball more cheaply still,
+ * because a ball's position moves a predictable distance along a known velocity
+ * and the residual against a *ballistic* prediction is centimetres -- and a
+ * *rolling* ball is the easiest case that encoding has, since it is travelling
+ * in nearly a straight line at nearly constant speed. That one is still
+ * unbuilt.
  *
  * What is left is real and is stated rather than smoothed away: a sixteen-player
  * brawl in one street costs more than it did. It is the thing that was asked for
  * -- the balls stay in play -- and it is the one situation where a player wants
- * every one of them drawn. `verifyNet` asserts the sustained case and that a
- * ball never costs more than a person.
+ * every one of them drawn, which is why the cap is set far past what a person
+ * can follow rather than at what a person can use. `verifyNet` asserts the
+ * sustained case and that a ball never costs more than a person.
  *
- * **Faction actors are on top of that too**, at 18 B each -- see `NPC_BYTES` --
+ * **Faction actors are on top of that too**, at 14 B each -- see `NPC_BYTES` --
  * and they are the one section here that is neither per-player nor transient.
  * `game/factions.MAX_ACTORS` is what bounds it, at 24, and that number is a
  * *wire* budget rather than a simulation one for exactly this reason:
  *
  *     quiet city      -> 0 actors                          -> no change at all
- *     one pursuit     -> 4 actors,  72 B                   ->  +12 kbit/s
- *     the cap         -> 24 actors, 432 B                  ->  +69 kbit/s
+ *     one pursuit     -> 4 actors,  56 B                   ->   +9 kbit/s
+ *     the cap         -> 24 actors, 336 B                  ->  +54 kbit/s
  *
  * The realistic worst case anything in this build can reach -- sixteen players,
- * the two balls six of them sustain, and a pursuit at the cap -- is 814 B a
- * snapshot, or **131 kbit/s**. That is well over spec 10's budget in the same
- * direction and for the same reason the player section already is, and the two
- * remedies below close it identically: an officer walking is a near-zero delta
- * and an officer running is a predictable one.
+ * the two balls six of them sustain, and a pursuit at the cap -- is 655 B a
+ * snapshot, or **105 kbit/s**. That is still over spec 10's budget in the same
+ * direction and for the same reason the player section already is, and the
+ * remedy below closes it: an officer walking is a near-zero delta and an
+ * officer running is a predictable one.
  *
  * The cap is what makes the number bounded rather than a function of how much
  * trouble a player is in, which is the property that actually matters. Ambient
@@ -122,14 +135,15 @@
  * because they are a deterministic function of the tick on both ends, exactly as
  * six thousand cars are.
  *
- * The gap is 12 bytes of position per player, and there are two known ways to
- * close it, neither of which belongs in a first server:
+ * The gap was 12 bytes of position per player, and there were two known ways to
+ * close it. **WORKSTREAM AD built the first**; the second is still the one that
+ * would actually reach spec 10's number:
  *
- *   - **Pack the position instead of sending three i32.** The extent is 4 km
- *     now and 15 km at stage 2, and the terrain spans about -100 to +400 m, so
- *     21/17/21 bits at 1 cm covers the whole middle ring in 8 bytes and takes
- *     the record to 17. That is 45 kbit/s at sixteen -- an improvement and still
- *     not the budget.
+ *   - ~~**Pack the position instead of sending three i32.**~~ **Done.** The
+ *     extent turned out to be 60 km rather than the 4 this note was written
+ *     against, so the shape is 24 bits an axis at 1 cm rather than the
+ *     21/17/21 sketched here -- nine bytes for a point, and the player record
+ *     landed at 17 with the two angles narrowed beside it. See `POS_BYTES`.
  *   - **Delta-encode against the last acknowledged snapshot.** This is the one
  *     that actually gets there: a standing player is a zero delta and a running
  *     one moves under 15 cm a snapshot, so a field mask plus i16 centimetres is
@@ -144,18 +158,31 @@
  * QUANTISATION. Spec 10: *"Quantise hard -- the world is metric and 1 cm is
  * plenty."*
  *
- * Position is i32 **millimetres** of world coordinate, which is ten times finer
- * than the spec asks and is chosen for robustness rather than for precision:
- * i32 mm covers +/- 2,147 km, so no player at any stage of the extent can ever
- * wrap the field, and there is no origin, no scale factor and no envelope for
- * the two ends to disagree about. Every other quantity is packed to the coarsest
+ * Position **outside the snapshot** is i32 millimetres of world coordinate --
+ * `quantisePos`, still used by `WELCOME`, the bike and car rosters and the
+ * events -- which is ten times finer than the spec asks and is chosen for
+ * robustness rather than for precision: i32 mm covers +/- 2,147 km, so nothing
+ * at any stage of the extent can wrap the field, and there is no origin, no
+ * scale factor and no envelope for the two ends to disagree about. Those
+ * messages are sent on a change or once a session, so the three bytes are free.
+ *
+ * Position **inside the snapshot** is 24 bits an axis at 1 cm -- `POS_BYTES`,
+ * WORKSTREAM AD -- which keeps the same "cannot wrap" property against the
+ * 60.5 km extent with headroom and costs nine bytes instead of twelve. It is
+ * the spec's own unit, and it is paid up to eighty times a snapshot twenty
+ * times a second, which is what makes the decimal place worth arguing about
+ * there and not anywhere else. Every other quantity is packed to the coarsest
  * unit that is still invisible:
  *
- *   - **yaw** to u16 over a full turn: 0.0000959 rad, or 0.0055 degrees. A
- *     player turning at the mouse's fastest is 6 rad/s, which is 0.1 rad a tick,
- *     so the step is a thousandth of one tick's turn.
- *   - **pitch** to i16 over +/- pi/2: 0.0000479 rad. Half the yaw step, because
- *     the range is half as wide and the field is the same width.
+ *   - **yaw** to u8 over a full turn in the snapshot (`quantiseYaw8`): 0.0245
+ *     rad, or 1.4 degrees a step. Against an interpolator reconstructing a
+ *     17-degree turn from two samples 50 ms apart, which is what the endpoints
+ *     are actually for. The **input's** yaw stays u16 (0.0055 degrees), because
+ *     the server integrates that one into an authoritative aim and runs a hit
+ *     test off it.
+ *   - **pitch** to i8 over +/- pi/2 in the snapshot: 0.0123 rad, 0.70 degrees.
+ *     Half the yaw step, because the range is half as wide and the field is the
+ *     same width. The input's stays i16 for the yaw's reason.
  *   - **health** to u8 at 1/64 pip. Spec 8.3's smallest real health is 0.6 pips
  *     and the HUD draws a ceiling, so what has to survive is only "is this
  *     above zero", which 1/64 answers with six bits to spare.
@@ -741,7 +768,31 @@ export const MSG = {
  * fighting for you landed. A v18 server would read the new INPUT one byte short
  * and mis-decode every button after the first, which is a bump.
  */
-export const PROTOCOL_VERSION = 19;
+/*
+ * v20: the snapshot got smaller, and there is nothing lenient about it.
+ *
+ * Workstream AD, the egress pass. Every per-tick record narrowed --
+ * `PLAYER_BYTES` 22 -> 17, `BALL_BYTES` 20 -> 17, `NPC_BYTES` 18 -> 14 -- by
+ * re-quantising the three fields whose precision the client was already
+ * throwing away: position from `i32` millimetres to 24 bits an axis at 1 cm
+ * (bound 0.87 cm in 3-D, against a reconciler whose dead zone is 2 cm), yaw
+ * from `u16` to `u8` (bound 0.703 degrees), pitch from `i16` to `i8`. The ball
+ * section also gained an interest rule of its own -- `AOI_BALL_RADIUS` 110 m,
+ * `AOI_MAX_BALLS` 40, nearest first -- so a hundred-player pileup stops
+ * broadcasting a hundred footballs to everybody standing in it.
+ *
+ * Positions *outside* the snapshot keep their millimetres: the WELCOME, the car
+ * and bike rosters and the event records are sent on change, so their bytes are
+ * not per tick and are not worth a rounding.
+ *
+ * This is the least lenient bump the wire has taken. Earlier versions moved a
+ * field or widened one and a mismatched reader got one value wrong; here every
+ * record in the snapshot has a different width, so a v19 client pointed at a
+ * v20 server does not read a stale position -- it reads garbage from the middle
+ * of the next player. The handshake refusal is the whole safety net, which is
+ * why the number moves in the same commit as the widths.
+ */
+export const PROTOCOL_VERSION = 20;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
@@ -835,6 +886,71 @@ export const AOI_ENTER_RADIUS = 180;
 export const AOI_LEAVE_RADIUS = 220;
 export const AOI_MAX_PLAYERS = 40;
 
+/**
+ * WORKSTREAM AD. The same two numbers for the **ball** section, which is the
+ * one part of a snapshot interest management left unbounded.
+ *
+ * PERFORMANCE.md phase 4 measured a CBD pileup at 372 kbit/s a client and named
+ * where it went: *"mostly footballs, not people. Forty players at 22 B is 143
+ * kbit/s; the rest is the ball section, which interest management does not
+ * bound in a pileup because all the balls are in the same place as all the
+ * people."* A hundred clients spamming throw sustained **67 balls in the air**,
+ * about 60% of the stream. The radius filter that already existed does nothing
+ * there -- sixty-seven balls inside forty metres are sixty-seven balls inside
+ * any radius -- so what was missing was the half of the player rule that does
+ * the real work: **a cap**.
+ *
+ * **`AOI_MAX_BALLS` is 40, the same as the roster's**, and equality is the
+ * point rather than a coincidence. The protocol's standing invariant is that a
+ * ball must never cost more than a person (`verifyNet` asserts it against
+ * `PLAYER_BYTES`); giving the two sections the same count makes the *section*
+ * obey it too, so the worst snapshot this wire can produce is bounded by two
+ * constants instead of by one constant and a throwing rate. Forty balls is far
+ * past what anybody can look at: a football is 0.27 m across, and forty of them
+ * inside 110 m is a sky full.
+ *
+ * **`AOI_BALL_RADIUS` is 110 m, half the players' leave radius**, and it is a
+ * separate number rather than a reuse of theirs because a ball is not a person
+ * and the thing that has to survive the cull is different. What must never be
+ * culled is a ball somebody could still *act* on, and the two things that bound
+ * that are both short:
+ *
+ *   - A ball is swattable inside `swat` range of a bat, which is metres, and
+ *     the server rewinds at most `MAX_REWIND_MS` (250 ms) to judge it. The
+ *     fastest a ball ever travels is about 45 m/s (`BALL_BYTES`), so the
+ *     furthest a ball that is about to matter to you can be at the moment it
+ *     stops being sent is **11 m**. 110 m is ten rewind windows.
+ *   - A ball has to *arrive* before it can be reacted to. At the 28 m/s launch
+ *     speed, 110 m is **3.9 seconds** of warning -- an eternity against the
+ *     100 ms interpolation buffer and against human reaction time.
+ *
+ * And what it buys at the other end: a ball at 220 m subtends 0.07 degrees,
+ * which on a 1080p 60-degree view is **2.2 pixels** -- and that is the ball's
+ * whole silhouette, before the interpolation and the tumble it is carrying
+ * three bytes of velocity to drive. The old radius was paying 17 B a snapshot,
+ * twenty times a second, for two pixels. There is no hysteresis band on either number,
+ * for the reason `InterestIndex.selectBalls` already states: a ball is a record
+ * in a map, not a rig to be built and disposed.
+ *
+ * **And a ball is not sent to the person who threw it at all**, which is the
+ * one rule here that goes the opposite way to the obvious guess. The natural
+ * assumption is that a thrower needs their own ball most, because it is what
+ * corrects their prediction. This client does not work that way and says so in
+ * two places: `net/client.interpolateBalls` opens with
+ * `if (this.ownBall(b.thrower)) continue`, and `ownBall`'s own comment explains
+ * why -- `main.ts` flies its own `localBalls` copy at *present* time, where the
+ * authoritative record is 100 ms behind it, so drawing the wire's copy would be
+ * two balls or a third of a second of lag on the throw. The correction a
+ * thrower actually gets is `MSG.SWAT`, an event, not the snapshot; `thrower` is
+ * deliberately left alone by a swat (`footy.Footy.owner` is what changes), so
+ * the filter holds for the whole of the ball's life. Sending those records is
+ * seventeen bytes a ball a snapshot that the receiver's first line of ball
+ * handling throws away -- **19 kbit/s** for a player sustaining the seven balls
+ * the file header's arithmetic says they can. `verifyAoi` pins it.
+ */
+export const AOI_BALL_RADIUS = 110;
+export const AOI_MAX_BALLS = 40;
+
 /** Spec 10: "Server rewind for punch validation, capped at 250 ms." */
 export const MAX_REWIND_MS = 250;
 
@@ -872,6 +988,167 @@ export function quantisePitch(pitch: number): number {
 
 export function dequantisePitch(raw: number): number {
   return raw / PITCH_SCALE;
+}
+
+/**
+ * WORKSTREAM AD. The snapshot's two angles, at a byte each instead of two.
+ *
+ * **u8 yaw: 1.406 degrees a step, 0.703 degrees of error.** **i8 pitch: 0.703
+ * degrees a step over the controller's own +/-90, 0.352 of error.** Both are
+ * eighty times coarser than the `u16`/`i16` they replace, and the case for them
+ * is the one the file header makes about the ball's velocity: *nothing
+ * integrates them*, and the thing sitting next to them on the same record is
+ * already far less exact.
+ *
+ * The comparison that decides it is against the **interpolator**, not against
+ * an eye. A remote's yaw is drawn by interpolating between two snapshots 50 ms
+ * apart, and a player turning at the mouse's fastest -- the 6 rad/s the header
+ * quotes -- turns **17 degrees** between two of them. The renderer is already
+ * reconstructing that arc from its two endpoints; feeding those endpoints to
+ * five decimal places is measuring the quantiser. 0.7 degrees of endpoint error
+ * against 17 degrees of interpolated sweep is 4% of the error already there.
+ *
+ * What the angles are actually *for* bounds it the other way. A remote's yaw
+ * points a body and a pitch tilts a head: at 0.703 degrees, the far shoulder of
+ * a 0.5 m torso moves **3 mm**. Neither field is read by anything that decides
+ * an outcome -- the server owns every hit, and a client's own yaw and pitch
+ * come from its own mouse and are never adopted from the wire (`reconcile`
+ * seeds a replay body with them and then overwrites both from the first
+ * replayed input; only the *position* it produces is kept).
+ *
+ * The two fields that keep their width are deliberate and are the ones that are
+ * integrated or accumulated rather than drawn: the **input** yaw and pitch
+ * (`INPUT_BYTES`) stay `u16`/`i16` because the server integrates the client's
+ * aim into an authoritative look direction and a hit test runs off it, and
+ * `WELCOME`'s spawn yaw stays wide because it is sent once.
+ *
+ * `verifyNet` pins both bounds, and pins the wrap at the seam -- an angle a
+ * hair under a full turn must come back as approximately zero and not as
+ * approximately 2 pi, which is a player facing backwards for one frame.
+ */
+const YAW8_SCALE = 256 / TAU;
+const PITCH8_SCALE = 127 / (Math.PI / 2);
+
+/** Radians to u8. Wraps rather than clamps, as `quantiseYaw` does and for its reason. */
+export function quantiseYaw8(yaw: number): number {
+  const wrapped = ((yaw % TAU) + TAU) % TAU;
+  return Math.round(wrapped * YAW8_SCALE) & 0xff;
+}
+
+export function dequantiseYaw8(raw: number): number {
+  return (raw & 0xff) / YAW8_SCALE;
+}
+
+/** Radians to i8, clamped to the controller's own pitch limit. */
+export function quantisePitch8(pitch: number): number {
+  const clamped = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+  return Math.max(-127, Math.min(127, Math.round(clamped * PITCH8_SCALE)));
+}
+
+export function dequantisePitch8(raw: number): number {
+  return raw / PITCH8_SCALE;
+}
+
+/** The worst error each byte-wide angle can carry, radians. `verifyNet` pins these. */
+export const YAW8_MAX_ERROR = Math.PI / 256;
+export const PITCH8_MAX_ERROR = Math.PI / 2 / 254;
+
+/**
+ * WORKSTREAM AD. The snapshot's position field: **24 bits an axis at 1 cm**,
+ * nine bytes for a point, against the twelve three `i32` millimetres cost.
+ *
+ * This is the field the file header above has been promising to pack since v8
+ * -- *"21/17/21 bits at 1 cm covers the whole middle ring in 8 bytes"* -- and
+ * the shape it actually landed in is three bytes an axis rather than a
+ * bit-packed 8, for reasons the old note could not have had:
+ *
+ *   - **The extent moved.** `world/root.json` is `radius_m: 60000` and the far
+ *     heightfield's half-extent is 60,500 m, so a horizontal axis has to reach
+ *     +/-60.5 km. 21 bits at 1 cm reaches 10.5 km and 23 reaches 41.9 km --
+ *     both of them short. 24 bits reaches **+/-83,886.07 m**, which is the
+ *     smallest byte-aligned field that covers the world with headroom.
+ *   - **The vertical axis gets the same field as the other two**, where the old
+ *     sketch gave it a narrow biased one. A biased 16-bit `y` is 655 m of range
+ *     that has to be positioned by hand against terrain this build has not
+ *     finished growing (60 km west of Town Hall is the foot of the Blue
+ *     Mountains), and the failure mode when it is positioned wrong is a player
+ *     silently clamped to the top of the field. `quantisePos`'s own header
+ *     argues the same thing about the `i32` it is replacing -- *"chosen for
+ *     robustness rather than for precision"* -- and one uniform axis keeps that
+ *     property: **no position reachable in this world can wrap or clamp this
+ *     field**, and there is one error bound rather than two.
+ *
+ * **The error bound is 0.5 cm an axis, 0.87 cm on a diagonal.** That number is
+ * not a guess about what an eye can see; it is under a threshold the client has
+ * already written down. `net/client.CORRECTION_DEADZONE` is **2 cm** -- the
+ * reconciler's own statement that a disagreement smaller than that is not worth
+ * telling the simulation about -- so the whole of this quantiser's error is
+ * inside the band the local player's own prediction already discards. For a
+ * *remote* body it is smaller still against the thing next to it: remotes are
+ * drawn `INTERP_DELAY_MS` (100 ms) in the past and interpolated between samples
+ * 50 ms apart, and a player sprinting at 8.2 m/s covers 41 cm between two of
+ * them. Half a centimetre is a fiftieth of the gap the interpolator is already
+ * guessing across.
+ *
+ * The 1 mm this replaces was never a requirement. Spec 10 asks for 1 cm in
+ * those words (*"the world is metric and 1 cm is plenty"*); the millimetre was
+ * a side effect of `i32` being the convenient width, and it cost three bytes on
+ * every record in the hottest message on the wire -- 40 players and 40 balls in
+ * a pileup is 240 B a snapshot, 38 kbit/s, of a decimal place nothing reads.
+ *
+ * `verifyNet` pins the bound, the range and the sign at the extremes.
+ */
+export const POS_STEP_M = 0.01;
+/** What one axis of a packed position can hold, metres. Asserted by `verifyNet`. */
+export const POS_LIMIT_M = 0x7fffff * POS_STEP_M;
+/** Bytes one packed position occupies. Three axes, three bytes each. */
+export const POS_BYTES = 9;
+
+/** Metres to a signed 24-bit count of centimetres, clamped rather than wrapped. */
+export function quantisePos24(metres: number): number {
+  // Non-finite lands at the edge of the field on `quantisePos`' argument: a
+  // position should never be NaN, and if one ever is, a player at the far edge
+  // of the world is a visible failure rather than an invisible one at the ENU
+  // origin. Clamped rather than wrapped for the same reason -- a wrap puts a
+  // body at the *opposite* edge, which reads as a legitimate teleport.
+  if (!Number.isFinite(metres)) return metres > 0 ? 0x7fffff : -0x7fffff;
+  const n = Math.round(metres / POS_STEP_M);
+  return n < -0x7fffff ? -0x7fffff : n > 0x7fffff ? 0x7fffff : n;
+}
+
+export function dequantisePos24(raw: number): number {
+  return raw * POS_STEP_M;
+}
+
+/**
+ * Write one position at `off`. Nine bytes: x, y, z, each a little-endian
+ * signed 24.
+ *
+ * Two writes an axis rather than one, because there is no `setUint24`: a `u16`
+ * for the low half and a `u8` for the high byte, in the little-endian order the
+ * rest of this file uses so a hex dump of a frame reads the same way
+ * throughout. The reader sign-extends with `<< 8 >> 8`, which is the one-op
+ * idiom for a 24-bit two's-complement field and is exact in both runtimes.
+ */
+export function writePos(v: DataView, off: number, x: number, y: number, z: number): void {
+  const qx = quantisePos24(x);
+  const qy = quantisePos24(y);
+  const qz = quantisePos24(z);
+  v.setUint16(off, qx & 0xffff, true);
+  v.setUint8(off + 2, (qx >> 16) & 0xff);
+  v.setUint16(off + 3, qy & 0xffff, true);
+  v.setUint8(off + 5, (qy >> 16) & 0xff);
+  v.setUint16(off + 6, qz & 0xffff, true);
+  v.setUint8(off + 8, (qz >> 16) & 0xff);
+}
+
+/** One axis of a packed position, metres. `axis` is 0, 1 or 2 for x, y, z. */
+export function readPos(v: DataView, off: number, axis: number): number {
+  const at = off + axis * 3;
+  const raw = v.getUint16(at, true) | (v.getUint8(at + 2) << 16);
+  // Sign-extend the 24-bit field. Without this a negative coordinate comes back
+  // as a position 167 km east, which is a player drawn in the Pacific.
+  return dequantisePos24((raw << 8) >> 8);
 }
 
 /** Metres to i32 millimetres. */
@@ -1629,16 +1906,26 @@ export const FLAG = {
 } as const;
 
 /**
- * 22 bytes. See the header's bandwidth arithmetic.
+ * 17 bytes. See the header's bandwidth arithmetic.
  *
  *     u16  id            v8: was a u8, which aliased above 255 players
- *     i32  x, y, z
- *     u16  yaw
- *     i16  pitch
+ *     pos  x, y, z       9 B, 1 cm an axis; see `POS_BYTES`
+ *     u8   yaw           see `quantiseYaw8`
+ *     i8   pitch
  *     u8   anim
  *     u8   health
  *     u8   stamina | phase << 4
  *     u8   flags | ballCharges << 4
+ *
+ * **WORKSTREAM AD took this from 22 to 17**, and it is the same five bytes on
+ * every record in the message: three off the position (i32 mm -> 24-bit cm,
+ * `POS_BYTES`) and one each off the yaw and the pitch (`quantiseYaw8`). Both
+ * quantisers carry their own argument and their own `verifyNet` bound; what is
+ * worth stating *here* is what the five bytes are worth, because this record is
+ * paid up to `AOI_MAX_PLAYERS` times a snapshot: at the cap it is **200 B a
+ * snapshot, 32 kbit/s a client**, and at 1,000 concurrent it is 32 Mbit/s and
+ * 14 GB a day of a transfer allowance PERFORMANCE.md phase 4 says is the
+ * binding constraint on this box.
  *
  * **The id is the one field v8 widened here, and PERFORMANCE.md phase 1 is the
  * measurement that says why.** A 500-player load run put two players on id 244
@@ -1654,15 +1941,22 @@ export const FLAG = {
  * ordinary street. That is the trade the widening was cheap under: 21 B x 128
  * was never going to be sent, and 22 B x 40 is.
  */
-export const PLAYER_BYTES = 22;
+export const PLAYER_BYTES = 17;
 /**
- * 20 bytes, against a player's 22.
+ * 17 bytes, against a player's 17.
  *
  *     u16  id                  v8: was a u8; 0 is "no ball"
  *     u16  thrower             the combatant id, for "is this mine" and the audio
- *     i32  x, y, z             millimetres, as every position on this wire is
+ *     pos  x, y, z             9 B, 1 cm an axis, as every snapshot position is
  *     i8   vx, vy, vz          half-metres a second
  *     u8   bounces             0..`footy.MAX_BOUNCES`, which is 30 and still a byte
+ *
+ * **WORKSTREAM AD took this from 20 to 17** by packing the position exactly as
+ * the player record above was packed, and the equality with `PLAYER_BYTES` that
+ * fell out of it is worth keeping rather than shaving further: the standing
+ * invariant `verifyNet` asserts is *a ball must never cost more than a person*,
+ * and at 17 against 17 it holds with nothing to spare, which is the right place
+ * for a section that is now capped at the same count (`AOI_MAX_BALLS`).
  *
  * **Why the velocity is on the wire at all**, when a player's is not: a ball
  * moves 1.4 m between snapshots where a sprinting player moves 0.4 m, so the two
@@ -1703,15 +1997,26 @@ export const PLAYER_BYTES = 22;
  * history of one that just died, which draws a football teleporting across the
  * street.
  */
-export const BALL_BYTES = 20;
+export const BALL_BYTES = 17;
 /**
- * One faction actor, 18 bytes -- the same as a football and three under a player.
+ * One faction actor, 14 bytes -- three under a football and three under a player.
  *
  *     u16  id            `factions.NpcActor.id`, 1..65535; 0 is "no actor"
  *     u8   kind          `factions.NPC_KIND`
- *     i32  x, y, z       millimetres, as every position on this wire is
- *     u16  yaw
+ *     pos  x, y, z       9 B, 1 cm an axis, as every snapshot position is
+ *     u8   yaw           see `quantiseYaw8`
  *     u8   state         `factions.NPC_STATE`
+ *
+ * **WORKSTREAM AD took this from 18 to 14**, on the player record's arguments
+ * and with one extra that is specific to an officer: the note below explains
+ * that an actor carries **no target field** because *"the yaw already does,
+ * authoritatively, and 0.0055 degrees more precisely than a target position
+ * re-derived on the far end"*. That parenthesis is now 1.4 degrees more
+ * precisely, and the conclusion is unchanged -- what the yaw is for is aiming a
+ * body at somebody, and 0.7 degrees of error at `factions.ENGAGE_RANGE` (45 m)
+ * points an officer 55 cm to one side of a target they are drawn near rather
+ * than at. Nothing decides a shot from it: `factions` rolls its hit probability
+ * off range on the server.
  *
  * **Everything about an actor that is not in this record is derived**, and that
  * is the whole design of the section. There is no health, no target, no
@@ -1750,7 +2055,7 @@ export const BALL_BYTES = 20;
  * argument was really protecting against is culling at *engagement* range, and
  * `factions.ENGAGE_RANGE` is 45 m.
  */
-export const NPC_BYTES = 18;
+export const NPC_BYTES = 14;
 /**
  * type + tick + ackSeq + player count + ball count + actor count.
  *
@@ -1952,23 +2257,30 @@ export interface Snapshot {
   ackSeq: number;
   players: SnapshotPlayer[];
   /**
-   * Every ball in the air, everywhere, with no relevance culling -- on exactly
-   * the argument `server/sim.ts` makes about players. A ball is in the air for
-   * at most five seconds and the realistic count in a busy fight is a handful;
-   * culling one that is about to arc into view is the pop the interpolation
-   * buffer exists to prevent.
+   * The balls this client can see: within `AOI_BALL_RADIUS` of it, the
+   * `AOI_MAX_BALLS` nearest of those, and never one it threw itself.
+   *
+   * This field's doc used to read *"every ball in the air, everywhere, with no
+   * relevance culling"*, and both halves of that stopped being true in stages.
+   * v8 added the radius; WORKSTREAM AD added the cap and the own-ball rule
+   * after PERFORMANCE.md phase 4 measured the section at 60% of a CBD pileup's
+   * stream. The reasoning for all three lives on `AOI_BALL_RADIUS`; the
+   * selection is `server/aoi.InterestIndex.selectBalls` and `verifyAoi` pins
+   * it against a brute-force statement of the rule.
    */
   balls: SnapshotBall[];
   /**
-   * Every promoted faction actor in the world -- police now, and whatever the
-   * two factions behind them promote later.
+   * The promoted faction actors this client can see -- police now, and whatever
+   * the two factions behind them promote later.
    *
-   * No relevance culling, on exactly the argument the players and the balls are
-   * carried under, plus one that is specific to a pursuer: the actor a player
-   * most needs to see is the one that has not arrived yet. Culling by distance
-   * would hide precisely the officer rounding the corner. `factions.MAX_ACTORS`
-   * is what bounds it instead, and it is a wire budget rather than a simulation
-   * one for that reason.
+   * Filtered by the actor's own position against `AOI_LEAVE_RADIUS`, exactly as
+   * the players are. There is no cap here and there does not need to be one:
+   * `factions.MAX_ACTORS` is 24 per room, so the section is bounded by a
+   * constant before interest ever looks at it, which is why that number is a
+   * wire budget rather than a simulation one. The old counter-argument -- *"the
+   * actor a player most needs to see is the one that has not arrived yet"* --
+   * survives at the radius actually used: 220 m is five city blocks, and
+   * `factions.ENGAGE_RANGE` is 45.
    */
   npcs: SnapshotNpc[];
   /**
@@ -2050,18 +2362,16 @@ export function encodeSnapshotInto(
   let p = SNAPSHOT_HEADER_BYTES;
   for (const s of players) {
     v.setUint16(p, s.id & 0xffff, true);
-    v.setInt32(p + 2, quantisePos(s.x), true);
-    v.setInt32(p + 6, quantisePos(s.y), true);
-    v.setInt32(p + 10, quantisePos(s.z), true);
-    v.setUint16(p + 14, quantiseYaw(s.yaw), true);
-    v.setInt16(p + 16, quantisePitch(s.pitch), true);
-    v.setUint8(p + 18, s.anim);
-    v.setUint8(p + 19, quantiseHealth(s.health));
+    writePos(v, p + 2, s.x, s.y, s.z);
+    v.setUint8(p + 11, quantiseYaw8(s.yaw));
+    v.setInt8(p + 12, quantisePitch8(s.pitch));
+    v.setUint8(p + 13, s.anim);
+    v.setUint8(p + 14, quantiseHealth(s.health));
     // Stamina is 0..4 and the phase is 0..5, so both fit in one byte with two
     // bits spare. Packed rather than given a byte each because at the counts a
     // working set holds a byte is 6.4 kbit/s of nothing.
-    v.setUint8(p + 20, (s.stamina & 0x0f) | ((s.phase & 0x0f) << 4));
-    v.setUint8(p + 21, (s.flags & FLAG.MASK) | ((s.ballCharges & 0x03) << FLAG.BALL_SHIFT));
+    v.setUint8(p + 15, (s.stamina & 0x0f) | ((s.phase & 0x0f) << 4));
+    v.setUint8(p + 16, (s.flags & FLAG.MASK) | ((s.ballCharges & 0x03) << FLAG.BALL_SHIFT));
     p += PLAYER_BYTES;
   }
   // The projectile section, after every player. Its own loop and its own record
@@ -2071,13 +2381,11 @@ export function encodeSnapshotInto(
   for (const b of balls) {
     v.setUint16(p, b.id & 0xffff, true);
     v.setUint16(p + 2, b.thrower & 0xffff, true);
-    v.setInt32(p + 4, quantisePos(b.x), true);
-    v.setInt32(p + 8, quantisePos(b.y), true);
-    v.setInt32(p + 12, quantisePos(b.z), true);
-    v.setInt8(p + 16, quantiseVelocity(b.vx));
-    v.setInt8(p + 17, quantiseVelocity(b.vy));
-    v.setInt8(p + 18, quantiseVelocity(b.vz));
-    v.setUint8(p + 19, b.bounces & 0xff);
+    writePos(v, p + 4, b.x, b.y, b.z);
+    v.setInt8(p + 13, quantiseVelocity(b.vx));
+    v.setInt8(p + 14, quantiseVelocity(b.vy));
+    v.setInt8(p + 15, quantiseVelocity(b.vz));
+    v.setUint8(p + 16, b.bounces & 0xff);
     p += BALL_BYTES;
   }
   // The faction section, after the projectiles, on the same argument the balls
@@ -2087,11 +2395,9 @@ export function encodeSnapshotInto(
   for (const n of npcs) {
     v.setUint16(p, n.id & 0xffff, true);
     v.setUint8(p + 2, n.kind & 0xff);
-    v.setInt32(p + 3, quantisePos(n.x), true);
-    v.setInt32(p + 7, quantisePos(n.y), true);
-    v.setInt32(p + 11, quantisePos(n.z), true);
-    v.setUint16(p + 15, quantiseYaw(n.yaw), true);
-    v.setUint8(p + 17, n.state & 0xff);
+    writePos(v, p + 3, n.x, n.y, n.z);
+    v.setUint8(p + 12, quantiseYaw8(n.yaw));
+    v.setUint8(p + 13, n.state & 0xff);
     p += NPC_BYTES;
   }
   // The riders, last, and after the actors on the same argument they sit after
@@ -2149,17 +2455,17 @@ export function decodeSnapshot(buffer: ArrayBuffer, out: Snapshot): Snapshot | n
       out.players[i] = s;
     }
     s.id = v.getUint16(p, true);
-    s.x = dequantisePos(v.getInt32(p + 2, true));
-    s.y = dequantisePos(v.getInt32(p + 6, true));
-    s.z = dequantisePos(v.getInt32(p + 10, true));
-    s.yaw = dequantiseYaw(v.getUint16(p + 14, true));
-    s.pitch = dequantisePitch(v.getInt16(p + 16, true));
-    s.anim = v.getUint8(p + 18);
-    s.health = dequantiseHealth(v.getUint8(p + 19));
-    const sp = v.getUint8(p + 20);
+    s.x = readPos(v, p + 2, 0);
+    s.y = readPos(v, p + 2, 1);
+    s.z = readPos(v, p + 2, 2);
+    s.yaw = dequantiseYaw8(v.getUint8(p + 11));
+    s.pitch = dequantisePitch8(v.getInt8(p + 12));
+    s.anim = v.getUint8(p + 13);
+    s.health = dequantiseHealth(v.getUint8(p + 14));
+    const sp = v.getUint8(p + 15);
     s.stamina = sp & 0x0f;
     s.phase = (sp >> 4) & 0x0f;
-    const fl = v.getUint8(p + 21);
+    const fl = v.getUint8(p + 16);
     s.flags = fl & FLAG.MASK;
     s.ballCharges = (fl >> FLAG.BALL_SHIFT) & 0x03;
     p += PLAYER_BYTES;
@@ -2173,13 +2479,13 @@ export function decodeSnapshot(buffer: ArrayBuffer, out: Snapshot): Snapshot | n
     }
     b.id = v.getUint16(p, true);
     b.thrower = v.getUint16(p + 2, true);
-    b.x = dequantisePos(v.getInt32(p + 4, true));
-    b.y = dequantisePos(v.getInt32(p + 8, true));
-    b.z = dequantisePos(v.getInt32(p + 12, true));
-    b.vx = dequantiseVelocity(v.getInt8(p + 16));
-    b.vy = dequantiseVelocity(v.getInt8(p + 17));
-    b.vz = dequantiseVelocity(v.getInt8(p + 18));
-    b.bounces = v.getUint8(p + 19);
+    b.x = readPos(v, p + 4, 0);
+    b.y = readPos(v, p + 4, 1);
+    b.z = readPos(v, p + 4, 2);
+    b.vx = dequantiseVelocity(v.getInt8(p + 13));
+    b.vy = dequantiseVelocity(v.getInt8(p + 14));
+    b.vz = dequantiseVelocity(v.getInt8(p + 15));
+    b.bounces = v.getUint8(p + 16);
     p += BALL_BYTES;
   }
   out.npcs.length = npcCount;
@@ -2191,11 +2497,11 @@ export function decodeSnapshot(buffer: ArrayBuffer, out: Snapshot): Snapshot | n
     }
     n.id = v.getUint16(p, true);
     n.kind = v.getUint8(p + 2);
-    n.x = dequantisePos(v.getInt32(p + 3, true));
-    n.y = dequantisePos(v.getInt32(p + 7, true));
-    n.z = dequantisePos(v.getInt32(p + 11, true));
-    n.yaw = dequantiseYaw(v.getUint16(p + 15, true));
-    n.state = v.getUint8(p + 17);
+    n.x = readPos(v, p + 3, 0);
+    n.y = readPos(v, p + 3, 1);
+    n.z = readPos(v, p + 3, 2);
+    n.yaw = dequantiseYaw8(v.getUint8(p + 12));
+    n.state = v.getUint8(p + 13);
     p += NPC_BYTES;
   }
   out.aboard.length = aboardCount;
@@ -4041,6 +4347,124 @@ export function verifyNet(): string[] {
     }
   }
 
+  // --- WORKSTREAM AD: the snapshot's own position field, which is a different
+  // quantiser from the one three blocks up and is the one paid eighty times a
+  // frame. Three things are pinned rather than one, because they fail
+  // differently and only the first has a picture anybody would recognise:
+  //
+  //   - **The bound.** 0.5 cm an axis. Stated here so a step that silently
+  //     became 10 cm -- a `POS_STEP_M` typo -- is a failure rather than a
+  //     population of remote players who jitter half a metre while standing
+  //     still.
+  //   - **The sign.** A 24-bit field read without sign extension turns every
+  //     negative coordinate into one 167 km east, which draws the western half
+  //     of Sydney in the Pacific. This is the failure the `<< 8 >> 8` in
+  //     `readPos` exists for and it has no partial version: it is either right
+  //     or the whole west is gone.
+  //   - **The range.** The field must reach the extent (`root.json`'s
+  //     `radius_m` is 60,000 and the far heightfield's half-extent 60,500) with
+  //     room over, and must *clamp* rather than wrap past it -- a wrap is a
+  //     player who walks off the east edge and reappears in the west.
+  {
+    const view = new DataView(new ArrayBuffer(POS_BYTES));
+    const cases: Array<[number, number, number]> = [
+      [0, 0, 0],
+      [0.005, -0.005, 0.014],
+      [1.234, -70.125, 987.654],
+      [-1234.56, 42.5, -3999.99],
+      // The corners of the built world, on both signs of both horizontal axes,
+      // and a vertical that is past anything standable -- the point being that
+      // the vertical axis has the same reach as the other two, which is the
+      // whole argument for nine bytes over a biased eight.
+      [60500, 910, -60500],
+      [-60500, -400, 60500],
+    ];
+    for (const [x, y, z] of cases) {
+      writePos(view, 0, x, y, z);
+      const back: [number, number, number] = [readPos(view, 0, 0), readPos(view, 0, 1), readPos(view, 0, 2)];
+      const want = [x, y, z];
+      for (let a = 0; a < 3; a++) {
+        if (Math.abs(back[a] - want[a]) > POS_STEP_M / 2 + 1e-9) {
+          failures.push(
+            `Snapshot position axis ${a} of (${x}, ${y}, ${z}) came back as ${back[a]}; the field is ` +
+              `${POS_STEP_M * 100} cm steps, so the worst error is ${POS_STEP_M * 50} cm.`,
+          );
+        }
+        // The sign is only meaningful once the value is past one step -- a
+        // coordinate of -0.005 m legitimately rounds to zero, and demanding a
+        // sign of it would be demanding precision the field does not claim.
+        if (Math.abs(want[a]) > POS_STEP_M && Math.sign(back[a]) !== Math.sign(want[a])) {
+          failures.push(
+            `Snapshot position axis ${a} of (${x}, ${y}, ${z}) came back as ${back[a]} -- the sign is ` +
+              `wrong. A 24-bit field read without sign extension puts every negative coordinate ` +
+              `${(0x1000000 * POS_STEP_M) / 1000} km east.`,
+          );
+        }
+      }
+    }
+    if (POS_LIMIT_M < 60500) {
+      failures.push(
+        `A snapshot position axis reaches ${POS_LIMIT_M} m and the world's half-extent is 60,500 m. ` +
+          `Somebody at the edge of the bake would be clamped short of where they are standing.`,
+      );
+    }
+    // Past the field: clamped to the edge, never wrapped to the other side.
+    writePos(view, 0, POS_LIMIT_M * 4, -POS_LIMIT_M * 4, 0);
+    if (readPos(view, 0, 0) <= 0 || readPos(view, 0, 1) >= 0) {
+      failures.push(
+        'A position four times outside the field wrapped instead of clamping. A wrap is a body at ' +
+          'the opposite edge of Sydney, which reads as a legitimate teleport rather than as a bug.',
+      );
+    }
+    // And NaN, which `Math.round` turns into NaN and `setUint16` turns into a
+    // zero -- a player silently at Town Hall with nothing thrown.
+    writePos(view, 0, NaN, NaN, NaN);
+    if (readPos(view, 0, 0) === 0 && readPos(view, 0, 1) === 0 && readPos(view, 0, 2) === 0) {
+      failures.push('A NaN position encoded as the ENU origin rather than as the edge of the world.');
+    }
+  }
+
+  // --- WORKSTREAM AD: the snapshot's two byte-wide angles.
+  //
+  // Both are pinned against their stated bound and the yaw against the seam.
+  // The seam is the one with a picture: a yaw a hair under a full turn that
+  // rounds *up* out of the field and is masked back to 0 is the same angle, and
+  // a yaw that rounds up and is not masked is a player facing due north for one
+  // frame in every turn.
+  {
+    for (const yaw of [0, 0.5, Math.PI, -Math.PI, TAU - 0.001, TAU - 1e-9, -7.3, 12.9]) {
+      const back = dequantiseYaw8(quantiseYaw8(yaw));
+      const wrapped = ((yaw % TAU) + TAU) % TAU;
+      const err = Math.abs(Math.atan2(Math.sin(back - wrapped), Math.cos(back - wrapped)));
+      if (err > YAW8_MAX_ERROR + 1e-9) {
+        failures.push(
+          `Snapshot yaw ${yaw.toFixed(4)} round-tripped to ${back.toFixed(4)} (${err.toFixed(5)} rad out); ` +
+            `the u8 field's worst error is ${YAW8_MAX_ERROR.toFixed(5)} rad, ` +
+            `${((YAW8_MAX_ERROR * 180) / Math.PI).toFixed(2)} degrees.`,
+        );
+      }
+    }
+    for (const pitch of [0, 0.1, -0.1, 0.5, -0.5, 1.55, -1.55, Math.PI, -Math.PI]) {
+      const back = dequantisePitch8(quantisePitch8(pitch));
+      const clamped = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+      if (Math.abs(back - clamped) > PITCH8_MAX_ERROR + 1e-9) {
+        failures.push(
+          `Snapshot pitch ${pitch.toFixed(4)} round-tripped to ${back.toFixed(4)}; the i8 field's ` +
+            `worst error is ${PITCH8_MAX_ERROR.toFixed(5)} rad.`,
+        );
+      }
+    }
+    // And the two bounds are what the prose says they are, in degrees, so a
+    // scale changed without the header changing with it is caught here rather
+    // than by somebody reading two numbers that no longer agree.
+    if (Math.abs((YAW8_MAX_ERROR * 180) / Math.PI - 0.703125) > 1e-6) {
+      failures.push(`The u8 yaw's worst error is ${(YAW8_MAX_ERROR * 180) / Math.PI} degrees, not the 0.703 the header states.`);
+    }
+    if (Math.abs((PITCH8_MAX_ERROR * 180) / Math.PI - 0.354) > 0.01) {
+      failures.push(`The i8 pitch's worst error is ${(PITCH8_MAX_ERROR * 180) / Math.PI} degrees, not the 0.35 the header states.`);
+    }
+  }
+
   // --- Health: 1/64 of a pip, over spec 8.3's real values.
   for (const h of [0, 0.6, 1, 1.6, 2.8, 3]) {
     const back = dequantiseHealth(quantiseHealth(h));
@@ -4243,6 +4667,17 @@ export function verifyNet(): string[] {
             failures.push(`Player ${a.id}: ${axis} ${want} came back as ${back}; spec 10's tolerance is 1 cm.`);
           }
         }
+        // WORKSTREAM AD: the two angles, at the record level and for the reason
+        // stated on the actor's yaw below -- an angle read from the wrong
+        // offset is a plausible angle, and only the comparison catches it.
+        const pyawErr = Math.abs(
+          Math.atan2(Math.sin(b.yaw - (a.yaw % (Math.PI * 2))), Math.cos(b.yaw - (a.yaw % (Math.PI * 2)))),
+        );
+        if (pyawErr > YAW8_MAX_ERROR + 1e-9) failures.push(`Player ${a.id}: yaw ${a.yaw} came back as ${b.yaw}.`);
+        const wantPitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, a.pitch));
+        if (Math.abs(b.pitch - wantPitch) > PITCH8_MAX_ERROR + 1e-9) {
+          failures.push(`Player ${a.id}: pitch ${a.pitch} came back as ${b.pitch}.`);
+        }
         if (b.anim !== a.anim) failures.push(`Player ${a.id}: anim ${a.anim} came back as ${b.anim}.`);
         if (b.stamina !== a.stamina) failures.push(`Player ${a.id}: stamina ${a.stamina} came back as ${b.stamina}.`);
         if (b.phase !== a.phase) failures.push(`Player ${a.id}: phase ${a.phase} came back as ${b.phase}.`);
@@ -4302,7 +4737,13 @@ export function verifyNet(): string[] {
         const yawErr = Math.abs(
           Math.atan2(Math.sin(b.yaw - (a.yaw % (Math.PI * 2))), Math.cos(b.yaw - (a.yaw % (Math.PI * 2)))),
         );
-        if (yawErr > 0.006) failures.push(`Actor ${a.id}: yaw ${a.yaw} came back as ${b.yaw}.`);
+        // WORKSTREAM AD: the actor's yaw is a byte now, so the tolerance is the
+        // byte's -- see `quantiseYaw8`. Left as a tolerance on the *record*
+        // rather than deleted in favour of the quantiser's own check, because
+        // what this one catches is different: a yaw read from the wrong offset
+        // decodes as a plausible angle, and only comparing it to the one that
+        // went in says the record's layout is wrong.
+        if (yawErr > YAW8_MAX_ERROR + 1e-9) failures.push(`Actor ${a.id}: yaw ${a.yaw} came back as ${b.yaw}.`);
       }
 
       // --- v10's aboard section, which is now the tail. The failure this one
@@ -5073,11 +5514,11 @@ export function verifyNet(): string[] {
     // somebody has widened a record without re-reading what it is now multiplied
     // by -- 40 rather than 16 -- and the ceiling has moved with it.
     const atCap = snapshotBytes(AOI_MAX_PLAYERS) * SNAPSHOT_HZ * 8;
-    if (atCap > 150000) {
+    if (atCap > 120000) {
       failures.push(
         `A full working set of ${AOI_MAX_PLAYERS} is ${(atCap / 1000).toFixed(1)} kbit/s. The header ` +
-          `documents 143; anything above 150 means the player record grew and the CBD-pileup ` +
-          `budget in PERFORMANCE.md is stale.`,
+          `documents 111 since WORKSTREAM AD narrowed the record to ${PLAYER_BYTES} B; anything above ` +
+          `120 means the player record grew and the CBD-pileup budget in PERFORMANCE.md is stale.`,
       );
     }
     // And the same arithmetic at the counts the game is actually played at,
@@ -5144,13 +5585,13 @@ export function verifyNet(): string[] {
     }
     // And the pathological one: a whole working set in one carriage, which is
     // the most this section can ever be because it is filtered by the same
-    // interest cap the players are. It moves the documented ceiling from 143 to
-    // 194 kbit/s, and that is the number to re-read before widening anything.
+    // interest cap the players are. It moves the documented ceiling from 111 to
+    // 162 kbit/s, and that is the number to re-read before widening anything.
     const ridingCap = snapshotBytes(AOI_MAX_PLAYERS, 0, 0, AOI_MAX_PLAYERS) * SNAPSHOT_HZ * 8;
-    if (ridingCap > 200000) {
+    if (ridingCap > 170000) {
       failures.push(
         `A full working set of ${AOI_MAX_PLAYERS}, all of them on one train, is ` +
-          `${(ridingCap / 1000).toFixed(1)} kbit/s against the 194 the record documents.`,
+          `${(ridingCap / 1000).toFixed(1)} kbit/s against the 162 the record documents.`,
       );
     }
     // A rider must never cost half of what a person costs. It is the invariant
@@ -5185,8 +5626,37 @@ export function verifyNet(): string[] {
     // that will break the stream first.
     if (BALL_BYTES > PLAYER_BYTES) {
       failures.push(
-        `A ball is ${BALL_BYTES} B against a player's ${PLAYER_BYTES}. The ball count is unbounded ` +
-          `where the roster is capped at ${MAX_PLAYERS}, so the cheaper record has to be the ball.`,
+        `A ball is ${BALL_BYTES} B against a player's ${PLAYER_BYTES}. The cheaper record has to be ` +
+          `the ball: the two sections are now capped at the same count, so a ball that costs more ` +
+          `than a person makes the projectile section the larger half of the worst snapshot.`,
+      );
+    }
+    // WORKSTREAM AD: and the section is *bounded* at all, which is the part
+    // that was missing rather than the byte width. PERFORMANCE.md phase 4
+    // measured 67 balls in a pileup against a roster capped at 40; the cap
+    // below is what turns "60% of the stream, unbounded" into a constant.
+    if (AOI_MAX_BALLS > AOI_MAX_PLAYERS) {
+      failures.push(
+        `The ball cap is ${AOI_MAX_BALLS} against a roster cap of ${AOI_MAX_PLAYERS}. The projectile ` +
+          `section must not be allowed to be the bigger half of a snapshot.`,
+      );
+    }
+    if (AOI_BALL_RADIUS > AOI_LEAVE_RADIUS) {
+      failures.push(
+        `Balls are carried to ${AOI_BALL_RADIUS} m and players to ${AOI_LEAVE_RADIUS} m. A ball ` +
+          `further away than any player a client can see is a ball nobody has anything to look at.`,
+      );
+    }
+    // And the floor under the ball radius, which is the one thing shrinking it
+    // could actually break: a ball must never leave the stream while somebody
+    // could still act on it. The server rewinds `MAX_REWIND_MS` to judge a swat
+    // and the fastest a ball travels is about 45 m/s, so 11 m is the distance a
+    // ball that is about to matter can be at the moment it stops being sent.
+    if (AOI_BALL_RADIUS < (45 * MAX_REWIND_MS) / 1000 * 4) {
+      failures.push(
+        `The ball radius is ${AOI_BALL_RADIUS} m, under four rewind windows of a 45 m/s ball ` +
+          `(${((45 * MAX_REWIND_MS) / 1000).toFixed(1)} m each). A ball can now be culled while it is ` +
+          `still swattable.`,
       );
     }
     // --- And v7's faction section, against the cap it was scoped with.
@@ -5199,10 +5669,10 @@ export function verifyNet(): string[] {
     // and a pursuit with reinforcements trickling in can, which is exactly the
     // shape of thing that quietly becomes the largest item on the wire.
     const npcSection = 24 * NPC_BYTES;
-    if (npcSection > 500) {
+    if (npcSection > 400) {
       failures.push(
-        `24 faction actors is ${npcSection} B a snapshot, over the 500 B this section was scoped at. ` +
-          `An actor is ${NPC_BYTES} B.`,
+        `24 faction actors is ${npcSection} B a snapshot, over the 400 B this section now fits in ` +
+          `(it was scoped at 500 and WORKSTREAM AD took the record to ${NPC_BYTES} B).`,
       );
     }
     // The whole stream at the worst case anything can reach under v8: a working
@@ -5212,10 +5682,23 @@ export function verifyNet(): string[] {
     // *moved* -- the faction section is the one part of this record not bounded
     // by the interest cap, so it is the one that will grow unnoticed.
     const fullHouse = snapshotBytes(AOI_MAX_PLAYERS, 10, 24) * SNAPSHOT_HZ * 8;
-    if (fullHouse > 250000) {
+    if (fullHouse > 200000) {
       failures.push(
         `A full working set with ten balls and a full pursuit is ${(fullHouse / 1000).toFixed(1)} kbit/s. ` +
-          'The CBD-pileup budget in PERFORMANCE.md is 244; anything above 250 means a record grew.',
+          'It was 244 before WORKSTREAM AD and is 192 after; anything above 200 means a record grew.',
+      );
+    }
+    // WORKSTREAM AD: and the case that was not expressible before -- **every**
+    // section at its cap at once. It could not be written down while the ball
+    // count was open-ended, which is exactly why the pileup surprised phase 4.
+    // This is now the largest snapshot this protocol can emit, full stop, and it
+    // is the number to size an egress budget on.
+    const ceiling = snapshotBytes(AOI_MAX_PLAYERS, AOI_MAX_BALLS, 24, AOI_MAX_PLAYERS) * SNAPSHOT_HZ * 8;
+    if (ceiling > 340000) {
+      failures.push(
+        `The largest snapshot this wire can emit -- ${AOI_MAX_PLAYERS} players, ${AOI_MAX_BALLS} balls, ` +
+          `24 actors, all of them on a train -- is ${(ceiling / 1000).toFixed(1)} kbit/s against the ` +
+          `325 documented. Every term in it is a constant, so a rise means one of the constants moved.`,
       );
     }
     // And the one that actually matters at the count this build is played at.
