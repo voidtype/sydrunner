@@ -212,6 +212,50 @@ const STATION_FLARE_M = 12;
 export const CUT_MIN_DEPTH = -0.3;
 
 /**
+ * How far the ground has to sit **over a bridge deck** before the corridor is
+ * cut anyway, metres.
+ *
+ * `inCutting` refuses to dig under a `SPAN_BRIDGE` span, and the reason is
+ * right for the case it was written for: a viaduct crossing a valley the DEM
+ * has smoothed flat is a modelling error in the *terrain*, and trenching under
+ * it produces a hole with a bridge over it. `checkRailCutting` names the worst
+ * of those — the Circular Quay viaduct, 8.9 m under a grid that is really the
+ * roofs of Alfred Street, because the DEM is a **surface** model and in the CBD
+ * the surface is buildings. Cutting there would carve a canyon through Circular
+ * Quay to expose a bridge. That decision was correct and this does not reverse
+ * it.
+ *
+ * What the rule had no answer for is the opposite case. Chatswood's northern
+ * throat is a deck with **fifteen metres of hill** on it: nothing carved, the
+ * ground stayed, and the train ran through the inside of a ridge for the first
+ * 230 m out of the platform, which is why it could not be seen leaving for
+ * Roseville. Both are "ground over a bridge"; only one of them is earth.
+ *
+ * **Nine metres, and it is a fence post rather than a principle — say so.** The
+ * honest discriminator is whether the height over the deck is a building or a
+ * hill, and nothing at this call site knows that: `RailCut` holds the corridor
+ * and the roads, and the roads rule (`decked`) already handles a carriageway
+ * over a railhead. What is available is the measured distribution, and it
+ * happens to separate:
+ *
+ *     within 3 km of the CBD, where the DEM reads roofs:  45 vertices, deepest 7.8 m
+ *     beyond it:                                          56 vertices, deepest 14.9 m
+ *
+ * Nine sits in that gap, above the worst known false positive and below the
+ * cluster that is genuinely a ridge. It moves about 0.4 km of the 43.3 km of
+ * bridge-flagged track in the bake and leaves Circular Quay exactly as it is.
+ *
+ * A gap in today's data is not a law, so this is deliberately the kind of
+ * number that shows up when it drifts: `checkRailCutting` counts buried bridge
+ * decks and reports them separately, and `server/rail-clearance-check.ts`
+ * prints the bridge total every run. When the real discriminator arrives — the
+ * building footprints are in the pipeline, and a "is this height a roof" flag
+ * per corridor point is the shape of it — this constant goes away rather than
+ * gets tuned.
+ */
+export const BRIDGE_BURIED_DEPTH = 9;
+
+/**
  * How deep a cutting has to be before **walls** are built in the hole.
  *
  * **A second question, and the reason it is a second constant is the cost.**
@@ -277,9 +321,13 @@ export function drawnAsTunnel(flags: number, _depth?: number): boolean {
  * and digging a trench under a viaduct would be a hole with a bridge over it.
  */
 export function inCutting(flags: number, depth: number): boolean {
-  if ((flags & SPAN_BRIDGE) !== 0) return false;
   if (drawnAsTunnel(flags)) return false;
   if (!Number.isFinite(depth)) return false;
+  // A bridge is not in a cutting *until the ground is properly on top of it*,
+  // at which point the flag is describing a structure and the depth is
+  // describing a burial, and the burial is the thing the player can see. See
+  // `BRIDGE_BURIED_DEPTH`.
+  if ((flags & SPAN_BRIDGE) !== 0) return depth > BRIDGE_BURIED_DEPTH;
   // One floor, and no tag branch: the tag exists to say "the grid has smoothed a
   // cutting away", and this floor is already below the grid's own noise. See
   // `CUT_MIN_DEPTH`, and `inTrench` for where the tag is still spent.

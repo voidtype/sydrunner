@@ -68,6 +68,13 @@ import {
   type RailLine,
   type RailDirection,
 } from '../client/src/game/rail.ts';
+/*
+ * The cut's own rule, imported rather than restated, because this file's whole
+ * job is to say what a player can see and only `inCutting` knows that. It is
+ * three-free and DOM-free -- a flag test and a depth comparison -- which is why
+ * a server-side driver can ask it.
+ */
+import { inCutting } from '../client/src/world/rail-cut.ts';
 
 // --- The budgets -----------------------------------------------------------------
 
@@ -92,6 +99,17 @@ export const BURIED_BUDGET_KM = 270;
  * the watchable railway rather than either alone.
  */
 export const BURIED_BUDGET_PCT = 29;
+
+/**
+ * What may be buried with **nothing carving it**, in kilometres.
+ *
+ * The real defect, and a much smaller number than the two above: today 3.1 km,
+ * against 264.5 km buried. See the gate below for why the distinction is the
+ * whole point, and `world/rail-cut.BRIDGE_BURIED_DEPTH` for the rule that
+ * decides it. A little above today's measurement, and it comes down when the
+ * remaining bridge decks get a discriminator better than a depth threshold.
+ */
+export const UNCUT_BUDGET_KM = 3.5;
 
 // --- Options ---------------------------------------------------------------------
 
@@ -143,6 +161,7 @@ let tunnelM = 0;
 let nonTunnelM = 0;
 let buriedM = 0;
 let buriedBridgeM = 0;
+let uncutM = 0;
 let worst = { c: 0, name: '', x: 0, z: 0 };
 const perLineBuried: number[] = new Array(bake.lines.length).fill(0);
 
@@ -166,6 +185,13 @@ for (let li = 0; li < bake.lines.length; li++) {
       if (c < -1) {
         buriedM += L;
         perLineBuried[li] += L;
+        // **The number that is actually a defect.** `world/rail-cut.RailCut`
+        // carves the corridor out of the terrain wherever `inCutting` says so
+        // and `rail-geo` builds a trench in the hole, so most of the buried
+        // total is a train in a trench -- visible, and correct. What is left is
+        // track with the ground still standing over it, which is a train inside
+        // a hill. `depth` is `groundY - railY`, the negation of the clearance.
+        if (!inCutting(flags, -c)) uncutM += L;
         // A bridge is a span, and a span under the ground is a contradiction.
         if ((flags & SPAN_BRIDGE) !== 0) buriedBridgeM += L;
       }
@@ -188,6 +214,8 @@ say(`  total track ............ ${(totalM / 1000).toFixed(1)} km`);
 say(`  tunnel / subway ........ ${(tunnelM / 1000).toFixed(1)} km   (correctly buried, not counted)`);
 say(`  buried, not tunnel ..... ${buriedKm.toFixed(1)} km = ${buriedPct.toFixed(1)}% of watchable track`);
 say(`    of which BRIDGE ...... ${(buriedBridgeM / 1000).toFixed(1)} km   (a span under the ground)`);
+say(`    the cut carves ....... ${((buriedM - uncutM) / 1000).toFixed(1)} km   (a train in a trench, which is visible and correct)`);
+say(`    NOTHING carves ....... ${(uncutM / 1000).toFixed(1)} km   <-- the train is inside a hill here`);
 say(`  worst clearance ........ ${worst.c.toFixed(1)} m  ${worst.name}  (${Math.round(worst.x)}, ${Math.round(worst.z)})`);
 say('');
 say('  per-line buried, worst first:');
@@ -290,6 +318,30 @@ if (buriedPct > BURIED_BUDGET_PCT) {
       `The buried fraction of the railway has grown; the carve is the fix.`,
   );
 }
+/*
+ * **And the gate that matters most, which is not either of the two above.**
+ *
+ * Buried is not invisible. The corridor cut carves 98.8% of the buried total
+ * and `rail-geo` builds a trench in the hole, so nearly all of it is a train in
+ * a cutting -- which is what a railway in Sydney largely is. The two budgets
+ * above watch a number that is mostly *correct*, and they are kept because a
+ * jump in it still means the bake moved under the cut.
+ *
+ * This one watches the defect: track with the ground standing over it and
+ * nothing carving. Today that is 3.1 km, all of it bridge decks the DEM has
+ * buried -- Circular Quay and its neighbours, where the DEM is reading the
+ * roofs of the CBD rather than earth, and where `BRIDGE_BURIED_DEPTH` in
+ * `world/rail-cut.ts` deliberately declines to dig. A budget close above it, so
+ * a rule change that starts leaving track under a hill is caught on the run
+ * that does it.
+ */
+if (uncutM / 1000 > UNCUT_BUDGET_KM) {
+  failures.push(
+    `${(uncutM / 1000).toFixed(1)} km of track has the ground over it and nothing carving, against a budget of ` +
+      `${UNCUT_BUDGET_KM} km. This is the one a player sees: the train is inside a hill. ` +
+      `See inCutting and BRIDGE_BURIED_DEPTH in client/src/world/rail-cut.ts.`,
+  );
+}
 
 if (failures.length > 0) {
   say('  FAIL');
@@ -303,6 +355,7 @@ if (failures.length > 0) {
 
 say(
   `  PASS -- buried ${buriedKm.toFixed(1)} / ${BURIED_BUDGET_KM} km, ` +
-    `${buriedPct.toFixed(1)} / ${BURIED_BUDGET_PCT} %`,
+    `${buriedPct.toFixed(1)} / ${BURIED_BUDGET_PCT} %, ` +
+    `uncarved ${(uncutM / 1000).toFixed(1)} / ${UNCUT_BUDGET_KM} km`,
 );
 process.exit(0);
