@@ -5619,6 +5619,21 @@ if (only === 'ridingOnline') {
   for (const f of failures) say(`  - ${f}`);
   say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
   process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'suggestions') {
+  await checkSuggestions();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'bugs') {
+  await checkBugReports();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'feed') {
+  await checkChangeFeed();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
 } else if (only === 'cutting') {
   await checkRailCutting();
   for (const f of failures) say(`  - ${f}`);
@@ -13148,8 +13163,14 @@ async function checkSuggestions(): Promise<void> {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ handle, password: 'monorail-please-1' }),
       }).catch(() => null);
-      const body = (await res?.json().catch(() => null)) as { ok?: boolean; token?: string } | null;
-      check(body?.ok === true && typeof body.token === 'string', `${handle} has an account to file feedback with`);
+      const body = (await res?.json().catch(() => null)) as
+        | { ok?: boolean; token?: string; message?: string }
+        | null;
+      const why = res === null ? 'the request itself failed' : (body?.message ?? JSON.stringify(body));
+      check(
+        body?.ok === true && typeof body.token === 'string',
+        `${handle} has an account to file feedback with${body?.ok === true ? '' : ` — ${why}`}`,
+      );
       return typeof body?.token === 'string' ? body.token : '';
     };
     const tokenA = await signup('Bazza');
