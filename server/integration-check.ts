@@ -13075,6 +13075,13 @@ async function checkSuggestions(): Promise<void> {
       SYDNEY_PORT: String(port),
       SYDNEY_BOTS: '0',
       SYDNEY_SUGGESTIONS: ledger,
+      // Into the section's own temp directory, never the real one. Filing
+      // feedback needs an account (workstream G's gate, `suggestions.ts`'s
+      // `accountId` refusal), so this section signs two up -- and an
+      // integration check that wrote two handles into `/var/lib/sydney` or a
+      // developer's `./data/state` would burn those handles globally, since a
+      // handle is unique per account and never released.
+      SYDNEY_STATE_DIR: dir,
       // Explicitly cleared, so this section can never post to a real repo even
       // if the environment running the check happens to have a token in it.
       SYDNEY_GITHUB_TOKEN: '',
@@ -13110,8 +13117,28 @@ async function checkSuggestions(): Promise<void> {
       return;
     }
 
-    const client = await suggestProbe(`ws://127.0.0.1:${port}`, ID_A, 'Bazza');
-    const other = await suggestProbe(`ws://127.0.0.1:${port}`, ID_B, 'Shazza');
+    // Two real accounts, because feedback is gated behind one. The gate itself
+    // is `accounts-check`'s subject (a guest is refused, an account holder is
+    // not); what this section is about is the suggestions box, so it arrives
+    // holding tokens rather than re-testing the door. Before the accounts
+    // workstream these two probes were plain guests, and when the gate landed
+    // this section started failing with the gate's own message -- a red that
+    // said nothing about suggestions and sat in the suite for weeks.
+    const signup = async (handle: string): Promise<string> => {
+      const res = await fetch(`http://127.0.0.1:${port}/auth/signup`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ handle, password: 'monorail-please-1' }),
+      }).catch(() => null);
+      const body = (await res?.json().catch(() => null)) as { ok?: boolean; token?: string } | null;
+      check(body?.ok === true && typeof body.token === 'string', `${handle} has an account to file feedback with`);
+      return typeof body?.token === 'string' ? body.token : '';
+    };
+    const tokenA = await signup('Bazza');
+    const tokenB = await signup('Shazza');
+
+    const client = await suggestProbe(`ws://127.0.0.1:${port}`, ID_A, 'Bazza', tokenA);
+    const other = await suggestProbe(`ws://127.0.0.1:${port}`, ID_B, 'Shazza', tokenB);
 
     const opened = await client.list();
     check(opened !== null, 'a client asking for the list over the socket is sent one');
@@ -13180,7 +13207,12 @@ async function checkSuggestions(): Promise<void> {
 
     // Exhaust the quota. Three more suggestions to spend on, then the fifth vote.
     for (let i = 0; i < 3; i++) {
-      const p = await suggestProbe(`ws://127.0.0.1:${port}`, crypto.randomUUID(), `Filler ${i}`);
+      // Accounts as well, for the same reason as the two above: a guest's
+      // filler is refused, the board stays two rows long, and the quota loop
+      // below then "proves" a four-vote allowance is two — a failure that reads
+      // as a bug in the quota and is nothing of the sort.
+      const fillerToken = await signup(`Filler${i}`);
+      const p = await suggestProbe(`ws://127.0.0.1:${port}`, crypto.randomUUID(), `Filler${i}`, fillerToken);
       await p.submit(`a filler suggestion number ${i}`, '');
       p.close();
     }
@@ -13246,6 +13278,8 @@ async function suggestProbe(
   url: string,
   id: string,
   name: string,
+  /** An `/auth/signup` token. Without one the socket is a guest, and a guest cannot file feedback. */
+  token = '',
 ): Promise<{
   list(): Promise<SuggestionList | null>;
   submit(title: string, body: string): Promise<{ result: number; issue: number; message: string } | null>;
@@ -13260,7 +13294,7 @@ async function suggestProbe(
 
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('no welcome within 5 s')), 5000);
-    socket.onopen = () => socket.send(encodeHello(255, name));
+    socket.onopen = () => socket.send(encodeHello(255, name, token));
     socket.onerror = () => {
       clearTimeout(timer);
       reject(new Error('socket error'));
@@ -26738,6 +26772,11 @@ async function checkBugReports(): Promise<void> {
       SYDNEY_BOTS: '0',
       SYDNEY_BUGS: `${dir}/queue`,
       SYDNEY_SUGGESTIONS: `${dir}/suggestions.json`,
+      // Same reason as the suggestions section: filing needs an account, this
+      // section signs one up, and a handle is claimed for good — so it is
+      // claimed inside the section's own temp directory and nowhere near the
+      // box's `/var/lib/sydney` or a developer's `./data/state`.
+      SYDNEY_STATE_DIR: dir,
       SYDNEY_GITHUB_TOKEN: '',
       SYDNEY_GITHUB_REPO: 'voidtype/sydney-integration-check-no-such-repo',
     },
@@ -26760,10 +26799,30 @@ async function checkBugReports(): Promise<void> {
       return;
     }
 
-    const post = async (payload: unknown): Promise<{ status: number; ok: boolean; result: string; message: string }> => {
+    // A bug report needs an account behind it (`index.ts` resolves the bearer
+    // to a handle and `bugs.ts` refuses a null one), so this section files as
+    // somebody. Everything below is about what the endpoint does with a report
+    // -- the magic-number sniff, the EXIF strip, the size caps, the budget --
+    // and none of it is reachable from behind the door.
+    const reporterSignup = await fetch(`http://127.0.0.1:${port}/auth/signup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ handle: 'Reporter', password: 'the-fence-is-in-the-road-1' }),
+    })
+      .then((r) => r.json() as Promise<{ ok?: boolean; token?: string }>)
+      .catch(() => null);
+    const reporter = typeof reporterSignup?.token === 'string' ? reporterSignup.token : '';
+    check(reporter.length > 0, 'the reporter has an account, which filing a bug now requires');
+
+    const post = async (
+      payload: unknown,
+      token = reporter,
+    ): Promise<{ status: number; ok: boolean; result: string; message: string }> => {
       const res = await fetch(`http://127.0.0.1:${port}/bug`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: token
+          ? { 'content-type': 'application/json', authorization: `Bearer ${token}` }
+          : { 'content-type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const body = (await res.json()) as { ok?: boolean; result?: string; message?: string };
@@ -26791,6 +26850,14 @@ async function checkBugReports(): Promise<void> {
     {
       const noId = await post({ title: 'a bug report with no client id at all' });
       check(noId.status === 400 && !noId.ok, `a report with no client id is refused: "${noId.message}"`);
+      // The gate, kept here as a positive assertion rather than as the silent
+      // reason everything below used to fail. `accounts-check` owns the door;
+      // this one line stops the door from quietly closing on this section again.
+      const guest = await post({ clientId: ID_A, title: 'a guest tries to file a bug report' }, '');
+      check(
+        !guest.ok && /sign up to send feedback/.test(guest.message),
+        `a guest cannot file a bug report: "${guest.message}"`,
+      );
       const noTitle = await post({ clientId: ID_A, title: 'hi' });
       check(
         noTitle.status === 400 && !noTitle.ok,
@@ -27163,7 +27230,7 @@ async function rawPost(port: number, head: string, body: string, timeoutMs: numb
  * lines -- which is exactly the failure a screenshot cannot see.
  */
 async function checkChangeFeed(): Promise<void> {
-  say("CHANGE FEED — three commits, generated at build time, and what happens when there is no git");
+  say("CHANGE FEED — the history, generated at build time, and what happens when there is no git");
 
   const root = new URL('..', import.meta.url).pathname;
   const script = `${root}scripts/changelog.mjs`;
@@ -27183,14 +27250,26 @@ async function checkChangeFeed(): Promise<void> {
     second.exitCode === 0 && before === after && before !== '',
     'running it twice leaves the file byte-identical — idempotent, so it is not a vite reload and a git diff on every build',
   );
+  // The budget was 1,500 B and three entries when the panel showed three
+  // lines. The owner asked for an infinitely scrollable column, so
+  // `scripts/changelog.mjs` now carries `ENTRIES = 200` of history and the old
+  // numbers were asserting the feature had not shipped. The budget that
+  // replaces them is the one that still matters: this file is fetched on every
+  // first load, so 200 entries at the generator's own title and body clamps is
+  // the ceiling, and anything past it means a clamp stopped clamping.
+  const FEED_ENTRIES_MAX = 200;
+  const FEED_BYTES_MAX = 64 * 1024;
   check(
-    before.length > 0 && before.length < 1500,
-    `the whole feed is ${before.length} B, which is the "a few hundred bytes, not the whole history" budget`,
+    before.length > 0 && before.length < FEED_BYTES_MAX,
+    `the whole feed is ${before.length} B, inside the ${FEED_BYTES_MAX} B a first load will carry`,
   );
 
   // --- 2. What it wrote is what git says, hash by hash.
   const parsed = parseChangelog(JSON.parse(before || '{}'));
-  check(parsed.entries.length === 3, `it holds ${parsed.entries.length} entries`);
+  check(
+    parsed.entries.length >= 3 && parsed.entries.length <= FEED_ENTRIES_MAX,
+    `it holds ${parsed.entries.length} entries, between the three the panel has always shown and the generator's ceiling of ${FEED_ENTRIES_MAX}`,
+  );
   let matched = 0;
   for (const entry of parsed.entries) {
     const subject = (await Bun.$`git -C ${root} log -1 --format=%s ${entry.hash}`.quiet().nothrow()).stdout

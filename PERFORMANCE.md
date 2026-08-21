@@ -480,6 +480,93 @@ the socket URL with `/health` glued on, which behind the box's Caddy asks for
 `/ws/health` and 404s — the harness reported "no server" at a box that was
 serving fine. It now strips the socket's own path segment.
 
+## Measured: the snapshot got smaller, and 15 Hz was measured and refused
+*(workstream AD, 2026-08-21 — protocol v20)*
+
+The tick work above left the box at 0.85 ms and the bill unchanged, because a
+1 vCPU box with a 20 GB monthly cap is not CPU-bound, it is **egress-bound**:
+one full room of a hundred players was 13.59 GB/hour, which is 1 h 28 m of the
+month. This pass went after the bytes.
+
+### The table (paired runs, one room, no bots, `before` = the same tree at `75ad0b8`)
+
+| players | scenario | before | after | Δ |
+|---|---|---:|---:|---:|
+| 1 | ordinary | 20.8 kbit/s | 18.9 | −9% |
+| 8 | ordinary | 44.7 | 36.4 | −19% |
+| 40 | ordinary | 230.7 | 159.0 | −31% |
+| 100 | ordinary | 302.0 | 196.9 | −35% |
+| 100 | pileup (`--converge`) | 695.7 | 446.7 | −36% |
+
+**13.59 → 8.86 GB/hour at a hundred concurrent; 31.3 → 20.1 in a pileup.**
+Against the 20 GB cap that is 1 h 28 m of a full room before and **2 h 15 m**
+after. A third more evening — not a solved problem. The cap is still the binding
+constraint and the remaining lever is delta encoding, which is the next pass.
+
+On the box, one player: **79 → 64 B/snapshot, 12.9 → 10.6 kbit/s.**
+
+### Where the bytes went
+
+**Re-quantisation, on the three fields the client was already discarding
+precision from.** Every one has a stated bound and a `verifyNet` case:
+
+| field | was | now | worst error | why it is free |
+|---|---|---|---|---|
+| snapshot position | `i32` mm | 24 bits/axis at 1 cm | 0.87 cm in 3-D | `CORRECTION_DEADZONE` is 2 cm — the reconciler already throws away more |
+| snapshot yaw | `u16` | `u8` | 0.703° | the interpolator reconstructs a 17° turn from samples 50 ms apart |
+| snapshot pitch | `i16` | `i8` | 0.354° | same |
+
+Twenty-four bits rather than the packed sixteen the v8 header sketched, because
+the world is 60 km now: 24 bits reaches ±83.9 km on *every* axis, so the
+vertical needs no hand-chosen bias and nobody can be clamped at the top of a
+narrow shaft. Positions **outside** the snapshot — the WELCOME, the car and bike
+rosters, event records — keep their millimetres: those are sent on change, so
+their bytes are not per-tick and rounding them buys nothing. Input yaw and pitch
+also keep their width, because the server integrates those and runs the hit test
+off them. `PLAYER_BYTES` 22 → 17, `BALL_BYTES` 20 → 17, `NPC_BYTES` 18 → 14.
+
+**An interest rule for the ball section**, which this page has been asking for
+since phase 4: `AOI_BALL_RADIUS = 110 m` (floor: four rewind windows of the
+fastest ball, 11 m; ceiling: a football at 220 m is 2.2 px), `AOI_MAX_BALLS =
+40`, nearest first, ascending so the frame dedup still groups. Measured through
+a new `/stats` `balls: {live, sentMean}` section: forty players in a park had
+19.4 balls live and sent **8.8**; the hundred-player pileup had 105 live and
+sent **40.00** — the cap binds on every sample. Worth 34 kbit/s in the park and
+**208 kbit/s** in the pileup.
+
+And the thrower's own ball is no longer sent to them at all:
+`net/client.interpolateBalls` opens by skipping it, so those were 17 B a tick
+the receiver discarded on its first line — about 19 kbit/s for somebody
+sustaining seven balls. `verifyAoi` pins the exception, which is that an
+orphaned ball (`thrower === 0`) must not be swallowed by the same filter.
+
+### 15 Hz: measured, and not taken
+
+`SYDNEY_SNAPSHOT_HZ` accepts 20/15/12/10 and defaults to 20. At a hundred
+players 15 Hz is a further **196.9 → 151.4 kbit/s**. It was still refused, for
+two measured reasons the host now prints on boot when it is set:
+
+1. The observed inter-snapshot gap goes to a **p99 of 75.8 ms on a loopback with
+   no network in it**, leaving 24 ms of the 100 ms interpolation buffer for a
+   domestic connection's 20–30 ms of jitter. At 20 Hz there is 37 ms.
+2. A 4-tick interval is longer than `factions.FIRE_STATE_TICKS` (3), so roughly
+   a quarter of police muzzle flashes fall between two snapshots and are never
+   sent. The shot still lands — the player is shot by something they did not see
+   fire.
+
+Raising `INTERP_DELAY_MS` to 133 ms restores the margin at the cost of 33 ms of
+apparent latency on everybody else's position, which is a worse trade in a melee
+game where the whole fight is at arm's length.
+
+### The bump this cost
+
+**Protocol v20 is the least lenient version the wire has taken.** Earlier bumps
+moved or widened a field and a mismatched reader got one value wrong; here every
+record in the snapshot has a different width, so a v19 client pointed at a v20
+server reads garbage out of the middle of the next player. The handshake refusal
+is the entire safety net — which is why the number moves in the same commit as
+the widths, and why a deploy of this batch disconnects everybody who is on.
+
 ## Target hardware (with the egress arithmetic)
 
 **Rewritten against phase 4's measurements.** The original version of this table
@@ -520,6 +607,15 @@ section** (60% of the pileup stream, unbounded by interest because balls pile up
 where people do) and the **snapshot rate** (20 Hz is spec 10's floor of the
 20–30 range already, but 15 Hz with the same 100 ms interpolation buffer would
 be a 25% cut for a change nobody would see at these speeds). Both are phase 5.
+
+**Both were taken, and only one of them was worth taking — see "Measured: the
+snapshot got smaller" below.** The ball section now has an interest rule of its
+own and every per-tick field was re-quantised, for −35% at a hundred players.
+The snapshot rate was measured at 15 Hz and *rejected*: it is a further −23%,
+and it costs a quarter of the police muzzle flashes and most of the jitter
+margin. Two numbers on this page did not survive that measurement, and are
+marked where they appear: the pileup was never 372 kbit/s at 67 balls on this
+tree, it was **696 kbit/s at 105 balls**.
 
 ## Client-side riders (same round)
 
@@ -823,7 +919,11 @@ table's bandwidth column came off the *clients*, not off `/stats`.
   at 22 B is 143 kbit/s; the rest is the ball section, which interest management
   does **not** bound in a pileup because all the balls are in the same place as
   all the people. A hundred clients spamming throw sustained roughly 67 balls in
-  the air — 1.3 kB a snapshot, about 60% of the stream. The protocol's own
+  the air — 1.3 kB a snapshot, about 60% of the stream. *(Both numbers are
+  stale as of 2026-08-21: re-running the same harness on today's tree, before
+  any of the egress work, measured **696 kbit/s and 105 balls**. The diagnosis
+  below was right and got worse — which is why the ball section was the first
+  thing the egress pass bounded.)* The protocol's own
   invariant (a ball must never cost more than a person) still holds at 20 B
   against 22, but the *count* is unbounded where the roster is capped, which is
   exactly what `verifyNet` has always said about that section. A ball cap, or
