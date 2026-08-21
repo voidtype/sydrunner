@@ -35,6 +35,17 @@ match that voice, and read the header of any file before changing it.
   parts. If only eyes can judge something, say so in one sentence and let the
   owner look. Do not start vite, drive the browser pane, or build screenshot
   sinks.
+- **`integration-check` runs against the live tree.** It takes ~25 minutes and
+  spawns real servers along the way, each reading the working tree *at spawn
+  time* — so a merge or an edit landed mid-run gives a parent on the old code
+  talking to children on the new, and every failure it prints is suspect (a v20
+  merge mid-run once produced eighteen, all phantom). Run it on a tree you will
+  not touch, or in a worktree pinned to the commit under test. Two more traps
+  from the same hour: `SYDNEY_CHECK_ONLY=<section>` runs one section in a
+  minute instead of twenty-five (the list is at the bottom of the file), and
+  `pkill -f "SYDNEY_PORT=8791"` matches **nothing** — env vars are not in a
+  process's command line, so servers you think you cleaned up keep listening on
+  the check's ports and the next run silently talks to them. Kill by pid.
 - **Determinism**: anything evaluated on both ends avoids `Math.sin/cos/pow/
   hypot`; ambient things are pure functions of `(anchor, index, tick)`. See
   `game/footy.ts` and `game/traffic.ts` headers.
