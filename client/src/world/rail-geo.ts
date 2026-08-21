@@ -3032,7 +3032,7 @@ function writePortal(concrete: Solid, lining: Solid, portal: Portal): void {
   const stub: Segment = {
     ax: portal.x - ux * 1.5, ay: portal.y, az: portal.z - uz * 1.5,
     bx: portal.x + ux * 14, by: portal.y, bz: portal.z + uz * 14,
-    flags: SPAN_TUNNEL, len: 15.5, ux, uz, open: [false, false],
+    flags: SPAN_TUNNEL, len: 15.5, ux, uz, open: [false, false], vi: -1,
   };
   writeTunnel(lining, stub);
 }

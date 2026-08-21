@@ -555,6 +555,7 @@ import {
 import { RailCut } from './world/rail-cut.ts';
 import { RoadDeck, verifyRoadDeck } from './world/road-deck.ts';
 import { ClearanceEnvelope, verifyEnvelope } from './world/envelope.ts';
+import { verifyTrackAtlas } from './world/track-atlas.ts';
 import { verifyUndercroft } from './world/undercroft.ts';
 // Phase 1 of `STATIONS.md`: the vessel primitive and its manifold invariant.
 // Nothing in the build reads a vessel yet -- `vesselsEnabled()` is off and no
@@ -2175,6 +2176,14 @@ async function main(): Promise<void> {
       const envFailures = verifyEnvelope();
       if (envFailures.length) {
         console.warn('[rail] clearance envelope self-check:\n  - ' + envFailures.join('\n  - '));
+      }
+      // And the atlas, which decides how much of a corridor each track may
+      // build in. Synthetic -- four railways whose answers are known by
+      // construction, one of them a crossing that must *not* read as a
+      // neighbour. See `world/track-atlas.ts` and `RAIL-CORRIDOR.md`.
+      const atlasFailures = verifyTrackAtlas();
+      if (atlasFailures.length) {
+        console.warn('[rail] track atlas self-check:\n  - ' + atlasFailures.join('\n  - '));
       }
       // The same case seen from the other side: the envelope's check proves the
       // *collision* comes out as a tunnel, and this one proves the picture does.

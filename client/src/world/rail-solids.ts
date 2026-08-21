@@ -97,6 +97,7 @@ import { pointInPolygon } from '../player/collision.ts';
 import { DECK_THICKNESS_M } from './road-deck.ts';
 import { RAIL_HALF_M } from './envelope.ts';
 import { PLATFORM_OUTER_M, samePlatform } from '../game/riding.ts';
+import type { SpineRef } from './platform-spine.ts';
 
 /**
  * What `world/rail-geo.ts` hands `CollisionWorld`, and what this file evaluates.
@@ -426,6 +427,19 @@ export interface Segment {
    * for what a false answer here would build.
    */
   open: [boolean, boolean];
+  /**
+   * The polyline vertex this segment was **first seen at**, before the twenty
+   * directions were deduplicated into one set.
+   *
+   * The dedup throws away which line a length of track belongs to, which is
+   * right for everything that draws it -- ballast is ballast -- and wrong for
+   * the one consumer that needs the *curve* rather than the segment:
+   * `world/platform-spine.ts` sweeps a platform along a running line and a
+   * running line is a polyline, not a bag of edges. Recovering it by searching
+   * would be a second answer to a question the dedup loop already answers, so
+   * the loop keeps its own.
+   */
+  vi: number;
 }
 
 /** A tunnel mouth: where the flags flip between one vertex and the next. */
@@ -450,6 +464,22 @@ export interface Portal {
 export type PlacedStation = RailStation & {
   ux: number; uz: number;
   nodeX: number; nodeZ: number;
+  /**
+   * Which running line this platform stands against, and where along it.
+   *
+   * `ux, uz` is that line's direction **at the anchor and nowhere else**, which
+   * is exactly the assumption the box made and the report broke: over 80 m of a
+   * curve the tangent at the middle is not the tangent at the end. This is the
+   * curve itself, so `world/platform-spine.spineAround` can hand every writer a
+   * frame that is right along the whole platform instead of at its centre.
+   *
+   * Null at an anchor whose nearest rail could not be traced back to a
+   * direction's own polyline -- a station the network never reaches, standing by
+   * a stub the dedup kept and no service runs over. Those keep the straight
+   * frame they have always had; `straightSpine` is the same object built from
+   * `ux, uz`, so nothing downstream has a second code path for them.
+   */
+  spine: SpineRef | null;
 };
 
 export interface Chunk {
@@ -544,6 +574,7 @@ export function buildNetwork(bake: RailBake): RailNetwork {
           ux: dx / len,
           uz: dz / len,
           open: [true, true],
+          vi: i,
         });
       }
     }
@@ -614,9 +645,12 @@ export function buildNetwork(bake: RailBake): RailNetwork {
   // construction. A station **no line calls at** -- and 94 of the bake's 267 are
   // light-rail stops or closed platforms the network never reaches -- falls back
   // to the nearest segment within 60 m, and is dropped if there is not one.
-  interface Anchor { name: string; x: number; y: number; z: number; ux: number; uz: number }
+  interface Anchor {
+    name: string; x: number; y: number; z: number; ux: number; uz: number;
+    spine: SpineRef;
+  }
   const anchors: Anchor[] = [];
-  const anchorAt = (dir: (typeof bake.lines)[number]['dirs'][number], at: number): Omit<Anchor, 'name'> => {
+  const anchorAt = (dir: (typeof bake.lines)[number]['dirs'][number], at: number): Omit<Anchor, 'name' | 'spine'> => {
     const c = bake.cum;
     let lo = dir.vertexOff;
     let hi = dir.vertexOff + dir.vertexCount - 1;
@@ -637,8 +671,10 @@ export function buildNetwork(bake: RailBake): RailNetwork {
     const len = Math.sqrt(dx * dx + dz * dz) || 1;
     return { x: ax + dx * u, y: ay + dy * u, z: az + dz * u, ux: dx / len, uz: dz / len };
   };
-  for (const line of bake.lines) {
-    for (const dir of line.dirs) {
+  for (let li = 0; li < bake.lines.length; li++) {
+    const line = bake.lines[li];
+    for (let di = 0; di < line.dirs.length; di++) {
+      const dir = line.dirs[di];
       for (const stop of dir.stops) {
         if (!stop.calls) continue;
         const at = anchorAt(dir, stop.s);
@@ -654,7 +690,7 @@ export function buildNetwork(bake: RailBake): RailNetwork {
         // header is the argument; both readers of the bake use it.
         const near = anchors.find((a) => a.name === stop.name && samePlatform(a, at));
         if (near) continue;
-        anchors.push({ name: stop.name, ...at });
+        anchors.push({ name: stop.name, ...at, spine: { line: li, dir: di, s: stop.s } });
       }
     }
   }
@@ -671,6 +707,7 @@ export function buildNetwork(bake: RailBake): RailNetwork {
       ...record,
       x: a.x, z: a.z, trackY: a.y, ux: a.ux, uz: a.uz,
       nodeX: record.x, nodeZ: record.z,
+      spine: a.spine,
     });
     bucket(chunks, chunkOf(a.x, a.z)).stations.push(index);
   }
@@ -704,11 +741,56 @@ export function buildNetwork(bake: RailBake): RailNetwork {
       ...station,
       ux: segments[best].ux, uz: segments[best].uz,
       nodeX: station.x, nodeZ: station.z,
+      // The curve behind the segment the nearest-rail search settled on. The
+      // *segment* is what decides `ux, uz` and that is unchanged; this only says
+      // which polyline that segment was cut from, so the sweep has a curve to
+      // follow rather than the tangent at one point of it.
+      spine: refFor(bake, segments[best], station.x, station.z),
     });
     bucket(chunks, chunkOf(station.x, station.z)).stations.push(index);
   }
 
   return { bake, segments, portals, stations, chunks, directedSegments: directed };
+}
+
+/**
+ * Which direction's polyline a deduplicated segment was cut from, and the arc
+ * length on it nearest a point.
+ *
+ * `Segment.vi` is the vertex the segment was first seen at, so the direction is
+ * whichever one's vertex range contains it -- a linear scan over twenty-odd
+ * directions, run once per unserved station and never on a hot path. The arc
+ * length is `cum[vi]` plus the projection of the point onto that one edge, which
+ * is the same interpolation `anchorAt` inverts, so a station placed here and a
+ * station placed from a calling stop are describing their curve the same way.
+ */
+function refFor(bake: RailBake, seg: Segment, x: number, z: number): SpineRef | null {
+  if (seg.vi < 0) return null;
+  for (let li = 0; li < bake.lines.length; li++) {
+    const dirs = bake.lines[li].dirs;
+    for (let di = 0; di < dirs.length; di++) {
+      const d = dirs[di];
+      if (seg.vi < d.vertexOff || seg.vi >= d.vertexOff + d.vertexCount - 1) continue;
+      const ex = seg.bx - seg.ax;
+      const ez = seg.bz - seg.az;
+      const len2 = ex * ex + ez * ez;
+      let u = 0;
+      if (len2 > 1e-9) {
+        u = ((x - seg.ax) * ex + (z - seg.az) * ez) / len2;
+        u = u < 0 ? 0 : u > 1 ? 1 : u;
+      }
+      // The segment may be stored reversed against the polyline -- the dedup key
+      // is canonical and the geometry is not -- so the arc length is measured
+      // from whichever of the two vertices `vi` actually is.
+      const a = bake.cum[seg.vi];
+      const b = bake.cum[seg.vi + 1];
+      const px = bake.vertices[seg.vi * 3];
+      const pz = bake.vertices[seg.vi * 3 + 2];
+      const forward = Math.abs(px - seg.ax) + Math.abs(pz - seg.az) <= Math.abs(px - seg.bx) + Math.abs(pz - seg.bz);
+      return { line: li, dir: di, s: forward ? a + (b - a) * u : b - (b - a) * u };
+    }
+  }
+  return null;
 }
 
 /**
