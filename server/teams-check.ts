@@ -370,7 +370,14 @@ async function run(): Promise<void> {
     const store = new AccountStore(`${accountPath}.aura`);
     await store.load();
     const fresh = emptyWorld();
-    const room = new Simulation(fresh, { accounts: store });
+    // With a wallet store, because this section now tests `Tip Jar`'s other
+    // half and a room with no wallets answers every credit with a silent
+    // no-op -- `moveWallet` refuses an id whose participant has no wallet, so
+    // a payout check without this passes or fails for the wrong reason. It
+    // cost three failing assertions to learn that, all of them reading $0.
+    const auraWallets = new WalletStore(`${accountPath}.aura.wallets`);
+    await auraWallets.load();
+    const room = new Simulation(fresh, { accounts: store, wallets: auraWallets });
 
     const make = async (handle: string, team: number): Promise<Participant> => {
       await store.signup(handle, 'hunter2hunter2', '', null);
@@ -421,6 +428,36 @@ async function run(): Promise<void> {
       String(room.teams.scalar(taker.id, FX.MAX_PIPS)),
     );
 
+    // --- The other half of Tip Jar: the tithe, which had a query and no call
+    // site until now. *"you get $2 of every $20 they make"* -- the holder is
+    // paid beside the earner, and the earner is not taxed for it.
+    {
+      const before = room.wallet.balanceOf(giver.id);
+      const earned = room.wallet.balanceOf(taker.id);
+      // Paid the way Centrelink pays: straight through the wallet door, which
+      // is the same call the three real income paths make.
+      room.wallet.credit(taker.id, 20, 'fare');
+      room.payTitheForCheck(taker.id, 20, 'tip jar');
+      check(
+        room.wallet.balanceOf(giver.id) - before === 2,
+        'a Tip Jar holder gets $2 of a teammate\'s $20',
+        `${room.wallet.balanceOf(giver.id) - before}`,
+      );
+      check(
+        room.wallet.balanceOf(taker.id) - earned === 20,
+        'and the earner keeps the whole $20 -- the cut is minted, not deducted',
+        `${room.wallet.balanceOf(taker.id) - earned}`,
+      );
+      const enemyBefore = room.wallet.balanceOf(other.id);
+      room.payTitheForCheck(other.id, 20, 'tip jar');
+      check(
+        room.wallet.balanceOf(giver.id) - before === 2,
+        `and a ${TEAM_NAME[TEAM.DEFAULT]} earning beside the jar pays nothing into it`,
+        `${room.wallet.balanceOf(giver.id) - before}`,
+      );
+      check(room.wallet.balanceOf(other.id) === enemyBefore, 'nor is the enemy charged');
+    }
+
     stand(taker, 20);
     room.step(out);
     check(
@@ -428,6 +465,17 @@ async function run(): Promise<void> {
       `and twenty metres is outside the ${AURA_M} m radius`,
       String(room.teams.scalar(taker.id, FX.TEAM_EARN)),
     );
+    // Out of the aura, out of the jar: the payout and the fold share one walk,
+    // so this cannot pass while the line above fails.
+    {
+      const before = room.wallet.balanceOf(giver.id);
+      room.payTitheForCheck(taker.id, 20, 'tip jar');
+      check(
+        room.wallet.balanceOf(giver.id) === before,
+        'and a teammate earning twenty metres away pays no tithe',
+        `${room.wallet.balanceOf(giver.id) - before}`,
+      );
+    }
 
     // Walking back in turns it on again on the tick they arrive, not the one
     // after: the index is refilled from the positions the tick just produced.

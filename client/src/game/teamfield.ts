@@ -321,6 +321,31 @@ export class TeamField implements TeamLookup {
     // order, which is the same order on both ends: two runtimes that admitted a
     // *different* three of five Tip Jars would disagree about a number the
     // server is about to adjudicate a payout with.
+    this.forEachAura(m, (nd) => {
+      // A teammate's aura never brings its group clause with it: a group is
+      // a fact about who is standing around *you*, and `nd.group` is only
+      // ever set on a mega, which is never `aura`. Passed anyway so the one
+      // rule lives in one place.
+      apply(fx, nd, nd.group !== undefined);
+    });
+  }
+
+  /**
+   * The teammates' aura nodes that apply to `m`, admitted once each under
+   * `AURA_STACKS` and in the hash's ascending insertion order.
+   *
+   * **Extracted so that the fold and the payout cannot disagree.** The comment
+   * above says two runtimes admitting a different three of five Tip Jars would
+   * disagree about a number the server is about to adjudicate a payout with --
+   * and the same is true of two *call sites* in one runtime. `TEAM_TITHE` pays
+   * the holders of the very nodes this walk admits, so it has to be the same
+   * walk, in the same order, under the same caps, and not a second copy of the
+   * rule that starts out identical and drifts.
+   *
+   * The visitor gets the node and the member it came from, because the fold
+   * only needs the node and the payout only needs the member.
+   */
+  private forEachAura(m: MemberState, visit: (nd: TalentNode, from: MemberState) => void): void {
     const near = this.hash.collectWithin(m.x, m.z, AURA_M, this.neighbours);
     if (near.length > 1) {
       const stacks = STACK_SCRATCH;
@@ -336,15 +361,40 @@ export class TeamField implements TeamLookup {
           const used = stacks.get(nd.id) ?? 0;
           if (used >= cap) continue;
           stacks.set(nd.id, used + 1);
-          // A teammate's aura never brings its group clause with it: a group is
-          // a fact about who is standing around *you*, and `nd.group` is only
-          // ever set on a mega, which is never `aura`. Passed anyway so the one
-          // rule lives in one place.
-          apply(fx, nd, nd.group !== undefined);
+          visit(nd, o);
         }
       }
     }
     near.length = 0;
+  }
+
+  /**
+   * Who is owed a cut of what `earnerId` just made, and how much of it.
+   *
+   * `Tip Jar` is the only node with a `TEAM_TITHE` effect today: *"you get $2 of
+   * every $20 they make"*. The money is **minted, not deducted** -- the earner
+   * keeps every dollar of their own -- which is the same shape as `TEAM_EARN`
+   * sitting beside it in the same node, and is what the node's text says: the
+   * jar holder gets a cut, the worker is not taxed.
+   *
+   * Visits each holder once with the fraction their node carries, in the fold's
+   * order and under the fold's caps, so a fourth Tip Jar standing in a huddle
+   * of three is paid nothing rather than paid a fourth share -- the same
+   * sentence the earner's own +10% obeys.
+   *
+   * Silent for an earner with no side, nobody near, or nothing on this key,
+   * which is very nearly always: the walk is the fold's walk and it is already
+   * paid for once a tick.
+   */
+  forEachTithe(earnerId: number, visit: (holderId: number, fraction: number) => void): void {
+    if (!this.live) return;
+    const m = this.members.get(earnerId);
+    if (m === undefined || m.team === TEAM.NONE) return;
+    this.forEachAura(m, (nd, from) => {
+      for (const [key, value] of nd.effects) {
+        if (key === FX.TEAM_TITHE && value > 0) visit(from.id, value);
+      }
+    });
   }
 
   /**

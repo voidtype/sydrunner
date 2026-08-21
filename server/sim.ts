@@ -1272,6 +1272,49 @@ export class Simulation {
       this.participants.get(playerId)?.wallet?.balance ?? 0,
   };
 
+  /**
+   * Pay the `Tip Jar` holders standing around an earner their cut.
+   *
+   * *"Marita within 12 m earn +10% on every fare, drop and Centrelink claim,
+   * and you get $2 of every $20 they make."* The first half of that sentence
+   * has worked since workstream W -- it is `TEAM_EARN`, folded into
+   * `fxEarnScale` and `fxFareScale`. The second half had a query function and
+   * no call site, which is worse than the talent not existing: a player spent a
+   * point and nothing happened.
+   *
+   * **Minted, not deducted.** The earner keeps every dollar of their own; the
+   * jar holder is paid beside them. That is what the node says -- a cut, not a
+   * tax -- and it is the same shape as the `TEAM_EARN` half sitting in the same
+   * node, which also mints.
+   *
+   * `TeamField.forEachTithe` walks the *same* neighbours in the same order
+   * under the same stack caps as the aura fold, which is deliberate and is
+   * argued at that method: the fourth Tip Jar in a huddle of three is paid
+   * nothing, exactly as it grants nothing.
+   */
+  private payTithe(earnerId: number, amount: number, why: string): void {
+    if (amount <= 0) return;
+    this.teams.forEachTithe(earnerId, (holderId, fraction) => {
+      // Rounded per holder rather than once for the group: each is paid what
+      // their own jar is worth, and three jars on a $20 fare is three lots of
+      // $2 rather than one $6 divided in a way nobody could read off the HUD.
+      const cut = Math.round(amount * fraction);
+      if (cut > 0) this.wallet.credit(holderId, cut, why);
+    });
+  }
+
+  /**
+   * `payTithe`, for `server/teams-check.ts`.
+   *
+   * The three real callers are income paths a driver cannot reach without a
+   * fare in progress, a bundle on the ground or a Centrelink office in range,
+   * and a check that had to stage all three to test one payout would be testing
+   * the staging. Named for what it is so nobody mistakes it for a game path.
+   */
+  payTitheForCheck(earnerId: number, amount: number, why: string): void {
+    this.payTithe(earnerId, amount, why);
+  }
+
   constructor(
     world: ServerWorld,
     options: { wallets?: WalletStore; driving?: DrivingLookup; accounts?: AccountStore } = {},
@@ -3038,6 +3081,10 @@ export class Simulation {
         continue;
       }
       this.moveWallet(e.combatant.id, e.bundle.amount, 'found');
+      // `Tip Jar`'s cut of a drop. Only on this path: the trapped branch above
+      // is a transfer between two players rather than income, and titheing a
+      // `Loan Shark` payout would pay a third party out of a mugging.
+      this.payTithe(e.combatant.id, e.bundle.amount, 'tip jar');
     }
     if (this.bundles.length !== this.bundlesLastCount) {
       // Expiry also changes the list, and `tickBundles` reports collections
@@ -3207,6 +3254,7 @@ export class Simulation {
       const out = stepFare(job, ctx);
       if (out.paid > 0) {
         this.wallet.credit(p.id, out.paid, 'fare');
+        this.payTithe(p.id, out.paid, 'tip jar');
         // WORKSTREAM W: `Tradie Rates` grants 30 s of `Ute Life` on every
         // completed fare. A *granted* talent rather than a taken one, which the
         // frozen `TeamLookup` cannot express -- see `teamfx.fxGrantUteLife`.
@@ -3270,6 +3318,7 @@ export class Simulation {
     // "+10% on every fare, drop and Centrelink claim".
     const paid = Math.round(fxCentrelinkAmount(playerId, CENTRELINK_PAYMENT) * fxEarnScale(playerId));
     this.wallet.credit(playerId, paid, 'centrelink');
+    this.payTithe(playerId, paid, 'tip jar');
     // And the teammates standing near enough to have come along. O(players) with
     // the room's cap, on the tick a button was pressed -- not a sweep.
     const cx = c.body.position.x;
