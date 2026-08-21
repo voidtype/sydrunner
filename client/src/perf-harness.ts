@@ -111,10 +111,30 @@
  *
  *   bun run client/src/perf-harness.ts --coverage     # the warm-up audit alone
  *
- * `--coverage` runs in about a second and **exits non-zero** when a mesh the
- * renderers build has no matching entry in the boot warm-up. That is the cheap
- * repeatable check for the whole subject; see section "the coverage audit"
- * below. The full run does it too, at the end, with the same exit code.
+ * `--coverage` runs in about two seconds and **exits non-zero** on any of three
+ * things: a mesh the renderers build with no matching entry in the boot warm-up
+ * (see "the coverage audit" below), a rail chunk that comes out differently
+ * built one step at a time than built in one go, or a part-built chunk that
+ * leaves something behind when the player walks away from it. That is the cheap
+ * repeatable check for the whole subject. The full run does all three too, at
+ * the end, with the same exit code.
+ *
+ * ---------------------------------------------------------------------------
+ * ## The rail chunk sections, which are a measurement and two assertions
+ *
+ * WORKSTREAM AF. `railChunkProfile` rides Emu Plains -> Berowra along the bake's
+ * own vertices and reports what a building frame costs, which is how the "little
+ * freezes on the train" were sized in the first place. Since a chunk is built
+ * across frames rather than inside one (`rail-geo.ChunkBuild`), it also reports
+ * the **worst single step**, because the bound on a building frame is
+ * `RAIL_BUILD_BUDGET_MS` plus that and nothing else.
+ *
+ * `railChunkIdentity` and `railChunkAbandon` are the two assertions that make
+ * the split safe rather than plausible: the same chunk built one step per slice
+ * and built in one slice must agree buffer for buffer, and a build the player
+ * walks out of `KEEP_RADIUS` on must leave nothing in any of the three states
+ * and no geometry alive. Both are ordinary functions returning failure lists, so
+ * they cost a second and fail a shell.
  *
  * ---------------------------------------------------------------------------
  * ## The coverage audit, which is the other thing a headless renderer is for
@@ -222,7 +242,17 @@ import { streetlifeWarmupParts } from './world/streetlife.ts';
 import { characterWarmupParts } from './world/characters.ts';
 import { eventWarmupParts } from './world/events.ts';
 import { RaveAssets, RaveWorld, raveWarmupParts } from './world/rave.ts';
-import { RailAssets, RailWorld, buildNetwork, railWarmupParts } from './world/rail-geo.ts';
+import {
+  CHUNK_ABSENT,
+  RailAssets,
+  RailWorld,
+  buildNetwork,
+  chunkPhaseNames,
+  railWarmupParts,
+  type BuiltChunk,
+  type RailNetwork,
+} from './world/rail-geo.ts';
+import { KEEP_RADIUS, CHUNK_M, type SolidPrism } from './world/rail-solids.ts';
 import { decodeRail, type RailBake, type RailDirection } from './game/rail.ts';
 import {
   BigNightKit,
@@ -904,6 +934,8 @@ const RAIL_BAKE = new URL('../public/rail/rail.bin', import.meta.url).pathname;
 interface RailRide {
   world: RailWorld;
   bake: RailBake;
+  /** The derived network, shared with the identity check's own world. */
+  net: RailNetwork;
   /** The longest direction in the bake, which is the longest ride available. */
   route: RailDirection;
 }
@@ -1047,7 +1079,8 @@ async function warmGroups(): Promise<{ groups: WarmGroup[]; rail: RailRide | nul
   if (bun && (await bun.file(RAIL_BAKE).exists())) {
     const bake = decodeRail(await bun.file(RAIL_BAKE).arrayBuffer());
     if (bake) {
-      const world = new RailWorld(buildNetwork(bake), railAssets, FLAT);
+      const net = buildNetwork(bake);
+      const world = new RailWorld(net, railAssets, FLAT);
       // The longest direction in the bake, which is the route the profile below
       // rides. Its first vertex is where the ring is filled: `BUILDS_PER_FRAME`
       // caps a frame's chunks, so this is driven until the queue drains.
@@ -1055,7 +1088,7 @@ async function warmGroups(): Promise<{ groups: WarmGroup[]; rail: RailRide | nul
         .reduce((a, b) => (b.lengthM > a.lengthM ? b : a));
       const first = route.vertexOff * 3;
       for (let i = 0; i < 400; i++) world.update(bake.vertices[first], bake.vertices[first + 2]);
-      rail = { world, bake, route };
+      rail = { world, bake, net, route };
     }
   }
   groups.push({
@@ -1385,11 +1418,314 @@ function railChunkProfile(rail: RailRide | null): void {
       `${(1000 / (samples.length / km) / 30.5).toFixed(1)} s at a 110 km/h line speed -- which is the ` +
       `rate at which a rider meets one of the numbers above.`,
   );
+  // --- What the worst frame is *made of*, which is the number that says whether
+  //     the split is finished.
+  //
+  // WORKSTREAM AF. A chunk build is a cursor over steps under
+  // `RAIL_BUILD_BUDGET_MS`, and the ceiling is a check between steps rather than
+  // a pre-emption -- so the bound on a building frame is the budget plus the
+  // worst single step, and the worst single step is the only part of that sum
+  // that can grow silently. Printed by phase, because "4 ms" means three
+  // different next moves depending on whether it is a station writer, a
+  // `Solid.build` or one forty-metre segment.
+  const names = chunkPhaseNames();
+  const byPhase = [...world.worstStepByPhase]
+    .map((ms, i) => `${names[i]} ${ms.toFixed(2)}`)
+    .join(', ');
   console.log(
-    `    A building frame is BUILDS_PER_FRAME chunks of geometry on the main thread, and nothing ` +
-      `bounds it. Over ~2 ms it wants a budget -- world/streamer.ts's BUILD_BUDGET_MS is the ` +
-      `pattern. A bun run is not a browser: read the shape, not the absolute.`,
+    `    ${world.chunksBuilt} chunks landed. Worst single step ${world.worstStepMs.toFixed(2)} ms ` +
+      `(${world.worstStep || 'none'}); by phase: ${byPhase}.`,
   );
+  console.log(
+    `    A building frame is bounded by RAIL_BUILD_BUDGET_MS plus that worst step, because one ` +
+      `segment, one station writer, one portal or one Solid.build always completes once started. ` +
+      `A bun run is not a browser: read the shape, not the absolute.`,
+  );
+}
+
+// --- The chunk builder's identity test -----------------------------------------
+//
+// WORKSTREAM AF. A chunk is built across frames now: eleven order-dependent
+// accumulators advanced a step at a time, resuming on a cursor. The failure that
+// arrangement invites is not a crash -- it is one segment written twice, or a
+// station's stairs written before its platform, and both come out as
+// ordinary-looking geometry that is quietly wrong somewhere in Sydney.
+//
+// So the same chunk is built twice through the same builder, once **one step per
+// slice** and once **in a single slice**, and every buffer is compared.
+//
+// **What that does and does not prove, said plainly**, because an assertion
+// whose limit is not written down gets trusted past it. It proves that no step
+// depends on the frame it happens to run in: a writer that read the clock, a
+// counter kept in a local instead of in the state, a resumption that lost a
+// cursor would all show here, and so would a mesh order, a sleeper set or a
+// prism list that is not a pure function of the chunk. It does **not** prove
+// that the seams are where the old single-pass `buildChunk` wrote, because both
+// runs go through the new builder.
+//
+// That second thing was proved once, at the commit, the only way it can be: by
+// building 63 chunks -- the busiest station, the busiest junction throat, the
+// most portals, the most masts and an even sweep of the rest -- through the
+// pre-split `buildChunk` at `HEAD` and through this builder, and comparing 380
+// meshes and **902,352 vertices**. They were identical, signs included. The old
+// function is gone, so that check cannot live here; this one is what guards the
+// seams from here on.
+
+/** Exact, element for element. `Object.is` so a NaN vertex compares equal to itself. */
+function sameNumbers(a: ArrayLike<number> | undefined, b: ArrayLike<number> | undefined): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) return false;
+  return true;
+}
+
+/** Every buffer of one built chunk against another's. Empty when they agree. */
+function sameChunk(
+  key: string,
+  sliced: { chunk: BuiltChunk; prisms: readonly SolidPrism[] },
+  whole: { chunk: BuiltChunk; prisms: readonly SolidPrism[] },
+): string[] {
+  const bad: string[] = [];
+  const a = sliced.chunk.group.children as Mesh[];
+  const b = whole.chunk.group.children as Mesh[];
+  if (a.length !== b.length) {
+    bad.push(`chunk ${key}: ${a.length} meshes sliced, ${b.length} in one go`);
+    return bad;
+  }
+  for (let i = 0; i < a.length; i++) {
+    // The order of the meshes is the order the materials are built in, and it is
+    // read by `countDraws` and by anything that greps the scene graph.
+    if (a[i].name !== b[i].name) {
+      bad.push(`chunk ${key}: mesh ${i} is "${a[i].name}" sliced and "${b[i].name}" in one go`);
+      continue;
+    }
+    for (const attr of ['position', 'normal', 'uv']) {
+      const pa = a[i].geometry.getAttribute(attr) as { array?: ArrayLike<number> } | undefined;
+      const pb = b[i].geometry.getAttribute(attr) as { array?: ArrayLike<number> } | undefined;
+      if (!sameNumbers(pa?.array, pb?.array)) {
+        bad.push(
+          `chunk ${key}: ${a[i].name}.${attr} differs ` +
+            `(${pa?.array?.length ?? 'absent'} vs ${pb?.array?.length ?? 'absent'} values)`,
+        );
+      }
+    }
+    if (!sameNumbers(a[i].geometry.getIndex()?.array, b[i].geometry.getIndex()?.array)) {
+      bad.push(`chunk ${key}: ${a[i].name} index differs`);
+    }
+  }
+  // The sleeper source, which is order-dependent in exactly the same way and is
+  // written from the segment phase rather than from a material.
+  if (!sameNumbers(sliced.chunk.sleepers, whole.chunk.sleepers)) {
+    bad.push(
+      `chunk ${key}: the sleeper set differs ` +
+        `(${sliced.chunk.sleepers.length} vs ${whole.chunk.sleepers.length} values)`,
+    );
+  }
+  if (sliced.chunk.provisional !== whole.chunk.provisional) {
+    bad.push(`chunk ${key}: provisional is ${sliced.chunk.provisional} sliced, ${whole.chunk.provisional} whole`);
+  }
+  // ...and the prisms, which are what a *body* meets. A chunk whose triangles
+  // agree and whose collision does not is the worse of the two failures.
+  if (sliced.prisms.length !== whole.prisms.length) {
+    bad.push(`chunk ${key}: ${sliced.prisms.length} prisms sliced, ${whole.prisms.length} whole`);
+  } else {
+    for (let i = 0; i < sliced.prisms.length; i++) {
+      const p = sliced.prisms[i];
+      const q = whole.prisms[i];
+      if (!sameNumbers(p.points, q.points) || !Object.is(p.height, q.height) || !Object.is(p.base, q.base)) {
+        bad.push(`chunk ${key}: prism ${i} differs`);
+        break;
+      }
+    }
+  }
+  return bad;
+}
+
+/** Free a specimen chunk. It never joined a scene, so its geometries are all it owns. */
+function disposeSpecimen(built: { chunk: BuiltChunk }): void {
+  for (const g of built.chunk.geometries) g.dispose();
+}
+
+/**
+ * Build a spread of chunks both ways and prove they agree.
+ *
+ * The sample is chosen by what a chunk *contains* rather than by where it is,
+ * because the phases are what is being tested: the busiest station, the busiest
+ * junction throat, the most tunnel portals, a median plain-track chunk, and then
+ * an even sweep of the rest so nothing about the choice is special pleading.
+ *
+ * A second `RailAssets` with its sign atlas prepared, and a second `RailWorld`
+ * over the same network, so the last of the seven station steps -- the platform
+ * blade and the street board, both of which need a name to have a cell in the
+ * atlas -- is actually reached. The ride above keeps the unprepared assets, so
+ * its numbers stay comparable with the ones in `RAIL_BUILD_BUDGET_MS`' header.
+ */
+function railChunkIdentity(rail: RailRide | null): string[] {
+  console.log('');
+  console.log('--- rail chunk identity: one step per slice against one slice, buffer for buffer');
+  if (!rail) {
+    console.log('    client/public/rail/rail.bin is missing; not checked.');
+    return [];
+  }
+  const { net } = rail;
+  const signed = new RailAssets();
+  signed.prepareSigns(net.stations.map((s) => s.name));
+  const world = new RailWorld(net, signed, FLAT);
+
+  const entries = [...net.chunks.entries()];
+  const pick = (label: string, score: (c: (typeof entries)[number][1]) => number): [string, string] | null => {
+    let best: (typeof entries)[number] | null = null;
+    let bestScore = 0;
+    for (const e of entries) {
+      const s = score(e[1]);
+      if (s > bestScore) {
+        bestScore = s;
+        best = e;
+      }
+    }
+    return best ? [best[0], `${label} (${bestScore})`] : null;
+  };
+
+  const chosen = new Map<string, string>();
+  const add = (entry: [string, string] | null): void => {
+    if (entry && !chosen.has(entry[0])) chosen.set(entry[0], entry[1]);
+  };
+  add(pick('the busiest station chunk', (c) => c.stations.length * 1000 + c.segments.length));
+  add(pick('the busiest junction throat', (c) => c.segments.length));
+  add(pick('the most tunnel portals', (c) => c.portals.length));
+  add(pick('the most masts', (c) => c.masts.length));
+  // A plain-track chunk at the median of the plain-track chunks: the common case,
+  // and the one the other four are not.
+  const plain = entries
+    .filter(([, c]) => c.stations.length === 0 && c.portals.length === 0 && c.segments.length > 0)
+    .sort((p, q) => p[1].segments.length - q[1].segments.length);
+  if (plain.length) add([plain[plain.length >> 1][0], `a median plain-track chunk (${plain[plain.length >> 1][1].segments.length} segments)`]);
+  // ...and an even sweep of everything else, so the sample is not four chunks
+  // chosen because they are interesting.
+  const stride = Math.max(1, Math.floor(entries.length / 20));
+  for (let i = 0; i < entries.length; i += stride) add([entries[i][0], 'the even sweep']);
+
+  const bad: string[] = [];
+  let meshes = 0;
+  let values = 0;
+  for (const [key, why] of chosen) {
+    // A negative budget is a deadline already past when the first step returns,
+    // which is one step per slice -- the most divided the builder can be.
+    const sliced = world.buildChunkSliced(key, -1);
+    const whole = world.buildChunkSliced(key, Infinity);
+    if (!sliced || !whole) {
+      bad.push(`chunk ${key} (${why}) could not be built`);
+      continue;
+    }
+    const failures = sameChunk(key, sliced, whole);
+    if (failures.length) {
+      bad.push(...failures.map((f) => `${f}  -- ${why}`));
+    }
+    meshes += sliced.chunk.group.children.length;
+    for (const m of sliced.chunk.group.children as Mesh[]) {
+      values += (m.geometry.getAttribute('position') as { count?: number } | undefined)?.count ?? 0;
+    }
+    disposeSpecimen(sliced);
+    disposeSpecimen(whole);
+  }
+  console.log(
+    `    ${chosen.size} chunks, ${meshes} meshes, ${values} vertices compared both ways ` +
+      `(${[...chosen.values()].filter((v) => v !== 'the even sweep').join('; ')}).`,
+  );
+  if (bad.length === 0) console.log('    every buffer identical.');
+  else for (const line of bad) console.log(`      - ${line}`);
+  return bad;
+}
+
+/**
+ * Walk away from a chunk while it is being built, and prove nothing is left.
+ *
+ * The invariant the split put at risk. Before it, a chunk that existed had
+ * finished and the only way to stop owning one was `disposeChunk`; now a player
+ * can cross `KEEP_RADIUS` with a station chunk half assembled behind them, and a
+ * partial build holds geometries that no map is pointing at.
+ *
+ * Three assertions, and the third is the one that would not show up in a test
+ * written without meaning to: the key is in none of the three states, the scene
+ * holds nothing but finished chunks, and `RailWorld.liveGeometries` -- which
+ * counts up in `addMesh` and down at every `dispose()` the class performs -- is
+ * back to zero.
+ */
+function railChunkAbandon(rail: RailRide | null): string[] {
+  console.log('');
+  console.log('--- rail chunk abandonment: walk out of KEEP_RADIUS mid-build');
+  if (!rail) {
+    console.log('    client/public/rail/rail.bin is missing; not checked.');
+    return [];
+  }
+  const { world, net } = rail;
+  const bad: string[] = [];
+  // Fixtures of the scene that are not chunks: the always-on corridor group and
+  // the three instanced sets. Everything above this is a resident chunk.
+  world.clear();
+  const fixtures = world.group.children.length;
+  if (world.liveGeometries !== 0) {
+    bad.push(`clear() left ${world.liveGeometries} chunk geometries alive`);
+  }
+
+  // The busiest station chunk, because it is the one that cannot finish inside a
+  // frame and so is certain to be caught half built.
+  let key = '';
+  let most = -1;
+  for (const [k, c] of net.chunks) {
+    const score = c.stations.length * 1000 + c.segments.length;
+    if (score > most) {
+      most = score;
+      key = k;
+    }
+  }
+  const [cx, cz] = key.split(',').map(Number);
+  const x = (cx + 0.5) * CHUNK_M;
+  const z = (cz + 0.5) * CHUNK_M;
+
+  let caught = '';
+  for (let f = 0; f < 400 && caught === ''; f++) {
+    world.update(x, z);
+    // The scene may never hold a part-built chunk. Checked every frame rather
+    // than at the end, because "it appears atomically" is a claim about every
+    // instant and not about the last one.
+    if (world.group.children.length !== fixtures + world.residentChunks) {
+      bad.push(
+        `the scene holds ${world.group.children.length - fixtures} chunk groups ` +
+          `for ${world.residentChunks} resident chunks`,
+      );
+      break;
+    }
+    if (world.buildingChunks === 1) caught = key;
+  }
+  if (caught === '' && bad.length === 0) {
+    bad.push('no chunk was ever caught part-built, so this check proved nothing');
+  }
+
+  const resident = world.residentChunks;
+  const live = world.liveGeometries;
+  // Straight out of every radius, which is the teleport and also the walk taken
+  // to its conclusion.
+  world.update(x + KEEP_RADIUS * 4, z);
+  if (world.buildingChunks !== 0) bad.push('a build survived the walk out of KEEP_RADIUS');
+  if (world.residentChunks !== 0) bad.push(`${world.residentChunks} chunks survived out of range`);
+  if (world.chunkStateOf(key) !== CHUNK_ABSENT) {
+    bad.push(`the abandoned chunk ${key} is still in state ${world.chunkStateOf(key)}`);
+  }
+  if (world.group.children.length !== fixtures) {
+    bad.push(`${world.group.children.length - fixtures} chunk groups are still in the scene`);
+  }
+  if (world.liveGeometries !== 0) {
+    bad.push(`${world.liveGeometries} chunk geometries leaked (was ${live} before the walk)`);
+  }
+  console.log(
+    `    caught chunk ${key} part-built with ${resident} resident and ${live} geometries live; ` +
+      `after walking ${(KEEP_RADIUS * 4 / 1000).toFixed(1)} km off: ` +
+      `${world.residentChunks} resident, ${world.buildingChunks} building, ${world.liveGeometries} live.`,
+  );
+  if (bad.length === 0) console.log('    nothing left behind.');
+  else for (const line of bad) console.log(`      - ${line}`);
+  return bad;
 }
 
 async function main(): Promise<void> {
@@ -1411,6 +1747,12 @@ async function main(): Promise<void> {
   }
   const { failures, rail } = await warmupAudit();
   railChunkProfile(rail);
+  // WORKSTREAM AF. The ride above is a measurement and these two are assertions,
+  // so they run after it and in this order: the identity check builds its own
+  // world and cannot disturb the ride's, and the abandonment check teleports the
+  // ride's world and so must be the last thing to touch it.
+  failures.push(...railChunkIdentity(rail));
+  failures.push(...railChunkAbandon(rail));
   console.log('');
   if (!coverageOnly) {
     console.log('Sections marked "not covered" need a browser; the ?perf=1 strip reports them.');
@@ -1419,10 +1761,10 @@ async function main(): Promise<void> {
     // Non-zero, on `server/tick-profile.ts`'s terms: a check nobody can fail is
     // a check nobody runs. The list above is the whole message; this line is for
     // the shell.
-    console.log(`FAIL: ${failures.length} real meshes have no boot warm-up entry.`);
+    console.log(`FAIL: ${failures.length} checks failed (warm-up coverage, chunk identity, abandonment).`);
     host.process?.exit(1);
   }
-  console.log('warm-up coverage OK.');
+  console.log('warm-up coverage OK, chunk identity OK, abandonment OK.');
 }
 
 // `import.meta.main` is bun's; it is absent in the browser, where this module is

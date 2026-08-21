@@ -354,28 +354,44 @@ export const BUILDS_PER_FRAME = 2;
  * per kilometre a rider meets one about every fifteen seconds. That is the
  * "little freezes on the train" this constant exists to stop.
  *
- * **A check between builds, not a pre-emption** — the same shape, and the same
- * honesty about its limit, as `world/streamer.ts`' `BUILD_BUDGET_MS`: the first
- * chunk of a frame always runs, so a single expensive chunk is untouched by
- * this. What it removes is the second one queued behind it.
+ * **A check between steps, not a pre-emption** — the same shape, and the same
+ * honesty about its limit, as `world/streamer.ts`' `BUILD_BUDGET_MS`: whatever
+ * step is running when the ceiling passes always finishes, so the frame costs
+ * this plus one step.
  *
- * **And measurement says that is the smaller half.** Re-running the ride with
- * this ceiling in place moved the worst frame not at all — 84.9 ms before,
- * 85.8 ms after, inside the noise — while building frames went 214 → 224, which
- * is the ceiling deferring work to later frames exactly as intended. Both
- * numbers together say the worst frame is **one** chunk, not two stacking: a
- * station throat or a junction is forty times the cost of plain double track
- * and no per-frame count can divide it. Cutting that tail means splitting a
- * single `buildChunk` across frames — its dozen `add(...)` calls are the
- * natural seam — which is a real restructuring and wants its own pass. This
- * constant is the cheap half, kept because it is correct and costs nothing.
+ * **It was a check between whole chunks, and that was measurably not enough.**
+ * Adding it moved the worst frame not at all — 84.9 ms before, 85.8 ms after,
+ * inside the noise — while building frames went 214 → 224, which is the ceiling
+ * deferring work to later frames exactly as intended. Both numbers together say
+ * the worst frame is **one** chunk, not two stacking: a station throat or a
+ * junction is forty times the cost of plain double track and no per-frame count
+ * can divide one object. So the object was divided. `rail-geo.ChunkBuild` is a
+ * chunk build as a resumable state — eleven accumulators, the station plans and
+ * a cursor — advanced under this same ceiling across as many frames as it
+ * needs, and `RailWorld.worstStepMs` reports the "plus one step" half of the
+ * bound above so the claim stays checkable as the geometry grows.
  *
- * Deliberately under a frame at 60 Hz. The queue survives across frames — that
- * is what `pending` is — so nothing is lost by stopping early; the ring simply
- * fills a frame or two later, exactly as it already does behind a walking
- * player.
+ * **Four and not eight, and the four is arithmetic rather than taste.** The
+ * bound on a building frame is this constant plus the worst indivisible step,
+ * and the worst step measured over the ride is 11.5 ms — one `Solid.build` of
+ * the concrete at Central, which is 190k floats moved out of a JavaScript array
+ * into a `Float32Array` at about 10 ns each. A frame at 60 Hz is 16.7 ms, so
+ * the ceiling has to be under 5 or the sum does not fit. At 8 it did not: three
+ * runs of the ride gave worst frames of 14.2, 13.3 and **18.8** ms, the last of
+ * them a big `Solid.build` starting at 7.9 ms into its frame. At 4 the same
+ * three runs give 13.3, 12.9 and 12.7 — and land the identical 285 chunks, so
+ * the ring is not paying for it.
+ *
+ * If the worst step ever grows, this must come down with it, or the step must
+ * be divided. `RailWorld.worstStepMs` is printed by
+ * `perf-harness.ts --coverage` for exactly that reading.
+ *
+ * Deliberately under a frame at 60 Hz. The work survives across frames — that
+ * is what `pending` and the in-flight build are — so nothing is lost by
+ * stopping early; the ring simply fills a frame or two later, exactly as it
+ * already does behind a walking player.
  */
-export const RAIL_BUILD_BUDGET_MS = 8;
+export const RAIL_BUILD_BUDGET_MS = 4;
 /** And disposed past this. The hysteresis is the streamer's own pattern. */
 export const KEEP_RADIUS = 1500;
 /** How many times a chunk is rebuilt waiting for terrain. See `retryProvisional`. */
