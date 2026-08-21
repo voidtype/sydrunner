@@ -8880,11 +8880,11 @@ async function main(): Promise<void> {
    * design of `warmupStandins`. A second `warmUpPipelines` would mean a second
    * `compileAsync` over the whole scene, and this pass is the most expensive
    * step in the boot precisely because three awaits `yieldToMain()` between
-   * every render object in it. Nine stand-in meshes riding along in the same
-   * walk cost nine more; a second walk would cost hundreds.
+   * every render object in it. Five stand-in triangles riding along in the same
+   * walk cost five more objects; a second walk would cost hundreds.
    *
    * `release()` is in a `finally` for the same reason the warm-up's own is: a
-   * pass that timed out must not leave nine invisible triangles in the render
+   * pass that timed out must not leave five invisible triangles in the render
    * list for the rest of the session.
    */
   const lateWarmup = warmupStandins([...handsWarmupParts(handsViewmodel.assets), ...money.warmupParts()]);

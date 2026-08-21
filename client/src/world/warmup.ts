@@ -828,8 +828,15 @@ export function verifyWarmup(): string[] {
   if (!receives.includes(true) || !receives.includes(false)) {
     failures.push('the default receives is not both ways, so a tile crossing the shadow volume would compile mid-walk');
   }
+  // Parented for real before the release, because a holder that was never added
+  // is detached by definition and asserting on it proves nothing. This is the
+  // arrangement the scene pass uses: `scene.add(holder)` and `release()` after.
+  const stage = new Group();
+  stage.add(stand.holder);
   stand.release();
-  if (stand.holder.parent !== null) failures.push('warmupStandins.release left the holder parented');
+  if (stand.holder.parent !== null) {
+    failures.push('warmupStandins.release left the holder parented, so its stand-ins stay in the render list for the session');
+  }
 
   material.dispose();
   other.dispose();
