@@ -21,7 +21,11 @@ match that voice, and read the header of any file before changing it.
   the box holds accounts/wallets and must never be rsynced over, and the
   Caddy `/auth/*` handle.
 - **[STATIONS.md](STATIONS.md)** / **[RAIL-VERTICAL.md](RAIL-VERTICAL.md)** /
-  **[TRAINS.md](TRAINS.md)** — the railway's architecture and invariants.
+  **[TRAINS.md](TRAINS.md)** / **[RAIL-CORRIDOR.md](RAIL-CORRIDOR.md)** — the
+  railway's architecture and invariants. RAIL-CORRIDOR is the newest and binds
+  every writer of lineside geometry: the corridor is shared, the lateral budget
+  is the one answer to how far a track may build, and the structure gauge is
+  the check that convicts anything that forgets to ask.
 - **[PERFORMANCE.md](PERFORMANCE.md)** / **[EXPANSION.md](EXPANSION.md)** —
   the budgets (1 vCPU / 1 GB box, wire per player, memory caps).
 
