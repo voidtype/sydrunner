@@ -452,6 +452,34 @@ Both were tested by breaking them: a record blind to the field, a record blind
 to the generation, a box refusal 50% too tight, a cover built at half the reach,
 a slop of zero and a geometry cache off by one cell each produce a named failure.
 
+### On the box, which is the only number that was ever the complaint
+*(2026-08-21, after AA + AC shipped)*
+
+Every table above is an M-series laptop. The complaint that started this round
+was the production line, so here is the production line, one player attached
+through `server/loadtest.ts --players 1 --url wss://sydrunner.3rp.uk/ws`:
+
+    before   3.30 ms/host-tick median
+    after    0.85 ms/host-tick median
+             tick 0.85 ms = advance 0.13, streetlife 0.09, broadcast 0.08,
+                            powerups 0.07, characters 0.07, wildlife 0.05,
+                            rest 0.05   (profiler 1.59 us/tick)
+
+**A 74% cut, and the shape matters more than the total**: there is no longer a
+hog. Six sections within 0.08 ms of each other is what a tick looks like when
+every system is paying about what it should, and it means the next win has to
+come from somewhere other than the sim — which is why the frame profiler
+(workstream AB) and the snapshot egress went next rather than another tick pass.
+The box runs each section roughly an order of magnitude slower than the laptop
+does, which is the honest exchange rate for a shared 1 vCPU and the reason the
+`tick-profile` budgets are set against local numbers with headroom rather than
+read as absolutes.
+
+One tooling fix came out of taking this measurement: `loadtest`'s stats URL was
+the socket URL with `/health` glued on, which behind the box's Caddy asks for
+`/ws/health` and 404s — the harness reported "no server" at a box that was
+serving fine. It now strips the socket's own path segment.
+
 ## Target hardware (with the egress arithmetic)
 
 **Rewritten against phase 4's measurements.** The original version of this table

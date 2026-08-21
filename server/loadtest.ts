@@ -233,7 +233,14 @@ function parseArgs(argv: string[]): Options {
     players: Number(get('players', '50')),
     minutes: Number(get('minutes', '1')),
     url,
-    statsUrl: url.replace(/^ws/, 'http').replace(/\/$/, ''),
+    // The socket URL and the stats URL are the same host but not the same
+    // path. Locally the server is the whole origin, so they coincide. Behind
+    // the box's Caddy they do not: the socket is `wss://host/ws` while
+    // `/health` and `/rooms` are their own handles at the root, and appending
+    // `/health` to the socket path asks for `/ws/health`, which is a 404 and
+    // reads as "no server there" — pointing this at prod looked like the box
+    // was down when it was serving fine. Strip the socket's own path segment.
+    statsUrl: url.replace(/^ws/, 'http').replace(/\/$/, '').replace(/\/ws$/, ''),
     shards: Number(get('shards', '1')),
     ramp: Number(get('ramp', '5')),
     sample: Number(get('sample', '5')),
