@@ -50,6 +50,7 @@ import {
   frameType,
   rankRoster,
   sanitiseName,
+  SNAPSHOT_HEADER_BYTES,
   snapshotBytes,
   uniqueName,
   type RosterEntry,
@@ -1598,12 +1599,22 @@ async function main(): Promise<void> {
       ballsAtA.every((x) => x.samples >= 2),
       `every ball was seen in at least two snapshots (${ballsAtA.map((x) => x.samples).join(', ')})`,
     );
-    // Both clients have to see the same balls: the section is broadcast, not
-    // per-viewer, so a ball A can see and B cannot is a culling bug.
+    // The ball section is **per viewer**, not broadcast -- protocol v20 gave it
+    // its own interest radius and stopped sending a thrower its own ball, which
+    // the client discarded on arrival anyway. So the old assertion here ("A and
+    // B saw the same balls") is now false by design in this exact scenario: B
+    // is the only one throwing, and B is the one person not sent them.
+    //
+    // What replaces it is the same claim from the other side. Everything B
+    // threw reached A (asserted above, with flight paths); none of it came back
+    // to B. Mutual visibility of a ball neither client threw is covered by the
+    // three-probe section in `checkRooms` and by `verifyAoi`.
     const idsAtA = new Set(ballsAtA.map((_, i) => [...a.balls.keys()][i]));
-    const idsAtB = new Set([...b.balls.keys()]);
-    const shared = [...idsAtA].filter((id) => idsAtB.has(id)).length;
-    check(shared > 0, `A and B saw the same balls (${shared} ids in common)`);
+    const ownAtB = [...b.balls.values()].filter((x) => x.thrower === b.id).length;
+    check(
+      ownAtB === 0,
+      `and B was sent none of its own ${idsAtA.size} throws back (${ownAtB} of them arrived)`,
+    );
     // **Down from its apex**, and the apex has to be read as the flight goes.
     //
     // Two versions of this have now been wrong in the same way -- both compared
@@ -6878,10 +6889,21 @@ async function checkPolice(): Promise<void> {
     );
     check(decoded?.version !== PROTOCOL_VERSION, 'and is not mistaken for a current one');
     // And the header really did grow, which is why v6 had to be refused at all.
+    // Compared header against header, not total against total. The first cut of
+    // this asserted `snapshotBytes(1, 0, 0) !== 9 + 21` -- v6's 9-byte header
+    // plus its 21-byte player record -- which was a fair proxy right up until
+    // v20 narrowed the player record to 17 and grew the header to 13. Thirteen
+    // and seventeen is thirty, so a true claim started reading as false on an
+    // arithmetic coincidence. The claim was always about the *header*.
+    // Through a `number` because the constant is a literal type: comparing it
+    // to 9 directly is a compile error ("'13' and '9' have no overlap"), which
+    // is TypeScript being right about today and wrong about the point -- the
+    // assertion exists to fail on the day somebody makes them equal again.
+    const headerBytes: number = SNAPSHOT_HEADER_BYTES;
     check(
-      snapshotBytes(1, 0, 0) !== 9 + 21,
-      `the v7 snapshot header carries an actor count, so a v6 decoder reads ${9 + 21} B where there are ` +
-        `${snapshotBytes(1)} -- every field after the player count would be shifted`,
+      headerBytes !== 9,
+      `the v7 snapshot header carries an actor count (${headerBytes} B against v6's 9), so every ` +
+        `field after the player count would be shifted for a v6 decoder`,
     );
   }
 
@@ -11044,14 +11066,29 @@ async function checkAoi(): Promise<void> {
     check(victim.combat.phase === 'ko', `the victim really was knocked out (phase "${victim.combat.phase}")`);
   }
 
-  // --- 4. Balls and officers are filtered by their own position, not by whose
-  // they are. A ball is most interesting to the player it is about to reach,
-  // who by definition is nowhere near whoever threw it.
+  // --- 4. A ball reaches the people it is near, and nobody else -- including,
+  // since the egress pass, the person who threw it.
+  //
+  // Three probes rather than two, and the third is the reason this section
+  // still says anything. Until protocol v20 the claim here was "balls are
+  // filtered by their own position, not by whose they are", asserted as *the
+  // thrower sees its own ball*. Workstream AD made the thrower the one
+  // exception: `net/client.interpolateBalls` opens with
+  // `if (this.ownBall(b.thrower)) continue` -- your own throw is drawn from
+  // your own prediction, 100 ms ahead of the authoritative copy -- so those
+  // seventeen bytes a tick were being decoded and dropped on the first line of
+  // the loop that received them.
+  //
+  // That turns both of the old assertions into "somebody saw nothing", which is
+  // exactly the shape that passes when the ball section is broken outright. So
+  // a bystander stands next to the thrower and must see it: two negatives and a
+  // positive, and the positive is the one that fails if a ball stops being sent
+  // at all.
   {
     const room = new Room(0, world, 8, 0);
     const socks: FakeSocket[] = [];
     const parts: Participant[] = [];
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 3; i++) {
       const conn = newConn(0);
       const ws = new FakeSocket(conn);
       const p = room.join(conn, i, `ball-${i}`)!;
@@ -11059,26 +11096,38 @@ async function checkAoi(): Promise<void> {
       socks.push(ws);
       parts.push(p);
     }
-    const [thrower, far] = parts;
+    const [thrower, near, far] = parts;
     thrower.combat.body.position.set(world.spawn.x, EYE_HEIGHT, world.spawn.z);
+    // Five metres away: well inside `AOI_BALL_RADIUS`, and far enough that the
+    // ball is a separate body rather than something inside the thrower.
+    near.combat.body.position.set(world.spawn.x + 5, EYE_HEIGHT, world.spawn.z);
     far.combat.body.position.set(world.spawn.x + 1500, EYE_HEIGHT, world.spawn.z);
     thrower.input.throwBall = true;
     thrower.input.pitch = 0.2;
     let throwerSaw = 0;
+    let nearSaw = 0;
     let farSaw = 0;
     const scratch = createSnapshot();
     for (let t = 0; t < 40; t++) {
+      near.combat.body.position.x = world.spawn.x + 5;
+      near.combat.body.position.z = world.spawn.z;
       far.combat.body.position.x = world.spawn.x + 1500;
       far.combat.body.position.z = world.spawn.z;
       const m0 = socks[0].frames.length;
       const m1 = socks[1].frames.length;
+      const m2 = socks[2].frames.length;
       room.step();
       thrower.input.throwBall = false;
       for (const f of socks[0].since(m0, MSG.SNAPSHOT)) throwerSaw += decodeSnapshot(f, scratch)!.balls.length;
-      for (const f of socks[1].since(m1, MSG.SNAPSHOT)) farSaw += decodeSnapshot(f, scratch)!.balls.length;
+      for (const f of socks[1].since(m1, MSG.SNAPSHOT)) nearSaw += decodeSnapshot(f, scratch)!.balls.length;
+      for (const f of socks[2].since(m2, MSG.SNAPSHOT)) farSaw += decodeSnapshot(f, scratch)!.balls.length;
     }
-    check(throwerSaw > 0, `the thrower saw its own ball in the stream (${throwerSaw} ball-records)`);
-    check(farSaw === 0, `a client 1.5 km away was sent none of it (${farSaw} ball-records)`);
+    check(nearSaw > 0, `a bystander beside the throw was sent it (${nearSaw} ball-records)`);
+    check(
+      throwerSaw === 0,
+      `and the thrower was sent none of its own, which its client would have discarded (${throwerSaw} ball-records)`,
+    );
+    check(farSaw === 0, `and a client 1.5 km away was sent none of it either (${farSaw} ball-records)`);
   }
 }
 
