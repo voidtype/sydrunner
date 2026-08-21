@@ -489,6 +489,7 @@ import {
   drawnTriangles,
   loadRailBake,
   railWarmupParts,
+  verifyRailChunkSteps,
   verifyRailGeometry,
   type RailNetwork,
 } from './world/rail-geo.ts';
@@ -1303,6 +1304,13 @@ async function main(): Promise<void> {
   // world hitches, which is the one failure mode worse than having no audit.
   // See `world/warmup.verifyWarmup`.
   const warmupFailures = timed('warm-up keys', () => verifyWarmup());
+  // WORKSTREAM AF: the chunk builder's cursor. A rail chunk is now built across
+  // frames rather than inside one (see `rail-geo.ChunkBuild`), and the walk over
+  // its phases is the part of that a mistake in is silent -- a phase skipped
+  // draws ballast with no rails on it. The bake is not loaded yet at this point
+  // in boot and this check does not need it: it is arithmetic over the phase
+  // sizes and nothing else. See `verifyRailChunkSteps`.
+  const railStepFailures = timed('rail chunk steps', () => verifyRailChunkSteps());
   // Once, at `debug` so it is out of the way, and slowest-first because the only
   // question anyone asks of this line is which one it was.
   checkMs.sort((a, b) => b[1] - a[1]);
@@ -1371,6 +1379,7 @@ async function main(): Promise<void> {
     raveFailures.length ||
     sunButtonFailures.length ||
     warmupFailures.length ||
+    railStepFailures.length ||
     cycleFailures.length ||
     duskFailures.length ||
     clockFailures.length ||
@@ -1451,6 +1460,7 @@ async function main(): Promise<void> {
           ...raveFailures,
           ...sunButtonFailures,
           ...warmupFailures,
+          ...railStepFailures,
           ...cycleFailures,
           ...duskFailures,
           ...clockFailures,
@@ -11251,10 +11261,20 @@ async function main(): Promise<void> {
         portals: railNetwork?.portals.length ?? 0,
         stations: railNetwork?.stations.length ?? 0,
         residentChunks: railWorld?.residentChunks ?? 0,
+        // The other two states a chunk key can be in. See `rail-geo.ChunkBuild`:
+        // a chunk is built over several frames now, so "resident" no longer
+        // accounts for everything the ring is working on and a reader at the
+        // console would otherwise see a chunk that is neither here nor queued.
+        buildingChunks: railWorld?.buildingChunks ?? 0,
+        pendingChunks: railWorld?.pendingChunks ?? 0,
         chunkDraws: railWorld?.chunkDraws ?? 0,
         sleepers: railWorld?.sleeperCount ?? 0,
         masts: railWorld?.mastCount ?? 0,
         rebuildMs: railWorld?.rebuildMs ?? 0,
+        // The bound on a building frame is `RAIL_BUILD_BUDGET_MS` plus this, and
+        // this is the half that can grow silently as the geometry does.
+        worstStepMs: railWorld?.worstStepMs ?? 0,
+        worstStep: railWorld?.worstStep ?? '',
         overflows: railWorld?.overflows ?? 0,
         trains: { ...trains.stats },
       }),

@@ -274,12 +274,14 @@ import {
   viaductSolids,
   framePrism,
   stationSolids,
+  type Chunk,
   type FrameSolid,
   type GroundAt,
   type Portal,
   type RailNetwork,
   type RailSolids,
   type Segment,
+  type SolidPrism,
   type TrenchRib,
   type StationPlan,
   type TrackFrame,
@@ -635,7 +637,6 @@ export class RailAssets {
    * the next suburb, and that is the right distance for it.
    */
   prepareSigns(names: readonly string[]): void {
-    if (typeof document === 'undefined') return;
     const cols = 8;
     const cellW = 2048 / cols;
     const cellH = 32;
@@ -643,6 +644,25 @@ export class RailAssets {
     if (rows * cellH > 2048) {
       console.warn(`[rail] ${names.length} station names do not fit one sign atlas; the tail is blank.`);
     }
+    // **The cell layout is arithmetic and the plate is a picture**, and this is
+    // split at that line rather than done in one pass under
+    // `typeof document !== 'undefined'`. A process with no canvas can still say
+    // where a name's cell would be, so a headless check -- `perf-harness.ts`'
+    // chunk identity test is the reader -- builds the same sign geometry the
+    // browser builds instead of silently skipping every sign in the network.
+    // What it does not get is the atlas, which is what `hasSignAtlas` is for.
+    for (let i = 0; i < names.length; i++) {
+      const x = (i % cols) * cellW;
+      const y = ((i / cols) | 0) * cellH;
+      if (y + cellH > 2048) break;
+      this.signSlots.set(names[i], [
+        (x + 2) / 2048,
+        1 - (y + cellH - 1) / 2048,
+        (x + cellW - 2) / 2048,
+        1 - (y + 1) / 2048,
+      ]);
+    }
+    if (typeof document === 'undefined') return;
     const canvas = document.createElement('canvas');
     canvas.width = 2048;
     canvas.height = 2048;
@@ -656,22 +676,14 @@ export class RailAssets {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     for (let i = 0; i < names.length; i++) {
-      const col = i % cols;
-      const row = (i / cols) | 0;
-      const x = col * cellW;
-      const y = row * cellH;
+      const x = (i % cols) * cellW;
+      const y = ((i / cols) | 0) * cellH;
       if (y + cellH > 2048) break;
       ctx.fillStyle = '#12181c';
       ctx.fillRect(x, y, cellW, cellH);
       ctx.fillStyle = '#eef3f6';
       ctx.font = '600 21px "Helvetica Neue", Helvetica, Arial, sans-serif';
       ctx.fillText(names[i].toUpperCase(), x + cellW / 2, y + cellH / 2 + 1, cellW - 14);
-      this.signSlots.set(names[i], [
-        (x + 2) / 2048,
-        1 - (y + cellH - 1) / 2048,
-        (x + cellW - 2) / 2048,
-        1 - (y + 1) / 2048,
-      ]);
     }
     const texture = new CanvasTexture(canvas);
     texture.colorSpace = SRGBColorSpace;
@@ -885,7 +897,7 @@ export type { GroundAt, RailSolids } from './rail-solids.ts';
 
 // --- Per-chunk construction ----------------------------------------------------------
 
-interface BuiltChunk {
+export interface BuiltChunk {
   group: Group;
   geometries: BufferGeometry[];
   collisionKey: string | null;
@@ -903,6 +915,218 @@ interface BuiltChunk {
   cz: number;
 }
 
+// --- One chunk, built across frames --------------------------------------------
+//
+// **WHY A CHUNK IS A STATE OBJECT AND NOT A FUNCTION CALL.**
+//
+// `RAIL_BUILD_BUDGET_MS`' own header ends by naming what it could not fix, and
+// this is that. A millisecond ceiling checked *between* chunks bounds the second
+// expensive chunk of a frame and does nothing at all about the first: measured
+// over Emu Plains -> Berowra, adding it moved the worst building frame from
+// 84.9 ms to 85.8 ms while the count of building frames went 214 -> 224. Both
+// numbers together say the worst frame is **one** chunk. A chunk holding a
+// station throat or a junction is forty times a chunk of plain double track, and
+// no per-frame count can divide one object.
+//
+// So the object is divided instead. `buildChunk` was a function that ran three
+// loops and eleven `Solid.build`s to completion; it is now a `ChunkBuild` -- the
+// eleven accumulators, the station plans and a cursor -- advanced one **step** at
+// a time under the same millisecond ceiling, across as many frames as it needs.
+// The worst frame stops being "whatever the worst chunk costs" and becomes
+// `RAIL_BUILD_BUDGET_MS + the worst single step`, which is a bound a reader can
+// check by measurement rather than a hope. `RailWorld.worstStepMs` reports the
+// second half of that sum for the run of a session, so the claim stays honest as
+// the geometry grows.
+//
+// Four things this arrangement has to get right, each of which is a way to have
+// got it wrong:
+//
+//   - **A chunk appears atomically.** Nothing enters the scene graph and no
+//     prism reaches `CollisionWorld` until the last step. Half a chunk is
+//     ballast with no rails on it, which is worse than a chunk that is late --
+//     and late is already tolerated, because that is what `pending` is.
+//   - **Three states, not two.** `built` holds finished chunks; `active` holds
+//     the one being built; `pending` holds keys not started. Every reader of
+//     `built` below says which of the three it means, and `reshapeRing` skips
+//     all three, or an in-progress chunk is queued a second time and built
+//     twice.
+//   - **Abandonment frees.** The player can walk out of `KEEP_RADIUS` mid-build.
+//     `abandonBuild` disposes exactly what the partial build allocated, which is
+//     the geometries the finish phase has made so far and the wire.
+//   - **The geometry is bit-identical.** The accumulators are order-dependent,
+//     so a step must resume exactly where the last one stopped and the write
+//     order across materials must not change. `perf-harness.ts`' identity test
+//     is the assertion: the same chunk built one step per slice and built in one
+//     go must agree vertex for vertex, index for index, prism for prism.
+//
+// The one honest change in meaning: `rawGround` is now read at several instants
+// instead of one, so a chunk can be planned against terrain that arrived while
+// it was being built. That is strictly an improvement on the alternative -- a
+// tile only ever goes from absent to present -- and any `NaN` still marks the
+// chunk provisional, so `retryProvisional` builds it again either way.
+
+/** The phases of a chunk build, in the order they write. See the essay above. */
+const PHASE_PLAN = 0;
+const PHASE_SEGMENT = 1;
+const PHASE_PORTAL = 2;
+const PHASE_STATION = 3;
+const PHASE_VESSEL = 4;
+const PHASE_WIRE = 5;
+const PHASE_FINISH = 6;
+const PHASE_COUNT = 7;
+
+const PHASE_NAMES = ['plan', 'segment', 'portal', 'station', 'vessel', 'wire', 'finish'];
+
+/** The phase names, for whoever prints `RailWorld.worstStepByPhase`. */
+export function chunkPhaseNames(): readonly string[] {
+  return PHASE_NAMES;
+}
+
+/**
+ * The seven steps of one station and the thirteen of the finish, by name.
+ *
+ * Only ever read to *describe* a step in `RailWorld.worstStep`, and it exists
+ * because `finish[3]` is not a thing a reader can act on and
+ * `finish.concrete` is: the whole point of reporting the worst step is that it
+ * says which seam to look at next.
+ */
+const STATION_STEP_NAMES = [
+  'solids', 'platforms', 'furniture', 'access', 'footbridge', 'house', 'signs',
+];
+const FINISH_STEP_NAMES = [
+  'ballast', 'cess', 'rails', 'concrete', 'lining', 'canopy', 'tactile', 'brick',
+  'furniture', 'fence', 'signs', 'wire', 'install',
+];
+
+/** What a cursor is pointing at, in words. See `RailWorld.worstStep`. */
+function chunkStepName(phase: number, index: number): string {
+  if (phase === PHASE_STATION) {
+    const sub = index - ((index / STATION_STEPS) | 0) * STATION_STEPS;
+    return `station.${STATION_STEP_NAMES[sub]}`;
+  }
+  if (phase === PHASE_FINISH) return `finish.${FINISH_STEP_NAMES[index] ?? index}`;
+  return `${PHASE_NAMES[phase]}[${index}]`;
+}
+
+/**
+ * Steps within one station, because a station is where the cost is.
+ *
+ * `writePlatforms`, the furniture, the access stairs, the footbridge, the house
+ * and the sign are six separate writers over the same plan and they run in a
+ * fixed order, so the seams between them are free: splitting there cannot change
+ * a single vertex. The first step is the plan's own solids and their prisms.
+ */
+const STATION_STEPS = 7;
+/** ...and within the finish: eleven materials, the wire, and the tail. */
+const FINISH_STEPS = 13;
+
+/**
+ * The three states a chunk key can be in, and the fourth that is none of them.
+ *
+ * Named rather than left as three `Map.has` calls at every call site, because
+ * the middle one is the state this round added and the one a reader forgets:
+ * see `RailWorld.chunkStateOf`.
+ */
+export const CHUNK_ABSENT = 0;
+export const CHUNK_PENDING = 1;
+export const CHUNK_BUILDING = 2;
+export const CHUNK_BUILT = 3;
+
+/** Where a build has got to: which phase, and how far into it. */
+export interface ChunkCursor {
+  phase: number;
+  index: number;
+}
+
+/**
+ * Move a cursor to the next step, skipping empty phases. **Pure**, mutating only
+ * the cursor it is handed, which is what makes `verifyRailChunkSteps` able to
+ * walk every shape of chunk the network can produce without building one.
+ *
+ * Returns false when the walk is over. Start at `{ phase: 0, index: -1 }`, so
+ * the first call lands on the first real step however many leading phases are
+ * empty -- and a chunk with nothing at all in it is a single `false`.
+ */
+export function advanceChunkStep(sizes: readonly number[], at: ChunkCursor): boolean {
+  let phase = at.phase;
+  let index = at.index + 1;
+  while (phase < sizes.length && index >= sizes[phase]) {
+    phase++;
+    index = 0;
+  }
+  at.phase = phase;
+  at.index = index;
+  return phase < sizes.length;
+}
+
+/**
+ * A chunk build in flight: everything `buildChunk` used to hold in locals.
+ *
+ * Nothing here is shared with a finished chunk and nothing here is in the scene.
+ * The only fields that are not simply the old locals are the last four, and each
+ * is one of the four rules in the essay above.
+ */
+interface ChunkBuild {
+  key: string;
+  cx: number;
+  cz: number;
+  chunk: Chunk;
+  /** How many steps each phase has, and where the cursor is. */
+  sizes: number[];
+  at: ChunkCursor;
+
+  group: Group;
+  geometries: BufferGeometry[];
+  prisms: SolidPrism[];
+  ballast: Solid;
+  rails: Solid;
+  concrete: Solid;
+  lining: Solid;
+  canopy: Solid;
+  signs: Solid;
+  cess: Solid;
+  fence: Solid;
+  tactile: Solid;
+  brick: Solid;
+  furniture: Solid;
+  sleepers: number[];
+
+  /** The 3x3 neighbourhood's stations, listed at the start and planned one a step. */
+  todo: Array<{ si: number; mine: boolean }>;
+  plans: StationPlan[];
+  /** The solids of the station currently being written, held across its steps. */
+  boxes: FrameSolid[];
+
+  floorAt: ((x: number, z: number) => number) | null;
+  vesselled: (x: number, z: number) => boolean;
+  inChunk: (x: number, z: number) => boolean;
+
+  wireSpans: number;
+  wirePosition: Float32Array | null;
+  wireIndex: Uint16Array | Uint32Array | null;
+  wireCursor: { vp: number; ip: number };
+  wire: BufferGeometry | null;
+
+  provisional: boolean;
+  attempts: number;
+  /**
+   * A finished chunk this build replaces when it lands, or null for a first
+   * build. See `retryProvisional`: a chunk rebuilt for its terrain stays in the
+   * scene until its replacement is ready, because the alternative is a railway
+   * that blinks out for a few frames once a second while somebody stands still.
+   */
+  replacing: BuiltChunk | null;
+  /**
+   * Does this build join the world when it lands? False for the identity check,
+   * which wants the geometry and must not touch the ring, the scene graph or
+   * `CollisionWorld`. See `buildChunkSliced`.
+   */
+  install: boolean;
+  /** Set by the tail step. The build is over and `result` is the chunk. */
+  landed: boolean;
+  result: BuiltChunk | null;
+}
+
 const _matrix = /*#__PURE__*/ new Matrix4();
 const _white = /*#__PURE__*/ new Color(1, 1, 1);
 
@@ -915,12 +1139,63 @@ const _white = /*#__PURE__*/ new Color(1, 1, 1);
  */
 export class RailWorld {
   readonly group = new Group();
-  /** Chunks built right now. On the debug overlay. */
+  /**
+   * Chunks **finished** and in the scene right now. On the debug overlay.
+   *
+   * One of the three states, and the one a reader means by "resident": a chunk
+   * being built is not in the scene, is not collidable and has no sleepers in
+   * the instanced set. `buildingChunks` is the second state and `pendingChunks`
+   * the third.
+   */
   get residentChunks(): number {
     return this.built.size;
   }
-  /** What the last chunk transition cost, milliseconds. */
+  /** Chunks part-built right now: zero or one. See `ChunkBuild`. */
+  get buildingChunks(): number {
+    return this.active === null ? 0 : 1;
+  }
+  /** Chunks inside the radius that have not been started. */
+  get pendingChunks(): number {
+    return this.pending.length;
+  }
+  /** What the last frame that did any building cost, milliseconds. */
   rebuildMs = 0;
+  /** Chunks that have landed over the run of a session. */
+  chunksBuilt = 0;
+  /**
+   * The most expensive **single step** of a chunk build this session, and which
+   * one it was.
+   *
+   * This is the number the split is worth judging on, because the worst frame a
+   * rider can meet is `RAIL_BUILD_BUDGET_MS` plus this: the budget is a check
+   * between steps rather than a pre-emption, so one segment, one station writer,
+   * one portal or one `Solid.build` always completes once started. If this
+   * climbs past a few milliseconds the answer is a finer seam inside whatever
+   * `worstStep` names, not a smaller budget.
+   */
+  worstStepMs = 0;
+  worstStep = '';
+  /**
+   * ...and the worst step in each phase, so the number above has a shape rather
+   * than only a size.
+   *
+   * Indexed by `PHASE_*`, named by `chunkPhaseNames()`. It is what says whether
+   * the tail is a station writer, a `Solid.build` or a single forty-metre
+   * segment, which is the difference between three different next moves.
+   */
+  readonly worstStepByPhase = new Float64Array(PHASE_COUNT);
+  /**
+   * Chunk geometries made and not yet disposed. **The leak ledger.**
+   *
+   * One up in `addMesh` and one down at every `dispose()` this class performs,
+   * so it is not a restatement of an array's length: a path that drops a partial
+   * build without freeing it leaves this positive, and after a teleport out of
+   * every radius it must be exactly zero. That is the assertion in
+   * `perf-harness.ts`' abandonment test, and it is the invariant the split put
+   * at risk -- before it, a chunk that existed had finished, and the only way to
+   * stop owning one was `disposeChunk`.
+   */
+  liveGeometries = 0;
   /**
    * How many times the millisecond ceiling stopped a frame short of
    * `BUILDS_PER_FRAME`, for the run of a session.
@@ -942,8 +1217,19 @@ export class RailWorld {
   /** Chunks rebuilt because their terrain arrived late. See `retryProvisional`. */
   provisionalRebuilds = 0;
 
+  /** State one: chunks finished, in the scene, and collidable. */
   private readonly built = new Map<string, BuiltChunk>();
-  /** Chunk keys inside the build radius that have not been built yet. */
+  /**
+   * State two: the chunk being built right now, or null.
+   *
+   * **One at a time**, deliberately. Two builds in flight would need two sets of
+   * accumulators alive at once for no gain -- the budget is a wall clock and it
+   * does not care which chunk it is spent on -- and would put a second answer in
+   * the way of the one question every other method here asks about this state,
+   * which is "is this key already being built?".
+   */
+  private active: ChunkBuild | null = null;
+  /** State three: chunk keys inside the build radius that have not been started. */
   private pending: string[] = [];
   private readonly sleeperMesh: InstancedMesh;
   private readonly cantileverMesh: InstancedMesh;
@@ -1047,27 +1333,44 @@ export class RailWorld {
       // transition also invalidates it.
       this.lastSleeperCell = '';
     }
-    if (this.pending.length > 0) {
+    if (this.active !== null || this.pending.length > 0) {
       const started = performance.now();
-      for (let n = 0; n < BUILDS_PER_FRAME && this.pending.length > 0; n++) {
-        // The first build of a frame always runs; every one after it has to ask
-        // first. See `RAIL_BUILD_BUDGET_MS` -- a station chunk and a plain-track
-        // chunk are the same unit to `BUILDS_PER_FRAME` and forty times apart in
-        // cost, and two expensive ones in one frame is the stall a rider feels.
-        if (n > 0 && performance.now() - started > RAIL_BUILD_BUDGET_MS) {
+      const deadline = started + RAIL_BUILD_BUDGET_MS;
+      let landed = 0;
+      // `BUILDS_PER_FRAME` still bounds how many chunks may *land* in one frame,
+      // and the ceiling now bounds the time honestly rather than only the chunk
+      // queued behind an expensive one: a build that runs out of budget stops
+      // between two of its own steps and resumes next frame, so the frame costs
+      // the budget plus one step whatever the chunk holds. See `ChunkBuild`.
+      for (let n = 0; n < BUILDS_PER_FRAME; n++) {
+        if (this.active === null) {
+          let next: string | undefined;
+          while ((next = this.pending.pop()) !== undefined) {
+            if (this.built.has(next) || !this.net.chunks.has(next)) continue;
+            break;
+          }
+          if (next === undefined) break;
+          const [cx, cz] = next.split(',').map(Number);
+          this.active = this.beginChunk(next, cx, cz, null, true);
+        }
+        // The first *step* of a frame always runs -- that is what makes progress
+        // guaranteed rather than a race against a clock -- but a second chunk
+        // started after the ceiling has passed is the old defect back again.
+        if (n > 0 && performance.now() > deadline) {
           this.rebuildDeferred++;
           break;
         }
-        const next = this.pending.pop()!;
-        if (this.built.has(next) || !this.net.chunks.has(next)) continue;
-        const [cx, cz] = next.split(',').map(Number);
-        this.built.set(next, this.buildChunk(next, cx, cz));
+        if (!this.advanceBuild(this.active, deadline)) break;
+        this.active = null;
+        landed++;
       }
       this.rebuildMs = performance.now() - started;
-      this.countDraws();
-      this.refillMasts(x, z);
-      // A chunk that has just arrived may be the one the player is standing on.
-      this.lastSleeperCell = '';
+      if (landed > 0) {
+        this.countDraws();
+        this.refillMasts(x, z);
+        // A chunk that has just arrived may be the one the player is standing on.
+        this.lastSleeperCell = '';
+      }
     }
     // **And the chunks that were built blind get another look while standing
     // still.** `retryProvisional` used to run only from `reshapeRing`, which is
@@ -1081,7 +1384,7 @@ export class RailWorld {
     //
     // Once a second, and `PROVISIONAL_ATTEMPTS` still bounds it, so a chunk over
     // the harbour asks four times and then stops asking forever.
-    if (this.pending.length === 0 && ++this.idleFrames >= 60) {
+    if (this.pending.length === 0 && this.active === null && ++this.idleFrames >= 60) {
       this.idleFrames = 0;
       this.retryProvisional(x, z);
       this.countDraws();
@@ -1112,7 +1415,13 @@ export class RailWorld {
     for (let ox = -span; ox <= span; ox++) {
       for (let oz = -span; oz <= span; oz++) {
         const key = chunkKey(cx + ox, cz + oz);
-        if (this.built.has(key)) continue;
+        // Both of the first two states are skipped, and the second is the trap:
+        // a chunk half built is not in `built`, so a ring reshape across its own
+        // build would queue it a second time and the player would end up with
+        // two copies of one chunk's geometry in the scene and one of them
+        // orphaned. `chunkStateOf` is the one reader that knows all three.
+        const state = this.chunkStateOf(key);
+        if (state === CHUNK_BUILT || state === CHUNK_BUILDING) continue;
         if (!this.net.chunks.has(key)) continue;
         const d = chunkDistance(cx + ox, cz + oz, x, z);
         if (d > BUILD_RADIUS) continue;
@@ -1126,9 +1435,32 @@ export class RailWorld {
       if (chunkDistance(chunk.cx, chunk.cz, x, z) <= KEEP_RADIUS) continue;
       this.disposeChunk(key, chunk);
     }
+    // **And the one being built, which no map holds.** A player can cross the
+    // ring and keep going while a station chunk is still assembling behind them,
+    // and a build nothing will ever want is a build whose geometries are
+    // allocated for nothing. `disposeChunk` above has already dropped whatever
+    // it was replacing, so this is the only thing left holding it.
+    if (this.active !== null && chunkDistance(this.active.cx, this.active.cz, x, z) > KEEP_RADIUS) {
+      this.abandonBuild();
+    }
     this.countDraws();
   }
 
+  /**
+   * Which of the three states holds this key, if any.
+   *
+   * The single reader, so nothing here can answer the question with one `.has`
+   * and forget the other two. `reshapeRing` asks it, and so does the harness's
+   * abandonment test -- which is the only way to assert from outside that a
+   * build the player walked away from left nothing behind in any of them.
+   */
+  chunkStateOf(key: string): number {
+    if (this.built.has(key)) return CHUNK_BUILT;
+    if (this.active !== null && this.active.key === key) return CHUNK_BUILDING;
+    return this.pending.includes(key) ? CHUNK_PENDING : CHUNK_ABSENT;
+  }
+
+  /** Draws the **finished** chunks contribute. A build in flight draws nothing. */
   private countDraws(): void {
     let draws = 0;
     for (const chunk of this.built.values()) draws += chunk.group.children.length;
@@ -1137,41 +1469,84 @@ export class RailWorld {
 
   private disposeChunk(key: string, chunk: BuiltChunk): void {
     this.group.remove(chunk.group);
-    for (const g of chunk.geometries) g.dispose();
+    for (const g of chunk.geometries) {
+      g.dispose();
+      this.liveGeometries--;
+    }
     if (chunk.collisionKey && this.solids) this.solids.removeTile(chunk.collisionKey);
     this.built.delete(key);
+    // A rebuild waiting on this chunk has nothing left to replace. Dropping it
+    // rather than letting it land keeps the rule that a chunk outside
+    // `KEEP_RADIUS` holds no geometry: the alternative is a build that finishes
+    // a frame later and quietly puts the disposed chunk back.
+    //
+    // **Unless it is that replacement landing right now**, which is the one call
+    // where the two are the same event: the tail step disposes the chunk it
+    // supersedes a line before it registers its own prisms under the same
+    // collision key, and abandoning there would throw away the finished build on
+    // the last step of it.
+    if (this.active !== null && this.active.key === key && this.active.replacing !== chunk) {
+      this.abandonBuild();
+    }
+  }
+
+  /**
+   * Throw away the build in flight, freeing exactly what it had allocated.
+   *
+   * A partial build owns two things and nothing else, because that is the whole
+   * point of the atomicity rule: the geometries the finish phase has made so far
+   * and, between the wire phase and the wire's own `add`, the wire. Its `group`
+   * is not in the scene, its prisms are not in `CollisionWorld`, and whatever it
+   * was replacing is still exactly where it was. The accumulators are plain
+   * arrays and go with the object.
+   */
+  private abandonBuild(): void {
+    const state = this.active;
+    if (state === null) return;
+    for (const g of state.geometries) {
+      g.dispose();
+      this.liveGeometries--;
+    }
+    // The wire between the phase that builds it and the finish step that hands
+    // it to `addMesh`, which is the one geometry a partial build owns that is
+    // not in `geometries` yet -- and the one an abandonment would otherwise
+    // leak without leaving a trace.
+    if (state.wire) state.wire.dispose();
+    this.active = null;
   }
 
   /** Drop everything. For a teleport, and for the module's own tests. */
   clear(): void {
+    this.abandonBuild();
     for (const [key, chunk] of [...this.built]) this.disposeChunk(key, chunk);
     this.pending.length = 0;
     this.lastChunk = '';
     this.lastSleeperCell = '';
   }
 
-  private buildChunk(key: string, cx: number, cz: number): BuiltChunk {
+  /**
+   * Open a chunk build. Allocates the accumulators and sizes every phase;
+   * writes not one vertex.
+   *
+   * Everything the cursor needs to be known up front is known here, which is
+   * what lets `advanceChunkStep` be a pure function over a fixed array. The
+   * station count is the only one that looks like it could not be: the *plans*
+   * are expensive and are one step each, but the **list** of stations in the 3x3
+   * neighbourhood is three nested array reads and is taken now.
+   */
+  private beginChunk(
+    key: string,
+    cx: number,
+    cz: number,
+    replacing: BuiltChunk | null,
+    install: boolean,
+  ): ChunkBuild {
     const chunk = this.net.chunks.get(key)!;
     const group = new Group();
     group.name = `rail_${key}`;
-    const geometries: BufferGeometry[] = [];
-    const prisms: Array<{ points: Float32Array; height: number; base: number }> = [];
 
-    const ballast = new Solid();
-    const rails = new Solid();
-    const concrete = new Solid();
-    const lining = new Solid();
-    const canopy = new Solid();
-    const signs = new Solid();
-    const cess = new Solid();
-    const fence = new Solid();
-    const tactile = new Solid();
-    const brick = new Solid();
-    const furniture = new Solid();
-    const sleepers: number[] = [];
-
-    // --- Every station whose entrance could reach into this chunk, measured
-    //     once, before anything is drawn.
+    // --- Every station whose entrance could reach into this chunk, listed once,
+    //     before anything is drawn.
     //
     // Nine chunks rather than one, and that is not caution: a station's stair,
     // its forecourt and the hole it opens in the boundary fence reach about
@@ -1179,169 +1554,315 @@ export class RailWorld {
     // boundary has to be able to open this chunk's fence. Cheap, because 321
     // stations over 785 chunks means the loop below finds nothing at all in the
     // overwhelming majority of builds.
-    const plans: StationPlan[] = [];
+    const todo: Array<{ si: number; mine: boolean }> = [];
     for (let ox = -1; ox <= 1; ox++) {
       for (let oz = -1; oz <= 1; oz++) {
         const near = this.net.chunks.get(chunkKey(cx + ox, cz + oz));
         if (near === undefined) continue;
-        for (const si of near.stations) {
-          plans.push(planStation(this.net, this.net.stations[si], this.rawGround, ox === 0 && oz === 0));
-        }
+        for (const si of near.stations) todo.push({ si, mine: ox === 0 && oz === 0 });
       }
     }
 
     // --- The corridor as closed solids, if there is one. See `setVessels`.
     //
-    // Two closures, both null with the flag down, so the loop below reads as one
-    // question -- *is a formation drawn here?* -- asked at the track centreline
-    // and answered by the footprint itself.
+    // Two closures, both null with the flag down, so the segment phase reads as
+    // one question -- *is a formation drawn here?* -- asked at the track
+    // centreline and answered by the footprint itself.
     const floorAt = this.vessels === null
       ? null
       : (x: number, z: number): number => this.vesselFloorAt(x, z);
     const vesselled = floorAt === null
       ? () => false
       : (x: number, z: number): boolean => Number.isFinite(floorAt(x, z));
+    // The half-open box a formation's faces are filed by. See the vessel phase.
+    const x0 = cx * CHUNK_M;
+    const z0 = cz * CHUNK_M;
+    const inChunk = (x: number, z: number): boolean =>
+      x >= x0 && x < x0 + CHUNK_M && z >= z0 && z < z0 + CHUNK_M;
 
-    let wireSpans = 0;
-    /** See `BuiltChunk.provisional`: any depth this chunk could not measure. */
-    let provisional = false;
-    for (const si of chunk.segments) {
-      const s = this.net.segments[si];
-      // **How deep this span is, honestly.** `rawGround` rather than `ground`:
-      // an unknown depth must read as unknown here, not as zero. See the
-      // constructor's `rawGround` argument for what a wrong answer costs.
-      const depth = this.rawGround((s.ax + s.bx) / 2, (s.az + s.bz) / 2) - (s.ay + s.by) / 2;
-      // Bore, trench or grade -- one rule, shared with the carve so the hole and
-      // the thing standing in it cannot disagree. See `rail-cut.ts`, which also
-      // records the measurement that killed the obvious version of this: reading
-      // `SPAN_SUBWAY` as "Metro, therefore tunnel below 6 m" lined the deepest
-      // 70 spans of the *open* cutting at Sydenham. Sydney Metro's tunnels all
-      // carry `tunnel=yes`; the flag that earns its place is `SPAN_CUTTING`, and
-      // `inCutting` is where it is spent.
-      const tunnel = drawnAsTunnel(s.flags);
-      const bridge = (s.flags & SPAN_BRIDGE) !== 0;
-      // A span whose depth is unknown cannot be trenched, and a chunk built
-      // without knowing is built again. See `retryProvisional`.
-      if (!Number.isFinite(depth) && !tunnel && !bridge) provisional = true;
-      if (tunnel) {
-        writeTunnel(lining, s);
-      } else {
-        writeBallast(ballast, s, bridge, floorAt);
-        if ((s.flags & SPAN_ELECTRIFIED) !== 0) wireSpans++;
-        for (let t = 0; t < s.len; t += SLEEPER_PITCH) {
-          const f = t / s.len;
-          sleepers.push(
-            s.ax + (s.bx - s.ax) * f,
-            s.ay + (s.by - s.ay) * f - BALLAST_TOP_DROP,
-            s.az + (s.bz - s.az) * f,
-            Math.atan2(-s.ux, -s.uz),
-          );
+    const sizes = new Array<number>(PHASE_COUNT).fill(0);
+    sizes[PHASE_PLAN] = todo.length;
+    sizes[PHASE_SEGMENT] = chunk.segments.length;
+    sizes[PHASE_PORTAL] = chunk.portals.length;
+    sizes[PHASE_STATION] = todo.length * STATION_STEPS;
+    sizes[PHASE_VESSEL] = this.vessels === null ? 0 : this.vessels.runs.length;
+    // The wire is a second pass over the same segments, and how many of them
+    // carry one is not known until the first pass has run -- so the phase is
+    // sized for all of them and its steps are no-ops where there is no wire.
+    // A no-op step costs one `performance.now()`, which is the price of never
+    // having to resize a phase the cursor is already inside.
+    sizes[PHASE_WIRE] = chunk.segments.length;
+    sizes[PHASE_FINISH] = FINISH_STEPS;
+
+    return {
+      key, cx, cz, chunk,
+      sizes,
+      at: { phase: 0, index: -1 },
+      group,
+      geometries: [],
+      prisms: [],
+      ballast: new Solid(),
+      rails: new Solid(),
+      concrete: new Solid(),
+      lining: new Solid(),
+      canopy: new Solid(),
+      signs: new Solid(),
+      cess: new Solid(),
+      fence: new Solid(),
+      tactile: new Solid(),
+      brick: new Solid(),
+      furniture: new Solid(),
+      sleepers: [],
+      todo,
+      plans: [],
+      boxes: [],
+      floorAt,
+      vesselled,
+      inChunk,
+      wireSpans: 0,
+      wirePosition: null,
+      wireIndex: null,
+      wireCursor: { vp: 0, ip: 0 },
+      wire: null,
+      provisional: false,
+      attempts: 0,
+      replacing,
+      install,
+      landed: false,
+      result: null,
+    };
+  }
+
+  /**
+   * Run steps until the chunk lands or the clock passes `deadline`. Returns true
+   * when it has landed.
+   *
+   * **The budget is a check between steps and not a pre-emption**, which is the
+   * same shape and the same honesty about its limit as `RAIL_BUILD_BUDGET_MS`
+   * had over whole chunks: one segment, one station writer, one portal or one
+   * `Solid.build` always completes once started, so a frame costs the budget
+   * plus the worst step rather than the budget. `worstStepMs` is that second
+   * term, measured rather than assumed, and it is measured here because the
+   * clock is already being read once a step for the budget.
+   */
+  private advanceBuild(state: ChunkBuild, deadline: number): boolean {
+    let last = performance.now();
+    while (!state.landed) {
+      if (!advanceChunkStep(state.sizes, state.at)) {
+        // Unreachable: the tail of the finish phase is the last step and it is
+        // what sets `landed`. Belt and braces, because a cursor that walked off
+        // the end without landing would spin this loop forever.
+        state.landed = true;
+        break;
+      }
+      this.runStep(state);
+      const now = performance.now();
+      if (state.install) {
+        const spent = now - last;
+        if (spent > this.worstStepByPhase[state.at.phase]) {
+          this.worstStepByPhase[state.at.phase] = spent;
         }
-        // And the cutting. The ground over this span has been taken away by
-        // `terrain.buildTerrainMesh`; this is the trench that stands in the hole.
-        //
-        // **Asked of the carve, point by point, rather than of the segment's
-        // midpoint.** `inCutting(s.flags, depth)` is one sample at the middle of
-        // a forty-metre span, and the carve is a sample every four metres, so
-        // the two disagreed along every segment that ran into a bank: ground
-        // taken away with no trench built in the hole. See `RailCut.cutsAlong`.
-        //
-        // **Two questions now, and they are asked of the same points.** `cut`
-        // is where the ground has come away; `trenched` is where that hole is
-        // deep enough to want walls. See `rail-cut.TRENCH_MIN_DEPTH` -- the
-        // first fires along most of the at-grade network after this round and
-        // the second must not, or every 512 m of walking is a hitch.
-        const probe = this.cut === null
-          ? { cut: false, trench: false }
-          : this.cut.probeAlong(s.ax, s.az, s.bx, s.bz, this.rawGround);
-        const carved = probe.cut;
-        const trenched = probe.trench;
-        // The floor of the hole, before anything is built in it. Where the
-        // ground has come away and no trench wall reaches, this is the only
-        // surface between the ballast toe and the rim -- and without it the
-        // corridor at Erskineville is a slot into the void with two rails over
-        // the top of it. See `writeFormation`.
-        //
-        // **Unless a vessel is drawn here**, in which case all three of these
-        // stand down and the formation supplies the floor, the walls, the coping
-        // and the fence as faces of one solid. See `setVessels` for why it is
-        // all or nothing per point rather than a blend.
-        if (carved) writeFormation(ballast, s, this.cut!, this.rawGround, vesselled);
-        if (trenched) {
-          if (!writeTrench(concrete, prisms, s, this.cut!, this.rawGround, vesselled)) {
-            provisional = true;
+        if (spent > this.worstStepMs) {
+          this.worstStepMs = spent;
+          this.worstStep = `${chunkStepName(state.at.phase, state.at.index)} of chunk ${state.key}`;
+        }
+      }
+      last = now;
+      if (!state.landed && now > deadline) return false;
+    }
+    return true;
+  }
+
+  /**
+   * One step of one chunk. The switch is `buildChunk`'s old body, cut at the
+   * seams that were already there and at no others.
+   *
+   * The accumulators are pulled out of the state by name so the writers below
+   * read exactly as they did when they were locals: the whole safety argument
+   * for this change is that nothing between the seams was touched.
+   */
+  private runStep(state: ChunkBuild): void {
+    const {
+      chunk, ballast, rails, concrete, lining, canopy, signs, cess, fence, tactile, brick,
+      furniture, plans, prisms, sleepers, floorAt, vesselled,
+    } = state;
+    const index = state.at.index;
+    switch (state.at.phase) {
+      // --- The stations, measured. One plan a step: `planStation` samples the
+      //     terrain four times and sweeps the chunk's segments twice for
+      //     clearance, which is not free at a big station.
+      case PHASE_PLAN: {
+        const t = state.todo[index];
+        plans.push(planStation(this.net, this.net.stations[t.si], this.rawGround, t.mine));
+        return;
+      }
+
+      case PHASE_SEGMENT: {
+        const s = this.net.segments[chunk.segments[index]];
+        // **How deep this span is, honestly.** `rawGround` rather than `ground`:
+        // an unknown depth must read as unknown here, not as zero. See the
+        // constructor's `rawGround` argument for what a wrong answer costs.
+        const depth = this.rawGround((s.ax + s.bx) / 2, (s.az + s.bz) / 2) - (s.ay + s.by) / 2;
+        // Bore, trench or grade -- one rule, shared with the carve so the hole
+        // and the thing standing in it cannot disagree. See `rail-cut.ts`, which
+        // also records the measurement that killed the obvious version of this:
+        // reading `SPAN_SUBWAY` as "Metro, therefore tunnel below 6 m" lined the
+        // deepest 70 spans of the *open* cutting at Sydenham. Sydney Metro's
+        // tunnels all carry `tunnel=yes`; the flag that earns its place is
+        // `SPAN_CUTTING`, and `inCutting` is where it is spent.
+        const tunnel = drawnAsTunnel(s.flags);
+        const bridge = (s.flags & SPAN_BRIDGE) !== 0;
+        // A span whose depth is unknown cannot be trenched, and a chunk built
+        // without knowing is built again. See `retryProvisional`.
+        if (!Number.isFinite(depth) && !tunnel && !bridge) state.provisional = true;
+        if (tunnel) {
+          writeTunnel(lining, s);
+        } else {
+          writeBallast(ballast, s, bridge, floorAt);
+          if ((s.flags & SPAN_ELECTRIFIED) !== 0) state.wireSpans++;
+          for (let t = 0; t < s.len; t += SLEEPER_PITCH) {
+            const f = t / s.len;
+            sleepers.push(
+              s.ax + (s.bx - s.ax) * f,
+              s.ay + (s.by - s.ay) * f - BALLAST_TOP_DROP,
+              s.az + (s.bz - s.az) * f,
+              Math.atan2(-s.ux, -s.uz),
+            );
+          }
+          // And the cutting. The ground over this span has been taken away by
+          // `terrain.buildTerrainMesh`; this is the trench that stands in the
+          // hole.
+          //
+          // **Asked of the carve, point by point, rather than of the segment's
+          // midpoint.** `inCutting(s.flags, depth)` is one sample at the middle
+          // of a forty-metre span, and the carve is a sample every four metres,
+          // so the two disagreed along every segment that ran into a bank:
+          // ground taken away with no trench built in the hole. See
+          // `RailCut.cutsAlong`.
+          //
+          // **Two questions now, and they are asked of the same points.** `cut`
+          // is where the ground has come away; `trenched` is where that hole is
+          // deep enough to want walls. See `rail-cut.TRENCH_MIN_DEPTH` -- the
+          // first fires along most of the at-grade network after this round and
+          // the second must not, or every 512 m of walking is a hitch.
+          const probe = this.cut === null
+            ? { cut: false, trench: false }
+            : this.cut.probeAlong(s.ax, s.az, s.bx, s.bz, this.rawGround);
+          const carved = probe.cut;
+          const trenched = probe.trench;
+          // The floor of the hole, before anything is built in it. Where the
+          // ground has come away and no trench wall reaches, this is the only
+          // surface between the ballast toe and the rim -- and without it the
+          // corridor at Erskineville is a slot into the void with two rails over
+          // the top of it. See `writeFormation`.
+          //
+          // **Unless a vessel is drawn here**, in which case all three of these
+          // stand down and the formation supplies the floor, the walls, the
+          // coping and the fence as faces of one solid. See `setVessels` for why
+          // it is all or nothing per point rather than a blend.
+          if (carved) writeFormation(ballast, s, this.cut!, this.rawGround, vesselled);
+          if (trenched) {
+            if (!writeTrench(concrete, prisms, s, this.cut!, this.rawGround, vesselled)) {
+              state.provisional = true;
+            }
+          }
+          // ...and the corridor either side of it: the cess and verge where the
+          // track is at grade, and the boundary fence everywhere. See
+          // `writeVerge` for why a bridge span gets neither.
+          if (!bridge) {
+            writeVerge(cess, fence, s, this.cut, this.rawGround, trenched, plans, vesselled);
           }
         }
-        // ...and the corridor either side of it: the cess and verge where the
-        // track is at grade, and the boundary fence everywhere. See `writeVerge`
-        // for why a bridge span gets neither.
-        if (!bridge) {
-          writeVerge(cess, fence, s, this.cut, this.rawGround, trenched, plans, vesselled);
+        if (!tunnel) writeRails(rails, s);
+        if (bridge) writeViaduct(concrete, prisms, s, this.ground);
+        return;
+      }
+
+      case PHASE_PORTAL: {
+        writePortal(concrete, lining, this.net.portals[chunk.portals[index]]);
+        return;
+      }
+
+      // --- One station, in seven steps.
+      //
+      // A station chunk is the object this whole arrangement exists for: a
+      // throat like Strathfield or Central is forty times a chunk of plain
+      // double track, and the six writers below are the seams that were already
+      // there. Their order is fixed and unchanged, which is the only thing the
+      // accumulators care about.
+      case PHASE_STATION: {
+        const p = (index / STATION_STEPS) | 0;
+        const plan = state.plans[p];
+        if (!plan.mine) return;
+        const station = plan.station;
+        const underground = station.vertical === 'underground';
+        switch (index - p * STATION_STEPS) {
+          case 0:
+            // A station planned before its terrain arrived is a station whose
+            // stairs are the wrong length. See `StationPlan.measured`.
+            if (!plan.measured) state.provisional = true;
+            // **Every solid this station stands on the world, enumerated once.**
+            // `rail-solids.stationSolids` is the definition; this registers it
+            // with `CollisionWorld` and the writers below draw it.
+            // `RailSolidField` on the server evaluates the identical call over
+            // the identical plan, which is what makes the two ends' ground query
+            // one number rather than two that agree at the stations somebody
+            // checked.
+            state.boxes = [];
+            stationSolids(plan, state.boxes);
+            for (const b of state.boxes) prisms.push(framePrism(b));
+            return;
+          case 1:
+            if (underground) writeUndergroundStation(concrete, lining, state.boxes, station);
+            else writePlatforms(concrete, canopy, tactile, state.boxes, plan);
+            return;
+          case 2:
+            // **The access, and it is generated rather than looked up.**
+            // `RAIL-VERTICAL.md` section 4: the same measurement that made this
+            // station need steps is the one that builds them, so a station
+            // cannot be left unreachable by an OSM tag nobody wrote. Reported
+            // twice -- "im at roseville and cant get up to the platform", and a
+            // player on the Chatswood plaza reading "doors 23 m away" with no
+            // way down.
+            if (!underground) writePlatformFurniture(canopy, furniture, plan);
+            return;
+          case 3:
+            if (!underground) writeStationAccess(concrete, furniture, state.boxes, plan);
+            return;
+          case 4:
+            if (!underground) writeFootbridge(concrete, furniture, state.boxes, plan);
+            return;
+          case 5:
+            if (!underground) writeStationHouse(brick, canopy, state.boxes, plan);
+            return;
+          default: {
+            const uv = this.assets.signUv(station.name);
+            if (!uv) return;
+            // The platform blade, for the person already on the platform.
+            if (!underground) writeSign(signs, concrete, station, uv);
+            // And the board, for the person in the street who does not yet know
+            // there is a station here. See `writeStationBoard`: reported as
+            // "there is no sign for the train station", and the platform blade
+            // is not an answer to it -- it is 45 cm tall, it is under the
+            // canopy, and at a station in a cutting it is metres below the
+            // footpath.
+            writeStationBoard(signs, concrete, station, uv);
+            return;
+          }
         }
       }
-      if (!tunnel) writeRails(rails, s);
-      if (bridge) writeViaduct(concrete, prisms, s, this.ground);
-    }
 
-    for (const pi of chunk.portals) writePortal(concrete, lining, this.net.portals[pi]);
-
-    for (const plan of plans) {
-      if (!plan.mine) continue;
-      // A station planned before its terrain arrived is a station whose stairs
-      // are the wrong length. See `StationPlan.measured`.
-      if (!plan.measured) provisional = true;
-      const station = plan.station;
-      // **Every solid this station stands on the world, enumerated once.**
-      // `rail-solids.stationSolids` is the definition; the loop below registers
-      // it with `CollisionWorld` and the writers draw it. `RailSolidField` on the
-      // server evaluates the identical call over the identical plan, which is
-      // what makes the two ends' ground query one number rather than two that
-      // agree at the stations somebody checked.
-      const boxes: FrameSolid[] = [];
-      stationSolids(plan, boxes);
-      for (const b of boxes) prisms.push(framePrism(b));
-      if (station.vertical === 'underground') {
-        writeUndergroundStation(concrete, lining, boxes, station);
-      } else {
-        writePlatforms(concrete, canopy, tactile, boxes, plan);
-        // **The access, and it is generated rather than looked up.**
-        // `RAIL-VERTICAL.md` section 4: the same measurement that made this
-        // station need steps is the one that builds them, so a station cannot
-        // be left unreachable by an OSM tag nobody wrote. Reported twice --
-        // "im at roseville and cant get up to the platform", and a player on
-        // the Chatswood plaza reading "doors 23 m away" with no way down.
-        writePlatformFurniture(canopy, furniture, plan);
-        writeStationAccess(concrete, furniture, boxes, plan);
-        writeFootbridge(concrete, furniture, boxes, plan);
-        writeStationHouse(brick, canopy, boxes, plan);
-      }
-      const uv = this.assets.signUv(station.name);
-      if (uv) {
-        // The platform blade, for the person already on the platform.
-        if (station.vertical !== 'underground') writeSign(signs, concrete, station, uv);
-        // And the board, for the person in the street who does not yet know
-        // there is a station here. See `writeStationBoard`: reported as "there
-        // is no sign for the train station", and the platform blade is not an
-        // answer to it -- it is 45 cm tall, it is under the canopy, and at a
-        // station in a cutting it is metres below the footpath.
-        writeStationBoard(signs, concrete, station, uv);
-      }
-    }
-
-    // --- And the formations, drawn. Phase 3a; nothing here runs with the flag
-    //     down, because `setVessels` is never called with a build.
-    //
-    // Filed by triangle centroid and by panel midpoint rather than clipped, so a
-    // 4 km formation crossing eight chunks puts each of its faces in exactly one
-    // of them: no triangle is cut, nothing is drawn twice, and there is no seam
-    // between two chunks to leak. The test is a half-open box, which is what
-    // makes "exactly one" true on the boundary as well as inside.
-    if (this.vessels !== null) {
-      const x0 = cx * CHUNK_M;
-      const z0 = cz * CHUNK_M;
-      const inChunk = (x: number, z: number): boolean =>
-        x >= x0 && x < x0 + CHUNK_M && z >= z0 && z < z0 + CHUNK_M;
-      for (const run of this.vessels.runs) {
+      // --- And the formations, drawn. Phase 3a; nothing here runs with the flag
+      //     down, because `setVessels` is never called with a build.
+      //
+      // Filed by triangle centroid and by panel midpoint rather than clipped, so
+      // a 4 km formation crossing eight chunks puts each of its faces in exactly
+      // one of them: no triangle is cut, nothing is drawn twice, and there is no
+      // seam between two chunks to leak. The test is a half-open box, which is
+      // what makes "exactly one" true on the boundary as well as inside.
+      case PHASE_VESSEL: {
+        if (this.vessels === null) return;
+        const run = this.vessels.runs[index];
         // A cheap reject on the run's own ribs, widened by the widest a
         // formation's rim gets from its centreline (`FORMATION_MAX_SPAN_M` is
         // 100 m, so half of it plus slack). Without it every chunk build walks
@@ -1357,108 +1878,194 @@ export class RailWorld {
           if (rib.cz > rz1) rz1 = rib.cz;
         }
         const pad = 60;
-        if (rx1 + pad < x0 || rx0 - pad > x0 + CHUNK_M) continue;
-        if (rz1 + pad < z0 || rz0 - pad > z0 + CHUNK_M) continue;
-        writeVesselShell(concrete, cess, run.vessel, inChunk);
-        writeVesselFence(fence, run.vessel, inChunk, this.cut, plans);
-        writeVesselWalls(prisms, run.vessel, inChunk);
+        const x0 = state.cx * CHUNK_M;
+        const z0 = state.cz * CHUNK_M;
+        if (rx1 + pad < x0 || rx0 - pad > x0 + CHUNK_M) return;
+        if (rz1 + pad < z0 || rz0 - pad > z0 + CHUNK_M) return;
+        writeVesselShell(concrete, cess, run.vessel, state.inChunk);
+        writeVesselFence(fence, run.vessel, state.inChunk, this.cut, plans);
+        writeVesselWalls(prisms, run.vessel, state.inChunk);
+        return;
+      }
+
+      // The overhead line, strung span by span over the electrified segments.
+      // The sag maths is `power.ts`' and so is the cross-ribbon: see
+      // `writeCatenary`.
+      case PHASE_WIRE: {
+        if (state.wireSpans === 0) return;
+        if (index === 0) {
+          const verts = state.wireSpans * 2 * CATENARY_VERTS;
+          state.wirePosition = new Float32Array(verts * 3);
+          state.wireIndex =
+            verts > 65535
+              ? new Uint32Array(state.wireSpans * 2 * CATENARY_INDICES)
+              : new Uint16Array(state.wireSpans * 2 * CATENARY_INDICES);
+        }
+        const s = this.net.segments[chunk.segments[index]];
+        if ((s.flags & SPAN_TUNNEL) === 0 && (s.flags & SPAN_ELECTRIFIED) !== 0) {
+          const px = -s.uz;
+          const pz = s.ux;
+          const sag = catenarySag(s.len);
+          // The messenger sags and the contact wire does not, which is the whole
+          // point of a catenary suspension and the only thing that tells one
+          // apart from a trolley wire at a glance.
+          writeCatenary(
+            state.wirePosition!, state.wireIndex!, state.wireCursor,
+            s.ax, s.ay + MESSENGER_HEIGHT, s.az,
+            s.bx, s.by + MESSENGER_HEIGHT, s.bz,
+            px, pz, sag,
+          );
+          writeCatenary(
+            state.wirePosition!, state.wireIndex!, state.wireCursor,
+            s.ax, s.ay + CONTACT_HEIGHT, s.az,
+            s.bx, s.by + CONTACT_HEIGHT, s.bz,
+            px, pz, 0.02,
+          );
+        }
+        if (index === chunk.segments.length - 1 && state.wireCursor.vp > 0) {
+          const wire = new BufferGeometry();
+          wire.name = `rail_wire_${state.key}`;
+          wire.setAttribute(
+            'position',
+            new BufferAttribute(state.wirePosition!.subarray(0, state.wireCursor.vp * 3), 3),
+          );
+          wire.setIndex(new BufferAttribute(state.wireIndex!.subarray(0, state.wireCursor.ip), 1));
+          wire.computeBoundingSphere();
+          state.wire = wire;
+        }
+        return;
+      }
+
+      // --- The finish: eleven materials, the wire, and the tail.
+      //
+      // `Solid.build` is where a chunk's accumulated arrays become typed arrays
+      // and a bounding sphere, and at a station the concrete alone is a hundred
+      // thousand floats -- so each material is its own step. The order is the
+      // order the meshes are added to the group in, and it is the order it has
+      // always been: `countDraws` and the identity check both read it.
+      default: {
+        const key = state.key;
+        const add = (
+          geometry: BufferGeometry | null,
+          material: Material,
+          name: string,
+          casts: boolean,
+          receives: boolean,
+        ): void => this.addMesh(state, geometry, material, name, casts, receives);
+        switch (index) {
+          case 0: add(ballast.build(`rail_ballast_${key}`), this.assets.ballast, 'ballast', false, true); return;
+          case 1: add(cess.build(`rail_cess_${key}`), this.assets.cess, 'cess', false, true); return;
+          case 2: add(rails.build(`rail_steel_${key}`), this.assets.rail, 'rails', false, true); return;
+          case 3: add(concrete.build(`rail_concrete_${key}`), this.assets.concrete, 'concrete', true, true); return;
+          case 4: add(lining.build(`rail_lining_${key}`), this.assets.lining, 'lining', false, false); return;
+          case 5: add(canopy.build(`rail_canopy_${key}`), this.assets.canopy, 'canopy', true, true); return;
+          case 6: add(tactile.build(`rail_tactile_${key}`), this.assets.tactile, 'tactile', false, true); return;
+          case 7: add(brick.build(`rail_brick_${key}`), this.assets.brick, 'house', true, true); return;
+          case 8: add(furniture.build(`rail_furniture_${key}`), this.assets.furniture, 'furniture', true, true); return;
+          // The boundary fence, with UVs, because the whole object is a mask on
+          // them: `u` is metres along the run and `v` metres up the panel, which
+          // is exactly what `fences.createFenceOpenMaterial` reads. It casts
+          // nothing -- see `railWarmupParts` for the arithmetic behind that.
+          case 9: add(fence.build(`rail_fence_${key}`, true), this.assets.fence, 'fence', false, true); return;
+          case 10: add(signs.build(`rail_sign_${key}`, true), this.assets.sign, 'signs', false, false); return;
+          case 11:
+            add(state.wire, this.assets.wire, 'wire', false, false);
+            // Handed over: `addMesh` has pushed it into `geometries`, so
+            // `abandonBuild` must not dispose it a second time.
+            state.wire = null;
+            return;
+          default: {
+            // --- The tail, and the only step in the build that anything outside
+            //     this object can see.
+            //
+            // A chunk enters the scene, the collision world and the ring
+            // together or not at all. Everything above wrote into objects
+            // nothing can reach, which is what makes a half-built chunk simply
+            // late rather than visibly wrong -- see `ChunkBuild`.
+            if (state.replacing !== null) {
+              // What this build supersedes goes first, so `addPrisms` below is
+              // not racing `removeTile` for the same collision key. See
+              // `retryProvisional`.
+              this.disposeChunk(state.key, state.replacing);
+              this.provisionalRebuilds++;
+            }
+            let collisionKey: string | null = null;
+            if (state.install) {
+              if (state.group.children.length > 0) this.group.add(state.group);
+              if (this.solids && prisms.length > 0) {
+                collisionKey = `rail:${key}`;
+                this.solids.addPrisms(collisionKey, prisms);
+              }
+            }
+            state.result = {
+              group: state.group,
+              geometries: state.geometries,
+              collisionKey,
+              provisional: state.provisional,
+              attempts: state.attempts,
+              sleepers: new Float32Array(sleepers),
+              masts: chunk.masts,
+              cx: state.cx,
+              cz: state.cz,
+            };
+            state.landed = true;
+            if (state.install) {
+              this.built.set(key, state.result);
+              this.chunksBuilt++;
+            }
+            return;
+          }
+        }
       }
     }
+  }
 
-    // The overhead line, strung span by span over the electrified segments. The
-    // sag maths is `power.ts`' and so is the cross-ribbon: see `writeCatenary`.
-    let wire: BufferGeometry | null = null;
-    if (wireSpans > 0) {
-      const position = new Float32Array(wireSpans * 2 * CATENARY_VERTS * 3);
-      const index =
-        wireSpans * 2 * CATENARY_VERTS > 65535
-          ? new Uint32Array(wireSpans * 2 * CATENARY_INDICES)
-          : new Uint16Array(wireSpans * 2 * CATENARY_INDICES);
-      const cursor = { vp: 0, ip: 0 };
-      for (const si of chunk.segments) {
-        const s = this.net.segments[si];
-        if ((s.flags & SPAN_TUNNEL) !== 0 || (s.flags & SPAN_ELECTRIFIED) === 0) continue;
-        const px = -s.uz;
-        const pz = s.ux;
-        const sag = catenarySag(s.len);
-        // The messenger sags and the contact wire does not, which is the whole
-        // point of a catenary suspension and the only thing that tells one apart
-        // from a trolley wire at a glance.
-        writeCatenary(
-          position, index, cursor,
-          s.ax, s.ay + MESSENGER_HEIGHT, s.az,
-          s.bx, s.by + MESSENGER_HEIGHT, s.bz,
-          px, pz, sag,
-        );
-        writeCatenary(
-          position, index, cursor,
-          s.ax, s.ay + CONTACT_HEIGHT, s.az,
-          s.bx, s.by + CONTACT_HEIGHT, s.bz,
-          px, pz, 0.02,
-        );
-      }
-      if (cursor.vp > 0) {
-        wire = new BufferGeometry();
-        wire.name = `rail_wire_${key}`;
-        wire.setAttribute('position', new BufferAttribute(position.subarray(0, cursor.vp * 3), 3));
-        wire.setIndex(new BufferAttribute(index.subarray(0, cursor.ip), 1));
-        wire.computeBoundingSphere();
-      }
+  /** One mesh into a build's group. `buildChunk`'s `add`, unchanged. */
+  private addMesh(
+    state: ChunkBuild,
+    geometry: BufferGeometry | null,
+    material: Material,
+    name: string,
+    casts: boolean,
+    receives: boolean,
+  ): void {
+    if (!geometry) return;
+    const mesh = new Mesh(geometry, material);
+    mesh.name = name;
+    mesh.castShadow = casts;
+    mesh.receiveShadow = receives;
+    if (!casts) mesh.userData.noShadow = true;
+    state.group.add(mesh);
+    state.geometries.push(geometry);
+    if (state.install) this.liveGeometries++;
+  }
+
+  /**
+   * Build one chunk to completion outside the ring, in slices of `budgetMs`.
+   *
+   * **For `perf-harness.ts`' identity test and for nothing else.** The whole
+   * safety argument for splitting a chunk across frames is that the seams change
+   * no geometry, and the way to assert that is to build the same chunk twice --
+   * once one step per slice, once in a single slice -- and compare every buffer.
+   * A budget of `Infinity` is the second of those; a negative one is the first,
+   * because the deadline is then already past when the first step returns.
+   *
+   * Nothing here joins the world: no scene graph, no `CollisionWorld`, no entry
+   * in any of the three states. The caller owns the geometries and must dispose
+   * them.
+   */
+  buildChunkSliced(key: string, budgetMs: number): { chunk: BuiltChunk; prisms: readonly SolidPrism[] } | null {
+    if (!this.net.chunks.has(key)) return null;
+    const [cx, cz] = key.split(',').map(Number);
+    const state = this.beginChunk(key, cx, cz, null, false);
+    let slices = 0;
+    while (!this.advanceBuild(state, performance.now() + budgetMs)) {
+      // A slice that made no progress would spin here forever. It cannot: the
+      // budget is checked *after* a step has run, so every slice advances the
+      // cursor at least once and the cursor is finite.
+      if (++slices > 1_000_000) throw new Error(`rail chunk ${key} did not finish in a million slices`);
     }
-
-    const add = (
-      geometry: BufferGeometry | null,
-      material: Material,
-      name: string,
-      casts: boolean,
-      receives: boolean,
-    ): void => {
-      if (!geometry) return;
-      const mesh = new Mesh(geometry, material);
-      mesh.name = name;
-      mesh.castShadow = casts;
-      mesh.receiveShadow = receives;
-      if (!casts) mesh.userData.noShadow = true;
-      group.add(mesh);
-      geometries.push(geometry);
-    };
-
-    add(ballast.build(`rail_ballast_${key}`), this.assets.ballast, 'ballast', false, true);
-    add(cess.build(`rail_cess_${key}`), this.assets.cess, 'cess', false, true);
-    add(rails.build(`rail_steel_${key}`), this.assets.rail, 'rails', false, true);
-    add(concrete.build(`rail_concrete_${key}`), this.assets.concrete, 'concrete', true, true);
-    add(lining.build(`rail_lining_${key}`), this.assets.lining, 'lining', false, false);
-    add(canopy.build(`rail_canopy_${key}`), this.assets.canopy, 'canopy', true, true);
-    add(tactile.build(`rail_tactile_${key}`), this.assets.tactile, 'tactile', false, true);
-    add(brick.build(`rail_brick_${key}`), this.assets.brick, 'house', true, true);
-    add(furniture.build(`rail_furniture_${key}`), this.assets.furniture, 'furniture', true, true);
-    // The boundary fence, with UVs, because the whole object is a mask on them:
-    // `u` is metres along the run and `v` metres up the panel, which is exactly
-    // what `fences.createFenceOpenMaterial` reads. It casts nothing -- see
-    // `railWarmupParts` for the arithmetic behind that.
-    add(fence.build(`rail_fence_${key}`, true), this.assets.fence, 'fence', false, true);
-    add(signs.build(`rail_sign_${key}`, true), this.assets.sign, 'signs', false, false);
-    add(wire, this.assets.wire, 'wire', false, false);
-
-    if (group.children.length > 0) this.group.add(group);
-
-    let collisionKey: string | null = null;
-    if (this.solids && prisms.length > 0) {
-      collisionKey = `rail:${key}`;
-      this.solids.addPrisms(collisionKey, prisms);
-    }
-
-    return {
-      group,
-      geometries,
-      collisionKey,
-      provisional,
-      attempts: 0,
-      sleepers: new Float32Array(sleepers),
-      masts: chunk.masts,
-      cx,
-      cz,
-    };
+    return { chunk: state.result!, prisms: state.prisms };
   }
 
   /**
@@ -1511,6 +2118,12 @@ export class RailWorld {
     const signature = build === null ? '' : `${build.runs.length}:${build.triangles}`;
     if (signature === this.vesselSignature) return;
     this.vesselSignature = signature;
+    // The build in flight goes with them: it was sized against the old
+    // corridor -- `ChunkBuild.sizes` carries the run count and its closures
+    // capture the old field -- so letting it land would put a chunk drawn to a
+    // superseded formation in the scene, which is the one thing this method
+    // exists to prevent.
+    this.abandonBuild();
     for (const [key, chunk] of [...this.built]) this.disposeChunk(key, chunk);
     this.lastChunk = '';
     this.lastSleeperCell = '';
@@ -1549,11 +2162,19 @@ export class RailWorld {
    * Returns how many were dropped, for the log.
    */
   invalidate(box: readonly [number, number, number, number]): number {
+    const overlaps = (cx: number, cz: number): boolean => {
+      const x0 = cx * CHUNK_M;
+      const z0 = cz * CHUNK_M;
+      return !(x0 > box[2] || x0 + CHUNK_M < box[0] || z0 > box[3] || z0 + CHUNK_M < box[1]);
+    };
+    // The build in flight is decided by the same stale road deck as a finished
+    // chunk over the box -- its fence panels and its wall heights are already
+    // written -- so it is dropped on the same test rather than allowed to land
+    // as the thing this method exists to remove.
+    if (this.active !== null && overlaps(this.active.cx, this.active.cz)) this.abandonBuild();
     let dropped = 0;
     for (const [key, chunk] of [...this.built]) {
-      const x0 = chunk.cx * CHUNK_M;
-      const z0 = chunk.cz * CHUNK_M;
-      if (x0 > box[2] || x0 + CHUNK_M < box[0] || z0 > box[3] || z0 + CHUNK_M < box[1]) continue;
+      if (!overlaps(chunk.cx, chunk.cz)) continue;
       // `disposeChunk` deletes from `built` itself.
       this.disposeChunk(key, chunk);
       dropped++;
@@ -1586,17 +2207,21 @@ export class RailWorld {
    * ring to fill in behind a player who walked straight out from the spawn.
    */
   private retryProvisional(x: number, z: number): void {
-    for (const [key, chunk] of [...this.built]) {
+    // One at a time, and never while another build is in flight: a rebuild is
+    // the same work as a first build and goes through the same budget. See
+    // `RailWorld.active`.
+    if (this.active !== null) return;
+    for (const [key, chunk] of this.built) {
       if (!chunk.provisional || chunk.attempts >= PROVISIONAL_ATTEMPTS) continue;
       if (chunkDistance(chunk.cx, chunk.cz, x, z) > BUILD_RADIUS) continue;
-      const attempts = chunk.attempts + 1;
-      this.disposeChunk(key, chunk);
-      const fresh = this.buildChunk(key, chunk.cx, chunk.cz);
-      fresh.attempts = attempts;
-      this.built.set(key, fresh);
-      this.provisionalRebuilds++;
-      // One a transition. A rebuild is the same work as a first build and the
-      // frame budget that made `BUILDS_PER_FRAME` two applies here identically.
+      // **The chunk it replaces stays in the scene until this lands.** It used
+      // to be disposed first and rebuilt in the same call, which was invisible
+      // while a rebuild was one statement. Spread over frames it would be a
+      // railway that blinks out and back once a second while a player stands
+      // still at a station waiting for their terrain -- so the swap happens in
+      // the tail step instead, where it is one event. See `ChunkBuild.replacing`.
+      this.active = this.beginChunk(key, chunk.cx, chunk.cz, chunk, true);
+      this.active.attempts = chunk.attempts + 1;
       return;
     }
   }
@@ -3629,6 +4254,84 @@ function buildCorridor(net: RailNetwork): Array<[string, BufferGeometry]> {
 }
 
 // --- The module's own self-check -----------------------------------------------------
+
+/**
+ * The chunk builder's cursor, proved without building a chunk.
+ *
+ * `advanceChunkStep` is the whole of the state machine that is *pure*, and it is
+ * the piece a mistake in would be silent in the worst way: a phase skipped
+ * builds a chunk with no rails on it, a phase visited twice builds the ballast
+ * of a station on top of itself, and both look like ordinary geometry from a
+ * distance. The identity test in `perf-harness.ts` would catch either -- but
+ * that test needs the bake and a minute, and this needs neither, so this is what
+ * ships in the boot list.
+ *
+ * What it asserts, over a set of size vectors chosen to be every shape a real
+ * chunk can have -- empty, one phase only, a hole in the middle, a hole at each
+ * end -- is the only property the accumulators depend on: **the walk visits
+ * every step of every phase exactly once, in order, and then stops.**
+ */
+export function verifyRailChunkSteps(): string[] {
+  const bad: string[] = [];
+
+  if (PHASE_NAMES.length !== PHASE_COUNT) {
+    bad.push(`PHASE_NAMES has ${PHASE_NAMES.length} entries for ${PHASE_COUNT} phases`);
+  }
+  // Eleven materials, the wire and the tail. Named here because the finish
+  // phase's `switch` is a list of literals and a miscount would silently drop
+  // the last material off the end of the walk.
+  if (FINISH_STEPS !== 13) bad.push(`FINISH_STEPS is ${FINISH_STEPS}; it is 11 materials + the wire + the tail`);
+  // The two name tables are read by index off a live cursor, so a short one is
+  // an `undefined` in a performance report rather than a crash -- which is the
+  // kind of thing that survives for a year.
+  if (STATION_STEP_NAMES.length !== STATION_STEPS) {
+    bad.push(`STATION_STEP_NAMES has ${STATION_STEP_NAMES.length} entries for ${STATION_STEPS} steps`);
+  }
+  if (FINISH_STEP_NAMES.length !== FINISH_STEPS) {
+    bad.push(`FINISH_STEP_NAMES has ${FINISH_STEP_NAMES.length} entries for ${FINISH_STEPS} steps`);
+  }
+
+  const shapes: number[][] = [
+    [0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, FINISH_STEPS],
+    [1, 12, 0, STATION_STEPS, 0, 12, FINISH_STEPS],
+    [2, 40, 3, 2 * STATION_STEPS, 5, 40, FINISH_STEPS],
+    [0, 0, 0, 0, 0, 0, FINISH_STEPS],
+    [3, 0, 0, 0, 0, 0, 0],
+    [0, 0, 7, 0, 0, 0, 0],
+  ];
+  for (const sizes of shapes) {
+    const want: string[] = [];
+    for (let p = 0; p < sizes.length; p++) for (let i = 0; i < sizes[p]; i++) want.push(`${p}:${i}`);
+    const got: string[] = [];
+    const at: ChunkCursor = { phase: 0, index: -1 };
+    // Bounded, so a cursor that failed to terminate is a failure rather than a
+    // hung boot.
+    for (let guard = 0; guard <= want.length + 4; guard++) {
+      if (!advanceChunkStep(sizes, at)) break;
+      got.push(`${at.phase}:${at.index}`);
+    }
+    if (got.join(',') !== want.join(',')) {
+      bad.push(
+        `the chunk cursor walked [${got.join(',')}] over sizes [${sizes.join(',')}]; ` +
+          `it must walk [${want.join(',')}]`,
+      );
+      continue;
+    }
+    // ...and it stays stopped. A cursor that restarts would rebuild the chunk
+    // on top of itself for as long as the frame budget allowed.
+    if (advanceChunkStep(sizes, at)) {
+      bad.push(`the chunk cursor restarted after finishing sizes [${sizes.join(',')}]`);
+    }
+  }
+
+  // The four state codes are compared with `===` in `reshapeRing`, so two of
+  // them sharing a value would make an in-flight chunk queue a second time.
+  const codes = [CHUNK_ABSENT, CHUNK_PENDING, CHUNK_BUILDING, CHUNK_BUILT];
+  if (new Set(codes).size !== codes.length) bad.push('the four chunk state codes are not distinct');
+
+  return bad;
+}
 
 /**
  * Everything about the derived network that must be true before anything draws
