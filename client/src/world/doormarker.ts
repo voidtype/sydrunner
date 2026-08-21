@@ -42,6 +42,8 @@ import {
   RingGeometry,
 } from 'three/webgpu';
 
+import type { WarmupPart } from './warmup.ts';
+
 /** How far away a standing train's doors are still worth pointing at, metres. */
 export const BOARD_HINT_M = 45;
 
@@ -147,6 +149,31 @@ export class DoorMarker {
     this.chevron.geometry.dispose();
     this.ringMat.dispose();
     this.chevronMat.dispose();
+  }
+
+  /**
+   * The boot warm-up entries, and this object is the textbook case for one.
+   *
+   * WORKSTREAM AE. The marker is constructed hidden -- `group.visible = false`
+   * in the constructor, and `aim` is the only thing that ever shows it -- and
+   * `_projectObject` skips an invisible object in `compileAsync`'s walk exactly
+   * as it does in `render`. So the boot scene pass, which is what covers
+   * everything else that is merely sitting in the scene, could never reach these
+   * two: their pipelines compiled on the frame the marker first appeared, which
+   * is the frame a player walks up to a train door. That is a stall placed
+   * precisely on the action it exists to make obvious, and it is one of the
+   * things behind *"looking around on the train has little freezes"*.
+   *
+   * The real meshes are handed over rather than stood in for, because they are
+   * two objects with twelve triangles between them: a throwaway would be the same
+   * pipeline at the cost of a `RingGeometry` nobody needs. Neither casts nor
+   * receives -- both are unlit additive signage, see the header.
+   */
+  warmupParts(): WarmupPart[] {
+    return [
+      { geometry: this.ring.geometry, material: this.ringMat, casts: false, receives: [false] },
+      { geometry: this.chevron.geometry, material: this.chevronMat, casts: false, receives: [false] },
+    ];
   }
 }
 

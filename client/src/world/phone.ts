@@ -59,6 +59,7 @@ import {
 
 import { BONE } from '../player/animation.ts';
 import { CharacterActor, SELF_SHADOW_LAYER } from '../player/character.ts';
+import type { WarmupPart } from './warmup.ts';
 
 /** Metres. A phone, at the size a phone is. */
 const WIDTH = 0.071;
@@ -227,6 +228,39 @@ export class PhoneAssets {
 const HOLD_OFFSET: readonly [number, number, number] = [0.008, -0.062, 0.02];
 const HOLD_PITCH = -1.15;
 const HOLD_YAW = 0.22;
+
+/**
+ * The boot warm-up entries: the slab and the glass, in the three configurations
+ * the two objects between them are ever drawn in.
+ *
+ * WORKSTREAM AE. The viewmodel is in the scene from `installMoney` onward and
+ * so the boot scene pass does reach it -- but only because `PhoneViewmodel`
+ * starts `visible` and nothing has posed it yet when that pass runs. The moment
+ * one `update` lands first, `raise = 0` sets `visible = false` and both its
+ * pipelines move to the frame the player first presses the key. That is a
+ * one-line change away at all times, and `main.ts` has already paid for the same
+ * accident twice (see the `sky.stars.visible` paragraph at the scene pass).
+ *
+ * **`PhoneProp` is not a maybe.** It is built on a slot change and destroyed on
+ * the next one, so it is never in the scene at boot at all: its casting body was
+ * a compile on the frame somebody first took their phone out, every session.
+ * Its colour pipeline is the viewmodel's -- same material, same layout, same
+ * `receiveShadow` -- and what it adds is the **depth** variant, which is why the
+ * casting entry is here on its own terms rather than folded into the row above.
+ */
+export function phoneWarmupParts(assets: PhoneAssets): WarmupPart[] {
+  return [
+    // The viewmodel's slab: welded to the eye, so out of the depth pass, but it
+    // keeps `receiveShadow` so it darkens under an awning. See `PhoneViewmodel`.
+    { geometry: assets.body, material: assets.bodyMaterial, casts: false, receives: [true] },
+    // The prop's slab on a character's wrist, which is the same colour pipeline
+    // and one depth pipeline more.
+    { geometry: assets.body, material: assets.bodyMaterial, casts: true, receives: [true] },
+    // The glass, in both objects: never in the depth pass -- it is inside the
+    // slab's silhouette -- and never receiving, because it is emissive.
+    { geometry: assets.screen, material: assets.screenMaterial, casts: false, receives: [false] },
+  ];
+}
 
 /**
  * One character's phone. Attaches on construction, detaches on `dispose`.

@@ -96,6 +96,7 @@ import {
   verifyHandsPose,
   type HandPhase,
 } from '../game/hands-pose.ts';
+import type { WarmupPart } from '../world/warmup.ts';
 import { BONE, PUNCH_ACTIVE, PUNCH_RECOVERY, PUNCH_WIND_UP } from './animation.ts';
 import { COLOURWAYS, CharacterAssets } from './character.ts';
 
@@ -556,6 +557,25 @@ function wrapPi(a: number): number {
  *
  *     bun -e "import {verifyHands} from './src/player/hands.ts'; console.log(verifyHands())"
  */
+/**
+ * The boot warm-up entry: one material, one layout, one shadow role.
+ *
+ * WORKSTREAM AE. The hands are built too late for the boot stand-in pass -- the
+ * viewmodel is parented to the camera a couple of thousand lines below it -- so
+ * until now the only thing that compiled them was the scene pass, and only
+ * because the group happens to be `visible` when it runs. That is the same
+ * accident `main.ts` already calls out over `sky.stars.visible`: true today,
+ * true by nobody's decision, and a stall on the first punch of the session the
+ * day somebody hides the viewmodel until a slot is equipped.
+ *
+ * One entry rather than two, because both hands are the same buffer at
+ * `scale.x = -1` and a mirrored draw is not a different pipeline. Neither casts
+ * nor receives -- see `HandsViewmodel`'s constructor, which argues both.
+ */
+export function handsWarmupParts(assets: HandsAssets): WarmupPart[] {
+  return [{ geometry: assets.geometry, material: assets.material, casts: false, receives: [false] }];
+}
+
 export function verifyHands(): string[] {
   // The pure half first, so a pose failure is reported once and in the right
   // words rather than showing up here as a geometry that will not fit.

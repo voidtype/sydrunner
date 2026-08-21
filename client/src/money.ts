@@ -62,7 +62,7 @@ import type { Camera, Scene } from 'three/webgpu';
 // built the stubby gold cylinder that stood for a bundle; all of that -- the
 // pool, the spin, the placement -- has moved to `world/cashnote.ts`, which is
 // one class and one `update` call. Nothing else in this file changed.
-import { CashNotePiles } from './world/cashnote.ts';
+import { CashNotePiles, cashNoteWarmupParts } from './world/cashnote.ts';
 
 import type { Capture } from './bugreport.ts';
 import type { Hud } from './hud.ts';
@@ -91,7 +91,8 @@ import {
 } from './game/phone.ts';
 import { Phone } from './phone.ts';
 import { composePhoto } from './photo.ts';
-import { PhoneAssets, PhoneProp, PhoneViewmodel } from './world/phone.ts';
+import { PhoneAssets, PhoneProp, PhoneViewmodel, phoneWarmupParts } from './world/phone.ts';
+import type { WarmupPart } from './world/warmup.ts';
 
 /**
  * How far out Centrelink offices are offered to the minimap.
@@ -203,6 +204,18 @@ export interface MoneyDeps {
 export interface MoneyHooks {
   /** Once per rendered frame, after the simulation. */
   frame(dt: number): void;
+  /**
+   * The shader pipelines this feature draws with, for the boot warm-up.
+   *
+   * WORKSTREAM AE. `installMoney` runs thousands of lines below the boot
+   * stand-in pass, so nothing this file owns could be in that list -- and two of
+   * its three objects are built on demand and are therefore not in the scene for
+   * the scene pass either. The handset's prop appears on a slot change and a
+   * pile of fifties appears when somebody drops one, so both used to compile
+   * inside `render` on the frame they were first wanted. `main.ts` puts these
+   * stand-ins into the scene pass instead; see `world/warmup.warmupStandins`.
+   */
+  warmupParts(): WarmupPart[];
   /**
    * A keydown, from inside `main.ts`'s own handler and after its `hud.typing`
    * interlock. Returns true when it consumed the key.
@@ -610,6 +623,12 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
 
   return {
     frame,
+    // The handset and the fifties, on the assets this closure owns -- which is
+    // the whole reason it is a method here rather than a line in `main.ts`: the
+    // pipeline is keyed on the material *instance*, so a second `PhoneAssets`
+    // built to describe this one would warm a pipeline nothing draws. See
+    // `world/warmup.WarmupPart`.
+    warmupParts: () => [...phoneWarmupParts(phoneAssets), ...cashNoteWarmupParts(piles.assets)],
     keydown(code, shift, repeat) {
       if (repeat) return false;
       // The number row. `Digit1`..`Digit4` rather than `e.key`, so a French

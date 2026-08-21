@@ -109,6 +109,72 @@
  *   bun run client/src/perf-harness.ts --scene chase
  *   SYDNEY_WORLD=/path/to/world bun run client/src/perf-harness.ts
  *
+ *   bun run client/src/perf-harness.ts --coverage     # the warm-up audit alone
+ *
+ * `--coverage` runs in about a second and **exits non-zero** when a mesh the
+ * renderers build has no matching entry in the boot warm-up. That is the cheap
+ * repeatable check for the whole subject; see section "the coverage audit"
+ * below. The full run does it too, at the end, with the same exit code.
+ *
+ * ---------------------------------------------------------------------------
+ * ## The coverage audit, which is the other thing a headless renderer is for
+ *
+ * WORKSTREAM AE. The report was *"looking around on the train has little
+ * freezes, feels like something being pulled from network when i turn around"*,
+ * and it is not the network: the streamer's prefetch does not know where the
+ * camera points. What knows where the camera points is which pipelines the
+ * renderer is asked to build, and three's WebGPU backend builds a missing one
+ * **inside `render`** -- `Pipelines.getForRender`'s blocking branch -- on the
+ * frame the object first appears.
+ *
+ * `world/warmup.ts` exists to make that impossible, and the recurring way it
+ * fails is not a missing renderer but a warm-up entry that has *drifted from the
+ * mesh it stands in for*. The overhead wire is the confirmed case: it was warmed
+ * with `{ normal: true, uv: true }` and the real catenary carries position and
+ * an index and nothing else. A pipeline is keyed on the attribute layout as much
+ * as on the material, so the boot pass compiled a wire that does not exist and
+ * the real one compiled on the frame the first catenary came into view -- while
+ * riding, which is exactly where it was felt.
+ *
+ * Neither file can catch that by being read, because the fault is that the two
+ * agree in prose and differ in a flag. `auditWarmup` catches it in a live
+ * session and only after somebody has looked. So this does it here, before the
+ * commit: build every renderer, walk the scene graphs it produces, reduce each
+ * mesh to the things three's cache key reads -- through `geometryLayout`, the
+ * same function `warmupSignature` builds its layout half from, so the two sides
+ * cannot disagree about what an attribute layout *is* -- and diff the two sets.
+ *
+ * Three rules decide what has to be covered, and each is a property of three's
+ * cache key rather than a convention of this project:
+ *
+ *   - **An ordinary `Mesh` must have a stand-in.** Its key is (material,
+ *     attribute layout, `receiveShadow`), all of which a throwaway can copy.
+ *     A real mesh with no matching part is a hitch, and is what the audit fails
+ *     on.
+ *   - **An `InstancedMesh` cannot have one**, ever: `getMaterialCacheKey`
+ *     appends `object.uuid`. Those are counted and skipped -- the scene pass and
+ *     `TileStreamer.setPrecompiler` cover them, and `world/warmup.ts` sets out
+ *     why at length.
+ *   - **`castShadow` is in the audit's key** even though it is not in the colour
+ *     pipeline's, because it decides whether the nested depth render draws the
+ *     mesh at all, and the depth pipelines are half of what the pass is for. A
+ *     part warmed `casts: false` over a mesh that casts is the same defect with
+ *     a later symptom: the stall arrives when the sun moves its volume over the
+ *     thing rather than when you turn towards it.
+ *
+ * Both directions are printed. The one that matters is real-without-warm. The
+ * other -- warm-without-real -- is boot time spent on a pipeline nothing draws,
+ * and it is usually the *other half* of a mismatch, as the wire's was.
+ *
+ * What it cannot reach is listed by name in the output rather than skipped
+ * silently: a coverage audit that quietly omits half the world is worse than
+ * none. Today that is the streamer's twenty slot materials, the terrain, the
+ * water, the power wires and the far city (all need `fetch` and a decode
+ * worker), the nameplates and the sun button (both build a `CanvasTexture` off
+ * `document`), and the two hero trains (10.5 MB of glTF, and covered by
+ * `trains.warm` rather than by a stand-in anyway).
+ *
+ * ---------------------------------------------------------------------------
  * No node imports and no bun types: the client's `tsconfig.json` has neither in
  * `types`, and adding them there to please one file would put `process` and
  * `Buffer` in scope for nine thousand lines of browser code. The three host
@@ -116,7 +182,15 @@
  * through the narrow declared shims at the top of the file instead.
  */
 
-import { PerspectiveCamera, Scene } from 'three/webgpu';
+import {
+  InstancedMesh,
+  Material,
+  Mesh,
+  Object3D,
+  PerspectiveCamera,
+  Scene,
+  SkinnedMesh,
+} from 'three/webgpu';
 
 import { FRAME_SECTION_NAMES, FSEC, FrameProfile } from './frameprofile.ts';
 import { CharacterActor, CharacterAssets } from './player/character.ts';
@@ -140,17 +214,29 @@ import {
 } from './world/highway-patrol.ts';
 import { NightLights, type LampSource } from './world/nightlights.ts';
 import { uploadStats } from './world/instupload.ts';
-import { BatAssets } from './player/bat.ts';
-import { FootyAssets, footyWarmupParts } from './world/footyball.ts';
+import { BatAssets, BatProp, BatViewmodel } from './player/bat.ts';
+import { FootyAssets, FootyPool, FootyProp, FootyViewmodel, footyWarmupParts } from './world/footyball.ts';
 import { Tracers, policeWarmupParts } from './world/police.ts';
 import { highwayPatrolWarmupParts } from './world/highway-patrol.ts';
 import { streetlifeWarmupParts } from './world/streetlife.ts';
 import { characterWarmupParts } from './world/characters.ts';
 import { eventWarmupParts } from './world/events.ts';
-import { RaveAssets, raveWarmupParts } from './world/rave.ts';
-import { RailAssets, railWarmupParts } from './world/rail-geo.ts';
-import { BigNightKit, TeamRingField, teamLookWarmupParts } from './world/teamlook.ts';
-import { warmupSignature, type WarmupPart } from './world/warmup.ts';
+import { RaveAssets, RaveWorld, raveWarmupParts } from './world/rave.ts';
+import { RailAssets, RailWorld, buildNetwork, railWarmupParts } from './world/rail-geo.ts';
+import { decodeRail, type RailBake, type RailDirection } from './game/rail.ts';
+import {
+  BigNightKit,
+  HornProp,
+  TeamRingField,
+  TentSet,
+  teamLookWarmupParts,
+} from './world/teamlook.ts';
+import { SwatPuffs } from './world/swatpuff.ts';
+import { HandsAssets, HandsViewmodel, handsWarmupParts } from './player/hands.ts';
+import { PhoneAssets, PhoneProp, PhoneViewmodel, phoneWarmupParts } from './world/phone.ts';
+import { CashNoteAssets, CashNotePiles, cashNoteWarmupParts } from './world/cashnote.ts';
+import { DoorMarker } from './world/doormarker.ts';
+import { geometryLayout, type WarmupPart } from './world/warmup.ts';
 
 // --- The host, through the smallest possible window ----------------------------
 //
@@ -632,76 +718,711 @@ function printTable(spec: SceneSpec, result: Awaited<ReturnType<typeof runScene>
   );
 }
 
+// --- The warm-up coverage audit ------------------------------------------------
+//
+// See the header section "the coverage audit" for why this exists and what its
+// three rules are. Everything below is the machinery.
+
 /**
- * How much of the boot shader warm-up is the same pipeline twice.
+ * One renderer family: what it asks the boot warm-up for, and what it actually
+ * puts in the scene.
  *
- * The other half of what this file is for. `main.ts` assembles the parts list
- * out of nine independent contributors and none of them can see the others, so
- * the collisions are only visible in aggregate -- which is to say, only from
- * something that builds all nine and counts. That is exactly what a harness is,
- * and it is why this lives here rather than in a comment somebody has to
- * believe.
- *
- * The streamer's twenty slot materials and the nameplate field are missing: the
- * first needs a `TileStreamer` and therefore `fetch`, the second builds a canvas
- * texture. Both are named in the output so the total is not read as the whole
- * boot pass.
+ * The two halves are built from the **same asset instance**, and that is the
+ * only thing here that is not obvious. A pipeline is keyed on the material
+ * itself, so a group that constructed `new PoliceAssets(chars)` twice
+ * -- once for its parts and once for its squad -- would report every one of its
+ * materials as both uncovered and unused, and the audit would be a list of its
+ * own mistakes. One `assets`, threaded through both.
  */
-function warmupCensus(): void {
+interface WarmGroup {
+  name: string;
+  /** What this group contributes to `main.ts`'s boot list. May be empty. */
+  parts: readonly WarmupPart[];
+  /** Roots of the real scene graph the renderers build. Traversed, not drawn. */
+  real: readonly Object3D[];
+  /**
+   * Objects `main.ts` hands to `warmUpPipelines` **whole** rather than as
+   * stand-ins -- today only the two throwaway characters, because a skinned
+   * mesh's cache key folds in its skeleton and no triangle can fake one. They
+   * warm their own exact pipelines, so their signatures count as covered.
+   */
+  extras?: readonly Object3D[];
+  /**
+   * Asset objects to read material names off, so the report can say
+   * `rail.wire` rather than `MeshBasicNodeMaterial#7f3a`. Own enumerable
+   * properties only, one level deep, arrays included.
+   */
+  label?: Record<string, unknown>;
+}
+
+/**
+ * One drawable, reduced to the things three's cache key actually reads.
+ *
+ * ---------------------------------------------------------------------------
+ * **A mesh needs up to two pipelines and they are keyed differently**, and
+ * getting that wrong is the difference between a useful audit and a list of
+ * false alarms. Read out of `RenderObject.getMaterialCacheKey` and
+ * `getDynamicCacheKey` rather than assumed:
+ *
+ *   - The **colour** pipeline's key is the material's own properties, the
+ *     geometry's attribute layout, the skeleton's bone count and
+ *     `object.receiveShadow`. `castShadow` is **not** in it.
+ *   - The **depth** pipeline's key is the same list with the material replaced
+ *     by one shared `ShadowMaterial` per light -- `ShadowNode.updateBefore` sets
+ *     it as `scene.overrideMaterial` -- so the object's own material drops out
+ *     entirely and only the layout, the bones and `receiveShadow` remain. It is
+ *     needed only when `castShadow` is true, because
+ *     `getShadowRenderObjectFunction` draws nothing else.
+ *
+ * So a part warmed `casts: true` over a mesh that does not cast has warmed the
+ * colour pipeline the mesh does need and one depth pipeline it does not; that is
+ * a little boot time and no hitch. The reverse -- a caster with no casting part
+ * at its layout -- is a stall the first time the sun's volume covers it, and is
+ * a failure. `warmupSignature` folds both into one string because for the
+ * *warm-up* that is the conservative thing to do; the audit has to be exact.
+ */
+interface RealMesh {
+  /** `material | layout | bones | receiveShadow`. */
+  colourKey: string;
+  /** `layout | bones | receiveShadow`, or '' when the mesh never casts. */
+  depthKey: string;
+  group: string;
+  material: Material;
+  layout: string;
+  casts: boolean;
+  receives: boolean;
+  /** An object name a reader can grep for. */
+  example: string;
+  /**
+   * Whether it was visible when the audit walked it, which is the closest this
+   * can get to "the boot scene pass would have reached it". That pass walks the
+   * real scene once, and `_projectObject` skips anything invisible; so a
+   * hidden-until-used mesh -- the footy in its pool, the swat puff, the door
+   * marker -- can only ever be warmed by a stand-in. Nor does the pass reach
+   * anything built *after* it: every rail chunk mesh is made on demand while the
+   * player moves, so `visible` here means only that a stand-in is not the sole
+   * possible cover, never that one is unnecessary.
+   */
+  visibleAtBoot: boolean;
+}
+
+const colourKeyOf = (material: Material, layout: string, bones: number, receives: boolean): string =>
+  `${material.uuid}|${layout}|${bones}|${receives}`;
+const depthKeyOf = (layout: string, bones: number, receives: boolean): string =>
+  `${layout}|${bones}|${receives}`;
+
+/** How many bones are in this object's cache key. Zero for everything unskinned. */
+const bonesOf = (object: Object3D): number =>
+  (object as SkinnedMesh).skeleton?.bones.length ?? 0;
+
+/** The nearest named thing at or above `object`, so the report can be grepped for. */
+function nameOfObject(object: Object3D): string {
+  for (let o: Object3D | null = object; o; o = o.parent) {
+    if (o.name) return o === object ? o.name : `${o.name}/${object.type}`;
+  }
+  return object.type;
+}
+
+/** Name every material reachable one level down from an asset object. */
+function labelMaterials(prefix: string, source: Record<string, unknown>, into: Map<string, string>): void {
+  for (const [key, value] of Object.entries(source)) {
+    if (value instanceof Material) into.set(value.uuid, `${prefix}.${key}`);
+    else if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i++) {
+        if (value[i] instanceof Material) into.set((value[i] as Material).uuid, `${prefix}.${key}[${i}]`);
+      }
+    }
+  }
+}
+
+/**
+ * Every real mesh under `roots`, keyed exactly as the warm-up keys its parts.
+ *
+ * `InstancedMesh` is skipped and counted rather than reported: three appends
+ * `object.uuid` to an instanced draw's material cache key, so no stand-in can
+ * ever cover one and listing them here would be listing the design. Skinned
+ * meshes *are* reported, because `main.ts` covers them with real extras and a
+ * rig whose shadow flags drifted from those extras is a genuine miss.
+ */
+function collectReal(
+  group: string,
+  roots: readonly Object3D[],
+  into: Map<string, RealMesh>,
+  instanced: { count: number },
+): void {
+  for (const root of roots) {
+    // Visibility is inherited, so it has to be carried down rather than read off
+    // the mesh: a `visible = false` pool group hides balls whose own flag is
+    // true, and `_projectObject` stops at the group.
+    const walk = (object: Object3D, visible: boolean): void => {
+      const shown = visible && object.visible;
+      const mesh = object as Mesh;
+      const material = mesh.material;
+      if (material && mesh.geometry) {
+        if ((mesh as InstancedMesh).isInstancedMesh) {
+          instanced.count++;
+        } else {
+          const layout = geometryLayout(mesh.geometry);
+          const bones = bonesOf(object);
+          for (const m of Array.isArray(material) ? material : [material]) {
+            // Keyed for the report by everything, including `casts`, so a mesh
+            // that casts and one that does not are two rows a reader can tell
+            // apart. The *coverage* test below uses the two narrower keys.
+            const row = `${colourKeyOf(m, layout, bones, mesh.receiveShadow)}|${mesh.castShadow}`;
+            const existing = into.get(row);
+            if (existing) {
+              // Keep the most favourable visibility: one mesh of a kind being
+              // shown at boot is enough for the scene pass to compile the
+              // pipeline the rest of them share.
+              if (shown) existing.visibleAtBoot = true;
+              continue;
+            }
+            into.set(row, {
+              colourKey: colourKeyOf(m, layout, bones, mesh.receiveShadow),
+              depthKey: mesh.castShadow ? depthKeyOf(layout, bones, mesh.receiveShadow) : '',
+              group,
+              material: m,
+              layout,
+              casts: mesh.castShadow,
+              receives: mesh.receiveShadow,
+              example: nameOfObject(object),
+              visibleAtBoot: shown,
+            });
+          }
+        }
+      }
+      for (const child of object.children) walk(child, shown);
+    };
+    walk(root, true);
+  }
+}
+
+/** The rail bake, off disk. `main.ts` fetches the identical bytes from `/rail/`. */
+const RAIL_BAKE = new URL('../public/rail/rail.bin', import.meta.url).pathname;
+
+/** A `RailWorld` and the route to ride it along. See `railChunkProfile`. */
+interface RailRide {
+  world: RailWorld;
+  bake: RailBake;
+  /** The longest direction in the bake, which is the longest ride available. */
+  route: RailDirection;
+}
+
+/**
+ * Build every renderer the audit can build, and pair it with its warm-up parts.
+ *
+ * The rail world is the one that needs the disk: `RailWorld` is driven through
+ * `update` at a real Sydney position so its chunk ring actually builds, because
+ * the chunk meshes -- ballast, rails, platforms, canopies, the overhead wire --
+ * are made on demand and a `RailWorld` that has never been updated contains
+ * only the corridor. That is also the geometry `railChunkProfile` times.
+ */
+async function warmGroups(): Promise<{ groups: WarmGroup[]; rail: RailRide | null }> {
   const chars = new CharacterAssets();
+  const groups: WarmGroup[] = [];
+
+  // --- The two throwaway characters, which is the whole of `warmupExtras`.
+  //
+  // Both variants, exactly as `main.ts` builds them: `CharacterActor` sets
+  // `receiveShadow = true` on every body and `castShadowOnly` turns it off again
+  // for the local player's own, and three keys the pipeline on that flag.
+  const warmA = new CharacterActor(chars, 0);
+  const warmB = new CharacterActor(chars, 0);
+  warmA.mesh.receiveShadow = true;
+  warmB.mesh.receiveShadow = false;
+  groups.push({ name: 'player', parts: [], real: [], extras: [warmA.mesh, warmB.mesh] });
+
+  const footy = new FootyAssets();
+  const footyActor = new CharacterActor(chars, 0);
+  const footyProp = new FootyProp(footy, footyActor);
+  groups.push({
+    name: 'footy',
+    parts: footyWarmupParts(footy),
+    real: [new FootyPool(footy).group, new FootyViewmodel(footy).group, footyActor.mesh],
+    label: { footy },
+  });
+  void footyProp;
+
   const bats = new BatAssets();
-  const groups: Array<[string, readonly WarmupPart[]]> = [
-    ['footy', footyWarmupParts(new FootyAssets())],
-    ['bat', [{ geometry: bats.geometry, material: bats.material, casts: true }]],
-    ['police', policeWarmupParts(new PoliceAssets(chars), new Tracers())],
-    ['patrol', highwayPatrolWarmupParts(new HighwayPatrolAssets())],
-    ['street', streetlifeWarmupParts(new StreetlifeAssets(chars))],
-    ['characters', characterWarmupParts(new CharacterKitAssets(chars))],
-    ['events', eventWarmupParts(new EventAssets())],
-    ['rave', raveWarmupParts(new RaveAssets())],
-    ['rail', railWarmupParts(new RailAssets())],
-    ['teams', teamLookWarmupParts(new BigNightKit(chars), chars, new TeamRingField())],
-  ];
+  const batActor = new CharacterActor(chars, 0);
+  const batProp = new BatProp(bats, batActor);
+  groups.push({
+    name: 'bat',
+    parts: [{ geometry: bats.geometry, material: bats.material, casts: true }],
+    real: [new BatViewmodel(bats).group, batActor.mesh],
+    label: { bat: bats },
+  });
+  void batProp;
+
+  const puffs = new SwatPuffs();
+  groups.push({
+    name: 'swatpuff',
+    // `main.ts` writes this one inline rather than through a `*WarmupParts`
+    // function, so it is repeated here in the same shape. See the block around
+    // `swatPuffs.meshes[0]` there.
+    parts: [
+      {
+        geometry: puffs.meshes[0].geometry,
+        material: puffs.meshes[0].material as Material,
+        casts: false,
+        receives: [false],
+      },
+    ],
+    real: puffs.meshes,
+  });
+
+  const policeAssets = new PoliceAssets(chars);
+  const tracers = new Tracers();
+  const squad = new PoliceSquad(policeAssets, chars);
+  groups.push({
+    name: 'police',
+    parts: policeWarmupParts(policeAssets, tracers),
+    real: [...squad.rigs.map((r) => r.mesh), ...tracers.meshes],
+    label: { police: policeAssets, tracer: tracers },
+  });
+
+  const patrolAssets = new HighwayPatrolAssets();
+  const fleet = new HighwayPatrolFleet(patrolAssets);
+  const polairScene = new Scene();
+  const polair = new Polair(polairScene, patrolAssets);
+  groups.push({
+    name: 'patrol',
+    parts: highwayPatrolWarmupParts(patrolAssets),
+    real: [fleet.group, polair.group, polairScene],
+    label: { patrol: patrolAssets },
+  });
+
+  const streetAssets = new StreetlifeAssets(chars);
+  const street = new StreetCrowd(streetAssets, chars);
+  groups.push({
+    name: 'street',
+    parts: streetlifeWarmupParts(streetAssets),
+    real: street.rigs.map((r) => r.mesh),
+    label: { street: streetAssets },
+  });
+
+  const kitAssets = new CharacterKitAssets(chars);
+  const kitCrowd = new CharacterCrowd(kitAssets, chars);
+  groups.push({
+    name: 'characters',
+    parts: characterWarmupParts(kitAssets),
+    real: kitCrowd.rigs.map((r) => r.mesh),
+    label: { kit: kitAssets },
+  });
+
+  const eventAssets = new EventAssets();
+  const events = new EventScene(eventAssets);
+  groups.push({
+    name: 'events',
+    parts: eventWarmupParts(eventAssets),
+    real: events.meshes,
+    label: { events: eventAssets },
+  });
+
+  const raveAssets = new RaveAssets();
+  const raves = new RaveWorld(raveAssets, new PedestrianAssets(), chars);
+  groups.push({
+    name: 'rave',
+    parts: raveWarmupParts(raveAssets),
+    real: [...raves.meshes, raves.banner, ...raves.rigs.map((r) => r.mesh)],
+    label: { rave: raveAssets },
+  });
+
+  const bigNight = new BigNightKit(chars);
+  const rings = new TeamRingField();
+  const hornActor = new CharacterActor(chars, 0);
+  const horns = new HornProp(bigNight, chars, hornActor);
+  groups.push({
+    name: 'teams',
+    parts: teamLookWarmupParts(bigNight, chars, rings),
+    real: [new TentSet(bigNight, chars).mesh, rings.mesh, hornActor.mesh],
+    label: { teamring: rings },
+  });
+  void horns;
+
+  // --- The railway, which is the one that reads the disk.
+  const railAssets = new RailAssets();
+  let rail: RailRide | null = null;
+  const bun = host.Bun;
+  if (bun && (await bun.file(RAIL_BAKE).exists())) {
+    const bake = decodeRail(await bun.file(RAIL_BAKE).arrayBuffer());
+    if (bake) {
+      const world = new RailWorld(buildNetwork(bake), railAssets, FLAT);
+      // The longest direction in the bake, which is the route the profile below
+      // rides. Its first vertex is where the ring is filled: `BUILDS_PER_FRAME`
+      // caps a frame's chunks, so this is driven until the queue drains.
+      const route = bake.lines.flatMap((line) => line.dirs)
+        .reduce((a, b) => (b.lengthM > a.lengthM ? b : a));
+      const first = route.vertexOff * 3;
+      for (let i = 0; i < 400; i++) world.update(bake.vertices[first], bake.vertices[first + 2]);
+      rail = { world, bake, route };
+    }
+  }
+  groups.push({
+    name: 'rail',
+    parts: railWarmupParts(railAssets),
+    real: rail ? [rail.world.group] : [],
+    label: { rail: railAssets },
+  });
+
+  // --- The world-wide instanced populations, which contribute no parts at all
+  // and are here to be counted rather than covered. Every one of them is warmed
+  // by the scene pass at the bottom of `main.ts`; see `world/warmup.ts`.
+  const movers = new TrafficMovers(new CarAssets());
+  const crowd = new PedestrianCrowd(new PedestrianAssets(), chars);
+  const flock = new WildlifeFlock(new WildlifeAssets());
+  const lightScene = new Scene();
+  void new NightLights(lightScene);
+  groups.push({
+    name: 'instanced',
+    parts: [],
+    real: [...movers.meshes, ...crowd.meshes, ...crowd.rigs.map((r) => r.mesh), ...flock.meshes, lightScene],
+  });
+
+  // --- The viewmodels and the props built on demand.
+  //
+  // These four are `main.ts`'s late block: they are constructed below
+  // `hud.ready` and so cannot be in the boot list, and two of them are built on
+  // demand and so are not in the scene for the scene pass either. Their parts
+  // ride into the scene pass on `warmupStandins`; here they are one group like
+  // any other, because from the audit's side the question is the same.
+  const handsAssets = new HandsAssets();
+  const phoneAssets = new PhoneAssets();
+  const phoneActor = new CharacterActor(chars, 0);
+  const phoneProp = new PhoneProp(phoneAssets, phoneActor);
+  const cashScene = new Scene();
+  const cashAssets = new CashNoteAssets();
+  const cash = new CashNotePiles(cashScene, cashAssets);
+  // One bundle, because a pile is built on demand and a `CashNotePiles` nobody
+  // has handed money to holds nothing.
+  cash.update(1 / 60, [{ id: 1, x: 0, y: 0, z: 0, amount: 250 }]);
+  const doorMarker = new DoorMarker();
+  groups.push({
+    name: 'viewmodels',
+    parts: [
+      ...handsWarmupParts(handsAssets),
+      ...phoneWarmupParts(phoneAssets),
+      ...cashNoteWarmupParts(cashAssets),
+      ...doorMarker.warmupParts(),
+    ],
+    real: [
+      new HandsViewmodel(handsAssets).group,
+      new PhoneViewmodel(phoneAssets).group,
+      phoneProp.group,
+      cashScene,
+      doorMarker.group,
+    ],
+    label: { hands: handsAssets, phone: phoneAssets, cash: cashAssets },
+  });
+
+  return { groups, rail };
+}
+
+/** Renderers this harness cannot build, and why. Printed, never skipped silently. */
+const UNAUDITED: ReadonlyArray<readonly [string, string]> = [
+  ['streamer (20 slot materials)', 'needs a TileStreamer, which spawns decode workers and fetches tiles'],
+  ['terrain / water / contact skirt', 'built from a tile\'s .terr.bin inside the streamer'],
+  ['power wires (world/power.ts)', 'merged per tile by the streamer'],
+  ['street-name blades', 'a CanvasTexture per legend, off document'],
+  ['far city (world/far.ts)', 'fetches the hex bake; covered by precompileGroup, not by a stand-in'],
+  ['nameplates (world/nameplates.ts)', 'builds a CanvasTexture in its constructor'],
+  ['sun button (world/sunbutton.ts)', 'builds a CanvasTexture in its constructor'],
+  ['trains (world/trains.ts)', '10.5 MB of glTF; covered by trains.warm(precompileGroup)'],
+  ['near-field car models (world/carlod.ts)', '2.4 MB of glTF over fetch'],
+  ['landmarks', 'a streamed GLB group; covered by compileAsync on the group'],
+];
+
+/**
+ * The census and the coverage diff, printed together.
+ *
+ * Returns the failures -- real meshes with no warm-up entry -- so the caller can
+ * set an exit code. Nothing here throws: a coverage audit that dies halfway
+ * through reports less than one that finishes and says what it could not reach.
+ */
+async function warmupAudit(): Promise<{ failures: string[]; rail: RailRide | null }> {
+  const { groups, rail } = await warmGroups();
+
+  const names = new Map<string, string>();
+  for (const group of groups) if (group.label) {
+    for (const [prefix, source] of Object.entries(group.label)) {
+      labelMaterials(prefix, source as Record<string, unknown>, names);
+    }
+  }
+  const nameOf = (m: Material): string =>
+    names.get(m.uuid) ?? `${m.name || m.type}#${m.uuid.slice(0, 4)}`;
+
+  // --- Half one: the dedupe census, which is what this table has always been.
   console.log('');
   console.log('--- the boot shader warm-up, deduped');
   console.log(`    ${'group'.padEnd(12)}${'parts'.padStart(6)}${'draws'.padStart(7)}${'pipelines'.padStart(11)}`);
-  const all = new Set<string>();
+  /** A warmed pipeline, flattened to the same fields a real mesh carries. */
+  interface WarmEntry {
+    group: string;
+    material: Material;
+    layout: string;
+    bones: number;
+    casts: boolean;
+    receives: boolean;
+  }
+  /** Colour pipelines the boot pass compiles, and the depth pipelines with them. */
+  const warmColour = new Map<string, WarmEntry>();
+  const warmDepth = new Map<string, WarmEntry>();
   let draws = 0;
-  for (const [name, parts] of groups) {
+  for (const group of groups) {
+    if (group.parts.length === 0 && !group.extras) continue;
     const seen = new Set<string>();
     let d = 0;
-    for (const part of parts) {
+    const submit = (entry: WarmEntry): void => {
+      d++;
+      seen.add(`${colourKeyOf(entry.material, entry.layout, entry.bones, entry.receives)}|${entry.casts}`);
+      const colour = colourKeyOf(entry.material, entry.layout, entry.bones, entry.receives);
+      if (!warmColour.has(colour)) warmColour.set(colour, entry);
+      if (entry.casts) {
+        const depth = depthKeyOf(entry.layout, entry.bones, entry.receives);
+        if (!warmDepth.has(depth)) warmDepth.set(depth, entry);
+      }
+    };
+    for (const part of group.parts) {
       for (const receive of part.receives ?? [false, true]) {
-        d++;
-        const signature = warmupSignature(part, receive);
-        seen.add(signature);
-        all.add(signature);
+        submit({
+          group: group.name,
+          material: part.material,
+          layout: geometryLayout(part.geometry),
+          bones: 0,
+          casts: part.casts ?? true,
+          receives: receive,
+        });
       }
     }
+    // An extra warms exactly the pipelines its own meshes need -- it *is* the
+    // real object -- so every mesh under it counts as warm, bones and all.
+    const extras = new Map<string, RealMesh>();
+    collectReal(group.name, group.extras ?? [], extras, { count: 0 });
+    for (const mesh of extras.values()) {
+      submit({
+        group: group.name,
+        material: mesh.material,
+        layout: mesh.layout,
+        bones: Number(mesh.colourKey.split('|')[2]),
+        casts: mesh.casts,
+        receives: mesh.receives,
+      });
+    }
     draws += d;
-    console.log(`    ${name.padEnd(12)}${String(parts.length).padStart(6)}${String(d).padStart(7)}${String(seen.size).padStart(11)}`);
+    console.log(
+      `    ${group.name.padEnd(12)}${String(group.parts.length).padStart(6)}${String(d).padStart(7)}${String(seen.size).padStart(11)}`,
+    );
   }
+  const distinct = warmColour.size + warmDepth.size;
   console.log(
-    `    ${'TOTAL'.padEnd(12)}${''.padStart(6)}${String(draws).padStart(7)}${String(all.size).padStart(11)}  ` +
-      `-- ${draws - all.size} duplicate draws dropped (${((1 - all.size / draws) * 100).toFixed(0)}%)`,
+    `    ${'TOTAL'.padEnd(12)}${''.padStart(6)}${String(draws).padStart(7)}${String(distinct).padStart(11)}  ` +
+      `-- ${warmColour.size} colour + ${warmDepth.size} depth, from ${draws} draws`,
   );
-  console.log('    (the streamer\'s 20 slot materials and the nameplate field need fetch/canvas and are not counted)');
+
+  // --- Half two: what the renderers really build.
+  const real = new Map<string, RealMesh>();
+  const instanced = { count: 0 };
+  for (const group of groups) collectReal(group.name, group.real, real, instanced);
+
+  console.log('');
+  console.log('--- warm-up coverage: every mesh the renderers build, against every part the boot pass submits');
+  console.log(
+    `    ${real.size} distinct real draws over ${groups.length} groups, ` +
+      `${instanced.count} instanced draws skipped (no stand-in can warm one -- see world/warmup.ts)`,
+  );
+
+  /** What a real mesh is missing, in words, or '' when it is covered. */
+  const missing = (m: RealMesh): string => {
+    const gaps: string[] = [];
+    if (!warmColour.has(m.colourKey)) gaps.push('colour');
+    if (m.depthKey && !warmDepth.has(m.depthKey)) gaps.push('depth');
+    return gaps.join(' + ');
+  };
+  const uncovered = [...real.values()]
+    .map((m) => [m, missing(m)] as const)
+    .filter(([, gap]) => gap !== '');
+
+  const failures: string[] = [];
+  console.log('');
+  if (uncovered.length === 0) {
+    console.log('    real meshes with no warm-up entry: none.');
+  } else {
+    console.log(`    !!! ${uncovered.length} real draws have no warm-up entry. Each is a hitch on first sight.`);
+    for (const [m, gap] of uncovered) {
+      // The nearest thing that *was* warmed on the same material, which is
+      // nearly always the drifted part and is what a reader wants next to the
+      // miss. Exactly how the overhead wire read before it was fixed.
+      const near = [...warmColour.values()].find((w) => w.material === m.material);
+      const line =
+        `[${m.group}] ${nameOf(m.material)} needs ${gap}: ` +
+        `layout={${m.layout}} casts=${m.casts} receives=${m.receives}  e.g. ${m.example}` +
+        (near ? `\n          warmed instead: layout={${near.layout}} casts=${near.casts}` : '\n          warmed instead: nothing -- this material has no part at all') +
+        (m.visibleAtBoot ? '' : '\n          hidden at boot, so only a stand-in can ever warm it');
+      failures.push(line.replace(/\n\s+/g, ' | '));
+      console.log(`      - ${line}`);
+    }
+  }
+
+  const realColour = new Set([...real.values()].map((m) => m.colourKey));
+  const realDepth = new Set([...real.values()].filter((m) => m.depthKey).map((m) => m.depthKey));
+  const unusedColour = [...warmColour.entries()].filter(([key]) => !realColour.has(key));
+  const unusedDepth = [...warmDepth.entries()].filter(([key]) => !realDepth.has(key));
+
+  console.log('');
+  if (unusedColour.length === 0 && unusedDepth.length === 0) {
+    console.log('    warm-up parts covering nothing real: none.');
+  } else {
+    console.log(
+      `    ${unusedColour.length} colour and ${unusedDepth.length} depth pipelines are warmed for nothing ` +
+        `this harness can build -- boot time, and often the other half of a miss:`,
+    );
+    for (const [, entry] of unusedColour) {
+      // Distinguish the cases a reader has to act on differently. A part whose
+      // layout matches nothing real is the overhead wire's bug. A part that
+      // merely warmed the other `receiveShadow` variant is the default in
+      // `WarmupPart.receives` doing its job -- the streamer really does flip a
+      // tile from one to the other mid-walk -- and is not a defect.
+      const sameMaterial = [...real.values()].filter((m) => m.material === entry.material);
+      const sameLayout = sameMaterial.filter((m) => m.layout === entry.layout);
+      const why = sameMaterial.length === 0
+        ? 'no real mesh with this material (unbuildable here, or dead)'
+        : sameLayout.length === 0
+          ? `LAYOUT MISMATCH: the real mesh carries {${sameMaterial[0].layout}}`
+          // A stand-in is a plain `Mesh` and has no skeleton, so its cache key
+          // carries no bone count. Nothing can stand in for a skinned draw --
+          // see `main.ts`'s `warmupExtras`, which hands over real actors -- and
+          // a part built on a skinned *layout* is warming a pipeline that cannot
+          // exist.
+          : entry.bones === 0 && sameLayout.every((m) => Number(m.colourKey.split('|')[2]) > 0)
+            ? `SKINNED: the real mesh has ${Number(sameLayout[0].colourKey.split('|')[2])} bones in its key and a stand-in Mesh has none`
+            : 'only the other receiveShadow variant is real -- defensible, see WarmupPart.receives';
+      console.log(
+        `      - colour [${entry.group}] ${nameOf(entry.material)}  layout={${entry.layout}} ` +
+          `receives=${entry.receives}  -- ${why}`,
+      );
+    }
+    for (const [, entry] of unusedDepth) {
+      console.log(
+        `      - depth  [${entry.group}] ${nameOf(entry.material)}  layout={${entry.layout}} ` +
+          `receives=${entry.receives}  -- nothing real with this layout casts a shadow`,
+      );
+    }
+  }
+
+  console.log('');
+  console.log('    not audited, because this harness cannot build them:');
+  for (const [what, why] of UNAUDITED) console.log(`      - ${what}: ${why}`);
+
+  return { failures, rail };
+}
+
+/**
+ * What a rail chunk costs to build, which is the *other* candidate for the same
+ * report.
+ *
+ * Rail geometry is made and thrown away per 512 m chunk while the player moves
+ * (`rail-geo.ts` section 3), so riding a train is a chunk build every few
+ * seconds on a schedule set by the train's speed. That is real main-thread work
+ * and it is position-driven rather than look-driven, so it would feel like a
+ * regular tick rather than a hitch on turning -- which is why it is measured
+ * here rather than assumed either way.
+ *
+ * Measured the way the streamer's budget would have to see it: one chunk at a
+ * time, over a corridor with viaducts, tunnels and stations in it, reporting the
+ * median and the worst rather than a mean. A mean over 900 chunks is dominated
+ * by the empty ones.
+ */
+function railChunkProfile(rail: RailRide | null): void {
+  console.log('');
+  console.log('--- rail chunk builds (the per-512 m work a train ride pays for)');
+  if (!rail) {
+    console.log('    client/public/rail/rail.bin is missing; not measured.');
+    return;
+  }
+  const { world, bake, route } = rail;
+  // **A ride down the real polyline**, not a straight line across the map. The
+  // ring is reshaped by where the player is, and a rule like "30 m west a step"
+  // leaves the corridor inside a kilometre and then measures an empty ring
+  // forever -- which reads as "chunk builds are free" and is the opposite of the
+  // truth. The bake's own densified vertices for the longest direction are
+  // exactly the path a train takes, so this is the schedule the report was made
+  // on: `world/trains.ts` drives carriages along the same array.
+  //
+  // `rebuildMs` is the renderer's own counter, the one the debug overlay shows,
+  // so a number argued with here is the same number argued with in a session.
+  // Every densified vertex, which is a step of about 40 m -- a second and a bit
+  // at line speed. Finer would be more frames reporting no work and would not
+  // change what a build costs; coarser starts merging two transitions into one
+  // step and flatters the count.
+  const samples: number[] = [];
+  const steps = route.vertexCount;
+  for (let v = route.vertexOff; v < route.vertexOff + steps; v++) {
+    const before = world.rebuildMs;
+    world.update(bake.vertices[v * 3], bake.vertices[v * 3 + 2]);
+    // `rebuildMs` is only written on a frame that built something, so an
+    // unchanged value is a frame that did not -- which is most of them, and is
+    // the point: the cost is a spike on a transition, not a per-frame load.
+    if (world.rebuildMs !== before && world.rebuildMs > 0) samples.push(world.rebuildMs);
+  }
+  if (samples.length === 0) {
+    console.log('    no chunks were built along the sample route.');
+    return;
+  }
+  const sorted = [...samples].sort((a, b) => a - b);
+  const median = sorted[sorted.length >> 1];
+  const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
+  const worst = sorted[sorted.length - 1];
+  const km = route.lengthM / 1000;
+  console.log(
+    `    ${route.label}, ${km.toFixed(1)} km, ridden as ${steps} steps of ~${(route.lengthM / steps).toFixed(0)} m: ` +
+      `${samples.length} of them built chunks, ${world.residentChunks} resident at the end.`,
+  );
+  console.log(
+    `    median ${median.toFixed(2)} ms, p95 ${p95.toFixed(2)} ms, worst ${worst.toFixed(2)} ms per building frame.`,
+  );
+  console.log(
+    `    ${(samples.length / km).toFixed(2)} building frames per km, so about one every ` +
+      `${(1000 / (samples.length / km) / 30.5).toFixed(1)} s at a 110 km/h line speed -- which is the ` +
+      `rate at which a rider meets one of the numbers above.`,
+  );
+  console.log(
+    `    A building frame is BUILDS_PER_FRAME chunks of geometry on the main thread, and nothing ` +
+      `bounds it. Over ~2 ms it wants a budget -- world/streamer.ts's BUILD_BUDGET_MS is the ` +
+      `pattern. A bun run is not a browser: read the shape, not the absolute.`,
+  );
 }
 
 async function main(): Promise<void> {
   const argv = host.process?.argv ?? [];
   const frames = Number(argv[argv.indexOf('--frames') + 1]) || 600;
   const only = argv.indexOf('--scene') >= 0 ? argv[argv.indexOf('--scene') + 1] : null;
+  // The audit alone, in about a second. That is the form this belongs in on a
+  // pre-commit or in a reviewer's terminal: the scene tables take a minute and
+  // answer a different question.
+  const coverageOnly = argv.includes('--coverage');
 
   console.log(`SYDNEY frame harness -- CPU-side only, no device. world=${WORLD_DIR}`);
-  const rig = buildRenderers();
-  for (const spec of SCENES) {
-    if (only && spec.key !== only) continue;
-    printTable(spec, await runScene(spec, frames, rig));
+  if (!coverageOnly) {
+    const rig = buildRenderers();
+    for (const spec of SCENES) {
+      if (only && spec.key !== only) continue;
+      printTable(spec, await runScene(spec, frames, rig));
+    }
   }
-  warmupCensus();
+  const { failures, rail } = await warmupAudit();
+  railChunkProfile(rail);
   console.log('');
-  console.log('Sections marked "not covered" need a browser; the ?perf=1 strip reports them.');
+  if (!coverageOnly) {
+    console.log('Sections marked "not covered" need a browser; the ?perf=1 strip reports them.');
+  }
+  if (failures.length > 0) {
+    // Non-zero, on `server/tick-profile.ts`'s terms: a check nobody can fail is
+    // a check nobody runs. The list above is the whole message; this line is for
+    // the shell.
+    console.log(`FAIL: ${failures.length} real meshes have no boot warm-up entry.`);
+    host.process?.exit(1);
+  }
+  console.log('warm-up coverage OK.');
 }
 
 // `import.meta.main` is bun's; it is absent in the browser, where this module is

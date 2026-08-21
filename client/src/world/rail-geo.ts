@@ -709,25 +709,84 @@ export class RailAssets {
  * deliberately **not** here -- three keys those on `object.uuid` and no stand-in
  * can warm one -- and are covered by the scene pass instead, which is why they
  * are constructed before it rather than on first use.
+ *
+ * ---------------------------------------------------------------------------
+ * **THIS LIST IS A MIRROR OF THE `add(...)` CALLS AT THE BOTTOM OF
+ * `buildChunk`, AND THAT IS THE ONLY WAY IT CAN BE RIGHT.**
+ *
+ * WORKSTREAM AE. For the life of this function every entry here was built by one
+ * `lit()` helper carrying `{ normal: true, uv: true }` and both `receiveShadow`
+ * variants -- and *nine of the ten* materials it covered were wrong, because
+ * `Solid.build(name)` emits position, normal and an index and **no uv at all**.
+ * The uv only appears under `build(name, true)`, which exactly two callers use:
+ * the boundary fence, whose alpha mask is a function of it, and the station-name
+ * signs, which sample the atlas with it.
+ *
+ * A pipeline is keyed on the attribute layout as much as on the material
+ * (`RenderObject.getGeometryCacheKey`, mirrored by `warmupSignature`), so the
+ * boot pass compiled ten pipelines for a railway that does not exist and the
+ * real ballast, rails, concrete, lining, canopy, cess, tactile, brickwork and
+ * platform furniture each compiled **inside `render`** the first time a chunk
+ * carrying them entered the frustum -- `Pipelines.getForRender`'s blocking
+ * branch, tens to hundreds of milliseconds on the main thread.
+ *
+ * And the chunk ring is rebuilt every 512 m of travel, so on a train that is not
+ * a first-walk cost paid once: it is a fresh chunk every few seconds, and the
+ * first one to bring a canopy, or a station's brick, or a tunnel lining, pays
+ * for it there and then. That is the reported symptom -- *"looking around on the
+ * train has little freezes"* -- and it is the same defect the overhead wire had,
+ * found the same way, nine more times.
+ *
+ * So the table below is written against the builder rather than beside it, one
+ * row per `add(...)`, with the same `casts` and `receives` those calls pass.
+ * `receives` is pinned rather than left at its default of both, which is right
+ * *here* and would be wrong for a streamed tile: `applyShadowRole` flips a tile
+ * between the two as the player walks at it, and nothing in this file ever
+ * changes a rail mesh's flags after `add`. Pinning them halves what this group
+ * costs the boot pass -- and, more to the point, means a future `add(...)` whose
+ * flags do not match its row is a coverage failure rather than a silent second
+ * pipeline. `bun run client/src/perf-harness.ts --coverage` is what checks it.
  */
 export function railWarmupParts(assets: RailAssets): WarmupPart[] {
-  const lit = (material: Material, casts: boolean): WarmupPart => ({
+  /**
+   * Position, normal and an index: `Solid.build(name)` with no second argument,
+   * which is every chunk mesh except the fence and the signs.
+   */
+  const solid = (material: Material, casts: boolean, receives: boolean): WarmupPart => ({
+    geometry: warmupGeometry({ normal: true }),
+    material,
+    owned: true,
+    casts,
+    receives: [receives],
+  });
+  /** And `Solid.build(name, true)`, which adds the uv the mask and the atlas read. */
+  const textured = (material: Material, casts: boolean, receives: boolean): WarmupPart => ({
     geometry: warmupGeometry({ normal: true, uv: true }),
     material,
     owned: true,
     casts,
+    receives: [receives],
   });
   return [
-    lit(assets.ballast, false),
-    lit(assets.rail, true),
-    lit(assets.concrete, true),
-    lit(assets.canopy, true),
-    lit(assets.lining, false),
-    lit(assets.corridor, false),
-    lit(assets.cess, false),
-    lit(assets.tactile, false),
-    lit(assets.brick, true),
-    lit(assets.furniture, true),
+    solid(assets.ballast, false, true),
+    solid(assets.cess, false, true),
+    // The rails themselves do **not** cast, and the builder has always said so;
+    // this row said they did. Harmless on the colour side -- `castShadow` is not
+    // in that key -- but it put a depth pipeline in the boot pass for a pair of
+    // 7 cm strips whose shadow at a 10.7 cm shadow texel is nothing, which is the
+    // same arithmetic the fence's paragraph below does.
+    solid(assets.rail, false, true),
+    solid(assets.concrete, true, true),
+    // The tunnel lining neither casts nor receives: it is the inside of a tube
+    // and the only light in there is the train's.
+    solid(assets.lining, false, false),
+    solid(assets.canopy, true, true),
+    solid(assets.tactile, false, true),
+    solid(assets.brick, true, true),
+    solid(assets.furniture, true, true),
+    // The far corridor ribbon, built once in the constructor rather than per
+    // chunk, and flagged `userData.noShadow` at both ends.
+    solid(assets.corridor, false, false),
     // The boundary fence, which casts nothing. `fences.ts`' header works out at
     // length what a 0.9 m palisade's shadow is worth at a 10.7 cm shadow texel
     // and the answer for a 1.8 m mesh fence at 300 km of it is the same one with
@@ -735,12 +794,9 @@ export function railWarmupParts(assets: RailAssets): WarmupPart[] {
     // fence would throw is a continuous soft bar down both sides of every
     // railway in Sydney. That is not what a see-through fence does, and paying
     // the whole network's depth-pass cost for it would be paying to be wrong.
-    {
-      geometry: warmupGeometry({ normal: true, uv: true }),
-      material: assets.fence,
-      owned: true,
-      casts: false,
-    },
+    textured(assets.fence, false, true),
+    // The station-name blades, off the one atlas `prepareSigns` lays out.
+    textured(assets.sign, false, false),
     {
       /*
        * **Position only, because that is all the real wire carries.**
@@ -760,16 +816,11 @@ export function railWarmupParts(assets: RailAssets): WarmupPart[] {
        * electrified line in Sydney. `world/streamer.ts` already gets this right
        * for the power lines, with a comment saying the same thing; this one was
        * copied from the row above it instead.
+       *
+       * It was also only the first of eleven. See this function's header.
        */
       geometry: warmupGeometry({}),
       material: assets.wire,
-      owned: true,
-      casts: false,
-      receives: [false],
-    },
-    {
-      geometry: warmupGeometry({ normal: true, uv: true }),
-      material: assets.sign,
       owned: true,
       casts: false,
       receives: [false],

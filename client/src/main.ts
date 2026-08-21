@@ -89,7 +89,14 @@ import {
   type PedBand,
   type PedPose,
 } from './game/pedestrians.ts';
-import { PipelineWatch, auditWarmup, warmUpPipelines, type WarmupPart } from './world/warmup.ts';
+import {
+  PipelineWatch,
+  auditWarmup,
+  verifyWarmup,
+  warmUpPipelines,
+  warmupStandins,
+  type WarmupPart,
+} from './world/warmup.ts';
 // WORKSTREAM AB: where the browser frame goes. One import block and one
 // `FrameProfile` in the loop's closure; every `frame.at(FSEC.x)` below is a
 // single line at a boundary that already existed. See `client/src/frameprofile.ts`.
@@ -130,7 +137,7 @@ import { BatAssets, BatProp, BatViewmodel, MAX_VIEW_REACH, verifyBat } from './p
 // is the bat viewmodel's shape twice over -- two mitts on the camera, posed
 // from a pure function in `game/hands-pose.ts` -- and everything this file
 // does about it is four short blocks marked "Workstream I".
-import { HandsAssets, HandsViewmodel, verifyHands } from './player/hands.ts';
+import { HandsAssets, HandsViewmodel, handsWarmupParts, verifyHands } from './player/hands.ts';
 // --- Money, the phone and the weapon slots. See `client/src/money.ts`.
 //
 // One import and one `installMoney(...)` call, and everything else this feature
@@ -1288,6 +1295,14 @@ async function main(): Promise<void> {
     ...verifySunButton(),
     ...verifySunButtonRenderer(),
   ]);
+  // WORKSTREAM AE: the keying rules the whole warm-up rests on. Not a check that
+  // the parts list is right -- `bun run client/src/perf-harness.ts --coverage`
+  // is that, against every renderer built for real -- but a check that
+  // `warmupSignature` still tells apart exactly what three's cache key tells
+  // apart. If it stops doing that, the coverage audit goes **green** while the
+  // world hitches, which is the one failure mode worse than having no audit.
+  // See `world/warmup.verifyWarmup`.
+  const warmupFailures = timed('warm-up keys', () => verifyWarmup());
   // Once, at `debug` so it is out of the way, and slowest-first because the only
   // question anyone asks of this line is which one it was.
   checkMs.sort((a, b) => b[1] - a[1]);
@@ -1355,6 +1370,7 @@ async function main(): Promise<void> {
     trainLightFailures.length ||
     raveFailures.length ||
     sunButtonFailures.length ||
+    warmupFailures.length ||
     cycleFailures.length ||
     duskFailures.length ||
     clockFailures.length ||
@@ -1434,6 +1450,7 @@ async function main(): Promise<void> {
           ...trainLightFailures,
           ...raveFailures,
           ...sunButtonFailures,
+          ...warmupFailures,
           ...cycleFailures,
           ...duskFailures,
           ...clockFailures,
@@ -2438,6 +2455,14 @@ async function main(): Promise<void> {
         // here and cannot be: they are instanced, and `world/warmup.ts` sets out
         // why no stand-in warms one. The scene pass below reaches those.
         ...railWarmupParts(railAssets),
+        // WORKSTREAM AE: the boarding marker's ring and chevron, which are the
+        // one thing in this list that the scene pass at the bottom could never
+        // have reached. `DoorMarker` is constructed `visible = false` and only
+        // `aim` ever shows it, and `_projectObject` skips an invisible object in
+        // `compileAsync`'s walk exactly as it does in `render` -- so both
+        // pipelines compiled on the frame a player first walked up to a train
+        // door. See `DoorMarker.warmupParts`.
+        ...doorMarker.warmupParts(),
         // And **nothing instanced**, which is the change this list most needs
         // explaining. The bikes, the crowd, the traffic, the flock and the
         // headlights were all warmed here and none of them was ever warmed at
@@ -8840,8 +8865,32 @@ async function main(): Promise<void> {
   // previous two instances of this bug were in.
   sky.stars.visible = true;
   sky.moon.visible = true;
+  /**
+   * WORKSTREAM AE: the stand-ins that could not exist when the boot pass ran.
+   *
+   * Three objects are built below `hud.ready` and are therefore invisible to the
+   * warm-up list a thousand lines above -- the hands viewmodel, the phone and
+   * the piles of cash -- and two of the three are built **on demand** after
+   * that, so the scene pass cannot see them either: `PhoneProp` appears on a
+   * slot change and a `CashNotePiles` mesh appears the frame somebody drops
+   * their fifties. Each was a compile inside `render` on the frame it was first
+   * wanted, which for the cash is a frame that already had a knockdown in it.
+   *
+   * Put into *this* pass rather than given a second one, and that is the whole
+   * design of `warmupStandins`. A second `warmUpPipelines` would mean a second
+   * `compileAsync` over the whole scene, and this pass is the most expensive
+   * step in the boot precisely because three awaits `yieldToMain()` between
+   * every render object in it. Nine stand-in meshes riding along in the same
+   * walk cost nine more; a second walk would cost hundreds.
+   *
+   * `release()` is in a `finally` for the same reason the warm-up's own is: a
+   * pass that timed out must not leave nine invisible triangles in the render
+   * list for the rest of the session.
+   */
+  const lateWarmup = warmupStandins([...handsWarmupParts(handsViewmodel.assets), ...money.warmupParts()]);
+  scene.add(lateWarmup.holder);
   const scenePass = await withDeadline(
-    renderer.compileAsync(scene, camera),
+    renderer.compileAsync(scene, camera).finally(() => lateWarmup.release()),
     // WORKSTREAM AB: the shader budget, not the asset one. This pass reaches
     // every instanced set in the world and is the only thing that can -- see
     // the paragraph above -- so timing it out is not "we lose the skyline", it

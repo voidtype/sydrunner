@@ -118,6 +118,7 @@ import {
   BufferGeometry,
   Group,
   Mesh,
+  MeshBasicNodeMaterial,
   type Camera,
   type Material,
   type Object3D,
@@ -180,6 +181,90 @@ export interface WarmupReport {
 const BOTH_WAYS: readonly boolean[] = [false, true];
 
 /**
+ * The stand-in meshes for a parts list, in a group, deduped -- and nothing else.
+ *
+ * ---------------------------------------------------------------------------
+ * Split out of `warmUpPipelines` for the one caller that cannot use it:
+ * everything built *after* the boot pass has run. `main.ts`'s hands viewmodel,
+ * the phone and the cash piles are all constructed thousands of lines below it,
+ * and a second `warmUpPipelines` for them would mean a second `compileAsync`
+ * over the whole scene -- which is the single most expensive step in the boot,
+ * because three awaits `yieldToMain()` between every render object in it.
+ *
+ * So those callers put this group into the scene, let the **scene pass** walk it
+ * along with everything else, and call `release()` afterwards. One pass, the
+ * same dedupe, and the same rule about what may be disposed.
+ *
+ * `release()` takes the group out of wherever it was added and frees only the
+ * geometries this module made (`WarmupPart.owned`). It is safe to call twice and
+ * must be called once, or the stand-ins stay in the render list forever.
+ */
+export function warmupStandins(parts: readonly WarmupPart[]): {
+  holder: Group;
+  owned: BufferGeometry[];
+  draws: number;
+  duplicates: number;
+  release(): void;
+} {
+  const holder = new Group();
+  holder.name = 'pipeline-warmup';
+
+  const owned: BufferGeometry[] = [];
+  let draws = 0;
+  let duplicates = 0;
+  /**
+   * Signatures already submitted. See `warmupSignature` -- 42% of this list is
+   * nine independent callers asking for the same pipeline.
+   *
+   * A `Set` rather than sorting the parts, because the *order* of the list is
+   * the order the pass compiles in and several groups deliberately put the
+   * thing a player sees first at the front of their own block. Dropping a
+   * later duplicate preserves that; sorting would destroy it.
+   */
+  const submitted = new Set<string>();
+
+  for (const part of parts) {
+    if (part.owned) owned.push(part.geometry);
+    for (const receive of part.receives ?? BOTH_WAYS) {
+      const signature = warmupSignature(part, receive);
+      if (submitted.has(signature)) {
+        duplicates++;
+        continue;
+      }
+      submitted.add(signature);
+      const mesh = new Mesh(part.geometry, part.material);
+      // Never culled, in either walk. `_projectObject` short-circuits the
+      // frustum test on this flag, and it is tested by both the colour walk
+      // (with the view camera) and the nested shadow render (with the sun's
+      // orthographic camera), so one flag covers the case where the sun is
+      // behind the player and the case where the camera has not been pointed
+      // anywhere yet.
+      mesh.frustumCulled = false;
+      mesh.castShadow = part.casts ?? true;
+      mesh.receiveShadow = receive;
+      holder.add(mesh);
+      draws++;
+    }
+  }
+
+  return {
+    holder,
+    owned,
+    draws,
+    duplicates,
+    release(): void {
+      holder.removeFromParent();
+      // Only the geometries this module made. Every other geometry and every
+      // material here is the shared instance the game draws with, and disposing
+      // one would blank the thing it belongs to -- or, worse, throw away the
+      // pipeline the pass just paid for.
+      for (const geometry of owned) geometry.dispose();
+      owned.length = 0;
+    },
+  };
+}
+
+/**
  * WORKSTREAM AB: what makes two warm-up draws the *same pipeline*.
  *
  * ---------------------------------------------------------------------------
@@ -220,17 +305,32 @@ const BOTH_WAYS: readonly boolean[] = [false, true];
  * Two parts that differ only in `casts` are kept as two.
  */
 export function warmupSignature(part: WarmupPart, receive: boolean): string {
-  const attributes = part.geometry.attributes;
+  return `${part.material.uuid}|${geometryLayout(part.geometry)}|${part.casts ?? true}|${receive}`;
+}
+
+/**
+ * The attribute layout half of the key, on its own.
+ *
+ * Split out of `warmupSignature` for the coverage audit, which prints it: a
+ * mismatch report that says two signatures differ without saying *how* is a
+ * report whose reader has to go and derive the layout by hand, and the layout is
+ * the half that is nearly always wrong (the overhead wire was warmed with a
+ * normal and a uv it does not carry). One function so the string the audit shows
+ * a human is by construction the string the key was built from.
+ *
+ * Sorted, because `getGeometryCacheKey` sorts and two geometries built with
+ * their attributes in a different order are one pipeline. `Object.keys` order is
+ * insertion order, and the facade path in particular inserts `_bldidx` and
+ * `_BLDIDX` in whichever order the loader happened to.
+ */
+export function geometryLayout(geometry: BufferGeometry): string {
+  const attributes = geometry.attributes;
   let layout = '';
-  // Sorted, because `getGeometryCacheKey` sorts and two geometries built with
-  // their attributes in a different order are one pipeline. `Object.keys` order
-  // is insertion order, and the facade path in particular inserts `_bldidx` and
-  // `_BLDIDX` in whichever order the loader happened to.
   for (const name of Object.keys(attributes).sort()) {
     const attribute = attributes[name];
     layout += `${name},${attribute.itemSize},${attribute.normalized ? 'n' : ''};`;
   }
-  return `${part.material.uuid}|${layout}|${part.casts ?? true}|${receive}`;
+  return layout;
 }
 
 /**
@@ -328,46 +428,8 @@ export async function warmUpPipelines(
   const programsBefore = renderer.info.memory.programs;
   const pipelinesBefore = pipelineCount(renderer);
 
-  const holder = new Group();
-  holder.name = 'pipeline-warmup';
-
-  const owned: BufferGeometry[] = [];
-  let draws = 0;
-  let duplicates = 0;
-  /**
-   * Signatures already submitted. See `partSignature` -- 42% of this list is
-   * nine independent callers asking for the same pipeline.
-   *
-   * A `Set` rather than sorting the parts, because the *order* of the list is
-   * the order the pass compiles in and several groups deliberately put the
-   * thing a player sees first at the front of their own block. Dropping a
-   * later duplicate preserves that; sorting would destroy it.
-   */
-  const submitted = new Set<string>();
-
-  for (const part of parts) {
-    if (part.owned) owned.push(part.geometry);
-    for (const receive of part.receives ?? BOTH_WAYS) {
-      const signature = warmupSignature(part, receive);
-      if (submitted.has(signature)) {
-        duplicates++;
-        continue;
-      }
-      submitted.add(signature);
-      const mesh = new Mesh(part.geometry, part.material);
-      // Never culled, in either walk. `_projectObject` short-circuits the
-      // frustum test on this flag, and it is tested by both the colour walk
-      // (with the view camera) and the nested shadow render (with the sun's
-      // orthographic camera), so one flag covers the case where the sun is
-      // behind the player and the case where the camera has not been pointed
-      // anywhere yet.
-      mesh.frustumCulled = false;
-      mesh.castShadow = part.casts ?? true;
-      mesh.receiveShadow = receive;
-      holder.add(mesh);
-      draws++;
-    }
-  }
+  const { holder, draws: standInDraws, duplicates, release } = warmupStandins(parts);
+  let draws = standInDraws;
 
   // Culling off for the duration and put back afterwards. It is only ever
   // handed throwaways today, but "the warm-up permanently turned culling off on
@@ -391,16 +453,13 @@ export async function warmUpPipelines(
   } catch (err) {
     console.warn('[warmup] pipeline warm-up did not finish; first-walk hitches remain.', err);
   } finally {
-    scene.remove(holder);
+    // The extras come back out before `release` takes the holder away, because
+    // they are the caller's objects and the caller is still using them.
     for (let i = 0; i < extras.length; i++) {
       holder.remove(extras[i]);
       extras[i].frustumCulled = extraCulling[i];
     }
-    // Only the geometries this module made. Every other geometry and every
-    // material here is the shared instance the game is about to draw with, and
-    // disposing one would blank the thing it belongs to -- or, worse, throw away
-    // the pipeline this pass just paid for.
-    for (const geometry of owned) geometry.dispose();
+    release();
   }
 
   return {
@@ -503,6 +562,23 @@ export interface WarmupAudit {
   syncFrames: number;
   syncPipelines: number;
   syncWorstMs: number;
+  /**
+   * Hidden meshes in the scene whose exact pipeline no stand-in warmed.
+   *
+   * WORKSTREAM AE. `coldMaterials` compares by **material** and so cannot see
+   * the defect that produced this workstream: an entry that names the right
+   * material and the wrong attribute layout, which warms a pipeline nothing
+   * draws and leaves the real one to compile on first sight. This list compares
+   * the whole key.
+   *
+   * Restricted to `visible === false` objects, and that is what keeps it honest
+   * rather than noisy. Everything else in the scene was compiled by the scene
+   * pass at the bottom of `main.ts` and needs no stand-in; an invisible object
+   * was skipped by `_projectObject` in that walk exactly as it is in `render`,
+   * so a stand-in is the only cover it can ever have. That is precisely the
+   * boarding marker's case, and the swat puff's, and the football's.
+   */
+  uncovered: string[];
   /** Everything above that is a defect, as one list. Empty means covered. */
   failures: string[];
 }
@@ -574,10 +650,58 @@ export function auditWarmup(
   });
   const coldMaterials = [...cold.values()];
 
+  // --- And the same question asked of the whole key rather than the material.
+  //
+  // `warmupSignature` is what the boot pass dedupes on, so a real mesh whose
+  // signature is not in that set is a mesh the pass did not compile -- however
+  // right the material was. Built here rather than kept from the pass because
+  // the audit is also reachable from `sydney.warmupAudit()` at any moment.
+  const signatures = new Set<string>();
+  for (const part of parts) {
+    for (const receive of part.receives ?? BOTH_WAYS) signatures.add(warmupSignature(part, receive));
+  }
+  for (const extra of extras) {
+    extra.traverse((o) => {
+      const mesh = o as Mesh;
+      if (!mesh.material || !mesh.geometry || Array.isArray(mesh.material)) return;
+      signatures.add(
+        warmupSignature({ geometry: mesh.geometry, material: mesh.material, casts: mesh.castShadow }, mesh.receiveShadow),
+      );
+    });
+  }
+  const uncovered: string[] = [];
+  const seen = new Set<string>();
+  scene.traverse((object) => {
+    // Hidden only. See `WarmupAudit.uncovered`: everything visible was reached
+    // by the scene pass, and an `InstancedMesh` can never be reached by a
+    // stand-in at all -- three keys one on `object.uuid`.
+    if (object.visible) return;
+    const mesh = object as Mesh;
+    if (!mesh.material || !mesh.geometry || Array.isArray(mesh.material)) return;
+    if ((mesh as unknown as { isInstancedMesh?: boolean }).isInstancedMesh) return;
+    const signature = warmupSignature(
+      { geometry: mesh.geometry, material: mesh.material, casts: mesh.castShadow },
+      mesh.receiveShadow,
+    );
+    if (signatures.has(signature) || seen.has(signature)) return;
+    seen.add(signature);
+    uncovered.push(
+      `${mesh.material.name || mesh.material.type} {${geometryLayout(mesh.geometry)}} ` +
+        `casts=${mesh.castShadow} receives=${mesh.receiveShadow} (e.g. ${object.name || object.type}) ` +
+        `-- hidden, so only a boot stand-in can warm it`,
+    );
+  });
+
   const now = pipelineCount(renderer);
   const pipelinesSinceWarmup = now < 0 || pipelinesAfterWarmup < 0 ? -1 : now - pipelinesAfterWarmup;
 
   const failures: string[] = [];
+  if (uncovered.length > 0) {
+    failures.push(
+      `${uncovered.length} hidden meshes have no warm-up entry with their exact key, so each ` +
+        `compiles inside the frame it is first shown:\n      ${uncovered.join('\n      ')}`,
+    );
+  }
   if (watch.frames > 0) {
     failures.push(
       `${watch.pipelines} pipelines were compiled inside ${watch.frames} rendered frames ` +
@@ -593,6 +717,127 @@ export function auditWarmup(
     syncFrames: watch.frames,
     syncPipelines: watch.pipelines,
     syncWorstMs: watch.worstMs,
+    uncovered,
     failures,
   };
+}
+
+/**
+ * The self-check: the keying rules the whole subject rests on, asserted.
+ *
+ * ---------------------------------------------------------------------------
+ * WORKSTREAM AE. Everything above and everything in
+ * `client/src/perf-harness.ts --coverage` is built on one claim: that
+ * `warmupSignature` tells apart exactly the things three's `RenderObject`
+ * cache key tells apart, and nothing else. If that claim slips -- if the layout
+ * stops reading `normalized`, or starts reading insertion order, or
+ * `receiveShadow` falls out -- then the *audit goes green* while the world
+ * hitches, which is worse than no audit at all. So the claim is a check.
+ *
+ * Every case below is a real bug this project has shipped or nearly shipped:
+ *
+ *   - **uv or no uv.** The overhead wire and then nine of the ten rail chunk
+ *     materials were warmed with a uv the geometry does not carry. If these two
+ *     signatures were equal the audit could not have found either.
+ *   - **`normalized`.** The contact skirt's COLOR_0 is normalised bytes and the
+ *     client's own builders emit float3; `warmupGeometry` has a separate flag
+ *     for each and they must not collide.
+ *   - **insertion order.** The facade path adds `_bldidx` and `_BLDIDX` in
+ *     whichever order `GLTFLoader` happened to, and three sorts. A signature
+ *     that did not sort would report the same geometry as two pipelines and
+ *     send somebody looking for a mismatch that is not there.
+ *   - **`receiveShadow` and `castShadow` both split.** Half the pipelines in
+ *     this world are one of these two flags, and `applyShadowRole` flips the
+ *     first one mid-walk.
+ *   - **the `receives` default is both ways**, which is what makes that flip
+ *     free -- and a part that quietly warmed one variant would put the compile
+ *     back in the walk.
+ *   - **`warmupStandins` dedupes and cleans up.** 43% of the parts list is the
+ *     same pipeline asked for twice, and each duplicate costs a whole frame
+ *     inside `compileAsync`'s sequential loop. And a `release()` that missed
+ *     would leave stand-ins in the render list forever.
+ *
+ * Client-side only, and it has to be: this file imports three, and the server
+ * imports nothing that does. Cheap enough for the boot list -- it builds six
+ * one-triangle geometries and one throwaway material.
+ */
+export function verifyWarmup(): string[] {
+  const failures: string[] = [];
+  const material = new MeshBasicNodeMaterial();
+  material.name = 'warmup-selfcheck';
+  const other = new MeshBasicNodeMaterial();
+
+  const sig = (geometry: BufferGeometry, casts: boolean, receive: boolean, m: Material = material): string =>
+    warmupSignature({ geometry, material: m, casts }, receive);
+
+  const plain = warmupGeometry({ normal: true });
+  const withUv = warmupGeometry({ normal: true, uv: true });
+  if (sig(plain, true, true) === sig(withUv, true, true)) {
+    failures.push('a geometry with a uv and one without share a signature, so the rail/wire class of bug is invisible');
+  }
+  if (geometryLayout(plain) === geometryLayout(withUv)) {
+    failures.push('geometryLayout does not distinguish a uv, so the audit prints two identical layouts for a mismatch');
+  }
+
+  const floatColour = warmupGeometry({ color3: true });
+  const byteColour = warmupGeometry({ colorU8x4: true });
+  if (sig(floatColour, true, true) === sig(byteColour, true, true)) {
+    failures.push('a float3 colour and a normalised u8x4 colour share a signature; the contact skirt would be warmed wrong');
+  }
+
+  // Two geometries with the same attributes added in opposite orders. Three
+  // sorts, so these are one pipeline and must be one signature.
+  const forwards = new BufferGeometry();
+  const backwards = new BufferGeometry();
+  const position = new BufferAttribute(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), 3);
+  const uv = new BufferAttribute(new Float32Array([0, 0, 1, 0, 0, 1]), 2);
+  forwards.setAttribute('position', position);
+  forwards.setAttribute('uv', uv);
+  backwards.setAttribute('uv', uv);
+  backwards.setAttribute('position', position);
+  if (sig(forwards, true, true) !== sig(backwards, true, true)) {
+    failures.push('attribute insertion order changes the signature, but getGeometryCacheKey sorts -- the audit would report phantom mismatches');
+  }
+
+  if (sig(plain, true, true) === sig(plain, true, false)) {
+    failures.push('receiveShadow is not in the signature, so every material would be warmed in one variant instead of two');
+  }
+  if (sig(plain, true, true) === sig(plain, false, true)) {
+    failures.push('castShadow is not in the signature, so a caster with no depth pipeline would read as covered');
+  }
+  if (sig(plain, true, true) === sig(plain, true, true, other)) {
+    failures.push('two different materials share a signature');
+  }
+
+  // The dedupe, the `receives` default, and the cleanup, on one list.
+  const owned = warmupGeometry({ normal: true });
+  const stand = warmupStandins([
+    { geometry: owned, material, owned: true },
+    // The same pipeline again, from a "different contributor". 43% of the real
+    // list is this.
+    { geometry: owned, material, owned: false },
+    { geometry: owned, material, owned: false, casts: false },
+  ]);
+  if (stand.draws !== 4) {
+    failures.push(`warmupStandins made ${stand.draws} draws for two distinct (material, layout, casts) pairs both ways; expected 4`);
+  }
+  if (stand.duplicates !== 2) {
+    failures.push(`warmupStandins dropped ${stand.duplicates} duplicate draws; expected 2`);
+  }
+  const receives = stand.holder.children.map((c) => (c as Mesh).receiveShadow);
+  if (!receives.includes(true) || !receives.includes(false)) {
+    failures.push('the default receives is not both ways, so a tile crossing the shadow volume would compile mid-walk');
+  }
+  stand.release();
+  if (stand.holder.parent !== null) failures.push('warmupStandins.release left the holder parented');
+
+  material.dispose();
+  other.dispose();
+  plain.dispose();
+  withUv.dispose();
+  floatColour.dispose();
+  byteColour.dispose();
+  forwards.dispose();
+  backwards.dispose();
+  return failures;
 }

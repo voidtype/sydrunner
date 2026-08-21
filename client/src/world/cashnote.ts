@@ -93,6 +93,7 @@ import {
   noteOps,
   type NoteOp,
 } from '../game/cashnote.ts';
+import type { WarmupPart } from './warmup.ts';
 
 // --- The sheet ------------------------------------------------------------------
 
@@ -357,6 +358,28 @@ interface Pile {
   z: number;
   /** Its own turn, so two piles side by side are not in lockstep. */
   spin: number;
+}
+
+/**
+ * The boot warm-up entry: one pipeline for every pile of money in Sydney.
+ *
+ * WORKSTREAM AE. A pile is a `Mesh` created the first time a bundle appears in
+ * the wallet frame -- which is the frame somebody was knocked over and dropped
+ * their fifties -- and until now nothing warmed it: the boot stand-in pass runs
+ * before `installMoney` and the scene pass finds no pile in the scene, because
+ * at boot there are none. So the first pile of the session compiled two
+ * pipelines inside `render`, on a frame that already had a knockdown in it.
+ *
+ * **One entry covers all seven fans.** `buildFan` emits the same three
+ * attributes for every note count, and the pipeline key reads the layout rather
+ * than the contents (`RenderObject.getGeometryCacheKey`), so `fans[MIN_NOTES]`
+ * stands in for the lot. Casting and not receiving, exactly as `update` builds
+ * them -- the paragraph there argues the receive side.
+ */
+export function cashNoteWarmupParts(assets: CashNoteAssets): WarmupPart[] {
+  const fan = assets.fans.find((g) => g !== null);
+  if (!fan) return [];
+  return [{ geometry: fan, material: assets.material, casts: true, receives: [false] }];
 }
 
 /**
