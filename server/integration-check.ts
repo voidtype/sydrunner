@@ -1440,7 +1440,25 @@ async function main(): Promise<void> {
   for (let i = 0; i < ticks || (i < MAX_TICKS && (closedAt < 0 || i < closedAt + FIGHT_TICKS)); i++) {
     ran = i + 1;
     const pa = a.at(a.id);
-    const pb = a.at(b.id);
+    /*
+     * B's position out of A's stream when A can see B, and out of **B's own**
+     * stream when it cannot.
+     *
+     * The fallback is not a convenience. Steering A by what A can see means
+     * the harness cannot drive the one case it most wants to reach: the dither
+     * is a 100 m disc, so two joins land up to 200 m apart, and
+     * `AOI_ENTER_RADIUS` is 180 -- above that A's snapshots contain no B at
+     * all, `gap` is `Infinity`, the aim below never runs, and both probes walk
+     * in whatever direction they happened to start facing until the clock runs
+     * out. That is what a run at 185 m did: 68 m of walking, no approach, no
+     * swing, and nine failures that all read as "the wire lost a player" when
+     * the wire was correctly saying he was too far away to be on it.
+     *
+     * The assertions are untouched by this and still mean what they said: A
+     * *seeing* B is checked separately, and it is now checked after a walk that
+     * actually happens rather than after a random one.
+     */
+    const pb = a.at(b.id) ?? b.at(b.id);
     const gap = pa && pb ? Math.hypot(pb[0] - pa[0], pb[1] - pa[1]) : Infinity;
     if (i > THROW_UNTIL && closedAt < 0 && gap <= REACH * 0.75) closedAt = i;
     if (i > THROW_UNTIL) closest = Math.min(closest, gap);
