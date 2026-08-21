@@ -162,6 +162,11 @@ export interface WarmupPart {
 export interface WarmupReport {
   /** Warm-up draws submitted -- parts multiplied by their shadow variants. */
   draws: number;
+  /**
+   * Draws the dedupe removed: a (material, attribute layout, shadow role) that
+   * some earlier part had already submitted. See `partSignature`.
+   */
+  duplicates: number;
   /** Shader modules the renderer holds. The count that says a compile happened. */
   programsBefore: number;
   programsAfter: number;
@@ -173,6 +178,60 @@ export interface WarmupReport {
 }
 
 const BOTH_WAYS: readonly boolean[] = [false, true];
+
+/**
+ * WORKSTREAM AB: what makes two warm-up draws the *same pipeline*.
+ *
+ * ---------------------------------------------------------------------------
+ * The boot log said `the shader warm-up did not finish in 11000 ms`, and the
+ * first thing to ask about a pass that is too slow is how much of it is being
+ * done twice. The answer was 42%.
+ *
+ * A pipeline for an ordinary `Mesh` is keyed by three things this pass controls
+ * (`RenderObject.getCacheKey` and `getMaterialCacheKey`): the **material**, the
+ * geometry's **attribute layout** -- names, item sizes and the normalised flag,
+ * and nothing about the contents -- and **`receiveShadow`**. Nine callers build
+ * the parts list independently and none of them can see the others, so the list
+ * arrives full of collisions that are obvious only in aggregate:
+ *
+ *   - `characterWarmupParts` submits eight props -- cap, bumbag, shades, cup,
+ *     hardhat, vest, phone, clipboard -- on **one** material with **one**
+ *     attribute layout. Sixteen draws for two pipelines.
+ *   - `eventWarmupParts` submits five, `streetlifeWarmupParts` four, on the same
+ *     pattern. Ten draws for two, eight for two.
+ *   - `highwayPatrolWarmupParts` submits the body, the light-bar housing and the
+ *     RBT props on one material, and two lamp lenses on another.
+ *
+ * Counted over every group `perf-harness.ts` can build headlessly: **99 draws
+ * for 57 distinct pipelines.** Each duplicate still costs a render-object
+ * lookup, a binding update and -- the expensive part -- one `await
+ * yieldToMain()` inside `Renderer.compileAsync`'s sequential loop, which is a
+ * whole animation frame on any browser without `scheduler.yield`.
+ *
+ * Dropping them cannot change what gets compiled, because two draws with the
+ * same signature compile the same pipeline by definition: the material is the
+ * *same object*, so every property in the material cache key is equal, and the
+ * layout string is exactly what `getGeometryCacheKey` reads. What it changes is
+ * how many times the pass asks for it.
+ *
+ * `castShadow` is in the signature even though it is not in the colour
+ * pipeline's key, because it decides whether the nested depth render sees this
+ * mesh at all -- and the depth pipelines are half of what this pass exists for.
+ * Two parts that differ only in `casts` are kept as two.
+ */
+export function warmupSignature(part: WarmupPart, receive: boolean): string {
+  const attributes = part.geometry.attributes;
+  let layout = '';
+  // Sorted, because `getGeometryCacheKey` sorts and two geometries built with
+  // their attributes in a different order are one pipeline. `Object.keys` order
+  // is insertion order, and the facade path in particular inserts `_bldidx` and
+  // `_BLDIDX` in whichever order the loader happened to.
+  for (const name of Object.keys(attributes).sort()) {
+    const attribute = attributes[name];
+    layout += `${name},${attribute.itemSize},${attribute.normalized ? 'n' : ''};`;
+  }
+  return `${part.material.uuid}|${layout}|${part.casts ?? true}|${receive}`;
+}
 
 /**
  * A one-triangle stand-in with a given attribute layout.
@@ -274,10 +333,27 @@ export async function warmUpPipelines(
 
   const owned: BufferGeometry[] = [];
   let draws = 0;
+  let duplicates = 0;
+  /**
+   * Signatures already submitted. See `partSignature` -- 42% of this list is
+   * nine independent callers asking for the same pipeline.
+   *
+   * A `Set` rather than sorting the parts, because the *order* of the list is
+   * the order the pass compiles in and several groups deliberately put the
+   * thing a player sees first at the front of their own block. Dropping a
+   * later duplicate preserves that; sorting would destroy it.
+   */
+  const submitted = new Set<string>();
 
   for (const part of parts) {
     if (part.owned) owned.push(part.geometry);
     for (const receive of part.receives ?? BOTH_WAYS) {
+      const signature = warmupSignature(part, receive);
+      if (submitted.has(signature)) {
+        duplicates++;
+        continue;
+      }
+      submitted.add(signature);
       const mesh = new Mesh(part.geometry, part.material);
       // Never culled, in either walk. `_projectObject` short-circuits the
       // frustum test on this flag, and it is tested by both the colour walk
@@ -329,6 +405,7 @@ export async function warmUpPipelines(
 
   return {
     draws,
+    duplicates,
     programsBefore,
     programsAfter: renderer.info.memory.programs,
     pipelinesBefore,

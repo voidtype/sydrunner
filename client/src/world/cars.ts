@@ -127,6 +127,7 @@ import {
   decodeCars,
   type TileCars,
 } from '../game/staticcars.ts';
+import { uploadInstances } from './instupload.ts';
 
 /** Must match `parking.SEDAN` .. `parking.VAN` in the pipeline. */
 export const BODY_COUNT = 5;
@@ -1502,10 +1503,11 @@ export class TrafficMovers {
       // Only upload what changed. A tile of the buffer nobody is drawing does
       // not need to be correct, and `needsUpdate` on an untouched set is a
       // pointless re-upload of 16 kB every frame.
-      if (n > 0 || mesh.count > 0) {
-        mesh.instanceMatrix.needsUpdate = true;
-        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-      }
+      // WORKSTREAM AB: a prefix range rather than the whole 28 kB set. The
+      // comment above has always said "only upload what changed" and the only
+      // lever it had was skipping an empty set; this is the other half. See
+      // `world/instupload.ts`.
+      if (n > 0 || mesh.count > 0) uploadInstances(mesh, n);
       mesh.count = n;
       drawn += n;
     }
@@ -1514,7 +1516,7 @@ export class TrafficMovers {
     // buffers are flushed in the same place its matrices were written, on
     // exactly the headlights' terms: one pass over the cars, one flush.
     if (modelling) models!.end();
-    if (this.bandCount > 0 || this.band.count > 0) this.band.instanceMatrix.needsUpdate = true;
+    if (this.bandCount > 0 || this.band.count > 0) uploadInstances(this.band, this.bandCount);
     this.band.count = this.bandCount;
     this.liveried = this.bandCount;
     this.drawn = drawn;

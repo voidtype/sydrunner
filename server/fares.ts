@@ -778,5 +778,9 @@ function straight(x0: number, z0: number, x1: number, z1: number): PedBand {
     x, y, z, s, ux, uz, length, slots: 0,
     minX: Math.min(x0, x1), maxX: Math.max(x0, x1),
     minZ: Math.min(z0, z1), maxZ: Math.max(z0, z1),
+    // WORKSTREAM AB: `PedestrianField.near`'s dedupe stamp. Zero is "no query
+    // has looked at this band", and a synthetic band that never enters a field
+    // never will. See `pedestrians.PedBand.mark`.
+    mark: 0,
   };
 }

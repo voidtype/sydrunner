@@ -80,6 +80,7 @@ import { dayAtTick } from '../game/characters.ts';
 import { type PedestrianField } from '../game/pedestrians.ts';
 import { trafficSeconds } from '../game/traffic.ts';
 import { triangle } from '../game/streetlife.ts';
+import { uploadInstances } from './instupload.ts';
 
 // --- Geometry -------------------------------------------------------------------------------
 
@@ -515,10 +516,14 @@ export class EventScene {
     this.bins.count = bins;
     this.signs.count = signs;
     this.birds.count = birds;
-    for (const m of this.meshes) {
-      m.instanceMatrix.needsUpdate = true;
-      if (m.instanceColor) m.instanceColor.needsUpdate = true;
-    }
+    // WORKSTREAM AB: prefix ranges. An empty street uploaded 12.8 kB a frame
+    // for nought sites, because `needsUpdate` on an untouched pool is still the
+    // whole pool. See `world/instupload.ts`.
+    uploadInstances(this.bodies, bodies);
+    uploadInstances(this.cars, cars);
+    uploadInstances(this.bins, bins);
+    uploadInstances(this.signs, signs);
+    uploadInstances(this.birds, birds);
     this.drawn = bodies + cars + bins + signs + birds;
     this.costMs = performance.now() - at;
   }

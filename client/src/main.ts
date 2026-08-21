@@ -90,6 +90,11 @@ import {
   type PedPose,
 } from './game/pedestrians.ts';
 import { PipelineWatch, auditWarmup, warmUpPipelines, type WarmupPart } from './world/warmup.ts';
+// WORKSTREAM AB: where the browser frame goes. One import block and one
+// `FrameProfile` in the loop's closure; every `frame.at(FSEC.x)` below is a
+// single line at a boundary that already existed. See `client/src/frameprofile.ts`.
+import { FSEC, FrameOverlay, FrameProfile, verifyFrameProfile } from './frameprofile.ts';
+import { uploadReport, verifyInstanceUpload } from './world/instupload.ts';
 import {
   NIGHT_VISIBLE_LEVEL,
   NightLights,
@@ -645,6 +650,40 @@ const COLLISION_FETCH_TIMEOUT_MS = 8000;
 const WARMUP_DEADLINE_MS = 11000;
 
 /**
+ * WORKSTREAM AB: how long the **shader** passes get, which is no longer the same
+ * number.
+ *
+ * The boot log said `the shader warm-up did not finish in 11000 ms`, and what
+ * that message means is worth being precise about: `withDeadline` does not
+ * cancel anything. The compile keeps running, yielding to the main thread
+ * between render objects, and finishes whenever it finishes. What the deadline
+ * decides is whether the player is *already playing* while it does -- and a
+ * player who is already playing is drawing objects whose pipelines are not
+ * compiled yet, which takes `Pipelines.getForRender`'s blocking branch inside
+ * `render`. That is precisely the hitch this whole subject exists to remove,
+ * and it is what `PipelineWatch` counts.
+ *
+ * So the deadline is not a safety net here in the way it is for a fetch. For an
+ * asset, 11 s means "the harbour has no bridge on it but the game runs"; for
+ * this, it means "the game runs and stutters for the next thirty seconds",
+ * which is worse than eight more seconds of a loading screen that is telling
+ * the truth.
+ *
+ * Twenty-five seconds, and it is still a bound rather than a wait: a driver that
+ * has genuinely wedged must not brick a boot, which is the only thing the
+ * original number was ever protecting against. It is a **separate constant**
+ * from `WARMUP_DEADLINE_MS` because the eight other things sharing that number
+ * -- the rail bake, the car models, the far layer, the ground -- are fetches
+ * with a fallback, and giving those 25 s would be 14 s of a player staring at
+ * nothing for an asset the game can do without.
+ *
+ * The other half of this pass is that the work itself got smaller: the boot
+ * warm-up was submitting 42% duplicate draws, which `warmup.partSignature` now
+ * drops. See its header for the count.
+ */
+const SHADER_WARMUP_DEADLINE_MS = 25000;
+
+/**
  * How long the 1 MB rail bake gets before the railway is written off.
  *
  * At module scope rather than beside `FAR_LAYER_DEADLINE_MS` because it is
@@ -1097,6 +1136,18 @@ async function main(): Promise<void> {
   // `world/nameplates.ts`. `MAX_HEALTH` is handed in so the bar's pip ticks
   // cannot drift from the number of pips there actually are.
   const nameplateFailures = timed('nameplates', () => verifyNameplates(MAX_HEALTH));
+  // WORKSTREAM AB: the frame profiler's own sections, checked before it is
+  // believed. A profiler that under-reports is worse than none at all, because
+  // the next person to look at a slow frame will believe it and optimise
+  // something else -- which is the argument `verifyProfile` makes on the server
+  // and the reason this is its sibling check for check.
+  const frameProfileFailures = timed('frame profile', verifyFrameProfile);
+  // And the prefix ranges every instanced pool in the client now uploads with.
+  // A range that undershoots what was written is instances drawn from a region
+  // the driver was never given -- a car collapsed to a point, which this
+  // codebase has already shipped once from the other end of the same subject.
+  // See `world/instupload.ts`.
+  const uploadFailures = timed('instance upload', verifyInstanceUpload);
   // --- WORKSTREAM X: teams you can see.
   //
   // Two checks and they are deliberately in two files. `verifyTeamLook` is
@@ -1285,6 +1336,8 @@ async function main(): Promise<void> {
     walletFailures.length ||
     accountFailures.length ||
     nameplateFailures.length ||
+    frameProfileFailures.length ||
+    uploadFailures.length ||
     teamLookFailures.length ||
     bigNightFailures.length ||
     guardFailures.length ||
@@ -1361,6 +1414,8 @@ async function main(): Promise<void> {
           ...walletFailures,
           ...accountFailures,
           ...nameplateFailures,
+          ...frameProfileFailures,
+          ...uploadFailures,
           ...teamLookFailures,
           ...bigNightFailures,
           ...guardFailures,
@@ -2394,12 +2449,12 @@ async function main(): Promise<void> {
       // the skeleton's bone count in, and the vertex path is the skinning one.
       warmupExtras,
     ),
-    WARMUP_DEADLINE_MS,
+    SHADER_WARMUP_DEADLINE_MS,
     'the shader warm-up',
   );
   if (warmup) {
     console.debug(
-      `[warmup] ${warmup.draws} draws in ${warmup.ms.toFixed(0)} ms  ` +
+      `[warmup] ${warmup.draws} draws (${warmup.duplicates} duplicates dropped) in ${warmup.ms.toFixed(0)} ms  ` +
         `shaders ${warmup.programsBefore} -> ${warmup.programsAfter}, ` +
         `pipelines ${warmup.pipelinesBefore} -> ${warmup.pipelinesAfter}`,
     );
@@ -8720,6 +8775,21 @@ async function main(): Promise<void> {
    * per-session, which is what `sydney.render.report()` is answering.
    */
   const renderGuard = new RenderGuard();
+  /**
+   * WORKSTREAM AB: where this frame went, section by section.
+   *
+   * Built here, in the loop's closure, beside `frameTimes` -- which is the one
+   * number this replaces nothing of and completes: `medianFrameMs` says a frame
+   * cost 9 ms and this says which nine. Always measuring, on
+   * `server/profile.ts`'s argument that a profile behind a flag is a profile
+   * that is off the day something regresses; only the *strip* is behind
+   * `?perf=1`, because a DOM write at 165 Hz is not free and the measurement is.
+   *
+   * `sydney.frame()` prints the same table from the console. See
+   * `client/src/frameprofile.ts`.
+   */
+  const frameProfile = new FrameProfile();
+  const frameOverlay = new FrameOverlay(new URLSearchParams(location.search).get('perf') === '1');
 
   // --- The scene pass: the half of the warm-up that has to happen down here.
   //
@@ -8764,7 +8834,12 @@ async function main(): Promise<void> {
   sky.moon.visible = true;
   const scenePass = await withDeadline(
     renderer.compileAsync(scene, camera),
-    WARMUP_DEADLINE_MS,
+    // WORKSTREAM AB: the shader budget, not the asset one. This pass reaches
+    // every instanced set in the world and is the only thing that can -- see
+    // the paragraph above -- so timing it out is not "we lose the skyline", it
+    // is "every instanced draw in Sydney compiles inside the frame it first
+    // appears". `SHADER_WARMUP_DEADLINE_MS` carries the argument.
+    SHADER_WARMUP_DEADLINE_MS,
     'the scene shader pass',
   );
   console.debug(
@@ -8780,6 +8855,13 @@ async function main(): Promise<void> {
     const frameDt = Math.min((now - last) / 1000, 0.25);
     last = now;
 
+    // WORKSTREAM AB: the frame opens here and closes at `frameProfile.stop()` at
+    // the very bottom, and between the two every nanosecond is charged to a
+    // section. `begin` is before the first line of real work rather than before
+    // `performance.now()` above, so the clock read this loop already makes is
+    // not charged twice.
+    frameProfile.begin();
+    frameProfile.at(FSEC.input);
     input.forward = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
     input.jump = keys.has('Space');
     input.sprint = keys.has('ShiftLeft') || keys.has('ShiftRight');
@@ -8842,6 +8924,7 @@ async function main(): Promise<void> {
         : 0;
     rideLean += (leanTarget - rideLean) * Math.min(1, 1 - Math.exp(-frameDt / 0.14));
 
+    frameProfile.at(FSEC.sim);
     accumulator += frameDt;
     let steps = 0;
     while (accumulator >= FIXED_DT && steps < 8) {
@@ -8850,6 +8933,7 @@ async function main(): Promise<void> {
       steps++;
     }
 
+    frameProfile.at(FSEC.camera);
     // --- The rail clock, once a frame, for everything that has to agree about
     //     where a train is on *this* frame.
     //
@@ -9178,6 +9262,7 @@ async function main(): Promise<void> {
     // swat.
     swatPuffs.update(frameDt);
 
+    frameProfile.at(FSEC.hud);
     // Spec 8.3's chips, longest-lived first so the one about to expire is not
     // the one that moves. Built here rather than in `hud.ts` because which
     // powerups exist is gameplay and the HUD's job is to draw a list.
@@ -9417,6 +9502,7 @@ async function main(): Promise<void> {
     locator.update(frameDt, player.position.x, player.position.z);
     minimap.setReadout(locator.text);
 
+    frameProfile.at(FSEC.sky);
     // Night factor drives the lit-window shader. Ramps across civil twilight.
     //
     // Read one line *before* `sky.update()`, which is where the shared day/night
@@ -9429,6 +9515,9 @@ async function main(): Promise<void> {
     const d = sky.solar.direction;
     globals.sunDirection.value.set(d.x, d.y, d.z);
 
+    // AB: `sky` closes and `stream` opens on the same line the camera matrix is
+    // composed, because that compose exists for the streamer's frustum cull.
+    frameProfile.at(FSEC.stream);
     // The camera's world matrix has to be current before either of these: the
     // sky centres the shadow volume on it, and the streamer culls against its
     // frustum -- and since that cull now also decides which tiles reach the
@@ -9494,6 +9583,7 @@ async function main(): Promise<void> {
     // rather than by however long the browser was not drawing.
     streamer.updateLife(frameDt, camera);
 
+    frameProfile.at(FSEC.rail);
     // --- The railway, after the streamer for the same reason everything else
     // is: a tile that arrived this frame has terrain under it, so a viaduct
     // pier built now stands on the ground rather than on the fallback depth.
@@ -9552,6 +9642,7 @@ async function main(): Promise<void> {
       audio.sunScreamLevel(),
     );
 
+    frameProfile.at(FSEC.lights);
     // The night rig, after the streamer -- so a tile that arrived this frame
     // already has its luminaires in the set the four real lights are picked from
     // -- and before the traffic, so `carLights.begin()` answers for this frame
@@ -9627,6 +9718,7 @@ async function main(): Promise<void> {
     // a mesh flag and must never become a light one.
     streamer.setNightLightsVisible(nightLights.level > NIGHT_VISIBLE_LEVEL);
 
+    frameProfile.at(FSEC.traffic);
     // The traffic, after the streamer so a tile that arrived this frame already
     // has its routes in the field, and before the render so the matrices are
     // current.
@@ -9710,6 +9802,7 @@ async function main(): Promise<void> {
     // reason; this one was simply missed.
     carModels?.end();
 
+    frameProfile.at(FSEC.crowd);
     // And the crowd, on exactly the same terms and immediately after, because
     // they come out of the same file and the same clock: the fractional tick so
     // a 144 Hz display does not watch 60 Hz people, and no clock of its own so a
@@ -9820,6 +9913,7 @@ async function main(): Promise<void> {
       bustedVenue = -1;
     }
 
+    frameProfile.at(FSEC.police);
     // --- The police, both tiers, from whichever authority is running.
     //
     // The fractional tick is `TrafficMovers.update`'s split, for the same
@@ -9917,6 +10011,7 @@ async function main(): Promise<void> {
       }
     }
 
+    frameProfile.at(FSEC.npcvoice);
     // --- What a shot sounds and looks like.
     //
     // Read off the state byte rather than off an event, which is the whole
@@ -10099,6 +10194,7 @@ async function main(): Promise<void> {
       }
     }
 
+    frameProfile.at(FSEC.heat);
     // --- The banner.
     //
     // One record, filled from whichever authority is running, so the HUD call
@@ -10208,6 +10304,7 @@ async function main(): Promise<void> {
       audio.sunScreamUpdate(sunScreamMix(screaming, sunAltDeg));
     }
 
+    frameProfile.at(FSEC.actors);
     // Every actor -- three dummies and the player's own body -- on the frame
     // delta rather than the fixed step. Deliberate, and the opposite of the
     // choice `simulate` makes above: the simulation is fixed so that prediction
@@ -10312,6 +10409,7 @@ async function main(): Promise<void> {
       }
     }
 
+    frameProfile.at(FSEC.bikes);
     // --- The lime e-bikes, after every actor is posed.
     //
     // Three sources, one geometry, three draws:
@@ -10429,6 +10527,7 @@ async function main(): Promise<void> {
       refreshVessels();
     }
 
+    frameProfile.at(FSEC.plates);
     // --- The nameplates, last, because they are the only thing in the frame
     // that reads *other* objects' final world transforms.
     //
@@ -10442,10 +10541,15 @@ async function main(): Promise<void> {
     // `headPosition` without forcing the update would put every plate one frame
     // behind its owner, which at a sprint is 16 cm of visible lag.
     //
-    // The cost is about twenty matrix composes per player, on at most fifteen
-    // players, once a frame. The camera gets the same treatment for the same
-    // reason: `begin` reads its world matrix for the billboard basis, and a
-    // frame-old basis is a plate that lags a fast mouse turn.
+    // WORKSTREAM AB: the cost *was* about twenty matrix composes per player, on
+    // at most fifteen players, once a frame -- and eighteen of the twenty were
+    // the rest of the skeleton, which `renderer.render` recomposes a few lines
+    // below anyway. `refreshHeadMatrix` walks up to the head instead of down
+    // through the body: six composes, the identical plate position, and 20.35
+    // us a frame becomes 5.60 at fifteen remotes. The camera keeps its full
+    // update for the same reason it always had one: `begin` reads its world
+    // matrix for the billboard basis, and a frame-old basis is a plate that
+    // lags a fast mouse turn.
     camera.updateMatrixWorld();
     nameplates.begin(camera);
     if (net) {
@@ -10455,7 +10559,11 @@ async function main(): Promise<void> {
         if (r.fresh) continue;
         const entry = remotes.get(r.id);
         if (!entry) continue;
-        entry.actor.mesh.updateMatrixWorld(true);
+        // WORKSTREAM AB: the head's ancestor chain, not the whole eighteen-node
+        // body. Same answer, six composes instead of eighteen, and the twelve
+        // this stops touching were being composed a second time inside
+        // `renderer.render` anyway. See `CharacterActor.refreshHeadMatrix`.
+        entry.actor.refreshHeadMatrix();
         entry.actor.headPosition(plateHead);
         plate.id = r.id;
         // The roster's name, which is also where the bots' Aussie names come
@@ -10490,7 +10598,7 @@ async function main(): Promise<void> {
       // distinguishes them.
       for (const f of fighters) {
         if (!f.dummy) continue;
-        f.driver.actor.mesh.updateMatrixWorld(true);
+        f.driver.actor.refreshHeadMatrix();
         f.driver.actor.headPosition(plateHead);
         plate.id = f.combat.id;
         plate.name = dummyLabel(f.dummy.kind);
@@ -10508,6 +10616,7 @@ async function main(): Promise<void> {
     }
     nameplates.end();
 
+    frameProfile.at(FSEC.teams);
     // WORKSTREAM X: the bodies, the horns, the ground rings and the tents, on
     // the same argument the plates are here for -- this reads other objects'
     // final transforms, and a ring under somebody's feet has to agree with the
@@ -10536,9 +10645,11 @@ async function main(): Promise<void> {
     // `compileAsync`, so the cache growing across this one call is precisely
     // "this frame stalled on a compile" -- with no wrapper around three's
     // internals and nothing to keep in step. See `world/warmup.ts`.
+    frameProfile.at(FSEC.render);
     pipelineWatch.begin(renderer);
     renderGuard.run(() => renderer.render(scene, camera), scene, hud);
     pipelineWatch.end(renderer, performance.now() - now);
+    frameProfile.at(FSEC.present);
 
     // **The bug box's screenshot, and it has to be exactly here.**
     //
@@ -10707,6 +10818,19 @@ async function main(): Promise<void> {
         feed: kills,
       });
     }
+
+    // WORKSTREAM AB: the strip, then the frame closes.
+    //
+    // The overlay is painted *inside* `present` rather than after `stop`, so its
+    // own cost is charged to a section rather than disappearing into the gap
+    // between frames -- a profiler that does not measure itself is the one thing
+    // this file could get wrong and never find out about. It returns on the
+    // first line when `?perf=1` is absent, which is every real session.
+    frameOverlay.update(frameProfile, now);
+    // And nothing after this line, ever: `stop` charges the open section and
+    // disarms the cursor, and work placed below it would be charged to the next
+    // frame's `input`. See `frameprofile.FrameProfile.stop`.
+    frameProfile.stop();
   });
 
   // Shadows fail silently, so say so once if they have not started.
@@ -10742,6 +10866,32 @@ async function main(): Promise<void> {
     player,
     globals,
     frameMs: () => medianFrameMs(),
+
+    /**
+     * WORKSTREAM AB: where the frame went. `sydney.frame()`.
+     *
+     * Prints the table and returns the record, so it is readable by a person and
+     * destructurable by a script. The window is the last 120 frames -- two
+     * seconds at 60 Hz -- because "the mean since boot" is dominated forever by
+     * the ten seconds after boot when the streamer is hammering, and the number
+     * anybody asking this question wants is what the frame costs *now*.
+     *
+     * `worstMs` beside each mean is the point of the whole instrument: a hitch is
+     * precisely the frame a mean is hiding, and the section that owns the worst
+     * frame is frequently not the section that owns the mean. `?perf=1` puts the
+     * same two columns on screen while you walk around.
+     */
+    frame: () => {
+      const report = frameProfile.report();
+      console.log(frameProfile.table('frame:'));
+      // And what the instance pools handed the driver, which is not a section
+      // of the frame -- it lands inside `renderer.render` where it cannot be
+      // attributed -- but is the number the biggest cut in this pass was made
+      // against, so it is printed where somebody would look for it. See
+      // `world/instupload.ts`.
+      console.log(`  ${uploadReport()}`);
+      return report;
+    },
 
     /**
      * The heat ladder, for the console. One contiguous block; see `game/heat.ts`.

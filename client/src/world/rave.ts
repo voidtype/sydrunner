@@ -193,6 +193,7 @@ import {
   type RecordBag,
   type SetPosition,
 } from '../game/rave.ts';
+import { uploadInstances } from './instupload.ts';
 
 type Rgb = readonly [number, number, number];
 
@@ -2305,10 +2306,12 @@ export class RaveWorld {
     const upload = (mesh: InstancedMesh, count: number): void => {
       // Only upload what changed. A region of the buffer nobody is drawing does
       // not have to be correct -- `PedestrianCrowd.fillImpostors`' rule.
-      if (count > 0 || mesh.count > 0) {
-        mesh.instanceMatrix.needsUpdate = true;
-        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-      }
+      //
+      // WORKSTREAM AB: and the twelve sets here are the densest instance of that
+      // rule in the client -- 83 kB of pools for a venue that is dark on
+      // seventy-nine nights in eighty. A prefix range makes an empty night cost
+      // nothing rather than 83 kB a frame. See `world/instupload.ts`.
+      if (count > 0 || mesh.count > 0) uploadInstances(mesh, count);
       mesh.count = count;
     };
     upload(this.beams, this.nBeam);

@@ -109,6 +109,7 @@ import {
   carHash,
   decodeLanes,
   insertSorted,
+  nextQueryStamp,
   removeSorted,
   trafficSeconds,
   type LaneWay,
@@ -300,6 +301,24 @@ export interface PedBand {
   maxX: number;
   minZ: number;
   maxZ: number;
+
+  /**
+   * WORKSTREAM AB: scratch for `near`'s dedupe. Not data; see `near`.
+   *
+   * A band spans several broadphase cells, so the same one arrives from more
+   * than one bucket and has to be dropped on the second sighting. That used to
+   * be `out.indexOf`, which is quadratic in the answer's length: measured on a
+   * CBD street, `near(x, z, 200)` returned 82 bands in 16.5 us and
+   * `near(x, z, 320)` returned 180 in 80.5 us -- five times the work for twice
+   * the bands. Stamping each
+   * candidate with the id of the query that has already decided about it makes
+   * the whole pass linear and produces the identical list in the identical
+   * order -- first-encounter order either way.
+   *
+   * Set by `near` and read by nothing else. It is a number rather than a
+   * boolean so it never has to be cleared: the next query has a different id.
+   */
+  mark: number;
 }
 
 /** Where one pedestrian is, and what they look like. Reused; never allocated per frame. */
@@ -618,6 +637,8 @@ function buildBand(way: LaneWay, side: number, offset: number, density: number):
     length: total,
     slots,
     minX, maxX, minZ, maxZ,
+    // WORKSTREAM AB: no query has looked at this band yet. Stamps start at 1.
+    mark: 0,
   };
 }
 
@@ -855,6 +876,7 @@ export class PedestrianField {
    */
   near(x: number, z: number, radius: number, out: PedBand[]): PedBand[] {
     out.length = 0;
+    const stamp = nextQueryStamp();
     const c0 = Math.floor((x - radius) / CELL);
     const c1 = Math.floor((x + radius) / CELL);
     const r0 = Math.floor((z - radius) / CELL);
@@ -864,11 +886,17 @@ export class PedestrianField {
         const bucket = this.grid.get(cellKey(cx, cz));
         if (bucket === undefined) continue;
         for (const band of bucket) {
+          // WORKSTREAM AB: decided once per query, whichever cell it arrives
+          // from. The stamp covers rejections as well as acceptances -- the
+          // bounds test does not depend on the cell, so a band rejected here is
+          // rejected everywhere and re-testing it is pure waste. See `mark`.
+          if (band.mark === stamp) continue;
+          band.mark = stamp;
           if (
             band.maxX < x - radius || band.minX > x + radius ||
             band.maxZ < z - radius || band.minZ > z + radius
           ) continue;
-          if (out.indexOf(band) < 0) out.push(band);
+          out.push(band);
         }
       }
     }
@@ -1834,6 +1862,61 @@ export function verifyPedestrians(
           }
         }
       }
+    }
+  }
+
+  // --- WORKSTREAM AB: the broadphase dedupes, and it dedupes *completely*.
+  //
+  // `near` stamps each candidate with the id of the query that has already
+  // decided about it, where it used to scan the output with `indexOf`. The two
+  // failures a stamp can have are opposite and both silent:
+  //
+  //   - a band returned **twice** (the stamp never set, or reset between cells)
+  //     is every pedestrian on that footpath drawn twice, at the same place, and
+  //     counted twice against the impostor cap -- which reads as the far end of
+  //     the street being empty.
+  //   - a band returned **not at all** (the stamp set before the bounds test in
+  //     a way that also swallows the accept) is a footpath with nobody on it,
+  //     which is indistinguishable from a quiet street.
+  //
+  // A band spans several 128 m cells by construction -- a way is clipped to a
+  // 500 m tile -- so the multi-cell case is the ordinary one rather than an edge
+  // case to contrive.
+  {
+    const field = new PedestrianField();
+    field.adopt('synthetic', tile);
+    const all = field.bands();
+    const out: PedBand[] = [];
+    // A radius that certainly spans several cells and certainly reaches every
+    // band in a 500 m synthetic tile.
+    field.near(250, 250, 900, out);
+    const seen = new Set<PedBand>();
+    for (const band of out) {
+      if (seen.has(band)) {
+        failures.push(
+          `The broadphase returned the same band twice out of ${out.length}. Every walker on it is drawn ` +
+            'twice and counted twice against the impostor cap.',
+        );
+        break;
+      }
+      seen.add(band);
+    }
+    if (out.length !== all.length) {
+      failures.push(
+        `A query reaching the whole tile returned ${out.length} of ${all.length} bands; ` +
+          'the dedupe stamp is swallowing bands the bounds test accepted.',
+      );
+    }
+    // And two queries in a row give the same answer -- the stamp must not leave
+    // a band looking "already decided" to the next query, which would empty the
+    // street on every second frame.
+    const again: PedBand[] = [];
+    field.near(250, 250, 900, again);
+    if (again.length !== out.length) {
+      failures.push(
+        `Two identical queries returned ${out.length} then ${again.length} bands; ` +
+          'the query stamp is not advancing and the second frame sees nothing.',
+      );
     }
   }
 
