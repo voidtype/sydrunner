@@ -28,6 +28,10 @@ match that voice, and read the header of any file before changing it.
   the check that convicts anything that forgets to ask.
 - **[PERFORMANCE.md](PERFORMANCE.md)** / **[EXPANSION.md](EXPANSION.md)** —
   the budgets (1 vCPU / 1 GB box, wire per player, memory caps).
+- **[DESIGN.md](DESIGN.md)** — the taste ledger: the eight rules every
+  mechanic must pass, and the researched verdicts (adopt / later / refuse)
+  from WoW, Skyrim, GTA and the player suggestion board. A brief that
+  contradicts it is wrong until it is changed.
 
 ## Rules that are not negotiable
 
