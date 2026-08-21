@@ -30,7 +30,13 @@
  * broken.
  *
  * ---------------------------------------------------------------------------
- * SECTION 0 IS OFFLINE, AND ON PURPOSE.
+ * SECTIONS 0 AND 0E ARE OFFLINE, AND ON PURPOSE. The modes, in one place:
+ *
+ *     RIDE_GANGWAY=off|on|only   section 0  -- walking a moving Metropolis
+ *     RIDE_E2E=off|on|only       section 0e -- Hornsby to Penrith, one seat
+ *     RIDE_S=<seconds>           sections 1-6, how long the networked ride runs
+ *     SYDNEY_RIDE_FROM=<station> sections 1-6, where the networked ride boards
+ *     SYDNEY_SERVER=<ws url>     sections 1-6, which server to drive
  *
  * The gangway case below the imports runs **before anything opens a socket**,
  * against the shipped bake and nothing else, and `RIDE_GANGWAY=only` runs it and
@@ -41,6 +47,26 @@
  * timetable, and solving for a moving train is a division rather than a wait.
  * What it drives is the real seam either way: `rideEnter`, `combat.advance`,
  * `rideExit`, tick by tick, which is the same three calls `sim.step` makes.
+ *
+ * ---------------------------------------------------------------------------
+ * AND SECTION 0E IS OFFLINE FOR A HARDER REASON: THE CLOCK.
+ *
+ * *"i wanna be able to go from hornsby to penrith if a train will do that for
+ * me"*. A train will: T1's Berowra -> Emu Plains calls at both, forty-one hops
+ * apart, and the run between them is **3,670 seconds** of timetable. There is no
+ * version of that which a networked harness can sit through, and there is no
+ * knob on a separately-launched `server/index.ts` that makes its wall clock run
+ * faster -- `Simulation.railNowMs` is a field on an object this process does not
+ * own.
+ *
+ * So 0e owns the object. It builds a **real `Simulation` over the real world**,
+ * drives `railNowMs` at the tick rate the way `integration-check.rideAt` has
+ * since the rail round, and steps `sim.step` 220,000 times: the authority's own
+ * boarding, the authority's own `enterCarriage`, the authority's own alight. It
+ * gives up exactly two things against sections 1-6 -- the WebSocket framing and
+ * a second process's opinion of the millisecond -- and those two are what
+ * sections 1-6 are for. What it buys is the only thing that matters here: a
+ * whole journey, end to end, in a check that finishes.
  */
 import { NetClient } from '../client/src/net/client.ts';
 import {
@@ -52,11 +78,18 @@ import { advance, createCombatant } from '../client/src/game/combat.ts';
 import { EYE_HEIGHT } from '../client/src/player/controller.ts';
 import { createTrainPose, decodeRail, poseTrain, railSeconds } from '../client/src/game/rail.ts';
 import {
-  RIDE_ON, aboardFrame, aboardPose, boardHere, clearAboard, consistOf, consistOffset,
-  createBoardOffer, createCarFrame, createCarriageStand, carSign, dirOf, findBoarding,
-  interiorOfCar, isAboard,
+  RIDE_ON, aboardFrame, aboardPose, boardHere, carriageFloor, clearAboard, consistOf,
+  consistOffset, createBoardOffer, createCarFrame, createCarriageStand, carSign, dirOf,
+  dwellStand, findBoarding, interiorOfCar, isAboard,
   nextDwell, projectAboard, rideEnter, rideExit, verifyGangway, worldToLocal,
+  type Stand,
 } from '../client/src/game/riding.ts';
+import {
+  ANNOUNCE_ARRIVE, announcementAt, callToStop, createRailAnnouncement,
+} from '../client/src/game/rail-audio.ts';
+import { RAIL_EPOCH_MS } from '../client/src/game/rail.ts';
+import { Simulation, type TickOutput } from './sim.ts';
+import { loadWorld, roomWorld } from './world.ts';
 import type { CombatWorld } from '../client/src/game/combat.ts';
 
 const URL_ = process.env.SYDNEY_SERVER ?? 'ws://localhost:8788';
@@ -288,6 +321,550 @@ if ((process.env.RIDE_GANGWAY ?? 'on') !== 'off') {
     if (!ok) process.exit(1);
   }
   if ((process.env.RIDE_GANGWAY ?? 'on') === 'only') process.exit(0);
+}
+
+// --- 0e. Hornsby to Penrith, in one seat, without getting up.
+//
+// See the header for why this one is offline too. `RIDE_E2E=off` skips it,
+// `RIDE_E2E=only` runs it and stops, and `RIDE_E2E_FROM` / `RIDE_E2E_TO` point
+// it at some other pair of stations on some other line.
+//
+// ---------------------------------------------------------------------------
+// WHAT IS BEING ASSERTED, AND WHY IT IS NOT "THE TRAIN GOT THERE".
+//
+// The train getting there was never in doubt: `poseTrain` is a closed-form
+// lookup over a baked curve and workstream AF rode 95 km of this very direction
+// through it with no rider attached. What has never been run is a **passenger**
+// staying on for a whole direction, and every one of the six things below is a
+// thing a person would notice and none of them is visible to a pose sweep:
+//
+//   (a) aboard on every tick, from the first stop to the last;
+//   (b) in the carriage they sat down in, having never stood up;
+//   (c) moving forwards -- arc length never goes backwards, the world position
+//       never jumps further in a tick than a train can travel in one, and the
+//       body stays inside the carriage box the whole way;
+//   (d) every station called at, in the timetable's order, none skipped;
+//   (e) the PA naming each of them exactly once, in the same order;
+//   (f) the wire carrying the rider on every tick -- the invariant section 0
+//       checks over thirty seconds, checked over sixty-one minutes;
+//   (g) nothing reaching them through the side of it. This one was added after
+//       the run found something doing exactly that; see the counter.
+//
+// And then the rider gets off at the far end and lands on a platform -- twice,
+// because the far end has two meanings and both are a way a ride ends: pressing
+// E at Penrith, and staying on until the trip itself stops existing.
+if ((process.env.RIDE_E2E ?? 'on') !== 'off') {
+  const FROM_E2E = process.env.RIDE_E2E_FROM ?? 'Hornsby';
+  const TO_E2E = process.env.RIDE_E2E_TO ?? 'Penrith';
+  say(`--- 0e. ${FROM_E2E} to ${TO_E2E}, one seat, the whole way ---`);
+
+  // **The instant is an argument, not a sample.** `integration-check.rideAt`
+  // learned this the hard way and the reason transfers verbatim: the timetable
+  // is a pure function of the millisecond, so a journey is a pure function of
+  // the millisecond it starts at, and a failure that cannot be pointed at an
+  // instant cannot be re-run. `RIDE_E2E_AT` replays one; the default is now, and
+  // it is printed either way.
+  const askedAtMs = Number(process.env.RIDE_E2E_AT ?? Date.now());
+  const askedAt = railSeconds(askedAtMs);
+
+  // Which service. `nextDwell`'s `then` is the whole of "a train that is any use
+  // to me": Hornsby is served in both directions and one of them goes to
+  // Berowra, which is four minutes the wrong way up a line that never sees
+  // Penrith. One call ahead is not enough either -- `minAhead` is left at its
+  // default because `then` is strictly stronger.
+  const dwell = nextDwell(bake, FROM_E2E, askedAt, { then: TO_E2E });
+  if (dwell === null) {
+    say(`  ! no service in the bake calls at ${FROM_E2E} and then at ${TO_E2E}`);
+    process.exit(1);
+  }
+  const dir = dirOf(bake, dwell.line, dwell.dir)!;
+
+  // The stops between the two, off the timetable rather than off the ride, so
+  // (d) is checked against what the bake promises rather than against what the
+  // simulation happened to do.
+  const calling = dir.stops.filter((s) => s.calls);
+  const fromCall = calling.findIndex((s) => s.name === FROM_E2E);
+  const toCall = calling.findIndex((s, i) => i > fromCall && s.name === TO_E2E);
+  const wanted = calling.slice(fromCall + 1, toCall + 1);
+  say(
+    `  ${dwell.lineId} "${dir.line.name}" ${dir.label}: ${wanted.length} stations from ` +
+      `${FROM_E2E} to ${TO_E2E}, ${((calling[toCall].s - calling[fromCall].s) / 1000).toFixed(1)} km, ` +
+      `${((dir.arrivals[toCall] - dir.arrivals[fromCall]) / 60).toFixed(1)} minutes of timetable`,
+  );
+  say(`  boarding trip ${dwell.trip}, doors open at rail second ${dwell.opensAt.toFixed(1)} (asked at ${askedAtMs})`);
+
+  // --- The route, before anybody rides it: does it ever double back on itself?
+  //
+  // ---------------------------------------------------------------------------
+  // WHY THIS IS A PRE-FLIGHT AND NOT A CONSEQUENCE OF THE RIDE.
+  //
+  // A carriage's frame is built from two bogie samples fourteen metres apart
+  // (`riding.carFrameAt`), so where the route's heading reverses the whole
+  // carriage swings through 180 degrees and back -- and a rider sitting 4.7 m
+  // along it and 1 m off the centreline is thrown eight metres sideways in a
+  // single tick while the train's own reference point moves two thirds of one.
+  // From the seat it is the city whipping round; from a check it looks like a
+  // teleport, and blaming the teleport on the rider is how this would get fixed
+  // in the wrong file.
+  //
+  // So it is measured **off the polyline**, before a `Simulation` exists, and it
+  // is measured the way `STATIONS.md` already measures it for the terrain carve:
+  // *"a reversal is a turn of 180 degrees and is refused by the same test that
+  // lets a two-degree bend through"*. That test is `CHAIN_STRAIGHT_COS` and it
+  // guards the chaining of cutting runs. **The service polylines the timetable
+  // rides have no equivalent guard**, and this is what that costs.
+  //
+  // 90 degrees rather than the carve's 32: this is not asking whether the route
+  // is smooth, it is asking whether it goes backwards, and nothing short of
+  // backwards produces the swing.
+  interface Reversal { cum: number; deg: number; legA: number; legB: number; near: string }
+  const reversalsOn = (d: typeof dir): Reversal[] => {
+    const found: Reversal[] = [];
+    for (let i = d.vertexOff + 1; i < d.vertexOff + d.vertexCount - 1; i++) {
+      const a = (i - 1) * 3;
+      const b = i * 3;
+      const c = (i + 1) * 3;
+      const h1x = bake.vertices[b] - bake.vertices[a];
+      const h1z = bake.vertices[b + 2] - bake.vertices[a + 2];
+      const h2x = bake.vertices[c] - bake.vertices[b];
+      const h2z = bake.vertices[c + 2] - bake.vertices[b + 2];
+      const l1 = Math.sqrt(h1x * h1x + h1z * h1z);
+      const l2 = Math.sqrt(h2x * h2x + h2z * h2z);
+      if (l1 === 0 || l2 === 0) continue;
+      const cos = (h1x * h2x + h1z * h2z) / (l1 * l2);
+      if (cos >= 0) continue;
+      const cum = bake.cum[i];
+      let near = '?';
+      let gap = Infinity;
+      for (const st of d.stops) {
+        const g = Math.abs(st.s - cum);
+        if (g < gap) { gap = g; near = `${st.name} ${cum > st.s ? '+' : '-'}${gap.toFixed(0)} m`; }
+      }
+      found.push({
+        cum,
+        deg: (Math.acos(cos < -1 ? -1 : cos) * 180) / Math.PI,
+        legA: l1,
+        legB: l2,
+        near,
+      });
+    }
+    return found;
+  };
+  const reversals = reversalsOn(dir);
+  // The whole network, so the report says whether this is one bad direction or
+  // the pathing. It is 22 directions of a few thousand vertices; it costs nothing.
+  let networkReversals = 0;
+  let networkDirs = 0;
+  for (const l of bake.lines) {
+    for (const d of l.dirs) {
+      const n = reversalsOn(d).length;
+      networkReversals += n;
+      if (n > 0) networkDirs++;
+    }
+  }
+  say(
+    `  the route doubles back on itself ${reversals.length} time(s) on this direction, ` +
+      `${networkReversals} across all ${bake.lines.length * 2} directions (${networkDirs} of them affected)`,
+  );
+  for (const r of reversals) {
+    say(`      ! ${r.deg.toFixed(0)} deg at ${r.cum.toFixed(0)} m, legs ${r.legA.toFixed(0)}/${r.legB.toFixed(0)} m -- near ${r.near}`);
+  }
+
+  // One second into the dwell, which is where `dwellStand` wants to be asked and
+  // is a second a real boarder has in hand.
+  const boardAt = Math.max(dwell.opensAt + 1, askedAt);
+  const place: Stand = { x: 0, y: 0, z: 0, yaw: 0 };
+  if (!dwellStand(bake, dwell, boardAt, place)) {
+    say(`  ! the solved dwell at ${FROM_E2E} places nobody -- no carriage of trip ${dwell.trip} is on the platform`);
+    process.exit(1);
+  }
+
+  // The world, whole. `loadWorld`'s default caps are the deployed ones and this
+  // is deliberately not `loadWholeWorld`: a rider crossing the basin is exactly
+  // the case the residency was written for, and a check that pinned every
+  // hexagon resident would be checking a host nobody runs.
+  const t0Load = Date.now();
+  const shared = await loadWorld(
+    process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname,
+  );
+  const sim = new Simulation(roomWorld(shared));
+  say(`  world loaded in ${((Date.now() - t0Load) / 1000).toFixed(1)} s`);
+
+  // The rail clock, driven at the tick rate. `Simulation.railNowMs` is the seam
+  // and it has been there since the rail round; see the header for why nothing
+  // networked can use it.
+  let railMs = RAIL_EPOCH_MS + boardAt * 1000;
+  sim.railNowMs = () => railMs;
+  const tickClock = (): void => { railMs += 1000 / TICK_HZ; };
+
+  const p = sim.join(0, null, 'E2E');
+  // `placeAt` and not a hand-set position: it is the authority's own move, it
+  // seeds the rewind ring, and it ends any ride the join spot left behind.
+  sim.placeAt(p, place.x, place.y, place.z, place.yaw);
+  p.input.yaw = place.yaw;
+
+  // The residency, driven the way `Rooms.step` drives it -- before the tick, on
+  // the union of where everybody is. One player, so one pair.
+  const occupants: number[] = [0, 0];
+  const pumpResidency = (): void => {
+    occupants[0] = p.combat.body.position.x;
+    occupants[1] = p.combat.body.position.z;
+    shared.segments?.update(occupants);
+  };
+
+  const out: TickOutput = { tick: 0, events: [], snapshot: null };
+  const stepOne = (): void => {
+    pumpResidency();
+    sim.step(out);
+    tickClock();
+  };
+
+  // Press E. One tick with it down; the sim edges the level bit itself.
+  p.input.mount = true;
+  stepOne();
+  p.input.mount = false;
+  const a = p.combat.aboard;
+  if (!isAboard(a)) {
+    say(`  ! FAILED: E on the platform at ${FROM_E2E} did not board anything`);
+    process.exit(1);
+  }
+  const boardedCar = a.car;
+  const consist = consistOf(dir, a.trip);
+  say(`  boarded carriage ${boardedCar} of ${consist.cars.length} (${consist.cars[boardedCar].key})`);
+
+  // --- The ride.
+  const ann = createRailAnnouncement();
+  const snap = createSnapshot();
+  const wire: SnapshotAboard[] = [{ id: 1, line: 0, dir: 0, tripLow: 0, car: 0, x: 0, y: 0, z: 0 }];
+
+  let ticks = 0;
+  let notAboard = 0;
+  let firstLost = -1;
+  let carMoved = 0;
+  let arcBackwards = 0;
+  let worstBack = 0;
+  let jumps = 0;
+  let worstJump = 0;
+  /** Of those, the ones the pre-flight already accounts for. See `atReversal`. */
+  let jumpsAtReversal = 0;
+  let outsideBox = 0;
+  let worstOutside = 0;
+  let wireBad = 0;
+  let wireCarBad = 0;
+  /**
+   * The lowest the rider's health got, and where -- **(g), and it found one**.
+   *
+   * A sealed carriage with one passenger in it, no second player and no bot, has
+   * nothing in it that can cost a pip. It cost one anyway: 3.0 down to 2.75 at
+   * arc length 32,728 m, in four runs out of six and then in none, which is what
+   * a bug that depends on the *wall* clock looks like from here -- the rail
+   * clock is driven at the tick rate but the street factions still run on
+   * `Date.now()`, so whether an actor is standing beside that piece of railway
+   * is a property of the minute the check was started in.
+   *
+   * It was an NPC on the ground reaching through the side of the train. See the
+   * `isAboard` guard at the top of `Simulation.shoot`, which is the fix and
+   * which also says what is *not* fixed. The counter stays, and it is a gate
+   * rather than a report, because the same defect can now only come back
+   * through a door somebody adds.
+   */
+  let minHealth = p.combat.health;
+  let minHealthAt = -1;
+  let minHealthS = 0;
+  let lastS = -Infinity;
+  let lastX = p.combat.body.position.x;
+  let lastZ = p.combat.body.position.z;
+  /**
+   * Which `dir.stops` index the doors were last open at, so a dwell counts once.
+   *
+   * Seeded with the station being boarded at rather than with -1, and the same
+   * for the PA below. The rider gets on one second into a fifteen-second dwell,
+   * so on the first tick of the ride the doors at `FROM_E2E` are still open and
+   * its own approach announcement is still two seconds from finishing. Counting
+   * either would put the station you are standing on into the list of stations
+   * you travelled to.
+   */
+  let dwellingAt = callToStop(dir, fromCall);
+  const called: string[] = [];
+  /** The `dir.arrivals` index the PA was last naming, so a clip counts once. */
+  let announcing = fromCall;
+  const announced: number[] = [];
+  let arrived = false;
+  let endedBy = 'the tick budget ran out';
+
+  // A tick a second of timetable at 60 Hz, plus a minute of slack. The budget is
+  // the trip's own remaining duration and not a constant, so pointing this at a
+  // Metro shuttle does not sit through an hour of nothing.
+  const budget = Math.ceil((dir.duration - dir.arrivals[fromCall] + 60) * TICK_HZ);
+  const wallFrom = Date.now();
+  for (; ticks < budget; ticks++) {
+    stepOne();
+
+    // (a) aboard, every tick.
+    if (!isAboard(a)) {
+      notAboard++;
+      if (firstLost < 0) firstLost = ticks;
+      endedBy = `the ride ended under the rider at tick ${ticks}`;
+      break;
+    }
+    // (b) the carriage they sat down in.
+    if (a.car !== boardedCar) carMoved++;
+    if (p.combat.health < minHealth) {
+      minHealth = p.combat.health;
+      minHealthAt = ticks;
+      minHealthS = aboardPose(bake, a, railSeconds(railMs))!.s;
+    }
+
+    const pose = aboardPose(bake, a, railSeconds(railMs))!;
+
+    // (c) forwards, and inside the box.
+    if (pose.s < lastS - 1e-6) {
+      arcBackwards++;
+      const back = lastS - pose.s;
+      if (back > worstBack) worstBack = back;
+    }
+    lastS = pose.s;
+    const step = Math.hypot(p.combat.body.position.x - lastX, p.combat.body.position.z - lastZ);
+    // The express cruise is 66.6 m/s -- `bake.physics.vExpress`, deliberately
+    // 1.5x TRAINS.md's plan number so a train beats a 3x bike, see
+    // `rail.V_EXPRESS` -- which is 1.11 m in a tick; a rider adds their own walk
+    // on top. Two metres is a teleport by any reading and nothing legitimate
+    // reaches it.
+    if (ticks > 0 && step > 2) {
+      jumps++;
+      if (step > worstJump) worstJump = step;
+      // **Attributed rather than merely counted.** A swing within a consist
+      // length of a place the route reverses is the pre-flight's finding
+      // happening, not a second bug; one anywhere else would be a new one, and
+      // the two must not be summed into a number that hides which.
+      if (reversals.some((r) => Math.abs(r.cum - pose.s) < 2 * consist.pitch * consist.cars.length)) {
+        jumpsAtReversal++;
+      }
+    }
+    lastX = p.combat.body.position.x;
+    lastZ = p.combat.body.position.z;
+    const it = interiorOfCar(consistOf(dir, a.trip), a.car);
+    if (it !== null) {
+      const floor = carriageFloor(it, a.x, a.z, a.y - EYE_HEIGHT);
+      const outBy = Math.max(
+        it.xMin - a.x, a.x - it.xMax, Math.abs(a.z) - it.halfWidth,
+        Math.abs((a.y - EYE_HEIGHT) - floor) - 0.5, 0,
+      );
+      if (outBy > 0) {
+        outsideBox++;
+        if (outBy > worstOutside) worstOutside = outBy;
+      }
+    }
+
+    // (d) the stations, each counted once per dwell.
+    if (pose.doorsOpen && pose.atStop >= 0) {
+      if (pose.atStop !== dwellingAt) {
+        dwellingAt = pose.atStop;
+        called.push(dir.stops[pose.atStop].name);
+        if (dir.stops[pose.atStop].name === TO_E2E) {
+          arrived = true;
+          endedBy = `arrived at ${TO_E2E}`;
+        }
+      }
+    } else {
+      dwellingAt = -1;
+    }
+
+    // (e) the PA, the same way -- one entry per clip rather than per tick.
+    if (announcementAt(bake, dir, pose.age, ANNOUNCE_ARRIVE, ann)) {
+      if (ann.call !== announcing) {
+        announcing = ann.call;
+        announced.push(ann.call);
+      }
+    } else {
+      announcing = -1;
+    }
+
+    // (f) the wire, every tick, exactly as section 0 does it.
+    wire[0].line = a.line;
+    wire[0].dir = a.dir;
+    wire[0].tripLow = a.trip & 0xff;
+    wire[0].car = a.car;
+    wire[0].x = a.x;
+    wire[0].y = a.y;
+    wire[0].z = a.z;
+    const back = decodeSnapshot(encodeSnapshot(ticks, 0, [], [], [], wire), snap);
+    const rec = back?.aboard[0];
+    if (!rec || rec.car !== a.car) wireCarBad++;
+    else if (
+      Math.abs(rec.x - quantiseAlong(a.x) * ABOARD_STEP_M) > 1e-9 ||
+      Math.abs(rec.y - quantiseRise(a.y) * ABOARD_STEP_M) > 1e-9 ||
+      Math.abs(rec.z - quantiseAcross(a.z) * ABOARD_STEP_M) > 1e-9
+    ) wireBad++;
+
+    if (arrived) break;
+  }
+  const wallS = (Date.now() - wallFrom) / 1000;
+
+  // --- Off, at the far end.
+  const alightFrom = { x: p.combat.body.position.x, z: p.combat.body.position.z };
+  const alightS = lastS;
+  let landed = { onGround: false, feet: 0, surface: -Infinity, health: p.combat.health };
+  if (isAboard(a)) {
+    p.input.mount = true;
+    stepOne();
+    p.input.mount = false;
+    // Half a second of physics on whatever they were put on: a body placed on a
+    // platform stays on it, and a body placed a metre above one falls onto it.
+    for (let i = 0; i < 30; i++) stepOne();
+    landed = {
+      onGround: p.combat.body.onGround,
+      feet: p.combat.body.position.y - EYE_HEIGHT,
+      surface: shared.platforms?.surfaceAt(p.combat.body.position.x, p.combat.body.position.z) ?? -Infinity,
+      health: p.combat.health,
+    };
+  }
+
+  // --- What happened.
+  const missed = wanted.filter((s) => !called.includes(s.name));
+  const orderOk = (() => {
+    let i = 0;
+    for (const name of called) {
+      while (i < wanted.length && wanted[i].name !== name) i++;
+      if (i >= wanted.length) return false;
+      i++;
+    }
+    return true;
+  })();
+  const wantedCalls = wanted.map((s) => calling.findIndex((c) => c === s));
+  const missedPA = wantedCalls.filter((c) => !announced.includes(c));
+  const paTwice = announced.filter((c, i) => announced.indexOf(c) !== i);
+  const terminusGap = Math.abs(alightS - calling[toCall].s);
+
+  say(`  rode ${ticks} ticks (${(ticks / TICK_HZ / 60).toFixed(1)} min of timetable) in ${wallS.toFixed(1)} s of wall clock -- ${endedBy}`);
+  say(`  (a) aboard on ${ticks - notAboard}/${ticks} ticks${firstLost >= 0 ? `, first lost at tick ${firstLost}` : ''}`);
+  say(`  (b) carriage ${boardedCar} throughout: ${carMoved === 0 ? 'yes' : `NO, moved on ${carMoved} tick(s)`}`);
+  say(
+    `  (c) arc length went backwards ${arcBackwards} tick(s) (worst ${worstBack.toFixed(3)} m), ` +
+      `outside the carriage box ${outsideBox} tick(s) (worst ${worstOutside.toFixed(3)} m)`,
+  );
+  say(
+    `      world jumps over 2 m: ${jumps} (worst ${worstJump.toFixed(2)} m), of which ` +
+      `${jumpsAtReversal} are the route doubling back and ${jumps - jumpsAtReversal} are not`,
+  );
+  say(`  (d) called at ${called.length} of ${wanted.length} stations, in order: ${orderOk ? 'yes' : 'NO'}`);
+  if (missed.length > 0) say(`      ! never called at: ${missed.map((s) => s.name).join(', ')}`);
+  say(`      ${called.join(' -> ')}`);
+  say(`  (e) the PA named ${announced.length} approaches; missed ${missedPA.length}, repeated ${paTwice.length}`);
+  if (missedPA.length > 0) {
+    say(`      ! never announced: ${missedPA.map((c) => calling[c].name).join(', ')}`);
+  }
+  say(`  (f) the wire round-tripped the rider on ${ticks - wireCarBad - wireBad}/${ticks} ticks (${wireCarBad} wrong carriage, ${wireBad} outside the quantiser)`);
+  say(
+    minHealthAt < 0
+      ? `  (g) nothing reached the rider through the side of the train: health ${p.combat.health.toFixed(1)} the whole way`
+      : `  (g) ! something hurt the rider aboard: down to ${minHealth.toFixed(2)} at tick ${minHealthAt}, ` +
+        `arc length ${minHealthS.toFixed(0)} m -- see the note on this counter`,
+  );
+  say(
+    `  off at ${TO_E2E}: ${terminusGap.toFixed(1)} m from the platform's own arc length, ` +
+      `moved ${(Math.hypot(p.combat.body.position.x - alightFrom.x, p.combat.body.position.z - alightFrom.z)).toFixed(1)} m getting out`,
+  );
+  say(
+    `  landed: onGround ${landed.onGround}, feet at ${landed.feet.toFixed(2)} m, platform under them at ` +
+      `${landed.surface === -Infinity ? 'nothing' : `${landed.surface.toFixed(2)} m`}, health ${landed.health.toFixed(1)}`,
+  );
+  if (shared.segments !== undefined) {
+    const st = shared.segments.stats();
+    say(
+      `  residency at the end: ${st.resident}/${st.hexes} hexagons of collision resident, ` +
+        `${st.loads} load(s) and ${st.evictions} eviction(s) over the run, ` +
+        `${(st.bytes / 1e6).toFixed(0)} MB of ${(st.capBytes / 1e6).toFixed(0)} MB`,
+    );
+  }
+
+  // --- The one edge case the brief named: still aboard when the trip ends.
+  //
+  // A trip is a pure function of `(dir, trip, t)` and it stops being one the
+  // instant `t` passes `dir.duration` -- `poseTrain` returns false, `rideEnter`
+  // says `RIDE_TRIP_GONE`, and `sim.strandRider` is the whole of the answer. It
+  // is the one way a ride ends that nobody asked for, and the passenger who fell
+  // asleep is exactly the passenger this section is about, so it is checked here
+  // rather than left to the argument in `strandRider`'s header.
+  //
+  // Cheap, because it reuses the world and the `Simulation` that are already
+  // built: board at the last station before the buffers, stay on, and see where
+  // the far end puts you.
+  const terminus = calling[calling.length - 1].name;
+  const beforeIt = calling[calling.length - 2].name;
+  let terminusOk = false;
+  let terminusWhy = '';
+  {
+    const d2 = nextDwell(bake, beforeIt, railSeconds(railMs), {
+      lineId: dwell.lineId, then: terminus,
+    });
+    const place2: Stand = { x: 0, y: 0, z: 0, yaw: 0 };
+    if (d2 === null) {
+      terminusWhy = `no ${dwell.lineId} service calls at ${beforeIt} and then at ${terminus}`;
+    } else if (!dwellStand(bake, d2, Math.max(d2.opensAt + 1, railSeconds(railMs)), place2)) {
+      terminusWhy = `the dwell at ${beforeIt} places nobody`;
+    } else {
+      railMs = RAIL_EPOCH_MS + Math.max(d2.opensAt + 1, railSeconds(railMs)) * 1000;
+      sim.placeAt(p, place2.x, place2.y, place2.z, place2.yaw);
+      p.input.yaw = place2.yaw;
+      p.input.mount = true;
+      stepOne();
+      p.input.mount = false;
+      if (!isAboard(a)) {
+        terminusWhy = `E on the platform at ${beforeIt} did not board anything`;
+      } else {
+        const d2dir = dirOf(bake, d2.line, d2.dir)!;
+        // Past the buffers: the remaining run plus half a minute, and **no `E`
+        // is ever pressed**. The ride has to end on its own.
+        const past = Math.ceil((d2dir.duration - d2dir.arrivals[calling.length - 2] + 30) * TICK_HZ);
+        let n = 0;
+        for (; n < past && isAboard(a); n++) stepOne();
+        for (let i = 0; i < 30; i++) stepOne();
+        const feet = p.combat.body.position.y - EYE_HEIGHT;
+        const surface = shared.platforms?.surfaceAt(
+          p.combat.body.position.x, p.combat.body.position.z,
+        ) ?? -Infinity;
+        const site = bake.stations.find((s) => s.name === terminus);
+        const fromSite = site === undefined
+          ? Infinity
+          : Math.hypot(p.combat.body.position.x - site.siteX, p.combat.body.position.z - site.siteZ);
+        terminusOk = !isAboard(a) && p.combat.body.onGround && surface > -Infinity && fromSite < 200;
+        terminusWhy =
+          `rode ${(n / TICK_HZ / 60).toFixed(1)} min past ${beforeIt} and the trip ended under them; ` +
+          `left standing ${fromSite.toFixed(0)} m from ${terminus}, feet at ${feet.toFixed(2)} m, ` +
+          `platform under them at ${surface === -Infinity ? 'nothing' : `${surface.toFixed(2)} m`}, ` +
+          `onGround ${p.combat.body.onGround}`;
+      }
+    }
+  }
+  say(`  the terminus: ${terminusOk ? '' : '! '}${terminusWhy}`);
+
+  // --- The verdict, in two halves, because they are two different owners.
+  //
+  // **The journey** is everything the rider does and everything the two ends
+  // agree about: it is this file's and `game/riding.ts`'s, and it is what the
+  // owner asked for by name. **The route** is the shape of the railway under it,
+  // which is `pipeline/sydney/rail.py`'s and cannot be corrected on this side of
+  // the bake -- see the pre-flight. Summing the two into one boolean would mean
+  // a pathing fix in the pipeline showing up as a riding fix here, and a real
+  // riding regression hiding behind a known pathing defect.
+  const journeyOk =
+    arrived && notAboard === 0 && carMoved === 0 && arcBackwards === 0 &&
+    outsideBox === 0 && missed.length === 0 && orderOk && missedPA.length === 0 &&
+    paTwice.length === 0 && wireCarBad === 0 && wireBad === 0 &&
+    jumps - jumpsAtReversal === 0 && terminusOk && minHealthAt < 0 &&
+    terminusGap < consist.pitch && landed.onGround && landed.surface > -Infinity;
+  const routeOk = reversals.length === 0;
+  say(`  the journey ${FROM_E2E} -> ${TO_E2E}: ${journeyOk ? 'PASS' : 'FAILED'}`);
+  say(
+    `  the route it rides on: ${routeOk ? 'PASS' : `FAILED -- ${reversals.length} reversal(s) on this ` +
+      `direction and ${networkReversals} across the network. The service polylines are pathed with no ` +
+      `straight-ahead gate; STATIONS.md's CHAIN_STRAIGHT_COS is the precedent and it guards the terrain ` +
+      `carve only. Fixing it is a pipeline round and a world republish.`}`,
+  );
+  const e2eOk = journeyOk && routeOk;
+  if ((process.env.RIDE_E2E ?? 'on') === 'only') process.exit(e2eOk ? 0 : 1);
+  if (!e2eOk) process.exit(1);
 }
 
 /** The city, as far as a headless pilot needs one: flat, and never consulted aboard. */

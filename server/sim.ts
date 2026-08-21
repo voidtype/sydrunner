@@ -3572,6 +3572,36 @@ export class Simulation {
    * snapshot either way.
    */
   private shoot(playerId: number, pips: number, actor: NpcActor): void {
+    // --- WORKSTREAM AH: not through the side of a moving train.
+    //
+    // Found by the end-to-end ride: a passenger sitting still in carriage three
+    // of a T1 to Emu Plains lost a quarter of a pip at arc length 32,728 m,
+    // between one station and the next, with the doors shut and nobody else in
+    // the room. The `HIT` event names the victim as their own attacker, which is
+    // this file's "the world did this" sentinel, and the only door the world
+    // has is this one.
+    //
+    // The street factions pick their targets by plan distance and `engageable`,
+    // which is *"upright, alive, in the world"* -- and a body inside a train is
+    // none of the third. It is 130 km/h of steel away from the footpath the
+    // actor is standing on, and its world position is only there because
+    // `exitCarriage` composed it out of a carriage frame a moment ago. Three
+    // other damage paths in this file already say exactly that and say it with
+    // one line each: the car that runs somebody over (`stepTraffic`), the blast
+    // of an exploding car, and the melee sweep. This is the fourth, and it was
+    // the one nobody had ridden far enough to find.
+    //
+    // Here rather than in `game/characters.ts` on the same argument the run-over
+    // guard gives for being here rather than in `carHitting`: that file answers
+    // a question about geometry, and this is a question about what a body is
+    // standing in. **It is not the whole of the fix.** An eshay still walks up
+    // to the outside of the train and still swings, and `characters.ts` debits
+    // the wallet on the shove itself rather than through this door -- so the
+    // pip is stopped here and the mugging is not. Making the actor decline the
+    // target in the first place is `engageable`'s to do and is that file's.
+    const victim = this.participants.get(playerId);
+    if (victim !== undefined && isAboard(victim.combat.aboard)) return;
+
     // --- WORKSTREAM Z: was this an ally's punch, and is anybody owed the KO?
     //
     // `Meth-adone`: "they count as your assist for kills". Asked **before**
