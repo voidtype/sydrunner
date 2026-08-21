@@ -114,7 +114,6 @@ import {
   MAX_REWIND_MS,
   MSG,
   PROTOCOL_VERSION,
-  SNAPSHOT_HZ,
   TICK_HZ,
   decodeHello,
   decodePing,
@@ -166,6 +165,7 @@ import { sunReady, sunScreaming, verifySunButton } from '../client/src/game/sunb
 import { trafficTick } from '../client/src/game/traffic.ts';
 import { verifySuggestions } from '../client/src/net/suggestions.ts';
 import { verifyAoi } from './aoi.ts';
+import { describeRate, verifySnapshotRate } from '../client/src/net/snapshotrate.ts';
 import { BugGuards, BugStore, defaultBugDir, handleBugRequest, verifyBugs } from './bugs.ts';
 import { ChatHub } from './chat.ts';
 import {
@@ -225,6 +225,10 @@ import { verifySim } from './sim.ts';
 import { topSections, verifyProfile } from './profile.ts';
 import {
   HEARTBEAT_MS,
+  // WORKSTREAM AD: the rate this host resolved `SYDNEY_SNAPSHOT_HZ` to, which
+  // is what the boot line and `/health` must quote rather than the protocol
+  // default -- a host saying 20 while sending 15 is worse than either.
+  HOST_SNAPSHOT_HZ,
   RoomHost,
   heartbeat,
   newConn,
@@ -483,6 +487,12 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // somebody nearby is a player invisible while punching you; see
     // `server/aoi.ts`, which asserts the rule against a brute-force scan.
     ['verifyAoi', verifyAoi()],
+    // WORKSTREAM AD: and the snapshot rate, which is a knob now
+    // (`SYDNEY_SNAPSHOT_HZ`) rather than a constant. What this asserts is the
+    // arithmetic underneath -- that every rate it will accept divides the tick
+    // and fits inside the client's 100 ms interpolation buffer -- because a
+    // rate that does neither produces a game that runs and stutters.
+    ['verifySnapshotRate', verifySnapshotRate()],
     ['verifyProfile', verifyProfile()],
     ['verifySim', verifySim()],
     // --- Workstream E's three, and every one of them is here rather than only
@@ -1643,9 +1653,21 @@ setInterval(() => {
 
 console.log(
   `[sydney] listening on ws://localhost:${server.port}  ` +
-    `(${TICK_HZ} Hz tick, ${SNAPSHOT_HZ} Hz snapshots, ${MAX_REWIND_MS} ms rewind, protocol ${PROTOCOL_VERSION}, ` +
+    `(${TICK_HZ} Hz tick, ${HOST_SNAPSHOT_HZ} Hz snapshots, ${MAX_REWIND_MS} ms rewind, protocol ${PROTOCOL_VERSION}, ` +
     `spec 2's cap is ${MAX_PLAYERS} and a room here holds ${ROOM_CAP})`,
 );
+// WORKSTREAM AD: and, only if somebody has moved it off the default, exactly
+// what a lower snapshot rate has given up. A knob like this is dangerous
+// precisely because it is silent -- somebody sets it once, forgets, and spends
+// a month looking for the cause of remote-player stutter -- so the host says so
+// on every boot rather than once in a changelog. See `net/snapshotrate.ts`.
+{
+  const line = describeRate(
+    process.env.SYDNEY_SNAPSHOT_HZ === undefined ? undefined : Number(process.env.SYDNEY_SNAPSHOT_HZ),
+    HOST_SNAPSHOT_HZ,
+  );
+  if (line !== '') console.log(`[sydney] ${line}`);
+}
 console.log(`[sydney] health: http://localhost:${server.port}/health   rooms: http://localhost:${server.port}/rooms`);
 
 /**

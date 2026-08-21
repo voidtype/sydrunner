@@ -80,8 +80,6 @@ import {
   MAX_REWIND_MS,
   MSG,
   PROTOCOL_VERSION,
-  SNAPSHOT_HZ,
-  SNAPSHOT_INTERVAL,
   TICK_HZ,
   encodeBikes,
   encodeCars,
@@ -108,6 +106,9 @@ import {
   type SnapshotNpc,
   type SnapshotPlayer,
 } from '../client/src/net/protocol.ts';
+// WORKSTREAM AD: the snapshot rate as a measured option. See `HOST_SNAPSHOT_HZ`
+// below and `client/src/net/snapshotrate.ts` for the arithmetic behind it.
+import { rateFacts, resolveSnapshotHz } from '../client/src/net/snapshotrate.ts';
 // The talents broadcast. Workstream V; see `MSG.TALENTS` and `sendTalents`.
 import { encodeTalents } from '../client/src/net/teams.ts';
 // The shared wall-clock tick. The heat channel's deadlines are denominated in
@@ -611,6 +612,32 @@ const HEAT_REFRESH_TICKS = TICK_HZ * 2;
 /** A tick this far over budget waited on something. Bun exposes no GC hook. */
 const STALL_MS = (1000 / TICK_HZ) * 4;
 
+/**
+ * WORKSTREAM AD. The rate this host actually broadcasts at, resolved once.
+ *
+ * `SYDNEY_SNAPSHOT_HZ` exists so the 20-versus-15 question can be *measured*
+ * rather than argued -- PERFORMANCE.md phase 4 names the snapshot rate as one
+ * of two untried levers on per-player egress -- and it defaults to
+ * `protocol.SNAPSHOT_HZ`, so a host nobody has configured behaves exactly as it
+ * did. `client/src/net/snapshotrate.ts` holds the resolution rule, the
+ * interpolation arithmetic that says what a lower rate costs, and the
+ * `verifySnapshotRate` both boot lists run.
+ *
+ * Read at module scope rather than threaded through `Room`'s constructor for
+ * one reason and one only: five workstreams are editing this file at once and a
+ * changed constructor signature is a merge conflict in four other branches. It
+ * is a host-wide setting either way -- every room on a host shares the pump.
+ *
+ * The client is *told*, not assumed: `Welcome.snapshotHz` has carried this
+ * number since v8, so a host at 15 Hz announces it in the handshake and nothing
+ * on the client has to guess.
+ */
+export const HOST_SNAPSHOT_HZ = resolveSnapshotHz(
+  process.env.SYDNEY_SNAPSHOT_HZ === undefined ? undefined : Number(process.env.SYDNEY_SNAPSHOT_HZ),
+);
+/** Ticks between snapshots on this host. `SNAPSHOT_INTERVAL` unless configured. */
+export const HOST_SNAPSHOT_INTERVAL = rateFacts(HOST_SNAPSHOT_HZ).interval;
+
 export interface RoomStats {
   id: number;
   players: number;
@@ -627,6 +654,17 @@ export interface RoomStats {
   dedup: number;
   /** Mean and worst working-set size across this room's clients. */
   interest: { mean: number; max: number };
+  /**
+   * WORKSTREAM AD. The projectile section, which had no number of its own.
+   *
+   * `live` is how many footballs are in the room's air; `sentMean` is how many
+   * of them the average client is actually sent. Before the cap those two were
+   * the same number by construction, which is precisely why nobody looked at
+   * either: PERFORMANCE.md phase 4 had to *infer* "67 balls, 60% of the stream"
+   * from a byte total after the fact. With a cap between them the gap is the
+   * saving, and it is readable live off `/stats` instead of reconstructed.
+   */
+  balls: { live: number; sentMean: number };
 }
 
 export class Room {
@@ -747,6 +785,11 @@ export class Room {
   interestTotal = 0;
   interestSamples = 0;
   interestMax = 0;
+  /** WORKSTREAM AD: the same pair for the ball section. See `RoomStats.balls`. */
+  ballsSentTotal = 0;
+  ballsSentSamples = 0;
+  /** Balls in this room's air, sampled on the last snapshot tick. */
+  ballsLive = 0;
 
   /**
    * Which of the three ticks in a snapshot interval this room broadcasts on.
@@ -758,14 +801,18 @@ export class Room {
    * that read as a host p99 of 24.4 ms against a p50 of 3.8: not a slow
    * simulation, one tick in three doing all of the sending.
    *
-   * Offsetting by `id % SNAPSHOT_INTERVAL` spreads the eight rooms over the
-   * three ticks, which is free -- nobody's snapshot rate changes, nobody's
+   * Offsetting by `id % HOST_SNAPSHOT_INTERVAL` spreads the eight rooms over
+   * the three ticks, which is free -- nobody's snapshot rate changes, nobody's
    * interval changes, and a client cannot tell which of the three its room
    * landed on. The measured effect is at the foot of PERFORMANCE.md.
    *
    * It is the room's **id** rather than its index so that the spread survives a
    * multi-process deployment: host 2's rooms are 8..15, and `8 % 3` is not
    * `0 % 3`, so two hosts on one box do not line up either.
+   *
+   * WORKSTREAM AD: the divisor is the *host's* interval rather than the
+   * protocol constant, so the spread still works when `SYDNEY_SNAPSHOT_HZ` has
+   * changed how many ticks there are to spread over. See `HOST_SNAPSHOT_HZ`.
    */
   private readonly snapshotPhase: number;
 
@@ -806,7 +853,7 @@ export class Room {
   constructor(id: number, shared: ServerWorld, cap: number, bots: number, money: RoomMoney = {}) {
     this.id = id;
     this.cap = cap;
-    this.snapshotPhase = id % SNAPSHOT_INTERVAL;
+    this.snapshotPhase = id % HOST_SNAPSHOT_INTERVAL;
     this.ground = groundFor(shared);
     // Its own powerups, everybody else's city. See `world.roomWorld`.
     //
@@ -883,7 +930,7 @@ export class Room {
         version: PROTOCOL_VERSION,
         id: p.id,
         colourway: p.colourway,
-        snapshotHz: SNAPSHOT_HZ,
+        snapshotHz: HOST_SNAPSHOT_HZ,
         room: this.id,
         tick: this.sim.tick,
         x: p.combat.body.position.x,
@@ -1215,7 +1262,7 @@ export class Room {
     this.sendEvents();
     // Offset per room, so the host's egress is spread across the three ticks in
     // a snapshot interval rather than landing on one. See `snapshotPhase`.
-    if ((this.sim.tick + this.snapshotPhase) % SNAPSHOT_INTERVAL === 0) this.sendSnapshots();
+    if ((this.sim.tick + this.snapshotPhase) % HOST_SNAPSHOT_INTERVAL === 0) this.sendSnapshots();
 
     prof.stop();
     const cost = performance.now() - began;
@@ -1568,6 +1615,9 @@ export class Room {
     const aboard = sim.aboardSnapshot();
     this.interest.begin(players, balls, npcs);
     this.groups.begin();
+    // WORKSTREAM AD: what the cap is capping, sampled here rather than counted
+    // per client, because it is a property of the room and not of a viewer.
+    this.ballsLive = balls.length;
 
     for (const ws of this.conns) {
       const conn = ws.data;
@@ -1578,7 +1628,10 @@ export class Room {
       const x = p.combat.body.position.x;
       const z = p.combat.body.position.z;
       this.interest.select(x, z, conn.interest, this.setIds);
-      this.interest.selectBalls(x, z, this.setBalls);
+      // WORKSTREAM AD: the ball selection takes this client's own id now, so it
+      // can drop the throws `net/client.interpolateBalls` would discard anyway.
+      // See `InterestIndex.selectBalls` for that rule and for the cap beside it.
+      this.interest.selectBalls(x, z, p.id, this.setBalls);
       this.interest.selectNpcs(x, z, this.setNpcs);
       const group = this.groups.intern(this.setIds, this.setBalls, this.setNpcs);
 
@@ -1586,6 +1639,8 @@ export class Room {
       conn.interest.update(this.setIds);
       this.interestTotal += this.setIds.length;
       this.interestSamples++;
+      this.ballsSentTotal += this.setBalls.length;
+      this.ballsSentSamples++;
       if (this.setIds.length > this.interestMax) this.interestMax = this.setIds.length;
       if (conn.interest.entered.length > 0 || conn.interest.left.length > 0) {
         // Pooled records, written in place, on `Simulation.snapshot`'s terms:
@@ -1727,6 +1782,10 @@ export class Room {
         mean: this.interestSamples === 0 ? 0 : this.interestTotal / this.interestSamples,
         max: this.interestMax,
       },
+      balls: {
+        live: this.ballsLive,
+        sentMean: this.ballsSentSamples === 0 ? 0 : this.ballsSentTotal / this.ballsSentSamples,
+      },
     };
   }
 
@@ -1747,6 +1806,8 @@ export class Room {
     this.interestTotal = 0;
     this.interestSamples = 0;
     this.interestMax = 0;
+    this.ballsSentTotal = 0;
+    this.ballsSentSamples = 0;
   }
 }
 
