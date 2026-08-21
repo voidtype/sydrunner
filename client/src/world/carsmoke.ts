@@ -187,6 +187,7 @@ import {
   SCORCH_M,
   SCORCH_S,
 } from '../game/carfire.ts';
+import { uploadAttribute, uploadInstances } from './instupload.ts';
 
 /**
  * How many puffs stand in one car's plume.
@@ -1128,7 +1129,7 @@ export class CarSmoke {
 
   end(): void {
     const n = this.count * PUFFS_PER_CAR;
-    if (n > 0 || this.mesh.count > 0) this.mesh.instanceMatrix.needsUpdate = true;
+    if (n > 0 || this.mesh.count > 0) uploadInstances(this.mesh, n);
     this.mesh.count = n;
     this.drawn = this.count;
     // The flames, on the plume's own rule: the count is set from what was
@@ -1136,7 +1137,7 @@ export class CarSmoke {
     // burning over an empty parking space. That is the leak `verifyCarSmoke`
     // exists to catch, one effect over.
     const f = this.flameCount * FLAMES_PER_CAR;
-    if (f > 0 || this.flames.count > 0) this.flames.instanceMatrix.needsUpdate = true;
+    if (f > 0 || this.flames.count > 0) uploadInstances(this.flames, f);
     this.flames.count = f;
     this.alight = this.flameCount;
     if (!this.sooty) {
@@ -1224,8 +1225,11 @@ export class CarSmoke {
     // carried over, so a frame with no explosions in it leaves no mark hanging
     // over a street where a wreck used to be.
     if (written > 0 || this.marks.count > 0) {
-      this.marks.instanceMatrix.needsUpdate = true;
-      this.markFade.needsUpdate = true;
+      // WORKSTREAM AB: prefix ranges, and the fade attribute takes the same
+      // treatment through `uploadAttribute` -- one float per mark, written in
+      // lockstep with the matrices above. See `world/instupload.ts`.
+      uploadInstances(this.marks, written);
+      uploadAttribute(this.markFade, written, 1);
     }
     this.marks.count = written;
     this.scorched = scorch;

@@ -148,6 +148,7 @@ import { BLAST_M, BOOM_RING_S } from '../game/carfire.ts';
 const BOOM_RING_HEX = 0xff6b14;
 import { verifyTeamView } from './teamview.ts';
 import type { WarmupPart } from './warmup.ts';
+import { uploadInstances } from './instupload.ts';
 
 const TAU = Math.PI * 2;
 
@@ -833,7 +834,8 @@ export class TentSet {
     }
     this.mesh.count = n;
     this.live = n;
-    if (n > 0) this.mesh.instanceMatrix.needsUpdate = true;
+    // WORKSTREAM AB: the tents that are actually pitched, not the pool.
+    if (n > 0) uploadInstances(this.mesh, n);
   }
 
   dispose(): void {
@@ -1024,10 +1026,8 @@ export class TeamRingField {
   end(): void {
     this.mesh.count = this.written;
     this.live = this.written;
-    if (this.written > 0) {
-      this.mesh.instanceMatrix.needsUpdate = true;
-      if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
-    }
+    // WORKSTREAM AB: the rings drawn this frame, not the whole ring pool.
+    if (this.written > 0) uploadInstances(this.mesh, this.written);
   }
 
   dispose(): void {

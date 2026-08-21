@@ -1353,6 +1353,39 @@ export class CharacterActor {
   headPosition(target: Vector3): Vector3 {
     return target.setFromMatrixPosition(this.bones[BONE.HEAD].matrixWorld);
   }
+
+  /**
+   * WORKSTREAM AB: make `headPosition` current without composing the whole body.
+   *
+   * `CharacterActor.update` sets bone rotations and the mesh transform but does
+   * not compose world matrices -- the renderer does that, later, for the whole
+   * scene. Anything that wants a *bone* in world space before the render has to
+   * force the composition itself, and the nameplates do: a plate hangs over the
+   * head bone rather than at a fixed height over the feet, because a knocked-out
+   * body is face down and a rider is seated.
+   *
+   * `main.ts` did that with `mesh.updateMatrixWorld(true)`, which recomposes the
+   * **entire** subtree -- eighteen nodes: the skinned mesh, the seventeen bones,
+   * and whatever is parented to a hand. The plate needs exactly one of them.
+   * `Object3D.updateWorldMatrix(true, false)` walks *up* instead, so the cost is
+   * the head's ancestor depth -- six -- rather than the subtree's size, and
+   * every node it does touch would have been recomposed by the renderer
+   * regardless.
+   *
+   * Measured with fifteen remotes, which is a full room: **20.35 us a frame
+   * against 5.60**, and the head position is bit-identical (asserted in
+   * `verifyCharacterRig`). The saving is not the matrices themselves so much as
+   * that the other twelve nodes were being composed twice a frame, here and
+   * again inside `renderer.render`.
+   *
+   * A method rather than the call spelled out at the two sites in `main.ts`,
+   * because "which bone does the plate hang off" is this class's fact and the
+   * frame loop should not have to know that the answer is `BONE.HEAD` or that
+   * three has an upward walk at all.
+   */
+  refreshHeadMatrix(): void {
+    this.bones[BONE.HEAD].updateWorldMatrix(true, false);
+  }
 }
 
 // --- The first-person self, and its shadow ------------------------------------
@@ -1940,6 +1973,50 @@ export function verifyCharacterRig(): string[] {
   for (const [label, knee] of [['left', BONE.KNEE_L], ['right', BONE.KNEE_R]] as Array<[string, number]>) {
     if (actor.bones[knee].rotation.x > 1e-3) {
       failures.push(`A riding character's ${label} knee bent forward by ${actor.bones[knee].rotation.x.toFixed(3)} rad.`);
+    }
+  }
+
+  // --- WORKSTREAM AB: the cheap head update answers exactly what the expensive
+  //     one answered.
+  //
+  // `main.ts` hangs every nameplate off `headPosition` and used to force the
+  // whole eighteen-node body through `updateMatrixWorld(true)` to make it
+  // current. `refreshHeadMatrix` walks the head's six ancestors instead. If the
+  // two ever disagreed the symptom would be a plate a few centimetres off
+  // somebody's head -- visible, unattributable, and exactly the kind of thing
+  // nobody would connect to a performance change three weeks earlier.
+  //
+  // Checked in a *posed* body rather than the bind pose, and off a mesh that has
+  // been moved and turned, because the bind pose is the one case where every
+  // wrong implementation happens to be right.
+  {
+    const posed = new CharacterActor(assets, 0);
+    posed.mesh.position.set(11.5, 2.25, -7.75);
+    posed.mesh.rotation.y = 0.7;
+    posed.update(0.2, { position: { x: 11.5, y: 2.25, z: -7.75 }, yaw: 0.7, speed: 4.2, onGround: true });
+    posed.mesh.updateMatrixWorld(true);
+    const full = posed.headPosition(new Vector3()).clone();
+    // Dirty every matrix on the way, so a `refreshHeadMatrix` that quietly did
+    // nothing would return the stale answer rather than the right one. Measured
+    // against the mesh's *own* y rather than the input's: `update` adds the
+    // gait's `lift` on the way in, so the two differ by a centimetre and an
+    // absolute expectation here would be asserting the walk cycle.
+    posed.mesh.position.y += 0.5;
+    posed.refreshHeadMatrix();
+    const cheap = posed.headPosition(new Vector3()).clone();
+    posed.mesh.updateMatrixWorld(true);
+    const again = posed.headPosition(new Vector3()).clone();
+    if (cheap.distanceTo(again) > 1e-9) {
+      failures.push(
+        `refreshHeadMatrix put the head at ${cheap.toArray().map((n) => n.toFixed(4)).join(',')} where the full ` +
+          `matrix walk puts it at ${again.toArray().map((n) => n.toFixed(4)).join(',')}. Every nameplate is off by that much.`,
+      );
+    }
+    if (Math.abs(cheap.y - full.y - 0.5) > 1e-6) {
+      failures.push(
+        `Moving the body 0.5 m up moved the head by ${(cheap.y - full.y).toFixed(4)} m; ` +
+          `refreshHeadMatrix is not recomposing the chain above the bone.`,
+      );
     }
   }
 

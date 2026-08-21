@@ -67,6 +67,7 @@ import {
   type WildPose,
   type WildScratch,
 } from '../game/wildlife.ts';
+import { uploadInstances } from './instupload.ts';
 
 // --- The palette ----------------------------------------------------------------
 
@@ -867,7 +868,14 @@ export class WildlifeFlock {
     this.magpies.count = nm;
     this.wingsL.count = nm;
     this.wingsR.count = nm;
-    for (const mesh of this.meshes) mesh.instanceMatrix.needsUpdate = true;
+    // WORKSTREAM AB: each set uploads its own prefix rather than its whole
+    // pool. Five sets of 24 is only 5 kB, but it is 5 kB a frame for nine birds
+    // and the fix is the same one line. See `world/instupload.ts`.
+    uploadInstances(this.turkeys, nt);
+    uploadInstances(this.ibises, ni);
+    uploadInstances(this.magpies, nm);
+    uploadInstances(this.wingsL, nm);
+    uploadInstances(this.wingsR, nm);
   }
 
   /**

@@ -96,6 +96,7 @@ import {
   type PedBand,
   type PedPose,
 } from '../game/pedestrians.ts';
+import { uploadInstances } from './instupload.ts';
 
 // --- The figure ----------------------------------------------------------------
 
@@ -718,10 +719,11 @@ export class PedestrianCrowd {
       const count = this.counts[p];
       // Only upload what changed. A region of the buffer nobody is drawing does
       // not need to be correct.
-      if (count > 0 || mesh.count > 0) {
-        mesh.instanceMatrix.needsUpdate = true;
-        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-      }
+      // WORKSTREAM AB: and only *what* changed, which this comment has always
+      // claimed and could not do. `needsUpdate` alone hands three's WebGPU
+      // backend the whole 16 kB array; a prefix range hands it the 52
+      // pedestrians actually in view. See `world/instupload.ts`.
+      if (count > 0 || mesh.count > 0) uploadInstances(mesh, count);
       mesh.count = count;
     }
   }
