@@ -403,6 +403,7 @@ import {
   fxCentrelinkNearby,
   fxDeathDropFraction,
   fxDropScale,
+  fxBoardMoving,
   fxDropTrap,
   fxEarnScale,
   fxFareUteLifeS,
@@ -5120,6 +5121,10 @@ export class Simulation {
     // not a second copy of the arithmetic.
     return boardHere(
       bake, p.combat.aboard, p.combat.body, this.railT, this.frame, this.boardOffer, EYE_HEIGHT,
+      // `Opal Hop`, and this is the authoritative half of it: the client
+      // predicts the same board off the same node through the same rules
+      // record, and this line is what decides.
+      { moving: fxBoardMoving(p.id) },
     );
   }
 

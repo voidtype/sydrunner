@@ -2142,6 +2142,37 @@ export function projectAboard(a: AboardSlot, body: RiderBody, f: CarFrame): void
  */
 export const BOARD_REACH_M = 3;
 
+/**
+ * And what `Opal Hop` reaches with, for a door that is not stopping, metres.
+ *
+ * *"E on a moving train door within 4 m boards it — you no longer need it
+ * stopped."* A metre more than `BOARD_REACH_M`, and only for a train whose
+ * doors are shut: a holder standing at a platform boards on the same three
+ * metres as everybody else, because the node buys the *moving* door and nothing
+ * else. See `BoardRules`.
+ */
+export const BOARD_MOVING_REACH_M = 4;
+
+/**
+ * What a particular player is allowed to board, as against where they are.
+ *
+ * One optional record rather than a flag argument, and it is threaded through
+ * `boardHere` rather than read inside `findBoarding`, for the reason
+ * `sim.tryBoard`'s header gives about everything else in this file: the client
+ * predicts the board and the server adjudicates it, and the two have to be
+ * asking the same question of the same geometry. A talent read *inside* the
+ * search would be read from two different lookups on two different machines
+ * with no seam to notice the disagreement at; a parameter is a thing both
+ * callers can be seen passing.
+ */
+export interface BoardRules {
+  /** `Opal Hop`: a door that is not stopping is still a door. */
+  moving: boolean;
+}
+
+/** What everybody without the node gets, and the default every caller falls back to. */
+export const BOARD_RULES_DEFAULT: BoardRules = { moving: false };
+
 /** And how far above or below the carriage floor, so nobody boards from a bridge. */
 export const BOARD_RISE_M = 2.4;
 
@@ -2207,6 +2238,7 @@ export function findBoarding(
   wx: number, feetY: number, wz: number,
   t: number,
   out: BoardOffer,
+  rules: BoardRules = BOARD_RULES_DEFAULT,
 ): boolean {
   out.line = -1;
   out.distance = Infinity;
@@ -2228,7 +2260,10 @@ export function findBoarding(
         if (!poseTrain(bake, dir, trip, t, _pose)) continue;
         // Doors open is the whole gate. `poseTrain` sets it only while the curve
         // is stationary at a calling station, which is a fifteen-second window.
-        if (!_pose.doorsOpen) continue;
+        // **Unless the player bought the other half of it.** `Opal Hop` is the
+        // one node that reaches past this line, and it is the only reason a
+        // train that is not stopping is a train you can get on.
+        if (!_pose.doorsOpen && !rules.moving) continue;
         const dcx = _pose.x - wx;
         const dcz = _pose.z - wz;
         if (dcx * dcx + dcz * dcz > REACH * REACH) continue;
@@ -2251,8 +2286,10 @@ export function findBoarding(
           const lz = _local.z;
           const side = lz < 0 ? -1 : 1;
           const outside = Math.abs(lz) - it.halfWidth;
-          // Inside the shell already, or too far off the side to reach.
-          if (outside > BOARD_REACH_M) continue;
+          // Inside the shell already, or too far off the side to reach. The
+          // extra metre is `Opal Hop`'s and applies only to the moving door it
+          // paid for -- at a platform every player has the same reach.
+          if (outside > (_pose.doorsOpen ? BOARD_REACH_M : BOARD_MOVING_REACH_M)) continue;
           if (Math.abs(_local.y - it.vestibuleY) > BOARD_RISE_M) continue;
           const bay = doorBayAt(it, _local.x, 0.35);
           if (bay < 0) continue;
@@ -2323,9 +2360,10 @@ export function boardHere(
   frame: CarFrame,
   offer: BoardOffer,
   eyeHeight: number,
+  rules: BoardRules = BOARD_RULES_DEFAULT,
 ): boolean {
   const feetY = body.position.y - eyeHeight;
-  if (!findBoarding(bake, body.position.x, feetY, body.position.z, t, offer)) return false;
+  if (!findBoarding(bake, body.position.x, feetY, body.position.z, t, offer, rules)) return false;
   a.line = offer.line;
   a.dir = offer.dir;
   a.trip = offer.trip;

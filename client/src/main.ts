@@ -224,7 +224,7 @@ import { verifyTeleport } from './game/teleport.ts';
 // hook is the identity until something calls `setTeamLookup`, which is the
 // framework workstream's job -- so this block changes nothing on its own.
 import { verifyAbilities } from './game/abilities.ts';
-import { AGENT_CHEER_M, fxSetNow, setTeamLookup, verifyTeamFx } from './game/teamfx.ts';
+import { AGENT_CHEER_M, fxBoardMoving, fxSetNow, setTeamLookup, verifyTeamFx } from './game/teamfx.ts';
 import { tickTalentKeys, LOCAL_ID } from './game/talentkeys.ts';
 // --- WORKSTREAM Z: the nine talents that had no call site. One import block;
 // two marker sources and two feed lines hang off it. See `game/talentlive.ts`.
@@ -512,6 +512,7 @@ import {
   clearAboard,
   consistOf,
   createBoardOffer,
+  type BoardRules,
   createCarFrame,
   createCarriageStand,
   createRideBanner,
@@ -5794,6 +5795,15 @@ async function main(): Promise<void> {
   const rideFrame = createCarFrame();
   let rideActive = false;
   const boardOffer = createBoardOffer();
+  /**
+   * `Opal Hop`, for the prediction half of boarding.
+   *
+   * Rebuilt per call rather than cached, because a talent can be taken between
+   * two presses of `E` and a cached record would let the pill promise a door
+   * the server refuses -- or, worse, refuse one it would have given. One object
+   * per press of a key, which is not a hot path.
+   */
+  const boardRules = (): BoardRules => ({ moving: fxBoardMoving(net ? net.id : LOCAL_ID) });
   const rideLanding = { x: 0, y: 0, z: 0 };
   /** Carriage-local velocity, handed to `net.sendInput`. One vector, reused. */
   const rideVelocity = new Vector3();
@@ -7556,7 +7566,7 @@ async function main(): Promise<void> {
         };
       }
       const feet = player.position.y - EYE_HEIGHT;
-      if (findBoarding(railBake, player.position.x, feet, player.position.z, t, boardOffer)) {
+      if (findBoarding(railBake, player.position.x, feet, player.position.z, t, boardOffer, boardRules())) {
         const dir = dirOf(railBake, boardOffer.line, boardOffer.dir);
         return {
           offer: `${dir?.line.id} carriage ${boardOffer.car} bay ${boardOffer.bay} at ${boardOffer.station}`,
@@ -7819,7 +7829,7 @@ async function main(): Promise<void> {
         // adjudicate, so what the pill promises is what the key delivers.
         const feet = player.position.y - EYE_HEIGHT;
         const t = railSeconds(Date.now());
-        boardable = findBoarding(railBake, player.position.x, feet, player.position.z, t, boardOffer);
+        boardable = findBoarding(railBake, player.position.x, feet, player.position.z, t, boardOffer, boardRules());
         if (boardable) {
           const dir = dirOf(railBake, boardOffer.line, boardOffer.dir);
           const towards = dir && dir.stops.length > 0 ? dir.stops[dir.stops.length - 1].name : '';

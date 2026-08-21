@@ -1110,6 +1110,17 @@ export function fxFareUteLifeS(playerId: number): number {
 export function fxEarnScale(playerId: number): number {
   return 1 + lookup.scalar(playerId, FX.TEAM_EARN);
 }
+/**
+ * `Opal Hop`: is a door that is not stopping still a door for this player?
+ *
+ * Read by the two callers of `riding.boardHere` -- the client's prediction and
+ * `sim.tryBoard` -- and passed *in* rather than read inside the search. See
+ * `riding.BoardRules` for why that seam is where it is.
+ */
+export function fxBoardMoving(playerId: number): boolean {
+  return lookup.flag(playerId, FX.BOARD_MOVING);
+}
+
 /** The fraction of a teammate's earnings this player is owed. `Tip Jar`'s 10%. */
 export function fxTeamTithe(playerId: number): number {
   return lookup.scalar(playerId, FX.TEAM_TITHE);

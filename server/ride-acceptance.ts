@@ -53,7 +53,8 @@ import { EYE_HEIGHT } from '../client/src/player/controller.ts';
 import { createTrainPose, decodeRail, poseTrain, railSeconds } from '../client/src/game/rail.ts';
 import {
   RIDE_ON, aboardFrame, aboardPose, boardHere, clearAboard, consistOf, consistOffset,
-  createBoardOffer, createCarFrame, createCarriageStand, carSign, dirOf, interiorOfCar, isAboard,
+  createBoardOffer, createCarFrame, createCarriageStand, carSign, dirOf, findBoarding,
+  interiorOfCar, isAboard,
   nextDwell, projectAboard, rideEnter, rideExit, verifyGangway, worldToLocal,
 } from '../client/src/game/riding.ts';
 import type { CombatWorld } from '../client/src/game/combat.ts';
@@ -145,6 +146,46 @@ if ((process.env.RIDE_GANGWAY ?? 'on') !== 'off') {
     if (!aboardFrame(bake, a, found.t, frame)) throw new Error('the trip vanished');
     projectAboard(a, combat.body, frame);
     combat.body.onGround = true;
+
+    // --- `Opal Hop`, tested on the one thing in the bake that is hard to
+    // stage: a train that is moving.
+    //
+    // The section already had to find a service between stations with its doors
+    // shut, which is exactly the fixture this node is about, so the assertions
+    // cost one `findBoarding` each and no server at all.
+    //
+    // The probe is placed by `projectAboard` rather than by a hand-rolled
+    // rotation, and that is not fussiness: `findBoarding` locates a door with
+    // `worldToLocal`, and a world position built by a second, independently
+    // written transform tests my arithmetic instead of the rule. Placed *at* a
+    // door bay too -- `doorBayAt` refuses any x more than 0.35 m off one, for
+    // everybody and every talent.
+    {
+      const probe = createBoardOffer();
+      const beside = createCombatant(0, 0, 0);
+      const it = interiorOfCar(consist, a.car)!;
+      const at = (lateral: number): void => {
+        const spot = { ...a, x: it.doors[0].x, y: it.vestibuleY + EYE_HEIGHT, z: it.halfWidth + lateral };
+        projectAboard(spot, beside.body, frame);
+      };
+      const ask = (moving: boolean): boolean =>
+        findBoarding(
+          bake, beside.body.position.x, beside.body.position.y - EYE_HEIGHT, beside.body.position.z,
+          found.t, probe, { moving },
+        );
+
+      at(1.5);
+      const without = ask(false);
+      const with_ = ask(true);
+      say(`  Opal Hop: 1.5 m off a moving door -- without the node ${without ? 'BOARDED' : 'refused'}, with it ${with_ ? 'boarded' : 'REFUSED'}`);
+      if (without) say('  ! FAILED: a moving train was boardable without Opal Hop; the doors-open gate is gone for everybody');
+      if (!with_) say('  ! FAILED: Opal Hop did not open the moving door it is sold as');
+
+      // And the extra metre is bounded rather than a free pass.
+      at(6);
+      const tooFar = ask(true);
+      say(`  Opal Hop: six metres off the side -- ${tooFar ? 'BOARDED (FAILED: the reach is unbounded)' : 'refused, as the 4 m reach says'}`);
+    }
 
     const input = {
       forward: 1, right: 0, jump: false, sprint: false,
