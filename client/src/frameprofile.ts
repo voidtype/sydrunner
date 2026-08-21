@@ -139,7 +139,10 @@ export const FSEC = {
   input: 0,
   /** The fixed-step accumulator: `simulate(FIXED_DT)`, up to eight of them. */
   sim: 1,
-  /** `applyToCamera`, the net correction, the chase boom's occlusion march, feedback. */
+  /**
+   * `applyToCamera`, the net correction, the chase boom's occlusion march, the
+   * feedback shake, and the swat puffs that ride on the same frame delta.
+   */
   camera: 2,
   /** The vitals, the chips, the level, the talents panel, the maps, the money, the locator. */
   hud: 3,
