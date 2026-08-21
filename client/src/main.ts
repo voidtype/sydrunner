@@ -496,6 +496,15 @@ import {
 // The arithmetic half of the railway, which the server evaluates too. See
 // `world/rail-solids.ts` for why the definition lives outside the renderer.
 import { RailSolidField } from './world/rail-solids.ts';
+// WORKSTREAM AI: the lights on the tunnel wall, which are the only optic flow a
+// bore has. See `world/tunnellights.ts` section 1 for why the pitch is 12 m.
+import {
+  TunnelLightAssets,
+  TunnelLights,
+  buildTunnelLamps,
+  tunnelLightWarmupParts,
+  verifyTunnelLights,
+} from './world/tunnellights.ts';
 import { TrainFleet, verifyTrainLights } from './world/trains.ts';
 import {
   aboardFrame,
@@ -1312,6 +1321,15 @@ async function main(): Promise<void> {
   // in boot and this check does not need it: it is arithmetic over the phase
   // sizes and nothing else. See `verifyRailChunkSteps`.
   const railStepFailures = timed('rail chunk steps', () => verifyRailChunkSteps());
+  // WORKSTREAM AI: the tunnel lamps. Arithmetic over a synthetic eleven-vertex
+  // bore, so it runs before the bake is fetched and answers the only questions
+  // about this feature a machine can: the placement is deterministic in arc
+  // length, lamps land on tunnelled spans and nowhere else, the gap between two
+  // of them is the constant, the two walls alternate, three services over one
+  // pair of rails light it once, the ring adds and disposes symmetrically, and
+  // the warm-up stand-in keys identically to the mesh it stands in for. Whether
+  // it *feels* fast is not in here and cannot be. See `verifyTunnelLights`.
+  const tunnelLightFailures = timed('tunnel lights', () => verifyTunnelLights());
   // Once, at `debug` so it is out of the way, and slowest-first because the only
   // question anyone asks of this line is which one it was.
   checkMs.sort((a, b) => b[1] - a[1]);
@@ -1381,6 +1399,7 @@ async function main(): Promise<void> {
     sunButtonFailures.length ||
     warmupFailures.length ||
     railStepFailures.length ||
+    tunnelLightFailures.length ||
     cycleFailures.length ||
     duskFailures.length ||
     clockFailures.length ||
@@ -1462,6 +1481,7 @@ async function main(): Promise<void> {
           ...sunButtonFailures,
           ...warmupFailures,
           ...railStepFailures,
+          ...tunnelLightFailures,
           ...cycleFailures,
           ...duskFailures,
           ...clockFailures,
@@ -1957,6 +1977,19 @@ async function main(): Promise<void> {
    * railway drawn in it, which is the city that shipped last week.
    */
   const railAssets = new RailAssets();
+  /**
+   * WORKSTREAM AI: the one material every tunnel lamp wears.
+   *
+   * Beside `railAssets` and for its reason -- constructed before the boot
+   * warm-up so `tunnelLightWarmupParts` can hand the real instance over, rather
+   * than after it, when a first compile would land on the frame a train enters
+   * the tunnel. Unconditional on the bake: a material with nothing wearing it
+   * costs one pipeline at boot, and a bake that arrives late must not be able to
+   * decide whether the pass saw it.
+   */
+  const tunnelLightAssets = new TunnelLightAssets();
+  /** The lamps in the scene, once there is a bake to place them from. */
+  let tunnelLights: TunnelLights | null = null;
   /** Station platforms as rectangles, for `groundHeightAt`. Null with no bake. */
   let platforms: PlatformField | null = null;
   /**
@@ -2466,6 +2499,12 @@ async function main(): Promise<void> {
         // here and cannot be: they are instanced, and `world/warmup.ts` sets out
         // why no stand-in warms one. The scene pass below reaches those.
         ...railWarmupParts(railAssets),
+        // WORKSTREAM AI: the tunnel lamp, which is one part for one material and
+        // is here rather than left to the scene pass on purpose. The set is a
+        // plain `Mesh` over a shared material precisely so that a stand-in *can*
+        // warm it -- `world/tunnellights.ts` section 4 -- because the frame it
+        // would otherwise compile on is the frame the train enters the bore.
+        ...tunnelLightWarmupParts(tunnelLightAssets),
         // WORKSTREAM AE: the boarding marker's ring and chevron, which are the
         // one thing in this list that the scene pass at the bottom could never
         // have reached. `DoorMarker` is constructed `visible = false` and only
@@ -3862,6 +3901,20 @@ async function main(): Promise<void> {
       ? null
       : new RailWorld(railNetwork, railAssets, wildGround, collision, railCut, rawGroundAt);
   if (railWorld) scene.add(railWorld.group);
+  /**
+   * WORKSTREAM AI: and the lights inside the tunnels it draws.
+   *
+   * Its own group rather than a member of `RailWorld`, and off the **bake**
+   * rather than off the network, which are the same decision twice: the lamp
+   * table is a pure function of arc length over the polylines and it wants
+   * nothing `buildNetwork` derives, so a separate object is one less thing that
+   * has to be rebuilt when the chunk ring is. Null with no bake, exactly as the
+   * railway itself is -- a city with no railway has no tunnels to light.
+   */
+  if (railBake !== null) {
+    tunnelLights = new TunnelLights(buildTunnelLamps(railBake), tunnelLightAssets);
+    scene.add(tunnelLights.group);
+  }
   // The arithmetic half of the same railway, for the ground query. Built from
   // the identical network, the identical carve and the identical two ground
   // readings `railWorld` above is given, because a field seeded any other way
@@ -9669,6 +9722,12 @@ async function main(): Promise<void> {
     // 512 m chunk boundary rebuilds the ring, crossing a 64 m one refills the
     // sleepers -- and there is no clock in it at all. See `world/rail-geo.ts`.
     railWorld?.update(player.position.x, player.position.z);
+    // WORKSTREAM AI: and the lamps on the wall of whatever bore is nearby. Free
+    // on every frame but the one that crosses a 128 m cell -- under two seconds
+    // apart at line speed -- and there is no clock in it either: the set is a
+    // pure function of arc length and the player's position, so two riders in
+    // the same carriage see the same lights go past at the same instant.
+    tunnelLights?.update(player.position.x, player.position.z);
     // And the trains, on the traffic's own contract one line up from it: no
     // frame delta, no state, and the wall clock read through `railSeconds` so a
     // backgrounded tab costs nothing and comes back with every train in the
@@ -11280,6 +11339,11 @@ async function main(): Promise<void> {
         chunkDraws: railWorld?.chunkDraws ?? 0,
         sleepers: railWorld?.sleeperCount ?? 0,
         masts: railWorld?.mastCount ?? 0,
+        // WORKSTREAM AI. `tunnelLampOverflows` should be zero forever; anything
+        // else says the capacity has been outgrown and part of a bore is dark.
+        tunnelLamps: tunnelLights?.lampCount ?? 0,
+        tunnelLampMs: tunnelLights?.refillMs ?? 0,
+        tunnelLampOverflows: tunnelLights?.overflows ?? 0,
         rebuildMs: railWorld?.rebuildMs ?? 0,
         // The bound on a building frame is `RAIL_BUILD_BUDGET_MS` plus this, and
         // this is the half that can grow silently as the geometry does.
