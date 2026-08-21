@@ -352,6 +352,106 @@ takes about a minute. A budget raised quietly is how 0.20 ms became 3.30, so the
 file says in as many words: if it fails, fix the tick or record a fresh
 measurement here, but do not just move the number.
 
+## Measured: the floor under the ambient scan
+*(workstream AC, 2026-08-21)*
+
+The section above ends by naming what it left: `stepCharacters` and
+`stepStreetlife` were the top two sections, 0.15 ms of the 0.20 ms tick at eight
+players, both the same shape — a sweep of the world **once per combatant** — and
+both linear in the player count, so about 1.9 ms at the room cap of 100. AA
+called that enumeration "the floor". It was not; it was a cache key.
+
+### What it actually was
+
+Nothing either sweep evaluates depends on **who is asking**. The five cell
+counts are a function of `(cell, day)`; the band pool and its extent are a
+function of `(cell, resident set)`; only the last comparison, the exact circle
+test, knows where the player is. AA had memoised `countIn` and left the rest.
+
+1. **The band pool was keyed per person and is per cell.** `cellBands` took
+   `carHash(seed, (kind * 32 + unit) ^ 0x2c1b)` — forty keys per cell — for a
+   search whose query point is the cell centre and whose radius is a constant.
+   Forty entries in the map holding forty copies of one answer, and forty grid
+   walks on the first visit. Keyed by the cell, the pool's bounding box becomes a
+   property of the cell, which is what makes (2) possible.
+2. **The box refusal is per cell, not per person.** AA's `poseCharacter` gate
+   refused each person off their pool's extent; the same box now refuses the
+   whole cell once. Identical box, identical decision, a fiftieth of the calls.
+3. **One record per cell per tick**, holding the five counts and that box, read
+   by every combatant in the room. `stepCharacters` is untouched: the visit
+   stream it consumes — cells row-major, kinds in table order, slots ascending,
+   positions to the last bit — is unchanged, so **promotion timing is unchanged**,
+   including which NPC wins the shared cap when it binds.
+4. **The geometry behind the biases is cached per point.** The distance to the
+   nearest of 267 stations, the distance to the nearest of 16 beaches and the
+   census multiplier are properties of a *place* and were recomputed on every
+   evaluation. The station scan is 400 ns and at night it is the only bias not
+   gated off on its first line: ~22 µs a tick, invisible in any profile taken in
+   daylight, which is how it survived AA.
+5. **`forEachMethheadNear` walked 837 suburbs and `forEachDrunkNear` 875 venues,
+   per player, per tick** — 1,712 squared distances to find about ten anchors,
+   171,000 a tick at the room cap. Each grid cell now carries a precomputed
+   ascending list of the anchors a query in it must consider, built once at
+   module load by walking the tables in order, so the visit order is still table
+   order and no merge or sort happens at query time.
+6. **`poseMethhead` got AA's fix 3**, the early refusal off the chosen band's
+   bounding box plus `METH_POSE_SLOP`, which is the treatment the section above
+   said was "the cheapest 0.07 ms left on the table".
+
+A slot hash worth writing down: the per-tick record first used AA's
+`imul(cx, K1) ^ imul(cz, K2)` mixer and measured a **90% miss rate on a table
+holding fifty entries** — multiplication modulo a power of two only sees the low
+bits, so the fifty-odd cells of one sweep, which differ by one in each index,
+landed on twenty-five slots. Both tables now tile the cell grid modulo 32, which
+is collision-free by construction over any 13.4 km block.
+
+### After
+
+Two builds run alternately — before, after, before, after — because the eshays'
+bias is gated off in daylight and the other four at night, so a before/after pair
+an hour apart is measuring the clock rather than the code. Ranges are the two
+runs of each, at cycle phase 0.02.
+
+| | 0 players | 1 player | 8 players | 32 players |
+|---|---:|---:|---:|---:|
+| `characters`, before | 0.0002 | 0.0087–0.0106 | 0.0778–0.0804 | 0.2802–0.2898 |
+| `characters`, after | 0.0001 | 0.0012–0.0013 | 0.0058 | 0.0203–0.0213 |
+| `streetlife`, before | 0.0004 | 0.0069–0.0078 | 0.0479–0.0526 | 0.1772–0.1854 |
+| `streetlife`, after | 0.0003–0.0004 | 0.0026–0.0027 | 0.0107–0.0115 | 0.0358–0.0382 |
+| **tick total**, before | 0.0111–0.0135 | 0.0330–0.0404 | 0.1896–0.1902 | 0.6003–0.6876 |
+| **tick total**, after | 0.0139–0.0140 | 0.0231–0.0242 | 0.0607–0.0692 | 0.1805–0.2105 |
+
+The two sections together: **0.017 ms at eight players against 0.129**, and
+0.058 against 0.466 at thirty-two. Per additional player the whole tick went
+from 0.0183–0.0209 ms to **0.0051–0.0060 ms**, which at the room cap is 0.55 ms
+on this laptop rather than 2.0.
+
+### The checks, and the budgets
+
+`server/tick-profile.ts` gained a **32-player column** — the scaling is now
+measured rather than extrapolated off two points — and a third gate,
+`PER_PLAYER_BUDGET_MS`, on the *slope* between the 1- and 32-player columns.
+That is the right shape for this class of regression: a system that sweeps the
+world once per player is a slope, not a constant, and unlike the 8- and
+32-player totals a slope does not depend on how many synthetic bodies are
+standing on one spawn tile. `SOLO_BUDGET_MS` comes down 0.050 → 0.035;
+`AMBIENT_BUDGET_MS` stays at 0.020, because nothing here touches an empty room.
+
+`verifyCharacters` compares the swept stream against an enumeration written a
+second way out of `countIn` and `poseCharacter` — positions included, because a
+record that returns the right *number* of people in the wrong *place* is
+invisible to a comparison of identities — across three `PedestrianField`s queried
+**interleaved on one tick**, plus a tile adopted mid-tick (the host's generation
+bumps hundreds of times while a hexagon streams in). `verifyStreetlife` compares
+the gated and ungated sweeps and checks the anchor cover against a linear scan
+over the real tables, and is now in the **server's** boot list, where it had
+never run — it had only ever run in the browser and inside the 45-minute
+`integration-check`.
+
+Both were tested by breaking them: a record blind to the field, a record blind
+to the generation, a box refusal 50% too tight, a cover built at half the reach,
+a slop of zero and a geometry cache off by one cell each produce a named failure.
+
 ## Target hardware (with the egress arithmetic)
 
 **Rewritten against phase 4's measurements.** The original version of this table

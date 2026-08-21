@@ -44,6 +44,53 @@
  * fails on a loaded machine, run it on an idle one; do not raise the number to
  * make it pass.
  *
+ * ---------------------------------------------------------------------------
+ * ## Workstream AC: a 32-player column, and a budget on the slope
+ *
+ * AA left `characters` and `streetlife` at 0.15 ms of the 0.20 at eight players
+ * and said so; AC took the per-player cell and anchor enumerations out of both.
+ * Same laptop, 2026-08-21, the two builds run **alternately** -- before, after,
+ * before, after, eight minutes end to end -- rather than one after the other.
+ * That is not fussiness: half of what these two sections cost depends on the
+ * **time of day**, because the eshays' bias is gated off in daylight and the
+ * Karens', tradies', influencer's and agent's are gated off at night. A run at
+ * two in the afternoon and a run at midnight are measuring different cities, and
+ * a before/after pair an hour apart is measuring the clock. The ranges below are
+ * the two runs of each; this pair was measured at cycle phase 0.02, which is the
+ * small hours, so the 267-station scan behind the eshays was live.
+ *
+ *                              0 players    1 player      8 players     32 players
+ *     characters, before       0.0002       0.0087-0.0106 0.0778-0.0804 0.2802-0.2898
+ *     characters, after        0.0001       0.0012-0.0013 0.0058        0.0203-0.0213
+ *     streetlife, before       0.0004       0.0069-0.0078 0.0479-0.0526 0.1772-0.1854
+ *     streetlife, after        0.0003-0.0004 0.0026-0.0027 0.0107-0.0115 0.0358-0.0382
+ *     TOTAL, before            0.0111-0.0135 0.0330-0.0404 0.1896-0.1902 0.6003-0.6876
+ *     TOTAL, after             0.0139-0.0140 0.0231-0.0242 0.0607-0.0692 0.1805-0.2105
+ *
+ * The two sections together are **0.017 ms at eight players against 0.129**, and
+ * 0.058 against 0.466 at thirty-two. What is left of them is mostly the one
+ * evaluation per cell and per anchor that a tick genuinely owes, which is why
+ * the eight- and thirty-two-player columns are now within a factor of four of
+ * each other rather than a factor of eight.
+ *
+ * The **32-player column** is new and it is the point: at eight players the two
+ * sections were 0.15 ms and the honest question was what that becomes at the
+ * room cap of 100. Extrapolating a straight line off two points is how a
+ * capacity curve in a document becomes wrong, so the column is measured.
+ *
+ * `SOLO_BUDGET_MS` comes down from 0.050 to 0.035 on the same rule as before --
+ * the worst of the runs plus about a third -- and `AMBIENT_BUDGET_MS` stays at
+ * 0.020, because nothing AC did touches a room with nobody in it and moving a
+ * budget that is not under pressure is just noise in the diff.
+ *
+ * The new gate is `PER_PLAYER_BUDGET_MS`, on the **slope** rather than on a
+ * column: `(total at 32 - total at 1) / 31`, which is what one more person costs
+ * this host. That is the number the header's whole story is about -- a system
+ * that sweeps the world once per player does not show up as a big constant, it
+ * shows up as a slope -- and unlike the 8- and 32-player totals it does not
+ * depend on how many synthetic bodies happen to be standing on one spawn tile.
+ * Measured at 0.0051-0.0060 ms after AC against 0.0183-0.0209 before it.
+ *
  * The same four fixes took the **live host** -- `server/index.ts` with
  * `server/loadtest.ts` against it, which is the measurement the brief started
  * from -- from **1.30 ms to 0.46 ms** median per host tick at one player, and
@@ -90,7 +137,25 @@ import { ProfileReader, SECTION_NAMES, topSections } from './profile.ts';
 export const AMBIENT_BUDGET_MS = 0.020;
 
 /** And with one person standing in it. See the header for why both are gated. */
-export const SOLO_BUDGET_MS = 0.050;
+export const SOLO_BUDGET_MS = 0.035;
+
+/**
+ * What **one more player** may cost, milliseconds per tick.
+ *
+ * The slope between the 1- and 32-player columns, which is the shape of every
+ * regression this file exists to catch: a sweep over the world per combatant is
+ * invisible in the ambient row, small in the solo row, and ruinous at the room
+ * cap. Workstream AC measured 0.0051-0.0060 here against 0.0183-0.0209 before
+ * it; the budget is the worse of those plus a third, because the 32-player
+ * column is the noisiest one on the table -- it is the only column where the
+ * `advance` integrator and the rewind index are doing real work beside the
+ * ambient systems, and `events` alone moved by 0.017 ms between two runs of the
+ * same build.
+ *
+ * At the room cap of 100 this budget is 0.8 ms of a 16.67 ms tick, on a laptop
+ * that is about 2.5x the production box. That is the number to hold.
+ */
+export const PER_PLAYER_BUDGET_MS = 0.008;
 
 // --- Options ----------------------------------------------------------------------
 
@@ -100,7 +165,10 @@ function flag(name: string, fallback: string): string {
 }
 
 const TICKS = Number(flag('ticks', '3000'));
-const COUNTS = flag('players', '0,1,8').split(',').map((s) => Number(s.trim()));
+// WORKSTREAM AC: 32 by default. The column costs about twenty seconds of wall
+// clock and it is the only place the slope of the tick against the player count
+// is a measurement rather than a guess. See the header.
+const COUNTS = flag('players', '0,1,8,32').split(',').map((s) => Number(s.trim()));
 
 const say = (s: string): void => console.log(s);
 const pad = (s: string, n: number): string => s.length >= n ? s : ' '.repeat(n - s.length) + s;
@@ -232,6 +300,27 @@ if (solo && solo.total > SOLO_BUDGET_MS) {
       `Something is O(players x world) again.`,
   );
 }
+// --- WORKSTREAM AC: the slope, which is the shape of the failure this file is
+// about. Only gated when both ends of it were actually measured, so
+// `--players 0,1` still runs and still gates what it can.
+const crowd = rows.find((r) => r.players === 32);
+if (solo && crowd) {
+  const perPlayer = (crowd.total - solo.total) / (crowd.players - solo.players);
+  if (perPlayer > PER_PLAYER_BUDGET_MS) {
+    // Which section grew the most between the two columns, which is almost
+    // always the answer and is a great deal more useful than the biggest
+    // section in either one.
+    const growth: Record<string, number> = {};
+    for (const name of SECTION_NAMES) {
+      growth[name] = ((crowd.phases[name] ?? 0) - (solo.phases[name] ?? 0)) / (crowd.players - solo.players);
+    }
+    failures.push(
+      `Each additional player costs ${perPlayer.toFixed(4)} ms against a budget of ${PER_PLAYER_BUDGET_MS} ms ` +
+        `(${solo.total.toFixed(4)} ms at 1, ${crowd.total.toFixed(4)} at 32). The sections that grew per player ` +
+        `are ${topSections(growth, 4, 0)}. At the room cap that is ${(perPlayer * 100).toFixed(2)} ms a tick.`,
+    );
+  }
+}
 
 if (failures.length > 0) {
   say('  FAIL');
@@ -243,6 +332,8 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
+const slope = solo && crowd ? (crowd.total - solo.total) / (crowd.players - solo.players) : null;
 say(`  PASS -- ambient ${ambient?.total.toFixed(4) ?? '?'} / ${AMBIENT_BUDGET_MS} ms, ` +
-  `solo ${solo?.total.toFixed(4) ?? '?'} / ${SOLO_BUDGET_MS} ms`);
+  `solo ${solo?.total.toFixed(4) ?? '?'} / ${SOLO_BUDGET_MS} ms, ` +
+  `per player ${slope === null ? '?' : slope.toFixed(4)} / ${PER_PLAYER_BUDGET_MS} ms`);
 process.exit(0);

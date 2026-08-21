@@ -491,6 +491,81 @@ function nearestBeachDist2(x: number, z: number): number {
   return best;
 }
 
+// --- WORKSTREAM AC: the three geometric fields, remembered per point ------------------
+//
+// **Every bias below is a function of the same three numbers and of the phase**,
+// and only the phase moves. The distance to the nearest station, the distance to
+// the nearest beach and the census multiplier are properties of a *place*: they
+// were fixed when the tables above were baked and they cannot change while the
+// process runs.
+//
+// They were being recomputed on every evaluation anyway, and the eshay's is the
+// expensive one -- `nearestStationDist2` is a linear scan of 267 stations, about
+// 400 ns, and at night (when it is the only bias that is not gated off on its
+// first line) `forEachCharacterNear` was paying it for each of the ~56 cells in
+// its sweep, **22 us of a tick that is supposed to cost 60**. That cost is
+// invisible in a daylight profile, which is how it survived workstream AA: the
+// three-thousand-tick run lands wherever the wall clock happens to be, and half
+// the day it never runs the eshay's first line at all.
+//
+// A direct-mapped table keyed by the *exact* coordinate pair, on
+// `countInCached`'s terms and for its reasons: a slot holds the identity of what
+// is in it, a mismatch recomputes, and removing the whole thing changes nothing
+// but the time. The keys in practice are `charCentre` values -- a few hundred
+// distinct cells around wherever anybody is standing -- so the table is hit on
+// essentially every call after the first tick in a place.
+//
+// The three are filled **together** on a miss, rather than lazily one at a time,
+// because a per-field valid bit is three more branches on the hot path to save
+// 450 ns once per cell per process. `verifyCharacters` asserts the cached
+// answers equal the uncached ones over a spread of points, which is the check
+// that would catch a hash that dropped a bit of the key.
+//
+// ---------------------------------------------------------------------------
+// **The slot is a tiling of the cell grid, not a hash**, and that is the second
+// thing this pass got wrong before it got right. The first cut reused workstream
+// AA's mixer -- `imul(x, K1) ^ imul(z, K2)`, masked -- and measured a *ninety
+// per cent* miss rate on a table holding fifty entries: multiplication modulo a
+// power of two only sees the low bits of its operands, so the fifty-odd cells of
+// one sweep, which differ by one in each index, landed on twenty-five slots.
+// A cache that thrashes is worse than no cache, and it is silent.
+//
+// Cell indices modulo 32 are collision-free by construction for any 32-by-32
+// block of cells -- 13.4 km on a side, so **one player can never collide with
+// themselves**, whatever the sweep radius. Two players more than that apart can
+// share a slot, and then both recompute, which costs exactly what it cost before
+// this table existed. That is the right shape for a cache: no aliasing in the
+// case that happens, and a graceful return to the old cost in the case that
+// does not.
+const GEOM_SLOTS = 1024;
+const geomX = new Float64Array(GEOM_SLOTS);
+const geomZ = new Float64Array(GEOM_SLOTS);
+const geomFilled = new Uint8Array(GEOM_SLOTS);
+const geomStation = new Float64Array(GEOM_SLOTS);
+const geomBeach = new Float64Array(GEOM_SLOTS);
+const geomCrowd = new Float64Array(GEOM_SLOTS);
+
+/**
+ * The slot for a point, as its cell indices modulo 32. Shared with `cellSlot`,
+ * which tiles the same grid the same way; see the note above.
+ */
+function gridSlot(cx: number, cz: number): number {
+  return ((cx & 31) << 5) | (cz & 31);
+}
+
+/** The slot holding `(x, z)`'s three fields, computing them if it does not. */
+function geomAt(x: number, z: number): number {
+  const slot = gridSlot(charCell(x), charCell(z));
+  if (geomFilled[slot] === 1 && geomX[slot] === x && geomZ[slot] === z) return slot;
+  geomX[slot] = x;
+  geomZ[slot] = z;
+  geomStation[slot] = nearestStationDist2(x, z);
+  geomBeach[slot] = nearestBeachDist2(x, z);
+  geomCrowd[slot] = crowdMultiplier(x, z);
+  geomFilled[slot] = 1;
+  return slot;
+}
+
 // --- The cell grid ------------------------------------------------------------------------
 
 /**
@@ -631,7 +706,9 @@ export const CHARACTER_BIAS: readonly CharacterBias[] = [
      */
     weight(x, z, phase) {
       if (daylight(phase)) return 0;
-      const station = nearness(nearestStationDist2(x, z), 250);
+      // WORKSTREAM AC: the same 267 squared distances, taken from the per-point
+      // cache rather than walked again. See `geomAt`.
+      const station = nearness(geomStation[geomAt(x, z)], 250);
       const region = 0.35 + 0.9 * Math.max(westness(x), southness(z) * 0.8);
       return (0.25 + 1.75 * station) * region;
     },
@@ -685,7 +762,7 @@ export const CHARACTER_BIAS: readonly CharacterBias[] = [
      */
     weight(x, z, phase) {
       if (phase < SUNRISE_PHASE || phase > 0.6) return 0;
-      const m = crowdMultiplier(x, z);
+      const m = geomCrowd[geomAt(x, z)];
       // A tent peaking at 0.45 and reaching zero at 0.05 and 0.95. Absolute
       // value rather than a square, so it is three operations and no rounding.
       const tent = Math.max(0, 1 - Math.abs(m - 0.45) / 0.5);
@@ -713,7 +790,7 @@ export const CHARACTER_BIAS: readonly CharacterBias[] = [
      */
     weight(x, z, phase) {
       if (!daylight(phase)) return 0;
-      return 2.6 * nearness(nearestBeachDist2(x, z), 1200);
+      return 2.6 * nearness(geomBeach[geomAt(x, z)], 1200);
     },
   },
   {
@@ -731,7 +808,7 @@ export const CHARACTER_BIAS: readonly CharacterBias[] = [
      */
     weight(x, z, phase) {
       if (!daylight(phase)) return 0;
-      const m = crowdMultiplier(x, z);
+      const m = geomCrowd[geomAt(x, z)];
       const houses = Math.max(0, 1 - Math.abs(m - 0.3) / 0.42);
       return (0.25 + 1.4 * houses) * (1 + 0.8 * northShoreOrInnerWest(x, z));
     },
@@ -779,12 +856,29 @@ export const ESHAY_GROUP = 3;
 export function countIn(kind: number, cx: number, cz: number, day: GameDay): number {
   const bias = biasFor(kind);
   if (bias === undefined) return 0;
+  return countOf(bias, charCentre(cx), charCentre(cz), day);
+}
+
+/**
+ * `countIn` with the row and the cell centre already in hand.
+ *
+ * WORKSTREAM AC: the per-tick cell record fills five counts for one cell, and
+ * through `countIn` that was five linear scans of `CHARACTER_BIAS` to find a row
+ * the loop is already holding, plus ten `charCentre` divides for one point. Both
+ * are small and both are on the only path that still costs anything at eight
+ * players, which is exactly where small things are worth taking out. The
+ * arithmetic below is `countIn`'s, unchanged, and `countIn` is now one call into
+ * it -- so there is still one definition of how many people a cell holds.
+ */
+function countOf(bias: CharacterBias, x: number, z: number, day: GameDay): number {
+  const kind = bias.kind;
   if (kind === NPC_KIND.AGENT && !saturdayAt(day.index)) return 0;
-  const x = charCentre(cx);
-  const z = charCentre(cz);
   const w = bias.weight(x, z, day.phase);
   if (!(w > 0)) return 0;
-  const n = Math.round(CELL_BASE * crowdMultiplier(x, z) * w);
+  // WORKSTREAM AC: the census field for this cell, from the per-point cache. The
+  // same `crowdMultiplier(x, z)`, evaluated once per place rather than once per
+  // kind per cell per tick. See `geomAt`.
+  const n = Math.round(CELL_BASE * geomCrowd[geomAt(x, z)] * w);
   // **An eshay cell holds a group or nobody.** The brief's word was "in
   // threes", and a cell that rounded to two would produce a pair -- which is
   // two blokes, not a group, and reads as the placement having failed rather
@@ -910,14 +1004,37 @@ const POOL_SIZE = 8;
  */
 const CELL_RESCUE_MAX = 600;
 
-function cellBands(field: PedestrianField, key: number, x: number, z: number, out: PedBand[]): Pool {
+/**
+ * The pool for a cell.
+ *
+ * **WORKSTREAM AC: keyed by the cell, and it always could have been.** This took
+ * `carHash(seed, (kind * 32 + unit) ^ 0x2c1b)` -- a key per *person* -- and the
+ * search behind it does not depend on the person at all: the query point is the
+ * cell centre, the radius is `CHAR_CELL * 0.5`, the rescue ladder is the same
+ * and the scoring function closes over nothing else. Forty keys per cell were
+ * therefore forty entries in the map holding forty copies of one answer, and the
+ * first visit to a cell paid `PedestrianField.near` and a sort forty times over.
+ *
+ * What it buys is not only the duplicate work. A pool per *cell* means the
+ * pool's extent is a property of the cell, which is what lets
+ * `forEachCharacterNear` do the box refusal **once per cell** instead of once
+ * per person -- see there. `verifyCharacters` asserts the two keyings return the
+ * same bands, because "the search does not depend on the person" is exactly the
+ * kind of sentence that stops being true one edit later.
+ */
+function cellBands(field: PedestrianField, cx: number, cz: number, out: PedBand[]): Pool {
   let entry = poolCache.get(field);
   if (entry === undefined || entry.gen !== field.generation) {
     entry = { gen: field.generation, byKey: new Map() };
     poolCache.set(field, entry);
   }
+  // Exact integer identity for the cell, on `characterKey`'s packing and inside
+  // the same bound: the built extent's cells are within +/-150 of the origin.
+  const key = (cx + 4096) * 8192 + (cz + 4096);
   const cached = entry.byKey.get(key);
   if (cached !== undefined) return cached;
+  const x = charCentre(cx);
+  const z = charCentre(cz);
   let reach = CHAR_CELL * 0.5;
   field.near(x, z, reach, out);
   while (out.length === 0 && reach < CELL_RESCUE_MAX) {
@@ -1187,9 +1304,14 @@ export function poseCharacter(
   out: CharacterPose,
   // --- WORKSTREAM AA: the caller's query, for the early refusal below.
   //
-  // Optional and defaulting to "no gate", so every existing call keeps its
-  // meaning; `forEachCharacterNear` is the only caller in the project and it
-  // always passes one.
+  // Optional and defaulting to "no gate". **WORKSTREAM AC: no caller in the
+  // project passes one any more** -- `forEachCharacterNear` makes the identical
+  // refusal against the identical box once per cell instead of once per person
+  // (see `cellSlot`), so repeating it here would be four compares for an answer
+  // the caller already holds. It is kept because it is the honest shape of this
+  // function's contract: anybody posing a character to answer "is one of these
+  // near me" can hand in the query and be refused early, and the next consumer
+  // of this module should not have to rediscover the box.
   qx = 0,
   qz = 0,
   qr = -1,
@@ -1200,7 +1322,7 @@ export function poseCharacter(
   const h = carHash(seed ^ (kind * 0x9e37), unit ^ 0x51ed);
   const px = charCentre(cx);
   const pz = charCentre(cz);
-  const pool = cellBands(peds, carHash(seed, (kind * 32 + unit) ^ 0x2c1b), px, pz, scratch);
+  const pool = cellBands(peds, cx, cz, scratch);
   const bands = pool.bands;
   if (bands.length === 0) return false;
 
@@ -1339,54 +1461,125 @@ export const CHARACTER_REACH = CELL_RESCUE_MAX * 1.415 + CELL_STROLL + CHAR_CELL
  * cached against the resident set, so the second frame in a place costs nothing
  * at all.
  */
-// --- WORKSTREAM AA: `countIn`, memoised for the length of one tick ------------
+// --- WORKSTREAM AC: one record per cell per tick, and every player reads it ----
 //
-// `countIn(kind, cell, day)` is a pure function of three things and **none of
-// them is the caller**, so every combatant in a room asks the same question of
-// the same 250-odd cell-and-kind pairs on the same tick and gets the same
-// answer. `stepCharacters` runs the sweep once per combatant; at eight players
-// that is eight identical evaluations of a census lookup, a bias curve and, for
-// the eshays at night, a scan of 267 stations.
+// This replaces workstream AA's `countInCached`, which memoised `countIn` alone.
+// The lesson of that pass is the shape of this one: **nothing the cell sweep
+// evaluates depends on who is asking.** The five counts are a function of
+// `(cell, day)`; the band pool and its extent are a function of `(cell,
+// resident set)`. Only the final radius test knows where the player is.
 //
-// A direct-mapped table with a generation stamp, rather than a `Map`. That is
-// not micro-optimisation for its own sake: a `Map.get` is about 25 ns against
-// `countIn`'s 50-75, so a `Map` would pay for itself at two combatants and
-// still cost half the saving at eight. A slot read is two array loads.
+// So `stepCharacters` running the sweep once per combatant was eight players
+// asking the same 56 cells the same five questions and then, for each of the
+// ~260 people those answers describe, doing a hash, a map lookup and a box test
+// that had the same answer for all eight. Memoising `countIn` fixed the first
+// half of that and left the second, which is where the 0.10 ms at eight players
+// still was: **the pose attempts, not the counts.**
 //
-// **Collisions are correct, not merely tolerated.** A slot holds the exact
-// integer identity of what is in it and a mismatch simply recomputes, so the
-// table is a cache in the strict sense: removing it changes nothing but the
-// time. `verifyCharacters` runs nine query points at one tick through this and
-// compares against the ungated sweep, which is exactly the shape that would
-// catch a key collision returning somebody else's count.
-const COUNT_SLOTS = 2048;
-const countKey = new Float64Array(COUNT_SLOTS);
-const countVal = new Int32Array(COUNT_SLOTS);
-const countStamp = new Int32Array(COUNT_SLOTS);
-let countTick = Number.NaN;
-let countGen = 0;
+// One record holds both halves:
+//
+//   - the five counts and their sum, so a cell that holds nobody costs one slot
+//     read and a branch, and the pool behind it is never touched (which is what
+//     keeps a cold cell from paying for a `PedestrianField.near` it does not
+//     need -- see `cellBands`);
+//   - the pool's bounding box, so the refusal `poseCharacter` does per *person*
+//     can be done once per *cell*. It is the identical test against the
+//     identical box -- the pool no longer varies by kind or slot -- so it
+//     refuses exactly the same people, which is the property `verifyCharacters`
+//     asserts by running the sweep with the gate off.
+//
+// A direct-mapped table with a generation stamp rather than a `Map`, on
+// `countInCached`'s own argument: a `Map.get` is about 25 ns, a slot read is two
+// array loads, and this is on the path 56 times per player per tick.
+// **Collisions are correct rather than tolerated**: a slot holds the exact
+// integer identity of the cell in it and a mismatch recomputes, so removing the
+// table changes nothing but the time. The slot is `gridSlot`'s tiling of the
+// cell grid and not a multiplicative hash, for the reason set out there -- a
+// hash of two small adjacent integers collides, and this table measured a 90%
+// miss rate with one before the tiling replaced it.
+//
+// The table is also keyed on the *field*, which the counts do not need and the
+// box does. Two `PedestrianField`s in one process is not a game configuration --
+// the browser has one and the host shares one across its rooms -- but
+// `verifyCharacters` builds its own, and a box remembered from somebody else's
+// street grid would be a check that passes because it is comparing a cache with
+// itself. A reference compare and a generation compare per call; the whole table
+// is dropped when either moves.
+const CELL_SLOTS = 1024; // 32 x 32 cells; see `gridSlot`.
+/**
+ * Derived from the table rather than written as 5, so a sixth character is a
+ * wider record and not a character the sweep silently never enumerates. The
+ * record's per-kind counts are indexed by `CHARACTER_BIAS`' own order.
+ */
+const KIND_COUNT = CHARACTER_BIAS.length;
+const cellId = new Float64Array(CELL_SLOTS);
+const cellStamp = new Int32Array(CELL_SLOTS);
+/** Per kind, in `CHARACTER_BIAS` order. */
+const cellCount = new Int32Array(CELL_SLOTS * KIND_COUNT);
+/** The sum of the five, so the common "nobody here" case is one read. */
+const cellTotal = new Int32Array(CELL_SLOTS);
+/** `minX, minZ, maxX, maxZ` of the cell's band pool, or the inverted box. */
+const cellBox = new Float64Array(CELL_SLOTS * 4);
+let cellTick = Number.NaN;
+let cellGen = 0;
+let cellField: PedestrianField | null = null;
+let cellFieldGen = -1;
 
-function countInCached(kind: number, cx: number, cz: number, day: GameDay, tick: number): number {
-  if (tick !== countTick) {
-    countTick = tick;
-    countGen = (countGen + 1) | 0;
+/**
+ * The slot describing `(cx, cz)` on this tick, filling it if it does not.
+ *
+ * Returns the slot index rather than a record object, because a record object
+ * is an allocation per cell per tick and this runs sixty times a second forever
+ * -- `FactionField.step`'s rule, and `Pool` is the one place in this file that
+ * is allowed a heap object because it is cached across ticks.
+ */
+function cellSlot(peds: PedestrianField, cx: number, cz: number, day: GameDay, tick: number): number {
+  if (tick !== cellTick || peds !== cellField || peds.generation !== cellFieldGen) {
+    cellTick = tick;
+    cellField = peds;
+    cellFieldGen = peds.generation;
+    cellGen = (cellGen + 1) | 0;
     // The wrap, once every 400 days of uptime at 60 Hz. Without it a stamp
-    // could match a slot written two billion ticks ago, and the count of
-    // eshays at Redfern would be last year's for one tick. Cheap to be right.
-    if (countGen === 0) countStamp.fill(-1);
+    // could match a slot written two billion ticks ago, and the count of eshays
+    // at Redfern would be last year's for one tick. Cheap to be right.
+    if (cellGen === 0) cellStamp.fill(-1);
   }
-  // Exact identity: cells are bounded by the city (a few hundred either way)
-  // and kinds by `NPC_KIND`, so this stays well inside the integers a double
-  // represents exactly.
-  const key = (cx * 4096 + cz) * 64 + kind;
-  const slot = (Math.imul(cx, 0x8da6b343) ^ Math.imul(cz, 0xd8163841) ^ Math.imul(kind, 0x2545f491)) & (COUNT_SLOTS - 1);
-  if (countStamp[slot] === countGen && countKey[slot] === key) return countVal[slot];
-  const n = countIn(kind, cx, cz, day);
-  countStamp[slot] = countGen;
-  countKey[slot] = key;
-  countVal[slot] = n;
-  return n;
+  const id = (cx + 4096) * 8192 + (cz + 4096);
+  const slot = gridSlot(cx, cz);
+  if (cellStamp[slot] === cellGen && cellId[slot] === id) return slot;
+
+  const px = charCentre(cx);
+  const pz = charCentre(cz);
+  let total = 0;
+  for (let k = 0; k < KIND_COUNT; k++) {
+    const n = countOf(CHARACTER_BIAS[k], px, pz, day);
+    cellCount[slot * KIND_COUNT + k] = n;
+    total += n;
+  }
+  cellTotal[slot] = total;
+  // The pool, and therefore the box, **only if somebody stands here**. A cell
+  // that holds nobody must not pay for the band search: the search is a grid
+  // walk and a sort, it is cached only until the next tile streams in, and the
+  // sweep touches fifty-odd cells of which most are empty at any hour.
+  if (total > 0) {
+    const pool = cellBands(peds, cx, cz, poolScratch);
+    cellBox[slot * 4] = pool.minX;
+    cellBox[slot * 4 + 1] = pool.minZ;
+    cellBox[slot * 4 + 2] = pool.maxX;
+    cellBox[slot * 4 + 3] = pool.maxZ;
+    // A cell with a count and no footpath under it places nobody -- exactly
+    // what `poseCharacter` returns false for -- and the inverted box the empty
+    // pool carries would fail every test anyway. Zeroing the total here saves
+    // the caller a second branch and says the same thing.
+    if (pool.bands.length === 0) cellTotal[slot] = 0;
+  }
+  cellStamp[slot] = cellGen;
+  cellId[slot] = id;
+  return slot;
 }
+
+/** The scratch `cellBands` fills. Module-level; see `stepCharacters`. */
+const poolScratch: PedBand[] = [];
 
 export function forEachCharacterNear(
   peds: PedestrianField,
@@ -1399,10 +1592,10 @@ export function forEachCharacterNear(
   visit: (pose: CharacterPose) => boolean | void,
   /**
    * WORKSTREAM AA: pass false to pose everybody the cell sweep enumerates,
-   * however far away, instead of letting `poseCharacter` refuse them off their
-   * band pool's extent. **For `verifyCharacters` only** -- it is the "before"
-   * of the comparison that proves the gate is exact, and nothing in the game
-   * ever turns it off. See `poseCharacter`.
+   * however far away, instead of refusing them off their cell's band pool's
+   * extent. **For `verifyCharacters` only** -- it is the "before" of the
+   * comparison that proves the gate is exact, and nothing in the game ever
+   * turns it off. See `poseCharacter`.
    */
   poseGate = true,
 ): void {
@@ -1414,20 +1607,40 @@ export function forEachCharacterNear(
   const c1x = charCell(x + span);
   const c0z = charCell(z - span);
   const c1z = charCell(z + span);
+  const cellGate = span + CHAR_CELL;
+  const cellGate2 = cellGate * cellGate;
+  // WORKSTREAM AC: the box refusal, hoisted out of `poseCharacter` and applied
+  // to the cell. See `cellSlot`: the pool is the cell's, so this is the same
+  // comparison against the same numbers, made once instead of once per person.
+  const slop = radius + POSE_SLOP;
   for (let cx = c0x; cx <= c1x; cx++) {
     for (let cz = c0z; cz <= c1z; cz++) {
       // The cell's own gate, before any placement work: the furthest anybody in
       // this cell can be is half a diagonal plus the reach.
       const ddx = charCentre(cx) - x;
       const ddz = charCentre(cz) - z;
-      const cellGate = span + CHAR_CELL;
-      if (ddx * ddx + ddz * ddz > cellGate * cellGate) continue;
-      for (const bias of CHARACTER_BIAS) {
-        const n = countInCached(bias.kind, cx, cz, day, tick);
+      if (ddx * ddx + ddz * ddz > cellGate2) continue;
+      const slot = cellSlot(peds, cx, cz, day, tick);
+      if (cellTotal[slot] === 0) continue;
+      if (poseGate) {
+        const b = slot * 4;
+        if (
+          cellBox[b] - x > slop || x - cellBox[b + 2] > slop ||
+          cellBox[b + 1] - z > slop || z - cellBox[b + 3] > slop
+        ) {
+          continue;
+        }
+      }
+      for (let k = 0; k < KIND_COUNT; k++) {
+        const n = cellCount[slot * KIND_COUNT + k];
+        if (n === 0) continue;
+        const kind = CHARACTER_BIAS[k].kind;
         for (let i = 0; i < n; i++) {
-          // WORKSTREAM AA: the query goes in, so the pose can refuse before it
-          // does the expensive half. See `poseCharacter`.
-          if (!poseCharacter(peds, bias.kind, cx, cz, i, now, scratch, out, x, z, poseGate ? radius : -1)) continue;
+          // The pose is asked for ungated: the box test above has already made
+          // the identical refusal for the whole cell, and asking `poseCharacter`
+          // to repeat it would be four compares per person for an answer we
+          // hold. It still takes the query for callers that have not.
+          if (!poseCharacter(peds, kind, cx, cz, i, now, scratch, out)) continue;
           const dx = out.x - x;
           const dz = out.z - z;
           if (dx * dx + dz * dz > r2) continue;
@@ -2344,6 +2557,16 @@ export function isCharacterKind(kind: number): boolean {
  * Allocates nothing. The scratch is module-level and reused, on
  * `FactionField.step`'s own argument: this runs sixty times a second forever.
  *
+ * **WORKSTREAM AC changed nothing in this function, deliberately.** The cost was
+ * all in `forEachCharacterNear` and it was the same question asked once per
+ * combatant; what that pass did was memoise the answer, not reorder the scan.
+ * The visit stream this loop consumes -- cells row-major, kinds in table order,
+ * slots ascending, positions to the last bit -- is unchanged, which is what
+ * makes the promotion *timing* unchanged: the same person becomes solid on the
+ * same tick, and the same person wins the shared cap when it binds.
+ * `verifyCharacters` asserts that stream against an independent enumeration
+ * built out of `countIn` and `poseCharacter`, rather than asserting it here.
+ *
  * Every promotion here is with `target = -1` -- **passive**. Nobody in this file
  * is promoted already angry. The eshay decides to roll you in his own `think` on
  * the tick after, which costs sixteen milliseconds and buys the property that
@@ -2758,6 +2981,271 @@ export function verifyCharacters(): string[] {
         `POSE_SLOP is ${POSE_SLOP} m against a worst-case displacement of ${worst.toFixed(2)} m. ` +
           'The pose gate would refuse somebody who is actually within range, which deletes them from the world.',
       );
+    }
+  }
+
+  // --- WORKSTREAM AC: the per-point geometry cache answers what the functions
+  // behind it answer.
+  //
+  // Three fields, one of which -- the distance to the nearest of 267 stations --
+  // decides how many eshays exist. A cache that returned a neighbouring cell's
+  // answer would put a group of three outside a station that is not there, on
+  // both ends, consistently, which is a bug no determinism check can see and no
+  // screenshot can either. The points below are walked **twice, interleaved with
+  // a second set**, so that a slot which was quietly stolen and refilled is
+  // caught rather than a slot which was merely never contended.
+  {
+    let wrong = 0;
+    let example = '';
+    for (let pass = 0; pass < 2; pass++) {
+      for (let i = 0; i < 240; i++) {
+        // Two sequences 32 cells apart, which is exactly the aliasing distance
+        // of `gridSlot`'s tiling -- the case the cache is allowed to miss and is
+        // not allowed to get wrong.
+        const cx = (i % 40) - 20 + (pass === 0 ? 0 : 32);
+        const cz = Math.floor(i / 40) * 7 - 20;
+        const x = charCentre(cx);
+        const z = charCentre(cz);
+        const slot = geomAt(x, z);
+        const station = nearestStationDist2(x, z);
+        const beach = nearestBeachDist2(x, z);
+        const crowd = crowdMultiplier(x, z);
+        if (geomStation[slot] !== station || geomBeach[slot] !== beach || geomCrowd[slot] !== crowd) {
+          wrong++;
+          if (example === '') {
+            example =
+              `cell (${cx}, ${cz}): cached station ${geomStation[slot].toFixed(1)} against ${station.toFixed(1)}, ` +
+              `beach ${geomBeach[slot].toFixed(1)} against ${beach.toFixed(1)}, ` +
+              `crowd ${geomCrowd[slot].toFixed(4)} against ${crowd.toFixed(4)}`;
+          }
+        }
+      }
+    }
+    if (wrong > 0) {
+      failures.push(
+        `The per-cell geometry cache returned somebody else's answer at ${wrong} of 480 points -- ${example}. ` +
+          'Every count in this file is derived from those three numbers, so the city would be populated off a ' +
+          'neighbouring cell.',
+      );
+    }
+  }
+
+  // --- WORKSTREAM AC: the per-tick cell record, against a sweep that has none,
+  // and against a second field on the same tick.
+  //
+  // `forEachCharacterNear` now reads a direct-mapped record per cell per tick --
+  // five counts, the pool's bounding box -- and every player in a room reads the
+  // same one. Three things can go wrong with that and all three are silent:
+  //
+  //   1. **A stale record.** The stamp is the tick; a tick that did not
+  //      invalidate would hand the next tick the last one's counts, and the
+  //      symptom is a Karen who exists for one frame after her hour ends.
+  //   2. **A record from somebody else's world.** The box comes from a
+  //      `PedestrianField`, and two fields on one tick -- which is exactly what
+  //      this check itself creates -- must not see each other's boxes.
+  //   3. **The hoisted box refusing somebody.** The refusal `poseCharacter` made
+  //      per person is now made once per cell. It is the same box (the pool is
+  //      the cell's, not the person's) but "it is the same box" is a sentence,
+  //      and this is the measurement.
+  //
+  // The reference is built out of the two exported primitives -- `countIn` and
+  // an ungated `poseCharacter` -- in the sweep's own order, so it is the same
+  // enumeration written a second way rather than the same code called twice.
+  // Positions are compared, not just identities: a record that returned the
+  // right *number* of people in the wrong *place* is the failure mode a key
+  // comparison cannot see.
+  {
+    const gridA = syntheticGrid(0, 0);
+    const gridB = syntheticGrid(-2000, 4500);
+    if (gridA === null || gridB === null) {
+      failures.push('verifyCharacters could not build its second street grid; the per-tick cell record is unproven.');
+    } else {
+      const a = new PedestrianField();
+      a.adopt('a', gridA);
+      a.adopt('b', gridB);
+      // A second field with the identical content, standing in for the other end
+      // of the wire. Queries against the two are interleaved below.
+      const b = new PedestrianField();
+      b.adopt('a', gridA);
+      b.adopt('b', gridB);
+      // And a **third field whose streets are somewhere the other two have
+      // none**, queried in between them. Two identical fields cannot catch a
+      // record that forgot which field it came from -- they agree by
+      // construction -- and that is the bug this check was written for and did
+      // not catch until this field existed. Over `gridC`'s block the first two
+      // fields hold nothing, so their record says "no footpath here, nobody
+      // stands in this cell"; a record that leaked would delete every character
+      // on the third field's streets, which is the whole failure in one line.
+      const gridC = syntheticGrid(2000, 2000);
+      const c = gridC === null ? null : new PedestrianField();
+      if (c !== null && gridC !== null) c.adopt('c', gridC);
+      const bands: PedBand[] = [];
+      const pose = createCharacterPose();
+      const line = (p: CharacterPose): string =>
+        `${p.kind}:${p.cx},${p.cz}#${p.index}@${p.x.toFixed(4)},${p.z.toFixed(4)},${p.dx.toFixed(4)}`;
+      /** The sweep, written out longhand with no record and no gate. */
+      const reference = (peds: PedestrianField, x: number, z: number, r: number, tick: number): string[] => {
+        const found: string[] = [];
+        const now = trafficSeconds(tick);
+        const day = dayAtTick(tick);
+        const span = r + CHARACTER_REACH;
+        const cellGate = span + CHAR_CELL;
+        const scratch: PedBand[] = [];
+        const out = createCharacterPose();
+        for (let cx = charCell(x - span); cx <= charCell(x + span); cx++) {
+          for (let cz = charCell(z - span); cz <= charCell(z + span); cz++) {
+            const ddx = charCentre(cx) - x;
+            const ddz = charCentre(cz) - z;
+            if (ddx * ddx + ddz * ddz > cellGate * cellGate) continue;
+            for (const bias of CHARACTER_BIAS) {
+              const n = countIn(bias.kind, cx, cz, day);
+              for (let i = 0; i < n; i++) {
+                if (!poseCharacter(peds, bias.kind, cx, cz, i, now, scratch, out)) continue;
+                const dx = out.x - x;
+                const dz = out.z - z;
+                if (dx * dx + dz * dz > r * r) continue;
+                found.push(line(out));
+              }
+            }
+          }
+        }
+        return found;
+      };
+      let recordMismatch = '';
+      let fieldMismatch = '';
+      let placed = 0;
+      // Several densities: the two grids sit over different census cells and at
+      // different distances from the station and beach tables, so the counts
+      // differ between them rather than the same fixture being checked twice.
+      const spots: Array<[number, number]> = [
+        [0, 0], [150, -150], [-100, -260], [-2000, 4500], [-1850, 4350], [-1700, 4600],
+        // Over the third field's block, where the first two have no streets.
+        [2000, 2000], [2150, 1850],
+      ];
+      outer: for (let tick = 0; tick < 240_000; tick += 26_669) {
+        for (const r of [NOTICE_RANGE, KAREN_RANGE, 150]) {
+          for (const [x, z] of spots) {
+            const live: string[] = [];
+            const other: string[] = [];
+            const third: string[] = [];
+            // Interleaved on purpose, and on the same tick: a record keyed on
+            // the tick and not on the field would hand `b` the boxes it just
+            // filled for `a`, and `c` -- whose streets are somewhere else --
+            // would be answered off `a`'s pools.
+            forEachCharacterNear(a, x, z, r, tick, bands, pose, (p) => { live.push(line(p)); });
+            forEachCharacterNear(b, x, z, r, tick, bands, pose, (p) => { other.push(line(p)); });
+            if (c !== null) forEachCharacterNear(c, x, z, r, tick, bands, pose, (p) => { third.push(line(p)); });
+            const want = reference(a, x, z, r, tick);
+            const wantThird = c === null ? [] : reference(c, x, z, r, tick);
+            placed += live.length;
+            if (recordMismatch === '' && live.join('|') !== want.join('|')) {
+              recordMismatch = `at (${x}, ${z}) r=${r} tick=${tick}: swept [${live.join('|')}], reference [${want.join('|')}]`;
+            }
+            if (recordMismatch === '' && third.join('|') !== wantThird.join('|')) {
+              recordMismatch =
+                `on a third field at (${x}, ${z}) r=${r} tick=${tick}: swept [${third.join('|')}], ` +
+                `reference [${wantThird.join('|')}] -- the record is answering one field's query off another's pools`;
+            }
+            if (fieldMismatch === '' && live.join('|') !== other.join('|')) {
+              fieldMismatch = `at (${x}, ${z}) r=${r} tick=${tick}: one field [${live.join('|')}], the other [${other.join('|')}]`;
+            }
+            if (recordMismatch !== '' && fieldMismatch !== '') break outer;
+          }
+        }
+      }
+      if (placed === 0) {
+        failures.push(
+          'The cell-record comparison placed nobody over two grids, three radii and nine ticks, so it proves ' +
+            'nothing. The fixture has drifted away from the bias table.',
+        );
+      }
+      if (recordMismatch !== '') {
+        failures.push(
+          `The per-tick cell record changed who is nearby ${recordMismatch}. The sweep no longer agrees with ` +
+            'countIn and poseCharacter, which are what the renderer and the authority each believe.',
+        );
+      }
+      if (fieldMismatch !== '') {
+        failures.push(
+          `Two identical band sets placed different people on one tick ${fieldMismatch}. The per-tick record is ` +
+            'keyed on the tick but not on the field it came from.',
+        );
+      }
+
+      // --- A tile arriving mid-tick changes the answer mid-tick.
+      //
+      // The record's box is a property of the resident band set, and on the host
+      // that set changes **hundreds of times a second** while a hexagon streams
+      // in -- `PedestrianField.generation` bumps per tile. A record stamped only
+      // with the tick would answer the rest of that tick off the world as it was
+      // before the tile landed, which is a character who is not there for one
+      // frame and is there the next, or worse is missing for the frame in which
+      // a player walks past them. Cheap to be right: one integer compare.
+      if (c !== null && gridC !== null) {
+        const tick = 60_000;
+        const want: string[] = [];
+        forEachCharacterNear(c, 2000, 2000, 150, tick, bands, pose, (p) => { want.push(line(p)); });
+        const late = new PedestrianField();
+        const got: string[] = [];
+        // Queried empty first, on the same tick, so there is a record to be
+        // stale, and then again with the streets in.
+        forEachCharacterNear(late, 2000, 2000, 150, tick, bands, pose, () => {});
+        late.adopt('c', gridC);
+        forEachCharacterNear(late, 2000, 2000, 150, tick, bands, pose, (p) => { got.push(line(p)); });
+        if (want.length === 0) {
+          failures.push('The mid-tick streaming check found nobody to stream in; it proves nothing.');
+        } else if (want.join('|') !== got.join('|')) {
+          failures.push(
+            `A tile adopted mid-tick did not change who is nearby: the field that had it all along found ` +
+              `${want.length} character(s) and the one it arrived on found ${got.length}. The per-tick cell ` +
+              'record is not keyed on `PedestrianField.generation`, so a streaming host answers off the world ' +
+              'as it was at the top of the tick.',
+          );
+        }
+      }
+
+      // --- And the box the hoisted refusal rests on: everybody a cell places is
+      // inside that cell's pool box, grown by `POSE_SLOP`.
+      //
+      // This is the invariant, rather than a consequence of it. The check above
+      // would catch a box that is too small *for the query points it tries*;
+      // this catches one that is too small for anybody, which is the property
+      // the refusal actually needs.
+      {
+        const day = dayAtTick(120_000);
+        const now = trafficSeconds(120_000);
+        const scratch: PedBand[] = [];
+        const out = createCharacterPose();
+        let outside = 0;
+        let example = '';
+        for (let cx = -8; cx <= 8; cx++) {
+          for (let cz = -8; cz <= 8; cz++) {
+            const pool = cellBands(a, cx, cz, scratch);
+            if (pool.bands.length === 0) continue;
+            for (const bias of CHARACTER_BIAS) {
+              const n = countIn(bias.kind, cx, cz, day);
+              for (let i = 0; i < n; i++) {
+                if (!poseCharacter(a, bias.kind, cx, cz, i, now, scratch, out)) continue;
+                const over = Math.max(
+                  pool.minX - out.x, out.x - pool.maxX, pool.minZ - out.z, out.z - pool.maxZ,
+                );
+                if (over > POSE_SLOP) {
+                  outside++;
+                  if (example === '') {
+                    example = `kind ${bias.kind} in cell (${cx}, ${cz}) stands ${over.toFixed(2)} m outside its pool box`;
+                  }
+                }
+              }
+            }
+          }
+        }
+        if (outside > 0) {
+          failures.push(
+            `${outside} placed character(s) finish further than POSE_SLOP (${POSE_SLOP} m) outside their cell's ` +
+              `band pool -- ${example}. The cell-level box refusal deletes them from the sweep.`,
+          );
+        }
+      }
     }
   }
 

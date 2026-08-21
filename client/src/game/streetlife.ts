@@ -143,7 +143,13 @@ import {
   type NpcActor,
 } from './factions.ts';
 import { createBeatPose, forEachPoliceNear } from './factions.ts';
-import { createPedPose, type PedBand, type PedPose, type PedestrianField } from './pedestrians.ts';
+// WORKSTREAM AC: `PedestrianField` and `syntheticGrid` as *values* rather than
+// types, for the checks at the bottom of this file. `verifyCharacters` already
+// builds the same fixture for the same reason -- a gate over a real band set is
+// the only thing that can prove a gate over a real band set.
+import {
+  PedestrianField, createPedPose, syntheticGrid, type PedBand, type PedPose,
+} from './pedestrians.ts';
 import { carHash, trafficSeconds } from './traffic.ts';
 import { EYE_HEIGHT } from '../player/controller.ts';
 // WORKSTREAM Z: `Meth-adone`. The register is `game/talentlive.ts`' -- see that
@@ -1166,6 +1172,158 @@ export const VENUE_XZ: readonly number[] = [
 
 export const VENUE_COUNT = VENUE_XZ.length / 2;
 
+// --- WORKSTREAM AC: the anchor broadphase ------------------------------------------
+//
+// **The two sweeps below were the last thing in the tick that walked the whole
+// city once per player.** `forEachMethheadNear` tested all 837 suburb centroids
+// and `forEachDrunkNear` all 875 venues, on every combatant, sixty times a
+// second: 1,712 squared distances per player per tick, of which -- measured at
+// the spawn -- ten and zero respectively survive. At the room cap that is 171,000
+// distance tests a tick to find about ten anchors.
+//
+// The gates themselves cannot be tightened: `METH_REACH` is 2,081 m because a
+// rescued loiterer really can stand that far from their centroid, and a gate
+// tighter than the search that placed somebody **deletes** them (see there). So
+// the fix is not a smaller radius, it is not doing the scan.
+//
+// ---------------------------------------------------------------------------
+// ## A precomputed cover, not a grid walk
+//
+// The obvious spatial index answers "which anchors are in these nine buckets",
+// which is a walk over nine lists that then have to be **merged into ascending
+// order** -- because the visit order of both sweeps is table order, the
+// promotion scan takes the first thing it is handed, and two processes that
+// broke a tie differently would promote different people. A merge per query is
+// most of the saving back.
+//
+// So the cover is inverted and precomputed. For each grid cell, the ascending
+// list of every anchor that could possibly be within `reach` of a query landing
+// in it -- built once at module load by walking the anchors **in table order**
+// and appending each to the cells it covers, which makes every list ascending by
+// construction and needs no sort at query time. A query is then: one cell index,
+// one contiguous slice of a flat `Int32Array`, and the *identical* exact gate
+// test over a list that is a superset of the answers.
+//
+// It is a `game/spatialhash.ts`-shaped argument with the opposite trade: that
+// file's grid is rebuilt every tick for things that move, and this one is built
+// once for two tables that are frozen at compile time.
+//
+// ---------------------------------------------------------------------------
+// ## The cover is exact, and the clamp does not break it
+//
+// An anchor `A` is stored in every cell whose index falls in
+// `[cell(A - reach), cell(A + reach)]` on each axis. A query at `p` with
+// `|p - A| <= reach` therefore has `cell(p)` inside that range on both axes, so
+// `A` is in `cell(p)`'s list. Cell indices are clamped into the grid at both
+// ends, and clamping is monotone, so `cell(p)` clamped still lies between the
+// clamped ends -- an anchor or a query outside the extent is folded onto the
+// edge row and is still found. `verifyStreetlife` asserts the whole of this the
+// only way worth asserting it: by comparing the indexed sweep against a linear
+// one over the real tables at a spread of points and radii.
+const ANCHOR_CELL_M = 1000;
+const ANCHOR_ORIGIN = -72000;
+const ANCHOR_SPAN = 144;
+
+/**
+ * The largest query radius the two indexes are built for.
+ *
+ * The game's own are `METH_SIGHT` (25 m), `DRUNK_NOTICE` (7 m) and the
+ * renderer's 200 m draw radius. The checks ask for 400 and 500 m, which is a
+ * fair question to ask of an enumeration and a silly one to size a permanent
+ * table around -- a 500 m index costs a third again as many entries to make a
+ * check that runs once a release marginally faster. Anything wider falls back to
+ * the full scan, which is what this replaced and is therefore always correct.
+ */
+const ANCHOR_INDEX_RADIUS = 256;
+
+/** A cell index on one axis, clamped into the grid. See the note above. */
+function anchorAxis(v: number): number {
+  const c = Math.floor((v - ANCHOR_ORIGIN) / ANCHOR_CELL_M);
+  return c < 0 ? 0 : c > ANCHOR_SPAN - 1 ? ANCHOR_SPAN - 1 : c;
+}
+
+/**
+ * Which anchors a query in each grid cell must consider, in table order.
+ *
+ * CSR: `starts[c]` to `starts[c + 1]` is cell `c`'s slice of `entries`. Two flat
+ * typed arrays rather than an array of arrays, because the whole point is to
+ * touch one cache line and not chase 20,000 pointers -- `characters.STATION_XZ`
+ * makes the same argument about a much smaller table.
+ */
+class AnchorCover {
+  readonly starts: Int32Array;
+  readonly entries: Int32Array;
+  readonly reach: number;
+
+  constructor(count: number, at: (i: number) => number, atZ: (i: number) => number, reach: number) {
+    this.reach = reach;
+    const cells = ANCHOR_SPAN * ANCHOR_SPAN;
+    // Two passes: count, then fill. One pass into arrays-of-arrays would
+    // allocate 20,000 of them at module load on a phone.
+    const counts = new Int32Array(cells + 1);
+    for (let i = 0; i < count; i++) {
+      const x0 = anchorAxis(at(i) - reach);
+      const x1 = anchorAxis(at(i) + reach);
+      const z0 = anchorAxis(atZ(i) - reach);
+      const z1 = anchorAxis(atZ(i) + reach);
+      for (let cx = x0; cx <= x1; cx++) for (let cz = z0; cz <= z1; cz++) counts[cx * ANCHOR_SPAN + cz]++;
+    }
+    const starts = new Int32Array(cells + 1);
+    let total = 0;
+    for (let c = 0; c < cells; c++) {
+      starts[c] = total;
+      total += counts[c];
+    }
+    starts[cells] = total;
+    const entries = new Int32Array(total);
+    const cursor = starts.slice(0, cells);
+    for (let i = 0; i < count; i++) {
+      const x0 = anchorAxis(at(i) - reach);
+      const x1 = anchorAxis(at(i) + reach);
+      const z0 = anchorAxis(atZ(i) - reach);
+      const z1 = anchorAxis(atZ(i) + reach);
+      for (let cx = x0; cx <= x1; cx++) {
+        for (let cz = z0; cz <= z1; cz++) {
+          const c = cx * ANCHOR_SPAN + cz;
+          entries[cursor[c]++] = i;
+        }
+      }
+    }
+    this.starts = starts;
+    this.entries = entries;
+  }
+
+  /** The cell a query at `(x, z)` reads. */
+  cellOf(x: number, z: number): number {
+    return anchorAxis(x) * ANCHOR_SPAN + anchorAxis(z);
+  }
+}
+
+/**
+ * The suburb centroids and the venue positions, packed.
+ *
+ * The gate loops read two numbers per anchor and nothing else, and
+ * `SUBURBS[s].x` is a pointer chase into a heap the collector is free to have
+ * scattered. `characters.STATION_XZ` packs 267 records for exactly this reason
+ * and measured it; `VENUE_XZ` is already flat but is a plain `number[]`, which
+ * is a boxed-or-unboxed question the engine answers and a `Float64Array` does
+ * not have to ask.
+ */
+const SUBURB_XZ: Float64Array = (() => {
+  const out = new Float64Array(SUBURBS.length * 2);
+  for (let i = 0; i < SUBURBS.length; i++) {
+    out[i * 2] = SUBURBS[i].x;
+    out[i * 2 + 1] = SUBURBS[i].z;
+  }
+  return out;
+})();
+
+const VENUE_PACKED: Float64Array = (() => {
+  const out = new Float64Array(VENUE_COUNT * 2);
+  for (let i = 0; i < VENUE_COUNT * 2; i++) out[i] = VENUE_XZ[i];
+  return out;
+})();
+
 // --- How many of each, and where they reach --------------------------------------
 
 /**
@@ -1776,6 +1934,20 @@ export const SWIG_DUTY = 0.22;
  * protocol, evaluated identically by the client drawing it and the authority
  * deciding whether it has seen you.
  */
+/**
+ * How far off the band they stand on a loiterer can finish, metres.
+ *
+ * WORKSTREAM AC, and it is `characters.POSE_SLOP` restated on this tier's own
+ * three displacements: the kerb lean (0.55 across), the pace (`PACE_AMPLITUDE`
+ * along) and the twitch (`TWITCH_AMPLITUDE` along). Each is applied to a unit
+ * direction, so each contributes its own magnitude and no more; the sum is
+ * 1.84 m and this is it rounded **up** to the whole metre, for the reason that
+ * constant gives -- the number is a conservative bound and a slack metre buys
+ * the property that two runtimes summing three float constants cannot land
+ * either side of it. `verifyStreetlife` asserts it against the tables.
+ */
+export const METH_POSE_SLOP = Math.ceil(0.55 + PACE_AMPLITUDE + TWITCH_AMPLITUDE);
+
 export function poseMethhead(
   peds: PedestrianField,
   suburb: number,
@@ -1783,6 +1955,14 @@ export function poseMethhead(
   now: number,
   scratch: PedBand[],
   out: StreetPose,
+  // --- WORKSTREAM AC: the caller's query, for the early refusal below.
+  //
+  // Optional and defaulting to "no gate", so every existing call keeps its
+  // meaning -- `verifyStreetlife` runs the sweep both ways and compares, which
+  // is the check that proves the gate refuses nobody.
+  qx = 0,
+  qz = 0,
+  qr = -1,
 ): boolean {
   const s = SUBURBS[suburb];
   const seed = suburbSeed(s);
@@ -1836,6 +2016,33 @@ export function poseMethhead(
   const bands = pool.bands;
   if (bands.length === 0) return false;
   const band = bands[h % bands.length];
+
+  // --- WORKSTREAM AC: is this loiterer even in the neighbourhood?
+  //
+  // `characters.poseCharacter`'s early refusal, one tier over and tighter,
+  // because here the band is already chosen. Whichever rung placed this person,
+  // they stand **on this band** -- `pointOnBand` interpolates between its
+  // vertices on both paths -- displaced by at most `METH_POSE_SLOP`. So the
+  // band's own bounding box grown by that and by the query radius contains
+  // everybody the full pose could have put inside `qr`, and the test below
+  // refuses nobody the caller would have kept. What it skips is the binary
+  // search, the projection on the rescued path, and two triangle waves.
+  //
+  // The gate matters because the broadphase above cannot be tight: `METH_REACH`
+  // is 2,081 m, so a 25 m sight scan poses everybody within two kilometres and
+  // then throws away all but the handful within twenty-five. Box against box on
+  // `game/spatialhash.ts`' terms -- a conservative superset followed by the
+  // caller's unchanged exact circle test is identical output.
+  if (qr >= 0) {
+    const slop = qr + METH_POSE_SLOP;
+    if (
+      band.minX - qx > slop || qx - band.maxX > slop ||
+      band.minZ - qz > slop || qz - band.maxZ > slop
+    ) {
+      return false;
+    }
+  }
+
   if (rescued) {
     // --- Rescued, and therefore **projected rather than dropped uniformly**.
     //
@@ -2072,6 +2279,24 @@ export function swigPhase(seed: number, now: number): number {
  * processes have to break ties the same way. Returns early if `visit` returns
  * true.
  */
+/**
+ * WORKSTREAM AC: the two covers, built here rather than beside `AnchorCover`
+ * because `METH_REACH` and `DRUNK_REACH` are derived further down the file and a
+ * `const` cannot read one before it exists.
+ */
+const METH_COVER = new AnchorCover(
+  SUBURBS.length,
+  (i) => SUBURB_XZ[i * 2],
+  (i) => SUBURB_XZ[i * 2 + 1],
+  METH_REACH + ANCHOR_INDEX_RADIUS,
+);
+const DRUNK_COVER = new AnchorCover(
+  VENUE_COUNT,
+  (i) => VENUE_PACKED[i * 2],
+  (i) => VENUE_PACKED[i * 2 + 1],
+  DRUNK_REACH + ANCHOR_INDEX_RADIUS,
+);
+
 export function forEachMethheadNear(
   peds: PedestrianField,
   x: number,
@@ -2081,11 +2306,27 @@ export function forEachMethheadNear(
   scratch: PedBand[],
   out: StreetPose,
   visit: (pose: StreetPose) => boolean | void,
+  /**
+   * WORKSTREAM AC: pass false to pose every loiterer the anchor sweep
+   * enumerates, however far away, instead of letting `poseMethhead` refuse them
+   * off their band's extent. **For `verifyStreetlife` only** -- it is the
+   * "before" of the comparison that proves the gate is exact, and nothing in
+   * the game ever turns it off.
+   */
+  poseGate = true,
 ): void {
   const now = trafficSeconds(tick);
   const r2 = radius * radius;
-  for (let s = 0; s < SUBURBS.length; s++) {
-    const suburb = SUBURBS[s];
+  const gateR = poseGate ? radius : -1;
+  // WORKSTREAM AC: the candidates, in table order, from the precomputed cover --
+  // or the whole table when the caller asks for a radius wider than the cover
+  // was built for. See `AnchorCover`.
+  const indexed = radius <= ANCHOR_INDEX_RADIUS;
+  const cell = indexed ? METH_COVER.cellOf(x, z) : 0;
+  const from = indexed ? METH_COVER.starts[cell] : 0;
+  const to = indexed ? METH_COVER.starts[cell + 1] : SUBURBS.length;
+  for (let e = from; e < to; e++) {
+    const s = indexed ? METH_COVER.entries[e] : e;
     // The suburb's spread, out to the corner of the square patch, plus the reach
     // of a patch's own band search, plus the query's. Anything tighter than this
     // drops a loiterer who is genuinely inside `radius` -- see `LOITER_REACH`.
@@ -2106,12 +2347,12 @@ export function forEachMethheadNear(
     // `SPREAD_MAX` the tight rungs reach 581 m and this is 2,081 m, so one
     // constant covers both rungs and there is one derivation to keep honest.
     const gate = METH_REACH + radius;
-    const sdx = suburb.x - x;
-    const sdz = suburb.z - z;
+    const sdx = SUBURB_XZ[s * 2] - x;
+    const sdz = SUBURB_XZ[s * 2 + 1] - z;
     if (sdx * sdx + sdz * sdz > gate * gate) continue;
-    const n = methLoiterers(suburb);
+    const n = methLoiterers(SUBURBS[s]);
     for (let i = 0; i < n; i++) {
-      if (!poseMethhead(peds, s, i, now, scratch, out)) continue;
+      if (!poseMethhead(peds, s, i, now, scratch, out, x, z, gateR)) continue;
       const dx = out.x - x;
       const dz = out.z - z;
       if (dx * dx + dz * dz > r2) continue;
@@ -2141,9 +2382,17 @@ export function forEachDrunkNear(
   // the grid walk a spatial index would need for a set this size.
   const gate = DRUNK_REACH + radius;
   const gate2 = gate * gate;
-  for (let v = 0; v < VENUE_COUNT; v++) {
-    const vdx = VENUE_XZ[v * 2] - x;
-    const vdz = VENUE_XZ[v * 2 + 1] - z;
+  // WORKSTREAM AC: as `forEachMethheadNear`, and see `AnchorCover`. A venue's
+  // reach is small enough that most cells carry a handful of candidates and the
+  // CBD's carry a few dozen, against 875 before.
+  const indexed = radius <= ANCHOR_INDEX_RADIUS;
+  const cell = indexed ? DRUNK_COVER.cellOf(x, z) : 0;
+  const from = indexed ? DRUNK_COVER.starts[cell] : 0;
+  const to = indexed ? DRUNK_COVER.starts[cell + 1] : VENUE_COUNT;
+  for (let e = from; e < to; e++) {
+    const v = indexed ? DRUNK_COVER.entries[e] : e;
+    const vdx = VENUE_PACKED[v * 2] - x;
+    const vdz = VENUE_PACKED[v * 2 + 1] - z;
     if (vdx * vdx + vdz * vdz > gate2) continue;
     const n = venueDrunks(v);
     for (let i = 0; i < n; i++) {
@@ -3228,6 +3477,207 @@ export function verifyStreetlife(): string[] {
     // `pedKey` reaches (2^32 * 2 + 1) * 64 + 39, a shade under 2^39. Anything
     // this file emits has to clear it.
     if (KEY_BASE < 2 ** 39) failures.push('The street key base overlaps pedKey; a loiterer and a walker would share an identity.');
+  }
+
+  // --- WORKSTREAM AC: the pose slop, from the tables rather than from the line
+  // that declares it. `characters.POSE_SLOP` is asserted the same way and for
+  // the same reason: a bound that is a comment is a bound that drifts the day
+  // somebody retunes the pace.
+  {
+    const worst = 0.55 + PACE_AMPLITUDE + TWITCH_AMPLITUDE;
+    if (METH_POSE_SLOP < worst) {
+      failures.push(
+        `METH_POSE_SLOP is ${METH_POSE_SLOP} m against a worst-case displacement of ${worst.toFixed(2)} m off ` +
+          'the band. The pose gate would refuse a loiterer who is actually within range, which does not fail to ' +
+          'draw them -- it deletes them from the only enumeration there is.',
+      );
+    }
+  }
+
+  // --- WORKSTREAM AC: the anchor cover is a superset of the linear scan.
+  //
+  // `forEachMethheadNear` and `forEachDrunkNear` no longer walk the whole table.
+  // They read one precomputed slice of anchors per grid cell, and **an anchor
+  // missing from a slice is an anchor that does not exist** as far as the game
+  // is concerned: not drawn, not promoted, not hittable, silently, in one
+  // corner of the city. That is the same class of failure `DRUNK_REACH`'s header
+  // describes and it is worth the same kind of check.
+  //
+  // So: at a spread of query points, the set the cover offers is compared with
+  // the set a linear scan over the real tables offers, at the gate each sweep
+  // actually uses. Order is compared as well as membership -- the promotion scan
+  // takes the first thing it is handed, and two processes that disagreed about
+  // which suburb comes first would promote different people from the same tick.
+  {
+    const points: Array<[number, number]> = [
+      [0, 0], [-2236, 4543], [6053, 2336], [-19000, -5338], [-36068, 22319],
+      [11451, -49595], [-47772, -12232], [3654, 2421], [-9720, 1096], [-71000, 71000],
+      [59000, -59000], [-500.5, 1200.25],
+    ];
+    let missing = 0;
+    let disordered = 0;
+    let example = '';
+    for (const [x, z] of points) {
+      for (const radius of [DRUNK_NOTICE, METH_SIGHT, 200]) {
+        // The meth cover.
+        {
+          const gate = METH_REACH + radius;
+          const want: number[] = [];
+          for (let s = 0; s < SUBURBS.length; s++) {
+            const dx = SUBURB_XZ[s * 2] - x;
+            const dz = SUBURB_XZ[s * 2 + 1] - z;
+            if (dx * dx + dz * dz <= gate * gate) want.push(s);
+          }
+          const cell = METH_COVER.cellOf(x, z);
+          const got = new Set<number>();
+          let last = -1;
+          for (let e = METH_COVER.starts[cell]; e < METH_COVER.starts[cell + 1]; e++) {
+            const s = METH_COVER.entries[e];
+            if (s <= last) disordered++;
+            last = s;
+            got.add(s);
+          }
+          for (const s of want) {
+            if (!got.has(s)) {
+              missing++;
+              if (example === '') example = `suburb ${s} (${SUBURBS[s].name}) at r=${radius} from (${x}, ${z})`;
+            }
+          }
+        }
+        // And the drunks'.
+        {
+          const gate = DRUNK_REACH + radius;
+          const cell = DRUNK_COVER.cellOf(x, z);
+          const got = new Set<number>();
+          let last = -1;
+          for (let e = DRUNK_COVER.starts[cell]; e < DRUNK_COVER.starts[cell + 1]; e++) {
+            const v = DRUNK_COVER.entries[e];
+            if (v <= last) disordered++;
+            last = v;
+            got.add(v);
+          }
+          for (let v = 0; v < VENUE_COUNT; v++) {
+            const dx = VENUE_PACKED[v * 2] - x;
+            const dz = VENUE_PACKED[v * 2 + 1] - z;
+            if (dx * dx + dz * dz > gate * gate) continue;
+            if (!got.has(v)) {
+              missing++;
+              if (example === '') example = `venue ${v} at r=${radius} from (${x}, ${z})`;
+            }
+          }
+        }
+      }
+    }
+    if (missing > 0) {
+      failures.push(
+        `The anchor cover dropped ${missing} anchor(s) a linear scan finds -- the first is ${example}. ` +
+          'Everybody hanging off them is deleted from the world in that part of the city.',
+      );
+    }
+    if (disordered > 0) {
+      failures.push(
+        `${disordered} anchor slice(s) are not in ascending table order, so the promotion scan would take a ` +
+          'different loiterer from the one another process takes on the same tick.',
+      );
+    }
+  }
+
+  // --- WORKSTREAM AC: the pose gate refuses nobody, and two fields agree.
+  //
+  // Two claims over one fixture, because they need the same expensive setup and
+  // they fail in the same way -- somebody who is there on one machine and not on
+  // another:
+  //
+  //   1. `poseMethhead`'s early box refusal is **exact**. The sweep is run with
+  //      the gate on and off and the two ordered streams are compared. A gate
+  //      that refuses somebody the ungated sweep places inside the radius is not
+  //      a missing drawing, it is an NPC the server has and the client does not.
+  //   2. The placement is a **pure function of `(anchor, index, tick)` and the
+  //      band set**, which is `factions.ts` section 2's contract and the thing
+  //      the whole ambient tier rests on. Two independent `PedestrianField`s
+  //      carrying the same streets stand in for two processes, and the queries
+  //      are **interleaved** rather than run one field after the other -- which
+  //      is the arrangement that catches a cache keyed on the tick but not on
+  //      the field, the exact mistake the per-tick tables in `game/characters.ts`
+  //      could make.
+  //
+  // Several densities, in the sense the built city has them: the grid is adopted
+  // at four origins, which puts it over four different `crowdMultiplier` fields
+  // and four different distances from the suburb and venue tables, so the sweeps
+  // enumerate different numbers of people from the same geometry.
+  {
+    const origins: Array<[number, number]> = [[0, 0], [-2000, 4500], [6000, 2400], [-19000, -5300]];
+    const a = new PedestrianField();
+    const b = new PedestrianField();
+    let adopted = 0;
+    for (const [ox, oz] of origins) {
+      const grid = syntheticGrid(ox, oz);
+      if (grid === null) continue;
+      a.adopt(`grid${ox},${oz}`, grid);
+      b.adopt(`grid${ox},${oz}`, grid);
+      adopted++;
+    }
+    if (adopted !== origins.length) {
+      failures.push('verifyStreetlife could not build its synthetic street grids; the pose gate is unproven.');
+    } else {
+      const bandsA: PedBand[] = [];
+      const bandsB: PedBand[] = [];
+      const poseA = createStreetPose();
+      const poseB = createStreetPose();
+      const line = (p: StreetPose): string =>
+        `${p.kind}:${p.anchor}#${p.index}@${p.x.toFixed(4)},${p.z.toFixed(4)}`;
+      let gateMismatch = '';
+      let fieldMismatch = '';
+      let placed = 0;
+      outer: for (let tick = 0; tick < 240_000; tick += 31_991) {
+        for (const [ox, oz] of origins) {
+          for (const r of [DRUNK_NOTICE, METH_SIGHT, 150]) {
+            for (let q = 0; q < 4; q++) {
+              const x = ox + (q % 2) * 150;
+              const z = oz - Math.floor(q / 2) * 150;
+              const gated: string[] = [];
+              const plain: string[] = [];
+              const other: string[] = [];
+              // Interleaved: A gated, B gated, A ungated. Any table that
+              // remembered the last field's answer for this tick would show up
+              // as B disagreeing with A rather than as a slow check.
+              forEachMethheadNear(a, x, z, r, tick, bandsA, poseA, (p) => { gated.push(line(p)); });
+              forEachMethheadNear(b, x, z, r, tick, bandsB, poseB, (p) => { other.push(line(p)); });
+              forEachMethheadNear(a, x, z, r, tick, bandsA, poseA, (p) => { plain.push(line(p)); }, false);
+              forEachDrunkNear(a, x, z, r, tick, bandsA, poseA, (p) => { gated.push(line(p)); });
+              forEachDrunkNear(b, x, z, r, tick, bandsB, poseB, (p) => { other.push(line(p)); });
+              forEachDrunkNear(a, x, z, r, tick, bandsA, poseA, (p) => { plain.push(line(p)); });
+              placed += gated.length;
+              if (gateMismatch === '' && gated.join('|') !== plain.join('|')) {
+                gateMismatch = `at (${x}, ${z}) r=${r} tick=${tick}: gated [${gated.join('|')}], ungated [${plain.join('|')}]`;
+              }
+              if (fieldMismatch === '' && gated.join('|') !== other.join('|')) {
+                fieldMismatch = `at (${x}, ${z}) r=${r} tick=${tick}: one field [${gated.join('|')}], the other [${other.join('|')}]`;
+              }
+              if (gateMismatch !== '' && fieldMismatch !== '') break outer;
+            }
+          }
+        }
+      }
+      if (placed === 0) {
+        failures.push(
+          'The two-field comparison placed nobody at all over four grids, three radii and eight ticks, so it ' +
+            'proves nothing. The fixture has drifted away from the suburb and venue tables.',
+        );
+      }
+      if (gateMismatch !== '') {
+        failures.push(
+          `The loiterer pose gate changed who is nearby ${gateMismatch}. METH_POSE_SLOP (${METH_POSE_SLOP} m) ` +
+            'does not cover everything `poseMethhead` displaces somebody by.',
+        );
+      }
+      if (fieldMismatch !== '') {
+        failures.push(
+          `Two identical band sets placed different people ${fieldMismatch}. The ambient tier is no longer a ` +
+            'pure function of (anchor, index, tick) -- something is remembering an answer across fields.',
+        );
+      }
+    }
   }
 
   return failures;

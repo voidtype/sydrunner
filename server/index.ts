@@ -157,6 +157,9 @@ import { verifyPolair } from '../client/src/game/polair.ts';
 // run in the second runtime -- which is the premise this whole block exists to
 // test. See the comment above the list.
 import { verifyCharacters } from '../client/src/game/characters.ts';
+// WORKSTREAM AC: and the street factions', which this process runs every tick
+// and never checked at boot. See the list below.
+import { verifyStreetlife } from '../client/src/game/streetlife.ts';
 import { verifyEvents } from '../client/src/game/events.ts';
 import { verifyWallet } from './wallet-contract.ts';
 import { verifyTeleport } from '../client/src/game/teleport.ts';
@@ -508,7 +511,18 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // "they went through your pockets" for money that never moved -- in a build
     // that has no money in it at all. It is three lines of arithmetic and it is
     // the contract the branch that owns the money inherits.
+    //
+    // WORKSTREAM AC: `verifyStreetlife` joins them, and it should have been here
+    // all along -- it has run in `main.ts`'s boot list since the loiterers
+    // shipped and only ever ran on this side inside `integration-check`, which
+    // takes 45 minutes and is therefore not a boot gate. What it now covers is
+    // squarely the authority's: the two ambient sweeps read a precomputed anchor
+    // cover instead of walking 837 suburbs and 875 venues per player, and an
+    // anchor missing from that cover is a meth head who exists on the client and
+    // not on the server -- one you can walk through, in one corner of the city,
+    // silently.
     ['verifyCharacters', verifyCharacters()],
+    ['verifyStreetlife', verifyStreetlife()],
     ['verifyEvents', verifyEvents()],
     ['verifyWallet', verifyWallet()],
     // The money. Four checks rather than one, because they are four different
