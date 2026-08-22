@@ -32,6 +32,10 @@ match that voice, and read the header of any file before changing it.
   mechanic must pass, and the researched verdicts (adopt / later / refuse)
   from WoW, Skyrim, GTA and the player suggestion board. A brief that
   contradicts it is wrong until it is changed.
+- **[scripts/content/README.md](scripts/content/README.md)** — content packs
+  (quests, dialog) go live from GitHub without a deploy; the five scripts
+  there are the only placement/register gate, and a pack is refused whole on
+  one error.
 
 ## Rules that are not negotiable
 
@@ -48,12 +52,19 @@ match that voice, and read the header of any file before changing it.
   time* — so a merge or an edit landed mid-run gives a parent on the old code
   talking to children on the new, and every failure it prints is suspect (a v20
   merge mid-run once produced eighteen, all phantom). Run it on a tree you will
-  not touch, or in a worktree pinned to the commit under test. Two more traps
+  not touch, or in a worktree pinned to the commit under test. Four more traps
   from the same hour: `SYDNEY_CHECK_ONLY=<section>` runs one section in a
-  minute instead of twenty-five (the list is at the bottom of the file), and
-  `pkill -f "SYDNEY_PORT=8791"` matches **nothing** — env vars are not in a
-  process's command line, so servers you think you cleaned up keep listening on
-  the check's ports and the next run silently talks to them. Kill by pid.
+  minute instead of twenty-five (the list is at the bottom of the file;
+  `SYDNEY_CHECK_ONLY=police` now exists), and `pkill -f "SYDNEY_PORT=8791"`
+  matches **nothing** — env vars are not in a process's command line, so servers
+  you think you cleaned up keep listening on the check's ports and the next run
+  silently talks to them. Kill by pid. The main checkout's `client/public/world`
+  is the real 16 GB world, not a symlink — `vite build` there copies it into
+  `dist`, so build only from a pinned worktree with the symlink removed; and
+  `pkill -f <fragment>` also kills any sub-agent whose prompt text contains the
+  fragment (the handoff runner passes the whole task on its command line) — stop
+  servers by port (`lsof -tiTCP:<port> -sTCP:LISTEN | xargs kill`) and handoffs
+  by their pid file.
 - **Determinism**: anything evaluated on both ends avoids `Math.sin/cos/pow/
   hypot`; ambient things are pure functions of `(anchor, index, tick)`. See
   `game/footy.ts` and `game/traffic.ts` headers.

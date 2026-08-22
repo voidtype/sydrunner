@@ -520,6 +520,10 @@ they must move together or the server and the CDN disagree about the ground.
 #    if it is a symlink; restore it afterwards.)
 export PATH="$HOME/.nvm/versions/node/v22.12.0/bin:$PATH"   # bare PATH has node v4
 (cd client && npm run build)          # tsc --noEmit + vite build (~5 s, 70 MB dist)
+# Build only from a pinned worktree with client/public/world removed — the main
+# checkout's is the real 16 GB world, not a symlink, and vite build copies it into
+# dist; and compare the bundle hash local vs live (index-XXXX.js) before trusting
+# a deploy.
 scripts/precompress-dist.sh           # .zst/.br sidecars beside every asset
 
 # 1. Ship. The host key is only known as oxford-tractor.bnr.la; sydrunner.3rp.uk
