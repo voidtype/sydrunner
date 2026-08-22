@@ -1173,7 +1173,7 @@ export function clampImprov(raw: unknown): string {
   if (typeof raw !== 'string') return '';
   const flat = raw
     .replace(/<[^>]*>/g, ' ')
-    .replace(/[ -]+/g, ' ')
+    .replace(/[\x00-\x1f\x7f]+/g, ' ')
     .replace(/\s+/gu, ' ')
     .trim();
   return [...flat].slice(0, MAX_IMPROV_CHARS).join('').trim();
@@ -1790,7 +1790,7 @@ export function verifyDialog(): string[] {
       ['a\nb\nc', 'a b c'],
       ['<b>bold</b>', 'bold'],
       ['<script>alert(1)</script>', 'alert(1)'],
-      ['a b', 'a b'],
+      ['a\x00b', 'a b'],
     ];
     for (const [raw, want] of cases) {
       const got = clampImprov(raw);
