@@ -1,0 +1,155 @@
+{
+  "pack": "act0",
+  "_comment": [
+    "DENISE, AT THE REDFERN SERVICE CENTRE.",
+    "",
+    "A node has a line and up to six choices. A choice may go to another node, or",
+    "accept a quest, or turn one in, and may be gated on level, faction, a story",
+    "flag, the absence of one, or money. `cost` spends through the wallet and the",
+    "server takes it, not the client.",
+    "",
+    "TWO NODES HERE ARE MARKED `improv`. When SYDNEY_DIALOG_AI_URL/_KEY are set,",
+    "the server renders those lines through the model once per node per week and",
+    "caches the answer. With no key -- which is the ordinary configuration -- the",
+    "authored `line` below serves and nothing anywhere is different. An improv",
+    "node may not accept, turn in or charge for anything: the schema forbids it",
+    "and verifyDialog refuses a pack that tries. The AI paints; the data decides."
+  ],
+  "npcs": [
+    {
+      "id": "centrelink-clerk",
+      "name": "Denise, Services Australia",
+      "x": -925.2,
+      "z": 2645.2,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Take a number. The number is not connected to anything, but take one.",
+          "choices": [
+            { "text": "What am I meant to be doing?", "goto": "obligations" },
+            { "text": "I've done it.", "goto": "turnins" },
+            { "text": "About that course.", "goto": "upskilled" },
+            { "text": "How long's the wait?", "goto": "smalltalk" },
+            {
+              "text": "You wanted to see me.",
+              "goto": "review",
+              "needFlag": "act0:trained",
+              "needLevel": 2
+            },
+            { "text": "Nothing. Sorry.", "goto": "" }
+          ]
+        },
+        {
+          "id": "obligations",
+          "line": "Your mutual obligations. You agreed to these. There is a signature and it is yours.",
+          "choices": [
+            {
+              "text": "The initial appointment.",
+              "accept": "act0-report",
+              "denyFlag": "act0:reported"
+            },
+            {
+              "text": "Twenty points of job search.",
+              "accept": "act0-jobsearch",
+              "needFlag": "act0:reported",
+              "denyFlag": "act0:points"
+            },
+            {
+              "text": "Evidence of attendance.",
+              "accept": "act0-evidence",
+              "needFlag": "act0:points",
+              "denyFlag": "act0:evidence"
+            },
+            {
+              "text": "Approved travel.",
+              "accept": "act0-travel",
+              "needFlag": "act0:evidence",
+              "denyFlag": "act0:travel"
+            },
+            {
+              "text": "Mandatory upskilling.",
+              "accept": "act0-training",
+              "needFlag": "act0:travel",
+              "denyFlag": "act0:trained"
+            },
+            {
+              "text": "The participation review.",
+              "accept": "act0-review",
+              "needFlag": "act0:trained",
+              "needLevel": 2
+            }
+          ]
+        },
+        {
+          "id": "turnins",
+          "line": "Let's see it, then. I'll put it in the system. The system is down. I'll put it in when it's up.",
+          "choices": [
+            { "text": "I turned up.", "turnin": "act0-report" },
+            { "text": "Twenty points, give or take.", "turnin": "act0-jobsearch" },
+            { "text": "Here's the photo.", "turnin": "act0-evidence" },
+            { "text": "I caught the train.", "turnin": "act0-travel" },
+            { "text": "I did the course.", "turnin": "act0-training" },
+            { "text": "I sat through the review.", "turnin": "act0-review" }
+          ]
+        },
+        {
+          "id": "upskilled",
+          "line": "Resilience in the Modern Workplace. Six hours. There's a certificate. Nobody has ever asked to see one.",
+          "choices": [
+            { "text": "Right.", "goto": "hello" },
+            { "text": "Does it lead to anything?", "goto": "upskilled_no" }
+          ]
+        },
+        {
+          "id": "upskilled_no",
+          "line": "It leads to the next course.",
+          "choices": [{ "text": "Of course it does.", "goto": "hello" }]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Forty minutes. It says twelve on the screen. The screen is aspirational.",
+          "improv": {
+            "persona": "Denise, a Centrelink officer at the Redfern service centre in Sydney. Twenty-two years in the job, entirely out of patience, not unkind. Deadpan, lower case, very Australian.",
+            "context": "A claimant has asked how long the wait is. The queue display says twelve minutes and is wrong. She has said this sentence several thousand times."
+          },
+          "choices": [
+            { "text": "I'll sit down.", "goto": "hello" },
+            { "text": "It said twelve when I got here.", "goto": "smalltalk_again" }
+          ]
+        },
+        {
+          "id": "smalltalk_again",
+          "line": "It said twelve when I got here in 2004.",
+          "choices": [{ "text": "Fair enough.", "goto": "hello" }]
+        },
+        {
+          "id": "review",
+          "line": "This is a participation review. It is not a breach. A breach has a form. This has a conversation, and then possibly a form. — Someone in a high-vis vest is standing in the doorway looking at you.",
+          "choices": [
+            { "text": "Who's that in the doorway?", "goto": "interrupted" },
+            { "text": "Understood.", "goto": "" }
+          ]
+        },
+        {
+          "id": "interrupted",
+          "line": "Don't. They come in here recruiting. Marita reckon they can get you work by Thursday and DeFAULT reckon work is the problem. Whichever one you talk to first is the one you end up with. — Denise goes back to her screen.",
+          "improv": {
+            "persona": "Denise, a Centrelink officer at the Redfern service centre in Sydney, twenty-two years in the job and finished with all of it. Deadpan, lower case, no exclamation marks.",
+            "context": "A recruiter from one of the two street factions -- Marita, who promise work, and DeFAULT, who say work is the problem -- is loitering in the doorway of her office waiting for the claimant to come out. She has watched this happen to a great many people and has no opinion she is paid to share. Spell the two names exactly as Marita and DeFAULT."
+          },
+          "choices": [
+            { "text": "Right. Thanks, Denise.", "goto": "" },
+            { "text": "Which one would you pick?", "goto": "interrupted_no" }
+          ]
+        },
+        {
+          "id": "interrupted_no",
+          "line": "I'm a public servant. I'd pick the one that doesn't come to my counter.",
+          "choices": [{ "text": "Noted.", "goto": "" }]
+        }
+      ]
+    }
+  ]
+}

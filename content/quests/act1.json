@@ -1,0 +1,46 @@
+{
+  "pack": "act1",
+  "_comment": [
+    "ACT 1 — the far side of the faction door. Two jobs, one each, both weekly.",
+    "",
+    "`repeatable: true` is the whole of what makes these weekly: a repeatable never",
+    "writes its q:<id> completion mark, so it comes round again, and its cursor is",
+    "cleared by the Monday reset with the xp. A story quest writes the mark and is",
+    "finished forever. See net/accounts.AccountRecord.story.",
+    "",
+    "`needFlags: [act1:open]` is what act0-review unlocks, and `faction` is the",
+    "side gate. Both are checked on the server against its own copy of this file."
+  ],
+  "quests": [
+    {
+      "id": "act1-marita-roundup",
+      "act": 1,
+      "title": "A Conversation With Four Agents",
+      "blurb": "Sharnie has identified four real estate agents conducting business on land they do not own. Marita would like a word had.",
+      "giver": "marita-handler",
+      "level": 2,
+      "faction": "Marita",
+      "needFlags": ["act1:open"],
+      "repeatable": true,
+      "steps": [
+        { "kind": "ko", "npc": "real estate agent", "count": 4, "label": "have a word with four agents" }
+      ],
+      "reward": { "cash": 60, "xp": 200, "unlock": [] }
+    },
+    {
+      "id": "act1-default-audit",
+      "act": 1,
+      "title": "Sixty Dollars, Unspecified",
+      "blurb": "Mick would like sixty dollars to exist that did not exist this morning. He has been careful not to say how.",
+      "giver": "default-handler",
+      "level": 2,
+      "faction": "DeFAULT",
+      "needFlags": ["act1:open"],
+      "repeatable": true,
+      "steps": [
+        { "kind": "earn", "dollars": 60, "label": "come up with sixty dollars" }
+      ],
+      "reward": { "cash": 60, "xp": 200, "unlock": [] }
+    }
+  ]
+}

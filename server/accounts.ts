@@ -66,8 +66,11 @@
 import {
   AUTH_PER_MIN,
   CHECK_PER_MIN,
+  MAX_OPEN_QUESTS,
+  MAX_STORY_FLAGS,
   MAX_TOKENS_PER_ACCOUNT,
   TOKEN_TTL_MS,
+  XP_PER_KO,
   type AccountFile,
   type AccountRecord,
   type AccountView,
@@ -87,6 +90,7 @@ import {
   weekOf,
 } from '../client/src/net/accounts.ts';
 import { EMPTY_MASK, TEAM, type TalentMask, type Team } from '../client/src/game/teams.ts';
+import { MAX_XP_REWARD, type QuestCursor } from '../client/src/game/questmodel.ts';
 import { FloodGuard } from './suggestions.ts';
 import { type WalletStore } from './wallets.ts';
 
@@ -121,6 +125,20 @@ export const ACCOUNT_SAVE_DEBOUNCE_MS = 2000;
  * handle, and short enough that the file does not accumulate forever.
  */
 export const ACCOUNT_TTL_MS = 365 * 24 * 3600 * 1000;
+
+/**
+ * The most experience one call may add. Workstream AK.
+ *
+ * The second wall behind `questmodel.MAX_XP_REWARD`, and it exists because the
+ * first one is a validator over a file that a person edits in a browser. That
+ * validator is good and it is also the only thing between a typo and this
+ * store, so the store has an opinion of its own -- `wallets.debit`'s standing
+ * argument, made about the field that decides what level everybody is.
+ *
+ * Deliberately the *same* number rather than a looser one: a call that wants
+ * more than a content pack may pay is a caller that has already gone wrong.
+ */
+export const MAX_XP_PER_AWARD = MAX_XP_REWARD;
 
 /** What a route hands back. `token` is empty on every failure. */
 export interface AuthOutcome {
@@ -425,7 +443,11 @@ export class AccountStore {
       providers: {},
       tokens: [],
       kills,
-      level: levelFor(kills),
+      // The guest's knockouts, in the ladder's own currency. A guest cannot
+      // have quest xp -- there is nowhere to keep it, which is the whole of
+      // what an account buys -- so this is exact rather than a floor.
+      xp: kills * XP_PER_KO,
+      level: levelFor(kills * XP_PER_KO),
       levelWeek: weekOf(now),
       lastPos: spot,
       // No side and nothing spent. A guest cannot have chosen -- the choice is
@@ -435,6 +457,13 @@ export class AccountStore {
       // See `AccountRecord.team`.
       team: TEAM.NONE,
       talents: { ...EMPTY_MASK },
+      // No story and nothing in progress. A guest can be *given* a quest -- the
+      // engine holds a transient cursor for them -- but nothing about it is
+      // carried here, and that is the same call the team field makes one line
+      // up for the same reason: what does not persist for a guest is precisely
+      // what an account is for. See `server/quests.ts`' guest paragraph.
+      story: [],
+      quests: {},
     };
     // Re-checked **after** the await. Hashing is tens of milliseconds and this
     // process is single-threaded but not single-*task*: two sign-ups for one
@@ -628,10 +657,96 @@ export class AccountStore {
     const reset = resetIfNewWeek(record, now);
     const before = record.level;
     record.kills++;
-    record.level = levelFor(record.kills);
+    // WORKSTREAM AK: **the one place a knockout becomes experience**, and it is
+    // deliberately this line rather than a listener somewhere else, on the same
+    // argument `Simulation.creditKo` makes about the kill funnel: a second
+    // counter anywhere else is the one that stops counting when a weapon
+    // changes. `kills` stays the body count and `xp` is the ladder; they are
+    // equal times a hundred until a quest pays, which is what makes this change
+    // bit-for-bit invisible today. See `net/accounts.XP_PER_KO`.
+    record.xp += XP_PER_KO;
+    record.level = levelFor(record.xp);
     record.lastSeenMs = now;
     this.touch();
     return { level: record.level, levelled: record.level > before, reset };
+  }
+
+  // --- Quests and the story. Workstream AK.
+
+  /**
+   * Add experience from something that is not a knockout, and say what changed.
+   *
+   * `creditKill`'s shape, and a **separate method rather than a parameter on
+   * it** because the two have different obligations to the rest of the record:
+   * a knockout must also increment `kills`, which is what the leaderboard's
+   * body count is, and a quest reward emphatically must not -- money for
+   * paperwork is not a knockout and putting it in that column would be a
+   * scoreboard that lies about a fight that never happened.
+   *
+   * Clamped rather than trusted, because the amount ultimately comes from a
+   * **JSON file somebody edited on github.com**: `game/questmodel.ts` refuses a
+   * pack that pays over `MAX_XP_REWARD`, and this is the second wall behind it,
+   * on `wallets.debit`'s standing argument that the store is the last thing
+   * between a number and the disk.
+   */
+  creditXp(record: AccountRecord, amount: number, now = Date.now()): { level: number; levelled: boolean } {
+    if (resetIfNewWeek(record, now)) this.touch();
+    const before = record.level;
+    const add = Number.isFinite(amount) ? Math.max(0, Math.min(MAX_XP_PER_AWARD, Math.trunc(amount))) : 0;
+    if (add === 0) return { level: record.level, levelled: false };
+    record.xp = Math.min(1e9, record.xp + add);
+    record.level = levelFor(record.xp);
+    record.lastSeenMs = now;
+    this.touch();
+    return { level: record.level, levelled: record.level > before };
+  }
+
+  /**
+   * Set a story flag. Returns whether it was new.
+   *
+   * **The one write path for the only field that outlives the week**, and the
+   * "once" is enforced here rather than at the call site for `chooseTeam`'s
+   * reason exactly: a rule kept in the engine is a rule a second caller can
+   * simply not know about, and a story flag written twice is a `story` array
+   * that grows every time a repeatable is turned in.
+   *
+   * Deliberately **not** rolled into the week first, unlike every other method
+   * on this store. Rolling would be harmless -- the flags survive the roll --
+   * but it would also be the one place in this file where a *read* of the
+   * calendar is not load-bearing, and the honest version of "this field has no
+   * calendar" is not to consult one.
+   */
+  setStoryFlag(record: AccountRecord, flag: string, now = Date.now()): boolean {
+    const clean = flag.trim().toLowerCase().slice(0, 64);
+    if (clean === '' || record.story.includes(clean)) return false;
+    if (record.story.length >= MAX_STORY_FLAGS) return false;
+    record.story.push(clean);
+    record.lastSeenMs = now;
+    this.touch();
+    return true;
+  }
+
+  /**
+   * Write a player's quest cursors back.
+   *
+   * `writeTalents`' shape and its two properties. **Deliberately dumb**: every
+   * rule about what a cursor may be lives in `game/questmodel.ts` and is
+   * applied by `server/quests.ts` before this is called, because a second
+   * opinion here would be a second copy of the step arithmetic on the
+   * file-writing side, where nothing renders when it disagrees. And the record
+   * is **copied** rather than aliased, because the caller's object is the
+   * engine's live one and a record on disk that shares an object with a cursor
+   * in play is a record that changes under the serialiser.
+   */
+  writeQuests(record: AccountRecord, cursors: Readonly<Record<string, QuestCursor>>): void {
+    const out: Record<string, QuestCursor> = {};
+    let n = 0;
+    for (const [id, c] of Object.entries(cursors)) {
+      out[id] = { s: c.s, c: [...c.c], d: c.d };
+      if (++n >= MAX_OPEN_QUESTS) break;
+    }
+    record.quests = out;
+    this.touch();
   }
 
   // --- The side, and the points spent on it. Workstream V.

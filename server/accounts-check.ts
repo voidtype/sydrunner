@@ -74,8 +74,8 @@ import {
   decodeSuggestAck,
   encodeSuggestSubmit,
 } from '../client/src/net/suggestions.ts';
-import { weekOf } from '../client/src/net/accounts.ts';
-import { AccountStore, AuthGuards, handleAuthRequest, type LiveLookup } from './accounts.ts';
+import { XP_PER_KO, koEquivalent, levelFor, weekOf } from '../client/src/net/accounts.ts';
+import { AccountStore, AuthGuards, MAX_XP_PER_AWARD, handleAuthRequest, type LiveLookup } from './accounts.ts';
 import { WalletStore } from './wallets.ts';
 import { PROMPTED, SAVE_PROMPT_BALANCE, Simulation, type Participant } from './sim.ts';
 import type { ServerWorld } from './world.ts';
@@ -204,6 +204,57 @@ async function phaseA(): Promise<void> {
   check(hero.kos === 10, 'the scoreboard counted them', `${hero.kos} KOs`);
   check(record.kills === 10, 'the account counted them', `${record.kills} kills`);
   check(hero.level === 2 && record.level === 2, 'ten kills is level 2', `level ${hero.level}`);
+
+  /*
+   * --- WORKSTREAM AK: the ladder is experience now, and this is where the
+   * claim that nothing changed is actually tested.
+   *
+   * `levelFor` reads `xp` rather than `kills`, and the whole argument for that
+   * being safe is that `XP_PER_KO x KILLS_PER_LEVEL` is `XP_PER_LEVEL` -- so
+   * ten knockouts is level 2 today exactly as it was yesterday. The three
+   * assertions above already prove the *level*; these prove it happened for the
+   * right reason rather than by a coincidence of two constants that could drift
+   * apart later.
+   *
+   * The roster field goes with it: it is a `u16` of knockout-*equivalents* now
+   * (`accounts.koEquivalent`), which is the same number until a quest pays and
+   * is the number the HUD's bar has always been drawn from.
+   */
+  check(record.xp === 10 * XP_PER_KO, 'ten knockouts is a thousand xp', `${record.xp} xp`);
+  check(levelFor(record.xp) === record.level, 'and the stored level is the one the xp implies');
+  check(koEquivalent(record.xp) === record.kills, 'the roster field still equals the kill count', `${koEquivalent(record.xp)}`);
+
+  /*
+   * --- The two doors quests write through, which nothing else in this file
+   * exercises: xp that did not come from a knockout, and a permanent flag.
+   *
+   * On a **record of its own**, because the first cut of this ran them against
+   * the hero and pushed him to level 5 -- which the restart and login
+   * assertions two hundred lines below are written against ("level 2 on 10
+   * kills"). A check that perturbs the fixture it shares with the rest of the
+   * file fails somewhere else, for a reason that reads as unrelated.
+   */
+  {
+    const spare = await accounts.signup('Shazza', 'hunter2hunter2', '', null);
+    const other = accounts.byHandle('shazza');
+    if (!spare.ok || !other) {
+      check(false, 'the spare account exists');
+    } else {
+      const out = accounts.creditXp(other, 1000);
+      check(out.levelled && other.level === 2, 'xp from something other than a knockout levels you up', `level ${other.level}`);
+      check(other.kills === 0, 'and does not touch the body count', `${other.kills} kills`);
+      // The store is the last wall in front of the disk, on `wallets.debit`'s
+      // standing argument: the amount ultimately comes out of a JSON file
+      // somebody edits in a browser.
+      const capped = other.xp;
+      accounts.creditXp(other, 10_000_000);
+      check(other.xp - capped <= MAX_XP_PER_AWARD, 'a single award is clamped by the store', `+${other.xp - capped}`);
+
+      check(accounts.setStoryFlag(other, 'act0:reported'), 'a story flag is written');
+      check(!accounts.setStoryFlag(other, 'ACT0:Reported'), 'and folds, so it is not written twice');
+      check(other.story.length === 1, 'one flag, once', JSON.stringify(other.story));
+    }
+  }
 
   // --- The level is on the roster, and survives the wire.
   {

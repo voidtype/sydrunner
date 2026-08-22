@@ -152,6 +152,8 @@ import {
 } from '../game/teams.ts';
 import { TeamField } from '../game/teamfield.ts';
 import { TEAM_OP, decodeTalents, encodeTeamOp, type TalentsRecord } from './teams.ts';
+// WORKSTREAM AK: the quest conversation's two codecs and its frame shape.
+import { blankQuestState, decodeQuestState, encodeQuest, type QuestStateFrame } from './quests.ts';
 import { railSeconds, tripIndexAt, type RailBake, type RailDirection } from '../game/rail.ts';
 import {
   aboardFrame,
@@ -625,6 +627,20 @@ export class NetClient {
    * A **replacement, not an upsert**, matching the message. See `decodeTalents`.
    */
   private readonly talents = new Map<number, TalentsRecord>();
+  /**
+   * WORKSTREAM AK: the last `QUEST_STATE`. Never null; see `questState`.
+   *
+   * **A mirror with no callback beside it**, which is the one way this differs
+   * from `talents` above. That one fires `onTalents` because the talent panel
+   * is a modal screen a player is staring at and a redraw owed to the next
+   * frame is a click that appears not to have registered. The dialog panel and
+   * the phone's obligations app both redraw on their own 4 Hz clock -- they
+   * show distances and gate states that move on their own anyway -- so a
+   * handler here would be a second path to the same redraw, and this repo's
+   * standing rule about a self-check nothing runs applies just as well to a
+   * hook nothing listens to.
+   */
+  private quests: QuestStateFrame = blankQuestState();
 
   /**
    * The aura-resolved lookup, for the client's own predictions.
@@ -737,6 +753,43 @@ export class NetClient {
   resetTalents(): void {
     if (!this.transport.open) return;
     this.transport.send(encodeTeamOp(MSG.TEAM, TEAM_OP.RESET_ALL));
+  }
+
+  // --- WORKSTREAM AK: quests and dialog. One door out, one mirror in.
+
+  /**
+   * Send one quest operation. The **only** thing the dialog panel can make
+   * happen.
+   *
+   * A single method taking an op rather than six named ones, which is the
+   * opposite of the four talent methods above it and is deliberate: those four
+   * have four different argument shapes and four different meanings to a
+   * reader, where these six are one conversation with one frame layout and the
+   * caller is a single `switch`-free panel. Six near-identical wrappers would
+   * be five more places to forget the `transport.open` test.
+   */
+  quest(op: number, id = '', node = '', choice = 0): void {
+    if (!this.transport.open) return;
+    this.transport.send(encodeQuest(MSG.QUEST, { op, id, node, choice }));
+  }
+
+  /**
+   * This player's cursors, story flags and xp, as the server last described
+   * them.
+   *
+   * A **mirror rather than an authority**, exactly like `talents` above: the
+   * panel greys a choice out optimistically off `questmodel.choiceRefusal`,
+   * which is a *rule* in a shared file rather than a guess about what the
+   * server will say, and this frame is what turns a click into a moved cursor.
+   *
+   * It is never null. `blankQuestState()` is what serves before the first frame
+   * arrives, which is the first second of every session and the whole of every
+   * session in which nobody talks to anybody -- the panel reads it every
+   * quarter-second and a null here would be a branch on the hot path of the
+   * ordinary case. See `verifyDialogPanel`, which asserts the blank is blank.
+   */
+  questState(): QuestStateFrame {
+    return this.quests;
   }
 
   /** The board, in the order it is drawn. See `protocol.rankRoster`. */
@@ -1740,6 +1793,25 @@ export class NetClient {
         this.talents.clear();
         for (const r of records) this.talents.set(r.playerId, r);
         this.handlers.onTalents?.();
+        return;
+      }
+      /*
+       * WORKSTREAM AK: where this player is in every quest they are on.
+       *
+       * Wholesale replacement rather than a merge, because the frame is the
+       * server's complete answer about this player rather than a delta -- a
+       * cursor that has been turned in is *absent* from the next frame, and a
+       * merge would leave it on screen forever.
+       *
+       * The `note` is handed straight to the pill, which is where every other
+       * per-player sentence in this game goes (`Simulation.note`'s channel).
+       * The improv line is left on the frame for the panel to read, because it
+       * is addressed to one node and only that node's draw should use it.
+       */
+      case MSG.QUEST_STATE: {
+        const state = decodeQuestState(frame, MSG.QUEST_STATE);
+        if (!state) return;
+        this.quests = state;
         return;
       }
       case MSG.BYE: {

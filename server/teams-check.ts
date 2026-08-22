@@ -61,7 +61,7 @@ import { TerrainField } from '../client/src/world/terrain.ts';
 import { TrafficField } from '../client/src/game/traffic.ts';
 import { WaterLevels } from '../client/src/world/wading.ts';
 import { decodeRoster, encodeRoster } from '../client/src/net/protocol.ts';
-import { levelFor, weekOf } from '../client/src/net/accounts.ts';
+import { XP_PER_KO, levelFor, weekOf } from '../client/src/net/accounts.ts';
 import {
   AURA_M,
   FX,
@@ -276,7 +276,13 @@ async function run(): Promise<void> {
   // and it is the real function.
   const setLevel = (level: number): void => {
     record.kills = (level - 1) * 10;
-    record.level = levelFor(record.kills);
+    // WORKSTREAM AK: the ladder is xp now and `levelFor` reads it, so a fixture
+    // that seeds a level has to seed the currency the level is made of. The
+    // knockouts stay beside it because they are the body count and the
+    // leaderboard still draws them; `kills x XP_PER_KO` is exactly what those
+    // knockouts would have paid. See `net/accounts.XP_PER_KO`.
+    record.xp = record.kills * XP_PER_KO;
+    record.level = levelFor(record.xp);
     hero.level = record.level;
   };
   setLevel(7);
@@ -384,7 +390,8 @@ async function run(): Promise<void> {
       const rec = store.byHandle(handle);
       if (!rec) throw new Error(`no ${handle}`);
       rec.kills = 90;
-      rec.level = levelFor(rec.kills);
+      rec.xp = rec.kills * XP_PER_KO;
+      rec.level = levelFor(rec.xp);
       store.chooseTeam(rec, team as 1 | 2);
       return room.join(0, null, rec.handle, rec);
     };
@@ -539,7 +546,8 @@ async function liveHero(
   const rec = store.byHandle(handle);
   if (!rec) throw new Error(`no ${handle}`);
   rec.kills = 90;
-  rec.level = levelFor(rec.kills);
+  rec.xp = rec.kills * XP_PER_KO;
+  rec.level = levelFor(rec.xp);
   if (team !== TEAM.NONE) store.chooseTeam(rec, team as 1 | 2);
   const p = room.join(0, null, rec.handle, rec);
   for (const name of build) room.teamOp(p.id, TEAM_OP.TAKE, nodeId(team, name));

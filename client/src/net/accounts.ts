@@ -114,6 +114,9 @@
 import { EMPTY_MASK, NODE_COUNT, TEAM, TEAM_NAME, type TalentMask, type Team } from '../game/teams.ts';
 import { MAX_NAME_CHARS, sanitiseName } from './protocol.ts';
 import { weekKey } from './suggestions.ts';
+// WORKSTREAM AK: one parser for a cursor, imported rather than copied. The
+// module is three-free and content-free at this level; see `sanitiseCursor`.
+import { completionFlag, sanitiseCursor, type QuestCursor } from '../game/questmodel.ts';
 
 // --- Handles -------------------------------------------------------------------
 
@@ -237,13 +240,40 @@ export function tokenLive(t: SessionToken, now: number): boolean {
 
 // --- Levels --------------------------------------------------------------------
 
-/** *"10 kills levels u up"*. */
-export const KILLS_PER_LEVEL = 10;
+/**
+ * --- WORKSTREAM AK: the ladder is **experience** now, and a knockout is
+ * 100 of it.
+ *
+ * *"10 kills levels u up"* is still exactly true and the numbers below are
+ * chosen so that it is **bit-for-bit** true rather than approximately: a
+ * knockout pays `XP_PER_KO` and a level is `XP_PER_LEVEL`, and 100 x 10 is
+ * 1000, so every player who has only ever punched people is at precisely the
+ * level they were at before this changed. Nothing about today's behaviour
+ * moves; what moves is that there is now somewhere else for a level to come
+ * from.
+ *
+ * Why xp rather than "kills plus a bonus counter": because the alternative is
+ * two ladders. A quest that paid kills would put a number in the *kills* column
+ * of the leaderboard that nobody was knocked over for, and a quest that paid a
+ * second counter would need every reader of `levelFor` to add the two -- which
+ * is the second derivation this file's header spends a paragraph refusing.
+ * `kills` stays what it says on the tin (bodies), `xp` is the ladder, and
+ * exactly one function turns one into the other.
+ *
+ * The broader sources -- fares, rides, escaping a pursuit -- are deliberately
+ * **not** here. They are a later pass; this one adds the field and the one
+ * source that already existed.
+ */
+export const XP_PER_LEVEL = 1000;
+export const XP_PER_KO = 100;
+
+/** *"10 kills levels u up"*, derived rather than stated, so the two cannot drift. */
+export const KILLS_PER_LEVEL = XP_PER_LEVEL / XP_PER_KO;
 
 /**
- * The one place the ladder is computed. `1 + floor(kills / 10)`.
+ * The one place the ladder is computed. `1 + floor(xp / 1000)`.
  *
- * Level 1 at zero kills rather than level 0, because the number is drawn over a
+ * Level 1 at zero xp rather than level 0, because the number is drawn over a
  * body and "lvl 0" reads as an error state. Clamped at the top to what the
  * roster's `u8` can carry: a `level` of 300 would arrive as 44, and a plate that
  * silently disagreed with the leaderboard is the kind of failure this repo's
@@ -251,14 +281,44 @@ export const KILLS_PER_LEVEL = 10;
  */
 export const MAX_LEVEL = 255;
 
-export function levelFor(kills: number): number {
-  if (!Number.isFinite(kills) || kills <= 0) return 1;
-  return Math.min(MAX_LEVEL, 1 + Math.floor(kills / KILLS_PER_LEVEL));
+export function levelFor(xp: number): number {
+  if (!Number.isFinite(xp) || xp <= 0) return 1;
+  return Math.min(MAX_LEVEL, 1 + Math.floor(xp / XP_PER_LEVEL));
 }
 
-/** The kill count at which `level` is reached. The inverse, for the HUD's "3 to go". */
+/** The xp at which `level` is reached. The inverse, for the HUD's bar. */
+export function xpForLevel(level: number): number {
+  return Math.max(0, (Math.max(1, Math.floor(level)) - 1) * XP_PER_LEVEL);
+}
+
+/**
+ * The same inverse in knockouts, which is what the HUD's "3 to go" counts in.
+ *
+ * Kept as its own export rather than left to the call sites to divide, because
+ * the roster carries progress in **knockout-equivalents** (`RosterEntry.kills`)
+ * and the bar is drawn against this: two derivations of the same boundary is
+ * exactly the disagreement `verifyLevelHud` exists to catch.
+ */
 export function killsForLevel(level: number): number {
-  return Math.max(0, (Math.max(1, Math.floor(level)) - 1) * KILLS_PER_LEVEL);
+  return xpForLevel(level) / XP_PER_KO;
+}
+
+/**
+ * Experience as the roster's `u16` carries it: whole knockout-equivalents.
+ *
+ * The roster field predates xp and is a `u16` of *kills toward the next level*.
+ * Widening it would be a protocol change on the one message that is re-sent
+ * every two seconds for every player in the room, to carry a number the HUD
+ * immediately divides by 100 to draw a bar. So the division happens here, once,
+ * on the way out -- and a quest paying 250 xp moves the bar two and a half
+ * knockouts, which floors to two on the plate and is exact in `levelFor`.
+ *
+ * 255 levels is 255,000 xp is 2,550 knockout-equivalents, comfortably inside a
+ * `u16`, so the field cannot wrap before the level clamps.
+ */
+export function koEquivalent(xp: number): number {
+  if (!Number.isFinite(xp) || xp <= 0) return 0;
+  return Math.min(65535, Math.floor(xp / XP_PER_KO));
 }
 
 /**
@@ -401,7 +461,16 @@ export interface AccountRecord {
   tokens: SessionToken[];
   /** Player KOs this week. Reset by `resetIfNewWeek`. */
   kills: number;
-  /** `levelFor(kills)`, stored so a read costs nothing and a change is detectable. */
+  /**
+   * The ladder currency this week. See `XP_PER_LEVEL`.
+   *
+   * Reset with the kills, and it must be: it *is* the level, and the level goes
+   * to one on Monday. Every account written before workstream AK has no such
+   * field, and `sanitiseAccount` reconstructs it as `kills * XP_PER_KO`, which
+   * is exact rather than approximate -- see that function.
+   */
+  xp: number;
+  /** `levelFor(xp)`, stored so a read costs nothing and a change is detectable. */
   level: number;
   /** The `weekOf` the kills above were counted in. */
   levelWeek: string;
@@ -453,7 +522,66 @@ export interface AccountRecord {
    * thrown inside `AccountStore.save`, on the debounce, with nothing on screen.
    */
   talents: TalentMask;
+  /**
+   * --- WORKSTREAM AK. **The story flags, and the one thing on this record that
+   * survives Monday.**
+   *
+   * `team` used to be that thing and stopped being it on 2026-08-19 (see
+   * `resetIfNewWeek`, which now clears the side with everything else). This is
+   * the replacement, and it is a *different kind* of thing rather than the same
+   * exception moved: a side is a preference and re-asking is the feature; an
+   * **act is a story**, and a story that resets weekly is not one. A player who
+   * finished Mutual Obligations in March must not be handed the first job again
+   * in April, and there is no version of that where the flag lives in something
+   * the calendar clears.
+   *
+   * Two kinds of string live in here and they are told apart by a prefix:
+   *
+   *   - `q:<questId>` -- written by the engine when a non-repeatable quest is
+   *     turned in. "Have I done this" and "did the story branch" are then the
+   *     same question against the same set, which is why there is no separate
+   *     "completed" list. A **repeatable** quest never writes one, and that is
+   *     the whole of the repeatable/story distinction.
+   *   - anything else -- an authored `unlock` from a content pack.
+   *
+   * Bounded at `MAX_STORY_FLAGS`, because this is a list a *content file* can
+   * grow and a content file is edited on github.com by a person in a hurry.
+   */
+  story: string[];
+  /**
+   * --- WORKSTREAM AK. In-progress quest cursors, keyed by quest id.
+   *
+   * **The opposite lifetime to `story` one field up**, and deliberately: the
+   * obligations are weekly and so is the paperwork. A job abandoned halfway
+   * through on Saturday is not waiting on Monday, which is correct -- and it
+   * means this field cannot grow without bound on an account that starts things
+   * and does not finish them.
+   *
+   * Content-free by construction. This file has never read a quest pack and
+   * must not learn to: `sanitiseCursor` keeps what is on disk, bounded, and the
+   * engine reconciles the shape against the real quest the first time it looks
+   * (`questmodel.reconcileCursor`). That ordering is what lets an author add a
+   * step to a quest people are halfway through without resetting anybody.
+   */
+  quests: Record<string, QuestCursor>;
 }
+
+/**
+ * How many story flags one account may hold, and how long each may be.
+ *
+ * A cap because this is the one field on a record that a **content file** can
+ * grow: a pack with a hundred quests in it, each unlocking four flags, is four
+ * hundred strings on every account that plays through it, in a JSON file
+ * rewritten on a two-second debounce. 256 is far past every act this game is
+ * ever going to have and far short of a file that is a problem.
+ *
+ * Reached rather than exceeded is a *drop*, not a refusal -- see
+ * `sanitiseAccount`. An account that somehow accumulated more flags than this
+ * keeps the oldest, because the oldest are the story and the newest is one
+ * quest.
+ */
+export const MAX_STORY_FLAGS = 256;
+export const MAX_OPEN_QUESTS = 24;
 
 /** What the file on disk looks like. Versioned, on `WalletFile`'s terms. */
 export interface AccountFile {
@@ -465,6 +593,30 @@ export interface AccountFile {
 /**
  * Roll a record into the current week if it is behind. Returns whether it moved.
  *
+ * ---------------------------------------------------------------------------
+ * **WHAT SURVIVES MONDAY, AND IT IS EXACTLY ONE FIELD.**
+ *
+ * Everything on a record is cleared here -- kills, xp, level, the saved spot,
+ * the talents, the side -- with one deliberate exception: `record.story`.
+ *
+ * The reason is that a story is not a score. The rest of this record is a
+ * statement about *this week* and the whole point of clearing it is that "what
+ * level are you" should not decay into "how long have you been playing" (the
+ * header argues that at length). An **act** is the opposite kind of thing: it
+ * happened, it is behind you, and the world is supposed to remember. A player
+ * who finished the Mutual Obligations arc in March and is handed the first job
+ * again in April has not been given a fresh week, they have been told the
+ * previous one did not happen.
+ *
+ * So story flags -- and only story flags -- persist. `record.quests`, which is
+ * *in-progress* cursors, is cleared here with the xp: the obligations are
+ * weekly and so is the paperwork, and a job abandoned halfway through on
+ * Saturday is not waiting on Monday. A quest that was actually finished left a
+ * `q:<id>` mark in `story` and is therefore still finished. See
+ * `AccountRecord.story` for the two kinds of string in that list and
+ * `game/questmodel.ts`'s header for the whole arrangement.
+ *
+ * ---------------------------------------------------------------------------
  * The **only** place kills are zeroed **and the only place a saved spot is
  * dropped by the calendar**, called from every path that reads or
  * writes them (load, login, join, a knockout, and the per-room minute check).
@@ -480,7 +632,15 @@ export function resetIfNewWeek(record: AccountRecord, at: number | Date = Date.n
   if (record.levelWeek === week) return false;
   record.levelWeek = week;
   record.kills = 0;
+  // The ladder currency itself, which *is* the level -- see `XP_PER_LEVEL`.
+  // Zeroed beside the kills rather than derived from them, because after
+  // workstream AK the kills are no longer the only source.
+  record.xp = 0;
   record.level = 1;
+  // In-progress quest cursors, cleared with the xp. **`record.story` is not**;
+  // it is the one field on this record that survives, and the block above says
+  // why at length.
+  record.quests = {};
   // *"persisted to end of week"*, and this is the end of the week. Cleared in
   // the same three lines as the ladder rather than in a rule of its own, so
   // there is exactly one Monday in this feature -- see the header.
@@ -568,8 +728,11 @@ export function sanitiseAccount(value: unknown, now = Date.now()): AccountRecord
     providers,
     tokens,
     kills: Number.isFinite(kills) ? Math.max(0, Math.min(1e9, Math.trunc(kills))) : 0,
+    // Filled in below, once the kills are known: an account written before
+    // workstream AK has no `xp` and its ladder position is `kills * XP_PER_KO`.
+    xp: 0,
     // Derived rather than read, for `handleKey`'s reason: a stored level that
-    // disagreed with the kills beside it is the one number a player checks.
+    // disagreed with the xp beside it is the one number a player checks.
     level: 1,
     levelWeek: typeof raw.levelWeek === 'string' ? raw.levelWeek : '',
     // **Absent is the ordinary case, not an error.** Every account written
@@ -584,8 +747,35 @@ export function sanitiseAccount(value: unknown, now = Date.now()): AccountRecord
     // on the deploy that introduced the feature.
     team: sanitiseTeam(raw.team),
     talents: sanitiseTalents(raw.talents),
+    // **Absent is the ordinary case for both of these too**, and will be for
+    // every row on the box on the deploy that introduces them. See below for
+    // the migration, which is exact rather than lossy.
+    story: sanitiseStory(raw.story),
+    quests: sanitiseQuestCursors(raw.quests),
   };
-  record.level = levelFor(record.kills);
+  /*
+   * --- WORKSTREAM AK: the xp migration, in one line, and it is **exact**.
+   *
+   * Every account written before this pass has kills and no xp. Reconstructing
+   * the xp as `kills * XP_PER_KO` is not an approximation: a knockout was the
+   * only source of a level before quests existed, so the number this produces
+   * is the number that would have been stored had the field always been there,
+   * and `levelFor` on it returns bit-for-bit what `levelFor(kills)` returned
+   * yesterday.
+   *
+   * Derived rather than read **when it is absent**, and read when it is
+   * present, because once quests are paying, `xp` and `kills * 100` genuinely
+   * differ and the stored one is the truth. The `undefined` test is therefore
+   * load-bearing and cannot be a `|| 0`: a legitimate row with `xp: 0` and 40
+   * kills is a player who was reset this morning, and rebuilding 4000 xp for
+   * them would hand back a level the week just took away.
+   */
+  const storedXp = Number(raw.xp);
+  record.xp =
+    raw.xp === undefined || !Number.isFinite(storedXp)
+      ? record.kills * XP_PER_KO
+      : Math.max(0, Math.min(1e9, Math.trunc(storedXp)));
+  record.level = levelFor(record.xp);
   // Talents without a side are talents nobody can have spent -- a hand-edited
   // row, or a `team` that was cleared without the mask beside it. Dropped here
   // rather than left for `TeamField`, which would refuse them silently on the
@@ -601,6 +791,66 @@ export function sanitiseAccount(value: unknown, now = Date.now()): AccountRecord
   // weekend does not serve last week's ladder for the first minute of this one.
   resetIfNewWeek(record, now);
   return record;
+}
+
+/**
+ * The story flags off disk: strings, deduplicated, bounded, lower-cased.
+ *
+ * `sanitiseTalents`' discipline applied to a list, and the reason it is a
+ * function rather than a filter inline is that all three of its bounds protect
+ * something different. **Lower-casing** makes `q:Act0-Report` and
+ * `q:act0-report` one flag rather than a completed quest that is offered again.
+ * **Deduplicating** stops a repeatable-turned-story quest writing its mark
+ * every week for a year. And the **cap** is the only defence this record has
+ * against a content file, which is a thing a person edits on github.com with no
+ * compiler in the way.
+ *
+ * The cap keeps the **oldest** and drops the newest, which is the opposite of
+ * what a cache would do and is right here: the oldest flags are the story so
+ * far and the newest is one quest. Losing the story to keep the newest job is
+ * the wrong half to lose.
+ */
+export function sanitiseStory(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== 'string') continue;
+    const flag = item.trim().toLowerCase().slice(0, 64);
+    if (flag === '' || seen.has(flag)) continue;
+    seen.add(flag);
+    out.push(flag);
+    if (out.length >= MAX_STORY_FLAGS) break;
+  }
+  return out;
+}
+
+/**
+ * In-progress cursors off disk, keyed by quest id.
+ *
+ * Every value re-derived through `questmodel.sanitiseCursor`, which is the same
+ * arrangement `lastPos` has with `sanitiseLastPos`: there is one parser for a
+ * cursor and this file is not a second copy of it. What this adds is the
+ * **key** discipline -- an id that is not an id is dropped rather than becoming
+ * a key nothing will ever look up -- and the count bound.
+ *
+ * Content-free, and it has to be: this runs at load, before any pack has been
+ * fetched, so it cannot know whether "act0-doorknock" still exists or how many
+ * steps it has. `questmodel.reconcileCursor` is the second half; see its note.
+ */
+export function sanitiseQuestCursors(value: unknown): Record<string, QuestCursor> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const out: Record<string, QuestCursor> = {};
+  let n = 0;
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    const id = key.trim().toLowerCase().slice(0, 64);
+    if (id === '' || !/^[a-z0-9][a-z0-9:_-]*$/.test(id)) continue;
+    const cursor = sanitiseCursor(raw);
+    if (cursor === null) continue;
+    out[id] = cursor;
+    if (++n >= MAX_OPEN_QUESTS) break;
+  }
+  return out;
 }
 
 /**
@@ -813,24 +1063,48 @@ export function verifyAccounts(): string[] {
   }
 
   // --- The ladder. Ten kills a level, level 1 at the bottom, capped at the u8.
+  //
+  // WORKSTREAM AK: **written in kills and asserted through xp**, which is the
+  // point. The whole claim of that change is that `1000 xp per level` and
+  // `100 xp per knockout` reproduce `10 kills per level` exactly, and a table
+  // written in xp would be a table that agreed with the new constants rather
+  // than with the old behaviour. These are the same six rows as before, put
+  // through the conversion.
   {
     const cases: Array<[number, number]> = [
       [0, 1], [1, 1], [9, 1], [10, 2], [19, 2], [20, 3], [100, 11],
     ];
     for (const [kills, want] of cases) {
-      const got = levelFor(kills);
-      if (got !== want) failures.push(`${kills} kills is level ${got}, not ${want}.`);
+      const got = levelFor(kills * XP_PER_KO);
+      if (got !== want) failures.push(`${kills} kills is level ${got}, not ${want}. The xp ladder must reproduce the kill ladder exactly.`);
     }
-    if (levelFor(-5) !== 1) failures.push('A negative kill count produced a level other than 1.');
-    if (levelFor(NaN) !== 1) failures.push('A NaN kill count produced a level other than 1.');
+    if (KILLS_PER_LEVEL !== 10) failures.push(`${KILLS_PER_LEVEL} kills a level; the owner's rule is ten.`);
+    if (levelFor(-5) !== 1) failures.push('Negative xp produced a level other than 1.');
+    if (levelFor(NaN) !== 1) failures.push('NaN xp produced a level other than 1.');
     if (levelFor(1e9) > 255) failures.push('A level over 255 was produced; the roster carries it as a u8.');
+    // The roster's `u16` cannot wrap before the level clamps, or a player past
+    // level 66 watches their bar reset while their level does not.
+    if (koEquivalent(xpForLevel(MAX_LEVEL)) > 65535) {
+      failures.push(`Level ${MAX_LEVEL} is ${koEquivalent(xpForLevel(MAX_LEVEL))} ko-equivalents, past the roster's u16.`);
+    }
+    if (koEquivalent(250) !== 2) failures.push(`250 xp is ${koEquivalent(250)} ko-equivalents on the roster, not 2.`);
+    if (koEquivalent(-1) !== 0 || koEquivalent(NaN) !== 0) failures.push('Nonsense xp produced a non-zero roster field.');
+    // The inverse, in the currency the bar is drawn in.
+    for (let level = 1; level <= 12; level++) {
+      if (levelFor(xpForLevel(level)) !== level) {
+        failures.push(`xpForLevel(${level}) is ${xpForLevel(level)}, which is level ${levelFor(xpForLevel(level))}.`);
+      }
+    }
     // The inverse has to agree with the forward direction at every boundary, or
     // the HUD's "3 kills to go" counts down to a level-up that does not happen.
     for (let level = 1; level <= 12; level++) {
       const at = killsForLevel(level);
-      if (levelFor(at) !== level) failures.push(`killsForLevel(${level}) is ${at}, which is level ${levelFor(at)}.`);
-      if (at > 0 && levelFor(at - 1) !== level - 1) {
-        failures.push(`One kill short of level ${level} is level ${levelFor(at - 1)}, not ${level - 1}.`);
+      if (!Number.isInteger(at)) failures.push(`killsForLevel(${level}) is ${at}, which is not a whole number of knockouts.`);
+      if (levelFor(at * XP_PER_KO) !== level) {
+        failures.push(`killsForLevel(${level}) is ${at}, which is level ${levelFor(at * XP_PER_KO)}.`);
+      }
+      if (at > 0 && levelFor((at - 1) * XP_PER_KO) !== level - 1) {
+        failures.push(`One kill short of level ${level} is level ${levelFor((at - 1) * XP_PER_KO)}, not ${level - 1}.`);
       }
     }
   }
@@ -843,16 +1117,110 @@ export function verifyAccounts(): string[] {
     }
     const record = fakeAccount(now);
     record.kills = 34;
-    record.level = levelFor(34);
+    record.xp = 34 * XP_PER_KO;
+    record.level = levelFor(record.xp);
+    // WORKSTREAM AK: the two new fields, one on each side of Monday. Set here
+    // rather than in a section of their own because the *contrast* is the rule
+    // -- reading them ten lines apart is what makes "story survives, cursors do
+    // not" checkable rather than remembered.
+    record.story = ['q:act0-report', 'act0:reported'];
+    record.quests = { 'act0-doorknock': { s: 1, c: [1, 0], d: false } };
     if (resetIfNewWeek(record, now)) failures.push('A record already in the current week was reset.');
     if (record.kills !== 34) failures.push('A same-week reset zeroed the kills anyway.');
+    if (record.xp !== 3400) failures.push('A same-week reset zeroed the xp anyway.');
     record.levelWeek = '2020-W01';
     if (!resetIfNewWeek(record, now)) failures.push('A record from an old week was not reset.');
     if (record.kills !== 0 || record.level !== 1) {
       failures.push(`A weekly reset left ${record.kills} kills at level ${record.level}; both must go to the floor.`);
     }
+    if (record.xp !== 0) failures.push(`A weekly reset left ${record.xp} xp; the xp is the level and the level is 1.`);
+    // **The one field that survives.** A story that resets weekly is not one;
+    // see `resetIfNewWeek`'s header, which argues it at length.
+    if (record.story.length !== 2 || !record.story.includes('q:act0-report')) {
+      failures.push(
+        `A weekly reset left ${JSON.stringify(record.story)} in the story flags. They must survive Monday, or a ` +
+          'player who finished an act in March is handed the first job again in April.',
+      );
+    }
+    // And the one beside it that does not.
+    if (Object.keys(record.quests).length !== 0) {
+      failures.push('A weekly reset kept an in-progress quest cursor; the obligations are weekly and so is the paperwork.');
+    }
     if (record.levelWeek !== weekOf(now)) failures.push('A weekly reset did not stamp the new week; it would reset again next tick.');
     if (resetIfNewWeek(record, now)) failures.push('The weekly reset is not idempotent; it would fire on every read.');
+  }
+
+  // --- WORKSTREAM AK: the xp field's migration, the story list, and the
+  // cursors, off the rows that will really be on the box.
+  {
+    const now = Date.UTC(2026, 7, 19, 3, 0, 0);
+    /*
+     * **The migration, which is the one that costs a level when it is wrong.**
+     *
+     * Every account on the box on the deploy that lands this has kills and no
+     * `xp`, and the claim is that reconstructing it is exact. If it is not, the
+     * whole box drops to level 1 on a restart and there is nothing on screen
+     * that says why.
+     */
+    const old = sanitiseAccount({ id: 'x', handle: 'Bazza', passwordHash: '$argon2id$x', kills: 34, levelWeek: weekOf(now) }, now);
+    if (!old) {
+      failures.push('An account written before xp existed was refused off disk.');
+    } else {
+      if (old.xp !== 3400) failures.push(`A pre-xp row with 34 kills came back with ${old.xp} xp, not 3400.`);
+      if (old.level !== 4) failures.push(`A pre-xp row with 34 kills came back at level ${old.level}, not 4.`);
+      if (old.story.length !== 0) failures.push('A pre-quests row came back with story flags.');
+      if (Object.keys(old.quests).length !== 0) failures.push('A pre-quests row came back with quest cursors.');
+    }
+    // And the case that makes the `undefined` test load-bearing rather than a
+    // `|| 0`: a row reset this morning legitimately has 0 xp beside 0 kills,
+    // and one mid-week has xp that is **not** kills x 100 because a quest paid.
+    const paid = sanitiseAccount({ ...fakeAccount(now), kills: 3, xp: 900 }, now);
+    if (paid?.xp !== 900) failures.push(`A row whose xp is not kills x 100 was rewritten to ${paid?.xp}; quest xp would vanish.`);
+    if (paid?.level !== 1) failures.push(`900 xp came back as level ${paid?.level}, not 1.`);
+    const zeroed = sanitiseAccount({ ...fakeAccount(now), kills: 40, xp: 0 }, now);
+    if (zeroed?.xp !== 0) failures.push('A row with a stored xp of 0 had it rebuilt from the kills; the week would be un-done.');
+
+    // The story list: folded, deduplicated, bounded.
+    const messy = sanitiseStory(['Q:Act0-Report', 'q:act0-report', '  act0:reported  ', 42, '', null]);
+    if (messy.length !== 2) failures.push(`A messy story list came back with ${messy.length} flags, not 2.`);
+    if (messy[0] !== 'q:act0-report') failures.push(`A story flag came back as ${JSON.stringify(messy[0])}; they fold to lower case.`);
+    const flood = sanitiseStory(Array.from({ length: MAX_STORY_FLAGS + 50 }, (_, i) => `f${i}`));
+    if (flood.length > MAX_STORY_FLAGS) failures.push(`${flood.length} story flags survived, over the ${MAX_STORY_FLAGS} cap.`);
+    if (flood[0] !== 'f0') failures.push('The story cap dropped the oldest flags; the oldest are the story.');
+    for (const raw of [null, 'act0', 42, {}]) {
+      if (sanitiseStory(raw).length !== 0) failures.push(`sanitiseStory(${JSON.stringify(raw)}) produced flags.`);
+    }
+
+    // The cursors: keys checked, values through the one parser, count bounded.
+    const cursors = sanitiseQuestCursors({
+      'act0-doorknock': { s: 1, c: [1, 0], d: false },
+      'NOT AN ID': { s: 0, c: [0] },
+      'act0-bad': 'halfway',
+    });
+    if (Object.keys(cursors).length !== 1) failures.push(`${Object.keys(cursors).length} cursors survived, not 1.`);
+    if (cursors['act0-doorknock']?.s !== 1) failures.push('A well-formed cursor lost its step index.');
+    const many = sanitiseQuestCursors(
+      Object.fromEntries(Array.from({ length: MAX_OPEN_QUESTS + 10 }, (_, i) => [`q${i}`, { s: 0, c: [0] }])),
+    );
+    if (Object.keys(many).length > MAX_OPEN_QUESTS) failures.push(`${Object.keys(many).length} cursors survived, over the cap.`);
+    for (const raw of [null, [], 'nope']) {
+      if (Object.keys(sanitiseQuestCursors(raw)).length !== 0) failures.push(`sanitiseQuestCursors(${JSON.stringify(raw)}) produced cursors.`);
+    }
+
+    // A record carrying both survives a round trip through the parser, which is
+    // the whole of "progress persists".
+    const full = sanitiseAccount(
+      { ...fakeAccount(now), xp: 1200, story: ['q:act0-report'], quests: { 'act0-doorknock': { s: 0, c: [2], d: false } } },
+      now,
+    );
+    if (full?.story[0] !== 'q:act0-report') failures.push('A record lost its story flags in the parser.');
+    if (full?.quests['act0-doorknock']?.c[0] !== 2) failures.push('A record lost its quest progress in the parser.');
+    if (full?.level !== 2) failures.push(`1200 xp came back as level ${full?.level}, not 2.`);
+    // The completion mark's spelling, which is the only thing standing between
+    // "you have done that" and a story quest that is offered every day.
+    if (completionFlag('act0-report') !== 'q:act0-report') {
+      failures.push(`completionFlag is ${JSON.stringify(completionFlag('act0-report'))}; the engine and the parser must agree.`);
+    }
   }
 
   // --- Tokens: the shape test, and the expiry that is the whole of the security.
@@ -916,7 +1284,7 @@ export function verifyAccounts(): string[] {
       failures.push('A well-formed account record was refused off disk.');
     } else {
       if (good.handleKey !== 'bazza') failures.push(`A hand-edited handleKey survived as ${JSON.stringify(good.handleKey)}.`);
-      if (good.level !== levelFor(25)) failures.push(`A stored level of 99 survived beside ${good.kills} kills.`);
+      if (good.level !== levelFor(25 * XP_PER_KO)) failures.push(`A stored level of 99 survived beside ${good.kills} kills.`);
       if (good.tokens.length !== 2) failures.push(`${good.tokens.length} tokens survived the parser; the dead and malformed ones must not.`);
       if (good.tokens.some((t) => t.expiresMs > now + TOKEN_TTL_MS)) {
         failures.push('A token with an absurd expiry was kept unclamped; a text editor could mint a permanent session.');
@@ -1028,7 +1396,8 @@ export function verifyAccounts(): string[] {
     record.team = TEAM.MARITA;
     record.talents = { lo: 0b1001, hi: 1 };
     record.kills = 34;
-    record.level = levelFor(34);
+    record.xp = 34 * XP_PER_KO;
+    record.level = levelFor(record.xp);
     if (resetIfNewWeek(record, now)) failures.push('A record already in the current week was reset.');
     if (record.talents.lo !== 0b1001) failures.push('A same-week reset cleared the talents anyway.');
     record.levelWeek = '2020-W01';
@@ -1139,10 +1508,13 @@ function fakeAccount(now: number): AccountRecord {
     providers: {},
     tokens: [],
     kills: 0,
+    xp: 0,
     level: 1,
     levelWeek: weekOf(now),
     lastPos: null,
     team: TEAM.NONE,
     talents: { ...EMPTY_MASK },
+    story: [],
+    quests: {},
   };
 }

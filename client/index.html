@@ -918,6 +918,82 @@
         padding: 6px 11px 2px; font-size: 10px; color: #55697c; letter-spacing: .06em;
         text-align: center;
       }
+
+      /* --- WORKSTREAM AK: the conversation panel and the `E` prompt above it.
+
+         Bottom-centre and **wide rather than tall**, which is the one layout
+         decision here worth stating. The phone above is bottom-right because a
+         phone is an object you hold; a conversation is a thing happening in
+         front of you, so it sits under the middle of the frame where the person
+         talking is, and it is capped at 620px so a line of dialogue is about
+         eighty characters -- the width a person reads a sentence at without
+         tracking back to the wrong line.
+
+         It deliberately does **not** dim the world behind it. Time does not
+         stop in this game (see `client/src/dialog.ts`), and a scrim over a
+         street you can still be run over in would be a lie about what is
+         happening. The panel is opaque enough to read against traffic and no
+         more.
+
+         `pointer-events` follows `shown`, so the gap around it reaches the
+         canvas and a click beside the panel re-locks the pointer -- which is
+         how you get out of a conversation without the keyboard. Same
+         arrangement `#phone` has, and for the same reason. */
+      #dialog {
+        position: fixed; left: 50%; bottom: 8vh; transform: translate(-50%, 10px);
+        width: min(620px, calc(100vw - 32px));
+        opacity: 0; pointer-events: none;
+        transition: opacity .14s ease, transform .14s ease;
+        background: rgba(9, 13, 18, .93);
+        border: 1px solid rgba(207, 226, 242, .16);
+        border-radius: 12px;
+        box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
+        font-size: 14px; line-height: 1.45; color: #d8e6f2;
+        z-index: 40;
+      }
+      #dialog.shown { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+      #dialog-who {
+        padding: 9px 14px 0; font-size: 11px; letter-spacing: .12em;
+        text-transform: uppercase; color: #78d6ec;
+      }
+      /* `min-height` on the line rather than on the panel: an improv rewrite is
+         a different length from the authored line it replaces, and a panel that
+         changed height when the model answered would jump under the cursor
+         between the frame the node opens and the frame the line arrives. Two
+         lines' worth is the floor and it grows from there. */
+      #dialog-line { padding: 7px 14px 11px; min-height: 2.9em; }
+      #dialog-choices {
+        display: flex; flex-direction: column; gap: 1px;
+        border-top: 1px solid rgba(207, 226, 242, .1);
+      }
+      .dialog-choice {
+        display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+        width: 100%; text-align: left; padding: 9px 14px;
+        background: none; border: 0; border-top: 1px solid rgba(207, 226, 242, .07);
+        color: #cfe2f2; font: inherit; cursor: pointer;
+      }
+      .dialog-choice:first-child { border-top: 0; }
+      .dialog-choice:hover:not(.locked) { background: rgba(120, 214, 236, .13); }
+      /* A locked choice is **shown and greyed**, never hidden. A door you can
+         see is locked is information -- "level 2 first", "Marita only", "$50" --
+         and a door that is not there is not. The refusal is the server's own
+         sentence, drawn small on the right. */
+      .dialog-choice.locked { color: #6d8091; cursor: default; }
+      .dialog-choice em { font-style: normal; font-size: 11px; color: #7f95ab; white-space: nowrap; }
+      .dialog-choice.locked em { color: #86603f; }
+
+      /* The `E` prompt. Same shape and place as the game's other interaction
+         hints so it reads as one vocabulary, and hidden the moment the panel is
+         up -- "press E to talk" over an open conversation reads as a bug. */
+      #dialog-prompt {
+        position: fixed; left: 50%; bottom: calc(8vh + 14px); transform: translateX(-50%);
+        opacity: 0; transition: opacity .12s ease; pointer-events: none;
+        padding: 5px 12px; border-radius: 999px;
+        background: rgba(9, 13, 18, .8); border: 1px solid rgba(207, 226, 242, .16);
+        font-size: 12px; color: #cfe2f2; letter-spacing: .03em; z-index: 39;
+      }
+      #dialog-prompt.shown { opacity: 1; }
+      #dialog-prompt b { color: #78d6ec; font-weight: 600; }
       /* The gallery: a grid of thumbnails, then one photograph with three things
          you can do to it. `client/src/phone.ts` builds both.
 
@@ -2502,6 +2578,18 @@
     </div>
     <div id="talents"></div>
     <div id="talents-tip"></div>
+
+    <!-- WORKSTREAM AK: the conversation. `client/src/dialog.ts` owns every
+         listener on it and fills the choices from the pack it fetched from
+         `/content`; nothing here is authoritative and every click is re-walked
+         on the server against its own copy. The world keeps running behind it:
+         time does not stop in this game, ever. -->
+    <div id="dialog">
+      <div id="dialog-who"></div>
+      <div id="dialog-line"></div>
+      <div id="dialog-choices"></div>
+    </div>
+    <div id="dialog-prompt"><b>E</b> &nbsp;talk to <span id="dialog-prompt-name"></span></div>
 
     <!-- The landing panel. Two ways in, and `client/src/accounts.ts` owns every
          listener on it: `hud.ts` only hides it, on a fatal error.

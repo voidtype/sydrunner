@@ -70,7 +70,7 @@ import { pickSpawnPoint, restoreSpawnPoint, spawnGround } from '../client/src/ga
 // identical function offline -- see `client/src/game/unstuck.ts`, whose header
 // says why this is a chat command rather than a message id.
 import { UNSTUCK_CAR_CLEAR_M, unstuckDestination, type UnstuckSpot } from '../client/src/game/unstuck.ts';
-import { tickPowerups, type PickupEvent } from '../client/src/game/powerups.ts';
+import { KIND_NAME as POWERUP_KIND_NAME, tickPowerups, type PickupEvent } from '../client/src/game/powerups.ts';
 import {
   applyCarHit,
   carHitStrength,
@@ -327,7 +327,11 @@ import type { WalletFrame } from '../client/src/net/cash.ts';
 // left in *this* file is the three places an account meets the simulation --
 // which wallet a joiner opens, what a knockout does to the ladder, and the
 // sentence a guest is shown when they cross $100.
-import { levelFor } from '../client/src/net/accounts.ts';
+import { XP_PER_KO, koEquivalent, levelFor } from '../client/src/net/accounts.ts';
+// WORKSTREAM AK: a **type only**, so this file learns the shape of the quest
+// engine's sink without importing the engine. `server/quests.ts` imports
+// nothing from here, which is what keeps the two acyclic.
+import type { QuestSink } from './quests.ts';
 // Teams and talents. The contract (`game/teams.ts`) is data and pure rules; the
 // lookup (`game/teamfield.ts`) folds auras in and is the thing the gameplay
 // hooks read; the wire (`net/teams.ts`) is the sub-ops and the broadcast. This
@@ -1828,7 +1832,16 @@ export class Simulation {
       // a second field to keep in step with the record beside it, updated on the
       // same path, to save one nullable dereference per player per refresh. The
       // dereference is the cheaper of the two.
-      s.kills = p.account !== null ? p.account.kills : p.kos;
+      //
+      // WORKSTREAM AK: the account branch is now the **ladder currency** rather
+      // than the body count, expressed in the knockout-equivalents this `u16`
+      // has always carried (`accounts.koEquivalent`). The two were the same
+      // number until quests started paying xp and are not any more, and the one
+      // the bar has to be drawn from is the one `levelFor` reads -- otherwise a
+      // player finishes a job, levels up, and watches a bar that still says
+      // "4 of 10" under a plate that says 3. The guest branch is untouched: a
+      // guest has no xp because there is nowhere to keep it.
+      s.kills = p.account !== null ? koEquivalent(p.account.xp) : p.kos;
       s.colourway = p.colourway;
       s.bot = p.bot !== null;
       s.name = p.name;
@@ -1917,6 +1930,12 @@ export class Simulation {
         // already inside -- a player knocked over by their own thrown football
         // has not levelled up.
         this.creditLadder(attacker);
+        // WORKSTREAM AK: and the quest engine, at the same funnel and for the
+        // identical reason the comment above gives about the ladder -- a
+        // second counter anywhere else is the one that stops counting when
+        // somebody adds a sixth weapon. `'player'` rather than a kind name,
+        // which is the one `ko` step target that is not an `NPC_KIND`.
+        this.quests?.signal(attacker.id, 'ko', 'player', weight);
       }
     }
     this.rosterVersion++;
@@ -2006,7 +2025,10 @@ export class Simulation {
     if (account === null) {
       // A guest at the first threshold. `attacker.kos` has already been
       // incremented by the caller, so this fires on the tenth kill exactly.
-      if ((attacker.prompted & PROMPTED.LEVEL) === 0 && levelFor(attacker.kos) > 1) {
+      // The guest's own knockouts, in the ladder's currency: a guest has no
+      // `xp` field to read (workstream AK), and `kos * XP_PER_KO` is exactly
+      // what an account with the same knockouts would be holding.
+      if ((attacker.prompted & PROMPTED.LEVEL) === 0 && levelFor(attacker.kos * XP_PER_KO) > 1) {
         attacker.prompted |= PROMPTED.LEVEL;
         this.note(attacker.id, 'sign up to level up (esc)');
       }
@@ -2404,6 +2426,13 @@ export class Simulation {
     if (!p || p.wallet === null) return 0;
     const moved = moveBalance(p.wallet, delta);
     if (moved === 0) return 0;
+    // WORKSTREAM AK: an `earn` step, at the only place in this process a
+    // balance goes up -- which is the same property the save-progress prompt
+    // below relies on, stated in its own comment three lines down. Credits
+    // only: a step that asks a player to earn $60 is not un-earned by them
+    // spending it, and a debit that counted would make the step unreachable
+    // for anybody who buys anything.
+    if (moved > 0) this.quests?.signal(playerId, 'earn', why, moved);
     this.wallets?.markDirty();
     p.walletVersion++;
     p.walletNote = `${moved > 0 ? '+' : '-'}${formatMoney(Math.abs(moved))} ${why}`.slice(0, 40);
@@ -3027,6 +3056,8 @@ export class Simulation {
       this.world.points, this.combatants, FIXED_DT, this.pickups, this.liveIndex, this.world.pointIndex,
     )) {
       const at = this.world.tileOf.get(tileKeyOf(e.point.id));
+      // WORKSTREAM AK: a `buy` step, at the one place a powerup changes hands.
+      this.quests?.signal(e.combatant.id, 'pickup', (POWERUP_KIND_NAME[e.point.kind] ?? '').toLowerCase(), 1);
       this.events.push({
         kind: EVENT.PICKUP,
         combatant: e.combatant.id,
@@ -5689,6 +5720,13 @@ export class Simulation {
       p.combat.health = fxMaxPips(p.id, MAX_HEALTH);
     }
     if (strike.down) this.dropNpcCash(actor, p);
+    // WORKSTREAM AK. Beside the cash rather than inside it, because
+    // `dropNpcCash` returns early for a bot, for a worthless kind and for a
+    // spent rate bank -- and a quest step that says "knock over three
+    // eshays" is about the eshays, not about whether they were carrying
+    // anything. The name is the registry's, which is what a `ko` step's
+    // `npc` field is validated against; see `server/quests.worldRefusals`.
+    if (strike.down && def) this.quests?.signal(p.id, 'ko', def.name, 1);
     if (strike.down && def && !def.scoresKo) {
       // No leaderboard movement, deliberately: a scoreboard is a record of what
       // players did to each other, and a downed officer is not a player. The
@@ -5977,6 +6015,61 @@ export class Simulation {
     const pose = aboardPose(bake, a, this.railT);
     if (pose === null) return -2;
     return pose.atStop;
+  }
+
+  // --- WORKSTREAM AK: the three lines the quest engine needs and one it asks.
+
+  /**
+   * Where the quest engine is told about things. Null until one is installed.
+   *
+   * A **sink rather than an event bus**, and the brief's rule is the reason:
+   * there is already exactly one funnel for each of the three things quests
+   * care about -- `creditKo` for a knockout, the pickup loop for a powerup,
+   * `moveWallet` for money -- and a parallel bus would be three more places to
+   * keep in step with them. So each of those funnels grows one optional call
+   * and this class learns nothing about quests beyond the shape of the sink.
+   *
+   * A field rather than a constructor option because a `Simulation` is built
+   * per room and the engine is the host's, exactly as `AccountStore` is; see
+   * `server/index.ts`, which constructs one engine and installs it into every
+   * room.
+   */
+  private quests: QuestSink | null = null;
+
+  setQuestSink(sink: QuestSink | null): void {
+    this.quests = sink;
+  }
+
+  /**
+   * Which station this player's train is standing at, or null.
+   *
+   * `rideStop` one method up answers an *index* and is the heat ladder's -- it
+   * only ever asks "is this player at a stop". A `ride` step has to know
+   * **which** stop and on **which line**, because "catch a train to Newtown" is
+   * a different job from "catch a train", so the name is resolved here against
+   * the same direction table `game/riding.ts` draws the platform sign from.
+   *
+   * A method on this class rather than a lookup in `server/quests.ts` because
+   * everything it needs -- the bake, the rail clock, the aboard record -- is
+   * private to this file, and a quest engine that reached for all three would
+   * be a second copy of `rideStop` with a name table bolted on.
+   *
+   * The engine edge-triggers off the name; see `QuestEngine.sweepOne`. This
+   * answers the same station for every tick the train is stopped, which is the
+   * honest thing for a query to do.
+   */
+  rideStation(playerId: number): { line: number; station: string } | null {
+    const p = this.participants.get(playerId);
+    if (!p) return null;
+    const a = p.combat.aboard;
+    if (!isAboard(a)) return null;
+    const bake = this.world.rail;
+    if (!bake) return null;
+    const pose = aboardPose(bake, a, this.railT);
+    if (pose === null || pose.atStop < 0) return null;
+    const dir = dirOf(bake, a.line, a.dir);
+    if (dir === null || pose.atStop >= dir.stops.length) return null;
+    return { line: a.line, station: dir.stops[pose.atStop].name };
   }
 
   /** Faction events this tick -- shots, barks, knockdowns. Drained by the transport. */
