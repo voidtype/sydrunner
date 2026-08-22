@@ -224,6 +224,7 @@ import { PedestrianAssets, PedestrianCrowd } from './world/people.ts';
 import { PoliceAssets, PoliceSquad } from './world/police.ts';
 import { StreetlifeAssets, StreetCrowd } from './world/streetlife.ts';
 import { CharacterCrowd, CharacterKitAssets } from './world/characters.ts';
+import { GiverBodyField } from './world/giverbodies.ts';
 import { WildlifeAssets, WildlifeFlock } from './world/wildlife.ts';
 import { EventAssets, EventScene } from './world/events.ts';
 import {
@@ -1048,6 +1049,23 @@ async function warmGroups(): Promise<{ groups: WarmGroup[]; rail: RailRide | nul
     parts: characterWarmupParts(kitAssets),
     real: kitCrowd.rigs.map((r) => r.mesh),
     label: { kit: kitAssets },
+  });
+
+  // WORKSTREAM AO: the quest givers' bodies. **No parts, deliberately.**
+  //
+  // A giver is a `CharacterActor` on `CharacterAssets`' own kit geometry and
+  // material and carries no prop, so every pipeline she needs is already warmed
+  // by the two throwaway characters in the `player` group above. Registering her
+  // rigs as `real` with an empty parts list is what turns that sentence from a
+  // claim in `world/giverbodies.ts`'s header into something this audit checks:
+  // the day somebody gives a giver a bespoke kit or a clipboard, she appears in
+  // the real-with-no-warm list and the header's paragraph about warm-up stops
+  // being true out loud.
+  const giverBodies = new GiverBodyField(chars);
+  groups.push({
+    name: 'givers',
+    parts: [],
+    real: giverBodies.rigs.map((r) => r.mesh),
   });
 
   const eventAssets = new EventAssets();

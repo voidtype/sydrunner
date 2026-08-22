@@ -261,6 +261,9 @@ import {
 import { blankQuestState } from './net/quests.ts';
 // WORKSTREAM AN: the `!` and the `?` in the street. Wired in the same block.
 import { QuestMarkerField, verifyQuestMarkers, type QuestMarkerSource } from './world/questmarkers.ts';
+// WORKSTREAM AO: and the givers standing under them. Same block, same beat.
+import { verifyGiverBodies } from './game/giverbodies.ts';
+import { GiverBodyField, verifyGiverBodyField, type GiverBodySource } from './world/giverbodies.ts';
 import { BuildSheet, verifyBuildSheet } from './buildsheet.ts';
 import { ChangelogFeed, verifyChangelog, verifyChangeFeed } from './changelog.ts';
 import { BugReportForm, FrameGrabber, verifyBugReport } from './bugreport.ts';
@@ -4548,7 +4551,16 @@ async function main(): Promise<void> {
    * `client/src/teams.ts` already does for the same reason. It consumes only
    * the Escape that actually closed something.
    */
-  const dialogFailures = [...verifyQuests(), ...verifyDialog(), ...verifyDialogPanel(), ...verifyQuestMarkers()];
+  const dialogFailures = [
+    ...verifyQuests(),
+    ...verifyDialog(),
+    ...verifyDialogPanel(),
+    ...verifyQuestMarkers(),
+    // WORKSTREAM AO. The pure half runs on the server too; the field half needs
+    // `CharacterAssets` and so can only run here, beside the marks it feeds.
+    ...verifyGiverBodies(),
+    ...verifyGiverBodyField(characters),
+  ];
   if (dialogFailures.length > 0) {
     hud.fatal('Quest content self-checks failed:\n' + dialogFailures.map((f) => '  - ' + f).join('\n'));
   }
@@ -4642,6 +4654,34 @@ async function main(): Promise<void> {
    */
   const questMarkers = new QuestMarkerField();
   scene.add(questMarkers.mesh);
+  /*
+   * --- WORKSTREAM AO: and the bodies under those marks.
+   *
+   * `world/giverbodies.ts` is twelve pooled `CharacterActor`s in the crowd's own
+   * seven kits, and it hangs off the field above rather than beside it: the same
+   * range, the same cap, and `questMarkers.beats` as literally the same 4 Hz
+   * decision clock. Three closures, and they are the same three the marks read
+   * -- the live bundle, the ground under a coordinate, and (new here) which
+   * footpaths are resident, which is how a giver works out that she is standing
+   * beside a road and which way it is.
+   *
+   * `player.position` rather than the camera, which is the one place this
+   * deliberately differs from the marks: the field above selects off
+   * `camera.matrixWorld` and this selects off the player's feet. They are a
+   * body-length apart at most, and against a cap of twelve over a content pool
+   * whose worst crowding anywhere in Sydney is five within this range, a metre
+   * cannot change who is chosen. What it does change is who a giver *looks* at,
+   * and that has to be the player -- it is the same point `dialog.ts` measures
+   * the `E` prompt from, so she is turned to you before the prompt appears
+   * rather than turned to a camera you are not standing in.
+   */
+  const giverBodies = new GiverBodyField(characters);
+  for (const rig of giverBodies.rigs) scene.add(rig.mesh);
+  const giverBodySource: GiverBodySource = {
+    npcs: () => questBundle.npcs,
+    groundAt: (x, z) => wildGround(x, z),
+    bandsNear: (x, z, radius, out) => pedestrians.near(x, z, radius, out),
+  };
   const questMarkerSource: QuestMarkerSource = {
     npcs: () => questBundle.npcs,
     view: () => questView(questBundle.quests, cursorsFrom(questFrame())),
@@ -4652,10 +4692,17 @@ async function main(): Promise<void> {
       cash: questCash(),
     }),
     groundAt: (x, z) => wildGround(x, z),
+    // The hook `world/questmarkers.ts`'s header asked for: the mark comes off
+    // the rig's head when there is a rig, and off the ground when there is not.
+    headY: (id) => giverBodies.headY(id),
   };
   /** One line in the render loop, beside the plates. See `nameplates.end()`. */
   const updateQuestMarkers = (dt: number): void => {
     questMarkers.update(dt, camera, questMarkerSource);
+    // **After** the marks, so the body field sees the beat the marks have just
+    // taken rather than the previous one. See `GiverBodyField`'s header on the
+    // one beat of settle that costs.
+    giverBodies.update(dt, questMarkers.beats, player.position.x, player.position.z, giverBodySource);
   };
   window.addEventListener(
     'keydown',
