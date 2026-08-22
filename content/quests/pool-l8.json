@@ -3,7 +3,7 @@
   "quests": [
     {
       "id": "l8-beach-that-got-a-train",
-      "act": 1,
+      "act": 2,
       "title": "The Beach That Got a Train",
       "blurb": "Cronulla is the same sand as us and they had a railway by 1939. I want a photograph of it. Bring it back to this table and I will show you what it proves.",
       "giver": "bondi-stationmaster",
@@ -69,11 +69,14 @@
         "unlock": [
           "l8:bondi-moat"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l8-macquarie-headcount",
-      "act": 1,
+      "act": 2,
       "title": "The Monday Headcount",
       "blurb": "Friday the tower has three hundred and eighty-one active badges. Monday it has four hundred and twelve. Nobody is hired, nobody resigns. Walk the campus for me. The building has never met you.",
       "giver": "lindsay-access",
@@ -134,11 +137,14 @@
         "unlock": [
           "l8:macquarie-headcount"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l8-doors-closing",
-      "act": 1,
+      "act": 2,
       "title": "The Doors Do Not Wait",
       "blurb": "Forty-one years I held those doors for people. Now there's nobody up the front to see a bloke running. I'm putting in a submission and a submission wants evidence. Bring me the doors, the trip, and the fare.",
       "giver": "wollstonecraft-guard",
@@ -197,11 +203,14 @@
         "unlock": [
           "l8:doors-closing"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l8-engagement-photo",
-      "act": 1,
+      "act": 2,
       "title": "The Engagement Photo",
       "blurb": "Two o'clock: twelve engaged participants, a whiteboard, one photo. Compliance are in Thursday and the room has to look like it's been doing something since March. I'm not asking you to lie. I'm asking you to be present, in numbers.",
       "giver": "erko-bounce-gav",
@@ -260,11 +269,14 @@
         "unlock": [
           "l8:engagement-photo"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l8-public-liability",
-      "act": 1,
+      "act": 2,
       "title": "Public Liability, Unit 4",
       "blurb": "It's my niece's birthday. It's a night-time thing. Door up at ten, down at half three, and if anyone says the other word out loud my broker hears it from Parramatta. Stand near the gate and be large.",
       "giver": "vince-unit-four",
@@ -323,11 +335,14 @@
         "unlock": [
           "l8:public-liability"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l8-fourth-in-the-rank",
-      "act": 1,
+      "act": 2,
       "title": "Fourth in the Rank",
       "blurb": "Bus has been on Park Street since eleven. Three trucks ahead of me and not one's turned a wheel. First job out of that bus is mine, and you're going to make sure a job comes out.",
       "giver": "towie-druitt",
@@ -392,11 +407,14 @@
         "unlock": [
           "l8:rank-jumped"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l8-rockdale-awning",
-      "act": 1,
+      "act": 2,
       "title": "Fifty Metres of Bay Street",
       "blurb": "The awning, and the lane out the back on a Tuesday when the trays come in. Then Hurstville. She can't be within fifty metres of the shop with her own name on it. There's a copy of the undertaking laminated behind the till.",
       "giver": "vasso-banksia",
@@ -422,7 +440,7 @@
           "x": -6420,
           "z": 9300,
           "radius": 20,
-          "label": "the loading lane out the back — get the trays, and get the label on the trays"
+          "label": "the loading lane out the back \u2014 get the trays, and get the label on the trays"
         },
         {
           "kind": "ko",
@@ -433,7 +451,7 @@
         {
           "kind": "earn",
           "dollars": 120,
-          "label": "front the printing and the solicitor's half hour — she is not made of money, she is made of a settlement she hasn't received"
+          "label": "front the printing and the solicitor's half hour \u2014 she is not made of money, she is made of a settlement she hasn't received"
         },
         {
           "kind": "ride",
@@ -455,11 +473,14 @@
         "unlock": [
           "l8:rockdale-awning"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l8-everyone-starts-thursday",
-      "act": 1,
+      "act": 2,
       "title": "Everyone Starts Thursday",
       "blurb": "Forty placements, all of them starting Thursday, all of them at the club. The line's a metro now and none of them believe me. You're not fixing the trains. You're fixing the forty.",
       "giver": "bankstown-placements-desk",
@@ -518,13 +539,16 @@
         "unlock": [
           "l8:everyone-starts-thursday"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l8-two-trains-leave-strathfield",
-      "act": 1,
+      "act": 2,
       "title": "Two Trains Leave Strathfield",
-      "blurb": "Unit 4: Rates and Ratios. Two trains leave Strathfield — in a textbook that is a question, here it is the timetable. You sit the practical on the concourse while Year 11 watches. Marks are final. So is the fee.",
+      "blurb": "Unit 4: Rates and Ratios. Two trains leave Strathfield \u2014 in a textbook that is a question, here it is the timetable. You sit the practical on the concourse while Year 11 watches. Marks are final. So is the fee.",
       "giver": "strathfield-tutor-grace",
       "level": 8,
       "requires": [],
@@ -581,11 +605,14 @@
         "unlock": [
           "l8:two-trains"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l8-clear-path",
-      "act": 1,
+      "act": 2,
       "title": "Clear Path of Travel",
       "blurb": "A review of the 2019 review, which recommended a review. Crown Street offers one point one metres of clear path. The standard is one and a half. Somebody has to say so, in the approved format.",
       "giver": "jarrod-public-domain",
@@ -643,7 +670,10 @@
         "unlock": [
           "l8:clear-path"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     }
   ]
 }

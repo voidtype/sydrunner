@@ -3,7 +3,7 @@
   "quests": [
     {
       "id": "l4-no-driver",
-      "act": 1,
+      "act": 2,
       "title": "The 5:41 Has No Driver",
       "blurb": "I can't put a foot in the door of that thing. So you go. Ride it through to Sydenham, sit at the very front where the cab used to be, and come back and tell me what's there.",
       "giver": "bankstown-guard",
@@ -57,11 +57,14 @@
         "unlock": [
           "l4:no-driver"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l4-deed-of-release",
-      "act": 1,
+      "act": 2,
       "title": "The Deed of Release Says Nothing About You",
       "blurb": "Fourteenth pylon from the station end, if they haven't moved it. My name is on it with eleven thousand others. I'm not permitted past the roundabout. The deed says nothing whatsoever about you.",
       "giver": "vaughn-lidcombe-deed",
@@ -74,7 +77,7 @@
           "line": "Olympic Park",
           "from": "Lidcombe",
           "to": "Olympic Park",
-          "label": "take the shuttle off Platform 0 — the one he watches leave"
+          "label": "take the shuttle off Platform 0 \u2014 the one he watches leave"
         },
         {
           "kind": "goto",
@@ -115,11 +118,14 @@
         "unlock": [
           "l4:deed-of-release"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l4-erko-monday",
-      "act": 1,
+      "act": 2,
       "title": "Eleven Books Back by Monday",
       "blurb": "Every Monday the same eleven books are back in my street library, dog-ears and all, and the bloke who borrows the Bryson says hello like we've never met. Second set of eyes, before I put any of it in writing.",
       "giver": "erko-librarian",
@@ -171,11 +177,14 @@
         "unlock": [
           "l4:erko-monday"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l4-nets-away",
-      "act": 1,
+      "act": 2,
       "title": "Nobody Puts the Nets Away",
       "blurb": "Forty-two Saturdays on the roster and four names on it, and one of the names moved to Queensland. You're doing the coffees, the ground, the poster, the seconds' ice and the book. Then the nets.",
       "giver": "maroubra-gulls-val",
@@ -234,13 +243,16 @@
         "unlock": [
           "l4:nets-away"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l4-gordon-notification",
-      "act": 1,
+      "act": 2,
       "title": "Notification of the Notification",
-      "blurb": "The sign has to stand on the fence for fourteen days. It has stood for four, twice. I can't photograph it — council photographing council isn't evidence, it's a diary entry. You can. You're the public.",
+      "blurb": "The sign has to stand on the fence for fourteen days. It has stood for four, twice. I can't photograph it \u2014 council photographing council isn't evidence, it's a diary entry. You can. You're the public.",
       "giver": "kuringgai-assessment",
       "level": 4,
       "requires": [],
@@ -291,11 +303,14 @@
         "unlock": [
           "l4:gordon-notification"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l4-employment-fund",
-      "act": 1,
+      "act": 2,
       "title": "The Employment Fund Must Be Spent",
       "blurb": "There's four hundred and ten dollars in your Employment Fund and it dies Friday. You can't have it. You can have boots, a course, and a ticket to an interview that isn't real. Help me acquit the lot.",
       "giver": "ashfield-provider",
@@ -348,13 +363,16 @@
         "unlock": [
           "l4:employment-fund"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l4-no-grounds",
-      "act": 1,
+      "act": 2,
       "title": "Twelve Weeks, No Grounds",
-      "blurb": "Forty-one years I've been in this house and the letter says no grounds. It says it like it's a comfort — like the good news is they don't need one. Get me a photo of that back wall before the boy with the roller does.",
+      "blurb": "Forty-one years I've been in this house and the letter says no grounds. It says it like it's a comfort \u2014 like the good news is they don't need one. Get me a photo of that back wall before the boy with the roller does.",
       "giver": "eleni-dulwich",
       "level": 4,
       "requires": [],
@@ -411,11 +429,14 @@
         "unlock": [
           "l4:no-grounds"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l4-chatswood-phoenix-abn",
-      "act": 1,
+      "act": 2,
       "title": "The Same Ute, A New ABN",
       "blurb": "Nine floors of waterproofing, done twice, paid for never. The head contractor liquidated on Friday and was trading again on Monday, one stop down the line, new ABN, same ute. Get me a photo of the door.",
       "giver": "chatswood-waterproofer",
@@ -474,11 +495,14 @@
         "unlock": [
           "l4:phoenix-abn"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l4-acceptance-rate",
-      "act": 1,
+      "act": 2,
       "title": "Acceptance Rate",
       "blurb": "Three fares stacked, a daughter's assembly at nine, and a rating that dies below ninety. Take the phone, run the queue, and don't let anyone sit in the front.",
       "giver": "sevenhills-driver",
@@ -531,11 +555,14 @@
         "unlock": [
           "l4:fares"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l4-anyone-else-awake",
-      "act": 1,
+      "act": 2,
       "title": "Was Anyone Else Awake For This",
       "blurb": "I need an incident. Westpoint roof, something with a siren in it, and a photo before the police put out their own version. Then get on a train like a sensible person.",
       "giver": "blacktown-notice-board",
@@ -567,7 +594,7 @@
           "kind": "ko",
           "npc": "police",
           "count": 4,
-          "label": "survive the response — all four of them"
+          "label": "survive the response \u2014 all four of them"
         },
         {
           "kind": "ride",
@@ -594,7 +621,10 @@
         "unlock": [
           "l4:notice-board"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     }
   ]
 }

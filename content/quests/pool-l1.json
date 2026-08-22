@@ -3,9 +3,9 @@
   "quests": [
     {
       "id": "l1-artarmon-outcome",
-      "act": 1,
+      "act": 2,
       "title": "Your Four-Week Outcome",
-      "blurb": "I don't need you to have a job. I need a job to have had you — four weeks, on a form. Suite 3, above the tile showroom, Reserve Road. Buzz twice. The first buzzer does nothing and I've claimed for that too.",
+      "blurb": "I don't need you to have a job. I need a job to have had you \u2014 four weeks, on a form. Suite 3, above the tile showroom, Reserve Road. Buzz twice. The first buzzer does nothing and I've claimed for that too.",
       "giver": "artarmon-pathways-dale",
       "level": 1,
       "requires": [],
@@ -49,11 +49,14 @@
         "unlock": [
           "l1:artarmon-outcome"
         ]
-      }
+      },
+      "needFlags": [
+        "act0:trained"
+      ]
     },
     {
       "id": "l1-wolseley-hedge",
-      "act": 1,
+      "act": 2,
       "title": "Photographic Evidence of the Hedge",
       "blurb": "There is a hedge on Ocean Avenue that has grown four metres since the orders. I am not permitted within a hundred metres of it. Nobody knows who you are, which makes you the most useful person in the eastern suburbs.",
       "giver": "rodney-wolseley-hedge",
@@ -72,7 +75,7 @@
           "x": 2731,
           "z": 896,
           "radius": 70,
-          "label": "walk up Ocean Avenue — there is no station, that is the whole point of the suburb — and photograph the hedge from the public footpath"
+          "label": "walk up Ocean Avenue \u2014 there is no station, that is the whole point of the suburb \u2014 and photograph the hedge from the public footpath"
         },
         {
           "kind": "ko",
@@ -93,11 +96,14 @@
         "unlock": [
           "l1:wolseley-hedge"
         ]
-      }
+      },
+      "needFlags": [
+        "act0:trained"
+      ]
     },
     {
       "id": "l1-harbour-rail-experience",
-      "act": 1,
+      "act": 2,
       "title": "The Harbour Bridge Rail Experience",
       "blurb": "Twelve dollars. Three minutes. Unrivalled harbour views. Five more for the harbour side, and don't you dare tell them which side that is. The hard part is the photograph. I'll explain the photograph.",
       "giver": "milsons-tour-dawn",
@@ -144,11 +150,14 @@
         "unlock": [
           "l1:harbour-rail-experience"
         ]
-      }
+      },
+      "needFlags": [
+        "act0:trained"
+      ]
     },
     {
       "id": "l1-evidence-of-vibrancy",
-      "act": 1,
+      "act": 2,
       "title": "Evidence of Vibrancy",
       "blurb": "Category B placemaking grant. To get the money that fixes the piazza I first have to prove the piazza is already in use. Footfall, retail expenditure, a photo, one objection. You are the footfall.",
       "giver": "iwc-place-officer",
@@ -189,11 +198,14 @@
         "unlock": [
           "l1:vibrancy"
         ]
-      }
+      },
+      "needFlags": [
+        "act0:trained"
+      ]
     },
     {
       "id": "l1-one-short-for-the-triples",
-      "act": 1,
+      "act": 2,
       "title": "One Short for the Triples",
       "blurb": "Kev's done his hamstring at touch footy, so we're two and the constitution says three. Club's woods are in Wazza's ute at Rooty Hill. Get them, get the train back, be on the green before four.",
       "giver": "mtdruitt-bowlo-nev",
@@ -240,11 +252,14 @@
         "unlock": [
           "l1:triples"
         ]
-      }
+      },
+      "needFlags": [
+        "act0:trained"
+      ]
     },
     {
       "id": "l1-four-point-six-one",
-      "act": 1,
+      "act": 2,
       "title": "Four Point Six One",
       "blurb": "At four point six oh the app stops opening and you find out you were never an employee. Three pings stacked, a ranger doing laps of the block, and a bloke asleep in my back seat. You've got legs. Go.",
       "giver": "redfern-sydride-bec",
@@ -297,11 +312,14 @@
         "unlock": [
           "l1:four-point-six-one"
         ]
-      }
+      },
+      "needFlags": [
+        "act0:trained"
+      ]
     },
     {
       "id": "l1-fasting-since-sunday",
-      "act": 1,
+      "act": 2,
       "title": "Fasting Since Sunday",
       "blurb": "Six-ten, and the round starts at six. Seven tubes for the Carlton rooms, one stop down the line. The courier van was booked for Sunday. Sunday isn't in the system this morning, so neither is the van.",
       "giver": "kogarah-pathology-nell",
@@ -348,11 +366,14 @@
         "unlock": [
           "l1:fasting-since-sunday"
         ]
-      }
+      },
+      "needFlags": [
+        "act0:trained"
+      ]
     },
     {
       "id": "l1-blacks-no-logos",
-      "act": 1,
+      "act": 2,
       "title": "Blacks, No Logos",
       "blurb": "Black shirt, black pants, shoes you can't see your socks through. Before a client sees you there's an assessment: a coffee, a complaint, one stop on the train, and a photo of a door in Edgecliff.",
       "giver": "roz-bondi-junction-f486a8",
@@ -393,11 +414,14 @@
         "unlock": [
           "l1:blacks-no-logos"
         ]
-      }
+      },
+      "needFlags": [
+        "act0:trained"
+      ]
     },
     {
       "id": "l1-oxford-heritage-audit",
-      "act": 1,
+      "act": 2,
       "title": "Submission 41 to the Night-Time Economy Review",
       "blurb": "DeFAULT is lodging a submission and a submission needs photographs. Two hours of your day, most of it downhill. There's no money in it. There's forty dollars in it. Don't say that in front of the branch.",
       "giver": "darlo-tam-oxford",
@@ -422,7 +446,7 @@
           "x": 160,
           "z": 860,
           "radius": 40,
-          "label": "photograph the Downing Centre on Liverpool Street — where Oxford Street ends up on a Monday morning"
+          "label": "photograph the Downing Centre on Liverpool Street \u2014 where Oxford Street ends up on a Monday morning"
         },
         {
           "kind": "ride",
@@ -444,11 +468,14 @@
         "unlock": [
           "l1:oxford-heritage-audit"
         ]
-      }
+      },
+      "needFlags": [
+        "act0:trained"
+      ]
     },
     {
       "id": "l1-cabramatta-open-home",
-      "act": 1,
+      "act": 2,
       "title": "Wide, Light-Filled, Close to Transport",
       "blurb": "Ten-fifteen open home, forty-one registered, and the owner reckons five-twenty a week. Mate, it's a garage. It has a roller door. I need it photographing like a home before ten-fifteen.",
       "giver": "vinh-leasing-cabramatta",
@@ -461,7 +488,7 @@
           "line": -1,
           "from": "Central",
           "to": "Cabramatta",
-          "label": "come out the way an applicant would — the listing says twenty-two minutes to the city, and nobody at the agency has ever checked"
+          "label": "come out the way an applicant would \u2014 the listing says twenty-two minutes to the city, and nobody at the agency has ever checked"
         },
         {
           "kind": "goto",
@@ -475,7 +502,7 @@
           "x": -24845,
           "z": 3545,
           "radius": 20,
-          "label": "shoot it from across the road, back to the wall, phone sideways — high enough that the bottle shop is out of frame"
+          "label": "shoot it from across the road, back to the wall, phone sideways \u2014 high enough that the bottle shop is out of frame"
         },
         {
           "kind": "ko",
@@ -495,7 +522,10 @@
         "unlock": [
           "l1:cabramatta-open-home"
         ]
-      }
+      },
+      "needFlags": [
+        "act0:trained"
+      ]
     }
   ]
 }

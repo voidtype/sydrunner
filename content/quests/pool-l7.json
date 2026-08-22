@@ -3,7 +3,7 @@
   "quests": [
     {
       "id": "l7-ten-cents",
-      "act": 1,
+      "act": 2,
       "title": "Ten Cents, Forty Thousand Times",
       "blurb": "Everyone at Lidcombe is changing trains to go somewhere and be paid. I stay here. Ten cents a container is not a business. Ten cents a container, forty thousand times, after a full house at the ground, is a business.",
       "giver": "lidcombe-can-auntie",
@@ -62,11 +62,14 @@
         "unlock": [
           "l7:tencents"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l7-glebe-figs",
-      "act": 1,
+      "act": 2,
       "title": "Two Hundred Metres From a Fig",
       "blurb": "I gave the council an undertaking. Two hundred metres from the tree, in writing, by consent. It says nothing at all about a telephoto lens. Go and count what they've cut, and don't wave at me on the way back.",
       "giver": "l7-merrilyn-fig",
@@ -127,11 +130,14 @@
         "unlock": [
           "l7:glebe-figs"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l7-monday-shelf",
-      "act": 1,
+      "act": 2,
       "title": "The Monday Shelf",
       "blurb": "Forty-one umbrellas on Friday, a bare shelf on Monday, eleven weeks running. Norm wants it tested properly and he can't leave the window. Take the marked board somewhere else and be back before four.",
       "giver": "redfern-lost-property",
@@ -190,11 +196,14 @@
         "unlock": [
           "l7:monday-shelf"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l7-fresh-slab",
-      "act": 1,
+      "act": 2,
       "title": "Somebody Signed the Slab",
       "blurb": "Forty metres, exposed aggregate, screeded till dark on Saturday. Sunday morning it's got three names, a handprint and a word I won't repeat cured into it. She won't pay. I've got a hearing date and a grinder.",
       "giver": "auburn-concreter",
@@ -207,7 +216,7 @@
           "x": -16238,
           "z": -1652,
           "radius": 25,
-          "label": "photograph the driveway for the tribunal — all three names and the hand"
+          "label": "photograph the driveway for the tribunal \u2014 all three names and the hand"
         },
         {
           "kind": "ko",
@@ -227,7 +236,7 @@
           "line": -1,
           "from": "Auburn",
           "to": "Granville",
-          "label": "the ute's blocked in by her Kluger — get the train to the trade counter at Granville"
+          "label": "the ute's blocked in by her Kluger \u2014 get the train to the trade counter at Granville"
         },
         {
           "kind": "buy",
@@ -259,11 +268,14 @@
         "unlock": [
           "l7:fresh-slab"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l7-eleven-days-shirley-road",
-      "act": 1,
+      "act": 2,
       "title": "Eleven Days on Shirley Road",
       "blurb": "Eleven days that Commodore's sat by the war memorial and the plate comes back stolen out of Hornsby. I'm not hooking up a stolen car with a booze bus at the bottom of the hill. Go and look at it for me.",
       "giver": "dobbo-lower-north-shore-towing",
@@ -322,11 +334,14 @@
         "unlock": [
           "l7:shirley-road"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l7-continuous-sporting-use",
-      "act": 1,
+      "act": 2,
       "title": "Continuous Sporting Use",
       "blurb": "There's a development application on our green. Three townhouses. The constitution says the club exists as long as it can field a side, so I need a side, and I need it photographed doing something.",
       "giver": "vaucluse-bowlo-lifer",
@@ -345,7 +360,7 @@
           "x": 1010,
           "z": 2560,
           "radius": 70,
-          "label": "photograph a proper cricket ground at Moore Park — the bundle needs comparable sporting amenity, and the club will crop it"
+          "label": "photograph a proper cricket ground at Moore Park \u2014 the bundle needs comparable sporting amenity, and the club will crop it"
         },
         {
           "kind": "ride",
@@ -369,7 +384,7 @@
         {
           "kind": "earn",
           "dollars": 150,
-          "label": "put $150 through the club, so the books show it trades — meat tray, raffle, whatever you like"
+          "label": "put $150 through the club, so the books show it trades \u2014 meat tray, raffle, whatever you like"
         },
         {
           "kind": "goto",
@@ -385,11 +400,14 @@
         "unlock": [
           "l7:continuous-use"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l7-wet-signature",
-      "act": 1,
+      "act": 2,
       "title": "A Wet Signature, Before 4:30",
       "blurb": "One fig, one footpath, three councils. Two paper objections, two counters, both shut at half four. The portal says it received them. The portal says a lot of things.",
       "giver": "crowsnest-progress",
@@ -408,7 +426,7 @@
           "kind": "ko",
           "npc": "karen",
           "count": 5,
-          "label": "the other residents' group has the same laminate — disagree with five of them"
+          "label": "the other residents' group has the same laminate \u2014 disagree with five of them"
         },
         {
           "kind": "buy",
@@ -456,11 +474,14 @@
         "unlock": [
           "l7:wet-signature"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l7-tail-number",
-      "act": 1,
+      "act": 2,
       "title": "One Clean Shot of the Hercules",
       "blurb": "They know my car, my hat and the exact gap in the fence I use. They don't know you. Get the tail number off that Hercules and be on the train before Polair's up.",
       "giver": "richmond-spotter",
@@ -519,13 +540,16 @@
         "unlock": [
           "l7:tail-number"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l7-bondi-fare-job",
-      "act": 1,
+      "act": 2,
       "title": "Sixty-Forty, and I'm the Sixty",
-      "blurb": "Ten minutes of surge left, a bus lane camera in front and a ranger behind. Take my queue — two to Edgecliff, four outside the pub, and a flat white. Sixty-forty. I'm the sixty. It's my account.",
+      "blurb": "Ten minutes of surge left, a bus lane camera in front and a ranger behind. Take my queue \u2014 two to Edgecliff, four outside the pub, and a flat white. Sixty-forty. I'm the sixty. It's my account.",
       "giver": "behrouz-sydride",
       "level": 7,
       "requires": [],
@@ -575,11 +599,14 @@
         "unlock": [
           "l7:bondi-fare-job"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l7-via-airport",
-      "act": 1,
+      "act": 2,
       "title": "The 6:12 Goes Via the Airport",
       "blurb": "Forty years I called the stops. Now a computer says 'City' and never mentions the seventeen-dollar gate at the other end. Ride the 6:12. Get done like my grandson got done. I want a witness who can afford it.",
       "giver": "carlton-guard",
@@ -638,7 +665,10 @@
         "unlock": [
           "l7:via-airport"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     }
   ]
 }

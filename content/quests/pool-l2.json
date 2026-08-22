@@ -3,7 +3,7 @@
   "quests": [
     {
       "id": "l2-four-hundred-cans",
-      "act": 1,
+      "act": 2,
       "title": "Four Hundred Cans",
       "blurb": "Friday knock-off in the towers and it rains aluminium up there. Ten cents a can. Four hundred cans is forty dollars. That is not a figure of speech, that is the whole business plan, and the contractor wants it.",
       "giver": "col-trolley-wollstonecraft",
@@ -62,11 +62,14 @@
         "unlock": [
           "l2:fourhundredcans"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l2-carport-of-a-dead-council",
-      "act": 1,
+      "act": 2,
       "title": "The Carport of a Council That No Longer Exists",
       "blurb": "Carport in Banksia. Ordered removed in 2015 by Rockdale City Council. Rockdale City Council was abolished in 2016. The order stands, I can't close a file with a live order on it, and the audit is Thursday.",
       "giver": "rockdale-compliance-vesna",
@@ -78,7 +81,7 @@
           "kind": "dialog",
           "npc": "rockdale-compliance-vesna",
           "node": "paperwork",
-          "label": "collect the notice in triplicate — a second appointment, at the same desk, with the same officer"
+          "label": "collect the notice in triplicate \u2014 a second appointment, at the same desk, with the same officer"
         },
         {
           "kind": "goto",
@@ -92,7 +95,7 @@
           "x": -6152,
           "z": 8724,
           "radius": 25,
-          "label": "photograph the structure from the public footpath, not from the neighbour's yard — the neighbour's yard is a whole other file"
+          "label": "photograph the structure from the public footpath, not from the neighbour's yard \u2014 the neighbour's yard is a whole other file"
         },
         {
           "kind": "ko",
@@ -114,11 +117,14 @@
         "unlock": [
           "l2:carport-of-a-dead-council"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l2-ninth-floor",
-      "act": 1,
+      "act": 2,
       "title": "The Ninth Floor Still Has My Name On It",
       "blurb": "I can't go within a hundred metres of that building until the deed is signed. You can. The foyer directory still has my name on it, three months after they told Fair Work I was never there. Photograph the board.",
       "giver": "waverton-carolyn",
@@ -137,7 +143,7 @@
           "kind": "buy",
           "powerup": "FLAT WHITE",
           "count": 1,
-          "label": "buy the coffee first — nobody stands in a North Sydney lobby empty-handed"
+          "label": "buy the coffee first \u2014 nobody stands in a North Sydney lobby empty-handed"
         },
         {
           "kind": "photo",
@@ -156,7 +162,7 @@
         {
           "kind": "earn",
           "dollars": 25,
-          "label": "find your own fare home — her money is held pending a signature"
+          "label": "find your own fare home \u2014 her money is held pending a signature"
         },
         {
           "kind": "dialog",
@@ -171,11 +177,14 @@
         "unlock": [
           "l2:ninth-floor"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l2-make-it-look-busy",
-      "act": 1,
+      "act": 2,
       "title": "Make It Look Busy",
       "blurb": "Ten fifteen, forty-two Queen Street. You don't have to be buying. I need bodies on the nature strip, and I need them off a train, because the listing says walk to station and I'd like that true in front of the vendor.",
       "giver": "st-marys-deano",
@@ -223,11 +232,14 @@
         "unlock": [
           "l2:open-home"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l2-haldon-camry",
-      "act": 1,
+      "act": 2,
       "title": "The Camry Is Not Missing",
       "blurb": "It is not stolen. Stolen is a word for the insurance. Bilal took his uncle's car to Wiley Park at one in the morning and it has been sitting there since with the hazards going.",
       "giver": "haldon-knafeh-randa",
@@ -275,11 +287,14 @@
         "unlock": [
           "l2:haldon-camry"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l2-surry-hills-cold-chain",
-      "act": 1,
+      "act": 2,
       "title": "The Cold Chain Trial",
       "blurb": "One flat white, Central to Redfern, one stop. If it arrives hot I have a product. If it arrives cold I have a problem slide, and a problem slide raises more.",
       "giver": "fletch-devonshire-street",
@@ -333,11 +348,14 @@
         "unlock": [
           "l2:cold-chain"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l2-sustained-outcome",
-      "act": 1,
+      "act": 2,
       "title": "A Sustained Employment Outcome",
       "blurb": "Deng is on his last warning and his fourth vape. He needs one placement to hold, notionally, for four hours. You will be a barista at Macarthur Square. There is no coffee. There is a lanyard.",
       "giver": "queen-st-consultant",
@@ -389,11 +407,14 @@
         "unlock": [
           "l2:sustained-outcome"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l2-driver-in-it",
-      "act": 1,
+      "act": 2,
       "title": "Something With a Driver In It",
       "blurb": "They shut my line to make it driverless. I'm not tapping on to a bus, love. Take my Opal down to Sydenham, catch something with a person in the front of it, and bring me back a photo.",
       "giver": "voula-marrickville-platform",
@@ -441,11 +462,14 @@
         "unlock": [
           "l2:driver-in-it"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l2-terminates-here",
-      "act": 1,
+      "act": 2,
       "title": "This Train Terminates at Hornsby",
       "blurb": "Every second service gives up here and two hundred people a night find out they're eleven kilometres short of home. I can fit four of them. Take the rest and I'll square you up.",
       "giver": "hornsby-sydride",
@@ -458,7 +482,7 @@
           "x": -10535,
           "z": -18168,
           "radius": 30,
-          "label": "stand on the Jersey Street kerb outside Hornsby station — forty metres past the taxi rank, which is as close as a SydRide is legally allowed to hope"
+          "label": "stand on the Jersey Street kerb outside Hornsby station \u2014 forty metres past the taxi rank, which is as close as a SydRide is legally allowed to hope"
         },
         {
           "kind": "ride",
@@ -472,7 +496,7 @@
           "x": -10725,
           "z": -18105,
           "radius": 25,
-          "label": "photograph the upside-down water clock in the mall — the app can't find Ray's street, but it knows the clock"
+          "label": "photograph the upside-down water clock in the mall \u2014 the app can't find Ray's street, but it knows the clock"
         },
         {
           "kind": "ko",
@@ -483,7 +507,7 @@
         {
           "kind": "earn",
           "dollars": 45,
-          "label": "$45 of fares up the hill — Asquith, Mount Colah, and one bloke to Berowra who talks about the tolls the entire way"
+          "label": "$45 of fares up the hill \u2014 Asquith, Mount Colah, and one bloke to Berowra who talks about the tolls the entire way"
         }
       ],
       "reward": {
@@ -492,11 +516,14 @@
         "unlock": [
           "l2:terminates-here"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l2-page-one",
-      "act": 1,
+      "act": 2,
       "title": "Every Monday Is Page One",
       "blurb": "Twenty-two weeks in this book and every Monday it's page one again. Same faces, same fights, same bloke asleep on the 1:40 east. I'm not saying anything by that. I'm asking you to look, then tell me I'm tired.",
       "giver": "kx-door-fadi",
@@ -542,7 +569,10 @@
         "unlock": [
           "l2:page-one"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     }
   ]
 }

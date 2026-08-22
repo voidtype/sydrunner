@@ -3,7 +3,7 @@
   "quests": [
     {
       "id": "l9-monday-starts-at-001",
-      "act": 1,
+      "act": 2,
       "title": "Monday Starts at 001",
       "blurb": "Forty-one years of dockets. Sunday I finish on a big number. Monday the book starts at 001 and nobody in this plaza thinks that is strange except me. Look at a few things for me before you go home.",
       "giver": "cabramatta-transfer-counter",
@@ -69,11 +69,14 @@
         "unlock": [
           "l9:docket-book"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l9-no-grounds",
-      "act": 1,
+      "act": 2,
       "title": "No Grounds Required",
       "blurb": "Forty-one years in flat 3. Then the metro opened, the rent found out, and the notice arrived with no reason on it, because it does not have to have one. I would like the reason written down somewhere. Anywhere will do.",
       "giver": "wollstonecraft-tenant",
@@ -138,11 +141,14 @@
         "unlock": [
           "l9:no-grounds"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l9-be-more-interesting",
-      "act": 1,
+      "act": 2,
       "title": "Be More Interesting Than Me",
       "blurb": "Seventeen dollars thirty-four to walk through a gate. My people don't pay it. But tonight there's a car parked on my footpath, so go and be more interesting than me for twenty minutes.",
       "giver": "wolli-gate-walker",
@@ -160,7 +166,7 @@
         {
           "kind": "earn",
           "dollars": 120,
-          "label": "ten a head, up the road, twelve of them — minus the two who saw the towers and got a taxi"
+          "label": "ten a head, up the road, twelve of them \u2014 minus the two who saw the towers and got a taxi"
         },
         {
           "kind": "ko",
@@ -201,11 +207,14 @@
         "unlock": [
           "l9:gate-walk"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l9-the-712-from-pymble",
-      "act": 1,
+      "act": 2,
       "title": "Someone Has to Catch the 7:12",
       "blurb": "Thirty-one years on the 7:12 and my wife can see every tap of it on the statement. Today I need to be on a train going the other way. Take my card. Have an ordinary Tuesday on my behalf.",
       "giver": "pymble-712",
@@ -231,7 +240,7 @@
           "x": -190,
           "z": -330,
           "radius": 50,
-          "label": "photograph the lobby of the building he does not work in — the group chat expects a Tuesday"
+          "label": "photograph the lobby of the building he does not work in \u2014 the group chat expects a Tuesday"
         },
         {
           "kind": "earn",
@@ -264,11 +273,14 @@
         "unlock": [
           "l9:the-712"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l9-breath-test-queue",
-      "act": 1,
+      "act": 2,
       "title": "The Wagon's in the Breath Test Queue",
       "blurb": "Someone took the wagon off King Street with the whole PA in the back. It's alive, it's standing at an RBT on the Princes Highway, and the constable wants to keep it till Monday. I've got a Saturday gig.",
       "giver": "newtown-gail-foh",
@@ -280,7 +292,7 @@
           "kind": "dialog",
           "npc": "newtown-gail-foh",
           "node": "spare",
-          "label": "take the spare key off Gail — it lives in the till, taped to a coaster from the old pub"
+          "label": "take the spare key off Gail \u2014 it lives in the till, taped to a coaster from the old pub"
         },
         {
           "kind": "photo",
@@ -292,7 +304,7 @@
         {
           "kind": "earn",
           "dollars": 260,
-          "label": "get the release fee together — two hundred and sixty, cash, no card facility, obviously"
+          "label": "get the release fee together \u2014 two hundred and sixty, cash, no card facility, obviously"
         },
         {
           "kind": "ride",
@@ -333,11 +345,14 @@
         "unlock": [
           "l9:wagon-home"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l9-ocean-glimpse",
-      "act": 1,
+      "act": 2,
       "title": "Ocean Glimpse, From One Particular Square Metre",
       "blurb": "The listing says Coogee. The letterbox says Randwick. The glimpse is one square metre of the back deck and I can't be seen within four hundred of it. Auction Saturday. Monday next door pours a pergola. Photograph it while it exists.",
       "giver": "agent-kavanagh-randwick",
@@ -396,11 +411,14 @@
         "unlock": [
           "l9:ocean-glimpse"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l9-shire-economy",
-      "act": 1,
+      "act": 2,
       "title": "Nobody Round Here Has a Job",
       "blurb": "Everyone in this postcode has a business. Nobody in this postcode has a job. The juniors need eleven hundred by Sunday for jerseys, and I have got a tin, a barbecue and you. Bring the tin back heavier.",
       "giver": "cronulla-treasurer",
@@ -444,7 +462,7 @@
           "x": -4977,
           "z": 20825,
           "radius": 40,
-          "label": "photograph the train unloading at the last stop on the line — the council grant form calls it 'evidence of visitation'"
+          "label": "photograph the train unloading at the last stop on the line \u2014 the council grant form calls it 'evidence of visitation'"
         },
         {
           "kind": "ride",
@@ -466,11 +484,14 @@
         "unlock": [
           "l9:shire-economy"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l9-colour-and-movement",
-      "act": 1,
+      "act": 2,
       "title": "Colour and Movement, Six Episodes",
       "blurb": "A production company has taken the Westfield carpark for six episodes about how hard it is out here. They pay a hundred and twenty a driveway. Go and be authentic at them, then go and say it in Artarmon.",
       "giver": "md-ronnie",
@@ -530,11 +551,14 @@
         "unlock": [
           "l9:colour-and-movement"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l9-statistically-valid",
-      "act": 1,
+      "act": 2,
       "title": "Statistically Valid Community Consultation",
       "blurb": "Under forty submissions it isn't statistically valid and we run the whole thing again. This is the fourth one. I don't need you for or against. I need you to be forty people. There's a sausage sizzle and nobody's come.",
       "giver": "priya-rhodes-engagement",
@@ -600,11 +624,14 @@
         "unlock": [
           "l9:statistically-valid"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l9-burwood-doof",
-      "act": 1,
+      "act": 2,
       "title": "The Doof Has a Two-Hour Loading Zone",
       "blurb": "Six hundred people upstairs, one lead down the fire stairs, and my van's been in a two-hour zone since eleven. Nobody dances if the ranger comes back. Get me to four in the morning and you can have the good earplugs.",
       "giver": "burwood-rig-op",
@@ -622,7 +649,7 @@
         {
           "kind": "earn",
           "dollars": 220,
-          "label": "work the door in cash — the building wants its cut before the first drop"
+          "label": "work the door in cash \u2014 the building wants its cut before the first drop"
         },
         {
           "kind": "ko",
@@ -641,7 +668,7 @@
           "x": -9880,
           "z": 1228,
           "radius": 45,
-          "label": "photograph the queue folded down the laneway past Burwood Park — it is next month's flyer"
+          "label": "photograph the queue folded down the laneway past Burwood Park \u2014 it is next month's flyer"
         },
         {
           "kind": "ride",
@@ -669,7 +696,10 @@
         "unlock": [
           "l9:burwood-doof"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     }
   ]
 }

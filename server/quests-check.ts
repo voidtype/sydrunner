@@ -801,12 +801,32 @@ async function main(): Promise<void> {
       `every shipped job sits on a rung of the register (1-${REGISTER_LEVELS})`,
       rungs.join(', '),
     );
-    const rung1 = shipped.bundle.quests.filter((q) => q.level === 1);
+    const rung1 = shipped.bundle.quests.filter((q) => q.level === 1 && q.act === 0);
     check(rung1.length === 5, 'Act 0 puts five obligations on rung 1', `${rung1.length}`);
     const rung1Xp = rung1.reduce((sum, q) => sum + q.reward.xp, 0);
     check(
       rung1Xp < XP_PER_LEVEL,
-      `rung 1 pays ${rung1Xp} xp between its five jobs, under the ${XP_PER_LEVEL} that would level a player off it`,
+      `rung 1 pays ${rung1Xp} xp between its five obligations, under the ${XP_PER_LEVEL} that would level a player off it`,
+    );
+    // Act 2 is the city's own work: the hundred-quest pool, ten to a rung. A
+    // rung may hold more than a player can finish -- that is a menu, not a
+    // chain -- but it must not be able to lure a player off rung 1 before the
+    // obligations are done, or the story is locked until Monday. So rung 1's
+    // pool waits for the chain's last flag and every other rung's for the
+    // review's. The sum rule above is the chain's alone.
+    const pool = shipped.bundle.quests.filter((q) => q.act === 2);
+    check(pool.length === 100, 'Act 2 is a hundred jobs', `${pool.length}`);
+    for (let rung = 1; rung <= REGISTER_LEVELS; rung++) {
+      const on = pool.filter((q) => q.level === rung);
+      check(on.length === 10, `rung ${rung} carries ten of them`, `${on.length}`);
+    }
+    check(
+      pool.every((q) => q.needFlags.includes(q.level === 1 ? 'act0:trained' : 'act1:open')),
+      'and none of them opens before the story does: rung 1 waits for act0:trained, the rest for act1:open',
+    );
+    check(
+      pool.every((q) => !q.repeatable),
+      'the pool is story work, done once',
     );
     const act1 = shipped.bundle.quests.filter((q) => q.act === 1);
     check(act1.length > 0 && act1.every((q) => q.level === last?.level), 'the faction work stands on the rung its door opens onto');

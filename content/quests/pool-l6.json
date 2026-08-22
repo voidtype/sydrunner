@@ -3,7 +3,7 @@
   "quests": [
     {
       "id": "l6-silver-man-tally",
-      "act": 1,
+      "act": 2,
       "title": "The Silver Man's Tally",
       "blurb": "Eight hours a day I don't move, which makes me the only one at this Quay who sees it move. There's a number chalked on a bollard down the western end. Photograph it before Monday gets to it. Don't look at me while I'm talking.",
       "giver": "quay-silver-man",
@@ -55,11 +55,14 @@
         "unlock": [
           "l6:silver-man-tally"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l6-courtesy-car",
-      "act": 1,
+      "act": 2,
       "title": "Whoever Stole My Car Is Blowing Zeroes",
       "blurb": "Eleven months of fines and not one of them is mine. The booze bus on the Princes Highway has breath-tested my courtesy car three times this week. Three clean readings. Find me the better driver.",
       "giver": "narelle-tow-sydenham",
@@ -112,11 +115,14 @@
         "unlock": [
           "l6:sydenham-courtesy"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l6-stmarys-board",
-      "act": 1,
+      "act": 2,
       "title": "Is My Name Still On The Board",
       "blurb": "One stop up the line there's a working-bee honour board in a club foyer with my name on it twice. I can't go and look. You can. Whole board, please, not just my bit.",
       "giver": "stmarys-trev",
@@ -135,7 +141,7 @@
           "line": -1,
           "from": "Werrington",
           "to": "St Marys",
-          "label": "one stop up the line — he won't drive it, he sold the ute to the club raffle bloke"
+          "label": "one stop up the line \u2014 he won't drive it, he sold the ute to the club raffle bloke"
         },
         {
           "kind": "buy",
@@ -161,7 +167,7 @@
           "x": -40266,
           "z": -10894,
           "radius": 20,
-          "label": "the honour board in the foyer — the whole thing, in frame, no zooming"
+          "label": "the honour board in the foyer \u2014 the whole thing, in frame, no zooming"
         },
         {
           "kind": "ride",
@@ -177,11 +183,14 @@
         "unlock": [
           "l6:stmarys-board"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l6-booze-bus",
-      "act": 1,
+      "act": 2,
       "title": "The Booze Bus Outside a Street That Doesn't Drink",
       "blurb": "Twenty-two years on Haldon Street and the strongest thing I have ever poured is the tea. They have parked the breath-test bus across from my window and my queue has gone home. Move it. Politely. Second tray is out at eleven.",
       "giver": "lakemba-knafeh",
@@ -240,11 +249,14 @@
         "unlock": [
           "l6:booze-bus"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l6-doublebay-fig",
-      "act": 1,
+      "act": 2,
       "title": "The Banner Goes in the Gap",
       "blurb": "Someone drilled a ninety-year-old fig on New South Head Road and filled it with glyphosate. The fine is cheaper than the view. So we're doing the banner. I need an authorised person and you'll do.",
       "giver": "woollahra-trees",
@@ -303,11 +315,14 @@
         "unlock": [
           "l6:doublebay-fig"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l6-doors-closing",
-      "act": 1,
+      "act": 2,
       "title": "Eleven Seconds at Homebush",
       "blurb": "There's an inquiry into station staffing and my submission is one bloke's opinion in a font they don't like. Get me the platform, get me the crowd, get me back the fares those dead readers ate. Submissions close Friday.",
       "giver": "des-homebush",
@@ -366,11 +381,14 @@
         "unlock": [
           "l6:doors-closing"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l6-price-guide",
-      "act": 1,
+      "act": 2,
       "title": "The Price Guide Is a Guide",
       "blurb": "Federation, four bed, walk to rail. Guide's one point nine; the reserve is not one point nine. I need Saturday to look busy, the drop saw next door to stop, and one photo of the back garden without the tenant's washing in it.",
       "giver": "wahroonga-agent",
@@ -429,11 +447,14 @@
         "unlock": [
           "l6:price-guide"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l6-quarry-doof",
-      "act": 1,
+      "act": 2,
       "title": "Strictly Acoustic, Says the Permit",
       "blurb": "Council signed off on an acoustic evening in the quarry. Acoustic. They never said how loud. Rig's in Waitara, the hole's in Hornsby, and I'm back on ward at seven.",
       "giver": "hornsby-doof-nurse",
@@ -499,11 +520,14 @@
         "unlock": [
           "l6:quarry-doof"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l6-hurstville-fare",
-      "act": 1,
+      "act": 2,
       "title": "Seven Trips Short of the Weekly Bonus",
       "blurb": "Forty trips by Sunday and the bonus covers my rego. I'm on thirty-three and the car's on a hoist in Peakhurst. The app never asks what you turned up in. Take the phone, work the sheet, don't touch the aux cord.",
       "giver": "kenny-sydride-hurstville",
@@ -529,7 +553,7 @@
           "line": -1,
           "from": "Hurstville",
           "to": "Domestic Airport",
-          "label": "the 5:10 airport run — no car, so the fare goes by train and is not told"
+          "label": "the 5:10 airport run \u2014 no car, so the fare goes by train and is not told"
         },
         {
           "kind": "earn",
@@ -563,11 +587,14 @@
           "l6:hurstville-fare",
           "l6:sydride-phone"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l6-ashfield-express",
-      "act": 1,
+      "act": 2,
       "title": "The Express Does Not Stop At Ashfield",
       "blurb": "Out to Strathfield on the all stations, back on the all stations, and the express goes past us twice doing nothing for anybody. Knees are gone today. You're doing my run, and you're doing it properly.",
       "giver": "l6-ashfield-platform-two-baz",
@@ -620,7 +647,10 @@
         "unlock": [
           "l6:ashfield-express"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     }
   ]
 }

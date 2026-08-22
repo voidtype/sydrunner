@@ -3,7 +3,7 @@
   "quests": [
     {
       "id": "l10-possession",
-      "act": 1,
+      "act": 2,
       "title": "Possession of the Down Line",
       "blurb": "Sunday night the line is mine until five. I want someone off the books to check something between here and Penrith, and I want it done before Monday, because on Monday it won't be there to check.",
       "giver": "stmarys-possession",
@@ -15,7 +15,7 @@
           "kind": "buy",
           "powerup": "FLAT WHITE",
           "count": 2,
-          "label": "two flat whites from the servo on Queen Street — nobody signs on without one, and one of them is his"
+          "label": "two flat whites from the servo on Queen Street \u2014 nobody signs on without one, and one of them is his"
         },
         {
           "kind": "photo",
@@ -28,7 +28,7 @@
           "kind": "ko",
           "npc": "drunk",
           "count": 4,
-          "label": "clear the platform — the possession can't start while four blokes are on it arguing about whose taxi it is"
+          "label": "clear the platform \u2014 the possession can't start while four blokes are on it arguing about whose taxi it is"
         },
         {
           "kind": "ride",
@@ -47,7 +47,7 @@
         {
           "kind": "earn",
           "dollars": 120,
-          "label": "make $120 while it's still Sunday rates — after midnight it's ordinary time and you're worth less"
+          "label": "make $120 while it's still Sunday rates \u2014 after midnight it's ordinary time and you're worth less"
         },
         {
           "kind": "goto",
@@ -69,11 +69,14 @@
         "unlock": [
           "l10:possession"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l10-tenfifty-wahroonga",
-      "act": 1,
+      "act": 2,
       "title": "Ten Fifty on the Ridge",
       "blurb": "Eleven blue gums, a district view, and a garden shed that became a dwelling in April. Photograph them standing, before Monday. I can't be seen north of the boundary and my car is famous on that street.",
       "giver": "wahroonga-arborist",
@@ -132,11 +135,14 @@
         "unlock": [
           "l10:tenfifty"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l10-hurstville-doof",
-      "act": 1,
+      "act": 2,
       "title": "Level Five, After the Last Train",
       "blurb": "Top deck of the Hurstville car park. Starts when the last train goes, ends when the first one comes. One ramp, one boom gate, nine hundred windows above it. You're on load-in, security and the door. Column F.",
       "giver": "hurstville-doof-ada",
@@ -168,7 +174,7 @@
           "kind": "buy",
           "powerup": "FLAT WHITE",
           "count": 2,
-          "label": "two coffees at four — one for you, one for the bloke on the desk"
+          "label": "two coffees at four \u2014 one for you, one for the bloke on the desk"
         },
         {
           "kind": "earn",
@@ -192,7 +198,7 @@
           "x": -9527,
           "z": 11151,
           "radius": 40,
-          "label": "photograph the empty deck at sunrise — proof nothing happened here"
+          "label": "photograph the empty deck at sunrise \u2014 proof nothing happened here"
         }
       ],
       "reward": {
@@ -201,11 +207,14 @@
         "unlock": [
           "l10:hurstville-doof"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l10-open-home-circuit",
-      "act": 1,
+      "act": 2,
       "title": "Forty Groups Through the Door",
       "blurb": "Nine opens between Blacktown and Rooty Hill and every one starts at ten past ten. Forty groups through the door, one lease. I've got nine clients who can't take the morning off. You can run and you don't scare easy.",
       "giver": "lorraine-queue",
@@ -271,11 +280,14 @@
         "unlock": [
           "l10:open-home-circuit"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l10-nineteen-thousand-thirsty",
-      "act": 1,
+      "act": 2,
       "title": "Nineteen Thousand Thirsty People",
       "blurb": "Grand final at the park. Forty thousand go in, nineteen thousand never get near a bar, and every one of them walks past my gate to the station. Get them through it and the board can't sell my greens.",
       "giver": "concord-bowlo-president",
@@ -340,11 +352,14 @@
         "unlock": [
           "l10:bowlo-held"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l10-hard-earned",
-      "act": 1,
+      "act": 2,
       "title": "The Hard Way, 2026. Mixed media. Courtesy the artist.",
       "blurb": "Free entry, always has been. The work behind me went for two-twenty and I'm on thirty-one an hour. So: four hundred and fifty dollars, earned by you, in a day, in this postcode. I frame it. The label says exactly how you got it.",
       "giver": "chippo-gallery-sitter",
@@ -403,11 +418,14 @@
         "unlock": [
           "l10:hard-earned"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l10-front-window-seat",
-      "act": 1,
+      "act": 2,
       "title": "The Seat Where the Driver Would Be",
       "blurb": "Thirty-one years I said stand clear of the closing doors. Now the doors say it themselves, and they built the station under my flat. Do my old run properly, one last time, then come and tell me what you heard.",
       "giver": "waterloo-guard-doreen",
@@ -466,11 +484,14 @@
         "unlock": [
           "l10:front-window"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l10-erko-loop",
-      "act": 1,
+      "act": 2,
       "title": "The Long Way Round to Erskineville",
       "blurb": "Col Fenech at the Rose says nobody rides Hornsby to Penrith and home in a day any more. Two hundred dollars says he's wrong. Raise my stake first, love, then tap off where you tapped on.",
       "giver": "erko-nella",
@@ -536,11 +557,14 @@
         "unlock": [
           "l10:erko-loop"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l10-last-register-cc311b",
-      "act": 1,
+      "act": 2,
       "title": "The Last Cash Register on Darlinghurst Road",
       "blurb": "Four hundred in the drawer by six, or the wellness people get to write down that the strip is finished. It isn't finished. It's gone quiet, and quiet doesn't pay the rent. Earn it the hard way. Nobody hands it over up here.",
       "giver": "marj-cash-window-cc311b",
@@ -564,7 +588,7 @@
           "x": 990,
           "z": 650,
           "radius": 40,
-          "label": "photograph the big red sign at the top of William Street — the one on her wall has faded"
+          "label": "photograph the big red sign at the top of William Street \u2014 the one on her wall has faded"
         },
         {
           "kind": "buy",
@@ -592,13 +616,16 @@
         "unlock": [
           "l10:last-register-cc311b"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l10-mosman-fare",
-      "act": 1,
+      "act": 2,
       "title": "A Fare to Mosman, With No Car",
-      "blurb": "Council clamped my car outside my own house. Seven minutes over. Queue's still live and Annabel wants Mosman by six — the app says fifty-four minutes for three kilometres. Take her the way the harbour's meant to be crossed.",
+      "blurb": "Council clamped my car outside my own house. Seven minutes over. Queue's still live and Annabel wants Mosman by six \u2014 the app says fifty-four minutes for three kilometres. Take her the way the harbour's meant to be crossed.",
       "giver": "sydride-kosta",
       "level": 10,
       "requires": [],
@@ -615,7 +642,7 @@
           "kind": "buy",
           "powerup": "FLAT WHITE",
           "count": 1,
-          "label": "she ordered a flat white to the car. There is no car. Get it anyway — SydRide does not reimburse coffee and the rating remembers"
+          "label": "she ordered a flat white to the car. There is no car. Get it anyway \u2014 SydRide does not reimburse coffee and the rating remembers"
         },
         {
           "kind": "ride",
@@ -655,7 +682,10 @@
         "unlock": [
           "l10:mosman-fare"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     }
   ]
 }

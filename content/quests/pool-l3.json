@@ -3,7 +3,7 @@
   "quests": [
     {
       "id": "l3-change-of-ends",
-      "act": 1,
+      "act": 2,
       "title": "Change of Ends",
       "blurb": "Eight carriages come out from the city, the driver walks to the other end, and it goes back as a different service with a different number. Ride it. Photograph both ends of that. Bring me something that keeps.",
       "giver": "emu-turnback-doug",
@@ -41,7 +41,7 @@
         {
           "kind": "earn",
           "dollars": 45,
-          "label": "turn up with $45 — money is the part that keeps"
+          "label": "turn up with $45 \u2014 money is the part that keeps"
         },
         {
           "kind": "dialog",
@@ -56,11 +56,14 @@
         "unlock": [
           "l3:change-of-ends"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l3-coogee-pier",
-      "act": 1,
+      "act": 2,
       "title": "Asset 0041, Condition Fair",
       "blurb": "Asset 0041 on the register is the Coogee Pier. The sea took it in 1934. It has been inspected every year since, it is rated condition fair, and this year that is you. Bring a camera and the heights ticket.",
       "giver": "neville-asset-register",
@@ -114,11 +117,14 @@
         "unlock": [
           "l3:coogee-pier"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l3-second-bedroom",
-      "act": 1,
+      "act": 2,
       "title": "The Second Bedroom Is the 4:51 to Hornsby",
       "blurb": "Forty-one degrees on my balcony at four o'clock and the glass doesn't open. I've done the research. I need someone with a phone, a train ticket, and no opinions about how I spend my afternoons.",
       "giver": "rhodes-west-facing",
@@ -155,7 +161,7 @@
         {
           "kind": "earn",
           "dollars": 60,
-          "label": "make back the fares — she has been buying an afternoon at $4.20 a leg"
+          "label": "make back the fares \u2014 she has been buying an afternoon at $4.20 a leg"
         },
         {
           "kind": "dialog",
@@ -170,11 +176,14 @@
         "unlock": [
           "l3:second-bedroom"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l3-incident-number",
-      "act": 1,
+      "act": 2,
       "title": "An Incident Number",
       "blurb": "Council says there is no evidence of a safety issue on my corner. Evidence is a police event number. I have eleven months of tally marks and no number. Go and be one.",
       "giver": "coralie-wollstonecraft",
@@ -234,11 +243,14 @@
         "unlock": [
           "l3:incident-number"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l3-one-blink",
-      "act": 1,
+      "act": 2,
       "title": "One Blink in Eighteen Years",
       "blurb": "Eighteen years I shot that family. One photo where Auntie blinked, and now I'm not invited to my own niece's wedding. I'm not going up there. You are. Go and finish the album.",
       "giver": "anu-granville-photographer",
@@ -297,11 +309,14 @@
         "unlock": [
           "l3:one-blink"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l3-chimney-doof",
-      "act": 1,
+      "act": 2,
       "title": "Fifteen People, No Amplified Sound",
       "blurb": "It's a picnic. I've got the permit in a sleeve. Fifteen people, nine till five, no amplified sound. There's four hundred of them, six kilowatts and it's ten past two, so call it a permit with some give in it.",
       "giver": "sydney-park-doof",
@@ -359,11 +374,14 @@
         "unlock": [
           "l3:chimney-doof"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l3-burwood-render",
-      "act": 1,
+      "act": 2,
       "title": "Four Hundred Metres to the Metro",
       "blurb": "The family gets here at four. By then this strip has to look like the picture on the hoarding: coffee in every hand, nobody arguing about height limits, everyone walking briskly toward a train that doesn't stop here yet.",
       "giver": "burwood-render-sandra",
@@ -417,11 +435,14 @@
         "unlock": [
           "l3:burwood-render"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l3-nine-seconds",
-      "act": 1,
+      "act": 2,
       "title": "Nine Seconds at Auburn",
       "blurb": "The timetable says the doors stand open twenty seconds. I have timed them eleven months and it is nine. Bring me a number off the line that got built, and I will put both in the one email.",
       "giver": "auburn-opal-ferhat",
@@ -467,11 +488,14 @@
         "unlock": [
           "l3:nine-seconds"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l3-tunnel-pitch",
-      "act": 1,
+      "act": 2,
       "title": "The Tunnel Pitch, Written in Pen",
       "blurb": "Everyone thinks the tunnel is free. The tunnel is not free, it's booked, and I keep the book. Bring me a hundred and twenty out of that hat in coins and I'll stop writing you in pencil.",
       "giver": "trish-tunnel-roster",
@@ -530,11 +554,14 @@
         "unlock": [
           "l3:tunnel-pitch"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l3-richmond-ute",
-      "act": 1,
+      "act": 2,
       "title": "The Ute That Did The Right Thing",
       "blurb": "First time in my life I leave the ute at the club and take a lift home, and it's gone by morning. Sober, on foot, in Richmond. Richmond's the end of the line, mate, and the end of the line is a long way from anything.",
       "giver": "richmond-kev",
@@ -554,7 +581,7 @@
           "line": -1,
           "from": "Richmond",
           "to": "Windsor",
-          "label": "the report went in on a form and stopped there — go to Windsor and ask a human, by train, like a man with no ute"
+          "label": "the report went in on a form and stopped there \u2014 go to Windsor and ask a human, by train, like a man with no ute"
         },
         {
           "kind": "ko",
@@ -587,7 +614,10 @@
         "unlock": [
           "l3:richmond-ute"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     }
   ]
 }

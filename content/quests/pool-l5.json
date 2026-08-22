@@ -3,7 +3,7 @@
   "quests": [
     {
       "id": "l5-express-through-mounty-county",
-      "act": 1,
+      "act": 2,
       "title": "Express Through Mounty County",
       "blurb": "A crew are filming a hardship program out the window of the 11:42, doing ninety, windows up. I want one of them standing on my platform with a coffee going cold in their hand.",
       "giver": "rhonda-mount-druitt-platform",
@@ -62,11 +62,14 @@
         "unlock": [
           "l5:mounty-express"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l5-change-of-use",
-      "act": 1,
+      "act": 2,
       "title": "Change of Use, With Seating",
       "blurb": "The Bourke Road roastery has put four stools on the footpath. That is a change of use. Notification, heritage statement, advertising fee, hard copy to Town Hall. The applicant is in Newcastle. You look free.",
       "giver": "l5-nerida-planner",
@@ -119,11 +122,14 @@
         "unlock": [
           "l5:change-of-use"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l5-fourth-trench",
-      "act": 1,
+      "act": 2,
       "title": "The Fourth Trench on Church Street",
       "blurb": "Poured that footpath twice. Water cut it, then gas cut it, then the light rail cut it. Now there's a fourth mob out there with a saw and a work order, and I want it on record that it was flat when I left.",
       "giver": "macca-concreter",
@@ -182,11 +188,14 @@
         "unlock": [
           "l5:fourth-trench"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l5-unit-604",
-      "act": 1,
+      "act": 2,
       "title": "Unit 604 Shows Beautifully",
       "blurb": "Unit 604, eleven o'clock, and so far the crowd is me. I need bodies on the landing and a photo the netting stays out of. There is a report on the building. There is a report on every building.",
       "giver": "mascot-vendor-604",
@@ -239,11 +248,14 @@
         "unlock": [
           "l5:unit-604"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l5-underutilised",
-      "act": 1,
+      "act": 2,
       "title": "The Green Is Not Underutilised",
       "blurb": "Forty-two townhouses and a communal recreation space. That's a lawn with a barbecue on it. The DA says my green is underutilised. I want that disproved, photographed, and lodged at Gordon before four.",
       "giver": "pymble-bowlo-captain",
@@ -256,7 +268,7 @@
           "x": -6651,
           "z": -13519,
           "radius": 25,
-          "label": "photograph the green in play — feet on the mat, jack down, sun on it"
+          "label": "photograph the green in play \u2014 feet on the mat, jack down, sun on it"
         },
         {
           "kind": "buy",
@@ -267,7 +279,7 @@
         {
           "kind": "earn",
           "dollars": 70,
-          "label": "sell $70 of chook raffle tickets at the bar — the objection has a printing cost"
+          "label": "sell $70 of chook raffle tickets at the bar \u2014 the objection has a printing cost"
         },
         {
           "kind": "ride",
@@ -294,7 +306,7 @@
           "x": -5252,
           "z": -12386,
           "radius": 35,
-          "label": "lodge the objection at the Ku-ring-gai chambers at Gordon — the counter shuts at four"
+          "label": "lodge the objection at the Ku-ring-gai chambers at Gordon \u2014 the counter shuts at four"
         },
         {
           "kind": "dialog",
@@ -309,11 +321,14 @@
         "unlock": [
           "l5:bowlo"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l5-booked-in-rookwood",
-      "act": 1,
+      "act": 2,
       "title": "Nobody Has Ever Been Booked in Rookwood",
       "blurb": "A million residents in there and not one's ever blown into a tube. That's either the law or it's manners, and the kitty says manners. Make yourself known on Railway Street, then walk in the gate and count how far it follows you.",
       "giver": "lidcombe-hearse-gaz",
@@ -372,11 +387,14 @@
         "unlock": [
           "l5:booked-in-rookwood"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l5-monday-inventory",
-      "act": 1,
+      "act": 2,
       "title": "The Monday Inventory",
       "blurb": "Eleven pools on Wolseley Road and I've kept a book since March. Monday the leaf nets are hung properly, the teak's unscratched, and the coin I dropped in the skimmer is back in my pocket. Warm.",
       "giver": "pointpiper-pools",
@@ -402,7 +420,7 @@
           "x": 2660,
           "z": 890,
           "radius": 45,
-          "label": "top of the hill, where the whole Point Piper waterfront is in one frame — photograph it Sunday-side"
+          "label": "top of the hill, where the whole Point Piper waterfront is in one frame \u2014 photograph it Sunday-side"
         },
         {
           "kind": "ko",
@@ -428,11 +446,14 @@
         "unlock": [
           "l5:monday-inventory"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l5-cabramatta-proxy",
-      "act": 1,
+      "act": 2,
       "title": "One Stop Is Far Enough",
       "blurb": "I can't go to Cabramatta. My aunty's committee sits outside the bakery from seven, and if they see me I'm engaged by Sunday. You go. Take photos. Say nothing to anyone with a clipboard.",
       "giver": "canley-vale-exile",
@@ -444,7 +465,7 @@
           "kind": "buy",
           "powerup": "FLAT WHITE",
           "count": 1,
-          "label": "get a coffee in your hand — nobody photographs a bakery on a break"
+          "label": "get a coffee in your hand \u2014 nobody photographs a bakery on a break"
         },
         {
           "kind": "ride",
@@ -458,7 +479,7 @@
           "x": -24878,
           "z": 3298,
           "radius": 25,
-          "label": "photograph the new shop's sign under the arch — the family name, spelt her family's way"
+          "label": "photograph the new shop's sign under the arch \u2014 the family name, spelt her family's way"
         },
         {
           "kind": "ko",
@@ -491,11 +512,14 @@
         "unlock": [
           "l5:cabramatta-proxy"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l5-kilns-load-in",
-      "act": 1,
+      "act": 2,
       "title": "Load-In: Newtown to the Kilns",
       "blurb": "There's no party. There's a picnic. The picnic has four kilowatts of rig locked in a shed on Erskineville Road, the ute's got no rego, and the sun comes up at six whether we're ready or not.",
       "giver": "kez-sound",
@@ -514,7 +538,7 @@
           "x": -2205,
           "z": 3555,
           "radius": 25,
-          "label": "the lockup off Erskineville Road — second roller door, the mural nobody finished"
+          "label": "the lockup off Erskineville Road \u2014 second roller door, the mural nobody finished"
         },
         {
           "kind": "earn",
@@ -554,11 +578,14 @@
         "unlock": [
           "l5:kilns-load-in"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     },
     {
       "id": "l5-floating-forest",
-      "act": 1,
+      "act": 2,
       "title": "The Floating Forest, Wrong Side of the Fence",
       "blurb": "Council fenced the only angle where dawn comes through the mangroves. I'm seventy-eight and my knees are a matter of public record. Get over, get the shot, get gone. There's a print in it. The fine is not my problem.",
       "giver": "rhodes-dawn-shooter",
@@ -623,7 +650,10 @@
         "unlock": [
           "l5:floating-forest"
         ]
-      }
+      },
+      "needFlags": [
+        "act1:open"
+      ]
     }
   ]
 }
