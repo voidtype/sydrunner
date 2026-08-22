@@ -253,6 +253,12 @@ import {
   type RailNetwork,
 } from './world/rail-geo.ts';
 import { KEEP_RADIUS, CHUNK_M, type SolidPrism } from './world/rail-solids.ts';
+import {
+  TunnelLightAssets,
+  TunnelLights,
+  buildTunnelLamps,
+  tunnelLightWarmupParts,
+} from './world/tunnellights.ts';
 import { decodeRail, type RailBake, type RailDirection } from './game/rail.ts';
 import {
   BigNightKit,
@@ -1096,6 +1102,29 @@ async function warmGroups(): Promise<{ groups: WarmGroup[]; rail: RailRide | nul
     parts: railWarmupParts(railAssets),
     real: rail ? [rail.world.group] : [],
     label: { rail: railAssets },
+  });
+
+  // --- WORKSTREAM AI: the tunnel lamps, which are the whole reason that feature
+  // is a plain `Mesh` and not an `InstancedMesh`.
+  //
+  // `world/tunnellights.ts` section 4 argues it at length: instancing would have
+  // put `object.uuid` in the pipeline key, this audit would have counted the set
+  // among its "instanced draws skipped", and a layout mistake would have shown
+  // up as a compile on the frame the train enters the bore instead of as a line
+  // here. Driven at the same place the rail ride starts, so the mesh in `real`
+  // has a real draw range rather than the empty one a fresh set carries.
+  const tunnelAssets = new TunnelLightAssets();
+  let tunnel: TunnelLights | null = null;
+  if (rail) {
+    tunnel = new TunnelLights(buildTunnelLamps(rail.bake), tunnelAssets);
+    const first = rail.route.vertexOff * 3;
+    tunnel.update(rail.bake.vertices[first], rail.bake.vertices[first + 2]);
+  }
+  groups.push({
+    name: 'tunnellight',
+    parts: tunnelLightWarmupParts(tunnelAssets),
+    real: tunnel ? [tunnel.group] : [],
+    label: { tunnellight: tunnelAssets },
   });
 
   // --- The world-wide instanced populations, which contribute no parts at all
