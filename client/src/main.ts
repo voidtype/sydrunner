@@ -245,6 +245,19 @@ import { EMPTY_MASK, TEAM, TEAM_NAME, verifyTeams, type Team } from './game/team
 import { verifyTeamField } from './game/teamfield.ts';
 import { verifyTeamsWire } from './net/teams.ts';
 import { TalentsPanel, verifyTalentsPanel } from './teams.ts';
+// --- WORKSTREAM AK: quests and dialog. The contract, the panel and the wire's
+// client half; the one block that uses all three is beside `TalentsPanel`'s
+// construction, well clear of the boot region. See it for why.
+import { DialogPanel, verifyDialogPanel } from './dialog.ts';
+import {
+  EMPTY_BUNDLE,
+  parseDialogPack,
+  parseQuestPack,
+  verifyDialog,
+  verifyQuests,
+  type ContentBundle,
+} from './game/questmodel.ts';
+import { blankQuestState } from './net/quests.ts';
 import { BuildSheet, verifyBuildSheet } from './buildsheet.ts';
 import { ChangelogFeed, verifyChangelog, verifyChangeFeed } from './changelog.ts';
 import { BugReportForm, FrameGrabber, verifyBugReport } from './bugreport.ts';
@@ -4273,6 +4286,141 @@ async function main(): Promise<void> {
    */
   const buildSheet = new BuildSheet(talentRead);
 
+  /* ==== WORKSTREAM AK: quests and dialog ====================================
+   *
+   * One contiguous block, here rather than in the boot list four thousand
+   * lines up, and the placement is deliberate on two counts. It is **beside
+   * the talents panel**, which is the other thing in this file that is a
+   * self-contained panel handed closures and reaching into nothing else. And
+   * it is **out of the boot/loading region entirely**, which is a shared
+   * stretch of this file that several branches edit at once -- a block down
+   * here merges cleanly against work up there.
+   *
+   * ## The checks run here, not in the boot list, and still refuse to start
+   *
+   * `verifyQuests`, `verifyDialog` and `verifyDialogPanel` gate the boot
+   * through `hud.fatal`, which is the same thing the asset kits do a couple of
+   * thousand lines up ("a fatal check belongs beside the kit"). The server runs
+   * the first two in its own list before it opens a socket; this side runs all
+   * three and refuses to render. Nothing about the gate is weaker for being
+   * here -- `hud.fatal` is how this file has always refused after the boot
+   * checks have already passed.
+   *
+   * ## The pack arrives over HTTP, once, and a failure is not fatal
+   *
+   * `GET /content` beside `/health`, ETag'd, so a returning player gets a 304.
+   * A server that does not answer it -- an older build, `?offline`, a laptop
+   * with nothing running -- leaves the bundle empty, which means no NPC is ever
+   * within reach, which means the prompt never appears and nothing else in this
+   * block ever runs. That is the correct degraded state and it needs no branch:
+   * an empty world of quests is a world with no quests in it.
+   *
+   * ## `E` is shared, and is deliberately not consumed
+   *
+   * `money.keydown`'s Centrelink claim already shares this key and says so in
+   * as many words: *"Not consumed -- the mount bit still goes out on this
+   * press."* This does the same. The alternative was to swallow `E` whenever an
+   * NPC is in reach, and that would make a lime bike parked beside Denise
+   * unmountable -- a rule nobody could discover and nothing would report.
+   *
+   * The one guard that matters is **not while riding**, because `E` on a train
+   * or a bike unambiguously means "get off" and a conversation that opened over
+   * the top of that would release the pointer at 130 km/h. `money.ts` gates its
+   * own `E` on the same question.
+   *
+   * ## Capture phase, for Escape and for nothing else
+   *
+   * Escape has an ordering in this file and the dialog has to sit ahead of the
+   * suggestions box in it, exactly as the phone does. The phone gets there
+   * through `money.keydown`, which is called early in the main listener; this
+   * gets there through a **capture-phase** listener, which is what
+   * `client/src/teams.ts` already does for the same reason. It consumes only
+   * the Escape that actually closed something.
+   */
+  const dialogFailures = [...verifyQuests(), ...verifyDialog(), ...verifyDialogPanel()];
+  if (dialogFailures.length > 0) {
+    hud.fatal('Quest content self-checks failed:\n' + dialogFailures.map((f) => '  - ' + f).join('\n'));
+  }
+  /**
+   * The pack, mutable and empty until `/content` answers.
+   *
+   * A `let` rather than a promise the panel awaits, because the panel is polled
+   * at 4 Hz from a timer and "not loaded yet" and "this server has no quests"
+   * are the same state to it: no npcs, no prompt, nothing drawn. A player who
+   * joins before the fetch lands sees the world they always saw.
+   */
+  let questBundle: ContentBundle = EMPTY_BUNDLE;
+  void (async () => {
+    try {
+      // Off the same origin the socket resolved to, so a client pointed at a
+      // remote host fetches that host's content rather than the page's. A null
+      // `netUrl` is `?offline`, which has no server and therefore no quests --
+      // the same empty-bundle state a server that does not answer produces.
+      if (netUrl === null) return;
+      const base = netUrl.replace(/^ws/, 'http').replace(/\/ws\b.*$/, '');
+      const res = await fetch(`${base}/content`);
+      if (!res.ok) return;
+      const raw = (await res.json()) as { revision?: string; quests?: unknown; npcs?: unknown };
+      // Re-parsed on this side rather than trusted, which is not paranoia about
+      // the server -- it is the same `parseQuestPack` the server ran, so a
+      // client on an older build silently drops a step kind it does not know
+      // instead of drawing a tracker line it cannot describe.
+      const quests = parseQuestPack({ quests: raw.quests }, 'live').value.quests;
+      const npcs = parseDialogPack({ npcs: raw.npcs }, 'live').value.npcs;
+      questBundle = { quests, npcs, revision: String(raw.revision ?? '') };
+    } catch {
+      // No content, no quests, no prompt. See the header.
+    }
+  })();
+  const dialog = new DialogPanel({
+    content: () => questBundle,
+    state: () => net?.questState() ?? blankQuestState(),
+    position: () => ({ x: player.position.x, z: player.position.z }),
+    level: () => net?.myTalentLevel ?? 1,
+    faction: () => TEAM_NAME[net?.myTeam ?? TEAM.NONE],
+    cash: () => net?.wallet.balance ?? 0,
+    send: (op, id, node, choice) => net?.quest(op, id, node, choice),
+    // The click that closed the conversation is a user gesture, which is the
+    // only thing `requestPointerLock` will accept -- `Phone.setCamera`'s note.
+    lockPointer: () => {
+      if (!document.pointerLockElement) void canvas.requestPointerLock();
+    },
+  });
+  /**
+   * The panel's own clock, 4 Hz, and **not** the frame clock.
+   *
+   * It rebuilds DOM and reads one position; it is not frame-coupled and
+   * nothing it draws is animated. A timer keeps the whole feature in this one
+   * block instead of putting a line in the render loop, and it keeps drawing
+   * at the same rate when the tab throttles rAF -- which is when a player has
+   * alt-tabbed away mid-conversation and the panel should not freeze holding a
+   * stale gate state.
+   */
+  window.setInterval(() => dialog.tick(0.25), 250);
+  window.addEventListener(
+    'keydown',
+    (e) => {
+      if (hud.typing) return;
+      if (e.code === 'Escape' && dialog.visible) {
+        dialog.goBack();
+        // Consumed, so the suggestions box does not open behind the
+        // conversation that just closed. This is the whole reason the listener
+        // is in the capture phase.
+        e.stopPropagation();
+        return;
+      }
+      if (e.code !== 'KeyE' || e.repeat || dialog.visible) return;
+      // `E` on a train or a bike means "get off". See the header.
+      if (playerCombat.ridingBike !== 0 || isAboard(playerCombat.aboard)) return;
+      // **Not consumed**, deliberately: the mount bit still goes out on this
+      // press, on `money.keydown`'s Centrelink precedent.
+      dialog.tryOpen();
+    },
+    true,
+  );
+  // ==== end workstream AK ====================================================
+
+
   // --- The nameplates: a name and a large health bar over every other player.
   //
   // A user-ordered feature that overrules spec 8.2's "no world-space health
@@ -5701,6 +5849,12 @@ async function main(): Promise<void> {
     speed: () => Math.sqrt(player.velocity.x * player.velocity.x + player.velocity.z * player.velocity.z),
     firstPerson: () => !thirdPerson,
     riding: () => playerCombat.ridingBike !== 0,
+    // WORKSTREAM AK: the Obligations screen, rendered by the file that owns the
+    // quest model. One line, on `openTalents`' route below, and the only part
+    // of this feature that is not in the block beside `TalentsPanel` -- because
+    // this literal is where every phone screen is handed in and a second route
+    // for one of them would be worse than a line here.
+    obligations: () => dialog.obligationsHtml(),
     // --- Both maps and the camera. See `client/src/game/phone.ts`.
     //
     // The `KeyM` block that used to sit in the keydown listener below is gone:

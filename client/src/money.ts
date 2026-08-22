@@ -147,6 +147,15 @@ export interface MoneyDeps {
    * to compose.
    */
   openTalents(): void;
+  /**
+   * WORKSTREAM AK: the Obligations screen's markup. Optional.
+   *
+   * Threaded through here rather than reached for, on `openTalents`' route one
+   * line up and for its reason: this file owns the handset and `main.ts` owns
+   * everything the handset shows, so a screen whose content belongs to a third
+   * file arrives as a closure like every other one. See `PhoneSource.obligations`.
+   */
+  obligations?(): string;
   /** Put the big map away. Escape from a map the phone opened; see `keydown`. */
   closeMap(): void;
   /** Is the big map up? Sampled before Escape decides what a press meant. */
@@ -410,6 +419,7 @@ export function installMoney(deps: MoneyDeps): MoneyHooks {
       mapFromPhone = true;
     },
     openTalents: () => deps.openTalents(),
+    obligations: () => deps.obligations?.() ?? '',
   });
   let online = false;
   /**

@@ -117,6 +117,20 @@ export interface PhoneSource {
    */
   openTalents?(): void;
   /**
+   * WORKSTREAM AK: the Obligations screen's markup, or undefined.
+   *
+   * **Markup rather than data**, which is this interface's one departure from
+   * how every other app here is fed, and it is the same call `openTalents`
+   * makes one line up for a different reason: the rows belong to
+   * `client/src/dialog.ts`, which owns the quest model, the step labels and the
+   * escaping -- and a `PhoneSource` that carried cursors and steps instead
+   * would put a second renderer for them in this file.
+   *
+   * Optional, so a build with no quest content -- `?offline`, an older server
+   * -- draws a tile that says so rather than a tile that throws.
+   */
+  obligations?(): string;
+  /**
    * The album, owned by `money.ts`.
    *
    * Handed in rather than constructed here because a photograph is taken from
@@ -157,7 +171,7 @@ export interface PhoneSource {
 
 // --- The overlay -------------------------------------------------------------------
 
-type AppId = 'wallet' | 'centrelink' | 'sydride' | 'map' | 'camera' | 'gallery' | 'talents';
+type AppId = 'wallet' | 'centrelink' | 'sydride' | 'map' | 'camera' | 'gallery' | 'talents' | 'obligations';
 
 interface AppDef {
   id: AppId;
@@ -201,6 +215,19 @@ const APPS: readonly AppDef[] = [
    * you have to already know about.
    */
   { id: 'talents', glyph: '✦', label: 'talents' },
+  /**
+   * WORKSTREAM AK. **A screen, not a shortcut**, which is what separates it
+   * from Map and Talents above: what you owe Centrelink is four short rows and
+   * a step you are part way through, and a 300 px handset draws that perfectly
+   * well. There is nothing to take the screen for.
+   *
+   * Eighth tile, so the grid is three rows of three and finally square again --
+   * which the seventh tile's own note apologised for and is worth saying is
+   * now fixed rather than leaving the apology standing.
+   *
+   * `§` because it is a form. The joke is the whole point of Act 0.
+   */
+  { id: 'obligations', glyph: '§', label: 'obligations' },
 ];
 
 /** How long the viewfinder flashes white after the shutter, milliseconds. */
@@ -502,6 +529,14 @@ export class Phone {
           }
           rows.push('<div class="phone-note">this session only</div>');
         }
+        break;
+
+      case 'obligations':
+        this.title.textContent = 'obligations';
+        rows.push(
+          this.source.obligations?.() ??
+            '<div class="phone-note">no participation requirements are recorded for this session.</div>',
+        );
         break;
 
       case 'centrelink': {

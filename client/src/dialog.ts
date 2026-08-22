@@ -513,13 +513,35 @@ export function verifyDialogPanel(): string[] {
     if (shortLabel('short') !== 'short') failures.push('A short label was clipped anyway.');
   }
 
-  // The two names, which render perfectly when they are wrong. `verifyTeams`
-  // greps `game/teams.ts` and cannot see this file's own copy; `verifyDialog`
-  // greps a content pack and cannot see it either.
+  /*
+   * **The panel never spells a side at all**, which is a stronger rule than
+   * "spells them correctly" and is the one worth asserting.
+   *
+   * Every faction string this panel can draw arrives from somewhere that is
+   * already checked: `TEAM_NAME` through `main.ts` (which `verifyTeams` greps),
+   * or a `needFaction` out of a content pack (which the parser refuses unless
+   * it is exactly `Marita` or `DeFAULT`). So a team name appearing *here* is by
+   * definition a hardcoded copy, and a hardcoded copy is the thing that renders
+   * perfectly while being wrong.
+   *
+   * The needle is assembled from pieces rather than written out, and that is
+   * not decoration: the first cut of this scanned `String(verifyDialogPanel)`
+   * against a literal list and found all four of its own needles. A check that
+   * fails on its own source is a check that has to be deleted or ignored, and
+   * both of those end the same way.
+   */
   {
-    const source = String(verifyDialogPanel) + String(DialogPanel);
-    for (const wrong of ['DEFAULT"', 'Default ', '"marita', 'MARITA']) {
-      if (source.includes(wrong)) failures.push(`The dialog panel spells a side "${wrong}"; it is Marita and DeFAULT.`);
+    // Inside a **string literal**, specifically. The second cut of this matched
+    // the substring anywhere and convicted `defaultLabel`, an identifier out of
+    // the shared contract that has nothing to do with a faction -- so the test
+    // has to be about text that could be *drawn*, which is text in quotes.
+    const inAString = new RegExp(`['"\`][^'"\`]*\\b(mar${'ita'}|def${'ault'})\\b[^'"\`]*['"\`]`, 'i');
+    const found = inAString.exec(String(DialogPanel));
+    if (found !== null) {
+      failures.push(
+        `The dialog panel has a faction name in a string literal: ${JSON.stringify(found[0])}. Names come from ` +
+          'TEAM_NAME and from the content pack, both already checked; a copy here is a copy nothing greps.',
+      );
     }
   }
 

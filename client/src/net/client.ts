@@ -469,8 +469,6 @@ export interface NetHandlers {
    * shut for all but a minute of the session.
    */
   onTalents?(): void;
-  /** WORKSTREAM AK: a quest cursor moved, or a story flag was set. */
-  onQuests?(state: QuestStateFrame): void;
 }
 
 interface PendingInput {
@@ -629,7 +627,19 @@ export class NetClient {
    * A **replacement, not an upsert**, matching the message. See `decodeTalents`.
    */
   private readonly talents = new Map<number, TalentsRecord>();
-  /** WORKSTREAM AK: the last `QUEST_STATE`. Never null; see `questState`. */
+  /**
+   * WORKSTREAM AK: the last `QUEST_STATE`. Never null; see `questState`.
+   *
+   * **A mirror with no callback beside it**, which is the one way this differs
+   * from `talents` above. That one fires `onTalents` because the talent panel
+   * is a modal screen a player is staring at and a redraw owed to the next
+   * frame is a click that appears not to have registered. The dialog panel and
+   * the phone's obligations app both redraw on their own 4 Hz clock -- they
+   * show distances and gate states that move on their own anyway -- so a
+   * handler here would be a second path to the same redraw, and this repo's
+   * standing rule about a self-check nothing runs applies just as well to a
+   * hook nothing listens to.
+   */
   private quests: QuestStateFrame = blankQuestState();
 
   /**
@@ -1802,7 +1812,6 @@ export class NetClient {
         const state = decodeQuestState(frame, MSG.QUEST_STATE);
         if (!state) return;
         this.quests = state;
-        this.handlers.onQuests?.(state);
         return;
       }
       case MSG.BYE: {
