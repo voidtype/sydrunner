@@ -173,6 +173,19 @@ import {
   collectBladeLabels,
 } from './furniture.ts';
 import { createGroundMaterial } from './ground.ts';
+// WORKSTREAM AJ: the arithmetic behind "the ground draws first", kept three-free
+// so both boot lists can hold it still. The build-order table below is imported
+// rather than described here for the reason its own header gives -- a sequence
+// the builder drives from is a sequence a check can convict.
+import {
+  GROUND_FETCH_AHEAD,
+  GROUND_REVEAL_RADIUS_M,
+  coverage as groundRingCoverage,
+  groundRing,
+  stepOrder,
+  type GroundCoverage,
+  type TileBuildStep,
+} from './ground-first.ts';
 import {
   PowerupAssets,
   PowerupIcons,
@@ -636,6 +649,52 @@ interface PendingBuild {
    * first.
    */
   steps: Generator<void, void, void>;
+}
+
+/**
+ * WORKSTREAM AJ: how long `pumpGround` may spend building ground sheets in one
+ * frame, milliseconds.
+ *
+ * Its own budget rather than a share of `BUILD_BUDGET_MS`, and the split is the
+ * point: the two queues are in a race the ground has to win, so taking the
+ * ground's time out of the geometry's would be spending the fix on the thing it
+ * is fixing. The number is small because the work is: `buildTerrainMesh` is 640
+ * triangles over a grid already in memory, measured at 0.2-0.4 ms a tile, so
+ * 1.0 ms retires two or three sheets a frame -- and the whole 600 m reveal ring
+ * is eleven. Even a teleport, which invalidates every sheet at once, is a
+ * fraction of a second at this rate.
+ *
+ * A check between steps rather than a pre-emption, exactly as
+ * `BUILD_BUDGET_MS` is, so the real bound is this plus one sheet.
+ */
+const GROUND_BUDGET_MS = 1.0;
+
+/**
+ * How far the camera must move before the ground ring is recomputed, metres.
+ *
+ * A quarter of a tile. The ring is a set of 500 m rectangles tested against a
+ * radius, so moving 125 m can add or drop at most the tiles already within
+ * 125 m of the boundary -- which the radius' own margin covers -- and it turns a
+ * per-frame pass over 18,113 index entries into one pass every few seconds of
+ * walking. `prefetchAt` makes the same trade one level up for the same reason.
+ */
+const RING_CACHE_STEP_M = 125;
+
+/**
+ * One tile's ground, as a thing with a lifetime of its own.
+ *
+ * The `receives` flag is a copy of `LoadedTile.receives` and has to be, because
+ * the sheet is no longer inside the group `applyShadowRole` walks -- and leaving
+ * it permanently receiving is not the harmless simplification it looks like:
+ * three keys the render pipeline on `receiveShadow`, so every sheet out at
+ * 1,800 m would pay the shadow gathers to find out that the lookup lands outside
+ * the map. The rule and the hysteresis are the tiles' own; see
+ * `applyGroundShadowRole`.
+ */
+interface GroundSheet {
+  entry: TileEntry;
+  mesh: Mesh;
+  receives: boolean;
 }
 
 interface LoadedTile {
@@ -1156,6 +1215,72 @@ export class TileStreamer implements LampSource {
   /** The vessel rim the ground is triangulated to, or null. See `setSeam`. */
   private seam: SeamField | null = null;
 
+  /* --- WORKSTREAM AJ: the ground layer ---------------------------------------
+   *
+   * The ground used to be a child of the tile group and therefore arrived with
+   * the tile: 1,156 bytes waiting on 311 kB, and on a CBD tile 1.6 MB. It is now
+   * a sheet of its own, built the moment its grid lands, and the tile's geometry
+   * catches up through the budgeted queue as it always did. See
+   * `world/ground-first.ts` for the payload arithmetic that makes this nearly
+   * free and for what the player was actually seeing before it.
+   *
+   * `groundRoot` sits in the scene beside `root` rather than inside it, on the
+   * gulls' and the blade labels' argument: `root` is the tiles and eviction
+   * walks it. A sheet outlives no tile -- it is dropped with the same eviction,
+   * one line further down `dispose` -- but it is not *of* one either, and
+   * `setNightLightsVisible`'s walk over `root.children` would otherwise be
+   * looking inside a mesh for lamps.
+   */
+  private readonly groundRoot = new Group();
+  private readonly groundSheets = new Map<string, GroundSheet>();
+  /**
+   * Tiles whose ground is answered: a sheet is built, or the build does not
+   * contain one.
+   *
+   * The second half is what stops every gate in this subject from hanging on a
+   * hole in the pipeline's output. A `.terr.bin` that 404s is a fact about the
+   * build -- `TerrainField` remembers it forever and will never fetch it again
+   * -- so a coverage predicate that waited for it would wait for the session.
+   * A *transient* failure is deliberately not in here: that one is coming back
+   * on `RETRY_AFTER_MS`, and `GROUND_REVEAL_DEADLINE_MS` is what bounds the wait
+   * if it does not.
+   */
+  private readonly groundSettled = new Set<string>();
+  /**
+   * The last ring computed at each radius, and where from.
+   *
+   * `groundRing` is a linear pass over `index.tiles`, which is 18,113 entries in
+   * the shipped build -- fine once, ruinous at 60 Hz from a boot poller that has
+   * nothing better to do. The ring can only change when the query point leaves
+   * the cell it was in, so it is recomputed on a `RING_CACHE_STEP_M` grid and
+   * reused in between. The camera does not move at all during the boot, so the
+   * gate's whole life costs one pass.
+   *
+   * **Keyed by radius, and it has to be.** Two rings are live at once during the
+   * reveal -- the fetch priority's 900 m and the gate's 600 m -- and a single
+   * slot would have them evicting each other every frame, which is the pass this
+   * cache exists to avoid, twice.
+   */
+  private ringCache = new Map<number, { x: number; z: number; ring: string[] }>();
+  /** Ground sheets built this session. Monotonic; for the overlay. */
+  private builtSheets = 0;
+  /**
+   * How many frames this streamer has been driven through.
+   *
+   * The client's own answer to "is the render loop running", and the boot's
+   * reveal gate is the caller that needs it. `renderer.setAnimationLoop` is the
+   * **last statement** of `main`, so everything the boot does -- the far layer,
+   * the rail bake, the name prompt, the socket, the spawn, the scene shader pass
+   * -- happens with nothing rendered and nothing streamed. A curtain that came
+   * up before this was non-zero would be uncovering an empty canvas, which is
+   * the defect the gate exists to close rather than a state to reveal into.
+   *
+   * Counted here rather than read off `renderer.info`, whose per-frame counters
+   * are reset by the renderer itself and say nothing about whether a frame has
+   * ever happened. This one only goes up.
+   */
+  private framesSeen = 0;
+
   constructor(
     scene: Scene,
     globals: FacadeGlobals,
@@ -1259,6 +1384,11 @@ export class TileStreamer implements LampSource {
     this.waterMaterial = createWaterMaterial(globals, this.waterClock);
 
     scene.add(this.root);
+    // WORKSTREAM AJ. Not in `this.root` either, and see the field's header for
+    // the two reasons: eviction walks that group, and so does the night-lights
+    // pass, and a ground sheet is neither a tile nor inside one.
+    this.groundRoot.name = 'ground';
+    scene.add(this.groundRoot);
     // Not in `this.root`: that group is the tiles, and eviction walks it.
     scene.add(this.gulls.mesh);
     // Nor is this one, and for the same reason plus one more: a legend belongs
@@ -1819,6 +1949,9 @@ export class TileStreamer implements LampSource {
       onHexTiles((manifest) => {
         index.tiles.push(...(manifest.tiles as unknown as TileEntry[]));
         addRegions(manifest.regions);
+        // WORKSTREAM AJ: and the ground gate's cached ring, which is a linear
+        // pass over an array that just grew and is therefore stale.
+        this.noteIndexGrew();
       });
       await ensureHexesNear(focus.x, focus.z);
     }
@@ -1957,9 +2090,19 @@ export class TileStreamer implements LampSource {
    * Rebuild the ground of resident tiles whose carve may have changed.
    *
    * `box` is a plan bounding box to limit the sweep to, or `null` for every
-   * resident tile. The terrain mesh is the one child of a tile group this may
-   * replace -- everything else in a tile was draped by the pipeline and is
-   * untouched.
+   * resident sheet. Only the ground is ever replaced -- everything else in a
+   * tile was draped by the pipeline and is untouched.
+   *
+   * **WORKSTREAM AJ: it sweeps the ground layer now rather than the loaded
+   * tiles**, and that is not a rename. A sheet is built when its 1,156-byte grid
+   * lands, which is well before its tile's geometry does and sometimes instead
+   * of it -- so the old sweep over `loaded` would have missed exactly the sheets
+   * that are standing there uncarved while their bundle is still in flight. It
+   * also picks up the one new window this pass opens: a sheet built before its
+   * own `.lanes.bin` has been adopted does not know where the carriageways are,
+   * so the corridor takes ground a road should have kept. `buildTile`'s commit
+   * already calls this with the tile's road box for the *neighbours*' sake, and
+   * that same call now corrects the tile itself.
    *
    * **Bounded, and that is the difference between this and the road half of
    * `world/envelope.ts`.** `server/world.ts` records at length why the roads were
@@ -1973,26 +2116,25 @@ export class TileStreamer implements LampSource {
    * no solid is touched here.
    */
   private recutGround(box: readonly [number, number, number, number] | null): number {
-    if (this.railCut === null || this.loaded.size === 0) return 0;
+    if (this.railCut === null || this.groundSheets.size === 0) return 0;
     const tileSize = this.index?.tile_size ?? 0;
     if (tileSize <= 0 || this.terrainField === null) return 0;
     let recut = 0;
-    for (const tile of this.loaded.values()) {
-      const b = tile.entry.bounds;
+    for (const sheet of this.groundSheets.values()) {
+      const b = sheet.entry.bounds;
       if (box !== null && (b[2] < box[0] || b[0] > box[2] || b[3] < box[1] || b[1] > box[3])) {
         continue;
       }
-      const grid = this.terrainField.grid(tile.entry.key);
+      const grid = this.terrainField.grid(sheet.entry.key);
       if (!grid) continue;
-      const old = tile.group.children.find((c) => c.name === 'terrain');
-      if (!(old instanceof Mesh)) continue;
+      const old = sheet.mesh;
       const fresh = buildTerrainMesh(
         grid,
         this.terrain.grid,
         tileSize,
         this.groundMaterial,
-        this.tileCut(tile.entry),
-        this.tileSeam(tile.entry),
+        this.tileCut(sheet.entry),
+        this.tileSeam(sheet.entry),
       );
       const cutArea = fresh.userData.cutArea as number;
       const deckArea = fresh.userData.deckArea as number;
@@ -2014,12 +2156,255 @@ export class TileStreamer implements LampSource {
         fresh.geometry.dispose();
         continue;
       }
-      tile.group.remove(old);
+      this.groundRoot.remove(old);
       old.geometry.dispose();
-      tile.group.add(fresh);
+      sheet.mesh = fresh;
+      this.placeSheetMesh(sheet);
       recut++;
     }
     return recut;
+  }
+
+  /* --- WORKSTREAM AJ: the ground layer ---------------------------------------
+   *
+   * A handful of short methods and one budgeted pass. Everything about *when* a
+   * sheet is wanted is `pumpGround`; everything about what one is lives here.
+   */
+
+  /**
+   * The index grew, so any ring computed from it is stale.
+   *
+   * A hex manifest pushes a square kilometre of tile entries onto `index.tiles`
+   * mid-session, and `ringAt`'s whole premise is that a ring can only change
+   * when the query point moves. It can also change when the *world* does, which
+   * is this, and the correction is simply to drop the cache: the next query does
+   * one pass and is right again.
+   */
+  private noteIndexGrew(): void {
+    this.ringCache.clear();
+  }
+
+  /**
+   * Put a freshly built mesh into a sheet's place in the world.
+   *
+   * One function for the two callers -- a sheet arriving and a sheet re-cut --
+   * because the three things that must be done to every terrain mesh in this
+   * layer are the three that were previously done to it by *being inside a tile
+   * group*, and a rule written twice is a rule that ends up applied once.
+   *
+   *   - **The world offset**, which the tile group used to carry. The geometry is
+   *     tile-local by design: it is what keeps float32 vertex precision constant
+   *     across a 60 km extent, and it is why every other payload can inherit one
+   *     translation instead of baking sixty thousand metres into every vertex.
+   *   - **Frustum culling per mesh**, where a tile's children were culled per
+   *     group. `buildTerrainMesh` sets `frustumCulled = false` and says why in a
+   *     trailing comment -- "culled with its tile" -- which stops being true
+   *     here. One sheet is one box test against whichever camera is rendering,
+   *     which is *better* than the group test it replaces: the tile group's
+   *     visibility is a hand-rolled union of the view frustum and the shadow
+   *     volume, and three does that correctly per pass on its own.
+   *   - **The shadow role**, carried over from whatever the sheet already held so
+   *     a re-cut in the middle of a walk does not flip the pipeline.
+   */
+  private placeSheetMesh(sheet: GroundSheet): void {
+    const tileSize = this.index?.tile_size ?? 0;
+    const [minX, minZ] = sheet.entry.bounds;
+    sheet.mesh.position.set(minX, 0, minZ + tileSize);
+    sheet.mesh.frustumCulled = true;
+    sheet.mesh.receiveShadow = sheet.receives;
+    this.groundRoot.add(sheet.mesh);
+  }
+
+  /**
+   * Build one tile's ground, if it is not built and the grid is in hand.
+   *
+   * Idempotent and cheap to call speculatively, which is what lets the commit
+   * step call it as a last resort: **no tile group may enter the scene without
+   * its ground already in it.** That is the invariant this whole workstream is
+   * about, and making it a line of code in the one place a tile becomes visible
+   * is worth more than any amount of ordering discipline elsewhere -- a future
+   * pass that reorders the ground pass, or a caller that drives `loadTile`
+   * directly with no `update` behind it, cannot get it wrong.
+   *
+   * Returns whether the tile's ground is now settled, which includes the tile
+   * whose `.terr.bin` the build does not contain: nothing can ever be drawn
+   * there and nothing should ever wait for it. See `groundSettled`.
+   */
+  private ensureGroundSheet(entry: TileEntry, grid: Float32Array | null = null): boolean {
+    if (this.groundSheets.has(entry.key)) return true;
+    const field = this.terrainField;
+    const tileSize = this.index?.tile_size ?? 0;
+    if (field === null || tileSize <= 0) return false;
+    const heights = grid ?? field.grid(entry.key) ?? null;
+    if (heights === null) {
+      // Not a failure to record and not a thing to retry: `TerrainField` owns
+      // both of those decisions and has already made them. All this reads is
+      // the one it made permanently.
+      if (field.absent(entry.key)) {
+        this.groundSettled.add(entry.key);
+        return true;
+      }
+      return false;
+    }
+    const sheet: GroundSheet = {
+      entry,
+      mesh: buildTerrainMesh(
+        heights,
+        this.terrain.grid,
+        tileSize,
+        this.groundMaterial,
+        this.tileCut(entry),
+        this.tileSeam(entry),
+      ),
+      // Arrives receiving, exactly as it did as a tile child -- `buildTerrainMesh`
+      // sets the flag and the boot warm-up compiles that variant and only that
+      // variant. `applyGroundShadowRole` switches it off on the first frame the
+      // sheet is out of the sun's reach.
+      receives: true,
+    };
+    this.placeSheetMesh(sheet);
+    this.groundSheets.set(entry.key, sheet);
+    this.groundSettled.add(entry.key);
+    this.builtSheets++;
+    return true;
+  }
+
+  /**
+   * Take one tile's ground out of the world.
+   *
+   * On the same eviction as the tile it belongs to, and not on a longer lease,
+   * even though a sheet is only about 20 kB of buffers and the grid it was built
+   * from is kept forever anyway. The reason is the picture rather than the
+   * memory: ground drawn a kilometre past where the buildings stop is a green
+   * field with a city edge in the middle of it, which is a worse frame than the
+   * far sheet the eviction hands back to.
+   */
+  private dropGroundSheet(key: string): void {
+    const sheet = this.groundSheets.get(key);
+    if (sheet === undefined) return;
+    this.groundRoot.remove(sheet.mesh);
+    sheet.mesh.geometry.dispose();
+    this.groundSheets.delete(key);
+    this.groundSettled.delete(key);
+  }
+
+  /**
+   * `applyShadowRole` for a sheet, which is the same rule with one branch of it.
+   *
+   * Ground never casts at any distance -- its only contribution to the depth map
+   * would be the ground itself, and every fragment it wrote there is a fragment
+   * the buildings have to fight for -- so only the receiving half is left. The
+   * hysteresis and the range are the tiles' own, deliberately: a sheet and the
+   * tile standing on it flipping on different frames would be a block of city
+   * whose shadows and whose ground disagree for as long as the gap lasts.
+   */
+  private applyGroundShadowRole(sheet: GroundSheet, dist: number): void {
+    const receives = dist <= this.receiveRange + (sheet.receives ? SHADOW_HYSTERESIS : 0);
+    if (receives === sheet.receives) return;
+    sheet.receives = receives;
+    sheet.mesh.receiveShadow = receives;
+  }
+
+  /**
+   * The ring, cached. See `ringCache` for why this is not simply a call through
+   * to `groundRing`.
+   */
+  private ringAt(x: number, z: number, radiusM: number): string[] {
+    const cached = this.ringCache.get(radiusM);
+    if (
+      cached !== undefined &&
+      Math.abs(cached.x - x) < RING_CACHE_STEP_M &&
+      Math.abs(cached.z - z) < RING_CACHE_STEP_M
+    ) {
+      return cached.ring;
+    }
+    const ring = this.index === null ? [] : groundRing(this.index.tiles, x, z, radiusM);
+    this.ringCache.set(radiusM, { x, z, ring });
+    return ring;
+  }
+
+  /**
+   * How much of the ground around a point is settled.
+   *
+   * The one query the loading screen's progress line, the boot's reveal gate and
+   * the streamer's own fetch priority all read, so what the player is told and
+   * what the curtain waits for cannot drift apart. Public because the gate lives
+   * in `main.ts`; see `world/ground-first.ts` for the arithmetic and for the
+   * radius.
+   */
+  groundCoverage(x: number, z: number, radiusM: number = GROUND_REVEAL_RADIUS_M): GroundCoverage {
+    return groundRingCoverage(this.ringAt(x, z, radiusM), this.groundSettled);
+  }
+
+  /** Frames this streamer has been driven through. See `framesSeen`. */
+  get frames(): number {
+    return this.framesSeen;
+  }
+
+  /** Whether every tile whose ground a player at (x, z) could see nearby is built. */
+  groundReady(x: number, z: number, radiusM: number = GROUND_REVEAL_RADIUS_M): boolean {
+    return this.groundCoverage(x, z, radiusM).ready;
+  }
+
+  /**
+   * Phase 0: the ground of every wanted tile, ahead of the geometry of any tile.
+   *
+   * Handed `update`'s own nearest-first ranking rather than computing a ring of
+   * its own, which is not merely thrift: that array *is* the set of tiles the
+   * streamer is willing to fetch and the order it is willing to fetch them in,
+   * so a ground pass built from anything else would be answering about a
+   * different world than the one below it.
+   *
+   * Two halves. The first asks for the ground of the nearest unsettled tiles --
+   * **the nearest `GROUND_FETCH_AHEAD` of them and no more**, which is the one
+   * thing here that is not obvious and is the difference between a nearest-first
+   * order and a nearest-first *intention*. Firing all 57 at once hands the
+   * ordering to the transport, and a headless drive over a real origin caught
+   * exactly that: the eleven-tile reveal ring finishing after the first tile's
+   * geometry had already landed. See the constant.
+   *
+   * The window slides on its own. `wanted` is sorted, everything nearer is
+   * already settled once the boot is over, so in steady state the sixteen slots
+   * sit precisely on the streaming frontier.
+   *
+   * The second half builds whatever has landed, nearest first, under
+   * `GROUND_BUDGET_MS`. Building is not rationed by the window -- a grid in hand
+   * costs 0.13 ms to turn into a sheet whether it is under the player or a
+   * kilometre away, and refusing to spend it would leave ground undrawn for no
+   * saving.
+   *
+   * Nothing is returned. The ordering this buys is enforced one tile at a time
+   * in the fetch pass below -- see the `groundSettled` test there -- rather than
+   * by a global flag, because a global flag is the shape of thing that wedges.
+   */
+  private pumpGround(wanted: ReadonlyArray<{ entry: TileEntry; dist: number }>): void {
+    const field = this.terrainField;
+    if (field === null || this.index === null) return;
+
+    const deadline = performance.now() + GROUND_BUDGET_MS;
+    let budgetLeft = true;
+    let waitingOn = 0;
+    for (const { entry } of wanted) {
+      if (this.groundSettled.has(entry.key)) continue;
+      if (budgetLeft) {
+        // The grid may have landed since the last frame, in which case this is
+        // the sheet and the tile is settled before a request is considered.
+        if (this.ensureGroundSheet(entry)) continue;
+        budgetLeft = performance.now() < deadline;
+      } else if (field.grid(entry.key) !== undefined) {
+        // Grid in hand and only the build budget between it and a sheet. Not a
+        // fetch, so it must not take one of the window's slots -- a return trip
+        // finds every grid already held (the field never evicts) and would
+        // otherwise fill the window with tiles that need no network at all.
+        continue;
+      }
+      // Genuinely without ground: in flight, in a retry backoff, or about to be
+      // asked for. Free when the request already exists; `TerrainField.ensure`
+      // de-duplicates in flight and remembers forever, so this is a map lookup
+      // on every frame after the first.
+      void field.ensure(entry.key);
+      if (++waitingOn >= GROUND_FETCH_AHEAD) return;
+    }
   }
 
   /**
@@ -2189,6 +2574,17 @@ export class TileStreamer implements LampSource {
     return {
       resident: this.loaded.size,
       loading: this.loading.size,
+      /**
+       * WORKSTREAM AJ: ground sheets standing, and how many this session built.
+       *
+       * The pair says whether the ground is actually leading. `ground` should
+       * run ahead of `resident` at all times and by a wide margin while the
+       * player is moving into new country -- the two converging, or `resident`
+       * overtaking, means the ground pass has stopped winning its race and the
+       * first place to look is `GROUND_LEAD_SLOTS`.
+       */
+      ground: this.groundSheets.size,
+      groundBuilt: this.builtSheets,
       /**
        * Tiles decoded and waiting on the frame budget to be built.
        *
@@ -2491,6 +2887,10 @@ export class TileStreamer implements LampSource {
     shadowVolume: Frustum | null = null,
     sunAltitudeDeg: number = REFERENCE_ALTITUDE_DEG,
   ): void {
+    // WORKSTREAM AJ: before the index test, deliberately. The count is about the
+    // *loop*, not about the world, and the boot gate reads it to find out
+    // whether frames are happening at all.
+    this.framesSeen++;
     if (!this.index) return;
 
     // Phase 3, before anything else this frame.
@@ -2550,7 +2950,24 @@ export class TileStreamer implements LampSource {
     }
     wanted.sort((a, b) => a.dist - b.dist);
 
+    // WORKSTREAM AJ: phase 0, and it is deliberately in front of everything that
+    // asks for a tile's geometry.
+    //
+    // The ground of every wanted tile before the geometry of any of them, in the
+    // ranking that was just computed. It is 57 map lookups and a millisecond of
+    // mesh building, and what it buys is the difference between the player's
+    // floor arriving in 1,156 bytes and arriving in 311 kB. See `pumpGround` and
+    // `world/ground-first.ts`.
+    this.pumpGround(wanted);
+
     for (const { entry, dist } of wanted) {
+      // WORKSTREAM AJ: the ground first here as well, and for the reason the
+      // whole pass exists -- a sheet is resident on its own terms and is not
+      // reached by the tile branch below, which most of the time has no tile to
+      // run over. Same rule, same ranges, same hysteresis as the tile's; see
+      // `applyGroundShadowRole`.
+      const sheet = this.groundSheets.get(entry.key);
+      if (sheet !== undefined) this.applyGroundShadowRole(sheet, dist);
       const tile = this.loaded.get(entry.key);
       if (tile) {
         this.applyBand(tile, dist);
@@ -2592,6 +3009,30 @@ export class TileStreamer implements LampSource {
       if (
         this.loading.size < slots &&
         !this.loading.has(entry.key) &&
+        // WORKSTREAM AJ: **and this tile's own ground has settled.** The whole
+        // cross-tile ordering, in one clause. `pumpGround` above asked for the
+        // grid in this same frame and it is 270 times smaller than the bundle,
+        // so this is a wait measured in one round trip on any link where the
+        // bundle would have arrived at all.
+        //
+        // Per tile rather than a global throttle, and that is what makes it
+        // safe: a slow grid delays its own tile and nothing else, a grid the
+        // build does not contain counts as settled and never delays anything,
+        // and the worst case -- a transient fetch failure -- is bounded by
+        // `TerrainField`'s own five-second backoff rather than by anything here.
+        //
+        // A hazard tile is exempt. Its prisms are already resident, so it is not
+        // a hole in the picture but a solid invisible block of city, and that
+        // outranks every ordering preference in this file. See
+        // `HAZARD_EXTRA_SLOTS` and `world/invisible-walls.ts`.
+        //
+        // And a streamer with no terrain field at all is exempt outright, which
+        // is not defensiveness: `pumpGround` settles nothing without one, so
+        // without this clause a world with no `terrain` block in its index --
+        // every world built before the DEM existed -- would never load a single
+        // tile. A gate whose failure mode is an empty city gets an explicit
+        // pass-through rather than an implicit one.
+        (hazard || this.terrainField === null || this.groundSettled.has(entry.key)) &&
         // Decoded and queued counts as "on its way": without this the tile
         // would be fetched again on every frame between the decode landing and
         // the budget getting round to building it, which at four concurrent
@@ -2997,6 +3438,32 @@ export class TileStreamer implements LampSource {
     group.name = entry.key;
     let committed = false;
 
+    /**
+     * WORKSTREAM AJ: the step the builder is on, checked against the table.
+     *
+     * `TILE_BUILD_ORDER` is a list in a three-free file that a boot check reads;
+     * this is what makes it *the* order rather than a description of one. Every
+     * step names itself, the index must go forwards, and a name not in the table
+     * is a fault -- so a future pass that moves a block cannot quietly leave the
+     * table behind, and the check that asserts "the ground is not one of these"
+     * is asserting something about the code instead of about a comment.
+     *
+     * Steps are skipped all the time (a dry tile has no water, a CBD tile has no
+     * power sidecar), so the test is monotonic rather than consecutive. It costs
+     * an `indexOf` over eleven strings, eleven times a tile.
+     */
+    let stepAt = -1;
+    const step = (name: TileBuildStep): void => {
+      const at = stepOrder(name);
+      if (at < 0) throw new Error(`tile build step "${name}" is not in TILE_BUILD_ORDER`);
+      if (at <= stepAt) {
+        throw new Error(
+          `tile build ran "${name}" (${at}) after step ${stepAt}: the order table and the builder disagree`,
+        );
+      }
+      stepAt = at;
+    };
+
     try {
       const tileSize = this.index!.tile_size;
       const [minX, minZ] = entry.bounds;
@@ -3048,39 +3515,39 @@ export class TileStreamer implements LampSource {
             );
           }
         }
+        step('lanes');
         yield;
       }
 
-      // --- The ground, first, so it is the first thing drawn and the thing
-      // every other primitive in the tile was placed against. Its heights are
-      // already baked into the pipeline's geometry -- walls, roads and grass all
-      // arrive draped -- so this is the only piece of the tile the client
-      // positions vertically at all.
+      // --- WORKSTREAM AJ: **the ground is no longer built here, and that is the
+      // change.**
+      //
+      // It used to be the first step of this generator, which was the right
+      // ordering inside a tile and the wrong ordering across the world: nothing
+      // in here runs until all eleven of the tile's payloads have landed, so a
+      // 1,156-byte height grid was waiting on 311 kB of geometry -- 1.6 MB in the
+      // CBD -- before a single triangle of floor could be drawn. The sheet is
+      // built by `pumpGround` the moment its grid arrives, into the streamer's
+      // own ground layer, and by the time this generator exists it is almost
+      // always already standing. `ensureGroundSheet` is called again at the
+      // commit below, as the last line of defence for the invariant that matters:
+      // no tile group enters the scene without its ground already in it.
+      //
+      // What stays here is `groundAt` -- the tile-local height lookup the trees,
+      // the parked cars and the column lamps are placed against. That was never
+      // about the mesh; it reads the same grid the sheet was built from, and the
+      // grid is in hand because phase 1 still awaits it.
       const groundAt =
         terrain === null
           ? (): number => 0
           : (x: number, z: number): number =>
               sampleTileGrid(terrain, this.terrain.grid, tileSize, x, z);
-      if (terrain !== null) {
-        group.add(
-          buildTerrainMesh(
-            terrain,
-            this.terrain.grid,
-            tileSize,
-            this.groundMaterial,
-            this.tileCut(entry),
-            this.tileSeam(entry),
-          ),
-        );
-      }
-      yield;
 
-      // --- And the water over it, second, for the same reason the ground is
-      // first: it is the other half of the surface, it was cut against exactly
-      // this tile's terrain by the pipeline, and everything else in the tile
-      // stands on one or the other. Tile-local like the ground, so it inherits
-      // the group's translation; the surface height in it is absolute, so it
-      // does not.
+      // --- The water, which is now the first thing this generator builds: it is
+      // the other half of the surface, it was cut against exactly this tile's
+      // terrain by the pipeline, and everything else in the tile stands on one or
+      // the other. Tile-local like the ground, so it inherits the group's
+      // translation; the surface height in it is absolute, so it does not.
       let waterTriangles = 0;
       let waterPlan: Float32Array | null = null;
       const water = decoded.water;
@@ -3088,6 +3555,7 @@ export class TileStreamer implements LampSource {
         for (const mesh of buildWaterMeshes(water, this.waterMaterial)) group.add(mesh);
         waterTriangles = water.triangles;
         waterPlan = waterPlanWorld(water, minX, minZ + tileSize);
+        step('water');
         yield;
       }
 
@@ -3154,6 +3622,7 @@ export class TileStreamer implements LampSource {
         group.add(mesh);
         if ((i + 1) % GLB_PRIMITIVES_PER_STEP === 0) yield;
       }
+      step('buildings');
       yield;
 
       // --- Trees, from the sidecar. Added to the tile's own group so they
@@ -3169,6 +3638,7 @@ export class TileStreamer implements LampSource {
           group.add(mesh);
         }
         trees = veg.count;
+        step('trees');
         yield;
       }
 
@@ -3204,6 +3674,7 @@ export class TileStreamer implements LampSource {
           cars = parked.count;
           parkedCars = parked;
         }
+        step('cars');
         yield;
       }
 
@@ -3253,6 +3724,7 @@ export class TileStreamer implements LampSource {
         lamps = lit.lamps;
         poles = lines.poleCount;
         spans = lines.wireCount;
+        step('power');
         yield;
       }
 
@@ -3294,6 +3766,7 @@ export class TileStreamer implements LampSource {
           site.x += group.position.x;
           site.z += group.position.z;
         }
+        step('furniture');
         yield;
       }
 
@@ -3308,6 +3781,7 @@ export class TileStreamer implements LampSource {
       if (picks !== null) {
         powerupIcons = new PowerupIcons(picks, this.powerupAssets);
         for (const mesh of powerupIcons.meshes) group.add(mesh);
+        step('powerups');
         yield;
       }
 
@@ -3372,6 +3846,7 @@ export class TileStreamer implements LampSource {
           }
           columnLamps = built.lamps;
         }
+        step('column-lamps');
         yield;
       }
 
@@ -3423,6 +3898,7 @@ export class TileStreamer implements LampSource {
         birds.mesh.receiveShadow = false;
         group.add(birds.mesh);
       }
+      step('birds');
       yield;
 
       // --- The commit. One step, no `yield` inside it, and that is the point:
@@ -3430,12 +3906,34 @@ export class TileStreamer implements LampSource {
       // there is no frame in which the traffic is driving through a tile the
       // scene has not got or the far layer has taken its slabs away from a tile
       // that is not there yet.
+      step('commit');
+
+      // WORKSTREAM AJ: **the invariant, in the one place it can be enforced.**
+      //
+      // No tile group enters the scene without its ground already standing. The
+      // ground pass has almost certainly built this sheet several seconds ago --
+      // that is the whole point of it -- and this call is a map lookup when it
+      // has. It is here for the times it has not: a caller driving `loadTile`
+      // with no `update` behind it, a grid that landed in the same frame as the
+      // bundle, or some future reordering of the pass above. Making it a line of
+      // code at the moment a tile becomes visible is worth more than any amount
+      // of ordering discipline elsewhere.
+      this.ensureGroundSheet(entry, terrain);
+
       if (group.children.length === 0) {
         // Permanent, not transient, and the distinction is the point of the
         // taxonomy: the payload arrived, decoded and produced nothing, which is
         // a fact about what the pipeline emitted for this tile. Re-fetching
         // 1.6 MB every two minutes to build nothing again would be the retry
         // machinery doing damage. Counted with the 404s, where it belongs.
+        //
+        // **This reaches one tile more than it used to**, and the extra one is
+        // correct: a tile whose only content was its terrain used to have a
+        // terrain mesh in this group and therefore counted as built. Its ground
+        // is now a sheet in its own layer, drawn either way, so what is left
+        // here is a 311 kB payload that produces nothing -- which is exactly
+        // what this branch is for. The player sees the same ground and the
+        // streamer stops asking for the rest of it.
         this.ledger.notePermanent(entry.key, 'built nothing');
         // The roads were adopted before the ground was built and this tile is
         // now never going to be `dispose`d, because it was never loaded. Give
@@ -4095,6 +4593,25 @@ export class TileStreamer implements LampSource {
     for (const [key, tile] of this.loaded) {
       if (!keep.has(key)) this.dispose(key, tile, cam);
     }
+    // WORKSTREAM AJ: and the ground sheets, on one rule and only this one --
+    // **a sheet lives exactly as long as its tile is wanted.** Not as long as
+    // its tile is loaded, which is a different and shorter life: a sheet exists
+    // for tiles whose geometry has not arrived, for tiles whose geometry never
+    // will, and for tiles the budget below took back while they were still in
+    // range. Every one of those is ground the player is standing on or looking
+    // at, and `dispose` would take it from all three. See `dropGroundSheet` for
+    // why the lease is not longer either.
+    for (const key of [...this.groundSheets.keys()]) {
+      if (!keep.has(key)) this.dropGroundSheet(key);
+    }
+    // The settled set outlives the sheets in exactly one direction, and that is
+    // deliberate: a tile whose ground the build does not contain is settled with
+    // no mesh, and that is permanent -- `TerrainField` will never fetch it
+    // again. Forgetting it here would have the ground pass rediscover the same
+    // 404 every time the player walked past. It cannot grow without bound in any
+    // world that boots: the shipped build emits a `.terr.bin` for every one of
+    // its 18,113 tiles, so this set holds nothing at all unless a publish went
+    // wrong, which is the case it exists to survive rather than to hide.
     // Queued builds go the same way, and this is not merely tidiness: a teleport
     // moves the whole wanted set at once, and without this the queue would spend
     // the next several frames of its budget building tiles that are already four

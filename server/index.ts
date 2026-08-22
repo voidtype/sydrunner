@@ -97,6 +97,9 @@ import { verifyLevelHud } from '../client/src/game/levelhud.ts';
 // WORKSTREAM X (teams you can see): the three-free half of the team look. The
 // geometry half (`verifyBigNightKit`) imports three and runs in the browser only.
 import { verifyTeamLook } from '../client/src/game/teamlook.ts';
+// WORKSTREAM AJ: the ground gate's arithmetic, three-free, so it runs in both
+// boot lists as this file's own premise requires.
+import { verifyGroundFirst } from '../client/src/world/ground-first.ts';
 // WORKSTREAM N (carry): the restore sentence, and the spawn rules this process
 // has always run without checking. Both three-free, so this process runs the
 // same checks the browser does. See `client/src/game/carry.ts`.
@@ -436,6 +439,14 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // is a shockwave lying about a knockdown this process already adjudicated.
     // See `client/src/game/teamlook.ts`.
     ['verifyTeamLook', verifyTeamLook()],
+    // WORKSTREAM AJ: the rule that decides when the browser's loading screen
+    // comes off, and the ring it waits for. Run **here** on this list's own
+    // premise -- it is three-free and it is arithmetic, so it has to behave
+    // identically in both runtimes -- and because the failure it guards is one
+    // this process would never otherwise hear about: a client that reveals onto
+    // ground it has not got joins, plays and reports nothing wrong. See
+    // `client/src/world/ground-first.ts`.
+    ['verifyGroundFirst', verifyGroundFirst()],
     // What a knocked-over NPC is worth, how fast a player may be paid it, and
     // what the note looks like. Run **here** first and foremost because this
     // process *is* the mint: the drop table and the rate bank are enforced in

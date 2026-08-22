@@ -637,6 +637,15 @@ import { MapAtlas } from './mapatlas.ts';
 import { BigMap, verifyBigMap } from './bigmap.ts';
 import { InvisibleWalls, verifyInvisibleWalls } from './world/invisible-walls.ts';
 import { verifyTileLifecycle } from './world/tile-lifecycle.ts';
+// WORKSTREAM AJ: the reveal rule, its two constants and the progress line. See
+// the curtain block below `setPrecompiler`.
+import {
+  GROUND_REVEAL_DEADLINE_MS,
+  GROUND_REVEAL_RADIUS_M,
+  groundProgressLine,
+  revealReason,
+  verifyGroundFirst,
+} from './world/ground-first.ts';
 
 const SIMULATION_HZ = 60;
 const FIXED_DT = 1 / SIMULATION_HZ;
@@ -1226,6 +1235,15 @@ async function main(): Promise<void> {
   // fetches on is prisms vanishing from under a player's feet, with no error and
   // no frame that shows it. See `world/tile-lifecycle.ts`.
   const lifecycleFailures = timed('tile-lifecycle', () => verifyTileLifecycle());
+  // WORKSTREAM AJ, and it belongs directly under the two above because it is the
+  // same criterion a third time: every way the ground gate breaks looks like a
+  // working boot. A ring one tile too small reveals onto the edge of the built
+  // world and reads as a rendering bug; a coverage predicate that calls an empty
+  // ring unready is nine seconds of loading screen with nothing wrong; a reveal
+  // rule that lets the deadline outrank "a frame has been drawn" puts the black
+  // screen back, and only on the machines slow enough to reach the deadline,
+  // which are the machines nobody develops on. See `world/ground-first.ts`.
+  const groundFirstFailures = timed('ground-first', () => verifyGroundFirst());
   // And the night rig, which earns its place on this list twice over.
   //
   // Every other check here guards something that *renders wrongly*. This one
@@ -1396,6 +1414,7 @@ async function main(): Promise<void> {
     hudFailures.length ||
     wallFailures.length ||
     lifecycleFailures.length ||
+    groundFirstFailures.length ||
     nightFailures.length ||
     trainLightFailures.length ||
     raveFailures.length ||
@@ -1478,6 +1497,7 @@ async function main(): Promise<void> {
           ...hudFailures,
           ...wallFailures,
           ...lifecycleFailures,
+          ...groundFirstFailures,
           ...nightFailures,
           ...trainLightFailures,
           ...raveFailures,
@@ -2664,17 +2684,95 @@ async function main(): Promise<void> {
   };
   streamer.setPrecompiler(precompileGroup);
 
-  // And the loading overlay goes now, on the same argument. It exists to cover
-  // the gap before the renderer can draw, and the renderer can draw: the world
-  // arrives tile by tile afterwards, which is what streaming *is*. Holding it up
-  // until every await below has returned makes a slow network indistinguishable
-  // from a broken build.
-  //
-  // The warm-up above is the one thing it *does* wait for, and that is the whole
-  // point of it: a compile paid before the first frame is a compile not paid
-  // during the first walk. It is bounded so this can never be the thing that
-  // never returns.
-  hud.ready(index, firstVisit());
+  /* --- WORKSTREAM AJ: the curtain, and what it now waits for ------------------
+   *
+   * This line used to be `hud.ready(index, firstVisit())`, with an essay under
+   * it arguing that the overlay exists to cover the gap before the renderer can
+   * draw, that the renderer can now draw, and that the world arriving tile by
+   * tile afterwards is what streaming *is*. Every clause of that is still true
+   * and the conclusion was still wrong, because of one fact about this file that
+   * the essay did not account for: **`renderer.setAnimationLoop` is the last
+   * statement in `main`, six thousand lines below here.** Nothing renders before
+   * it. So the curtain came up and the player then watched an *unrendered
+   * canvas* through the far layer, the rail bake, the name prompt, the socket,
+   * the spawn ground and a scene shader pass with a 25-second deadline on it.
+   * The loading screen was not covering the gap. It was ending just before it.
+   *
+   * So the reveal moves to where the picture is, and the rule is
+   * `world/ground-first.ts`'s `revealReason`:
+   *
+   *   - **frames are happening** -- `streamer.frames`, which stands for every
+   *     await between here and the loop, because all of them are upstream of it;
+   *   - **and the ground within `GROUND_REVEAL_RADIUS_M` of the camera is
+   *     built** -- not fetched, built, which is what `groundCoverage` counts;
+   *   - **or `GROUND_REVEAL_DEADLINE_MS` has passed** since the first frame,
+   *     which is the bound. `SHADER_WARMUP_DEADLINE_MS`'s philosophy exactly: a
+   *     wedged CDN or a dropped fetch must produce a late reveal and a console
+   *     line, never a boot that hangs. Its clock starts at the first frame and
+   *     not here, because one of the steps in between waits on a human typing a
+   *     name and a deadline armed in front of that would expire every time.
+   *
+   * A poll rather than a hook, and rather than a second block down in the loop.
+   * It is one `requestAnimationFrame` chain that ends the moment it fires, its
+   * per-tick cost is a cached ring lookup over eleven keys, and keeping it here
+   * means the whole subject -- the condition, the deadline, the progress line
+   * and the reveal itself -- is one contiguous thing a reader can hold in their
+   * head instead of two halves six thousand lines apart.
+   *
+   * It reads `camera.position` rather than a spawn coordinate, and that is the
+   * one detail worth stating: the camera sits at the origin for the whole boot
+   * and is moved onto the drawn spawn by the loop, which is also the first
+   * moment `frames` is non-zero. So the gate can only ever be tested where the
+   * player actually is -- including after the *server* has relocated them, which
+   * happens eighteen hundred lines below and still well before any of this can
+   * fire.
+   *
+   * The join panel is unaffected and was always drawn over the loading screen --
+   * `index.html` says so where it sets the z-order, and `hud.fatal` relies on it.
+   * A player now types their name over an honest progress line instead of over a
+   * black canvas.
+   */
+  {
+    const revealFirstVisit = firstVisit();
+    let armedAt = -1;
+    const tick = (): void => {
+      const drawing = streamer.frames > 0;
+      if (drawing && armedAt < 0) armedAt = performance.now();
+      const cover = streamer.groundCoverage(camera.position.x, camera.position.z);
+      const why = revealReason({
+        drawing,
+        ground: cover.ready,
+        elapsedMs: armedAt < 0 ? 0 : performance.now() - armedAt,
+        deadlineMs: GROUND_REVEAL_DEADLINE_MS,
+      });
+      if (why === 'waiting') {
+        // Only once frames are happening. Before that the ring is empty of
+        // built ground by construction and "0 of 11" would be a countdown that
+        // does not move, which reads worse than the line the markup ships.
+        if (drawing) hud.loadingProgress(groundProgressLine(cover));
+        requestAnimationFrame(tick);
+        return;
+      }
+      if (why === 'deadline') {
+        // At `warn`, and naming the tiles, because this is the one outcome
+        // nobody can see: the game starts, it looks fine, and the ground under
+        // the first minute of it is the coarse far sheet three metres low. The
+        // missing keys are what to type into `sydney` next.
+        console.warn(
+          `[boot] revealing without the ground: ${cover.built} of ${cover.total} tiles within ` +
+            `${GROUND_REVEAL_RADIUS_M} m built after ${(GROUND_REVEAL_DEADLINE_MS / 1000).toFixed(0)} s. ` +
+            `Still missing: ${cover.missing.slice(0, 8).join(', ')}`,
+        );
+      } else {
+        console.debug(
+          `[boot] ground ready: ${cover.total} tiles within ${GROUND_REVEAL_RADIUS_M} m built in ` +
+            `${(armedAt < 0 ? 0 : performance.now() - armedAt).toFixed(0)} ms of frames`,
+        );
+      }
+      hud.ready(index, revealFirstVisit);
+    };
+    requestAnimationFrame(tick);
+  }
 
   // --- Who is playing.
   //
