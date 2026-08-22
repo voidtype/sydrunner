@@ -1430,8 +1430,20 @@ export class QuestEngine implements QuestSink {
     this.reconciledAt.delete(playerId);
   }
 
-  /** For the checks: one cursor as the engine holds it. */
+  /**
+   * For the checks: one cursor **as the engine holds it**, reconciled.
+   *
+   * The reconcile is the whole of why this is not a one-line getter. Every
+   * other reader in this class -- `handle`, `signal`, `tick`, `frameFor`,
+   * `offers` -- brings a player's cursors into line with the live pack before
+   * it looks at them, so "as the engine holds it" is *reconciled* and an
+   * accessor that skipped it would answer with a shape the engine never
+   * actually acts on. `server/quests-check.ts` caught that directly: it read a
+   * cursor written against a three-step quest, through a store holding the
+   * four-step version, and got three counters back.
+   */
   cursorFor(playerId: number, questId: string): QuestCursor | null {
+    this.reconcile(playerId);
     return this.cursorsOf(playerId)[questId] ?? null;
   }
 
@@ -1460,13 +1472,26 @@ export const DIALOG_SLACK_M = 2;
 /**
  * The per-player budget for this feature's traffic.
  *
- * `SUGGEST_BURST`'s shape and a smaller number, because the conversation is
- * smaller: opening a dialog, reading three nodes and taking a job is about six
- * ops, and nothing here is fired by a keystroke. Twelve refilling four a second
- * sits well above what a person clicking through a dialog tree can do and well
- * below what a loop does in a millisecond.
+ * **Twenty-four, and the first cut of this was twelve, which was too tight** --
+ * which is word for word what `SUGGEST_BURST`'s own comment says happened to
+ * it, and it happened here for the same reason and was caught the same way.
+ * `server/quests-check.ts` walks one job end to end -- accept, a refused
+ * duplicate, a goto, two knockouts, a dialog click out of range, one in range,
+ * a turn-in, a refused second turn-in -- and that is twelve ops before the
+ * check has even reached the weekly. A player reading through a dialog tree
+ * spends one op per click, and Denise's tree is six choices deep in places.
+ *
+ * The number has to sit above what a determined **person** can do and below
+ * what a loop does in a millisecond, and those two are three orders of
+ * magnitude apart -- so being generous costs nothing and being stingy breaks
+ * the feature for whoever uses it most. That is the suggestions box's
+ * conclusion and there was no reason to relearn it; the only excuse is that
+ * this conversation looked smaller than that one and is not.
+ *
+ * Refilled continuously at four a second rather than reset on a window, so a
+ * player who reads a node for a moment is not punished for the click after it.
  */
-export const QUEST_BURST = 12;
+export const QUEST_BURST = 24;
 export const QUEST_REFILL_PER_SEC = 4;
 
 /** The sentence a reward's `WALLET` frame carries. Composed here, never a literal. */
