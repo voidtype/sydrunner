@@ -104,6 +104,11 @@ import { verifyCarry } from '../client/src/game/carry.ts';
 import { verifySpawn } from '../client/src/game/spawn.ts';
 import { verifyCashDrops } from '../client/src/game/cashnote.ts';
 import { verifySpatialHash } from '../client/src/game/spatialhash.ts';
+// WORKSTREAM AG: how much of a corridor a track may build in. Both boot lists,
+// because `server/world.ts` builds the same atlas to answer where a platform is.
+import { verifyTrackAtlas } from '../client/src/world/track-atlas.ts';
+import { verifyStationLayouts } from '../client/src/world/station-layouts.ts';
+import { verifyPlatformSpine } from '../client/src/world/platform-spine.ts';
 import { verifyMovementBasis } from '../client/src/player/controller.ts';
 // WORKSTREAM O (feel): the one breath both viewmodels apply. Three-free, which is
 // why it can be run here at all -- `verifyBat` and `verifyFootyBall` cannot be,
@@ -486,6 +491,18 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // passes through somebody, and there is no frame in which that looks like
     // an index bug rather than a hit test one.
     ['verifySpatialHash', verifySpatialHash()],
+    // Every track believes it owns the whole corridor, and this is the file that
+    // ends that. Four synthetic railways with known answers, one of them a
+    // crossing that must not read as a neighbour. See `RAIL-CORRIDOR.md`.
+    ['verifyTrackAtlas', verifyTrackAtlas()],
+    // The hand-authored layouts. Without the bake's names here -- this list runs
+    // before the world loads -- so it checks the table's internal properties and
+    // `main.ts` checks the keys against the real stations.
+    ['verifyStationLayouts', verifyStationLayouts()],
+    // The swept platform, by its pure parts. This process stands bodies on the
+    // same sweep through `riding.PlatformField`, so it has to agree about where
+    // the deck is down to the bit.
+    ['verifyPlatformSpine', verifyPlatformSpine()],
     // And phase 2's selection on top of it. A working set that is missing
     // somebody nearby is a player invisible while punching you; see
     // `server/aoi.ts`, which asserts the rule against a brute-force scan.

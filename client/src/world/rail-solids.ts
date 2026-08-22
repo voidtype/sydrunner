@@ -97,6 +97,17 @@ import { pointInPolygon } from '../player/collision.ts';
 import { DECK_THICKNESS_M } from './road-deck.ts';
 import { RAIL_HALF_M } from './envelope.ts';
 import { PLATFORM_OUTER_M, samePlatform } from '../game/riding.ts';
+import {
+  frameAt,
+  platformSlots,
+  spineAround,
+  straightSpine,
+  railYAt,
+  sweepPanels,
+  type PlatformSpine,
+  type SpineRef,
+} from './platform-spine.ts';
+import { atlasFor, type TrackAtlas } from './track-atlas.ts';
 
 /**
  * What `world/rail-geo.ts` hands `CollisionWorld`, and what this file evaluates.
@@ -426,6 +437,19 @@ export interface Segment {
    * for what a false answer here would build.
    */
   open: [boolean, boolean];
+  /**
+   * The polyline vertex this segment was **first seen at**, before the twenty
+   * directions were deduplicated into one set.
+   *
+   * The dedup throws away which line a length of track belongs to, which is
+   * right for everything that draws it -- ballast is ballast -- and wrong for
+   * the one consumer that needs the *curve* rather than the segment:
+   * `world/platform-spine.ts` sweeps a platform along a running line and a
+   * running line is a polyline, not a bag of edges. Recovering it by searching
+   * would be a second answer to a question the dedup loop already answers, so
+   * the loop keeps its own.
+   */
+  vi: number;
 }
 
 /** A tunnel mouth: where the flags flip between one vertex and the next. */
@@ -450,6 +474,22 @@ export interface Portal {
 export type PlacedStation = RailStation & {
   ux: number; uz: number;
   nodeX: number; nodeZ: number;
+  /**
+   * Which running line this platform stands against, and where along it.
+   *
+   * `ux, uz` is that line's direction **at the anchor and nowhere else**, which
+   * is exactly the assumption the box made and the report broke: over 80 m of a
+   * curve the tangent at the middle is not the tangent at the end. This is the
+   * curve itself, so `world/platform-spine.spineAround` can hand every writer a
+   * frame that is right along the whole platform instead of at its centre.
+   *
+   * Null at an anchor whose nearest rail could not be traced back to a
+   * direction's own polyline -- a station the network never reaches, standing by
+   * a stub the dedup kept and no service runs over. Those keep the straight
+   * frame they have always had; `straightSpine` is the same object built from
+   * `ux, uz`, so nothing downstream has a second code path for them.
+   */
+  spine: SpineRef | null;
 };
 
 export interface Chunk {
@@ -469,6 +509,15 @@ export interface RailNetwork {
   chunks: Map<string, Chunk>;
   /** What the deduplication actually saved. Printed at boot. */
   directedSegments: number;
+  /**
+   * How much of the corridor each track may build in. `RAIL-CORRIDOR.md`.
+   *
+   * On the network rather than passed to the writers that want it, because the
+   * writers that want it are six deep and every one of them already has a
+   * `RailNetwork`. Built here so both ends build it from the identical bake at
+   * the identical moment, which is the same argument `buildNetwork` itself makes.
+   */
+  atlas: TrackAtlas;
 }
 
 export function chunkKey(cx: number, cz: number): string {
@@ -498,6 +547,9 @@ export function bucket(chunks: Map<string, Chunk>, key: string): Chunk {
  * 60 km from the origin.
  */
 export function buildNetwork(bake: RailBake): RailNetwork {
+  // First, because `planStation` reads it and because a network without it
+  // would be a network whose platforms do not know what is beside them.
+  const atlas = atlasFor(bake);
   const segments: Segment[] = [];
   const seen = new Map<string, number>();
   const p = bake.vertices;
@@ -544,6 +596,7 @@ export function buildNetwork(bake: RailBake): RailNetwork {
           ux: dx / len,
           uz: dz / len,
           open: [true, true],
+          vi: i,
         });
       }
     }
@@ -614,9 +667,12 @@ export function buildNetwork(bake: RailBake): RailNetwork {
   // construction. A station **no line calls at** -- and 94 of the bake's 267 are
   // light-rail stops or closed platforms the network never reaches -- falls back
   // to the nearest segment within 60 m, and is dropped if there is not one.
-  interface Anchor { name: string; x: number; y: number; z: number; ux: number; uz: number }
+  interface Anchor {
+    name: string; x: number; y: number; z: number; ux: number; uz: number;
+    spine: SpineRef;
+  }
   const anchors: Anchor[] = [];
-  const anchorAt = (dir: (typeof bake.lines)[number]['dirs'][number], at: number): Omit<Anchor, 'name'> => {
+  const anchorAt = (dir: (typeof bake.lines)[number]['dirs'][number], at: number): Omit<Anchor, 'name' | 'spine'> => {
     const c = bake.cum;
     let lo = dir.vertexOff;
     let hi = dir.vertexOff + dir.vertexCount - 1;
@@ -637,8 +693,10 @@ export function buildNetwork(bake: RailBake): RailNetwork {
     const len = Math.sqrt(dx * dx + dz * dz) || 1;
     return { x: ax + dx * u, y: ay + dy * u, z: az + dz * u, ux: dx / len, uz: dz / len };
   };
-  for (const line of bake.lines) {
-    for (const dir of line.dirs) {
+  for (let li = 0; li < bake.lines.length; li++) {
+    const line = bake.lines[li];
+    for (let di = 0; di < line.dirs.length; di++) {
+      const dir = line.dirs[di];
       for (const stop of dir.stops) {
         if (!stop.calls) continue;
         const at = anchorAt(dir, stop.s);
@@ -654,7 +712,7 @@ export function buildNetwork(bake: RailBake): RailNetwork {
         // header is the argument; both readers of the bake use it.
         const near = anchors.find((a) => a.name === stop.name && samePlatform(a, at));
         if (near) continue;
-        anchors.push({ name: stop.name, ...at });
+        anchors.push({ name: stop.name, ...at, spine: { line: li, dir: di, s: stop.s } });
       }
     }
   }
@@ -671,6 +729,7 @@ export function buildNetwork(bake: RailBake): RailNetwork {
       ...record,
       x: a.x, z: a.z, trackY: a.y, ux: a.ux, uz: a.uz,
       nodeX: record.x, nodeZ: record.z,
+      spine: a.spine,
     });
     bucket(chunks, chunkOf(a.x, a.z)).stations.push(index);
   }
@@ -704,11 +763,56 @@ export function buildNetwork(bake: RailBake): RailNetwork {
       ...station,
       ux: segments[best].ux, uz: segments[best].uz,
       nodeX: station.x, nodeZ: station.z,
+      // The curve behind the segment the nearest-rail search settled on. The
+      // *segment* is what decides `ux, uz` and that is unchanged; this only says
+      // which polyline that segment was cut from, so the sweep has a curve to
+      // follow rather than the tangent at one point of it.
+      spine: refFor(bake, segments[best], station.x, station.z),
     });
     bucket(chunks, chunkOf(station.x, station.z)).stations.push(index);
   }
 
-  return { bake, segments, portals, stations, chunks, directedSegments: directed };
+  return { bake, segments, portals, stations, chunks, directedSegments: directed, atlas };
+}
+
+/**
+ * Which direction's polyline a deduplicated segment was cut from, and the arc
+ * length on it nearest a point.
+ *
+ * `Segment.vi` is the vertex the segment was first seen at, so the direction is
+ * whichever one's vertex range contains it -- a linear scan over twenty-odd
+ * directions, run once per unserved station and never on a hot path. The arc
+ * length is `cum[vi]` plus the projection of the point onto that one edge, which
+ * is the same interpolation `anchorAt` inverts, so a station placed here and a
+ * station placed from a calling stop are describing their curve the same way.
+ */
+function refFor(bake: RailBake, seg: Segment, x: number, z: number): SpineRef | null {
+  if (seg.vi < 0) return null;
+  for (let li = 0; li < bake.lines.length; li++) {
+    const dirs = bake.lines[li].dirs;
+    for (let di = 0; di < dirs.length; di++) {
+      const d = dirs[di];
+      if (seg.vi < d.vertexOff || seg.vi >= d.vertexOff + d.vertexCount - 1) continue;
+      const ex = seg.bx - seg.ax;
+      const ez = seg.bz - seg.az;
+      const len2 = ex * ex + ez * ez;
+      let u = 0;
+      if (len2 > 1e-9) {
+        u = ((x - seg.ax) * ex + (z - seg.az) * ez) / len2;
+        u = u < 0 ? 0 : u > 1 ? 1 : u;
+      }
+      // The segment may be stored reversed against the polyline -- the dedup key
+      // is canonical and the geometry is not -- so the arc length is measured
+      // from whichever of the two vertices `vi` actually is.
+      const a = bake.cum[seg.vi];
+      const b = bake.cum[seg.vi + 1];
+      const px = bake.vertices[seg.vi * 3];
+      const pz = bake.vertices[seg.vi * 3 + 2];
+      const forward = Math.abs(px - seg.ax) + Math.abs(pz - seg.az) <= Math.abs(px - seg.bx) + Math.abs(pz - seg.bz);
+      return { line: li, dir: di, s: forward ? a + (b - a) * u : b - (b - a) * u };
+    }
+  }
+  return null;
 }
 
 /**
@@ -940,6 +1044,55 @@ export interface StationPlan {
    */
   sideClear: [boolean, boolean];
   /**
+   * How far out the platform deck may reach on each side, metres: `[-1, +1]`.
+   *
+   * ---------------------------------------------------------------------------
+   * **This replaces a constant, and the constant was the report.** The deck ran
+   * to `riding.PLATFORM_OUTER_M` -- 9.4 m, the rim of the terrain carve -- on
+   * both sides of every anchor, unconditionally. The nearest parallel running
+   * line in this bake is at a **median of 4.05 m**, so on the inside of a
+   * two-track corridor the deck was drawn straight through the neighbouring
+   * train: measured before the change, 59.6 km of running line had a platform
+   * inside the car body, across 162 of the 361 platform sites. That is
+   * *"passing through a lot of rail assets, but the platforms are the worst"*,
+   * and it is not a curve, a station or a tuning value. It is one number used in
+   * a place where the answer varies.
+   *
+   * So the deck reaches the lesser of the old constant and
+   * `track-atlas.runBudget` over the platform's own length -- which on a
+   * corridor edge is the constant unchanged, and beside a neighbour is half the
+   * gap. Zero where what is left is too narrow to stand on; see
+   * `MIN_PLATFORM_DECK` for why that is a refusal and not a sliver.
+   *
+   * The value is the **outer face in the station's frame**, so a reader wanting
+   * the deck writes `PLATFORM_INNER * side` to `slot[i] * side` and has no
+   * arithmetic of its own to get wrong. `riding.PlatformField` carries the
+   * identical pair from the identical call, because a deck the geometry has
+   * narrowed and the field has not is a metre of invisible floor -- which is the
+   * exact failure `platformSides`' essay refused to ship, and is why that essay
+   * ends *"the honest fix is for `buildPlatforms` to decide the side, from the
+   * bake, where both ends can see it"*. The atlas is that.
+   */
+  slot: [number, number];
+  /**
+   * The running line this platform is built along, over the platform's length.
+   *
+   * ---------------------------------------------------------------------------
+   * **The frame a station is built in stops being a point and becomes a curve.**
+   * Everything a station wrote was placed in `station`'s frame: one origin, one
+   * heading, taken at the stopping anchor. A railway does not keep a heading for
+   * eighty metres. Measured over the 361 sites in this bake, the running line
+   * departs from that heading's own tangent by a median of **2.25 m** and by
+   * **17.60 m at Wollstonecraft** -- against a 70 mm gap between the platform
+   * face and the side of a train.
+   *
+   * So the deck is swept along this instead, one panel per polyline edge, and
+   * the shorter things -- a stair, a house, a footbridge -- take a frame at
+   * their own position on it. On straight track the spine is one panel and every
+   * one of them is the box it always was; see `platform-spine.SPINE_FLAT_M`.
+   */
+  spine: PlatformSpine;
+  /**
    * The terrain under the station building, sampled at the building rather than
    * at the stair.
    *
@@ -1070,11 +1223,25 @@ export function planStation(
     if (!placed) housePush = 12;
   }
 
+  // How far the deck may reach on each side. See `StationPlan.slot`: this is the
+  // number that used to be `PLATFORM_OUTER_M` on both sides unconditionally, and
+  // the change is the end of *"the platforms are the worst"*.
+  const slot = platformSlots(
+    net.bake, net.atlas, station.spine, PLATFORM_HALF_LENGTH, PLATFORM_INNER, PLATFORM_OUTER_M,
+    station.name,
+  );
+  // ...and the curve it is swept along. `straightSpine` for an anchor with no
+  // polyline behind it, which is the frame that station has always had, so there
+  // is one code path below and not two.
+  const spine = station.spine === null
+    ? straightSpine(station, PLATFORM_HALF_LENGTH)
+    : spineAround(net.bake, station.spine, PLATFORM_HALF_LENGTH);
+
   const hp = framePoint(station, houseAlong, (houseInner + housePush + HOUSE_WIDTH / 2) * houseSide, 0);
   const hg = rawGround(hp[0], hp[2]);
   return {
     station, mine, top, base, onBridge, landing, run, measured,
-    houseSide, houseAlong, housePush, sideClear,
+    houseSide, houseAlong, housePush, sideClear, slot, spine,
     houseGround: Number.isFinite(hg) ? hg : landing[houseSide < 0 ? 0 : 1][0],
   };
 }
@@ -1216,15 +1383,37 @@ export function solidBase(b: FrameSolid): number {
  * and the number carved are one number.
  */
 export function platformDeckSolids(plan: StationPlan, out: FrameSolid[]): void {
-  const f = plan.station;
+  // **One box per panel of the running line, not one box for the platform.**
+  // See `StationPlan.spine`. On straight track `sweepPanels` returns exactly one
+  // panel spanning the whole platform, so this emits the identical box it always
+  // did and a station on a straight is untouched.
+  //
+  // The panels are butted rather than mitred, so at a turn the outside of the
+  // bend is short of the drawn deck by the wedge -- 13 cm at the median turn,
+  // 74 cm at the worst. That is the safe direction and it is deliberate: the
+  // prism set is what *blocks*, and `riding.PlatformField` -- which projects onto
+  // this same spine and is what both ends **stand** on -- covers the wedge
+  // exactly. A prism that over-reached would be an invisible wall in the six-foot;
+  // one that under-reaches is a corner of deck you can walk over, which is what
+  // it looks like.
   for (const side of platformSides(plan)) {
-    out.push({
-      f,
-      t0: -PLATFORM_HALF_LENGTH, t1: PLATFORM_HALF_LENGTH,
-      o0: PLATFORM_INNER * side, o1: PLATFORM_OUTER_M * side,
-      y0: plan.base, y1: plan.top,
-      kind: SOLID_PLATFORM_DECK,
-    });
+    // `plan.slot`, not `PLATFORM_OUTER_M`. On a corridor edge the two are the
+    // same number and nothing moves; beside a neighbouring running line the
+    // slot is half the gap and the deck stops out of the train's way. See
+    // `StationPlan.slot`.
+    const o1 = plan.slot[side < 0 ? 0 : 1] * side;
+    for (const p of sweepPanels(plan.spine, PLATFORM_INNER)) {
+      out.push({
+        f: { x: p.x, z: p.z, ux: p.ux, uz: p.uz },
+        t0: p.t0, t1: p.t1,
+        o0: PLATFORM_INNER * side, o1,
+        // The deck's top follows the railhead beside it rather than holding the
+        // anchor's, for `platform-spine.railYAt`'s reason -- a panel is short
+        // enough that its own midpoint is the whole of the grade it sees.
+        y0: plan.base, y1: railYAt(plan.spine, (p.s0 + p.s1) / 2) + PLATFORM_HEIGHT,
+        kind: SOLID_PLATFORM_DECK,
+      });
+    }
   }
 }
 
@@ -1262,11 +1451,20 @@ export function stairSolids(
 
 /** The access flights and their landings. `writeStationAccess`' arithmetic. */
 export function accessSolids(plan: StationPlan, out: FrameSolid[]): void {
-  const f = plan.station;
   for (const side of platformSides(plan)) {
     const i = side < 0 ? 0 : 1;
+    // **The flight is clipped to the slot as the deck is.** It runs in the band
+    // from the platform's outer face to `rail-cut.STATION_HALF_WIDTH`, which on
+    // an interior side is the neighbouring train's road: measured, 13.8 km of
+    // running line with a station's own stairs inside the car body, the worst of
+    // any station asset after the platform itself.
+    const room = plan.slot[i];
     const o0 = STAIR_INNER * side;
-    const o1 = STAIR_OUTER * side;
+    const o1 = Math.min(STAIR_OUTER, room) * side;
+    // Nothing left to put a tread on. The deck is still there and still
+    // reachable from the other end or the other side; a stair narrower than a
+    // stride is a decoration in a train's way.
+    if (Math.min(STAIR_OUTER, room) - STAIR_INNER < 0.6) continue;
     for (const end of [1, -1]) {
       const e = end > 0 ? 0 : 1;
       const run = plan.run[i][e];
@@ -1275,8 +1473,21 @@ export function accessSolids(plan: StationPlan, out: FrameSolid[]): void {
       const head = ACCESS_ALONG * end;
       if (run <= 0) continue;
       const foot = head + run * end;
-      stairSolids(f, o0, o1, head, plan.top, foot, street, baseY, SOLID_STAIR, out);
-      out.push({ f, t0: foot, t1: foot + 2.6 * end, o0, o1, y0: baseY, y1: street, kind: SOLID_LANDING });
+      // **A frame at the flight's own middle, not at the station's.** A flight
+      // is a few tens of metres and sweeping it panel by panel would be
+      // arithmetic for nothing, but taking the anchor's heading forty-four
+      // metres up a curving platform is how the stairs at Westmead ended up
+      // inside the train -- 13.3 km of running line, measured, with the
+      // footbridge stairs the worst of it. Re-based, and the residual bow over
+      // one flight is centimetres. See `platform-spine.frameAt`.
+      const mid = (head + foot) / 2;
+      const g = frameAt(plan.spine, mid);
+      const f: TrackFrame = { x: g.x, z: g.z, ux: g.ux, uz: g.uz };
+      stairSolids(f, o0, o1, head - mid, plan.top, foot - mid, street, baseY, SOLID_STAIR, out);
+      out.push({
+        f, t0: foot - mid, t1: foot - mid + 2.6 * end,
+        o0, o1, y0: baseY, y1: street, kind: SOLID_LANDING,
+      });
     }
   }
 }
@@ -1292,7 +1503,6 @@ export function accessSolids(plan: StationPlan, out: FrameSolid[]): void {
  */
 export function footbridgeSolids(plan: StationPlan, out: FrameSolid[]): void {
   if (plan.station.platforms < 2) return;
-  const f = plan.station;
   const deck = plan.station.trackY + BRIDGE_CLEAR;
   const ground = Math.max(plan.landing[0][0], plan.landing[0][1], plan.landing[1][0], plan.landing[1][1]);
   if (deck - ground < BRIDGE_MIN_OVER_GROUND) return;
@@ -1301,17 +1511,26 @@ export function footbridgeSolids(plan: StationPlan, out: FrameSolid[]): void {
   const run = Math.min(STAIR_MAX_STEPS, Math.round(rise / STAIR_RISE)) * STAIR_GOING;
   const s1 = PLATFORM_INNER + PLATFORM_WIDTH - 0.4;
   const s0 = s1 - 2.0;
+  // The bridge spans the corridor fifty metres up the platform, where the track
+  // has already turned away from the anchor's heading. Its own frame, on the
+  // curve, for `accessSolids`' reason.
+  const bg = frameAt(plan.spine, BRIDGE_ALONG);
+  const bf: TrackFrame = { x: bg.x, z: bg.z, ux: bg.ux, uz: bg.uz };
   out.push({
-    f,
-    t0: BRIDGE_ALONG, t1: BRIDGE_ALONG + BRIDGE_RUN,
+    f: bf,
+    t0: 0, t1: BRIDGE_RUN,
     o0: -s1, o1: s1,
     y0: deck - BRIDGE_DECK, y1: deck + 0.6,
     kind: SOLID_FOOTBRIDGE_DECK,
   });
   for (const side of [-1, 1]) {
+    // Each ramp is its own frame at its own middle: a flight down from the deck
+    // is as long as the rise and reaches back along the platform.
+    const rg = frameAt(plan.spine, BRIDGE_ALONG - run / 2);
+    const rf: TrackFrame = { x: rg.x, z: rg.z, ux: rg.ux, uz: rg.uz };
     stairSolids(
-      f, s0 * side, s1 * side,
-      BRIDGE_ALONG, deck, BRIDGE_ALONG - run, plan.top,
+      rf, s0 * side, s1 * side,
+      run / 2, deck, -run / 2, plan.top,
       plan.top - 0.2, SOLID_FOOTBRIDGE_STAIR, out,
     );
   }
@@ -1319,14 +1538,17 @@ export function footbridgeSolids(plan: StationPlan, out: FrameSolid[]): void {
 
 /** The station building's brick box. `writeStationHouse`'s arithmetic. */
 export function houseSolids(plan: StationPlan, out: FrameSolid[]): void {
-  const f = plan.station;
   const side = plan.houseSide;
   const t = plan.houseAlong;
+  // The building sits up to sixty-two metres along the platform. Its own frame,
+  // for `accessSolids`' reason.
+  const hg = frameAt(plan.spine, t);
+  const f: TrackFrame = { x: hg.x, z: hg.z, ux: hg.ux, uz: hg.uz };
   const o = (STAIR_OUTER + 1.2 + plan.housePush + HOUSE_WIDTH / 2) * side;
   const y = plan.houseGround;
   out.push({
     f,
-    t0: t - HOUSE_LENGTH / 2, t1: t + HOUSE_LENGTH / 2,
+    t0: -HOUSE_LENGTH / 2, t1: HOUSE_LENGTH / 2,
     o0: o - (HOUSE_WIDTH / 2) * side, o1: o + (HOUSE_WIDTH / 2) * side,
     y0: y - 2.5, y1: y + HOUSE_HEIGHT,
     kind: SOLID_HOUSE,
@@ -1389,15 +1611,55 @@ export function stationSolids(plan: StationPlan, out: FrameSolid[]): void {
 }
 
 /**
- * Which sides may carry a platform. `writePlatforms`' `platformSides`, moved
- * here because the deck, the stair and the field all have to agree about it.
+ * Which sides carry a platform. The deck, the stair, the canopy, the furniture
+ * and `riding.PlatformField` all read this one answer.
  *
- * See `StationPlan.sideClear`: the measurement is right, it is carried, and it
- * is deliberately not obeyed yet -- obeying it needs the *other* track's
- * platform to exist, which is a round of its own.
+ * ---------------------------------------------------------------------------
+ * **It returned `[-1, 1]` unconditionally, and the essay saying why is worth
+ * keeping because this is the round that discharges it.** Suppressing a blocked
+ * side was tried once and reverted the same hour, for a good reason:
+ *
+ *   > `game/riding.PlatformField` -- the analytic copy of the platform that
+ *   > **the server** holds and that `groundHeightAt` prefers over the terrain --
+ *   > answers for both sides of every site unconditionally, from the bake, with
+ *   > no notion of a side at all. Not drawing one leaves a platform that is
+ *   > still a floor on both ends of the wire and is invisible.
+ *
+ * ...and it ended: *"the honest fix is for `buildPlatforms` to decide the side,
+ * from the bake, where both ends can see it, and for this to follow."*
+ *
+ * `world/track-atlas.ts` is that. It is built from the bake, at decode, on both
+ * ends, and `platformSlots` turns it into the same pair of numbers here and in
+ * `buildPlatforms`. So a side that is not drawn is a side the field does not
+ * answer for either, and the invisible floor cannot happen.
+ *
+ * `StationPlan.sideClear` is still computed and still not obeyed. It asks a
+ * different question -- *is another track's loading gauge inside this strip* --
+ * and the slot subsumes it in every case measured, so acting on both would be
+ * two rules for one decision. It stays because its measurement is the expensive
+ * half and because a case where they disagree is worth finding.
  */
-export function platformSides(_plan: StationPlan): number[] {
-  return [-1, 1];
+/**
+ * The back of the **passenger platform** on this side, as against the back of
+ * the deck.
+ *
+ * Two different edges and they always were: `PLATFORM_WIDTH` is the platform a
+ * passenger walks on and `PLATFORM_OUTER_M` is the surface that runs back to the
+ * rim of the carve, which is 2.28 m of extra floor that exists so there is no
+ * slot behind the platform to fall into. The coping, the tactile strip, the
+ * canopy and every piece of furniture are placed against *this* one, and where
+ * the slot has narrowed the deck they move in with it rather than hanging over
+ * the edge of a platform that is no longer under them.
+ */
+export function platformBack(plan: StationPlan, side: number): number {
+  return Math.min(PLATFORM_INNER + PLATFORM_WIDTH, plan.slot[side < 0 ? 0 : 1]);
+}
+
+export function platformSides(plan: StationPlan): number[] {
+  const out: number[] = [];
+  if (plan.slot[0] > 0) out.push(-1);
+  if (plan.slot[1] > 0) out.push(1);
+  return out;
 }
 
 // --- The corridor: the trench wall and the viaduct ------------------------------------

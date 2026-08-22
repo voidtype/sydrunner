@@ -155,6 +155,7 @@ import {
   type Texture,
 } from 'three/webgpu';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { CAR_BODY_FLOOR_M, CAR_BODY_HALF_M, CAR_BODY_ROOF_M } from './envelope.ts';
 
 import {
   SPAN_SUBWAY,
@@ -989,9 +990,14 @@ const SOLID_KEY = 'rail:trains';
  * impostor tier. Length is the consist's own pitch less the coupler gap, which
  * is exactly the scale `drawImpostor` puts on the box.
  */
-const CAR_SOLID_FLOOR = 0.25;
-const CAR_SOLID_ROOF = 4.15;
-const CAR_SOLID_HALF_WIDTH = 1.55;
+// **Imported rather than written here, since P0.** The box that stops a player
+// walking into a train and the volume the railway's own kit must stay out of are
+// the same box, and `world/envelope.structureGauge` is the one that answers
+// both. Two copies of it is how a platform coping ends up three centimetres
+// inside a carriage with nothing able to say so. See `RAIL-CORRIDOR.md`.
+const CAR_SOLID_FLOOR = CAR_BODY_FLOOR_M;
+const CAR_SOLID_ROOF = CAR_BODY_ROOF_M;
+const CAR_SOLID_HALF_WIDTH = CAR_BODY_HALF_M;
 
 export class TrainFleet {
   readonly group = new Group();

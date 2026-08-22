@@ -109,6 +109,117 @@ export const RAIL_BELOW_M = 0.9;
  */
 export const RAIL_ABOVE_M = 5.9;
 
+// --- The structure gauge: the volume the railway's own kit must clear ------------
+//
+// `RAIL_HALF_M` above is the envelope a *building* is carved out of, and it is
+// 3.6 m because it carries a metre of the player's margin and the sway on top of
+// the body. A platform is 1.62 m from the centreline and is *supposed* to be, so
+// nothing on the railway can be tested against that number -- its own header
+// says so. What the railway's own writers need is the tighter statement: the
+// swept solid body of a carriage, and the smallest gap anybody may leave beside
+// it.
+//
+// It is here rather than in `rail-geo.ts` because it has to be askable by the
+// server, by the audit and by the renderer, and because a rule that lives beside
+// the writer it constrains is a rule that writer can quietly disagree with. This
+// is the one answer, and `structureGauge` is how it is asked.
+
+/**
+ * Half the solid body of a carriage, metres, at its widest.
+ *
+ * **This is the definition and `world/trains.ts` reads it**, rather than the
+ * other way round: the collider that stops a player walking into a moving train
+ * and the volume a platform coping must stay out of are the same box, and two
+ * numbers for it is how a platform ends up 3 cm inside a train.
+ *
+ * The impostor's drawn skin is 1.52 m and this is three centimetres outside it,
+ * so the collider sits just off the surface a body is also drawn against. One
+ * box for the Tangara and the Metropolis both: they differ by 3 cm across and
+ * nobody can tell, while a train that blocks when modelled and passes when
+ * impostored is immediately obvious.
+ */
+export const CAR_BODY_HALF_M = 1.55;
+
+/** The underside of that body, metres over the railhead. `trains.CAR_SOLID_FLOOR`. */
+export const CAR_BODY_FLOOR_M = 0.25;
+
+/** And its roof. `trains.CAR_SOLID_ROOF`. */
+export const CAR_BODY_ROOF_M = 4.15;
+
+/**
+ * How much clear air the railway's own structures must leave beside the body,
+ * metres.
+ *
+ * ---------------------------------------------------------------------------
+ * **Seventy millimetres, and the number is not a choice -- it is what a
+ * platform is.** `rail-solids.PLATFORM_INNER` is 1.62 m and a real platform
+ * really is that close to a real train; the gap you step over at Town Hall is
+ * about eight centimetres. So the margin cannot be set from comfort, because any
+ * comfortable margin condemns every platform in the state. It is set from the
+ * one structure that is allowed to be nearest, and everything else has to be
+ * further out than the platform is.
+ *
+ * **Exactly `PLATFORM_INNER - CAR_BODY_HALF_M`, and five millimetres of slop
+ * here cost a whole audit.** At 0.075 the limit came to 1.625 m against a
+ * platform face at 1.620, so once the deck was swept and actually followed the
+ * rail, every correctly-built metre of every platform in the city reported a
+ * 5 mm intrusion -- 57 km of it, which read as the sweep having made things
+ * worse when it had made them right. The gauge's edge has to be the platform's
+ * face, and the test below is strict, so a platform exactly where a platform
+ * goes is clear and anything nearer is not.
+ *
+ * The consequence is worth saying plainly, because it is the whole reason the
+ * platform sweep exists: **the railway's tightest clearance is 70 mm, so a
+ * platform placed in a frame the track leaves cannot survive.** Eighty metres of
+ * a 1,000 m curve walks 3.2 m off its own tangent, which is forty-five times the
+ * budget. A constant cannot absorb that and no constant was ever going to.
+ */
+export const STRUCTURE_MARGIN_M = 0.07;
+
+/**
+ * Is a point at lateral offset `offset` from a running line, `dy` metres over
+ * its railhead, inside the volume a train sweeps?
+ *
+ * The one question every rail writer has to be able to answer about anything it
+ * emits, and `server/platform-gauge-check.ts` asks it of everything they do
+ * emit. `offset` is signed and the test is on its magnitude, so a caller never
+ * has to remember which side it is working on.
+ *
+ * The height band matters as much as the width does and is the reason this is a
+ * function rather than a comparison against `CAR_BODY_HALF_M`: a canopy 4.9 m up
+ * and a footbridge soffit at 8.4 m are both nearer the centreline than the body
+ * is wide, and both are correct. Only the band the body actually occupies is
+ * forbidden.
+ */
+export function structureGauge(offset: number, dy: number): boolean {
+  if (dy <= CAR_BODY_FLOOR_M || dy >= CAR_BODY_ROOF_M) return false;
+  const a = offset < 0 ? -offset : offset;
+  return a < CAR_BODY_HALF_M + STRUCTURE_MARGIN_M;
+}
+
+/**
+ * How far inside the gauge a box reaching from `o0` to `o1` across the track and
+ * `y0` to `y1` over its railhead reaches, metres. Zero when it is clear.
+ *
+ * The signed version of `structureGauge`, because an audit that could only say
+ * *yes* would sort its offenders alphabetically. The depth is measured across
+ * the corridor -- the direction the platform is wrong in -- and is zero whenever
+ * the box misses the body's height band entirely.
+ */
+export function gaugeIntrusion(o0: number, o1: number, y0: number, y1: number): number {
+  const lo = Math.min(y0, y1);
+  const hi = Math.max(y0, y1);
+  if (hi <= CAR_BODY_FLOOR_M || lo >= CAR_BODY_ROOF_M) return 0;
+  const a = Math.min(o0, o1);
+  const b = Math.max(o0, o1);
+  const limit = CAR_BODY_HALF_M + STRUCTURE_MARGIN_M;
+  // The box straddles the centreline: the train is inside it, and the depth is
+  // the whole half-gauge rather than an edge distance.
+  if (a < 0 && b > 0) return limit;
+  const near = a >= 0 ? a : -b;
+  return near < limit ? limit - near : 0;
+}
+
 /**
  * The clearance a road needs kept over it, metres.
  *

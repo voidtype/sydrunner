@@ -264,10 +264,11 @@ import {
   SOLID_FOOTBRIDGE_STAIR,
   SOLID_HOUSE,
   SOLID_LANDING,
-  SOLID_PLATFORM_DECK,
   SOLID_STAIR,
   SOLID_VIADUCT_PIER,
   planStation,
+  platformBack,
+  platformSides,
   trenchPrisms,
   trenchProfile,
   viaductDeck,
@@ -286,6 +287,7 @@ import {
   type StationPlan,
   type TrackFrame,
 } from './rail-solids.ts';
+import { frameAt, offsetAt, railYAt, type PlatformSpine } from './platform-spine.ts';
 
 export { buildNetwork, type PlacedStation, type RailNetwork } from './rail-solids.ts';
 
@@ -1814,7 +1816,7 @@ export class RailWorld {
             return;
           case 1:
             if (underground) writeUndergroundStation(concrete, lining, state.boxes, station);
-            else writePlatforms(concrete, canopy, tactile, state.boxes, plan);
+            else writePlatforms(concrete, canopy, tactile, plan);
             return;
           case 2:
             // **The access, and it is generated rather than looked up.**
@@ -2899,6 +2901,111 @@ function frameBar(
   s.quad(...c(t0, o0, false), ...c(t0, o1, false), ...c(t0, o1, true), ...c(t0, o0, true));
 }
 
+/**
+ * A slab swept along a spine at a constant offset from the rail, closed at both
+ * ends and mitred at every joint.
+ *
+ * ---------------------------------------------------------------------------
+ * **This is `frameBox` for a curve, and the mitre is the only interesting part
+ * of it.** The panels of a spine meet at an angle, so a box per panel leaves a
+ * wedge open on the outside of the bend -- 13 cm at the median turn in this
+ * bake, 74 cm at the worst -- and a slot of daylight down a platform is exactly
+ * the failure `STATIONS.md` is about. `platform-spine.offsetAt` gives the corner
+ * where the two offset lines actually cross, so consecutive quads share it and
+ * there is nothing between them to gap.
+ *
+ * Six faces, same as `frameBox`: top, bottom, the two long sides, and a cap at
+ * each end. The long sides are a quad per panel; the top and bottom are a quad
+ * per panel between the two offset lines. A flat spine has one panel and this
+ * emits `frameBox`'s six quads at `frameBox`'s coordinates.
+ *
+ * `t0`/`t1` clip the sweep along the rail, for the things that do not run the
+ * platform's whole length -- the canopy is 68 m of a 160 m platform. Omitted,
+ * the sweep is the whole spine.
+ */
+function sweepDeck(
+  s: Solid, spine: PlatformSpine,
+  o0: number, o1: number,
+  /**
+   * The slab's underside and top, **metres over the railhead beside it**, or an
+   * absolute world y for `dLo` where the thing below is the ground rather than
+   * the rail -- which is the platform's own skirt and nothing else. See
+   * `platform-spine.railYAt` for why a constant height was the second half of
+   * this bug.
+   */
+  dLo: number, dHi: number,
+  t0?: number, t1?: number,
+  /** `dLo` is an absolute world y rather than a rise over the rail. */
+  floorIsAbsolute = false,
+): void {
+  const a = Math.min(o0, o1);
+  const b = Math.max(o0, o1);
+  const nodes = spine.nodes;
+  // The node indices the sweep covers, plus a synthetic node at each clip.
+  const from = t0 ?? nodes[0].t;
+  const to = t1 ?? nodes[nodes.length - 1].t;
+  if (!(to > from)) return;
+  /** `[xa, za, xb, zb, lo, hi]` per rib: the two mitred corners and its heights. */
+  const ribs: Array<[number, number, number, number, number, number]> = [];
+  const heights = (t: number): [number, number] => {
+    const rail = railYAt(spine, t);
+    const hi = rail + dHi;
+    const lo = floorIsAbsolute ? dLo : rail + dLo;
+    return lo <= hi ? [lo, hi] : [hi, lo];
+  };
+  const pushRib = (i: number): void => {
+    const pa = offsetAt(spine, i, a);
+    const pb = offsetAt(spine, i, b);
+    const [lo, hi] = heights(spine.nodes[i].t);
+    ribs.push([pa.x, pa.z, pb.x, pb.z, lo, hi]);
+  };
+  /**
+   * A rib at an arbitrary arc length, for a clip that lands mid-panel. The
+   * panel's own direction rather than a mitre, because a clip is not a joint --
+   * there is one panel either side of it and it is the same panel.
+   */
+  const pushAt = (t: number): void => {
+    const f = frameAt(spine, t);
+    const [lo, hi] = heights(t);
+    ribs.push([
+      f.x - f.uz * a, f.z + f.ux * a,
+      f.x - f.uz * b, f.z + f.ux * b,
+      lo, hi,
+    ]);
+  };
+  if (spine.flat) {
+    pushAt(from);
+    pushAt(to);
+  } else {
+    pushAt(from);
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i].t <= from || nodes[i].t >= to) continue;
+      pushRib(i);
+    }
+    pushAt(to);
+  }
+  if (ribs.length < 2) return;
+
+  for (let i = 0; i + 1 < ribs.length; i++) {
+    const [ax, az, bx, bz, lo0, hi0] = ribs[i];
+    const [cx, cz, dx, dz, lo1, hi1] = ribs[i + 1];
+    // Top and bottom. The two ribs carry their own heights, so a slab on a
+    // graded railway is a ramp rather than a step.
+    s.quad(ax, hi0, az, bx, hi0, bz, dx, hi1, dz, cx, hi1, cz);
+    s.quad(ax, lo0, az, cx, lo1, cz, dx, lo1, dz, bx, lo0, bz);
+    // The two long faces, wound so each looks outward from the slab.
+    s.quad(cx, lo1, cz, ax, lo0, az, ax, hi0, az, cx, hi1, cz);
+    s.quad(bx, lo0, bz, dx, lo1, dz, dx, hi1, dz, bx, hi0, bz);
+  }
+  // The end caps.
+  {
+    const [ax, az, bx, bz, lo, hi] = ribs[0];
+    s.quad(ax, lo, az, bx, lo, bz, bx, hi, bz, ax, hi, az);
+    const [cx, cz, dx, dz, lo2, hi2] = ribs[ribs.length - 1];
+    s.quad(dx, lo2, dz, cx, lo2, cz, cx, hi2, cz, dx, hi2, dz);
+  }
+}
+
 /** A box in the track frame, between two corners. */
 function frameBox(
   s: Solid, f: TrackFrame,
@@ -3032,7 +3139,7 @@ function writePortal(concrete: Solid, lining: Solid, portal: Portal): void {
   const stub: Segment = {
     ax: portal.x - ux * 1.5, ay: portal.y, az: portal.z - uz * 1.5,
     bx: portal.x + ux * 14, by: portal.y, bz: portal.z + uz * 14,
-    flags: SPAN_TUNNEL, len: 15.5, ux, uz, open: [false, false],
+    flags: SPAN_TUNNEL, len: 15.5, ux, uz, open: [false, false], vi: -1,
   };
   writeTunnel(lining, stub);
 }
@@ -3047,66 +3154,66 @@ function writePortal(concrete: Solid, lining: Solid, portal: Portal): void {
  * dressed as data. Two faces at the real clearance is right at every station
  * with an even count and generous at the others.
  */
-/**
- * Which sides of this station carry a platform. **Both, for now.**
- *
- * ---------------------------------------------------------------------------
- * `StationPlan.sideClear` measures something real and this function deliberately
- * does not act on it yet. The measurement: a platform is built 1.62 m off the
- * anchor's centreline on both sides, and at Roseville there are running lines
- * at -5, -3, +4, +5, +6 and +7 m from that axis -- inside the slab. The train
- * passes through the platform, and about a hundred anchors on four-road
- * formations are the same.
- *
- * Suppressing the blocked side was tried and reverted the same hour, by walking
- * it. `game/riding.PlatformField` -- the analytic copy of the platform that
- * **the server** holds and that `groundHeightAt` prefers over the terrain --
- * answers for both sides of every site unconditionally, from the bake, with no
- * notion of a side at all. Not drawing one leaves a platform that is still a
- * floor on both ends of the wire and is invisible, which is a worse bug than the
- * one being fixed and is exactly the class of bug -- geometry and field
- * disagreeing about a surface -- that `PlatformField` was written to end.
- *
- * The honest fix is for `buildPlatforms` to decide the side, from the bake,
- * where both ends can see it, and for this to follow. Until then `sideClear` is
- * computed, carried on the plan, and not obeyed -- kept rather than deleted
- * because the measurement is the expensive half and it is right.
+/*
+ * `platformSides` used to be defined here, returning `[-1, 1]` for every station
+ * with a page explaining why it could not yet do otherwise. It is now
+ * `rail-solids.platformSides`, decided from `world/track-atlas.ts`, and is
+ * imported above -- the deck, the collision prism, the access stair and
+ * `riding.PlatformField` all read the one answer. Read that function's header
+ * for what discharged the objection.
  */
-function platformSides(_plan: StationPlan): number[] {
-  return [-1, 1];
-}
 
 function writePlatforms(
   concrete: Solid,
   canopy: Solid,
   tactile: Solid,
-  /** This station's solids, from `rail-solids.stationSolids`. See `buildChunk`. */
-  boxes: readonly FrameSolid[],
   plan: StationPlan,
 ): void {
-  // **The deck is drawn from the box, not measured again.** Its extents are
-  // `rail-solids.platformDeckSolids`', which is the same call `RailSolidField`
-  // evaluates and the same box `buildChunk` hands `CollisionWorld` -- so the
-  // slab a passenger sees, the prism they cannot walk through and the height the
-  // server holds them at are one number with three consumers.
-  for (const b of boxes) {
-    if (b.kind !== SOLID_PLATFORM_DECK) continue;
-    frameBox(concrete, b.f, b.t0, b.t1, b.o0, b.o1, b.y0, b.y1);
-  }
-  const f = plan.station;
-  const top = plan.top;
-  const L = PLATFORM_HALF_LENGTH;
-
+  // **The deck is swept, and the mesh is mitred where the prisms are butted.**
+  //
+  // `rail-solids.platformDeckSolids` emits one box per panel of the running
+  // line, and drawing those boxes directly -- which is what this did, and what
+  // "drawn from the box, not measured again" bought -- would put a wedge of
+  // daylight down the outside of every bend, 74 cm of it at the worst turn in
+  // the bake. So the *definition* is still one thing, `plan.spine` and
+  // `plan.slot`, and this is a second **rendering** of it rather than a second
+  // measurement: `sweepDeck` walks the identical nodes at the identical offsets
+  // and closes the joints with `offsetAt`'s mitre.
+  //
+  // `STATIONS.md` is explicit that this is the allowed shape -- *"a boundary may
+  // have many renderings and exactly one definition"* -- and it names the price:
+  // the drawn surface and the prism differ inside the mitre wedge. It is the
+  // safe direction. The prisms under-reach, so there is no invisible wall, and
+  // `riding.PlatformField` projects onto the same spine and covers the wedge on
+  // both ends of the wire, which is what a body actually stands on.
+  //
+  // On straight track the spine is one panel, the mitre is the identity, and
+  // this emits the six quads `frameBox` emitted before it.
+  //
+  // Heights below are **rises over the railhead beside them**, not `plan.top`.
+  // See `platform-spine.railYAt`: a deck holding one height down a graded
+  // platform buries itself in the ballast at one end, which is the vertical half
+  // of the same defect.
   for (const side of platformSides(plan)) {
     const inner = PLATFORM_INNER;
-    const outer = PLATFORM_INNER + PLATFORM_WIDTH;
+    // The back of the passenger platform, which is `PLATFORM_WIDTH` where there
+    // is room for it and the slot where there is not. Everything below hangs off
+    // this rather than off the constant, so a narrowed platform's canopy and
+    // furniture move in with the deck instead of standing over the neighbouring
+    // train. See `rail-solids.platformBack`.
+    const outer = platformBack(plan, side);
+    const deckOuter = plan.slot[side < 0 ? 0 : 1];
+    // The skirt runs to the ground, so its floor is absolute; its top follows
+    // the rail. Everything after this is a rise over the rail on both faces.
+    sweepDeck(concrete, plan.spine, inner * side, deckOuter * side, plan.base, PLATFORM_HEIGHT, undefined, undefined, true);
+
     // The coping: a 25 mm lip along the platform edge.
     //
     // It is the smallest object in this file and it earns its six quads for the
     // reason `fences.COPING` gives about a garden wall -- what makes an edge
     // read at distance is a light line with a dark one under it, and without it
     // a platform and the ballast beside it are two grey rectangles that meet.
-    frameBox(concrete, f, -L, L, inner * side, (inner + 0.14) * side, top, top + COPING_RISE);
+    sweepDeck(concrete, plan.spine, inner * side, (inner + 0.14) * side, PLATFORM_HEIGHT, PLATFORM_HEIGHT + COPING_RISE);
 
     // ...and the tactile strip, which is the thing everybody actually looks at.
     //
@@ -3114,24 +3221,31 @@ function writePlatforms(
     // is a z-fight down 160 m of platform, and six millimetres is under the
     // depth buffer's argument and over its precision. AS 1428.4's real strip
     // starts one tile back from the edge, which is what `TACTILE_INSET` is.
-    frameBox(
-      tactile, f, -L, L,
+    sweepDeck(
+      tactile, plan.spine,
       (inner + TACTILE_INSET) * side, (inner + TACTILE_INSET + TACTILE_WIDTH) * side,
-      top, top + 0.006,
+      PLATFORM_HEIGHT, PLATFORM_HEIGHT + 0.006,
     );
 
     // Canopy: a flat roof on four posts over the middle third. Enough to say
     // "station" from the train and cheap enough to build at all 195 of them.
     const C = CANOPY_HALF_LENGTH;
-    const rise = top + CANOPY_HEIGHT;
-    frameBox(
-      canopy, f, -C, C,
-      (inner - CANOPY_OVERHANG) * side, (outer + CANOPY_OVERHANG) * side,
-      rise - 0.28, rise,
+    const rise = PLATFORM_HEIGHT + CANOPY_HEIGHT;
+    sweepDeck(
+      canopy, plan.spine,
+      (inner - CANOPY_OVERHANG) * side,
+      Math.min(outer + CANOPY_OVERHANG, deckOuter) * side,
+      rise - 0.28, rise, -C, C,
     );
+    // The columns, each on the curve at its own position rather than in one
+    // frame taken at the station's middle. A post is 22 cm across, so its own
+    // frame is exact; what matters is that it lands under the roof it holds up.
     for (const t of [-C + 3, -C / 3, C / 3, C - 3]) {
       const o = ((inner + outer) / 2) * side;
-      frameBox(canopy, f, t - 0.11, t + 0.11, o - 0.11, o + 0.11, top, rise - 0.28);
+      const g = frameAt(plan.spine, t);
+      const cf: TrackFrame = { x: g.x, z: g.z, ux: g.ux, uz: g.uz };
+      const deck = railYAt(plan.spine, t) + PLATFORM_HEIGHT;
+      frameBox(canopy, cf, -0.11, 0.11, o - 0.11, o + 0.11, deck, deck + CANOPY_HEIGHT - 0.28);
     }
   }
 }
@@ -3165,9 +3279,12 @@ function writePlatformFurniture(
 ): void {
   const f = plan.station;
   const top = plan.top;
-  const back = PLATFORM_INNER + PLATFORM_WIDTH;
 
   for (const side of platformSides(plan)) {
+    // Per side, because the two sides of one station routinely get different
+    // slots: an edge road keeps the full platform and the road beside it may
+    // have four metres to share. See `rail-solids.platformBack`.
+    const back = platformBack(plan, side);
     const at = (o: number): number => o * side;
 
     // Seats: a slatted bench with a back, against the rear of the platform.
