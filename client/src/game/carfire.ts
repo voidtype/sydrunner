@@ -139,6 +139,18 @@ import { CAR_FUSE_MAX_DECIS } from '../net/protocol.ts';
 export const CAR_HEALTH_FULL_FIRE = 100;
 export const CAR_SMOKING_HEALTH_FIRE = 40;
 
+/**
+ * `driving.CRASH_DAMAGE_MAX`, restated on the same terms as the pair above and
+ * for the same cycle. **The largest single impact in the game, 7.**
+ *
+ * New with WORKSTREAM AP, and it exists for one assertion: `verifyCarFire` uses
+ * it to prove `IGNITE_CRASH_HP` is a threshold something can actually cross. The
+ * retune that took the crash cap from 45 to 7 would otherwise have left this
+ * file's second ignition clause looking correct and firing never. A dead rule
+ * renders a perfectly good frame; it is exactly this project's kind of bug.
+ */
+export const CRASH_CAP_FIRE = 7;
+
 // --- The fire ------------------------------------------------------------------------
 
 /** `DrivenCar.burningMs` when the car is not on fire. See section 2 for the -1. */
@@ -207,19 +219,44 @@ export const BURN_PIPS_PER_S = 0.25;
  * A single crash this big on a car already under `driving.CAR_SMOKING_HEALTH`
  * sets it alight, even though it did not finish it off.
  *
- * Thirty, which against the retuned `CRASH_DAMAGE_MAX` of 45 is two thirds of
- * the worst impact the game can produce -- so this is not "another dent", it is
- * a car that was already broken taking a proper hit. The other way in is simply
- * reaching zero, which every write-off does, so the two clauses together read:
- * *a car that dies catches fire, and a car that is nearly dead catches fire if
- * you hit it hard enough.*
+ * **Four, and it used to be thirty.** It is not a change of heart about fire;
+ * it is this constant being *a fraction of the crash curve* and the crash curve
+ * having been divided by eight. Thirty against the old `CRASH_DAMAGE_MAX` of 45
+ * was two thirds of the worst impact the game could produce. Against the
+ * retuned cap of **7** (see `driving.CRASH_DAMAGE_MAX`, and the owner's *"cars
+ * should last 20-50 times longer"*) thirty is unreachable by anything -- there
+ * is no impact in the game worth thirty hp any more, so this clause would have
+ * quietly become dead code and the only way to burn a car would be to finish it
+ * off. Four is four sevenths of the worst impact, which is as close to the old
+ * two thirds as a round number gets.
+ *
+ * **What four is reachable by**, worked, because "is this rule still live" is
+ * the question a retune has to answer and not assume:
+ *
+ *   - a **car into a wall**: no. A car under the smoke line is capped at
+ *     `CAR_SMOKING_SCALE` of the top speed -- 26.4 m/s -- and `NOSE_SHED` makes
+ *     that 17.4 m/s of delta-v, which is 2.2 hp. A nearly-dead car cannot light
+ *     itself on a building however hard it tries.
+ *   - a **car into another car**: yes, easily. `closingAlong` reports the full
+ *     closing speed rather than two thirds of it, so a smoking car at its 26.4
+ *     ceiling into a stationary one is `(26.4 - 12) x 0.4` = 5.8 hp, and a
+ *     head-on saturates the cap at 7.
+ *   - the **chain from a nearby explosion**, `CHAIN_DAMAGE`, which is 40 and
+ *     clears it by a mile.
+ *
+ * So the rule reads, after the retune: *a nearly-dead car that hits something
+ * that is also moving catches fire.* That is a sharper and more legible rule
+ * than the one it replaces, and it is still the surprise the clause was written
+ * for -- you are limping home on 30 hp, you clip the traffic, and the bonnet
+ * goes up while the engine still runs.
  *
  * "Already under" is measured on the health the car had **before** the impact,
  * which is the brief's word and is the reading that makes the fire a property of
- * a car's condition rather than of one crash: a healthy car taking a 45 hp wall
- * lands on 55 and drives away, and it is the *next* heavy one that lights it.
+ * a car's condition rather than of one crash: a healthy car taking the worst
+ * impact in the game lands on 93 and drives away, and it is the *fifteenth*
+ * heavy one that lights it.
  */
-export const IGNITE_CRASH_HP = 30;
+export const IGNITE_CRASH_HP = 4;
 
 /**
  * How long after catching fire a car cannot catch fire again, milliseconds. The
@@ -689,22 +726,42 @@ export function verifyCarFire(): string[] {
     if (!ignitesOnCrash(CAR_HEALTH_FULL_FIRE, 0, CAR_HEALTH_FULL_FIRE)) {
       failures.push('A car taken from full to zero in one impossible hit did not catch fire.');
     }
-    // A heavy hit on an already-broken car.
-    if (!ignitesOnCrash(35, 5, 30)) {
+    // A heavy hit on an already-broken car. Off `IGNITE_CRASH_HP` rather than a
+    // literal, so the retune that divided the crash curve by eight moved this
+    // case with the constant instead of leaving a 30 no impact can reach.
+    if (!ignitesOnCrash(35, 35 - IGNITE_CRASH_HP, IGNITE_CRASH_HP)) {
       failures.push(`A ${IGNITE_CRASH_HP} hp hit on a car on 35 did not light it; 35 is under the smoke threshold.`);
     }
     // ...and the three refusals.
-    if (ignitesOnCrash(35, 6, IGNITE_CRASH_HP - 1)) {
+    if (ignitesOnCrash(35, 35 - IGNITE_CRASH_HP + 1, IGNITE_CRASH_HP - 1)) {
       failures.push(`A ${IGNITE_CRASH_HP - 1} hp hit lit a broken car; the threshold is ${IGNITE_CRASH_HP}.`);
     }
-    if (ignitesOnCrash(CAR_HEALTH_FULL_FIRE, 55, 45)) {
+    if (ignitesOnCrash(CAR_HEALTH_FULL_FIRE, CAR_HEALTH_FULL_FIRE - CRASH_CAP_FIRE, CRASH_CAP_FIRE)) {
       failures.push(
         'The worst single crash a healthy car can take set it on fire. The rule is "already broken": a ' +
           'full-health car that takes one heavy wall drives away from it.',
       );
     }
-    if (ignitesOnCrash(0, 0, 45)) {
+    if (ignitesOnCrash(0, 0, CRASH_CAP_FIRE)) {
       failures.push('A car that was already written off caught fire a second time from a later hit.');
+    }
+    // --- WORKSTREAM AP: **and the clause is still reachable.**
+    //
+    // The assertion a retune of the crash curve most needs and the one nothing
+    // above would have caught: a threshold larger than the largest impact in the
+    // game is dead code that reads as a working rule. `CRASH_CAP_FIRE` is
+    // `driving.CRASH_DAMAGE_MAX`, restated here on this file's own
+    // no-import-back rule, and if the fire threshold ever climbs past it the
+    // only way to burn a car is to write it off. See `IGNITE_CRASH_HP`, which
+    // works the arithmetic for what a smoking car can and cannot manage.
+    if (!(IGNITE_CRASH_HP <= CRASH_CAP_FIRE)) {
+      failures.push(
+        `IGNITE_CRASH_HP is ${IGNITE_CRASH_HP} against a crash cap of ${CRASH_CAP_FIRE}. No impact in the game ` +
+          `can reach it, so "a heavy hit on a broken car catches fire" is a rule nothing can trigger.`,
+      );
+    }
+    if (!ignitesOnCrash(CAR_SMOKING_HEALTH_FIRE - 1, CAR_SMOKING_HEALTH_FIRE - 1 - CRASH_CAP_FIRE, CRASH_CAP_FIRE)) {
+      failures.push('A smoking car taking the worst impact in the game did not catch fire. The clause is unreachable.');
     }
   }
 

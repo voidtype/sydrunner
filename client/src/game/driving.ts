@@ -240,7 +240,10 @@ import {
   BURN_HP_PER_S,
   CAR_HEALTH_FULL_FIRE,
   CAR_SMOKING_HEALTH_FIRE,
+  // WORKSTREAM AP: the third restated constant, cross-checked below.
+  CRASH_CAP_FIRE,
   FUSE_MS,
+  IGNITE_CRASH_HP,
   IGNITE_LOCK_MS,
   NOT_BURNING,
   burningFromFuse,
@@ -500,94 +503,117 @@ export const PARK_SNAP_RADIUS = 3;
 export const CAR_HEALTH_MAX = 100;
 
 /**
- * Below this delta-v a collision costs nothing, m/s. **Five, and it used to be
- * three.**
+ * Below this delta-v a collision costs nothing, m/s. **Twelve, and it used to
+ * be five.** The owner's *"make the threshold much higher"*.
  *
- * It is not "no damage below 5", it is **"5 m/s of every impact is free"** --
- * the curve is `(dv - 5) x 3.2` and not `dv x 3.2` above a threshold, so there
+ * It is not "no damage below 12", it is **"12 m/s of every impact is free"** --
+ * the curve is `(dv - 12) x 0.4` and not `dv x 0.4` above a threshold, so there
  * is no step at the boundary. That continuity is the same requirement
  * `traffic.carHitStrength`'s header states for the knockdown and it is here for
  * the identical reason: a threshold makes the last centimetre of a nudge the
- * difference between nothing and a dent, and a player who kerbed at 3.1 m/s
+ * difference between nothing and a dent, and a player who kerbed at 11.9 m/s
  * twice and got two different answers is a player who thinks the damage is
  * random.
  *
- * **Why it moved.** The owner's report was *"the cars are too weak"*, and the
- * free allowance is the half of that complaint nobody would think to name: at 3
- * m/s, mounting a kerb at walking-plus pace, clipping a bollard while parking
- * and easing into the car in front all cost real health, and a driver who never
- * had a proper crash still arrived home smoking. Five is a shade over
- * `TAKEABLE_SPEED`'s 3 with a margin: **manoeuvring is free, and so is being bad
- * at manoeuvring.** Anything you would describe as driving into something is
- * comfortably past it.
+ * **Why it moved again.** The report was *"its way too easy to take vehicle
+ * damage ... even small bumps in a road alone are giving damage"*, and this
+ * constant is the tuning half of that sentence. (The other half was a *bug* and
+ * is fixed in `stepCarSpeed`'s nose probe, which was asking the collision world
+ * a question with no step allowance in it and therefore reading every kerb in
+ * Sydney as a wall. Neither fix substitutes for the other: the probe fix stops
+ * free-standing geometry inventing crashes, and this number decides what a
+ * crash that really happened is worth.)
  *
- * The old paragraph tied this constant to `TAKEABLE_SPEED` exactly, and that tie
- * is deliberately cut rather than quietly broken: the two answer different
- * questions ("is this car standing still enough to steal" against "was that a
- * crash"), and making one number serve both was what stopped the free allowance
- * from being tuned when it needed to be.
+ * **Twelve is chosen against the nose probe rather than against the speedo**,
+ * which is the one piece of arithmetic worth carrying in your head here. The
+ * probe reports `NOSE_SHED` -- two thirds -- of the road speed as the delta-v,
+ * so a free allowance of 12 m/s of *impact* is a free allowance of
+ * `12 / 0.66 = 18.2 m/s` of *driving into something*, which is 65 km/h. Read
+ * plainly: **you can drive into a wall at suburban speed and the car does not
+ * care.** Kerbs, bollards, the car in front, mounting a gutter to park, a
+ * bridge joint, and the whole of the way anybody actually drives through a city
+ * are under it. What is left above it is what the word crash is for.
+ *
+ * The previous paragraph here tied the five to `TAKEABLE_SPEED`'s 3 "with a
+ * margin". That tie is gone for good and the reason is the same one it was cut
+ * for the first time: the two answer different questions, and a number that
+ * serves two is a number nobody can move.
  */
-export const CRASH_FREE_SPEED = 5;
+export const CRASH_FREE_SPEED = 12;
 
 /**
- * Health lost per metre per second of impact past the free allowance. **3.2, and
- * it used to be 6.**
+ * Health lost per metre per second of impact past the free allowance. **0.4,
+ * and it used to be 3.2.**
  *
- * The middle number of the retune the owner's *"the cars are too weak"* asked
- * for, and the three that moved together are worth reading as one change:
+ * The middle number of the second retune, and the three that moved together are
+ * again worth reading as one change:
  *
- *     free speed   3    ->  5      kerbs and nudges are free
- *     per m/s      6    ->  3.2    a real crash costs about half what it did
- *     cap          60   ->  45     no single impact is most of a car
+ *     free speed   5    ->  12     everything up to 18 m/s of road speed is free
+ *     per m/s      3.2  ->  0.4    what is left costs an eighth of what it did
+ *     cap          45   ->  7      no single impact is a twelfth of a car
  *
- * What the pair (5, 3.2) is chosen to produce is a **15 m/s square wall costing
- * 32 hp** -- `(15 - 5) x 3.2` -- against the 60 the old curve clamped that same
- * impact to. Fifteen metres a second is 54 km/h, which is a genuine crash in a
- * suburban street, and the difference between "a third of the car" and "most of
- * the car" is the whole of the complaint: a careless driver now has a long
- * afternoon and a reckless one still loses the vehicle.
+ * What the pair (12, 0.4) is chosen to produce is the owner's own number: **a
+ * full-throttle square wall costs 6.8 hp of 100.** `DRIVE_TOP_SPEED` is 44,
+ * `NOSE_SHED` makes that 29.04 m/s of delta-v, and `(29.04 - 12) x 0.4` is
+ * 6.816 -- fifteen flat-out runs at a brick wall to write off a healthy car,
+ * against the two the old curve took.
  *
- * A light knock moves proportionally less, which is deliberate and is the
- * opposite of the choice the old paragraph here defended. It argued against
- * pulling this constant down because it "would make every light knock cheaper
- * too, which is the wrong end of the curve to pay from". That was right when the
- * free allowance was 3; with the allowance at 5 the light knocks are *free*
- * rather than cheap, so the two changes together take the cost off exactly the
- * impacts nobody thinks of as crashes and leave the ones they do.
+ * **The brief asked for two things that cannot both be true, and this is the
+ * record of which one won.** It asked for the per-speed number to be divided by
+ * "roughly 30" *and* for a 44 m/s wall to cost 5-8 hp. At `3.2 / 30 = 0.107` the
+ * same wall costs 1.8 hp, which is under the floor of the stated range: with the
+ * free allowance at 12 there is only 17 m/s of curve left above it, so the
+ * divisor and the worked example are fighting over the same 17. The **worked
+ * example won**, because it is the one a player can feel and the one the checks
+ * can assert.
  *
- * And the curve still compounds in the forgiving direction: a car under
+ * And the divisor is honoured anyway, in the only sense that matters, which is
+ * what a crash actually costs across the band people drive in:
+ *
+ *     road speed   old cost   new cost   ratio
+ *     10 m/s        5.1        0         free
+ *     15 m/s       15.7        0         free
+ *     20 m/s       26.2        0.48        55x
+ *     25 m/s       36.0        1.4         26x
+ *     30 m/s       45 (cap)    3.1         14x
+ *     44 m/s       45 (cap)    6.8        6.6x
+ *
+ * Twenty to fifty times, exactly as asked, everywhere except the deliberate
+ * flat-out ram -- which is the one impact that *should* still hurt, and which no
+ * driver arrives at by accident.
+ *
+ * The curve still compounds in the forgiving direction: a car under
  * `CAR_SMOKING_HEALTH` is capped at `CAR_SMOKING_SCALE` of the top speed, so its
- * next crash is slower than its last.
- *
- * **What this costs, stated plainly, because it is the one number that got
- * worse:** a full-throttle wall is three runs rather than two. The nose probe
- * reports two thirds of the speed as the delta-v (`NOSE_SHED`), so 44 m/s is
- * 29 m/s of impact and `(29 - 5) x 3.2 = 77`, clamped to the 45 cap; the car
- * lands on 55, then on 10, and the third run finishes it. That is the *intended*
- * direction -- a car should take some killing -- and the drama the second half of
- * the owner's sentence asked for is not in the health bar at all. It is
- * `game/carfire.ts`: the run that takes the car to zero sets it alight, and six
- * seconds later there is no car.
+ * next crash is slower than its last. At the new numbers that compounding is
+ * severe and it is worth knowing about -- a smoking car cannot exceed 26.4 m/s,
+ * which is 17.4 m/s of delta-v and 2.2 hp a run, so the last forty health of a
+ * car takes about eighteen more runs at the wall. A car takes some killing now.
+ * That is the feature.
  */
-export const CRASH_DAMAGE_PER_SPEED = 3.2;
+export const CRASH_DAMAGE_PER_SPEED = 0.4;
 
 /**
- * The most one impact can cost, however fast you were going. **45, from 60.**
+ * The most one impact can cost, however fast you were going. **7, from 45.**
  *
- * The old value was chosen so that `CAR_HEALTH_MAX - CRASH_DAMAGE_MAX` landed
- * exactly on `CAR_SMOKING_HEALTH` -- one maximal crash put a car precisely on the
- * smoke threshold, which was a tidy property and is now gone. It is gone on
- * purpose. The tidiness was doing no work a player could perceive, and what it
- * *cost* was the thing they did perceive: the worst possible mistake taking 60%
- * of the car meant two of them ended it, and two mistakes is not a long
- * afternoon.
+ * **Its job changed with its value, and that is the interesting half.** At 45
+ * the cap existed to stop a *wall* being fatal: a top-speed nose probe reported
+ * 77 hp of raw curve and the cap clipped it to 45. At 7 the wall does not reach
+ * it at all -- a flat-out square hit is 6.816 and lands just under -- so the
+ * only thing left in the game that can saturate this number is **two cars
+ * closing on each other**, where `closingAlong` adds both speeds and a genuine
+ * head-on reports up to 88 m/s. That is what the cap is for now: the worst
+ * thing two players can do to each other costs the same 7 as the worst thing one
+ * player can do to a wall, and neither is a write-off.
  *
- * 45 leaves a full-health car on 55 after the worst impact in the game -- still
- * above the smoke line, still driving properly, and visibly dented. The warning
- * is the dent and not the handling, and the handling change arrives on the
- * second one.
+ * Seven of a hundred, said the other way: **fifteen worst-possible impacts to
+ * finish a car**, and the smoking penalty stretches that to about twenty-seven
+ * in practice. The old value was 45, which was two and a bit.
+ *
+ * The tidy property this constant used to have -- `CAR_HEALTH_MAX -
+ * CRASH_DAMAGE_MAX` landing on `CAR_SMOKING_HEALTH` -- was already given up at
+ * 45 and is not coming back. One maximal crash now leaves a car on 93.
  */
-export const CRASH_DAMAGE_MAX = 45;
+export const CRASH_DAMAGE_MAX = 7;
 
 /**
  * How little a purely sideways impact costs, as a fraction of a square one.
@@ -607,10 +633,11 @@ export const CRASH_DAMAGE_MAX = 45;
  * decision in this rule worth arguing. Scaling the *speed* before the curve is
  * the physically honest reading -- only the normal component of the closing
  * velocity is destructive -- and it was rejected for two reasons. It interacts
- * with the free allowance in a way nobody can predict from inside the game (a
- * 14 m/s scrape would come out at exactly zero because `14 x 0.35` is under
- * `CRASH_FREE_SPEED`, so a scrape at 13 and one at 15 are both free and one at
- * 30 is not), and it makes `CRASH_DAMAGE_MAX` unreachable for any impact that is
+ * with the free allowance in a way nobody can predict from inside the game (at
+ * the retuned allowance of 12 a 34 m/s scrape would come out at exactly zero,
+ * because `34 x 0.35` is 11.9 -- so a scrape at 30 and one at 34 are both free
+ * and one at 35 is not, and raising the allowance made that cliff *wider*
+ * rather than narrower), and it makes `CRASH_DAMAGE_MAX` unreachable for any impact that is
  * not perfectly square, which turns the cap into a constant that only describes
  * one geometry. Multiplying the clamped damage keeps `crashDamage(dv, 1)`
  * exactly the documented curve and makes the glancing factor a clean single
@@ -638,19 +665,51 @@ export const GLANCING_FLOOR = 0.35;
 export const CRASH_COOLDOWN_MS = 500;
 
 /**
- * What running somebody down costs the car. Two, and it is cosmetic on purpose.
+ * What running somebody down costs the car. **0.5, and it used to be 2.**
  *
  * The brief: "the human is the one hurt". A pedestrian is not a wall, and a game
  * where mowing down a crowd wrecked your car would be a game telling you not to
  * -- which is not the game `traffic.applyCarHit` and the owner's stated
- * fondness for being run over describe. Two hp is enough that a spree leaves a
- * mark, and forty pedestrians to a write-off is not a route anybody will take.
+ * fondness for being run over describe.
+ *
+ * **It moved because the wall got cheap, and what this constant means is a
+ * ratio rather than an absolute.** Against the old 45 hp cap, two was 4% of the
+ * worst impact in the game and read exactly as intended: a mark, not an event.
+ * Left at two against the new cap of 7 it would be 29% of the worst impact -- a
+ * pedestrian costing a third of a flat-out wall -- and mowing down a crowd
+ * would quietly become the fastest way to destroy a car, which is the opposite
+ * of what the paragraph above it promises. 0.5 restores the ratio (7%) and with
+ * it the sentence: two hundred pedestrians to a write-off is not a route
+ * anybody will take.
  */
-export const PEDESTRIAN_DAMAGE = 2;
+export const PEDESTRIAN_DAMAGE = 0.5;
 
-/** At or below this the paint is dented and one headlight is out. The brief's 70. */
+/**
+ * At or below this the paint is dented and one headlight is out. The brief's 70,
+ * **unchanged by WORKSTREAM AP and worth a line about why.**
+ *
+ * The owner's ask was *"cars should last 20-50 times longer in my hands"*, and
+ * the honest way to grant it was to make the *crashes* cheap rather than to move
+ * the bands they cross. So this is still 70 and what changed is how far away it
+ * is: a dent used to arrive on the first heavy wall and now takes five
+ * flat-out runs at one (6.816 hp each -- see `CRASH_DAMAGE_PER_SPEED`).
+ *
+ * That makes the visual ladder rarer, which is the intended cost and not an
+ * oversight: a dented car is supposed to mean *this driver has had a bad
+ * afternoon*, and it meant *this driver has hit one thing* until now.
+ * `verifyDamageGrade` asserts the grade off these thresholds rather than off any
+ * crash number, so it needed no retune at all.
+ */
 export const CAR_DENTED_HEALTH = 70;
-/** At or below this the bonnet smokes and the car is slow. The brief's 40. */
+/**
+ * At or below this the bonnet smokes and the car is slow. The brief's 40, and
+ * unchanged for `CAR_DENTED_HEALTH`'s reason.
+ *
+ * Nine flat-out walls away rather than one, and it is the point at which the
+ * retune starts compounding: `CAR_SMOKING_SCALE` caps a car past this line at
+ * 26.4 m/s, which is only 2.2 hp a crash, so the last forty health of a car is
+ * about eighteen more runs. See `CRASH_DAMAGE_PER_SPEED`'s closing paragraph.
+ */
 export const CAR_SMOKING_HEALTH = 40;
 
 /**
@@ -1109,6 +1168,57 @@ export const NOSE_REACH = 1.8;
 export const NOSE_RADIUS = 0.85;
 
 /**
+ * How high the nose probe lifts its feet before asking. **`controller.STEP_HEIGHT`.**
+ *
+ * ---------------------------------------------------------------------------
+ * **THIS CONSTANT IS A BUG FIX AND THE BUG IS WORTH WRITING DOWN**, because it
+ * was invisible in every unit check in this file and cost a player most of a car
+ * on an ordinary drive across town.
+ *
+ * The owner's report was *"even small bumps in a road alone are giving
+ * damage"*, and the cause was one missing argument. `CollisionWorld.solidFor`'s
+ * first clause is `feetY >= prism.top - 0.05`, and its header states the
+ * contract in bold: **the step allowance is the caller's to add.**
+ * `controller.step` adds it -- it asks at `feetY + STEP_HEIGHT`, which is why a
+ * body walks over a kerb instead of into it -- and the nose probe here asked at
+ * a bare `feetY`.
+ *
+ * So the two halves of the same car were asking the collision world two
+ * different questions about the same geometry. Every prism in Sydney shorter
+ * than 0.42 m -- a kerb, a driveway lip, a bridge joint, a planter, a road-edge
+ * band, the low wall round a car park -- was *not there* for the driver's own
+ * capsule, which sailed over it, and was a **brick wall** for the bonnet
+ * 1.8 m in front of it. The car did not stop, because nothing was stopping the
+ * body; it simply shed two thirds of its speed and took a full crash's damage
+ * every `CRASH_COOLDOWN_MS` for as long as the geometry kept passing under it.
+ * At the old curve a 44 m/s drive over a kerb was 45 hp. Nothing rendered, and
+ * the health bar moved on a car that had visibly hit nothing at all.
+ *
+ * It is `NOSE_STEP` and not an import for the reason `SPRINT_SPEED` one screen
+ * down is a number and not an import: `controller.ts` imports three and this
+ * file compiles into the Bun server. `verifyCombat` -- which imports both --
+ * asserts the two have not drifted, which is a real cross-check rather than
+ * this file's usual self-referential one, and it is a real cross-check because
+ * *this* pair drifting is not a tuning inconsistency, it is the bug above.
+ */
+export const NOSE_STEP = 0.42;
+
+/**
+ * And how tall the probe stands, measured from the **unlifted** feet.
+ *
+ * `collision.BODY_HEIGHT_M`, and the "unlifted" is the whole of why this is a
+ * separate constant rather than a default. `resolve`'s `headY` defaults to
+ * `feetY + BODY_HEIGHT_M` measured from whatever feet it was handed, so passing
+ * the lifted feet would silently demand 2.22 m of clearance and make the nose
+ * probe refuse a soffit the driver's own body is happy to pass under -- a car
+ * that took a crash for driving under the Cahill. `controller.step` passes the
+ * unlifted head for exactly this reason and says so; the probe now matches it
+ * argument for argument, which is the property that actually matters: **the
+ * bonnet asks the same question the body asks, one car-length further on.**
+ */
+export const NOSE_HEAD = 1.8;
+
+/**
  * How much speed a car keeps on the tick its bonnet enters something.
  *
  * A third, and it was a bare `0.34` inside `stepCarSpeed` until
@@ -1249,10 +1359,17 @@ export function stepCarSpeed(
     // `yaw` 0 faces -Z, exactly as `controller.step` derives it.
     const fx = -Math.sin(yaw);
     const fz = -Math.cos(yaw);
+    // **The two height arguments are the whole of the bump fix.** See
+    // `NOSE_STEP`: without them this probe asked the collision world whether a
+    // *point at ground level* was clear, which every kerb in Sydney answers no
+    // to, while the body it belongs to was stepping over the same kerb without
+    // noticing. Lifted feet and an unlifted head is `controller.step`'s own pair,
+    // argument for argument, so the bonnet and the body now agree about what is
+    // solid.
     const hit = world.collision.resolve(
       x, z,
       x + fx * NOSE_REACH, z + fz * NOSE_REACH,
-      NOSE_RADIUS, feetY,
+      NOSE_RADIUS, feetY + NOSE_STEP, feetY + NOSE_HEAD,
     );
     if (hit.hit) {
       // --- **How square was it?** The glancing-blow rule, and this is the one
@@ -1290,11 +1407,15 @@ export function stepCarSpeed(
       // **The impulse.** Two thirds of the speed in one tick is the whole of
       // what the car "lost to the wall", and it is the number `crashDamage`
       // wants -- which is why the 0.66 factor matters twice over: at 44 m/s it
-      // reports 29 m/s of delta-v and therefore a 60 hp write-off's worth of
-      // damage on the *first* tick, and the `CRASH_COOLDOWN_MS` half-second
-      // swallows the four ticks of continued grinding that follow. Reporting
-      // the whole 44 across five ticks would have been the same crash costing
-      // five times as much.
+      // reports 29 m/s of delta-v and therefore 6.8 hp of damage on the *first*
+      // tick, and the `CRASH_COOLDOWN_MS` half-second swallows the four ticks of
+      // continued grinding that follow. Reporting the whole 44 across five ticks
+      // would have been the same crash costing five times as much.
+      //
+      // It is also the reason `CRASH_FREE_SPEED` is 12 rather than the 18 the
+      // owner would have named if he were talking about the speedometer: this
+      // curve's argument is two thirds of a road speed and always has been. See
+      // that constant.
       lost = before - v;
     }
   }
@@ -1321,6 +1442,35 @@ export function stepCarSpeed(
  * A shortfall is a collision, its rate is the delta-v, and the same
  * `crashDamage` curve applies to it.
  *
+ * ---------------------------------------------------------------------------
+ * **`hitSolid` IS A GATE AND NOT A HINT.** It is `controller.step`'s own return
+ * -- did the prism resolver actually push this body -- and a shortfall reported
+ * without one is thrown away unmeasured.
+ *
+ * The rule it enforces is the owner's, in his words: *"even small bumps in a
+ * road alone are giving damage"*. **Damage comes from closing into a solid.**
+ * A shortfall with nothing solid in the way is not a crash whatever its size,
+ * and there are three ways to produce one that this function used to charge for
+ * in full:
+ *
+ *   - the **wading undo** in `combat.advance`, which puts a body that tried to
+ *     enter deep water straight back where it started. This function runs after
+ *     it and read `moved = 0` -- so driving off a wharf at 40 m/s billed a
+ *     `CRASH_DAMAGE_MAX` every half second for as long as you held W, and the
+ *     comment above the call said it was ordered that way *so as not to* charge
+ *     for a wave. It was charging for the wave. It is not any more.
+ *   - a **train's `mover`**, which replaces the city while a body is inside a
+ *     carriage: a passenger who is also nominally in a car is resolved against
+ *     a bodyside that has nothing to do with the street.
+ *   - anything future that undoes a step for a reason of its own. The gate makes
+ *     the honest answer the default, which is the shape a rule like this has to
+ *     have to survive the next feature.
+ *
+ * What it deliberately does *not* remove is the slip tolerance below. A body
+ * genuinely wedged against a prism is a solid *and* a shortfall, and the two
+ * questions are different: `hitSolid` asks whether anything was in the way and
+ * `CLAMP_SLIP` asks whether it was in the way hard enough to matter.
+ *
  * `SLIP` is the tolerance, and it is not zero for a reason worth writing down.
  * `controller.step` accelerates toward the target speed at 48 m/s^2 rather than
  * snapping to it, ground friction takes its cut, and a slope shortens the plan
@@ -1332,8 +1482,18 @@ export function stepCarSpeed(
  * Runs on both ends inside `combat.advance`, which is what makes it a prediction
  * rather than a second opinion.
  */
-export function crashFromClamp(c: DriveState, movedX: number, movedZ: number, dt: number): number {
+export function crashFromClamp(
+  c: DriveState,
+  movedX: number,
+  movedZ: number,
+  dt: number,
+  /** Did `controller.step`'s resolver push this body out of a prism? See above. */
+  hitSolid: boolean,
+): number {
   if (c.drivingCar === 0 || dt <= 1e-6) return 0;
+  // The gate, first, because it is one comparison and it is true on almost no
+  // tick of almost any session. A bump is free.
+  if (!hitSolid) return 0;
   const speed = c.carSpeed < 0 ? -c.carSpeed : c.carSpeed;
   if (speed <= CRASH_FREE_SPEED) return 0;
   // `Math.sqrt` and never `Math.hypot`: the determinism rule in section 5, and
@@ -2496,9 +2656,10 @@ export class CarField implements DrivingLookup {
     // was already broken catches, which is the feature.
     //
     // The **cost after the talent** is what is tested, deliberately: a `Ute Life`
-    // driver whose 45 hp wall was reduced to 31 took a 31 hp hit, and the fire
+    // driver whose 6.8 hp wall was reduced to 4.8 took a 4.8 hp hit, and the fire
     // should read off what actually happened to the car rather than off what
-    // would have happened to somebody else's.
+    // would have happened to somebody else's. Since the retune that is the
+    // difference between clearing `carfire.IGNITE_CRASH_HP` and not.
     if (ignitesOnCrash(healthBefore, car.health, cost)) this.ignite(car.id);
     // WORKSTREAM W: `Ute Life` shortens the window 500 → 300 ms. Absolute and
     // min-wins; the key is in seconds and this field is in ms.
@@ -3146,22 +3307,73 @@ export function verifyDriving(): string[] {
       failures.push(`A ${CRASH_FREE_SPEED} m/s bump cost ${crashDamage(CRASH_FREE_SPEED)} hp; that speed is free.`);
     }
     if (crashDamage(0) !== 0 || crashDamage(-9) !== 0) failures.push('A stationary or reversing car took crash damage.');
-    // **The retune's headline number**, and the one the whole of "the cars are
-    // too weak" turns on: a square 15 m/s wall -- 54 km/h, a real crash in a
-    // suburban street -- is 32 hp where the old curve clamped the same impact to
-    // 60. See `CRASH_DAMAGE_PER_SPEED`.
-    if (Math.abs(crashDamage(15) - 32) > 1e-9) {
-      failures.push(`A square 15 m/s wall cost ${crashDamage(15)} hp, not 32. The retune has drifted.`);
+    // --- WORKSTREAM AP: **the second retune's headline numbers**, and the whole
+    //     of *"cars should last 20-50 times longer in my hands"*.
+    //
+    // Three points on the curve, each re-derived here rather than copied, and
+    // each stated as the owner would state it:
+    //
+    //   - a **15 m/s impact is free**. It used to be 32 hp. `(15 - 12) x 0.4`
+    //     would be 1.2, so this one is *not* free as an impact -- but 15 m/s of
+    //     impact is 22.7 m/s of driving, and what is free is the thing a player
+    //     does: `NOSE_SHED` puts a 15 m/s *drive* into a wall at 9.9 m/s of
+    //     delta-v, under the 12 m/s allowance, and it costs nothing at all.
+    //   - a **flat-out square wall costs 6.816 hp**, which is the number the
+    //     brief asked for in the range 5-8 and is fifteen runs to a write-off.
+    //   - the **cap is only reachable by two cars closing on each other**.
+    if (Math.abs(crashDamage(15) - 1.2) > 1e-9) {
+      failures.push(`A square 15 m/s impact cost ${crashDamage(15)} hp, not 1.2. The retune has drifted.`);
+    }
+    if (crashDamage(15 * NOSE_SHED) !== 0) {
+      failures.push(
+        `Driving into a wall at 15 m/s cost ${crashDamage(15 * NOSE_SHED)} hp. The nose probe reports ` +
+          `${NOSE_SHED.toFixed(2)} of the road speed, so 15 m/s is ${(15 * NOSE_SHED).toFixed(1)} m/s of delta-v ` +
+          `and the ${CRASH_FREE_SPEED} m/s allowance swallows it whole. A suburban crash is free now.`,
+      );
+    }
+    // The owner's own number, stated as arithmetic so it cannot drift silently:
+    // `(44 x 0.66 - 12) x 0.4`.
+    {
+      const flatOut = crashDamage(DRIVE_TOP_SPEED * NOSE_SHED);
+      if (!(flatOut >= 5 && flatOut <= 8)) {
+        failures.push(
+          `A ${DRIVE_TOP_SPEED} m/s square wall costs ${flatOut.toFixed(2)} hp of ${CAR_HEALTH_MAX}. The brief's ` +
+            `range is 5 to 8 -- low enough that a careless driver never writes a car off, high enough that ` +
+            `${Math.ceil(CAR_HEALTH_MAX / flatOut)} deliberate runs at a wall still does.`,
+        );
+      }
+      if (Math.abs(flatOut - 6.816) > 1e-9) {
+        failures.push(`The flat-out wall is ${flatOut} hp and the header says 6.816. One of the three constants moved.`);
+      }
+      // ...and the free allowance is where it was put: 18.2 m/s of road speed.
+      const freeRoad = CRASH_FREE_SPEED / NOSE_SHED;
+      if (crashDamage((freeRoad - 0.5) * NOSE_SHED) !== 0 || !(crashDamage((freeRoad + 0.5) * NOSE_SHED) > 0)) {
+        failures.push(
+          `The free/paid boundary is not at ${freeRoad.toFixed(1)} m/s of road speed, which is where ` +
+            `CRASH_FREE_SPEED / NOSE_SHED puts it and what the constant's header promises.`,
+        );
+      }
     }
     // Continuous at the boundary: no step, so a kerb at 5.01 m/s is not a dent.
     if (crashDamage(CRASH_FREE_SPEED + 0.01) > 0.1) {
       failures.push(`The damage curve has a step at the free allowance; a ${CRASH_FREE_SPEED + 0.01} m/s kerb was a real hit.`);
     }
-    // And capped, so no single impact is most of a car. See `CRASH_DAMAGE_MAX`:
-    // full throttle into a wall leaves a healthy car on 55, above the smoke
-    // threshold and still driving properly, with a visible dent as the warning.
-    if (crashDamage(DRIVE_TOP_SPEED) !== CRASH_DAMAGE_MAX) {
-      failures.push(`A ${DRIVE_TOP_SPEED} m/s wall cost ${crashDamage(DRIVE_TOP_SPEED)} hp; the cap is ${CRASH_DAMAGE_MAX}.`);
+    // And capped, so no single impact is a twelfth of a car. See
+    // `CRASH_DAMAGE_MAX`, whose job changed with the retune: a *wall* no longer
+    // reaches it at any speed, and what does is two cars closing head on --
+    // `closingAlong` adds both speeds, so the worst two players can do to each
+    // other is 88 m/s and this is what it costs.
+    if (crashDamage(DRIVE_TOP_SPEED * 2) !== CRASH_DAMAGE_MAX) {
+      failures.push(
+        `A head-on between two cars at ${DRIVE_TOP_SPEED} m/s cost ${crashDamage(DRIVE_TOP_SPEED * 2)} hp; ` +
+          `the cap is ${CRASH_DAMAGE_MAX}.`,
+      );
+    }
+    if (!(crashDamage(DRIVE_TOP_SPEED * NOSE_SHED) < CRASH_DAMAGE_MAX)) {
+      failures.push(
+        `A flat-out wall saturates the ${CRASH_DAMAGE_MAX} hp cap. It is meant to land just under it, so the ` +
+          `curve is honest all the way to the top speed and the cap only catches car against car. See CRASH_DAMAGE_MAX.`,
+      );
     }
     if (!(CAR_HEALTH_MAX - CRASH_DAMAGE_MAX > CAR_SMOKING_HEALTH)) {
       failures.push(
@@ -3173,32 +3385,29 @@ export function verifyDriving(): string[] {
     }
     // --- The glancing-blow rule. See `GLANCING_FLOOR`.
     //
-    // A pure scrape at 20 m/s costs 16.8 against the 48 the same speed costs
-    // square, which is the "a fraction of hitting it square" the rule is for.
-    // (The brief's worked example said about 12, which is what a floor of 0.25
-    // would produce; the floor it *also* specified is 0.35 and the floor is the
-    // load-bearing half, so the number below is the one the stated constant
-    // gives. Recorded here rather than quietly resolved.)
+    // A pure scrape is `GLANCING_FLOOR` of the square cost, and the rule is
+    // unchanged by the retune -- it multiplies whatever the curve produced.
+    //
     // Two speeds, because they exercise the two halves of the curve. Fifteen is
-    // under the cap and shows the linear part: 32 square, 11.2 scraped. Twenty
-    // is *past* it -- `(20 - 5) x 3.2` is 48 against a 45 cap -- and shows that
-    // the factor is applied to the *clamped* damage, so even a saturating impact
-    // is discounted for being sideways.
+    // under the cap and shows the linear part: 1.2 square, 0.42 scraped.
+    // Eighty-eight -- a head-on between two cars at the top speed -- is *past*
+    // it, and shows that the factor is applied to the *clamped* damage, so even
+    // a saturating impact is discounted for being sideways.
     const square15 = crashDamage(15);
     const scrape15 = crashDamage(15, GLANCING_FLOOR);
-    if (Math.abs(scrape15 - 32 * GLANCING_FLOOR) > 1e-9) {
-      failures.push(`A 15 m/s scrape cost ${scrape15} hp against the ${(32 * GLANCING_FLOOR).toFixed(2)} the floor implies.`);
+    if (Math.abs(scrape15 - 1.2 * GLANCING_FLOOR) > 1e-9) {
+      failures.push(`A 15 m/s scrape cost ${scrape15} hp against the ${(1.2 * GLANCING_FLOOR).toFixed(3)} the floor implies.`);
     }
-    const square20 = crashDamage(20);
-    const scrape20 = crashDamage(20, GLANCING_FLOOR);
-    if (square20 !== CRASH_DAMAGE_MAX) failures.push(`A square 20 m/s hit cost ${square20} hp; it is past the ${CRASH_DAMAGE_MAX} cap.`);
-    if (Math.abs(scrape20 - CRASH_DAMAGE_MAX * GLANCING_FLOOR) > 1e-9) {
+    const square88 = crashDamage(88);
+    const scrape88 = crashDamage(88, GLANCING_FLOOR);
+    if (square88 !== CRASH_DAMAGE_MAX) failures.push(`A square 88 m/s hit cost ${square88} hp; it is past the ${CRASH_DAMAGE_MAX} cap.`);
+    if (Math.abs(scrape88 - CRASH_DAMAGE_MAX * GLANCING_FLOOR) > 1e-9) {
       failures.push(
-        `A 20 m/s scrape cost ${scrape20} hp against the ${(CRASH_DAMAGE_MAX * GLANCING_FLOOR).toFixed(2)} the ` +
+        `An 88 m/s scrape cost ${scrape88} hp against the ${(CRASH_DAMAGE_MAX * GLANCING_FLOOR).toFixed(2)} the ` +
           'floor implies. The glancing factor multiplies the *clamped* damage; see GLANCING_FLOOR.',
       );
     }
-    if (!(scrape20 < square20 && scrape15 < square15)) failures.push('A scrape cost as much as a square hit.');
+    if (!(scrape88 < square88 && scrape15 < square15)) failures.push('A scrape cost as much as a square hit.');
     // The default is the identity, which is what makes every call site that has
     // no contact normal -- car against car, the timetable, a pedestrian -- mean
     // exactly what it meant before the rule existed.
@@ -3206,10 +3415,10 @@ export function verifyDriving(): string[] {
     // The floor holds against a head-on-ness of zero and against a cosine that
     // arrived as a NaN, which is the failure that would make every crash in the
     // game free with nothing on screen to say so.
-    if (crashDamage(20, 0) !== scrape20) failures.push('A perfectly sideways impact was free; the floor is not holding.');
-    if (crashDamage(20, -1) !== scrape20) failures.push('A negative head-on-ness escaped the floor.');
-    if (crashDamage(20, NaN) !== scrape20) failures.push('A NaN head-on-ness multiplied the whole crash by NaN.');
-    if (crashDamage(20, 9) !== square20) failures.push('A head-on-ness over 1 made a crash worse than square.');
+    if (crashDamage(88, 0) !== scrape88) failures.push('A perfectly sideways impact was free; the floor is not holding.');
+    if (crashDamage(88, -1) !== scrape88) failures.push('A negative head-on-ness escaped the floor.');
+    if (crashDamage(88, NaN) !== scrape88) failures.push('A NaN head-on-ness multiplied the whole crash by NaN.');
+    if (crashDamage(88, 9) !== square88) failures.push('A head-on-ness over 1 made a crash worse than square.');
     if (!(GLANCING_FLOOR > 0 && GLANCING_FLOOR < 1)) {
       failures.push(`GLANCING_FLOOR is ${GLANCING_FLOOR}; at 0 a wall you are parallel to is free and at 1 the rule does nothing.`);
     }
@@ -3217,14 +3426,14 @@ export function verifyDriving(): string[] {
     // and monotone in the head-on-ness too -- a hit that got *cheaper* the
     // squarer it was would be unexplainable from inside the game.
     let last = -1;
-    for (let dv = 0; dv <= 30; dv += 0.5) {
+    for (let dv = 0; dv <= 100; dv += 0.5) {
       const d = crashDamage(dv);
       if (d < last) failures.push(`crashDamage fell from ${last} to ${d} at ${dv} m/s; harder must never be cheaper.`);
       last = d;
     }
     let lastSquare = -1;
     for (let k = 0; k <= 1.0001; k += 0.02) {
-      const d = crashDamage(20, k);
+      const d = crashDamage(88, k);
       if (d < lastSquare - 1e-9) failures.push(`A 20 m/s hit got cheaper as it got squarer, at |cos| ${k.toFixed(2)}.`);
       lastSquare = d;
     }
@@ -3413,16 +3622,16 @@ export function verifyDriving(): string[] {
     // this is the case that has to be *silent* -- a false positive here charges
     // damage for driving down a hill.
     const clear: DriveState = { drivingCar: 1, carSpeed: 20, carHealth: CAR_HEALTH_MAX };
-    if (crashFromClamp(clear, 20 * dt, 0, dt) !== 0) failures.push('An unobstructed car was charged for a crash.');
+    if (crashFromClamp(clear, 20 * dt, 0, dt, true) !== 0) failures.push('An unobstructed car was charged for a crash.');
     if (clear.carSpeed !== 20) failures.push('An unobstructed car was slowed by the clamp detector.');
     // Three per cent short is a slope, or friction, or the controller ramping.
     const slope: DriveState = { drivingCar: 1, carSpeed: 20, carHealth: CAR_HEALTH_MAX };
-    if (crashFromClamp(slope, 20 * dt * 0.97, 0, dt) !== 0) {
+    if (crashFromClamp(slope, 20 * dt * 0.97, 0, dt, true) !== 0) {
       failures.push('A car that covered 97 % of its step was charged for a crash. That is a slope.');
     }
     // Dead stop against a prism: the whole speed is the impulse.
     const wall: DriveState = { drivingCar: 1, carSpeed: 20, carHealth: CAR_HEALTH_MAX };
-    const dv = crashFromClamp(wall, 0, 0, dt);
+    const dv = crashFromClamp(wall, 0, 0, dt, true);
     if (Math.abs(dv - 20 * (1 - CLAMP_SLIP)) > 1e-6) {
       failures.push(`A car stopped dead at 20 m/s reported ${dv.toFixed(2)} m/s of delta-v.`);
     }
@@ -3432,38 +3641,133 @@ export function verifyDriving(): string[] {
           `speed as well as report it, or the next tick asks the controller for 20 m/s into the same wall.`,
       );
     }
+    // --- WORKSTREAM AP: **and the same dead stop with nothing solid in it is
+    //     free, and the car keeps its speed.**
+    //
+    // The gate, and the case it exists for is the wading undo: `combat.advance`
+    // puts a body that tried to enter deep water straight back where it started,
+    // which this function saw as `moved = 0` at 20 m/s and billed as the hardest
+    // crash it can measure. Water is not a wall. Neither is a wave, a carriage
+    // floor, or anything else that moves a body for a reason of its own.
+    const shoved: DriveState = { drivingCar: 1, carSpeed: 20, carHealth: CAR_HEALTH_MAX };
+    if (crashFromClamp(shoved, 0, 0, dt, false) !== 0) {
+      failures.push('A car that went nowhere with nothing solid in the way was charged for a crash. See the hitSolid gate.');
+    }
+    if (shoved.carSpeed !== 20) {
+      failures.push(`A car stopped by something that is not a solid lost ${20 - shoved.carSpeed} m/s. The gate returns before the bleed.`);
+    }
     // Nobody on foot, and nothing at all below the free speed.
     const walker: DriveState = { drivingCar: 0, carSpeed: 8, carHealth: CAR_HEALTH_MAX };
-    if (crashFromClamp(walker, 0, 0, dt) !== 0) failures.push('Somebody on foot crashed a car.');
+    if (crashFromClamp(walker, 0, 0, dt, true) !== 0) failures.push('Somebody on foot crashed a car.');
     const crawl: DriveState = { drivingCar: 1, carSpeed: CRASH_FREE_SPEED, carHealth: CAR_HEALTH_MAX };
-    if (crashFromClamp(crawl, 0, 0, dt) !== 0) failures.push('A car nudging a kerb at the free speed was charged.');
+    if (crashFromClamp(crawl, 0, 0, dt, true) !== 0) failures.push('A car nudging a kerb at the free speed was charged.');
+  }
+
+  // --- WORKSTREAM AP: **the bump.** A car driving over a 0.4 m step at 20 m/s
+  //     takes no damage, and does not even slow down.
+  //
+  // The owner's sentence, as a test: *"even small bumps in a road alone are
+  // giving damage"*. The fixture is not a mock of a wall; it is a mock of
+  // `CollisionWorld.solidFor`'s **first clause**, which is the line the bug was
+  // hiding behind:
+  //
+  //     if (feetY >= prism.top - 0.05) return false;
+  //
+  // A 0.4 m kerb is solid to a query whose feet are on the road and not solid to
+  // one that has lifted them by `NOSE_STEP`. `controller.step` lifts them, which
+  // is why the *body* drives over the kerb without noticing; before this
+  // workstream the nose probe did not, which is why the *car* took a full crash
+  // for the same kerb. Both halves are asserted, because a fixture that only
+  // proved the new behaviour would pass just as happily against a probe that had
+  // stopped querying at all.
+  {
+    const dt = 1 / 60;
+    const KERB_TOP = 0.4;
+    /** Every query is answered exactly as `CollisionWorld` would answer it. */
+    const kerb = (): DrivingWorld => ({
+      collision: {
+        resolve: (fx, fz, tx, tz, _r, feetY) =>
+          feetY >= KERB_TOP - 0.05
+            ? { x: tx, z: tz, hit: false }
+            : { x: fx, z: fz, hit: true },
+      },
+    });
+    const over: DriveState = { drivingCar: 1, carSpeed: 20, carHealth: CAR_HEALTH_MAX };
+    const lost = stepCarSpeed(over, { forward: 1, jump: false }, dt, 0, 0, 0, 0, kerb());
+    if (lost !== 0) {
+      failures.push(
+        `A car crossing a ${KERB_TOP} m kerb at 20 m/s reported ${lost.toFixed(2)} m/s of delta-v, which ` +
+          `crashDamage turns into ${crashDamage(lost).toFixed(2)} hp. A bump the body steps over is free. ` +
+          `See NOSE_STEP.`,
+      );
+    }
+    if (crashDamage(lost) !== 0) failures.push(`A ${KERB_TOP} m bump at 20 m/s cost ${crashDamage(lost)} hp; it costs nothing.`);
+    if (over.carSpeed <= 20) {
+      failures.push(`A car crossing a ${KERB_TOP} m kerb at 20 m/s came out at ${over.carSpeed.toFixed(2)} m/s. It should be accelerating.`);
+    }
+    // ...and a kerb taller than the step still stops the car, so this is a
+    // probe that got the height right rather than a probe that stopped asking.
+    const tall = (): DrivingWorld => ({
+      collision: {
+        resolve: (fx, fz, tx, tz, _r, feetY) =>
+          feetY >= 2 - 0.05 ? { x: tx, z: tz, hit: false } : { x: fx, z: fz, hit: true },
+      },
+    });
+    const into: DriveState = { drivingCar: 1, carSpeed: 20, carHealth: CAR_HEALTH_MAX };
+    if (!(stepCarSpeed(into, { forward: 1, jump: false }, dt, 0, 0, 0, 0, tall()) > 0)) {
+      failures.push('A 2 m wall let a car through. The nose probe is lifting its feet over everything, not over kerbs.');
+    }
+    // And the head, which is the other argument the fix added: a soffit high
+    // enough for the driver's own capsule is not a crash for the bonnet either.
+    // `solidFor`'s third clause -- `headY <= prism.base` -- for a deck whose
+    // underside is at 2.6 m, which is `decks.WALK_UNDER_M`.
+    const soffit = (): DrivingWorld => ({
+      collision: {
+        resolve: (fx, fz, tx, tz, _r, feetY, headY) =>
+          (headY ?? feetY + NOSE_HEAD) <= 2.6 ? { x: tx, z: tz, hit: false } : { x: fx, z: fz, hit: true },
+      },
+    });
+    const under: DriveState = { drivingCar: 1, carSpeed: 20, carHealth: CAR_HEALTH_MAX };
+    if (stepCarSpeed(under, { forward: 1, jump: false }, dt, 0, 0, 0, 0, soffit()) !== 0) {
+      failures.push('Driving under a 2.6 m soffit was a crash. The probe is asking for more headroom than the body needs.');
+    }
   }
 
   // --- Car against car: overlap plus closing speed, and neither on its own.
   {
     const box = { halfLength: 2.3 };
-    // Head-on at 8 and 0: the mover crashes.
+    // Head-on at 20 and 0: the mover crashes.
     //
-    // **Eight rather than the five this used to use**, and the reason is worth a
-    // line: `closingAlong` refuses anything at or under `CRASH_FREE_SPEED`, which
-    // the retune moved from 3 to 5 -- so a fixture at exactly 5 now measures the
-    // *threshold* rather than the geometry it was written for. Any speed clear of
-    // the allowance does; eight is a rear-ender nobody would call a nudge.
+    // **Twenty, and it has now been 3, then 5, then 8**, which is a fixture
+    // chasing a constant and is worth one line so the next person does not chase
+    // it again. `closingAlong` refuses anything at or under `CRASH_FREE_SPEED`,
+    // so any fixture at or near the allowance measures the *threshold* rather
+    // than the geometry it was written for. WORKSTREAM AP took the allowance to
+    // 12; twenty is clear of it and is a rear-ender nobody would call a nudge.
+    // The gentle-touch case at the bottom of this block is the one that is
+    // *supposed* to sit on the constant, and it reads it by name.
     const still = { x: 0, z: -4, yaw: 0, speed: 0, ...box };
-    const into = { x: 0, z: 0, yaw: Math.PI, speed: 8, ...box };
+    const into = { x: 0, z: 0, yaw: Math.PI, speed: 20, ...box };
     // yaw = PI faces +Z; the parked car is at -4, so this is driving *away*.
     if (carCrashClosing(into, still) !== 0) failures.push('A car driving away from another one crashed into it.');
-    const at = { x: 0, z: 0, yaw: 0, speed: 8, ...box };
+    const at = { x: 0, z: 0, yaw: 0, speed: 20, ...box };
     const ahead = { x: 0, z: -4, yaw: 0, speed: 0, ...box };
     const closing = carCrashClosing(at, ahead);
-    if (Math.abs(closing - 8) > 1e-6) failures.push(`An 8 m/s rear-ender reported ${closing.toFixed(2)} m/s of closing.`);
+    if (Math.abs(closing - 20) > 1e-6) failures.push(`A 20 m/s rear-ender reported ${closing.toFixed(2)} m/s of closing.`);
+    // ...and the same rear-ender under the allowance is nothing at all, which is
+    // the owner's *"make the threshold much higher"* arriving in the car-on-car
+    // path as well as in the wall one. Bumping the car in front is free now.
+    const nudge = { x: 0, z: 0, yaw: 0, speed: CRASH_FREE_SPEED - 1, ...box };
+    if (carCrashClosing(nudge, ahead) !== 0) {
+      failures.push(`A ${CRASH_FREE_SPEED - 1} m/s rear-ender was a crash; everything under ${CRASH_FREE_SPEED} is free.`);
+    }
     // Far apart is nothing, whatever the speed.
     const far = { x: 0, z: -40, yaw: 0, speed: 0, ...box };
     if (carCrashClosing(at, far) !== 0) failures.push('Two cars forty metres apart crashed.');
     // Nose to tail in convoy at the same speed is not a crash, which is the case
     // a plain overlap test gets wrong and is why this measures closing.
-    const lead = { x: 0, z: -4, yaw: 0, speed: 18, ...box };
-    const follow = { x: 0, z: 0, yaw: 0, speed: 18, ...box };
+    const lead = { x: 0, z: -4, yaw: 0, speed: 30, ...box };
+    const follow = { x: 0, z: 0, yaw: 0, speed: 30, ...box };
     if (carCrashClosing(follow, lead) !== 0) failures.push('Two cars in convoy at one speed crashed into each other.');
     // And a gentle touch is inside the free allowance.
     const gentle = { x: 0, z: 0, yaw: 0, speed: CRASH_FREE_SPEED, ...box };
@@ -3481,11 +3785,11 @@ export function verifyDriving(): string[] {
     // -Z, so its heading is (0, -1) and this is the identity `closingAlong` is
     // factored out to make checkable.
     const yawForm = carCrashClosing(
-      { x: 0, z: 0, yaw: 0, speed: 5, ...box },
+      { x: 0, z: 0, yaw: 0, speed: 20, ...box },
       { x: 0, z: -4, yaw: 0, speed: 0, ...box },
     );
     const headingForm = ambientCrashClosing(
-      { x: 0, z: 0, dx: 0, dz: -1, speed: 5, ...box },
+      { x: 0, z: 0, dx: 0, dz: -1, speed: 20, ...box },
       { x: 0, z: -4, dx: 0, dz: -1, speed: 0, ...box },
     );
     if (Math.abs(yawForm - headingForm) > 1e-9) {
@@ -3495,16 +3799,17 @@ export function verifyDriving(): string[] {
       );
     }
 
-    // A stationary driven car with a bus arriving at 12 m/s. This is the case
+    // A stationary driven car with a bus arriving at 20 m/s. This is the case
     // the owner reported -- it used to end with the driver on the tarmac -- and
     // it is *symmetric*: the closing speed does not care which of the two was
     // doing the moving, which is what makes "a crash" one number rather than a
-    // rule about fault.
+    // rule about fault. (Twenty rather than the twelve it was written with, on
+    // the rear-ender's reason two blocks up: twelve is the free allowance now.)
     const parked = { x: 0, z: 0, dx: 0, dz: -1, speed: 0, ...box };
-    const arriving = { x: 0, z: -4, dx: 0, dz: 1, speed: 12, ...box };
+    const arriving = { x: 0, z: -4, dx: 0, dz: 1, speed: 20, ...box };
     const rammed = ambientCrashClosing(parked, arriving);
-    if (Math.abs(rammed - 12) > 1e-6) {
-      failures.push(`A bus arriving at 12 m/s into a stopped car reported ${rammed.toFixed(2)} m/s of closing.`);
+    if (Math.abs(rammed - 20) > 1e-6) {
+      failures.push(`A bus arriving at 20 m/s into a stopped car reported ${rammed.toFixed(2)} m/s of closing.`);
     }
     // ...and it is the same number seen from the bus.
     const fromTheBus = ambientCrashClosing(arriving, parked);
@@ -3516,11 +3821,11 @@ export function verifyDriving(): string[] {
     // `crashIntoTraffic` puts the signed speed back for. `drivenCarPose`
     // publishes an unsigned speed and a magnitude here would score this as
     // driving *away* at 5 m/s, which is nothing.
-    const backing = { x: 0, z: 0, dx: 0, dz: -1, speed: -8, ...box };
+    const backing = { x: 0, z: 0, dx: 0, dz: -1, speed: -20, ...box };
     const behind = { x: 0, z: 4, dx: 0, dz: -1, speed: 0, ...box };
     const reversed = ambientCrashClosing(backing, behind);
-    if (Math.abs(reversed - 8) > 1e-6) {
-      failures.push(`Reversing at 8 m/s into the car behind reported ${reversed.toFixed(2)} m/s; a crash keeps its sign.`);
+    if (Math.abs(reversed - 20) > 1e-6) {
+      failures.push(`Reversing at 20 m/s into the car behind reported ${reversed.toFixed(2)} m/s; a crash keeps its sign.`);
     }
 
     // Overtaking a car doing the same speed in the next lane is not a crash,
@@ -3650,6 +3955,16 @@ export function verifyDriving(): string[] {
         `enough for a heavy hit to set it alight.`,
     );
   }
+  // WORKSTREAM AP: and the third of the restated trio, which is new because the
+  // retune made the fire threshold a fraction of the crash cap rather than a
+  // number that happened to sit under it. See `carfire.CRASH_CAP_FIRE`.
+  if (CRASH_DAMAGE_MAX !== CRASH_CAP_FIRE) {
+    failures.push(
+      `CRASH_DAMAGE_MAX is ${CRASH_DAMAGE_MAX} and carfire.CRASH_CAP_FIRE is ${CRASH_CAP_FIRE}. That pair is ` +
+        `what proves carfire.IGNITE_CRASH_HP is a threshold an impact can actually cross; drifted, the fire ` +
+        `rule reads as working and never fires.`,
+    );
+  }
 
   // --- WORKSTREAM Y: the fire, through the field rather than through the pure
   //     rules -- `verifyCarFire` owns those. What is checked here is the wiring:
@@ -3712,16 +4027,21 @@ export function verifyDriving(): string[] {
     const field = new CarField();
     const car = field.take({ identity: 0xf20, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: 0, parked: true }, 7)!;
     // Two hits with the cooldown cleared between them: 100 down to 39 -- under
-    // the smoke line -- and then a 30 hp hit, which is `IGNITE_CRASH_HP` exactly
-    // and lights the car **without finishing it**. That combination is the whole
-    // point of this fixture: the other ignition path (reaching zero) leaves
-    // nothing for the burn rate below to eat.
+    // the smoke line -- and then an `IGNITE_CRASH_HP` hit exactly, which lights
+    // the car **without finishing it**. That combination is the whole point of
+    // this fixture: the other ignition path (reaching zero) leaves nothing for
+    // the burn rate below to eat.
+    //
+    // WORKSTREAM AP: the second hit is the constant and not the 30 it used to
+    // be spelt as. The retune took the crash cap to 7 and `IGNITE_CRASH_HP` to
+    // 4 with it, and a literal 30 here would have gone on passing while
+    // describing a hit nothing in the game can land.
     field.damage(car.id, 61);
     if (!(car.health < CAR_SMOKING_HEALTH)) failures.push(`The burn fixture left the car on ${car.health}, not under the smoke line.`);
     field.age(CRASH_COOLDOWN_MS);
-    field.damage(car.id, 30);
+    field.damage(car.id, IGNITE_CRASH_HP);
     if (!isBurning(car.burningMs)) {
-      failures.push('A 30 hp hit on a car on 39 did not light it. That is the "already broken" ignition path.');
+      failures.push(`A ${IGNITE_CRASH_HP} hp hit on a car on 39 did not light it. That is the "already broken" ignition path.`);
     }
     if (!(car.health > 0)) failures.push('The burn check needs a car that caught fire with condition left; it is at zero.');
     const before = car.health;

@@ -167,6 +167,10 @@ import { verifyCharacters } from '../client/src/game/characters.ts';
 // WORKSTREAM AC: and the street factions', which this process runs every tick
 // and never checked at boot. See the list below.
 import { verifyStreetlife } from '../client/src/game/streetlife.ts';
+// WORKSTREAM AP: and the police's own, which has run in `main.ts`'s boot list
+// since the pursuit shipped and has never run here -- on this side of the wire,
+// where the shot is actually adjudicated. See the list below.
+import { verifyPolice } from '../client/src/game/factions.ts';
 import { verifyEvents } from '../client/src/game/events.ts';
 import { verifyWallet } from './wallet-contract.ts';
 import { verifyTeleport } from '../client/src/game/teleport.ts';
@@ -582,6 +586,15 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // silently.
     ['verifyCharacters', verifyCharacters()],
     ['verifyStreetlife', verifyStreetlife()],
+    // WORKSTREAM AP: and the police, for `verifyStreetlife`'s reason exactly and
+    // one sharper than it. This process is where a police round is decided --
+    // `Simulation.shoot` is reachable by no message a client can send -- and the
+    // check now covers a **deterministic dice roll**: the owner's one-in-ten,
+    // hashed from (officer, target, tick, shot). A `Math.random` in that path
+    // renders identically on both ends and desynchronises the browser's
+    // prediction of a pursuit from this process's authority for as long as the
+    // pursuit lasts. Only this side booting the check makes that a gate.
+    ['verifyPolice', verifyPolice()],
     ['verifyEvents', verifyEvents()],
     ['verifyWallet', verifyWallet()],
     // The money. Four checks rather than one, because they are four different

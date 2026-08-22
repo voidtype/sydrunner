@@ -165,7 +165,11 @@ import { CollisionWorld } from '../player/collision.ts';
 import { EYE_HEIGHT } from '../player/controller.ts';
 // WORKSTREAM Z: `Newtown Standoff`'s first clause. A statement about what the
 // police do, so it lives in this file -- see `FactionField.focusPolice`.
-import { POLICE_FOCUS_M, fxPoliceFocusAt } from './teamfx.ts';
+// WORKSTREAM AP: `fxPoliceHitScale` joins the two above. `Blue Line` says
+// "police shots against you miss 2x as often" and, until the one-in-ten roll
+// arrived, the *ground* police never asked -- only `heat.ts`' Polair marksman
+// did. See `policeShotLands`.
+import { POLICE_FOCUS_M, fxPoliceFocusAt, fxPoliceHitScale } from './teamfx.ts';
 
 // --- The stations ---------------------------------------------------------------
 
@@ -1297,6 +1301,110 @@ export function hitChance(
 ): number {
   const p = pointBlank - perMetre * range;
   return p < floor ? floor : p > pointBlank ? pointBlank : p;
+}
+
+// --- WORKSTREAM AP: the dice roll ------------------------------------------------------
+
+/**
+ * The range `hitChance` was specified at, and the range the police model is
+ * tuned around. Metres.
+ *
+ * Fifteen: past a bat's reach, inside `ENGAGE_RANGE`, and the distance a chase
+ * actually spends its time at. `verifyPolice` and `verifyPolair` both already
+ * anchor on the 55 % this produces; `POLICE_LAND_SCALE` below is the third
+ * thing that hangs off it and it is a named constant now rather than a 15
+ * repeated in three files.
+ */
+export const POLICE_TUNED_RANGE = 15;
+
+/**
+ * How often a police round does **any** damage at the tuned range. **One in ten.**
+ *
+ * The owner's words, and they are worth quoting because the number is not a
+ * derivation from anything -- it is the request:
+ *
+ *   > *"a 1:10 dice roll for cops shooting you to do any dmg"*
+ *
+ * Before this, a constable at 15 m landed 55 % of their rounds at half a pip
+ * each, which is a pip a second of standing in the open and is why the police
+ * read as a wall rather than as a hazard. One in ten is the same weapon fired at
+ * the same rate with the same tracer and the same crack, hitting a fifth as
+ * often.
+ *
+ * **The shot still happens.** Nine rounds in ten are a *miss*, not a cancelled
+ * shot: `actor.shotsFired` still counts it, `ctx.field.shots` still counts it,
+ * the `shot` event is still emitted with its muzzle and its aim point, and the
+ * client still draws a tracer and plays the crack off the state byte. What
+ * changes is where the round goes and whether `damagePlayer` is called.
+ */
+export const POLICE_LAND_TUNED = 0.1;
+
+/**
+ * The factor that turns `hitChance` from a hit model into a **damage** model.
+ *
+ * `POLICE_LAND_TUNED / hitChance(POLICE_TUNED_RANGE)` -- 0.1 / 0.55, about
+ * 0.1818 -- and it is a scale on the existing curve rather than a replacement
+ * for it, which is the one design decision in this change worth defending.
+ *
+ * The literal reading of *"a 1:10 dice roll"* is a flat 10 % at every distance,
+ * and that was rejected: it deletes the range model, and with it the two things
+ * the range model buys that a player can feel within seconds of being shot at --
+ * that closing on an officer is dangerous and that breaking away is safe. A flat
+ * roll makes a constable at 34 m exactly as lethal as one at 3 m, which is not a
+ * simplification of the pacing, it is the removal of it.
+ *
+ * So the *shape* survives and the *level* moves, pinned so that the owner's
+ * number is exactly true where the model is tuned:
+ *
+ *     range   hitChance   lands
+ *      5 m      0.75      13.6 %
+ *     15 m      0.55      10.0 %   <- the tuned point, one in ten exactly
+ *     25 m      0.35       6.4 %
+ *     35 m      0.15       2.7 %
+ *
+ * Read plainly: **one round in ten at the range a chase happens at, and fewer
+ * the further you get.** `Blue Line` and `Neighbourhood Watch` multiply on top
+ * through `fxPoliceHitScale`, so a talent that says "police miss twice as often"
+ * now halves a 10 % base to 5 % -- which is the composition the talent's own
+ * header specifies and, until this change, the *ground* police never applied at
+ * all (only `heat.ts`' Polair marksman did).
+ */
+export const POLICE_LAND_SCALE = POLICE_LAND_TUNED / hitChance(POLICE_TUNED_RANGE);
+
+/**
+ * Does this round do damage? The whole of the police damage roll.
+ *
+ * **Deterministic and hashed, never `Math.random`**, on the rule this project
+ * applies to everything two processes evaluate: the browser predicting a
+ * pursuit offline and the server deciding it have to agree, and a client that
+ * stops sending inputs must not be able to make the next round miss. The hash is
+ * `(officer, target, tick, shot index)`, and each of the four earns its place:
+ *
+ *   - **officer** so two constables firing on the same tick do not roll as one;
+ *   - **target** so an officer switching between two suspects does not carry one
+ *     suspect's luck onto the other -- this is the term the old roll was missing;
+ *   - **tick** so the sequence advances with the world rather than with a
+ *     counter a client could desync;
+ *   - **shot index** so two rounds that somehow land on the same tick differ.
+ *
+ * `carHash` is the project's one integer mixer and is nested rather than
+ * widened: `carHash(a, b)` already avalanches both arguments, so hashing the
+ * hash is four multiplies for four inputs and needs no new function anybody has
+ * to reason about separately.
+ *
+ * `missScale` is `teamfx.fxPoliceHitScale(target)` -- 1 with no talent -- and it
+ * multiplies, which is what makes `Blue Line` mean the same thing at every range.
+ */
+export function policeShotLands(
+  officerId: number,
+  targetId: number,
+  tick: number,
+  shotIndex: number,
+  range: number,
+  missScale = 1,
+): boolean {
+  const roll = carHash(officerId, carHash(targetId, (tick ^ Math.imul(shotIndex, 0x9e3779b1)) | 0)) / 4294967296;
+  return roll < hitChance(range) * POLICE_LAND_SCALE * missScale;
 }
 
 /** How long a batted officer stays down, seconds. They are hardy; they get up. */
@@ -3175,13 +3283,22 @@ export const POLICE = registerNpcKind({
     actor.stateTicks = 0;
     actor.fireCooldown = FIRE_INTERVAL_TICKS;
     actor.shotsFired++;
-    // The roll: an integer hash of the actor and the tick. Not `Math.random`,
-    // and the difference is the whole reason it is written down -- a client
-    // predicting this offline and a server deciding it online have to agree, and
-    // a client that stopped sending inputs must not be able to make the next
-    // round miss.
-    const roll = carHash(actor.id, (ctx.tick ^ Math.imul(actor.shotsFired, 0x9e3779b1)) | 0) / 4294967296;
-    const hit = roll < hitChance(d);
+    // --- WORKSTREAM AP: **the one-in-ten roll.**
+    //
+    // The whole decision moved into `policeShotLands`, which is where the hash,
+    // the range model, the 10 % level and the talent all meet -- see its header
+    // and `POLICE_LAND_SCALE`'s. What is left here is the sentence the owner
+    // wrote: nine rounds in ten do no damage, and every one of them is still a
+    // shot. `shotsFired` above and `field.shots` below both counted it before
+    // this line and still do; the event is still emitted; the tracer, the muzzle
+    // flash and the crack all come off the state byte and know nothing about
+    // this.
+    //
+    // `fxPoliceHitScale` is read here rather than inside the roll because the
+    // roll is a pure function and this is a lookup against live team state --
+    // `heat.ts` composes the same talent into the Polair marksman's damage on
+    // the same terms, one file over.
+    const hit = policeShotLands(actor.id, suspect.id, ctx.tick, actor.shotsFired, d, fxPoliceHitScale(suspect.id));
     ctx.field.shots++;
     ctx.emit({
       kind: 'shot',
@@ -3463,6 +3580,85 @@ export function verifyPolice(kitTriangles?: number, snapshotInterval?: number): 
     const hits = Math.ceil(MAX_HEALTH / SHOT_DAMAGE);
     if (hits < 4 || hits > 8) {
       failures.push(`It takes ${hits} hits to drop a full-health player; the intended band is 4-8.`);
+    }
+  }
+
+  // --- WORKSTREAM AP: **the one-in-ten roll**, which is the owner's sentence
+  //     and is now the thing that decides whether a round costs anything.
+  //
+  // Four properties, and each one is a different way this can be wrong:
+  // the *level* (does it land one time in ten), the *shape* (does range still
+  // matter), the *composition* (does `Blue Line` still multiply), and the
+  // *determinism* (is it a hash and not a clock). The last is the one with no
+  // frame that says so -- a `Math.random` here renders identically and desyncs
+  // the browser's prediction from the server's authority for the whole of a
+  // pursuit.
+  {
+    const SAMPLES = 20000;
+    /** How often a round lands over `SAMPLES` officer/target/tick triples. */
+    const rate = (range: number, missScale = 1): number => {
+      let landed = 0;
+      for (let i = 0; i < SAMPLES; i++) {
+        // Three inputs all moving, so a hash that ignored one of them still
+        // has to produce the right distribution over the other two.
+        if (policeShotLands(7 + (i % 13), 1 + (i % 5), i * 3, i, range, missScale)) landed++;
+      }
+      return landed / SAMPLES;
+    };
+
+    // The level. One in ten at the tuned range, to within a percentage point of
+    // the ideal -- a wider band than the sampling error needs, because what is
+    // being asserted is the constant and not the mixer's quality.
+    const tuned = rate(POLICE_TUNED_RANGE);
+    if (Math.abs(tuned - POLICE_LAND_TUNED) > 0.01) {
+      failures.push(
+        `Police rounds land ${(tuned * 100).toFixed(1)}% of the time at ${POLICE_TUNED_RANGE} m against the ` +
+          `${(POLICE_LAND_TUNED * 100).toFixed(0)}% the owner asked for. See POLICE_LAND_SCALE.`,
+      );
+    }
+    // The shape. Still falling with range, which is the half of the pacing a
+    // flat 10 % would have deleted -- closing on an officer has to be dangerous
+    // and running has to work.
+    const close = rate(5);
+    const far = rate(ENGAGE_RANGE);
+    if (!(close > tuned && tuned > far)) {
+      failures.push(
+        `The damage roll does not fall with range: ${(close * 100).toFixed(1)}% at 5 m, ` +
+          `${(tuned * 100).toFixed(1)}% at ${POLICE_TUNED_RANGE} m, ${(far * 100).toFixed(1)}% at ${ENGAGE_RANGE} m.`,
+      );
+    }
+    if (!(far > 0)) failures.push('A round at the engage range can never do damage. The floor of the miss model is gone.');
+    // The composition. `Blue Line`'s 0.5 halves it, at every range.
+    const halved = rate(POLICE_TUNED_RANGE, 0.5);
+    if (Math.abs(halved - tuned * 0.5) > 0.01) {
+      failures.push(
+        `A x0.5 police-miss talent gave ${(halved * 100).toFixed(1)}% against the ` +
+          `${(tuned * 50).toFixed(1)}% a clean halving implies. The talent must multiply the 10 % base.`,
+      );
+    }
+    // The determinism. The same four inputs answer the same way, always, and
+    // changing *any* of the four is capable of changing the answer -- a hash
+    // that dropped an argument would pass the first clause and fail these.
+    for (let i = 0; i < 500; i++) {
+      if (policeShotLands(3, 9, i, 2, 15) !== policeShotLands(3, 9, i, 2, 15)) {
+        failures.push('The police damage roll is not a pure function of its arguments. It must never read a clock.');
+        break;
+      }
+    }
+    const differs = (
+      a: [number, number, number, number],
+      b: [number, number, number, number],
+    ): boolean => {
+      for (let i = 0; i < 400; i++) {
+        const x = policeShotLands(a[0] + i * a[1], a[2] + i * a[3], i, i, 15);
+        const y = policeShotLands(b[0] + i * b[1], b[2] + i * b[3], i, i, 15);
+        if (x !== y) return true;
+      }
+      return false;
+    };
+    if (!differs([7, 0, 1, 0], [8, 0, 1, 0])) failures.push('Two different officers roll identically; the officer id is not in the hash.');
+    if (!differs([7, 0, 1, 0], [7, 0, 2, 0])) {
+      failures.push('The same officer rolls identically against two different targets; the target id is not in the hash.');
     }
   }
 

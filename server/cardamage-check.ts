@@ -39,7 +39,17 @@ import {
 import { PedestrianField } from '../client/src/game/pedestrians.ts';
 // WORKSTREAM W: the talent fixture. `fakeTeamLookup` is exported by `teamfx.ts`
 // precisely so the drivers can install one without building a real roster.
-import { fakeTeamLookup, pinTeamLookup } from '../client/src/game/teamfx.ts';
+import { fakeTeamLookup, fxPoliceHitScale, pinTeamLookup } from '../client/src/game/teamfx.ts';
+// --- WORKSTREAM AP: the police damage roll. `runPolice` asserts the owner's
+// "1:10 dice roll" in the owner's units and asserts that the sequence repeats;
+// `factions.verifyPolice` owns the distribution and the range shape.
+import {
+  FIRE_INTERVAL_TICKS,
+  POLICE_TUNED_RANGE,
+  SHOT_DAMAGE,
+  hitChance,
+  policeShotLands,
+} from '../client/src/game/factions.ts';
 import { FX, TEAM, type TeamLookup } from '../client/src/game/teams.ts';
 import { MAX_HEALTH } from '../client/src/game/combat.ts';
 import { EYE_HEIGHT } from '../client/src/player/controller.ts';
@@ -49,6 +59,9 @@ import {
   CAR_SMOKING_HEALTH,
   CAR_SMOKING_SCALE,
   CRASH_DAMAGE_MAX,
+  // WORKSTREAM AP: the free allowance, which sections 1b and 1c are the two
+  // sides of. See `driving.CRASH_FREE_SPEED`.
+  CRASH_FREE_SPEED,
   DRIVE_ACCELERATION,
   DRIVE_TOP_SPEED,
   NOSE_SHED,
@@ -100,6 +113,19 @@ const QUIET_STREET_X = 200;
  */
 const REAL_TIME_TICKS = 300;
 const REAL_TIME_STEP_MS = 8;
+
+/**
+ * How many runs at the wall section 2 will sit through before giving up. **40.**
+ *
+ * It was 8, and the eight was fine when the worst single crash was 45 hp of 100.
+ * WORKSTREAM AP took the flat-out wall to 6.8 hp and the smoking penalty
+ * stretches the tail (a car under 40 hp is capped at 26.4 m/s, which is 2.2 hp a
+ * run), so writing a car off by driving it into a wall now takes about
+ * twenty-seven runs. Forty is comfortably past that and is still a bound rather
+ * than a `while (true)`: a car that survives forty is a car this check should
+ * fail on rather than hang on.
+ */
+const WALL_RUNS_MAX = 40;
 
 /**
  * `verifySim`'s empty city, with one wall across the road at the end of the
@@ -197,41 +223,69 @@ function run(): string[] {
   if (car.health >= CAR_HEALTH_MAX) {
     failures.push('Driving into a wall at the top speed did the car no damage at all.');
   }
-  // The cap, exactly: one crash can never take more than `CRASH_DAMAGE_MAX`,
-  // which is what makes the first heavy crash a warning rather than the end --
-  // and it is also the whole of the cooldown working, because the car spends
-  // four more ticks grinding into the same wall before it stops.
+  // --- WORKSTREAM AP: **the owner's number, measured through the whole tick.**
+  //
+  // *"a full-speed 44 m/s square wall hit should cost ~5-8 of 100 hp, not a
+  // write-off in two."* It is 6.816: `NOSE_SHED` puts 44 m/s of road speed at
+  // 29.04 m/s of delta-v and `(29.04 - 12) x 0.4` is what the curve does with
+  // it. Asserted against the *model* rather than against a literal, so the next
+  // retune moves the check with the feature -- and against the stated band as
+  // well, because the model agreeing with itself is not the property the owner
+  // asked for.
+  //
+  // This assertion used to demand the `CRASH_DAMAGE_MAX` **cap**, exactly, and
+  // that is the line the retune changed most: at 45 a top-speed wall saturated
+  // the cap, and at 7 it lands just under it. The cap's job is car-on-car now.
+  // See `driving.CRASH_DAMAGE_MAX`.
   const cost = first.healthBefore - car.health;
-  if (Math.abs(cost - CRASH_DAMAGE_MAX) > 0.01) {
+  const model = crashDamage(DRIVE_TOP_SPEED * NOSE_SHED);
+  if (Math.abs(cost - model) > 0.01) {
     failures.push(
-      `A ${DRIVE_TOP_SPEED} m/s wall cost ${cost.toFixed(1)} hp against the ${CRASH_DAMAGE_MAX} cap. ` +
-        `More than the cap means the 500 ms cooldown is not swallowing the grind after the impact.`,
+      `A ${DRIVE_TOP_SPEED} m/s wall cost ${cost.toFixed(3)} hp against the ${model.toFixed(3)} the curve models ` +
+        `for a ${NOSE_SHED.toFixed(2)} shed. More than that means the ${CRASH_COOLDOWN_MS} ms cooldown is not ` +
+        `swallowing the grind after the impact; less means the probe never reached the wall.`,
     );
   }
-  // **Above** the smoke threshold, which is the retune arriving here and is the
-  // opposite of what this line used to demand. `CRASH_DAMAGE_MAX` was chosen so
-  // one maximal crash landed a car exactly on 40; it is 45 now and lands it on
-  // 55, still driving properly, with the dent as the warning. See that constant.
+  if (!(cost >= 5 && cost <= 8)) {
+    failures.push(
+      `The worst thing a driver can do to a car on their own cost ${cost.toFixed(2)} hp of ${CAR_HEALTH_MAX}, ` +
+        `outside the 5-8 the brief asked for. That is ${Math.ceil(CAR_HEALTH_MAX / cost)} flat-out runs at a ` +
+        `brick wall to write a car off.`,
+    );
+  }
+  if (!(cost < CRASH_DAMAGE_MAX)) {
+    failures.push(
+      `A flat-out wall saturated the ${CRASH_DAMAGE_MAX} hp cap. Since the retune the cap is reachable only by ` +
+        `two cars closing on each other; a wall is meant to land under it. See driving.CRASH_DAMAGE_MAX.`,
+    );
+  }
+  // **Barely dented**, which is the retune arriving here. The first heavy wall
+  // used to leave a car on 55; it leaves it on 93 now, above the dent line as
+  // well as the smoke one, and the whole ladder of consequences has moved out to
+  // where a careless driver never reaches it.
   if (car.health <= CAR_SMOKING_HEALTH) {
     failures.push(
       `The worst possible single crash left the car on ${car.health}, at or under the ${CAR_SMOKING_HEALTH} ` +
-        `smoke threshold. Since the retune the first heavy wall is a dent and not a change of handling.`,
+        `smoke threshold. Since the retune the first heavy wall is barely a dent.`,
     );
   }
 
-  // === 1b. **A 15 m/s wall**, which is the retune's headline number arriving
-  //         through the whole tick rather than through `crashDamage` alone.
+  // === 1b. **A 15 m/s wall is free**, which is WORKSTREAM AP's headline and is
+  //         the exact inverse of what this section used to assert.
   //
-  // Two numbers, and the gap between them is worth stating because it is the
-  // one place the brief's arithmetic and the simulation's disagree.
-  // `crashDamage(15)` is 32 -- that is the *curve*, and `verifyDriving` asserts
-  // it. What a car doing 15 m/s into a wall actually reports is smaller, because
-  // the nose probe sheds `NOSE_SHED` of the speed in the tick it fires and the
-  // delta-v is what it shed: `crashDamage(15 x 0.66)` is about 16. Both are
-  // right; they are answers to different questions ("what does a 15 m/s impact
-  // cost" against "what does driving at 15 m/s into a wall cost"), and this
-  // section measures the second against a model of the first rather than against
-  // a literal, so a change to either constant moves the check with the feature.
+  // It used to measure 16 hp here and call that the fix for "the cars are too
+  // weak". The owner's follow-up was *"its way too easy to take vehicle damage,
+  // make the threshold much higher"*, and the threshold went to 12 m/s of
+  // delta-v -- which, through `NOSE_SHED`, is 18.2 m/s of road speed. Fifteen is
+  // under it. Driving into a brick wall at 54 km/h now costs a car **nothing at
+  // all**, and that is the sentence this section exists to hold on to.
+  //
+  // The termination condition had to change with it: the old loop ran until the
+  // health moved, and the health does not move any more. So it runs a fixed
+  // window and asserts the two halves separately -- **the car really did hit the
+  // wall** (it reached 15 m/s and it is stopped dead against the prism at the
+  // end) and **it cost nothing**. Without the first half this section would pass
+  // just as happily on a car that drove off in the other direction.
   {
     const sim15 = new Simulation(emptyWorld());
     const p15 = sim15.join(0, null);
@@ -250,35 +304,97 @@ function run(): string[] {
     )!;
     p15.combat.drivingCar = car15.id;
     p15.input.forward = 1;
-    let atImpact = 0;
+    let top15 = 0;
     for (let i = 0; i < 900; i++) {
-      atImpact = p15.combat.carSpeed;
       sim15.step(out15);
-      if (car15.health < CAR_HEALTH_MAX) break;
+      if (p15.combat.carSpeed > top15) top15 = p15.combat.carSpeed;
     }
     p15.input.forward = 0;
     const cost15 = CAR_HEALTH_MAX - car15.health;
+    console.log(
+      `  run 1b: reached ${top15.toFixed(2)} m/s, held against the wall at z = ` +
+        `${p15.combat.body.position.z.toFixed(1)} doing ${p15.combat.carSpeed.toFixed(2)} m/s, ` +
+        `cost ${cost15.toFixed(2)} hp (the free allowance is ${CRASH_FREE_SPEED} m/s of delta-v, which is ` +
+        `${(CRASH_FREE_SPEED / NOSE_SHED).toFixed(1)} m/s of road speed)`,
+    );
+    if (Math.abs(top15 - 15) > 1.5) {
+      failures.push(`The 15 m/s section reached ${top15.toFixed(2)} m/s; the run-up is wrong, not the damage.`);
+    }
+    // It hit the wall: stopped dead, up against it, with the throttle still down.
+    if (!(p15.combat.carSpeed < 0.5)) {
+      failures.push(
+        `The 15 m/s section finished at ${p15.combat.carSpeed.toFixed(2)} m/s with the throttle held. It never ` +
+          `reached the wall, so "it cost nothing" proves nothing.`,
+      );
+    }
+    if (!(p15.combat.body.position.z < -RUN_UP + 8)) {
+      failures.push(`The 15 m/s section stopped at z = ${p15.combat.body.position.z.toFixed(1)}, short of the wall at ${(-RUN_UP + 2).toFixed(1)}.`);
+    }
+    // And it cost nothing at all.
+    if (cost15 !== 0) {
+      failures.push(
+        `Driving into a wall at 15 m/s cost ${cost15.toFixed(2)} hp. It is meant to be free: ` +
+          `${(15 * NOSE_SHED).toFixed(1)} m/s of delta-v is under the ${CRASH_FREE_SPEED} m/s allowance. ` +
+          `"Its way too easy to take vehicle damage" is not fixed.`,
+      );
+    }
+    if (Math.abs(crashDamage(15) - 1.2) > 1e-9) {
+      failures.push(`The retuned curve puts a square 15 m/s *impact* at ${crashDamage(15)} hp, not 1.2.`);
+    }
+  }
+
+  // === 1c. **And a wall that is not free**, so the section above is a tuning
+  //         and not a car that has stopped taking damage at all.
+  //
+  // Thirty metres a second -- 108 km/h, which is not a speed anybody reaches by
+  // accident on a suburban street -- is 19.8 m/s of delta-v and costs 3.1 hp.
+  // That is the shape of the whole retune in one pair of sections: the crash you
+  // have every few minutes is free and the one you have to work for is a
+  // thirtieth of a car.
+  {
+    const sim30 = new Simulation(emptyWorld());
+    const p30 = sim30.join(0, null);
+    const out30: TickOutput = { tick: 0, events: [], snapshot: null };
+    const z0 = -RUN_UP + 3.8 + (30 * 30) / (2 * DRIVE_ACCELERATION);
+    p30.combat.body.position.set(0, EYE_HEIGHT, z0);
+    p30.combat.body.yaw = 0;
+    p30.input.yaw = 0;
+    p30.history.seed(sim30.tick, 0, EYE_HEIGHT, z0, 0);
+    const car30 = sim30.cars.take(
+      { identity: 0xf30fed, body: 0, colour: 0, x: 0, y: 0, z: z0, yaw: 0, parked: true },
+      p30.combat.id,
+    )!;
+    p30.combat.drivingCar = car30.id;
+    p30.input.forward = 1;
+    let atImpact = 0;
+    for (let i = 0; i < 900; i++) {
+      atImpact = p30.combat.carSpeed;
+      sim30.step(out30);
+      if (car30.health < CAR_HEALTH_MAX) break;
+    }
+    p30.input.forward = 0;
+    const cost30 = CAR_HEALTH_MAX - car30.health;
     const want = crashDamage(atImpact * NOSE_SHED);
     console.log(
-      `  run 1b: hit the wall at ${atImpact.toFixed(2)} m/s, cost ${cost15.toFixed(2)} hp ` +
-        `(model ${want.toFixed(2)}; the pure 15 m/s curve is ${crashDamage(15).toFixed(1)})`,
+      `  run 1c: hit the wall at ${atImpact.toFixed(2)} m/s, cost ${cost30.toFixed(2)} hp (model ${want.toFixed(2)})`,
     );
-    if (Math.abs(atImpact - 15) > 1.5) {
-      failures.push(`The 15 m/s section hit the wall at ${atImpact.toFixed(2)} m/s; the run-up is wrong, not the damage.`);
+    if (Math.abs(atImpact - 30) > 1.5) {
+      failures.push(`The 30 m/s section hit the wall at ${atImpact.toFixed(2)} m/s; the run-up is wrong, not the damage.`);
     }
-    if (Math.abs(cost15 - want) > 1.5) {
+    if (!(cost30 > 0)) {
+      failures.push('A 30 m/s wall cost nothing. The retune has gone past a tuning and removed the mechanic.');
+    }
+    if (Math.abs(cost30 - want) > 0.1) {
       failures.push(
-        `A ${atImpact.toFixed(1)} m/s wall cost ${cost15.toFixed(2)} hp against the ${want.toFixed(2)} the curve ` +
+        `A ${atImpact.toFixed(1)} m/s wall cost ${cost30.toFixed(2)} hp against the ${want.toFixed(2)} the curve ` +
           `predicts for a ${NOSE_SHED.toFixed(2)} shed. Either the probe or the curve has moved.`,
       );
     }
-    if (Math.abs(crashDamage(15) - 32) > 1e-9) {
-      failures.push(`The retuned curve puts a square 15 m/s impact at ${crashDamage(15)} hp, not 32.`);
-    }
     // And it is a long way short of what the old curve charged for the same
-    // drive -- `(9.9 - 3) x 6` was 41. This is the complaint, measured.
-    if (!(cost15 < 25)) {
-      failures.push(`Driving into a wall at 15 m/s still costs ${cost15.toFixed(1)} hp. "The cars are too weak" is not fixed.`);
+    // drive: `(19.8 - 5) x 3.2` was 47, clamped to the old 45 cap. This is the
+    // complaint, measured.
+    if (!(cost30 < 5)) {
+      failures.push(`Driving into a wall at 30 m/s still costs ${cost30.toFixed(1)} hp. Cars do not last 20-50x longer.`);
     }
   }
 
@@ -290,7 +406,7 @@ function run(): string[] {
   let runs = 1;
   /** Has the smoking-handling assertion had its run yet? See below. */
   let measuredSmoking = false;
-  while (car.health > 0 && runs < 8) {
+  while (car.health > 0 && runs < WALL_RUNS_MAX) {
     place(0);
     const again = chargeTheWall(1800);
     runs++;
@@ -325,8 +441,32 @@ function run(): string[] {
     `  written off after ${runs} runs at the wall, final health ${car.health}, ` +
       `burning ${isBurning(car.burningMs)} (${fuseRemainingS(car.burningMs).toFixed(2)} s of fuse left)`,
   );
-  if (car.health !== 0) failures.push(`Eight runs at a wall left the car on ${car.health}, not written off.`);
-  if (runs < 2) failures.push('One crash wrote the car off. The first heavy wall is meant to be a warning.');
+  if (car.health !== 0) {
+    failures.push(`${WALL_RUNS_MAX} runs at a wall left the car on ${car.health.toFixed(1)}, not written off.`);
+  }
+  // --- WORKSTREAM AP: **the band, in both directions.**
+  //
+  // The lower bound is the owner's *"cars should last 20-50 times longer"* and
+  // the upper one is the other half of the same sentence, which nobody writes
+  // down: a car that cannot be destroyed is not a tougher car, it is a car with
+  // no damage model. Twelve to thirty-five deliberate full-throttle runs at a
+  // brick wall, and the number the retune actually produces is about
+  // twenty-seven -- fifteen of them if the car stayed healthy, and the rest
+  // stretched out by `CAR_SMOKING_SCALE` capping a broken car at 26.4 m/s, which
+  // is itself only 2.2 hp a run. A careless driver never gets there. A reckless
+  // one gets there in an afternoon, which is the ask.
+  if (runs < 12) {
+    failures.push(
+      `A car was written off in ${runs} runs at a wall. The retune's floor is twelve; anything under it means ` +
+        `the curve, the cap or the free allowance has drifted back toward the old numbers.`,
+    );
+  }
+  if (runs >= WALL_RUNS_MAX) {
+    failures.push(
+      `A car survived ${runs} full-throttle runs at a brick wall. A reckless driver has to be able to finish ` +
+        `one -- "20-50 times longer" is not "indestructible".`,
+    );
+  }
   // **And it caught fire.** The owner's second sentence, measured through the
   // whole tick: the wall filled `carCrashDv`, `stepCars` drained it,
   // `crashDamage` sized it, `CarField.damage` applied it and `ignitesOnCrash`
@@ -1021,9 +1161,14 @@ function runUteLife(): string[] {
     p.combat.drivingCar = car.id;
     const before = car.health;
     p.input.forward = 1;
-    // Short of the cap: `CRASH_DAMAGE_MAX` is 60 and a top-speed wall clips it,
-    // which would make both runs report exactly 60 and the check vacuous. Half
-    // the run-up puts the car into the wall well under the ceiling.
+    // Under the cap, which the top-speed wall now is on its own: 6.816 against a
+    // `CRASH_DAMAGE_MAX` of 7. That was not true when this comment was written
+    // -- the cap was 45 and a top-speed wall saturated it, which would have made
+    // both runs report exactly 45 and this check vacuous -- and it is worth
+    // keeping the warning even though the retune happens to have removed the
+    // hazard. If the cap ever comes back down to where a wall clips it, the two
+    // runs below stop being a measurement of the talent. `run()`'s section 1
+    // asserts the wall stays under the cap, which is what actually holds it.
     for (let i = 0; i < 1800; i++) {
       sim.step(out);
       if (car.health < before) break;
@@ -1088,8 +1233,244 @@ function runUteLife(): string[] {
   return failures;
 }
 
+/**
+ * --- WORKSTREAM AP: **two kilometres of bad road, and nothing to show for it.**
+ *
+ * The owner's sentence, as a driver: *"even small bumps in a road alone are
+ * giving damage"*. It is the one section here that would have failed before this
+ * workstream and it would have failed enormously -- twenty-four kerbs at a full
+ * crash apiece, capped only by the half-second cooldown.
+ *
+ * **What the bug actually was**, because it decides the shape of this fixture.
+ * `CollisionWorld.solidFor` reads `feetY >= prism.top - 0.05`, and the step
+ * allowance is the *caller's* to add: `controller.step` asks at
+ * `feet + STEP_HEIGHT`, so the driver's own capsule walks over anything under
+ * 0.42 m. `driving.stepCarSpeed`'s nose probe asked at a bare `feetY`. So every
+ * kerb in Sydney was thin air to the body and a brick wall to the bonnet 1.8 m
+ * in front of it -- the car did not stop, it simply shed two thirds of its speed
+ * and took a crash, invisibly, for a bump. See `driving.NOSE_STEP`.
+ *
+ * So the road here is made of the geometry that triggered it: **twenty-four
+ * prisms 0.1 to 0.4 m tall laid across two kilometres of straight road**, which
+ * is a kerb, a driveway lip, a bridge joint and a road-edge band. They are real
+ * `CollisionWorld` prisms and the car really drives over them -- `roofHeight`
+ * lifts it onto each one and gravity drops it off the far side, which is the
+ * vertical jolt half of the report as well as the prism half.
+ *
+ * And **a real wall at the end**, which is what stops this being a section that
+ * passes because nothing in it works. The same drive that costs zero over the
+ * bumps has to cost exactly one flat-out crash when it reaches something that is
+ * genuinely in the way.
+ */
+function runRough(): string[] {
+  const failures: string[] = [];
+  console.log('\n--- WORKSTREAM AP: 2 km of kerbs and bumps at full throttle, and a wall at the end');
+
+  /** How far apart the bumps are, metres, and how many there are. */
+  const BUMP_SPACING = 80;
+  const BUMPS = 24;
+  /** The wall's near face, metres north. Past the last bump with room to spare. */
+  const WALL_Z = -(BUMPS + 1) * BUMP_SPACING;
+  /** The four heights, cycled. Every one of them is under `controller.STEP_HEIGHT`. */
+  const BUMP_HEIGHTS = [0.1, 0.2, 0.3, 0.4];
+
+  const world = emptyWorld(false);
+  const prisms: Array<{ points: Float32Array; height: number; base: number }> = [];
+  for (let i = 1; i <= BUMPS; i++) {
+    const z = -i * BUMP_SPACING;
+    // 60 m of carriageway wide and 0.6 m deep, which is a kerb across the road
+    // rather than a step the car could steer round.
+    prisms.push({
+      points: new Float32Array([-30, z - 0.3, 30, z - 0.3, 30, z + 0.3, -30, z + 0.3]),
+      height: BUMP_HEIGHTS[i % BUMP_HEIGHTS.length],
+      base: 0,
+    });
+  }
+  world.collision.addPrisms('bumps', prisms);
+  // The control. Three metres tall, so no step allowance in the game reaches
+  // over it and the nose probe has to see it.
+  world.collision.addPrisms('endwall', [{
+    points: new Float32Array([-30, WALL_Z - 2, 30, WALL_Z - 2, 30, WALL_Z + 2, -30, WALL_Z + 2]),
+    height: 3,
+    base: 0,
+  }]);
+
+  const sim = new Simulation(world);
+  const out: TickOutput = { tick: 0, events: [], snapshot: null };
+  const p = sim.join(0, null);
+  p.combat.body.position.set(0, EYE_HEIGHT, 0);
+  p.combat.body.yaw = 0;
+  p.input.yaw = 0;
+  p.input.right = 0;
+  p.history.seed(sim.tick, 0, EYE_HEIGHT, 0, 0);
+  const car = sim.cars.take(
+    { identity: 0xb00b1e, body: 0, colour: 0, x: 0, y: 0, z: 0, yaw: 0, parked: true },
+    p.combat.id,
+  )!;
+  p.combat.drivingCar = car.id;
+  p.input.forward = 1;
+
+  // --- The drive. Stopped one bump short of the wall, so the two halves of this
+  //     section never overlap.
+  const STOP_Z = WALL_Z + BUMP_SPACING * 0.5;
+  let lastY = p.combat.body.position.y;
+  /** The biggest single-tick change in height. The vertical jolt, measured. */
+  let jolt = 0;
+  let top = 0;
+  let ticks = 0;
+  for (; ticks < 6000 && p.combat.body.position.z > STOP_Z; ticks++) {
+    sim.step(out);
+    const dy = Math.abs(p.combat.body.position.y - lastY);
+    if (dy > jolt) jolt = dy;
+    lastY = p.combat.body.position.y;
+    if (p.combat.carSpeed > top) top = p.combat.carSpeed;
+  }
+  const travelled = -p.combat.body.position.z;
+  const crossed = Math.floor(travelled / BUMP_SPACING);
+  console.log(
+    `  drove ${travelled.toFixed(0)} m over ${crossed} kerbs in ${ticks} ticks, topping ${top.toFixed(1)} m/s, ` +
+      `biggest vertical jolt ${jolt.toFixed(2)} m: health ${CAR_HEALTH_MAX} -> ${car.health.toFixed(2)}, ` +
+      `burning ${isBurning(car.burningMs)}`,
+  );
+
+  // The drive has to have *happened*, which is three separate ways this fixture
+  // could pass while proving nothing: a car that never moved, a car that never
+  // reached the bumps, and a car that drove along the road beside them.
+  if (!(travelled > 1900)) {
+    failures.push(`The rough drive covered ${travelled.toFixed(0)} m of the intended 2 km; it measured almost nothing.`);
+  }
+  if (crossed < 12) failures.push(`The rough drive crossed ${crossed} kerbs. The section needs a dozen at least.`);
+  if (!(jolt > 0.05)) {
+    failures.push(
+      `The biggest vertical movement in two kilometres was ${jolt.toFixed(3)} m. The car never went over a ` +
+        `kerb at all, so "it took no damage" is a statement about an empty road.`,
+    );
+  }
+  if (!(top > 30)) failures.push(`The rough drive topped out at ${top.toFixed(1)} m/s; the bumps are stopping the car.`);
+
+  // **And it cost nothing.** The report, as one comparison.
+  if (car.health !== CAR_HEALTH_MAX) {
+    failures.push(
+      `Two kilometres of rough road and ${crossed} kerbs cost ${(CAR_HEALTH_MAX - car.health).toFixed(2)} hp. ` +
+        `A bump the body steps over is free -- see driving.NOSE_STEP, which is the argument the nose probe ` +
+        `used to be missing.`,
+    );
+  }
+  if (isBurning(car.burningMs)) failures.push('Driving over kerbs set the car on fire.');
+
+  // --- The control: the same car, the same throttle, into something that really
+  //     is in the way. One crash exactly, at the flat-out price.
+  const beforeWall = car.health;
+  for (let i = 0; i < 900 && car.health >= beforeWall; i++) sim.step(out);
+  for (let i = 0; i < 120; i++) sim.step(out);
+  p.input.forward = 0;
+  const wallCost = beforeWall - car.health;
+  const model = crashDamage(DRIVE_TOP_SPEED * NOSE_SHED);
+  console.log(
+    `  ...then the 3 m wall at z = ${WALL_Z}: ${beforeWall.toFixed(1)} -> ${car.health.toFixed(2)} hp ` +
+      `(cost ${wallCost.toFixed(2)}, model ${model.toFixed(2)})`,
+  );
+  if (!(wallCost > 0)) {
+    failures.push(
+      'The wall at the end of the rough road cost nothing either. The nose probe has stopped seeing solids ' +
+        'altogether, which is not the fix -- see driving.NOSE_STEP.',
+    );
+  } else if (Math.abs(wallCost - model) > 0.2) {
+    failures.push(
+      `The wall at the end cost ${wallCost.toFixed(2)} hp against the ${model.toFixed(2)} a flat-out square ` +
+        `hit models. More than one crash means the kerbs behind it are being billed after all.`,
+    );
+  }
+
+  return failures;
+}
+
+/**
+ * --- WORKSTREAM AP: **the police dice roll.**
+ *
+ * *"a 1:10 dice roll for cops shooting you to do any dmg."* A hundred rounds,
+ * counted, and then the same hundred rounds counted again -- which is the half
+ * of this that a distribution check cannot see. A `Math.random` in this path
+ * produces a perfectly plausible one-in-ten and desynchronises the browser's
+ * prediction of a pursuit from the server's authority for as long as it lasts,
+ * with nothing on either screen that says so.
+ *
+ * `factions.verifyPolice` owns the distribution over twenty thousand samples and
+ * the composition with `Blue Line`. What is here is the owner's sentence in the
+ * owner's units, plus the determinism, plus the one thing neither of those
+ * covers: that a hundred rounds at the tuned range is a *survivable* amount of
+ * fire. Ten landings at `SHOT_DAMAGE` is five pips against a three-pip player,
+ * where 55 landings was twenty-seven.
+ */
+function runPolice(): string[] {
+  const failures: string[] = [];
+  console.log('\n--- WORKSTREAM AP: a hundred police rounds at the tuned range');
+
+  /** One officer emptying a hundred rounds at one suspect, tick by tick. */
+  const volley = (officer: number, target: number, range: number, missScale = 1): boolean[] => {
+    const out: boolean[] = [];
+    for (let shot = 1; shot <= 100; shot++) {
+      // `FIRE_INTERVAL_TICKS` between rounds, exactly as the officer's `think`
+      // spaces them, so this is the sequence a real pursuit produces and not a
+      // hundred rolls off consecutive integers.
+      out.push(policeShotLands(officer, target, shot * FIRE_INTERVAL_TICKS, shot, range, missScale));
+    }
+    return out;
+  };
+
+  const first = volley(11, 4, POLICE_TUNED_RANGE);
+  const landed = first.filter(Boolean).length;
+  console.log(
+    `  100 rounds at ${POLICE_TUNED_RANGE} m: ${landed} landed (${(landed * SHOT_DAMAGE).toFixed(1)} pips of ` +
+      `damage against a ${MAX_HEALTH}-pip player; before the roll it was ` +
+      `${(100 * hitChance(POLICE_TUNED_RANGE) * SHOT_DAMAGE).toFixed(1)})`,
+  );
+  if (landed < 5 || landed > 15) {
+    failures.push(
+      `${landed} of 100 police rounds landed at ${POLICE_TUNED_RANGE} m. The owner asked for one in ten and the ` +
+        `band this check allows is 5 to 15. See factions.POLICE_LAND_SCALE.`,
+    );
+  }
+
+  // **The same seed twice.** Byte for byte, or the pursuit is not predictable.
+  const again = volley(11, 4, POLICE_TUNED_RANGE);
+  let drift = -1;
+  for (let i = 0; i < first.length; i++) {
+    if (first[i] !== again[i]) { drift = i; break; }
+  }
+  console.log(`  the same hundred rounds again: ${drift < 0 ? 'identical' : `DIFFERED at round ${drift + 1}`}`);
+  if (drift >= 0) {
+    failures.push(
+      `Round ${drift + 1} of the same volley came out differently the second time. The roll must be a hash of ` +
+        `(officer, target, tick, shot) and never a clock -- see factions.policeShotLands.`,
+    );
+  }
+
+  // And a different suspect standing in the same place at the same instant gets
+  // a different volley, which is the term the old roll was missing.
+  const other = volley(11, 5, POLICE_TUNED_RANGE);
+  let same = true;
+  for (let i = 0; i < first.length; i++) if (first[i] !== other[i]) { same = false; break; }
+  if (same) failures.push('Two different suspects drew the identical hundred rounds; the target id is not in the hash.');
+
+  // `Blue Line` halves it, through the real talent lookup rather than through a
+  // bare argument -- `fxPoliceHitScale` is the thing `factions.ts` actually
+  // calls, and until this workstream the ground police never called it at all.
+  pinTeamLookup(fakeTeamLookup({ [FX.POLICE_MISS]: 0.5 }, TEAM.DEFAULT));
+  const scale = fxPoliceHitScale(4);
+  pinTeamLookup(null);
+  const shielded = volley(11, 4, POLICE_TUNED_RANGE, scale).filter(Boolean).length;
+  console.log(`  ...with Blue Line (x${scale} hit scale): ${shielded} of 100 landed`);
+  if (Math.abs(scale - 0.5) > 1e-9) failures.push(`Blue Line gave a hit scale of ${scale}, not 0.5.`);
+  if (!(shielded < landed)) {
+    failures.push(`Blue Line let ${shielded} rounds through against ${landed} without it. The talent must multiply the 10 % base.`);
+  }
+
+  return failures;
+}
+
 function main(): number {
-  const failures = [...run(), ...runCrashes(), ...runUteLife(), ...runFire()];
+  const failures = [...run(), ...runRough(), ...runPolice(), ...runCrashes(), ...runUteLife(), ...runFire()];
   if (failures.length === 0) {
     console.log('\ncardamage-check: OK');
     return 0;
