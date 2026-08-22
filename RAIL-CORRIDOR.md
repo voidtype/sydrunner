@@ -48,8 +48,18 @@ the writers' extents (`world/rail-solids.ts`):
 
 The platform fouls **everywhere** spacing is under 8.7 m. This is why the owner
 said "the platforms are the worst": they are the widest thing any track writes.
-It is not a bug at Wollstonecraft; Wollstonecraft's curve merely varies the
-spacing so the foul comes and goes, which is what made it *visible* there.
+
+**Corrected by the P0 audit (`server/rail-gauge-check.ts`), which outranks the
+paragraph above.** Swept against the car body, the shipped build fouls 190.3 of
+778.2 km (24.4%), and the split says there are **two mechanisms, not one**:
+neighbour overlap dominates the ballast, fences and masts (208.8 km of
+asset-metres), but the platform's own fouling is dominated by **its own curve**
+— a straight 160 m deck against a bowing running line. Median bow 2.25 m
+against a total platform margin of 70 mm; 323 of 361 sites exceed it on bow
+alone; the worst is Wollstonecraft at 17.60 m on a 182 m radius, which is the
+station the owner named from the train. So the budget (idea 2) fixes the
+neighbour half and the sweep (idea 3) fixes the curve half, and neither is
+sufficient alone.
 
 ## The model
 
@@ -67,9 +77,15 @@ adjacency locally will disagree at their seam.
   lowest `(line, dir)` index, which is deterministic — writes the shared
   geometry; the others write nothing. (Today both write, coincident: doubled
   draws and z-fighting nobody has looked closely enough to report.)
-- **Group physical tracks into corridors**: within ~20 m and roughly parallel.
-  The parallelism test matters — two directions 15 m apart on *diverging*
-  service paths are not neighbours and must not budget against each other.
+- **Group physical tracks into corridors** — corrected by implementation: a
+  corridor *partition* of Sydney does not exist. Adjacency is transitive and
+  the network is connected, so the closure is one corridor spanning the basin.
+  What a slot actually needs is **local**: the gap to the nearest parallel
+  track on each side, the count of parallel tracks here, and this track's
+  ordinal among them. `world/track-atlas.ts` stores exactly that and nothing
+  global. The parallelism test still matters — two directions 15 m apart on
+  diverging service paths are not neighbours and must not budget against each
+  other.
 - Per direction vertex, store **distance to the nearest other physical track,
   each side**. Two floats per vertex; the bake has 27,645 vertices; the memory
   is nothing and the build is one spatial-hash pass.
@@ -149,9 +165,14 @@ the last word on the two stations he named as already right.
         pairs by ±2 m so trains stop sharing rails head-on — the atlas already
         knows exactly where those 137+ samples are
 
-The gauge audit is the acceptance for all of it, and it must be red today: if
-P0's audit does not convict the current build of exactly what the owner rode
-through, the audit is measuring the wrong thing.
+The gauge audit is the acceptance for all of it, and it had to be red at P0:
+if it did not convict the current build of exactly what the owner rode through,
+it was measuring the wrong thing. It convicted (24.4%). **From the first merge
+on, it ratchets like every other check in this repo** — the budget sits just
+above the current measurement and descends with each phase, so the tree never
+carries an unexplained red and a regression fails the day it lands. The target
+(10 km total, 0 m platform) lives in the header as where the ratchet is going,
+not as today's gate.
 
 ## Costs, stated
 
