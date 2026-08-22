@@ -708,7 +708,7 @@ export class ImprovCache {
   lineFor(npcId: string, node: DialogNode, atMs = this.now()): string {
     if (node.improv === null || !this.enabled) return '';
     const week = weekKey(atMs);
-    const key = `${npcId} ${node.id} ${week}`;
+    const key = `${npcId}\x00${node.id}\x00${week}`;
     const hit = this.cache.get(key);
     if (hit) return hit.line;
     // A placeholder so a hundred players walking past one NPC queue one fill.
@@ -1352,7 +1352,7 @@ export class QuestEngine implements QuestSink {
       this.progress(playerId, (step) => step.kind === STEP_KIND.GOTO && withinStep(step, at.x, at.z), 1);
     }
     const stop = this.world.rideStation(playerId);
-    const key = stop === null ? '' : `${stop.line} ${stop.station}`;
+    const key = stop === null ? '' : `${stop.line}\x00${stop.station}`;
     if (key !== (this.lastStation.get(playerId) ?? '')) {
       this.lastStation.set(playerId, key);
       if (stop !== null) {
