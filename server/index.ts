@@ -222,6 +222,22 @@ import {
 } from './accounts.ts';
 import { verifyRewind } from './rewind.ts';
 import { verifySim } from './sim.ts';
+/*
+ * --- WORKSTREAM AK: quests and dialog as content, and the AI seam.
+ *
+ * One block, on the accounts block's arrangement above and for its reason: the
+ * three things this file has to know about the feature are the checks it runs
+ * at boot, the stores it constructs, and the route and the message it puts in
+ * front of them. The **rules** are `client/src/game/questmodel.ts` (shared with
+ * the browser, because a dialog gate has to be greyed out the same way it is
+ * refused) and the **wire** is `client/src/net/quests.ts`.
+ */
+import { verifyDialog, verifyQuests } from '../client/src/game/questmodel.ts';
+import { decodeQuest, verifyQuestWire } from '../client/src/net/quests.ts';
+import { ContentStore, ImprovCache, QuestEngine, contentResponse, type QuestWorld } from './quests.ts';
+import { TEAM } from '../client/src/game/teams.ts';
+import type { Participant } from './sim.ts';
+import type { Room } from './room.ts';
 // WORKSTREAM AA: the per-section profiler, whose breakdown rides the ten-second
 // line below. See `server/profile.ts` for why the ten `phaseMs` buckets it
 // replaces were not enough to catch a tenfold regression.
@@ -568,6 +584,31 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // ladder on the wrong day, and a token expiry that is not enforced makes
     // every session on the box permanent. See `client/src/net/accounts.ts`.
     ['verifyAccounts', verifyAccounts()],
+    // --- WORKSTREAM AK: the content system, in three checks for three kinds of
+    // failure, and every one of them is silent in this repo's sense.
+    //
+    // `verifyQuests` is the **parser and the ceilings**, and it is the one that
+    // matters most: this process applies JSON that a person edits on github.com
+    // with no compiler in the way, so a parser that accepts a bad pack is the
+    // whole safety property gone -- the pack goes live, half its quests are
+    // missing, and the obligations app is simply one item shorter than the
+    // author expected. The reward ceiling is the other half of it: `"cash":
+    // 50000` is four keystrokes from `"cash": 50`, it validates as a number,
+    // and by the time anybody notices the economy every wallet on the box is
+    // wrong with no un-doing it.
+    //
+    // `verifyDialog` carries the one rule here that is not merely cosmetic: an
+    // improv node may not accept a quest, turn one in, or spend money. Break
+    // that and there is a language model with a hand on the wallet, and no
+    // frame anywhere looks wrong.
+    //
+    // `verifyQuestWire` is the bytes, in the process that adjudicates them. A
+    // `NODE` op decoded one byte out resolves a *different node of the same
+    // NPC* -- a real node, with real choices, which this side then acts on --
+    // so the player clicks "take the job" and is told about the weather.
+    ['verifyQuests', verifyQuests()],
+    ['verifyDialog', verifyDialog()],
+    ['verifyQuestWire', verifyQuestWire()],
     // WORKSTREAM N (carry): the sentence a restored session is visible as. Run
     // here as well as in the browser for `verifyLevelHud`'s reason one line up
     // -- this process decides *whether* a join was a restore and puts the bit on
@@ -827,6 +868,119 @@ void bugs.drain();
 
 const conns = new Set<Socket>();
 
+/*
+ * --- WORKSTREAM AK: quests and dialog, as content rather than as code.
+ *
+ * Three objects and one rule. `ContentStore` holds the packs -- read from the
+ * repo's `content/` at boot, polled from GitHub every five minutes after that,
+ * and refused whole if a fetch does not validate. `ImprovCache` is the AI seam
+ * and is off unless `SYDNEY_DIALOG_AI_URL`/`_KEY` are set. `QuestEngine` is the
+ * per-player cursors and the adjudication.
+ *
+ * **Host-wide, like the suggestions box and for its reason**: a quest is about
+ * the game rather than about the twelve people in room 3, and two rooms with
+ * two engines would be a player whose Act 0 progress depended on where they
+ * spawned. The engine is then installed as the sink into every room's
+ * simulation, which is the same shape `AccountStore` already has.
+ *
+ * `load()` **returns** its errors rather than throwing, so the bundled packs
+ * join the self-check list below and the process refuses to start on a bad one
+ * -- they are part of the build. A pack fetched at *runtime* can never do that:
+ * it is refused and the last good one keeps serving, because a bad commit must
+ * not be able to take the game down. See `server/quests.ts`' header.
+ */
+const content = new ContentStore();
+{
+  const errors = await content.load();
+  if (errors.length > 0) {
+    console.error('Bundled quest content failed validation; refusing to start.\n');
+    for (const line of errors) console.error(`  ${line}`);
+    process.exit(1);
+  }
+}
+const improv = new ImprovCache();
+console.log(`[sydney] quests: ${content.describe()}; ${improv.describe()}`);
+// The model catalogue, once, not awaited and never fatal. A provider renaming
+// an id must cost a log line rather than a mute NPC three weeks later.
+void improv.probe().then((warning) => {
+  if (warning !== '') console.warn(warning);
+});
+
+/**
+ * The engine's window onto the simulation. Structural; see `QuestWorld`.
+ *
+ * `liveBodies` above is the same shape of thing for the same reason: this file
+ * is where the host, the rooms and the stores are all in scope, so it is where
+ * a feature that needs two of them gets wired together rather than growing an
+ * import into a third.
+ *
+ * `find` is O(rooms x players) and is called on the ops path -- a click in a
+ * dialog panel, a few times a session -- rather than on a tick. The tick path
+ * (`eachPlayer`) hands the id and the room's own simulation over together, so
+ * the sweep never pays for the search.
+ */
+function findPlayer(playerId: number): { room: Room; p: Participant } | null {
+  for (const r of host.rooms) {
+    const p = r.sim.participants.get(playerId);
+    if (p) return { room: r, p };
+  }
+  return null;
+}
+
+const questWorld: QuestWorld = {
+  eachPlayer(fn) {
+    for (const r of host.rooms) {
+      for (const p of r.sim.participants.values()) {
+        if (p.bot === null) fn(p.id);
+      }
+    }
+  },
+  positionOf(playerId) {
+    const found = findPlayer(playerId);
+    if (!found) return null;
+    const body = found.p.combat.body.position;
+    return { x: body.x, z: body.z };
+  },
+  accountOf: (playerId) => findPlayer(playerId)?.p.account ?? null,
+  isBot: (playerId) => (findPlayer(playerId)?.p.bot ?? null) !== null,
+  levelOf: (playerId) => findPlayer(playerId)?.p.level ?? 1,
+  teamOf: (playerId) => findPlayer(playerId)?.p.team ?? TEAM.NONE,
+  cashOf: (playerId) => findPlayer(playerId)?.room.sim.wallet.balanceOf(playerId) ?? 0,
+  credit(playerId, amount, why) {
+    findPlayer(playerId)?.room.sim.wallet.credit(playerId, amount, why);
+  },
+  debit: (playerId, amount, why) => findPlayer(playerId)?.room.sim.wallet.debit(playerId, amount, why) ?? 0,
+  note(playerId, text) {
+    findPlayer(playerId)?.room.sim.note(playerId, text);
+  },
+  rideStation: (playerId) => findPlayer(playerId)?.room.sim.rideStation(playerId) ?? null,
+  /**
+   * Put a frame on one player's socket.
+   *
+   * A walk of the host's connection set rather than a map, and rather than a
+   * new method on `Room`. `LiveLookup.ofAccount` above makes the identical
+   * call for the identical reason: this is on a path a person triggers a
+   * handful of times a session, and the alternative is a second index to keep
+   * in step on every join and every leave -- which is a standing correctness
+   * cost paid to make a rare operation cheap.
+   */
+  send(playerId, frame) {
+    for (const ws of conns) {
+      if (ws.data.participant?.id !== playerId) continue;
+      try {
+        ws.send(frame);
+      } catch {
+        // Closed between the decision and the reply. The decision is already
+        // on the record, which is the part that mattered.
+      }
+      return;
+    }
+  },
+};
+
+const questEngine = new QuestEngine(content, improv, questWorld, accounts);
+for (const r of host.rooms) r.sim.setQuestSink(questEngine);
+
 /**
  * The room a request is asking for, from `?room=<id>`, or -1 for "you choose".
  *
@@ -948,6 +1102,29 @@ const server = Bun.serve<Conn>({
         // rather than queue, and nothing about the token itself belongs on a
         // route anybody can fetch.
         github: { suggestions: suggestions.linked, bugs: bugs.linked },
+        /*
+         * WORKSTREAM AK: which content is live, and whether any of it was
+         * refused. Published for `vessels`' reason at the top of this object:
+         * **a content edit that did not take is invisible from the inside.**
+         * The author commits, five minutes pass, nothing changes in the game,
+         * and there is no way to tell "the poll has not run yet" from "the
+         * pack was refused" from "GitHub is down" without reading a server
+         * log. `revision` is the answer to "is my commit live", `refused` is
+         * the answer to "was it rejected", and `lastRefusal` is the first
+         * reason -- which is very often the only one that matters.
+         *
+         * `improv` is a boolean and a count and nothing else. Whether a model
+         * is configured is an operational fact; the key is not.
+         */
+        quests: {
+          revision: content.revision,
+          quests: content.bundle.quests.length,
+          npcs: content.bundle.npcs.length,
+          refused: content.refusals,
+          lastRefusal: content.lastRefusal,
+          lastFetchMs: content.lastFetchMs,
+          improv: { on: improv.enabled, calls: improv.calls, errors: improv.errors },
+        },
         // How many names have a balance on file, and whether the fare loop's
         // debug hatch is on. Published for `vessels`' reason two paragraphs up:
         // a flag that changes what the game does should be readable from
@@ -981,6 +1158,28 @@ const server = Bun.serve<Conn>({
      * can make from four numbers.
      */
     if (url.pathname === '/rooms') return json(host.listing());
+    /*
+     * `/content` -- the quest packs and the dialog trees, whole, ETag'd.
+     * Workstream AK; see `server/quests.contentResponse`.
+     *
+     * **HTTP rather than a message**, which is the same call `/bug` makes and
+     * for a version of its reason: a dialog tree is tens of kilobytes and this
+     * server's socket is `maxPayloadLength: 1024` because every frame it was
+     * designed for is a few dozen bytes of quantised integers. Raising that
+     * ceiling to carry content would raise it for every frame from every
+     * client on the host, forever, to deliver something that changes a few
+     * times a week and that the browser can cache.
+     *
+     * Its own route rather than a field on `/health`, on `/rooms`' argument:
+     * `/health` is a liveness probe a deployment hits, and this is a thing
+     * every client fetches once per revision and then 304s against.
+     *
+     * Public and unauthenticated, deliberately. The packs are already in a
+     * public repository, and a client cannot walk a dialog tree it cannot
+     * read -- every decision made inside one is re-walked on this side against
+     * this same copy. See `QuestEngine.node`.
+     */
+    if (url.pathname === '/content') return contentResponse(content, req);
     /*
      * `/auth/*` -- sign up, log in, log out, and the landing page's live handle
      * check. Workstream G; see `server/accounts.ts` for all four and for why
@@ -1445,6 +1644,32 @@ const server = Bun.serve<Conn>({
           return;
         }
 
+        /**
+         * Quests and dialog: take a job, hand one in, give one up, walk a
+         * dialog node, or say a photograph was taken. See
+         * `client/src/net/quests.QUEST_OP` for why six operations are one
+         * message id, and `QuestEngine.handle` for the rules.
+         *
+         * The **host's** rather than a room's, like `CHAT_SAY` and `SUGGEST`
+         * and unlike `PHONE` and `TEAM`: a quest is about the game and the
+         * story flags are on an account, so two rooms with two engines would
+         * be a player whose Act 0 progress depended on where they spawned.
+         * The engine resolves the body itself through `QuestWorld`.
+         *
+         * The flood guard is **inside** the engine rather than here, on
+         * `SuggestionHub`'s seam exactly: it is per-player state belonging to
+         * the feature, and a budget kept out here would be a budget the
+         * checks have to get past to drive the ops. See `QUEST_BURST`.
+         */
+        case MSG.QUEST: {
+          const p = conn.participant;
+          if (!p) return;
+          const req = decodeQuest(frame, MSG.QUEST);
+          if (!req) return;
+          questEngine.handle(p.id, req.op, req.id, req.node, req.choice);
+          return;
+        }
+
         default:
           return;
       }
@@ -1456,6 +1681,12 @@ const server = Bun.serve<Conn>({
       // push the list when a score moves. Forgetting on close is what stops that
       // set being an unbounded leak of dead sockets on a long-running host.
       suggestionHub.forget(ws);
+      // WORKSTREAM AK, for `suggestionHub.forget`'s reason and one more: the
+      // engine holds a **guest's whole progress** in a map keyed by player id,
+      // so forgetting on close is both what stops that map being an unbounded
+      // leak on a long-running host and what makes "a guest's quests do not
+      // persist" true rather than merely undocumented.
+      if (ws.data.participant) questEngine.forget(ws.data.participant.id);
       const conn = ws.data;
       const room = conn.room >= 0 ? host.get(conn.room) : undefined;
       const p = conn.participant;
@@ -1503,6 +1734,16 @@ let worstHostTick = 0;
 function runTick(): void {
   const began = performance.now();
   host.step();
+  // WORKSTREAM AK. **After the rooms, once for the host**, which is the whole
+  // of the quest engine's presence in the loop. Its own sweep is internally
+  // throttled to `SWEEP_HZ` -- a `goto` radius is metres and a player moves at
+  // most 8 m/s, so a quarter-second sample cannot miss a circle it walked
+  // through, and a per-tick distance test per open quest per player is a cost
+  // this box does not have to pay to notice something that happens once a
+  // minute. `flush` is the batch: one knockout can advance three quests, pay
+  // money and set a flag, which is one frame's worth of news.
+  questEngine.tick(1 / TICK_HZ);
+  questEngine.flush();
   const cost = performance.now() - began;
   hostTickCost[costCursor] = cost;
   costCursor = (costCursor + 1) % hostTickCost.length;

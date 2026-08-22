@@ -1,0 +1,117 @@
+{
+  "pack": "handlers",
+  "_comment": [
+    "THE TWO HANDLERS. The far side of Act 0's door.",
+    "",
+    "Both are gated on `act1:open`, which act0-review unlocks, and each one's work",
+    "is gated on `needFaction` -- so the handler you did not join will talk to you",
+    "and will not give you anything. That is the design rather than a gap: a",
+    "recruiter who pretends you were never on the other side is a worse joke than",
+    "one who remembers.",
+    "",
+    "Marita and DeFAULT: the capitalisation is the owner's and is checked by the",
+    "parser. A pack that spells either of them any other way is refused whole.",
+    "",
+    "The DeFAULT handler carries a bribe -- `needCash` gates the button, `cost`",
+    "is what the server actually takes through the wallet door. The gate must be",
+    "at least the price or the click is refused after the fact, and the validator",
+    "says so."
+  ],
+  "npcs": [
+    {
+      "id": "marita-handler",
+      "name": "Sharnie (Marita)",
+      "x": -2784.7,
+      "z": 3133.7,
+      "radius": 6,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "You're the one from the Centrelink. We can get you work by Thursday. It's not good work. It's Thursday.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "work",
+              "needFlag": "act1:open",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "I'm with DeFAULT.",
+              "goto": "other",
+              "needFaction": "DeFAULT"
+            },
+            { "text": "Not today.", "goto": "" }
+          ]
+        },
+        {
+          "id": "work",
+          "line": "Agents. There's a bloke doing an auction on somebody's lawn in Newtown and he hasn't asked whose lawn. Go and have a conversation with four of them.",
+          "choices": [
+            { "text": "That's a conversation, is it.", "accept": "act1-marita-roundup" },
+            { "text": "Done that.", "turnin": "act1-marita-roundup" },
+            { "text": "I'll think about it.", "goto": "hello" }
+          ]
+        },
+        {
+          "id": "other",
+          "line": "Yeah, I can tell. Go on then.",
+          "choices": [{ "text": "See ya.", "goto": "" }]
+        }
+      ]
+    },
+    {
+      "id": "default-handler",
+      "name": "Mick (DeFAULT)",
+      "x": 416.6,
+      "z": 1204.6,
+      "radius": 6,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Marita will get you a job. We looked into the job. The job is the problem.",
+          "choices": [
+            {
+              "text": "Go on then.",
+              "goto": "work",
+              "needFlag": "act1:open",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "Slip him fifty.",
+              "goto": "bribed",
+              "needCash": 50,
+              "cost": 50
+            },
+            {
+              "text": "I'm with Marita.",
+              "goto": "other",
+              "needFaction": "Marita"
+            },
+            { "text": "Nah.", "goto": "" }
+          ]
+        },
+        {
+          "id": "work",
+          "line": "Sixty dollars. Any way you like. We're not the ones who'll ask.",
+          "choices": [
+            { "text": "Sixty dollars of what?", "accept": "act1-default-audit" },
+            { "text": "Got it.", "turnin": "act1-default-audit" },
+            { "text": "Later.", "goto": "hello" }
+          ]
+        },
+        {
+          "id": "bribed",
+          "line": "That's very generous of you and it has bought you exactly nothing. I did say the job was the problem.",
+          "choices": [{ "text": "Worth a go.", "goto": "hello" }]
+        },
+        {
+          "id": "other",
+          "line": "Thursday's job, is it. How'd Thursday go.",
+          "choices": [{ "text": "Fine.", "goto": "" }]
+        }
+      ]
+    }
+  ]
+}
