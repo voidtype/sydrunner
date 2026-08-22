@@ -124,7 +124,7 @@ import {
   blankCursor,
   choiceRefusal,
   clampImprov,
-  completionFlag,
+  doneFlag,
   openStep,
   parseDialogPack,
   parseQuestPack,
@@ -868,6 +868,19 @@ export interface QuestWorld {
   debit(playerId: number, amount: number, why: string): number;
   /** One sentence in the pill. */
   note(playerId: number, text: string): void;
+  /**
+   * This player's level moved because a quest paid xp. Workstream AN.
+   *
+   * Optional, so a check can leave it out, and it exists because the register
+   * made a standing gap load-bearing. `AccountStore.creditXp` moves the level on
+   * the **record**; `levelOf` reads it off the **participant**, which until now
+   * was only ever updated by `Simulation.creditLadder` on a knockout. So a
+   * player who levelled purely on quest rewards kept being gated as if they had
+   * not -- invisible while `quest.level` was a minimum and merely generous, and
+   * a wall the moment it became a rung: their whole next rung of content would
+   * have stayed hidden until they happened to knock somebody over.
+   */
+  levelled?(playerId: number, level: number): void;
   /** Which station this player's train is standing at, or null. */
   rideStation(playerId: number): { line: number; station: string } | null;
   /** Put a frame on this player's socket. A no-op for anyone who has left. */
@@ -1150,9 +1163,20 @@ export class QuestEngine implements QuestSink {
       return;
     }
     delete cursors[questId];
-    // The implicit completion mark. **Not written for a repeatable**, which is
-    // the whole of the repeatable/story distinction -- see `AccountRecord.story`.
-    if (!quest.repeatable) this.setFlag(playerId, completionFlag(quest.id));
+    /*
+     * The implicit completion mark, and **which** mark is `repeatable`'s to
+     * decide. WORKSTREAM AN.
+     *
+     * This used to write `q:<id>` for a story quest and *nothing at all* for a
+     * repeatable, and the nothing was a bug wearing a design's clothes: a job
+     * `content/quests/act1.json` calls weekly could be handed in and taken
+     * again in the same breath, and the phone had no way to draw it as done
+     * because there was nothing to read. Now every turn-in writes a mark and
+     * the prefix carries the lifetime -- `q:` forever, `w:` until Monday sweeps
+     * it in `net/accounts.resetIfNewWeek`. See `questmodel.doneFlag`, which is
+     * the one place the choice is made.
+     */
+    this.setFlag(playerId, doneFlag(quest));
     for (const flag of quest.reward.unlock) this.setFlag(playerId, flag);
     if (quest.reward.cash > 0) this.world.credit(playerId, quest.reward.cash, questWhy(quest));
     if (quest.reward.xp > 0) this.awardXp(playerId, quest.reward.xp);
@@ -1173,7 +1197,12 @@ export class QuestEngine implements QuestSink {
     if (account === null || this.accounts === null) return;
     const out = this.accounts.creditXp(account, xp);
     this.pending.add(playerId);
-    if (out.levelled) this.world.note(playerId, `level ${out.level}`);
+    if (out.levelled) {
+      // The record moved; the body has to hear about it, or the next rung of
+      // the register stays shut. See `QuestWorld.levelled`.
+      this.world.levelled?.(playerId, out.level);
+      this.world.note(playerId, `level ${out.level}`);
+    }
   }
 
   /** Give one up. A story quest's mark is not written, so it can be taken again. */
@@ -1447,7 +1476,14 @@ export class QuestEngine implements QuestSink {
     return this.cursorsOf(playerId)[questId] ?? null;
   }
 
-  /** For the checks and the obligations app: what this player could take now. */
+  /**
+   * For the checks and the register: what this player could take **right now**.
+   *
+   * WORKSTREAM AN. "Now" got narrower when the level became a rung rather than
+   * a floor: this used to be everything at or below the player's level and is
+   * now everything *on* it, which is the phone's whole register in one line and
+   * is what `server/quests-check.ts` asserts the exact-level rule against.
+   */
   offers(playerId: number): Quest[] {
     this.reconcile(playerId);
     const facts = this.facts(playerId);

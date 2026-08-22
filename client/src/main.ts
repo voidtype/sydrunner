@@ -248,16 +248,19 @@ import { TalentsPanel, verifyTalentsPanel } from './teams.ts';
 // --- WORKSTREAM AK: quests and dialog. The contract, the panel and the wire's
 // client half; the one block that uses all three is beside `TalentsPanel`'s
 // construction, well clear of the boot region. See it for why.
-import { DialogPanel, verifyDialogPanel } from './dialog.ts';
+import { DialogPanel, cursorsFrom, verifyDialogPanel } from './dialog.ts';
 import {
   EMPTY_BUNDLE,
   parseDialogPack,
   parseQuestPack,
+  questView,
   verifyDialog,
   verifyQuests,
   type ContentBundle,
 } from './game/questmodel.ts';
 import { blankQuestState } from './net/quests.ts';
+// WORKSTREAM AN: the `!` and the `?` in the street. Wired in the same block.
+import { QuestMarkerField, verifyQuestMarkers, type QuestMarkerSource } from './world/questmarkers.ts';
 import { BuildSheet, verifyBuildSheet } from './buildsheet.ts';
 import { ChangelogFeed, verifyChangelog, verifyChangeFeed } from './changelog.ts';
 import { BugReportForm, FrameGrabber, verifyBugReport } from './bugreport.ts';
@@ -4534,7 +4537,7 @@ async function main(): Promise<void> {
    * `client/src/teams.ts` already does for the same reason. It consumes only
    * the Escape that actually closed something.
    */
-  const dialogFailures = [...verifyQuests(), ...verifyDialog(), ...verifyDialogPanel()];
+  const dialogFailures = [...verifyQuests(), ...verifyDialog(), ...verifyDialogPanel(), ...verifyQuestMarkers()];
   if (dialogFailures.length > 0) {
     hud.fatal('Quest content self-checks failed:\n' + dialogFailures.map((f) => '  - ' + f).join('\n'));
   }
@@ -4569,13 +4572,26 @@ async function main(): Promise<void> {
       // No content, no quests, no prompt. See the header.
     }
   })();
+  /*
+   * The four facts a gate is decided from, named once. WORKSTREAM AN.
+   *
+   * The panel and the world markers ask the same questions of the same player
+   * and must get the same answers -- `questmodel.choiceRefusal` is literally
+   * the same function on both paths -- so the closures are hoisted here rather
+   * than written twice. Two copies of `TEAM_NAME[net?.myTeam ?? TEAM.NONE]` is
+   * how a marker ends up disagreeing with the button under it.
+   */
+  const questFrame = () => net?.questState() ?? blankQuestState();
+  const questLevel = () => net?.myTalentLevel ?? 1;
+  const questFaction = () => TEAM_NAME[net?.myTeam ?? TEAM.NONE];
+  const questCash = () => net?.wallet.balance ?? 0;
   const dialog = new DialogPanel({
     content: () => questBundle,
-    state: () => net?.questState() ?? blankQuestState(),
+    state: questFrame,
     position: () => ({ x: player.position.x, z: player.position.z }),
-    level: () => net?.myTalentLevel ?? 1,
-    faction: () => TEAM_NAME[net?.myTeam ?? TEAM.NONE],
-    cash: () => net?.wallet.balance ?? 0,
+    level: questLevel,
+    faction: questFaction,
+    cash: questCash,
     send: (op, id, node, choice) => net?.quest(op, id, node, choice),
     // The click that closed the conversation is a user gesture, which is the
     // only thing `requestPointerLock` will accept -- `Phone.setCamera`'s note.
@@ -4594,6 +4610,42 @@ async function main(): Promise<void> {
    * stale gate state.
    */
   window.setInterval(() => dialog.tick(0.25), 250);
+  /*
+   * --- WORKSTREAM AN: the marks over the givers' heads.
+   *
+   * The field is one mesh, one material and one draw call and owns everything
+   * about how a mark looks; see `world/questmarkers.ts`. What is here is the
+   * three things only this file knows -- the live bundle, what the server last
+   * said about this player, and how high the ground is under a coordinate --
+   * and they are the same closures the panel above is built from, which is the
+   * point: `questmodel.markerFor` and the panel's greyed-out buttons are the
+   * same rule read twice and must not be handed two different players.
+   *
+   * `wildGround` rather than `groundHeightAt`, on `SunFeature`'s argument: the
+   * latter *writes* the player's `lastGround` as a side effect, and asking it
+   * about a clerk in Redfern would move the local player's fallback height to a
+   * footpath they have never stood on.
+   *
+   * Every closure below is called four times a second, not per frame -- the
+   * field runs the decision on its own clock and only the billboard per frame.
+   */
+  const questMarkers = new QuestMarkerField();
+  scene.add(questMarkers.mesh);
+  const questMarkerSource: QuestMarkerSource = {
+    npcs: () => questBundle.npcs,
+    view: () => questView(questBundle.quests, cursorsFrom(questFrame())),
+    facts: () => ({
+      level: questLevel(),
+      faction: questFaction(),
+      story: new Set(questFrame().flags),
+      cash: questCash(),
+    }),
+    groundAt: (x, z) => wildGround(x, z),
+  };
+  /** One line in the render loop, beside the plates. See `nameplates.end()`. */
+  const updateQuestMarkers = (dt: number): void => {
+    questMarkers.update(dt, camera, questMarkerSource);
+  };
   window.addEventListener(
     'keydown',
     (e) => {
@@ -9270,7 +9322,17 @@ async function main(): Promise<void> {
    * pass that timed out must not leave five invisible triangles in the render
    * list for the rest of the session.
    */
-  const lateWarmup = warmupStandins([...handsWarmupParts(handsViewmodel.assets), ...money.warmupParts()]);
+  const lateWarmup = warmupStandins([
+    ...handsWarmupParts(handsViewmodel.assets),
+    ...money.warmupParts(),
+    // WORKSTREAM AN: and the quest markers, which are the same case exactly --
+    // the field is built in the quest block below `hud.ready`, so the boot list
+    // three thousand lines up cannot see it, and its geometry is empty until a
+    // giver is in range, so the scene pass would compile nothing. Without this
+    // the first `!` in Sydney compiles a pipeline on the frame it appears,
+    // which is the frame a player is walking toward the thing it points at.
+    ...questMarkers.warmupParts(),
+  ]);
   scene.add(lateWarmup.holder);
   const scenePass = await withDeadline(
     renderer.compileAsync(scene, camera).finally(() => lateWarmup.release()),
@@ -11109,6 +11171,12 @@ async function main(): Promise<void> {
       }
     }
     nameplates.end();
+    // WORKSTREAM AN: the `!` and the `?` over the quest givers, here for the
+    // plates' own reason -- both are CPU billboards and both need *this*
+    // frame's camera basis, which the `updateMatrixWorld` above just produced.
+    // The decision behind them runs at 4 Hz inside the field; this is the
+    // rewrite of at most 1,056 vertices. See `world/questmarkers.ts`.
+    updateQuestMarkers(frameDt);
 
     frameProfile.at(FSEC.teams);
     // WORKSTREAM X: the bodies, the horns, the ground rings and the tents, on

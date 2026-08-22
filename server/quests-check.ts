@@ -23,7 +23,14 @@
  *   - **an improv node with no AI configured serving its authored line**, which
  *     is the ordinary configuration and therefore the one that must be tested;
  *   - a guest's story flags not surviving where an account's do;
- *   - the Monday reset clearing the xp and **not** the story.
+ *   - the Monday reset clearing the xp and **not** the story;
+ *   - **the rung**, which is workstream AN's whole feature: a job offered at
+ *     level 3 and refused at 2 *and at 4*, through the op a client really
+ *     sends, against a level the engine really reads. `verifyQuests` proves the
+ *     arithmetic; only this can prove the wiring, because `levelOf` comes off
+ *     the participant and the participant is a thing only a `Simulation` has;
+ *   - a repeatable's `w:` mark stopping it being taken twice in one week, and
+ *     Monday putting it back.
  *
  * Every one of those is a seam between two files and every one of them fails
  * *silently* in this repo's sense: the game plays perfectly and the quest never
@@ -55,8 +62,17 @@ import { SpatialHash } from '../client/src/game/spatialhash.ts';
 import { TerrainField } from '../client/src/world/terrain.ts';
 import { TrafficField } from '../client/src/game/traffic.ts';
 import { WaterLevels } from '../client/src/world/wading.ts';
-import { XP_PER_KO, resetIfNewWeek, weekOf } from '../client/src/net/accounts.ts';
-import { completionFlag, verifyDialog, verifyQuests } from '../client/src/game/questmodel.ts';
+import { XP_PER_KO, XP_PER_LEVEL, resetIfNewWeek, weekOf } from '../client/src/net/accounts.ts';
+import {
+  REGISTER_LEVELS,
+  completionFlag,
+  markerFor,
+  questView,
+  verifyDialog,
+  verifyQuests,
+  weeklyFlag,
+  type PlayerFacts,
+} from '../client/src/game/questmodel.ts';
 import { QUEST_OP, verifyQuestWire } from '../client/src/net/quests.ts';
 import { AccountStore } from './accounts.ts';
 import { WalletStore } from './wallets.ts';
@@ -180,6 +196,25 @@ const FIXTURE_QUESTS = {
       steps: [{ kind: 'earn', dollars: 30, label: 'earn thirty' }],
       reward: { cash: 10, xp: 100 },
     },
+    /*
+     * WORKSTREAM AN: the rung, and it has a **giver of its own**.
+     *
+     * Not another pair of choices on Denise's node, because that node is
+     * already at `MAX_CHOICES`. A second NPC is also the shape the content pool
+     * is being written in -- one self-contained giver per job -- so the
+     * exact-level walk below exercises the arrangement the packs will actually
+     * arrive in rather than a fixture nothing resembles.
+     */
+    {
+      id: 'check-rung3',
+      act: 1,
+      title: 'Rung Three',
+      blurb: 'Only while you are level three. Not before, and not after.',
+      giver: 'clerk3',
+      level: 3,
+      steps: [{ kind: 'earn', dollars: 5, label: 'earn five' }],
+      reward: { cash: 5, xp: 10 },
+    },
   ],
 };
 
@@ -218,6 +253,25 @@ const FIXTURE_DIALOG = {
         },
       ],
     },
+    /** The rung-3 job's own giver. See `check-rung3`. */
+    {
+      id: 'clerk3',
+      name: 'Another clerk',
+      x: 0,
+      z: 0,
+      radius: 5,
+      root: 'hello',
+      nodes: [
+        {
+          id: 'hello',
+          line: 'not for you. not yet, anyway.',
+          choices: [
+            { text: 'the rung three job', accept: 'check-rung3' },
+            { text: 'done the rung three job', turnin: 'check-rung3' },
+          ],
+        },
+      ],
+    },
   ],
 };
 
@@ -252,8 +306,8 @@ async function main(): Promise<void> {
   const content = new ContentStore({ dir: contentDir, ledgerPath: `${scratch}/ledger.json`, timers: false });
   const loadErrors = await content.load();
   check(loadErrors.length === 0, 'the fixture pack loads clean', loadErrors.slice(0, 2).join('; '));
-  check(content.bundle.quests.length === 2, 'both quests are live', `${content.bundle.quests.length}`);
-  check(content.bundle.npcs.length === 1, 'the clerk is live');
+  check(content.bundle.quests.length === 3, 'all three quests are live', `${content.bundle.quests.length}`);
+  check(content.bundle.npcs.length === 2, 'both clerks are live', `${content.bundle.npcs.length}`);
   const goodRevision = content.revision;
   check(goodRevision !== '' && goodRevision !== '0', 'the bundle has a revision', goodRevision);
 
@@ -306,7 +360,7 @@ async function main(): Promise<void> {
     // And the store keeps serving what it had. Driven through the same
     // `bundleFrom` the poll uses, then asserted against the live bundle.
     check(content.revision === goodRevision, 'the live revision did not move while bad packs were rejected');
-    check(content.bundle.quests.length === 2, 'and the good pack is still being served', `${content.bundle.quests.length} quest(s)`);
+    check(content.bundle.quests.length === 3, 'and the good pack is still being served', `${content.bundle.quests.length} quest(s)`);
   }
 
   // --- Phase B: a quest walked through a real Simulation --------------------------
@@ -358,6 +412,13 @@ async function main(): Promise<void> {
     },
     debit: (id, amount, why) => sim.wallet.debit(id, amount, why),
     note: (id, text) => sim.note(id, text),
+    // WORKSTREAM AN: `server/index.ts`'s two lines, in miniature. Without this
+    // the participant's level never follows the record's when a quest pays xp,
+    // and every rung above the first would be gated on knockouts alone.
+    levelled: (id, level) => {
+      const p = sim.participants.get(id);
+      if (p) p.level = level;
+    },
     rideStation: () => null,
     send: (id, frame) => {
       sent.push({ id, frame });
@@ -450,9 +511,89 @@ async function main(): Promise<void> {
   sim.wallet.debit(hero.id, 25, 'bribe');
   check(engine.cursorFor(hero.id, 'check-weekly')?.d === true, 'spending money does not un-earn the step');
   engine.handle(hero.id, QUEST_OP.TURNIN, 'check-weekly', '', 0, at());
-  check(!record.story.includes(completionFlag('check-weekly')), 'a repeatable writes no completion mark');
+  /*
+   * WORKSTREAM AN. A repeatable used to write **nothing**, which meant a job
+   * the content file calls weekly could be handed in and taken again in the
+   * same breath. It now writes `w:<id>`, which Monday sweeps and a story mark
+   * never is -- so "weekly" is true rather than merely written down, and the
+   * register has something to draw when it says done.
+   */
+  check(!record.story.includes(completionFlag('check-weekly')), 'a repeatable writes no permanent completion mark');
+  check(record.story.includes(weeklyFlag('check-weekly')), 'it writes a weekly one instead', JSON.stringify(record.story));
   engine.handle(hero.id, QUEST_OP.ACCEPT, 'check-weekly', '', 0, at());
-  check(record.quests['check-weekly'] !== undefined, 'so it can be taken again');
+  check(record.quests['check-weekly'] === undefined, 'so it cannot be taken twice in the same week');
+
+  // --- Phase C2: the register, and a level that is exact --------------------------
+  //
+  // The feature workstream AN exists for, walked through the ops a client
+  // really sends against a level the engine really reads. `verifyQuests` proves
+  // the arithmetic in isolation; this is the only thing that can prove the
+  // wiring, because `levelOf` comes off a `Participant` and a `Participant` is
+  // a thing only a `Simulation` has.
+  console.log('\n--- phase C2: offered at 3, refused at 2 and at 4 ---');
+  {
+    const clerk3 = content.bundle.npcs.find((n) => n.id === 'clerk3');
+    if (!clerk3) {
+      check(false, "the rung-3 job's own giver is in the bundle");
+    } else {
+      // The two halves of "who is this player", assembled the way the engine
+      // assembles them. `faction` is empty because nothing in this fixture is
+      // side-gated and the two spellings are `verifyQuests`' business.
+      const facts = (): PlayerFacts => ({
+        level: hero.level,
+        faction: '',
+        story: new Set(record.story),
+        cash: sim.wallet.balanceOf(hero.id),
+      });
+      const view = () => questView(content.bundle.quests, record.quests);
+      const offered = (): boolean => engine.offers(hero.id).some((q) => q.id === 'check-rung3');
+      // In range of both clerks, so nothing below is refused by distance.
+      hero.combat.body.position.set(0, EYE_HEIGHT, 0);
+
+      hero.level = 2;
+      engine.handle(hero.id, QUEST_OP.ACCEPT, 'check-rung3', '', 0, at());
+      check(record.quests['check-rung3'] === undefined, 'a rung-3 job is refused one rung below it');
+      check(!offered(), 'and is not in the register at level 2');
+      check(markerFor(clerk3, facts(), view()) === 'none', 'and its giver draws no "!" at level 2');
+
+      /*
+       * **And refused from above**, which is the assertion a minimum could
+       * never have failed and the whole of what "strict" means. A gate only
+       * ever tested from below reads as correct until somebody levels up.
+       */
+      hero.level = 4;
+      engine.handle(hero.id, QUEST_OP.ACCEPT, 'check-rung3', '', 0, at());
+      check(record.quests['check-rung3'] === undefined, 'a rung-3 job is refused one rung **above** it');
+      check(!offered(), 'and is not in the register at level 4');
+      check(markerFor(clerk3, facts(), view()) === 'none', 'and its giver draws no "!" at level 4');
+
+      hero.level = 3;
+      check(offered(), 'on the rung itself it is in the register');
+      check(markerFor(clerk3, facts(), view()) === 'offer', 'and its giver draws the "!"');
+      engine.handle(hero.id, QUEST_OP.ACCEPT, 'check-rung3', '', 0, at());
+      check(record.quests['check-rung3'] !== undefined, 'and it can be taken');
+      check(markerFor(clerk3, facts(), view()) === 'none', 'while it is being walked the giver draws nothing');
+
+      /*
+       * Levelling up mid-job does not strand it. The rung gates the **offer**
+       * and nothing else -- so the walking, the completion and the turn-in all
+       * still work from the rung above, which is what stops the register being
+       * a trap rather than a schedule.
+       */
+      hero.level = 4;
+      sim.wallet.credit(hero.id, 5, 'fare');
+      check(engine.cursorFor(hero.id, 'check-rung3')?.d === true, 'a job in progress completes after levelling past its rung');
+      check(markerFor(clerk3, facts(), view()) === 'turnin', 'and its giver draws the "?"');
+      const paid = sim.wallet.balanceOf(hero.id);
+      engine.handle(hero.id, QUEST_OP.TURNIN, 'check-rung3', '', 0, at());
+      check(sim.wallet.balanceOf(hero.id) === paid + 5, 'and it hands in from the rung above', `$${sim.wallet.balanceOf(hero.id)}`);
+      check(record.story.includes(completionFlag('check-rung3')), 'leaving a permanent mark; it is not repeatable');
+      check(markerFor(clerk3, facts(), view()) === 'none', 'and the giver goes quiet');
+    }
+    // Back to the rung everything after this assumes. The engine reads the
+    // participant's level and this file has been writing it by hand.
+    hero.level = 1;
+  }
 
   // --- Phase D: the AI seam, off ---------------------------------------------------
   console.log('\n--- phase D: an improv node with no model configured ---');
@@ -518,6 +659,14 @@ async function main(): Promise<void> {
       JSON.stringify(record.story),
     );
     check(record.levelWeek === weekOf(), 'the new week is stamped');
+    // WORKSTREAM AN: and the *weekly* mark went with it, which is the other
+    // half of "the story survives". A `w:` left standing is a weekly job that
+    // never comes back, silently, for the life of the account.
+    check(
+      !record.story.includes(weeklyFlag('check-weekly')),
+      'and the weekly completion mark did **not** survive Monday',
+      JSON.stringify(record.story),
+    );
     // Which means the story quest is *still* finished on the other side of
     // Monday. This is the assertion the whole persistence design exists for.
     engine.handle(hero.id, QUEST_OP.ACCEPT, 'check-run', '', 0, at());
@@ -631,8 +780,37 @@ async function main(): Promise<void> {
     // The arc has a spine: every job but the first requires the one before it,
     // and the last is gated at the level the faction choice happens.
     const last = shipped.bundle.quests.find((q) => q.id === 'act0-review');
-    check(last?.level === 2, 'the review is gated at the faction-choice level', `level ${last?.level}`);
+    check(last?.level === 2, 'the review sits on the faction-choice rung', `level ${last?.level}`);
     check(last?.reward.unlock.includes('act1:open') === true, 'and opens Act 1');
+
+    /*
+     * --- WORKSTREAM AN: the register the shipped packs actually make, and the
+     * one sum a content author has to keep true.
+     *
+     * A rung is exact, so the jobs standing on it must not pay enough xp
+     * between them to push the player off it before the last of them is taken.
+     * Act 0's five obligations are a chain -- each requires the one before --
+     * so if their rewards summed past a level the fifth would be unreachable to
+     * anybody who did the first four, every week, and nothing would say why.
+     * That is not a bug you find by playing carefully; it is a bug you find by
+     * adding up.
+     */
+    const rungs = [...new Set(shipped.bundle.quests.map((q) => q.level))].sort((a, b) => a - b);
+    check(
+      rungs.every((l) => l >= 1 && l <= REGISTER_LEVELS),
+      `every shipped job sits on a rung of the register (1-${REGISTER_LEVELS})`,
+      rungs.join(', '),
+    );
+    const rung1 = shipped.bundle.quests.filter((q) => q.level === 1);
+    check(rung1.length === 5, 'Act 0 puts five obligations on rung 1', `${rung1.length}`);
+    const rung1Xp = rung1.reduce((sum, q) => sum + q.reward.xp, 0);
+    check(
+      rung1Xp < XP_PER_LEVEL,
+      `rung 1 pays ${rung1Xp} xp between its five jobs, under the ${XP_PER_LEVEL} that would level a player off it`,
+    );
+    const act1 = shipped.bundle.quests.filter((q) => q.act === 1);
+    check(act1.length > 0 && act1.every((q) => q.level === last?.level), 'the faction work stands on the rung its door opens onto');
+    check(act1.every((q) => q.repeatable), 'and both faction jobs are repeatable, so they come round with the week');
     // The two spellings, in the strings a player reads. `verifyTeams` cannot
     // see a content file and `verifyQuests` only checks the `faction` field.
     const prose = JSON.stringify(shipped.bundle);

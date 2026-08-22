@@ -65,13 +65,42 @@
  * strips markup out of a model's answer (`questmodel.clampImprov`); this is the
  * second wall, and it is the one that would still hold if the first were
  * removed.
+ *
+ * ---------------------------------------------------------------------------
+ * ## THE OBLIGATIONS APP IS A REGISTER NOW. Workstream AN.
+ *
+ * The owner's words: *"all quests should be on a strict per level register"*.
+ * `quest.level` became a **rung** rather than a floor (`questmodel`'s header
+ * argues it), and this screen is where a player can see the shape that makes:
+ * the rung they are standing on with its jobs on it, and the rest of the
+ * register underneath as a count per rung.
+ *
+ * **Counts rather than titles for the other rungs**, and that is a decision
+ * rather than a shortcut. Two reasons pulling the same way. The first is this
+ * file's existing rule, which the previous version stated and which has not
+ * changed: *a full quest log listing everything in the game would be a
+ * walkthrough*, and the texture of Act 0 is that Denise tells you what you owe
+ * her one item at a time. The second is arithmetic -- the content pool this
+ * schema was opened up for is hundreds of jobs across ten rungs, and a screen
+ * that named every one of them would be a scroll nobody reads instead of a
+ * register anybody can. A row saying `level 5 - 12 jobs` says the true and
+ * useful thing (there is a reason to get there) without saying what they are.
+ *
+ * The rung you are on is different and gets titles, including the ones you have
+ * already finished: those are not a spoiler, they are your week.
  */
 
 import {
+  EMPTY_BUNDLE,
+  REGISTER_LEVELS,
   STEP_KIND,
   choiceRefusal,
-  defaultLabel,
+  parseQuestPack,
   questRefusal,
+  questStanding,
+  questView,
+  rungOf,
+  stepLabel,
   stepTarget,
   type ContentBundle,
   type DialogChoice,
@@ -80,6 +109,9 @@ import {
   type PlayerFacts,
   type Quest,
   type QuestCursor,
+  type QuestCursors,
+  type QuestStanding,
+  type QuestView,
 } from './game/questmodel.ts';
 import { NODE_OPENED, QUEST_OP, blankQuestState, type QuestStateFrame } from './net/quests.ts';
 
@@ -323,35 +355,22 @@ export class DialogPanel {
   /**
    * Why a choice is greyed out, or `''`.
    *
-   * Three questions in order, and the order is what makes the message useful --
-   * `SuggestionStore.vote`'s rule about putting "already voted" before "out of
-   * votes". A choice that accepts a quest you have already done should say so
-   * rather than saying nothing, and a choice that turns in a quest you have not
-   * finished should name **the step you are on**, which is the single most
-   * useful sentence this panel can produce.
+   * **Four lines and none of the rule.** WORKSTREAM AN moved every question
+   * this used to ask -- the choice's own gates, and then the quest behind an
+   * accept or a turn-in -- into `questmodel.choiceRefusal`, because the world's
+   * `!` markers have to ask exactly the same thing and a second copy of a rule
+   * is how a marker ends up floating over an NPC whose button is greyed out.
+   * The ordering the old comment argued for is preserved inside that function
+   * and is still the point: a turn-in for an unfinished job names **the step
+   * you are on**, which is the single most useful sentence this panel produces.
    */
   private refusalFor(choice: DialogChoice, facts: PlayerFacts, cursors: Map<string, QuestCursor>): string {
-    const gate = choiceRefusal(choice, facts);
-    if (gate !== '') return gate;
-    if (choice.accept !== '') {
-      const quest = this.questById(choice.accept);
-      if (!quest) return 'not available';
-      return questRefusal(quest, facts, Object.fromEntries(cursors));
-    }
-    if (choice.turnin !== '') {
-      const quest = this.questById(choice.turnin);
-      const cursor = cursors.get(choice.turnin);
-      if (!quest || !cursor) return 'you are not on that';
-      if (!cursor.d) {
-        const step = quest.steps[cursor.s];
-        return step ? shortLabel(step.label || defaultLabel(step)) : 'not yet';
-      }
-    }
-    return '';
+    return choiceRefusal(choice, facts, this.view(cursors));
   }
 
-  private questById(id: string): Quest | null {
-    return this.source.content().quests.find((q) => q.id === id) ?? null;
+  /** The live bundle and this player's cursors, as `choiceRefusal` wants them. */
+  private view(cursors: Map<string, QuestCursor>): QuestView {
+    return questView(this.source.content().quests, Object.fromEntries(cursors));
   }
 
   /**
@@ -391,40 +410,125 @@ export class DialogPanel {
    * compares the whole body as a string before it writes it, so a screen that
    * has not changed costs one `join` and one compare four times a second. A
    * panel of my own would be a second element to show, hide, position and
-   * Escape out of, for a list of at most eight rows.
+   * Escape out of.
    *
-   * It is deliberately **only the jobs you are on**, plus what is available
-   * from somebody you have already met. A full quest log listing everything in
-   * the game would be a walkthrough, and the whole texture of Act 0 is that
-   * Denise tells you what you owe her one item at a time.
+   * The shape is `registerRows`'; this is only the rendering, and the split is
+   * so the check can read the register without a DOM. Nothing here composes a
+   * decision -- see the header on why the other rungs are counts.
    */
   obligationsHtml(): string {
     const state = this.source.state();
-    const bundle = this.source.content();
-    const rows: string[] = [];
-    for (const cursor of state.cursors) {
-      const quest = bundle.quests.find((q) => q.id === cursor.id);
-      if (!quest) continue;
-      const step = quest.steps[cursor.step];
-      const detail = cursor.done
-        ? 'ready to hand in'
-        : step
-          ? `${escapeHtml(shortLabel(step.label || defaultLabel(step)))}${counterFor(step, cursor.counts[cursor.step] ?? 0)}`
-          : 'in progress';
-      rows.push(
-        `<div class="phone-row"><span>${escapeHtml(quest.title)}</span></div>` +
-          `<div class="phone-note">${detail}</div>`,
-      );
+    const out: string[] = [];
+    for (const row of registerRows(this.source.content(), state, this.facts())) {
+      if (row.kind === 'caption' || row.kind === 'detail') {
+        out.push(`<div class="phone-note">${escapeHtml(row.label)}</div>`);
+      } else if (row.kind === 'gap') {
+        out.push('<div class="phone-note">&nbsp;</div>');
+      } else {
+        out.push(
+          `<div class="phone-row"><span>${escapeHtml(row.label)}</span><span>${escapeHtml(row.value)}</span></div>`,
+        );
+      }
     }
-    if (rows.length === 0) {
-      rows.push(
-        '<div class="phone-note">Nothing outstanding. Services Australia will be in touch.</div>',
-      );
-    }
-    const xp = `<div class="phone-row"><span>experience</span><span>${state.xp}</span></div>`;
-    const level = `<div class="phone-row"><span>level</span><span>${state.level}</span></div>`;
-    return `${rows.join('')}<div class="phone-note">&nbsp;</div>${level}${xp}`;
+    return out.join('');
   }
+}
+
+// --- The register --------------------------------------------------------------------
+
+/** One line of the register, before it is markup. See `registerRows`. */
+export interface RegisterRow {
+  /** `entry` and `summary` are two-column rows; the rest are one. */
+  kind: 'caption' | 'entry' | 'detail' | 'summary' | 'gap';
+  label: string;
+  value: string;
+}
+
+/**
+ * What the right-hand column says for each of the five standings.
+ *
+ * `locked` is the fallback rather than the answer: a locked row prints
+ * `questRefusal`'s own **sentence** instead -- "not yet", "that is DeFAULT
+ * work", "level 2 only" -- because the word "locked" is the one thing on this
+ * screen a player already knows. The word survives only for the impossible
+ * case where the standing says locked and the refusal has nothing to say.
+ */
+const STANDING_WORD: Record<QuestStanding, string> = {
+  on: 'on it',
+  ready: 'ready to hand in',
+  available: 'available',
+  done: 'done',
+  locked: 'locked',
+};
+
+/**
+ * The register, as rows. Pure, so `verifyDialogPanel` can read it.
+ *
+ * Three sections and they answer three different questions, which is the whole
+ * reason this is not one list:
+ *
+ *   1. **This rung.** Every job on the level you are standing on, plus any job
+ *      you are *already on* whatever rung it belongs to -- because levelling up
+ *      mid-job does not abandon it (the rung gates the offer, not the walking),
+ *      and a tracker that dropped it the moment you levelled would be the one
+ *      screen in the game that lies about what you are doing.
+ *   2. **The rest of the register**, one row per rung, as a count. See the
+ *      header for why it is a count.
+ *   3. **Where you are on the ladder**, which is what decides section 1 and so
+ *      belongs on the same screen rather than only in the HUD.
+ */
+export function registerRows(bundle: ContentBundle, state: QuestStateFrame, facts: PlayerFacts): RegisterRow[] {
+  const rung = rungOf(facts.level);
+  const cursors = Object.fromEntries([...cursorMap(state)]);
+  const rows: RegisterRow[] = [{ kind: 'caption', label: `level ${rung} \u2014 this week`, value: '' }];
+
+  const here = bundle.quests.filter((q) => q.level === rung || cursors[q.id] !== undefined);
+  for (const quest of here) {
+    const standing = questStanding(quest, facts, cursors);
+    const value =
+      standing === 'locked' ? questRefusal(quest, facts, cursors) || STANDING_WORD.locked : STANDING_WORD[standing];
+    rows.push({ kind: 'entry', label: shortLabel(quest.title), value });
+    // The step you are on, under the job you are on. Only for the two standings
+    // that have a next thing to do: "available" has no step yet and "done" has
+    // no step left, and a detail line under either would be noise.
+    if (standing !== 'on') continue;
+    const cursor = cursors[quest.id];
+    const step = quest.steps[cursor.s];
+    if (step) {
+      rows.push({ kind: 'detail', label: `${stepLabel(step)}${counterFor(step, cursor.c[cursor.s] ?? 0)}`, value: '' });
+    }
+  }
+  if (here.length === 0) {
+    rows.push({
+      kind: 'caption',
+      label: 'Nothing on this rung. Services Australia will be in touch.',
+      value: '',
+    });
+  }
+
+  // --- The rungs you are not on.
+  const elsewhere: RegisterRow[] = [];
+  for (let level = 1; level <= REGISTER_LEVELS; level++) {
+    if (level === rung) continue;
+    const on = bundle.quests.filter((q) => q.level === level);
+    if (on.length === 0) continue;
+    const done = on.filter((q) => questStanding(q, facts, cursors) === 'done').length;
+    elsewhere.push({
+      kind: 'summary',
+      label: `level ${level}`,
+      value: done > 0 ? `${done} of ${on.length} done` : `${on.length} job${on.length === 1 ? '' : 's'}`,
+    });
+  }
+  if (elsewhere.length > 0) {
+    rows.push({ kind: 'gap', label: '', value: '' });
+    rows.push({ kind: 'caption', label: 'the rest of the register', value: '' });
+    rows.push(...elsewhere);
+  }
+
+  rows.push({ kind: 'gap', label: '', value: '' });
+  rows.push({ kind: 'summary', label: 'level', value: String(state.level) });
+  rows.push({ kind: 'summary', label: 'experience', value: String(state.xp) });
+  return rows;
 }
 
 /** `x of y` for a counted step, or nothing. One place, so the two agree. */
@@ -439,6 +543,19 @@ function cursorMap(state: QuestStateFrame): Map<string, QuestCursor> {
   const out = new Map<string, QuestCursor>();
   for (const c of state.cursors) out.set(c.id, { s: c.step, c: [...c.counts], d: c.done });
   return out;
+}
+
+/**
+ * The same thing keyed the way the model keys it, for anybody outside this file.
+ *
+ * `world/questmarkers.ts` needs exactly what the panel needs -- a `QuestView`
+ * over the live bundle and this player's cursors -- and the wire's rows are the
+ * only place either of them can come from. Exported here rather than added to
+ * `net/quests.ts` because **that file has no imports at all**, deliberately, and
+ * this conversion needs a type out of the model.
+ */
+export function cursorsFrom(state: QuestStateFrame): QuestCursors {
+  return Object.fromEntries(cursorMap(state));
 }
 
 function shortLabel(text: string): string {
@@ -553,7 +670,99 @@ export function verifyDialogPanel(): string[] {
       failures.push('The blank quest state is not blank; the panel draws it before the first frame arrives.');
     }
     if (cursorMap(blank).size !== 0) failures.push('An empty state produced cursors.');
+    // The register is drawn from the same blank frame on the first open, before
+    // `/content` has answered. An empty bundle must be a screen, not a throw.
+    const empty = registerRows(EMPTY_BUNDLE, blank, { level: 1, faction: '', story: new Set(), cash: 0 });
+    if (empty.length === 0) failures.push('An empty register drew nothing at all, not even the rung it is on.');
+  }
+
+  /*
+   * --- WORKSTREAM AN: the register, which is what the level gate is *for*.
+   *
+   * The gate itself is `verifyQuests`'; what this asserts is the screen a
+   * player reads it through, and the three ways it goes wrong are all silent:
+   *
+   *   - **A job on your rung missing from it.** The player never learns the
+   *     content exists, because there is nothing anywhere else that says so.
+   *   - **A job you are on disappearing when you level.** The rung gates the
+   *     offer and not the walking, so the tracker must keep showing it -- a
+   *     screen that dropped it would be the one place in the game that lies
+   *     about what you are currently doing.
+   *   - **Another rung's titles leaking in.** That is the walkthrough this file
+   *     has refused since it was written; see the header.
+   */
+  {
+    const bundle: ContentBundle = {
+      revision: '1',
+      npcs: [],
+      quests: [
+        quest('one', 1, 'A Level One Job'),
+        quest('two-a', 2, 'The Second Rung'),
+        quest('two-b', 2, 'Also The Second Rung'),
+        quest('five', 5, 'Miles Away'),
+      ],
+    };
+    const facts = (level: number, story: string[] = []): PlayerFacts => ({
+      level,
+      faction: '',
+      story: new Set(story),
+      cash: 0,
+    });
+    const state = (level: number, cursors: QuestStateFrame['cursors'] = []): QuestStateFrame => ({
+      ...blankQuestState(),
+      level,
+      cursors,
+    });
+
+    const at2 = registerRows(bundle, state(2), facts(2));
+    const titles = at2.filter((r) => r.kind === 'entry').map((r) => r.label);
+    if (titles.length !== 2 || !titles.includes('The Second Rung')) {
+      failures.push(`The register on rung 2 listed ${JSON.stringify(titles)}; both level-2 jobs belong on it.`);
+    }
+    if (at2.filter((r) => r.kind === 'entry').some((r) => r.value !== 'available')) {
+      failures.push('A takeable job on this rung did not read as available.');
+    }
+    const text = at2.map((r) => `${r.label} ${r.value}`).join(' | ');
+    for (const leaked of ['A Level One Job', 'Miles Away']) {
+      if (text.includes(leaked)) failures.push(`The register named "${leaked}", which is on another rung. That is a walkthrough.`);
+    }
+    if (!text.includes('level 1') || !text.includes('level 5')) {
+      failures.push('The register did not summarise the rungs the player is not on; there is no reason to climb.');
+    }
+    if (text.includes('level 3')) failures.push('The register listed a rung with nothing on it.');
+
+    // Finished, on this rung: the word changes and the row stays.
+    const done = registerRows(bundle, state(2), facts(2, ['q:two-a']));
+    const doneRow = done.find((r) => r.kind === 'entry' && r.label === 'The Second Rung');
+    if (doneRow?.value !== 'done') failures.push(`A finished job on this rung reads "${doneRow?.value}", not done.`);
+    // And on another rung it becomes part of that rung's count rather than a title.
+    const counted = registerRows(bundle, state(2), facts(2, ['q:one']));
+    const summary = counted.find((r) => r.kind === 'summary' && r.label === 'level 1');
+    if (summary?.value !== '1 of 1 done') failures.push(`Rung 1 summarised as "${summary?.value}" after its only job was done.`);
+
+    // Levelled up mid-job. The job is on rung 2, the player is on rung 3, and
+    // the tracker must still be showing it with the step they are on.
+    const carried = registerRows(
+      bundle,
+      state(3, [{ id: 'two-a', step: 0, done: false, counts: [1] }]),
+      facts(3),
+    );
+    const carriedRow = carried.find((r) => r.kind === 'entry' && r.label === 'The Second Rung');
+    if (carriedRow?.value !== 'on it') {
+      failures.push('A job in progress vanished from the register when the player levelled past its rung.');
+    }
+    if (!carried.some((r) => r.kind === 'detail')) {
+      failures.push('A job in progress drew no step line; the tracker is the only thing that says what to do next.');
+    }
   }
 
   return failures;
+}
+
+/** A quest for the register's fixtures, through the real parser. */
+function quest(id: string, level: number, title: string): Quest {
+  return parseQuestPack(
+    { quests: [{ id, level, title, giver: 'clerk', steps: [{ kind: 'ko', count: 2, label: 'drop two' }] }] },
+    'fixture',
+  ).value.quests[0];
 }

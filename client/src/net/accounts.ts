@@ -116,7 +116,7 @@ import { MAX_NAME_CHARS, sanitiseName } from './protocol.ts';
 import { weekKey } from './suggestions.ts';
 // WORKSTREAM AK: one parser for a cursor, imported rather than copied. The
 // module is three-free and content-free at this level; see `sanitiseCursor`.
-import { completionFlag, sanitiseCursor, type QuestCursor } from '../game/questmodel.ts';
+import { WEEKLY_FLAG_PREFIX, completionFlag, sanitiseCursor, type QuestCursor } from '../game/questmodel.ts';
 
 // --- Handles -------------------------------------------------------------------
 
@@ -535,14 +535,23 @@ export interface AccountRecord {
    * in April, and there is no version of that where the flag lives in something
    * the calendar clears.
    *
-   * Two kinds of string live in here and they are told apart by a prefix:
+   * Three kinds of string live in here and they are told apart by a prefix:
    *
-   *   - `q:<questId>` -- written by the engine when a non-repeatable quest is
-   *     turned in. "Have I done this" and "did the story branch" are then the
-   *     same question against the same set, which is why there is no separate
-   *     "completed" list. A **repeatable** quest never writes one, and that is
-   *     the whole of the repeatable/story distinction.
+   *   - `q:<questId>` -- written by the engine when a **story** quest is turned
+   *     in. "Have I done this" and "did the story branch" are then the same
+   *     question against the same set, which is why there is no separate
+   *     "completed" list. Permanent.
+   *   - `w:<questId>` -- WORKSTREAM AN. The same mark for a **repeatable**, and
+   *     the one kind of flag in here that Monday takes: `resetIfNewWeek` drops
+   *     every `w:` and keeps everything else, so a weekly job is done for the
+   *     week rather than done forever. `questmodel.doneFlag` picks between this
+   *     and the line above, and `repeatable` is the whole of the switch.
    *   - anything else -- an authored `unlock` from a content pack.
+   *
+   * The weekly marks live here rather than in a field of their own because the
+   * client already receives this list on `MSG.QUEST_STATE` and draws the
+   * phone's register and the world's `!` markers off it. A second list would
+   * have been a wire change to say something the wire already carries.
    *
    * Bounded at `MAX_STORY_FLAGS`, because this is a list a *content file* can
    * grow and a content file is edited on github.com by a person in a hurry.
@@ -613,8 +622,17 @@ export interface AccountFile {
  * weekly and so is the paperwork, and a job abandoned halfway through on
  * Saturday is not waiting on Monday. A quest that was actually finished left a
  * `q:<id>` mark in `story` and is therefore still finished. See
- * `AccountRecord.story` for the two kinds of string in that list and
+ * `AccountRecord.story` for the kinds of string in that list and
  * `game/questmodel.ts`'s header for the whole arrangement.
+ *
+ * **WORKSTREAM AN: the exception has an exception, and it is one prefix wide.**
+ * A repeatable quest's completion is a statement about *this week* wearing the
+ * same clothes as the story -- so it is written `w:<id>` and swept here. That
+ * is what makes `content/quests/act1.json`'s two jobs actually weekly rather
+ * than merely called weekly: before this they wrote no mark at all and could be
+ * handed in and taken again in the same breath. The prefix is
+ * `questmodel.WEEKLY_FLAG_PREFIX` rather than a literal, because a Monday that
+ * swept the wrong two characters would erase an act and nothing would say so.
  *
  * ---------------------------------------------------------------------------
  * The **only** place kills are zeroed **and the only place a saved spot is
@@ -641,6 +659,13 @@ export function resetIfNewWeek(record: AccountRecord, at: number | Date = Date.n
   // it is the one field on this record that survives, and the block above says
   // why at length.
   record.quests = {};
+  // ...except for the weekly completion marks inside it. WORKSTREAM AN; see the
+  // header. Reassigned only when something actually goes, so the ordinary
+  // Monday for a player with no repeatables behind them costs one walk and no
+  // allocation.
+  if (record.story.some((flag) => flag.startsWith(WEEKLY_FLAG_PREFIX))) {
+    record.story = record.story.filter((flag) => !flag.startsWith(WEEKLY_FLAG_PREFIX));
+  }
   // *"persisted to end of week"*, and this is the end of the week. Cleared in
   // the same three lines as the ladder rather than in a rule of its own, so
   // there is exactly one Monday in this feature -- see the header.
@@ -1123,7 +1148,10 @@ export function verifyAccounts(): string[] {
     // rather than in a section of their own because the *contrast* is the rule
     // -- reading them ten lines apart is what makes "story survives, cursors do
     // not" checkable rather than remembered.
-    record.story = ['q:act0-report', 'act0:reported'];
+    // WORKSTREAM AN: three flags, and the middle one is the whole point --
+    // `w:` is a completion that is only true this week and must not be here on
+    // the other side of the reset, while the two beside it must.
+    record.story = ['q:act0-report', 'w:act1-marita-roundup', 'act0:reported'];
     record.quests = { 'act0-doorknock': { s: 1, c: [1, 0], d: false } };
     if (resetIfNewWeek(record, now)) failures.push('A record already in the current week was reset.');
     if (record.kills !== 34) failures.push('A same-week reset zeroed the kills anyway.');
@@ -1136,10 +1164,19 @@ export function verifyAccounts(): string[] {
     if (record.xp !== 0) failures.push(`A weekly reset left ${record.xp} xp; the xp is the level and the level is 1.`);
     // **The one field that survives.** A story that resets weekly is not one;
     // see `resetIfNewWeek`'s header, which argues it at length.
-    if (record.story.length !== 2 || !record.story.includes('q:act0-report')) {
+    if (record.story.length !== 2 || !record.story.includes('q:act0-report') || !record.story.includes('act0:reported')) {
       failures.push(
         `A weekly reset left ${JSON.stringify(record.story)} in the story flags. They must survive Monday, or a ` +
           'player who finished an act in March is handed the first job again in April.',
+      );
+    }
+    // WORKSTREAM AN: and the one that must **not** survive, which is the other
+    // half of the same rule. A weekly mark left standing is a repeatable that
+    // never comes round again -- silently, for the rest of that account's life.
+    if (record.story.some((f) => f.startsWith(WEEKLY_FLAG_PREFIX))) {
+      failures.push(
+        `A weekly reset kept ${JSON.stringify(record.story.filter((f) => f.startsWith(WEEKLY_FLAG_PREFIX)))}. ` +
+          'A "done this week" mark that survives the week is a weekly job that never comes back.',
       );
     }
     // And the one beside it that does not.

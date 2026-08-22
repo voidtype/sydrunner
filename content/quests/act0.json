@@ -12,8 +12,17 @@
     "($500, 2000 xp, 4 flags) and a quest that asks for more is refused. The",
     "capitalisation of Marita and DeFAULT is law in any string a player reads.",
     "",
-    "The arc is early game and ends at the level-2 faction choice. The last job",
-    "is gated at level 2 and its final conversation is where a handler walks in.",
+    "`level` IS A RUNG, NOT A MINIMUM. A job is offered while your level is",
+    "exactly its level and at no other time -- see game/questmodel.ts. So the",
+    "five obligations below all sit on rung 1 and the review sits on rung 2, and",
+    "the arithmetic between them is part of the content: the five pay 700 xp",
+    "between them and a level is 1000, so nothing here can level you off its own",
+    "rung before you have finished it. Whoever edits these numbers owns that sum.",
+    "",
+    "The last 300 xp are knockouts, which is the point: Denise cannot sign you",
+    "off for a participation review until you have participated in something.",
+    "The review is the rung-2 door and its final conversation is where a handler",
+    "walks in.",
     "",
     "Coordinates are world metres: +X east, +Z south, origin at Town Hall. The",
     "Centrelink is the real Redfern office out of game/centrelink-data.ts."
@@ -29,7 +38,7 @@
       "steps": [
         { "kind": "goto", "x": -925.2, "z": 2645.2, "radius": 30, "label": "get to the Redfern service centre" }
       ],
-      "reward": { "cash": 20, "xp": 150, "unlock": ["act0:reported"] }
+      "reward": { "cash": 20, "xp": 100, "unlock": ["act0:reported"] }
     },
     {
       "id": "act0-jobsearch",
@@ -44,7 +53,7 @@
         { "kind": "ko", "npc": "eshay", "count": 3, "label": "network with three locals" },
         { "kind": "earn", "dollars": 40, "label": "demonstrate $40 of labour market attachment" }
       ],
-      "reward": { "cash": 30, "xp": 200, "unlock": ["act0:points"] }
+      "reward": { "cash": 30, "xp": 150, "unlock": ["act0:points"] }
     },
     {
       "id": "act0-evidence",
@@ -57,7 +66,7 @@
       "steps": [
         { "kind": "photo", "x": 0, "z": 0, "radius": 90, "label": "photograph the town hall as proof you exist" }
       ],
-      "reward": { "cash": 25, "xp": 150, "unlock": ["act0:evidence"] }
+      "reward": { "cash": 25, "xp": 100, "unlock": ["act0:evidence"] }
     },
     {
       "id": "act0-travel",
@@ -70,7 +79,7 @@
       "steps": [
         { "kind": "ride", "line": -1, "from": "", "to": "", "label": "catch a train to a station, any station" }
       ],
-      "reward": { "cash": 25, "xp": 200, "unlock": ["act0:travel"] }
+      "reward": { "cash": 25, "xp": 150, "unlock": ["act0:travel"] }
     },
     {
       "id": "act0-training",
@@ -84,7 +93,7 @@
         { "kind": "buy", "powerup": "training", "count": 1, "label": "complete the training module" },
         { "kind": "dialog", "npc": "centrelink-clerk", "node": "upskilled", "label": "have the course marked off at the desk" }
       ],
-      "reward": { "cash": 40, "xp": 250, "unlock": ["act0:trained"] }
+      "reward": { "cash": 40, "xp": 200, "unlock": ["act0:trained"] }
     },
     {
       "id": "act0-review",
