@@ -164,6 +164,24 @@ const MIN_HALF_M = 1.5;
  */
 const MIN_PAVING_HALF_M = 1.0;
 
+/**
+ * How far over the ground paving may stand and still be the reason the ground
+ * is there, metres. See `RoadDeck.carriesGroundAt`.
+ *
+ * **1.5 m, and it is bounded from both sides by numbers already in the build.**
+ * Below: `roadgrade.conform` pulls the lattice onto the solved road and the
+ * residual disagreement between a carriageway and the terrain under it is a
+ * few centimetres, but a road cut against a 31.25 m terrain facet can sit up to
+ * about a metre proud of the *interpolated* ground at the far corner of its own
+ * cell -- `roadgrade.LATTICE_REACH_M`'s block is the argument -- so anything
+ * under a metre would start calling ordinary streets viaducts. Above:
+ * `decks.MIN_ROAD_CLEARANCE_M` is 5.0 m and `decks.PARAPET_MIN_CLEARANCE_M`, the
+ * height at which the bake stops calling a bridge a piece of road over a pipe,
+ * is 0.8 m. 1.5 m sits above the second and far below the first, so a culvert
+ * crossing still carries its ground and a flyover does not.
+ */
+export const DECK_CARRIES_GROUND_M = 1.5;
+
 /** The grid cell strips are filed into, metres. `rail-cut.CELL_M`'s twin. */
 const CELL_M = 64;
 
@@ -456,6 +474,47 @@ export class RoadDeck {
   }
 
   /**
+   * Is the paving here **standing on the ground**, rather than flying over it?
+   *
+   * ---------------------------------------------------------------------------
+   * THE SEAM `pipeline/sydney/decks.py`' CROSSING RULE OPENS, AND WHY IT IS A
+   * SECOND QUESTION RATHER THAN A CHANGE TO `deckAt`.
+   *
+   * This file conflates two things that were the same thing while every bridge
+   * in the world was lying on the terrain: *"asphalt is drawn here"* and
+   * *"the ground here is kept because asphalt is drawn on it"*. `deckAt`
+   * answers the first, and `RailCut.decked` and `RailCut.probeAlong` ask it the
+   * second -- a paved surface over a railhead means the carve does not fire,
+   * because a road with a trench under it is a hole the player falls through.
+   *
+   * `decks.MIN_ROAD_CLEARANCE_M` separates them. After the retile that carries
+   * that rule, a viaduct crossing a rail corridor stands **six metres** over the
+   * ground rather than on it, and it is no longer the reason the ground is
+   * there -- its own collision prisms carry the player, and the railway
+   * underneath should be carved exactly as it is either side. Answered with
+   * `deckAt` alone, the carve stays suppressed and the corridor runs into a
+   * mound of un-carved ground with a bridge in the air above it. That defect
+   * exists today too and is invisible today, because a deck at ground level
+   * suppressing the carve looks like a road on an embankment.
+   *
+   * **`deckAt` itself must not learn this.** Its contract is that a carriageway's
+   * answer does not depend on the ground at all -- `verifyRoadDeck` §6 asserts
+   * it directly -- and that independence is what lets the browser and
+   * `server/world.ts` agree about a deck before either has the terrain for the
+   * tile under it. So the ground-aware question is its own method, and the
+   * caller that wants it says so.
+   *
+   * `NaN` ground means "I do not know", and the answer is then the same one
+   * `deckAt` gives a draped strip: nothing here, because a rule that guessed
+   * would guess differently on the two ends.
+   */
+  carriesGroundAt(x: number, z: number, groundY: number): boolean {
+    if (!Number.isFinite(groundY)) return false;
+    const y = this.deckAt(x, z, groundY);
+    return Number.isFinite(y) && y - groundY < DECK_CARRIES_GROUND_M;
+  }
+
+  /**
    * Every strip this deck holds, once each.
    *
    * For the audits and for nothing that draws. `checkPavedIntegrity` walks the
@@ -632,6 +691,36 @@ export function verifyRoadDeck(): string[] {
   }
   if (!Object.is(both.deckAt(50, 8, 0), 15)) {
     out.push(`the carriageway band answers ${both.deckAt(50, 8, 0)} where no paving reaches it`);
+  }
+
+  // 7. THE GROUND-AWARE QUESTION, which is the half `deckAt` deliberately does
+  //    not answer. `way` runs from y 10 to y 20; over ground 14.9 it is a road
+  //    on the ground at the midpoint (15) and over ground 3 it is a viaduct.
+  //    Both directions are asserted, because a predicate that always said "yes"
+  //    would pass every test above and suppress every rail carve in the city,
+  //    and one that always said "no" would carve the ground out from under
+  //    every level crossing. See `carriesGroundAt` and `DECK_CARRIES_GROUND_M`.
+  const gq = new RoadDeck();
+  gq.adopt('t', [way]);
+  if (!gq.carriesGroundAt(50, 0, 14.9)) {
+    out.push('a road 0.1 m over its ground does not carry it, and every street is a viaduct');
+  }
+  if (gq.carriesGroundAt(50, 0, 3)) {
+    out.push('a deck 12 m over its ground carries it, and a viaduct plugs the cutting under it');
+  }
+  if (gq.carriesGroundAt(50, 0, Number.NaN)) {
+    out.push('paving claims to carry a ground it does not know');
+  }
+  if (gq.carriesGroundAt(50, 20, 14.9)) {
+    out.push('a point off the ribbon carries the ground');
+  }
+  //    And the draped kind always carries its ground, because it *is* its
+  //    ground plus `PAVING_RISE_M` -- the one case where the answer cannot be
+  //    anything else.
+  const gp = new RoadDeck();
+  gp.adoptPaving(new Float32Array([0, 0, 40, 0, 1]));
+  if (!gp.carriesGroundAt(20, 0, -50)) {
+    out.push('foot paving does not carry the ground it is draped on');
   }
   return out;
 }
