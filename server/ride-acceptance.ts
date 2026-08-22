@@ -103,6 +103,18 @@ const posePad = createTrainPose();
 
 const say = (s: string): void => { console.log(s); };
 
+/**
+ * An offline section went red, remembered rather than acted on.
+ *
+ * Section 0e can fail on the shape of the railway, which is a real failure and
+ * is also nothing to do with the WebSocket half below it -- and exiting on it
+ * would mean a pathing defect in the bake silently stopping anybody from ever
+ * seeing sections 1-6 again. So the exit code is carried to the bottom of the
+ * file. `RIDE_E2E=only` still exits immediately, because that is what `only`
+ * means.
+ */
+let offlineFailed = false;
+
 // --- 0. The gangway: walking a Metropolis end to end while it is moving.
 //
 // See the header for why this is offline and why it is first. `RIDE_GANGWAY=off`
@@ -335,8 +347,8 @@ if ((process.env.RIDE_GANGWAY ?? 'on') !== 'off') {
 // The train getting there was never in doubt: `poseTrain` is a closed-form
 // lookup over a baked curve and workstream AF rode 95 km of this very direction
 // through it with no rider attached. What has never been run is a **passenger**
-// staying on for a whole direction, and every one of the six things below is a
-// thing a person would notice and none of them is visible to a pose sweep:
+// staying on for a whole direction, and every one of the seven things below is
+// a thing a person would notice and none of them is visible to a pose sweep:
 //
 //   (a) aboard on every tick, from the first stop to the last;
 //   (b) in the carriage they sat down in, having never stood up;
@@ -864,7 +876,7 @@ if ((process.env.RIDE_E2E ?? 'on') !== 'off') {
   );
   const e2eOk = journeyOk && routeOk;
   if ((process.env.RIDE_E2E ?? 'on') === 'only') process.exit(e2eOk ? 0 : 1);
-  if (!e2eOk) process.exit(1);
+  if (!e2eOk) offlineFailed = true;
 }
 
 /** The city, as far as a headless pilot needs one: flat, and never consulted aboard. */
@@ -1129,4 +1141,4 @@ say(`E got the rider off: server aboard = ${!off ? 'STILL ABOARD' : 'no'}; ` +
 running = false;
 await loop;
 for (const p of pilots) p.net.close();
-process.exit(0);
+process.exit(offlineFailed ? 1 : 0);
