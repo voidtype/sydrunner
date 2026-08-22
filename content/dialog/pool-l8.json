@@ -1302,8 +1302,8 @@
     {
       "id": "bankstown-placements-desk",
       "name": "Rana, placements officer",
-      "x": -16110,
-      "z": 5810,
+      "x": -16112.2,
+      "z": 5800.3,
       "radius": 5,
       "root": "hello",
       "nodes": [

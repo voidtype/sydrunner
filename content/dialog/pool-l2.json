@@ -661,8 +661,8 @@
     {
       "id": "haldon-knafeh-randa",
       "name": "Randa, the knafeh window on Haldon Street",
-      "x": -12210,
-      "z": 5852,
+      "x": -12208.4,
+      "z": 5854.5,
       "radius": 5,
       "root": "hello",
       "nodes": [

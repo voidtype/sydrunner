@@ -4,8 +4,8 @@
     {
       "id": "quay-silver-man",
       "name": "Ando, the silver man at Circular Quay",
-      "x": 132,
-      "z": -864,
+      "x": 125.1,
+      "z": -865,
       "radius": 5,
       "root": "hello",
       "nodes": [
@@ -204,8 +204,8 @@
     {
       "id": "narelle-tow-sydenham",
       "name": "Narelle, twenty-four hour tow",
-      "x": -3830,
-      "z": 5290,
+      "x": -3825.3,
+      "z": 5286.3,
       "radius": 5,
       "root": "hello",
       "nodes": [
@@ -710,8 +710,8 @@
     {
       "id": "woollahra-trees",
       "name": "Bronwyn Teale, Woollahra Council (Trees)",
-      "x": 2641,
-      "z": 973,
+      "x": 2639.5,
+      "z": 974.3,
       "radius": 5,
       "root": "hello",
       "nodes": [
@@ -1044,8 +1044,8 @@
     {
       "id": "wahroonga-agent",
       "name": "Hugh Marchetti, principal agent",
-      "x": -8712,
-      "z": -16766,
+      "x": -8713.2,
+      "z": -16768.7,
       "radius": 5,
       "root": "hello",
       "nodes": [
@@ -1340,8 +1340,8 @@
     {
       "id": "kenny-sydride-hurstville",
       "name": "Kenny Ng, SydRide, 4.91",
-      "x": -9722,
-      "z": 11048,
+      "x": -9719.1,
+      "z": 11045.3,
       "radius": 5,
       "root": "hello",
       "nodes": [

@@ -1520,8 +1520,8 @@
     {
       "id": "priya-rhodes-engagement",
       "name": "Priya, Community Engagement, City of Canada Bay",
-      "x": -11340,
-      "z": -4000,
+      "x": -11342.2,
+      "z": -3990.3,
       "radius": 5,
       "root": "hello",
       "nodes": [

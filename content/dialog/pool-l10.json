@@ -466,8 +466,8 @@
     {
       "id": "hurstville-doof-ada",
       "name": "Ada Leung, doof logistics",
-      "x": -9578,
-      "z": 11205,
+      "x": -9582.2,
+      "z": 11216.2,
       "radius": 5,
       "root": "hello",
       "nodes": [
@@ -1390,8 +1390,8 @@
     {
       "id": "marj-cash-window-cc311b",
       "name": "Marj, cash-only window on the strip",
-      "x": 1262,
-      "z": 518,
+      "x": 1264.8,
+      "z": 519,
       "radius": 5,
       "root": "hello",
       "nodes": [

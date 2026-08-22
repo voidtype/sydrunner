@@ -415,8 +415,8 @@
     {
       "id": "redfern-lost-property",
       "name": "Norm, Redfern lost property",
-      "x": -1043,
-      "z": 2609,
+      "x": -1037.4,
+      "z": 2593,
       "radius": 5,
       "root": "hello",
       "nodes": [

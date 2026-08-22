@@ -4,8 +4,8 @@
     {
       "id": "artarmon-pathways-dale",
       "name": "Dale, employment services consultant",
-      "x": -2510,
-      "z": -6520,
+      "x": -2512,
+      "z": -6526.7,
       "radius": 5,
       "root": "hello",
       "nodes": [
@@ -502,8 +502,8 @@
     {
       "id": "iwc-place-officer",
       "name": "Robyn, Inner West Council (Place & Liveability)",
-      "x": -5727,
-      "z": 1618,
+      "x": -5724.2,
+      "z": 1619,
       "radius": 5,
       "root": "hello",
       "nodes": [
@@ -983,8 +983,8 @@
     {
       "id": "kogarah-pathology-nell",
       "name": "Nell, pathology collections",
-      "x": -6740,
-      "z": 10600,
+      "x": -6731.1,
+      "z": 10612.1,
       "radius": 5,
       "root": "hello",
       "nodes": [

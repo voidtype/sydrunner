@@ -203,8 +203,8 @@
     {
       "id": "l5-nerida-planner",
       "name": "Nerida, City of Sydney planning",
-      "x": -2090,
-      "z": 3720,
+      "x": -2081.9,
+      "z": 3723.8,
       "radius": 5,
       "root": "hello",
       "nodes": [
@@ -1637,8 +1637,8 @@
     {
       "id": "rhodes-dawn-shooter",
       "name": "Warwick, dawn photographer, tower 6",
-      "x": -11470,
-      "z": -4120,
+      "x": -11466.5,
+      "z": -4118.1,
       "radius": 5,
       "root": "hello",
       "nodes": [
