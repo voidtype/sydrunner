@@ -195,12 +195,21 @@ import {
   registerNpcKind,
   setHeatReader,
   type FactionCtx,
-  type FactionField,
   type NpcActor,
   type Witness,
 } from './factions.ts';
 import { createBeatPose, forEachPoliceNear, SHOT_DAMAGE, type BeatPose } from './factions.ts';
-import { createPedPose, type PedBand, type PedPose } from './pedestrians.ts';
+// `FactionField` as a **value**, and `PURSUIT_TARGET` and `RETURN_TIMEOUT_TICKS`
+// with it, for `verifyStandDown` at the bottom of this file: the one claim here
+// that is about what `POLICE.think` does with what this file hands it, so the
+// only field that can prove it is the real one. No new cycle -- factions.ts
+// reads this file through `setHeatReader` precisely so it can stay unaware of
+// it, and every other name above is already a value import.
+import { FactionField, PURSUIT_TARGET, RETURN_TIMEOUT_TICKS } from './factions.ts';
+// `PedestrianField` and `syntheticGrid` as values for the same check, on
+// `game/streetlife.ts`' precedent: a gate over a real band set is the only thing
+// that can prove a gate over a real band set.
+import { PedestrianField, createPedPose, syntheticGrid, type PedBand, type PedPose } from './pedestrians.ts';
 // The fifth rung's geometry and schedule. Three-free, so this file stays
 // importable by the Bun server, and every function in it is pure except the
 // trail -- see its header, section 3, for why the *hit* is decided here and the
@@ -1051,6 +1060,42 @@ export class HeatField {
     // actor slot the pursuit could have used.
     if (h.aboard) return;
 
+    // --- **Is anybody still investigating them?** The gate on every rung below
+    //     that puts a *constable* in the street, and on nothing else.
+    //
+    // The ladder and the countdown are two clocks over the same player and the
+    // ladder is deliberately the longer one -- the 5-star shed is 150 s against
+    // `factions.MAX_COUNTDOWN_TICKS`' 120 -- so a wanted player with no live
+    // investigation is an ordinary state and not an error. What is not ordinary
+    // is putting officers on the ground in it.
+    //
+    // A promoted `POLICE` actor is an ordinary pursuer, which the comment on
+    // `HeatState.rbtOfficers` already says in as many words: *"a promoted POLICE
+    // actor with a live investigation against it runs at the suspect -- that is
+    // the whole of `factions.POLICE.think`"*. The other half of that sentence is
+    // the one this gate is for: with **no** investigation against it,
+    // `POLICE.think`'s first branch stands the officer down on the tick it is
+    // created, walks it back to a home it is already standing on, and sets the
+    // despawn flag before the tick is out. That is the police's own product rule
+    // and it is right -- when the countdown ends the officers go home.
+    //
+    // The convergence below then re-counts nobody and promotes eight more, and
+    // the loop is self-feeding rather than merely wasteful: those eight are
+    // inside `policeWitness`' range of the suspect, so `step`'s stage 3 sets
+    // `hiddenTicks = 0` every tick and the ladder can never shed the stars that
+    // are summoning them. Measured on `SYDNEY_CHECK_ONLY=police`: eight officers
+    // promoted and buried on every tick of a twenty-second wait, 1400 points
+    // frozen at the cap, and eight actors on every snapshot for a pursuit that
+    // had ended -- which is exactly the wire cost the police brief promises is
+    // zero once the countdown reaches nought.
+    //
+    // The air and the road are untouched, and that is the line: Polair's
+    // marksman and a patrol car already on the road are the *ladder's* own
+    // actors with their own lifetimes (`PATROL_PURSUIT_M`, and the trail), so
+    // they keep answering to the star count. Only the people who need an
+    // investigation to pursue wait for one.
+    const pursued = ctx.investigationOf(h.playerId) !== undefined;
+
     const sx = suspect.body.position.x;
     const sz = suspect.body.position.z;
 
@@ -1059,8 +1104,12 @@ export class HeatField {
       this.spawnPatrolCar(h, sx, sz, ctx, world);
     }
 
-    // --- 4 stars: the RBT, one at a time.
-    if (h.stars >= 4 && h.rbtActor === 0) {
+    // --- 4 stars: the RBT, one at a time. Gated on the investigation with the
+    //     convergence, because the site is two thirds officers: placing it
+    //     without them is the *"unmanned line of witches' hats"* `rbtOfficers`
+    //     names as the failure, and the site is placed once and never re-aimed,
+    //     so it would stay unmanned for as long as it stood.
+    if (h.stars >= 4 && h.rbtActor === 0 && pursued) {
       this.placeRbt(h, suspect, ctx, world);
     }
 
@@ -1079,7 +1128,11 @@ export class HeatField {
     // --- And the convergence. The spotlight and the rotor are the client's --
     // `world/highway-patrol.ts` draws them off the star count alone, which is
     // why there is no actor here. What the authority owes is the officers.
-    if (h.stars >= 5 && ctx.peds) {
+    //
+    // `pursued` last, so the reading is "eight officers converge on a five-star
+    // suspect somebody is still investigating". See its header for the loop this
+    // closes.
+    if (h.stars >= 5 && ctx.peds && pursued) {
       let onIt = 0;
       for (const a of ctx.field.actors) {
         if (a.kind === NPC_KIND.POLICE && a.target === h.playerId) onIt++;
@@ -1493,11 +1546,18 @@ export class HeatField {
         continue;
       }
 
-      // --- Arrived. Stop, and put two officers out. Once.
+      // --- Arrived. Stop, and put two officers out. Once, and only for a
+      //     suspect somebody is still investigating -- `escalate`'s `pursued`
+      //     gate, applied to the third and last door heat puts a constable
+      //     through. Two officers disgorged onto a lapsed countdown are two
+      //     officers `POLICE.think` stands down and buries on the next tick,
+      //     and the `disgorged` latch would then hold the car's doors shut for
+      //     the rest of the stop. The car keeps its own vigil either way; it is
+      //     the ladder's actor and does not need an investigation to drive.
       if (d2 <= PATROL_STOP_M * PATROL_STOP_M) {
         drive.speed = 0;
         actor.state = NPC_STATE.IDLE;
-        if (!drive.disgorged) {
+        if (!drive.disgorged && ctx.investigationOf(actor.target) !== undefined) {
           drive.disgorged = true;
           for (let side = 0; side < 2; side++) {
             const off = side === 0 ? 1.6 : -1.6;
@@ -2097,6 +2157,9 @@ export function verifyHeat(): string[] {
   // *wiring* -- that a five-star player is shot at, a four-star one is not, and a
   // bot never is.
   failures.push(...verifyMarksman());
+  // And the stand-down, over a real `FactionField`: the seam where this file's
+  // promotions meet `factions.POLICE.think`'s own product rule. See there.
+  failures.push(...verifyStandDown());
 
   return failures;
 }
@@ -2324,6 +2387,138 @@ function verifyMarksman(): string[] {
 function triangleFor(u: number): number {
   const f = u - Math.floor(u);
   return f < 0.5 ? 4 * f - 1 : 3 - 4 * f;
+}
+
+/**
+ * **The stand-down**, over a real `FactionField` and a real street grid.
+ *
+ * The one claim in this file that cannot be made against a stub, because it is
+ * a claim about what `factions.POLICE.think` does with what this file hands it:
+ * the ladder promotes officers and the police brain decides how long they last.
+ * `stubField.promote` returns null, so every other check here is blind to the
+ * whole question -- which is how the bug this exists for got in.
+ *
+ * The bug, in one sentence: at five stars `escalate` topped up to
+ * `POLAIR_PURSUIT_TARGET` officers every tick, `POLICE.think` stood every one of
+ * them down and set the despawn flag on the tick after it was made because there
+ * was no investigation behind the target, and the count it topped up against was
+ * therefore always zero. Eight promotions and eight burials a tick, eight actors
+ * on every snapshot of a pursuit that had ended, and -- because those eight are
+ * inside `policeWitness`' range of the suspect -- a ladder pinned at the cap that
+ * could never shed the stars summoning them. It ran forever.
+ *
+ * Three questions, in the order a pursuit asks them:
+ *
+ *   1. **No investigation, no constables.** Five stars and nobody investigating
+ *      is an ordinary state -- the 5-star shed is 150 s against the countdown's
+ *      120 s cap -- and it must put nobody on the ground.
+ *   2. **An investigation, and the fifth rung still means eight.** The gate has
+ *      to leave the feature alone: more than `PURSUIT_TARGET` officers, which is
+ *      the only number that distinguishes Polair's convergence from the ordinary
+ *      recruit `FactionField` would do on its own.
+ *   3. **The countdown ends and they go home, and stay gone.** The police brief's
+ *      own promise, and the regression: a second sweep after they have all
+ *      despawned catches a rung that starts promoting again the moment the field
+ *      is empty, which is exactly the shape of the loop.
+ */
+function verifyStandDown(): string[] {
+  const failures: string[] = [];
+  const grid = syntheticGrid(0, 0);
+  if (grid === null) return ['verifyStandDown could not build a street grid; the stand-down gate is unproven.'];
+  const peds = new PedestrianField();
+  peds.adopt('grid', grid);
+
+  const heat = new HeatField();
+  const was = installHeat(heat);
+  try {
+    const field = new FactionField();
+    const combatant = stubCombatant(7);
+    const world: HeatWorld = { lanes: null, rideStop: () => -2 };
+    const ctx: FactionCtx = {
+      tick: 1000,
+      dt: 1 / 60,
+      collision: null,
+      groundHeight: () => 0,
+      peds,
+      combatants: [combatant],
+      field,
+      // The real one, off the real field, which is the whole point: the server
+      // wires exactly this and it is the fact the gate reads.
+      investigationOf: (id) => field.investigationOf(id),
+      damagePlayer: () => {},
+      emit: () => {},
+    };
+
+    /** Officers standing in the world right now. */
+    const standing = (): number => field.actors.reduce((n, a) => n + (a.kind === NPC_KIND.POLICE ? 1 : 0), 0);
+    /** Officers this leg ever made, alive or buried. The churn is invisible to `standing`. */
+    let made = 0;
+    const seen = new Set<number>();
+    const run = (ticks: number): number => {
+      let worst = 0;
+      for (let i = 0; i < ticks; i++) {
+        ctx.tick++;
+        // Pinned, because the synthetic grid has beats on it and a five-star
+        // player standing in front of them would otherwise never shed -- which
+        // is true of the game and is not what this is measuring.
+        heat.debugSet(7, HEAT_MAX, ctx.tick);
+        // The authority's order, restated: the factions think and bury their
+        // dead, and then the ladder puts out whatever the rung owes. See
+        // `server/sim.step`, which says the same from its side.
+        field.step(ctx);
+        heat.step(ctx, world);
+        for (const a of field.actors) {
+          if (a.kind !== NPC_KIND.POLICE || seen.has(a.id)) continue;
+          seen.add(a.id);
+          made++;
+        }
+        if (standing() > worst) worst = standing();
+      }
+      return worst;
+    };
+
+    // --- 1. Five stars, and nobody investigating.
+    run(90);
+    if (made !== 0) {
+      failures.push(
+        `A five-star suspect with no investigation drew ${made} officer(s) over 90 ticks. Every one of them is ` +
+          'stood down and buried by POLICE.think on the tick after it is made, so the rung promotes eight more ' +
+          'the next tick and never stops. See escalate\'s `pursued`.',
+      );
+    }
+
+    // --- 2. And with one, the fifth rung still means eight.
+    field.accuse(7, REASON.ASSAULT, ctx.tick);
+    const most = run(90);
+    if (!(most > PURSUIT_TARGET)) {
+      failures.push(
+        `With an investigation open, five stars put ${most} officer(s) on the suspect and the ordinary recruit ` +
+          `already owes ${PURSUIT_TARGET}. Polair's convergence is gated off rather than gated.`,
+      );
+    }
+
+    // --- 3. The countdown ends. They walk home, they despawn, and nothing
+    //     brings them back.
+    field.clearInvestigation(7);
+    run(RETURN_TIMEOUT_TICKS + 120);
+    if (standing() !== 0) {
+      failures.push(
+        `${standing()} officer(s) were still in the field ${((RETURN_TIMEOUT_TICKS + 120) / 60).toFixed(0)} s after ` +
+          'the investigation ended. A finished pursuit costs nothing on the wire.',
+      );
+    }
+    made = 0;
+    run(120);
+    if (made !== 0) {
+      failures.push(
+        `Two seconds after the field was empty the ladder had made ${made} more officer(s) for a suspect nobody ` +
+          'is investigating. The promote-and-bury loop is back.',
+      );
+    }
+  } finally {
+    installHeat(was);
+  }
+  return failures;
 }
 
 /** A combatant-shaped record with nothing behind it. The check's only body. */

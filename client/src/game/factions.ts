@@ -1418,8 +1418,14 @@ export const PROMOTE_RADIUS = 120;
 export const PURSUIT_TARGET = 4;
 /** Ticks between reinforcements trickling out of the nearest station. 2 s. */
 export const REINFORCE_INTERVAL_TICKS = 120;
-/** How long a stood-down officer walks before giving up and despawning, ticks. */
-const RETURN_TIMEOUT_TICKS = 12 * 60;
+/**
+ * How long a stood-down officer walks before giving up and despawning, ticks.
+ *
+ * Exported for `game/heat.verifyStandDown`, which drives a real pursuit to its
+ * end and has to know how long "they went home" is allowed to take. A literal
+ * there would be a second copy of this number in another file.
+ */
+export const RETURN_TIMEOUT_TICKS = 12 * 60;
 
 /**
  * Promoted actors alive at once, across **every** faction.
