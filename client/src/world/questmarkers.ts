@@ -350,9 +350,15 @@ export class QuestMarkerField {
   readonly mesh: Mesh;
   readonly material: MeshBasicNodeMaterial;
 
-  /** How many marks were drawn last frame. Read by `sydney.quests` in `main.ts`. */
+  /** How many marks were drawn last frame. For the check, and for a console poke. */
   live = 0;
-  /** Givers in range that did not fit the cap. A number that should stay at 0. */
+  /**
+   * Givers in range with something to say who did not fit the cap.
+   *
+   * A number that should stay at zero and is worth having anyway: twelve was
+   * chosen against a content pool nobody has written yet, and the day a CBD
+   * block holds fifteen givers this is the only thing that would say so.
+   */
   dropped = 0;
 
   private readonly position: Float32Array;
