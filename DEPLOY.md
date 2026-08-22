@@ -587,6 +587,20 @@ block from it. So:
    synthetic wall on the Pacific Highway and proves it would have been named —
    if the control line ever says "the scan is blind", the zero above it is
    worthless. `--near x,z --radius m` scopes it to one place for a bug report.
+   Then `bun run server/overpass-clearance-check.ts` — 46 s over the whole
+   build, and the one that catches a retile which put a motorway back down on
+   the street it is supposed to fly over. It reads only `tiles/*.lanes.bin` and
+   asks a question with no tag in it: two carriageways whose centrelines cross
+   with no shared node are grade-separated, so the height between them must be
+   at least `decks.MIN_ROAD_CLEARANCE_M`. Today it measures **1,306** under
+   5.0 m of 1,373 grade separations and its budgets are ratchets at that
+   number, because the fix is in `decks.py` and only a retile carries it — **so
+   the retile that carries the deck work must lower `CLEARANCE_BUDGET` and
+   `TRUCK_BUDGET` to what it measures**, and the build log's own
+   `_report_decks` line prints the same count before the tiles are written.
+   It ends on a control that proves the crossing predicate can both convict a
+   grade separation and excuse an intersection. `--near x,z --radius m` scopes
+   it.
 3. **Restore region mtimes** for bundles whose hash did not change
    (`data/scratch/station-round/restore-region-mtimes.py`), so a
    size-and-mtime uploader sends only the ones that did.

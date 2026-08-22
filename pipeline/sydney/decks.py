@@ -46,7 +46,9 @@ street solve does it -- and every free node is solved by
   1. a weighted harmonic interpolation from the pinned touchdowns, which on a
      straight chain is a straight grade between them and on a branch hanging off
      one is flat at the junction's height, which is what a ramp gore is;
-  2. a lift so no deck is under the ground it flies over;
+  2. a lift so no deck is under the ground it flies over, **and no deck is on
+     top of the road it flies over** -- see the next section, which is the
+     whole of why this module was opened a second time;
   3. a two-sided Lipschitz projection at `MAX_GRADE`, pins held, which is
      `roadgrade._lipschitz`'s machinery at a tighter ceiling -- 7% rather than
      15%, because a structure is graded to a design standard where a street is
@@ -55,6 +57,99 @@ street solve does it -- and every free node is solved by
 The pins are not moved by any of the three. Where a touchdown genuinely demands
 more than 7% -- a short ramp off a high viaduct -- the clamp gives way and the
 touchdown wins, which is the right way round.
+
+---------------------------------------------------------------------------
+**THE SECOND BUG, AND THE RULE THAT REPLACES THE ONE THAT CAUSED IT.**
+
+The owner, on a screenshot of the St Peters interchange:
+
+  > *"not sure what we meant to do when over passes are ON the road"*
+
+A four-lane elevated ramp lying flat on the terrain with 2 m of concrete
+standing up out of the grass along both edges; ambient cars driving the deck at
+the same height as the cars on the street beside it; and Canal Road running
+straight into the parapet and stopping. Measured over the shipped 60 km bake,
+from `.lanes.bin` alone -- **1,685 places where two carriageways cross in plan
+without sharing a node, which is the definition of a grade separation, and the
+median clearance between them is 0.14 m.** 1,586 of them give less than the
+4.5 m a truck needs. It is the Western Motorway (82 crossings), the Warringah
+Freeway (71), the Westlink M7 (59), the M5 (55) -- every motorway in Sydney,
+sitting on every street it is supposed to fly over.
+
+**The cause is the list above, at step 2, and it is one word wide.** The floor
+was `ground + CARRIAGEWAY_Y`: a deck may not be under *the terrain*. Nothing in
+this module had ever heard of the road the deck is crossing. So a flyover whose
+ramps touch down at grade a few hundred metres either side gets a harmonic
+interpolation that is a straight line at ground level, a floor that lifts it two
+centimetres clear of the grass, and a parapet as soon as that reaches 0.8 m. The
+deck is drawn exactly where the solve put it, which is on top of the road.
+
+This is `RAIL-VERTICAL.md` §1 in road clothing, and it fails for the identical
+reason the buried stations did: **a relationship that was never measured cannot
+be got right by the label at either end of it.** `bridge=yes` was read, believed,
+and then used to decide *what to build* rather than *how high to build it*, and
+the DEM -- which is a surface model and already contains the deck's own top, see
+`roadgrade.py`'s header -- was left as the only vote on the vertical.
+
+So the rule, stated once:
+
+  **A deck's height over a road it crosses is not a fact about the terrain. It
+  is the crossed road's own solved surface, plus the girder, plus
+  `MIN_ROAD_CLEARANCE_M`.**
+
+  Where OSM's topology and the heightfield disagree about whether there is
+  room, the topology wins: two public carriageways whose centrelines cross and
+  which **share no node** are grade-separated, whatever the DEM makes of the
+  ground between them. That is not an inference -- a crossing without a
+  junction is a statement that you cannot turn from one into the other, and the
+  only way that is true is if one is over the other.
+
+`_crossing_demand` is the rule. It finds every place a deck run's centreline
+crosses a public ground carriageway's, reads the crossed road's surface as
+`terrain.sample(foot) + streets.CARRIAGEWAY_Y` -- the same expression the
+touchdown pin uses, so the deck and the road it clears agree about the road by
+construction -- and returns, per deck node, the height that clears it. The
+alternating floor/clamp loop then carries it exactly as it already carried the
+ground floor, which is why the demand is a *floor* and not a solve of its own:
+it is one more thing a station may not be below, and the loop was already the
+machinery for that.
+
+Four qualifications, each of which is a decision rather than a mechanic.
+
+**Public only.** `service` is out, on `elevated.py`'s rule and for its reason:
+a service way is a driveway, a loading dock and a car-park aisle, and lifting a
+bridge six metres to clear one would be a worse bug than the one being fixed.
+321 of the 1,685 cross a service way and they keep whatever the ground gives
+them.
+
+**A touchdown is not a crossing.** Where the deck way and the road share an OSM
+node -- the same coordinate, `_key`'s millimetre rule -- the deck is *joining*
+that road, not flying over it, and the demand is suppressed within
+`TOUCHDOWN_EXEMPT_M` of the shared node. Without it every ramp gore in the city
+would be asked to stand six metres over the road it merges into.
+
+**The reach is the plan overlap, not the crossing point.** A road is up to 20 m
+wide and a deck crosses it at a skew, so the stations that have to clear it are
+every one within `hw_deck + hw_road` of the crossing -- the ones whose ribbon is
+actually over the road's. Lifting only the two that bracket the intersection
+would leave the parapet down on the kerb.
+
+**Deck over deck is the same rule with the lower deck's live height.** 39 of the
+1,685 cross another bridge rather than a street -- the stacked ramps at St
+Peters and Darling Harbour -- and there OSM's `layer` says which is upper. The
+demand is recomputed from the current profile each round of the loop instead of
+once at the start, which is all that coupling costs at this size.
+
+**What this does not do is move the ground.** It does not have to, and that is
+worth saying because the reflex from `rail-cut.ts` is the opposite: a deck
+raised without the ground under it lowered is a floating slab with a cliff. Here
+the ground under the crossing is already the crossing road's own conformed
+surface -- `roadgrade.conform` put it there and excluded the bridge from the
+solve precisely so it would stay there -- so raising the deck opens the gap
+rather than cutting one. What it *does* change is who owns the surface: a deck
+six metres up is no longer paving that carries the ground, and
+`client/src/world/road-deck.ts` had been treating every lane way as if it were.
+`DECK_CARRIES_GROUND_M` on that side is the other half of this seam.
 
 ---------------------------------------------------------------------------
 **What is suppressed, and why the Harbour Bridge is not here.**
@@ -89,7 +184,8 @@ player's head so they walk under it; the top is standable through
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, field
 
 import numpy as np
 from shapely.geometry import LineString, Polygon
@@ -132,6 +228,99 @@ MAX_CG = 400
 
 # Rounds of "lift clear of the ground, then clamp the grade". See `_solve`.
 FLOOR_ROUNDS = 3
+
+# --- The crossing rule ---------------------------------------------------------
+
+# How much room a deck must leave over a road it crosses, metres, measured to
+# the **soffit** and not to the running surface -- the girder is added on top of
+# it, because what a truck hits is the underside.
+#
+# 5.0 m is Sydney's number. TfNSW's standard vertical clearance over a road is
+# 5.3 m for a new structure and 4.6 m is the absolute floor a heavy vehicle
+# route is signposted at; the overbridges actually built through the 1960s
+# motorway program sit between the two. Taking the lower of the two design
+# numbers rather than the higher is deliberate: this is a *floor* that the
+# solve will meet exactly wherever the terrain gives it nothing for free, so
+# every centimetre of it is a centimetre the approach ramps have to climb, and
+# a game where the M5 stands 5.3 m over every side street rather than 5.0 m is
+# not a better game.
+#
+# It is stated to the soffit and not to the deck for the same reason
+# `WALK_UNDER_M` is: the two numbers have to be comparable, and a clearance
+# measured to the top of the slab is a clearance that gets smaller when someone
+# makes the girder deeper.
+MIN_ROAD_CLEARANCE_M = 5.0
+
+# The grade a deck may climb **away from a touchdown** to reach a clearance.
+#
+# `MAX_GRADE` is 7% because a structure is graded to a design standard. This is
+# the other question, and it only comes up because of the crossing rule: when a
+# flyover has to be six metres up and its touchdown is forty metres away, how
+# much of the ceiling does the clearance get to spend? The touchdown itself
+# never moves -- `_pin_ceiling` is where the precedence is argued -- so this is
+# purely a trade between how much road is open underneath and how steep the ramp
+# over it is.
+#
+# **It is 10%, and the number is measured rather than chosen.** Over the inner
+# 8 km, 391 places where a deck crosses a public carriageway, against the deck
+# grades of the same solve:
+#
+#   ramp   crossings under 4.5 m   median clearance   grade p95   grade max
+#  no cap           0                    6.00 m          7.01%      149.3%
+#    35%           42                    6.00 m         21.65%       78.1%
+#    20%           92                    6.00 m         18.48%       74.2%
+#    15%          121                    6.00 m         15.00%       63.1%
+#    12%          152                    5.94 m         12.00%       54.5%
+# > 10%           172                    5.17 m         10.00%       39.9%
+#     7%           217                    3.68 m          7.00%       39.9%
+#  no rule         336                    0.34 m          6.36%       39.9%
+#
+# -- the last row being the bake as it shipped, with no crossing rule at all.
+#
+# 10% is where the last column stops moving. Everything at or under it leaves
+# the steepest deck in the extent exactly where it already was -- 39.9% on New
+# Link Road, which is a pre-existing run this rule never touches -- so the fix
+# cannot be blamed for a cliff it did not build. 12% buys twenty more crossings
+# and a 54% segment, which is a wall the player launches off; that is the wrong
+# side of the trade in a game whose verb is running down roads.
+#
+# It is also `roadgrade.TARGET_GRADE`, which is the grade the street solve is
+# pulled toward, and Austroads' absolute maximum for a ramp. The agreement is a
+# coincidence worth naming rather than an argument: a ramp climbing at what
+# Sydney's steeper streets climb at is a ramp nobody files a report about.
+#
+# The 172 that are still short are not a tolerance and are not silent. They are
+# stubs -- a 16 m OSM way tagged `bridge` between two ways that are not, at the
+# Cahill onramp and its like -- where the structure in the world is longer than
+# the structure in the data, and no grade allowance recovers a ramp that has no
+# length to climb in. `RAIL-VERTICAL.md` §6 is the precedent for naming a
+# resolution limit and moving on; the real fix is the approach embankments
+# becoming decks, which is a round of its own.
+TOUCHDOWN_RAMP_GRADE = 0.10
+
+# How near a node the deck way and the crossed road share the demand is dropped,
+# metres.
+#
+# A shared node is a touchdown or a ramp gore -- the deck is *joining* that road
+# there, and joining it at its own level is the one property this module values
+# above all others (see the header on the 2 cm lip). 25 m is four stations,
+# which is enough that the Lipschitz clamp can carry the profile away from the
+# junction without the pin fighting the demand, and short enough that a viaduct
+# which touches down on a street at one end and flies over the same street
+# 300 m later still has to clear it at the second place.
+TOUCHDOWN_EXEMPT_M = 25.0
+
+# The road classes a deck does **not** have to clear. `elevated.py`'s "public"
+# rule, restated here rather than imported so the two can be seen to be the same
+# decision: a service way is the driveway, the loading dock and the car-park
+# aisle, and a bridge standing on one is the normal case rather than the broken
+# one. 321 of the extent's 1,685 grade separations cross one of these.
+PRIVATE_CLASSES = frozenset({"service"})
+
+# Plan cell for the road index the crossing search runs against, metres.
+# Sized at the largest reach any one query has -- a 30 m road half width plus a
+# 20 m deck half width plus a station -- so a lookup is exactly nine cells.
+CROSS_CELL_M = 64.0
 
 # --- The structure -------------------------------------------------------------
 
@@ -222,6 +411,18 @@ class DeckRun:
     deck_y: np.ndarray  # (N,) running surface, world metres
     ground: np.ndarray  # (N,) terrain under each station
     half_width: float  # to the structural edge, not the traffic lane
+    # The per-station left-of-travel normals, memoised. See `_mitred_ring`: the
+    # collision rings and the drawn edges are built from the same array, and
+    # `prisms` asks for it once per segment, so recomputing it there would be a
+    # `_frames` call per six metres of viaduct in the extent.
+    _left: np.ndarray | None = field(default=None, repr=False, compare=False)
+
+    @property
+    def frames(self) -> np.ndarray:
+        """`_frames(self.pts)`, computed once."""
+        if self._left is None:
+            object.__setattr__(self, "_left", _frames(self.pts))
+        return self._left
 
     @property
     def length(self) -> float:
@@ -235,9 +436,15 @@ class DeckRun:
 class DeckNetwork:
     """Every bridge carriageway in the extent, as a solved elevated deck."""
 
-    def __init__(self, runs: list[DeckRun], stats: dict) -> None:
+    def __init__(self, runs: list[DeckRun], stats: dict, crossings: list[dict] | None = None) -> None:
         self.runs = runs
         self.stats = stats
+        # Every place a deck flies over a public carriageway, with the clearance
+        # the solve gave it. Kept rather than summarised away because it is the
+        # only pre-retile view of the thing the bake exists to fix -- a 25-hour
+        # retile is not something to start on a percentile. `cli._report_decks`
+        # prints the summary and the worst of them every build.
+        self.crossings = crossings or []
         self._by_tile: dict[str, list[tuple[DeckRun, int, int]]] | None = None
 
     # --- Construction ---------------------------------------------------------
@@ -282,7 +489,12 @@ class DeckNetwork:
                 if len(pts) >= 2 and piece.length >= MIN_RUN_M:
                     clipped.append((r, pts))
 
-        runs, solve_stats = _solve(clipped, ground_nodes, terrain)
+        runs, solve_stats, crossings = _solve(
+            clipped,
+            ground_nodes,
+            terrain,
+            [r for r in roads if _is_ground_carriageway(r) and r.highway not in PRIVATE_CLASSES],
+        )
         stats = {
             "bridge_ways": len(bridges),
             "bridge_length_m": sum(
@@ -310,7 +522,7 @@ class DeckNetwork:
                 clear_min=float(clear.min()),
                 elevated_share=float((clear > PARAPET_MIN_CLEARANCE_M).mean()),
             )
-        return cls(runs, stats)
+        return cls(runs, stats, crossings)
 
     def __len__(self) -> int:
         return len(self.runs)
@@ -386,8 +598,8 @@ class DeckNetwork:
         out: list = []
         for run, lo, hi in self._index().get(tile_key, []):
             hw = run.half_width
+            left = run.frames
             for i in range(lo, hi):
-                a, c = run.pts[i], run.pts[i + 1]
                 rise = max(run.clearance[i], run.clearance[i + 1])
                 if rise < PRISM_MIN_RISE_M:
                     continue
@@ -395,14 +607,16 @@ class DeckNetwork:
                 ground = 0.5 * (run.ground[i] + run.ground[i + 1])
                 soffit = top - GIRDER_DEPTH_M
                 base = soffit if soffit - ground >= WALK_UNDER_M else ground - 0.5
-                ring = _segment_ring(a, c, hw)
+                ring = _mitred_ring(run.pts, left, i, hw)
                 out.append(Prism(ring, float(base), float(top - base), "deck"))
                 if min(run.clearance[i], run.clearance[i + 1]) >= PARAPET_MIN_CLEARANCE_M:
                     for side in (1.0, -1.0):
                         off = side * (hw - PARAPET_THICK_M * 0.5)
                         out.append(
                             Prism(
-                                _segment_ring(a, c, PARAPET_THICK_M * 0.5, offset=off),
+                                _mitred_ring(
+                                    run.pts, left, i, PARAPET_THICK_M * 0.5, offset=off
+                                ),
                                 float(top),
                                 PARAPET_HEIGHT_M,
                                 "parapet",
@@ -512,10 +726,18 @@ def hero_bridge_zone(anchors: dict, zones: dict) -> Polygon:
 # --- The solve -----------------------------------------------------------------
 
 
-def _solve(clipped, ground_nodes: set, terrain) -> tuple[list[DeckRun], dict]:
-    """Station every run, wire them into one graph, and solve the profile."""
+def _solve(clipped, ground_nodes: set, terrain, ground_roads) -> tuple[list[DeckRun], dict, list[dict]]:
+    """Station every run, wire them into one graph, and solve the profile.
+
+    `ground_roads` is the public surface carriageway set the crossing rule is
+    measured against -- see `_crossing_demand` and the header. It is passed in
+    rather than re-read because `DeckNetwork.load` already holds the extract and
+    a second `read_roads` here would be a second set of `OsmRoad` objects
+    describing the same ways, which is the mistake `lanes._HeightField`'s
+    comment exists to stop coming back.
+    """
     if not clipped:
-        return [], {"nodes": 0, "pinned": 0, "components": 0, "unpinned_components": 0}
+        return [], {"nodes": 0, "pinned": 0, "components": 0, "unpinned_components": 0}, []
 
     # Which vertices are junctions, so a station always lands on one: a way
     # ending in the middle of another way has to be one unknown, not two.
@@ -582,6 +804,14 @@ def _solve(clipped, ground_nodes: set, terrain) -> tuple[list[DeckRun], dict]:
             ends = members[degree[members] <= 1]
             pinned[ends if len(ends) else members[np.argmin(ground[members])]] = True
 
+    # What the roads underneath demand, before anything is solved: a height per
+    # node that clears every public carriageway that node's ribbon stands over.
+    # See the header. Computed once because the ground roads do not move; the
+    # deck-over-deck half of it does move and is recomputed inside the loop.
+    demand, over_deck, cross_stats, crossings = _crossing_demand(
+        clipped, stations, node_of, ground_roads, terrain, n_nodes
+    )
+
     # Harmonic first, then the floor and the clamp **alternately**, ending on the
     # floor. The order is not cosmetic and the single pass it replaces was wrong:
     # the Lipschitz projection lowers nodes, so lifting a dipped span clear of
@@ -591,13 +821,74 @@ def _solve(clipped, ground_nodes: set, terrain) -> tuple[list[DeckRun], dict]:
     # there. Alternating converges in two rounds and the third is the guard;
     # what is left over after the last floor is the terrain's own grade under a
     # deck that is lying on it, which is a crossing at grade and not a defect.
+    #
+    # **The crossing demand rides in the same floor**, which is the whole reason
+    # it was written as a height rather than as a solve of its own: the loop
+    # already knew how to hold a lower bound against a grade clamp, and a second
+    # solve would have been a second opinion about where the deck is.
     h = _harmonic(h, edge, elen, pinned)
     free = ~pinned
-    floor = ground + streets.CARRIAGEWAY_Y
+    ground_floor = ground + streets.CARRIAGEWAY_Y
+    lim = MAX_GRADE * elen
+    # What the touchdowns and `TOUCHDOWN_RAMP_GRADE` between them will allow.
+    # Computed once, from the pinned heights, which never move. See
+    # `_pin_ceiling` for the precedence it enforces: pin, then grade, then
+    # clearance -- and note that the ramp grade is the *looser* of the two
+    # ceilings in this function on purpose. `MAX_GRADE` is what a free stretch
+    # of structure is graded to; this is what a stretch pinned at one end may
+    # spend to get out of the road.
+    ceiling = _pin_ceiling(h, edge, TOUCHDOWN_RAMP_GRADE * elen, pinned)
+
+    def _floor(profile: np.ndarray) -> np.ndarray:
+        """Everything a node may not be below, this round.
+
+        **The ceiling is applied on both sides of the roll-out, and the second
+        one is not redundant.** `_demand_envelope` spreads a demand outward at
+        7% while `_pin_ceiling` decays at `TOUCHDOWN_RAMP_GRADE` -- so between a
+        crossing and a touchdown near it the envelope falls away more slowly
+        than the ceiling does and arrives at the pin's neighbour six metres
+        high, which is the 119% cliff the first version of this shipped into the
+        measurement. Capping only the demand caps the wrong end of the roll-out.
+        """
+        want = np.minimum(
+            np.maximum(demand, _stacked_demand(profile, over_deck, n_nodes)), ceiling
+        )
+        rolled = np.minimum(_demand_envelope(want, edge, lim), ceiling)
+        return np.maximum(ground_floor, rolled)
+
     for _ in range(FLOOR_ROUNDS):
+        floor = _floor(h)
         h[free] = np.maximum(h[free], floor[free])
-        h = _lipschitz(h, edge, MAX_GRADE * elen, pinned)
-    h[free] = np.maximum(h[free], floor[free])
+        h = _lipschitz(h, edge, lim, pinned)
+    h[free] = np.maximum(h[free], _floor(h)[free])
+
+    # How much of the demand the pins refused. A crossing a few metres from a
+    # touchdown is a genuine contradiction -- the ramp has no length to climb in
+    # -- and it is *reported* rather than asserted, because the pin is a
+    # measurement and the demand is a rule, and the rule does not get to move
+    # the asphalt it is measured against. `server/overpass-clearance-check.ts`
+    # counts the same places from the shipped bytes; this is the same number
+    # seen from the solve's side, and if they ever disagree one of them is
+    # asking a different question.
+    want = np.maximum(demand, _stacked_demand(h, over_deck, n_nodes))
+    short = np.isfinite(want) & (h < want - 1e-3)
+    cross_stats["demand_unmet"] = int(short.sum())
+    cross_stats["demand_unmet_max_m"] = float((want - h)[short].max()) if short.any() else 0.0
+
+    # What each crossing actually got. The deck's own solved height at the
+    # crossing, against the road's surface under it -- both read the way the
+    # shipped check reads them, so the two numbers are comparable across the
+    # retile that carries this work to players.
+    for c in crossings:
+        c["deck_y"] = float(h[c["a"]] + c["t"] * (h[c["b"]] - h[c["a"]]))
+        c["clear"] = c["deck_y"] - c["road_y"]
+    if crossings:
+        cl = np.asarray([c["clear"] for c in crossings])
+        cross_stats.update(
+            cross_clear_p05=float(np.percentile(cl, 5)),
+            cross_clear_p50=float(np.percentile(cl, 50)),
+            cross_under_min=int((cl < MIN_ROAD_CLEARANCE_M).sum()),
+        )
 
     runs: list[DeckRun] = []
     for (road, _), sp, ids in zip(clipped, stations, node_of):
@@ -612,12 +903,359 @@ def _solve(clipped, ground_nodes: set, terrain) -> tuple[list[DeckRun], dict]:
                 half_width=_half_width(road),
             )
         )
-    return runs, {
-        "nodes": int(n_nodes),
-        "pinned": int(pinned.sum()),
-        "components": int(n_comp),
-        "unpinned_components": len(unpinned),
-    }
+    return (
+        runs,
+        {
+            "nodes": int(n_nodes),
+            "pinned": int(pinned.sum()),
+            "components": int(n_comp),
+            "unpinned_components": len(unpinned),
+            **cross_stats,
+        },
+        crossings,
+    )
+
+
+# --- The crossing demand ---------------------------------------------------------
+
+
+def _road_half_width(r: osm.OsmRoad) -> float:
+    """Half the ribbon `streets.py` draws for a ground way, metres.
+
+    `_half_width` without the edge beam, and read out of `streets.py` for the
+    same reason that one is: the road a deck has to clear is as wide as the road
+    that is drawn, and a second set of width constants here would drift.
+    """
+    return min(max(r.width, streets.MIN_ROAD_WIDTH), streets.MAX_ROAD_WIDTH) * 0.5
+
+
+def _cross_point(a0, a1, b0, b1):
+    """Where two plan segments cross, as `(t, u)` along each, or `None`.
+
+    The bare parametric solve with no tolerance on either end, which is what the
+    rule wants: a crossing that only happens if the segments are extended is a
+    crossing that does not happen. Parallel segments return `None` rather than
+    an interval -- two carriageways that lie along each other are not a grade
+    separation, they are a dual carriageway, and neither owes the other room.
+    """
+    rx, rz = a1[0] - a0[0], a1[1] - a0[1]
+    sx, sz = b1[0] - b0[0], b1[1] - b0[1]
+    den = rx * sz - rz * sx
+    if abs(den) < 1e-12:
+        return None
+    qx, qz = b0[0] - a0[0], b0[1] - a0[1]
+    t = (qx * sz - qz * sx) / den
+    u = (qx * rz - qz * rx) / den
+    if 0.0 <= t <= 1.0 and 0.0 <= u <= 1.0:
+        return t, u
+    return None
+
+
+def _foot(p, a, b):
+    """The point on segment `a`-`b` nearest `p`, clamped to the segment."""
+    abx, abz = b[0] - a[0], b[1] - a[1]
+    den = abx * abx + abz * abz
+    if den <= 0.0:
+        return a[0], a[1]
+    t = min(1.0, max(0.0, ((p[0] - a[0]) * abx + (p[1] - a[1]) * abz) / den))
+    return a[0] + t * abx, a[1] + t * abz
+
+
+def _cells(x0, z0, x1, z1, cell: float):
+    """Every index cell a segment's bounding box touches."""
+    for cx in range(math.floor(min(x0, x1) / cell), math.floor(max(x0, x1) / cell) + 1):
+        for cz in range(math.floor(min(z0, z1) / cell), math.floor(max(z0, z1) / cell) + 1):
+            yield cx, cz
+
+
+# How many stations either side of a crossing are examined for the reach.
+#
+# The reach is `hw_deck + hw_road`, at most about 35 m for the widest pair in
+# the extent, and a station is `STATION_M` = 6 m -- so six stations covers it and
+# eight is the guard. A window rather than a scan of the whole run because a
+# 3 km viaduct has 500 stations and every one of its crossings would otherwise
+# walk all of them.
+_REACH_STATIONS = 8
+
+
+def _crossing_demand(clipped, stations, node_of, ground_roads, terrain, n_nodes):
+    """Per deck node, the height that clears the roads it stands over.
+
+    Returns `(demand, over_deck, stats)`. `demand` is `-inf` where nothing is
+    crossed, so it composes with the ground floor by `np.maximum` and costs
+    nothing where there is no crossing -- which is 97% of the nodes in the
+    build. `over_deck` is the deck-over-deck half, kept as a list of
+    `(upper node ids, lower node a, lower node b, t)` because the lower deck's
+    height is not known until the loop has run; see `_stacked_demand`.
+
+    **The predicate is the one `server/overpass-clearance-check.ts` uses**, and
+    that identity is deliberate rather than convenient: the check reads the
+    shipped `.lanes.bin` and asks whether two carriageways cross in plan without
+    sharing a node, and if this pass answered a different question the two could
+    both be right while the world stayed broken.
+    """
+    demand = np.full(n_nodes, -np.inf)
+    over_deck: list[tuple[np.ndarray, int, int, float]] = []
+    stats = {"cross_roads": 0, "cross_stacked": 0, "cross_nodes": 0}
+    # One record per crossing, so the solve can report what it *achieved* rather
+    # than only what it asked for. `server/overpass-clearance-check.ts` measures
+    # the same thing from the shipped bytes; this is the same number seen before
+    # the tiles are written, which is the only way to know whether a retile is
+    # worth starting. See `DeckNetwork.crossings`.
+    found: list[dict] = []
+
+    # The deck stations' own occupancy, so the road index is built over the
+    # handful of cells a deck can reach rather than over the whole city. 3,023
+    # bridge ways against 410,405 road ways is the ratio this is exploiting.
+    occupied: set[tuple[int, int]] = set()
+    for sp in stations:
+        for e, n in sp:
+            for c in _cells(e - 40.0, n - 40.0, e + 40.0, n + 40.0, CROSS_CELL_M):
+                occupied.add(c)
+
+    # The road index: public ground carriageways only, and only their segments
+    # that fall in a cell some deck could reach.
+    road_bins: dict[tuple[int, int], list[tuple[int, int]]] = {}
+    for j, r in enumerate(ground_roads):
+        line = r.line
+        for i in range(len(line) - 1):
+            for c in _cells(line[i][0], line[i][1], line[i + 1][0], line[i + 1][1], CROSS_CELL_M):
+                if c in occupied:
+                    road_bins.setdefault(c, []).append((j, i))
+    road_keys = [frozenset(_key(p) for p in r.line) for r in ground_roads]
+    road_hw = [_road_half_width(r) for r in ground_roads]
+
+    # The deck index, for the stacked half. Keyed the same way, over the runs.
+    deck_bins: dict[tuple[int, int], list[tuple[int, int]]] = {}
+    for ri, sp in enumerate(stations):
+        for i in range(len(sp) - 1):
+            for c in _cells(sp[i][0], sp[i][1], sp[i + 1][0], sp[i + 1][1], CROSS_CELL_M):
+                deck_bins.setdefault(c, []).append((ri, i))
+
+    # (node id, foot point) pairs, gathered and sampled in one batch at the end:
+    # `terrain.sample` on a million-post lattice is vectorised and calling it per
+    # crossing was measured at two orders of magnitude slower than calling it
+    # once.
+    want_nodes: list[int] = []
+    want_pts: list[tuple[float, float]] = []
+
+    for ri, ((road, _), sp, ids) in enumerate(zip(clipped, stations, node_of)):
+        hw_d = _half_width(road)
+        deck_keys = frozenset(_key(p) for p in road.line)
+        seen_pairs: set[tuple[int, int]] = set()
+        for i in range(len(sp) - 1):
+            a0, a1 = sp[i], sp[i + 1]
+            cand: set[tuple[int, int]] = set()
+            for c in _cells(a0[0], a0[1], a1[0], a1[1], CROSS_CELL_M):
+                for dx in (-1, 0, 1):
+                    for dz in (-1, 0, 1):
+                        cand.update(road_bins.get((c[0] + dx, c[1] + dz), ()))
+            for j, k in cand:
+                r = ground_roads[j]
+                hit = _cross_point(a0, a1, r.line[k], r.line[k + 1])
+                if hit is None:
+                    continue
+                t, _u = hit
+                px = a0[0] + t * (a1[0] - a0[0])
+                pz = a0[1] + t * (a1[1] - a0[1])
+                # A touchdown is not a crossing. The shared node is looked up by
+                # coordinate, `_key`'s millimetre rule, so this is the same
+                # identity `_solve` welds the graph with.
+                shared = deck_keys & road_keys[j]
+                if shared and any(
+                    (px - q[0] / 1000.0) ** 2 + (pz - q[1] / 1000.0) ** 2
+                    <= TOUCHDOWN_EXEMPT_M * TOUCHDOWN_EXEMPT_M
+                    for q in shared
+                ):
+                    continue
+                if (j, k) not in seen_pairs:
+                    seen_pairs.add((j, k))
+                    stats["cross_roads"] += 1
+                found.append(
+                    {
+                        "e": float(px),
+                        "n": float(pz),
+                        "a": int(ids[i]),
+                        "b": int(ids[i + 1]),
+                        "t": float(t),
+                        "under": r.name,
+                        "under_class": r.highway,
+                        "over": road.name or road.osm_id,
+                        "foot": _foot((px, pz), r.line[k], r.line[k + 1]),
+                    }
+                )
+                reach = hw_d + road_hw[j]
+                lo = max(0, i - _REACH_STATIONS)
+                hi = min(len(sp), i + _REACH_STATIONS + 2)
+                for s in range(lo, hi):
+                    dx = sp[s][0] - px
+                    dz = sp[s][1] - pz
+                    if dx * dx + dz * dz > reach * reach:
+                        continue
+                    want_nodes.append(int(ids[s]))
+                    want_pts.append(_foot(sp[s], r.line[k], r.line[k + 1]))
+
+        # --- the stacked half ------------------------------------------------
+        #
+        # Only where OSM's `layer` says which deck is upper. Two decks at the
+        # same layer that cross in plan are a mapping oddity -- a ramp drawn
+        # through its own flyover -- and inventing a winner would be this
+        # module deciding something OSM is the authority on. See RAIL-VERTICAL
+        # §3: OSM says what the structure is, and it is the only thing that can.
+        for i in range(len(sp) - 1):
+            a0, a1 = sp[i], sp[i + 1]
+            cand2: set[tuple[int, int]] = set()
+            for c in _cells(a0[0], a0[1], a1[0], a1[1], CROSS_CELL_M):
+                for dx in (-1, 0, 1):
+                    for dz in (-1, 0, 1):
+                        cand2.update(deck_bins.get((c[0] + dx, c[1] + dz), ()))
+            for rj, k in cand2:
+                if rj == ri:
+                    continue
+                other = clipped[rj][0]
+                if other.layer <= road.layer:
+                    continue
+                # `road` is the LOWER deck here, so the demand goes on `other`.
+                osp = stations[rj]
+                hit = _cross_point(a0, a1, osp[k], osp[k + 1])
+                if hit is None:
+                    continue
+                t, u = hit
+                px = a0[0] + t * (a1[0] - a0[0])
+                pz = a0[1] + t * (a1[1] - a0[1])
+                if frozenset(_key(p) for p in other.line) & deck_keys:
+                    continue
+                reach = _half_width(other) + hw_d
+                lo = max(0, k - _REACH_STATIONS)
+                hi = min(len(osp), k + _REACH_STATIONS + 2)
+                up = [
+                    int(node_of[rj][s])
+                    for s in range(lo, hi)
+                    if (osp[s][0] - px) ** 2 + (osp[s][1] - pz) ** 2 <= reach * reach
+                ]
+                if not up:
+                    continue
+                over_deck.append((np.asarray(up, dtype=np.int64), int(ids[i]), int(ids[i + 1]), t))
+                stats["cross_stacked"] += 1
+
+    if want_nodes:
+        pts = np.asarray(want_pts, dtype=np.float64)
+        under = np.asarray(terrain.sample(pts[:, 0], pts[:, 1]), dtype=np.float64).reshape(-1)
+        need = under + streets.CARRIAGEWAY_Y + MIN_ROAD_CLEARANCE_M + GIRDER_DEPTH_M
+        np.maximum.at(demand, np.asarray(want_nodes, dtype=np.int64), need)
+    if found:
+        fp = np.asarray([c["foot"] for c in found], dtype=np.float64)
+        fy = np.asarray(terrain.sample(fp[:, 0], fp[:, 1]), dtype=np.float64).reshape(-1)
+        for c, y in zip(found, fy):
+            c["road_y"] = float(y) + streets.CARRIAGEWAY_Y
+            del c["foot"]
+    stats["cross_nodes"] = int(np.isfinite(demand).sum())
+    return demand, over_deck, stats, found
+
+
+def _pin_ceiling(h: np.ndarray, edge: np.ndarray, limit: np.ndarray, pinned: np.ndarray) -> np.ndarray:
+    """How high the touchdowns and the grade ceiling will let a node be.
+
+        ceiling(n) = min over pinned p of ( h(p) + TOUCHDOWN_RAMP_GRADE * dist(p, n) )
+
+    ---------------------------------------------------------------------------
+    **The precedence this function is, written down once, because all three of
+    the things it arbitrates are things this module calls non-negotiable
+    elsewhere.**
+
+      1. **A touchdown wins.** It is a measurement of where the ground asphalt
+         is, and the whole of `_lipschitz`'s docstring is about not moving it.
+      2. **The grade ceiling wins next.** A deck that climbs 100% is not a
+         steep bridge, it is a wall the player launches off; measured over the
+         inner 8 km, asking for clearance without this cap produced 178
+         segments over 25% and 39 over 100%, every one of them six metres of
+         rise inside a single six-metre station next to a pin.
+      3. **The clearance gives.** It is the newest rule and the only one of the
+         three that is a *want* rather than a fact -- and where a ramp touches
+         down twenty metres from the road it crosses, OSM is describing a
+         structure that does not fit in the space OSM says it occupies. The
+         shortfall is counted (`demand_unmet`) and named by
+         `server/overpass-clearance-check.ts` rather than papered over.
+
+    So the demand is capped here before it is rolled out by
+    `_demand_envelope`, and the two together leave a profile that always obeys
+    the touchdowns and the ceiling and clears everything it has room to clear.
+
+    A component with no pin in it gets `inf` and is uncapped, which is right: it
+    has no measurement to contradict.
+    """
+    ceil = np.where(pinned, h, np.inf)
+    if len(edge) == 0:
+        return ceil
+    i, j = edge[:, 0], edge[:, 1]
+    for _ in range(MAX_SWEEPS):
+        before = ceil[np.isfinite(ceil)].sum(), int(np.isfinite(ceil).sum())
+        np.minimum.at(ceil, j, ceil[i] + limit)
+        np.minimum.at(ceil, i, ceil[j] + limit)
+        if (ceil[np.isfinite(ceil)].sum(), int(np.isfinite(ceil).sum())) == before:
+            break
+    return ceil
+
+
+def _demand_envelope(demand: np.ndarray, edge: np.ndarray, limit: np.ndarray) -> np.ndarray:
+    """The gentlest profile that meets every demand: the demand, rolled out at 7%.
+
+    ---------------------------------------------------------------------------
+    **This function is the difference between a ramp and a cliff, and the first
+    cut of the crossing rule did not have it.** The demand is a step -- six
+    metres at the four stations over the road and nothing at the fifth -- and
+    handing a step to the alternating loop does not smooth it: `_lipschitz`
+    averages a downward projection with an upward one, so it *lowers the peak*
+    as much as it raises the shoulder, and the floor at the end of the round
+    puts the peak straight back. Measured over the inner 8 km, that solve
+    produced a maximum deck grade of **229%** against 40% before the rule, with
+    725 of 7,578 segments over the 7% ceiling. A vertical wall in a motorway is
+    not a better bug than a motorway lying in the street.
+
+    So the demand is made grade-feasible *before* it becomes a floor. This is
+    the standard lower envelope under a Lipschitz condition,
+
+        env(n) = max over demanded d of ( demand(d) - MAX_GRADE * dist(d, n) )
+
+    computed as a min-plus relaxation over the deck graph -- which is the same
+    sweep `_lipschitz` runs, one-sided and outward instead of two-sided and
+    inward. Its output already obeys the ceiling everywhere, so the clamp that
+    follows has nothing to pull down and the demand survives the round.
+
+    `-inf` means "no demand here" and propagates as itself, so a graph with no
+    crossing in it costs one sweep and returns unchanged.
+
+    Convergence is bounded by the reach of the tallest demand rather than by
+    `MAX_SWEEPS`: six metres at 7% is 86 m, which is fourteen stations, so the
+    early exit fires long before the cap. The cap is the guard, as it is above.
+    """
+    env = demand.copy()
+    if len(edge) == 0 or not np.isfinite(env).any():
+        return env
+    i, j = edge[:, 0], edge[:, 1]
+    for _ in range(MAX_SWEEPS):
+        before = env[np.isfinite(env)].sum(), int(np.isfinite(env).sum())
+        np.maximum.at(env, j, env[i] - limit)
+        np.maximum.at(env, i, env[j] - limit)
+        if (env[np.isfinite(env)].sum(), int(np.isfinite(env).sum())) == before:
+            break
+    return env
+
+
+def _stacked_demand(h: np.ndarray, over_deck: list, n_nodes: int) -> np.ndarray:
+    """What the decks underneath demand, at the profile's *current* height.
+
+    Recomputed every round rather than pinned once, which is what makes a
+    three-level interchange settle: the middle deck rises off the street, and
+    the top one then rises off the middle. At 39 crossings in the whole extent
+    the cost of doing it inside the loop is nothing, and doing it outside would
+    have stacked the top deck on where the middle one started.
+    """
+    out = np.full(n_nodes, -np.inf)
+    for up, a, b, t in over_deck:
+        low = h[a] + t * (h[b] - h[a])
+        np.maximum.at(out, up, low + MIN_ROAD_CLEARANCE_M + GIRDER_DEPTH_M)
+    return out
 
 
 def _half_width(r: osm.OsmRoad) -> float:
@@ -782,11 +1420,64 @@ def _lipschitz(
 # --- Geometry ------------------------------------------------------------------
 
 
+def _mitred_ring(
+    pts: np.ndarray, left: np.ndarray, i: int, half: float, offset: float = 0.0
+) -> np.ndarray:
+    """The plan rectangle a segment's **drawn** geometry occupies, in ENU.
+
+    ---------------------------------------------------------------------------
+    **THE COLLISION POLYGON IS THE DRAWN POLYGON**, which is `tiles.write_collision`'s
+    contract in its own capitals, and until this function existed a deck broke
+    it on every curve.
+
+    `_emit_run` builds each edge from `_frames`' **per-station** normal, which is
+    the average of the two segments meeting there -- the mitre, and the whole
+    reason it is averaged is written in `_frames`: without it "the ribbon's
+    edges step sideways by the width of the deck times the turn angle" at every
+    bend. `prisms` built its rings from `_segment_ring`, which uses the
+    **segment's own** normal. The two agree exactly on a straight run and part
+    company on a curve by `offset * theta`, where theta is the turn at the
+    station -- so on a tight ramp with a 5.6 m half width and 7 degrees of turn
+    per station, the solid is **0.85 m** from the barrier the player can see.
+    Measured on the shipped bake at the Warringah Freeway onramp at Cammeray
+    (370.6, -4584.3): the parapet prism's four corners had their nearest drawn
+    vertex 0.67, 0.79, 0.85 and 0.71 m away, and not one deck-slot vertex fell
+    inside the ring at all. `server/undrawn-solids-check.ts` reported 17 of
+    these network-wide and read them as parapets that were never drawn; they
+    were drawn, 0.8 m to the left.
+
+    A parapet is the case that shows up because its ring is 0.40 m across and
+    the whole ring misses. The **deck** ring misses by the same 0.8 m and does
+    not show up, because an 11 m ring still overlaps the geometry -- which is
+    worse, not better: it is 0.8 m of solid off the edge of a viaduct with
+    nothing drawn under it, and 0.8 m of drawn deck on the other edge with
+    nothing solid.
+
+    So both come from here, and there is one frame in the module.
+    """
+    a, b = pts[i], pts[i + 1]
+    la, lb = left[i], left[i + 1]
+    return np.asarray(
+        [
+            a + la * (offset - half),
+            b + lb * (offset - half),
+            b + lb * (offset + half),
+            a + la * (offset + half),
+        ],
+        dtype=np.float64,
+    )
+
+
 def _segment_ring(a: np.ndarray, b: np.ndarray, half: float, offset: float = 0.0) -> np.ndarray:
     """A plan rectangle covering one segment, `2 * half` wide, in ENU.
 
     `offset` slides it across the deck, which is what puts a parapet's volume on
     the edge rather than down the middle.
+
+    **Not for anything that also gets drawn** -- see `_mitred_ring`, which is
+    what the collision rings use now. This one survives for `_emit_piers`, where
+    the same ring is both the volume and the geometry so there is nothing to
+    disagree with.
     """
     d = b - a
     n = float(np.hypot(d[0], d[1]))
@@ -887,7 +1578,7 @@ def _emit_run(slots, run: DeckRun, lo: int, hi: int, origin) -> None:
     deck = slots[SLOT_DECK]
     struct = slots[SLOT_STRUCTURE]
     pts = run.pts
-    left = _frames(pts)
+    left = run.frames
     hw = run.half_width
     dy = run.deck_y
     clear = run.clearance
