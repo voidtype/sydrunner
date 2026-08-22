@@ -266,6 +266,22 @@ export class TerrainField {
   }
 
   /**
+   * Whether this build has no ground for a tile, ever.
+   *
+   * The `missing` set read from outside, and the distinction it draws is the
+   * whole reason it is worth exposing: a 404 or a wrong-sized payload is a fact
+   * about what the pipeline emitted and is remembered for the session, while a
+   * thrown or abandoned fetch is a fact about one moment and is not. Anything
+   * waiting on ground -- the boot's reveal gate, the streamer's fetch priority
+   * -- has to be able to tell those apart or it waits forever for a file that
+   * does not exist. A transient failure answers `false` on purpose: that one is
+   * coming back.
+   */
+  absent(key: string): boolean {
+    return this.missing.has(key);
+  }
+
+  /**
    * Hand this field a grid that was obtained some other way.
    *
    * `ensure` above fetches over HTTP, which is the only way a browser can read a
