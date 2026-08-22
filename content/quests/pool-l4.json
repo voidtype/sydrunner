@@ -1,0 +1,297 @@
+{
+  "pack": "pool-l4",
+  "quests": [
+    {
+      "id": "l4-no-driver",
+      "act": 1,
+      "title": "The 5:41 Has No Driver",
+      "blurb": "I can't put a foot in the door of that thing. So you go. Ride it through to Sydenham, sit at the very front where the cab used to be, and come back and tell me what's there.",
+      "giver": "bankstown-guard",
+      "level": 4,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites off Restwell Street, his and yours"
+        },
+        {
+          "kind": "goto",
+          "x": -15975,
+          "z": 5820,
+          "radius": 35,
+          "label": "find the bus stand he still won't look at"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Bankstown",
+          "to": "Sydenham",
+          "label": "ride it to Sydenham with nobody up the front"
+        },
+        {
+          "kind": "ko",
+          "npc": "eshay",
+          "count": 3,
+          "label": "three eshays reckon the front seat is theirs"
+        },
+        {
+          "kind": "photo",
+          "x": -3931,
+          "z": 5248,
+          "radius": 50,
+          "label": "photograph the empty cab from the windscreen seat"
+        },
+        {
+          "kind": "dialog",
+          "npc": "bankstown-guard",
+          "node": "verdict",
+          "label": "back to Bankstown and tell him what was there"
+        }
+      ],
+      "reward": {
+        "cash": 120,
+        "xp": 480,
+        "unlock": [
+          "l4:no-driver"
+        ]
+      }
+    },
+    {
+      "id": "l4-deed-of-release",
+      "act": 1,
+      "title": "The Deed of Release Says Nothing About You",
+      "blurb": "Fourteenth pylon from the station end, if they haven't moved it. My name is on it with eleven thousand others. I'm not permitted past the roundabout. The deed says nothing whatsoever about you.",
+      "giver": "vaughn-lidcombe-deed",
+      "level": 4,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "ride",
+          "line": "Olympic Park",
+          "from": "Lidcombe",
+          "to": "Olympic Park",
+          "label": "take the shuttle off Platform 0 — the one he watches leave"
+        },
+        {
+          "kind": "goto",
+          "x": -13060,
+          "z": -2330,
+          "radius": 45,
+          "label": "find the volunteer pylons on the Boulevard; count fourteen from the station end"
+        },
+        {
+          "kind": "photo",
+          "x": -13048,
+          "z": -2300,
+          "radius": 18,
+          "label": "photograph the name, and get the whole pylon in, he'll want the whole pylon in"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 2,
+          "label": "someone in a lanyard asks who authorised the photography; the second one has a radio"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "flat white at the Boulevard kiosk, one sugar, on his behalf"
+        },
+        {
+          "kind": "dialog",
+          "npc": "vaughn-lidcombe-deed",
+          "node": "describe",
+          "label": "back to Lidcombe and tell him what it looked like before you show him"
+        }
+      ],
+      "reward": {
+        "cash": 110,
+        "xp": 430,
+        "unlock": [
+          "l4:deed-of-release"
+        ]
+      }
+    },
+    {
+      "id": "l4-erko-monday",
+      "act": 1,
+      "title": "Eleven Books Back by Monday",
+      "blurb": "Every Monday the same eleven books are back in my street library, dog-ears and all, and the bloke who borrows the Bryson says hello like we've never met. Second set of eyes, before I put any of it in writing.",
+      "giver": "erko-librarian",
+      "level": 4,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "be at the counter at 7:40 like the rest of them. same order, same cup, name still spelt wrong"
+        },
+        {
+          "kind": "photo",
+          "x": -2112,
+          "z": 3556,
+          "radius": 22,
+          "label": "photograph the noticeboard on Erskineville Road. she wants a copy that isn't in her handwriting"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 3,
+          "label": "three signatures on the noise petition, all of them from the block that went up after the pub"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Erskineville",
+          "to": "Sydenham",
+          "label": "two stops down and see whether it's only Erko doing it, or whether it's the whole line"
+        },
+        {
+          "kind": "earn",
+          "dollars": 60,
+          "label": "sixty dollars, earned in front of her. money is the one thing she's sure carries over"
+        },
+        {
+          "kind": "dialog",
+          "npc": "erko-librarian",
+          "node": "monday",
+          "label": "read the round back to her at the fence"
+        }
+      ],
+      "reward": {
+        "cash": 110,
+        "xp": 430,
+        "unlock": [
+          "l4:erko-monday"
+        ]
+      }
+    },
+    {
+      "id": "l4-nets-away",
+      "act": 1,
+      "title": "Nobody Puts the Nets Away",
+      "blurb": "Forty-two Saturdays on the roster and four names on it, and one of the names moved to Queensland. You're doing the coffees, the ground, the poster, the seconds' ice and the book. Then the nets.",
+      "giver": "maroubra-gulls-val",
+      "level": 4,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites: one for the referee, one for the bloke who becomes the referee if the referee doesn't come"
+        },
+        {
+          "kind": "goto",
+          "x": 1862,
+          "z": 6320,
+          "radius": 50,
+          "label": "get to the No. 2 ground behind the leagues club. Kickoff is ten. The draw says nine. Both of those are wrong and one of them is Val's fault"
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 3,
+          "label": "the cricket club's working bee has started putting the practice nets up across the wing at ten past ten. Have a word with three of them"
+        },
+        {
+          "kind": "photo",
+          "x": 1268,
+          "z": 2812,
+          "radius": 40,
+          "label": "photograph the ground at Moore Park for the raffle poster. First prize is a day at the cricket and the poster has said TBC since May"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Bondi Junction",
+          "to": "Kogarah",
+          "label": "the seconds are away at Kogarah and the gear car is full of witches hats. Take the strapping tape and the ice on the train"
+        },
+        {
+          "kind": "earn",
+          "dollars": 90,
+          "label": "sell the rest of the blue book. Ten a ticket, three for twenty, and nobody standing on a sideline in 2026 has cash"
+        },
+        {
+          "kind": "dialog",
+          "npc": "maroubra-gulls-val",
+          "node": "nets",
+          "label": "back to Val for the last job of the day, which is the job nobody does"
+        }
+      ],
+      "reward": {
+        "cash": 110,
+        "xp": 460,
+        "unlock": [
+          "l4:nets-away"
+        ]
+      }
+    },
+    {
+      "id": "l4-gordon-notification",
+      "act": 1,
+      "title": "Notification of the Notification",
+      "blurb": "The sign has to stand on the fence for fourteen days. It has stood for four, twice. I can't photograph it — council photographing council isn't evidence, it's a diary entry. You can. You're the public.",
+      "giver": "kuringgai-assessment",
+      "level": 4,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "photo",
+          "x": -5439,
+          "z": -12594,
+          "radius": 40,
+          "label": "photograph the notification sign on the St Johns Avenue fence, as a member of the public, which is the only qualification the form asks for"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 3,
+          "label": "three objectors have been harvesting the sign nightly and lodging that it was never displayed; discuss it with them on the verge"
+        },
+        {
+          "kind": "earn",
+          "dollars": 95,
+          "label": "raise the $95 lodgement fee, scaled to the cost of works; the works are a hedge"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Gordon",
+          "to": "Chatswood",
+          "label": "the file lives at the Chatswood annexe, because the Gordon strongroom is being refurbished, and the refurbishment is a development application, and it is being assessed at Gordon"
+        },
+        {
+          "kind": "goto",
+          "x": -2680,
+          "z": -7790,
+          "radius": 30,
+          "label": "the records counter; ask for it by its file number, never by the address"
+        },
+        {
+          "kind": "dialog",
+          "npc": "kuringgai-assessment",
+          "node": "determination",
+          "label": "carry the file back up the hill and hear the determination"
+        }
+      ],
+      "reward": {
+        "cash": 120,
+        "xp": 450,
+        "unlock": [
+          "l4:gordon-notification"
+        ]
+      }
+    }
+  ]
+}

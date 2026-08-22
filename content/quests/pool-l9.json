@@ -1,0 +1,339 @@
+{
+  "pack": "pool-l9",
+  "quests": [
+    {
+      "id": "l9-monday-starts-at-001",
+      "act": 1,
+      "title": "Monday Starts at 001",
+      "blurb": "Forty-one years of dockets. Sunday I finish on a big number. Monday the book starts at 001 and nobody in this plaza thinks that is strange except me. Look at a few things for me before you go home.",
+      "giver": "cabramatta-transfer-counter",
+      "level": 9,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -25040,
+          "z": 3290,
+          "radius": 35,
+          "label": "stand at the John Street noticeboard and read the flyers: same three, corners curled the same way"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "order a flat white in Cabramatta. One place makes them, for the council people, and the machine is under a tea towel"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 4,
+          "label": "the plaza car park has four people who film you reversing. Discourage all four"
+        },
+        {
+          "kind": "photo",
+          "x": -24596,
+          "z": 2549,
+          "radius": 30,
+          "label": "photograph the specials board at Canley Vale. Compare it to Tuesday's photograph. It will be the same photograph"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Cabramatta",
+          "to": "Liverpool",
+          "label": "go the way the money goes: up the line to Liverpool"
+        },
+        {
+          "kind": "goto",
+          "x": -25850,
+          "z": 6740,
+          "radius": 35,
+          "label": "her cousin's counter, off the Liverpool mall. Look at his book, do not touch his book"
+        },
+        {
+          "kind": "earn",
+          "dollars": 300,
+          "label": "put three hundred through your own week and see whether the number stays where you left it"
+        },
+        {
+          "kind": "dialog",
+          "npc": "cabramatta-transfer-counter",
+          "node": "ledger",
+          "label": "back to the counter with all of it"
+        }
+      ],
+      "reward": {
+        "cash": 400,
+        "xp": 1650,
+        "unlock": [
+          "l9:docket-book"
+        ]
+      }
+    },
+    {
+      "id": "l9-no-grounds",
+      "act": 1,
+      "title": "No Grounds Required",
+      "blurb": "Forty-one years in flat 3. Then the metro opened, the rent found out, and the notice arrived with no reason on it, because it does not have to have one. I would like the reason written down somewhere. Anywhere will do.",
+      "giver": "wollstonecraft-tenant",
+      "level": 9,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "photo",
+          "x": -1642,
+          "z": -4192,
+          "radius": 12,
+          "label": "photograph the bathroom ceiling in flat 3. The condition report calls it surface discolouration consistent with age."
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 6,
+          "label": "find the emergency plumber. He has been on his way since March and it turns out there are six of him."
+        },
+        {
+          "kind": "goto",
+          "x": -930,
+          "z": -4820,
+          "radius": 25,
+          "label": "get to the 11:15 open home on Willoughby Road. Two hundred metres from Nola's kitchen, eight hundred and ninety a week."
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 12,
+          "label": "thin the queue. Twelve applicants, twelve cover letters, every one of them loves the area and will treat it as their own."
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "six fifty for a flat white on Willoughby Road. Two and a bit hours of the increase, if you spread the increase across the week, which is how Nola has started thinking."
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Crows Nest",
+          "to": "Victoria Cross",
+          "label": "ride the metro one stop to Victoria Cross. Three minutes under the harbour. That is the entire argument, and it cost her the flat."
+        },
+        {
+          "kind": "earn",
+          "dollars": 470,
+          "label": "raise $470 in a day: the difference between what flat 3 cost in March and what flat 3 is advertised for now."
+        },
+        {
+          "kind": "dialog",
+          "npc": "wollstonecraft-tenant",
+          "node": "tribunal",
+          "label": "take the lot back to Nola and help her fill in section four."
+        }
+      ],
+      "reward": {
+        "cash": 420,
+        "xp": 1600,
+        "unlock": [
+          "l9:no-grounds"
+        ]
+      }
+    },
+    {
+      "id": "l9-be-more-interesting",
+      "act": 1,
+      "title": "Be More Interesting Than Me",
+      "blurb": "Seventeen dollars thirty-four to walk through a gate. My people don't pay it. But tonight there's a car parked on my footpath, so go and be more interesting than me for twenty minutes.",
+      "giver": "wolli-gate-walker",
+      "level": 9,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -3958,
+          "z": 7332,
+          "radius": 70,
+          "label": "the kerb outside international, where the walk starts and the fares don't"
+        },
+        {
+          "kind": "earn",
+          "dollars": 120,
+          "label": "ten a head, up the road, twelve of them — minus the two who saw the towers and got a taxi"
+        },
+        {
+          "kind": "ko",
+          "npc": "police",
+          "count": 5,
+          "label": "plaza level, under the good lighting: give Discovery Point something to discover"
+        },
+        {
+          "kind": "ko",
+          "npc": "rbt",
+          "count": 2,
+          "label": "the breath test bus is parked across the end of his walk. Persuade the crew to test somebody else"
+        },
+        {
+          "kind": "photo",
+          "x": -5078,
+          "z": 6602,
+          "radius": 45,
+          "label": "photograph it. Sione keeps a file. The file goes nowhere and he keeps it anyway"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Wolli Creek",
+          "to": "Arncliffe",
+          "label": "one stop. One river. A platform nobody can drive a car onto"
+        },
+        {
+          "kind": "dialog",
+          "npc": "wolli-gate-walker",
+          "node": "cooled",
+          "label": "walk back at shift change and let him count what it bought"
+        }
+      ],
+      "reward": {
+        "cash": 420,
+        "xp": 1600,
+        "unlock": [
+          "l9:gate-walk"
+        ]
+      }
+    },
+    {
+      "id": "l9-the-712-from-pymble",
+      "act": 1,
+      "title": "Someone Has to Catch the 7:12",
+      "blurb": "Thirty-one years on the 7:12 and my wife can see every tap of it on the statement. Today I need to be on a train going the other way. Take my card. Have an ordinary Tuesday on my behalf.",
+      "giver": "pymble-712",
+      "level": 9,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Pymble",
+          "to": "Wynyard",
+          "label": "down the line to Wynyard, tapped on at Pymble like every other morning of his life"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "8:04. One flat white. The same order for eleven years and he has never once changed it"
+        },
+        {
+          "kind": "photo",
+          "x": -190,
+          "z": -330,
+          "radius": 50,
+          "label": "photograph the lobby of the building he does not work in — the group chat expects a Tuesday"
+        },
+        {
+          "kind": "earn",
+          "dollars": 200,
+          "label": "put two hundred through the day, so that one number on the statement is honestly earned"
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 4,
+          "label": "the 5:41 has four blokes on it who started at three, and one of them is on the phone in the quiet carriage"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Wynyard",
+          "to": "Pymble",
+          "label": "home, tapped off at Pymble at 6:04, exactly where thirty-one years of statements say you will be"
+        },
+        {
+          "kind": "dialog",
+          "npc": "pymble-712",
+          "node": "done",
+          "label": "give the man his card back on the up platform"
+        }
+      ],
+      "reward": {
+        "cash": 385,
+        "xp": 1550,
+        "unlock": [
+          "l9:the-712"
+        ]
+      }
+    },
+    {
+      "id": "l9-breath-test-queue",
+      "act": 1,
+      "title": "The Wagon's in the Breath Test Queue",
+      "blurb": "Someone took the wagon off King Street with the whole PA in the back. It's alive, it's standing at an RBT on the Princes Highway, and the constable wants to keep it till Monday. I've got a Saturday gig.",
+      "giver": "newtown-gail-foh",
+      "level": 9,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "dialog",
+          "npc": "newtown-gail-foh",
+          "node": "spare",
+          "label": "take the spare key off Gail — it lives in the till, taped to a coaster from the old pub"
+        },
+        {
+          "kind": "photo",
+          "x": -2660,
+          "z": 3310,
+          "radius": 25,
+          "label": "photograph the empty spot outside the pub for the insurer, who values the car at ninety dollars"
+        },
+        {
+          "kind": "earn",
+          "dollars": 260,
+          "label": "get the release fee together — two hundred and sixty, cash, no card facility, obviously"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Newtown",
+          "to": "St Peters",
+          "label": "train it down to St Peters, because the car you'd have driven is the car you're going to collect"
+        },
+        {
+          "kind": "goto",
+          "x": -2500,
+          "z": 4250,
+          "radius": 40,
+          "label": "find the breath test bus on the Princes Highway: cones out, everybody sober and furious"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 2,
+          "label": "two locals are livestreaming the RBT to the Newtown community page. The wagon does not need the exposure"
+        },
+        {
+          "kind": "ko",
+          "npc": "rbt",
+          "count": 4,
+          "label": "explain to the wand crew, at length, that a blue Corolla is not a witness"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "dawn on the Princes Highway, a manual with no clutch left, and all of King Street between you and the pub"
+        }
+      ],
+      "reward": {
+        "cash": 380,
+        "xp": 1500,
+        "unlock": [
+          "l9:wagon-home"
+        ]
+      }
+    }
+  ]
+}

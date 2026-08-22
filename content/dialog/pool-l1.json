@@ -1,0 +1,802 @@
+{
+  "pack": "pool-l1",
+  "npcs": [
+    {
+      "id": "artarmon-pathways-dale",
+      "name": "Dale, employment services consultant",
+      "x": -2510,
+      "z": -6520,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Dale. NorthStar Pathways, suite 3, above the tile showroom. Sit anywhere except that chair, the leg's gone and I've claimed for it twice.",
+          "choices": [
+            {
+              "text": "What is it you actually do up here?",
+              "goto": "what"
+            },
+            {
+              "text": "Denise at Redfern sent me.",
+              "goto": "offer"
+            },
+            {
+              "text": "About that outcome form.",
+              "goto": "sign"
+            },
+            {
+              "text": "I've done the running around.",
+              "goto": "done"
+            },
+            {
+              "text": "Where does a person get lunch around here?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nothing. I'll see myself out.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "what",
+          "line": "I'm the bit between you and the department. They pay me per outcome. An outcome is you, employed, four weeks, according to a form. Note where the emphasis landed.",
+          "choices": [
+            {
+              "text": "So the form is the job.",
+              "goto": "offer"
+            },
+            {
+              "text": "That's a rort, Dale.",
+              "goto": "rort"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "rort",
+          "line": "It's a market. The department built it, I just work in it. There's eleven of us on this floor doing the same thing and I'm the only one who tells you how it works.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "offer"
+            },
+            {
+              "text": "I'll think about it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Here's the arrangement. I don't need you to have a job. I need a job to have had you. Four weeks, on a form. The department pays me, I pay you, and everyone on this floor keeps their lanyard.",
+          "choices": [
+            {
+              "text": "Alright. What do I have to do?",
+              "accept": "l1-artarmon-outcome",
+              "denyFlag": "l1:artarmon-outcome"
+            },
+            {
+              "text": "What does the Employment Fund buy?",
+              "goto": "fund"
+            },
+            {
+              "text": "I'll pass.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "fund",
+          "line": "Steel caps, a haircut, ninety minutes about resilience, and a train ticket to Chatswood. It will not buy you a job. There's no line item for a job. I've looked.",
+          "choices": [
+            {
+              "text": "Back up. What was the arrangement?",
+              "goto": "offer"
+            },
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "sign",
+          "line": "Date it the Monday. Not this Monday, the one before, the fortnight has to close. — He turns the tablet round and looks out the window at the tile showroom while you do it.",
+          "choices": [
+            {
+              "text": "Signed.",
+              "goto": "signed"
+            },
+            {
+              "text": "Whose name goes on the employer line?",
+              "goto": "employer"
+            },
+            {
+              "text": "Give me a minute.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "signed",
+          "line": "Beautiful. You are now retrospectively employed. Finish the rest and come back — the money's real and the job isn't, and only one of those has to be.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "employer",
+          "line": "Kitchens and tiles, two doors down. He owes me a favour and he'll confirm it if anyone rings. Nobody has ever rung. Twelve years in Artarmon, not one phone call.",
+          "choices": [
+            {
+              "text": "Comforting.",
+              "goto": "sign"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Everyone in Artarmon is either selling tiles or storing something. Forty self-storage units on Reserve Road, one place that does a flat white worth the walk, and it shuts at two.",
+          "improv": {
+            "persona": "Dale, an employment services consultant in a serviced office above a tile showroom in the Artarmon industrial estate, Sydney. Twenty-six, lanyard on indoors, whiteboard behind him that says OUTCOMES. Deadpan, quick, entirely candid about the business he is in.",
+            "context": "A client has asked where you get lunch around here. The estate is warehouses, showrooms and self-storage, there is almost nowhere to eat, and the one good cafe closes at two in the afternoon."
+          },
+          "choices": [
+            {
+              "text": "It's ten past two.",
+              "goto": "smalltalk_two"
+            },
+            {
+              "text": "I'll manage.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_two",
+          "line": "Yeah. Welcome to the North Shore's shed.",
+          "choices": [
+            {
+              "text": "Ha.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Outcome recorded. You're employed, backwards, somewhere that'll confirm it if anyone rings. Here's your fifty-five. Don't raise it at Redfern — Denise does the paperwork properly and it makes her sad.",
+          "choices": [
+            {
+              "text": "Cheers, Dale.",
+              "turnin": "l1-artarmon-outcome"
+            },
+            {
+              "text": "Not finished yet.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rodney-wolseley-hedge",
+      "name": "Rodney, litigant in a hedge matter",
+      "x": 2560,
+      "z": 1030,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "I ride the 325 to the end of the road and back and I never get off. That is not a breach. My solicitor confirmed it in writing and it cost me nine hundred dollars.",
+          "choices": [
+            {
+              "text": "Why can't you get off the bus?",
+              "goto": "why"
+            },
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "What's in the binder?",
+              "goto": "binder"
+            },
+            {
+              "text": "I've got your photo.",
+              "goto": "film"
+            },
+            {
+              "text": "Not today, mate.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "why",
+          "line": "There were words at a strata meeting. Then there was an order. I am not to be within a hundred metres of number forty-two, or of the man who lives in it, or of his hedge.",
+          "choices": [
+            {
+              "text": "The hedge is named in a court order?",
+              "goto": "hedgelaw"
+            },
+            {
+              "text": "Right. What's the job?",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "hedgelaw",
+          "line": "There is an Act. Trees, Disputes Between Neighbours, two thousand and six. You can take a hedge to court in this state. I have. Twice. The hedge is winning.",
+          "choices": [
+            {
+              "text": "So what do you need?",
+              "goto": "offer"
+            },
+            {
+              "text": "I've heard enough.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "binder",
+          "line": "Twelve tabs. Tab nine is photographs. Every photograph in tab nine was taken by me from a place I am not allowed to stand, so tab nine is inadmissible and magnificent.",
+          "improv": {
+            "persona": "Rodney, a retired dental surgeon in a good jumper, sitting outside Edgecliff station with a ring binder on his knees. A litigant in person in a Double Bay hedge dispute. Deadpan, precise, entirely reasonable about something no reasonable person would still be doing.",
+            "context": "A stranger has asked what is in his binder. Tab nine is the photographic evidence and it is worthless, because he took every picture in it himself from a footpath a court has told him not to stand on. He is not sad about this. He is filing."
+          },
+          "choices": [
+            {
+              "text": "So you need someone else's photo.",
+              "goto": "offer"
+            },
+            {
+              "text": "Sorry I asked.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Photograph it from the footpath. The footpath is public — say that word twice before you argue with anybody. Buy a coffee first. Nobody in Double Bay stops a person holding a coffee.",
+          "choices": [
+            {
+              "text": "Give me the number and I'll walk it.",
+              "accept": "l1-wolseley-hedge",
+              "denyFlag": "l1:wolseley-hedge"
+            },
+            {
+              "text": "Get someone else.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "film",
+          "line": "Hold it still. — He looks at your phone for a long time. — That is the whole hedge. There is the fence line. There is the sky, where the view used to be.",
+          "choices": [
+            {
+              "text": "Can you use it?",
+              "goto": "done"
+            },
+            {
+              "text": "Do you want a copy?",
+              "goto": "film_copy"
+            }
+          ]
+        },
+        {
+          "id": "film_copy",
+          "line": "Send it to me. Do not send it to him. Do not send it to anybody at number forty-two. Do not put it anywhere that keeps the location on it.",
+          "choices": [
+            {
+              "text": "Understood.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Tab nine, page one. — He writes the date on a sticky note and the note falls off the page. — Take the fee. I have written the word fee on the note as well.",
+          "choices": [
+            {
+              "text": "Fee it is.",
+              "turnin": "l1-wolseley-hedge"
+            },
+            {
+              "text": "Later, Rodney.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "milsons-tour-coral",
+      "name": "Coral, Harbour Bridge Rail Experience",
+      "x": 260,
+      "z": -2600,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Harbour Bridge Rail Experience. Twelve dollars. Departs when there's four of you. Not affiliated with the Bridge, the climb, the pool, the park, or the face.",
+          "choices": [
+            {
+              "text": "What do the twelve dollars get me?",
+              "goto": "pitch"
+            },
+            {
+              "text": "Which side's the harbour side?",
+              "goto": "sides"
+            },
+            {
+              "text": "What if they want their money back?",
+              "goto": "refunds"
+            },
+            {
+              "text": "Need a hand running it?",
+              "goto": "offer"
+            },
+            {
+              "text": "It's done. Four fares, one crossing.",
+              "goto": "done"
+            },
+            {
+              "text": "I'll walk it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "pitch",
+          "line": "Three minutes across the top of the harbour on a scheduled service, a commemorative photograph, and my commentary. The commentary is free. The photograph is where the money is.",
+          "choices": [
+            {
+              "text": "So it's the train.",
+              "goto": "pitch_yes"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "pitch_yes",
+          "line": "It's the train. The ones up on the arch paid four hundred dollars and a breath test for the same view. Mine tap on, sit down, and are back for lunch.",
+          "choices": [
+            {
+              "text": "Sign me up.",
+              "goto": "offer"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "sides",
+          "line": "Every seat is the harbour side. The rail deck's on the eastern edge, so the Opera House is out the window whichever way you're pointed. The upgrade's five dollars and nobody has ever asked for it back.",
+          "improv": {
+            "persona": "Coral, who runs an unaffiliated one-stop train tour out of Milsons Point. Sixty-odd, sun-damaged, laminated sign, honest with locals and not remotely honest with cruise passengers. Deadpan, flat, Australian.",
+            "context": "A local has asked which side of the train has the harbour view. Both sides do -- the rail deck sits on the eastern edge of the Harbour Bridge. She sells a five dollar harbour-side upgrade anyway and feels fine about it."
+          },
+          "choices": [
+            {
+              "text": "That's a scam, Coral.",
+              "goto": "sides_no"
+            },
+            {
+              "text": "Genius.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "sides_no",
+          "line": "It's a donation. Five dollars, to a woman with a laminated sign and no insurance. Council's moved me twice this year. I've moved back twice this year.",
+          "choices": [
+            {
+              "text": "Carry on then.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "refunds",
+          "line": "If one of them counts the stops, that's between you and them. I've got a policy. The policy is that I am at the other end of the Bridge.",
+          "choices": [
+            {
+              "text": "So there's no refund.",
+              "goto": "refunds_no"
+            },
+            {
+              "text": "Understood.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "refunds_no",
+          "line": "There's a full refund. Twelve dollars, out of my sock, counted into your hand in coins. Nobody has ever stayed for all four minutes of it.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "You'd run the crossing while I work the queue by the pool fence. Collect them, take the fares, take them over, take the photo. The photo is the hard part and there's a reason for that.",
+          "choices": [
+            {
+              "text": "Tell me the hard part first.",
+              "goto": "twist"
+            },
+            {
+              "text": "I'll run the crossing.",
+              "accept": "l1-harbour-rail-experience",
+              "denyFlag": "l1:harbour-rail-experience"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "twist",
+          "line": "You cannot photograph the Bridge from the Bridge. Three minutes of the best view in the country and the one thing they paid to see is directly over their heads. So you get off at Wynyard and walk to the Quay.",
+          "choices": [
+            {
+              "text": "So the tour ends on the wrong side.",
+              "goto": "twist_yes"
+            },
+            {
+              "text": "Then that's where I'll take it.",
+              "accept": "l1-harbour-rail-experience",
+              "denyFlag": "l1:harbour-rail-experience"
+            }
+          ]
+        },
+        {
+          "id": "twist_yes",
+          "line": "The tour ends where the Bridge fits in the frame. That's not the wrong side, love. That's the itinerary.",
+          "choices": [
+            {
+              "text": "Right then.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Let's see it, then. — She holds the phone out at arm's length and squints at the Bridge in it. — There it is. The whole coathanger. Not one person who's ever sat on the thing has come back with that.",
+          "choices": [
+            {
+              "text": "Four fares, one crossing, one photo.",
+              "turnin": "l1-harbour-rail-experience"
+            },
+            {
+              "text": "Still working on it.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "iwc-place-officer",
+      "name": "Robyn, Inner West Council (Place & Liveability)",
+      "x": -5727,
+      "z": 1618,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Don't move. — She clicks a little tally counter. — That's four. You're four.",
+          "choices": [
+            {
+              "text": "Four what?",
+              "goto": "offer"
+            },
+            {
+              "text": "There's nobody here, Robyn.",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Who's the bloke shouting at the fountain?",
+              "goto": "objector"
+            },
+            {
+              "text": "I've done your list.",
+              "goto": "done"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Placemaking grant, Category B: activation of an underutilised public domain asset. To get the money that fixes the piazza I have to prove people already use the piazza. That is the criterion. I didn't write it.",
+          "choices": [
+            {
+              "text": "Right. Where do I start?",
+              "accept": "l1-evidence-of-vibrancy",
+              "denyFlag": "l1:vibrancy"
+            },
+            {
+              "text": "Who decides Category B?",
+              "goto": "categoryb"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "categoryb",
+          "line": "Council. Which council depends on the year. We were Leichhardt, then we were amalgamated, then everyone voted to demerge, then nothing happened. The letterhead has been reprinted twice.",
+          "choices": [
+            {
+              "text": "So who's actually paying for the piazza?",
+              "goto": "categoryb_no"
+            },
+            {
+              "text": "Back to it.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "categoryb_no",
+          "line": "A grant from the level of government that abolished us. — She clicks the counter. — Five. Someone walked past the entrance without stopping, but the form doesn't ask about stopping.",
+          "choices": [
+            {
+              "text": "Sign me up.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Nineteen ninety-nine, this. Colonnades, a fountain, a statue of a poet, Little Italy with a car park under it. The poet is still here. The tenants aren't.",
+          "improv": {
+            "persona": "Robyn, a place and liveability officer for Inner West Council, standing in the empty Italian Forum piazza off Norton Street in Leichhardt with a hand tally counter. Fifteen years in local government, dry as a chip, fond of the place and unable to say so on the record. Deadpan, lower case, very Australian, no exclamation marks.",
+            "context": "Someone has pointed out that the piazza she is doing a footfall count in is empty. It is a real 1999 mock-Italian development on Norton Street with a fountain, colonnades, a statue of Dante and almost no tenants left."
+          },
+          "choices": [
+            {
+              "text": "Bit sad, isn't it.",
+              "goto": "smalltalk_again"
+            },
+            {
+              "text": "Anyway.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_again",
+          "line": "It's not sad, it's underutilised. Sad isn't a funding category.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "objector",
+          "line": "Kevin. He objects. He objected to the Forum, the bike lane, the FOGO bins and the tree that came down on his own fence. He is a registered stakeholder, so I have to record him.",
+          "choices": [
+            {
+              "text": "Record him how, exactly?",
+              "goto": "objector_how"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "objector_how",
+          "line": "In full, and once. There's one box on the form for it and the box is not big.",
+          "choices": [
+            {
+              "text": "I'll be thorough.",
+              "goto": "hello"
+            },
+            {
+              "text": "Understood.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Let's see it. Light rail tap, one coffee, one photograph, one objection. — She staples the lot together. — Congratulations, that's a community.",
+          "choices": [
+            {
+              "text": "Here's the lot.",
+              "turnin": "l1-evidence-of-vibrancy"
+            },
+            {
+              "text": "Not finished yet.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mtdruitt-bowlo-nev",
+      "name": "Nev, greenkeeper, Mount Druitt Bowling Club",
+      "x": -36085,
+      "z": -10145,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Green's closed for the triples. You can walk on it. You just can't walk on it like that.",
+          "choices": [
+            {
+              "text": "What's the drama?",
+              "goto": "offer"
+            },
+            {
+              "text": "I've got your bowls.",
+              "goto": "done"
+            },
+            {
+              "text": "Why are there kids batting on the good green?",
+              "goto": "cricket"
+            },
+            {
+              "text": "What's a triples?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Kev's done a hamstring at touch footy. On a Wednesday. At fifty-one. In thongs. So we're two, and the constitution says three, and the constitution is one page.",
+          "choices": [
+            {
+              "text": "Where are the bowls?",
+              "goto": "wazza",
+              "denyFlag": "l1:triples"
+            },
+            {
+              "text": "I don't play bowls.",
+              "goto": "nobowls"
+            },
+            {
+              "text": "Not my afternoon, mate.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "wazza",
+          "line": "Wazza took the club's woods to his cousin's wedding in October and they've lived behind the seat of his ute ever since. He's roofing at Rooty Hill. He responds to being asked twice.",
+          "choices": [
+            {
+              "text": "I'll go get them.",
+              "accept": "l1-one-short-for-the-triples",
+              "denyFlag": "l1:triples"
+            },
+            {
+              "text": "Get them yourself.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "nobowls",
+          "line": "Neither does Kev. Neither did I, for nine years. You roll it, it goes where the green tells it, and then you argue about it. That's the whole sport.",
+          "choices": [
+            {
+              "text": "Alright. Where are the bowls?",
+              "goto": "wazza"
+            },
+            {
+              "text": "I'll think about it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "cricket",
+          "line": "Juniors play test matches on number two all summer. Flattest deck in the postcode and it's free. I stopped fighting it in 2019. I mow to a length now.",
+          "choices": [
+            {
+              "text": "The committee know?",
+              "goto": "committee"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "committee",
+          "line": "The committee know the number two green has never been better patronised. That's the sentence in the grant. Everything after it is a photo.",
+          "choices": [
+            {
+              "text": "Say no more.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Triples is three. Pairs is two. Fours is four. Nobody has ever needed this explained to them twice.",
+          "improv": {
+            "persona": "Nev, greenkeeper at the Mount Druitt Bowling Club in western Sydney. Sixties, sun-ruined, forty years on the mower, dry as the green in February. Deadpan, short sentences, no exclamation marks, never unkind.",
+            "context": "Someone standing at the gate has asked what a triples is. He is explaining the numbering of lawn bowls formats to an adult, which he considers the single least rewarding conversation available at the club."
+          },
+          "choices": [
+            {
+              "text": "So fives would be...",
+              "goto": "smalltalk_again"
+            },
+            {
+              "text": "Got it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_again",
+          "line": "There's no fives. Go and sit down.",
+          "choices": [
+            {
+              "text": "Sitting down.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Let's see them. — He turns a bowl over, finds the club's initials scratched under the bias marker, and looks at the roof of the shed for a second.",
+          "choices": [
+            {
+              "text": "Wazza sends his regards.",
+              "turnin": "l1-one-short-for-the-triples"
+            },
+            {
+              "text": "Still working on it.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

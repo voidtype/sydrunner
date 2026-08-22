@@ -1,0 +1,303 @@
+{
+  "pack": "pool-l3",
+  "quests": [
+    {
+      "id": "l3-change-of-ends",
+      "act": 1,
+      "title": "Change of Ends",
+      "blurb": "Eight carriages come out from the city, the driver walks to the other end, and it goes back as a different service with a different number. Ride it. Photograph both ends of that. Bring me something that keeps.",
+      "giver": "emu-turnback-doug",
+      "level": 3,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "photo",
+          "x": -50010,
+          "z": -12720,
+          "radius": 30,
+          "label": "photograph the 6:14 while it is still the 6:14"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Emu Plains",
+          "to": "Penrith",
+          "label": "one stop over the Nepean, which counts out here"
+        },
+        {
+          "kind": "photo",
+          "x": -47700,
+          "z": -12300,
+          "radius": 35,
+          "label": "same eight carriages, new number, photograph it"
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 3,
+          "label": "remind three of Doug's debtors who Doug is"
+        },
+        {
+          "kind": "earn",
+          "dollars": 45,
+          "label": "turn up with $45 — money is the part that keeps"
+        },
+        {
+          "kind": "dialog",
+          "npc": "emu-turnback-doug",
+          "node": "ledger",
+          "label": "read Doug's second column back to him"
+        }
+      ],
+      "reward": {
+        "cash": 95,
+        "xp": 380,
+        "unlock": [
+          "l3:change-of-ends"
+        ]
+      }
+    },
+    {
+      "id": "l3-coogee-pier",
+      "act": 1,
+      "title": "Asset 0041, Condition Fair",
+      "blurb": "Asset 0041 on the register is the Coogee Pier. The sea took it in 1934. It has been inspected every year since, it is rated condition fair, and this year that is you. Bring a camera and the heights ticket.",
+      "giver": "neville-asset-register",
+      "level": 3,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "TRAINING",
+          "count": 1,
+          "label": "sit the working at heights ticket, because 0041 is a structure over water"
+        },
+        {
+          "kind": "photo",
+          "x": 3062,
+          "z": 5218,
+          "radius": 25,
+          "label": "photograph Asset 0041 at its registered coordinates: High Cross Park, Randwick, 1.6 km inland of the sea that ate it"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 2,
+          "label": "receive two items of community feedback from the Friends of the Coogee Pier"
+        },
+        {
+          "kind": "photo",
+          "x": 1806,
+          "z": 5782,
+          "radius": 30,
+          "label": "photograph Asset 0041a, the kiosk, which drifted to Kingsford separately"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Central",
+          "to": "Bondi Junction",
+          "label": "log the leg by heavy rail; the travel schedule was last revised in 1979 and does not believe in the light rail"
+        },
+        {
+          "kind": "dialog",
+          "npc": "neville-asset-register",
+          "node": "condition",
+          "label": "have the condition rating read out to you in person"
+        }
+      ],
+      "reward": {
+        "cash": 95,
+        "xp": 380,
+        "unlock": [
+          "l3:coogee-pier"
+        ]
+      }
+    },
+    {
+      "id": "l3-second-bedroom",
+      "act": 1,
+      "title": "The Second Bedroom Is the 4:51 to Hornsby",
+      "blurb": "Forty-one degrees on my balcony at four o'clock and the glass doesn't open. I've done the research. I need someone with a phone, a train ticket, and no opinions about how I spend my afternoons.",
+      "giver": "rhodes-west-facing",
+      "level": 3,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "buy a coffee at the Rhodes concourse so you read as a commuter and not as a man loitering for the air conditioning"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Rhodes",
+          "to": "Meadowbank",
+          "label": "one stop north, over the water, in car four where the vents actually work"
+        },
+        {
+          "kind": "photo",
+          "x": -11205,
+          "z": -5490,
+          "radius": 30,
+          "label": "from the Meadowbank bank, photograph the west face of the tower at the hour it cooks"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 2,
+          "label": "secure two proxy votes for the annual general meeting"
+        },
+        {
+          "kind": "earn",
+          "dollars": 60,
+          "label": "make back the fares — she has been buying an afternoon at $4.20 a leg"
+        },
+        {
+          "kind": "dialog",
+          "npc": "rhodes-west-facing",
+          "node": "twist",
+          "label": "ride the 4:51 back with her and hear what the survey was actually for"
+        }
+      ],
+      "reward": {
+        "cash": 110,
+        "xp": 420,
+        "unlock": [
+          "l3:second-bedroom"
+        ]
+      }
+    },
+    {
+      "id": "l3-incident-number",
+      "act": 1,
+      "title": "An Incident Number",
+      "blurb": "Council says there is no evidence of a safety issue on my corner. Evidence is a police event number. I have eleven months of tally marks and no number. Go and be one.",
+      "giver": "coralie-wollstonecraft",
+      "level": 3,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "photo",
+          "x": -1620,
+          "z": -4010,
+          "radius": 40,
+          "label": "photograph the corner while it is still just a corner"
+        },
+        {
+          "kind": "goto",
+          "x": -1052,
+          "z": -4690,
+          "radius": 60,
+          "label": "get up to Willoughby Road before the eleven o'clock rush"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "buy a flat white; nobody suspects a man with a coffee"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 2,
+          "label": "become an item on the community page"
+        },
+        {
+          "kind": "ko",
+          "npc": "police",
+          "count": 2,
+          "label": "survive the two units they send"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Crows Nest",
+          "to": "Chatswood",
+          "label": "leave on the metro the group campaigned against"
+        },
+        {
+          "kind": "dialog",
+          "npc": "coralie-wollstonecraft",
+          "node": "minutes",
+          "label": "have it read into the minutes"
+        }
+      ],
+      "reward": {
+        "cash": 95,
+        "xp": 380,
+        "unlock": [
+          "l3:incident-number"
+        ]
+      }
+    },
+    {
+      "id": "l3-one-blink",
+      "act": 1,
+      "title": "One Blink in Eighteen Years",
+      "blurb": "Eighteen years I shot that family. One photo where Auntie blinked, and now I'm not invited to my own niece's wedding. I'm not going up there. You are. Go and finish the album.",
+      "giver": "anu-granville-photographer",
+      "level": 3,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "you'll be standing about for six hours. Get a coffee. Not the place on the corner, they know my face."
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Granville",
+          "to": "Harris Park",
+          "label": "one stop. Don't walk it up Alice Street -- somebody up there knows my walk and you've got my camera bag."
+        },
+        {
+          "kind": "photo",
+          "x": -18860,
+          "z": -4640,
+          "radius": 25,
+          "label": "the function centre on Wigram Street. Wide, from across the road, before the marigolds go up."
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 2,
+          "label": "by nine two uncles will want to review your camera roll. Decline. Twice."
+        },
+        {
+          "kind": "earn",
+          "dollars": 60,
+          "label": "shoot the singles table while you're in there. They tip, and they tip in cash, and they tip badly."
+        },
+        {
+          "kind": "photo",
+          "x": -19120,
+          "z": -5790,
+          "radius": 30,
+          "label": "the car does a lap of Church Street about nine. They think it's Bollywood. Be on the corner first."
+        },
+        {
+          "kind": "dialog",
+          "npc": "anu-granville-photographer",
+          "node": "album",
+          "label": "bring the card back down to Granville. Not the app. The app ruins them."
+        }
+      ],
+      "reward": {
+        "cash": 110,
+        "xp": 420,
+        "unlock": [
+          "l3:one-blink"
+        ]
+      }
+    }
+  ]
+}

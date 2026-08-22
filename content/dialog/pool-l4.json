@@ -1,0 +1,923 @@
+{
+  "pack": "pool-l4",
+  "npcs": [
+    {
+      "id": "bankstown-guard",
+      "name": "Sami, forty-one years a guard",
+      "x": -16008,
+      "z": 5786,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Forty-one years I stood in that doorway with a flag. Now the doorway's a screen and it says please stand clear. Very polite about it.",
+          "choices": [
+            {
+              "text": "What happened to the line?",
+              "goto": "line"
+            },
+            {
+              "text": "You after something?",
+              "goto": "offer"
+            },
+            {
+              "text": "When's the next one?",
+              "goto": "board"
+            },
+            {
+              "text": "I rode it.",
+              "goto": "verdict"
+            },
+            {
+              "text": "It's done.",
+              "goto": "done"
+            },
+            {
+              "text": "Nah, you're right.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "line",
+          "line": "Shut eleven months for the metro. Buses out the front, forty minutes to Sydenham, and a bloke in a vest saying it's temporary. Then it opened and I wasn't on it.",
+          "choices": [
+            {
+              "text": "And your job?",
+              "goto": "job"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "job",
+          "line": "Certificate, and a lanyard that scans nothing. The train doesn't need a guard. Fair enough. It doesn't need a driver either and nobody asked him how he felt about it.",
+          "choices": [
+            {
+              "text": "So what do you want?",
+              "goto": "offer"
+            },
+            {
+              "text": "Sorry, mate.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "I can't get on it. Down here every morning since March and I can't put a foot in the door. So you go. Sit at the very front, where the cab used to be, and tell me what's there.",
+          "choices": [
+            {
+              "text": "I'll ride it through to Sydenham.",
+              "accept": "l4-no-driver",
+              "denyFlag": "l4:no-driver"
+            },
+            {
+              "text": "What's in it for me?",
+              "goto": "pay"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "pay",
+          "line": "Hundred and twenty. It's redundancy money. I've got nothing to spend it on but a train I won't get on.",
+          "choices": [
+            {
+              "text": "That'll do.",
+              "accept": "l4-no-driver",
+              "denyFlag": "l4:no-driver"
+            },
+            {
+              "text": "Keep it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "board",
+          "line": "Four minutes. Then four minutes. Then four minutes. That's the whole timetable now. There's no 5:41. Nothing left to be late for.",
+          "improv": {
+            "persona": "Sami, sixty-three, retired guard on the old Bankstown line, standing on the concourse at Bankstown station most mornings out of habit. Deadpan, lower case, warm underneath, very Australian. No exclamation marks.",
+            "context": "Someone has asked when the next train is. The line is a driverless metro now and runs every four minutes, so the timetable he worked to for forty-one years no longer exists. He is not bitter about the trains, only about the four minutes."
+          },
+          "choices": [
+            {
+              "text": "That's progress.",
+              "goto": "hello"
+            },
+            {
+              "text": "You miss the 5:41?",
+              "goto": "board_again"
+            }
+          ]
+        },
+        {
+          "id": "board_again",
+          "line": "I miss being the reason it left.",
+          "choices": [
+            {
+              "text": "Yeah.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "verdict",
+          "line": "Go on then. Say it slow. What's sitting where the driver sat?",
+          "choices": [
+            {
+              "text": "Three kids with their feet on the glass.",
+              "goto": "verdict_kids"
+            },
+            {
+              "text": "Nothing. Just the tunnel coming at you.",
+              "goto": "verdict_nothing"
+            }
+          ]
+        },
+        {
+          "id": "verdict_kids",
+          "line": "Good. Good. Someone's up there, then.",
+          "choices": [
+            {
+              "text": "They fought me for it.",
+              "goto": "verdict_nothing"
+            },
+            {
+              "text": "Reckon they ride it all day.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "verdict_nothing",
+          "line": "Forty-one years I watched the back of one bloke's head, and now the whole carriage gets the view. That's not nothing. That's a promotion for everyone but us two.",
+          "choices": [
+            {
+              "text": "Come and sit in it with me.",
+              "goto": "ride_with_me"
+            },
+            {
+              "text": "Reckon.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "ride_with_me",
+          "line": "Monday. Off-peak, so the seat's free. I'll bring the flat whites.",
+          "choices": [
+            {
+              "text": "Monday.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Give us the photo, then. — He holds the phone out at arm's length, like the doors might close on it.",
+          "choices": [
+            {
+              "text": "Front window. No driver.",
+              "turnin": "l4-no-driver"
+            },
+            {
+              "text": "Haven't got it yet.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vaughn-lidcombe-deed",
+      "name": "Vaughn, formerly of the Authority",
+      "x": -15140,
+      "z": -330,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Don't stand in front of me. I'm watching the shuttle. Platform 0 — the platform they couldn't be bothered numbering properly. It goes there. I don't.",
+          "choices": [
+            {
+              "text": "Why don't you?",
+              "goto": "deed"
+            },
+            {
+              "text": "What's out at Olympic Park?",
+              "goto": "pillars"
+            },
+            {
+              "text": "I could go for you.",
+              "goto": "offer"
+            },
+            {
+              "text": "How often's the shuttle?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "I've got your photo.",
+              "goto": "describe"
+            },
+            {
+              "text": "Nothing, mate.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "deed",
+          "line": "Twenty-six years with the Authority. Parking, then compliance, then parking again. They walked me out with a deed of release. Twelve pages. Two of them are a map.",
+          "choices": [
+            {
+              "text": "A map of what?",
+              "goto": "deed2"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "deed2",
+          "line": "The precinct. Hatched red. I'm not to enter it, discuss it, or be photographed in it. I signed that in a room with a pot plant. The plant was real. I checked. It's the only thing in the whole business I'm certain of.",
+          "choices": [
+            {
+              "text": "So what do you want?",
+              "goto": "offer"
+            },
+            {
+              "text": "That's rough, Vaughn.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "pillars",
+          "line": "Two thousand. The Games. I was a volunteer years before I was ever staff — the hat, the blue and the yellow, the whole disgrace. They put every volunteer's name on the pylons along the Boulevard. Mine's on one of them.",
+          "choices": [
+            {
+              "text": "Which one?",
+              "goto": "pillars2"
+            },
+            {
+              "text": "And you can't go and look.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "pillars2",
+          "line": "Fourteenth from the station end. Probably. They aren't numbered, which I raised at the time, in writing, and was thanked for.",
+          "choices": [
+            {
+              "text": "Of course you were.",
+              "goto": "offer"
+            },
+            {
+              "text": "Fourteenth. Got it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "There's metro works going through there. Things get moved, then things get moved again, then nobody can find the paperwork for either. I want a photo of my name on that pylon while it's still standing where I say it is.",
+          "choices": [
+            {
+              "text": "I'll get your photo.",
+              "accept": "l4-deed-of-release",
+              "denyFlag": "l4:deed-of-release"
+            },
+            {
+              "text": "Send your daughter.",
+              "goto": "offer_no"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_no",
+          "line": "She's got a lanyard now. Works for them. She'd have to declare it.",
+          "choices": [
+            {
+              "text": "I'll go, then.",
+              "goto": "offer"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Event day, four cars every ten minutes and a bloke on the gate telling grown adults which way is out. No event, two cars and a driver reading a paperback. I know which one I miss and it isn't the football.",
+          "improv": {
+            "persona": "Vaughn, sixty-one, twenty-six years with the Sydney Olympic Park Authority in parking and compliance, now excluded from the precinct by a deed he signed in a room with a pot plant. He sits at the far end of Platform 0 at Lidcombe watching the Olympic Park shuttle come and go. Deadpan, precise, very Australian, never self-pitying, quietly funny about paperwork.",
+            "context": "Someone has asked him how often the Olympic Park shuttle runs. He knows the timetable exactly, event day and ordinary day, and has no remaining reason to know it. Keep it to the trains; he does not volunteer the sad part."
+          },
+          "choices": [
+            {
+              "text": "You'd know.",
+              "goto": "smalltalk_again"
+            },
+            {
+              "text": "I'll let you watch.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_again",
+          "line": "I wrote the parking plan that empties around it. Fifty thousand people and one road. It works, actually. That's the annoying part.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "describe",
+          "line": "Don't show me yet. Tell me first. Down that end — is the grass mown, or have they let it go?",
+          "choices": [
+            {
+              "text": "Mown. Someone's still on it.",
+              "goto": "describe2"
+            },
+            {
+              "text": "Gone to seed, mate.",
+              "goto": "describe2"
+            }
+          ]
+        },
+        {
+          "id": "describe2",
+          "line": "Right. Good. Alright. Show me.",
+          "choices": [
+            {
+              "text": "Here.",
+              "goto": "done"
+            },
+            {
+              "text": "Give us a sec.",
+              "goto": "describe"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "That's it. That's the one. — He holds the phone out at arm's length for a long time, then hands it back without looking at you.",
+          "choices": [
+            {
+              "text": "It's yours. Send it to yourself.",
+              "turnin": "l4-deed-of-release"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "erko-librarian",
+      "name": "Meredith, keeps the Swanson Street library box",
+      "x": -2204,
+      "z": 3648,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "The box on my fence is a street library. I built it out of a wardrobe. I write down what goes in and what comes out, because I like a tidy list, and the list has started doing something.",
+          "choices": [
+            {
+              "text": "What's the list doing?",
+              "goto": "offer"
+            },
+            {
+              "text": "I did the Monday round.",
+              "goto": "monday"
+            },
+            {
+              "text": "It's all done.",
+              "goto": "done"
+            },
+            {
+              "text": "Anyone actually read these?",
+              "goto": "regulars"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Monday, eleven books back. Same dog-ear on page forty of the Bryson. Nobody remembers taking them out. The bloke who takes the Bryson every week introduces himself to me every week, and he's lovely about it.",
+          "choices": [
+            {
+              "text": "I'll do a Monday round for you.",
+              "accept": "l4-erko-monday",
+              "denyFlag": "l4:erko-monday"
+            },
+            {
+              "text": "Books don't move themselves.",
+              "goto": "skeptic"
+            },
+            {
+              "text": "Not this week.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "skeptic",
+          "line": "No. They don't. That's the bit I keep getting stuck on, love.",
+          "choices": [
+            {
+              "text": "Alright. What do you want checked?",
+              "goto": "offer"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "regulars",
+          "line": "Three regulars, one thief, and a man who donates cookbooks he's already annotated. The annotations have been getting friendlier. I've started reading them in order.",
+          "improv": {
+            "persona": "Meredith, sixties, Erskineville, thirty-one years in the same terrace on Swanson Street. Keeps a street library in a converted wardrobe on her front fence and a ruled notebook of every loan. Deadpan, warm, no exclamation marks.",
+            "context": "A stranger has asked whether anyone actually uses the street library. She is fond of her borrowers and keeps records on them the way other people keep birdwatching lists. This is small talk on the footpath and nothing is being asked of anyone."
+          },
+          "choices": [
+            {
+              "text": "In order?",
+              "goto": "skeptic"
+            },
+            {
+              "text": "Good box.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "monday",
+          "line": "Read it back. Coffee at 7:40, board photographed, three complainants seen to, Sydenham doing the same trick as us, and sixty dollars still in your pocket. — She underlines the sixty, twice.",
+          "choices": [
+            {
+              "text": "Why underline the money?",
+              "goto": "monday_meaning"
+            },
+            {
+              "text": "Here's the lot.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "monday_meaning",
+          "line": "Because the money stays and everything else goes back in the box. The city keeps its receipts and loses the week. Somebody is doing the losing, and I would like their name on a card in my notebook.",
+          "choices": [
+            {
+              "text": "You think it's a someone?",
+              "goto": "skeptic"
+            },
+            {
+              "text": "Here's the lot.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Signed, dated, filed. — She writes your name in the notebook, on a page headed with a Monday that hasn't happened yet, and closes it before you can read the rest.",
+          "choices": [
+            {
+              "text": "Hand over the round.",
+              "turnin": "l4-erko-monday"
+            },
+            {
+              "text": "See you Monday, then.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "maroubra-gulls-val",
+      "name": "Val, South Maroubra Gulls canteen",
+      "x": 2012,
+      "z": 6258,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Ten a ticket, three for twenty. Meat tray, tray of prawns, voucher for the bowlo. — The tin is a Milo tin. The clipboard next to it has forty-two Saturdays on it and four names.",
+          "choices": [
+            {
+              "text": "What's the clipboard?",
+              "goto": "offer"
+            },
+            {
+              "text": "Three for twenty, then.",
+              "goto": "tickets",
+              "needCash": 10,
+              "cost": 10
+            },
+            {
+              "text": "The nets.",
+              "goto": "nets"
+            },
+            {
+              "text": "How long have you done the canteen?",
+              "goto": "canteen"
+            },
+            {
+              "text": "That's the lot.",
+              "goto": "done"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "It's the roster. I'm the canteen. I'm also ground marshal, first aid, gear steward, and since nine this morning I'm the under-11s coach. Everyone wants a club. Nobody wants a roster.",
+          "choices": [
+            {
+              "text": "Put me down for today.",
+              "accept": "l4-nets-away",
+              "denyFlag": "l4:nets-away"
+            },
+            {
+              "text": "Marita sent me.",
+              "goto": "recruiters_a",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "DeFAULT sent me.",
+              "goto": "recruiters_b",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "recruiters_a",
+          "line": "Marita told me last winter they'd send me volunteers. What they sent me was a bloke in a vest who took a photo of the sausages and left before half time.",
+          "choices": [
+            {
+              "text": "Sounds about right.",
+              "goto": "offer"
+            },
+            {
+              "text": "I'd still do the roster.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "recruiters_b",
+          "line": "DeFAULT reckon the club's a rort. Come and count the float, love. Four hundred dollars, a jar of five-cent pieces, and a Chiko Roll nobody will admit to.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "offer"
+            },
+            {
+              "text": "I'd still do the roster.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "tickets",
+          "line": "Blue book's ours. The pink book's the bowlo's and it doesn't count for anything here, no matter what Wazza tells you on the green. — She tears off a blue one and writes your name without looking.",
+          "choices": [
+            {
+              "text": "Who's Wazza?",
+              "goto": "wazza"
+            },
+            {
+              "text": "Cheers, Val.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "wazza",
+          "line": "Wazza does the bowlo's raffle and the bowlo's raffle is at six, which is our raffle's time. Has been since 1991. We've written letters.",
+          "choices": [
+            {
+              "text": "Letters.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "canteen",
+          "line": "Since my boy played. He's thirty-four. He does something with insurance in Brisbane and he asks after the club before he asks after me.",
+          "improv": {
+            "persona": "Val, who has run the canteen at a junior rugby league club at Maroubra in Sydney's east since the late nineties. Dry, deadpan, lower case, never bitter, never exclaims. Answers in one or two short sentences.",
+            "context": "Someone on the sideline has asked how long she has done the canteen. Her son stopped playing more than twenty years ago. Nobody has ever asked her to stop and nobody has ever replaced her. There is one urn and it has never worked properly."
+          },
+          "choices": [
+            {
+              "text": "That's a long time in a canteen.",
+              "goto": "canteen_more"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "canteen_more",
+          "line": "It's a long time in a canteen with one urn.",
+          "choices": [
+            {
+              "text": "Someone should fix the urn.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "nets",
+          "line": "Last job. Nets down, corner posts in the shed, shed locked, key back under the shed. — She says it the way other people say the national anthem.",
+          "choices": [
+            {
+              "text": "Why is the key under the shed?",
+              "goto": "nets_key"
+            },
+            {
+              "text": "The cricket lot can do their own nets.",
+              "goto": "nets_war"
+            },
+            {
+              "text": "Nets down. On it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "nets_key",
+          "line": "So it doesn't get lost. It's been under the shed since 1994 and it has never been lost, which is more than I can say for the under-13s' jerseys.",
+          "choices": [
+            {
+              "text": "Under the shed. Got it.",
+              "goto": "nets"
+            }
+          ]
+        },
+        {
+          "id": "nets_war",
+          "line": "Every winter they say we leave the nets up. Every summer we say they leave the posts in. Forty years, same two families, one ground. — She hands you a mallet. Not for that.",
+          "choices": [
+            {
+              "text": "Not for that.",
+              "goto": "nets"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Look at that. — She writes something on the clipboard, in the column headed NEXT WEEK, in the row with your name in it, which was not there this morning.",
+          "choices": [
+            {
+              "text": "Nets are away. Ice got to Kogarah.",
+              "turnin": "l4-nets-away"
+            },
+            {
+              "text": "Hang on. Next week?",
+              "goto": "next_week"
+            },
+            {
+              "text": "I'll come back for it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "next_week",
+          "line": "Next week's Kingsford at home and the canteen opens at seven. — She has already turned the page.",
+          "choices": [
+            {
+              "text": "Seven.",
+              "goto": "done"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kuringgai-assessment",
+      "name": "Warren, Ku-ring-gai Council (Assessment)",
+      "x": -5234,
+      "z": -12371,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Eight hundred and eighteen Pacific Highway. I'm standing outside it because the foyer is a controlled area and you're a member of the public. Out here you're an asset.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "About the determination.",
+              "goto": "determination"
+            },
+            {
+              "text": "I've got it.",
+              "goto": "done"
+            },
+            {
+              "text": "What is 'the character of the area', exactly?",
+              "goto": "character"
+            },
+            {
+              "text": "Why's that tree wrapped in tape?",
+              "goto": "tree"
+            },
+            {
+              "text": "Nothing. You're busy.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "A rear deck on St Johns Avenue. Notified to the neighbours by a sign on the fence for fourteen days. It has been up four days, across two attempts. Someone is harvesting it.",
+          "choices": [
+            {
+              "text": "I'll get you the photo.",
+              "accept": "l4-gordon-notification",
+              "denyFlag": "l4:gordon-notification"
+            },
+            {
+              "text": "Can't you just put up another sign?",
+              "goto": "offer_no"
+            },
+            {
+              "text": "Sounds like a council problem.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_no",
+          "line": "I've put up four. The fourth one is in a garage on Werona Avenue and I know whose garage, and knowing is not a power the Act gives me.",
+          "choices": [
+            {
+              "text": "Fine. I'll do it.",
+              "goto": "offer"
+            },
+            {
+              "text": "Grim.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "character",
+          "line": "The character of the area is protected. Nobody has ever defined it. That is what protects it.",
+          "choices": [
+            {
+              "text": "So who decides?",
+              "goto": "character_panel"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "character_panel",
+          "line": "The Panel. The Panel applies the definition. There isn't one, so it applies the mood. The mood on the upper North Shore is that nothing should be built and everything should be worth more.",
+          "choices": [
+            {
+              "text": "Cheers, Warren.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "tree",
+          "line": "Camphor laurel. Declared weed under one Act, heritage streetscape item under another. Both determinations are current. Neither of them is mine.",
+          "improv": {
+            "persona": "Warren, a development assessment officer at Ku-ring-gai Council in Gordon, on Sydney's leafy upper North Shore. Nineteen years assessing rear decks and pergolas. Deadpan, precise, lower case, not bitter — he finds the whole thing genuinely interesting.",
+            "context": "Someone has asked why a large camphor laurel outside the council chambers on the Pacific Highway is wrapped in hazard tape. It is a declared weed and also a listed heritage streetscape item, so it can neither lawfully stay nor lawfully go. He is not going to resolve this today."
+          },
+          "choices": [
+            {
+              "text": "So it stays?",
+              "goto": "tree_folder"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "tree_folder",
+          "line": "It stays, it's illegal, and it's protected. There's a folder. The folder is thicker than the tree was in 1974.",
+          "choices": [
+            {
+              "text": "Beautiful.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "determination",
+          "line": "Determination. The deck is approved, subject to conditions. Condition nine is that the sign stand for fourteen days. It didn't. So the notification is void, and an approval on a void notification is void.",
+          "choices": [
+            {
+              "text": "So we start again.",
+              "goto": "determination_again"
+            },
+            {
+              "text": "Then what was the photo for?",
+              "goto": "done"
+            },
+            {
+              "text": "I need to sit down.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "determination_again",
+          "line": "We start again. Same deck, same neighbours, same fence. I've costed it against defining the character of the area. Starting again is cheaper, and it's the third time this year I've proved that.",
+          "choices": [
+            {
+              "text": "See you in fourteen days.",
+              "goto": "done"
+            },
+            {
+              "text": "Does the applicant know?",
+              "goto": "determination_owner"
+            }
+          ]
+        },
+        {
+          "id": "determination_owner",
+          "line": "She's eighty-one and she wants somewhere to sit in the sun before she dies. I've told her the sun is not a matter for consent. That's the only part of this I lose sleep over.",
+          "choices": [
+            {
+              "text": "I'll hold the sign myself if I have to.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Let's see it. — He looks at the photograph for longer than a photograph needs, then stamps the back of it, which does nothing, and files it, which does.",
+          "choices": [
+            {
+              "text": "Photo, file, and ninety-five dollars.",
+              "turnin": "l4-gordon-notification"
+            },
+            {
+              "text": "Not finished yet.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,309 @@
+{
+  "pack": "pool-l6",
+  "quests": [
+    {
+      "id": "l6-silver-man-tally",
+      "act": 1,
+      "title": "The Silver Man's Tally",
+      "blurb": "Eight hours a day I don't move, which makes me the only one at this Quay who sees it move. There's a number chalked on a bollard down the western end. Photograph it before Monday gets to it. Don't look at me while I'm talking.",
+      "giver": "quay-silver-man",
+      "level": 6,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "get a flat white into you first -- you'll be standing still, and standing still is work"
+        },
+        {
+          "kind": "photo",
+          "x": 52,
+          "z": -886,
+          "radius": 22,
+          "label": "photograph the number chalked on the bollard at the western end of the Quay, before the week takes it"
+        },
+        {
+          "kind": "dialog",
+          "npc": "quay-silver-man",
+          "node": "tally",
+          "label": "say the number back to him, out the side of your mouth"
+        },
+        {
+          "kind": "ride",
+          "line": "North Shore & Western",
+          "from": "Circular Quay",
+          "to": "Milsons Point",
+          "label": "cross the bridge and have a proper look at who is on that train"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 3,
+          "label": "find three people who remember last Sunday -- the ones who complain remember best"
+        },
+        {
+          "kind": "earn",
+          "dollars": 120,
+          "label": "put $120 through the tin, because he reckons the tin is the only thing that carries over"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 950,
+        "unlock": [
+          "l6:silver-man-tally"
+        ]
+      }
+    },
+    {
+      "id": "l6-courtesy-car",
+      "act": 1,
+      "title": "Whoever Stole My Car Is Blowing Zeroes",
+      "blurb": "Eleven months of fines and not one of them is mine. The booze bus on the Princes Highway has breath-tested my courtesy car three times this week. Three clean readings. Find me the better driver.",
+      "giver": "narelle-tow-sydenham",
+      "level": 6,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -4077,
+          "z": 5347,
+          "radius": 45,
+          "label": "walk the bought-out streets under the flight path, where the houses used to be"
+        },
+        {
+          "kind": "ko",
+          "npc": "rbt",
+          "count": 2,
+          "label": "persuade the booze bus to share what its plate reader has been seeing"
+        },
+        {
+          "kind": "dialog",
+          "npc": "narelle-tow-sydenham",
+          "node": "log",
+          "label": "bring Narelle the printout and let her read it twice"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Sydenham",
+          "to": "Tempe",
+          "label": "catch the train down to Tempe, the way the thief plainly did"
+        },
+        {
+          "kind": "photo",
+          "x": -4700,
+          "z": 6390,
+          "radius": 30,
+          "label": "photograph it in the pram spot, wheels straight, for the release paperwork"
+        },
+        {
+          "kind": "earn",
+          "dollars": 150,
+          "label": "earn the hundred and fifty release fee her own holding yard is charging her"
+        }
+      ],
+      "reward": {
+        "cash": 220,
+        "xp": 900,
+        "unlock": [
+          "l6:sydenham-courtesy"
+        ]
+      }
+    },
+    {
+      "id": "l6-stmarys-board",
+      "act": 1,
+      "title": "Is My Name Still On The Board",
+      "blurb": "One stop up the line there's a working-bee honour board in a club foyer with my name on it twice. I can't go and look. You can. Whole board, please, not just my bit.",
+      "giver": "stmarys-trev",
+      "level": 6,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "dialog",
+          "npc": "stmarys-trev",
+          "node": "brief",
+          "label": "let Trev explain exactly what he wants photographed, and what you don't say at the desk"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Werrington",
+          "to": "St Marys",
+          "label": "one stop up the line — he won't drive it, he sold the ute to the club raffle bloke"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "flat white from the good bakery on Queen Street, for Colleen on the desk"
+        },
+        {
+          "kind": "goto",
+          "x": -40512,
+          "z": -10812,
+          "radius": 35,
+          "label": "the club car park off Boronia Road, where the Sunday session sits out"
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 4,
+          "label": "four blokes want to know whose mate you are before you get near the door"
+        },
+        {
+          "kind": "photo",
+          "x": -40266,
+          "z": -10894,
+          "radius": 20,
+          "label": "the honour board in the foyer — the whole thing, in frame, no zooming"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "St Marys",
+          "to": "Werrington",
+          "label": "back down to the bench, front carriage, so he can see you coming"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 950,
+        "unlock": [
+          "l6:stmarys-board"
+        ]
+      }
+    },
+    {
+      "id": "l6-booze-bus",
+      "act": 1,
+      "title": "The Booze Bus Outside a Street That Doesn't Drink",
+      "blurb": "Twenty-two years on Haldon Street and the strongest thing I have ever poured is the tea. They have parked the breath-test bus across from my window and my queue has gone home. Move it. Politely. Second tray is out at eleven.",
+      "giver": "lakemba-knafeh",
+      "level": 6,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -12163,
+          "z": 5804,
+          "radius": 40,
+          "label": "get up Haldon Street before the queue gives up"
+        },
+        {
+          "kind": "photo",
+          "x": -12184,
+          "z": 5776,
+          "radius": 25,
+          "label": "photograph the bus parked across from the window"
+        },
+        {
+          "kind": "dialog",
+          "npc": "lakemba-knafeh",
+          "node": "plan",
+          "label": "hear what Wassim means by a distraction"
+        },
+        {
+          "kind": "ko",
+          "npc": "rbt",
+          "count": 3,
+          "label": "give the breath testers something to test"
+        },
+        {
+          "kind": "ko",
+          "npc": "police",
+          "count": 5,
+          "label": "survive what comes up the street after that"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Lakemba",
+          "to": "Punchbowl",
+          "label": "leave on the rails; the pursuit is a road unit"
+        },
+        {
+          "kind": "earn",
+          "dollars": 160,
+          "label": "$160 off a street that suddenly needs lifts"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 950,
+        "unlock": [
+          "l6:booze-bus"
+        ]
+      }
+    },
+    {
+      "id": "l6-doublebay-fig",
+      "act": 1,
+      "title": "The Banner Goes in the Gap",
+      "blurb": "Someone drilled a ninety-year-old fig on New South Head Road and filled it with glyphosate. The fine is cheaper than the view. So we're doing the banner. I need an authorised person and you'll do.",
+      "giver": "woollahra-trees",
+      "level": 6,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "dialog",
+          "npc": "woollahra-trees",
+          "node": "form10a",
+          "label": "sign Form 10A in the wrong box"
+        },
+        {
+          "kind": "photo",
+          "x": 2688,
+          "z": 928,
+          "radius": 35,
+          "label": "photograph the gap where the fig was"
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 4,
+          "label": "find the four crews who quoted on the removal"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "hold the consultation, $7.50 a cup"
+        },
+        {
+          "kind": "earn",
+          "dollars": 220,
+          "label": "front the cost of the banner yourself"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Edgecliff",
+          "to": "Martin Place",
+          "label": "lodge it at the Land and Environment Court"
+        },
+        {
+          "kind": "goto",
+          "x": 2702,
+          "z": 941,
+          "radius": 20,
+          "label": "bolt six metres of vinyl across the view"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 900,
+        "unlock": [
+          "l6:doublebay-fig"
+        ]
+      }
+    }
+  ]
+}

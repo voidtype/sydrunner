@@ -1,0 +1,246 @@
+{
+  "pack": "pool-l1",
+  "quests": [
+    {
+      "id": "l1-artarmon-outcome",
+      "act": 1,
+      "title": "Your Four-Week Outcome",
+      "blurb": "I don't need you to have a job. I need a job to have had you — four weeks, on a form. Suite 3, above the tile showroom, Reserve Road. Buzz twice. The first buzzer does nothing and I've claimed for that too.",
+      "giver": "artarmon-pathways-dale",
+      "level": 1,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "TRAINING",
+          "count": 1,
+          "label": "sit the ninety-minute course he bills at four hundred"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Artarmon",
+          "to": "Chatswood",
+          "label": "attend the interview, one stop up the line"
+        },
+        {
+          "kind": "photo",
+          "x": -2690,
+          "z": -7790,
+          "radius": 60,
+          "label": "photograph the shopfront so the interview happened"
+        },
+        {
+          "kind": "earn",
+          "dollars": 40,
+          "label": "clear $40 so the form shows commencement earnings"
+        },
+        {
+          "kind": "dialog",
+          "npc": "artarmon-pathways-dale",
+          "node": "sign",
+          "label": "sign the claim, dated the Monday before last"
+        }
+      ],
+      "reward": {
+        "cash": 55,
+        "xp": 240,
+        "unlock": [
+          "l1:artarmon-outcome"
+        ]
+      }
+    },
+    {
+      "id": "l1-wolseley-hedge",
+      "act": 1,
+      "title": "Photographic Evidence of the Hedge",
+      "blurb": "There is a hedge on Ocean Avenue that has grown four metres since the orders. I am not permitted within a hundred metres of it. Nobody knows who you are, which makes you the most useful person in the eastern suburbs.",
+      "giver": "rodney-wolseley-hedge",
+      "level": 1,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "buy a flat white on the way through Double Bay and carry it like it is yours"
+        },
+        {
+          "kind": "photo",
+          "x": 2731,
+          "z": 896,
+          "radius": 70,
+          "label": "walk up Ocean Avenue — there is no station, that is the whole point of the suburb — and photograph the hedge from the public footpath"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 1,
+          "label": "someone will come out and ask what you are doing. Someone always comes out"
+        },
+        {
+          "kind": "dialog",
+          "npc": "rodney-wolseley-hedge",
+          "node": "film",
+          "label": "back to Edgecliff and show him the phone"
+        }
+      ],
+      "reward": {
+        "cash": 45,
+        "xp": 220,
+        "unlock": [
+          "l1:wolseley-hedge"
+        ]
+      }
+    },
+    {
+      "id": "l1-harbour-rail-experience",
+      "act": 1,
+      "title": "The Harbour Bridge Rail Experience",
+      "blurb": "Twelve dollars. Three minutes. Unrivalled harbour views. Five more for the harbour side, and don't you dare tell them which side that is. The hard part is the photograph. I'll explain the photograph.",
+      "giver": "milsons-tour-coral",
+      "level": 1,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": 300,
+          "z": -2680,
+          "radius": 25,
+          "label": "round up the punters from under the face"
+        },
+        {
+          "kind": "earn",
+          "dollars": 20,
+          "label": "take the fares and the harbour-side upgrade"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Milsons Point",
+          "to": "Wynyard",
+          "label": "run the crossing: one stop, facing the water"
+        },
+        {
+          "kind": "photo",
+          "x": 170,
+          "z": -900,
+          "radius": 60,
+          "label": "shoot the bridge from the Quay, where it fits"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 1,
+          "label": "handle the customer who counted the stops"
+        }
+      ],
+      "reward": {
+        "cash": 45,
+        "xp": 220,
+        "unlock": [
+          "l1:harbour-rail-experience"
+        ]
+      }
+    },
+    {
+      "id": "l1-evidence-of-vibrancy",
+      "act": 1,
+      "title": "Evidence of Vibrancy",
+      "blurb": "Category B placemaking grant. To get the money that fixes the piazza I first have to prove the piazza is already in use. Footfall, retail expenditure, a photo, one objection. You are the footfall.",
+      "giver": "iwc-place-officer",
+      "level": 1,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "photo",
+          "x": -5695,
+          "z": 1587,
+          "radius": 22,
+          "label": "photograph the Italian Forum piazza in use. You are the use."
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "record one (1) instance of retail expenditure on the Norton Street dining precinct"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Taverners Hill",
+          "to": "Marion",
+          "label": "arrive by light rail. Category B is transit-oriented, so the arrival has to be one you can evidence."
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 1,
+          "label": "record Kevin's objection. In full, and once."
+        }
+      ],
+      "reward": {
+        "cash": 45,
+        "xp": 230,
+        "unlock": [
+          "l1:vibrancy"
+        ]
+      }
+    },
+    {
+      "id": "l1-one-short-for-the-triples",
+      "act": 1,
+      "title": "One Short for the Triples",
+      "blurb": "Kev's done his hamstring at touch footy, so we're two and the constitution says three. Club's woods are in Wazza's ute at Rooty Hill. Get them, get the train back, be on the green before four.",
+      "giver": "mtdruitt-bowlo-nev",
+      "level": 1,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -33990,
+          "z": -10050,
+          "radius": 60,
+          "label": "find Wazza's ute at Rooty Hill; the club's woods are behind the seat"
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 2,
+          "label": "ask Wazza for the bowls, then ask Wazza's apprentice, who has the keys"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Rooty Hill",
+          "to": "Mount Druitt",
+          "label": "one stop on the train; nobody drives home from a triples"
+        },
+        {
+          "kind": "earn",
+          "dollars": 25,
+          "label": "move $25 of meat raffle tickets before the draw"
+        },
+        {
+          "kind": "photo",
+          "x": -36060,
+          "z": -10120,
+          "radius": 30,
+          "label": "photograph the green for the council grant: evidence of community usage"
+        }
+      ],
+      "reward": {
+        "cash": 45,
+        "xp": 220,
+        "unlock": [
+          "l1:triples"
+        ]
+      }
+    }
+  ]
+}

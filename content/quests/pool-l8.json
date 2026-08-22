@@ -1,0 +1,329 @@
+{
+  "pack": "pool-l8",
+  "quests": [
+    {
+      "id": "l8-beach-that-got-a-train",
+      "act": 1,
+      "title": "The Beach That Got a Train",
+      "blurb": "Cronulla is the same sand as us and they had a railway by 1939. I want a photograph of it. Bring it back to this table and I will show you what it proves.",
+      "giver": "bondi-stationmaster",
+      "level": 8,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "a flat white for the stationmaster; she is good for it"
+        },
+        {
+          "kind": "goto",
+          "x": 3656,
+          "z": 2459,
+          "radius": 25,
+          "label": "stand where the Eastern Suburbs line gives up"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 5,
+          "label": "canvass five Waverley ratepayers about the extension"
+        },
+        {
+          "kind": "earn",
+          "dollars": 80,
+          "label": "fund the society's field trip out of your own pocket"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Bondi Junction",
+          "to": "Cronulla",
+          "label": "ride to the beach they let have a railway"
+        },
+        {
+          "kind": "photo",
+          "x": -4790,
+          "z": 20880,
+          "radius": 60,
+          "label": "photograph the platform with the sand behind it"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Cronulla",
+          "to": "Bondi Junction",
+          "label": "come back. it is an hour. it is always an hour"
+        },
+        {
+          "kind": "dialog",
+          "npc": "bondi-stationmaster",
+          "node": "exhibit",
+          "label": "put the photograph in Dee's hand"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 950,
+        "unlock": [
+          "l8:bondi-moat"
+        ]
+      }
+    },
+    {
+      "id": "l8-macquarie-headcount",
+      "act": 1,
+      "title": "The Monday Headcount",
+      "blurb": "Friday the tower has three hundred and eighty-one active badges. Monday it has four hundred and twelve. Nobody is hired, nobody resigns. Walk the campus for me. The building has never met you.",
+      "giver": "lindsay-access",
+      "level": 8,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Epping",
+          "to": "Chatswood",
+          "label": "ride it end to end and notice you never once come up for air"
+        },
+        {
+          "kind": "goto",
+          "x": -7600,
+          "z": -9060,
+          "radius": 40,
+          "label": "the tower four forecourt, by the bollard everybody smokes at"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 3,
+          "label": "three flat whites off the forecourt cart. I want three timestamps"
+        },
+        {
+          "kind": "photo",
+          "x": -8530,
+          "z": -9932,
+          "radius": 40,
+          "label": "photograph the campus noticeboard, dates and all"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 4,
+          "label": "ask four workplace experience managers what they did last week"
+        },
+        {
+          "kind": "goto",
+          "x": -6690,
+          "z": -8070,
+          "radius": 35,
+          "label": "the North Ryde dock, where the contractors still sign a paper book"
+        },
+        {
+          "kind": "dialog",
+          "npc": "lindsay-access",
+          "node": "report",
+          "label": "bring the lot back to the bus bay"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 1000,
+        "unlock": [
+          "l8:macquarie-headcount"
+        ]
+      }
+    },
+    {
+      "id": "l8-doors-closing",
+      "act": 1,
+      "title": "The Doors Do Not Wait",
+      "blurb": "Forty-one years I held those doors for people. Now there's nobody up the front to see a bloke running. I'm putting in a submission and a submission wants evidence. Bring me the doors, the trip, and the fare.",
+      "giver": "wollstonecraft-guard",
+      "level": 8,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -1462,
+          "z": -5088,
+          "radius": 45,
+          "label": "the St Leonards gates, in the hospital rush"
+        },
+        {
+          "kind": "photo",
+          "x": -1024,
+          "z": -4740,
+          "radius": 35,
+          "label": "photograph the Hume Street doors, mid-close"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "St Leonards",
+          "to": "Chatswood",
+          "label": "ride it north and count the dwell yourself"
+        },
+        {
+          "kind": "ko",
+          "npc": "police",
+          "count": 4,
+          "label": "four inspectors, politely, at the paid gates"
+        },
+        {
+          "kind": "earn",
+          "dollars": 180,
+          "label": "earn back what it takes when you miss the tap"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites; Lionel drinks his standing up"
+        },
+        {
+          "kind": "dialog",
+          "npc": "wollstonecraft-guard",
+          "node": "submission",
+          "label": "hear the submission read out at Wollstonecraft"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 1000,
+        "unlock": [
+          "l8:doors-closing"
+        ]
+      }
+    },
+    {
+      "id": "l8-engagement-photo",
+      "act": 1,
+      "title": "The Engagement Photo",
+      "blurb": "Two o'clock: twelve engaged participants, a whiteboard, one photo. Compliance are in Thursday and the room has to look like it's been doing something since March. I'm not asking you to lie. I'm asking you to be present, in numbers.",
+      "giver": "erko-bounce-gav",
+      "level": 8,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -2212,
+          "z": 3584,
+          "radius": 20,
+          "label": "get to the Bounce Forward shopfront on Erskineville Road, between the dog groomer and the natural wine bar"
+        },
+        {
+          "kind": "earn",
+          "dollars": 180,
+          "label": "front the catering out of your own pocket; the float is real, the float is just slow"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 4,
+          "label": "four flat whites for the front row, so there is steam in the photo"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Sydenham",
+          "to": "Erskineville",
+          "label": "collect Kelso off the platform at Sydenham and bring him up the line; he will come if someone comes and gets him, and only then"
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 4,
+          "label": "ask the Ashmore site to knock off for twenty minutes; the jackhammer is in every take"
+        },
+        {
+          "kind": "photo",
+          "x": -2218,
+          "z": 3576,
+          "radius": 14,
+          "label": "upstairs, two o'clock: twelve heads, one whiteboard, the word ENGAGEMENT on the whiteboard. Take it."
+        },
+        {
+          "kind": "dialog",
+          "npc": "erko-bounce-gav",
+          "node": "signoff",
+          "label": "hand Gav the photo, and read the line above where he wants you to sign"
+        }
+      ],
+      "reward": {
+        "cash": 220,
+        "xp": 950,
+        "unlock": [
+          "l8:engagement-photo"
+        ]
+      }
+    },
+    {
+      "id": "l8-public-liability",
+      "act": 1,
+      "title": "Public Liability, Unit 4",
+      "blurb": "It's my niece's birthday. It's a night-time thing. Door up at ten, down at half three, and if anyone says the other word out loud my broker hears it from Parramatta. Stand near the gate and be large.",
+      "giver": "vince-unit-four",
+      "level": 8,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -25255,
+          "z": -9880,
+          "radius": 50,
+          "label": "get to the estate before ten. Powers Road, Unit 4: the sign says forklifts and there is no forklift"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Blacktown",
+          "to": "Seven Hills",
+          "label": "the van is off the road, so the last sub comes out from Blacktown on a train, on a trolley, like a passenger"
+        },
+        {
+          "kind": "dialog",
+          "npc": "vince-unit-four",
+          "node": "soundtest",
+          "label": "get the level off Vince before anybody touches the desk"
+        },
+        {
+          "kind": "earn",
+          "dollars": 220,
+          "label": "$220 into the bucket by the pedestrian gate. It is not a cover charge. It is a contribution toward the birthday."
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 3,
+          "label": "three dressing gowns come down the driveway filming. Settle them. They were sold an urban village and got a light-industrial zone"
+        },
+        {
+          "kind": "photo",
+          "x": -25360,
+          "z": -9770,
+          "radius": 25,
+          "label": "photograph the fire exit standing clear, for the file, for the event that is not occurring"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "dawn over the roller doors. The servo does a flat white, and once you are holding one the night is legally breakfast"
+        }
+      ],
+      "reward": {
+        "cash": 260,
+        "xp": 1050,
+        "unlock": [
+          "l8:public-liability"
+        ]
+      }
+    }
+  ]
+}

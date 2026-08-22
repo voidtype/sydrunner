@@ -1,0 +1,899 @@
+{
+  "pack": "pool-l6",
+  "npcs": [
+    {
+      "id": "quay-silver-man",
+      "name": "Ando, the silver man at Circular Quay",
+      "x": 132,
+      "z": -864,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Don't look at me. Look at the ferry and talk out the side of your mouth. If they see the statue having a chat they want their two dollars back.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "offer",
+              "needLevel": 6
+            },
+            {
+              "text": "I've done it.",
+              "goto": "done"
+            },
+            {
+              "text": "Why do you count anything?",
+              "goto": "tin"
+            },
+            {
+              "text": "Why silver?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "There's a bollard down the western end with a number chalked on it. Every Monday the chalk is gone and the handwriting is mine and I did not write it. I'd go and look myself, but I'm at work. I'm at work right now.",
+          "choices": [
+            {
+              "text": "I'll photograph it before Monday does.",
+              "accept": "l6-silver-man-tally",
+              "denyFlag": "l6:silver-man-tally"
+            },
+            {
+              "text": "You've been in the sun, mate.",
+              "goto": "offer_no"
+            },
+            {
+              "text": "Later.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_no",
+          "line": "I've been in the sun since seven. That's not the part that's wrong.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "tally",
+          "line": "Say it. Quietly. — Yeah. That's the number it was last Monday, and the Monday before, and the chalk's been brand new every single time.",
+          "choices": [
+            {
+              "text": "So somebody's rewriting it.",
+              "goto": "tally_more"
+            },
+            {
+              "text": "Righto.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "tally_more",
+          "line": "Somebody's rewriting all of it. Go over the bridge on the North Shore line and have a proper look at the carriage. Everyone on it starts the week fresh and none of them think that's strange.",
+          "choices": [
+            {
+              "text": "Neither did I, until now.",
+              "goto": "tally_more_2"
+            },
+            {
+              "text": "I'll go.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "tally_more_2",
+          "line": "That's the bit that keeps me still.",
+          "choices": [
+            {
+              "text": "I'll get the train.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "tin",
+          "line": "Whatever's in the tin on Sunday night is in the tin on Monday morning. Every other thing about me goes back to nothing. Work out what that tells you, and don't tell it to anyone at this Quay.",
+          "choices": [
+            {
+              "text": "Marita would call that a productivity problem.",
+              "goto": "tin_marita",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "DeFAULT would say that's the whole point.",
+              "goto": "tin_default",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "That's just money, Ando.",
+              "goto": "tin_money"
+            },
+            {
+              "text": "I'll keep it to myself.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "tin_marita",
+          "line": "One of your mob offered me a hi-vis and a start Thursday. I'm silver. It clashes.",
+          "choices": [
+            {
+              "text": "It really does.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "tin_default",
+          "line": "One of your mob told me the reset is the only honest thing in this city because it takes it off everybody at once. Then he asked for two dollars out of the tin.",
+          "choices": [
+            {
+              "text": "Sounds about right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "tin_money",
+          "line": "Money's the only thing at this Quay that remembers last week. That's not comforting, that's a clue.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Silver's the cheapest paint there is. The gold blokes work the Opera House end, and they've got a roster and a bloke who calls himself their manager.",
+          "improv": {
+            "persona": "Ando, a living statue busking at Circular Quay in Sydney. Painted silver head to boot, holds still eight hours a day, speaks without moving his lips or his eyes. Deadpan, lower case, dry, warm underneath. No exclamation marks.",
+            "context": "A passer-by has asked why he is painted silver. The answer is that silver paint is cheap and the gold-painted buskers have the better pitch down by the Opera House, a roster and a self-appointed manager. He is not bitter about it, exactly."
+          },
+          "choices": [
+            {
+              "text": "A manager.",
+              "goto": "smalltalk_again"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_again",
+          "line": "Takes fifteen percent to stand near a bin and watch a man not move. I do my own admin.",
+          "choices": [
+            {
+              "text": "Respect.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Coins in the tin, not on the lid. The lid is not a bank. — And you saw the carriage, didn't you. You've got the face.",
+          "choices": [
+            {
+              "text": "Here's the photo, and the number.",
+              "turnin": "l6-silver-man-tally"
+            },
+            {
+              "text": "Not finished yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "narelle-tow-sydenham",
+      "name": "Narelle, twenty-four hour tow",
+      "x": -3830,
+      "z": 5290,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Scanner's on. Two prangs on the highway tonight and both of them beat me to it. — She is leaning on a truck with nothing at all on the tray.",
+          "choices": [
+            {
+              "text": "You're not out chasing them?",
+              "goto": "why"
+            },
+            {
+              "text": "You look like you're missing something.",
+              "goto": "offer"
+            },
+            {
+              "text": "I found something out.",
+              "goto": "log"
+            },
+            {
+              "text": "It's back.",
+              "goto": "done"
+            },
+            {
+              "text": "Quiet out here.",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "why",
+          "line": "One truck and no courtesy car, and the courtesy car is the half of the business people actually thank you for. DeFAULT reckon the car is a symptom. Marita reckon they'll have it back by Thursday. It has been forty-eight Thursdays.",
+          "choices": [
+            {
+              "text": "So where did it go?",
+              "goto": "offer"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Taken off the yard fence eleven months back. Since then it has been through the booze bus on the Princes Highway three separate times. Three clean readings. The bus won't tell me where. The bus might tell you.",
+          "choices": [
+            {
+              "text": "I'll go and ask the bus nicely.",
+              "accept": "l6-courtesy-car",
+              "denyFlag": "l6:sydenham-courtesy"
+            },
+            {
+              "text": "Ring the police like a normal person.",
+              "goto": "cops"
+            },
+            {
+              "text": "Not tonight.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "cops",
+          "line": "Did that. They have it recorded as recovered. Recovered where, I said. Recovered, they said. That's a status, not a place.",
+          "choices": [
+            {
+              "text": "Right. I'll do it your way.",
+              "goto": "offer"
+            },
+            {
+              "text": "Grim.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "log",
+          "line": "Zero. Zero. Zero. He indicates. He's set the mirrors. He's put the seat where a taller man likes it. — She folds the printout in half. — Whoever's got my car loves it more than I do. Bring it home anyway.",
+          "choices": [
+            {
+              "text": "Where do I look?",
+              "goto": "tempe"
+            },
+            {
+              "text": "On it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "tempe",
+          "line": "Tempe. It's always Tempe. Everything anyone in this city has ever given up on ends up in that car park between the tip and the flat-pack furniture.",
+          "choices": [
+            {
+              "text": "I'll get the train down.",
+              "goto": ""
+            },
+            {
+              "text": "Back in a bit.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Planes stopped at eleven. You can hear the pub from here now, and the pub is a kilometre off. That's how you know how late it is.",
+          "improv": {
+            "persona": "Narelle, a twenty-four hour tow truck driver parked on the Princes Highway at Sydenham, under the flight path. Nineteen years on the police scanner. Deadpan, lower case, generous, never sentimental, no exclamation marks.",
+            "context": "It is late and the airport curfew has just started, so the planes have stopped and the suburb has gone strange and quiet. Someone loitering by her truck has remarked on how quiet it is. She does not complain about her night, she reports on it."
+          },
+          "choices": [
+            {
+              "text": "Suppose it is.",
+              "goto": "hello"
+            },
+            {
+              "text": "Night, Narelle.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "The pram spot. Eleven months of that car and he leaves it in a spot for parents with prams. — She counts the release fee twice: her own money, out of her own yard, into her own hand.",
+          "choices": [
+            {
+              "text": "Here's the fee. And the photo.",
+              "turnin": "l6-courtesy-car"
+            },
+            {
+              "text": "Give me a minute.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stmarys-trev",
+      "name": "Trev, self-excluded",
+      "x": -41940,
+      "z": -11268,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Werrington's far enough. From this bench you can see the top of the club roof, and nothing I signed says anything about a roof.",
+          "choices": [
+            {
+              "text": "Why can't you go to St Marys?",
+              "goto": "why"
+            },
+            {
+              "text": "You after something?",
+              "goto": "offer"
+            },
+            {
+              "text": "Two down from the top, then.",
+              "goto": "thanks",
+              "needFlag": "l6:stmarys-board"
+            },
+            {
+              "text": "I've got your photo.",
+              "goto": "done"
+            },
+            {
+              "text": "How's the bench?",
+              "goto": "bench"
+            },
+            {
+              "text": "Nah, you're right.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "why",
+          "line": "I'm not barred. Barred is something they do to you. I did this one myself, at a desk, with a pen, and there's a laminated photo of my face behind the bar so the girls know to knock me back.",
+          "choices": [
+            {
+              "text": "Five years?",
+              "goto": "why_two"
+            },
+            {
+              "text": "Want me to put twenty on the raffle for you?",
+              "goto": "no_thanks"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "why_two",
+          "line": "Five. Signed it on a Tuesday, which tells you what sort of Monday it was. Best thing I've done. Doesn't mean I like the view from a bench in Werrington.",
+          "choices": [
+            {
+              "text": "So what do you need?",
+              "goto": "offer"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "no_thanks",
+          "line": "No. That's the whole trick, that is — it starts as a favour and it is never a favour. Buy a coffee with it. I want a photo, not a runner.",
+          "choices": [
+            {
+              "text": "Understood. A photo.",
+              "goto": "offer"
+            },
+            {
+              "text": "Sorry, Trev.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "There's a board in the foyer, past the pokies room, before the bistro. Working bees, 2011 to 2019. My name's on it twice. If they've painted over it I'd rather know than wonder about it out here.",
+          "choices": [
+            {
+              "text": "I'll go and get you a photo of it.",
+              "accept": "l6-stmarys-board",
+              "needLevel": 6,
+              "denyFlag": "l6:stmarys-board"
+            },
+            {
+              "text": "What's the catch with the car park?",
+              "goto": "brief"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "brief",
+          "line": "Whole board in frame, not just my bit — I want to see who else is still up there. And don't say my name at the desk. Colleen's lovely, she'll ring me, and I'll cry on a train at four in the afternoon.",
+          "choices": [
+            {
+              "text": "Whole board. No names. Got it.",
+              "goto": "carpark"
+            },
+            {
+              "text": "Anything else?",
+              "goto": "carpark"
+            }
+          ]
+        },
+        {
+          "id": "carpark",
+          "line": "Sunday session sits in the car park now, out the Boronia Road end, because the smoking area's got a roof on it and a roof counts as inside. They'll want to know whose mate you are. Be quick about answering.",
+          "choices": [
+            {
+              "text": "And the coffee?",
+              "goto": "colleen"
+            },
+            {
+              "text": "I'll manage.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "colleen",
+          "line": "Flat white from the bakery on Queen Street, not the servo, and Colleen will stand there while you take it and pretend she's checking the raffle board. She knows exactly who it's for. She's just not going to say.",
+          "choices": [
+            {
+              "text": "Then I'm off.",
+              "goto": ""
+            },
+            {
+              "text": "You've thought about this a lot.",
+              "goto": "bench"
+            }
+          ]
+        },
+        {
+          "id": "bench",
+          "line": "Bench is fine. The 4:14 comes through and everyone on it looks like they've been told off.",
+          "improv": {
+            "persona": "Trev, fifties, western Sydney, sits on the Werrington platform bench most afternoons. Self-excluded from his own leagues club for five years, entirely at peace with it and entirely not over it. Deadpan, short sentences, no self-pity, dry as a chip.",
+            "context": "Someone has asked him how he finds sitting on a suburban railway bench for hours. He watches the Blue Mountains services go through. He is not waiting for a train. Never mention gambling directly; he talks around it."
+          },
+          "choices": [
+            {
+              "text": "You get the flyer kids out here?",
+              "goto": "flyers"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "flyers",
+          "line": "DeFAULT do the flyers at the interchange now, Marita run a barbecue in the car park Saturdays and reckon they'll have me working by Thursday. Neither of them can get me a photo of a board.",
+          "choices": [
+            {
+              "text": "That's what I'm for.",
+              "goto": "hello"
+            },
+            {
+              "text": "Sausage sandwich is a sausage sandwich.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Let's have a look then. — He holds the phone at arm's length like a menu.",
+          "choices": [
+            {
+              "text": "Two down from the top. Twice.",
+              "turnin": "l6-stmarys-board"
+            },
+            {
+              "text": "Hang on, I haven't been yet.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "thanks",
+          "line": "Still up there. Didn't paint over it. — He doesn't zoom in, just looks at the whole thing for a bit. Right. Good. Get yourself something at the bakery. The good one.",
+          "choices": [
+            {
+              "text": "See you on the bench, Trev.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lakemba-knafeh",
+      "name": "Wassim, knafeh and grievances",
+      "x": -12163,
+      "z": 5804,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Second tray's out at eleven. Don't stand there, that's where the queue goes. — He is not looking at you. He is looking at the far kerb, and he has been looking at it for two hours.",
+          "choices": [
+            {
+              "text": "What are you staring at?",
+              "goto": "offer"
+            },
+            {
+              "text": "Say the plan again.",
+              "goto": "plan"
+            },
+            {
+              "text": "It's done. Sirens and everything.",
+              "goto": "done"
+            },
+            {
+              "text": "How long for the second tray?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nothing, mate. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "The breath-test bus. Nine o'clock it parked, and it has tested four people, and three of them were the driver's mates. Nobody on this street drinks. Try telling a family to walk their kids past four coppers with a torch.",
+          "choices": [
+            {
+              "text": "You want it moved.",
+              "accept": "l6-booze-bus",
+              "needLevel": 6,
+              "denyFlag": "l6:booze-bus"
+            },
+            {
+              "text": "So they're testing the tea.",
+              "goto": "refused"
+            },
+            {
+              "text": "Sounds like a them problem.",
+              "goto": "refused"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "plan",
+          "line": "A distraction. That is the word, and I have thought about the word. Not a fire. Not the news. Something that makes that bus a road unit again — moving, elsewhere, at speed, lights on. — He slides you a tray. — Eat. You'll run better.",
+          "choices": [
+            {
+              "text": "And when they come back?",
+              "goto": "thursday"
+            },
+            {
+              "text": "Why not just ring the council?",
+              "goto": "council"
+            },
+            {
+              "text": "Understood.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "thursday",
+          "line": "They come back Thursday. Thursday I'm shut. That is not luck, that is planning, and it is the only planning anyone on this street has ever been thanked for.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "council",
+          "line": "I rang the council. The council rang the police. The police sent the bus. — He wipes the counter with the cloth he has been holding since you arrived. — I am very good at the phone.",
+          "choices": [
+            {
+              "text": "Right. The other way, then.",
+              "goto": "plan"
+            }
+          ]
+        },
+        {
+          "id": "refused",
+          "line": "Then you stand there and you watch a man's syrup go hard. That is allowed. It's a free country. They tell me that at the council, on hold, on a recording.",
+          "choices": [
+            {
+              "text": "...go on then. What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "I'll live with it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Eleven. It's eleven now. It'll be eleven for another twenty minutes.",
+          "improv": {
+            "persona": "Wassim, who has run the same sweets window on Haldon Street, Lakemba for twenty-two years. Deadpan, lower case, no exclamation marks. Proud of the pastry, tired of everything adjacent to it.",
+            "context": "A customer has asked how long until the next tray of knafeh comes out. It is late, the queue is thin because there is a breath-test bus parked across the road, and the tray is when the tray is."
+          },
+          "choices": [
+            {
+              "text": "I'll wait.",
+              "goto": "hello"
+            },
+            {
+              "text": "It was eleven when I got here.",
+              "goto": "smalltalk_again"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_again",
+          "line": "Yes. Cheese doesn't take instructions.",
+          "choices": [
+            {
+              "text": "Can't argue.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "I heard it. Whole street heard it. Sirens going west up King Georges Road like a wedding convoy, and my kerb empty and my queue back around the phone shop. — He is already wrapping something in foil for you.",
+          "choices": [
+            {
+              "text": "Settle up, then.",
+              "turnin": "l6-booze-bus"
+            },
+            {
+              "text": "Just the foil. I'm being followed.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "woollahra-trees",
+      "name": "Bronwyn Teale, Woollahra Council (Trees)",
+      "x": 2641,
+      "z": 973,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Woollahra Council, arboriculture. Ninety-year-old Port Jackson fig, drilled at the base, filled with glyphosate. Eleven days later a harbour view opened up on the fourth floor. Nobody saw anything.",
+          "choices": [
+            {
+              "text": "Who's on the fourth floor?",
+              "goto": "fine"
+            },
+            {
+              "text": "What do you need done?",
+              "goto": "offer"
+            },
+            {
+              "text": "About Form 10A.",
+              "goto": "form10a"
+            },
+            {
+              "text": "It's done.",
+              "goto": "done"
+            },
+            {
+              "text": "How long have you been out here?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "I've got somewhere to be.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "fine",
+          "line": "Maximum penalty is a hundred and thirty-two thousand dollars. The view put four million on the valuation. That's not a deterrent, that's a price list. So we don't fine them. We put up a banner.",
+          "choices": [
+            {
+              "text": "A banner.",
+              "goto": "banner"
+            },
+            {
+              "text": "Back up a second.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "banner",
+          "line": "Six metres by four, in the gap, facing the water. THIS VIEW WAS CREATED BY POISONING A PROTECTED TREE. It comes down when the new canopy reaches the same height. Forty years. Council has the ladder booked.",
+          "choices": [
+            {
+              "text": "That's petty.",
+              "goto": "petty"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "petty",
+          "line": "It's proportionate. We took legal advice and the advice was that it's proportionate. The advice cost more than the fine would have.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "I need an authorised person. Not an employee — that position's frozen until the review. Authorised. You sign a form, you become one, and then it's somebody's problem who isn't me.",
+          "choices": [
+            {
+              "text": "I'll be an authorised person.",
+              "accept": "l6-doublebay-fig",
+              "denyFlag": "l6:doublebay-fig",
+              "needLevel": 6
+            },
+            {
+              "text": "What's it pay?",
+              "goto": "pay"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "pay",
+          "line": "Two hundred and forty out of the tree fund. The tree fund is what's left of the fines from the last one. There is always a last one.",
+          "choices": [
+            {
+              "text": "Go on then.",
+              "goto": "offer"
+            },
+            {
+              "text": "Grim.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "form10a",
+          "line": "Form 10A. Authority to Act, Tree Preservation Order. Print your name — don't sign in the box marked signature, that box is mine. Yes, I know. Yes, it says signature.",
+          "choices": [
+            {
+              "text": "Printed.",
+              "goto": "form10a_done"
+            },
+            {
+              "text": "Which box, then?",
+              "goto": "form10a_box"
+            }
+          ]
+        },
+        {
+          "id": "form10a_box",
+          "line": "The one underneath, marked name. You print in signature and you sign in name. It's been like that since we digitised a form that was already like that.",
+          "choices": [
+            {
+              "text": "Done.",
+              "goto": "form10a_done"
+            }
+          ]
+        },
+        {
+          "id": "form10a_done",
+          "line": "You are now an authorised person of Woollahra Municipal Council for the purposes of one tree. Congratulations. The lanyard's on back order.",
+          "choices": [
+            {
+              "text": "What first?",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Since seven. Someone's reported the banner as unauthorised signage. To us. We're the ones who put it up, and I'm the officer who has to assess it.",
+          "improv": {
+            "persona": "Bronwyn Teale, a Woollahra Council tree officer on New South Head Road at Double Bay with a folding table, a laser rangefinder and a clipboard. Deadpan, lower case, unbothered, twenty years of this.",
+            "context": "A passer-by asked how long she's been standing out here. A resident has formally complained about the council's own banner as unauthorised signage, and she is the officer required to assess the complaint."
+          },
+          "choices": [
+            {
+              "text": "Will you approve it?",
+              "goto": "smalltalk_two"
+            },
+            {
+              "text": "Good luck with that.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_two",
+          "line": "I'll assess it. Twenty-eight days. Then I'll approve it. Then they'll appeal it. That's the forty years, mostly.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Photograph, four quotes, the receipts, the stamp from Macquarie Street — and the banner's up. I can see it from here. So can they. Sign in the name box.",
+          "choices": [
+            {
+              "text": "Sign in the name box.",
+              "turnin": "l6-doublebay-fig"
+            },
+            {
+              "text": "Not finished yet.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

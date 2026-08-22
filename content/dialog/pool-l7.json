@@ -1,0 +1,939 @@
+{
+  "pack": "pool-l7",
+  "npcs": [
+    {
+      "id": "lidcombe-can-auntie",
+      "name": "Auntie Hoa, containers by the trolley",
+      "x": -15155,
+      "z": -378,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "You're standing where the trolley goes. — She moves it four inches. The whole thing rings like a church.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "I've done the run.",
+              "goto": "ledger"
+            },
+            {
+              "text": "Why Lidcombe, of all the stations?",
+              "goto": "why"
+            },
+            {
+              "text": "How's the machine treating you?",
+              "goto": "machine"
+            },
+            {
+              "text": "Sell me the spare trolley. ($20)",
+              "cost": 20,
+              "needCash": 20,
+              "goto": "trolley"
+            },
+            {
+              "text": "Nothing. Mind the wheel.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Ten cents a container. That is not a business. Ten cents, forty thousand times, after a full house at the ground — that is a business, and it needs a second back.",
+          "choices": [
+            {
+              "text": "What's the catch?",
+              "goto": "catch"
+            },
+            {
+              "text": "I'll take the trolley out to the ground.",
+              "accept": "l7-ten-cents",
+              "needLevel": 7,
+              "denyFlag": "l7:tencents"
+            },
+            {
+              "text": "Ten cents.",
+              "goto": "tencents"
+            },
+            {
+              "text": "I'm right, thanks.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "catch",
+          "line": "The catch is four in the morning, and the machine is full by seven, and there is a queue by half past. The rest is arithmetic and you can do arithmetic sitting down.",
+          "choices": [
+            {
+              "text": "Fine. I'm in.",
+              "goto": "offer"
+            },
+            {
+              "text": "I'll think about it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "tencents",
+          "line": "Say it the other way. Every train that stops here is a hundred dollars standing up, holding a bottle, deciding.",
+          "choices": [
+            {
+              "text": "Alright. Show me.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "why",
+          "line": "Because everybody here is changing trains. Forty years of people going somewhere else to be paid. A person who stands still, where everybody passes, gets paid by all of them.",
+          "choices": [
+            {
+              "text": "Marita reckon there's real work in the west.",
+              "needFaction": "Marita",
+              "goto": "why_m"
+            },
+            {
+              "text": "DeFAULT reckon the machine owes us.",
+              "needFaction": "DeFAULT",
+              "goto": "why_d"
+            },
+            {
+              "text": "That's the whole plan?",
+              "goto": "why_plan"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "why_m",
+          "line": "Marita told me that in 1988. Work by Thursday. I have had work since 1988 and not one Thursday has ever turned up to help me lift it.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "why_d",
+          "line": "DeFAULT say the machine owes them. The machine owes nobody. The machine counts, and it counts you the same as it counts me, and that is the only honest thing at this station.",
+          "choices": [
+            {
+              "text": "Can't argue with it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "why_plan",
+          "line": "The plan bought a house in Berala. Slowly. Ten cents is slow money, but it is the only money nobody can decide not to give you.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "machine",
+          "line": "It swallowed a bottle sideways in March and I have not forgiven it. Otherwise we are civil.",
+          "improv": {
+            "persona": "Auntie Hoa, seventy-one, Vietnamese-Australian, works the container deposit machine behind Lidcombe station with a shopping trolley. Deadpan, lower case, sentences short as receipts. Never complains, only reports.",
+            "context": "Someone has asked how the Return and Earn machine is behaving today. It jams, it fills up by seven, and the queue behind it is the whole suburb. She has an entirely unsentimental relationship with it."
+          },
+          "choices": [
+            {
+              "text": "Does anyone service it?",
+              "goto": "machine_service"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "machine_service",
+          "line": "A man comes. He photographs it, and then he leaves, and then it works. I don't ask what the photograph does.",
+          "choices": [
+            {
+              "text": "Same as everywhere.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "trolley",
+          "line": "It isn't a trolley, it's a fleet of one. The left wheel has opinions and you will learn them at the ramp. Don't let a station guard read the side of it.",
+          "choices": [
+            {
+              "text": "Worth every cent.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "ledger",
+          "line": "Show me. — She counts by fours, out loud, faster than you can follow, and stops on the exact number you were about to say.",
+          "choices": [
+            {
+              "text": "Two hundred. Near enough.",
+              "goto": "ledger_near"
+            },
+            {
+              "text": "You did that in your head.",
+              "goto": "ledger_head"
+            },
+            {
+              "text": "Pay me, then.",
+              "goto": "done"
+            },
+            {
+              "text": "I'll come back with the rest.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "ledger_near",
+          "line": "Near enough is a word for people on wages.",
+          "choices": [
+            {
+              "text": "Count it again, then.",
+              "goto": "ledger"
+            }
+          ]
+        },
+        {
+          "id": "ledger_head",
+          "line": "I did it in 1988. Since then I am only checking.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "ledger"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Notes, not coins. I am not cruel. Count it anyway — everyone who doesn't count it comes back on Tuesday to tell me a number.",
+          "choices": [
+            {
+              "text": "That's the run.",
+              "turnin": "l7-ten-cents"
+            },
+            {
+              "text": "Hold it for me.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l7-merrilyn-fig",
+      "name": "Merrilyn, two hundred metres away",
+      "x": -3342,
+      "z": 452,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Don't wave. If someone on the Glebe side waves back and it goes in a log, that's the undertaking gone and I'm in the District Court in a cardigan.",
+          "choices": [
+            {
+              "text": "Why are you standing in the mangroves?",
+              "goto": "why"
+            },
+            {
+              "text": "What do you need?",
+              "goto": "offer"
+            },
+            {
+              "text": "I've got your pictures.",
+              "goto": "report"
+            },
+            {
+              "text": "Settle up.",
+              "goto": "done"
+            },
+            {
+              "text": "How's the water?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "why",
+          "line": "I chained myself to a fig on that boardwalk for nine days. The fig is still there. I am the only part of that arrangement the council was able to remove.",
+          "choices": [
+            {
+              "text": "Nine days.",
+              "goto": "why2"
+            },
+            {
+              "text": "So what happens now?",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "why2",
+          "line": "The first three days they brought me tea. On the fourth they brought a barrister. The barrister was cheaper than the tea and a good deal quicker.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Eleven figs on that avenue and the notice says maintenance. Maintenance does not book a crane and a road closure for a Tuesday. I need pictures and I cannot be the one holding the camera.",
+          "choices": [
+            {
+              "text": "I'll count your trees.",
+              "accept": "l7-glebe-figs",
+              "denyFlag": "l7:glebe-figs"
+            },
+            {
+              "text": "Get someone who actually lives in Glebe.",
+              "goto": "offer_no"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_no",
+          "line": "Everyone in Glebe is on the committee, on the development, or in Bali until the ninth. You are none of the three, which is the entirety of your qualification.",
+          "choices": [
+            {
+              "text": "Charming.",
+              "goto": "offer"
+            },
+            {
+              "text": "Leave it with me.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Rowers at six, light rail every eight minutes, and a bloke down there who has fished this bay for a year and never caught a thing. I know the timetable better than I know the trees now.",
+          "improv": {
+            "persona": "Merrilyn, retired schoolteacher and heritage agitator, standing on the Rozelle Bay side of Blackwattle Bay because a court undertaking keeps her two hundred metres from a fig tree in Glebe. Dry, precise, no self-pity, very Australian.",
+            "context": "Someone has asked how the water is. She watches this bay every day from the wrong side of it and has learned the ferry wash, the rowing eights and one unlucky fisherman by heart."
+          },
+          "choices": [
+            {
+              "text": "Sounds peaceful.",
+              "goto": "hello"
+            },
+            {
+              "text": "Doesn't it get cold out here?",
+              "goto": "smalltalk2"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk2",
+          "line": "It gets cold. It is still the better side of the bay, because it is the side you can see the other side from.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "report",
+          "line": "Give it here. — She scrolls with two fingers, slowly, the way people do when they don't want to reach the end of something. — Eleven in 1974. Eleven in March.",
+          "choices": [
+            {
+              "text": "I counted seven.",
+              "goto": "report2"
+            },
+            {
+              "text": "It's all on there.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "report2",
+          "line": "Seven. And a notice that says maintenance, and a hire crane, and a bloke at Petersham who does this for a living and sleeps beautifully.",
+          "choices": [
+            {
+              "text": "What'll you do with them?",
+              "goto": "report3"
+            }
+          ]
+        },
+        {
+          "id": "report3",
+          "line": "Write to the council. They'll write back. Then I'll put the photographs where letters don't reach, which is the front of the markets on a Saturday, from two hundred and one metres.",
+          "choices": [
+            {
+              "text": "Good luck, Merrilyn.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Cash, because a transfer has my name on one end and yours on the other, and I have had quite enough of documents. Count it. I did.",
+          "choices": [
+            {
+              "text": "Take the lot.",
+              "turnin": "l7-glebe-figs"
+            },
+            {
+              "text": "Keep it. Buy a barrister.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "redfern-lost-property",
+      "name": "Norm, Redfern lost property",
+      "x": -1043,
+      "z": 2609,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Lost property. If it's a phone it's gone, if it's a bike it's gone, and if it's on that shelf it's gone by Monday. Sign the book anyway. I like the book.",
+          "choices": [
+            {
+              "text": "What happens on Monday?",
+              "goto": "shelf"
+            },
+            {
+              "text": "Is that a ledger?",
+              "goto": "ledger"
+            },
+            {
+              "text": "I stood there at four.",
+              "goto": "monday"
+            },
+            {
+              "text": "I've got your answer.",
+              "goto": "done"
+            },
+            {
+              "text": "Nothing, mate.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "shelf",
+          "line": "Forty-one umbrellas on Friday. A bike helmet, a wig, an esky with a name on it. Monday morning: bare shelf, clean book, and me on this window the whole time. Nobody claimed a thing. Nobody remembers there was one.",
+          "choices": [
+            {
+              "text": "So you want it tested.",
+              "goto": "offer"
+            },
+            {
+              "text": "Shelves get cleared, Norm.",
+              "goto": "sceptic"
+            },
+            {
+              "text": "Righto.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "sceptic",
+          "line": "They do. By someone. There's a form, a bin and a bloke with a trolley. Marita send a fella round with a clipboard, DeFAULT send one with a can. Neither can tell me where forty-one umbrellas went. Show me the bloke.",
+          "choices": [
+            {
+              "text": "Fair point.",
+              "goto": "offer"
+            },
+            {
+              "text": "Leave it with me.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Take the board with my initials burnt in the tail. Put it somewhere that isn't here — one stop is enough, I want to know if one stop is enough. Then be back at this window before four on Monday. I pay out of the tin.",
+          "choices": [
+            {
+              "text": "Give us the board.",
+              "accept": "l7-monday-shelf",
+              "denyFlag": "l7:monday-shelf",
+              "needLevel": 7
+            },
+            {
+              "text": "Not this week.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "ledger",
+          "line": "It's a book. Biro. The computer behind me has got a Monday in it and the book hasn't.",
+          "improv": {
+            "persona": "Norm, sixty-three, the lost property window at Redfern station. Thirty-one years on the railway. Dry, unhurried, entirely sane about a thing that is not. Sentence case, no exclamation marks, very Australian.",
+            "context": "A stranger has asked why he keeps a paper ledger when there is a records system on the screen behind him. The screen starts again every Monday and the book does not. He will not say out loud the word he is circling."
+          },
+          "choices": [
+            {
+              "text": "Can I have a look?",
+              "goto": "ledger_no"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "ledger_no",
+          "line": "No. You'd be in it.",
+          "choices": [
+            {
+              "text": "Under what name?",
+              "goto": "ledger_name"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "ledger_name",
+          "line": "Same one as last week. Same one the week before. That's how I know it's you and not somebody who looks like you.",
+          "choices": [
+            {
+              "text": "I'll be off, then.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "monday",
+          "line": "Four o'clock. Bare shelf, clean book, and we watched the same door. — Norm writes the time down twice, once in the book and once on the back of his hand.",
+          "choices": [
+            {
+              "text": "The board's gone too.",
+              "goto": "done"
+            },
+            {
+              "text": "Nobody came through that door.",
+              "goto": "nobody"
+            }
+          ]
+        },
+        {
+          "id": "nobody",
+          "line": "No. And the trolley's parked where it was Friday with Friday's dust still on it. I'm not saying anything. I'm saying I've got eleven weeks of it in biro and nobody down there has got one.",
+          "choices": [
+            {
+              "text": "Eleven weeks.",
+              "goto": "done"
+            },
+            {
+              "text": "Get some sleep, Norm.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Then that's twelve. — He counts it out slowly, in fives, off the top of the tin, and that is the one number this morning he does not write down.",
+          "choices": [
+            {
+              "text": "I'll take it.",
+              "turnin": "l7-monday-shelf"
+            },
+            {
+              "text": "Put a lock on the shelf instead.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "auburn-concreter",
+      "name": "Serkan, concreter",
+      "x": -16412,
+      "z": -1748,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Don't walk on that. It's four days old and it's already got more signatures on it than my quote.",
+          "choices": [
+            {
+              "text": "What happened to the driveway?",
+              "goto": "job"
+            },
+            {
+              "text": "Who signed it?",
+              "goto": "names"
+            },
+            {
+              "text": "Why has your ute got a photo of a Japanese garden on the dash?",
+              "goto": "gardens"
+            },
+            {
+              "text": "Come and look at it now.",
+              "goto": "settle"
+            },
+            {
+              "text": "I've squared it away.",
+              "goto": "done"
+            },
+            {
+              "text": "Nothing, mate. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "job",
+          "line": "Forty metres, exposed aggregate, screeded till dark. Sunday morning there's three names, a hand and a word I won't say in it. She's got photos, she's got a review up, and she's got a hearing date.",
+          "choices": [
+            {
+              "text": "Give me the grinder and the address.",
+              "accept": "l7-fresh-slab",
+              "denyFlag": "l7:fresh-slab",
+              "needLevel": 7
+            },
+            {
+              "text": "Marita could have a crew on this by Thursday.",
+              "goto": "crew",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "DeFAULT would say the driveway is the problem.",
+              "goto": "crew",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "Sounds like a you problem.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "crew",
+          "line": "Mate, I don't care whose lanyard you're wearing. The slab is still grey and the names are still in it. Are you doing it or are you standing on it.",
+          "choices": [
+            {
+              "text": "I'm doing it.",
+              "goto": "job"
+            },
+            {
+              "text": "I'm standing on it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "names",
+          "line": "Three of them. Fifteen, maybe. Signed it like it was a cast on a broken arm. Their spelling is the only thing wrong with that job.",
+          "choices": [
+            {
+              "text": "You know which units?",
+              "goto": "names_units"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "names_units",
+          "line": "I know which balcony. One of them left a Nike print in it, size eight, and he's still wearing them.",
+          "choices": [
+            {
+              "text": "That'll do.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "gardens",
+          "line": "That's her reference image. The Botanic Gardens, ten minutes down the road — the blossom, the little red bridge, the koi. She sent it to me and wrote: like that, but a driveway.",
+          "improv": {
+            "persona": "Serkan, a concreter on Auburn Road in western Sydney. Twenty years on the tools, up since four, holds a screed the way other men hold their temper. Deadpan, lower case, very Australian, never sweary.",
+            "context": "A client sent him a photograph of the Auburn Botanic Gardens -- cherry blossom, a red bridge, koi -- as the reference for a residential concrete driveway, and someone has just asked him about it. He is not angry at the gardens. The gardens are genuinely beautiful and he takes his mum there in August."
+          },
+          "choices": [
+            {
+              "text": "Did you tell her no?",
+              "goto": "gardens_no"
+            },
+            {
+              "text": "The gardens are nice, to be fair.",
+              "goto": "gardens_nice"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "gardens_no",
+          "line": "I told her concrete comes in grey. She said so does the bridge. The bridge is red.",
+          "choices": [
+            {
+              "text": "Fair point, badly made.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "gardens_nice",
+          "line": "They're the best thing in Auburn and I'll fight the bloke who says otherwise. That's not what I'm charging her for.",
+          "choices": [
+            {
+              "text": "Understood.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "settle",
+          "line": "Right. Show us. — He crouches, runs a thumb across where the names were, and gets up slower than he went down. That's a grinder and half a Saturday. But she's paying, is she.",
+          "choices": [
+            {
+              "text": "She's paying.",
+              "goto": "settle_yes"
+            },
+            {
+              "text": "She's paying and she's taken the review down.",
+              "goto": "settle_review"
+            },
+            {
+              "text": "Ask me again tomorrow.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "settle_yes",
+          "line": "Then it's a driveway again. — He writes on the back of a card and hands it over. It isn't a phone number, it's a number.",
+          "choices": [
+            {
+              "text": "What's this?",
+              "goto": "done"
+            },
+            {
+              "text": "Cheers, Serkan.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "settle_review",
+          "line": "Four stars. Four. After all that. — He looks at the slab for a while. It's a good slab, that.",
+          "choices": [
+            {
+              "text": "It's a good slab.",
+              "goto": "done"
+            },
+            {
+              "text": "Take the four.",
+              "goto": "settle_yes"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "What you're owed, and forty on top for the boys' spelling. Don't tell them that's what it's for.",
+          "choices": [
+            {
+              "text": "Squared up.",
+              "turnin": "l7-fresh-slab"
+            },
+            {
+              "text": "Later, mate.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dobbo-lower-north-shore-towing",
+      "name": "Dobbo, Lower North Shore Towing",
+      "x": -1636,
+      "z": -4009,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Eleven days I've been looking at the same Commodore. In Wollstonecraft that's a crime wave.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "job"
+            },
+            {
+              "text": "I ran the plate.",
+              "goto": "verdict"
+            },
+            {
+              "text": "It's done. Nobody stole anything.",
+              "goto": "done"
+            },
+            {
+              "text": "What's the booze bus doing down there?",
+              "goto": "rbt"
+            },
+            {
+              "text": "Why's it called Wollstonecraft?",
+              "goto": "shirley"
+            },
+            {
+              "text": "Nothing. Enjoy the wait.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "job",
+          "line": "White Commodore, second one up from the war memorial. Strata want it gone, the plate comes back stolen out of Hornsby, and I'm not hooking a stolen car onto my deck at six in the morning with police at the bottom of the hill.",
+          "choices": [
+            {
+              "text": "I'll go and look at it.",
+              "accept": "l7-eleven-days-shirley-road",
+              "denyFlag": "l7:shirley-road"
+            },
+            {
+              "text": "Just ring it in yourself.",
+              "goto": "job_why"
+            },
+            {
+              "text": "Not this morning.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "job_why",
+          "line": "They call me Dobbo. Artarmon, 1998, I rang one plate in and I've worn it for twenty-seven years. So no. I don't ring things in. That is what you are for.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "rbt",
+          "line": "Random breath test, bottom of Shirley Road, been there since four. Four blokes sitting on their own bonnets like it's a picnic. That's the most anyone's spoken on this street since the strata meeting.",
+          "choices": [
+            {
+              "text": "Good morning for you, then.",
+              "goto": "rbt_more"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "rbt_more",
+          "line": "It's not a windfall. They blow over, they walk home, the car sits, and in a fortnight the strata pay me to take it anyway. I'm not the ambulance. I'm the follow-up appointment.",
+          "choices": [
+            {
+              "text": "Grim.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "shirley",
+          "line": "Named after a bloke. Edward. His cousin wrote the famous book about the rights of women; he wrote up land grants. Guess which one got the station.",
+          "improv": {
+            "persona": "Dobbo, a tow truck driver in his fifties parked on Shirley Road, Wollstonecraft, on Sydney's lower north shore. Thirty years on the trucks, dry as a chip, fond of the suburb and completely unsentimental about it. Deadpan, no exclamation marks.",
+            "context": "Someone has asked him where the suburb's name comes from. It is Edward Wollstonecraft, an early colonial landowner, whose cousin Mary wrote A Vindication of the Rights of Woman. He has explained this at the taxi rank many times and nobody has ever cared."
+          },
+          "choices": [
+            {
+              "text": "And nobody knows that.",
+              "goto": "shirley_more"
+            },
+            {
+              "text": "Huh.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "shirley_more",
+          "line": "Stand on that platform at seven and ask forty people. Thirty-nine are on their phones and the fortieth is me, and I drove here.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "verdict",
+          "line": "Still in the bay. Three weeks, same spot, four hundred owing on the car park. He didn't lose it, he abandoned it and filled in a form. And the Commodore's Ray's, unit four, who's been in Royal North Shore since the twelfth.",
+          "choices": [
+            {
+              "text": "So nothing was stolen.",
+              "goto": "done"
+            },
+            {
+              "text": "I'll let you get on.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "No theft, no tow, and I've been up since four for it. Best morning I've had all year. Take the money before I think about it and put the plate through myself.",
+          "choices": [
+            {
+              "text": "Pleasure doing nothing with you.",
+              "turnin": "l7-eleven-days-shirley-road"
+            },
+            {
+              "text": "Hang on, there's more.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

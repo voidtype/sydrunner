@@ -1,0 +1,315 @@
+{
+  "pack": "pool-l5",
+  "quests": [
+    {
+      "id": "l5-express-through-mounty-county",
+      "act": 1,
+      "title": "Express Through Mounty County",
+      "blurb": "A crew are filming a hardship program out the window of the 11:42, doing ninety, windows up. I want one of them standing on my platform with a coffee going cold in their hand.",
+      "giver": "rhonda-mount-druitt-platform",
+      "level": 5,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "dialog",
+          "npc": "rhonda-mount-druitt-platform",
+          "node": "platform",
+          "label": "let Rhonda talk you through it, the whole timetable included"
+        },
+        {
+          "kind": "photo",
+          "x": -36181,
+          "z": -10247,
+          "radius": 60,
+          "label": "photograph Mount Druitt the way the express never will: standing in it"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Mount Druitt",
+          "to": "Penrith",
+          "label": "ride west first, the direction nobody has ever pointed a lens"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites at Penrith, one of them not for you"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Penrith",
+          "to": "Mount Druitt",
+          "label": "come back in all stations, at the speed everybody else sees it"
+        },
+        {
+          "kind": "earn",
+          "dollars": 80,
+          "label": "cover both fares yourself; nobody out here is expensing you"
+        },
+        {
+          "kind": "dialog",
+          "npc": "rhonda-mount-druitt-platform",
+          "node": "researcher",
+          "label": "find out who was actually holding the clipboard"
+        }
+      ],
+      "reward": {
+        "cash": 130,
+        "xp": 550,
+        "unlock": [
+          "l5:mounty-express"
+        ]
+      }
+    },
+    {
+      "id": "l5-change-of-use",
+      "act": 1,
+      "title": "Change of Use, With Seating",
+      "blurb": "The Bourke Road roastery has put four stools on the footpath. That is a change of use. Notification, heritage statement, advertising fee, hard copy to Town Hall. The applicant is in Newcastle. You look free.",
+      "giver": "l5-nerida-planner",
+      "level": 5,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -1980,
+          "z": 3810,
+          "radius": 35,
+          "label": "attend the subject site on Bourke Road and pace out the footpath. It is 2.1 metres. It was 2.1 metres before the stools."
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "purchase two (2) beverages from the premises. One is the sensory baseline. One is Nerida's."
+        },
+        {
+          "kind": "photo",
+          "x": -2400,
+          "z": 4420,
+          "radius": 40,
+          "label": "photograph the Sydney Park brick kilns for the Statement of Heritage Impact. They are 900 metres away. The template has a field."
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 4,
+          "label": "complete neighbour notification with the four objectors within forty metres. In person. Council prefers a paper trail."
+        },
+        {
+          "kind": "earn",
+          "dollars": 70,
+          "label": "raise the Notification and Advertising Fee. Non-refundable. Payable whether or not anything is ever built or sat on."
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Erskineville",
+          "to": "Town Hall",
+          "label": "lodge the hard copy at Town Hall House. The portal accepted it on Tuesday. The portal is not the record."
+        }
+      ],
+      "reward": {
+        "cash": 120,
+        "xp": 500,
+        "unlock": [
+          "l5:change-of-use"
+        ]
+      }
+    },
+    {
+      "id": "l5-fourth-trench",
+      "act": 1,
+      "title": "The Fourth Trench on Church Street",
+      "blurb": "Poured that footpath twice. Water cut it, then gas cut it, then the light rail cut it. Now there's a fourth mob out there with a saw and a work order, and I want it on record that it was flat when I left.",
+      "giver": "macca-concreter",
+      "level": 5,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -19122,
+          "z": -5688,
+          "radius": 20,
+          "label": "stand on the slab at the top of Church Street"
+        },
+        {
+          "kind": "ko",
+          "npc": "eshay",
+          "count": 4,
+          "label": "move four signwriters off a green pour"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites: one of them is not for you"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Parramatta",
+          "to": "Harris Park",
+          "label": "one stop to Harris Park; you cannot walk it"
+        },
+        {
+          "kind": "photo",
+          "x": -18800,
+          "z": -4760,
+          "radius": 25,
+          "label": "photograph the trench they have already opened"
+        },
+        {
+          "kind": "earn",
+          "dollars": 120,
+          "label": "invoice somebody for pour number three"
+        },
+        {
+          "kind": "dialog",
+          "npc": "macca-concreter",
+          "node": "handover",
+          "label": "show Macca the photo"
+        }
+      ],
+      "reward": {
+        "cash": 140,
+        "xp": 560,
+        "unlock": [
+          "l5:fourth-trench"
+        ]
+      }
+    },
+    {
+      "id": "l5-unit-604",
+      "act": 1,
+      "title": "Unit 604 Shows Beautifully",
+      "blurb": "Unit 604, eleven o'clock, and so far the crowd is me. I need bodies on the landing and a photo the netting stays out of. There is a report on the building. There is a report on every building.",
+      "giver": "mascot-vendor-604",
+      "level": 5,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -1798,
+          "z": 5872,
+          "radius": 20,
+          "label": "be at the eleven o'clock, and be two people if you can"
+        },
+        {
+          "kind": "photo",
+          "x": -2085,
+          "z": 6210,
+          "radius": 25,
+          "label": "the hero shot from the park, netting out of frame"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 2,
+          "label": "the neighbours who mention the report to every buyer"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Domestic Airport",
+          "to": "Mascot",
+          "label": "arrive the way a buyer would: one stop, plus the gate fee"
+        },
+        {
+          "kind": "earn",
+          "dollars": 90,
+          "label": "a holding deposit, in cash, so the vendor feels something"
+        },
+        {
+          "kind": "dialog",
+          "npc": "mascot-vendor-604",
+          "node": "buyers",
+          "label": "tell Cheryl which one was actually going to bid"
+        }
+      ],
+      "reward": {
+        "cash": 120,
+        "xp": 480,
+        "unlock": [
+          "l5:unit-604"
+        ]
+      }
+    },
+    {
+      "id": "l5-underutilised",
+      "act": 1,
+      "title": "The Green Is Not Underutilised",
+      "blurb": "Forty-two townhouses and a communal recreation space. That's a lawn with a barbecue on it. The DA says my green is underutilised. I want that disproved, photographed, and lodged at Gordon before four.",
+      "giver": "pymble-bowlo-captain",
+      "level": 5,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "photo",
+          "x": -6651,
+          "z": -13519,
+          "radius": 25,
+          "label": "photograph the green in play — feet on the mat, jack down, sun on it"
+        },
+        {
+          "kind": "buy",
+          "powerup": "TRAINING",
+          "count": 1,
+          "label": "take a session of pennant training, so the record says somebody trained here this year"
+        },
+        {
+          "kind": "earn",
+          "dollars": 70,
+          "label": "sell $70 of chook raffle tickets at the bar — the objection has a printing cost"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Pymble",
+          "to": "Chatswood",
+          "label": "catch the train down to Chatswood, where the district side plays"
+        },
+        {
+          "kind": "goto",
+          "x": -2688,
+          "z": -7952,
+          "radius": 40,
+          "label": "get to Chatswood Oval before they finish pegging out the outfield"
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 4,
+          "label": "discuss the survey pegs with the four blokes holding them"
+        },
+        {
+          "kind": "goto",
+          "x": -5252,
+          "z": -12386,
+          "radius": 35,
+          "label": "lodge the objection at the Ku-ring-gai chambers at Gordon — the counter shuts at four"
+        },
+        {
+          "kind": "dialog",
+          "npc": "pymble-bowlo-captain",
+          "node": "verdict",
+          "label": "back up the hill to the bowlo, and tell Coral what they said"
+        }
+      ],
+      "reward": {
+        "cash": 130,
+        "xp": 560,
+        "unlock": [
+          "l5:bowlo"
+        ]
+      }
+    }
+  ]
+}

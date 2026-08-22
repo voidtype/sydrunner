@@ -1,0 +1,281 @@
+{
+  "pack": "pool-l2",
+  "quests": [
+    {
+      "id": "l2-four-hundred-cans",
+      "act": 1,
+      "title": "Four Hundred Cans",
+      "blurb": "Friday knock-off in the towers and it rains aluminium up there. Ten cents a can. Four hundred cans is forty dollars. That is not a figure of speech, that is the whole business plan, and the contractor wants it.",
+      "giver": "col-trolley-wollstonecraft",
+      "level": 2,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -1400,
+          "z": -5040,
+          "radius": 45,
+          "label": "get up to the plaza outside St Leonards station before the cleaning contractor's van does"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 2,
+          "label": "the owners corporation have decided the bin room is a security matter. change two minds"
+        },
+        {
+          "kind": "earn",
+          "dollars": 40,
+          "label": "forty dollars. four hundred containers. there is no third way to do this"
+        },
+        {
+          "kind": "photo",
+          "x": -1690,
+          "z": -5210,
+          "radius": 30,
+          "label": "photograph the Royal North Shore car park board. Col is having an argument and needs the evidence"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "buy the man a flat white. five fifty. fifty-five cans"
+        },
+        {
+          "kind": "ride",
+          "line": "North Shore & Western",
+          "from": "St Leonards",
+          "to": "Artarmon",
+          "label": "the machine at St Leonards has been full since Tuesday. take the line up to Artarmon"
+        },
+        {
+          "kind": "dialog",
+          "npc": "col-trolley-wollstonecraft",
+          "node": "weighin",
+          "label": "back down to Col at Wollstonecraft, and let him guess the count"
+        }
+      ],
+      "reward": {
+        "cash": 45,
+        "xp": 230,
+        "unlock": [
+          "l2:fourhundredcans"
+        ]
+      }
+    },
+    {
+      "id": "l2-carport-of-a-dead-council",
+      "act": 1,
+      "title": "The Carport of a Council That No Longer Exists",
+      "blurb": "Carport in Banksia. Ordered removed in 2015 by Rockdale City Council. Rockdale City Council was abolished in 2016. The order stands, I can't close a file with a live order on it, and the audit is Thursday.",
+      "giver": "rockdale-compliance-vesna",
+      "level": 2,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "dialog",
+          "npc": "rockdale-compliance-vesna",
+          "node": "paperwork",
+          "label": "collect the notice in triplicate — a second appointment, at the same desk, with the same officer"
+        },
+        {
+          "kind": "goto",
+          "x": -6120,
+          "z": 8690,
+          "radius": 40,
+          "label": "attend the site: the carport behind the shops off Railway Street, Banksia"
+        },
+        {
+          "kind": "photo",
+          "x": -6152,
+          "z": 8724,
+          "radius": 25,
+          "label": "photograph the structure from the public footpath, not from the neighbour's yard — the neighbour's yard is a whole other file"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 2,
+          "label": "doorknock the anonymous complainant, and then the other anonymous complainant"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Banksia",
+          "to": "Rockdale",
+          "label": "hand-deliver the file to the Rockdale counter. One stop. Council reimburses a fare and not a taxi."
+        }
+      ],
+      "reward": {
+        "cash": 55,
+        "xp": 240,
+        "unlock": [
+          "l2:carport-of-a-dead-council"
+        ]
+      }
+    },
+    {
+      "id": "l2-ninth-floor",
+      "act": 1,
+      "title": "The Ninth Floor Still Has My Name On It",
+      "blurb": "I can't go within a hundred metres of that building until the deed is signed. You can. The foyer directory still has my name on it, three months after they told Fair Work I was never there. Photograph the board.",
+      "giver": "waverton-carolyn",
+      "level": 2,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Waverton",
+          "to": "North Sydney",
+          "label": "one stop. she would walk it. she can't walk it"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "buy the coffee first — nobody stands in a North Sydney lobby empty-handed"
+        },
+        {
+          "kind": "photo",
+          "x": -190,
+          "z": -3010,
+          "radius": 30,
+          "label": "photograph the foyer directory on Miller Street, ninth floor, her name still on it"
+        },
+        {
+          "kind": "photo",
+          "x": 245,
+          "z": -2495,
+          "radius": 45,
+          "label": "one of the pool on the way back, so your camera roll reads like a Tuesday"
+        },
+        {
+          "kind": "earn",
+          "dollars": 25,
+          "label": "find your own fare home — her money is held pending a signature"
+        },
+        {
+          "kind": "dialog",
+          "npc": "waverton-carolyn",
+          "node": "board",
+          "label": "show her the board"
+        }
+      ],
+      "reward": {
+        "cash": 55,
+        "xp": 240,
+        "unlock": [
+          "l2:ninth-floor"
+        ]
+      }
+    },
+    {
+      "id": "l2-make-it-look-busy",
+      "act": 1,
+      "title": "Make It Look Busy",
+      "blurb": "Ten fifteen, forty-two Queen Street. You don't have to be buying. I need bodies on the nature strip, and I need them off a train, because the listing says walk to station and I'd like that true in front of the vendor.",
+      "giver": "st-marys-deano",
+      "level": 2,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Mount Druitt",
+          "to": "St Marys",
+          "label": "come in on a train like a buyer would, so the queue starts on the platform"
+        },
+        {
+          "kind": "goto",
+          "x": -40190,
+          "z": -10880,
+          "radius": 40,
+          "label": "be on the nature strip at forty-two Queen Street by ten fifteen, being demand"
+        },
+        {
+          "kind": "photo",
+          "x": -40225,
+          "z": -10905,
+          "radius": 30,
+          "label": "shoot the streetscape from the angle that gets the jacaranda in and the servo out"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 2,
+          "label": "settle two neighbours who came to find out what number fourteen went for and stayed to discuss the drainage"
+        },
+        {
+          "kind": "dialog",
+          "npc": "st-marys-deano",
+          "node": "verdict",
+          "label": "find Deano after the last car pulls out and hear the number"
+        }
+      ],
+      "reward": {
+        "cash": 45,
+        "xp": 220,
+        "unlock": [
+          "l2:open-home"
+        ]
+      }
+    },
+    {
+      "id": "l2-haldon-camry",
+      "act": 1,
+      "title": "The Camry Is Not Missing",
+      "blurb": "It is not stolen. Stolen is a word for the insurance. Bilal took his uncle's car to Wiley Park at one in the morning and it has been sitting there since with the hazards going.",
+      "giver": "haldon-knafeh-randa",
+      "level": 2,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Lakemba",
+          "to": "Wiley Park",
+          "label": "one stop west; she has already timed you"
+        },
+        {
+          "kind": "goto",
+          "x": -13090,
+          "z": 6150,
+          "radius": 60,
+          "label": "find it three streets back off the park"
+        },
+        {
+          "kind": "photo",
+          "x": -13070,
+          "z": 6170,
+          "radius": 50,
+          "label": "photograph the wheels before anyone denies them"
+        },
+        {
+          "kind": "ko",
+          "npc": "rbt",
+          "count": 1,
+          "label": "keep the fella with the straw looking elsewhere"
+        },
+        {
+          "kind": "dialog",
+          "npc": "haldon-knafeh-randa",
+          "node": "keys",
+          "label": "hand the keys back over the counter"
+        }
+      ],
+      "reward": {
+        "cash": 55,
+        "xp": 240,
+        "unlock": [
+          "l2:haldon-camry"
+        ]
+      }
+    }
+  ]
+}

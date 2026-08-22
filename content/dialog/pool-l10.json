@@ -1,0 +1,935 @@
+{
+  "pack": "pool-l10",
+  "npcs": [
+    {
+      "id": "stmarys-possession",
+      "name": "Barry, possession protection officer",
+      "x": -40380,
+      "z": -10975,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Off the platform. Nothing personal — after one o'clock it's mine, and a bloke standing on the ballast is a form I'd rather not fill in.",
+          "choices": [
+            {
+              "text": "What's the job tonight?",
+              "goto": "job"
+            },
+            {
+              "text": "Why's there white paint on the sleepers?",
+              "goto": "sleepers"
+            },
+            {
+              "text": "Buses again this weekend?",
+              "goto": "buses"
+            },
+            {
+              "text": "I've walked your line.",
+              "goto": "ledger"
+            },
+            {
+              "text": "I'm done. Sign me off.",
+              "goto": "done"
+            },
+            {
+              "text": "Nothing. Cold night.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "job",
+          "line": "Possession protection. Between one and five the railway isn't a railway, it's a worksite with my name on the top of the sheet. Anything that moves through St Marys moves because I said it could.",
+          "choices": [
+            {
+              "text": "So what do you actually need?",
+              "goto": "offer"
+            },
+            {
+              "text": "Sounds like a lot of paperwork.",
+              "goto": "paperwork"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "A second set of eyes between here and Penrith before five, attached to someone who isn't on the roster. The roster is the part I'm having the trouble with.",
+          "choices": [
+            {
+              "text": "I'll walk your line.",
+              "accept": "l10-possession",
+              "denyFlag": "l10:possession"
+            },
+            {
+              "text": "Not tonight, mate.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "paperwork",
+          "line": "Twenty-two years of it. I can tell you the exact word the department uses for a thing that was there Saturday and isn't Monday. The word is discrepancy. Good word. Does a lot of lifting.",
+          "choices": [
+            {
+              "text": "What sort of thing?",
+              "goto": "sleepers"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "sleepers",
+          "line": "Saturday we pulled eleven and put eleven new ones in. I painted the ends white so the day crew couldn't argue with me. Monday they were the old ones. Same splits. Same grain. No paint.",
+          "choices": [
+            {
+              "text": "That's not possible.",
+              "goto": "fence"
+            },
+            {
+              "text": "Did you tell anyone?",
+              "goto": "report"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "report",
+          "line": "Put it in twice. Second time a bloke rang me from the city and asked, very kindly, whether I'd been taking my breaks. So now I take a photo, I keep it in the phone, and I say nothing to anyone.",
+          "choices": [
+            {
+              "text": "Then you want photos.",
+              "goto": "offer"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "fence",
+          "line": "Werrington, the fence at the up end. Same three letters go on it Friday, same fence is clean Monday, and no one's ever booked a cleaning crew because no one's ever raised a job. I've noticed, is all.",
+          "choices": [
+            {
+              "text": "Marita say the week's a roster you can get on.",
+              "needFaction": "Marita",
+              "goto": "fence_marita"
+            },
+            {
+              "text": "DeFAULT say nothing that resets was ever real.",
+              "needFaction": "DeFAULT",
+              "goto": "fence_default"
+            },
+            {
+              "text": "Everyone's noticed. Nobody says it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "fence_marita",
+          "line": "Your mob would. Marita'd have a start for me by Thursday and it'd be the same start I had last Thursday. I'd take it, too. There's a mortgage in Cranebrook with my name on that as well.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "fence_default",
+          "line": "Your lot say that like it's good news. Mate, if none of it's real the sleepers still weigh eighty kilos and I'm still the one at the end of them.",
+          "choices": [
+            {
+              "text": "Also fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "buses",
+          "line": "Buses replace trains, St Marys to Penrith, all weekend. That's not a service change. That's a description of the week.",
+          "improv": {
+            "persona": "Barry, a rail possession protection officer working the overnight shutdown at St Marys in western Sydney. Twenty-two years on the tools, dry as a chip, unbothered, lower case, no exclamation marks.",
+            "context": "Someone on the platform at one in the morning has asked whether there are replacement buses on again this weekend. There are. There always are. He has said this to strangers a thousand times and finds it funnier than they do."
+          },
+          "choices": [
+            {
+              "text": "Every single weekend.",
+              "goto": "hello"
+            },
+            {
+              "text": "I'll take the bus, then.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "ledger",
+          "line": "Show us. — He turns the phone sideways, then holds it up against the dark towards the down end, comparing it with something you can't see from where you're standing.",
+          "choices": [
+            {
+              "text": "Penrith's whiteboard already has next weekend on it.",
+              "goto": "ledger_more"
+            },
+            {
+              "text": "The Werrington fence was clean. On a Sunday.",
+              "goto": "ledger_more"
+            },
+            {
+              "text": "That's everything I got.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "ledger_more",
+          "line": "Written in the same hand as this weekend's. Which is my hand. I haven't written it yet. — He puts the phone away. Finish the shift. Come back and I'll sign you off, and neither of us uses the word.",
+          "choices": [
+            {
+              "text": "Which word?",
+              "goto": "ledger_word"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "ledger_word",
+          "line": "Discrepancy.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Sunday rates till midnight, and then it's Monday, it's ordinary time, and none of tonight will be on anything. Sign here. It's the only bit of paper that stays.",
+          "choices": [
+            {
+              "text": "Sign me off, Barry.",
+              "turnin": "l10-possession"
+            },
+            {
+              "text": "I'll come back before five.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wahroonga-arborist",
+      "name": "Philippa, arborist on an undertaking",
+      "x": -8322,
+      "z": -15848,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "I'm on the Warrawee side of the boundary. Six hundred metres, and legally I'm a different woman. Sit on the end of the bench and don't point at me.",
+          "choices": [
+            {
+              "text": "Why can't you go up there yourself?",
+              "goto": "undertaking"
+            },
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "The shed. Where is it?",
+              "goto": "shed"
+            },
+            {
+              "text": "I've got your photos.",
+              "goto": "done"
+            },
+            {
+              "text": "Four leaf blowers going and nothing has fallen.",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nothing. Enjoy the bench.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "undertaking",
+          "line": "I gave Ku-ring-gai a written undertaking not to enter the conservation area while the matter's open. It is the only piece of paper in this entire business that anyone has honoured.",
+          "choices": [
+            {
+              "text": "What matter?",
+              "goto": "matter"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "matter",
+          "line": "Eleven blue gums on a ridge, and behind them a district view. In March a shed appeared nine point eight metres from the nearest trunk. In April it got a letterbox. In May it was a dwelling and the gums were a bushfire hazard.",
+          "choices": [
+            {
+              "text": "Nine point eight.",
+              "goto": "tenfifty"
+            },
+            {
+              "text": "That is not subtle.",
+              "goto": "tenfifty"
+            }
+          ]
+        },
+        {
+          "id": "tenfifty",
+          "line": "Ten fifty. Clear anything within ten metres of a dwelling: no approval, no arborist, no questions asked. It was written for the Blue Mountains. Up here it is a view-improvement scheme with a bushfire logo on it.",
+          "choices": [
+            {
+              "text": "So you want photographs.",
+              "goto": "offer"
+            },
+            {
+              "text": "Marita would just tender for the clearing work.",
+              "goto": "sides",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "Easier to torch the shed.",
+              "goto": "sides",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "sides",
+          "line": "I have had both of you on this bench. One wants paid work clearing it, one wants it burnt. I want a photograph, because a photograph is the only one of the three that stands up in the Land and Environment Court.",
+          "choices": [
+            {
+              "text": "A photograph it is.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Date-stamped, from the street, before the saws come Monday. The trees standing, and the dwelling they are measured from. It photographs beautifully. Letterbox, doorbell, and a ride-on mower parked where the bed would go.",
+          "choices": [
+            {
+              "text": "How do I not get noticed?",
+              "goto": "cover"
+            },
+            {
+              "text": "What happens when someone sees me?",
+              "goto": "residents"
+            },
+            {
+              "text": "I'll go up. Before Monday.",
+              "accept": "l10-tenfifty-wahroonga",
+              "denyFlag": "l10:tenfifty"
+            },
+            {
+              "text": "Not my street.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "cover",
+          "line": "Buy a coffee at the village and carry it. Nobody in Wahroonga has ever stopped a person holding a takeaway cup. It is the closest thing we have up here to a hi-vis vest.",
+          "choices": [
+            {
+              "text": "And the car?",
+              "goto": "nocar"
+            },
+            {
+              "text": "A cup. Got it.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "nocar",
+          "line": "Don't bring one. They know every car on that street and half the gateposts have a camera on them. Take the train up from here. It is one stop. You will be the only person who ever has.",
+          "choices": [
+            {
+              "text": "One stop.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "residents",
+          "line": "They come out. They always come out, filming, informing you it is a private street. It is a council road, it is in the LEP, and neither of those has ever once worked as a sentence.",
+          "choices": [
+            {
+              "text": "So what do I do?",
+              "goto": "residents_do"
+            },
+            {
+              "text": "Noted.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "residents_do",
+          "line": "Whatever the afternoon calls for. I was at Warrawee. I have been at Warrawee since half eight and there is a receipt for a large oat cappuccino that says so.",
+          "choices": [
+            {
+              "text": "Understood.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "shed",
+          "line": "Behind the tennis court, up the side path, past the bins. I am not putting an address in a message; the last message I sent is an exhibit. Go back up. Same trick with the cup.",
+          "choices": [
+            {
+              "text": "Back on the train, then.",
+              "goto": ""
+            },
+            {
+              "text": "Past the bins. Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Nine forty on a Tuesday and I can hear four of them. Four leaf blowers, in a suburb where the only thing that ever falls is property prices, briefly, in 2018.",
+          "improv": {
+            "persona": "Philippa, a consulting arborist in her fifties on a bench outside Warrawee station on Sydney's Upper North Shore. Dry, precise, quietly furious about trees. Speaks in short flat sentences and never raises her voice.",
+            "context": "She is barred by her own written undertaking from entering the Wahroonga conservation area while a tree matter is open, so she waits one station down. Someone has remarked on the leaf blowers going in every second yard on a weekday morning."
+          },
+          "choices": [
+            {
+              "text": "Somebody has to move the leaves.",
+              "goto": "blowers"
+            },
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "blowers",
+          "line": "Nobody moves them. They move them onto the neighbour, the neighbour moves them back on Thursday. It is the only sustainable industry on this ridge.",
+          "choices": [
+            {
+              "text": "Poetic.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Show me. — She goes through them twice, then a third time on the shed alone. Nine point eight metres. They measured that themselves. They wrote it on the form. In pen.",
+          "choices": [
+            {
+              "text": "The gums, and the dwelling.",
+              "turnin": "l10-tenfifty-wahroonga"
+            },
+            {
+              "text": "Still working on it.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hurstville-doof-ada",
+      "name": "Ada Leung, doof logistics",
+      "x": -9578,
+      "z": 11205,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "You're the one from the group chat. Right. There's a spreadsheet. There is always a spreadsheet. You're in column F.",
+          "choices": [
+            {
+              "text": "What's column F?",
+              "goto": "offer"
+            },
+            {
+              "text": "The boom gate key.",
+              "goto": "boomgate"
+            },
+            {
+              "text": "Why a car park?",
+              "goto": "why"
+            },
+            {
+              "text": "How's the night going?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "It's done.",
+              "goto": "done"
+            },
+            {
+              "text": "Wrong group chat, sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Load-in, the door, and keeping it civil. It starts when the last train goes and it ends when the first one comes. That isn't taste. Those are the only hours nobody up in the tower can prove anything.",
+          "choices": [
+            {
+              "text": "I'll take column F.",
+              "accept": "l10-hurstville-doof",
+              "denyFlag": "l10:hurstville-doof",
+              "needLevel": 10
+            },
+            {
+              "text": "What's it pay?",
+              "goto": "pay"
+            },
+            {
+              "text": "I'll stay in bed.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "pay",
+          "line": "Four hundred and twenty out of the tin, cash, at sunrise. I don't pay in exposure. Exposure is what happens when the sun comes up and you're still on the roof.",
+          "choices": [
+            {
+              "text": "Fine. Column F.",
+              "accept": "l10-hurstville-doof",
+              "denyFlag": "l10:hurstville-doof",
+              "needLevel": 10
+            },
+            {
+              "text": "Back up a step.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "boomgate",
+          "line": "Key's on a Bunnings carabiner with a Coles tag on it. My cousin does the boom gates and he wants it back by six. Not six-fifteen. He starts at six and he will notice.",
+          "choices": [
+            {
+              "text": "Back by six.",
+              "goto": "hello"
+            },
+            {
+              "text": "And if it's six-fifteen?",
+              "goto": "boomgate2"
+            }
+          ]
+        },
+        {
+          "id": "boomgate2",
+          "line": "Then the boom gate is just a boom gate, and eleven cars live on level five until Tuesday.",
+          "choices": [
+            {
+              "text": "Six it is.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "why",
+          "line": "Top deck of the shopping centre. Slab floor, one ramp, one gate. You can hear a sub from Penshurst and you cannot find it from Forest Road. I've tested that. Twice.",
+          "choices": [
+            {
+              "text": "And the towers over it?",
+              "goto": "why2"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "why2",
+          "line": "Nine hundred apartments, and every one of them has been to a wedding louder than this. Four will come down anyway. In dressing gowns. Filming.",
+          "choices": [
+            {
+              "text": "So what do I do about the dressing gowns?",
+              "goto": "why3"
+            },
+            {
+              "text": "Understood.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "why3",
+          "line": "You be polite, and then you be quick. I have never had to explain that part to anyone in column F before.",
+          "choices": [
+            {
+              "text": "You have now.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Nobody's cooked. Everybody's had a congee. I don't run a mess.",
+          "improv": {
+            "persona": "Ada Leung, who organises an illegal doof on the top deck of the Hurstville shopping centre car park the way other people organise a wedding: a run sheet, a spreadsheet, a WhatsApp group, contingencies. Thirty-four, deadpan, lower case, unbothered, faintly maternal about her crew.",
+            "context": "It is about half past two in the morning at the bottom of the car park ramp on a warm night in southern Sydney. Somebody working the door has asked how the night is going. Nothing has gone wrong yet, which she considers to be the result of planning rather than luck. Do not name any real person."
+          },
+          "choices": [
+            {
+              "text": "Congee at half two in the morning.",
+              "goto": "congee"
+            },
+            {
+              "text": "Good night for it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "congee",
+          "line": "Twenty-four hours, corner of Forest Road, five dollars, and the aunty knows every one of us by our car. That is the entire security plan, honestly. It has never failed.",
+          "choices": [
+            {
+              "text": "Better plan than most.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Sun's up over Kogarah, the deck is swept, there's no video and nobody's cousin lost a job. That's the night. Hold your hand out and don't count it in front of me.",
+          "choices": [
+            {
+              "text": "Column F, delivered.",
+              "turnin": "l10-hurstville-doof"
+            },
+            {
+              "text": "Not yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lorraine-queue",
+      "name": "Lorraine, stands in the queue for you",
+      "x": -28020,
+      "z": -10730,
+      "radius": 6,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "I sold houses out here for twelve years. Now I stand in the queue for the people who can't get the morning off. Business is unbelievable.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "I've run it.",
+              "goto": "done"
+            },
+            {
+              "text": "Why'd you quit the agency?",
+              "goto": "why"
+            },
+            {
+              "text": "Queue moving?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "You've got the forms?",
+              "goto": "forms"
+            },
+            {
+              "text": "Nah, you're alright.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Nine opens, four suburbs, one morning, and every agent shuts the book at noon. I need someone who can do the western line at a sprint and isn't precious about a crowd.",
+          "choices": [
+            {
+              "text": "Give me the forms.",
+              "accept": "l10-open-home-circuit",
+              "denyFlag": "l10:open-home-circuit",
+              "needLevel": 10
+            },
+            {
+              "text": "Marita reckon they'll have me in a place by Thursday.",
+              "goto": "factions",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "DeFAULT say the whole market's a con.",
+              "goto": "factions",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "What's in it for me?",
+              "goto": "pay"
+            },
+            {
+              "text": "I'll pass.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "factions",
+          "line": "Marita will find you a place by Thursday. It'll be a garage in Doonside with a laundry tub in it. DeFAULT are right that it's a con, and they still sleep somewhere. Everyone out here has an opinion and a landlord.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "pay",
+          "line": "Four fifty for the morning, and you keep whatever gets pressed into your hand. The agent makes three grand on a lease for opening a door for twenty minutes. I'm not the villain in this.",
+          "choices": [
+            {
+              "text": "Go on then.",
+              "goto": "offer"
+            },
+            {
+              "text": "Later.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "why",
+          "line": "Twelve years writing the ads. Cosy means one of you turns sideways. Original charm means nobody's touched the wiring since decimal currency. Deceased estate means somebody died, and it's the only honest word in the trade.",
+          "choices": [
+            {
+              "text": "And that made you quit?",
+              "goto": "why2"
+            },
+            {
+              "text": "Grim.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "why2",
+          "line": "No. The bidding did. The ad says six eighty, the app lets you type seven forty, and the app is the entire point. I typed price guide one too many times and heard myself say it out loud.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Moving. Wrong direction, but moving. Four groups through already and the bloke with the drone hasn't even landed it yet.",
+          "improv": {
+            "persona": "Lorraine, twelve years a Blacktown real estate agent, now a paid queue-stander on the nature strip by the station. Deadpan, dry, kind about the applicants and merciless about the trade.",
+            "context": "A runner has asked whether the Saturday inspection queue is moving. It is, slowly, in the sun, and one of the hopefuls has brought a camera drone to photograph the roof."
+          },
+          "choices": [
+            {
+              "text": "I'll wait.",
+              "goto": "hello"
+            },
+            {
+              "text": "A drone. At an open home.",
+              "goto": "drone"
+            }
+          ]
+        },
+        {
+          "id": "drone",
+          "line": "He's an investor. He's not going to live in it. He wants the roofline for the depreciation schedule and he'll bid from the car with the engine running.",
+          "choices": [
+            {
+              "text": "Of course he will.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "forms",
+          "line": "Thirty-nine of them, alphabetical, rubber-banded, every one signed in advance because nobody out here has time to read a lease twice. Don't lose the Marayong one. She's got twins.",
+          "choices": [
+            {
+              "text": "I'll keep them dry.",
+              "goto": "hello"
+            },
+            {
+              "text": "Which one do you want to win?",
+              "goto": "forms2"
+            }
+          ]
+        },
+        {
+          "id": "forms2",
+          "line": "The twins. But I've stood in enough queues to know it'll be the couple with two incomes and no kids, and I printed their form as well. That's the job.",
+          "choices": [
+            {
+              "text": "That's the job.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Let's see the pile. Nine stamps, and one of them went in before the agent had her coffee. That's a result nobody is ever going to thank you for.",
+          "choices": [
+            {
+              "text": "Nine opens, nine forms.",
+              "turnin": "l10-open-home-circuit"
+            },
+            {
+              "text": "Not yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "concord-bowlo-president",
+      "name": "Bev, president of the bowlo",
+      "x": -11660,
+      "z": -1930,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Rink one's under shadecloth for a wellness activation. Rink two's got a man with a laser measuring it up for padel. Rink three is mine, and I am standing on it.",
+          "choices": [
+            {
+              "text": "What do you need?",
+              "goto": "offer"
+            },
+            {
+              "text": "What's a wellness activation?",
+              "goto": "activation"
+            },
+            {
+              "text": "I've got your takings.",
+              "goto": "handback"
+            },
+            {
+              "text": "Nothing, Bev.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Footy in winter, cricket in summer, and the same forty thousand walking past us to the station both ways. If they drink here today the board keeps the lease. If they don't, we're a car park with a war memorial on it.",
+          "choices": [
+            {
+              "text": "I'll bring you the nineteen thousand.",
+              "accept": "l10-nineteen-thousand-thirsty",
+              "denyFlag": "l10:bowlo-held",
+              "needLevel": 10
+            },
+            {
+              "text": "Sounds like the board's problem.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "activation",
+          "line": "Eight blokes in linen doing breathwork on a green Trevor spent forty years getting true. They pay in exposure. Exposure doesn't top-dress a green.",
+          "improv": {
+            "persona": "Bev, seventy-one, president of a small bowling club at Concord West in Sydney. Blunt, funny, unsentimental, never cruel. Deadpan, lower case, no exclamation marks.",
+            "context": "A player has asked what a wellness activation is. Her number one bowling green has been leased out from under her for one, and the corporate crew are on it right now with a speaker and a gong. She has explained this to the council twice and to the board once."
+          },
+          "choices": [
+            {
+              "text": "Who signed that off?",
+              "goto": "activation_two"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "activation_two",
+          "line": "The secretary. He's ninety-one and he thought he was signing for the meat raffle. I haven't the heart, and anyway he did the honour boards in 1968 with his own hand.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "handback",
+          "line": "On the towel where I can see it. — She counts it twice, thumb licked, the way of a woman who has counted a raffle tin every Friday since 1974 and has never once been out.",
+          "choices": [
+            {
+              "text": "It's all there.",
+              "goto": "done"
+            },
+            {
+              "text": "I'll come back Friday.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Trays are gone, bar's dry, and the man with the laser has packed up his laser. You're a life member. There's no discount and no parking. It's a badge, and Trevor will shake your hand about it for some time.",
+          "choices": [
+            {
+              "text": "I'll take the badge.",
+              "turnin": "l10-nineteen-thousand-thirsty"
+            },
+            {
+              "text": "Put it on the board for Trevor.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

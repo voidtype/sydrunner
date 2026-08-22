@@ -1,0 +1,794 @@
+{
+  "pack": "pool-l2",
+  "npcs": [
+    {
+      "id": "col-trolley-wollstonecraft",
+      "name": "Col, ten cents a container",
+      "x": -1795,
+      "z": -4020,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Ten cents a can. It is not a living, it is arithmetic. Four hundred cans and you have got yourself a schooner in this postcode. Barely.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "Why Wollstonecraft? The towers are up the hill.",
+              "goto": "movedon"
+            },
+            {
+              "text": "Anyone offered you a hand?",
+              "goto": "recruiters"
+            },
+            {
+              "text": "How's the route today?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "I've got your cans.",
+              "goto": "weighin"
+            },
+            {
+              "text": "Nothing. Good luck with it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Friday, level fourteen, the whole floor drinks and not one of them rinses. I can do the bins or I can do the machine. I cannot do both and I am sixty-one.",
+          "choices": [
+            {
+              "text": "I'll work the towers. You work the trolley.",
+              "accept": "l2-four-hundred-cans",
+              "needLevel": 2,
+              "denyFlag": "l2:fourhundredcans"
+            },
+            {
+              "text": "What's the photo for?",
+              "goto": "carpark"
+            },
+            {
+              "text": "I've got a train to catch.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "carpark",
+          "line": "The hospital car park is thirty-six dollars for four hours. Three hundred and sixty containers. My brother-in-law says I am exaggerating. I want the sign photographed.",
+          "choices": [
+            {
+              "text": "You are not exaggerating.",
+              "goto": "offer"
+            },
+            {
+              "text": "He's right, you're a bit obsessed.",
+              "goto": "carpark_no"
+            }
+          ]
+        },
+        {
+          "id": "carpark_no",
+          "line": "I visited my wife in there for eleven weeks. I am allowed one obsession and I picked the cheapest one.",
+          "choices": [
+            {
+              "text": "Fair enough, Col.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "movedon",
+          "line": "Concourse security moved me on twice, so I sit one stop down where nobody is paid to have a view about me. The hill does the work on the way back. Gravity is free.",
+          "choices": [
+            {
+              "text": "Gravity is free.",
+              "goto": "hello"
+            },
+            {
+              "text": "That's a long push up, though.",
+              "goto": "movedon_up"
+            }
+          ]
+        },
+        {
+          "id": "movedon_up",
+          "line": "Empty going up. That is the trick of it. Everything hard in this postcode is hard on the way down.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "recruiters",
+          "line": "Marita reckon they can have me in work by Thursday. DeFAULT reckon the bins are a symptom. Neither of them has ever pushed a trolley up the Pacific Highway in February.",
+          "choices": [
+            {
+              "text": "So you're staying out of it.",
+              "goto": "recruiters_out"
+            },
+            {
+              "text": "One of them's right, though.",
+              "goto": "recruiters_out"
+            },
+            {
+              "text": "Back up a second.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "recruiters_out",
+          "line": "I am in the container business. The container business is the only one on this street that pays the same to everybody.",
+          "choices": [
+            {
+              "text": "Can't argue with that.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Rained at four. Does not matter. They pay by the container and not the kilo, which is the one mercy in the whole arrangement.",
+          "improv": {
+            "persona": "Col, sixty-one, works a shopping trolley of empties between the St Leonards office towers and the Return and Earn machine. Lower North Shore, deadpan, lower case, no self-pity and no exclamation marks. Counts everything in containers.",
+            "context": "Someone has asked how his route is going today. It rained in the afternoon. The deposit scheme pays ten cents per container regardless of weight or weather, so rain costs him comfort and nothing else."
+          },
+          "choices": [
+            {
+              "text": "Small mercies.",
+              "goto": "hello"
+            },
+            {
+              "text": "You count everything in cans, don't you.",
+              "goto": "smalltalk_count"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_count",
+          "line": "Rent is nineteen thousand containers. I stopped saying it out loud at the machine because a young bloke got upset.",
+          "choices": [
+            {
+              "text": "Understandable.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "weighin",
+          "line": "Hold the bag up. — He does not weigh it. He looks at it, says a number, and the machine agrees with him within four containers, every single time.",
+          "choices": [
+            {
+              "text": "Go on then. Guess.",
+              "goto": "done"
+            },
+            {
+              "text": "I'll come back when you're not busy.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Four hundred and eleven. Told you. Here is your half in coins, because the voucher only spends at Woolies and I am the one who needs the Woolies.",
+          "choices": [
+            {
+              "text": "Square us up.",
+              "turnin": "l2-four-hundred-cans"
+            },
+            {
+              "text": "Keep it. Buy a better trolley.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rockdale-compliance-vesna",
+      "name": "Vesna, Bayside Council compliance",
+      "x": -6448,
+      "z": 9418,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Bayside Council. Formerly Rockdale City Council. The letterhead changed in 2016 and the filing cabinet did not, which is how I come to be standing in a car park with a trundle wheel.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "Give me the triplicate.",
+              "goto": "paperwork"
+            },
+            {
+              "text": "I've got the file.",
+              "goto": "done"
+            },
+            {
+              "text": "Who's actually complaining?",
+              "goto": "complainant"
+            },
+            {
+              "text": "How's the merger going?",
+              "goto": "merger"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Carport in Banksia. Ordered removed in 2015 by a council that was abolished in 2016. I can't enforce the order and I can't close the file while it stands. That's the entire job. That's it.",
+          "choices": [
+            {
+              "text": "Why not just knock it down?",
+              "goto": "why"
+            },
+            {
+              "text": "I'll take the file.",
+              "accept": "l2-carport-of-a-dead-council",
+              "denyFlag": "l2:carport-of-a-dead-council"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "why",
+          "line": "A demolition needs an order. An order needs a council. The council that made this one is legally deceased. So I need a fresh order, and a fresh order needs a fresh inspection, and I have a budget for one inspection and it is you.",
+          "choices": [
+            {
+              "text": "So I'm the budget.",
+              "goto": "offer"
+            },
+            {
+              "text": "Right.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "paperwork",
+          "line": "Notice of Intention to Give an Order. Triplicate. Pink is the owner's, yellow is the file, white is yours. Lose the white one and we begin again from the pink.",
+          "choices": [
+            {
+              "text": "Pink, yellow, white. Got it.",
+              "goto": "hello"
+            },
+            {
+              "text": "And if I lose the pink one?",
+              "goto": "paperwork_lost"
+            }
+          ]
+        },
+        {
+          "id": "paperwork_lost",
+          "line": "Then it was never issued, and the carport was never there, and I go home at four. Don't tempt me.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "complainant",
+          "line": "Forty-one complaints. All anonymous. All the same handwriting. All posted from the box outside the servo on the Princes Highway. I am not permitted to notice any of that.",
+          "choices": [
+            {
+              "text": "Forty-one?",
+              "goto": "complainant_more"
+            },
+            {
+              "text": "Understood.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "complainant_more",
+          "line": "Forty-one. Beautiful cursive. Whoever it is has been at this longer than the carport and considerably longer than me.",
+          "choices": [
+            {
+              "text": "Respect, honestly.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "merger",
+          "line": "Two councils went in and one came out and nobody told the software. Half my forms still say Rockdale City. I stamp them Bayside and everyone agrees not to look at the stamp.",
+          "improv": {
+            "persona": "Vesna, a Bayside Council compliance officer working the old Rockdale end of the LGA in southern Sydney. Nineteen years in council, dry as a chip, not unkind, quietly proud of doing the job properly in a system that cannot. Deadpan, lower case, very Australian, no exclamation marks.",
+            "context": "Someone in the Rockdale Plaza car park has asked her how the 2016 amalgamation of Rockdale City Council and Botany Bay City Council into Bayside Council is going. It is nine years on. The letterhead changed; the records, the forms and the property database did not. She is standing in the sun with a trundle wheel and a clipboard."
+          },
+          "choices": [
+            {
+              "text": "That sounds mildly illegal.",
+              "goto": "merger_no"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "merger_no",
+          "line": "It's administrative. Nothing administrative is illegal. It's just unresolved, and it will be unresolved after both of us.",
+          "choices": [
+            {
+              "text": "Cheerful.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Beautiful. I'll scan it, the scan goes in the system, the system holds it seven years and then destroys it. That isn't cynicism. That's the retention schedule.",
+          "choices": [
+            {
+              "text": "Here's the white copy.",
+              "turnin": "l2-carport-of-a-dead-council"
+            },
+            {
+              "text": "I've still got it on me.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "waverton-carolyn",
+      "name": "Carolyn, recently restructured",
+      "x": -1150,
+      "z": -3352,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Stand on the Waverton side of me. Nobody I worked with has ever been to Waverton — they think it's a rumour. One stop from the office and it may as well be Dubbo.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "Why can't you go yourself?",
+              "goto": "why"
+            },
+            {
+              "text": "Why are we meeting at Waverton?",
+              "goto": "platform"
+            },
+            {
+              "text": "I've got it.",
+              "goto": "board"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "why",
+          "line": "Deed of release. Non-disparagement, non-attendance, non-everything. Their lawyer posted me a map with a circle drawn on it. It's on my fridge, under a magnet from the Christmas party.",
+          "choices": [
+            {
+              "text": "So I'm the legs.",
+              "goto": "offer"
+            },
+            {
+              "text": "That's a lot of hyphens.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Ninth floor, Miller Street. The foyer directory still says Head of Customer Outcomes and it still says my name — three months after they told Fair Work I was never employed there. Photograph the board.",
+          "choices": [
+            {
+              "text": "I'll get you the board.",
+              "accept": "l2-ninth-floor",
+              "denyFlag": "l2:ninth-floor"
+            },
+            {
+              "text": "How do I not get bounced out of the foyer?",
+              "goto": "cover"
+            },
+            {
+              "text": "Not this week.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "cover",
+          "line": "Buy a flat white before you point a phone at anything. A person in a North Sydney lobby with no coffee is a person being watched. Then take one of the pool after, so your camera roll reads like a Tuesday.",
+          "choices": [
+            {
+              "text": "Coffee, board, pool.",
+              "accept": "l2-ninth-floor",
+              "denyFlag": "l2:ninth-floor"
+            },
+            {
+              "text": "Back up a second.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "platform",
+          "line": "Two trains an hour, a bowlo, and a view of the bridge nobody's monetised yet. And nobody off the ninth floor has ever got off here. That's the whole reason, if I'm honest.",
+          "improv": {
+            "persona": "Carolyn, forty-six, three months redundant from a mid-tier insurer on Miller Street in North Sydney. Deadpan, lower case, dry as a chip, never self-pitying, and quietly furious in a way that reads as calm.",
+            "context": "She is waiting on a bench outside Waverton station because a deed of release bars her from going near her old building. Someone has asked why they are meeting all the way out here. She has become fond of Waverton and it annoys her."
+          },
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            },
+            {
+              "text": "You come here a lot?",
+              "goto": "platform_more"
+            }
+          ]
+        },
+        {
+          "id": "platform_more",
+          "line": "Weekdays, eight forty. I put the shoes on and everything. My partner thinks I'm consulting.",
+          "choices": [
+            {
+              "text": "I didn't hear that.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "fig",
+          "line": "There's a fiddle-leaf on the ninth floor, west window. I grew it from a cutting and I watered it through two restructures. Don't touch it. If the fig goes missing they'll know exactly who it went to.",
+          "choices": [
+            {
+              "text": "The fig stays.",
+              "goto": "hello"
+            },
+            {
+              "text": "You could buy another fig.",
+              "goto": "fig_no"
+            }
+          ]
+        },
+        {
+          "id": "fig_no",
+          "line": "I could. It wouldn't have sat through the same meetings.",
+          "choices": [
+            {
+              "text": "No. It wouldn't.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "board",
+          "line": "Let's see it, then. — She zooms in on her own name and stays there a while, longer than she means to. Right. Yes. That's the board. That's the one that doesn't exist.",
+          "choices": [
+            {
+              "text": "It's yours. Send it wherever it needs to go.",
+              "goto": "done"
+            },
+            {
+              "text": "There's a plant on that floor.",
+              "goto": "fig"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Cash, because everything else of mine is held pending a signature. And don't come back to Waverton. I mean that in the nicest possible way.",
+          "choices": [
+            {
+              "text": "Pleasure doing business.",
+              "turnin": "l2-ninth-floor"
+            },
+            {
+              "text": "I'll leave you to your eight forty.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "st-marys-deano",
+      "name": "Deano, real estate principal, St Marys",
+      "x": -40320,
+      "z": -10960,
+      "radius": 6,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Open home's at ten fifteen and there's one car in the driveway. It's mine.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "It's done.",
+              "goto": "done"
+            },
+            {
+              "text": "Is St Marys the next anything?",
+              "goto": "pitch"
+            },
+            {
+              "text": "I'm right, thanks.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Vendor wants six-eighty. It's worth six-eighty on a Saturday with a crowd and six-twenty on a Saturday without one. I'm not asking you to bid. I'm asking you to arrive.",
+          "choices": [
+            {
+              "text": "I'll make it look busy.",
+              "accept": "l2-make-it-look-busy",
+              "denyFlag": "l2:open-home"
+            },
+            {
+              "text": "That's fraud, mate.",
+              "goto": "notfraud"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "notfraud",
+          "line": "Fraud's got paperwork. This is marketing. — He hands you a flyer. The kitchen on the front of it is from a different house in a different suburb.",
+          "choices": [
+            {
+              "text": "Ten fifteen, then.",
+              "accept": "l2-make-it-look-busy",
+              "denyFlag": "l2:open-home"
+            },
+            {
+              "text": "Still no.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "pitch",
+          "line": "Metro's coming. Twelve minutes to the new airport. Had a bloke out from Balmain with a spreadsheet and a hire car and he never once got out of the car.",
+          "improv": {
+            "persona": "Deano, a real estate principal on Queen Street, St Marys, in western Sydney. Two weeks into running his own agency, permanently three minutes from an open home, sells the suburb the way a man sells a car he still owes money on. Deadpan, fast, warm, very Australian, lower case.",
+            "context": "Someone on the footpath has asked whether St Marys is really the next anything. The metro to the new Western Sydney airport is coming through here, which is the entire argument, and he knows it is the entire argument. Investors from the inner west drive out, look, and do not get out of their cars."
+          },
+          "choices": [
+            {
+              "text": "Twelve minutes to what, though.",
+              "goto": "pitch_more"
+            },
+            {
+              "text": "Sure.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "pitch_more",
+          "line": "To the airport. Not to anywhere you'd want to be once you're at the airport. To the airport.",
+          "choices": [
+            {
+              "text": "Got it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "verdict",
+          "line": "Forty-one through the door. Vendor's crying, under-bidder's crying, and I've got a fortnight of rent out of it. — He is already typing the next listing: RARE OFFERING. WALK TO METRO.",
+          "choices": [
+            {
+              "text": "Walk to a metro that isn't built.",
+              "goto": "done"
+            },
+            {
+              "text": "Congratulations, I think.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Forty-five, cash, out of my own pocket — which is where the marketing budget lives at an agency that's a fortnight old.",
+          "choices": [
+            {
+              "text": "Pleasure doing business.",
+              "turnin": "l2-make-it-look-busy"
+            },
+            {
+              "text": "Pay the $40 application fee. (He can't legally charge it. You won't get it back.)",
+              "cost": 40,
+              "needCash": 40,
+              "goto": "fee"
+            },
+            {
+              "text": "Later.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "fee",
+          "line": "I can't take that. — He takes it. — Two grand fine in this state, so as far as anyone's concerned you bought a flyer.",
+          "choices": [
+            {
+              "text": "Worth it for the kitchen photo.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "haldon-knafeh-randa",
+      "name": "Randa, the knafeh window on Haldon Street",
+      "x": -12210,
+      "z": 5852,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "You want the cheese one. Everyone asks for pistachio and everyone eats the cheese one. Sit down. — She wipes a counter that is already clean.",
+          "choices": [
+            {
+              "text": "What's going on with the car?",
+              "goto": "offer"
+            },
+            {
+              "text": "I've got the keys.",
+              "goto": "keys"
+            },
+            {
+              "text": "Why's the bus parked on Canterbury Road?",
+              "goto": "rbt"
+            },
+            {
+              "text": "Nothing. Just the knafeh.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Bilal took his uncle's car to Wiley Park at one in the morning to show a boy the exhaust. It is still there. His uncle has had two beers and a bond. You have had neither.",
+          "choices": [
+            {
+              "text": "I'll go and get it.",
+              "accept": "l2-haldon-camry",
+              "denyFlag": "l2:haldon-camry"
+            },
+            {
+              "text": "Is it stolen, though?",
+              "goto": "stolen"
+            },
+            {
+              "text": "Not my family, not my car.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "stolen",
+          "line": "Stolen is a word for the insurance, and the insurance lapsed in March. He took it. He'll bring it back when he can walk past his uncle again, so: never. Take the train, don't drive it, the rego's in a drawer in Punchbowl.",
+          "choices": [
+            {
+              "text": "Train it is.",
+              "accept": "l2-haldon-camry",
+              "denyFlag": "l2:haldon-camry"
+            },
+            {
+              "text": "I'll think about it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "rbt",
+          "line": "Random breath testing. Random. They have been random on that same corner every Friday since the Olympics.",
+          "improv": {
+            "persona": "Randa, who runs the knafeh window on Haldon Street, Lakemba. Fifty-something, feeds everyone, misses nothing, deadpan, lower case, no exclamation marks.",
+            "context": "A customer has asked about the police random breath testing unit set up on Canterbury Road, which appears on the same corner every Friday night. She has watched it from her window for twenty years."
+          },
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            },
+            {
+              "text": "Does it hurt your trade?",
+              "goto": "rbt2"
+            }
+          ]
+        },
+        {
+          "id": "rbt2",
+          "line": "It helps. Nobody drives home. Everybody stands out the front until two eating my cheese one.",
+          "choices": [
+            {
+              "text": "Silver linings.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "keys",
+          "line": "Give them here. Don't tell me about the wheels. I have seen the photo, I have eyes, I am asking you not to say the word wheels while his mother is in the back room.",
+          "choices": [
+            {
+              "text": "The wheels were like that.",
+              "goto": "done"
+            },
+            {
+              "text": "About the wheels—",
+              "goto": "wheels"
+            }
+          ]
+        },
+        {
+          "id": "wheels",
+          "line": "They were like that.",
+          "choices": [
+            {
+              "text": "They were like that.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Here. Fifty-five and a tray, and the tray is the part you'll remember. Don't come Friday, Friday we're flat out. Come Tuesday and I'll tell you what his uncle said when he saw it.",
+          "choices": [
+            {
+              "text": "Keys, photo, no comment.",
+              "turnin": "l2-haldon-camry"
+            },
+            {
+              "text": "Tuesday, then.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

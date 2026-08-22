@@ -1,0 +1,914 @@
+{
+  "pack": "pool-l5",
+  "npcs": [
+    {
+      "id": "rhonda-mount-druitt-platform",
+      "name": "Rhonda, thirty-one years on the Western line",
+      "x": -36262,
+      "z": -10361,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Retired off this platform and still turn up to it. The 11:42 doesn't stop at Mount Druitt, never has, but it slows for the curve. Lately there's a camera in the second carriage doing the slowing down for it.",
+          "choices": [
+            {
+              "text": "A camera?",
+              "goto": "offer"
+            },
+            {
+              "text": "Run me through the plan.",
+              "goto": "platform"
+            },
+            {
+              "text": "I found your clipboard girl.",
+              "goto": "researcher"
+            },
+            {
+              "text": "How are the trains running?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "It's done.",
+              "goto": "done"
+            },
+            {
+              "text": "Just waiting on a train.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "A program about hardship. They film us at ninety with the windows up and cut it over a piano. I don't want it stopped. I want one of them off the train and standing in the place.",
+          "choices": [
+            {
+              "text": "I'll get one of them onto your platform.",
+              "accept": "l5-express-through-mounty-county",
+              "denyFlag": "l5:mounty-express"
+            },
+            {
+              "text": "Not my circus, Rhonda.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "platform",
+          "line": "Rule one: you don't argue with a camera, you outlast it. Rule two: go west first. Penrith, then all stations back. Buy two coffees on the way and don't drink the second one.",
+          "choices": [
+            {
+              "text": "Why west?",
+              "goto": "platform_why"
+            },
+            {
+              "text": "Who's the second coffee for?",
+              "goto": "platform_coffee"
+            },
+            {
+              "text": "Understood.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "platform_why",
+          "line": "Because coming back in all stations you see it at walking speed. Anyone who's done that stops calling it a struggle and starts calling it a fifty-minute commute, which is what it is.",
+          "choices": [
+            {
+              "text": "Fifty minutes.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "platform_coffee",
+          "line": "Whoever's holding the clipboard. You can't film a woman while you're holding a coffee she paid for. It's the only manners the industry has left.",
+          "choices": [
+            {
+              "text": "Two flat whites, then.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Trackwork. Buses from Blacktown. There's a bloke in a vest at the top of the stairs telling everybody twenty minutes, and he's lying to be kind, which I respect.",
+          "improv": {
+            "persona": "Rhonda, sixty-six, retired station assistant at Mount Druitt on the Western line, thirty-one years of calling trains. Deadpan, lower case, no exclamation marks, fiercely fond of the suburb and short with anyone who is only passing through it.",
+            "context": "Someone on the platform has asked her how the trains are running. There is trackwork and replacement buses from Blacktown, and a staff member upstairs is understating the wait. She has thirty-one years of views about replacement buses."
+          },
+          "choices": [
+            {
+              "text": "I'll wait.",
+              "goto": "hello"
+            },
+            {
+              "text": "Buses from Blacktown, though.",
+              "goto": "smalltalk_bus"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_bus",
+          "line": "A replacement bus is a train that has given up. Same route, no timetable, and a driver who's never heard of Rooty Hill.",
+          "choices": [
+            {
+              "text": "Grim.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "researcher",
+          "line": "Clipboard girl's a local. Went to school off Luxford Road, took the express out at eighteen and came back with an inner-west vowel. I sold her mother a weekly every Monday for nine years.",
+          "choices": [
+            {
+              "text": "Does she know you know?",
+              "goto": "researcher_knows"
+            },
+            {
+              "text": "So the program's about her.",
+              "goto": "researcher_program"
+            }
+          ]
+        },
+        {
+          "id": "researcher_knows",
+          "line": "She knew the second I said her mum's name. Went the colour of the seat fabric. Then she asked me to say it again with the camera running. — Rhonda nearly smiles.",
+          "choices": [
+            {
+              "text": "And did you?",
+              "goto": "researcher_did"
+            }
+          ]
+        },
+        {
+          "id": "researcher_did",
+          "line": "I said the 11:42 is an express and it has never once stopped here, and if she wants Mount Druitt she can get off at Mount Druitt. Cut that in, love. She's still on the platform.",
+          "choices": [
+            {
+              "text": "Beautiful.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "researcher_program",
+          "line": "The program's about whatever they film, that's the whole trick of it. So we gave them a platform, a flat white going cold, and a woman who knew the mother.",
+          "choices": [
+            {
+              "text": "That'll do it.",
+              "goto": "done"
+            },
+            {
+              "text": "Marita reckon a job fixes this.",
+              "needFaction": "Marita",
+              "goto": "factions"
+            },
+            {
+              "text": "DeFAULT reckon the camera is the problem.",
+              "needFaction": "DeFAULT",
+              "goto": "factions"
+            }
+          ]
+        },
+        {
+          "id": "factions",
+          "line": "Marita want you working by Thursday. DeFAULT want the lens smashed by Wednesday. Both lots catch the express back to town at five. I live at the end of Luxford Road.",
+          "choices": [
+            {
+              "text": "Fair enough, Rhonda.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Go on then. Show me.",
+          "choices": [
+            {
+              "text": "One documentary crew, standing in it.",
+              "turnin": "l5-express-through-mounty-county"
+            },
+            {
+              "text": "Still working on it.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l5-nerida-planner",
+      "name": "Nerida, City of Sydney planning",
+      "x": -2090,
+      "z": 3720,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "City of Sydney, development assessment. I am measuring a footpath that was compliant on Monday. Four stools went out on Tuesday. Don't move the stools. The stools are the application.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "It's lodged.",
+              "goto": "done"
+            },
+            {
+              "text": "Four stools needs a whole application?",
+              "goto": "amenity"
+            },
+            {
+              "text": "Who's actually objecting?",
+              "goto": "objectors"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Change of use: light industry, to light industry with seating. Notification, a heritage statement, an advertising fee. The applicant is in Newcastle roasting beans and won't answer. Congratulations, you're the applicant.",
+          "choices": [
+            {
+              "text": "Give me the file.",
+              "accept": "l5-change-of-use",
+              "denyFlag": "l5:change-of-use"
+            },
+            {
+              "text": "I'd rather be breached.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "amenity",
+          "line": "The objection isn't the smell. Nobody objects to the smell, the smell is why they moved here. They object to amenity. Amenity is the smell with a lawyer.",
+          "choices": [
+            {
+              "text": "And the kilns? Why the kilns?",
+              "goto": "heritage"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "heritage",
+          "line": "Statement of Heritage Impact. The field is mandatory. The kilns are nine hundred metres away and made bricks for a hundred years without one stool between them, and I still need them on page four.",
+          "choices": [
+            {
+              "text": "I'll photograph the kilns.",
+              "goto": "hello"
+            },
+            {
+              "text": "Page four of how many?",
+              "goto": "heritage_pages"
+            }
+          ]
+        },
+        {
+          "id": "heritage_pages",
+          "line": "Sixty-one. The stools get half a line.",
+          "choices": [
+            {
+              "text": "Of course they do.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "objectors",
+          "line": "Two bought off the plan in the tower that went up on the roastery's old car park. One is the roaster's mother, objecting on principle. One I have never met and who objects to everything within four hundred metres.",
+          "improv": {
+            "persona": "Nerida, a City of Sydney development assessment planner in her thirties, standing on Bourke Road in Alexandria in a hi-vis vest with a tape measure and a clipboard. Wanted to be an architect. Deadpan, precise, uses the department's own words against it. Not unkind.",
+            "context": "Someone has asked who is actually objecting to four stools on a footpath outside a coffee roastery. The objectors are new apartment residents who moved in next to a forty-year-old roastery, the roaster's own mother, and a serial objector she has never laid eyes on. She has to notify all of them by hand."
+          },
+          "choices": [
+            {
+              "text": "I'll go and knock.",
+              "goto": "hello"
+            },
+            {
+              "text": "Does the serial one ever win?",
+              "goto": "objectors_win"
+            }
+          ]
+        },
+        {
+          "id": "objectors_win",
+          "line": "Never. He doesn't want to win. He wants to be notified.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Lodged is not determined. Determined is not approved. Approved is not built. But you lodged it, and lodging is the only part of this with a receipt.",
+          "choices": [
+            {
+              "text": "Here's the receipt.",
+              "turnin": "l5-change-of-use"
+            },
+            {
+              "text": "Not yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "macca-concreter",
+      "name": "Macca, concreter",
+      "x": -19060,
+      "z": -5470,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Don't stand on that. It's green. Twenty-eight days that wants, and it's had six. — He is sitting on an upturned bucket watching a man in a different hi-vis measure his footpath with a wheel.",
+          "choices": [
+            {
+              "text": "What happened to it?",
+              "goto": "slab"
+            },
+            {
+              "text": "Need a hand?",
+              "goto": "offer"
+            },
+            {
+              "text": "Who's the bloke with the wheel?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "It's done.",
+              "goto": "done"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "slab",
+          "line": "Water in March. Gas in April. Light rail in May, and they put the saw straight through my expansion joint like it was a suggestion. Same hundred metres, four times. I've stopped ordering the good mix.",
+          "choices": [
+            {
+              "text": "That's a rort.",
+              "goto": "offer"
+            },
+            {
+              "text": "So why keep pouring it?",
+              "goto": "why"
+            },
+            {
+              "text": "Grim.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "why",
+          "line": "Because my name's in the corner of it. Little brass plate, bottom right. Everyone in Parramatta reads that plate and not one of them reads the work order.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            },
+            {
+              "text": "Alright. What do you need?",
+              "goto": "offer"
+            },
+            {
+              "text": "Some of us reckon the trench is the point.",
+              "goto": "faction_d",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "I could have a crew here Thursday.",
+              "goto": "faction_m",
+              "needFaction": "Marita"
+            }
+          ]
+        },
+        {
+          "id": "faction_d",
+          "line": "Yeah. Easy to say the work's the problem when it's not your slab it's a problem in.",
+          "choices": [
+            {
+              "text": "Suppose so.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "faction_m",
+          "line": "A crew. Mate, I don't need a crew. I need one bloke at the water board to pick up a phone before somebody else's saw does.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Righto. I want it photographed before the next mob opens it, I want the kids who signed it at two in the morning moved on, and I want eyes on what's already dug at Harris Park. Take the train; you can't walk it.",
+          "choices": [
+            {
+              "text": "I'll sort it.",
+              "accept": "l5-fourth-trench",
+              "needLevel": 5,
+              "denyFlag": "l5:fourth-trench"
+            },
+            {
+              "text": "Bring us a coffee first?",
+              "goto": "coffee"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "coffee",
+          "line": "Two. One's for the inspector. He doesn't take anything, the inspector, he's very clear about that. He takes a flat white.",
+          "choices": [
+            {
+              "text": "Two flat whites. Done.",
+              "accept": "l5-fourth-trench",
+              "needLevel": 5,
+              "denyFlag": "l5:fourth-trench"
+            },
+            {
+              "text": "Back in a bit.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Him? Fifth mob. He's not opening anything, he says. He's scoping. — Macca says the word scoping the way other men say the name of a dog that bit them.",
+          "improv": {
+            "persona": "Macca, a concreter in his fifties at the top of Church Street, Parramatta. Sunburnt, cement in his thumbprint, deadpan, lower case, no exclamation marks. Funny without trying to be.",
+            "context": "A stranger has asked about the surveyor pacing out Macca's six-day-old footpath with a measuring wheel. Macca has watched four different utilities cut the same hundred metres this year and assumes this is the fifth."
+          },
+          "choices": [
+            {
+              "text": "Of course he is.",
+              "goto": "hello"
+            },
+            {
+              "text": "Have you asked him what for?",
+              "goto": "asked"
+            }
+          ]
+        },
+        {
+          "id": "asked",
+          "line": "Scoping's just what they call it in the month before they open it. September, he reckons. I'll pour it in August so it's nice and green for him.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "handover",
+          "line": "Show us. — He scrolls with one knuckle, because the thumb's got cement in the print. He stops on the trench photo and doesn't say anything for a while.",
+          "choices": [
+            {
+              "text": "Metre and a half deep.",
+              "goto": "done"
+            },
+            {
+              "text": "There's rebar in the spoil pile.",
+              "goto": "rebar"
+            }
+          ]
+        },
+        {
+          "id": "rebar",
+          "line": "That's my rebar.",
+          "choices": [
+            {
+              "text": "Yeah.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Here. Cash. I'm not putting an invoice through for a bloke who fought four eshays over a footpath, the accountant asks questions.",
+          "choices": [
+            {
+              "text": "Pleasure doing business.",
+              "turnin": "l5-fourth-trench"
+            },
+            {
+              "text": "I'll come back for it.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mascot-vendor-604",
+      "name": "Cheryl, owns unit 604",
+      "x": -1861,
+      "z": 5941,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Eleven o'clock, unit 604, and so far the crowd is you. Stand near the sign. Try to look pre-approved.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "What's the black netting for?",
+              "goto": "report"
+            },
+            {
+              "text": "Which one was serious?",
+              "goto": "buyers"
+            },
+            {
+              "text": "I've done it.",
+              "goto": "done"
+            },
+            {
+              "text": "That's a low plane.",
+              "goto": "planes"
+            },
+            {
+              "text": "Nothing. Good luck.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Two bedrooms, one bathroom, one crack. Engineering calls it a crack. The copy calls it a feature line. I need six through that door so the two real ones panic.",
+          "choices": [
+            {
+              "text": "I'll be your crowd.",
+              "accept": "l5-unit-604",
+              "denyFlag": "l5:unit-604"
+            },
+            {
+              "text": "I'm one person, Cheryl.",
+              "goto": "hello"
+            },
+            {
+              "text": "I've got somewhere to be.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "report",
+          "line": "Structural. The report says the building is safe to occupy and that nobody should stand under the awning. Same report. Same engineer. Same page.",
+          "choices": [
+            {
+              "text": "Why not just sell it?",
+              "goto": "geared"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "geared",
+          "line": "Sell it to who? I'd be selling the crack and I'd be selling the levy. What I own is a bill with a balcony.",
+          "choices": [
+            {
+              "text": "Marita reckon there's work on the remediation crew.",
+              "needFaction": "Marita",
+              "goto": "geared_work"
+            },
+            {
+              "text": "DeFAULT would put the strata roll through a shredder.",
+              "needFaction": "DeFAULT",
+              "goto": "geared_burn"
+            },
+            {
+              "text": "That's rough, Cheryl.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "geared_work",
+          "line": "Two hundred a day to jackhammer my own basement. I've thought about it. I'd be paying myself out of my own levy and I'd still finish the week up.",
+          "choices": [
+            {
+              "text": "Circular.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "geared_burn",
+          "line": "Love, I am the strata roll. There's eleven of us on it and every one of us thought we were the clever one.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "planes",
+          "line": "That one's the Melbourne. You stop hearing them by about week three, everyone says. I'm in week two hundred and ten.",
+          "improv": {
+            "persona": "Cheryl, a small-time landlord in Mascot who owns one cracked two-bedroom apartment under the flight path. Brittle cheer, deadpan, lower case, very Australian, never asks for pity.",
+            "context": "A plane has just gone over low on approach and the conversation has stopped for it, the way it always does out here. She is counting how many weeks she has lived with the noise."
+          },
+          "choices": [
+            {
+              "text": "Week two hundred and ten.",
+              "goto": "hello"
+            },
+            {
+              "text": "You get used to it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "buyers",
+          "line": "The linen shirt asked about the levy twice, so he's read it. The one photographing the meter box is a builder. The one who was kind to me isn't buying anything.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            },
+            {
+              "text": "And me?",
+              "goto": "buyers_you"
+            }
+          ]
+        },
+        {
+          "id": "buyers_you",
+          "line": "You're a face at eleven o'clock. No offence. It's the most useful thing anybody's done for me this quarter.",
+          "choices": [
+            {
+              "text": "None taken.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Two through the door, and one of them asked to see the report, which means he'll be back. Here's your hundred and twenty. It's from the redraw. Everything's from the redraw.",
+          "choices": [
+            {
+              "text": "I'll take it. Good luck Thursday.",
+              "turnin": "l5-unit-604"
+            },
+            {
+              "text": "Keep the money, Cheryl.",
+              "goto": "done_keep"
+            }
+          ]
+        },
+        {
+          "id": "done_keep",
+          "line": "No. You'd be the second person this year to do me a favour and I can only carry the one.",
+          "choices": [
+            {
+              "text": "Then thanks.",
+              "turnin": "l5-unit-604"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pymble-bowlo-captain",
+      "name": "Coral, club captain and greenkeeper",
+      "x": -6624,
+      "z": -13541,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Watch the edge, love. That's a bowling green, not a lawn. There's a difference and the difference is forty years.",
+          "choices": [
+            {
+              "text": "What's the sign on the fence about?",
+              "goto": "offer"
+            },
+            {
+              "text": "The council came back.",
+              "goto": "verdict"
+            },
+            {
+              "text": "It's done. All of it.",
+              "goto": "done"
+            },
+            {
+              "text": "How's she running?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nice green.",
+              "goto": "green"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Development application. Forty-two townhouses and a communal recreation space. That's a lawn with a barbecue on it. Nobody has ever won anything on a lawn.",
+          "choices": [
+            {
+              "text": "What do you need?",
+              "goto": "brief"
+            },
+            {
+              "text": "Not my fight.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "brief",
+          "line": "They've written underutilised. I've got a pennant side, a Tuesday social and a bloke who's been here every day since his wife went. Photograph it, then get it down to Gordon.",
+          "choices": [
+            {
+              "text": "I'll do it.",
+              "accept": "l5-underutilised",
+              "denyFlag": "l5:bowlo",
+              "needLevel": 5
+            },
+            {
+              "text": "Who's behind it?",
+              "goto": "developer"
+            },
+            {
+              "text": "Let me think about it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "developer",
+          "line": "Same mob who want the outfield at Chatswood Oval. They call what goes on it a pavilion. It has apartments on top. A pavilion has a scoreboard and a tap that works.",
+          "choices": [
+            {
+              "text": "Right. I'll do it.",
+              "accept": "l5-underutilised",
+              "denyFlag": "l5:bowlo",
+              "needLevel": 5
+            },
+            {
+              "text": "Back up a second.",
+              "goto": "brief"
+            }
+          ]
+        },
+        {
+          "id": "green",
+          "line": "Couch, cut to four millimetres, rolled Tuesday. The rhododendrons on the western edge are older than the council. In the DA they're vegetation to be managed.",
+          "choices": [
+            {
+              "text": "Managed how?",
+              "goto": "green_managed"
+            },
+            {
+              "text": "Marita reckon they could have this stopped by Thursday.",
+              "needFaction": "Marita",
+              "goto": "green_faction"
+            },
+            {
+              "text": "DeFAULT would just move onto the green and stay there.",
+              "needFaction": "DeFAULT",
+              "goto": "green_faction"
+            },
+            {
+              "text": "It's beautiful.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "green_managed",
+          "line": "Mulched. It's the same word they've used for the club.",
+          "choices": [
+            {
+              "text": "Christ.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "green_faction",
+          "line": "I've had both of you through that gate this month. One of you wants the site and one of you wants the fight. I want the green.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "She's running fourteen seconds. In February she ran sixteen and a man from Turramurra sat down on the bank and cried.",
+          "improv": {
+            "persona": "Coral, club captain and greenkeeper of a lawn bowls club at Pymble on Sydney's upper north shore. Sixty-eight, forty years on the same green, dry as a chip, never raises her voice. Deadpan, lower case, very Australian.",
+            "context": "A visitor has asked how the green is running. Bowls greens are timed in seconds, and the higher the number the faster the green. Hers is at fourteen and she is not pleased about it. She measures her life in ends, rain and Tuesdays."
+          },
+          "choices": [
+            {
+              "text": "Is fourteen good?",
+              "goto": "smalltalk_more"
+            },
+            {
+              "text": "I'll take your word for it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_more",
+          "line": "Fourteen is honest. Sixteen is showing off. Under twelve and you're bowling on a paddock, and you can tell them I said so.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "verdict",
+          "line": "Deferred. Not refused — deferred. Which means it comes back in six weeks with a new consultant and the same forty-two townhouses. Still. Six weeks is most of a pennant season.",
+          "choices": [
+            {
+              "text": "So we won?",
+              "goto": "verdict_won"
+            },
+            {
+              "text": "Six weeks.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "verdict_won",
+          "line": "We got another go. On this green that has always been the same thing as winning.",
+          "choices": [
+            {
+              "text": "I'll be back Tuesday.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Come here. Hold that. — She puts a bowl in your hands. It is heavier than you expected and warm from her jacket. — Size three. It's a loan. Tuesday, four o'clock, and there's a hundred and thirty out of the raffle tin.",
+          "choices": [
+            {
+              "text": "Lodged, stamped, and the counter woman signed it.",
+              "turnin": "l5-underutilised"
+            },
+            {
+              "text": "Not yet.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

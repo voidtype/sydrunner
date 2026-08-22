@@ -1,0 +1,916 @@
+{
+  "pack": "pool-l3",
+  "npcs": [
+    {
+      "id": "emu-turnback-doug",
+      "name": "Doug, relief guard at the end of the wire",
+      "x": -50120,
+      "z": -12580,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Emu Plains. End of the wire. Past me it's mountains and diesel and someone else's roster. Everything that comes out here goes back, and it goes back as something else.",
+          "choices": [
+            {
+              "text": "Goes back as what?",
+              "goto": "offer"
+            },
+            {
+              "text": "You've got a notebook there.",
+              "goto": "ledger"
+            },
+            {
+              "text": "Warm one.",
+              "goto": "heat"
+            },
+            {
+              "text": "I've done your run.",
+              "goto": "done"
+            },
+            {
+              "text": "Nah. You're right.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Same eight carriages. Driver walks the length of it, flips the seat backs, and now it's the 8:02 with a number it's never had before. Two hundred people get on and not one of them blinks.",
+          "choices": [
+            {
+              "text": "Give us the notebook. I'll do the run.",
+              "accept": "l3-change-of-ends",
+              "denyFlag": "l3:change-of-ends"
+            },
+            {
+              "text": "Doug. That's just how trains work.",
+              "goto": "trains_work"
+            },
+            {
+              "text": "Leave it, mate.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "trains_work",
+          "line": "That's what I said for nine years. Then I started writing down who owed me.",
+          "choices": [
+            {
+              "text": "Show us, then.",
+              "goto": "ledger"
+            },
+            {
+              "text": "Alright. What do you want done?",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "ledger",
+          "line": "Column one, name. Column two, what they owe me. Every Monday the second column's blank and the first column's the same forty faces. The forty dollars is still in their pocket. It's the being-someone that goes.",
+          "choices": [
+            {
+              "text": "That's the whole notebook?",
+              "goto": "ledger_more"
+            },
+            {
+              "text": "Have you told anyone?",
+              "goto": "ledger_more"
+            },
+            {
+              "text": "I'll get your photos.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "ledger_more",
+          "line": "I don't raise it at the depot. Marita would have me handing out flyers about it by Thursday and DeFAULT would have me setting fire to a ticket machine. I'd just like the page to add up.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            },
+            {
+              "text": "What do you reckon it is?",
+              "goto": "ledger_last"
+            }
+          ]
+        },
+        {
+          "id": "ledger_last",
+          "line": "Somebody up the line walks to the other end of the week and flips the seats. I'm not saying it's a bloke. I'm saying somebody does it, and they do it Sunday night, and they're tidy about it.",
+          "choices": [
+            {
+              "text": "Right. The photos.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "heat",
+          "line": "Forty-eight point nine, up the road, January. Rails went long, wire went slack, nothing ran till eight at night. Hot's not the word. Hot's a Tuesday out here.",
+          "improv": {
+            "persona": "Doug, a relief guard in his fifties at Emu Plains station, the last electrified stop before the Blue Mountains. Thirty-one years on the western line, dry as a chip, lower case, never raises his voice, no exclamation marks.",
+            "context": "A stranger on his platform has remarked on the heat. Penrith, ten minutes down the road, holds the hottest temperature ever recorded in Sydney. He is unimpressed by anybody's opinion of western Sydney weather."
+          },
+          "choices": [
+            {
+              "text": "How do you pick a bad one?",
+              "goto": "heat_more"
+            },
+            {
+              "text": "I'll stand in the shade.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "heat_more",
+          "line": "The ramp goes sticky and the pigeons all stand in the one bit of shade like they've been briefed. Then the announcement says minor delays, and it says that for eleven hours.",
+          "choices": [
+            {
+              "text": "Beautiful.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Go on. Same carriages? — He licks the pencil. He has already ruled up next Monday's lines, which tells you what he expects to find on them.",
+          "choices": [
+            {
+              "text": "Same carriages. New number. Both photos.",
+              "turnin": "l3-change-of-ends"
+            },
+            {
+              "text": "Still on it.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "neville-asset-register",
+      "name": "Neville, Randwick Council assets",
+      "x": 2870,
+      "z": 5395,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Randwick City Council, assets. I need someone who isn't scared of heights and won't ask too many questions about the register.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "What's Asset 0041?",
+              "goto": "register"
+            },
+            {
+              "text": "About the condition rating.",
+              "goto": "condition"
+            },
+            {
+              "text": "That clipboard's seen some things.",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "I've got your photographs.",
+              "goto": "done"
+            },
+            {
+              "text": "Wrong bloke, sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "register",
+          "line": "Asset 0041. Coogee Pier. Opened 1928 with a ballroom and a picture theatre. The swell had most of it by 1934 and a contractor carted off the rest. It has been inspected annually ever since.",
+          "choices": [
+            {
+              "text": "Then why is it still on the register?",
+              "goto": "revalue"
+            },
+            {
+              "text": "Where does the register say it is?",
+              "goto": "datum"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "revalue",
+          "line": "You can't delete an asset. You can only revalue it. To revalue it you need a current photograph of the asset. I have been explaining that sentence since 2011.",
+          "choices": [
+            {
+              "text": "So photograph the empty air and you can write it off.",
+              "goto": "offer"
+            },
+            {
+              "text": "Nobody's ever going to read it.",
+              "goto": "datum"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "datum",
+          "line": "Digitised in 1994 off the 1928 survey, wrong datum. Officially the pier now stands in High Cross Park. The kiosk is in Kingsford. They drifted separately. The register is the authority, not the ocean.",
+          "choices": [
+            {
+              "text": "High Cross Park is nowhere near the water.",
+              "goto": "revalue"
+            },
+            {
+              "text": "Fine. What do you need?",
+              "goto": "offer"
+            },
+            {
+              "text": "Back up a second.",
+              "goto": "register"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Annual inspection, Asset 0041. Photograph it at its registered coordinates, both parts, and log the travel or finance won't pay the claim. It's a day's work and it's a real job number.",
+          "choices": [
+            {
+              "text": "I'll do the inspection.",
+              "accept": "l3-coogee-pier",
+              "denyFlag": "l3:coogee-pier"
+            },
+            {
+              "text": "What's the heights ticket for?",
+              "goto": "heights"
+            },
+            {
+              "text": "Who's going to give me grief?",
+              "goto": "feedback"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "heights",
+          "line": "It's a structure over water, so you need the working at heights ticket. I know there's no structure. I know the water is in Coogee. Do the course.",
+          "choices": [
+            {
+              "text": "A ticket to climb a pier that isn't there.",
+              "goto": "revalue"
+            },
+            {
+              "text": "Fine.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "feedback",
+          "line": "There's a group. Friends of the Coogee Pier. Four of them, meets at the Coogee Bay, going since the eighties. Policy says community feedback must be received. So receive two.",
+          "choices": [
+            {
+              "text": "Received how, exactly?",
+              "goto": "feedback_how"
+            },
+            {
+              "text": "Understood.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "feedback_how",
+          "line": "The form has a box that says received. It does not have a box that says how. I stopped asking about that box a long time ago.",
+          "choices": [
+            {
+              "text": "Got it.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "condition",
+          "line": "Condition: fair. It's been fair for ninety-one years. Sign there. Not there. There.",
+          "choices": [
+            {
+              "text": "Fair based on what?",
+              "goto": "condition_good"
+            },
+            {
+              "text": "Done.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "condition_good",
+          "line": "Twice it came back good. 2004 and 2009, different officer each time. Neither of them went to Coogee either, so I've never worked out what improved.",
+          "choices": [
+            {
+              "text": "So nobody has ever actually looked.",
+              "goto": "revalue"
+            },
+            {
+              "text": "I'll take fair.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "The ballroom sat fourteen hundred. My nan danced in it. Then it rained sideways for six years and the council of the day learned something about the sea.",
+          "improv": {
+            "persona": "Neville, an asset officer at Randwick City Council in Sydney's east, grade five, thirty-one years in local government. Deadpan, unhurried, faintly proud of the register. No exclamation marks.",
+            "context": "Someone has remarked on his clipboard while he stands on Avoca Street, Randwick. He is thinking about the Coogee Pier of 1928, which had a ballroom and a picture theatre and was destroyed by the swell within six years. He keeps it dry and factual and does not moralise."
+          },
+          "choices": [
+            {
+              "text": "Your nan danced on the pier?",
+              "goto": "smalltalk_nan"
+            },
+            {
+              "text": "Back to it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_nan",
+          "line": "1931. She said the floor moved with the swell, and that was the part everybody paid for.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Photographs received. They go on the file, the file goes to a drive nobody has opened since the merger, and 0041 stands another year.",
+          "choices": [
+            {
+              "text": "Here's the lot.",
+              "turnin": "l3-coogee-pier"
+            },
+            {
+              "text": "Still working on it.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rhodes-west-facing",
+      "name": "Vivian Ng, west-facing, level 19",
+      "x": -11310,
+      "z": -4090,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Don't sit on that bench, it's been in the sun since eleven. I'll know if you did — you'll have the slats on you.",
+          "choices": [
+            {
+              "text": "You waiting for a train?",
+              "goto": "offer"
+            },
+            {
+              "text": "I did the survey.",
+              "goto": "done"
+            },
+            {
+              "text": "Why's everyone standing at this end?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Wrong platform, sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "I'm waiting for the cold one. Nine towers here and mine's the one they photographed for the brochure, which means it's the one that faces west. My lounge room hits forty-one and the windows are sealed for safety. Mine.",
+          "choices": [
+            {
+              "text": "Sealed for whose safety?",
+              "goto": "offer_glass"
+            },
+            {
+              "text": "What do you need done?",
+              "goto": "offer_job"
+            },
+            {
+              "text": "That's a strata problem.",
+              "goto": "offer_strata"
+            },
+            {
+              "text": "Good luck with it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_glass",
+          "line": "Ours. They put us on the old chemical works and then decided the danger was a window. There's a plaque about remediation by the ferry wharf. It's very proud of itself.",
+          "choices": [
+            {
+              "text": "What do you need done?",
+              "goto": "offer_job"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_strata",
+          "line": "It is a strata problem. I've taken it to strata three times. Three times the committee has voted that the building does not face west, because two of them are on the east side and one of them is in Shanghai.",
+          "choices": [
+            {
+              "text": "So get the votes.",
+              "goto": "offer_job"
+            },
+            {
+              "text": "Brutal.",
+              "goto": "offer_job"
+            }
+          ]
+        },
+        {
+          "id": "offer_job",
+          "line": "Evidence. A photo of the west face from the Meadowbank side at four, so nobody can tell me it's a shadow. Two proxies off the committee — be gentle, they're mostly retired. And come back on the 4:51 with me, because I want a second opinion on car four.",
+          "choices": [
+            {
+              "text": "A second opinion on a train carriage.",
+              "accept": "l3-second-bedroom",
+              "denyFlag": "l3:second-bedroom"
+            },
+            {
+              "text": "I'll take it. What's the fare situation?",
+              "accept": "l3-second-bedroom",
+              "denyFlag": "l3:second-bedroom"
+            },
+            {
+              "text": "That's a lot of admin for a warm flat.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Sun. That end of the platform's in shade from about two. Everyone here knows it and nobody says it out loud, we just all walk down here like it's a coincidence.",
+          "improv": {
+            "persona": "Vivian Ng, an owner-occupier in one of the identical Rhodes apartment towers in Sydney's inner west. Forties, precise, dry, no self-pity. Speaks in short flat sentences. Never exclaims.",
+            "context": "A stranger on the Rhodes platform has asked why the whole crowd stands at one end. It is the shaded end, from about two in the afternoon. Nobody who waits here has ever said so aloud. Small talk only, no offers, no business."
+          },
+          "choices": [
+            {
+              "text": "Makes sense.",
+              "goto": "hello"
+            },
+            {
+              "text": "You've timed it.",
+              "goto": "smalltalk_timed"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_timed",
+          "line": "I've timed a lot of things. Ask me anything about the Northern line between one and seven.",
+          "choices": [
+            {
+              "text": "I might.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "twist",
+          "line": "Right. Sit. — This is the bit I don't put in the emails. I don't ride this to go anywhere. My mortgage is nine hundred a week and my lounge room is unusable half the year, so I bought a monthly and I do Rhodes to Epping and back with a book. I call it the second bedroom.",
+          "choices": [
+            {
+              "text": "How long have you been doing that?",
+              "goto": "twist_long"
+            },
+            {
+              "text": "The survey's a pretext, then.",
+              "goto": "twist_pretext"
+            },
+            {
+              "text": "It's cheaper than a split system.",
+              "goto": "twist_cheaper"
+            }
+          ]
+        },
+        {
+          "id": "twist_long",
+          "line": "Since the December before last. You get to know the drivers. One of them holds the door if he sees me on the stairs, which is either kindness or a breach of something.",
+          "choices": [
+            {
+              "text": "Kindness, I reckon.",
+              "goto": "twist_pretext"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "twist_pretext",
+          "line": "Half of it. I do want the photo. But I've lost that vote three times and I'll lose it a fourth, and what I actually wanted today was somebody in the seat opposite for one stop. That's the whole twist. Sorry to waste a strong young person on it.",
+          "choices": [
+            {
+              "text": "Not wasted.",
+              "goto": "twist_cheaper"
+            },
+            {
+              "text": "I'll ride it again Thursday.",
+              "goto": "twist_cheaper"
+            }
+          ]
+        },
+        {
+          "id": "twist_cheaper",
+          "line": "Far cheaper. And a split system needs committee approval.",
+          "choices": [
+            {
+              "text": "Of course it does.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Show me. — That's it. That's the west face at four and you can see the glare off it from the other side of a river. I'm having it printed A3.",
+          "choices": [
+            {
+              "text": "Here's the lot. Proxies included.",
+              "turnin": "l3-second-bedroom"
+            },
+            {
+              "text": "Haven't finished yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coralie-wollstonecraft",
+      "name": "Coralie, Crows Nest traffic safety working group",
+      "x": -1651,
+      "z": -4041,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Eleven months I have stood on this corner with a clipboard. Council wants evidence. I have four thousand tally marks and they want evidence.",
+          "choices": [
+            {
+              "text": "What are you counting?",
+              "goto": "counting"
+            },
+            {
+              "text": "You said there was a job in it.",
+              "goto": "offer"
+            },
+            {
+              "text": "How's it going with the council?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "It's done. There's a number.",
+              "goto": "done"
+            },
+            {
+              "text": "Did the bollards ever happen?",
+              "goto": "aftermath",
+              "needFlag": "l3:incident-number"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "counting",
+          "line": "Cars turning right out of Bay Road against the arrow, on their way to the Pacific Highway. Four thousand and six. That is not data, apparently. That is a hobby.",
+          "choices": [
+            {
+              "text": "So what counts as data?",
+              "goto": "offer"
+            },
+            {
+              "text": "Four thousand and six.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "A police event number. When they attend something, it gets a number, and a number goes in the traffic committee minutes. This corner has never had a number.",
+          "choices": [
+            {
+              "text": "You want me to make you one.",
+              "goto": "deniable",
+              "denyFlag": "l3:incident-number"
+            },
+            {
+              "text": "Ask the police for one yourself.",
+              "goto": "askthem"
+            },
+            {
+              "text": "I'm not doing that.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "deniable",
+          "line": "I am not telling you to do anything. I am telling you that if something happened on Willoughby Road at eleven, an officer would attend, and there would be a number. Get a coffee first. You look nervous.",
+          "choices": [
+            {
+              "text": "Eleven o'clock. Willoughby Road.",
+              "accept": "l3-incident-number",
+              "needLevel": 3,
+              "denyFlag": "l3:incident-number"
+            },
+            {
+              "text": "I'll think about it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "askthem",
+          "line": "I did. The sergeant was lovely. He said if I ever see an incident, to call it in. I said that is what I am trying to prevent. We went round like that for some time.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "They say the matter is on the forward works program. The forward works program is a document about the future. It is not, and has never been, a road.",
+          "improv": {
+            "persona": "Coralie, retired, self-appointed convenor of a two-person traffic safety working group on a Wollstonecraft corner below Crows Nest, Sydney. Polite, relentless, funnier than she intends. Deadpan, lower case, no exclamation marks.",
+            "context": "Someone has asked how the campaign is going. She has attended every traffic committee meeting for eleven months and been recorded as an apology once, when she had shingles."
+          },
+          "choices": [
+            {
+              "text": "How long can you keep this up?",
+              "goto": "smalltalk_again"
+            },
+            {
+              "text": "Good luck with it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_again",
+          "line": "Eleven months. I have outlasted two engineers and a mayor. The corner has outlasted all of us.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "minutes",
+          "line": "Event number, time stamp, two units attending. — She writes it into a ring binder with a laminated cover. — That is Item 7. Item 7 has a police reference now. Item 7 has never had anything.",
+          "choices": [
+            {
+              "text": "Glad to help, I think.",
+              "goto": "hello"
+            },
+            {
+              "text": "Nobody needs to know it was me.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Show me. — She reads it twice. — Attended, dispersed, no charges. That is the good one. Charges make you a criminal. Attended makes you a statistic, and a statistic gets a speed cushion.",
+          "choices": [
+            {
+              "text": "Put it in the minutes.",
+              "turnin": "l3-incident-number"
+            },
+            {
+              "text": "I'll come back when I've caught my breath.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "aftermath",
+          "line": "Rubber speed cushion. Temporary, bolted down, the colour of a traffic cone. It is the ugliest thing on the lower North Shore and I have photographed it forty times.",
+          "choices": [
+            {
+              "text": "Congratulations, Coralie.",
+              "goto": ""
+            },
+            {
+              "text": "What's Item 8?",
+              "goto": "item8"
+            }
+          ]
+        },
+        {
+          "id": "item8",
+          "line": "The pedestrian refuge outside the gelato place. Come back Thursday. Bring the coffee.",
+          "choices": [
+            {
+              "text": "Thursday.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "anu-granville-photographer",
+      "name": "Anu, wedding photographer",
+      "x": -18268,
+      "z": -3552,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "I'm not banned from Harris Park. There's no such thing as banned from a suburb. It has been put to me that I'd be uncomfortable there, and I've agreed.",
+          "choices": [
+            {
+              "text": "Uncomfortable how?",
+              "goto": "banned"
+            },
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "I've shot it all.",
+              "goto": "album"
+            },
+            {
+              "text": "Long wait for the train?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "banned",
+          "line": "Eighteen years. Four hundred weddings, three funerals, every engagement in that family since the first shop on Wigram Street. One photo where Auntie blinked. So now I stand at Granville.",
+          "choices": [
+            {
+              "text": "One photo.",
+              "goto": "banned_two"
+            },
+            {
+              "text": "So what do you want done?",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "banned_two",
+          "line": "It went in the album. Page nine. Nobody has opened that album since 2019 and everybody knows what's on page nine.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            },
+            {
+              "text": "So what do you want done?",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "My niece gets married up there today and there'll be a bloke with an iPad calling himself a creative. Somebody should shoot it properly. You've got a phone. In 1997 that's all I had, except mine took film and cost me a fortnight.",
+          "choices": [
+            {
+              "text": "I'll get your photos.",
+              "accept": "l3-one-blink",
+              "denyFlag": "l3:one-blink"
+            },
+            {
+              "text": "Not my family, not my wedding.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Eleven minutes. It's four minutes to Harris Park and I've had eleven minutes for two years.",
+          "improv": {
+            "persona": "Anu, a wedding photographer in her fifties, standing on the Granville platform in western Sydney with a camera bag she has not put down. Dry, quick, warm underneath it, lower case, no exclamation marks.",
+            "context": "Someone has asked how long the wait is. Harris Park is the very next station and she is not going there. She has been standing on this platform, on and off, for two years, and the indicator board is a joke she has stopped telling."
+          },
+          "choices": [
+            {
+              "text": "You could just get on it.",
+              "goto": "smalltalk_two"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_two",
+          "line": "I could. And then I'd be a woman who turned up.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "album",
+          "line": "Show me. -- She scrolls with one knuckle, fast, the way you do when you've seen forty thousand of these. Then she stops. -- He's holding her hand under the table. Nobody got that one. Not even the bloke they paid.",
+          "choices": [
+            {
+              "text": "Page nine material.",
+              "goto": "album_two"
+            },
+            {
+              "text": "So are we square?",
+              "goto": "done"
+            },
+            {
+              "text": "I'll leave you with it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "album_two",
+          "line": "Page one. -- She doesn't look up. -- Tell them a stranger took it, if they ask. It'll be true enough by the time it gets to Auntie.",
+          "choices": [
+            {
+              "text": "So are we square?",
+              "goto": "done"
+            },
+            {
+              "text": "I'll leave you with it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Send them to me properly. Not through the app. The app takes a wedding and hands you back a text message.",
+          "choices": [
+            {
+              "text": "Card's yours.",
+              "turnin": "l3-one-blink"
+            },
+            {
+              "text": "I'll drop it back later.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

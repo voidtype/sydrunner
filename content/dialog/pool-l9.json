@@ -1,0 +1,957 @@
+{
+  "pack": "pool-l9",
+  "npcs": [
+    {
+      "id": "cabramatta-transfer-counter",
+      "name": "Trang, transfers and passport photos",
+      "x": -24905,
+      "z": 3350,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Recharge, transfer, passport photos, translations. Or you are here about the book, which is not a service I advertise.",
+          "choices": [
+            {
+              "text": "Tell me about the book.",
+              "goto": "offer"
+            },
+            {
+              "text": "I went to Liverpool. I saw his book.",
+              "goto": "ledger"
+            },
+            {
+              "text": "I've got the lot. Photo and all.",
+              "goto": "done"
+            },
+            {
+              "text": "Who else comes through here?",
+              "goto": "factions"
+            },
+            {
+              "text": "Just a recharge, thanks.",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Every Sunday I finish on a big number. Every Monday the book starts at 001, and my hand does not remember writing to the end of it. I am not asking you to explain it. I am asking you to go and look.",
+          "choices": [
+            {
+              "text": "I'll look.",
+              "accept": "l9-monday-starts-at-001",
+              "needLevel": 9,
+              "denyFlag": "l9:docket-book"
+            },
+            {
+              "text": "Buy a new book, aunty.",
+              "goto": "offer_no"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_no",
+          "line": "I have the old ones. Forty-one of them, in the back. They all stop mid-week and not one of them is finished. Explain that to me and I will buy a new book and never mention it again.",
+          "choices": [
+            {
+              "text": "Alright. I'll look.",
+              "goto": "offer"
+            },
+            {
+              "text": "I can't explain that.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "factions",
+          "line": "The Marita ones come Tuesday to send money home. The DeFAULT ones come Thursday to tell me sending money home is a scam. Both of them are back to nothing on Monday, same as the book, and neither of them notices.",
+          "choices": [
+            {
+              "text": "Nobody notices?",
+              "goto": "factions_no"
+            },
+            {
+              "text": "Huh.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "factions_no",
+          "line": "People notice the week. Nobody notices the counting.",
+          "choices": [
+            {
+              "text": "Except you.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Twelve for the recharge. Fifteen if you want to stand there and tell me about your week while I do it.",
+          "improv": {
+            "persona": "Trang, who has run a transfer and passport-photo counter on Freedom Plaza in Cabramatta for forty-one years. Dry, quick, entirely unbothered, funnier than whoever she is talking to. Short sentences. No exclamation marks.",
+            "context": "A customer wants a phone recharge. There is a queue of two behind them and a laminated price list that nobody reads. She has a docket book open in front of her."
+          },
+          "choices": [
+            {
+              "text": "Just the twelve.",
+              "goto": "hello"
+            },
+            {
+              "text": "Fifteen. It's been a week.",
+              "goto": "smalltalk_more"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_more",
+          "line": "It has been the same week for a while now. Go on.",
+          "choices": [
+            {
+              "text": "...yeah.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "ledger",
+          "line": "So Liverpool starts at 001 as well. My cousin has never once mentioned it and I have never once asked, because you do not ask a man that on a Monday. — She writes your name in the back of the book, where the numbers do not go.",
+          "choices": [
+            {
+              "text": "What's in the back?",
+              "goto": "ledger_back"
+            },
+            {
+              "text": "Right. Thanks, Trang.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "ledger_back",
+          "line": "Names. Only names. The front goes back to one every week. The back has never lost a line in forty-one years. Whoever arranged that was being kind, or was in a hurry. I have not decided which.",
+          "choices": [
+            {
+              "text": "Which do you reckon?",
+              "goto": "ledger_back_no"
+            },
+            {
+              "text": "Put me in the back, then.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "ledger_back_no",
+          "line": "Kind people do not use a docket book.",
+          "choices": [
+            {
+              "text": "No. They don't.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Show me. — She holds your photograph up beside one she took herself, on a Tuesday, of the same board, and puts them both down without saying anything for a while.",
+          "choices": [
+            {
+              "text": "It's the same board.",
+              "turnin": "l9-monday-starts-at-001"
+            },
+            {
+              "text": "I'm not finished yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wollstonecraft-tenant",
+      "name": "Nola, sitting tenant since 1983",
+      "x": -1660,
+      "z": -4160,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Forty-one years in flat 3. I know which step creaks and which window sticks. The listing calls that original character and wants eight hundred and ninety a week for it.",
+          "choices": [
+            {
+              "text": "What's the notice actually say?",
+              "goto": "notice"
+            },
+            {
+              "text": "You wanted something done about it.",
+              "goto": "offer"
+            },
+            {
+              "text": "It's the metro, isn't it.",
+              "goto": "metro"
+            },
+            {
+              "text": "I've done the lot.",
+              "goto": "done"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "No grounds. That's the term on the form. They don't need a reason, so there isn't a reason written anywhere, and I would like there to be a reason written somewhere.",
+          "choices": [
+            {
+              "text": "I'll get it written down.",
+              "accept": "l9-no-grounds",
+              "needLevel": 9,
+              "denyFlag": "l9:no-grounds"
+            },
+            {
+              "text": "Not today, Nola.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "notice",
+          "line": "Two pages. The second page is a diagram of how to hand back the keys. Nobody in the history of the world has needed a diagram to hand back keys.",
+          "choices": [
+            {
+              "text": "Who signed it?",
+              "goto": "agent"
+            },
+            {
+              "text": "Someone should be helping you with this.",
+              "goto": "helpers"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "agent",
+          "line": "A girl named on the letterhead who manages two hundred and eleven properties and has seen four of them. She calls me by my unit number. Good morning, three.",
+          "choices": [
+            {
+              "text": "Two hundred and eleven.",
+              "goto": "agent_more"
+            },
+            {
+              "text": "Back up a bit.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "agent_more",
+          "line": "She's twenty-three and she's frightened of me, which I don't enjoy. It isn't her. She's the part of it you can ring up.",
+          "choices": [
+            {
+              "text": "That's the trouble with it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "helpers",
+          "line": "Two lots have knocked. One says they'll have me placed by Thursday. The other says the placing is the problem. I've made tea for both and signed nothing.",
+          "choices": [
+            {
+              "text": "Thursday isn't nothing.",
+              "needFaction": "Marita",
+              "goto": "helpers_m"
+            },
+            {
+              "text": "They're right, the placing is the problem.",
+              "needFaction": "DeFAULT",
+              "goto": "helpers_d"
+            },
+            {
+              "text": "Signing nothing is the correct move.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "helpers_m",
+          "line": "Your lot are very polite. They call it a placement. It's a room in Rooty Hill with somebody else's furniture in it and a bus that comes when it likes.",
+          "choices": [
+            {
+              "text": "I'll see what I can do.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "helpers_d",
+          "line": "Your lot are right, and they are also standing in my hallway at nine in the morning with a clipboard, which is the exact thing I'm complaining about.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "metro",
+          "line": "Station opened and by the spring there were men in vests photographing my letterbox. Nobody has ever photographed a letterbox for a good reason.",
+          "improv": {
+            "persona": "Nola, eighty-one, a sitting tenant of forty-one years in a red-brick walk-up at Wollstonecraft, one street from the new Crows Nest metro. Dry, unhurried, not sorry for herself. Lower case, very Australian, no exclamation marks.",
+            "context": "Someone has asked whether the new metro station is the reason her rent went from four hundred and twenty a week to eight hundred and ninety. She watched the whole street get revalued in a single spring: the agents, the vests, the styling vans, the neighbours who sold. She has no interest in being anybody's cause."
+          },
+          "choices": [
+            {
+              "text": "Four minutes to the city, they reckon.",
+              "goto": "metro_more"
+            },
+            {
+              "text": "I'd photograph it too, to be fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "metro_more",
+          "line": "I've nowhere to be in four minutes. I had nowhere to be in twenty-five either, and it was cheaper.",
+          "choices": [
+            {
+              "text": "Hard to argue.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "tribunal",
+          "line": "I've filled the form in. Section four wants me to state what I'm seeking. I've written the flat. The woman on the phone says the flat is not one of the options.",
+          "choices": [
+            {
+              "text": "It ought to be one of the options.",
+              "goto": "tribunal_close"
+            },
+            {
+              "text": "What are the options?",
+              "goto": "tribunal_options"
+            }
+          ]
+        },
+        {
+          "id": "tribunal_options",
+          "line": "Compensation, repairs, or an order. I asked what an order gets you. She said a hearing in eleven weeks, and in eleven weeks it's somebody else's kitchen.",
+          "choices": [
+            {
+              "text": "Then we make the eleven weeks expensive.",
+              "goto": "tribunal_close"
+            }
+          ]
+        },
+        {
+          "id": "tribunal_close",
+          "line": "Put the photographs in the yellow folder. Not the plastic one, that's my rates. You've done more than the ombudsman and you did it before lunch.",
+          "choices": [
+            {
+              "text": "I'll see you Saturday, Nola.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "You've come back with the face people have after an open home. Sit on the step. Mind the creaky one. Tell me what the queue looked like.",
+          "choices": [
+            {
+              "text": "It's all written down now.",
+              "turnin": "l9-no-grounds"
+            },
+            {
+              "text": "Nearly. Give me till Saturday.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wolli-gate-walker",
+      "name": "Sione, unofficial airport transfers",
+      "x": -4930,
+      "z": 6790,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Seventeen dollars thirty-four. That's the gate. I'm the alternative and I'm nineteen minutes.",
+          "choices": [
+            {
+              "text": "What's the walk?",
+              "goto": "maths"
+            },
+            {
+              "text": "You said there was work in it.",
+              "goto": "offer"
+            },
+            {
+              "text": "They watched me the whole time.",
+              "goto": "cooled"
+            },
+            {
+              "text": "That's your job done.",
+              "goto": "done"
+            },
+            {
+              "text": "How do you sleep under this?",
+              "goto": "planes"
+            },
+            {
+              "text": "Nothing. Enjoy your night.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "maths",
+          "line": "Two hundred metres of fence, that's what the fee is for. My people carry their own bags anyway. Ten dollars cash and I walk them to a station where the train is just a train.",
+          "choices": [
+            {
+              "text": "Nineteen minutes.",
+              "goto": "maths2"
+            },
+            {
+              "text": "The fee is theft.",
+              "needFaction": "DeFAULT",
+              "goto": "faction_d"
+            },
+            {
+              "text": "There'd be a permit for this.",
+              "needFaction": "Marita",
+              "goto": "faction_m"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "maths2",
+          "line": "Fifty-four dollars an hour, to walk. Best paid walking in the country. Only qualification is comfortable shoes and knowing exactly where the footpath stops being theirs.",
+          "choices": [
+            {
+              "text": "Somebody's done the sums.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "faction_d",
+          "line": "Your mob say the fee is theft. It is. Theft's a market. I've got a hundred and twenty dollars of it in my sock and none of it changed the fence.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "faction_m",
+          "line": "Marita found me a job once. Airport, night shift, other side of that same fence. I'd have had to pay the seventeen dollars every morning to get to it.",
+          "choices": [
+            {
+              "text": "So you started walking.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Tonight there's a highway car on my footpath and a breath test bus where I finish. They're not here for me. They're here because nothing else is happening in this postcode. So make something happen.",
+          "choices": [
+            {
+              "text": "Twenty minutes of somebody else's attention.",
+              "accept": "l9-be-more-interesting",
+              "denyFlag": "l9:gate-walk",
+              "needLevel": 9
+            },
+            {
+              "text": "You want me arrested for a tenner a head.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "cooled",
+          "line": "Twelve through while you were being fascinating. One of them cried, she'd been quoted ninety for a taxi. Wait for the shift change with me — six o'clock they all go and get a coffee at once.",
+          "choices": [
+            {
+              "text": "And then?",
+              "goto": "hello"
+            },
+            {
+              "text": "I'll stand over here, in the dark.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "planes",
+          "line": "Every ninety seconds until eleven, then nothing, then the freight at five. You stop hearing it after a month. The rent never stopped hearing it.",
+          "improv": {
+            "persona": "Sione, a man who walks arriving passengers from the airport terminal to Wolli Creek station so they avoid the station access fee. Forties, Tongan-Australian, lives in one of the Discovery Point towers directly under the flight path. Deadpan, does arithmetic out loud, never raises his voice, lower case.",
+            "context": "Someone standing on the plaza with him has asked how anyone sleeps under the approach to the runway. He has lived here nine years. Planes pass every ninety seconds until the curfew at eleven and the freighters start again at five. He is not complaining; he is quoting the numbers."
+          },
+          "choices": [
+            {
+              "text": "Nine years of that.",
+              "goto": "hello"
+            },
+            {
+              "text": "Cheap rent, though.",
+              "goto": "planes2"
+            }
+          ]
+        },
+        {
+          "id": "planes2",
+          "line": "It is not cheap. That's the part that gets you.",
+          "choices": [
+            {
+              "text": "Yeah.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Go on then. Hold your hand out where the camera on the awning can't see it, that's not for you, that's for me.",
+          "choices": [
+            {
+              "text": "Square me up.",
+              "turnin": "l9-be-more-interesting"
+            },
+            {
+              "text": "Keep it. Buy the crying one a ticket.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pymble-712",
+      "name": "Geoffrey, 7:12 from Pymble",
+      "x": -6428,
+      "z": -13611,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "The 7:12 does not run at this hour. I'm aware of that. I am waiting for the 11:04, which is a different train with the same purpose.",
+          "choices": [
+            {
+              "text": "Which is?",
+              "goto": "routine"
+            },
+            {
+              "text": "That's a Tuesday suit for a Tuesday nothing.",
+              "goto": "offer",
+              "needLevel": 9
+            },
+            {
+              "text": "You know this timetable a bit well.",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "I did your Tuesday.",
+              "goto": "done"
+            },
+            {
+              "text": "Wrong platform. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "routine",
+          "line": "Out the door at 6:52. Tap on at Pymble. Flat white at 8:04. Home on the 5:41, second door, lines up with the stairs. Margaret can see every tap of it on the statement.",
+          "choices": [
+            {
+              "text": "And what does the statement say today?",
+              "goto": "offer",
+              "needLevel": 9
+            },
+            {
+              "text": "Second door.",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Leave you to it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "The 11:04 is an eight-car set with the old seats and nobody on it has anywhere to be. It is the most honest train on this line.",
+          "improv": {
+            "persona": "Geoffrey, fifty-eight, upper North Shore, standing on the up platform at Pymble in a suit at eleven in the morning. Thirty-one years of commuting. Courteous, precise, deadpan, no self-pity.",
+            "context": "A stranger has remarked that he knows the timetable unusually well. He is filling the silence with the sort of detail that only a man with a great deal of unstructured time collects. Nothing about his situation is said out loud here."
+          },
+          "choices": [
+            {
+              "text": "You know the whole timetable?",
+              "goto": "timetable"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "timetable",
+          "line": "I know which door lines up with the Pymble stairs. That isn't the timetable. That's thirty-one years.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "March. They called it a restructure and gave me a satchel with the company name on it. I have not yet found the sentence that tells Margaret, so I keep making the day look like the day.",
+          "choices": [
+            {
+              "text": "Give me the card. I'll be your Tuesday.",
+              "accept": "l9-the-712-from-pymble",
+              "denyFlag": "l9:the-712"
+            },
+            {
+              "text": "And where will you be?",
+              "goto": "other_way"
+            },
+            {
+              "text": "Marita could have you placed by Thursday.",
+              "goto": "marita_no",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "DeFAULT would say the job was the problem.",
+              "goto": "default_no",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "Five months is a long Tuesday.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "other_way",
+          "line": "Up the line. Hornsby, then across. There is an interview at the end of it — the first since March — and I would very much like the statement to say I was at work while I sat in it.",
+          "choices": [
+            {
+              "text": "Then I'll be at work. Card.",
+              "accept": "l9-the-712-from-pymble",
+              "denyFlag": "l9:the-712"
+            },
+            {
+              "text": "Good luck, Geoffrey.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "marita_no",
+          "line": "I know exactly what they place people in, and I am fifty-eight with a mortgage in Pymble and a daughter at the college on the hill. I need the interview, not the placement.",
+          "choices": [
+            {
+              "text": "Then let's do the interview.",
+              "goto": "other_way"
+            },
+            {
+              "text": "Suit yourself.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "default_no",
+          "line": "I've heard that argument. I heard it in my kitchen, from my son, who is twenty-six and lives in my house and has strong views about the concept of a mortgage.",
+          "choices": [
+            {
+              "text": "Then let's do the interview.",
+              "goto": "other_way"
+            },
+            {
+              "text": "He's not entirely wrong.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Tapped on 7:14, off at Wynyard, coffee at 8:04, home 6:04. Margaret will look at that and see a completely ordinary day, and she will be right, because somebody had one.",
+          "choices": [
+            {
+              "text": "Your card. It smells of the food court.",
+              "turnin": "l9-the-712-from-pymble"
+            },
+            {
+              "text": "How did it go? The other train.",
+              "goto": "outcome"
+            },
+            {
+              "text": "None of my business.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "outcome",
+          "line": "They offered me my old job. Smaller title, smaller building, Macquarie Park, eleven thousand less. I start Monday on the 7:12 and I have never in my life been happier about a train.",
+          "choices": [
+            {
+              "text": "Congratulations. I think.",
+              "turnin": "l9-the-712-from-pymble"
+            },
+            {
+              "text": "Tell Margaret tonight.",
+              "goto": "tell_her"
+            }
+          ]
+        },
+        {
+          "id": "tell_her",
+          "line": "Tonight. Over the roast. I'll say it went well and she'll say she knows, and then we will find out which one of us has been doing the lying.",
+          "choices": [
+            {
+              "text": "Here's your card back.",
+              "turnin": "l9-the-712-from-pymble"
+            },
+            {
+              "text": "Second door, mate.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "newtown-gail-foh",
+      "name": "Gail, front of house on King Street",
+      "x": -2645,
+      "z": 3332,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "If you're here about Saturday, there's no PA. If you're here about the wagon, get in line — so's the constable.",
+          "choices": [
+            {
+              "text": "What wagon?",
+              "goto": "wagon"
+            },
+            {
+              "text": "I'll go and get it.",
+              "goto": "offer"
+            },
+            {
+              "text": "You said something about a spare key.",
+              "goto": "spare"
+            },
+            {
+              "text": "Big night?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "It's out the front.",
+              "goto": "done"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "wagon",
+          "line": "Ninety-eight Corolla wagon, blue, four hundred thousand on the clock, the whole PA in the back. Parked where it's parked every Friday. Gone by the second set.",
+          "choices": [
+            {
+              "text": "Is it worth anything?",
+              "goto": "worth"
+            },
+            {
+              "text": "Who took it?",
+              "goto": "thief"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "worth",
+          "line": "The insurer values it at ninety dollars. There's two hundred dollars of stickers on the tailgate. They don't insure stickers. I asked. They thought I was doing a bit.",
+          "choices": [
+            {
+              "text": "Someone will tell you that's very Newtown.",
+              "goto": "theft"
+            },
+            {
+              "text": "Ninety dollars.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "theft",
+          "line": "A DeFAULT kid at the bar told me property is theft. Mate. The theft is theft. The property is a Corolla.",
+          "choices": [
+            {
+              "text": "Did he pay for his schooner?",
+              "goto": "theft_tab"
+            },
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "theft_tab",
+          "line": "He put it on a tab. Under a different name. So, consistent.",
+          "choices": [
+            {
+              "text": "Consistent.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "thief",
+          "line": "They pulled it up at an RBT on the Princes Highway at two in the morning. He blew zero. Dead sober. Didn't even have the courtesy.",
+          "choices": [
+            {
+              "text": "Zero?",
+              "goto": "sober"
+            },
+            {
+              "text": "So it's sitting there now.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "sober",
+          "line": "You can forgive a bloke who's off his head. Sober means he looked at my car, had a think about it, and chose it.",
+          "choices": [
+            {
+              "text": "I'll get it back.",
+              "goto": "offer"
+            },
+            {
+              "text": "Hard to argue.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "The constable's got it standing in the breath test line like it's a witness. Release fee's two-sixty, cash, and payday was Thursday. Bring me my wagon and I'll square you up and then some.",
+          "choices": [
+            {
+              "text": "Give me the key and consider it home.",
+              "accept": "l9-breath-test-queue",
+              "needLevel": 9,
+              "denyFlag": "l9:wagon-home"
+            },
+            {
+              "text": "Not tonight, Gail.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "spare",
+          "line": "Spare key. It's taped to a coaster because the coaster's what's in the tin. Don't lose the coaster. The coaster's from the old pub.",
+          "choices": [
+            {
+              "text": "I'll mind the coaster.",
+              "goto": "hello"
+            },
+            {
+              "text": "On my way.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "King Street on a Friday. Everyone's a promoter and nobody's a driver.",
+          "improv": {
+            "persona": "Gail, front of house and sound at a pub on King Street, Newtown. Nineteen years behind the desk, dry as a chip, fond of the place and tired of it in equal measure. Deadpan, lower case, no exclamation marks.",
+            "context": "Someone at the bar has asked her whether it was a big night. It is closing time on King Street: three bands, one working microphone, and a street full of people who all know a guy."
+          },
+          "choices": [
+            {
+              "text": "Someone always knows a guy.",
+              "goto": "smalltalk_guy"
+            },
+            {
+              "text": "I'll let you pack down.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_guy",
+          "line": "The guy is always in Marrickville and the guy is always asleep.",
+          "choices": [
+            {
+              "text": "Sounds like the guy.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "It's out the front and it's running, which is a sentence I say about that car more often than I'd like.",
+          "choices": [
+            {
+              "text": "They left the whole PA. They took the milk crate.",
+              "turnin": "l9-breath-test-queue"
+            },
+            {
+              "text": "I'll come back when you're not packing down.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

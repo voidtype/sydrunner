@@ -1,0 +1,346 @@
+{
+  "pack": "pool-l10",
+  "quests": [
+    {
+      "id": "l10-possession",
+      "act": 1,
+      "title": "Possession of the Down Line",
+      "blurb": "Sunday night the line is mine until five. I want someone off the books to check something between here and Penrith, and I want it done before Monday, because on Monday it won't be there to check.",
+      "giver": "stmarys-possession",
+      "level": 10,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites from the servo on Queen Street — nobody signs on without one, and one of them is his"
+        },
+        {
+          "kind": "photo",
+          "x": -40470,
+          "z": -10960,
+          "radius": 40,
+          "label": "photograph the eleven sleepers with the white paint on the ends, before anything happens to the white paint"
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 4,
+          "label": "clear the platform — the possession can't start while four blokes are on it arguing about whose taxi it is"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "St Marys",
+          "to": "Penrith",
+          "label": "ride the last down service before the buses take over for the weekend"
+        },
+        {
+          "kind": "photo",
+          "x": -47700,
+          "z": -12150,
+          "radius": 40,
+          "label": "photograph the whiteboard in the Penrith crew room, which already has next weekend written up on it"
+        },
+        {
+          "kind": "earn",
+          "dollars": 120,
+          "label": "make $120 while it's still Sunday rates — after midnight it's ordinary time and you're worth less"
+        },
+        {
+          "kind": "goto",
+          "x": -41950,
+          "z": -11260,
+          "radius": 45,
+          "label": "Werrington, the fence at the up end: three letters go on it Friday and nobody has ever booked a cleaner"
+        },
+        {
+          "kind": "dialog",
+          "npc": "stmarys-possession",
+          "node": "ledger",
+          "label": "back to St Marys and show him what's on the phone"
+        }
+      ],
+      "reward": {
+        "cash": 420,
+        "xp": 1650,
+        "unlock": [
+          "l10:possession"
+        ]
+      }
+    },
+    {
+      "id": "l10-tenfifty-wahroonga",
+      "act": 1,
+      "title": "Ten Fifty on the Ridge",
+      "blurb": "Eleven blue gums, a district view, and a garden shed that became a dwelling in April. Photograph them standing, before Monday. I can't be seen north of the boundary and my car is famous on that street.",
+      "giver": "wahroonga-arborist",
+      "level": 10,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "buy a flat white and carry it like you live there"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Warrawee",
+          "to": "Wahroonga",
+          "label": "get the train one stop; do not drive up there"
+        },
+        {
+          "kind": "photo",
+          "x": -8712,
+          "z": -16748,
+          "radius": 45,
+          "label": "photograph the eleven blue gums, standing, from the road"
+        },
+        {
+          "kind": "dialog",
+          "npc": "wahroonga-arborist",
+          "node": "shed",
+          "label": "come back down the hill for where the shed is"
+        },
+        {
+          "kind": "photo",
+          "x": -8951,
+          "z": -16515,
+          "radius": 35,
+          "label": "photograph the shed they are calling a dwelling"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 6,
+          "label": "settle with the six residents who come out filming"
+        },
+        {
+          "kind": "earn",
+          "dollars": 200,
+          "label": "raise $200 for the consulting arborist's report"
+        }
+      ],
+      "reward": {
+        "cash": 420,
+        "xp": 1750,
+        "unlock": [
+          "l10:tenfifty"
+        ]
+      }
+    },
+    {
+      "id": "l10-hurstville-doof",
+      "act": 1,
+      "title": "Level Five, After the Last Train",
+      "blurb": "Top deck of the Hurstville car park. Starts when the last train goes, ends when the first one comes. One ramp, one boom gate, nine hundred windows above it. You're on load-in, security and the door. Column F.",
+      "giver": "hurstville-doof-ada",
+      "level": 10,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "dialog",
+          "npc": "hurstville-doof-ada",
+          "node": "boomgate",
+          "label": "take the boom-gate key off Ada; her cousin wants it back by six"
+        },
+        {
+          "kind": "goto",
+          "x": -10840,
+          "z": 11060,
+          "radius": 35,
+          "label": "Penshurst, the lock-up garage, for the other half of the rig"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Penshurst",
+          "to": "Hurstville",
+          "label": "the sub is a two-person carry and nobody in column F can park"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two coffees at four — one for you, one for the bloke on the desk"
+        },
+        {
+          "kind": "earn",
+          "dollars": 220,
+          "label": "run the door: fifteen on the ramp, cash, Ada counts the tin"
+        },
+        {
+          "kind": "ko",
+          "npc": "rbt",
+          "count": 2,
+          "label": "the booze bus sets up on Forest Road at ten to four. Encourage it elsewhere"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 4,
+          "label": "four come down from the towers in dressing gowns, filming. Be polite, be quick"
+        },
+        {
+          "kind": "photo",
+          "x": -9527,
+          "z": 11151,
+          "radius": 40,
+          "label": "photograph the empty deck at sunrise — proof nothing happened here"
+        }
+      ],
+      "reward": {
+        "cash": 420,
+        "xp": 1750,
+        "unlock": [
+          "l10:hurstville-doof"
+        ]
+      }
+    },
+    {
+      "id": "l10-open-home-circuit",
+      "act": 1,
+      "title": "Forty Groups Through the Door",
+      "blurb": "Nine opens between Blacktown and Rooty Hill and every one starts at ten past ten. Forty groups through the door, one lease. I've got nine clients who can't take the morning off. You can run and you don't scare easy.",
+      "giver": "lorraine-queue",
+      "level": 10,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "a flat white before the 6.40 key pickup"
+        },
+        {
+          "kind": "goto",
+          "x": -28310,
+          "z": -10390,
+          "radius": 40,
+          "label": "first open: the brick veneer off Blacktown station"
+        },
+        {
+          "kind": "photo",
+          "x": -28310,
+          "z": -10390,
+          "radius": 25,
+          "label": "photograph what the wide-angle lens cropped out"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 10,
+          "label": "outlast ten tape-measure couples"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Blacktown",
+          "to": "Rooty Hill",
+          "label": "run the western line out to Rooty Hill"
+        },
+        {
+          "kind": "goto",
+          "x": -33790,
+          "z": -9960,
+          "radius": 40,
+          "label": "second open: the duplex behind the RSL"
+        },
+        {
+          "kind": "earn",
+          "dollars": 200,
+          "label": "take $200 in holding deposits nobody asked for"
+        },
+        {
+          "kind": "dialog",
+          "npc": "lorraine-queue",
+          "node": "forms",
+          "label": "get the forms back to Lorraine before noon"
+        }
+      ],
+      "reward": {
+        "cash": 450,
+        "xp": 1800,
+        "unlock": [
+          "l10:open-home-circuit"
+        ]
+      }
+    },
+    {
+      "id": "l10-nineteen-thousand-thirsty",
+      "act": 1,
+      "title": "Nineteen Thousand Thirsty People",
+      "blurb": "Grand final at the park. Forty thousand go in, nineteen thousand never get near a bar, and every one of them walks past my gate to the station. Get them through it and the board can't sell my greens.",
+      "giver": "concord-bowlo-president",
+      "level": 10,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -12820,
+          "z": -330,
+          "radius": 60,
+          "label": "eight meat trays out of Flemington, because that is where the trays have always come from"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Lidcombe",
+          "to": "Olympic Park",
+          "label": "back one stop to Lidcombe and take the sprint in, standing, like everybody else"
+        },
+        {
+          "kind": "photo",
+          "x": -12900,
+          "z": -2380,
+          "radius": 120,
+          "label": "photograph the bar queue at the park: eleven deep, fourteen dollars, mid-strength"
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 8,
+          "label": "persuade eight of them that Concord West is a short walk and the schooners are seven fifty"
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 4,
+          "label": "the crew pegging a padel court over the number two green: ask them to stop, in the local dialect"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites for Trevor, who has been rolling that green since four in the morning"
+        },
+        {
+          "kind": "earn",
+          "dollars": 200,
+          "label": "two hundred over the bar and off the trays, cash, in the tin with the cricket club sticker"
+        },
+        {
+          "kind": "dialog",
+          "npc": "concord-bowlo-president",
+          "node": "handback",
+          "label": "put the tin on the bar towel where Bev can see it"
+        }
+      ],
+      "reward": {
+        "cash": 400,
+        "xp": 1700,
+        "unlock": [
+          "l10:bowlo-held"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,328 @@
+{
+  "pack": "pool-l7",
+  "quests": [
+    {
+      "id": "l7-ten-cents",
+      "act": 1,
+      "title": "Ten Cents, Forty Thousand Times",
+      "blurb": "Everyone at Lidcombe is changing trains to go somewhere and be paid. I stay here. Ten cents a container is not a business. Ten cents a container, forty thousand times, after a full house at the ground, is a business.",
+      "giver": "lidcombe-can-auntie",
+      "level": 7,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -15120,
+          "z": -395,
+          "radius": 40,
+          "label": "find the Return and Earn behind Lidcombe station; it is full, it is always full"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two coffees before five in the morning. one of them is hers and she will not say thank you"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Lidcombe",
+          "to": "Olympic Park",
+          "label": "take the shuttle out to the ground at full time, with the trolley, against the crowd"
+        },
+        {
+          "kind": "photo",
+          "x": -12905,
+          "z": -2185,
+          "radius": 70,
+          "label": "photograph the concourse after the crowd goes: that is what forty thousand people leave behind"
+        },
+        {
+          "kind": "ko",
+          "npc": "eshay",
+          "count": 6,
+          "label": "six boys are tipping the bins for the noise it makes. explain the unit economics to them"
+        },
+        {
+          "kind": "earn",
+          "dollars": 200,
+          "label": "two hundred dollars. that is two thousand containers, or it is not, and she is not your father"
+        },
+        {
+          "kind": "dialog",
+          "npc": "lidcombe-can-auntie",
+          "node": "ledger",
+          "label": "bring the haul back to the trolley and let her count it"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 950,
+        "unlock": [
+          "l7:tencents"
+        ]
+      }
+    },
+    {
+      "id": "l7-glebe-figs",
+      "act": 1,
+      "title": "Two Hundred Metres From a Fig",
+      "blurb": "I gave the council an undertaking. Two hundred metres from the tree, in writing, by consent. It says nothing at all about a telephoto lens. Go and count what they've cut, and don't wave at me on the way back.",
+      "giver": "l7-merrilyn-fig",
+      "level": 7,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "photo",
+          "x": -2782,
+          "z": 838,
+          "radius": 40,
+          "label": "photograph the avenue at Jubilee Park -- the stumps and the ones still standing, in one frame"
+        },
+        {
+          "kind": "photo",
+          "x": -1962,
+          "z": 1012,
+          "radius": 35,
+          "label": "get the notice on the hoarding at the Glebe Point Road end, dates and all, before it gets turned to face the wall"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 4,
+          "label": "four residents will film you filming and put it in the group chat; discourage all four"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "buy a flat white on Glebe Point Road so you read as a local rather than as evidence"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Newtown",
+          "to": "Petersham",
+          "label": "the same arborist had the Petersham contract in March; catch the inner west line out and see it"
+        },
+        {
+          "kind": "photo",
+          "x": -4893,
+          "z": 2925,
+          "radius": 45,
+          "label": "photograph what he left at Petersham -- that is what precedent looks like"
+        },
+        {
+          "kind": "dialog",
+          "npc": "l7-merrilyn-fig",
+          "node": "report",
+          "label": "cross back round the bay and hand her the phone"
+        }
+      ],
+      "reward": {
+        "cash": 220,
+        "xp": 900,
+        "unlock": [
+          "l7:glebe-figs"
+        ]
+      }
+    },
+    {
+      "id": "l7-monday-shelf",
+      "act": 1,
+      "title": "The Monday Shelf",
+      "blurb": "Forty-one umbrellas on Friday, a bare shelf on Monday, eleven weeks running. Norm wants it tested properly and he can't leave the window. Take the marked board somewhere else and be back before four.",
+      "giver": "redfern-lost-property",
+      "level": 7,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -1206,
+          "z": 2709,
+          "radius": 30,
+          "label": "the Eveleigh gate on Wilson Street, where the trolleys park"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites off the South Eveleigh cart, 5:40 am"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Redfern",
+          "to": "Macdonaldtown",
+          "label": "one stop with the board, Redfern to Macdonaldtown"
+        },
+        {
+          "kind": "photo",
+          "x": -2065,
+          "z": 3200,
+          "radius": 25,
+          "label": "photograph the board where you leave it, time showing"
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 5,
+          "label": "five hi-vis blokes who all started this morning"
+        },
+        {
+          "kind": "earn",
+          "dollars": 120,
+          "label": "cover the fares yourself; the window has no budget line"
+        },
+        {
+          "kind": "dialog",
+          "npc": "redfern-lost-property",
+          "node": "monday",
+          "label": "four o'clock at the window; tell Norm what's on the shelf"
+        }
+      ],
+      "reward": {
+        "cash": 225,
+        "xp": 900,
+        "unlock": [
+          "l7:monday-shelf"
+        ]
+      }
+    },
+    {
+      "id": "l7-fresh-slab",
+      "act": 1,
+      "title": "Somebody Signed the Slab",
+      "blurb": "Forty metres, exposed aggregate, screeded till dark on Saturday. Sunday morning it's got three names, a handprint and a word I won't repeat cured into it. She won't pay. I've got a hearing date and a grinder.",
+      "giver": "auburn-concreter",
+      "level": 7,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "photo",
+          "x": -16238,
+          "z": -1652,
+          "radius": 25,
+          "label": "photograph the driveway for the tribunal — all three names and the hand"
+        },
+        {
+          "kind": "ko",
+          "npc": "eshay",
+          "count": 5,
+          "label": "have a word with the signatories, who live in the units behind the job"
+        },
+        {
+          "kind": "photo",
+          "x": -16610,
+          "z": 545,
+          "radius": 40,
+          "label": "photograph the Botanic Gardens: the blossom, the red bridge, the koi. Her reference image"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Auburn",
+          "to": "Granville",
+          "label": "the ute's blocked in by her Kluger — get the train to the trade counter at Granville"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites. One for Serkan, one for the bloke holding the other end of the screed"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 1,
+          "label": "the client is filming you from the nature strip for the review. Be in the review"
+        },
+        {
+          "kind": "earn",
+          "dollars": 190,
+          "label": "get the progress payment out of it, one way or the other"
+        },
+        {
+          "kind": "dialog",
+          "npc": "auburn-concreter",
+          "node": "settle",
+          "label": "show Serkan the slab and settle up on Auburn Road"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 950,
+        "unlock": [
+          "l7:fresh-slab"
+        ]
+      }
+    },
+    {
+      "id": "l7-eleven-days-shirley-road",
+      "act": 1,
+      "title": "Eleven Days on Shirley Road",
+      "blurb": "Eleven days that Commodore's sat by the war memorial and the plate comes back stolen out of Hornsby. I'm not hooking up a stolen car with a booze bus at the bottom of the hill. Go and look at it for me.",
+      "giver": "dobbo-lower-north-shore-towing",
+      "level": 7,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "photo",
+          "x": -1748,
+          "z": -4152,
+          "radius": 20,
+          "label": "photograph the plate on the white Commodore"
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 4,
+          "label": "settle the four blokes sitting on their own bonnets"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites, one for the constable on the bus"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Wollstonecraft",
+          "to": "Hornsby",
+          "label": "catch the North Shore line up to Hornsby"
+        },
+        {
+          "kind": "goto",
+          "x": -10520,
+          "z": -18240,
+          "radius": 35,
+          "label": "find the bay it was lifted from, top of the car park"
+        },
+        {
+          "kind": "earn",
+          "dollars": 120,
+          "label": "$120 to cover the flatbed and Dobbo's morning"
+        },
+        {
+          "kind": "dialog",
+          "npc": "dobbo-lower-north-shore-towing",
+          "node": "verdict",
+          "label": "tell Dobbo what the plate actually came back as"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 950,
+        "unlock": [
+          "l7:shirley-road"
+        ]
+      }
+    }
+  ]
+}

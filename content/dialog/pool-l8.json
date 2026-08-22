@@ -1,0 +1,988 @@
+{
+  "pack": "pool-l8",
+  "npcs": [
+    {
+      "id": "bondi-stationmaster",
+      "name": "Dee, Bondi Beach stationmaster (self-appointed)",
+      "x": 3520,
+      "z": 2419,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "This is not the terminus. It is a temporary terminus. It has been temporary since 1979. Timetable?",
+          "choices": [
+            {
+              "text": "A timetable for what, exactly?",
+              "goto": "plan"
+            },
+            {
+              "text": "Is there a job in this?",
+              "goto": "offer"
+            },
+            {
+              "text": "I've got your photograph.",
+              "goto": "exhibit"
+            },
+            {
+              "text": "Busy morning?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "I'm right, thanks.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "plan",
+          "line": "The 8:14 from Bondi Beach. Gazetted 1915, two stations past this one, Bondi Road and the beach. My great-grandmother's committee had six weeks to object and they only needed four.",
+          "choices": [
+            {
+              "text": "So it was never built.",
+              "goto": "plan_two"
+            },
+            {
+              "text": "And you print the timetable anyway.",
+              "goto": "plan_two"
+            }
+          ]
+        },
+        {
+          "id": "plan_two",
+          "line": "Every eleven years a minister stands on that sand and says they are looking at it. I have the folder. I have all of them. Nobody has ever asked to see it.",
+          "choices": [
+            {
+              "text": "So you want the line built.",
+              "goto": "offer"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "I need an exhibit. Cronulla. Same ocean, same sand, and they had a railway to it by 1939. Go down there and photograph the platform, and bring it back to this table.",
+          "choices": [
+            {
+              "text": "I'll go to Cronulla.",
+              "accept": "l8-beach-that-got-a-train",
+              "denyFlag": "l8:bondi-moat"
+            },
+            {
+              "text": "That's an hour each way.",
+              "goto": "offer_no"
+            },
+            {
+              "text": "Not today, Dee.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_no",
+          "line": "Fifty-eight minutes. I know because I do it twice a year for the folder. Take the flat white with you, it's a long sit.",
+          "choices": [
+            {
+              "text": "Then I'll allow an hour.",
+              "goto": "offer"
+            },
+            {
+              "text": "Still no.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "exhibit",
+          "line": "Hold it up. Beach. Station. Three hundred metres of car park in between. — She pencils something on the back and slides it into a folder. The folder is labelled OBJECTION.",
+          "choices": [
+            {
+              "text": "Objection? You've had me campaigning against it.",
+              "goto": "moat"
+            },
+            {
+              "text": "Who is it you object to, Dee?",
+              "goto": "moat_who"
+            }
+          ]
+        },
+        {
+          "id": "moat_who",
+          "line": "Everyone. Evenly. I object to volume. Ask me on a Sunday in January and I'll object to the bus as well, and to you, and to the sun.",
+          "choices": [
+            {
+              "text": "That's almost fair.",
+              "goto": "moat"
+            }
+          ]
+        },
+        {
+          "id": "moat",
+          "line": "Fifty-eight minutes to salt water, each way, forever. That bus queue at the kerb is not a gap in the network, love. The bus is the moat. My family dug it in 1915 and I keep it clean.",
+          "choices": [
+            {
+              "text": "That is the most Bondi sentence ever spoken.",
+              "turnin": "l8-beach-that-got-a-train"
+            },
+            {
+              "text": "You're a menace with a folding table.",
+              "turnin": "l8-beach-that-got-a-train"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Two people took a timetable today. One of them was you and one of them was a seagull.",
+          "improv": {
+            "persona": "Dee, a woman in a hi-vis vest and a stationmaster's cap behind a folding table on the Oxford Street mall above Bondi Junction station in Sydney. Dry, courteous, entirely unembarrassed. Lower case, no exclamation marks.",
+            "context": "She hands out printed timetables for the Bondi Beach railway, which was gazetted in 1915 and never built. Someone has asked whether she has had many takers today. She has not, and does not regard this as relevant."
+          },
+          "choices": [
+            {
+              "text": "How long have you been out here?",
+              "goto": "smalltalk_two"
+            },
+            {
+              "text": "Good luck with it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_two",
+          "line": "Eleven years. Dad did the eight before that. He wore the vest better and he never once got the 8:14 wrong.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lindsay-access",
+      "name": "Lindsay, access control, tower four",
+      "x": -11890,
+      "z": -10360,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Lindsay. Nine years doing badges for tower four. As of Monday the door doesn't know me, so I do the audit from the bus bay. Same audit. Worse chair.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "Why out here and not in there?",
+              "goto": "tunnel"
+            },
+            {
+              "text": "How's the interchange treating you?",
+              "goto": "bus"
+            },
+            {
+              "text": "I walked the campus.",
+              "goto": "report"
+            },
+            {
+              "text": "Sign it off, then.",
+              "goto": "done"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Friday: three hundred and eighty-one badges. Monday: four hundred and twelve. Every week, that number. I'd like it counted by someone the building hasn't got a record of.",
+          "choices": [
+            {
+              "text": "I'll go and count them.",
+              "accept": "l8-macquarie-headcount",
+              "needLevel": 8,
+              "denyFlag": "l8:macquarie-headcount"
+            },
+            {
+              "text": "That's a spreadsheet problem, mate.",
+              "goto": "spreadsheet"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "spreadsheet",
+          "line": "It was, for four years. I rebuilt it twice. I'm not attached to being right, I'm attached to the number being a different number occasionally.",
+          "choices": [
+            {
+              "text": "Alright. Tell me the job.",
+              "goto": "offer"
+            },
+            {
+              "text": "Leave it alone, Lindsay.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "tunnel",
+          "line": "Four stations between here and Chatswood and not one of them sees daylight. Whole suburb of glass and you get to it through a hole. Nobody finds that odd but me.",
+          "choices": [
+            {
+              "text": "It's a business park. It's meant to be grim.",
+              "goto": "tunnel2"
+            },
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "tunnel2",
+          "line": "Grim I can audit. Ask anyone off that platform what they did last week. Go on. Watch them reach for the calendar first.",
+          "choices": [
+            {
+              "text": "Everyone does that.",
+              "goto": "hello"
+            },
+            {
+              "text": "Right.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "bus",
+          "line": "Sixteen bays. Every one of them a shuttle to a tower I used to be able to open. — He does not look up from the paper book.",
+          "improv": {
+            "persona": "Lindsay, late fifties, nine years of building access control at a Macquarie Park office tower, now working from a plastic seat at the Epping bus interchange. Methodical, deadpan, lower case, entirely unbothered. Keeps everything on paper.",
+            "context": "Someone has asked how he is finding the bus interchange. He is not bitter about it, only precise. He watches the shuttle bays the way he used to watch a turnstile log. Small talk only; he does not explain the audit here."
+          },
+          "choices": [
+            {
+              "text": "You could just go home.",
+              "goto": "bus2"
+            },
+            {
+              "text": "I'll let you work.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "bus2",
+          "line": "I keep it on paper. Paper doesn't get Monday'd.",
+          "choices": [
+            {
+              "text": "No. It doesn't.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "report",
+          "line": "Read it to me slowly. — Pencil, paper book, ruled columns, a man who has never once trusted a screen.",
+          "choices": [
+            {
+              "text": "The noticeboard's dated for a week that hasn't happened.",
+              "goto": "report2"
+            },
+            {
+              "text": "Four hundred and twelve. Same as always.",
+              "goto": "done"
+            },
+            {
+              "text": "I'd rather not say it out loud.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "report2",
+          "line": "And the cart printed three different times on three cups, so time's doing its bit. It's the building that isn't. Good. Now I've got someone else's handwriting on it.",
+          "choices": [
+            {
+              "text": "What do you do with that?",
+              "goto": "report3"
+            },
+            {
+              "text": "Sign it off.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "report3",
+          "line": "Same as last week. File it, date it, put it under the seat. Next Monday I'll take it out and see whether I still agree with it.",
+          "choices": [
+            {
+              "text": "Do you? Usually?",
+              "goto": "report4"
+            },
+            {
+              "text": "Sign it off.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "report4",
+          "line": "Handwriting's mine. Never remember writing it. That's the audit, that is.",
+          "choices": [
+            {
+              "text": "Let's call it done.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Cash, because a bank transfer leaves a record and I'm off records this week. Count it. I did.",
+          "choices": [
+            {
+              "text": "Here's your headcount.",
+              "turnin": "l8-macquarie-headcount"
+            },
+            {
+              "text": "Keep it. See you Monday.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wollstonecraft-guard",
+      "name": "Lionel, retired Sydney Trains guard",
+      "x": -1712,
+      "z": -4062,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Wollstonecraft. Two hundred a day and every one of them looks surprised the station's still here. Sit down, don't sit down. I've got the clipboard either way.",
+          "choices": [
+            {
+              "text": "What's the clipboard for?",
+              "goto": "clipboard"
+            },
+            {
+              "text": "Read me the submission.",
+              "goto": "submission"
+            },
+            {
+              "text": "Why wait here and not St Leonards?",
+              "goto": "why_here"
+            },
+            {
+              "text": "You're not a guard any more, Lionel.",
+              "goto": "redundant"
+            },
+            {
+              "text": "I've got your evidence.",
+              "goto": "done"
+            },
+            {
+              "text": "Wrong platform. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "clipboard",
+          "line": "Submission to the inquiry. Forty-one years I held those doors for people. The new ones shut to the timetable, and the timetable has never once run for a bloke with a pram and a coffee.",
+          "choices": [
+            {
+              "text": "What do you need from me?",
+              "goto": "offer"
+            },
+            {
+              "text": "They do run on time, though.",
+              "goto": "ontime"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "ontime",
+          "line": "So does a kettle. Nobody's ever given a kettle a ribbon.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "clipboard"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Stand at the St Leonards gates at knock-off. Photograph the Hume Street doors mid-close. Ride it north and count. Then tap on and don't tap off, and see what they take off you for the privilege.",
+          "choices": [
+            {
+              "text": "You'll get your evidence.",
+              "accept": "l8-doors-closing",
+              "denyFlag": "l8:doors-closing",
+              "needLevel": 8
+            },
+            {
+              "text": "Lionel. It's a train.",
+              "goto": "just_a_train"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "just_a_train",
+          "line": "It's a door. The train is only the excuse the door travels in.",
+          "choices": [
+            {
+              "text": "...go on then.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "redundant",
+          "line": "Voluntary redundancy. They give you a letter and take the lanyard back. I kept the whistle. It isn't attached to anything now — but neither's your Opal card, mate, and you still tap it.",
+          "choices": [
+            {
+              "text": "Do you still blow it?",
+              "goto": "whistle"
+            },
+            {
+              "text": "Sorry, Lionel.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "whistle",
+          "line": "Thursdays. Nothing happens. That is exactly the point I am making in the submission.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "why_here",
+          "line": "Because nothing's changed here. No barriers, no screens, no recorded voice telling me where the yellow line is. Fifty metres of platform, a bin, and a bloke. Last honest station on the North Shore.",
+          "improv": {
+            "persona": "Lionel, sixty-eight, forty-one years a guard on the North Shore line, now retired and standing on the platform at Wollstonecraft with a clipboard. Deadpan, lower case, fond of old rolling stock, never raises his voice.",
+            "context": "Someone has asked why he waits at little Wollstonecraft rather than one stop up at St Leonards, where the towers, the hospital crowds and the new Metro entrance are. Wollstonecraft is small, quiet, barely staffed and almost unchanged."
+          },
+          "choices": [
+            {
+              "text": "It is quiet, I'll give you that.",
+              "goto": "hello"
+            },
+            {
+              "text": "They'll get to it eventually.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "submission",
+          "line": "Read it back. 'The doors close correctly and on time. That is the complaint.' — That's the submission. Took me four months. They'll write back thanking me for my valuable feedback.",
+          "choices": [
+            {
+              "text": "It's a good sentence, Lionel.",
+              "goto": "done"
+            },
+            {
+              "text": "They'll ignore it.",
+              "goto": "ignored"
+            }
+          ]
+        },
+        {
+          "id": "ignored",
+          "line": "Course they will. I'm not writing it for them. I'm writing it so there's a bit of paper in a drawer somewhere saying a man used to hold the doors.",
+          "choices": [
+            {
+              "text": "I'll say I saw it.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Show us, then. — He lays the photo on top, the fare under it, and pencils the dwell time in the margin, which is what a man does when he expects to be argued with.",
+          "choices": [
+            {
+              "text": "Photo, fare, and eleven seconds.",
+              "turnin": "l8-doors-closing"
+            },
+            {
+              "text": "Still working on it.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "erko-bounce-gav",
+      "name": "Gav, Bounce Forward Employment Solutions",
+      "x": -2212,
+      "z": 3584,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Don't come inside, the aircon's on the claim. Gav. Bounce Forward. You've been on my caseload since Tuesday and I've got you marked job ready, which is a compliment.",
+          "choices": [
+            {
+              "text": "What is Bounce Forward, exactly?",
+              "goto": "outfit"
+            },
+            {
+              "text": "You wanted something.",
+              "goto": "offer"
+            },
+            {
+              "text": "I've got your photo.",
+              "goto": "signoff"
+            },
+            {
+              "text": "I've done the lot.",
+              "goto": "done"
+            },
+            {
+              "text": "Why are you selling lanyards?",
+              "goto": "lanyard"
+            },
+            {
+              "text": "How long's this take?",
+              "goto": "smalltalk"
+            }
+          ]
+        },
+        {
+          "id": "outfit",
+          "line": "We're a provider. Redfern signs you off, we sign you on, the government pays us per outcome. An outcome is you, employed, for a period, evidenced. The evidencing is the industry.",
+          "choices": [
+            {
+              "text": "So you find people jobs.",
+              "goto": "outfit_no"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "outfit_no",
+          "line": "We find people outcomes. A job is one way to get one. It is not, historically, the reliable way.",
+          "choices": [
+            {
+              "text": "That's bleak, Gav.",
+              "goto": "hello"
+            },
+            {
+              "text": "Marita said you'd be standing here.",
+              "goto": "factions",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "DeFAULT reckon you are the actual problem.",
+              "goto": "factions",
+              "needFaction": "DeFAULT"
+            }
+          ]
+        },
+        {
+          "id": "factions",
+          "line": "Marita send me their blokes and I place them. DeFAULT send me nobody and I still bank the referral. I love the two of them equally and I'd say that in front of either.",
+          "choices": [
+            {
+              "text": "Of course you would.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "lanyard",
+          "line": "Five bucks. Blank card in it, no writing, doesn't need any. In a photograph a lanyard is the difference between a room of blokes and a workforce.",
+          "choices": [
+            {
+              "text": "Go on then. Five bucks.",
+              "cost": 5,
+              "needCash": 5,
+              "goto": "lanyard_yes"
+            },
+            {
+              "text": "I'll take my chances.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "lanyard_yes",
+          "line": "Wear that up Erskineville Road and people hold the door for you. I've tested it. I test everything.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Twenty minutes. It's a two o'clock and it's ten to. Sit on the milk crate — the chairs are all upstairs for the photo.",
+          "improv": {
+            "persona": "Gav, an employment services consultant working a shopfront on Erskineville Road in Sydney's inner west. Lanyard, vape, magnetic decal on a Corolla. Fast, warm, entirely amoral, speaks fluent KPI. Never cruel, never apologises.",
+            "context": "A claimant handed to him by the Redfern Centrelink office has asked how long the wait is. It is ten to two and his compliance photo is at two. All the chairs from the shopfront are upstairs in the training room. He is standing outside because the office aircon is on the claim."
+          },
+          "choices": [
+            {
+              "text": "I'll stand.",
+              "goto": "hello"
+            },
+            {
+              "text": "Why are the chairs upstairs?",
+              "goto": "chairs"
+            }
+          ]
+        },
+        {
+          "id": "chairs",
+          "line": "Because a room with twelve chairs in it is a training room and a room with three is a shopfront. Same room. Different funding.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Two o'clock I need twelve engaged participants, a whiteboard, and one photo. Compliance are in Thursday. I'm not asking you to lie. I'm asking you to be present, in numbers.",
+          "choices": [
+            {
+              "text": "Twelve heads by two. Done.",
+              "accept": "l8-engagement-photo",
+              "denyFlag": "l8:engagement-photo"
+            },
+            {
+              "text": "Who's paying for the coffees?",
+              "goto": "offer_money"
+            },
+            {
+              "text": "This is a rort, Gav.",
+              "goto": "offer_scam"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_money",
+          "line": "You are, then I am. There's a float and it's approved, it's just slow. Six to eight weeks. I've never had to apologise for it, because nobody's still on my caseload in eight weeks.",
+          "choices": [
+            {
+              "text": "Fine. I'll front it.",
+              "accept": "l8-engagement-photo",
+              "denyFlag": "l8:engagement-photo"
+            },
+            {
+              "text": "Back up a second.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "offer_scam",
+          "line": "A rort's when the money isn't meant to be there. That money is absolutely meant to be there, mate. There's a form for it. I've seen the form.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "signoff",
+          "line": "Beautiful. Twelve of them, steam on the coffees, everyone looking at the whiteboard like it said something. Now sign, there, where it says supervising officer.",
+          "choices": [
+            {
+              "text": "I'm a participant, Gav.",
+              "goto": "signoff_two"
+            },
+            {
+              "text": "Sign it and say nothing.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "signoff_two",
+          "line": "You were. A participant can't verify participation, that's circular, compliance hate it. A supervisor can. Supervisors aren't paid, which is how everyone knows they're honest.",
+          "choices": [
+            {
+              "text": "So I've been promoted.",
+              "goto": "signoff_three"
+            },
+            {
+              "text": "I'm signing. Don't explain it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "signoff_three",
+          "line": "Promoted, unpaid, and on the paperwork. Welcome to the sector. — He caps the pen and puts it in his shirt pocket, which is also where your pen went.",
+          "choices": [
+            {
+              "text": "Give us the pen back, Gav.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Photo's lodged, Thursday's handled. Two-twenty: your one-eighty and forty for the trouble. Don't tell the upstairs lot there was forty.",
+          "choices": [
+            {
+              "text": "Two-twenty.",
+              "turnin": "l8-engagement-photo"
+            },
+            {
+              "text": "Not yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vince-unit-four",
+      "name": "Vince, forklift hire, Unit 4",
+      "x": -25330,
+      "z": -9820,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Roller door's half up because I'm not opening it and I'm not closing it. You're not council, are you. You don't walk like council.",
+          "choices": [
+            {
+              "text": "What's actually on here tonight?",
+              "goto": "notarave"
+            },
+            {
+              "text": "I'll work your door.",
+              "goto": "offer"
+            },
+            {
+              "text": "How loud do you want it?",
+              "goto": "soundtest"
+            },
+            {
+              "text": "It's handled.",
+              "goto": "done"
+            },
+            {
+              "text": "Whose unit is this?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Wrong address, sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "notarave",
+          "line": "It's a birthday. It's a night-time thing. My niece has a laptop and a mate with speakers. The insurance covers forklifts. It covers a forklift going through that wall. It does not cover music.",
+          "choices": [
+            {
+              "text": "You can just say the word, Vince.",
+              "goto": "notarave_no"
+            },
+            {
+              "text": "What do the neighbours reckon?",
+              "goto": "neighbours"
+            },
+            {
+              "text": "Marita could staff this door properly.",
+              "goto": "factions_m",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "DeFAULT reckon a shed at 3am is the last working public institution.",
+              "goto": "factions_d",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "notarave_no",
+          "line": "I say it and it becomes a thing. A thing with a category and a form. It's a birthday until somebody official decides it's something else, and then it's their word, not mine.",
+          "choices": [
+            {
+              "text": "Understood. Birthday.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "neighbours",
+          "line": "They put townhouses over that fence in 2019, next to a zone marked light industrial on a map anyone could have read. Every Tuesday a truck reverses at six and every Tuesday they are astonished.",
+          "choices": [
+            {
+              "text": "So they'll call it in.",
+              "goto": "neighbours_call"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "neighbours_call",
+          "line": "Three of them will come down the driveway in dressing gowns holding a phone up like a warrant. Be nice to them. Be nice, and be somewhere else by the time they've finished filming.",
+          "choices": [
+            {
+              "text": "Nice. Elsewhere.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "factions_m",
+          "line": "Marita sent two blokes round in March offering me labour hire for the door. Twenty-two an hour and a folder with my name spelt wrong. I told them it's a birthday. They said everything is.",
+          "choices": [
+            {
+              "text": "That's the pitch, yeah.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "factions_d",
+          "line": "Your lot come out here and tell me a warehouse in Seven Hills is the only room in the city still doing what a room is meant to do. Then they ask for the wi-fi password. It's on the fridge.",
+          "choices": [
+            {
+              "text": "It usually is.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "soundtest",
+          "line": "Turn it up until the roller door starts talking. Corrugated steel hums before anything else in the building does. When the door joins in, that's too much. Back it off one and leave it.",
+          "choices": [
+            {
+              "text": "Door joins in, back it off. Got it.",
+              "goto": "hello"
+            },
+            {
+              "text": "And if the door's already singing?",
+              "goto": "soundtest_more"
+            }
+          ]
+        },
+        {
+          "id": "soundtest_more",
+          "line": "Then we've been too loud ten minutes and someone in a dressing gown is on hold to the council's after-hours line, which is a voicemail, which is the best news either of us gets tonight.",
+          "choices": [
+            {
+              "text": "Voicemail. Beautiful.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "One till three. Door down by half three, everyone out the pedestrian gate quiet, exits clear the whole time, and the servo run at dawn is on me. Two-sixty. I'd pay it just to not think about it.",
+          "choices": [
+            {
+              "text": "I'll stand near the gate and be large.",
+              "accept": "l8-public-liability",
+              "denyFlag": "l8:public-liability",
+              "needLevel": 8
+            },
+            {
+              "text": "Find someone else, Vince.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Unit 4. Twelve years. I hire forklifts out and I fix the ones I hire out, which tells you plenty about the units around here.",
+          "improv": {
+            "persona": "Vince, sixty-one, runs a forklift hire business out of Unit 4 on the industrial estate at Seven Hills in western Sydney. Polo shirt, reading glasses pushed up on his head. Deadpan, decent, lower case, no exclamation marks.",
+            "context": "Someone standing at his half-open roller door at one in the morning has asked whose unit this is. His niece is having a party inside that he will not name out loud. He is proud of the business and quietly embarrassed about the night."
+          },
+          "choices": [
+            {
+              "text": "Twelve years is a while.",
+              "goto": "smalltalk_more"
+            },
+            {
+              "text": "Back to it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_more",
+          "line": "Estate was all sheds when I signed. Now there's a gym, a church, and a boxing gym that is also a church. Then the townhouses. And tonight, whatever it is we're not calling this.",
+          "choices": [
+            {
+              "text": "Seven Hills.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Exits clear in the photo, two-twenty in the bucket, door down at twenty-five past three. Nothing happened here. Nothing at all. Look at it. It's a shed with a forklift in it.",
+          "choices": [
+            {
+              "text": "Nothing happened.",
+              "turnin": "l8-public-liability"
+            },
+            {
+              "text": "Not finished yet.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
