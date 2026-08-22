@@ -122,6 +122,36 @@ export const GROUND_REVEAL_RADIUS_M = 600;
  */
 
 /**
+ * How many tiles may be waiting for their ground at once.
+ *
+ * The ground pass walks the streamer's nearest-first ranking and stops issuing
+ * new `terr.bin` requests once this many tiles ahead of it are still unsettled.
+ * Everything further out waits for the window to slide.
+ *
+ * **Without it the nearest-first order is a fiction**, and that is a measured
+ * claim rather than a worry: a headless driver over a real origin, with the
+ * whole 1,800 m ring fired at once, had the eleven-tile reveal ring finishing
+ * *after* the first tile's geometry had already landed. Issuing 57 requests in
+ * one frame hands the ordering to the transport, and the transport does not know
+ * which tile the player is standing on. Six connections per host on HTTP/1.1,
+ * and even multiplexed on HTTP/2 the far ring's 46 requests are 46 requests the
+ * near ring's eleven are sharing a pipe with.
+ *
+ * **16, which is the reveal ring plus margin.** `GROUND_REVEAL_RADIUS_M`'s ring
+ * is eleven tiles at the spawn and twelve at the worst position inside a tile,
+ * so a window of sixteen always contains the whole of what the gate is waiting
+ * for with room for a tile or two sitting in `TerrainField`'s five-second retry
+ * backoff. Larger and it stops being a priority; smaller and the ring itself
+ * would be issued in two waves, which is the defect.
+ *
+ * In steady state on the move this window *is* the streaming frontier: every
+ * nearer tile is already settled, so the sixteen slots land on exactly the tiles
+ * the player is about to reach. On a train at 44 m/s that is the leading edge,
+ * which is the case the whole subject was reported from.
+ */
+export const GROUND_FETCH_AHEAD = 16;
+
+/**
  * How long the reveal waits for the ground before it goes ahead without it,
  * milliseconds.
  *
@@ -392,6 +422,15 @@ export function verifyGroundFirst(): string[] {
   fail(
     GROUND_REVEAL_RADIUS_M < 1800,
     'the reveal radius must be inside the streamer\'s load radius or the gate waits forever',
+  );
+  // The window has to hold the whole reveal ring or the gate is waiting on a
+  // tile the pass has deliberately not asked for yet, which is a deadlock until
+  // something nearer settles. Twelve is the worst-case ring: a point at a tile
+  // corner reaches four tiles on each of two axes.
+  fail(
+    GROUND_FETCH_AHEAD >= 12,
+    `the fetch window (${GROUND_FETCH_AHEAD}) must hold the whole reveal ring or the gate waits on ` +
+      'tiles the ground pass has not asked for',
   );
   fail(
     tileGap(px, pz, [0, 0, size, size]) === 0,

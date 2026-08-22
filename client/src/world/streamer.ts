@@ -178,6 +178,7 @@ import { createGroundMaterial } from './ground.ts';
 // rather than described here for the reason its own header gives -- a sequence
 // the builder drives from is a sequence a check can convict.
 import {
+  GROUND_FETCH_AHEAD,
   GROUND_REVEAL_RADIUS_M,
   coverage as groundRingCoverage,
   groundRing,
@@ -2354,20 +2355,27 @@ export class TileStreamer implements LampSource {
    * so a ground pass built from anything else would be answering about a
    * different world than the one below it.
    *
-   * Two halves, and the first is the one that matters. **Every unsettled tile is
-   * asked for outright**, with no cap and no budget, because there is nothing to
-   * cap: the whole 1,800 m ring is 57 requests of 1,156 bytes -- 64 kB, less
-   * than a fifth of *one* tile's geometry. `TerrainField.ensure` de-duplicates
-   * in flight and remembers forever, so calling it every frame for the same key
-   * is a map lookup, and that is what lets this pass be this blunt.
+   * Two halves. The first asks for the ground of the nearest unsettled tiles --
+   * **the nearest `GROUND_FETCH_AHEAD` of them and no more**, which is the one
+   * thing here that is not obvious and is the difference between a nearest-first
+   * order and a nearest-first *intention*. Firing all 57 at once hands the
+   * ordering to the transport, and a headless drive over a real origin caught
+   * exactly that: the eleven-tile reveal ring finishing after the first tile's
+   * geometry had already landed. See the constant.
+   *
+   * The window slides on its own. `wanted` is sorted, everything nearer is
+   * already settled once the boot is over, so in steady state the sixteen slots
+   * sit precisely on the streaming frontier.
    *
    * The second half builds whatever has landed, nearest first, under
-   * `GROUND_BUDGET_MS`. The order is the ranking's, which is the order the
-   * player notices things in.
+   * `GROUND_BUDGET_MS`. Building is not rationed by the window -- a grid in hand
+   * costs 0.13 ms to turn into a sheet whether it is under the player or a
+   * kilometre away, and refusing to spend it would leave ground undrawn for no
+   * saving.
    *
-   * Nothing is returned. The ordering it buys is enforced one tile at a time in
-   * the fetch pass below -- see the `groundSettled` test there -- rather than by
-   * a global flag, because a global flag is the shape of thing that wedges.
+   * Nothing is returned. The ordering this buys is enforced one tile at a time
+   * in the fetch pass below -- see the `groundSettled` test there -- rather than
+   * by a global flag, because a global flag is the shape of thing that wedges.
    */
   private pumpGround(wanted: ReadonlyArray<{ entry: TileEntry; dist: number }>): void {
     const field = this.terrainField;
@@ -2375,14 +2383,27 @@ export class TileStreamer implements LampSource {
 
     const deadline = performance.now() + GROUND_BUDGET_MS;
     let budgetLeft = true;
+    let waitingOn = 0;
     for (const { entry } of wanted) {
       if (this.groundSettled.has(entry.key)) continue;
-      // Free when the grid is already held, already in flight, or known absent,
-      // and started otherwise. This is the line the whole workstream is about.
+      if (budgetLeft) {
+        // The grid may have landed since the last frame, in which case this is
+        // the sheet and the tile is settled before a request is considered.
+        if (this.ensureGroundSheet(entry)) continue;
+        budgetLeft = performance.now() < deadline;
+      } else if (field.grid(entry.key) !== undefined) {
+        // Grid in hand and only the build budget between it and a sheet. Not a
+        // fetch, so it must not take one of the window's slots -- a return trip
+        // finds every grid already held (the field never evicts) and would
+        // otherwise fill the window with tiles that need no network at all.
+        continue;
+      }
+      // Genuinely without ground: in flight, in a retry backoff, or about to be
+      // asked for. Free when the request already exists; `TerrainField.ensure`
+      // de-duplicates in flight and remembers forever, so this is a map lookup
+      // on every frame after the first.
       void field.ensure(entry.key);
-      if (!budgetLeft) continue;
-      this.ensureGroundSheet(entry);
-      budgetLeft = performance.now() < deadline;
+      if (++waitingOn >= GROUND_FETCH_AHEAD) return;
     }
   }
 
