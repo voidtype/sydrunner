@@ -324,6 +324,326 @@
           "l8:public-liability"
         ]
       }
+    },
+    {
+      "id": "l8-fourth-in-the-rank",
+      "act": 1,
+      "title": "Fourth in the Rank",
+      "blurb": "Bus has been on Park Street since eleven. Three trucks ahead of me and not one's turned a wheel. First job out of that bus is mine, and you're going to make sure a job comes out.",
+      "giver": "towie-druitt",
+      "level": 8,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites. one's for Daz. not a large."
+        },
+        {
+          "kind": "goto",
+          "x": -77,
+          "z": 389,
+          "radius": 30,
+          "label": "down to the bus. don't jog, jogging looks like something"
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 6,
+          "label": "six in the car, none of them driving. establish otherwise"
+        },
+        {
+          "kind": "photo",
+          "x": -64,
+          "z": 546,
+          "radius": 60,
+          "label": "plate in frame, town hall clock in frame. a timestamp"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 2,
+          "label": "the two filming it for the residents' group"
+        },
+        {
+          "kind": "dialog",
+          "npc": "towie-druitt",
+          "node": "docket",
+          "label": "get the docket off Daz before the contractor does"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Town Hall",
+          "to": "Killara",
+          "label": "train up to the registered owner in Killara"
+        },
+        {
+          "kind": "earn",
+          "dollars": 200,
+          "label": "the release fee, in cash. he will have cash."
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 950,
+        "unlock": [
+          "l8:rank-jumped"
+        ]
+      }
+    },
+    {
+      "id": "l8-rockdale-awning",
+      "act": 1,
+      "title": "Fifty Metres of Bay Street",
+      "blurb": "The awning, and the lane out the back on a Tuesday when the trays come in. Then Hurstville. She can't be within fifty metres of the shop with her own name on it. There's a copy of the undertaking laminated behind the till.",
+      "giver": "vasso-banksia",
+      "level": 8,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "photo",
+          "x": -6395,
+          "z": 9350,
+          "radius": 25,
+          "label": "photograph the awning on Bay Street: her name, in her mother's 1974 lettering, over someone else's till"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "buy a coffee across the road so you are a customer standing about, not a bloke photographing a bakery"
+        },
+        {
+          "kind": "photo",
+          "x": -6420,
+          "z": 9300,
+          "radius": 20,
+          "label": "the loading lane out the back — get the trays, and get the label on the trays"
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 2,
+          "label": "two shopfitters are walking her mother's marble counter out to a ute; discourage them"
+        },
+        {
+          "kind": "earn",
+          "dollars": 120,
+          "label": "front the printing and the solicitor's half hour — she is not made of money, she is made of a settlement she hasn't received"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Rockdale",
+          "to": "Hurstville",
+          "label": "take it up the line to the solicitor on Forest Road; she can't be on that platform either"
+        },
+        {
+          "kind": "dialog",
+          "npc": "vasso-banksia",
+          "node": "verdict",
+          "label": "back to the Banksia platform and hand her the phone"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 950,
+        "unlock": [
+          "l8:rockdale-awning"
+        ]
+      }
+    },
+    {
+      "id": "l8-everyone-starts-thursday",
+      "act": 1,
+      "title": "Everyone Starts Thursday",
+      "blurb": "Forty placements, all of them starting Thursday, all of them at the club. The line's a metro now and none of them believe me. You're not fixing the trains. You're fixing the forty.",
+      "giver": "bankstown-placements-desk",
+      "level": 8,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -15960,
+          "z": 5860,
+          "radius": 35,
+          "label": "get to the loading dock behind the club and count how many of the forty found it"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Bankstown",
+          "to": "Lakemba",
+          "label": "ride two stops yourself, so you can tell forty people the metro exists and it comes every four minutes"
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 6,
+          "label": "six of the crew are on the schooners on Chapel Road at four in the afternoon; walk them out politely"
+        },
+        {
+          "kind": "buy",
+          "powerup": "TRAINING",
+          "count": 1,
+          "label": "sit the induction so at least one person on site holds a white card"
+        },
+        {
+          "kind": "photo",
+          "x": -16240,
+          "z": 5680,
+          "radius": 30,
+          "label": "the client wants to see faces at six in the morning, so photograph the rooftop car park and send them the cars"
+        },
+        {
+          "kind": "earn",
+          "dollars": 220,
+          "label": "the margin comes off the top and the top, this week, is you"
+        },
+        {
+          "kind": "dialog",
+          "npc": "bankstown-placements-desk",
+          "node": "signoff",
+          "label": "sign the forty on at the folding table, level four"
+        }
+      ],
+      "reward": {
+        "cash": 260,
+        "xp": 1050,
+        "unlock": [
+          "l8:everyone-starts-thursday"
+        ]
+      }
+    },
+    {
+      "id": "l8-two-trains-leave-strathfield",
+      "act": 1,
+      "title": "Two Trains Leave Strathfield",
+      "blurb": "Unit 4: Rates and Ratios. Two trains leave Strathfield — in a textbook that is a question, here it is the timetable. You sit the practical on the concourse while Year 11 watches. Marks are final. So is the fee.",
+      "giver": "strathfield-tutor-grace",
+      "level": 8,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Strathfield",
+          "to": "Lidcombe",
+          "label": "Q1a: train A, Strathfield to Lidcombe"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Strathfield",
+          "to": "Burwood",
+          "label": "Q1b: train B. Also from Strathfield. That is the point."
+        },
+        {
+          "kind": "photo",
+          "x": -10744,
+          "z": 477,
+          "radius": 40,
+          "label": "Q2: photograph the car park. Show your working."
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "Q3: two flat whites. One of them is hers."
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 3,
+          "label": "Q4: three parents are contesting the mark"
+        },
+        {
+          "kind": "earn",
+          "dollars": 220,
+          "label": "Q5: rates. Earn $220 at whatever rate you can get."
+        },
+        {
+          "kind": "dialog",
+          "npc": "strathfield-tutor-grace",
+          "node": "marking",
+          "label": "hand the paper in to be marked"
+        }
+      ],
+      "reward": {
+        "cash": 260,
+        "xp": 1000,
+        "unlock": [
+          "l8:two-trains"
+        ]
+      }
+    },
+    {
+      "id": "l8-clear-path",
+      "act": 1,
+      "title": "Clear Path of Travel",
+      "blurb": "A review of the 2019 review, which recommended a review. Crown Street offers one point one metres of clear path. The standard is one and a half. Somebody has to say so, in the approved format.",
+      "giver": "jarrod-public-domain",
+      "level": 8,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "photo",
+          "x": 331,
+          "z": 2008,
+          "radius": 25,
+          "label": "photograph the eleven hundred millimetres of footpath the Crown Street cafes have left us"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 4,
+          "label": "consult the four residents who lodged objections. Robustly. Robust is the word in the framework"
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 3,
+          "label": "consult the temporary works zone at the shopping village. Temporary since 2019"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "light refreshments for the consultation. The review is user-pays and you are the user"
+        },
+        {
+          "kind": "earn",
+          "dollars": 160,
+          "label": "recover $160 of the cost of the review from the community the review benefits"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Central",
+          "to": "Town Hall",
+          "label": "Central to Town Hall by rail. One stop. Walk it and the Traffic and Parking Impact Statement has no respondent"
+        },
+        {
+          "kind": "dialog",
+          "npc": "jarrod-public-domain",
+          "node": "debrief",
+          "label": "get the submission checked before it goes on the agenda"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 1050,
+        "unlock": [
+          "l8:clear-path"
+        ]
+      }
     }
   ]
 }

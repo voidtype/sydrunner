@@ -310,6 +310,320 @@
           "l5:bowlo"
         ]
       }
+    },
+    {
+      "id": "l5-booked-in-rookwood",
+      "act": 1,
+      "title": "Nobody Has Ever Been Booked in Rookwood",
+      "blurb": "A million residents in there and not one's ever blown into a tube. That's either the law or it's manners, and the kitty says manners. Make yourself known on Railway Street, then walk in the gate and count how far it follows you.",
+      "giver": "lidcombe-hearse-gaz",
+      "level": 5,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "coffee off Railway Street first. Gaz does not time a man who hasn't had one"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 3,
+          "label": "give three people outside the shopping centre something worth ringing in"
+        },
+        {
+          "kind": "ko",
+          "npc": "rbt",
+          "count": 1,
+          "label": "the breath testing unit parked outside the club on Joseph Street: introduce yourself"
+        },
+        {
+          "kind": "ko",
+          "npc": "police",
+          "count": 2,
+          "label": "handle the two that get there first, while the rest are still on Parramatta Road"
+        },
+        {
+          "kind": "photo",
+          "x": -16180,
+          "z": 520,
+          "radius": 60,
+          "label": "one photo at the Necropolis gate, timestamped, so the crematorium bloke can't argue the toss"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Berala",
+          "to": "Lidcombe",
+          "label": "out at Berala, one stop back on the all-stops. The dead had their own train in here; you don't"
+        },
+        {
+          "kind": "dialog",
+          "npc": "lidcombe-hearse-gaz",
+          "node": "report",
+          "label": "tell Gaz how far in it followed you"
+        }
+      ],
+      "reward": {
+        "cash": 140,
+        "xp": 560,
+        "unlock": [
+          "l5:booked-in-rookwood"
+        ]
+      }
+    },
+    {
+      "id": "l5-monday-inventory",
+      "act": 1,
+      "title": "The Monday Inventory",
+      "blurb": "Eleven pools on Wolseley Road and I've kept a book since March. Monday the leaf nets are hung properly, the teak's unscratched, and the coin I dropped in the skimmer is back in my pocket. Warm.",
+      "giver": "pointpiper-pools",
+      "level": 5,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "ride",
+          "line": "Eastern Suburbs & Illawarra",
+          "from": "Central",
+          "to": "Edgecliff",
+          "label": "come in the way the staff come in: Central to Edgecliff, before the road fills up"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "buy a coffee up here once, so you understand what these people are paying for water"
+        },
+        {
+          "kind": "photo",
+          "x": 2660,
+          "z": 890,
+          "radius": 45,
+          "label": "top of the hill, where the whole Point Piper waterfront is in one frame — photograph it Sunday-side"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 3,
+          "label": "three neighbours will ask what you're doing on their footpath. They ask with the phone already out"
+        },
+        {
+          "kind": "earn",
+          "dollars": 70,
+          "label": "get seventy dollars out of the eastern suburbs. Not by invoice. Nobody up here has ever paid an invoice"
+        },
+        {
+          "kind": "dialog",
+          "npc": "pointpiper-pools",
+          "node": "ledger",
+          "label": "go back to the van and read the book with him"
+        }
+      ],
+      "reward": {
+        "cash": 130,
+        "xp": 520,
+        "unlock": [
+          "l5:monday-inventory"
+        ]
+      }
+    },
+    {
+      "id": "l5-cabramatta-proxy",
+      "act": 1,
+      "title": "One Stop Is Far Enough",
+      "blurb": "I can't go to Cabramatta. My aunty's committee sits outside the bakery from seven, and if they see me I'm engaged by Sunday. You go. Take photos. Say nothing to anyone with a clipboard.",
+      "giver": "canley-vale-exile",
+      "level": 5,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "get a coffee in your hand — nobody photographs a bakery on a break"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Canley Vale",
+          "to": "Cabramatta",
+          "label": "one stop. She has done the sums and it is still too close."
+        },
+        {
+          "kind": "photo",
+          "x": -24878,
+          "z": 3298,
+          "radius": 25,
+          "label": "photograph the new shop's sign under the arch — the family name, spelt her family's way"
+        },
+        {
+          "kind": "ko",
+          "npc": "eshay",
+          "count": 3,
+          "label": "the boys outside the phone repair place will try you for the coffee"
+        },
+        {
+          "kind": "photo",
+          "x": -25064,
+          "z": 3472,
+          "radius": 25,
+          "label": "photograph the queue at the original at the same hour, for the comparison"
+        },
+        {
+          "kind": "earn",
+          "dollars": 45,
+          "label": "she said she'd cover the fare. Cover the fare."
+        },
+        {
+          "kind": "dialog",
+          "npc": "canley-vale-exile",
+          "node": "report",
+          "label": "get back up the line and show her"
+        }
+      ],
+      "reward": {
+        "cash": 110,
+        "xp": 480,
+        "unlock": [
+          "l5:cabramatta-proxy"
+        ]
+      }
+    },
+    {
+      "id": "l5-kilns-load-in",
+      "act": 1,
+      "title": "Load-In: Newtown to the Kilns",
+      "blurb": "There's no party. There's a picnic. The picnic has four kilowatts of rig locked in a shed on Erskineville Road, the ute's got no rego, and the sun comes up at six whether we're ready or not.",
+      "giver": "kez-sound",
+      "level": 5,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "dialog",
+          "npc": "kez-sound",
+          "node": "keys",
+          "label": "get the padlock code off Kez, who has never once said it out loud"
+        },
+        {
+          "kind": "goto",
+          "x": -2205,
+          "z": 3555,
+          "radius": 25,
+          "label": "the lockup off Erskineville Road — second roller door, the mural nobody finished"
+        },
+        {
+          "kind": "earn",
+          "dollars": 60,
+          "label": "sixty dollars of diesel money, however the night hands it to you"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites: the last two poured on King Street before the sun does anything"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Newtown",
+          "to": "St Peters",
+          "label": "no rego on the ute, so the subwoofer catches the train like everybody else"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 2,
+          "label": "two people who moved in beside a live music venue and then rang about the noise"
+        },
+        {
+          "kind": "photo",
+          "x": -2340,
+          "z": 4460,
+          "radius": 35,
+          "label": "photograph the rig at the Sydney Park brick kilns so next month's crew knows where the power is"
+        }
+      ],
+      "reward": {
+        "cash": 120,
+        "xp": 520,
+        "unlock": [
+          "l5:kilns-load-in"
+        ]
+      }
+    },
+    {
+      "id": "l5-floating-forest",
+      "act": 1,
+      "title": "The Floating Forest, Wrong Side of the Fence",
+      "blurb": "Council fenced the only angle where dawn comes through the mangroves. I'm seventy-eight and my knees are a matter of public record. Get over, get the shot, get gone. There's a print in it. The fine is not my problem.",
+      "giver": "rhodes-dawn-shooter",
+      "level": 5,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "one flat white; he does not brief anyone before caffeine"
+        },
+        {
+          "kind": "goto",
+          "x": -11512,
+          "z": -4188,
+          "radius": 30,
+          "label": "the end of the boardwalk, where the fence starts"
+        },
+        {
+          "kind": "photo",
+          "x": -11560,
+          "z": -4230,
+          "radius": 45,
+          "label": "the rusted hull with the trees growing out of it"
+        },
+        {
+          "kind": "ko",
+          "npc": "police",
+          "count": 3,
+          "label": "outlast the three that come for the tripod"
+        },
+        {
+          "kind": "ko",
+          "npc": "rbt",
+          "count": 1,
+          "label": "the booze bus on Concord Road would like a word"
+        },
+        {
+          "kind": "ride",
+          "line": "Northern",
+          "from": "Rhodes",
+          "to": "Meadowbank",
+          "label": "one stop over the river, be another river's problem"
+        },
+        {
+          "kind": "earn",
+          "dollars": 60,
+          "label": "sixty for the infringement he said he would cover"
+        },
+        {
+          "kind": "dialog",
+          "npc": "rhodes-dawn-shooter",
+          "node": "print",
+          "label": "back to tower 6 once they have stopped caring"
+        }
+      ],
+      "reward": {
+        "cash": 130,
+        "xp": 520,
+        "unlock": [
+          "l5:floating-forest"
+        ]
+      }
     }
   ]
 }

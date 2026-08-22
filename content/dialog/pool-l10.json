@@ -930,6 +930,786 @@
           ]
         }
       ]
+    },
+    {
+      "id": "chippo-gallery-sitter",
+      "name": "Perry, gallery sitter, Kensington Street",
+      "x": -540,
+      "z": 1836,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Free entry. Bag on the hook, don't touch the coal. Everyone asks what it cost and everyone is sorry they asked.",
+          "choices": [
+            {
+              "text": "What's the coal cost?",
+              "goto": "price"
+            },
+            {
+              "text": "You said you had work.",
+              "goto": "offer"
+            },
+            {
+              "text": "I've got the cash on me.",
+              "goto": "count"
+            },
+            {
+              "text": "It's done. Where's my label?",
+              "goto": "done"
+            },
+            {
+              "text": "What do they pay you in here?",
+              "goto": "pay"
+            },
+            {
+              "text": "Just looking.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "price",
+          "line": "Two hundred and twenty thousand. It is a pile of Hunter Valley coal in a converted terrace, the artist has never been to the Hunter, and it is, annoyingly, good.",
+          "choices": [
+            {
+              "text": "And they pay you what?",
+              "goto": "pay"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "pay",
+          "line": "Thirty-one an hour, no super, Sundays because Sundays are students. I can price anything on these walls and I can't price a two-bedroom terrace on this street. I'm the only thing in the building earning by the hour.",
+          "improv": {
+            "persona": "Perry, who sits the front desk of a small free gallery in a converted terrace on Kensington Street, Chippendale. Art history degree, casual hours, no super, eight years of it. Deadpan, lower case, warm underneath, very Sydney.",
+            "context": "A visitor has asked what the job pays. She is the only person in the building paid by the hour, and the work behind her is insured for more than she will earn in six years. She is not bitter about the art, only the arithmetic."
+          },
+          "choices": [
+            {
+              "text": "That's grim.",
+              "goto": "hello"
+            },
+            {
+              "text": "So what's the job you mentioned?",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "I want one honest thing on that wall. Four hundred and fifty dollars, earned by you, in a day, in this postcode. I frame it and I write the label, and the label is the work. Are you working today?",
+          "choices": [
+            {
+              "text": "Four fifty. Today. Fine.",
+              "accept": "l10-hard-earned",
+              "denyFlag": "l10:hard-earned",
+              "needLevel": 10
+            },
+            {
+              "text": "Ask someone with an allowance.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "count",
+          "line": "Sit down. I count it twice, out loud, and I write down where every fifty came from. That is the piece. Nobody has ever counted your money out loud in front of you before, have they.",
+          "choices": [
+            {
+              "text": "No. Nobody has.",
+              "goto": "done"
+            },
+            {
+              "text": "Count it again.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Framed, glass, eye height. It's a colour photocopy — you keep the cash, I'm not a monster. Someone will offer me real money for it by Thursday and write down that refusing them is part of the practice.",
+          "choices": [
+            {
+              "text": "Take my money. Give it back first.",
+              "turnin": "l10-hard-earned"
+            },
+            {
+              "text": "I'll come back at opening.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "waterloo-guard-doreen",
+      "name": "Doreen, thirty-one years a guard on the Bankstown line",
+      "x": -880,
+      "z": 2870,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Stand clear of the— sorry. Thirty-one years hanging off the back of a train and it still comes out when someone walks at me. I'm in the tower behind you. There's a station under it now. I've never been down.",
+          "choices": [
+            {
+              "text": "Never? It's directly beneath you.",
+              "goto": "offer"
+            },
+            {
+              "text": "What did you actually do on the trains?",
+              "goto": "guard"
+            },
+            {
+              "text": "Why not just walk down and ride it?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "It's done. All of it.",
+              "goto": "done"
+            },
+            {
+              "text": "Wrong person. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "The old line ran Bankstown to town with a bloke in the back looking down the platform, and that bloke was me. Now it's a metro with nobody in it at all. I want the run done properly one more time, by someone who owns the week.",
+          "choices": [
+            {
+              "text": "I'll do your last run.",
+              "accept": "l10-front-window-seat",
+              "denyFlag": "l10:front-window",
+              "needLevel": 10
+            },
+            {
+              "text": "What's it pay?",
+              "goto": "pay"
+            },
+            {
+              "text": "Get one of the kids to do it.",
+              "goto": "coy"
+            },
+            {
+              "text": "Find someone else, Doreen.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "pay",
+          "line": "Four twenty. That's a Sunday with penalties, near enough, and it's the last of the redundancy. You earn a hundred and seventy of it out there yourself first, though. I never once got paid to sit down.",
+          "choices": [
+            {
+              "text": "Deal. Bankstown to Waterloo.",
+              "accept": "l10-front-window-seat",
+              "denyFlag": "l10:front-window",
+              "needLevel": 10
+            },
+            {
+              "text": "Keep your redundancy.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "guard",
+          "line": "Guard. The one who leans out and watches the doors and knows which pram is going to be trouble. You can't teach it, so they didn't. They built a train that doesn't need looking at, and gave the rest of us a letter and a free pen.",
+          "choices": [
+            {
+              "text": "That's a rough trade.",
+              "goto": "offer"
+            },
+            {
+              "text": "Did you keep the pen?",
+              "goto": "coy"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Because I know what it sounds like down there.",
+          "improv": {
+            "persona": "Doreen, sixty-one, thirty-one years a train guard on the Bankstown line, made redundant when it became a driverless metro. Lives in a public housing tower in Waterloo. Deadpan, lower case, dry as a chip, never sorry for herself.",
+            "context": "Someone has asked why she doesn't simply take the escalator down to the brand new metro station built directly beneath her building and ride it. She has never been down. She will not say why yet."
+          },
+          "choices": [
+            {
+              "text": "Sounds like what?",
+              "goto": "coy"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "coy",
+          "line": "Ask me after you've ridden it. Front carriage, front window, where the driver would be if there was one. Bring the coffee. Don't spill it, the seat's the good one.",
+          "choices": [
+            {
+              "text": "Front window it is.",
+              "goto": "offer"
+            },
+            {
+              "text": "Righto.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "stand_clear",
+          "line": "Go on. Say the bit before the doors shut. Say it how you heard it. ... Yeah. That's mine. Two hundred dollars, a booth at Eveleigh, a Tuesday in 2003, and a form that said in perpetuity, which I did not look up.",
+          "choices": [
+            {
+              "text": "They kept your voice and binned you.",
+              "goto": "perpetuity"
+            },
+            {
+              "text": "That's why you've never been down.",
+              "goto": "perpetuity"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "perpetuity",
+          "line": "Every four minutes, both directions, since the day they switched it on. Thirty-one years I got paid for and one Tuesday I'll be doing forever. Don't feel bad for me. Feel bad for the doors. They've heard it more than you have.",
+          "choices": [
+            {
+              "text": "Here's your photo, then.",
+              "goto": "done"
+            },
+            {
+              "text": "Stand clear, Doreen.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Let's see the tower. ... It photographs better than it lives. They start knocking it down in March and the station stays, so there'll be a hole under Waterloo with my voice in it and nobody I know on top. Take the money.",
+          "choices": [
+            {
+              "text": "Your run's done. Both directions.",
+              "turnin": "l10-front-window-seat"
+            },
+            {
+              "text": "Not finished yet. I'll be back.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "erko-nella",
+      "name": "Nella, platform 1 at Erskineville since 1974",
+      "x": -2178,
+      "z": 3622,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Sit at that end. The sun's on this one by ten past and I've been waiting for it since June. You're the one they've been reading out on the ladder all week. Good. I've got a wager on and I need legs that still work.",
+          "choices": [
+            {
+              "text": "What's the wager?",
+              "goto": "offer"
+            },
+            {
+              "text": "I've been the long way round.",
+              "goto": "settle"
+            },
+            {
+              "text": "I've come for my money.",
+              "goto": "done"
+            },
+            {
+              "text": "Who's Col?",
+              "goto": "col"
+            },
+            {
+              "text": "Which side are you on, Nella?",
+              "goto": "sides"
+            },
+            {
+              "text": "Nothing, Nella. Enjoy the sun.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Col Fenech at the Rose reckons nobody rides Hornsby to Penrith and home in a day any more. He's had one job in his life, it was at Eveleigh, and he walked to it. Two hundred says he's wrong. I need the two hundred first.",
+          "choices": [
+            {
+              "text": "I'll raise your stake and I'll do your loop.",
+              "accept": "l10-erko-loop",
+              "denyFlag": "l10:erko-loop",
+              "needLevel": 10
+            },
+            {
+              "text": "Two hundred's a lot to leave with a bloke at a pub.",
+              "goto": "col"
+            },
+            {
+              "text": "Not this week.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "col",
+          "line": "Col's good for it. His mother's good for it and she's ninety-four and sharper than the pair of us. Corner terrace on Swanson Street since the shifts came out of Eveleigh at four and the whole street smelt of it.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            },
+            {
+              "text": "And if he welches?",
+              "goto": "col_welch"
+            }
+          ]
+        },
+        {
+          "id": "col_welch",
+          "line": "Then he drinks alone at the Rose for the rest of his life, which at his age is a shorter sentence than it sounds. He won't welch. He's from here. You can tell, because he still calls the Imperial the Imperial.",
+          "choices": [
+            {
+              "text": "Understood.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "bench",
+          "line": "I come down for the 5:40. I don't get on it. Pop drove out of Eveleigh for thirty-one years and I like to hear one leave without him.",
+          "improv": {
+            "persona": "Nella Vella, seventy-nine, born in a terrace on Swanson Street, Erskineville. Sits at the end of platform 1 with a thermos. Deadpan, warm, unsentimental, no exclamation marks, very inner-west Sydney.",
+            "context": "A stranger has asked why she is on the platform before dawn. Her father drove trains out of the Eveleigh workshops for thirty-one years. She comes down for the 5:40 and never boards it, and she will not be soppy about it out loud."
+          },
+          "choices": [
+            {
+              "text": "That's a good reason.",
+              "goto": "hello"
+            },
+            {
+              "text": "Do you ever get on?",
+              "goto": "bench_no"
+            }
+          ]
+        },
+        {
+          "id": "bench_no",
+          "line": "Once. A Sunday, 2019. All the way round and back to this bench, and the reader charged me nothing for it, which is the only thing this state has ever given me for free that wasn't a warning.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "sides",
+          "line": "Marita knock on the door with a clipboard. DeFAULT put a sticker on the pole out the front and call it a movement. Neither of them has ever once fixed the 5:40. I'm on the side of the timetable, love.",
+          "choices": [
+            {
+              "text": "Hard to argue.",
+              "goto": "hello"
+            },
+            {
+              "text": "Why are you out here at this hour?",
+              "goto": "bench"
+            }
+          ]
+        },
+        {
+          "id": "settle",
+          "line": "You went. Sit down. — The wager was never the loop, love. I've done the loop. Did it on a Sunday and the reader charged me nothing. Col bet me nobody under fifty would get on a train for a stranger any more.",
+          "choices": [
+            {
+              "text": "So I was the horse.",
+              "goto": "settle_horse"
+            },
+            {
+              "text": "You could have said.",
+              "goto": "settle_horse"
+            },
+            {
+              "text": "Then where's my money?",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "settle_horse",
+          "line": "You were the argument. Col's paying for the argument. He'll be at the Rose from eleven with it in an envelope with your name spelt wrong, telling the bar he let you have it.",
+          "choices": [
+            {
+              "text": "Let him.",
+              "goto": "done"
+            },
+            {
+              "text": "I want to be there when he opens it.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Col's two hundred and the rest out of my own purse, because you shouted me a coffee and nobody's done that since they put the Jets out of the competition. Go on. It's nearly Monday and the whole week goes back to nothing.",
+          "choices": [
+            {
+              "text": "I'll take it.",
+              "turnin": "l10-erko-loop"
+            },
+            {
+              "text": "Same bench next Sunday, Nella.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "marj-cash-window-cc311b",
+      "name": "Marj, cash-only window on the strip",
+      "x": 1262,
+      "z": 518,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Cash only. Has been since the tap machine started taking eleven cents a go. Eleven cents times four hundred people is my daughter's textbooks. So: cash only.",
+          "choices": [
+            {
+              "text": "What needs doing?",
+              "goto": "offer"
+            },
+            {
+              "text": "It's all here.",
+              "goto": "count"
+            },
+            {
+              "text": "Money's banked.",
+              "goto": "done"
+            },
+            {
+              "text": "Quiet tonight.",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Why not just get the machine, Marj?",
+              "goto": "machine"
+            },
+            {
+              "text": "Just the coffee, thanks.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Four hundred in the drawer by six. The wellness people are inspecting, and they've got a theory that nobody up here earns anything any more. I'd like to hand them a drawer.",
+          "choices": [
+            {
+              "text": "Four hundred by six. Done.",
+              "accept": "l10-last-register-cc311b",
+              "denyFlag": "l10:last-register-cc311b"
+            },
+            {
+              "text": "And what's in it for me?",
+              "goto": "terms"
+            },
+            {
+              "text": "Get the machine, Marj.",
+              "goto": "machine"
+            },
+            {
+              "text": "Not tonight.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "terms",
+          "line": "You get paid out of the drawer, in notes, before I sweep. Nobody up here has ever been paid any other way, and nobody's ever complained about it twice.",
+          "choices": [
+            {
+              "text": "Four hundred by six.",
+              "accept": "l10-last-register-cc311b",
+              "denyFlag": "l10:last-register-cc311b"
+            },
+            {
+              "text": "Marita said there's work up here.",
+              "goto": "recruiters",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "DeFAULT reckon the drawer is the problem.",
+              "goto": "recruiters",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "I'll think about it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "recruiters",
+          "line": "Marita send me people who want the shift. DeFAULT send me people who want to talk about the shift. Both of them buy chips at two in the morning, so both of them are welcome.",
+          "choices": [
+            {
+              "text": "Chips are chips.",
+              "goto": "terms"
+            }
+          ]
+        },
+        {
+          "id": "machine",
+          "line": "The machine takes eleven cents and a Tuesday. Cash takes a train to Bondi Junction, because they turned our branch into a shop that sells juice in a jar for fourteen dollars.",
+          "choices": [
+            {
+              "text": "Fourteen dollars.",
+              "goto": "machine2"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "machine2",
+          "line": "In a jar you give back. You are paying fourteen dollars to borrow a jar on a street where I can't get a bank.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Quiet now. They fixed it. You can hear the fountain from here, and everyone says that like it's good news.",
+          "improv": {
+            "persona": "Marj, sixty-odd, runs a cash-only takeaway window on Darlinghurst Road in Kings Cross. Thirty-one years on the same corner, through every owner and every law. Deadpan, dry, lower case, never a raised voice, never an exclamation mark.",
+            "context": "A regular has said it's quiet tonight. The strip that used to queue for four blocks is now apartments, a Woolworths and two gyms, and the loudest thing at midnight is the El Alamein fountain. She is not sentimental about the old Cross and she is not grateful for the new one."
+          },
+          "choices": [
+            {
+              "text": "You miss it?",
+              "goto": "smalltalk2"
+            },
+            {
+              "text": "Suppose it is.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk2",
+          "line": "I miss the queue. Nobody has ever queued for an apartment.",
+          "choices": [
+            {
+              "text": "No, they haven't.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "count",
+          "line": "On the counter. Notes flat, all facing the one way — I'm not being fussy, I'm being fast. — She counts it twice, out loud, in tens, and doesn't look up once.",
+          "choices": [
+            {
+              "text": "Four hundred. Counted.",
+              "goto": "count2"
+            },
+            {
+              "text": "I'll wait outside.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "count2",
+          "line": "That's the float. Now it has to go to the bank, and the bank is in Bondi Junction, and that is the entire joke of living here. Two stops. Don't stop for anyone.",
+          "choices": [
+            {
+              "text": "Two stops. On it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Receipt's on the spike, the drawer has a bottom again, and the wellness bloke had to write 'trading strongly' on his own form with his own pen. Money you earn the hard way sits heavier. Here. Count it in front of me, it's polite.",
+          "choices": [
+            {
+              "text": "Take the payout.",
+              "turnin": "l10-last-register-cc311b"
+            },
+            {
+              "text": "Put it toward the textbooks.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sydride-kosta",
+      "name": "Kosta, SydRide, 4.91",
+      "x": 240,
+      "z": -2514,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Don't get in. The car's clamped — Mosman Council, outside my own house, seven minutes over, on a Tuesday. The queue's still live though. The queue's never heard of the car.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "I've got her to the Quay.",
+              "goto": "settle"
+            },
+            {
+              "text": "Why do you sit on this side of the bridge?",
+              "goto": "parked"
+            },
+            {
+              "text": "Shift's done.",
+              "goto": "done"
+            },
+            {
+              "text": "Nothing, mate.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Annabel. Mosman. Four point nine. She can see her house from where you're standing — across the water, the one behind the boatshed. App reckons fifty-four minutes by road. It is three kilometres.",
+          "choices": [
+            {
+              "text": "I'll run the fare.",
+              "accept": "l10-mosman-fare",
+              "denyFlag": "l10:mosman-fare",
+              "needLevel": 10
+            },
+            {
+              "text": "Fifty-four minutes for three kays?",
+              "goto": "parked"
+            },
+            {
+              "text": "Not my shift.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "parked",
+          "line": "Because Mosman hasn't got a station. Never had one. They knocked the railway back when trains were new and they've been sitting in Military Road ever since, very pleased with themselves.",
+          "improv": {
+            "persona": "Kosta, a SydRide driver working the north end of the Harbour Bridge at Milsons Point in Sydney. Nine years on the apps, 4.91 stars, treats the decimal like a mortgage. Deadpan, lower case, no exclamation marks, quietly funny, never self-pitying.",
+            "context": "Someone has asked why he waits at Milsons Point instead of in Mosman, three kilometres away. Mosman has no railway station and never wanted one, Military Road is permanently at a standstill, and his own car is clamped by the council. He is not bitter. He is precise."
+          },
+          "choices": [
+            {
+              "text": "So you sit here.",
+              "goto": "hello"
+            },
+            {
+              "text": "Anyone offered you a way out of it?",
+              "goto": "factions"
+            }
+          ]
+        },
+        {
+          "id": "factions",
+          "line": "Marita came past with a lanyard, said they'd have me in a real job by Thursday. DeFAULT came past after and said the job is the problem. Both of them wanted a lift somewhere.",
+          "choices": [
+            {
+              "text": "Did you give either of them one?",
+              "goto": "factions_no"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "factions_no",
+          "line": "One of them tipped. That's my politics, that is.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "settle",
+          "line": "She's on the ferry. Twelve minutes, wharf to boatshed, and she's already left four stars — train was clean, she'd expected a car. That is not a complaint. That is a review. It costs eleven dollars.",
+          "choices": [
+            {
+              "text": "Four stars is good.",
+              "goto": "settle_no"
+            },
+            {
+              "text": "I'll wear it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "settle_no",
+          "line": "Four stars is a fail with extra steps.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Four point nine one. Held. That's the job, mate — not the money, the decimal. The money's only there to stop the decimal moving.",
+          "choices": [
+            {
+              "text": "Settle up, then.",
+              "turnin": "l10-mosman-fare"
+            },
+            {
+              "text": "Later, Kosta.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
     }
   ]
 }

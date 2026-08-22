@@ -292,6 +292,309 @@
           "l4:gordon-notification"
         ]
       }
+    },
+    {
+      "id": "l4-employment-fund",
+      "act": 1,
+      "title": "The Employment Fund Must Be Spent",
+      "blurb": "There's four hundred and ten dollars in your Employment Fund and it dies Friday. You can't have it. You can have boots, a course, and a ticket to an interview that isn't real. Help me acquit the lot.",
+      "giver": "ashfield-provider",
+      "level": 4,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "TRAINING",
+          "count": 1,
+          "label": "let the fund pay for the White Card course: six hours, the same slides as the resilience one, a new logo in the corner"
+        },
+        {
+          "kind": "goto",
+          "x": -7628,
+          "z": 2291,
+          "radius": 30,
+          "label": "collect the steel caps off the loading dock behind Ashfield Mall -- the fund only ever buys size elevens"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Ashfield",
+          "to": "Penrith",
+          "label": "attend the interview he booked at the far end of the line, because the travel is claimable and the interview is not"
+        },
+        {
+          "kind": "photo",
+          "x": -8727,
+          "z": 1724,
+          "radius": 40,
+          "label": "photograph yourself in the boots by the Croydon site that has been a hole in the ground for four years -- the audit wants context"
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 3,
+          "label": "the site has views about brand new boots; familiarise yourself with the workplace culture three times"
+        },
+        {
+          "kind": "earn",
+          "dollars": 80,
+          "label": "move the surplus: there is a bloke outside the Mall who pays cash for size elevens. Do not say his name in the office."
+        }
+      ],
+      "reward": {
+        "cash": 120,
+        "xp": 450,
+        "unlock": [
+          "l4:employment-fund"
+        ]
+      }
+    },
+    {
+      "id": "l4-no-grounds",
+      "act": 1,
+      "title": "Twelve Weeks, No Grounds",
+      "blurb": "Forty-one years I've been in this house and the letter says no grounds. It says it like it's a comfort — like the good news is they don't need one. Get me a photo of that back wall before the boy with the roller does.",
+      "giver": "eleni-dulwich",
+      "level": 4,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "photo",
+          "x": -6212,
+          "z": 4840,
+          "radius": 15,
+          "label": "photograph the back wall before the roller gets to it"
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 3,
+          "label": "have a word with the three lads holding rollers"
+        },
+        {
+          "kind": "goto",
+          "x": -6245,
+          "z": 4822,
+          "radius": 15,
+          "label": "take up room at their open, two doors up"
+        },
+        {
+          "kind": "earn",
+          "dollars": 60,
+          "label": "raise the tribunal fee she hasn't got"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Dulwich Hill",
+          "to": "Redfern",
+          "label": "get to Redfern before the tenants' line shuts"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "bring her a coffee from the old fruit shop"
+        },
+        {
+          "kind": "dialog",
+          "npc": "eleni-dulwich",
+          "node": "hearing",
+          "label": "sit on the step while she reads it out"
+        }
+      ],
+      "reward": {
+        "cash": 110,
+        "xp": 430,
+        "unlock": [
+          "l4:no-grounds"
+        ]
+      }
+    },
+    {
+      "id": "l4-chatswood-phoenix-abn",
+      "act": 1,
+      "title": "The Same Ute, A New ABN",
+      "blurb": "Nine floors of waterproofing, done twice, paid for never. The head contractor liquidated on Friday and was trading again on Monday, one stop down the line, new ABN, same ute. Get me a photo of the door.",
+      "giver": "chatswood-waterproofer",
+      "level": 4,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites before six -- one of them is hers, that is the arrangement"
+        },
+        {
+          "kind": "photo",
+          "x": -2830,
+          "z": -7745,
+          "radius": 35,
+          "label": "photograph the level nine balcony from Victoria Ave, where the render is still wet"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Chatswood",
+          "to": "Artarmon",
+          "label": "one stop down the line, which is as far as a phoenix has ever had to fly"
+        },
+        {
+          "kind": "photo",
+          "x": -2290,
+          "z": -6540,
+          "radius": 40,
+          "label": "photograph the serviced-office door: new company name, printed on A4, taped over the old one"
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 3,
+          "label": "have an honest conversation with the three blokes now doing her scope"
+        },
+        {
+          "kind": "earn",
+          "dollars": 120,
+          "label": "come back with $120 in your hand, so somebody on this job got paid today"
+        },
+        {
+          "kind": "dialog",
+          "npc": "chatswood-waterproofer",
+          "node": "paid",
+          "label": "bring the lot back to the hoarding"
+        }
+      ],
+      "reward": {
+        "cash": 110,
+        "xp": 430,
+        "unlock": [
+          "l4:phoenix-abn"
+        ]
+      }
+    },
+    {
+      "id": "l4-acceptance-rate",
+      "act": 1,
+      "title": "Acceptance Rate",
+      "blurb": "Three fares stacked, a daughter's assembly at nine, and a rating that dies below ninety. Take the phone, run the queue, and don't let anyone sit in the front.",
+      "giver": "sevenhills-driver",
+      "level": 4,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -24098,
+          "z": -8512,
+          "radius": 60,
+          "label": "collect the 8:10 from Toongabbie; he is not outside"
+        },
+        {
+          "kind": "earn",
+          "dollars": 90,
+          "label": "clear ninety dollars of the stacked queue"
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 2,
+          "label": "two blokes get in the back who never booked it"
+        },
+        {
+          "kind": "dialog",
+          "npc": "sevenhills-driver",
+          "node": "flagged",
+          "label": "the app has paused the account; go and see Nav"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Seven Hills",
+          "to": "Central",
+          "label": "put the airport fare on the Western line, ride with her"
+        },
+        {
+          "kind": "photo",
+          "x": -25510,
+          "z": -10062,
+          "radius": 40,
+          "label": "photograph the empty rank for Nav's dispute"
+        }
+      ],
+      "reward": {
+        "cash": 120,
+        "xp": 460,
+        "unlock": [
+          "l4:fares"
+        ]
+      }
+    },
+    {
+      "id": "l4-anyone-else-awake",
+      "act": 1,
+      "title": "Was Anyone Else Awake For This",
+      "blurb": "I need an incident. Westpoint roof, something with a siren in it, and a photo before the police put out their own version. Then get on a train like a sensible person.",
+      "giver": "blacktown-notice-board",
+      "level": 4,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -28040,
+          "z": -10730,
+          "radius": 45,
+          "label": "get up on the Westpoint rooftop, where the laps happen"
+        },
+        {
+          "kind": "ko",
+          "npc": "rbt",
+          "count": 1,
+          "label": "give the booze bus something to write up"
+        },
+        {
+          "kind": "photo",
+          "x": -28040,
+          "z": -10730,
+          "radius": 60,
+          "label": "one photo, taken before the police put out their own version"
+        },
+        {
+          "kind": "ko",
+          "npc": "police",
+          "count": 4,
+          "label": "survive the response — all four of them"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Blacktown",
+          "to": "Seven Hills",
+          "label": "heat doesn't buy a ticket: all-stops out to Seven Hills"
+        },
+        {
+          "kind": "earn",
+          "dollars": 90,
+          "label": "make back what the impound is going to want"
+        },
+        {
+          "kind": "dialog",
+          "npc": "blacktown-notice-board",
+          "node": "filed",
+          "label": "tell Ronnie how it went, slowly, she types with one finger"
+        }
+      ],
+      "reward": {
+        "cash": 130,
+        "xp": 500,
+        "unlock": [
+          "l4:notice-board"
+        ]
+      }
     }
   ]
 }

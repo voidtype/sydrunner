@@ -911,6 +911,797 @@
           ]
         }
       ]
+    },
+    {
+      "id": "sydney-park-doof",
+      "name": "Rae, sound system custodian",
+      "x": -2380,
+      "z": 4470,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Don't look at the chimneys, look like you live here. That's most of it. — She is coiling cable into a milk crate, in a hi-vis vest that is not hers.",
+          "choices": [
+            {
+              "text": "What's the go?",
+              "goto": "offer"
+            },
+            {
+              "text": "Is this legal?",
+              "goto": "permit"
+            },
+            {
+              "text": "What am I even listening to?",
+              "goto": "rig"
+            },
+            {
+              "text": "It's over. Sun's up.",
+              "goto": "sunrise"
+            },
+            {
+              "text": "I've done the rounds.",
+              "goto": "done"
+            },
+            {
+              "text": "Wrong park. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Sound's up, crowd's up, and I've got nobody on the ground but me and a bloke asleep under the trailer. Do the rounds and I'll square you up at first light.",
+          "choices": [
+            {
+              "text": "I'll do the rounds.",
+              "accept": "l3-chimney-doof",
+              "denyFlag": "l3:chimney-doof"
+            },
+            {
+              "text": "I'll get a kebab instead.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "permit",
+          "line": "It's a picnic booking. City of Sydney. Fifteen people, nine till five, no amplified sound. I've highlighted the fifteen so nobody has to squint at it in the dark.",
+          "improv": {
+            "persona": "Rae, who runs an unpermitted sound system at the Sydney Park brick kilns in St Peters. Late thirties, calm to the point of rudeness, deadpan, lower case, very inner-west, never raises her voice because the rig does that.",
+            "context": "Someone has asked whether this is legal. She is holding a laminated City of Sydney picnic booking for fifteen people, nine till five, no amplified sound. There are four hundred people here, it is after two in the morning, and the rig is six kilowatts. She does not experience this as a lie."
+          },
+          "choices": [
+            {
+              "text": "That's a picnic permit.",
+              "goto": "permit_yes"
+            },
+            {
+              "text": "Forget I asked.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "permit_yes",
+          "line": "It is. And this is a picnic. Everything after that is a matter of volume.",
+          "choices": [
+            {
+              "text": "Can't argue with that.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "rig",
+          "line": "Two eighteens in a box someone's dad welded in Marrickville, a generator that runs on whatever's in the jerry can, and a laptop with one working USB port. It's the port I worry about.",
+          "choices": [
+            {
+              "text": "And if the port goes?",
+              "goto": "rig_no"
+            },
+            {
+              "text": "Sounds massive.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "rig_no",
+          "line": "Then four hundred people find out they came here for each other, and they take that very badly.",
+          "choices": [
+            {
+              "text": "Grim.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "sunrise",
+          "line": "Sun's coming up over the airport and everyone's doing the face. Kill the sub, leave the tops on low, and now it isn't a rave — it's some friends standing in a field at dawn. Entirely legal.",
+          "choices": [
+            {
+              "text": "That's the whole trick, isn't it.",
+              "goto": "sunrise_yes"
+            },
+            {
+              "text": "Pay me before the rangers get here.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "sunrise_yes",
+          "line": "The trick is the sub. Nobody's ever been fined for a mood.",
+          "choices": [
+            {
+              "text": "Then square me up.",
+              "goto": "done"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Cash, because I can't put you through a bank. There's the bucket, there's what was in the bucket, and there's what's left of it after the generator had its go.",
+          "choices": [
+            {
+              "text": "Take the cash. Take the flyer photo too.",
+              "turnin": "l3-chimney-doof"
+            },
+            {
+              "text": "Keep it. Buy petrol.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "burwood-render-sandra",
+      "name": "Sandra Vuong, off the plan",
+      "x": -9648,
+      "z": 1046,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Don't stand there, love, you're in the render. — Four hundred metres to the Metro. Walking metres. The crow doesn't have to cross Parramatta Road.",
+          "choices": [
+            {
+              "text": "What Metro? There's a fence and a hole.",
+              "goto": "pitch"
+            },
+            {
+              "text": "You want something done.",
+              "goto": "offer"
+            },
+            {
+              "text": "About those doors.",
+              "goto": "closing"
+            },
+            {
+              "text": "It's done.",
+              "goto": "done"
+            },
+            {
+              "text": "I'm right, thanks.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "pitch",
+          "line": "It's a station. It's just a station that's still mostly vertical. Sixty metres of it is under your shoes right now and none of it is yours yet.",
+          "improv": {
+            "persona": "Sandra Vuong, an off-the-plan apartment agent working the display suite on Burwood Road in Sydney's inner west. Fourteen years selling proximity to things that are not built. Deadpan, fast, warm to your face, no exclamation marks.",
+            "context": "A passer-by has pointed out that the Metro West station she keeps selling is currently a fenced excavation on Parramatta Road. She has been asked this every day since the hoardings went up and she is not embarrassed by it."
+          },
+          "choices": [
+            {
+              "text": "When does it actually open?",
+              "goto": "pitch_when"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "pitch_when",
+          "line": "Twenty-thirty-something. The year is printed in a font you'd need your phone torch for. The price is printed in a font you can read from the bus.",
+          "choices": [
+            {
+              "text": "Cheers, Sandra.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "A family's coming through at four and I need the strip looking like the picture. Coffee in hands, nobody objecting in the park, everyone walking briskly toward a train.",
+          "choices": [
+            {
+              "text": "Tell me what's in the picture.",
+              "accept": "l3-burwood-render",
+              "denyFlag": "l3:burwood-render",
+              "needLevel": 3
+            },
+            {
+              "text": "You want me to stage an entire suburb.",
+              "goto": "offer_yes"
+            },
+            {
+              "text": "No.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_yes",
+          "line": "I want four minutes of one. The rest of Burwood can do whatever it likes. It usually does, and it usually does it in the Westfield car park.",
+          "choices": [
+            {
+              "text": "Go on then.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "closing",
+          "line": "The Metro's got no guard. No whistle, no bloke leaning out going stand clear. A chime, and then it's your problem. — Everything in this suburb closes on somebody. Just make sure it isn't closing on you.",
+          "choices": [
+            {
+              "text": "That's bleak for a Tuesday.",
+              "goto": "closing_two"
+            },
+            {
+              "text": "Noted.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "closing_two",
+          "line": "It's the honest version of the brochure. The brochure says connected.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Tell me you tapped off. — Good. You'd be amazed what the maximum fare does to a man's borrowing capacity.",
+          "choices": [
+            {
+              "text": "Coffee, hoarding, two objectors, one stop to Strathfield.",
+              "turnin": "l3-burwood-render"
+            },
+            {
+              "text": "Not yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "auburn-opal-ferhat",
+      "name": "Ferhat, top-ups and phone cases",
+      "x": -16369,
+      "z": -1799,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Top-ups, cases, screen protectors, chargers that actually charge. And I will tell you about the doors. Everybody gets told about the doors.",
+          "choices": [
+            {
+              "text": "Tell me about the doors.",
+              "goto": "doors"
+            },
+            {
+              "text": "You said there was a job.",
+              "goto": "offer"
+            },
+            {
+              "text": "What Metro?",
+              "goto": "metro"
+            },
+            {
+              "text": "I've got your number.",
+              "goto": "verdict"
+            },
+            {
+              "text": "I've done it.",
+              "goto": "done"
+            },
+            {
+              "text": "Nothing, mate.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "doors",
+          "line": "Nine seconds. Eleven months I have timed them, off this table, with a stopwatch off this table. The sign says the doors are closing. The doors have closed. That is not a warning. That is a report.",
+          "choices": [
+            {
+              "text": "Nine seconds is nothing with bags and a pram.",
+              "goto": "offer"
+            },
+            {
+              "text": "And nobody's written it down but you.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "metro",
+          "line": "They are building a Metro. Westmead, Parramatta, Olympic Park, Burwood. Look at the map. It comes within three kilometres of this table and then it goes around us, like we owe it money.",
+          "improv": {
+            "persona": "Ferhat, who runs a folding table outside Auburn station selling phone cases, chargers and Opal top-ups. Fifties, Turkish, precise, dry, entirely reasonable and completely obsessed with one thing. Lower case, no exclamation marks.",
+            "context": "Someone has asked him about the new Metro. It is being dug through Parramatta, Sydney Olympic Park and Burwood, a few kilometres north of Auburn, and it will not stop here. He has looked at the route map more times than he will admit to a customer."
+          },
+          "choices": [
+            {
+              "text": "It stops at Olympic Park, though.",
+              "goto": "metro_more"
+            },
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "metro_more",
+          "line": "For the football. Four times a year, for the football. And no driver on it, no guard, nobody in a vest. So when the doors take your bag, who is it you complain to. The ceiling.",
+          "choices": [
+            {
+              "text": "The ceiling, probably.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "So I need a number I did not write myself. Go and ride the line that got the money, stand in the doors, count. And tap off. Tap off, or they take the maximum fare, and the maximum fare is what they think of you.",
+          "choices": [
+            {
+              "text": "I'll get you your number.",
+              "accept": "l3-nine-seconds",
+              "denyFlag": "l3:nine-seconds",
+              "needLevel": 3
+            },
+            {
+              "text": "You could go yourself.",
+              "goto": "offer_no"
+            },
+            {
+              "text": "I catch the bus.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_no",
+          "line": "And leave the table. Two minutes I leave the table, that is when the man comes wanting a case for a phone nobody has made since 2014.",
+          "choices": [
+            {
+              "text": "Alright. I'll go.",
+              "accept": "l3-nine-seconds",
+              "denyFlag": "l3:nine-seconds",
+              "needLevel": 3
+            },
+            {
+              "text": "Some other time.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "verdict",
+          "line": "Nine here. Thirty on the new one, because it has nothing else to do all day. — He writes both down. — I am not angry at the Metro. I am angry at whoever drew the line and put the bend in it at Olympic Park.",
+          "choices": [
+            {
+              "text": "Thirty. I counted it twice.",
+              "goto": "done"
+            },
+            {
+              "text": "They'll never answer the email, Ferhat.",
+              "goto": "verdict_no"
+            }
+          ]
+        },
+        {
+          "id": "verdict_no",
+          "line": "No. But it goes in the file, and one day there is a hearing, and somebody stands up with a file. That is how it works here. Slowly, and with a file.",
+          "choices": [
+            {
+              "text": "Then here's your number.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Give it here. — He copies it into a notebook that is almost entirely numbers, holds it at arm's length, and looks pleased for about a second and a half.",
+          "choices": [
+            {
+              "text": "Both numbers, the one email.",
+              "turnin": "l3-nine-seconds"
+            },
+            {
+              "text": "Not yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "trish-tunnel-roster",
+      "name": "Trish, keeper of the tunnel roster",
+      "x": -332,
+      "z": 1626,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "The roster's laminated for a reason. People used to argue with the paper version.",
+          "choices": [
+            {
+              "text": "Who are you, exactly?",
+              "goto": "who"
+            },
+            {
+              "text": "I want the tunnel pitch.",
+              "goto": "pitch"
+            },
+            {
+              "text": "Why not just play the Quay?",
+              "goto": "quay"
+            },
+            {
+              "text": "Done. All of it.",
+              "goto": "done"
+            },
+            {
+              "text": "How's the tunnel treating you?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nothing. Just passing.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "who",
+          "line": "Trish. Twenty-six years on that pitch, four of them good. Now I keep the list. Everyone thinks the tunnel is free. The tunnel is not free. The tunnel is booked.",
+          "choices": [
+            {
+              "text": "Booked by who?",
+              "goto": "rules"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "rules",
+          "line": "Three rules. You don't play over the platform announcements, you don't chase anyone down to Chalmers Street, and you never touch another act's hat. Break the third and you're up on the Eddy Avenue ramp with the pigeons.",
+          "choices": [
+            {
+              "text": "And the first two?",
+              "goto": "rules_two"
+            },
+            {
+              "text": "Put me on the list, then.",
+              "goto": "pitch"
+            },
+            {
+              "text": "Understood.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "rules_two",
+          "line": "The first two are courtesy. The third one I enforce.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            },
+            {
+              "text": "Put me on the list.",
+              "goto": "pitch"
+            }
+          ]
+        },
+        {
+          "id": "quay",
+          "line": "Course the Quay makes more. A tourist has already decided to spend before they're off the ferry. Down here you've got two hundred thousand people who decided this morning not to look at you. Your job is to be a surprise.",
+          "choices": [
+            {
+              "text": "That sounds harder.",
+              "goto": "quay_harder"
+            },
+            {
+              "text": "So put me in the tunnel.",
+              "goto": "pitch"
+            },
+            {
+              "text": "Hm.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "quay_harder",
+          "line": "It is harder. That's why the list is short and why it's mine.",
+          "choices": [
+            {
+              "text": "Fine. The tunnel.",
+              "goto": "pitch"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Warm one. Tunnel runs ten degrees cooler and it eats your low notes, which is why the flute kids do all right down there and the didge blokes stay up top in the sun going deaf.",
+          "improv": {
+            "persona": "Trish, sixties, twenty-six years busking the Devonshire Street tunnel at Central Station in Sydney, now keeping the pitch roster on a laminated sheet. Deadpan, lower case, treats busking as a trade with rules and paperwork. Never sentimental about it.",
+            "context": "Someone has made small talk about the weather and the tunnel. She answers with the acoustics, because that is the only part of the weather that has ever affected her income. No exclamation marks."
+          },
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            },
+            {
+              "text": "Where'd you used to play?",
+              "goto": "who"
+            }
+          ]
+        },
+        {
+          "id": "pitch",
+          "line": "I'll pencil you in. Everyone can earn down there for twenty minutes. Show me a hundred and twenty in coins and the price of a coffee still in your pocket, and I'll write you in pen.",
+          "choices": [
+            {
+              "text": "Pen it in.",
+              "accept": "l3-tunnel-pitch",
+              "needLevel": 3,
+              "denyFlag": "l3:tunnel-pitch"
+            },
+            {
+              "text": "How much is the coffee?",
+              "goto": "coffee"
+            },
+            {
+              "text": "I'll think about it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "coffee",
+          "line": "Four fifty at the station, five twenty if you walk up to Surry Hills for a nice one. Either way it's nine songs. That's the maths of the whole trade and nobody wants to hear it.",
+          "choices": [
+            {
+              "text": "Nine songs. Pen it in.",
+              "accept": "l3-tunnel-pitch",
+              "needLevel": 3,
+              "denyFlag": "l3:tunnel-pitch"
+            },
+            {
+              "text": "Grim.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Let's see it. Coins on the ledge, not in my hand. I'm not counting your shrapnel twice.",
+          "choices": [
+            {
+              "text": "Hundred and twenty. Mostly gold.",
+              "turnin": "l3-tunnel-pitch"
+            },
+            {
+              "text": "And a photo of the Quay blokes.",
+              "goto": "done_photo"
+            },
+            {
+              "text": "Not yet.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done_photo",
+          "line": "Two of them on the one hat. That's not a duo, that's a syndicate. Good. Now hand me the coins.",
+          "choices": [
+            {
+              "text": "Here.",
+              "turnin": "l3-tunnel-pitch"
+            },
+            {
+              "text": "Give me a minute.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "richmond-kev",
+      "name": "Kev, ute owner, past tense",
+      "x": -42760,
+      "z": -29073,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "You're looking at a bloke standing in a car park with no car in it. That's the entirety of me this morning. And don't say rideshare. Out here rideshare is your uncle, and he's at work.",
+          "choices": [
+            {
+              "text": "What happened?",
+              "goto": "story"
+            },
+            {
+              "text": "I'll go and look for it.",
+              "goto": "offer"
+            },
+            {
+              "text": "I've got news about the ute.",
+              "goto": "keys"
+            },
+            {
+              "text": "How's the train treating you?",
+              "goto": "platform"
+            },
+            {
+              "text": "Bad luck, mate.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "story",
+          "line": "Friday at the club. Two schooners in and I thought, no, the bus'll be on the bridge, I'll leave it and get a lift. Nine years that bus has been on that bridge and the one Friday I plan around it, this.",
+          "choices": [
+            {
+              "text": "So the RBT saved your licence and cost you the ute.",
+              "goto": "offer"
+            },
+            {
+              "text": "Two schooners.",
+              "goto": "offer"
+            },
+            {
+              "text": "Rough.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "White HiLux, tray, dog cage, one hubcap doing its best. If it's anywhere it's the lanes behind East Richmond, which is where they get left when the tank runs out. I can't get there. I can't get anywhere.",
+          "choices": [
+            {
+              "text": "I'll go and have a look.",
+              "accept": "l3-richmond-ute",
+              "denyFlag": "l3:richmond-ute"
+            },
+            {
+              "text": "Have you told the police?",
+              "goto": "cops"
+            },
+            {
+              "text": "Get a bike.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "cops",
+          "line": "Windsor took it down on a form and said they'd flag it. Then they asked was I certain I hadn't lent it to my cousin. Fair question. I checked. He's got his own problems and none of them are white.",
+          "choices": [
+            {
+              "text": "I'll go and have a look.",
+              "accept": "l3-richmond-ute",
+              "denyFlag": "l3:richmond-ute"
+            },
+            {
+              "text": "Where do I start?",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "platform",
+          "line": "Every half hour if you're lucky and every hour if it's a Sunday. The whole suburb's built assuming you've got a car, and the timetable's built assuming you haven't. Somebody should introduce them.",
+          "improv": {
+            "persona": "Kev, forty-odd, Hawkesbury born, standing in the car park by Richmond station with no vehicle. Deadpan, cheerful about the wrong things, lower case, very Australian. Never whinges directly; states facts that are their own complaint.",
+            "context": "Someone has asked him how the trains are. Richmond is the terminus of the line, an hour and a half from the city, and he has been relying on it for four days after nineteen years of not once looking at a timetable."
+          },
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            },
+            {
+              "text": "You'll get used to it.",
+              "goto": "platform_no"
+            }
+          ]
+        },
+        {
+          "id": "platform_no",
+          "line": "Mate, that's what I'm frightened of.",
+          "choices": [
+            {
+              "text": "Understandable.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "keys",
+          "line": "Tray's there. Wheels are there. Tank's dry and there's a servo pie on the dash that isn't mine and isn't recent. Thank you. Genuinely. Give us the keys and don't look in the glovebox.",
+          "choices": [
+            {
+              "text": "What's in the glovebox?",
+              "goto": "glovebox"
+            },
+            {
+              "text": "Here.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "glovebox",
+          "line": "Sixty CDs and a court date. Neither of them mine any more, by the look of it.",
+          "choices": [
+            {
+              "text": "Right then.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Take that, it was in the console and it's less than the excess. First thing I'm doing is driving to the club. Second thing is leaving it there again and getting a lift home. I've learnt nothing and I'm at peace.",
+          "choices": [
+            {
+              "text": "Worth it for the hubcap alone.",
+              "turnin": "l3-richmond-ute"
+            },
+            {
+              "text": "Stay off the bridge, Kev.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
     }
   ]
 }

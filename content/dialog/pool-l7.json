@@ -934,6 +934,943 @@
           ]
         }
       ]
+    },
+    {
+      "id": "vaucluse-bowlo-lifer",
+      "name": "Hughie, last life member of the bowlo",
+      "x": 3591,
+      "z": 2278,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "You came up the escalators, so you're not from Vaucluse. Good. Everyone from Vaucluse has already told me the green's gone.",
+          "choices": [
+            {
+              "text": "What's happening to the green?",
+              "goto": "da"
+            },
+            {
+              "text": "You need a hand with something?",
+              "goto": "offer"
+            },
+            {
+              "text": "It's done. All of it.",
+              "goto": "done"
+            },
+            {
+              "text": "Why are you standing at a bus stop?",
+              "goto": "station"
+            },
+            {
+              "text": "What does footy mean round here?",
+              "goto": "footy"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "da",
+          "line": "Three townhouses. Each with a lawn the size of a rink. I've put that sentence in the submission twice and they've taken it out twice.",
+          "choices": [
+            {
+              "text": "So what beats it?",
+              "goto": "daclause"
+            },
+            {
+              "text": "Back up a second.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "daclause",
+          "line": "Clause four. Continuous sporting use. If the club plays, the green is a sporting facility. If it doesn't, it's nine hundred square metres of harbour glimpse.",
+          "choices": [
+            {
+              "text": "I'll get you a side.",
+              "goto": "offer"
+            },
+            {
+              "text": "Marita could put ten bodies on that green by lunch.",
+              "goto": "recruits",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "DeFAULT reckon a green should belong to nobody.",
+              "goto": "recruits",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "Grim.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "recruits",
+          "line": "I don't care who you run with. If they can hold a bat and stand still for the photograph they're a member, and it's forty dollars, and there's a form.",
+          "choices": [
+            {
+              "text": "There's always a form.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Here it is, then. Photographs, a ringer, a night in the nets, money through the till, and the whole bundle in Double Bay before four. I'd do it myself if I could still drive at night.",
+          "choices": [
+            {
+              "text": "Give me the bundle.",
+              "accept": "l7-continuous-sporting-use",
+              "needLevel": 7,
+              "denyFlag": "l7:continuous-use"
+            },
+            {
+              "text": "Not today, Hughie.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "footy",
+          "line": "Half the bar says Easts and means the Roosters. The other half says Easts and means the Beasts. Sixty years, and they've never once found this out about each other.",
+          "choices": [
+            {
+              "text": "And the cricket?",
+              "goto": "cricket"
+            },
+            {
+              "text": "Leave them to it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "cricket",
+          "line": "We field eleven. Nine are past seventy, one's a solicitor who stands at fine leg with the phone in his pocket. That is why you're going to Cabramatta.",
+          "choices": [
+            {
+              "text": "Understood.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "station",
+          "line": "There's no railway in Vaucluse. Never was. The men who built the place made sure of it, and now their grandchildren can't get a plumber before Tuesday.",
+          "improv": {
+            "persona": "Hughie, eighty-one, last life member of a bowling club in Vaucluse in eastern Sydney. Club blazer with a badge on it, drinks middies, has fought four development applications and lost three. Deadpan, dry, never bitter for longer than a sentence.",
+            "context": "Someone has asked why an old man from Vaucluse is standing at the Bondi Junction bus interchange. The answer is that the train does not go to Vaucluse and never has, and he is waiting on the 325 with a folder under his arm. Small talk only, no business."
+          },
+          "choices": [
+            {
+              "text": "So you catch the bus.",
+              "goto": "station2"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "station2",
+          "line": "The 325. It comes when it likes. Years of it, and I've never once been early to anything I wanted to go to.",
+          "choices": [
+            {
+              "text": "Same.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Well? Did they stamp it, or did they tell you the officer handling it is on leave?",
+          "choices": [
+            {
+              "text": "Stamped. Clause four and all.",
+              "turnin": "l7-continuous-sporting-use"
+            },
+            {
+              "text": "Not yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crowsnest-progress",
+      "name": "Janet, Crows Nest Progress Association",
+      "x": -1105,
+      "z": -4650,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Sign the petition. Don't read it first. Nobody reads it first, and I once watched a man read it for nine minutes and then not sign it.",
+          "choices": [
+            {
+              "text": "What's the petition?",
+              "goto": "what"
+            },
+            {
+              "text": "What's so special about the tree?",
+              "goto": "tree"
+            },
+            {
+              "text": "Both envelopes are lodged.",
+              "goto": "done"
+            },
+            {
+              "text": "How'd the consultation go?",
+              "goto": "sandwiches"
+            },
+            {
+              "text": "So what happened in the end?",
+              "goto": "verdict",
+              "needFlag": "l7:wet-signature"
+            },
+            {
+              "text": "Nothing, sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "what",
+          "line": "One fig, one footpath, three councils. North Sydney rings the bell, Willoughby owns the kerb it stands in, and the decision gets made in Parramatta by people who have never stood under it.",
+          "choices": [
+            {
+              "text": "So who am I objecting to?",
+              "goto": "offer"
+            },
+            {
+              "text": "Can't you just email it?",
+              "goto": "portal"
+            },
+            {
+              "text": "Three councils for one tree.",
+              "goto": "tree"
+            },
+            {
+              "text": "Marita reckon that tower's four hundred jobs.",
+              "goto": "jobs",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "DeFAULT were at the last one with a banner.",
+              "goto": "banner",
+              "needFaction": "DeFAULT"
+            }
+          ]
+        },
+        {
+          "id": "portal",
+          "line": "The portal accepts your submission. It does not receive it. Those are two different words and the tree is the difference. Paper, signed wet, handed to a person who has to look at you.",
+          "choices": [
+            {
+              "text": "Wet signature.",
+              "goto": "offer"
+            },
+            {
+              "text": "Ink dries, Janet.",
+              "goto": "ink"
+            }
+          ]
+        },
+        {
+          "id": "ink",
+          "line": "Not on the file it doesn't. On the file it's wet forever. That's the only good thing I've learnt in eleven years of this.",
+          "choices": [
+            {
+              "text": "Give me the envelopes.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "tree",
+          "line": "Ninety years. It was there before the ambulance station, the ambulance station is a day spa now, and the fig appears in the report exactly once, as a constraint.",
+          "choices": [
+            {
+              "text": "A constraint.",
+              "goto": "offer"
+            },
+            {
+              "text": "Day spa's not bad, though.",
+              "goto": "spa"
+            }
+          ]
+        },
+        {
+          "id": "spa",
+          "line": "It's very good. I go. That's not the point and you know it's not the point.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "jobs",
+          "line": "Four hundred jobs. It's in the flyer, ten-point type, with an asterisk. The asterisk is construction. Construction finishes. The fig was not going to finish.",
+          "choices": [
+            {
+              "text": "Still four hundred jobs.",
+              "goto": "offer"
+            },
+            {
+              "text": "I'll lodge it anyway.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "banner",
+          "line": "Lovely banner. Really well made. You stood it in front of the one woman from the department who'd come up on the train, and she went and had her lunch in the car.",
+          "choices": [
+            {
+              "text": "That's not what a banner's for.",
+              "goto": "offer"
+            },
+            {
+              "text": "She should've read it.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "sandwiches",
+          "line": "Three hundred people, four hours, butcher's paper on every wall. They wrote down every word we said. Then they built it. But the sandwiches were genuinely excellent and I'll say so anywhere.",
+          "improv": {
+            "persona": "Janet, seventy-one, secretary of the Crows Nest Progress Association, at a folding table outside the Metro entrance on Hume Street. Dry, precise, unbeatable, has read every planning document since 2014. Lower case energy, no exclamation marks.",
+            "context": "Someone has asked how the council's community consultation session went. It was well attended, meticulously minuted, catered, and changed nothing. She is not bitter about it in a loud way. Do not mention the factions in this answer."
+          },
+          "choices": [
+            {
+              "text": "What kind of sandwiches?",
+              "goto": "sandwiches_two"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "sandwiches_two",
+          "line": "Ribbon. Crusts off. Someone was paid to think about those sandwiches for a whole afternoon, and nobody was paid to think about the tree.",
+          "choices": [
+            {
+              "text": "That's the whole thing, isn't it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Two envelopes. Identical. Two counters, two suburbs, both shut at half four and one of them means going past the tree again. I'd do it myself but I've a hip and a tribunal Thursday.",
+          "choices": [
+            {
+              "text": "Give me the envelopes.",
+              "accept": "l7-wet-signature",
+              "denyFlag": "l7:wet-signature"
+            },
+            {
+              "text": "Half four's tight.",
+              "goto": "deadline"
+            },
+            {
+              "text": "Not my fig.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "deadline",
+          "line": "It shuts at 4:30 and it has shut at 4:29. Twice. Same woman both times. There's a plaque with her name on it now, for service to the community.",
+          "choices": [
+            {
+              "text": "Right. Hand them here.",
+              "accept": "l7-wet-signature",
+              "denyFlag": "l7:wet-signature"
+            },
+            {
+              "text": "I'll think about it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Both stamped? Show me the date. Not the receipt — the date. A receipt is a photocopy of a promise and I've a drawer of them at home.",
+          "choices": [
+            {
+              "text": "Both counters. Stamped, dated, witnessed.",
+              "turnin": "l7-wet-signature"
+            },
+            {
+              "text": "Still going.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "verdict",
+          "line": "Panel determined it Tuesday. Sitting in Parramatta, while you were on the train. The fig is retained in principle, which in this business means retained in a render.",
+          "choices": [
+            {
+              "text": "So that was all for nothing.",
+              "goto": "not_nothing"
+            },
+            {
+              "text": "A render.",
+              "goto": "not_nothing"
+            }
+          ]
+        },
+        {
+          "id": "not_nothing",
+          "line": "It's on the file. In 2011 they took the one outside the post office and there was no file at all — no objection, no name, no date. Now there's a name. Next one's in six weeks. Bring your own pen.",
+          "choices": [
+            {
+              "text": "I'll bring a pen.",
+              "goto": ""
+            },
+            {
+              "text": "Six weeks, Janet.",
+              "goto": "six"
+            }
+          ]
+        },
+        {
+          "id": "six",
+          "line": "Six weeks is nothing. I've a fig that did ninety years and a council that's been amalgamating since I was fifty-two.",
+          "choices": [
+            {
+              "text": "See you in six weeks.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "richmond-spotter",
+      "name": "Mick, aviation photographer (moved on)",
+      "x": -42250,
+      "z": -28850,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "That's a Herc running up. You can hear it from the car park at East Richmond. You cannot photograph it from the car park at East Richmond. That is the whole tragedy of my life.",
+          "choices": [
+            {
+              "text": "So what's stopping you?",
+              "goto": "offer"
+            },
+            {
+              "text": "I've got your shot.",
+              "goto": "handover"
+            },
+            {
+              "text": "Any chance of a spare card?",
+              "goto": "card"
+            },
+            {
+              "text": "When's the next train?",
+              "goto": "timetable"
+            },
+            {
+              "text": "Nothing. You're alright.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Twenty-two years on that fence and they know the hat. Last time two of them came out in a white ute and asked me to describe my intentions. I described them. They wrote them down.",
+          "choices": [
+            {
+              "text": "I'll get you the tail number.",
+              "accept": "l7-tail-number",
+              "denyFlag": "l7:tail-number"
+            },
+            {
+              "text": "What happens when they see me?",
+              "goto": "heat"
+            },
+            {
+              "text": "Marita reckon there's work going on the base.",
+              "needFaction": "Marita",
+              "goto": "politics"
+            },
+            {
+              "text": "DeFAULT reckon the base is the problem.",
+              "needFaction": "DeFAULT",
+              "goto": "politics"
+            },
+            {
+              "text": "Not for me, mate.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "heat",
+          "line": "The white ute first. Then the blue and whites off Windsor Street, and the breatho they've had sitting on the bridge approach since the last flood. Do not run at the bridge. The bridge is where they want you.",
+          "choices": [
+            {
+              "text": "So where do I go?",
+              "goto": "getaway"
+            },
+            {
+              "text": "Right.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "getaway",
+          "line": "The train. Richmond to East Richmond, one stop, eleven hundred metres, and it is still quicker than the road when the road has a checkpoint on it. I'll be on the platform with the good lens.",
+          "choices": [
+            {
+              "text": "Eleven hundred metres.",
+              "goto": "getaway_yes"
+            },
+            {
+              "text": "Got it.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "getaway_yes",
+          "line": "Cheapest fare on the network and the only one anybody has ever been grateful for.",
+          "choices": [
+            {
+              "text": "See you on the platform.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "politics",
+          "line": "Both your mobs have a view about that base and neither of them has ever stood in a paddock for four hours waiting on a wind change. Take the photo. The politics can have it after.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "timetable",
+          "line": "Fifty-one minutes. That's not a delay, that's the timetable. Single track past Riverstone. One an hour out here since before the fence went up, and the fence went up before I did.",
+          "improv": {
+            "persona": "Mick, a banned plane spotter standing in the car park at East Richmond station on the Hawkesbury floodplain. Sixties, camera bag, wide hat, deadpan, lower case, very Australian, patient past all reason.",
+            "context": "Someone has asked when the next train is. It is fifty-one minutes away. The Richmond line is single track past Riverstone and has run one train an hour his whole adult life. He is not complaining, only reporting."
+          },
+          "choices": [
+            {
+              "text": "I'll wait, then.",
+              "goto": "hello"
+            },
+            {
+              "text": "Fifty-one.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "card",
+          "line": "Spare card. Thirty-two gig, been through the Hawkesbury twice, so don't drop it in anything brown. Ten bucks, and I want it back with something on it.",
+          "choices": [
+            {
+              "text": "Ten bucks. Done.",
+              "needCash": 10,
+              "cost": 10,
+              "goto": "card_thanks"
+            },
+            {
+              "text": "I'll use my phone.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "card_thanks",
+          "line": "Format it before you shoot. Nobody has ever regretted formatting a card and everybody has regretted the other thing.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "handover",
+          "line": "Let's see. — He holds it at arm's length, then close, then at arm's length again. — That's the tail number. That is the actual tail number, and you got it on a Tuesday.",
+          "choices": [
+            {
+              "text": "Tail number and all. Take it.",
+              "turnin": "l7-tail-number"
+            },
+            {
+              "text": "Give me a minute.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "behrouz-sydride",
+      "name": "Behrouz, SydRide driver (4.62)",
+      "x": 3600,
+      "z": 2360,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Hazards on means I'm working. Hazards on means I'm allowed to be here. They are two different things and the ranger only knows the one.",
+          "choices": [
+            {
+              "text": "You're parked in a bus zone.",
+              "goto": "offer"
+            },
+            {
+              "text": "I've run your queue.",
+              "goto": "done"
+            },
+            {
+              "text": "Check the app.",
+              "goto": "rating"
+            },
+            {
+              "text": "How's the shift?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nothing. Good luck.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Ten minutes of surge left and I am boxed in by a camera in front and a ranger behind. You've got legs. Take my queue. Sixty-forty, and I'm the sixty, because it is my account they deactivate.",
+          "choices": [
+            {
+              "text": "What's in the queue?",
+              "goto": "queue"
+            },
+            {
+              "text": "Forty's fine.",
+              "accept": "l7-bondi-fare-job",
+              "needLevel": 7,
+              "denyFlag": "l7:bondi-fare-job"
+            },
+            {
+              "text": "I'll walk.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "queue",
+          "line": "Two to Edgecliff, which is one stop on the train. Four outside the pub who are not getting in this car. And a flat white, for me, which is the only one of them I'm certain of.",
+          "choices": [
+            {
+              "text": "Forty's fine.",
+              "accept": "l7-bondi-fare-job",
+              "needLevel": 7,
+              "denyFlag": "l7:bondi-fare-job"
+            },
+            {
+              "text": "Edgecliff is one stop.",
+              "goto": "onestop"
+            },
+            {
+              "text": "Not for forty percent.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "onestop",
+          "line": "I know it's one stop. She knows it's one stop. She books it anyway and she tips, and the train does not tip. Do not explain the train to her.",
+          "choices": [
+            {
+              "text": "Forty's fine.",
+              "accept": "l7-bondi-fare-job",
+              "needLevel": 7,
+              "denyFlag": "l7:bondi-fare-job"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "The surge map is orange over the beach. It has been orange over the beach since the day I bought the car. Orange is a feeling. It is not a road.",
+          "improv": {
+            "persona": "Behrouz, a SydRide rideshare driver parked with his hazards on outside Westfield Bondi Junction in Sydney. Twenty-two months on the app, rated 4.62, dry, unhurried, never bitter. Lower case, no exclamation marks.",
+            "context": "A stranger on Grafton Street has asked how the shift is going. The surge map has glowed orange over Bondi Beach all afternoon and it has never once meant a fare. Buses are replacing trains and the interchange is a scrum."
+          },
+          "choices": [
+            {
+              "text": "Drive to the beach, then.",
+              "goto": "smalltalk_more"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_more",
+          "line": "The surge is at the beach and so are the cars. That is what orange means. It means everybody else read the same map I did.",
+          "choices": [
+            {
+              "text": "Grim.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "rating",
+          "line": "Refresh. — Four point five eight. And there's an email. Subject line: an update to your SydRide account. Six words and not one of them is sacked.",
+          "choices": [
+            {
+              "text": "Appeal it.",
+              "goto": "appeal"
+            },
+            {
+              "text": "That's it, then.",
+              "goto": "after"
+            }
+          ]
+        },
+        {
+          "id": "appeal",
+          "line": "You appeal to a form. The form asks which of these best describes your concern. None of these best describes my concern.",
+          "choices": [
+            {
+              "text": "There's never an 'other'.",
+              "goto": "after"
+            }
+          ]
+        },
+        {
+          "id": "after",
+          "line": "Twenty-two months of this one street. — I've got a Saturday now. I have not had a Saturday since the twins.",
+          "choices": [
+            {
+              "text": "Congratulations, I think.",
+              "goto": "hello"
+            },
+            {
+              "text": "Take the hazards off, mate.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Cash, is it. Good. The app takes four days and a percentage to hand me my own money, and then the app calls that instant.",
+          "choices": [
+            {
+              "text": "Sixty-forty. Count it.",
+              "turnin": "l7-bondi-fare-job"
+            },
+            {
+              "text": "Not finished yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "carlton-guard",
+      "name": "Stavros, retired guard, platform 2",
+      "x": -7620,
+      "z": 11192,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Platform 2. Stand here, not there. There's where the guard's panel was. Forty years I had a window at that exact spot and I'm not having someone lean on it.",
+          "choices": [
+            {
+              "text": "What are you writing in that?",
+              "goto": "offer"
+            },
+            {
+              "text": "Here's what the board said.",
+              "goto": "ledger"
+            },
+            {
+              "text": "I've done the run.",
+              "goto": "done"
+            },
+            {
+              "text": "Do the announcements lie, or just leave things out?",
+              "goto": "board"
+            },
+            {
+              "text": "Did you ever call it wrong yourself?",
+              "goto": "fortyyears",
+              "needFlag": "l7:via-airport"
+            },
+            {
+              "text": "Nothing. My train's coming.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Forty years I called the stops. 'This train stops all stations to Cronulla.' You knew where you stood. Now it's a voice in a server, and she has never once had to pay for what she leaves out.",
+          "choices": [
+            {
+              "text": "What do you want done about it?",
+              "accept": "l7-via-airport",
+              "denyFlag": "l7:via-airport",
+              "needLevel": 7
+            },
+            {
+              "text": "Leaves out what, exactly?",
+              "goto": "board"
+            },
+            {
+              "text": "Some other time, Stavros.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "board",
+          "line": "They took four seconds off every announcement in 2019. Four seconds, every service, all day. Four seconds is exactly how long it takes to say 'via the airport'.",
+          "improv": {
+            "persona": "Stavros, a retired railway guard who worked the Illawarra line out of Kogarah for forty years and still comes to Carlton station every morning to stand where his window used to be. Deadpan, lower case, Greek-Australian, St George area, precise about timetables and nothing else.",
+            "context": "Someone has asked him whether the automated announcements lie. He thinks the omission is worse than a lie, and he has the exact figure -- four seconds trimmed per service in 2019 -- because he wrote to the minister about it four times. No slurs, no real people by name."
+          },
+          "choices": [
+            {
+              "text": "Four seconds.",
+              "goto": "board2"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "board2",
+          "line": "Somebody got a bonus for those four seconds. I got a plaque.",
+          "choices": [
+            {
+              "text": "What's on the plaque?",
+              "goto": "plaque"
+            },
+            {
+              "text": "Of course they did.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "plaque",
+          "line": "'For service.' Spelt right and everything. It's in the shed with the mower.",
+          "choices": [
+            {
+              "text": "Better than a gate fee.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "ledger",
+          "line": "Read it out and I'll write it. Kogarah, 6:12, board said City. — Spirax notebook, biro on a bit of string, eleven pages of this in the same handwriting.",
+          "choices": [
+            {
+              "text": "It said City. It went via the airport.",
+              "goto": "ledger2"
+            },
+            {
+              "text": "You could just look this up online.",
+              "goto": "ledger2"
+            }
+          ]
+        },
+        {
+          "id": "ledger2",
+          "line": "A timetable is a promise. A promise you have to look up isn't one.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Show me the photo. — He holds it at arm's length, then close, then arm's length again. Right. Seventeen thirty-four to get out of a station you never meant to be standing in.",
+          "choices": [
+            {
+              "text": "Seventeen thirty-four.",
+              "turnin": "l7-via-airport"
+            },
+            {
+              "text": "I'll bring it Tuesday.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "fortyyears",
+          "line": "Forty years I said 'City' and I never said 'via the airport', because the script didn't and the script was the job. My grandson got done in March. Page one of that book is my own handwriting.",
+          "choices": [
+            {
+              "text": "So that's what the notebook is.",
+              "goto": "fortyyears2"
+            },
+            {
+              "text": "That's not on you, Stavros.",
+              "goto": "fortyyears2"
+            }
+          ]
+        },
+        {
+          "id": "fortyyears2",
+          "line": "It's in my handwriting. Round here that's close enough to on me.",
+          "choices": [
+            {
+              "text": "See you on platform 2.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
     }
   ]
 }

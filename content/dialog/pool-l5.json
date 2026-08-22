@@ -909,6 +909,907 @@
           ]
         }
       ]
+    },
+    {
+      "id": "lidcombe-hearse-gaz",
+      "name": "Gaz, hearse driver at Rookwood",
+      "x": -15120,
+      "z": -120,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Fifteen minute zone, and I've been in it since ten. Flowers in the back, nowhere to be till two. You want something, or are you just reading the signwriting?",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "I've got a number for you.",
+              "goto": "report"
+            },
+            {
+              "text": "It's done. Open the kitty.",
+              "goto": "done"
+            },
+            {
+              "text": "There was a station in there?",
+              "goto": "mortuary"
+            },
+            {
+              "text": "Who else is in on this bet?",
+              "goto": "kitty"
+            },
+            {
+              "text": "Nothing. Nice hearse.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Three hundred and fourteen hectares, a million residents, not one booking on record. Nobody has ever actually tested it. I want a man to make himself unpopular out here and then walk in the gate.",
+          "choices": [
+            {
+              "text": "I'll make myself unpopular.",
+              "accept": "l5-booked-in-rookwood",
+              "denyFlag": "l5:booked-in-rookwood"
+            },
+            {
+              "text": "Unpopular with who, exactly?",
+              "goto": "offer_why"
+            },
+            {
+              "text": "I'll leave the dead out of it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_why",
+          "line": "The unit outside the club on Joseph Street will do. They set up at eight and they've got all night and nothing to point it at. You don't have to be clever. You have to be memorable, and then you have to be through the gate.",
+          "choices": [
+            {
+              "text": "And after the gate?",
+              "goto": "offer_then"
+            },
+            {
+              "text": "Back up a bit.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "offer_then",
+          "line": "After the gate you're a landscaping problem, not a police one. Walk out at Berala, get the Bankstown line back one stop like a person. The dead had their own train in here once. You get the all-stops with everyone's shopping.",
+          "choices": [
+            {
+              "text": "Fine. I'm in.",
+              "accept": "l5-booked-in-rookwood",
+              "denyFlag": "l5:booked-in-rookwood"
+            },
+            {
+              "text": "Their own train?",
+              "goto": "mortuary"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "mortuary",
+          "line": "Mortuary line. Ran from Central, one way, no return fares. They sold the station building in the fifties and carted it off to Canberra and made a church out of it. That's Rookwood: even the platform worked out how to leave.",
+          "choices": [
+            {
+              "text": "That can't be true.",
+              "goto": "mortuary_true"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "mortuary_true",
+          "line": "Stone by stone, on the back of trucks. Ask anyone out here who works a shovel.",
+          "choices": [
+            {
+              "text": "I'll ask a shovel.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "kitty",
+          "line": "Me, two of the grounds crew, and a bloke from the crematorium who has never once paid out. A hundred and forty dollars in an ice cream container in the glovebox.",
+          "improv": {
+            "persona": "Gaz, a hearse driver at Rookwood Necropolis in Lidcombe, western Sydney. Thirty years in the job, dry as a chip, genuinely fond of the place. Deadpan, lower case, no exclamation marks, never solemn about the dead.",
+            "context": "Someone has asked who else is in on his standing bet about whether anyone has ever been booked inside the cemetery. The stake is cash in an ice cream container in the hearse's glovebox. He is parked in a fifteen minute zone outside the bakery at Lidcombe station with flowers in the back and a service at two."
+          },
+          "choices": [
+            {
+              "text": "An ice cream container.",
+              "goto": "kitty_more"
+            },
+            {
+              "text": "Good enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "kitty_more",
+          "line": "It's a good container. It's been a good container for eleven years.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "report",
+          "line": "Go on then. Gate, or further?",
+          "choices": [
+            {
+              "text": "Two avenues. Then they stopped and looked at the map.",
+              "goto": "report_verdict"
+            },
+            {
+              "text": "They didn't come in at all.",
+              "goto": "report_verdict"
+            },
+            {
+              "text": "One of them is still in there.",
+              "goto": "report_lost"
+            }
+          ]
+        },
+        {
+          "id": "report_verdict",
+          "line": "Manners, then. Not the law. Forty years of blokes being too polite to book a man in a cemetery, and now it's a rule and nobody ever wrote it down. Best kind.",
+          "choices": [
+            {
+              "text": "Open the container.",
+              "goto": "done"
+            },
+            {
+              "text": "Write it down yourself.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "report_lost",
+          "line": "Then he's having a nicer afternoon than he planned. Necropolis Drive loops. He'll come out at the crematorium — everyone comes out at the crematorium.",
+          "choices": [
+            {
+              "text": "Open the container.",
+              "goto": "done"
+            },
+            {
+              "text": "I'll go back for him.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Glovebox. Don't count it in front of the flowers, they've had a big morning.",
+          "choices": [
+            {
+              "text": "Take the lid off.",
+              "turnin": "l5-booked-in-rookwood"
+            },
+            {
+              "text": "Keep it. Buy someone a wreath.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pointpiper-pools",
+      "name": "Dessie, pools and jetties",
+      "x": 2610,
+      "z": 1010,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "You're not strata, are you. Good. I do eleven pools on Wolseley Road and I've got a question that isn't about chlorine.",
+          "choices": [
+            {
+              "text": "Go on then.",
+              "goto": "offer"
+            },
+            {
+              "text": "What's the book for?",
+              "goto": "ledger"
+            },
+            {
+              "text": "I've had a look around.",
+              "goto": "done"
+            },
+            {
+              "text": "Eleven pools?",
+              "goto": "pools"
+            },
+            {
+              "text": "Nothing, mate.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Sunday I sling the leaf nets over the rail, because I'm knackered and I come back Tuesday. Monday they're hung properly. I have never once hung them properly.",
+          "choices": [
+            {
+              "text": "So someone's redoing your work.",
+              "accept": "l5-monday-inventory",
+              "denyFlag": "l5:monday-inventory"
+            },
+            {
+              "text": "Or you did it and forgot.",
+              "goto": "forgot"
+            },
+            {
+              "text": "Not this week.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "forgot",
+          "line": "I put a two-dollar coin in the skimmer box to settle it. Monday morning it's not in the box. It's not gone either. It's in my pocket, and it's warm.",
+          "choices": [
+            {
+              "text": "Right. Show me the run.",
+              "accept": "l5-monday-inventory",
+              "denyFlag": "l5:monday-inventory"
+            },
+            {
+              "text": "That's a Sunday-night explanation.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "ledger",
+          "line": "March to now. Same eleven pools, same readings, same Monday. Here's the bit I don't say at the pub: the pH is identical. Not close. Identical. Water doesn't do that.",
+          "choices": [
+            {
+              "text": "Nothing does that.",
+              "goto": "theory"
+            },
+            {
+              "text": "What do you reckon it is?",
+              "goto": "theory"
+            },
+            {
+              "text": "Keep the book somewhere dry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "theory",
+          "line": "I reckon somebody puts the harbour back. Neat about it, too. And they don't count the staff. — He looks at your hands. — You've still got last week on you. Most people up here don't.",
+          "choices": [
+            {
+              "text": "Meaning what?",
+              "goto": "theory2"
+            },
+            {
+              "text": "Marita would say you're owed for both weeks.",
+              "goto": "handlers",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "DeFAULT would say stop putting it back.",
+              "goto": "handlers",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "I'll take that as a compliment.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "theory2",
+          "line": "Meaning you turned up on a Monday remembering a Sunday. Whoever hangs my nets doesn't know that's a thing a person can do.",
+          "choices": [
+            {
+              "text": "Neither did I.",
+              "goto": "handlers"
+            },
+            {
+              "text": "I'll keep it to myself.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "handlers",
+          "line": "Whatever they told you. I'm not in a faction, I'm in a van. — He writes something in the book and turns it away from you. — Come Monday I'll have forgotten all this. You won't. Do us a favour and turn up.",
+          "choices": [
+            {
+              "text": "I'll turn up.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "pools",
+          "line": "Eleven. Three infinity, one lap pool nobody laps, and a pond at number 40 with ambitions.",
+          "improv": {
+            "persona": "Dessie, a pool and jetty maintenance contractor who services eleven harbourfront houses on Wolseley Road, Point Piper. Van, thongs, forearms, a clipboard he takes seriously. Deadpan, lower case, very Australian, fond of his clients the way you're fond of weather.",
+            "context": "Someone on the footpath has asked how many pools he looks after. He is proud of the round and quietly contemptuous of what the round is for. Small talk only -- no offers, no money."
+          },
+          "choices": [
+            {
+              "text": "Which one's the worst?",
+              "goto": "pools_worst"
+            },
+            {
+              "text": "Righto.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "pools_worst",
+          "line": "The pond with ambitions. Frogs. Forty grand of landscaping and it has produced frogs.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Let's see it. — He holds your photo next to a page. — Same light. Same tide. Same boat on the mooring, and that boat is supposed to be in Pittwater since Easter.",
+          "choices": [
+            {
+              "text": "Here's the lot.",
+              "turnin": "l5-monday-inventory"
+            },
+            {
+              "text": "I'll bring it back tomorrow.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "canley-vale-exile",
+      "name": "Hien, exiled one stop up the line",
+      "x": -24561,
+      "z": 2456,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "I'm not hiding. I'm standing at Canley Vale. There's a difference and it's about nine hundred metres.",
+          "choices": [
+            {
+              "text": "Hiding from what?",
+              "goto": "feud"
+            },
+            {
+              "text": "You want something photographed.",
+              "goto": "offer"
+            },
+            {
+              "text": "I'm back.",
+              "goto": "report"
+            },
+            {
+              "text": "Got your photos.",
+              "goto": "done"
+            },
+            {
+              "text": "Long wait for a train that's not coming.",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "None of my business.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "feud",
+          "line": "My cousin opened a second bakery two hundred metres from ours. Same name. Our name. And my aunty's committee sit out the front of the original from seven, drinking the evidence, planning my wedding to a man I have met once.",
+          "choices": [
+            {
+              "text": "So send someone who isn't you.",
+              "goto": "offer"
+            },
+            {
+              "text": "Just tell them no.",
+              "goto": "feud_no"
+            },
+            {
+              "text": "Rough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "feud_no",
+          "line": "I told them no in March. There is now a deposit on a function room.",
+          "choices": [
+            {
+              "text": "Right. What do you need.",
+              "goto": "offer"
+            },
+            {
+              "text": "Good luck with that.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Two photos. The new sign, so I can prove they used the name. The queue at ours, same morning, same light, so nobody can say I picked a slow day. Buy a coffee first — a man with a coffee is on a break, a man without one is a process server.",
+          "choices": [
+            {
+              "text": "One stop, two photos, done.",
+              "accept": "l5-cabramatta-proxy",
+              "denyFlag": "l5:cabramatta-proxy"
+            },
+            {
+              "text": "And the fare?",
+              "goto": "offer_fare"
+            },
+            {
+              "text": "This is a family problem.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_fare",
+          "line": "I'll cover the fare. — She says this the way the queue display says twelve minutes.",
+          "choices": [
+            {
+              "text": "Sure you will.",
+              "accept": "l5-cabramatta-proxy",
+              "denyFlag": "l5:cabramatta-proxy"
+            },
+            {
+              "text": "I'll think about it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "report",
+          "line": "Let me see. — She zooms in on the sign, then on the queue, then back on the sign, for a long time. — That's not even our font.",
+          "choices": [
+            {
+              "text": "Is that the part that matters?",
+              "goto": "report_font"
+            },
+            {
+              "text": "The queue at ours was longer.",
+              "goto": "report_font"
+            }
+          ]
+        },
+        {
+          "id": "report_font",
+          "line": "It's the part I can put in the group chat. Nobody argues with a photo. They argue with me. — She is already typing.",
+          "choices": [
+            {
+              "text": "So we're square.",
+              "goto": "done"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Everything comes through here eventually. That's the problem with the whole line. So does everyone.",
+          "improv": {
+            "persona": "Hien, thirty-four, born in Cabramatta, now standing on the Canley Vale platform one stop up the line because she cannot be seen in her own suburb this month. Dry, quick, fond of the place she is avoiding. Deadpan, no exclamation marks.",
+            "context": "A stranger has remarked on the wait for a train. She is not actually catching one. She has been on this platform most mornings for six weeks, watching the Cabramatta trains go through without her on them. Do not mention either street faction."
+          },
+          "choices": [
+            {
+              "text": "You're not catching a train, are you.",
+              "goto": "smalltalk_no"
+            },
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_no",
+          "line": "I've bought a ticket every morning for six weeks. It's cheaper than the wedding.",
+          "choices": [
+            {
+              "text": "Can't argue with that.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Send them to me. Both of them. And whatever you paid for that coffee, don't tell me, I don't want it on my conscience with everything else.",
+          "choices": [
+            {
+              "text": "Here's the lot.",
+              "turnin": "l5-cabramatta-proxy"
+            },
+            {
+              "text": "Later.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kez-sound",
+      "name": "Kez, sound for things without a name",
+      "x": -2660,
+      "z": 3312,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Kez. I do sound for things that haven't got a name yet. Don't say the word out loud this close to the station, the transit officers have ears.",
+          "choices": [
+            {
+              "text": "What needs doing?",
+              "goto": "offer"
+            },
+            {
+              "text": "The code for the lockup.",
+              "goto": "keys"
+            },
+            {
+              "text": "Where's it actually on?",
+              "goto": "where"
+            },
+            {
+              "text": "Whose power are you running off?",
+              "goto": "power"
+            },
+            {
+              "text": "The rig's in. Sub and all.",
+              "goto": "done"
+            },
+            {
+              "text": "Nothing. Good luck with it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Four kilowatts, a shed on Erskineville Road, and sunrise. Nobody's charging entry, so legally it's a picnic with a subwoofer, and I'd like it to stay legal until about two.",
+          "choices": [
+            {
+              "text": "I'll move your picnic.",
+              "accept": "l5-kilns-load-in",
+              "needLevel": 5,
+              "denyFlag": "l5:kilns-load-in"
+            },
+            {
+              "text": "I've moved a fridge. Never a sub.",
+              "goto": "weight"
+            },
+            {
+              "text": "Find someone with a ute.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "weight",
+          "line": "A fridge doesn't cost anything if you drop it. Take the stairs at St Peters slowly and don't let it touch the yellow line.",
+          "choices": [
+            {
+              "text": "Fine. I'll do it.",
+              "accept": "l5-kilns-load-in",
+              "needLevel": 5,
+              "denyFlag": "l5:kilns-load-in"
+            },
+            {
+              "text": "I'll think about it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "keys",
+          "line": "Padlock's a four-digit. It's my birthday backwards, which I'm not saying at a train station, so watch my hand. — She counts it out on her fingers, twice, wrong the first time.",
+          "choices": [
+            {
+              "text": "Got it.",
+              "goto": "hello"
+            },
+            {
+              "text": "That was five fingers.",
+              "goto": "keys_again"
+            }
+          ]
+        },
+        {
+          "id": "keys_again",
+          "line": "Then it's four of those five. You'll work it out, it's a shed, not a bank.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "where",
+          "line": "Off Sydney Park, down in the brick kilns. If you have to ask on King Street, you're already too far up King Street.",
+          "improv": {
+            "persona": "Kez, thirty-one, does sound for unpermitted parties in Sydney's inner west. Stands outside Newtown station at midnight in a hi-vis vest she is not entitled to wear. Deadpan, lower case, no exclamation marks, allergic to hype.",
+            "context": "Someone has asked where tonight's party is. It is in the old brick kilns at Sydney Park, St Peters. She will say it, because they will find it by ear anyway, but she resents being asked in public. Do not use the word rave."
+          },
+          "choices": [
+            {
+              "text": "I'll follow the bass.",
+              "goto": "hello"
+            },
+            {
+              "text": "Do the two mobs turn up to these?",
+              "goto": "factions"
+            }
+          ]
+        },
+        {
+          "id": "factions",
+          "line": "Marita treat it as a networking opportunity and hand out cards. DeFAULT arrive at four and stay for the birds. Neither of them helps carry anything.",
+          "choices": [
+            {
+              "text": "Sounds about right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "power",
+          "line": "Generator. We used the council's power once, in a park, and the council noticed in about eleven minutes. Diesel doesn't file a report.",
+          "choices": [
+            {
+              "text": "How much diesel?",
+              "goto": "power_cost"
+            },
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "power_cost",
+          "line": "Sixty dollars gets us to sunrise. After sunrise it's someone else's problem, usually mine.",
+          "choices": [
+            {
+              "text": "I'll find sixty.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "I can hear it from the platform, which means the whole of Erskineville can hear it, which means we've got about forty minutes of goodwill. Perfect. Here.",
+          "choices": [
+            {
+              "text": "Sub survived. So did I.",
+              "turnin": "l5-kilns-load-in"
+            },
+            {
+              "text": "Later. Go stand near your speakers.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rhodes-dawn-shooter",
+      "name": "Warwick, dawn photographer, tower 6",
+      "x": -11470,
+      "z": -4120,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Eleven years I've shot that hull. Trees growing out of a ship. Nothing I built in this suburb lasted like that, and I built most of it.",
+          "choices": [
+            {
+              "text": "What's the shot?",
+              "goto": "offer"
+            },
+            {
+              "text": "I've got your photo.",
+              "goto": "print"
+            },
+            {
+              "text": "Here's your card back.",
+              "goto": "done"
+            },
+            {
+              "text": "You built most of it?",
+              "goto": "works"
+            },
+            {
+              "text": "Good view from up there?",
+              "goto": "balcony"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Council fenced the good angle. Contamination, they said. I know exactly what is in that soil — I helped put it there — and it will not touch you in ninety seconds.",
+          "choices": [
+            {
+              "text": "I'll get your photo.",
+              "accept": "l5-floating-forest",
+              "denyFlag": "l5:floating-forest"
+            },
+            {
+              "text": "What happens when they see me?",
+              "goto": "heat"
+            },
+            {
+              "text": "Find a hobby, Warwick.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "heat",
+          "line": "Tower security ring the police. The police ring the booze bus, and the booze bus is already on Concord Road because the booze bus is always on Concord Road. Then you walk the rail bridge to Meadowbank and stop being interesting.",
+          "choices": [
+            {
+              "text": "And that works?",
+              "goto": "heat_yes"
+            },
+            {
+              "text": "Let me think about it.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "heat_yes",
+          "line": "It works on the ones who keep walking. It has never once worked on a man standing still explaining himself.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "works",
+          "line": "Process engineer. Thirty-one years on this exact dirt. Then they scraped the dirt off, put six towers on it, and sold a piece of it back to me as a balcony.",
+          "choices": [
+            {
+              "text": "That's grim.",
+              "goto": "works_no"
+            },
+            {
+              "text": "Back up a second.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "works_no",
+          "line": "It's tidy, is what it is. I helped ruin that bay, I live over it, and every morning I photograph the one thing in it that grew back. Not many blokes get their whole life inside one postcode.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "balcony",
+          "line": "Six towers went up while I was learning the light. The sun clears tower 8 at 6:40 now instead of 6:12. So I moved the tripod. That's the entire skill.",
+          "improv": {
+            "persona": "Warwick, seventy-eight, a retired process engineer living on level nine of an apartment tower at Rhodes in Sydney, built on the industrial site he used to work at. Dry, unhurried, faintly pleased with himself. Talks about light the way other men talk about horses.",
+            "context": "Someone has asked what the view is like from his flat. He photographs the same rusted ship in Homebush Bay every dawn and resents each new tower only for what it does to the sunrise timing. Small talk, nothing offered, nothing asked for."
+          },
+          "choices": [
+            {
+              "text": "Do the neighbours know you do this?",
+              "goto": "balcony_more"
+            },
+            {
+              "text": "Nice.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "balcony_more",
+          "line": "Two of them come down with me now. One brings a thermos. We have never once spoken about the soil.",
+          "choices": [
+            {
+              "text": "Probably wise.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "print",
+          "line": "Give it here. — He holds the phone at arm's length for a long, silent while. — The trees are sharp and the fence isn't in it. That's the one. Eleven years and a stranger gets it in a morning.",
+          "choices": [
+            {
+              "text": "The tide was right.",
+              "goto": "print_yes"
+            },
+            {
+              "text": "Where's my print, then?",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "print_yes",
+          "line": "The tide was right for me too, three thousand times. You just weren't scared of the fence. Come see me for the print.",
+          "choices": [
+            {
+              "text": "I'll take it now.",
+              "goto": "done"
+            },
+            {
+              "text": "Later, Warwick.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "A3, cotton rag, and I've written the date on the back because you will forget it and I won't. Money's in the envelope. Don't tell me what the fine was.",
+          "choices": [
+            {
+              "text": "Pleasure doing business.",
+              "turnin": "l5-floating-forest"
+            },
+            {
+              "text": "Keep it warm, I'll be back.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
     }
   ]
 }

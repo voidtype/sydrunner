@@ -894,6 +894,811 @@
           ]
         }
       ]
+    },
+    {
+      "id": "des-homebush",
+      "name": "Des, Homebush station assistant",
+      "x": -11327,
+      "z": 58,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "You want the 7:42 or you want a chat. Can't do both. That train has never once waited for anybody and I've stopped taking it personally.",
+          "choices": [
+            {
+              "text": "What's the vest for?",
+              "goto": "metro"
+            },
+            {
+              "text": "You look like a man with a problem.",
+              "goto": "offer"
+            },
+            {
+              "text": "I've got your evidence.",
+              "goto": "lodged"
+            },
+            {
+              "text": "How late's the next one?",
+              "goto": "board"
+            },
+            {
+              "text": "Nah. All good.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "metro",
+          "line": "Thirty-one years. Guard, then platform, then this. The Metro's got no driver, no guard and nobody to hold a door. Eleven carriages of no one being asked for anything.",
+          "choices": [
+            {
+              "text": "Sounds efficient.",
+              "goto": "metro_two"
+            },
+            {
+              "text": "Marita reckon that's a productivity story.",
+              "goto": "sides",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "DeFAULT reckon it's a redundancy with a logo.",
+              "goto": "sides",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "So what do you actually want?",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "metro_two",
+          "line": "So's a vending machine. I held a door eleven seconds in 2019 and a bloke made his connection at Strathfield. That's the whole career, and I'd do it again tomorrow, and they'd write it up.",
+          "choices": [
+            {
+              "text": "Eleven seconds.",
+              "goto": "offer"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "sides",
+          "line": "They've both been up here with a clipboard. One of them wants me retrained and one of them wants me radicalised. Neither of them tapped on.",
+          "choices": [
+            {
+              "text": "That's the whole argument, really.",
+              "goto": "offer"
+            },
+            {
+              "text": "Fair enough, Des.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "board",
+          "line": "Six minutes. Board says four. The board and the train have never met.",
+          "improv": {
+            "persona": "Des, a Sydney Trains station assistant at Homebush. Thirty-one years on the network, dry as a chip, fond of the job in a way he'd never say out loud. Deadpan, lower case, very Australian, no exclamation marks.",
+            "context": "A commuter has asked how late the next city-bound service is. The indicator board says four minutes and is wrong, as it is every morning. He is standing on the concourse in a high-vis vest with a flat white going cold on the ticket barrier."
+          },
+          "choices": [
+            {
+              "text": "I'll wait.",
+              "goto": "hello"
+            },
+            {
+              "text": "It said four ten minutes ago.",
+              "goto": "board_two"
+            }
+          ]
+        },
+        {
+          "id": "board_two",
+          "line": "It's not lying to you. It's hoping.",
+          "choices": [
+            {
+              "text": "Aren't we all.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "There's an inquiry. Station staffing, submissions close Friday, terms of reference longer than the platform. Mine is one bloke's opinion. Yours would have photographs in it.",
+          "choices": [
+            {
+              "text": "I'll get you your evidence.",
+              "accept": "l6-doors-closing",
+              "denyFlag": "l6:doors-closing",
+              "needLevel": 6
+            },
+            {
+              "text": "Write it yourself, Des.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "lodged",
+          "line": "Signed, dated, lodged before five. They'll read it in 2031, by which time I'm a photo on a wall at Strathfield and the doors still shut on their own. Ta for the coffee. It's cold. They always are.",
+          "choices": [
+            {
+              "text": "Here's the lot.",
+              "turnin": "l6-doors-closing"
+            },
+            {
+              "text": "Still working on it.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wahroonga-agent",
+      "name": "Hugh Marchetti, principal agent",
+      "x": -8712,
+      "z": -16766,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Open home's at ten. If you're buying, wonderful. If you're here to look at the kitchen and tell someone about it later, also wonderful — stand near the front so it reads full.",
+          "choices": [
+            {
+              "text": "What's it actually worth?",
+              "goto": "guide"
+            },
+            {
+              "text": "You need a hand Saturday.",
+              "goto": "offer"
+            },
+            {
+              "text": "What's the little place out the back going for?",
+              "goto": "granny"
+            },
+            {
+              "text": "It's Saturday. I'm here.",
+              "goto": "auction"
+            },
+            {
+              "text": "I did the lot.",
+              "goto": "done"
+            },
+            {
+              "text": "Just looking.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "guide",
+          "line": "Price guide's one point nine. The guide is a guide. That word is doing more work this morning than I am, and I've been up since five putting out signs.",
+          "choices": [
+            {
+              "text": "So what's the reserve?",
+              "goto": "guide2"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "guide2",
+          "line": "Two point four. If it makes two point two the vendor will be devastated and I will tell the paper it exceeded expectations. Both of those are true at the same time. That's the job.",
+          "choices": [
+            {
+              "text": "You need a hand Saturday.",
+              "goto": "offer"
+            },
+            {
+              "text": "Grim.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Good. Not complicated. Here before ten. Noise next door sorted. One photograph of the back garden with no laundry in it. Two hundred of marketing, because the vendor won't. And you out front at eleven looking solvent when I open the bidding.",
+          "choices": [
+            {
+              "text": "Coffee run, drop saw, one photo, two hundred. Done.",
+              "accept": "l6-price-guide",
+              "denyFlag": "l6:price-guide",
+              "needLevel": 6
+            },
+            {
+              "text": "I don't do auctions.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "granny",
+          "line": "The studio out the back? Six hundred a week. It's a garage with a sink and a very carefully worded legal opinion. Went up eighty in March. She stayed. They always stay — it's nine minutes' walk to the station.",
+          "choices": [
+            {
+              "text": "Eighty dollars.",
+              "goto": "grannybond"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "grannybond",
+          "line": "Look. Wear and tear is a hallway. Wear and tear is not a hallway with a hole in it. That distinction is eight hundred dollars of somebody's bond and I have defended it at tribunal twice.",
+          "improv": {
+            "persona": "Hugh Marchetti, principal agent of a two-office real estate agency on the Pacific Highway at Wahroonga, upper North Shore Sydney. Twenty years selling Federation houses to people who already live three streets away. Deadpan, fluent in agent-speak, entirely aware of himself and not apologising for it.",
+            "context": "Small talk on the footpath before an open home. Someone has asked why part of a bond was withheld on the granny flat out the back, and he is explaining the line between fair wear and tear and damage — a line he has argued at the tenancy tribunal. He offers no job and takes no money here."
+          },
+          "choices": [
+            {
+              "text": "You've thought about this a lot.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "auction",
+          "line": "Eleven. Register with Priya at the gate, don't bid, just breathe near the fence. Someone from DeFAULT tagged my A-frame last Saturday — housing is a human right, in silver paint. Fair point. I photographed it out.",
+          "choices": [
+            {
+              "text": "And the tenant out the back?",
+              "goto": "auction2"
+            },
+            {
+              "text": "Breathing near the fence.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "auction2",
+          "line": "She's had first look. That's a courtesy and it is worth exactly what courtesies are worth. Marita reckon they can have her a bond loan by Thursday. I hope they can. Bidding's in ten minutes.",
+          "choices": [
+            {
+              "text": "I'll be out front.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Gone. Two point three eight, to a couple from Turramurra who already own the house behind it. They'll rent it out. Nothing has moved anywhere. Here's your two-forty — you earned it and the vendor will never see the line item.",
+          "choices": [
+            {
+              "text": "Pleasure doing business.",
+              "turnin": "l6-price-guide"
+            },
+            {
+              "text": "Not yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hornsby-doof-nurse",
+      "name": "Nadia, night-shift nurse with a sound rig",
+      "x": -10520,
+      "z": -18120,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "The water clock, because everyone in Hornsby knows the water clock and nobody in Hornsby knows anything else. You look like you can lift. I've got a permit, a generator in Waitara, and until seven.",
+          "choices": [
+            {
+              "text": "What's the permit for?",
+              "goto": "offer"
+            },
+            {
+              "text": "What even is a water clock?",
+              "goto": "clock"
+            },
+            {
+              "text": "Your mob sent me.",
+              "goto": "zines",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "You know we do paid gigs, right?",
+              "goto": "rsl",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "It's done. Sun's up.",
+              "goto": "done"
+            },
+            {
+              "text": "I'm right, thanks.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Council approved an acoustic evening in the quarry. Acoustic. They didn't define it and I'm a nurse, not a lawyer. Rig has to be in the hole by one, or it's just people standing in a paddock at night.",
+          "choices": [
+            {
+              "text": "I'll go get your generator.",
+              "accept": "l6-quarry-doof",
+              "denyFlag": "l6:quarry-doof"
+            },
+            {
+              "text": "A rave. In the tip.",
+              "goto": "quarry"
+            },
+            {
+              "text": "Not tonight.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "quarry",
+          "line": "It's not a tip. It's NorthConnex spoil, and it's the only hole in this postcode the council hasn't put a Bunnings on. Bass sits in it like water. You'll hear it in Wahroonga, and then you'll hear from Wahroonga.",
+          "choices": [
+            {
+              "text": "Fine. Where's the generator.",
+              "accept": "l6-quarry-doof",
+              "denyFlag": "l6:quarry-doof"
+            },
+            {
+              "text": "I'll have a think.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "clock",
+          "line": "It tells the time with water, eventually. Every kid in this shire has been told not to climb it, and every kid in this shire has climbed it. That clock is the whole of Hornsby.",
+          "improv": {
+            "persona": "Nadia, a night-shift nurse at Hornsby Ku-ring-gai Hospital who runs a bush doof on her days off. Deadpan, dry, lower case, very Australian, fond of Hornsby in the way you are fond of a difficult relative.",
+            "context": "She is standing by the Hornsby water clock in the mall at eleven at night, waiting on a lift, and someone has asked her what the water clock actually is. It is a large kinetic sculpture that keeps time with water and is the only landmark anyone in Hornsby agrees on."
+          },
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            },
+            {
+              "text": "Did you climb it?",
+              "goto": "clock_yes"
+            }
+          ]
+        },
+        {
+          "id": "clock_yes",
+          "line": "I fell off it and I splinted my own wrist, which is how I found out what I wanted to do for a living.",
+          "choices": [
+            {
+              "text": "That tracks.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "zines",
+          "line": "Your lot turn up, sit on the rim, hand out zines and tell the kids the quarry is a metaphor. They also carry speakers up a fire trail without being asked, so I've stopped arguing with the zines.",
+          "choices": [
+            {
+              "text": "So where's this generator?",
+              "goto": "offer"
+            },
+            {
+              "text": "It is a bit of a metaphor.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "rsl",
+          "line": "Marita keep offering me a paid slot at the RSL. Thursday, seven till ten, sound limiter bolted to the wall, chicken schnitzel. I don't want a paid slot. I want a hole full of bass and my Sunday back.",
+          "choices": [
+            {
+              "text": "Then let's fill the hole.",
+              "goto": "offer"
+            },
+            {
+              "text": "The schnitty's good, though.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Sun's up, hole's empty, four dressing gowns went home, and nobody got hurt except acoustically. Gate money's yours. I'm on ward in twenty minutes smelling like a generator.",
+          "choices": [
+            {
+              "text": "Here's your night back.",
+              "turnin": "l6-quarry-doof"
+            },
+            {
+              "text": "Go to work, Nadia.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kenny-sydride-hurstville",
+      "name": "Kenny Ng, SydRide, 4.91",
+      "x": -9722,
+      "z": 11048,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Loading zone's twelve minutes. I've been in it since Tuesday. Hazards on means I'm working, mate, it's the law.",
+          "choices": [
+            {
+              "text": "You're in a loading zone with no car.",
+              "goto": "offer"
+            },
+            {
+              "text": "I'm back. What's the night sheet?",
+              "goto": "nightshift"
+            },
+            {
+              "text": "I've worked your sheet.",
+              "goto": "done"
+            },
+            {
+              "text": "Four point nine one. What happened?",
+              "goto": "rating"
+            },
+            {
+              "text": "Where is the car, actually?",
+              "goto": "car"
+            },
+            {
+              "text": "Nothing. Good luck with the ranger.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Forty trips gets the weekly bonus. I'm on thirty-three, it's Thursday, and the car is on a hoist. So you're on thirty-four through forty and I'm on the phone telling them you're two minutes away.",
+          "choices": [
+            {
+              "text": "Give me the phone.",
+              "accept": "l6-hurstville-fare",
+              "denyFlag": "l6:hurstville-fare",
+              "needLevel": 6
+            },
+            {
+              "text": "How does that work without a car?",
+              "goto": "howitworks"
+            },
+            {
+              "text": "Find someone with a licence.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "howitworks",
+          "line": "The pin is at the station. The passenger is never at the station — they're walking toward the pin, which is the one thing the app can't see. You walk toward them. Meet in the middle. That's the job.",
+          "choices": [
+            {
+              "text": "And the airport run?",
+              "goto": "airport"
+            },
+            {
+              "text": "Give me the phone.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "airport",
+          "line": "Hurstville to the terminal is the only fare on this side of the river worth setting an alarm for. Put her on the train and sit next to her the whole way. She'll rate the conversation, not the vehicle.",
+          "choices": [
+            {
+              "text": "That's fraud, Kenny.",
+              "goto": "airport_no"
+            },
+            {
+              "text": "Right. The phone.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "airport_no",
+          "line": "It's a five star arrival at a domestic terminal is what it is.",
+          "choices": [
+            {
+              "text": "Give me the phone.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "rating",
+          "line": "Four point nine one. I was four point nine eight in March. A bloke gave me one star because it rained on him between the door and the kerb.",
+          "improv": {
+            "persona": "Kenny Ng, a SydRide driver parked in the twelve-minute loading zone on Forest Road outside Westfield Hurstville. Fifty-one, immaculate Camry, does the 4am airport runs and the 2am karaoke runs and nothing in between. Deadpan, lower case, faintly wounded about his rating.",
+            "context": "Someone has asked why his passenger rating is 4.91. He can name every trip that cost him a star and he has thought about all of them. He does not blame the passengers out loud. Keep it short and dry, no exclamation marks."
+          },
+          "choices": [
+            {
+              "text": "Brutal.",
+              "goto": "hello"
+            },
+            {
+              "text": "Do you remember all of them?",
+              "goto": "rating_yes"
+            }
+          ]
+        },
+        {
+          "id": "rating_yes",
+          "line": "Every one. There's a lady in Penshurst who gave me three stars in 2019 and I still slow down outside her place.",
+          "choices": [
+            {
+              "text": "That's not healthy.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "car",
+          "line": "Peakhurst. Smash repairer. There's a bollard on level two of the carpark that has been there since the centre opened and the insurer has decided I invented it.",
+          "choices": [
+            {
+              "text": "You hit a bollard.",
+              "goto": "car_no"
+            },
+            {
+              "text": "I'll get you a photo of it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "car_no",
+          "line": "The bollard was stationary. That's the whole of their case.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "nightshift",
+          "line": "Right — night sheet. Ten till three, Forest Road, outside the karaoke. Half of them will try the door of a car that isn't mine and isn't there. Be firm. Be polite. Cancel nothing, cancelling costs me the bonus.",
+          "choices": [
+            {
+              "text": "And if they won't take no?",
+              "goto": "nightshift_firm"
+            },
+            {
+              "text": "Ten till three. Got it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "nightshift_firm",
+          "line": "Then they meet the footpath and they sleep it off and in the morning they leave five stars, because nobody remembers who they lost to at two a.m. — they only remember getting home.",
+          "choices": [
+            {
+              "text": "See you at three.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Forty. It says forty on the screen. Bonus lands Tuesday, rego's due Wednesday, and the car's out of the shop Monday if the bollard stops arguing.",
+          "choices": [
+            {
+              "text": "Pay me in cash, in the loading zone.",
+              "turnin": "l6-hurstville-fare"
+            },
+            {
+              "text": "Later, Kenny.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "l6-ashfield-platform-two-baz",
+      "name": "Baz, platform 2 at Ashfield",
+      "x": -7702,
+      "z": 2262,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Platform 2. Don't stand there, the shade's mine. — He is holding a timetable that was printed in 2011 and folded flat by hand.",
+          "choices": [
+            {
+              "text": "What are you doing out here?",
+              "goto": "run"
+            },
+            {
+              "text": "Someone said you had a job going.",
+              "goto": "offer"
+            },
+            {
+              "text": "Does the express really not stop here?",
+              "goto": "express"
+            },
+            {
+              "text": "How long's the wait?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "I've done your run.",
+              "goto": "done"
+            },
+            {
+              "text": "Nothing, mate.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "run",
+          "line": "Out to Strathfield on the all stations. Back on the all stations. I don't get off. Forty minutes where nobody wants anything off me and nobody has my number.",
+          "choices": [
+            {
+              "text": "Every day?",
+              "goto": "run2"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "run2",
+          "line": "Eleven years. My daughter thinks it's a bowls club. There is no bowls club. There's a train, and there's a window, and that'll do me.",
+          "choices": [
+            {
+              "text": "So what do you need?",
+              "goto": "offer"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "express",
+          "line": "Never has. It stops at Strathfield, it stops at Redfern, and it comes through here at ninety doing nothing for anyone. There's a petition. I started it. Four names on it and two of them are mine.",
+          "choices": [
+            {
+              "text": "Who signed the other two?",
+              "goto": "express2"
+            },
+            {
+              "text": "I'd sign it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "express2",
+          "line": "The bloke at the kebab shop, and his brother, who lives in Perth.",
+          "choices": [
+            {
+              "text": "A movement.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Four minutes on the board. It's six. The board rounds down out of politeness.",
+          "improv": {
+            "persona": "Baz, sixty-eight, a retired council parks bloke who spends every morning on platform 2 at Ashfield in Sydney's inner west. Deadpan, lower case, no exclamation marks, never uses two words where one will do.",
+            "context": "Somebody on the platform has asked how long until the next train. The indicator board says four minutes and is, as always, lying by two. He has watched this board for eleven years and holds no grudge against it, only the express."
+          },
+          "choices": [
+            {
+              "text": "I'll wait.",
+              "goto": "hello"
+            },
+            {
+              "text": "It said four when I got here.",
+              "goto": "smalltalk2"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk2",
+          "line": "It's said four since the Olympics.",
+          "choices": [
+            {
+              "text": "Righto.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Knees have gone on me and I'm not missing the run, so you're doing it. Coffee first — flat white, no sugar, I'll drink it here. Then out, then back. And one thing at Strathfield.",
+          "choices": [
+            {
+              "text": "What am I doing at Strathfield?",
+              "goto": "strathfield"
+            },
+            {
+              "text": "Not today, Baz.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "strathfield",
+          "line": "Take a photo of it. The station. Twice a day for eleven years and I have never once put a foot on that platform. I'd like to see the place I've been going.",
+          "choices": [
+            {
+              "text": "I'll get your photo.",
+              "accept": "l6-ashfield-express",
+              "denyFlag": "l6:ashfield-express",
+              "needLevel": 6
+            },
+            {
+              "text": "Ask me tomorrow.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Well? — He has his hand out for the phone before you've got it out of your pocket.",
+          "choices": [
+            {
+              "text": "Here. That's Strathfield.",
+              "turnin": "l6-ashfield-express",
+              "goto": "after"
+            },
+            {
+              "text": "Not yet.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "after",
+          "line": "Bigger than I thought. — He looks at it a long time, then hands the phone back. — Same time tomorrow. Don't sit next to me.",
+          "choices": [
+            {
+              "text": "See you, Baz.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
     }
   ]
 }

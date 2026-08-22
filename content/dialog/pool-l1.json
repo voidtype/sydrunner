@@ -106,7 +106,7 @@
         },
         {
           "id": "sign",
-          "line": "Date it the Monday. Not this Monday, the one before, the fortnight has to close. — He turns the tablet round and looks out the window at the tile showroom while you do it.",
+          "line": "Date it the Monday. Not this Monday, the one before, the fortnight has to close. \u2014 He turns the tablet round and looks out the window at the tile showroom while you do it.",
           "choices": [
             {
               "text": "Signed.",
@@ -124,7 +124,7 @@
         },
         {
           "id": "signed",
-          "line": "Beautiful. You are now retrospectively employed. Finish the rest and come back — the money's real and the job isn't, and only one of those has to be.",
+          "line": "Beautiful. You are now retrospectively employed. Finish the rest and come back \u2014 the money's real and the job isn't, and only one of those has to be.",
           "choices": [
             {
               "text": "Right.",
@@ -172,7 +172,7 @@
         },
         {
           "id": "done",
-          "line": "Outcome recorded. You're employed, backwards, somewhere that'll confirm it if anyone rings. Here's your fifty-five. Don't raise it at Redfern — Denise does the paperwork properly and it makes her sad.",
+          "line": "Outcome recorded. You're employed, backwards, somewhere that'll confirm it if anyone rings. Here's your fifty-five. Don't raise it at Redfern \u2014 Denise does the paperwork properly and it makes her sad.",
           "choices": [
             {
               "text": "Cheers, Dale.",
@@ -268,7 +268,7 @@
         },
         {
           "id": "offer",
-          "line": "Photograph it from the footpath. The footpath is public — say that word twice before you argue with anybody. Buy a coffee first. Nobody in Double Bay stops a person holding a coffee.",
+          "line": "Photograph it from the footpath. The footpath is public \u2014 say that word twice before you argue with anybody. Buy a coffee first. Nobody in Double Bay stops a person holding a coffee.",
           "choices": [
             {
               "text": "Give me the number and I'll walk it.",
@@ -283,7 +283,7 @@
         },
         {
           "id": "film",
-          "line": "Hold it still. — He looks at your phone for a long time. — That is the whole hedge. There is the fence line. There is the sky, where the view used to be.",
+          "line": "Hold it still. \u2014 He looks at your phone for a long time. \u2014 That is the whole hedge. There is the fence line. There is the sky, where the view used to be.",
           "choices": [
             {
               "text": "Can you use it?",
@@ -307,7 +307,7 @@
         },
         {
           "id": "done",
-          "line": "Tab nine, page one. — He writes the date on a sticky note and the note falls off the page. — Take the fee. I have written the word fee on the note as well.",
+          "line": "Tab nine, page one. \u2014 He writes the date on a sticky note and the note falls off the page. \u2014 Take the fee. I have written the word fee on the note as well.",
           "choices": [
             {
               "text": "Fee it is.",
@@ -322,8 +322,8 @@
       ]
     },
     {
-      "id": "milsons-tour-coral",
-      "name": "Coral, Harbour Bridge Rail Experience",
+      "id": "milsons-tour-dawn",
+      "name": "Dawn, Harbour Bridge Rail Experience",
       "x": 260,
       "z": -2600,
       "radius": 5,
@@ -391,12 +391,12 @@
           "id": "sides",
           "line": "Every seat is the harbour side. The rail deck's on the eastern edge, so the Opera House is out the window whichever way you're pointed. The upgrade's five dollars and nobody has ever asked for it back.",
           "improv": {
-            "persona": "Coral, who runs an unaffiliated one-stop train tour out of Milsons Point. Sixty-odd, sun-damaged, laminated sign, honest with locals and not remotely honest with cruise passengers. Deadpan, flat, Australian.",
+            "persona": "Dawn, who runs an unaffiliated one-stop train tour out of Milsons Point. Sixty-odd, sun-damaged, laminated sign, honest with locals and not remotely honest with cruise passengers. Deadpan, flat, Australian.",
             "context": "A local has asked which side of the train has the harbour view. Both sides do -- the rail deck sits on the eastern edge of the Harbour Bridge. She sells a five dollar harbour-side upgrade anyway and feels fine about it."
           },
           "choices": [
             {
-              "text": "That's a scam, Coral.",
+              "text": "That's a scam, Dawn.",
               "goto": "sides_no"
             },
             {
@@ -485,7 +485,7 @@
         },
         {
           "id": "done",
-          "line": "Let's see it, then. — She holds the phone out at arm's length and squints at the Bridge in it. — There it is. The whole coathanger. Not one person who's ever sat on the thing has come back with that.",
+          "line": "Let's see it, then. \u2014 She holds the phone out at arm's length and squints at the Bridge in it. \u2014 There it is. The whole coathanger. Not one person who's ever sat on the thing has come back with that.",
           "choices": [
             {
               "text": "Four fares, one crossing, one photo.",
@@ -509,7 +509,7 @@
       "nodes": [
         {
           "id": "hello",
-          "line": "Don't move. — She clicks a little tally counter. — That's four. You're four.",
+          "line": "Don't move. \u2014 She clicks a little tally counter. \u2014 That's four. You're four.",
           "choices": [
             {
               "text": "Four what?",
@@ -568,7 +568,7 @@
         },
         {
           "id": "categoryb_no",
-          "line": "A grant from the level of government that abolished us. — She clicks the counter. — Five. Someone walked past the entrance without stopping, but the form doesn't ask about stopping.",
+          "line": "A grant from the level of government that abolished us. \u2014 She clicks the counter. \u2014 Five. Someone walked past the entrance without stopping, but the form doesn't ask about stopping.",
           "choices": [
             {
               "text": "Sign me up.",
@@ -634,7 +634,7 @@
         },
         {
           "id": "done",
-          "line": "Let's see it. Light rail tap, one coffee, one photograph, one objection. — She staples the lot together. — Congratulations, that's a community.",
+          "line": "Let's see it. Light rail tap, one coffee, one photograph, one objection. \u2014 She staples the lot together. \u2014 Congratulations, that's a community.",
           "choices": [
             {
               "text": "Here's the lot.",
@@ -784,7 +784,7 @@
         },
         {
           "id": "done",
-          "line": "Let's see them. — He turns a bowl over, finds the club's initials scratched under the bias marker, and looks at the roof of the shed for a second.",
+          "line": "Let's see them. \u2014 He turns a bowl over, finds the club's initials scratched under the bias marker, and looks at the roof of the shed for a second.",
           "choices": [
             {
               "text": "Wazza sends his regards.",
@@ -792,6 +792,878 @@
             },
             {
               "text": "Still working on it.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "redfern-sydride-bec",
+      "name": "Bec, SydRide night shift",
+      "x": -1000,
+      "z": 2569,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Don't get in the front. Nobody gets in the front. \u2014 A white Camry in the Lawson Street bus zone, engine running, phone in the vent mount going off like a smoke alarm.",
+          "choices": [
+            {
+              "text": "Are you working?",
+              "goto": "job"
+            },
+            {
+              "text": "What's four point six one?",
+              "goto": "rating"
+            },
+            {
+              "text": "There's a bloke asleep in your back seat.",
+              "goto": "sleeper"
+            },
+            {
+              "text": "I've got your money.",
+              "goto": "settle"
+            },
+            {
+              "text": "All of it. Done.",
+              "goto": "done"
+            },
+            {
+              "text": "Wrong car, sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "job",
+          "line": "Three pings stacked and a ranger doing laps of the block. I can't leave the car and I can't sit in it. So you do the walking half and I'll do the driving half.",
+          "choices": [
+            {
+              "text": "What's the split?",
+              "goto": "split"
+            },
+            {
+              "text": "I'm not getting in that back seat.",
+              "goto": "sleeper"
+            },
+            {
+              "text": "Not tonight.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "split",
+          "line": "Sixty forty, my sixty, because I'm the one paying for tyres. One of the pings is a girl going Redfern to Newtown. Nineteen dollars. The train's one stop and it's standing in the station right now, and I'm not allowed to tell her that.",
+          "choices": [
+            {
+              "text": "But I am.",
+              "accept": "l1-four-point-six-one",
+              "denyFlag": "l1:four-point-six-one"
+            },
+            {
+              "text": "Tell her yourself.",
+              "goto": "tellher"
+            },
+            {
+              "text": "I'll think about it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "tellher",
+          "line": "Last time I told someone to catch the train I got three stars and a paragraph. You don't get a paragraph. You're not on the app.",
+          "choices": [
+            {
+              "text": "Fine. Give us the pin.",
+              "accept": "l1-four-point-six-one",
+              "denyFlag": "l1:four-point-six-one"
+            },
+            {
+              "text": "Free advice is expensive.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "rating",
+          "line": "My rating. Four point six one. At four point six oh the app stops opening and you find out you were never an employee, you were a small business, and the small business was you.",
+          "improv": {
+            "persona": "Bec, a Sydney rideshare driver working nights out of Redfern station in a white Camry. Eleven years of it. Dry, fast, lower case, not bitter so much as accurate. No exclamation marks.",
+            "context": "Someone leaning on her window has asked what the number on her phone means. It is her driver rating: 4.61, and 4.60 is deactivation. She has explained this to a great many people who thought it was a phone number."
+          },
+          "choices": [
+            {
+              "text": "How do you lose the points?",
+              "goto": "stars"
+            },
+            {
+              "text": "Grim.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "stars",
+          "line": "Chips. A bloke ate chips in here and gave me three stars for the smell of chips. Another one docked me for the Harbour Tunnel toll. I don't own the tunnel. I've never even been consulted about the tunnel.",
+          "choices": [
+            {
+              "text": "Nobody owns the tunnel.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "sleeper",
+          "line": "Got in at Erskineville, said the name of a pub, and went out like a christening baby. He's not sick, he's finished. Get him upright, get him out, point him at his own street. He lives about forty metres from here, which is the tragedy of it.",
+          "choices": [
+            {
+              "text": "I'll wake him.",
+              "goto": "hello"
+            },
+            {
+              "text": "Gently?",
+              "goto": "sleeper_two"
+            }
+          ]
+        },
+        {
+          "id": "sleeper_two",
+          "line": "Firmly. Gently is how he got to sleep in the first place.",
+          "choices": [
+            {
+              "text": "Understood.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "settle",
+          "line": "Give us it. \u2014 She counts it on the steering wheel in the dark, faster than you counted it in daylight. \u2014 Yeah. That's the night. Ticket on the windscreen's a hundred and ninety, so the night's a hundred and forty-five in the hole. But the rating held.",
+          "choices": [
+            {
+              "text": "That's not a business.",
+              "goto": "settle_two"
+            },
+            {
+              "text": "Keep the sixty. Keep the forty too.",
+              "goto": "settle_two"
+            }
+          ]
+        },
+        {
+          "id": "settle_two",
+          "line": "It's a car with a job. Come back Friday, I'm on till four and the last train isn't.",
+          "choices": [
+            {
+              "text": "Friday.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Photo of the ticket, fare delivered to Newtown by rail, my back seat empty and smelling of nothing. You're the only part of tonight that worked.",
+          "choices": [
+            {
+              "text": "Settle up.",
+              "turnin": "l1-four-point-six-one"
+            },
+            {
+              "text": "Not yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kogarah-pathology-nell",
+      "name": "Nell, pathology collections",
+      "x": -6740,
+      "z": 10600,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Six ten. Round starts at six. It has started at six every Monday I can remember, and I can remember fewer Mondays than I ought to.",
+          "choices": [
+            {
+              "text": "What's in the esky?",
+              "goto": "esky"
+            },
+            {
+              "text": "You need something run down the line?",
+              "goto": "offer"
+            },
+            {
+              "text": "It's done.",
+              "goto": "done"
+            },
+            {
+              "text": "Long shift?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "esky",
+          "line": "Seven tubes and a cold pack. All seven fasted since Sunday. All seven will fast since Sunday again next week. I have stopped writing that part down.",
+          "choices": [
+            {
+              "text": "Same seven?",
+              "goto": "esky_same"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "esky_same",
+          "line": "Same seven, same order, same tick in the fasting box. Their bloods come back clean every time, which for two of them is a small miracle and for one of them is impossible.",
+          "choices": [
+            {
+              "text": "Have you told anyone?",
+              "goto": "esky_told"
+            },
+            {
+              "text": "I'll not think about that.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "esky_told",
+          "line": "I told the registrar. He said the system rolls over Monday and anything before it is prior period. Then he asked me if I'd been on since Sunday. Fair question. I don't know.",
+          "choices": [
+            {
+              "text": "Prior period.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Carlton rooms. One stop, three minutes, and I can't leave the door unattended. The courier van was booked for Sunday and Sunday isn't offering an opinion this morning.",
+          "choices": [
+            {
+              "text": "Give us the esky.",
+              "accept": "l1-fasting-since-sunday",
+              "denyFlag": "l1:fasting-since-sunday"
+            },
+            {
+              "text": "I'll walk. It's one stop.",
+              "goto": "offer_walk"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_walk",
+          "line": "It's one stop by train and forty minutes by Rocky Point Road, and the cold pack is good for twenty. Get the train.",
+          "choices": [
+            {
+              "text": "Fine. Give us the esky.",
+              "accept": "l1-fasting-since-sunday",
+              "denyFlag": "l1:fasting-since-sunday"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "ledger",
+          "line": "Read it out. \u2014 Monday. Of course it says Monday. It said Monday on the one I photographed last week, and the ink was still wet on that one too, and I have both, and they are the same docket.",
+          "choices": [
+            {
+              "text": "It's a printer fault.",
+              "goto": "ledger_printer"
+            },
+            {
+              "text": "Both the same number?",
+              "goto": "ledger_printer"
+            },
+            {
+              "text": "Right. Well. Cheers, Nell.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "ledger_printer",
+          "line": "That's what I said. Out loud, to a man with a lanyard, in a corridor. \u2014 She puts your photo in the back of a notebook that is thicker than a fortnight, and does not show you the rest.",
+          "choices": [
+            {
+              "text": "How many are in there?",
+              "goto": "ledger_count"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "ledger_count",
+          "line": "Enough that I stopped counting, and the counting is the one part of this job I'm good at. Go on. You've got a week ahead of you and you'll want the run of it.",
+          "choices": [
+            {
+              "text": "See you Monday.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Twelve hours, and the first four of them are the same four. Kogarah at six is a carpark, a boom gate and eleven pharmacies, and not one of them open.",
+          "improv": {
+            "persona": "Nell, a pathology collections officer standing outside the specimen door on Belgrave Street in Kogarah, Sydney, at six in the morning with an esky. Nineteen years on the round. Deadpan, dry, lower case, kind underneath it, never sentimental.",
+            "context": "Someone has asked whether it's a long shift. It is always the same shift. Kogarah at dawn: the St George Hospital carpark boom gate, the specialists' rooms, the pharmacies that don't open until nine, the ambulances reversing into the bay. She is not going to say out loud that she thinks the week starts over, but she is thinking it."
+          },
+          "choices": [
+            {
+              "text": "Eleven pharmacies?",
+              "goto": "smalltalk_pharmacy"
+            },
+            {
+              "text": "I'll let you get on.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_pharmacy",
+          "line": "Twelve if you count the one in the hospital, and everyone counts the one in the hospital. That's the whole suburb: doctors, and a stadium, and somewhere to park for neither.",
+          "choices": [
+            {
+              "text": "Sounds about right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Carlton signed for it? Good. That's the round. \u2014 She looks at the docket for slightly too long before she files it.",
+          "choices": [
+            {
+              "text": "Signed, photographed, delivered.",
+              "turnin": "l1-fasting-since-sunday"
+            },
+            {
+              "text": "Not yet.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "roz-bondi-junction-f486a8",
+      "name": "Roz, Marita placements",
+      "x": 3560,
+      "z": 2340,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Marita placements. That's a table, not a stall \u2014 centre management have a form for stalls and I have read it. Stand there. The chair's for clients and you're not one yet.",
+          "choices": [
+            {
+              "text": "What's on offer?",
+              "goto": "offer"
+            },
+            {
+              "text": "I've done your four items.",
+              "goto": "done"
+            },
+            {
+              "text": "You lot stand in the doorway at Redfern.",
+              "goto": "doorway"
+            },
+            {
+              "text": "I'm with DeFAULT.",
+              "goto": "theothers",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "Why's the escalator taped off?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Kitchen hand, two hours, trial. Blacks, no logos, shoes you can't see your socks through. Before a client meets you I run an assessment. Four items. They are not errands \u2014 errands don't have a form.",
+          "choices": [
+            {
+              "text": "Where do I sign?",
+              "accept": "l1-blacks-no-logos",
+              "denyFlag": "l1:blacks-no-logos"
+            },
+            {
+              "text": "What's the pay?",
+              "goto": "pay"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "pay",
+          "line": "The trial's unpaid, which is legal, which is the part everyone wants to argue about at a table in a shopping centre. Travel's on me. Travel is forty-five dollars because I decided it was.",
+          "choices": [
+            {
+              "text": "And the actual job?",
+              "goto": "thursday"
+            },
+            {
+              "text": "Fine.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "thursday",
+          "line": "Thursday. \u2014 She writes something on the form that is not a date, and does not say which Thursday, because nobody who has asked has ever asked twice.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "offer"
+            },
+            {
+              "text": "I'll think about it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "doorway",
+          "line": "I don't loiter in doorways. I've got a table, a lanyard and a bay allocation. That's not loitering, that's presence. The bloke in the doorway is the other mob, and they're not offering you a shift, are they.",
+          "choices": [
+            {
+              "text": "So what are you offering?",
+              "goto": "offer"
+            },
+            {
+              "text": "Just asking.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "theothers",
+          "line": "Good. Bring that. Clients love a bit of fire in a kitchen hand \u2014 for the first fortnight. I don't ask what you believe, I ask what size shirt.",
+          "choices": [
+            {
+              "text": "Medium.",
+              "goto": "offer"
+            },
+            {
+              "text": "You're not bothered?",
+              "goto": "theothers_no"
+            }
+          ]
+        },
+        {
+          "id": "theothers_no",
+          "line": "Love, half my placements think work is the problem. They still turn up. That's the tragedy of the eastern suburbs: the rent is due either way.",
+          "choices": [
+            {
+              "text": "Show me the four items.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Third time this year. They put up a sign apologising for any inconvenience, and then they put a bloke next to the sign to say it out loud.",
+          "improv": {
+            "persona": "Roz, a labour-hire placement officer for Marita, working from a folding table by the Westfield entrance at Bondi Junction. Fifties, lanyard, deadpan, lower case, no exclamation marks. Never cruel, never warm.",
+            "context": "A new client has asked why the escalator up to the bus interchange is taped off again. It has been out three times this year. She has watched the whole of the eastern suburbs file past her table around it. Spell her employer exactly as Marita."
+          },
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            },
+            {
+              "text": "I'll take the stairs.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Cold. But it's here and you're here, which puts you ahead of the last four. \u2014 She initials the form twice, keeps the coffee, and does not look at the photo of the door.",
+          "choices": [
+            {
+              "text": "So I'm on the books.",
+              "turnin": "l1-blacks-no-logos"
+            },
+            {
+              "text": "Not finished yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "darlo-tam-oxford",
+      "name": "Tam, DeFAULT (Darlinghurst branch)",
+      "x": 1148,
+      "z": 792,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Careful, you're in the coffee queue. They'll serve you before me and I've been standing here since six.",
+          "choices": [
+            {
+              "text": "What's the clipboard for?",
+              "goto": "offer"
+            },
+            {
+              "text": "You're the ones who say work is the problem.",
+              "goto": "work"
+            },
+            {
+              "text": "What happened to the crossing?",
+              "goto": "crossing"
+            },
+            {
+              "text": "You said there was a form to sign.",
+              "goto": "affidavit"
+            },
+            {
+              "text": "I've got your photos.",
+              "goto": "done"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Submission forty-one. Night-time economy review. They've asked for lived experience, so I need someone with a phone and no appointments, and mate, you've got both.",
+          "choices": [
+            {
+              "text": "Go on then.",
+              "accept": "l1-oxford-heritage-audit",
+              "denyFlag": "l1:oxford-heritage-audit"
+            },
+            {
+              "text": "What's in it for me?",
+              "goto": "pay"
+            },
+            {
+              "text": "Try the bloke behind me.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "pay",
+          "line": "Forty out of the branch float. Don't say it upstairs \u2014 the others all did theirs for nothing and they've been unbearable about it since.",
+          "choices": [
+            {
+              "text": "Forty's forty.",
+              "accept": "l1-oxford-heritage-audit",
+              "denyFlag": "l1:oxford-heritage-audit"
+            },
+            {
+              "text": "Keep your forty.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "work",
+          "line": "We do. And I've been on Darlinghurst Road since six with a clipboard, no super and a coffee I bought myself. Don't start.",
+          "improv": {
+            "persona": "Tam, an unpaid organiser for DeFAULT, standing outside a coffee place on Darlinghurst Road in Darlinghurst, Sydney. Thirties, high-vis over a good shirt, deadpan, lower case, fond of the suburb and tired of it. Spell the factions exactly as Marita and DeFAULT.",
+            "context": "A stranger has just pointed out that the faction whose whole position is that work is the problem has him doing eleven-hour days for free. He has heard this one before, from his own mother."
+          },
+          "choices": [
+            {
+              "text": "That's a contradiction.",
+              "goto": "work_no"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "work_no",
+          "line": "It's not a contradiction, it's an unpaid internship. Completely different form. The other mob, Marita, they'd have you in a hi-vis by Thursday \u2014 paid, too, that's the trap.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "crossing",
+          "line": "Council painted the rainbow crossing at Taylor Square, then scraped it off, then apologised. Two invoices, one council, same financial year. That's the submission, really. That's the whole thing.",
+          "choices": [
+            {
+              "text": "People chalked their own, though.",
+              "goto": "crossing_chalk"
+            },
+            {
+              "text": "Grim.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "crossing_chalk",
+          "line": "Every driveway from here to Enmore, in one night. There's still one in the lane behind the sign if it hasn't rained and the council hasn't been.",
+          "choices": [
+            {
+              "text": "I'll go and look.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "affidavit",
+          "line": "Statutory declaration. I read it, you sign it, I lodge it, they acknowledge receipt in eleven weeks and change nothing. Hold the pen properly, it's the branch's pen.",
+          "choices": [
+            {
+              "text": "Give us the pen.",
+              "goto": "affidavit_signed"
+            },
+            {
+              "text": "Read it again, slower.",
+              "goto": "affidavit_slow"
+            }
+          ]
+        },
+        {
+          "id": "affidavit_slow",
+          "line": "\"The declarant attended Oxford Street and observed.\" That's the clause. That's all of it. Eleven weeks for that.",
+          "choices": [
+            {
+              "text": "Where do I sign.",
+              "goto": "affidavit_signed"
+            }
+          ]
+        },
+        {
+          "id": "affidavit_signed",
+          "line": "Witnessed. There's two dollars in it for photocopying if you're flush. No worries if you're not, I'll do it at the library and lie about the queue.",
+          "choices": [
+            {
+              "text": "Here's two bucks.",
+              "goto": "photocopy",
+              "cost": 2,
+              "needCash": 2
+            },
+            {
+              "text": "I'm not flush.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "photocopy",
+          "line": "Colour copy. They read the colour ones. I don't know why that's true and I've stopped asking.",
+          "choices": [
+            {
+              "text": "Worth it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Let's see. \u2014 Tam looks at your phone for a long time, then up the road at the shutters, then back at the phone.",
+          "choices": [
+            {
+              "text": "Submission forty-one.",
+              "turnin": "l1-oxford-heritage-audit"
+            },
+            {
+              "text": "Still getting them.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vinh-leasing-cabramatta",
+      "name": "Vinh, leasing agent, first week",
+      "x": -24905,
+      "z": 3300,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Are you the ten-fifteen? Register on the iPad. The iPad's flat. Register on this envelope.",
+          "choices": [
+            {
+              "text": "What's the place like?",
+              "goto": "listing"
+            },
+            {
+              "text": "You look like you need a hand.",
+              "goto": "offer"
+            },
+            {
+              "text": "Why's the queue round the corner?",
+              "goto": "queue"
+            },
+            {
+              "text": "I've done what you asked.",
+              "goto": "done"
+            },
+            {
+              "text": "Wrong driveway. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "listing",
+          "line": "Studio. It's a studio. The council has it down as a garage and the council isn't the one paying five-twenty a week.",
+          "improv": {
+            "persona": "Vinh, twenty-three, first week as a leasing agent at a small Cabramatta agency. Suit jacket from the Vinnies on John Street, one clipboard, no commission yet. Cheerful, fast, quietly ashamed. Deadpan, lower case, very western Sydney.",
+            "context": "Someone at the open home has asked what the property is actually like. It is a converted garage behind a block on Cabramatta Road with a roller door, one window, and a shower over the laundry tub. He is not going to lie exactly, he is going to describe it beautifully."
+          },
+          "choices": [
+            {
+              "text": "Is that a roller door?",
+              "goto": "roller"
+            },
+            {
+              "text": "What's the dark bit on the ceiling?",
+              "goto": "mould"
+            },
+            {
+              "text": "Right. Anyway.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "roller",
+          "line": "That's the feature wall. It goes up. Most feature walls don't.",
+          "choices": [
+            {
+              "text": "Sell it to me, then.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "mould",
+          "line": "It's a shadow. It's a shadow that's a bit soft when you press it. Don't press it during the inspection.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "queue",
+          "line": "Forty-one registered. The owner grew up two streets over, he's out at Bella Vista now, and he rings every Saturday at eleven to ask if it went for more.",
+          "choices": [
+            {
+              "text": "Did it ever go for less?",
+              "goto": "queue_no"
+            },
+            {
+              "text": "Bleak.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "queue_no",
+          "line": "Once. He put in a dishwasher and got it back in nine weeks.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "I do. Ride out the way an applicant would so I know what the twenty-two minutes actually is, get down the driveway, get me a photo that has a hallway in it somehow, and keep number nine off the front lawn. She means well. She means it loudly.",
+          "choices": [
+            {
+              "text": "Twenty-two minutes. Sure. I'll time it.",
+              "accept": "l1-cabramatta-open-home",
+              "denyFlag": "l1:cabramatta-open-home"
+            },
+            {
+              "text": "I'm not knocking over your neighbour, mate.",
+              "goto": "scruple"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "scruple",
+          "line": "She's eighty-one and she has a leaf blower she uses at inspections on purpose. She'll enjoy it more than you will.",
+          "choices": [
+            {
+              "text": "Alright. Ten-fifteen.",
+              "accept": "l1-cabramatta-open-home",
+              "denyFlag": "l1:cabramatta-open-home"
+            },
+            {
+              "text": "Still no.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Let's see it. \u2014 He turns the phone sideways, then upside down, then sideways again. \u2014 That's a hallway. That's genuinely a hallway. You've made a garage have a hallway.",
+          "choices": [
+            {
+              "text": "Thirty-eight minutes, by the way. Not twenty-two.",
+              "turnin": "l1-cabramatta-open-home"
+            },
+            {
+              "text": "I'll come back when it's uploaded.",
               "goto": ""
             }
           ]

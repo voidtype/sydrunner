@@ -100,7 +100,7 @@
       "act": 1,
       "title": "The Harbour Bridge Rail Experience",
       "blurb": "Twelve dollars. Three minutes. Unrivalled harbour views. Five more for the harbour side, and don't you dare tell them which side that is. The hard part is the photograph. I'll explain the photograph.",
-      "giver": "milsons-tour-coral",
+      "giver": "milsons-tour-dawn",
       "level": 1,
       "requires": [],
       "repeatable": false,
@@ -239,6 +239,261 @@
         "xp": 220,
         "unlock": [
           "l1:triples"
+        ]
+      }
+    },
+    {
+      "id": "l1-four-point-six-one",
+      "act": 1,
+      "title": "Four Point Six One",
+      "blurb": "At four point six oh the app stops opening and you find out you were never an employee. Three pings stacked, a ranger doing laps of the block, and a bloke asleep in my back seat. You've got legs. Go.",
+      "giver": "redfern-sydride-bec",
+      "level": 1,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -1078,
+          "z": 2643,
+          "radius": 25,
+          "label": "stand where the app drops the pin: the Abercrombie Street corner, where no car has ever legally stopped"
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 1,
+          "label": "get the sleeper out of the back seat and pointed at his own street. He isn't sick, he's finished"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Redfern",
+          "to": "Newtown",
+          "label": "walk the nineteen-dollar fare onto the platform and ride her the one stop she ordered a car for"
+        },
+        {
+          "kind": "earn",
+          "dollars": 35,
+          "label": "clear $35 off the queue before the surge dies and it's just a Tuesday again"
+        },
+        {
+          "kind": "photo",
+          "x": -996,
+          "z": 2559,
+          "radius": 20,
+          "label": "photograph the ticket on the windscreen in the Lawson Street bus zone. The appeal needs to see there was no bus"
+        },
+        {
+          "kind": "dialog",
+          "npc": "redfern-sydride-bec",
+          "node": "settle",
+          "label": "count the night up on the steering wheel with Bec"
+        }
+      ],
+      "reward": {
+        "cash": 45,
+        "xp": 230,
+        "unlock": [
+          "l1:four-point-six-one"
+        ]
+      }
+    },
+    {
+      "id": "l1-fasting-since-sunday",
+      "act": 1,
+      "title": "Fasting Since Sunday",
+      "blurb": "Six-ten, and the round starts at six. Seven tubes for the Carlton rooms, one stop down the line. The courier van was booked for Sunday. Sunday isn't in the system this morning, so neither is the van.",
+      "giver": "kogarah-pathology-nell",
+      "level": 1,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "One flat white, no sugar, hers. The seven names on her list have fasted since Sunday and it would be rude to walk in holding seven more."
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 1,
+          "label": "Clear the boom gate on the hospital carpark. Someone has been explaining her parking validation to a machine since ten past six and the ambulances would like through."
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Kogarah",
+          "to": "Carlton",
+          "label": "One stop with the esky on your lap. Not on the floor, not on the seat, not next to the bloke with the Dragons scarf. On your lap."
+        },
+        {
+          "kind": "photo",
+          "x": -7600,
+          "z": 11220,
+          "radius": 25,
+          "label": "Photograph the docket on the counter at the Carlton rooms. Monday will say nothing arrived. The photo will say otherwise, for a while."
+        },
+        {
+          "kind": "dialog",
+          "npc": "kogarah-pathology-nell",
+          "node": "ledger",
+          "label": "Back up Belgrave Street to Nell, and read her the date the docket printed."
+        }
+      ],
+      "reward": {
+        "cash": 45,
+        "xp": 220,
+        "unlock": [
+          "l1:fasting-since-sunday"
+        ]
+      }
+    },
+    {
+      "id": "l1-blacks-no-logos",
+      "act": 1,
+      "title": "Blacks, No Logos",
+      "blurb": "Black shirt, black pants, shoes you can't see your socks through. Before a client sees you there's an assessment: a coffee, a complaint, one stop on the train, and a photo of a door in Edgecliff.",
+      "giver": "roz-bondi-junction-f486a8",
+      "level": 1,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "item one: flat white, from the place by the escalators. It is timed and she can tell."
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 1,
+          "label": "item two: the woman who reports the table to centre management every fortnight. Be persuasive."
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Bondi Junction",
+          "to": "Edgecliff",
+          "label": "item three: one stop to Edgecliff. Tap on. She needs the record, not the walk."
+        },
+        {
+          "kind": "photo",
+          "x": 2545,
+          "z": 1152,
+          "radius": 40,
+          "label": "item four: photograph the client's door. Do not buzz it. They have not been told about you."
+        }
+      ],
+      "reward": {
+        "cash": 45,
+        "xp": 210,
+        "unlock": [
+          "l1:blacks-no-logos"
+        ]
+      }
+    },
+    {
+      "id": "l1-oxford-heritage-audit",
+      "act": 1,
+      "title": "Submission 41 to the Night-Time Economy Review",
+      "blurb": "DeFAULT is lodging a submission and a submission needs photographs. Two hours of your day, most of it downhill. There's no money in it. There's forty dollars in it. Don't say that in front of the branch.",
+      "giver": "darlo-tam-oxford",
+      "level": 1,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "get a flat white into Tam. He does not start the working day without one and neither does the suburb."
+        },
+        {
+          "kind": "ko",
+          "npc": "rbt",
+          "count": 1,
+          "label": "the booze bus sets up at the bottom of Darlinghurst Road from nine. Register your feedback with it."
+        },
+        {
+          "kind": "photo",
+          "x": 160,
+          "z": 860,
+          "radius": 40,
+          "label": "photograph the Downing Centre on Liverpool Street — where Oxford Street ends up on a Monday morning"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Central",
+          "to": "Newtown",
+          "label": "train it out to Newtown. Everything that used to happen here happens on Enmore Road now, and Tam wants that in the record."
+        },
+        {
+          "kind": "dialog",
+          "npc": "darlo-tam-oxford",
+          "node": "affidavit",
+          "label": "back up Darlinghurst Road and sign the statutory declaration"
+        }
+      ],
+      "reward": {
+        "cash": 40,
+        "xp": 220,
+        "unlock": [
+          "l1:oxford-heritage-audit"
+        ]
+      }
+    },
+    {
+      "id": "l1-cabramatta-open-home",
+      "act": 1,
+      "title": "Wide, Light-Filled, Close to Transport",
+      "blurb": "Ten-fifteen open home, forty-one registered, and the owner reckons five-twenty a week. Mate, it's a garage. It has a roller door. I need it photographing like a home before ten-fifteen.",
+      "giver": "vinh-leasing-cabramatta",
+      "level": 1,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Central",
+          "to": "Cabramatta",
+          "label": "come out the way an applicant would — the listing says twenty-two minutes to the city, and nobody at the agency has ever checked"
+        },
+        {
+          "kind": "goto",
+          "x": -24810,
+          "z": 3510,
+          "radius": 30,
+          "label": "get down the driveway behind the block on Cabramatta Road before the couples do"
+        },
+        {
+          "kind": "photo",
+          "x": -24845,
+          "z": 3545,
+          "radius": 20,
+          "label": "shoot it from across the road, back to the wall, phone sideways — high enough that the bottle shop is out of frame"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 1,
+          "label": "number nine tells every applicant about the mould; number nine can tell them about it Monday"
+        },
+        {
+          "kind": "earn",
+          "dollars": 30,
+          "label": "show thirty dollars of income and you go to the top of the applicant list, which tells you everything"
+        }
+      ],
+      "reward": {
+        "cash": 45,
+        "xp": 220,
+        "unlock": [
+          "l1:cabramatta-open-home"
         ]
       }
     }

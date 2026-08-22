@@ -983,6 +983,800 @@
           ]
         }
       ]
+    },
+    {
+      "id": "towie-druitt",
+      "name": "Daz, fourth truck in the Druitt Street rank",
+      "x": -158,
+      "z": 462,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Fourth in the rank. Been fourth since eleven. You don't jump the rank, mate. You just get older in it.",
+          "choices": [
+            {
+              "text": "How does the rank work?",
+              "goto": "rank"
+            },
+            {
+              "text": "Anything going?",
+              "goto": "offer"
+            },
+            {
+              "text": "Where's the docket?",
+              "goto": "docket"
+            },
+            {
+              "text": "It's sorted. He paid.",
+              "goto": "done"
+            },
+            {
+              "text": "Nothing. Go back to sleep.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "rank",
+          "line": "Truck one's been here since the Olympics. Truck two's got the contractor on speed dial. Truck three is truck one's son-in-law. Then me.",
+          "improv": {
+            "persona": "Daz, a tow truck driver parked fourth in the rank behind an RBT bus on Druitt Street in the Sydney CBD. Awake since Thursday, superstitious about queue order. Deadpan, lower case, very Australian, never cruel.",
+            "context": "Someone has asked him how the tow rank works. He has explained it four thousand times and the explanation is mostly a list of grievances about the three trucks parked in front of him."
+          },
+          "choices": [
+            {
+              "text": "Who's truck one?",
+              "goto": "rankone"
+            },
+            {
+              "text": "That's a Marita sticker on truck two.",
+              "needFaction": "Marita",
+              "goto": "ranktwo"
+            },
+            {
+              "text": "Towing's just theft with a winch.",
+              "needFaction": "DeFAULT",
+              "goto": "rank-winch"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "rankone",
+          "line": "Since the Olympics. He tows one car a night and he tows it beautifully. Watching him hook up is like watching a bloke ice a cake.",
+          "choices": [
+            {
+              "text": "And you?",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "ranktwo",
+          "line": "Yeah. Doesn't get him jobs. Gets him told about jobs. At four in the morning that's the same thing and I've stopped pretending it isn't.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "rank-winch",
+          "line": "I've heard it. Your lot come past every Friday and say it, and every Friday I say the same thing back: mate, so is the parking meter.",
+          "choices": [
+            {
+              "text": "Can't argue.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Nothing comes out of a booze bus on its own. Go down there and be the reason a car gets pulled over. I'll be the reason it gets moved. Six blokes in a Commodore and none of them drove it here. It got here on faith.",
+          "choices": [
+            {
+              "text": "Fine. Coffee's on you.",
+              "accept": "l8-fourth-in-the-rank",
+              "denyFlag": "l8:rank-jumped",
+              "needLevel": 8
+            },
+            {
+              "text": "I'm not walking into an RBT for you.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "docket",
+          "line": "Docket. Don't fold it. The contractor's got a bloke who walks the line lifting jobs off drivers who folded their docket, and I am not being that story at the Christmas do.",
+          "choices": [
+            {
+              "text": "Got it.",
+              "goto": "hello"
+            },
+            {
+              "text": "Who's the contractor?",
+              "goto": "contractor"
+            }
+          ]
+        },
+        {
+          "id": "contractor",
+          "line": "Same three trucks. Different jacket. Sydney's a small town wearing a big hat.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Killara. Six in the morning. He told you about the nephew, didn't he. There is a nephew. He's in Dubai. He's been in Dubai since that car was new.",
+          "choices": [
+            {
+              "text": "He paid. Eventually.",
+              "turnin": "l8-fourth-in-the-rank"
+            },
+            {
+              "text": "Not yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "vasso-banksia",
+      "name": "Vasso, banned from her own bakery",
+      "x": -6260,
+      "z": 8623,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "I'm not loitering, I'm waiting for the 9:14. Have been since Tuesday. When the wind's from the south you can smell the ovens from this platform. That's not a breach. I checked.",
+          "choices": [
+            {
+              "text": "Why can't you go down there yourself?",
+              "goto": "why"
+            },
+            {
+              "text": "You've got a job for someone.",
+              "goto": "offer"
+            },
+            {
+              "text": "I've got your photos.",
+              "goto": "verdict"
+            },
+            {
+              "text": "That's it done.",
+              "goto": "done"
+            },
+            {
+              "text": "Nice day for it.",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Wrong platform, sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "why",
+          "line": "There's an undertaking. Fifty metres of the premises. My own solicitor drafted it and my own solicitor billed me for it. My brother-in-law keeps a copy behind the till. Laminated.",
+          "choices": [
+            {
+              "text": "So you need eyes.",
+              "goto": "offer"
+            },
+            {
+              "text": "Family, is it?",
+              "goto": "family"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "family",
+          "line": "The shop was my mother's. The oven was my father's. The name on the awning is mine. What's going on inside it now is a question I am legally not allowed to walk in and ask.",
+          "choices": [
+            {
+              "text": "I'll ask it for you.",
+              "goto": "offer"
+            },
+            {
+              "text": "Rough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Photos. That's all. The awning, and the back lane on a Tuesday when the trays come in. Then up to Hurstville with them. Buy yourself a flat white across the road — you'll be standing about a while.",
+          "choices": [
+            {
+              "text": "I'll go to Rockdale for you.",
+              "accept": "l8-rockdale-awning",
+              "denyFlag": "l8:rockdale-awning"
+            },
+            {
+              "text": "Not today, Vasso.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Southerly. That's the ovens, ten past five. Forty years I woke up before that smell and now I catch it off a train platform like a stray dog.",
+          "improv": {
+            "persona": "Vasso, sixties, Greek-Australian, born above a cake shop on Bay Street in Rockdale and legally kept fifty metres from it. Dry, unbothered, no self-pity, lower case, very Australian.",
+            "context": "A stranger on the Banksia platform has said it's a nice day. The wind is from the south, which means she can smell her own bakery's ovens from a kilometre up the Illawarra line. She has made her peace with roughly none of it and will not say so."
+          },
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            },
+            {
+              "text": "You'll get it back.",
+              "goto": "back"
+            }
+          ]
+        },
+        {
+          "id": "back",
+          "line": "I'll get something back. Might be the marble. Might be the name. I'd take the name.",
+          "choices": [
+            {
+              "text": "Understood.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "verdict",
+          "line": "Ingleburn. In a tray. With a lid. — She holds the phone at arm's length, then further. — Forty years we made the custard at four in the morning and he's buying it in on a truck. Print two.",
+          "choices": [
+            {
+              "text": "Two?",
+              "goto": "verdict_two"
+            },
+            {
+              "text": "What'll you do?",
+              "goto": "verdict_next"
+            },
+            {
+              "text": "Right, then.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "verdict_two",
+          "line": "One for the solicitor. One for the fridge.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "verdict_next",
+          "line": "Open here. Banksia. One stop up, and fifty metres of that place turns out to be exactly as far as I ever needed to be.",
+          "choices": [
+            {
+              "text": "See you Tuesday.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Go on then. Show me the lot.",
+          "choices": [
+            {
+              "text": "The awning, the lane, and the trays.",
+              "turnin": "l8-rockdale-awning"
+            },
+            {
+              "text": "Still working on it.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bankstown-placements-desk",
+      "name": "Rana, placements officer",
+      "x": -16110,
+      "z": 5810,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Level four, past the trolley bay. Folding table, esky, printer in the ute. Marita doesn't rent offices. An office is a cost and a cost comes out of somebody's shift.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "The forty are on. Where do I sign them?",
+              "goto": "signoff"
+            },
+            {
+              "text": "That's it done.",
+              "goto": "done"
+            },
+            {
+              "text": "Why the rooftop?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nothing. Good view.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Forty placements. Every one of them starts Thursday at the club. Half haven't been told the line's a metro now, half don't believe me, and the client counts heads at six, not reasons.",
+          "choices": [
+            {
+              "text": "I'll have the forty there by six.",
+              "accept": "l8-everyone-starts-thursday",
+              "denyFlag": "l8:everyone-starts-thursday",
+              "needFaction": "Marita",
+              "needLevel": 8
+            },
+            {
+              "text": "I'm not with your mob.",
+              "goto": "wrongmob"
+            },
+            {
+              "text": "Not this week.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "wrongmob",
+          "line": "Then you want the ones with the flyers outside the library, explaining that the job is the problem. Lovely people. Not one of them starts Thursday.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "signoff",
+          "line": "Sign here, print here, date it Thursday even if it's Wednesday. The club pays on the sheet, not on the day.",
+          "choices": [
+            {
+              "text": "Signed.",
+              "goto": "hello"
+            },
+            {
+              "text": "That's the date wrong.",
+              "goto": "signoff_no"
+            }
+          ]
+        },
+        {
+          "id": "signoff_no",
+          "line": "The date's not wrong, it's early. Wrong is forty people standing at Punchbowl at ten past six wondering where the bus went.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "From up here I can see the station, the club and the whole of Chapel Road. Same forty people walk past twice a day. I just decide which way.",
+          "improv": {
+            "persona": "Rana, a placements officer working the rooftop car park at Bankstown Central in south-west Sydney. Runs forty casuals a week off a folding table and an esky. Fast, warm, entirely unsentimental. Deadpan, lower case, no exclamation marks.",
+            "context": "A worker has asked why her desk is level four of a shopping centre car park instead of an office. She can see the station, the club and the length of Chapel Road from up there, and she thinks rent is a cost that comes out of somebody's shift. Spell her outfit Marita, exactly."
+          },
+          "choices": [
+            {
+              "text": "Cheaper than an office.",
+              "goto": "hello"
+            },
+            {
+              "text": "Does anyone ever walk the other way?",
+              "goto": "smalltalk_no"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_no",
+          "line": "Once. He's got the flyers now.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Client counted thirty-eight. Two are asleep in a Camry on level three, which is on site, so that's forty. Don't ever let me hear you say thirty-eight.",
+          "choices": [
+            {
+              "text": "Forty. Always was.",
+              "turnin": "l8-everyone-starts-thursday"
+            },
+            {
+              "text": "I'll come back.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "strathfield-tutor-grace",
+      "name": "Grace Yeo, Meridian Coaching (between premises)",
+      "x": -10526,
+      "z": 547,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Meridian Coaching, Strathfield. The room above the barbecue place is gone, the whiteboard is on a trolley, and Year 11 is on that bench. Class is still on.",
+          "choices": [
+            {
+              "text": "What's the practical?",
+              "goto": "offer"
+            },
+            {
+              "text": "I've sat the paper.",
+              "goto": "marking"
+            },
+            {
+              "text": "Is there a practice paper?",
+              "goto": "paper",
+              "needCash": 20
+            },
+            {
+              "text": "Why are you teaching in a car park?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Wrong bench. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Two trains leave Strathfield. In a textbook that's a question. Here it's every four minutes. You'll do Unit 4 out loud, in the open, and they will watch you get it wrong first. That is the lesson.",
+          "choices": [
+            {
+              "text": "Enrol me.",
+              "accept": "l8-two-trains-leave-strathfield",
+              "denyFlag": "l8:two-trains",
+              "needLevel": 8
+            },
+            {
+              "text": "I'll audit from the bench.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "paper",
+          "line": "Practice paper. Twenty dollars. I know. I would love to tell you the first one's free, but the first one being free is exactly why I teach on a concourse.",
+          "choices": [
+            {
+              "text": "Twenty dollars for a photocopy.",
+              "cost": 20,
+              "needCash": 20,
+              "goto": "paper_bought"
+            },
+            {
+              "text": "I'll wing it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "paper_bought",
+          "line": "Question one. 'Two trains leave Strathfield.' Yes. That is what twenty dollars buys you. The paper was never the product. The marking is.",
+          "choices": [
+            {
+              "text": "That's the whole question?",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Rent went up eleven per cent and the agent called it a market correction. The market corrected me onto a bench with a view of Platform 6.",
+          "improv": {
+            "persona": "Grace, a maths tutor in Strathfield in her fifties. Ran a coaching college above a Korean barbecue for nineteen years until the rent moved. Dry, exacting, warm underneath. Lower case, no exclamation marks.",
+            "context": "A player has asked why she is teaching on the station concourse instead of in a room. The rent rose eleven per cent and the agent called it a market correction. She is not asking for sympathy and will not take any."
+          },
+          "choices": [
+            {
+              "text": "Eleven per cent.",
+              "goto": "smalltalk_again"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_again",
+          "line": "Eleven, and the sign downstairs still says Under New Management like that's news anybody wanted. Two trains leave Strathfield. The rent stays.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "marking",
+          "line": "Q1, both legs, correct — nobody ever believes both trains leave from here. Q3 you bought two coffees and drank both, which is a rate problem you've answered honestly. Q4: three parents. I've had those three since Year 7.",
+          "choices": [
+            {
+              "text": "Well?",
+              "goto": "marked"
+            },
+            {
+              "text": "Don't read it out.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "marked",
+          "line": "Two hundred and sixty. It's a refund I owe a family for a term I can't teach, and I'd rather it went to someone who did the work than sat in an account earning nothing. That's Unit 4 as well.",
+          "choices": [
+            {
+              "text": "I'll take the fee.",
+              "turnin": "l8-two-trains-leave-strathfield"
+            },
+            {
+              "text": "Keep it. Rent's rent.",
+              "goto": "charity"
+            }
+          ]
+        },
+        {
+          "id": "charity",
+          "line": "Don't. I've been offered charity in this car park twice and both times it arrived with an opinion attached. Take the money. Keep the opinion.",
+          "choices": [
+            {
+              "text": "Fine. Pay me.",
+              "turnin": "l8-two-trains-leave-strathfield"
+            },
+            {
+              "text": "Noted, Miss.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "jarrod-public-domain",
+      "name": "Jarrod, City of Sydney Public Domain",
+      "x": 331,
+      "z": 2140,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Stop there. You're standing in the clear path of travel. It's meant to be one and a half metres. Crown Street gives me one point one, and only when the sandwich board falls over.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "brief"
+            },
+            {
+              "text": "It's a footpath, mate.",
+              "goto": "domain"
+            },
+            {
+              "text": "Who objected?",
+              "goto": "objections"
+            },
+            {
+              "text": "How's the shopping village coming along?",
+              "goto": "village"
+            },
+            {
+              "text": "I've done your review.",
+              "goto": "debrief",
+              "denyFlag": "l8:clear-path"
+            },
+            {
+              "text": "You're busy. I'll go around.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "brief",
+          "line": "The Crown Street Amenity Review. It is a review of the 2019 review, which recommended a review. Evidence, consultation, refreshments, a cost recovery. Then it goes to Council and gets deferred.",
+          "choices": [
+            {
+              "text": "Give me the clipboard.",
+              "accept": "l8-clear-path",
+              "needLevel": 8,
+              "denyFlag": "l8:clear-path"
+            },
+            {
+              "text": "Deferred to when?",
+              "goto": "deferred"
+            },
+            {
+              "text": "That's eleven hundred pages of nothing.",
+              "goto": "domain"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "deferred",
+          "line": "Item 9.4. It was 9.4 last month and it'll be 9.4 in October. One day it'll be 9.3 and the whole street will know something has happened.",
+          "choices": [
+            {
+              "text": "And you keep writing them.",
+              "goto": "domain2"
+            },
+            {
+              "text": "Right. Back to it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "domain",
+          "line": "It is not a footpath. It is the public domain. The difference is about eleven hundred pages and a definition of the word kerb that took two years.",
+          "choices": [
+            {
+              "text": "So you hate cafes.",
+              "goto": "domain2"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "domain2",
+          "line": "I'm not anti-cafe. I'm pro-footpath. They're not the same team, but they're in the same competition, and one of them has tables.",
+          "choices": [
+            {
+              "text": "And a heater.",
+              "goto": "hello"
+            },
+            {
+              "text": "Who objected?",
+              "goto": "objections"
+            }
+          ]
+        },
+        {
+          "id": "objections",
+          "line": "Forty-one submissions. Thirty-nine opposed. Two in support, both from the applicant's mother, one of them twice. That is what we call a strong level of community interest.",
+          "choices": [
+            {
+              "text": "And the four out the front with the printouts?",
+              "goto": "objections2"
+            },
+            {
+              "text": "Terrific.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "objections2",
+          "line": "They're stakeholders. Every one of them has read the Development Control Plan and none of them has read the same page.",
+          "choices": [
+            {
+              "text": "I'll go and consult them.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "village",
+          "line": "Stage one was approved in a different decade. There's an artist's impression on the hoarding and the artist has since retired. The hoarding itself now needs a permit.",
+          "improv": {
+            "persona": "Jarrod, a City of Sydney public domain officer in Surry Hills, mid-thirties, hi-vis vest over a good shirt, trundle wheel, lanyard. Earnest, deadpan, genuinely believes in footpath widths. No exclamation marks.",
+            "context": "Someone has asked how the long-running Surry Hills shopping village redevelopment is going. It has been hoarded off and half-built for years, through several owners and several approvals. He is not bitter about it, exactly. Do not name any real person."
+          },
+          "choices": [
+            {
+              "text": "A permit for the hoarding.",
+              "goto": "village2"
+            },
+            {
+              "text": "Anyway.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "village2",
+          "line": "Hoardings are structures. Structures occupy the public domain. I issued it myself. It's the tidiest file I've got.",
+          "choices": [
+            {
+              "text": "Congratulations.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "debrief",
+          "line": "Photographs, four objectors consulted, the works zone consulted, two flat whites, the cost recovery, and you came by rail. That's a complete submission. Nobody has ever handed me a complete submission.",
+          "choices": [
+            {
+              "text": "Stamp it.",
+              "goto": "stamped"
+            },
+            {
+              "text": "The train was one stop, Jarrod.",
+              "goto": "onestop"
+            }
+          ]
+        },
+        {
+          "id": "onestop",
+          "line": "The Statement assumes rail. If you'd walked it, the modal split would read zero, and a zero gets an asterisk, and an asterisk gets it deferred. You did the right thing.",
+          "choices": [
+            {
+              "text": "Stamp it.",
+              "goto": "stamped"
+            }
+          ]
+        },
+        {
+          "id": "stamped",
+          "line": "Stamped. Item 9.4, where it lives. You're the first person in six years who actually measured anything, so take the cost recovery and don't tell the finance team which cost it recovered.",
+          "choices": [
+            {
+              "text": "Pleasure doing business with the public domain.",
+              "turnin": "l8-clear-path"
+            },
+            {
+              "text": "Keep it on the agenda.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
     }
   ]
 }

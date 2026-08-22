@@ -276,6 +276,273 @@
           "l2:haldon-camry"
         ]
       }
+    },
+    {
+      "id": "l2-surry-hills-cold-chain",
+      "act": 1,
+      "title": "The Cold Chain Trial",
+      "blurb": "One flat white, Central to Redfern, one stop. If it arrives hot I have a product. If it arrives cold I have a problem slide, and a problem slide raises more.",
+      "giver": "fletch-devonshire-street",
+      "level": 2,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "collect the payload from a Surry Hills roaster"
+        },
+        {
+          "kind": "goto",
+          "x": -198,
+          "z": 1548,
+          "radius": 40,
+          "label": "walk it to Central without drinking it"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Central",
+          "to": "Redfern",
+          "label": "one stop to Redfern. That is the whole trial"
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 1,
+          "label": "settle the man on Lawson Street who wants a sip"
+        },
+        {
+          "kind": "photo",
+          "x": -1010,
+          "z": 2560,
+          "radius": 45,
+          "label": "photograph the cup at Redfern, cold, on the hour"
+        },
+        {
+          "kind": "dialog",
+          "npc": "fletch-devonshire-street",
+          "node": "debrief",
+          "label": "carry the bad news back to Devonshire Street"
+        }
+      ],
+      "reward": {
+        "cash": 50,
+        "xp": 240,
+        "unlock": [
+          "l2:cold-chain"
+        ]
+      }
+    },
+    {
+      "id": "l2-sustained-outcome",
+      "act": 1,
+      "title": "A Sustained Employment Outcome",
+      "blurb": "Deng is on his last warning and his fourth vape. He needs one placement to hold, notionally, for four hours. You will be a barista at Macarthur Square. There is no coffee. There is a lanyard.",
+      "giver": "queen-st-consultant",
+      "level": 2,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "TRAINING",
+          "count": 1,
+          "label": "sit the module he ticked off in March"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Campbelltown",
+          "to": "Macarthur",
+          "label": "claim the travel assistance: it is one stop"
+        },
+        {
+          "kind": "photo",
+          "x": -37520,
+          "z": 23180,
+          "radius": 70,
+          "label": "be photographed looking employable at the Square"
+        },
+        {
+          "kind": "dialog",
+          "npc": "queen-st-consultant",
+          "node": "ghost",
+          "label": "report back to Queen Street"
+        },
+        {
+          "kind": "ko",
+          "npc": "eshay",
+          "count": 2,
+          "label": "recover the lanyards and the float"
+        },
+        {
+          "kind": "earn",
+          "dollars": 40,
+          "label": "post a $40 outcome, however you like"
+        }
+      ],
+      "reward": {
+        "cash": 55,
+        "xp": 240,
+        "unlock": [
+          "l2:sustained-outcome"
+        ]
+      }
+    },
+    {
+      "id": "l2-driver-in-it",
+      "act": 1,
+      "title": "Something With a Driver In It",
+      "blurb": "They shut my line to make it driverless. I'm not tapping on to a bus, love. Take my Opal down to Sydenham, catch something with a person in the front of it, and bring me back a photo.",
+      "giver": "voula-marrickville-platform",
+      "level": 2,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -3860,
+          "z": 5205,
+          "radius": 60,
+          "label": "walk to Sydenham, straight past the replacement bus"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Sydenham",
+          "to": "Tempe",
+          "label": "one stop to Tempe, tapped on with her card"
+        },
+        {
+          "kind": "photo",
+          "x": -4745,
+          "z": 6305,
+          "radius": 45,
+          "label": "photograph a train with a human being in it"
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 1,
+          "label": "wake the bloke who's been asleep since Hurstville"
+        },
+        {
+          "kind": "dialog",
+          "npc": "voula-marrickville-platform",
+          "node": "proof",
+          "label": "show Voula the photo"
+        }
+      ],
+      "reward": {
+        "cash": 45,
+        "xp": 230,
+        "unlock": [
+          "l2:driver-in-it"
+        ]
+      }
+    },
+    {
+      "id": "l2-terminates-here",
+      "act": 1,
+      "title": "This Train Terminates at Hornsby",
+      "blurb": "Every second service gives up here and two hundred people a night find out they're eleven kilometres short of home. I can fit four of them. Take the rest and I'll square you up.",
+      "giver": "hornsby-sydride",
+      "level": 2,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -10535,
+          "z": -18168,
+          "radius": 30,
+          "label": "stand on the Jersey Street kerb outside Hornsby station — forty metres past the taxi rank, which is as close as a SydRide is legally allowed to hope"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Hornsby",
+          "to": "Berowra",
+          "label": "ride one service the whole way north, so you know exactly what the strandeds were promised at Central"
+        },
+        {
+          "kind": "photo",
+          "x": -10725,
+          "z": -18105,
+          "radius": 25,
+          "label": "photograph the upside-down water clock in the mall — the app can't find Ray's street, but it knows the clock"
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 2,
+          "label": "explain to two gentlemen off the last service that the back seat is a fare, not accommodation"
+        },
+        {
+          "kind": "earn",
+          "dollars": 45,
+          "label": "$45 of fares up the hill — Asquith, Mount Colah, and one bloke to Berowra who talks about the tolls the entire way"
+        }
+      ],
+      "reward": {
+        "cash": 55,
+        "xp": 240,
+        "unlock": [
+          "l2:terminates-here"
+        ]
+      }
+    },
+    {
+      "id": "l2-page-one",
+      "act": 1,
+      "title": "Every Monday Is Page One",
+      "blurb": "Twenty-two weeks in this book and every Monday it's page one again. Same faces, same fights, same bloke asleep on the 1:40 east. I'm not saying anything by that. I'm asking you to look, then tell me I'm tired.",
+      "giver": "kx-door-fadi",
+      "level": 2,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "photo",
+          "x": 1040,
+          "z": 758,
+          "radius": 30,
+          "label": "photograph the Coke sign, for the record"
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 3,
+          "label": "put the three regulars to bed, gently"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Kings Cross",
+          "to": "Bondi Junction",
+          "label": "ride the 1:40 east and watch seat 4B"
+        },
+        {
+          "kind": "earn",
+          "dollars": 30,
+          "label": "take $30 off the strip, cash, like everyone"
+        },
+        {
+          "kind": "dialog",
+          "npc": "kx-door-fadi",
+          "node": "compare",
+          "label": "bring it back to the book"
+        }
+      ],
+      "reward": {
+        "cash": 55,
+        "xp": 240,
+        "unlock": [
+          "l2:page-one"
+        ]
+      }
     }
   ]
 }

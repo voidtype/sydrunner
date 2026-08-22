@@ -323,6 +323,322 @@
           "l7:shirley-road"
         ]
       }
+    },
+    {
+      "id": "l7-continuous-sporting-use",
+      "act": 1,
+      "title": "Continuous Sporting Use",
+      "blurb": "There's a development application on our green. Three townhouses. The constitution says the club exists as long as it can field a side, so I need a side, and I need it photographed doing something.",
+      "giver": "vaucluse-bowlo-lifer",
+      "level": 7,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "dialog",
+          "npc": "vaucluse-bowlo-lifer",
+          "node": "da",
+          "label": "let Hughie read you the application at the bus interchange"
+        },
+        {
+          "kind": "photo",
+          "x": 1010,
+          "z": 2560,
+          "radius": 70,
+          "label": "photograph a proper cricket ground at Moore Park — the bundle needs comparable sporting amenity, and the club will crop it"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Cabramatta",
+          "to": "Bondi Junction",
+          "label": "bring the ringer in from Cabramatta; he bowls at the stumps and asks for the fare"
+        },
+        {
+          "kind": "buy",
+          "powerup": "TRAINING",
+          "count": 1,
+          "label": "an hour in the nets, which the grant application calls a high performance camp"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 4,
+          "label": "settle four objections from the progress association at the site inspection"
+        },
+        {
+          "kind": "earn",
+          "dollars": 150,
+          "label": "put $150 through the club, so the books show it trades — meat tray, raffle, whatever you like"
+        },
+        {
+          "kind": "goto",
+          "x": 2610,
+          "z": 955,
+          "radius": 80,
+          "label": "lodge the bundle at the council chambers in Double Bay before four"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 950,
+        "unlock": [
+          "l7:continuous-use"
+        ]
+      }
+    },
+    {
+      "id": "l7-wet-signature",
+      "act": 1,
+      "title": "A Wet Signature, Before 4:30",
+      "blurb": "One fig, one footpath, three councils. Two paper objections, two counters, both shut at half four. The portal says it received them. The portal says a lot of things.",
+      "giver": "crowsnest-progress",
+      "level": 7,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "photo",
+          "x": -940,
+          "z": -4700,
+          "radius": 20,
+          "label": "photograph the fig on Hume Street while it is still a fig"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 5,
+          "label": "the other residents' group has the same laminate — disagree with five of them"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites on Willoughby Road; one of them is for Janet"
+        },
+        {
+          "kind": "earn",
+          "dollars": 160,
+          "label": "raise the $160 lodgement charge, which is not a fee, it is a charge"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Crows Nest",
+          "to": "North Sydney",
+          "label": "south one stop, because the bell for this footpath rings in Miller Street"
+        },
+        {
+          "kind": "goto",
+          "x": -260,
+          "z": -3170,
+          "radius": 25,
+          "label": "hand the first envelope over a counter in Miller Street and be seen doing it"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "North Sydney",
+          "to": "Chatswood",
+          "label": "back north, past the tree, to the council that owns the kerb it stands in"
+        },
+        {
+          "kind": "goto",
+          "x": -2700,
+          "z": -7790,
+          "radius": 25,
+          "label": "Victor Street, Chatswood, before the counter shuts at 4:30"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 950,
+        "unlock": [
+          "l7:wet-signature"
+        ]
+      }
+    },
+    {
+      "id": "l7-tail-number",
+      "act": 1,
+      "title": "One Clean Shot of the Hercules",
+      "blurb": "They know my car, my hat and the exact gap in the fence I use. They don't know you. Get the tail number off that Hercules and be on the train before Polair's up.",
+      "giver": "richmond-spotter",
+      "level": 7,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -42700,
+          "z": -28950,
+          "radius": 45,
+          "label": "get to the fence line off Richmond station"
+        },
+        {
+          "kind": "photo",
+          "x": -42655,
+          "z": -29015,
+          "radius": 35,
+          "label": "one clean shot of the Hercules on the apron"
+        },
+        {
+          "kind": "ko",
+          "npc": "police",
+          "count": 4,
+          "label": "the white ute first, then the blue and whites"
+        },
+        {
+          "kind": "ko",
+          "npc": "rbt",
+          "count": 2,
+          "label": "the breatho on the Windsor Street approach"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Richmond",
+          "to": "East Richmond",
+          "label": "one stop: the shortest getaway in New South Wales"
+        },
+        {
+          "kind": "earn",
+          "dollars": 140,
+          "label": "$140 for the shot. the forums pay cash"
+        },
+        {
+          "kind": "dialog",
+          "npc": "richmond-spotter",
+          "node": "handover",
+          "label": "hand Mick the card on the East Richmond platform"
+        }
+      ],
+      "reward": {
+        "cash": 260,
+        "xp": 1000,
+        "unlock": [
+          "l7:tail-number"
+        ]
+      }
+    },
+    {
+      "id": "l7-bondi-fare-job",
+      "act": 1,
+      "title": "Sixty-Forty, and I'm the Sixty",
+      "blurb": "Ten minutes of surge left, a bus lane camera in front and a ranger behind. Take my queue — two to Edgecliff, four outside the pub, and a flat white. Sixty-forty. I'm the sixty. It's my account.",
+      "giver": "behrouz-sydride",
+      "level": 7,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "one flat white, one sugar, from the Junction. He cannot leave the car and he has been awake since four."
+        },
+        {
+          "kind": "photo",
+          "x": 3521,
+          "z": 2287,
+          "radius": 25,
+          "label": "photograph the Westfield boom gate that could not read his plate. The appeal form wants evidence and the evidence is inside a nine dollar car park."
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Bondi Junction",
+          "to": "Edgecliff",
+          "label": "the fare that is one stop. Take the train like a person and keep the difference."
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 4,
+          "label": "four out of the Oxford Street pubs who are getting in the car whether or not they are getting in the car."
+        },
+        {
+          "kind": "earn",
+          "dollars": 160,
+          "label": "clear $160 of his queue before the surge dies. The app rounds it down and calls that a partnership."
+        },
+        {
+          "kind": "dialog",
+          "npc": "behrouz-sydride",
+          "node": "rating",
+          "label": "back to Grafton Street so he can refresh the app in front of you."
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 950,
+        "unlock": [
+          "l7:bondi-fare-job"
+        ]
+      }
+    },
+    {
+      "id": "l7-via-airport",
+      "act": 1,
+      "title": "The 6:12 Goes Via the Airport",
+      "blurb": "Forty years I called the stops. Now a computer says 'City' and never mentions the seventeen-dollar gate at the other end. Ride the 6:12. Get done like my grandson got done. I want a witness who can afford it.",
+      "giver": "carlton-guard",
+      "level": 7,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -6880,
+          "z": 10508,
+          "radius": 40,
+          "label": "get down into the Kogarah trench and read the indicator board. It says City. It means City the way a real estate agent means cosy"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Kogarah",
+          "to": "Domestic Airport",
+          "label": "let the 6:12 take you. At Wolli Creek the line forks: left is Sydenham and free, right is the airport and it is not. Nobody announces the fork"
+        },
+        {
+          "kind": "photo",
+          "x": -2470,
+          "z": 7266,
+          "radius": 40,
+          "label": "photograph the gate that ate the money. Stavros wants it in colour, he says black and white makes it look like history"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "buy the only coffee open airside of the barrier, at the price of a return to Wollongong"
+        },
+        {
+          "kind": "earn",
+          "dollars": 40,
+          "label": "make back the gate fee. Twice, because the gate charges you to get out of the mistake as well as into it"
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 6,
+          "label": "the Dragons lost at home, so the last one south is one loud carriage from Wolli Creek to Kogarah. Settle it down before Carlton"
+        },
+        {
+          "kind": "dialog",
+          "npc": "carlton-guard",
+          "node": "ledger",
+          "label": "read the entry back to Stavros while he writes it in the book"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 950,
+        "unlock": [
+          "l7:via-airport"
+        ]
+      }
     }
   ]
 }

@@ -341,6 +341,321 @@
           "l10:bowlo-held"
         ]
       }
+    },
+    {
+      "id": "l10-hard-earned",
+      "act": 1,
+      "title": "The Hard Way, 2026. Mixed media. Courtesy the artist.",
+      "blurb": "Free entry, always has been. The work behind me went for two-twenty and I'm on thirty-one an hour. So: four hundred and fifty dollars, earned by you, in a day, in this postcode. I frame it. The label says exactly how you got it.",
+      "giver": "chippo-gallery-sitter",
+      "level": 10,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -855,
+          "z": 2404,
+          "radius": 40,
+          "label": "start on the corner where the pub was, is, and was again"
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 5,
+          "label": "a word with the crew who've had the footpath since 2019"
+        },
+        {
+          "kind": "photo",
+          "x": -500,
+          "z": 1900,
+          "radius": 50,
+          "label": "photograph the mirrors that sell the sun back to the park"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Central",
+          "to": "Redfern",
+          "label": "one stop, Central to Redfern, full fare, on purpose"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites at the Kensington Street rate"
+        },
+        {
+          "kind": "earn",
+          "dollars": 450,
+          "label": "four hundred and fifty dollars, earned, not found"
+        },
+        {
+          "kind": "dialog",
+          "npc": "chippo-gallery-sitter",
+          "node": "count",
+          "label": "let her count it twice, out loud"
+        }
+      ],
+      "reward": {
+        "cash": 460,
+        "xp": 1750,
+        "unlock": [
+          "l10:hard-earned"
+        ]
+      }
+    },
+    {
+      "id": "l10-front-window-seat",
+      "act": 1,
+      "title": "The Seat Where the Driver Would Be",
+      "blurb": "Thirty-one years I said stand clear of the closing doors. Now the doors say it themselves, and they built the station under my flat. Do my old run properly, one last time, then come and tell me what you heard.",
+      "giver": "waterloo-guard-doreen",
+      "level": 10,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "earn",
+          "dollars": 170,
+          "label": "earn $170, what a Sunday with penalties paid"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two coffees: yours, and one for the empty cab"
+        },
+        {
+          "kind": "goto",
+          "x": -16010,
+          "z": 5790,
+          "radius": 60,
+          "label": "sign on at Bankstown, where her shift started"
+        },
+        {
+          "kind": "ko",
+          "npc": "eshay",
+          "count": 5,
+          "label": "clear the front window seat, the way she used to"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Bankstown",
+          "to": "Waterloo",
+          "label": "ride her old run to the station under her flat"
+        },
+        {
+          "kind": "photo",
+          "x": -759,
+          "z": 3138,
+          "radius": 40,
+          "label": "photograph the tower from the new entrance"
+        },
+        {
+          "kind": "dialog",
+          "npc": "waterloo-guard-doreen",
+          "node": "stand_clear",
+          "label": "tell Doreen exactly what the doors said"
+        }
+      ],
+      "reward": {
+        "cash": 420,
+        "xp": 1750,
+        "unlock": [
+          "l10:front-window"
+        ]
+      }
+    },
+    {
+      "id": "l10-erko-loop",
+      "act": 1,
+      "title": "The Long Way Round to Erskineville",
+      "blurb": "Col Fenech at the Rose says nobody rides Hornsby to Penrith and home in a day any more. Two hundred dollars says he's wrong. Raise my stake first, love, then tap off where you tapped on.",
+      "giver": "erko-nella",
+      "level": 10,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "earn",
+          "dollars": 200,
+          "label": "raise Nella's two hundred; Col's is already down"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "the 5:40 coffee. Hers is black. Yours is not."
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Erskineville",
+          "to": "Hornsby",
+          "label": "north to Hornsby, the long side of the argument"
+        },
+        {
+          "kind": "ko",
+          "npc": "eshay",
+          "count": 4,
+          "label": "four eshays who wanted the vestibule to themselves"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Hornsby",
+          "to": "Penrith",
+          "label": "across the top to Penrith, and no complaining"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Penrith",
+          "to": "Erskineville",
+          "label": "home to Erko, tapping off where you tapped on"
+        },
+        {
+          "kind": "photo",
+          "x": -1909,
+          "z": 3011,
+          "radius": 60,
+          "label": "photograph Eveleigh for Pop on the walk back"
+        },
+        {
+          "kind": "dialog",
+          "npc": "erko-nella",
+          "node": "settle",
+          "label": "back to the bench and tell Nella she was right"
+        }
+      ],
+      "reward": {
+        "cash": 420,
+        "xp": 1750,
+        "unlock": [
+          "l10:erko-loop"
+        ]
+      }
+    },
+    {
+      "id": "l10-last-register-cc311b",
+      "act": 1,
+      "title": "The Last Cash Register on Darlinghurst Road",
+      "blurb": "Four hundred in the drawer by six, or the wellness people get to write down that the strip is finished. It isn't finished. It's gone quiet, and quiet doesn't pay the rent. Earn it the hard way. Nobody hands it over up here.",
+      "giver": "marj-cash-window-cc311b",
+      "level": 10,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "earn",
+          "dollars": 400,
+          "label": "make four hundred dollars the way she makes it: fares, drops, whatever's going"
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 8,
+          "label": "walk eight of the night's finest toward the taxi rank, firmly, so the queue can queue"
+        },
+        {
+          "kind": "photo",
+          "x": 990,
+          "z": 650,
+          "radius": 40,
+          "label": "photograph the big red sign at the top of William Street — the one on her wall has faded"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites at five: she won't drink hers until the money's banked"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Kings Cross",
+          "to": "Bondi Junction",
+          "label": "take the takings two stops east, because that is where the branch went"
+        },
+        {
+          "kind": "dialog",
+          "npc": "marj-cash-window-cc311b",
+          "node": "count",
+          "label": "count it out on the counter, in front of her, twice"
+        }
+      ],
+      "reward": {
+        "cash": 420,
+        "xp": 1650,
+        "unlock": [
+          "l10:last-register-cc311b"
+        ]
+      }
+    },
+    {
+      "id": "l10-mosman-fare",
+      "act": 1,
+      "title": "A Fare to Mosman, With No Car",
+      "blurb": "Council clamped my car outside my own house. Seven minutes over. Queue's still live and Annabel wants Mosman by six — the app says fifty-four minutes for three kilometres. Take her the way the harbour's meant to be crossed.",
+      "giver": "sydride-kosta",
+      "level": 10,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": 248,
+          "z": -2492,
+          "radius": 25,
+          "label": "the pickup: Alfred Street, north end of the bridge, hazards on like everyone else"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "she ordered a flat white to the car. There is no car. Get it anyway — SydRide does not reimburse coffee and the rating remembers"
+        },
+        {
+          "kind": "ride",
+          "line": "North Shore & Western",
+          "from": "Milsons Point",
+          "to": "Circular Quay",
+          "label": "over the bridge with the fare aboard. Call it a premium harbour transfer and she will call it that too"
+        },
+        {
+          "kind": "photo",
+          "x": 120,
+          "z": -880,
+          "radius": 25,
+          "label": "the app wants a photo at drop-off. Take it of the wharves, so she can work out which ferry is hers"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 5,
+          "label": "five people left Kosta four stars this week and a note about the aircon. They are all still on the Quay. Discuss the note"
+        },
+        {
+          "kind": "earn",
+          "dollars": 300,
+          "label": "$300 clear before the shift ends, or the bonus tier resets and he pays for the clamp twice"
+        },
+        {
+          "kind": "dialog",
+          "npc": "sydride-kosta",
+          "node": "settle",
+          "label": "settle up at the rank, where the car still is"
+        }
+      ],
+      "reward": {
+        "cash": 420,
+        "xp": 1650,
+        "unlock": [
+          "l10:mosman-fare"
+        ]
+      }
     }
   ]
 }

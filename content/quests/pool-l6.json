@@ -304,6 +304,323 @@
           "l6:doublebay-fig"
         ]
       }
+    },
+    {
+      "id": "l6-doors-closing",
+      "act": 1,
+      "title": "Eleven Seconds at Homebush",
+      "blurb": "There's an inquiry into station staffing and my submission is one bloke's opinion in a font they don't like. Get me the platform, get me the crowd, get me back the fares those dead readers ate. Submissions close Friday.",
+      "giver": "des-homebush",
+      "level": 6,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -11325,
+          "z": 59,
+          "radius": 40,
+          "label": "the eastern stairs at Homebush, before the 7:42"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two from the platform cart; the second one is Des's"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Homebush",
+          "to": "Strathfield",
+          "label": "one stop, then change at Strathfield like it's 2009"
+        },
+        {
+          "kind": "photo",
+          "x": -10602,
+          "z": 476,
+          "radius": 60,
+          "label": "photograph the change at Strathfield: the crowd is the case"
+        },
+        {
+          "kind": "ko",
+          "npc": "police",
+          "count": 4,
+          "label": "see off four blokes doing a gate blitz on a dead reader"
+        },
+        {
+          "kind": "earn",
+          "dollars": 90,
+          "label": "get $90 of eaten fares back out of the barriers"
+        },
+        {
+          "kind": "dialog",
+          "npc": "des-homebush",
+          "node": "lodged",
+          "label": "back to Des before submissions close at five"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 950,
+        "unlock": [
+          "l6:doors-closing"
+        ]
+      }
+    },
+    {
+      "id": "l6-price-guide",
+      "act": 1,
+      "title": "The Price Guide Is a Guide",
+      "blurb": "Federation, four bed, walk to rail. Guide's one point nine; the reserve is not one point nine. I need Saturday to look busy, the drop saw next door to stop, and one photo of the back garden without the tenant's washing in it.",
+      "giver": "wahroonga-agent",
+      "level": 6,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -8700,
+          "z": -16780,
+          "radius": 35,
+          "label": "get up to the Federation on the quiet side of the Pacific Highway before the ten o'clock open"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites. Hugh does not run an open home on one, and he will not be buying"
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 4,
+          "label": "the renovation next door has a drop saw going through the whole inspection. Four blokes. Reason with them"
+        },
+        {
+          "kind": "photo",
+          "x": -8688,
+          "z": -16800,
+          "radius": 25,
+          "label": "photograph the back garden from the one corner where the tenant's washing is out of frame"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Wahroonga",
+          "to": "Chatswood",
+          "label": "ride it once, Wahroonga to Chatswood, so he can print 'nine minutes to Chatswood' and mean it"
+        },
+        {
+          "kind": "earn",
+          "dollars": 200,
+          "label": "raise the two hundred of marketing yourself. The vendor has declined to fund marketing"
+        },
+        {
+          "kind": "dialog",
+          "npc": "wahroonga-agent",
+          "node": "auction",
+          "label": "eleven o'clock Saturday. Stand at the front and look like money"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 900,
+        "unlock": [
+          "l6:price-guide"
+        ]
+      }
+    },
+    {
+      "id": "l6-quarry-doof",
+      "act": 1,
+      "title": "Strictly Acoustic, Says the Permit",
+      "blurb": "Council signed off on an acoustic evening in the quarry. Acoustic. They never said how loud. Rig's in Waitara, the hole's in Hornsby, and I'm back on ward at seven.",
+      "giver": "hornsby-doof-nurse",
+      "level": 6,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Hornsby",
+          "to": "Waitara",
+          "label": "one stop to Waitara. Nobody on a Sydney train has ever asked what's in the bag"
+        },
+        {
+          "kind": "goto",
+          "x": -9950,
+          "z": -17427,
+          "radius": 40,
+          "label": "the loading dock under the Waitara towers, where my cousin keeps the generator between weddings"
+        },
+        {
+          "kind": "goto",
+          "x": -10850,
+          "z": -18060,
+          "radius": 60,
+          "label": "down Quarry Road while the gate's still open, and quietly, because the gate is the loudest thing here"
+        },
+        {
+          "kind": "earn",
+          "dollars": 140,
+          "label": "ten a head on the rim. The gate is cash and tonight the gate is you"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 4,
+          "label": "Wahroonga heard the bass at one. Four of them came down the fire trail in dressing gowns with a phone each"
+        },
+        {
+          "kind": "ko",
+          "npc": "rbt",
+          "count": 1,
+          "label": "the booze bus parked itself at the top of Quarry Road at three, for the drive home that nobody here has"
+        },
+        {
+          "kind": "photo",
+          "x": -10820,
+          "z": -18030,
+          "radius": 80,
+          "label": "photograph the sun coming up over the hole, so council can see the evening stayed acoustic"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "the good coffee in the mall opens at six. Get two. One is for me and I am not asking"
+        }
+      ],
+      "reward": {
+        "cash": 220,
+        "xp": 850,
+        "unlock": [
+          "l6:quarry-doof"
+        ]
+      }
+    },
+    {
+      "id": "l6-hurstville-fare",
+      "act": 1,
+      "title": "Seven Trips Short of the Weekly Bonus",
+      "blurb": "Forty trips by Sunday and the bonus covers my rego. I'm on thirty-three and the car's on a hoist in Peakhurst. The app never asks what you turned up in. Take the phone, work the sheet, don't touch the aux cord.",
+      "giver": "kenny-sydride-hurstville",
+      "level": 6,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "get the four o'clock flat white into you; the sheet runs eleven hours"
+        },
+        {
+          "kind": "goto",
+          "x": -8600,
+          "z": 11390,
+          "radius": 30,
+          "label": "first fare: the pin says Hurstville, so she is standing at Allawah, walking toward the pin"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Hurstville",
+          "to": "Domestic Airport",
+          "label": "the 5:10 airport run — no car, so the fare goes by train and is not told"
+        },
+        {
+          "kind": "earn",
+          "dollars": 180,
+          "label": "clear $180 before the morning surge dies and Forest Road goes back to $9 jobs"
+        },
+        {
+          "kind": "dialog",
+          "npc": "kenny-sydride-hurstville",
+          "node": "nightshift",
+          "label": "back to the loading zone on Forest Road for the night sheet"
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 4,
+          "label": "explain to four gentlemen outside the karaoke that this is not their car and never was"
+        },
+        {
+          "kind": "photo",
+          "x": -9760,
+          "z": 11010,
+          "radius": 18,
+          "label": "photograph the bollard on level two of the Westfield carpark, for the insurer, who doubts it"
+        }
+      ],
+      "reward": {
+        "cash": 240,
+        "xp": 900,
+        "unlock": [
+          "l6:hurstville-fare",
+          "l6:sydride-phone"
+        ]
+      }
+    },
+    {
+      "id": "l6-ashfield-express",
+      "act": 1,
+      "title": "The Express Does Not Stop At Ashfield",
+      "blurb": "Out to Strathfield on the all stations, back on the all stations, and the express goes past us twice doing nothing for anybody. Knees are gone today. You're doing my run, and you're doing it properly.",
+      "giver": "l6-ashfield-platform-two-baz",
+      "level": 6,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "get his flat white, no sugar"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Ashfield",
+          "to": "Strathfield",
+          "label": "ride out to Strathfield, all stations"
+        },
+        {
+          "kind": "photo",
+          "x": -10629,
+          "z": 595,
+          "radius": 60,
+          "label": "photograph Strathfield for a man who's never seen it"
+        },
+        {
+          "kind": "earn",
+          "dollars": 60,
+          "label": "make $60 on the way home, in fares like he does"
+        },
+        {
+          "kind": "ko",
+          "npc": "eshay",
+          "count": 3,
+          "label": "settle three vestibule DJs before Croydon"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Strathfield",
+          "to": "Ashfield",
+          "label": "come back to Ashfield, all stations, like a human"
+        }
+      ],
+      "reward": {
+        "cash": 220,
+        "xp": 950,
+        "unlock": [
+          "l6:ashfield-express"
+        ]
+      }
     }
   ]
 }

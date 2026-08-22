@@ -918,6 +918,834 @@
           ]
         }
       ]
+    },
+    {
+      "id": "ashfield-provider",
+      "name": "Dilshan, employment consultant",
+      "x": -7654,
+      "z": 2274,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Sit down. Don't touch the lolly jar, it's props. -- The whiteboard behind him says QUARTER ENDS FRIDAY in three different colours of marker, each one heavier than the last.",
+          "choices": [
+            {
+              "text": "You said on the phone there was money.",
+              "goto": "offer"
+            },
+            {
+              "text": "What is it I signed, exactly?",
+              "goto": "jobplan"
+            },
+            {
+              "text": "Quiet in here.",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "It's done. All of it.",
+              "goto": "done"
+            },
+            {
+              "text": "Wrong shopfront. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "There's four hundred and ten dollars in your Employment Fund. It is yours. You cannot see it, hold it, or spend it, and on Friday it evaporates. Other than that, entirely yours.",
+          "choices": [
+            {
+              "text": "Go on then. Spend it.",
+              "accept": "l4-employment-fund",
+              "needLevel": 4,
+              "denyFlag": "l4:employment-fund"
+            },
+            {
+              "text": "Or you could give me the four hundred and ten.",
+              "goto": "nocash"
+            },
+            {
+              "text": "Why do you care if it's spent?",
+              "goto": "burwood"
+            },
+            {
+              "text": "I'll have a think.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "nocash",
+          "line": "No. The fund buys boots, courses and travel. It does not buy rent, food, or a haircut for the interview it just paid you to travel to. I didn't build it. I only acquit it.",
+          "choices": [
+            {
+              "text": "Boots it is.",
+              "goto": "offer"
+            },
+            {
+              "text": "Unbelievable.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "burwood",
+          "line": "An unspent fund reads as an unengaged caseload, and an unengaged caseload gets my hundred and eighty moved to the Burwood office. I live above the dumpling place. Four hundred metres to work. I am fighting for that.",
+          "choices": [
+            {
+              "text": "Four hundred metres is worth defending.",
+              "goto": "offer"
+            },
+            {
+              "text": "Everyone's got a hustle.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "jobplan",
+          "line": "Your Job Plan. You agreed to seek work in an industry you named while I was typing. You said 'anything'. It went in as 'anything'. That is the entire reason you are a labourer this quarter.",
+          "choices": [
+            {
+              "text": "The plan's the fiction. Work's the fiction.",
+              "needFaction": "DeFAULT",
+              "goto": "jobplan_reply"
+            },
+            {
+              "text": "Anything by Thursday suits me fine.",
+              "needFaction": "Marita",
+              "goto": "jobplan_reply"
+            },
+            {
+              "text": "Where do I sign?",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "jobplan_reply",
+          "line": "I get both of you through that door. One wants the box ticked and one wants me to admit the box is a lie. The box is a lie and it still has to be ticked. Bottom of page two.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Tuesdays are dead. Everyone's at the Mall food court where the aircon is free. -- There is a takeaway container on the desk with the lid still on, going cold.",
+          "improv": {
+            "persona": "Dilshan, an employment services consultant in a shopfront on Liverpool Road, Ashfield, wedged between a dumpling house and a phone repair kiosk. A caseload of a hundred and eighty. Tired, dry, faintly fond of the people he cannot help. Lower case, deadpan, very Australian.",
+            "context": "A jobseeker on his caseload has noticed the office is empty on a Tuesday afternoon. The free air conditioning at Ashfield Mall food court is where everyone actually is. His lunch has been on the desk since one o'clock. No exclamation marks."
+          },
+          "choices": [
+            {
+              "text": "Get much of a lunch break?",
+              "goto": "lunch"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "lunch",
+          "line": "Twelve pork and chive from two doors down. I eat them at four. Every appointment runs over and not one of them has ever ended in a job. The dumplings are the win. I'm at peace with it.",
+          "choices": [
+            {
+              "text": "Small mercies.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Course, boots, ticket, photograph. That is the fund acquitted at ninety-six per cent and I have no questions about the other four. Sign here. Don't tell me what you sold or to whom.",
+          "choices": [
+            {
+              "text": "Acquitted.",
+              "turnin": "l4-employment-fund"
+            },
+            {
+              "text": "Not quite yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "eleni-dulwich",
+      "name": "Eleni, forty-one years at number 9",
+      "x": -6218,
+      "z": 4831,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Sit on the step. The agent says the step is a trip hazard and the couch is a fire hazard, and he's twenty-six, and he's never once come inside.",
+          "choices": [
+            {
+              "text": "What's the letter actually say?",
+              "goto": "letter"
+            },
+            {
+              "text": "Who's out the front with the rollers?",
+              "goto": "roller"
+            },
+            {
+              "text": "I'll help.",
+              "goto": "offer"
+            },
+            {
+              "text": "I've done the lot of it.",
+              "goto": "hearing"
+            },
+            {
+              "text": "How's the street these days?",
+              "goto": "street"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "letter",
+          "line": "Twelve weeks, and where it says why, it says no grounds. That's the actual wording. No grounds. Then it's back on the market Saturday, same house, same crack in the ceiling, eleven hundred a week.",
+          "choices": [
+            {
+              "text": "Eleven hundred. For this.",
+              "goto": "offer"
+            },
+            {
+              "text": "Can they just do that?",
+              "goto": "letter_yes"
+            }
+          ]
+        },
+        {
+          "id": "letter_yes",
+          "line": "They can. That's what no grounds is. It's not a loophole, love, it's the front door.",
+          "choices": [
+            {
+              "text": "Then let's give them grounds to regret it.",
+              "goto": "offer"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "roller",
+          "line": "Significant renovations, the letter calls it. It's a dishwasher and my kitchen in a skip. They've been starting Monday since March and this morning they turned up with paint for the back wall.",
+          "choices": [
+            {
+              "text": "What's wrong with the back wall?",
+              "goto": "offer"
+            },
+            {
+              "text": "Blokes turn up eventually.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "street",
+          "line": "The fruit shop's a coffee shop. The fish shop's a coffee shop. And the coffee shop sells one shirt, in the window, on a chair.",
+          "improv": {
+            "persona": "Eleni, Greek-Australian, seventies, forty-one years in the same terrace two streets off Dulwich Hill station. Dry, warm, unhurried, not sentimental. Lower case energy, no exclamation marks.",
+            "context": "Someone has asked how the street has changed. The fruit shop, the fish shop and the milk bar are all cafes now, the deli is a wine bar with no wine list, and the new people are lovely and none of them stay two years."
+          },
+          "choices": [
+            {
+              "text": "A shirt. On a chair.",
+              "goto": "street_shirt"
+            },
+            {
+              "text": "Back to the letter.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "street_shirt",
+          "line": "Two hundred and forty dollars. I asked. I wasn't buying, I wanted to see if he'd say it out loud.",
+          "choices": [
+            {
+              "text": "Did he?",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "The mould behind the wardrobe has been there four winters and the tribunal will want to see it. So: the photo before the paint. Then stand at their open Saturday taking up room. Then the filing fee, because I haven't got it.",
+          "choices": [
+            {
+              "text": "I'll get the photo before the paint does.",
+              "accept": "l4-no-grounds",
+              "denyFlag": "l4:no-grounds"
+            },
+            {
+              "text": "That's a big Saturday, Eleni.",
+              "goto": "offer_no"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_no",
+          "line": "It's a big Saturday for me too and I'm seventy-four. Go on, the paint's in the hallway.",
+          "choices": [
+            {
+              "text": "Fine. Photo first.",
+              "accept": "l4-no-grounds",
+              "denyFlag": "l4:no-grounds"
+            },
+            {
+              "text": "Give me a bit.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "hearing",
+          "line": "Read it back to me. Applicant: Eleni. Premises: this. Grounds: theirs, none — mine, four winters of it, photographed. It's lodged and there's a date, and a date is more than they meant me to have.",
+          "choices": [
+            {
+              "text": "So what happens now?",
+              "goto": "done"
+            },
+            {
+              "text": "Drink your coffee first.",
+              "goto": "done"
+            },
+            {
+              "text": "I'll come back Saturday.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Now they turn up, or they don't, and either way somebody with a folder asks them a question in a room. Here. It's from the tin, and don't look at me like that, the tin's for exactly this.",
+          "choices": [
+            {
+              "text": "From the tin, then.",
+              "turnin": "l4-no-grounds"
+            },
+            {
+              "text": "Keep it. Buy the shirt.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chatswood-waterproofer",
+      "name": "Loz, waterproofing subcontractor",
+      "x": -2712,
+      "z": -7790,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "You right? Mind the hoarding. That's not council's, that's ours. Was ours. It's a bit complicated as of Friday.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "Why are you sitting on an esky?",
+              "goto": "why"
+            },
+            {
+              "text": "About the money.",
+              "goto": "paid"
+            },
+            {
+              "text": "I've done the lot.",
+              "goto": "done"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Nine floors of membrane, laid twice, invoiced once. Head contractor went under Friday and was trading again Monday. Same ute, new letters on the door. I want a photo of that door.",
+          "choices": [
+            {
+              "text": "I'll get your photo.",
+              "accept": "l4-chatswood-phoenix-abn",
+              "denyFlag": "l4:phoenix-abn"
+            },
+            {
+              "text": "Isn't that a lawyer's job?",
+              "goto": "lawyer"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "lawyer",
+          "line": "Lawyer wants four grand up front to write a letter to a company that doesn't exist any more. I want a photo and three blokes to have a bit of a think.",
+          "choices": [
+            {
+              "text": "When you put it like that.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "why",
+          "line": "Site shed's padlocked and my lunch is in it. Six years on this street. I've waterproofed half the balconies you can see from here, and paid for a fair few of them twice.",
+          "improv": {
+            "persona": "Loz, a waterproofing subcontractor sitting on an esky outside a half-remediated apartment tower on Victoria Ave, Chatswood. Fifties, sunburnt, hi-vis, absolutely level. Deadpan, lower case, very Australian, never raises her voice.",
+            "context": "A stranger has asked why she is sitting on an esky at seven in the morning. The site shed is padlocked because the head contractor went into liquidation on Friday. She has worked this street for six years. Small talk only -- she is not offering work in this answer."
+          },
+          "choices": [
+            {
+              "text": "Long six years.",
+              "goto": "why_more"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "why_more",
+          "line": "That tower behind you got its occupation certificate on a Thursday and its first leak on the Sunday. That's not a defect. That's a schedule.",
+          "choices": [
+            {
+              "text": "Jesus.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "paid",
+          "line": "So he's one stop down the line in a serviced office with a printer and a pot plant. Good. That's a name, and a name gets me on the list with everyone else he's done.",
+          "choices": [
+            {
+              "text": "Happy to be the witness.",
+              "goto": "hello"
+            },
+            {
+              "text": "What actually happens to him?",
+              "goto": "paid_more"
+            }
+          ]
+        },
+        {
+          "id": "paid_more",
+          "line": "Nothing quick. Payment claim, adjudication, twenty business days. But he has to read it, and reading it will ruin his week. That'll do me for now.",
+          "choices": [
+            {
+              "text": "That'll do.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Let's see it, then. — She counts it out of a Bunnings bag, twice, and hands you more than she said she would.",
+          "choices": [
+            {
+              "text": "Here's the lot.",
+              "turnin": "l4-chatswood-phoenix-abn"
+            },
+            {
+              "text": "Not finished yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sevenhills-driver",
+      "name": "Nav, SydRide, 4.61",
+      "x": -25428,
+      "z": -9958,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Kiss and ride is two minutes. I have been here nine. The council bloke and I have an understanding: he writes the ticket, I appeal the ticket, nobody's day is ruined.",
+          "choices": [
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "Your app's kicking off.",
+              "goto": "flagged"
+            },
+            {
+              "text": "Done. All three.",
+              "goto": "done"
+            },
+            {
+              "text": "Any advice?",
+              "goto": "rules"
+            },
+            {
+              "text": "Quiet morning?",
+              "goto": "wait"
+            },
+            {
+              "text": "Nah, you're right.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Three fares stacked and my daughter's assembly is at nine. Cancel them and my acceptance rate goes under ninety, and then it's a fortnight of Blacktown to Lalor Park and no airport runs. You've got a face people get in a car with.",
+          "choices": [
+            {
+              "text": "Give me the phone.",
+              "accept": "l4-acceptance-rate",
+              "needLevel": 4,
+              "denyFlag": "l4:fares"
+            },
+            {
+              "text": "Take her to the assembly instead.",
+              "goto": "offer_no"
+            },
+            {
+              "text": "Find someone else.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_no",
+          "line": "She sings at nine and she gets in the car at three. Those are different problems and only one of them pays.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "rules",
+          "line": "Two rules. They will say Parramatta and they will mean Westmead. And nobody, in eleven years, has ever been outside.",
+          "choices": [
+            {
+              "text": "Nobody?",
+              "goto": "rules_more"
+            },
+            {
+              "text": "Got it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "rules_more",
+          "line": "One bloke. Kings Langley, 2019. Standing on the nature strip with the bag already zipped. I still think about him.",
+          "choices": [
+            {
+              "text": "A legend.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "wait",
+          "line": "Six forty the commuter car park's full. Six forty-five they're on the grass. Seven o'clock they're on the grass at the church. You could set a clock by the grass.",
+          "improv": {
+            "persona": "Nav, a SydRide driver in his forties parked in the kiss-and-ride at Seven Hills station in western Sydney. Eleven years and half a million kilometres in the same Camry. Dry, precise, unhurried, never bitter. Lower case, no exclamation marks.",
+            "context": "Someone has asked whether it is a quiet morning. It is the weekday commuter peak: the Seven Hills park-and-ride fills before six forty and the overflow parks on grass, then on the church's grass. He has watched this happen every working day for over a decade and finds it neither funny nor annoying any more, just reliable."
+          },
+          "choices": [
+            {
+              "text": "Why not park there yourself?",
+              "goto": "wait_more"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "wait_more",
+          "line": "Because a parked car earns nothing and a moving car earns four dollars. It's not a good business. It's just an honest one, most days.",
+          "choices": [
+            {
+              "text": "Most days.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "flagged",
+          "line": "They've paused the account mid-shift, so the airport one is on you and it's not by road. Train from here, Western line, sit with her all the way to Central. Flight's at two, the M4 is a car park, and she will want to argue about the toll.",
+          "choices": [
+            {
+              "text": "She'll hate the train.",
+              "goto": "flagged_no"
+            },
+            {
+              "text": "Western line. Done.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "flagged_no",
+          "line": "She'll hate the toll longer. Nobody has ever thanked me for the M4 and I've been on it since it cost a dollar sixty.",
+          "choices": [
+            {
+              "text": "I'll get her there.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Empty rank in the photo, timestamp on the corner. That's the dispute won and the fortnight back. Cash for the fares, and the tip's hers — she said you didn't talk to her. Highest compliment anyone gets out here.",
+          "choices": [
+            {
+              "text": "Three fares, one train, one photo.",
+              "turnin": "l4-acceptance-rate"
+            },
+            {
+              "text": "Not finished yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "blacktown-notice-board",
+      "name": "Ronnie, admin of the Blacktown notice board",
+      "x": -28212,
+      "z": -10528,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Forty-one thousand members and the top post this week is a lost cockatiel. It came home, love. It came home and I've got nothing.",
+          "choices": [
+            {
+              "text": "What is this, exactly?",
+              "goto": "board"
+            },
+            {
+              "text": "What is it you need posted?",
+              "goto": "offer"
+            },
+            {
+              "text": "It's done. Get your finger ready.",
+              "goto": "report"
+            },
+            {
+              "text": "If they come for me, what do I do?",
+              "goto": "heat"
+            },
+            {
+              "text": "Busy week on the page?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "board",
+          "line": "Community safety page. I've run it since the Westpoint carpark still had a boom gate. Police won't tell you a thing, so I tell everyone everything, twice.",
+          "choices": [
+            {
+              "text": "That's just gossip with a header image.",
+              "goto": "board_no"
+            },
+            {
+              "text": "Someone has to.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "board_no",
+          "line": "Gossip is when it's about a person. This is about a vehicle.",
+          "choices": [
+            {
+              "text": "Fair distinction.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "An incident. Nothing tragic — I don't want anyone hurt, I want everyone informed that someone nearly was. Up on the Westpoint roof, with a siren in it, and my photo first.",
+          "choices": [
+            {
+              "text": "I'll go and make you some news.",
+              "accept": "l4-anyone-else-awake",
+              "denyFlag": "l4:notice-board"
+            },
+            {
+              "text": "That's a bit arranged, isn't it.",
+              "goto": "offer_no"
+            },
+            {
+              "text": "Find someone else.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_no",
+          "line": "Everything's arranged. The council arranges the roadworks, I arrange the post about the roadworks. Nobody has ever once thanked the council.",
+          "choices": [
+            {
+              "text": "Alright. Say it again properly.",
+              "goto": "offer"
+            },
+            {
+              "text": "I'll think about it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "heat",
+          "line": "Don't run the Great Western. That's four lanes of witnesses and every one of them tags me in it. Go down the stairs and get on a train. A highway car cannot follow you to Seven Hills.",
+          "choices": [
+            {
+              "text": "The train is the getaway vehicle.",
+              "goto": "heat_yes"
+            },
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "heat_yes",
+          "line": "It's the only one out here that's never been reported stolen.",
+          "choices": [
+            {
+              "text": "Right you are.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Two trolleys in the creek, a python in a Kia, and a man selling mangoes out of a ute on Richmond Road who I think we can all agree is fine.",
+          "improv": {
+            "persona": "Ronnie, who runs a forty-one-thousand-member community notice board page for Blacktown in western Sydney. Sixties, lanyard, phone always out, entirely certain she is critical infrastructure. Deadpan, warm, lower case, no exclamation marks.",
+            "context": "Someone has asked how her week on the page has been. She lists two or three small suburban western-Sydney incidents in the flattest possible order and has one unshakeable opinion about the last of them. No politics, no real people by name."
+          },
+          "choices": [
+            {
+              "text": "The mango bloke is fine.",
+              "goto": "smalltalk_mango"
+            },
+            {
+              "text": "Slow week, then.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_mango",
+          "line": "He is fine. I've had to lock the comments on him twice.",
+          "choices": [
+            {
+              "text": "Democracy.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "report",
+          "line": "Go on then. Slowly. I type with one finger and I'm doing the caption at the same time.",
+          "choices": [
+            {
+              "text": "Here's how it went.",
+              "goto": "filed"
+            },
+            {
+              "text": "Later, Ronnie.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "filed",
+          "line": "Right. Heading: was anyone else awake for this. No question mark — I never use them, it reads more urgent without.",
+          "choices": [
+            {
+              "text": "That's not a question either way.",
+              "goto": "filed_edit"
+            },
+            {
+              "text": "Post it.",
+              "goto": "posted"
+            }
+          ]
+        },
+        {
+          "id": "filed_edit",
+          "line": "Nothing on that page is a question. Everything on that page is a question. That is the format and it has served this suburb well.",
+          "choices": [
+            {
+              "text": "Post it, Ronnie.",
+              "goto": "posted"
+            }
+          ]
+        },
+        {
+          "id": "posted",
+          "line": "Two hundred reacts in four minutes. Someone's already said it's the council's fault. Someone always does. Money's in the glovebox — I'm not carrying it in a lanyard.",
+          "choices": [
+            {
+              "text": "Pleasure doing community safety.",
+              "turnin": "l4-anyone-else-awake"
+            },
+            {
+              "text": "Hold it for me.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
     }
   ]
 }

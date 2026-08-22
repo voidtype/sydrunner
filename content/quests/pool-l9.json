@@ -334,6 +334,342 @@
           "l9:wagon-home"
         ]
       }
+    },
+    {
+      "id": "l9-ocean-glimpse",
+      "act": 1,
+      "title": "Ocean Glimpse, From One Particular Square Metre",
+      "blurb": "The listing says Coogee. The letterbox says Randwick. The glimpse is one square metre of the back deck and I can't be seen within four hundred of it. Auction Saturday. Monday next door pours a pergola. Photograph it while it exists.",
+      "giver": "agent-kavanagh-randwick",
+      "level": 9,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "a flat white at the Spot. You're a buyer's agent this morning: hold it, don't drink it."
+        },
+        {
+          "kind": "photo",
+          "x": 2896,
+          "z": 5232,
+          "radius": 20,
+          "label": "the glimpse. One square metre of back deck, over next door's roofline. Stand wrong and it's a carport."
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 4,
+          "label": "four neighbours will come out to ask who you are. This street has photographed every tradesman since 2011."
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Randwick",
+          "to": "Kingsford",
+          "label": "Randwick to Kingsford on the tram. Don't walk Anzac Parade in this heat, you'll photograph like a hostage."
+        },
+        {
+          "kind": "photo",
+          "x": 1768,
+          "z": 5804,
+          "radius": 30,
+          "label": "the rival's board on the corner: the price guide, the word COOGEE, and the fact that you're standing in Kingsford."
+        },
+        {
+          "kind": "earn",
+          "dollars": 200,
+          "label": "$200 of your own on the way. He can't pay you until settlement, and settlement is a concept."
+        },
+        {
+          "kind": "dialog",
+          "npc": "agent-kavanagh-randwick",
+          "node": "paddles",
+          "label": "back to the terminus and give him the paddle count"
+        }
+      ],
+      "reward": {
+        "cash": 420,
+        "xp": 1500,
+        "unlock": [
+          "l9:ocean-glimpse"
+        ]
+      }
+    },
+    {
+      "id": "l9-shire-economy",
+      "act": 1,
+      "title": "Nobody Round Here Has a Job",
+      "blurb": "Everyone in this postcode has a business. Nobody in this postcode has a job. The juniors need eleven hundred by Sunday for jerseys, and I have got a tin, a barbecue and you. Bring the tin back heavier.",
+      "giver": "cronulla-treasurer",
+      "level": 9,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -7594,
+          "z": 19348,
+          "radius": 90,
+          "label": "Caringbah, the wholesaler. Sausages on the club account, settled fortnightly since 1981."
+        },
+        {
+          "kind": "ko",
+          "npc": "tradie",
+          "count": 5,
+          "label": "collect the five blokes who said 'yeah for sure' in March and have been at a seminar in Miranda ever since"
+        },
+        {
+          "kind": "goto",
+          "x": -5761,
+          "z": 19882,
+          "radius": 120,
+          "label": "get the barbecue onto the grass at Woolooware before the juniors kick off"
+        },
+        {
+          "kind": "earn",
+          "dollars": 320,
+          "label": "three hundred and twenty dollars, one sausage at a time. This is the hard way. There is no other way."
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites off the Kingsway. She reimburses you exactly, in fifty cent pieces, counted twice"
+        },
+        {
+          "kind": "photo",
+          "x": -4977,
+          "z": 20825,
+          "radius": 40,
+          "label": "photograph the train unloading at the last stop on the line — the council grant form calls it 'evidence of visitation'"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Cronulla",
+          "to": "Sutherland",
+          "label": "the last bank branch in the Shire is at Sutherland and it shuts at four. Bank run."
+        },
+        {
+          "kind": "dialog",
+          "npc": "cronulla-treasurer",
+          "node": "ledger",
+          "label": "sit down while Doris reads the day back to you, line by line"
+        }
+      ],
+      "reward": {
+        "cash": 400,
+        "xp": 1500,
+        "unlock": [
+          "l9:shire-economy"
+        ]
+      }
+    },
+    {
+      "id": "l9-colour-and-movement",
+      "act": 1,
+      "title": "Colour and Movement, Six Episodes",
+      "blurb": "A production company has taken the Westfield carpark for six episodes about how hard it is out here. They pay a hundred and twenty a driveway. Go and be authentic at them, then go and say it in Artarmon.",
+      "giver": "md-ronnie",
+      "level": 9,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -36340,
+          "z": -10420,
+          "radius": 45,
+          "label": "the unit base is in the Westfield carpark: eleven vehicles, a marquee, and a bloke with a clipboard where the trolley bay was"
+        },
+        {
+          "kind": "photo",
+          "x": -36300,
+          "z": -10420,
+          "radius": 60,
+          "label": "film the film crew. They will ask what it's for. Do not tell them."
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 3,
+          "label": "the production has flown out three community liaison consultants to consult with the community. Consult back."
+        },
+        {
+          "kind": "earn",
+          "dollars": 120,
+          "label": "a hundred and twenty a driveway is the going rate. Get a hundred and twenty out of the day off somebody who isn't them."
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Mount Druitt",
+          "to": "Artarmon",
+          "label": "the broadcaster sits in Artarmon. In 2015 the boys did this run with forty trucks. You've got an Opal card."
+        },
+        {
+          "kind": "photo",
+          "x": -2260,
+          "z": -6510,
+          "radius": 50,
+          "label": "photograph the front doors and the visitor parking. That is the right of reply, delivered in full."
+        },
+        {
+          "kind": "dialog",
+          "npc": "md-ronnie",
+          "node": "debrief",
+          "label": "get back out west and tell Ronnie what Artarmon looks like"
+        }
+      ],
+      "reward": {
+        "cash": 420,
+        "xp": 1600,
+        "unlock": [
+          "l9:colour-and-movement"
+        ]
+      }
+    },
+    {
+      "id": "l9-statistically-valid",
+      "act": 1,
+      "title": "Statistically Valid Community Consultation",
+      "blurb": "Under forty submissions it isn't statistically valid and we run the whole thing again. This is the fourth one. I don't need you for or against. I need you to be forty people. There's a sausage sizzle and nobody's come.",
+      "giver": "priya-rhodes-engagement",
+      "level": 9,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "photo",
+          "x": -11600,
+          "z": -4150,
+          "radius": 40,
+          "label": "photograph the view from Lot 4 while it is still a view: the bay, the mangroves, and the sign about not eating the fish"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 8,
+          "label": "doorknock the Rhodes Peninsula Residents' Action Group for eight submissions. They will not go quietly, and that is the point"
+        },
+        {
+          "kind": "earn",
+          "dollars": 120,
+          "label": "acquit the sausage sizzle against the community engagement grant. One hundred and twenty dollars. Bread was not in the budget"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "two flat whites from the Waterside. One is for the acting director, who will not be attending"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Rhodes",
+          "to": "Meadowbank",
+          "label": "one stop across the river. The traffic study assumes everybody takes the train. Be an assumption"
+        },
+        {
+          "kind": "photo",
+          "x": -11230,
+          "z": -5590,
+          "radius": 45,
+          "label": "photograph the shadow where it actually lands. It lands in Ryde, so it is not our shadow, so it is not in the report"
+        },
+        {
+          "kind": "goto",
+          "x": -11290,
+          "z": -3960,
+          "radius": 25,
+          "label": "lodge the submissions at the only counter on the peninsula. The counter belongs to the applicant"
+        },
+        {
+          "kind": "dialog",
+          "npc": "priya-rhodes-engagement",
+          "node": "lodged",
+          "label": "stand there while Priya writes down forty"
+        }
+      ],
+      "reward": {
+        "cash": 420,
+        "xp": 1600,
+        "unlock": [
+          "l9:statistically-valid"
+        ]
+      }
+    },
+    {
+      "id": "l9-burwood-doof",
+      "act": 1,
+      "title": "The Doof Has a Two-Hour Loading Zone",
+      "blurb": "Six hundred people upstairs, one lead down the fire stairs, and my van's been in a two-hour zone since eleven. Nobody dances if the ranger comes back. Get me to four in the morning and you can have the good earplugs.",
+      "giver": "burwood-rig-op",
+      "level": 9,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -9793,
+          "z": 1005,
+          "radius": 30,
+          "label": "get up to level six of the Burwood carpark and help walk the subs out of the lift"
+        },
+        {
+          "kind": "earn",
+          "dollars": 220,
+          "label": "work the door in cash — the building wants its cut before the first drop"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 4,
+          "label": "four noise complaints are coming up the fire stairs with the council app already open"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 2,
+          "label": "half three: one flat white for the closing DJ, one for Kaz, from the bubble tea place that never shuts"
+        },
+        {
+          "kind": "photo",
+          "x": -9880,
+          "z": 1228,
+          "radius": 45,
+          "label": "photograph the queue folded down the laneway past Burwood Park — it is next month's flyer"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Burwood",
+          "to": "Central",
+          "label": "put the last of them on the first train to Central before they try to drive"
+        },
+        {
+          "kind": "ko",
+          "npc": "rbt",
+          "count": 1,
+          "label": "the dawn RBT has parked itself across the driveway and the van is behind it"
+        },
+        {
+          "kind": "dialog",
+          "npc": "burwood-rig-op",
+          "node": "done",
+          "label": "find Kaz at the load-out and tell her the van is clear"
+        }
+      ],
+      "reward": {
+        "cash": 380,
+        "xp": 1500,
+        "unlock": [
+          "l9:burwood-doof"
+        ]
+      }
     }
   ]
 }

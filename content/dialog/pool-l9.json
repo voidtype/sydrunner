@@ -952,6 +952,958 @@
           ]
         }
       ]
+    },
+    {
+      "id": "agent-kavanagh-randwick",
+      "name": "Trent Kavanagh, currently between agencies",
+      "x": 2951,
+      "z": 5271,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Don't wave. Stand there like you're waiting for the tram. — Navy suit, no lanyard, holding a display folder the way other men hold a passport at a border.",
+          "choices": [
+            {
+              "text": "You're the bloke who can't go to Coogee.",
+              "goto": "letter"
+            },
+            {
+              "text": "What's the job?",
+              "goto": "offer"
+            },
+            {
+              "text": "It's done.",
+              "goto": "done"
+            },
+            {
+              "text": "How's Saturday go?",
+              "goto": "after",
+              "needFlag": "l9:ocean-glimpse"
+            },
+            {
+              "text": "How long have you been standing here?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Wrong bloke. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "letter",
+          "line": "There's a letter. I'm not to attend the premises, the street, or the café at the end of the street. The café was the part that hurt. Fourteen years I had that patch.",
+          "choices": [
+            {
+              "text": "What did you actually do?",
+              "goto": "letter2"
+            },
+            {
+              "text": "So what do you need?",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "letter2",
+          "line": "At the auction I said the number out loud. The real one. In front of the crowd and the vendor's mother. You can underquote in this town or you can be accurate in it, and only one of those comes with a car.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            },
+            {
+              "text": "So what do you need?",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Two bedroom, back deck, listed as Coogee. It's Randwick. The letterbox knows it's Randwick. But there is a glimpse — one square metre, over next door's roofline — and Monday a pergola goes on top of it.",
+          "choices": [
+            {
+              "text": "I'll get you your glimpse.",
+              "accept": "l9-ocean-glimpse",
+              "needLevel": 9,
+              "denyFlag": "l9:ocean-glimpse"
+            },
+            {
+              "text": "Photograph your own listing, mate.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "paddles",
+          "line": "Good. Boards, guide price, and the neighbour. Now the only number that matters: how many paddles do you reckon register Saturday? — He writes your answer down without looking at the paper.",
+          "choices": [
+            {
+              "text": "Eleven registered. Four serious.",
+              "goto": "paddles2"
+            },
+            {
+              "text": "Two. One of them's next door.",
+              "goto": "paddles2"
+            }
+          ]
+        },
+        {
+          "id": "paddles2",
+          "line": "That's a Randwick number. A Coogee number is nineteen and a bloke crying in a Prado. — He looks east at nothing in particular. The rail stops here. It has stopped here since they pulled the Coogee tram up in 1960.",
+          "choices": [
+            {
+              "text": "Ever think the whole game's the problem?",
+              "goto": "paddles3",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "There's work in it if you want back in.",
+              "goto": "paddles3",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "Anything else?",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "paddles3",
+          "line": "I've been recruited twice on this platform. One of them offered me a start Thursday and one of them offered me a leaflet. The leaflet was better written.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Two hours. Tram every eight minutes, I've watched forty of them go. I don't drive at the moment.",
+          "improv": {
+            "persona": "Trent Kavanagh, a Randwick real estate agent in a navy suit standing at the light rail terminus because he is not allowed east of it. Forty-ish, immaculate, quietly humiliated, still selling. Deadpan, short sentences, no exclamation marks.",
+            "context": "A stranger has asked how long he has been waiting at the Randwick light rail stop. He is not waiting for a tram. He has no licence and no listings and is standing where he can watch a street he cannot walk down."
+          },
+          "choices": [
+            {
+              "text": "Why not drive?",
+              "goto": "smalltalk2"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk2",
+          "line": "Points. You do a hundred and ten open homes a year in the one suburb and eventually the camera on Alison Road knows you better than the office does.",
+          "choices": [
+            {
+              "text": "Brutal.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Show me. — He looks at one square metre of water for longer than a man should have to.",
+          "choices": [
+            {
+              "text": "There's your ocean.",
+              "turnin": "l9-ocean-glimpse"
+            },
+            {
+              "text": "Not yet.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "after",
+          "line": "Sold. Two-ten over the guide, and the buyer's from Coogee — he's paid a Coogee premium for a view of the suburb he already lives in. — He has a lanyard on. Different colour.",
+          "choices": [
+            {
+              "text": "Congratulations, I think.",
+              "goto": "hello"
+            },
+            {
+              "text": "Did they credit you?",
+              "goto": "after2"
+            }
+          ]
+        },
+        {
+          "id": "after2",
+          "line": "The board says the principal's name and the photo is one you took standing in a stranger's garden. That's the industry. — He shakes your hand this time, at a tram stop, in full view.",
+          "choices": [
+            {
+              "text": "Good luck, Trent.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cronulla-treasurer",
+      "name": "Doris, Cronulla surf club treasurer",
+      "x": -4874,
+      "z": 20903,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Doris. Treasurer of four things. If it's raffle tickets, three dollars, and the meat tray is real — which is more than I can say for most of this suburb.",
+          "choices": [
+            {
+              "text": "Anything going? Paid?",
+              "goto": "offer"
+            },
+            {
+              "text": "I've run the day.",
+              "goto": "turnins"
+            },
+            {
+              "text": "How'd we go?",
+              "goto": "ledger"
+            },
+            {
+              "text": "Quiet down here for a Saturday.",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Four things?",
+              "goto": "seminars"
+            },
+            {
+              "text": "Nothing. Enjoy the surf.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Everyone in this postcode has a business. Nobody in this postcode has a job. Juniors need eleven hundred by Sunday for jerseys and I've got a tin, a barbecue and you.",
+          "choices": [
+            {
+              "text": "What's it pay?",
+              "goto": "pay"
+            },
+            {
+              "text": "I'll run the day.",
+              "accept": "l9-shire-economy",
+              "denyFlag": "l9:shire-economy"
+            },
+            {
+              "text": "Get one of the dads to do it.",
+              "goto": "dads"
+            },
+            {
+              "text": "I don't do volunteer work.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "pay",
+          "line": "Four hundred. Cash, out of my hand, Sunday, after the tin's counted. It is the only income stream in the Shire that has ever actually arrived.",
+          "choices": [
+            {
+              "text": "Then I'm your bloke.",
+              "accept": "l9-shire-economy",
+              "denyFlag": "l9:shire-economy"
+            },
+            {
+              "text": "Out of the juniors' money?",
+              "goto": "pay_no"
+            },
+            {
+              "text": "I'll think about it.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "pay_no",
+          "line": "Out of the line in the books that says labour, because it is labour. I've done thirty years of it for free and I'm not pretending that's a virtue.",
+          "choices": [
+            {
+              "text": "Fair. I'll run the day.",
+              "accept": "l9-shire-economy",
+              "denyFlag": "l9:shire-economy"
+            },
+            {
+              "text": "Understood.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "dads",
+          "line": "The dads have a group chat. It is called Shire Wealth. Nobody in it has answered a message about the barbecue since the March one, which said 'yeah for sure'.",
+          "choices": [
+            {
+              "text": "So it's me.",
+              "goto": "offer"
+            },
+            {
+              "text": "What's my nephew's excuse, then.",
+              "goto": "seminars"
+            }
+          ]
+        },
+        {
+          "id": "seminars",
+          "line": "Surf club, juniors, the netball, and the progress association. My nephew did a two grand course in Miranda. He's got seven income streams now. I've seen the statement. There are two.",
+          "choices": [
+            {
+              "text": "What's the other one?",
+              "goto": "recruiters"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "recruiters",
+          "line": "His mum. — The DeFAULT lot came down in January with a pamphlet about wage theft, and Marita sent a fella with fridge magnets. Both of them read the sign, both of them bought a sausage. Two dollars fifty. No discount.",
+          "choices": [
+            {
+              "text": "Two fifty's cheap.",
+              "goto": "prices"
+            },
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "prices",
+          "line": "It's been two dollars fifty since 2009 and it will be two dollars fifty when I'm dead. The bread's gone up four times. We absorb it. That's what a club is.",
+          "choices": [
+            {
+              "text": "That's what a club is.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Train comes right to the sand. That's our whole problem. Everyone north of Tom Ugly's thinks the Shire is a car park with a view, and they're not entirely wrong on a long weekend.",
+          "improv": {
+            "persona": "Doris, sixty-odd, treasurer of the Cronulla surf club and three other Shire organisations. Dry, exact about money, fond of the place without a single illusion about it. Short sentences, no exclamation marks.",
+            "context": "A visitor has remarked that it's quiet for a Saturday. She is watching the last-stop train from the city empty onto the esplanade — day-trippers who bring towels and no wallets, which she has costed."
+          },
+          "choices": [
+            {
+              "text": "They spend, though?",
+              "goto": "smalltalk_no"
+            },
+            {
+              "text": "I'll let you work.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_no",
+          "line": "They bring a towel and a bottle of water from home. Forty thousand people a hot Sunday and the canteen takes six hundred dollars. I've kept the figures. Somebody should.",
+          "choices": [
+            {
+              "text": "Somebody should.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "ledger",
+          "line": "Snags out, three hundred and eleven. Gold coin, two eighty. Notes, forty. One bloke tapped his phone on the tin, waited for a beep, and walked off looking proud of himself. That's the day.",
+          "choices": [
+            {
+              "text": "Then here's the tin.",
+              "goto": "turnins"
+            },
+            {
+              "text": "What's the shortfall?",
+              "goto": "ledger_no"
+            },
+            {
+              "text": "I'll come back Sunday.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "ledger_no",
+          "line": "Eleven hundred needed, seven eighty in. The rest comes out of the raffle and me. It always comes out of me. Don't put that in the minutes.",
+          "choices": [
+            {
+              "text": "Here's the tin.",
+              "goto": "turnins"
+            },
+            {
+              "text": "It's in the minutes.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "turnins",
+          "line": "Give it here. Don't shake it — I can count a tin by weight and you'll cost me a reconciliation.",
+          "choices": [
+            {
+              "text": "All of it's there.",
+              "turnin": "l9-shire-economy"
+            },
+            {
+              "text": "Give me an hour.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "md-ronnie",
+      "name": "Ronnie Two-Phones, DeFAULT out west",
+      "x": -36180,
+      "z": -10230,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Two phones. This one's DeFAULT. This one is the other thing. Don't ask me which one just rang.",
+          "choices": [
+            {
+              "text": "Which one just rang?",
+              "goto": "offer"
+            },
+            {
+              "text": "What's the other thing?",
+              "goto": "twophones"
+            },
+            {
+              "text": "I've been out to Artarmon.",
+              "goto": "debrief"
+            },
+            {
+              "text": "Sort me out for it.",
+              "goto": "done"
+            },
+            {
+              "text": "Nothing. You're right.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "A production company. Six episodes. The working title has the word Real in it twice. They pay a hundred and twenty for a driveway and forty for a wave, and half of Luxford Road has already signed.",
+          "choices": [
+            {
+              "text": "So what do you want done about it?",
+              "accept": "l9-colour-and-movement",
+              "denyFlag": "l9:colour-and-movement",
+              "needLevel": 9
+            },
+            {
+              "text": "You're in it, aren't you.",
+              "goto": "cast"
+            },
+            {
+              "text": "Not my street.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "cast",
+          "line": "They offered me community voice. Sit on a milk crate, say something true, four hundred in the hand. — He looks at the second phone. — I haven't rung back. That is not the same as no.",
+          "choices": [
+            {
+              "text": "Take the four hundred, Ronnie.",
+              "goto": "cast2"
+            },
+            {
+              "text": "So what do you want done about it?",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "cast2",
+          "line": "Marita would tell you it's exposure, and exposure is nearly a job, and nearly a job is their whole religion. We just don't like being other people's evidence.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "twophones",
+          "line": "This one's for the movement. This one's my sister's landscaping ABN. Guess which one rings on a Sunday.",
+          "improv": {
+            "persona": "Ronnie Two-Phones, a DeFAULT street handler standing outside Mount Druitt station in Western Sydney. Forties, patient, very dry, lower case, no exclamation marks. Proud of the suburb and tired of explaining it.",
+            "context": "Someone has asked why he carries two phones. One is for the faction; the other is his sister's landscaping business, which he answers more often than he admits. Small talk only. Spell the two factions exactly as Marita and DeFAULT."
+          },
+          "choices": [
+            {
+              "text": "The landscaping one.",
+              "goto": "twophones2"
+            },
+            {
+              "text": "Anyway.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "twophones2",
+          "line": "Everyone wants a hedge done. Nobody wants a hedge done Monday.",
+          "choices": [
+            {
+              "text": "Anyway.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "debrief",
+          "line": "You went the whole way across the city to stand outside a building. — He laughs, properly, for the first time. — Forty trucks, that took. And an Opal card, apparently.",
+          "choices": [
+            {
+              "text": "Nobody came out.",
+              "goto": "debrief2"
+            },
+            {
+              "text": "Sort me out, then.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "debrief2",
+          "line": "You photographed their doors and their reception photographed you. Somewhere in that building is a folder with both of us in it. — He puts the second phone face down on the bench. — I'm not ringing them back.",
+          "choices": [
+            {
+              "text": "Sort me out, then.",
+              "goto": "done"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Four hundred I'm not taking, and a hundred and twenty a driveway I couldn't stop. — He counts it out anyway, off the roll, slowly. — Call it a location fee. You were the location.",
+          "choices": [
+            {
+              "text": "Location fee.",
+              "turnin": "l9-colour-and-movement"
+            },
+            {
+              "text": "Keep it for the hedge.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "priya-rhodes-engagement",
+      "name": "Priya, Community Engagement, City of Canada Bay",
+      "x": -11340,
+      "z": -4000,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "This is the consultation. The table, the corflute, and me. If you take a humbug I'm obliged to write down that you engaged.",
+          "choices": [
+            {
+              "text": "What am I looking at?",
+              "goto": "plan"
+            },
+            {
+              "text": "What do you need from me?",
+              "goto": "offer"
+            },
+            {
+              "text": "The submissions are lodged.",
+              "goto": "lodged"
+            },
+            {
+              "text": "How's it going?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "I've done it.",
+              "goto": "turnin"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "plan",
+          "line": "Rhodes East. Twelve towers, one primary school, and a traffic study that assumes everybody takes the train. That's the train, there, on the corflute. They've drawn it empty.",
+          "choices": [
+            {
+              "text": "Is it already decided?",
+              "goto": "decided"
+            },
+            {
+              "text": "What about the shadows?",
+              "goto": "councils"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "decided",
+          "line": "The DA is lodged. The consultation is a separate process that runs alongside it and informs it. Informs. That's the word in the act. I've read the act. It doesn't say what informs means.",
+          "choices": [
+            {
+              "text": "So it's decided.",
+              "goto": "decided2"
+            },
+            {
+              "text": "Back up a bit.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "decided2",
+          "line": "It's informed.",
+          "choices": [
+            {
+              "text": "Beautiful.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "councils",
+          "line": "Half the shadow lands in Ryde and half of it lands on Parramatta's towers at Wentworth Point. Three councils across one bit of water, and not one of those shadows is ours.",
+          "choices": [
+            {
+              "text": "So who counts them?",
+              "goto": "councils2"
+            },
+            {
+              "text": "Marita reckon twelve towers is twelve years of work.",
+              "goto": "hoardings",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "DeFAULT reckon nobody should be housed by a spreadsheet.",
+              "goto": "mangroves",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "councils2",
+          "line": "Nobody counts them. There's a diagram.",
+          "choices": [
+            {
+              "text": "There's always a diagram.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "hoardings",
+          "line": "Your lot came through with the hoarding crew. Forty-one submissions, all in favour, all in the one handwriting. I counted them. They were valid.",
+          "choices": [
+            {
+              "text": "They were enthusiastic.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "mangroves",
+          "line": "Your lot glued a photo of the mangroves over the render. It was a better render. I left it up for a day and three people asked which stage that was.",
+          "choices": [
+            {
+              "text": "It was accurate.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Under the policy, a consultation with fewer than forty submissions isn't statistically valid and we run the whole thing again. This is the fourth. I have met the same eleven people four times.",
+          "choices": [
+            {
+              "text": "Forty people. I'll be forty people.",
+              "accept": "l9-statistically-valid",
+              "denyFlag": "l9:statistically-valid",
+              "needLevel": 9
+            },
+            {
+              "text": "Sounds like your problem, Priya.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Two hundred and forty units in that tower and today I have spoken to one man walking a dog. Twice. Same man. Different dog.",
+          "improv": {
+            "persona": "Priya, a community engagement officer for the City of Canada Bay, running a public consultation from a trestle table outside Rhodes station. Deadpan, lower case, very Australian, tired rather than bitter, faintly fond of the place.",
+            "context": "She has a corflute of a tower that does not exist yet, a bowl of mint humbugs nobody wants, and a sausage sizzle nobody has come to. A passer-by has asked how the consultation is going. It is a weekday afternoon and the peninsula is empty because everyone is at work."
+          },
+          "choices": [
+            {
+              "text": "Where is everyone?",
+              "goto": "smalltalk2"
+            },
+            {
+              "text": "I'll let you get on.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk2",
+          "line": "Work. Or inside. It's thirty-four degrees out here and there's no shade on this peninsula yet. The shade's in stage three.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "lodged",
+          "line": "Thirty-nine. And you. Forty. — She writes the number down, looks at it a while, and does not look pleased. — Right. That's a valid consultation. Now it informs the thing.",
+          "choices": [
+            {
+              "text": "Congratulations?",
+              "goto": "lodged2"
+            },
+            {
+              "text": "Good luck, Priya.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "lodged2",
+          "line": "Don't. I'm booked to run the next one across the water at Wentworth Point. Same corflute, different council. They've drawn the train empty there too.",
+          "choices": [
+            {
+              "text": "See you across the water.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "turnin",
+          "line": "Let's see it. I'll put it in the portal. The portal was decommissioned pending a review of the portal, so I'll put it in a spreadsheet, and the review will find the spreadsheet.",
+          "choices": [
+            {
+              "text": "Forty submissions, one shadow, one photo of a view.",
+              "turnin": "l9-statistically-valid"
+            },
+            {
+              "text": "Not yet.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "burwood-rig-op",
+      "name": "Kaz, sound and lighting (one van)",
+      "x": -9648,
+      "z": 1186,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Careful — that's a lead, not a rope. Six hundred people upstairs are standing on the other end of it.",
+          "choices": [
+            {
+              "text": "What needs doing?",
+              "goto": "offer"
+            },
+            {
+              "text": "How's it sounding up there?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Why's the van the problem?",
+              "goto": "zone"
+            },
+            {
+              "text": "Who else has been sniffing round?",
+              "goto": "politics"
+            },
+            {
+              "text": "It's four. It's done.",
+              "goto": "done"
+            },
+            {
+              "text": "Nothing. Sorry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Midnight is what the council says, two is what the lease says, and the lift key says whatever I say it says. What I need is nobody official in that driveway until the sun's on the Westfield.",
+          "choices": [
+            {
+              "text": "I'll get you to four.",
+              "accept": "l9-burwood-doof",
+              "denyFlag": "l9:burwood-doof",
+              "needLevel": 9
+            },
+            {
+              "text": "Not tonight.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "zone",
+          "line": "Two-hour zone. Loaded in at eleven. The ranger's been past twice and waved. Third time they don't wave, they photograph the plate, and then I'm doing weddings.",
+          "choices": [
+            {
+              "text": "So we're on a clock.",
+              "goto": "hello"
+            },
+            {
+              "text": "Move the van?",
+              "goto": "zone_no"
+            }
+          ]
+        },
+        {
+          "id": "zone_no",
+          "line": "Move it where. This is Burwood Road. There is one legal space between here and Croydon and a driving instructor lives in it.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Like a fridge full of bees. That's the room, not the rig — Burwood's all tile and glass and nobody in the history of this suburb has hung a curtain.",
+          "improv": {
+            "persona": "Kaz, a live sound operator in her forties running one van's worth of PA at an unlicensed party in a Burwood carpark, western Sydney. Twenty years of pub rooms, dry, unhurried, swears rarely and precisely. Deadpan, lower case, no exclamation marks.",
+            "context": "Someone has asked her how the room sounds at two in the morning. It is a concrete carpark with tiled walls and a fire door, which is acoustically terrible, and she has already accepted that. She is more worried about the parking ranger than the reverb."
+          },
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            },
+            {
+              "text": "Can you fix it?",
+              "goto": "smalltalk_fix"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_fix",
+          "line": "I can turn it down. That's the fix. In twenty years nobody has ever taken it.",
+          "choices": [
+            {
+              "text": "Understood.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "politics",
+          "line": "Everyone. It's a room with six hundred people in it and nobody on the door but me and a bloke holding a clicker he doesn't press.",
+          "choices": [
+            {
+              "text": "DeFAULT said to say hello.",
+              "goto": "politics_d",
+              "needFaction": "DeFAULT"
+            },
+            {
+              "text": "I'm here for Marita.",
+              "goto": "politics_m",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "Just me, then.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "politics_d",
+          "line": "Your lot keep offering to defend the space. I don't need it defended. I need it quiet at the front door and loud at the back, and that is a job, not a position.",
+          "choices": [
+            {
+              "text": "I can do a job.",
+              "goto": "hello"
+            },
+            {
+              "text": "Suit yourself.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "politics_m",
+          "line": "One of yours came round with a compliance checklist and a laminated business card. I put him on the door. He's very good at it. He's asked about super.",
+          "choices": [
+            {
+              "text": "That tracks.",
+              "goto": "hello"
+            },
+            {
+              "text": "I'll pass it on.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "You're still standing. Good. Everyone who's still standing at this hour is either working or lying.",
+          "choices": [
+            {
+              "text": "Van's out. Nobody got booked.",
+              "turnin": "l9-burwood-doof"
+            },
+            {
+              "text": "Not yet.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
     }
   ]
 }

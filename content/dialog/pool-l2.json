@@ -789,6 +789,910 @@
           ]
         }
       ]
+    },
+    {
+      "id": "fletch-devonshire-street",
+      "name": "Fletch, founder, pre-revenue",
+      "x": 352,
+      "z": 2078,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "This is the Surry Hills node. It's a light rail stop, but it is also a node. Sit wherever. Not on the laptop.",
+          "choices": [
+            {
+              "text": "What are you building?",
+              "goto": "pitch"
+            },
+            {
+              "text": "Is there work in it?",
+              "goto": "offer"
+            },
+            {
+              "text": "It went cold.",
+              "goto": "debrief"
+            },
+            {
+              "text": "Why are you sitting at a tram stop?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "I've done it.",
+              "goto": "done"
+            },
+            {
+              "text": "Nothing. Good luck.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "pitch",
+          "line": "We are not a coffee company. We are a mobility layer that happens to be wet. Coffee is the first payload because coffee is the payload Surry Hills will pay to move.",
+          "choices": [
+            {
+              "text": "Who's we?",
+              "goto": "pitch_we"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "pitch_we",
+          "line": "Me, and a board with three columns. One of the columns is called Later.",
+          "choices": [
+            {
+              "text": "Solid team.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Trial run, documented. One flat white, Central to Redfern. One stop. Ninety seconds of track and a hundred metres of stairs, and I need to know which half kills it.",
+          "choices": [
+            {
+              "text": "One stop. That's the whole experiment?",
+              "accept": "l2-surry-hills-cold-chain",
+              "denyFlag": "l2:cold-chain"
+            },
+            {
+              "text": "You want it to fail.",
+              "goto": "offer_honest"
+            },
+            {
+              "text": "Buy your own coffee.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_honest",
+          "line": "I want it to fail honestly. Don't stand on the platform blowing on it. A staged failure is just a lie with a photo attached, and I've seen what happens to those in due diligence.",
+          "choices": [
+            {
+              "text": "Understood.",
+              "goto": "offer"
+            },
+            {
+              "text": "And if it's still hot?",
+              "goto": "offer_hot"
+            }
+          ]
+        },
+        {
+          "id": "offer_hot",
+          "line": "Then I have a business and no story, which is the worse of the two.",
+          "choices": [
+            {
+              "text": "Sydney in one sentence.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "debrief",
+          "line": "Cold. One stop, one escalator, and it's cold. — He photographs your photograph of it. — That's the problem slide. Nobody funds a coffee run. Everybody funds a broken city.",
+          "choices": [
+            {
+              "text": "You seem pleased.",
+              "goto": "debrief_happy"
+            },
+            {
+              "text": "So there's no product.",
+              "goto": "debrief_none"
+            },
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "debrief_happy",
+          "line": "I'm pre-revenue. Pleased is a Q3 line item.",
+          "choices": [
+            {
+              "text": "Book it in.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "debrief_none",
+          "line": "There's a problem. The product is the easy half and nobody in this postcode has ever been paid for the easy half.",
+          "choices": [
+            {
+              "text": "Somebody will.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "There is no rent at a light rail stop. There's also no toilet. Every office is that trade, mate, mine is just honest about it.",
+          "improv": {
+            "persona": "Fletch, a pre-revenue startup founder working off a laptop at the Surry Hills light rail stop on Devonshire Street. Late twenties, entirely sincere, speaks fluent pitch deck. Deadpan, Australian, no exclamation marks.",
+            "context": "Someone has asked why he works at a tram stop instead of an office. The honest answer is money. He will give the honest answer, framed as a strategy."
+          },
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "hello"
+            },
+            {
+              "text": "There's a co-working place up the road.",
+              "goto": "smalltalk_more"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_more",
+          "line": "Nine hundred a month for a beanbag and a kombucha tap. I can see the same beanbag from here for free.",
+          "choices": [
+            {
+              "text": "You can, at that.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Let's see it, then. Don't tell me the temperature. I want to be surprised in front of the camera.",
+          "choices": [
+            {
+              "text": "It went cold. You were right.",
+              "turnin": "l2-surry-hills-cold-chain"
+            },
+            {
+              "text": "Still working on it.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "queen-st-consultant",
+      "name": "Deng, employment consultant",
+      "x": -36160,
+      "z": 22380,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Don't stand in the doorway. The camera counts anyone in the doorway as an attended appointment, and then I have to write down what we discussed.",
+          "choices": [
+            {
+              "text": "You had something for me.",
+              "goto": "offer"
+            },
+            {
+              "text": "Stall's done. Photo's taken.",
+              "goto": "ghost"
+            },
+            {
+              "text": "It's all finished.",
+              "goto": "turnins"
+            },
+            {
+              "text": "What did we discuss?",
+              "goto": "doorway"
+            },
+            {
+              "text": "How's the market out here?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nothing. I'll move.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "doorway",
+          "line": "We discussed your goals. You have three. I typed them in March. One of them is forklift.",
+          "choices": [
+            {
+              "text": "I've never driven a forklift.",
+              "goto": "forklift"
+            },
+            {
+              "text": "Sounds like me.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "forklift",
+          "line": "Neither has the bloke who's had a forklift goal since 2019. He comes in Tuesdays, I type forklift, we both go home. Two very consistent men.",
+          "choices": [
+            {
+              "text": "Consistency is something.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Here's the shape of it. I get paid when a placement holds. It doesn't have to hold well. It has to hold four hours and produce one photograph.",
+          "choices": [
+            {
+              "text": "What's the placement?",
+              "goto": "placement"
+            },
+            {
+              "text": "I'll hold for four hours.",
+              "accept": "l2-sustained-outcome",
+              "denyFlag": "l2:sustained-outcome"
+            },
+            {
+              "text": "That's your problem, mate.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "placement",
+          "line": "A coffee cart at the Square. The cart is a trestle table and the coffee is a sign that says coffee. You'll wear a lanyard and look trained. You will be trained, because you're sitting the module first.",
+          "choices": [
+            {
+              "text": "Why do I have to sit the module?",
+              "goto": "module"
+            },
+            {
+              "text": "Fine. Give me the lanyard.",
+              "accept": "l2-sustained-outcome",
+              "denyFlag": "l2:sustained-outcome"
+            },
+            {
+              "text": "No.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "module",
+          "line": "Because I ticked it off in March and the auditor comes in August. I'd like the tick to become true before then. That's not fraud. That's retrofitting.",
+          "choices": [
+            {
+              "text": "Retrofitting.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "ghost",
+          "line": "Photo's good. You look employed. Now: two lads have gone off with the lanyards and the float. If you're going looking, go toward the creek. Everything in this town ends up at the creek eventually.",
+          "choices": [
+            {
+              "text": "What's at the creek?",
+              "goto": "fisher"
+            },
+            {
+              "text": "I'll get them back.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "fisher",
+          "line": "Fisher's Ghost. Bloke got done in 1826, then sat on a rail pointing at the creek until somebody found him. We have a festival for it. There's a fun run. The ghost has a fun run.",
+          "choices": [
+            {
+              "text": "The ghost has a fun run.",
+              "goto": "fisher2"
+            },
+            {
+              "text": "Right. The creek.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "fisher2",
+          "line": "Two hundred years and still pointing at the same spot. If he walked in here I'd have him closed and outcomed by lunch. That is engagement.",
+          "choices": [
+            {
+              "text": "I'll go get your lanyards.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Strong, says the dashboard. The dashboard is green. The carpark is full of people who've been parking here since it was free, and half of them have a DeFAULT sticker on the laptop and come in anyway.",
+          "improv": {
+            "persona": "Deng, an employment services consultant on Queen Street, Campbelltown. Six years of it, on a placement target he will not hit, standing outside his own office because the office has a camera on the doorway. Deadpan, dry, not cruel. No exclamation marks.",
+            "context": "A jobseeker has asked how the local job market is. His provider dashboard reports it as strong. He does not believe the dashboard. The two street factions are written exactly as Marita and DeFAULT; DeFAULT say work is the problem and their stickers are on half the laptops in his waiting room."
+          },
+          "choices": [
+            {
+              "text": "The dashboard's always green.",
+              "goto": "smalltalk_again"
+            },
+            {
+              "text": "I'll let you get back to it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_again",
+          "line": "It has two colours and I've only ever seen the one.",
+          "choices": [
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "turnins",
+          "line": "Show me, then. I'll upload it, it'll fail, it'll go through overnight, and neither of us will ever find out why.",
+          "choices": [
+            {
+              "text": "Four hours. One lanyard. No coffee.",
+              "turnin": "l2-sustained-outcome"
+            },
+            {
+              "text": "Not yet.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "voula-marrickville-platform",
+      "name": "Voula, waiting for the 8:14",
+      "x": -5035,
+      "z": 5148,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Eight fourteen. That one's mine. Forty-one years I got on at this platform and now there's a boy in a vest telling me to get on a bus.",
+          "choices": [
+            {
+              "text": "What happened to your line?",
+              "goto": "metro"
+            },
+            {
+              "text": "You after something?",
+              "goto": "offer"
+            },
+            {
+              "text": "I've been to Tempe.",
+              "goto": "proof"
+            },
+            {
+              "text": "Here's your card back.",
+              "goto": "settle"
+            },
+            {
+              "text": "How long have you been sitting there?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "Nothing, Voula.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "metro",
+          "line": "They're converting it. Driverless, they said, like it's a feature. A train with nobody in the front of it, going wherever it likes. And in the meantime, a bus.",
+          "choices": [
+            {
+              "text": "A bus gets you there.",
+              "goto": "metro_bus"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "metro_bus",
+          "line": "A bus is a room that turns. A train knows where it's going because someone laid it down in 1895 and nobody's asked it since. Don't argue, love. I've brought the chair.",
+          "choices": [
+            {
+              "text": "You've brought the chair.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Do us a favour. My Opal's got eight-twenty on it and it expires in December. Walk it down to Sydenham where they still run, spend some of it, and photograph the driver so I know they kept them.",
+          "choices": [
+            {
+              "text": "Give us the card.",
+              "accept": "l2-driver-in-it",
+              "needLevel": 2,
+              "denyFlag": "l2:driver-in-it"
+            },
+            {
+              "text": "I'm not your grandson, Voula.",
+              "goto": "offer_no"
+            },
+            {
+              "text": "Not today.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer_no",
+          "line": "No. He's in Earlwood and he's got a car, which is a worse thing to be.",
+          "choices": [
+            {
+              "text": "Alright, give us the card.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Since twenty past seven. I bring the chair and a thermos. The chair is the only thing on this platform still doing the job it was put here for.",
+          "improv": {
+            "persona": "Voula, seventy-one, Greek-Australian, on a folding chair on the closed platform at Marrickville station. Deadpan, stubborn, warm, entirely lucid. Lower case, very Australian, no exclamation marks.",
+            "context": "A stranger has asked how long she has been sitting there. Her railway line was shut to be converted to a driverless metro. There are replacement buses and she will not get on one. She has a chair and a thermos and a plane overhead every ninety seconds."
+          },
+          "choices": [
+            {
+              "text": "There's a plane every ninety seconds.",
+              "goto": "smalltalk_planes"
+            },
+            {
+              "text": "I'll leave you to it.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_planes",
+          "line": "You stop hearing them. Forty years under the flight path and I can tell you the airline by the shadow. It's the quiet that would get me.",
+          "choices": [
+            {
+              "text": "Right.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "proof",
+          "line": "Ohh. Look at him. Hand on the thing, hat on, the whole beard. See, they didn't get rid of them. They just got rid of mine.",
+          "choices": [
+            {
+              "text": "Card's nearly empty.",
+              "goto": "settle"
+            },
+            {
+              "text": "He waved.",
+              "goto": "proof_waved"
+            }
+          ]
+        },
+        {
+          "id": "proof_waved",
+          "line": "Of course he waved. That's the job. Try getting a wave out of a ceiling sensor.",
+          "choices": [
+            {
+              "text": "Here's your card back.",
+              "goto": "settle"
+            }
+          ]
+        },
+        {
+          "id": "settle",
+          "line": "Give it here, then. Eight-twenty, minus a Tempe. That's the most fun that card has had since the Olympics.",
+          "choices": [
+            {
+              "text": "All yours. Keep the photo.",
+              "turnin": "l2-driver-in-it"
+            },
+            {
+              "text": "Topped it up a fiver. For when they run again.",
+              "turnin": "l2-driver-in-it",
+              "needCash": 5,
+              "cost": 5
+            },
+            {
+              "text": "Hang onto it a bit longer.",
+              "goto": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hornsby-sydride",
+      "name": "Ray, SydRide, 4.61",
+      "x": -10512,
+      "z": -18205,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "Don't get in the front. Everyone up here gets in the front and then wants to talk to me about the tolls.",
+          "choices": [
+            {
+              "text": "You hiring?",
+              "goto": "offer"
+            },
+            {
+              "text": "Why are you parked in a loading zone?",
+              "goto": "rank"
+            },
+            {
+              "text": "What's the 4.61 about?",
+              "goto": "rating"
+            },
+            {
+              "text": "Ran your fares.",
+              "goto": "done"
+            },
+            {
+              "text": "Marita said the north shore was quiet work.",
+              "goto": "recruiters",
+              "needFaction": "Marita"
+            },
+            {
+              "text": "Nothing, mate.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Look at the board. Terminates here. Terminates here. Terminates here. They say it like it's weather. Two hundred people a night walk out that gate eleven kilometres short of a bed and I can fit four.",
+          "choices": [
+            {
+              "text": "I'll take the overflow.",
+              "accept": "l2-terminates-here",
+              "denyFlag": "l2:terminates-here"
+            },
+            {
+              "text": "Sounds like a train problem.",
+              "goto": "trainproblem"
+            },
+            {
+              "text": "What's the clock got to do with it?",
+              "goto": "clock"
+            }
+          ]
+        },
+        {
+          "id": "trainproblem",
+          "line": "It is a train problem. That's the whole business. If the trains went where they said, I'd be a bloke sitting in a Camry for no reason.",
+          "choices": [
+            {
+              "text": "Fair.",
+              "goto": "offer"
+            },
+            {
+              "text": "You are a bloke sitting in a Camry.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "clock",
+          "line": "The upside-down water clock in the mall. Big brass thing, been dribbling since before you were born. The app can't find my street but it's heard of the clock. Photograph the clock and the app agrees you're in Hornsby.",
+          "choices": [
+            {
+              "text": "Right. The clock.",
+              "goto": "offer"
+            },
+            {
+              "text": "That's not how satellites work.",
+              "goto": "clocktwo"
+            }
+          ]
+        },
+        {
+          "id": "clocktwo",
+          "line": "Tell the app.",
+          "choices": [
+            {
+              "text": "I'll photograph the clock.",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "rank",
+          "line": "Rank's for taxis. So I do laps of the roundabout at four k an hour with the hazards off and the app calls that positioning. Eleven years of positioning.",
+          "improv": {
+            "persona": "Ray, a SydRide driver working the Hornsby station kerb in northern Sydney. Late fifties, third Camry, entirely reasonable and entirely fed up. Deadpan, lower case, very Australian, no exclamation marks.",
+            "context": "Someone has asked why he is idling in a loading zone instead of the taxi rank outside Hornsby station. Rideshare cars are not permitted on the rank, so he circles the roundabout for hours and the app describes this as positioning. He is not angry about it, he has simply stopped expecting anything else."
+          },
+          "choices": [
+            {
+              "text": "Positioning.",
+              "goto": "hello"
+            },
+            {
+              "text": "Ever park properly?",
+              "goto": "ranktwo"
+            }
+          ]
+        },
+        {
+          "id": "ranktwo",
+          "line": "Parked properly once. Got a ticket, a horn, and a bloke in a Hilux telling me what he'd have done in Vietnam. He'd have been nine.",
+          "choices": [
+            {
+              "text": "Keep circling.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "rating",
+          "line": "Was a 4.9 before I started telling people the truth about the M1. You lose a star a year for honesty. I've got four left, so I'll be doing this until 2030.",
+          "choices": [
+            {
+              "text": "What's the truth about the M1?",
+              "goto": "ratingtwo"
+            },
+            {
+              "text": "Grim.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "ratingtwo",
+          "line": "It's not a shortcut at any hour God made. Berowra to the Central Coast, six in the morning, Boxing Day — doesn't matter. People want to hear it might be. One star.",
+          "choices": [
+            {
+              "text": "One star from me too, then.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "recruiters",
+          "line": "They come up on the express and hand out cards at the gate. Marita want me driving their blokes to a site in Kellyville for nothing. The DeFAULT lot reckon the car is the problem. Both of them get a rank fare and neither of them tips.",
+          "choices": [
+            {
+              "text": "Noted.",
+              "goto": "hello"
+            },
+            {
+              "text": "Which one's worse in the car?",
+              "goto": "recruiterstwo"
+            }
+          ]
+        },
+        {
+          "id": "recruiterstwo",
+          "line": "The ones who talk are worse than the ones who bleed on the upholstery. Make of that what you like.",
+          "choices": [
+            {
+              "text": "I will.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Show us. — He looks at the photo of the clock for a long time. — Yeah. That's Hornsby. Can't argue with the clock.",
+          "choices": [
+            {
+              "text": "Forty-five in fares and two blokes poured out at Asquith.",
+              "turnin": "l2-terminates-here"
+            },
+            {
+              "text": "Not finished yet.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kx-door-fadi",
+      "name": "Fadi, door at a dessert bar",
+      "x": 1245,
+      "z": 470,
+      "radius": 5,
+      "root": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "line": "No thongs after eleven. That's for the kunafa — the club's a dessert bar now. Nine years I did this door when it was a club. Same door. Different sugar.",
+          "choices": [
+            {
+              "text": "What's the book for?",
+              "goto": "book"
+            },
+            {
+              "text": "You wanted me to look at something.",
+              "goto": "offer"
+            },
+            {
+              "text": "I looked.",
+              "goto": "compare"
+            },
+            {
+              "text": "Busy tonight?",
+              "goto": "smalltalk"
+            },
+            {
+              "text": "It's done. All of it.",
+              "goto": "done"
+            },
+            {
+              "text": "Nah. You're alright.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "book",
+          "line": "Every face that comes through, I write it down. Twenty-two weeks of it. And every Monday I open the book and it's page one again. Clean. Not torn out. Clean.",
+          "choices": [
+            {
+              "text": "New owners binning your book?",
+              "goto": "book_no"
+            },
+            {
+              "text": "So what do you want from me?",
+              "goto": "offer"
+            },
+            {
+              "text": "Mate.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "book_no",
+          "line": "Owners change on a Monday too. I've had four. Every one of them shakes my hand like it's the first time. So did you, and you have been past this door before.",
+          "choices": [
+            {
+              "text": "I have not.",
+              "goto": "book_no2"
+            },
+            {
+              "text": "Right. What do you need?",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "book_no2",
+          "line": "Tuesday. You asked me where the ATM was and I said there isn't one, there's four. You laughed at the second half. Nobody laughs at the second half.",
+          "choices": [
+            {
+              "text": "…What do you need?",
+              "goto": "offer"
+            }
+          ]
+        },
+        {
+          "id": "offer",
+          "line": "Four things, none of them dodgy. The sign, the regulars, the last train east, and thirty bucks earnt on the strip like everyone else here earns it. Then come back and tell me the book's wrong.",
+          "choices": [
+            {
+              "text": "I'll have a look.",
+              "accept": "l2-page-one",
+              "denyFlag": "l2:page-one"
+            },
+            {
+              "text": "I'm not your detective, Fadi.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "compare",
+          "line": "Seat 4B. Suit, no tie, headphones, asleep past Edgecliff. He was there last Monday. He does not get off at the Junction — I have stood on that platform and watched it not happen.",
+          "choices": [
+            {
+              "text": "Maybe he rides it back.",
+              "goto": "compare_no"
+            },
+            {
+              "text": "He wasn't on the way back either.",
+              "goto": "compare_no"
+            },
+            {
+              "text": "I need to sit down.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "compare_no",
+          "line": "Write it in the book. It'll be gone by Monday, but write it in the book.",
+          "choices": [
+            {
+              "text": "Writing it in the book.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "done",
+          "line": "Give us the photo. — He holds it up next to the page, which is blank, and looks at the two of them for a while. Then he puts money on the ledge without looking at you.",
+          "choices": [
+            {
+              "text": "Keep the book somewhere else on Sunday night.",
+              "turnin": "l2-page-one"
+            },
+            {
+              "text": "You're tired, Fadi. That's all it is.",
+              "turnin": "l2-page-one"
+            },
+            {
+              "text": "Not yet.",
+              "goto": ""
+            }
+          ]
+        },
+        {
+          "id": "smalltalk",
+          "line": "Quiet. It's always quiet now. The lockouts took the crowd and the crowd never came back, and these days I check IDs so a girl can buy a waffle at one in the morning.",
+          "improv": {
+            "persona": "Fadi, a doorman on Darlinghurst Road in Kings Cross, Sydney. Nine years on nightclub doors, now security at a late-night dessert bar. Deadpan, warm, lower case, very Sydney, no exclamation marks.",
+            "context": "Someone has asked whether it is busy. It is a weeknight, the strip is empty, and the lockout laws emptied it years ago. He is not bitter about it, only precise, and he still runs the door properly."
+          },
+          "choices": [
+            {
+              "text": "Waffles at one in the morning.",
+              "goto": "smalltalk_two"
+            },
+            {
+              "text": "Fair enough.",
+              "goto": "hello"
+            }
+          ]
+        },
+        {
+          "id": "smalltalk_two",
+          "line": "Kunafa. The waffle place is two doors up and their bloke doesn't work a door, he works a stool.",
+          "choices": [
+            {
+              "text": "A stool's not a door.",
+              "goto": "hello"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

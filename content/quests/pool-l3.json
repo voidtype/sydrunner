@@ -298,6 +298,296 @@
           "l3:one-blink"
         ]
       }
+    },
+    {
+      "id": "l3-chimney-doof",
+      "act": 1,
+      "title": "Fifteen People, No Amplified Sound",
+      "blurb": "It's a picnic. I've got the permit in a sleeve. Fifteen people, nine till five, no amplified sound. There's four hundred of them, six kilowatts and it's ten past two, so call it a permit with some give in it.",
+      "giver": "sydney-park-doof",
+      "level": 3,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "the servo on the Princes Highway does a two a.m. flat white. It is not good. It is structural."
+        },
+        {
+          "kind": "photo",
+          "x": -2290,
+          "z": 4560,
+          "radius": 45,
+          "label": "up the hill, skyline over the four chimneys, one photo for the flyer that goes out after it's finished"
+        },
+        {
+          "kind": "ko",
+          "npc": "drunk",
+          "count": 4,
+          "label": "four of them have waded into the water reuse wetlands. The wetlands are for the ibis, and the ibis were here first"
+        },
+        {
+          "kind": "earn",
+          "dollars": 70,
+          "label": "walk the bucket. It's a donation. Hold it at chest height, say the word donation, and money appears"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 2,
+          "label": "the Mitchell Road townhouses have a decibel app and a printed copy of the noise regulation. Discuss it with two of them"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "St Peters",
+          "to": "Erskineville",
+          "label": "first train out of St Peters, one stop, because the after is a terrace in Erskineville and everyone is pretending otherwise"
+        },
+        {
+          "kind": "dialog",
+          "npc": "sydney-park-doof",
+          "node": "sunrise",
+          "label": "back to the kilns before the sun clears the airport"
+        }
+      ],
+      "reward": {
+        "cash": 120,
+        "xp": 450,
+        "unlock": [
+          "l3:chimney-doof"
+        ]
+      }
+    },
+    {
+      "id": "l3-burwood-render",
+      "act": 1,
+      "title": "Four Hundred Metres to the Metro",
+      "blurb": "The family gets here at four. By then this strip has to look like the picture on the hoarding: coffee in every hand, nobody arguing about height limits, everyone walking briskly toward a train that doesn't stop here yet.",
+      "giver": "burwood-render-sandra",
+      "level": 3,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -9690,
+          "z": 1060,
+          "radius": 18,
+          "label": "start at the Opal readers on Burwood station. The brochure times the walk from here, and the brochure has never carried shopping"
+        },
+        {
+          "kind": "photo",
+          "x": -9762,
+          "z": 872,
+          "radius": 35,
+          "label": "photograph the hoarding on Parramatta Road. The hoarding, not the hole. The hoarding is the finished one"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "buy a coffee on Burwood Road. In the render everybody is holding one. Be the render"
+        },
+        {
+          "kind": "ko",
+          "npc": "karen",
+          "count": 2,
+          "label": "two objectors in Burwood Park with the height limit printed out and highlighted. Change their minds"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Burwood",
+          "to": "Strathfield",
+          "label": "one stop to Strathfield so the flyer can say 'minutes from everywhere'. Tap off. She is unbelievably serious about tapping off"
+        },
+        {
+          "kind": "dialog",
+          "npc": "burwood-render-sandra",
+          "node": "closing",
+          "label": "get the honest version of the pitch out of her before the family arrives"
+        }
+      ],
+      "reward": {
+        "cash": 100,
+        "xp": 400,
+        "unlock": [
+          "l3:burwood-render"
+        ]
+      }
+    },
+    {
+      "id": "l3-nine-seconds",
+      "act": 1,
+      "title": "Nine Seconds at Auburn",
+      "blurb": "The timetable says the doors stand open twenty seconds. I have timed them eleven months and it is nine. Bring me a number off the line that got built, and I will put both in the one email.",
+      "giver": "auburn-opal-ferhat",
+      "level": 3,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "photo",
+          "x": -16423,
+          "z": -1860,
+          "radius": 30,
+          "label": "photograph the top-up machine, out of order since 2000"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Auburn",
+          "to": "Sydenham",
+          "label": "take the long way to a Metro; Auburn is not on one"
+        },
+        {
+          "kind": "ko",
+          "npc": "police",
+          "count": 2,
+          "label": "two Opal inspectors working the Lidcombe change"
+        },
+        {
+          "kind": "earn",
+          "dollars": 70,
+          "label": "earn back the maximum fare they charged you"
+        },
+        {
+          "kind": "dialog",
+          "npc": "auburn-opal-ferhat",
+          "node": "verdict",
+          "label": "bring Ferhat the number he did not write himself"
+        }
+      ],
+      "reward": {
+        "cash": 95,
+        "xp": 380,
+        "unlock": [
+          "l3:nine-seconds"
+        ]
+      }
+    },
+    {
+      "id": "l3-tunnel-pitch",
+      "act": 1,
+      "title": "The Tunnel Pitch, Written in Pen",
+      "blurb": "Everyone thinks the tunnel is free. The tunnel is not free, it's booked, and I keep the book. Bring me a hundred and twenty out of that hat in coins and I'll stop writing you in pencil.",
+      "giver": "trish-tunnel-roster",
+      "level": 3,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "goto",
+          "x": -189,
+          "z": 1563,
+          "radius": 20,
+          "label": "take the pitch mid-tunnel, under Devonshire Street, where it echoes off both ends at once"
+        },
+        {
+          "kind": "earn",
+          "dollars": 120,
+          "label": "a hundred and twenty dollars out of people who decided this morning not to look at you"
+        },
+        {
+          "kind": "ko",
+          "npc": "eshay",
+          "count": 2,
+          "label": "two lads will take an interest in the hat somewhere around the ninety-dollar mark"
+        },
+        {
+          "kind": "buy",
+          "powerup": "FLAT WHITE",
+          "count": 1,
+          "label": "buy the station flat white. That's nine songs. Drink it standing up, you lose the pitch if you sit"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Central",
+          "to": "Circular Quay",
+          "label": "go and see what the Quay is making. Pay the fare like everyone else; the gates here have staff"
+        },
+        {
+          "kind": "photo",
+          "x": 131,
+          "z": -772,
+          "radius": 35,
+          "label": "photograph the competition for the roster file. Wide shot. Get the hat in, that's the whole point"
+        },
+        {
+          "kind": "dialog",
+          "npc": "trish-tunnel-roster",
+          "node": "done",
+          "label": "back to Trish at the Eddy Avenue end, coins and all"
+        }
+      ],
+      "reward": {
+        "cash": 110,
+        "xp": 420,
+        "unlock": [
+          "l3:tunnel-pitch"
+        ]
+      }
+    },
+    {
+      "id": "l3-richmond-ute",
+      "act": 1,
+      "title": "The Ute That Did The Right Thing",
+      "blurb": "First time in my life I leave the ute at the club and take a lift home, and it's gone by morning. Sober, on foot, in Richmond. Richmond's the end of the line, mate, and the end of the line is a long way from anything.",
+      "giver": "richmond-kev",
+      "level": 3,
+      "requires": [],
+      "repeatable": false,
+      "steps": [
+        {
+          "kind": "photo",
+          "x": -42990,
+          "z": -29255,
+          "radius": 25,
+          "label": "photograph the empty bay at the club car park; the insurer will want to see the nothing"
+        },
+        {
+          "kind": "ride",
+          "line": -1,
+          "from": "Richmond",
+          "to": "Windsor",
+          "label": "the report went in on a form and stopped there — go to Windsor and ask a human, by train, like a man with no ute"
+        },
+        {
+          "kind": "ko",
+          "npc": "rbt",
+          "count": 2,
+          "label": "the bus is set up on the bridge on the way back and they have questions about the empty jerry can"
+        },
+        {
+          "kind": "goto",
+          "x": -42210,
+          "z": -28700,
+          "radius": 30,
+          "label": "the lanes behind East Richmond, where they leave them when the tank runs dry"
+        },
+        {
+          "kind": "earn",
+          "dollars": 70,
+          "label": "raise $70: the tow yard wants a release fee and the ute wants twenty litres"
+        },
+        {
+          "kind": "dialog",
+          "npc": "richmond-kev",
+          "node": "keys",
+          "label": "bring Kev back what's left of it"
+        }
+      ],
+      "reward": {
+        "cash": 100,
+        "xp": 400,
+        "unlock": [
+          "l3:richmond-ute"
+        ]
+      }
     }
   ]
 }
