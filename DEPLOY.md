@@ -638,6 +638,17 @@ block from it. So:
    `.pow.bin`, `.cars.bin` and `collision/` for exactly the rebuilt tile ids,
    plus the pivots and the far layer, with `rsync --files-from` (never
    `--delete`, never `.glb`, never `regions/`), then `systemctl restart sydney`.
+   **The destination is `/opt/sydney/dist/world/`, which is what
+   `SYDNEY_WORLD` in `sydney.service` names** -- not `/opt/sydney/world/`,
+   which does not exist until an rsync invents it and which the server never
+   reads. An rsync to the wrong path succeeds, `/health` stays green, and the
+   box keeps serving the old ground; check the unit's `SYDNEY_WORLD` before the
+   transfer rather than the exit code after it. The pivots need their `.br` and
+   `.zst` sidecars regenerated wherever they land -- the box has `zstd` but no
+   `brotli`, so the `.br` pair is made on the Mac and copied -- for the reason
+   `scripts/lib-sidecars.sh` gives: Caddy serves the sidecar and never the file
+   beside it, so a stamped `index.json` with a stale `.zst` reaches curl and
+   not a player.
    Server and CDN must always describe the same ground — and since workstream S
    that includes the parked cars: `.cars.bin` is what makes a kerbed car
    stealable, and a retile that reshuffles a tile's parking changes every
