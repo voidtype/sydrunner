@@ -52,11 +52,24 @@
  * that answers "is this point inside a solid" the way the client and server
  * both do it -- see `server/undrawn-solids-check.ts`'s header for the longer
  * argument against a second, hand-rolled reader of the same bytes. This loads
- * only the tiles the drop's own givers fall in (a hundred-odd points touch a
- * hundred-odd tiles at most, against several thousand shipped), decodes each
- * tile's collision sidecar once through `addTile` exactly as the server does,
- * and asks `pointInPolygon` against every prism taller than 2 m -- tall enough
- * to be a wall around a giver's feet rather than a kerb or a low fence.
+ * each giver's own tile and the ring of eight neighbours around it (a
+ * hundred-odd givers touch a few hundred tiles at most this way, against
+ * several thousand shipped), decodes each tile's collision sidecar once
+ * through `addTile` exactly as the server does, and asks `pointInPolygon`
+ * against every prism taller than 2 m -- tall enough to be a wall around a
+ * giver's feet rather than a kerb or a low fence.
+ *
+ * **Why the ring, and not just the tile a giver's feet fall in.** A building's
+ * footprint is written to exactly one tile's collision payload -- the tile
+ * that owns it -- and a footprint that straddles a tile line still lives in
+ * that one file, overhanging the neighbour. `priya-rhodes-engagement`, at
+ * (-11340, -4000) in Rhodes, stood exactly on such a line: her own tile's
+ * payload carried no building at her feet, the 19 m block she was actually
+ * standing in was filed under the tile next door, and a test that opened only
+ * the standing tile read her as clear. `place-clear.ts`'s `insideBuilding`
+ * found this the hard way already and loads the same ring for the same reason
+ * (see its header) -- nine small files bought once per giver, paid back the
+ * moment a footprint crosses a line.
  *
  * **The height half, and the datum that makes it possible.** A prism is a solid
  * only between its `base` and its `top`, not from the ground up, and a plan hit
@@ -88,7 +101,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { decodeRail } from '../../client/src/game/rail.ts';
-import { CollisionWorld, pointInPolygon, type Prism } from '../../client/src/player/collision.ts';
+import { CollisionWorld, pointInPolygon } from '../../client/src/player/collision.ts';
 import { TerrainField, decodeTerrain } from '../../client/src/world/terrain.ts';
 import { REGISTER_LEVELS } from '../../client/src/game/questmodel.ts';
 
@@ -190,6 +203,7 @@ for (const q of pool) {
 interface TileEntry { key: string; b: number; bounds: [number, number, number, number]; }
 const worldIndex = JSON.parse(readFileSync(join(WORLD_ROOT, 'index.json'), 'utf8')) as {
   tile_size: number;
+  terrain: { grid: number };
   tiles: TileEntry[];
 };
 const TILE_SIZE = worldIndex.tile_size;
@@ -202,20 +216,35 @@ function tileFor(x: number, z: number): TileEntry | undefined {
   return tileByCorner.get(`${minX},${minZ}`);
 }
 
-/** One tile's prisms, loaded once and cached -- a drop's givers touch at most a hundred-odd tiles. */
-const prismCache = new Map<string, Prism[]>();
-function prismsOf(t: TileEntry): Prism[] {
-  const cached = prismCache.get(t.key);
-  if (cached) return cached;
+/**
+ * Every tile whose square meets the axis-aligned box, deduped. `place-clear.ts`'s
+ * `tilesOver`, mirrored rather than imported -- see the header for why a
+ * giver's own tile is not enough to test against.
+ */
+function tilesOver(minX: number, minZ: number, maxX: number, maxZ: number): TileEntry[] {
+  const out: TileEntry[] = [];
+  const seen = new Set<string>();
+  for (let x = Math.floor(minX / TILE_SIZE) * TILE_SIZE; x <= maxX; x += TILE_SIZE) {
+    for (let z = Math.floor(minZ / TILE_SIZE) * TILE_SIZE; z <= maxZ; z += TILE_SIZE) {
+      const t = tileByCorner.get(`${x},${z}`);
+      if (t && !seen.has(t.key)) { seen.add(t.key); out.push(t); }
+    }
+  }
+  return out;
+}
+
+/**
+ * One `CollisionWorld` for the whole drop, tiles adopted as givers reach them.
+ * Two givers' rings can share a tile, and `hasTile` makes the second load free.
+ */
+const collision = new CollisionWorld();
+function loadCollision(t: TileEntry): void {
+  if (collision.hasTile(t.key)) return;
   const path = join(WORLD_ROOT, 'collision', `${t.key}.bin`);
-  if (!existsSync(path)) { prismCache.set(t.key, []); return []; }
+  if (!existsSync(path)) return;
   const b = readFileSync(path);
   const buf = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
-  const world = new CollisionWorld();
-  world.addTile(t.key, buf, t.bounds[0], t.bounds[1] + TILE_SIZE, t.b);
-  const prisms = world.prismsWithin((t.bounds[0] + t.bounds[2]) / 2, (t.bounds[1] + t.bounds[3]) / 2, TILE_SIZE * 1.5);
-  prismCache.set(t.key, prisms);
-  return prisms;
+  collision.addTile(t.key, buf, t.bounds[0], t.bounds[1] + TILE_SIZE, t.b);
 }
 
 /** Tall enough to be a wall around a giver's feet, not a kerb or a low fence. See header. */
@@ -244,9 +273,15 @@ function terrainOf(t: TileEntry): void {
 for (const n of npcs) {
   const tile = tileFor(n.x, n.z);
   if (!tile) continue; // outside the baked world -- nothing to test this giver against
-  terrainOf(tile);
+  // The giver's own tile and its eight neighbours: a footprint is filed under
+  // whichever tile owns it, and one can straddle the line into this tile
+  // while its payload lives in the neighbour's. See the header.
+  for (const t of tilesOver(n.x - TILE_SIZE, n.z - TILE_SIZE, n.x + TILE_SIZE, n.z + TILE_SIZE)) {
+    loadCollision(t);
+    terrainOf(t);
+  }
   const feet = terrain.height(n.x, n.z);
-  for (const prism of prismsOf(tile)) {
+  for (const prism of collision.prismsWithin(n.x, n.z, 1)) {
     if (prism.height <= SOLID_MIN_HEIGHT_M) continue;
     if (!pointInPolygon(prism.points, n.x, n.z)) continue;
     // A plan hit is an "inside" only with the feet in the prism's own band. A
