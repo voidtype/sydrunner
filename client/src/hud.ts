@@ -711,6 +711,34 @@ export class Hud {
     else if (this.hint.textContent === previous) this.notice('');
   }
 
+  /**
+   * WORKSTREAM AJ: what the loading screen is waiting for, in words.
+   *
+   * The markup ships one static line -- "Starting renderer…" -- and until this
+   * existed that was the entire content of the screen for its whole life,
+   * whether that was half a second or twenty. The screen now stays up until the
+   * ground under the spawn is drawn (see `world/ground-first.ts`), which is a
+   * wait with a *number* in it, and a wait with a number that shows a spinner
+   * instead is a wait the player cannot tell from a hang.
+   *
+   * Refused once `ready` has run, and that is not defensiveness. The reveal is
+   * driven by a poll and a poll has a frame of latency; without this, a tick
+   * that lands after the curtain went up would write "laying the ground" into a
+   * hidden element and leave it there for the fatal handler to show later.
+   *
+   * The error class is never touched here. A fatal message must not be
+   * overwritten by progress, and `fatal` sets a colour this has no business
+   * clearing.
+   */
+  loadingProgress(message: string): void {
+    if (this.revealed) return;
+    if (this.loadingText.textContent === message) return;
+    this.loadingText.textContent = message;
+  }
+
+  /** Whether `ready` has taken the loading screen down. See `loadingProgress`. */
+  private revealed = false;
+
   fatal(message: string): void {
     this.loading.classList.remove('hidden');
     this.loadingText.textContent = message;
@@ -863,6 +891,7 @@ export class Hud {
    * exists at all.
    */
   ready(index: { stage: string; totals: Record<string, number> }, firstVisit = false): void {
+    this.revealed = true;
     this.loading.classList.add('hidden');
     const t = index.totals;
     this.world = `stage "${index.stage}" · ${(t.buildings ?? 0).toLocaleString()} buildings`;

@@ -178,8 +178,6 @@ import { createGroundMaterial } from './ground.ts';
 // rather than described here for the reason its own header gives -- a sequence
 // the builder drives from is a sequence a check can convict.
 import {
-  GROUND_LEAD_RADIUS_M,
-  GROUND_LEAD_SLOTS,
   GROUND_REVEAL_RADIUS_M,
   coverage as groundRingCoverage,
   groundRing,
@@ -1276,6 +1274,22 @@ export class TileStreamer implements LampSource {
   private readonly entries = new Map<string, TileEntry>();
   /** Ground sheets built this session. Monotonic; for the overlay. */
   private builtSheets = 0;
+  /**
+   * How many frames this streamer has been driven through.
+   *
+   * The client's own answer to "is the render loop running", and the boot's
+   * reveal gate is the caller that needs it. `renderer.setAnimationLoop` is the
+   * **last statement** of `main`, so everything the boot does -- the far layer,
+   * the rail bake, the name prompt, the socket, the spawn, the scene shader pass
+   * -- happens with nothing rendered and nothing streamed. A curtain that came
+   * up before this was non-zero would be uncovering an empty canvas, which is
+   * the defect the gate exists to close rather than a state to reveal into.
+   *
+   * Counted here rather than read off `renderer.info`, whose per-frame counters
+   * are reset by the renderer itself and say nothing about whether a frame has
+   * ever happened. This one only goes up.
+   */
+  private framesSeen = 0;
 
   constructor(
     scene: Scene,
@@ -2331,54 +2345,55 @@ export class TileStreamer implements LampSource {
     return groundRingCoverage(this.ringAt(x, z, radiusM), this.groundSettled);
   }
 
+  /** Frames this streamer has been driven through. See `framesSeen`. */
+  get frames(): number {
+    return this.framesSeen;
+  }
+
   /** Whether every tile whose ground a player at (x, z) could see nearby is built. */
   groundReady(x: number, z: number, radiusM: number = GROUND_REVEAL_RADIUS_M): boolean {
     return this.groundCoverage(x, z, radiusM).ready;
   }
 
   /**
-   * Phase 0: the ground of the near tiles, ahead of the geometry of any tile.
+   * Phase 0: the ground of every wanted tile, ahead of the geometry of any tile.
    *
-   * Two halves, and the first is the one that matters. **Every unsettled tile
-   * inside the lead radius is asked for outright**, with no concurrency cap of
-   * its own -- because there is nothing to cap: the whole 900 m ring is about
-   * twenty-three requests of 1,156 bytes, which is 26 kB, which is a twelfth of
-   * one CBD tile. `TerrainField.ensure` de-duplicates in flight and remembers
-   * forever, so calling it every frame for the same key is a map lookup.
+   * Handed `update`'s own nearest-first ranking rather than computing a ring of
+   * its own, which is not merely thrift: that array *is* the set of tiles the
+   * streamer is willing to fetch and the order it is willing to fetch them in,
+   * so a ground pass built from anything else would be answering about a
+   * different world than the one below it.
+   *
+   * Two halves, and the first is the one that matters. **Every unsettled tile is
+   * asked for outright**, with no cap and no budget, because there is nothing to
+   * cap: the whole 1,800 m ring is 57 requests of 1,156 bytes -- 64 kB, less
+   * than a fifth of *one* tile's geometry. `TerrainField.ensure` de-duplicates
+   * in flight and remembers forever, so calling it every frame for the same key
+   * is a map lookup, and that is what lets this pass be this blunt.
    *
    * The second half builds whatever has landed, nearest first, under
-   * `GROUND_BUDGET_MS`. The order is the ring's order, which is the order the
+   * `GROUND_BUDGET_MS`. The order is the ranking's, which is the order the
    * player notices things in.
    *
-   * Returns whether the ground ahead is settled, which `update` spends on the
-   * tile-bundle concurrency: while it is false the browser's six connections per
-   * host are not to be filled with 311 kB payloads that a 1.2 kB sidecar is then
-   * queued behind. See `GROUND_LEAD_SLOTS`.
+   * Nothing is returned. The ordering it buys is enforced one tile at a time in
+   * the fetch pass below -- see the `groundSettled` test there -- rather than by
+   * a global flag, because a global flag is the shape of thing that wedges.
    */
-  private pumpGround(cam: Vector3): boolean {
+  private pumpGround(wanted: ReadonlyArray<{ entry: TileEntry; dist: number }>): void {
     const field = this.terrainField;
-    if (field === null || this.index === null) return true;
-    const ring = this.ringAt(cam.x, cam.z, GROUND_LEAD_RADIUS_M);
-    if (ring.length === 0) return true;
+    if (field === null || this.index === null) return;
 
     const deadline = performance.now() + GROUND_BUDGET_MS;
-    let settled = true;
     let budgetLeft = true;
-    for (const key of ring) {
-      if (this.groundSettled.has(key)) continue;
-      const entry = this.entries.get(key);
-      if (entry === undefined) continue;
-      // Free when the grid is already held or already in flight, and the whole
-      // reason this pass can be this blunt.
-      void field.ensure(key);
-      if (!budgetLeft) {
-        settled = false;
-        continue;
-      }
-      if (!this.ensureGroundSheet(entry)) settled = false;
+    for (const { entry } of wanted) {
+      if (this.groundSettled.has(entry.key)) continue;
+      // Free when the grid is already held, already in flight, or known absent,
+      // and started otherwise. This is the line the whole workstream is about.
+      void field.ensure(entry.key);
+      if (!budgetLeft) continue;
+      this.ensureGroundSheet(entry);
       budgetLeft = performance.now() < deadline;
     }
-    return settled;
   }
 
   /**
@@ -2861,6 +2876,10 @@ export class TileStreamer implements LampSource {
     shadowVolume: Frustum | null = null,
     sunAltitudeDeg: number = REFERENCE_ALTITUDE_DEG,
   ): void {
+    // WORKSTREAM AJ: before the index test, deliberately. The count is about the
+    // *loop*, not about the world, and the boot gate reads it to find out
+    // whether frames are happening at all.
+    this.framesSeen++;
     if (!this.index) return;
 
     // Phase 3, before anything else this frame.
@@ -2904,16 +2923,6 @@ export class TileStreamer implements LampSource {
     updateHexes(cam.x, cam.z);
     updateRegions(cam.x, cam.z);
 
-    // WORKSTREAM AJ: phase 0, and it is deliberately in front of everything that
-    // asks for a tile.
-    //
-    // The ground of the near tiles before the geometry of any tile. It is one
-    // pass over a twenty-three-key ring and a millisecond of mesh building, and
-    // what it buys is the difference between the player's floor arriving in
-    // 1,156 bytes and arriving in 311 kB. See `pumpGround` and
-    // `world/ground-first.ts`.
-    const groundAhead = this.pumpGround(cam);
-
     this.projScreen.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     // The coordinate system matters: WebGPU clips depth to [0, w] and WebGL to
     // [-w, w], and the near-plane extraction differs between them. Reading it
@@ -2929,6 +2938,16 @@ export class TileStreamer implements LampSource {
       if (dist <= this.loadRadius) wanted.push({ entry, dist });
     }
     wanted.sort((a, b) => a.dist - b.dist);
+
+    // WORKSTREAM AJ: phase 0, and it is deliberately in front of everything that
+    // asks for a tile's geometry.
+    //
+    // The ground of every wanted tile before the geometry of any of them, in the
+    // ranking that was just computed. It is 57 map lookups and a millisecond of
+    // mesh building, and what it buys is the difference between the player's
+    // floor arriving in 1,156 bytes and arriving in 311 kB. See `pumpGround` and
+    // `world/ground-first.ts`.
+    this.pumpGround(wanted);
 
     for (const { entry, dist } of wanted) {
       // WORKSTREAM AJ: the ground first here as well, and for the reason the
@@ -2975,20 +2994,34 @@ export class TileStreamer implements LampSource {
       // slots nobody else can have. See `HAZARD_EXTRA_SLOTS` for why that set
       // is bounded and why the extra slots are the ones that matter.
       const hazard = this.collisionSink?.hasTile(entry.key) === true;
-      // WORKSTREAM AJ: and the other direction of the same idea. While any tile
-      // inside `GROUND_LEAD_RADIUS_M` still has no ground, the bundles stand
-      // down to one connection so the 1,156-byte sidecars are not queued behind
-      // them -- a browser gives one origin six connections, and four of them
-      // holding 311 kB each is exactly the case `TerrainField.FETCH_TIMEOUT_MS`
-      // was written for. One slot rather than none, so geometry always
-      // progresses and this can never be the thing that wedges a boot; and a
-      // hazard tile keeps its extra slots regardless, because a solid invisible
-      // block of city outranks everything.
-      const base = groundAhead ? this.concurrency : GROUND_LEAD_SLOTS;
-      const slots = hazard ? base + HAZARD_EXTRA_SLOTS : base;
+      const slots = hazard ? this.concurrency + HAZARD_EXTRA_SLOTS : this.concurrency;
       if (
         this.loading.size < slots &&
         !this.loading.has(entry.key) &&
+        // WORKSTREAM AJ: **and this tile's own ground has settled.** The whole
+        // cross-tile ordering, in one clause. `pumpGround` above asked for the
+        // grid in this same frame and it is 270 times smaller than the bundle,
+        // so this is a wait measured in one round trip on any link where the
+        // bundle would have arrived at all.
+        //
+        // Per tile rather than a global throttle, and that is what makes it
+        // safe: a slow grid delays its own tile and nothing else, a grid the
+        // build does not contain counts as settled and never delays anything,
+        // and the worst case -- a transient fetch failure -- is bounded by
+        // `TerrainField`'s own five-second backoff rather than by anything here.
+        //
+        // A hazard tile is exempt. Its prisms are already resident, so it is not
+        // a hole in the picture but a solid invisible block of city, and that
+        // outranks every ordering preference in this file. See
+        // `HAZARD_EXTRA_SLOTS` and `world/invisible-walls.ts`.
+        //
+        // And a streamer with no terrain field at all is exempt outright, which
+        // is not defensiveness: `pumpGround` settles nothing without one, so
+        // without this clause a world with no `terrain` block in its index --
+        // every world built before the DEM existed -- would never load a single
+        // tile. A gate whose failure mode is an empty city gets an explicit
+        // pass-through rather than an implicit one.
+        (hazard || this.terrainField === null || this.groundSettled.has(entry.key)) &&
         // Decoded and queued counts as "on its way": without this the tile
         // would be fetched again on every frame between the decode landing and
         // the budget getting round to building it, which at four concurrent

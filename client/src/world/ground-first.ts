@@ -100,32 +100,26 @@ export interface GroundTile {
 export const GROUND_REVEAL_RADIUS_M = 600;
 
 /**
- * How far ahead the ground is fetched in preference to geometry, metres.
+ * The cross-tile half of "the ground draws first" is not a constant, and it is
+ * worth saying so here where a reader will look for one.
  *
- * The cross-tile half of "the ground draws first": while any tile inside this
- * radius has unsettled ground, the streamer runs on **one** tile-bundle
- * connection instead of four, so the 1.2 kB sidecars are not queued behind
- * 311 kB of geometry on a browser's six connections per host. That queueing is
- * not hypothetical -- `TerrainField.FETCH_TIMEOUT_MS`'s header is a note about
- * having watched it happen.
+ * There is no separate lead radius. The ground pass runs over the streamer's own
+ * `loadRadius` -- the same 1,800 m ranking `update` already computes to decide
+ * what to fetch -- so it costs no extra pass over the index and covers exactly
+ * the world the near tiles are drawn in. The whole ring is 57 tiles at the
+ * spawn, which is 64 kB of terrain: less than a fifth of *one* tile's geometry.
  *
- * Larger than the reveal radius on purpose, and this is the number the *ride*
- * cares about rather than the boot. At 44 m/s a train covers 900 m in twenty
- * seconds, so ground fetched at this range is ground built well before the
- * carriage reaches it, and the leading edge of a fast ride is the worst case the
- * whole subject has. Not larger still, because the priority is only worth
- * anything while it is narrow: extend it to the load radius and it is not a
- * priority, it is a permanent one-slot streamer.
- *
- * It cannot wedge, and that is by construction rather than by luck: the cap is
- * one slot rather than none, so geometry always progresses; and the predicate is
- * over *settled* tiles, so a tile whose ground the build does not contain
- * satisfies it instead of blocking on it forever.
+ * The ordering is then enforced per tile rather than by rationing connections:
+ * **a tile's 311 kB bundle does not start until that tile's own 1,156 bytes have
+ * settled.** The ground pass runs in front of the fetch pass in the same frame,
+ * so a tile's grid is always requested first and, being 270 times smaller,
+ * always lands first. A per-tile rule cannot starve the streamer the way a
+ * global throttle can: a tile whose ground is slow delays only itself, a tile
+ * whose ground the build does not contain is settled and proceeds immediately,
+ * and a tile the player is standing inside of -- one whose prisms are resident,
+ * an invisible wall -- is exempt outright, because a solid block of city nobody
+ * can see outranks every ordering preference in this file.
  */
-export const GROUND_LEAD_RADIUS_M = 900;
-
-/** Tile-bundle fetch slots while the ground ahead is still unsettled. */
-export const GROUND_LEAD_SLOTS = 1;
 
 /**
  * How long the reveal waits for the ground before it goes ahead without it,
@@ -386,16 +380,18 @@ export function verifyGroundFirst(): string[] {
     'a zero-radius ring is the tile the player is standing in and nothing else',
   );
   fail(groundRing([], px, pz, 600).length === 0, 'an empty index has an empty ring');
-  // Monotonic in the radius, which is the property the lead radius rests on:
-  // the fetch-priority ring must contain the reveal ring.
-  const lead = new Set(groundRing(tiles, px, pz, GROUND_LEAD_RADIUS_M));
+  // Monotonic in the radius, which is what lets the gate's 600 m ring and the
+  // ground pass's 1,800 m one be the same arithmetic asked twice: the pass must
+  // reach every tile the gate waits for, or the curtain hangs on ground nothing
+  // is fetching.
+  const wide = new Set(groundRing(tiles, px, pz, 1800));
   fail(
-    groundRing(tiles, px, pz, GROUND_REVEAL_RADIUS_M).every((k) => lead.has(k)),
-    'the lead ring must contain the reveal ring, or the gate waits on tiles nothing is prioritising',
+    groundRing(tiles, px, pz, GROUND_REVEAL_RADIUS_M).every((k) => wide.has(k)),
+    'the load-radius ring must contain the reveal ring, or the gate waits on tiles nothing fetches',
   );
   fail(
-    GROUND_REVEAL_RADIUS_M < 1800 && GROUND_LEAD_RADIUS_M < 1800,
-    'both radii must be inside the streamer\'s load radius or the gate waits on tiles it never fetches',
+    GROUND_REVEAL_RADIUS_M < 1800,
+    'the reveal radius must be inside the streamer\'s load radius or the gate waits forever',
   );
   fail(
     tileGap(px, pz, [0, 0, size, size]) === 0,
