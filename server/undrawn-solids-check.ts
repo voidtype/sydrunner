@@ -1,5 +1,5 @@
 /**
- * Solids standing in the road with nothing drawn there, measured from the bake.
+ * Solids the player is stopped by with nothing drawn there, measured from the bake.
  *
  *     bun run server/undrawn-solids-check.ts
  *     bun run server/undrawn-solids-check.ts --worst 40
@@ -144,6 +144,33 @@ export const UNDRAWN_BUDGET = 0;
  * are different defects, and a count alone cannot tell them apart.
  */
 export const UNDRAWN_AREA_BUDGET_M2 = 0;
+
+/**
+ * And how many undrawn solids may stand **anywhere at all**, on a lane or off it.
+ *
+ * ---------------------------------------------------------------------------
+ * THE LANE FILTER WAS A BLIND SPOT AND THIS IS THE LINE THAT ADMITS IT.
+ *
+ * The first version of this check tested only the prisms standing on a
+ * carriageway, on the reasoning that a wall in the road is the one a player
+ * drives into. That reasoning was wrong twice over. A player on foot is off the
+ * carriageway most of the time -- the footpath, the verge, a park, a car park,
+ * the strip between a building and its kerb -- and every one of those is
+ * somewhere an invisible wall stops them. And the filter *hid a real class*:
+ * with it on the check measured zero, and with it off the same build measures
+ * **17**, every one of them a 2-3 m2 structural sliver about a metre over the
+ * ground with `decks.PARAPET_HEIGHT_M`'s own 1.1 m of height -- deck parapets
+ * whose prism was emitted where their geometry was not. Several of them are
+ * inside a standing body's band: the three at (-301, -1097), (-298, -1102) and
+ * (-258, -1075) have their base 1.1 m over the ground and their top 2.4 m over
+ * it, which is a shin-to-shoulder bar across Millers Point that nothing draws.
+ *
+ * So the scan is over every prism now and the lane test is kept only as a
+ * *severity* split -- a wall in a trunk carriageway is worse than a wall in a
+ * back garden, and the table sorts by it. Both counts are ratcheted, because
+ * they can regress independently.
+ */
+export const UNDRAWN_ANYWHERE_BUDGET = 17;
 
 /**
  * How far a prism's underside must clear the ground before it stops being a
@@ -475,7 +502,7 @@ const scope = centre === null
     });
 
 say(
-  `undrawn solids on drivable lanes -- ${scope.length.toLocaleString()} tiles` +
+  `undrawn solids -- ${scope.length.toLocaleString()} tiles` +
     (centre === null ? '' : ` within ${RADIUS} m of (${centre[0]}, ${centre[1]})`),
 );
 
@@ -515,12 +542,14 @@ const t0 = Date.now();
 for (const t of scope) {
   const prisms = prismsOf(t);
   if (prisms.length === 0) continue;
+  // A tile with no lane sidecar still gets scanned -- its prisms are off-lane
+  // by definition, and the class this check was blind to lives exactly there.
   const ways = neighbourWays(t);
-  if (ways.length === 0) continue;
   tilesWithRoad++;
   prismsSeen += prisms.length;
 
-  // The prisms standing on a carriageway. Only these are worth a GLB.
+  // Every prism, with how much carriageway it stands on -- which is a severity
+  // number now rather than a filter. See UNDRAWN_ANYWHERE_BUDGET.
   const standing: Array<{ p: Prism; on: number; klass: number; osmId: number }> = [];
   for (const p of prisms) {
     let best = 0;
@@ -542,10 +571,10 @@ for (const t of scope) {
         if (a > best) { best = a; klass = w.klass; osmId = w.osmId; }
       }
     }
-    if (best >= MIN_ON_ROAD_M2) standing.push({ p, on: best, klass, osmId });
+    standing.push({ p, on: best >= MIN_ON_ROAD_M2 ? best : 0, klass, osmId });
+    if (best >= MIN_ON_ROAD_M2) onRoadPrisms++;
   }
   if (standing.length === 0) continue;
-  onRoadPrisms += standing.length;
 
   // The walk-under rule, before the geometry is opened: a viaduct over a street
   // is not a wall and its GLB is not worth reading.
@@ -590,7 +619,7 @@ for (const t of scope) {
       if (hits < closestCall) closestCall = hits;
       continue;
     }
-    onRoadArea += on;
+    if (on > 0) onRoadArea += on;
     offenders.push({
       key: t.key, onRoad: on, area: polyArea(p.points), base: p.base, top: p.top,
       structural: p.structural, x: (p.minX + p.maxX) / 2, z: (p.minZ + p.maxZ) / 2, klass, osmId,
@@ -599,10 +628,12 @@ for (const t of scope) {
 }
 
 const secs = (Date.now() - t0) / 1000;
-say(`  ${tilesWithRoad.toLocaleString()} tiles carry both a road and a prism; ${prismsSeen.toLocaleString()} prisms read in ${secs.toFixed(0)} s`);
-say(`  ${onRoadPrisms.toLocaleString()} prisms stand on a carriageway by ${MIN_ON_ROAD_M2} m2 or more`);
-say(`  ${walkUnder.toLocaleString()} of those clear ${WALKABLE_UNDER_M} m over the ground and are walked under, not into`);
-say(`  ${offenders.length.toLocaleString()} are SOLID AND UNDRAWN -- ${onRoadArea.toFixed(0)} m2 of carriageway`);
+const onLane = offenders.filter((o) => o.onRoad > 0).length;
+say(`  ${tilesWithRoad.toLocaleString()} tiles carry a prism; ${prismsSeen.toLocaleString()} prisms read in ${secs.toFixed(0)} s`);
+say(`  ${onRoadPrisms.toLocaleString()} of them stand on a carriageway by ${MIN_ON_ROAD_M2} m2 or more`);
+say(`  ${walkUnder.toLocaleString()} clear ${WALKABLE_UNDER_M} m over the ground and are walked under, not into`);
+say(`  ${offenders.length.toLocaleString()} are SOLID AND UNDRAWN anywhere at all`);
+say(`  ${onLane.toLocaleString()} of those stand on a drivable lane -- ${onRoadArea.toFixed(0)} m2 of carriageway`);
 say(
   `  margin: the drawn prism nearest the line had ` +
     `${Number.isFinite(closestCall) ? closestCall : 0} vertices inside its own ring, against a ` +
@@ -744,11 +775,18 @@ if (centre !== null) {
 }
 
 const failures: string[] = runControl();
-if (offenders.length > UNDRAWN_BUDGET) {
+if (onLane > UNDRAWN_BUDGET) {
   failures.push(
-    `${offenders.length} solids stand on a drivable lane with nothing drawn over them, against a budget of ` +
+    `${onLane} solids stand on a drivable lane with nothing drawn over them, against a budget of ` +
       `${UNDRAWN_BUDGET}. This is the class a player reports as "why is there an invisible wall here" and ` +
       `cannot diagnose from inside the game.`,
+  );
+}
+if (offenders.length > UNDRAWN_ANYWHERE_BUDGET) {
+  failures.push(
+    `${offenders.length} solids stand somewhere with nothing drawn over them, against a budget of ` +
+      `${UNDRAWN_ANYWHERE_BUDGET}. A player on foot is off the carriageway most of the time; see ` +
+      `UNDRAWN_ANYWHERE_BUDGET for why this count exists beside the one above.`,
   );
 }
 if (onRoadArea > UNDRAWN_AREA_BUDGET_M2) {
@@ -769,5 +807,8 @@ if (failures.length > 0) {
 }
 
 say('');
-say(`  PASS -- ${offenders.length} / ${UNDRAWN_BUDGET} undrawn solids, ${onRoadArea.toFixed(0)} / ${UNDRAWN_AREA_BUDGET_M2} m2`);
+say(
+  `  PASS -- ${onLane} / ${UNDRAWN_BUDGET} on a lane (${onRoadArea.toFixed(0)} / ${UNDRAWN_AREA_BUDGET_M2} m2), ` +
+    `${offenders.length} / ${UNDRAWN_ANYWHERE_BUDGET} anywhere`,
+);
 process.exit(0);
