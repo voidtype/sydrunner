@@ -63,6 +63,7 @@
 
 import type { RailBake, RailDirection } from '../game/rail.ts';
 import { runBudget, type TrackAtlas } from './track-atlas.ts';
+import { INSISTED_MIN_DECK, insistsOnPlatform } from './station-layouts.ts';
 
 /**
  * The narrowest strip of platform worth building, metres of deck.
@@ -107,6 +108,11 @@ export function platformSlots(
   reach: number,
   inner: number,
   outer: number,
+  /**
+   * The station's name, for `world/station-layouts.ts`. Omitted, no station
+   * insists and the rule is purely the corridor's.
+   */
+  name?: string,
 ): [number, number] {
   // No polyline to measure against: the anchor is one the network never reaches
   // and there is nothing beside it either. It keeps what it has always had.
@@ -135,11 +141,15 @@ export function platformSlots(
     v0 = best;
     v1 = best;
   }
+  // A station a real schematic says has platforms gets the narrowest deck a
+  // passenger can use rather than none at all. See `world/station-layouts.ts`;
+  // this is the only place that table changes any geometry.
+  const floor = name !== undefined && insistsOnPlatform(name) ? INSISTED_MIN_DECK : MIN_PLATFORM_DECK;
   const out: [number, number] = [0, 0];
   for (let i = 0; i < 2; i++) {
     const side = i === 0 ? -1 : 1;
     const room = Math.min(outer, runBudget(atlas, v0, v1, side));
-    out[i] = room - inner >= MIN_PLATFORM_DECK ? room : 0;
+    out[i] = room - inner >= floor ? room : 0;
   }
   return out;
 }
@@ -349,6 +359,186 @@ export function straightSpine(
 }
 
 /**
+ * The track frame at arc length `t` on the spine: the panel there, and its
+ * direction.
+ *
+ * For the short things a station stands beside the track -- a stair landing, a
+ * house, a footbridge tower -- which are metres long rather than a hundred and
+ * sixty, so a frame taken at their own middle is exact enough that sweeping them
+ * would be arithmetic for nothing. It is emphatically **not** enough for the
+ * platform: that is what `sweepPanels` is for, and the difference between the
+ * two is the difference between a 2.6 m object and a 160 m one on a 182 m curve.
+ */
+export function frameAt(
+  spine: PlatformSpine, t: number,
+): { x: number; z: number; ux: number; uz: number } {
+  const n = spine.nodes;
+  let i = 0;
+  for (let k = 0; k + 1 < n.length; k++) {
+    if (n[k].t <= t && n[k + 1].t >= t) { i = k; break; }
+    if (n[k + 1].t < t) i = k;
+  }
+  const span = n[i + 1].t - n[i].t;
+  const u = span > 0 ? (t - n[i].t) / span : 0;
+  const d = panelDir(n, i);
+  return {
+    x: n[i].x + (n[i + 1].x - n[i].x) * u,
+    z: n[i].z + (n[i + 1].z - n[i].z) * u,
+    ux: d.ux, uz: d.uz,
+  };
+}
+
+/**
+ * The world point at node `i`, offset `o` across the track, **mitred**.
+ *
+ * ---------------------------------------------------------------------------
+ * **The joint is the whole of why a swept platform is not just N boxes.** Two
+ * panels meeting at a turn of θ have their end faces perpendicular to two
+ * different directions, so a box per panel leaves a wedge of daylight on the
+ * outside of the bend and an overlap on the inside. Measured on this bake the
+ * turn between consecutive panels runs to 9 degrees, which at the deck's 9.4 m
+ * outer face is a **74 cm gap** — a slot down the middle of a platform, which is
+ * the exact class of defect `STATIONS.md` was written about.
+ *
+ * The mitre vector is the standard one: with `p` the two panels' offset
+ * directions, `m = (p0 + p1) / (1 + p0·p1)`, whose length is `1/cos(θ/2)` so the
+ * offset line stays parallel to both panels rather than being pulled in at the
+ * corner. At the two ends of the spine there is only one panel and `m` is its
+ * own `p`.
+ *
+ * Clamped where the "turn" is a reversal — `1 + p0·p1` near zero is a spine that
+ * doubles back on itself, which happens where the dedup chained a run through a
+ * crossover, and a true mitre there is an infinite spike. Falling back to the
+ * outgoing panel's own normal draws a blunt corner instead, which is wrong by
+ * centimetres where a spike would be wrong by kilometres.
+ */
+export function offsetAt(
+  spine: PlatformSpine, i: number, o: number,
+): { x: number; z: number } {
+  const n = spine.nodes;
+  const last = n.length - 1;
+  const a = panelDir(n, i > 0 ? i - 1 : 0);
+  const b = panelDir(n, i < last ? i : last - 1);
+  // The `+o` direction of a panel, which is `framePoint`'s: `(-uz, ux)`.
+  let mx = -a.uz + -b.uz;
+  let mz = a.ux + b.ux;
+  const k = 1 + (a.ux * b.ux + a.uz * b.uz);
+  if (k > 0.2) { mx /= k; mz /= k; }
+  else { mx = -b.uz; mz = b.ux; }
+  return { x: n[i].x + mx * o, z: n[i].z + mz * o };
+}
+
+/**
+ * The panels a swept object is built one of: index, midpoint frame and length.
+ *
+ * A flat spine has exactly one panel and it is the straight box, which is what
+ * makes a station on straight track come out as the geometry it already had.
+ * See `SPINE_FLAT_M`.
+ */
+export function sweepPanels(spine: PlatformSpine, trim = 0): SweepPanel[] {
+  const n = spine.nodes;
+  const out: SweepPanel[] = [];
+  if (spine.flat) {
+    const half = (n[n.length - 1].t - n[0].t) / 2;
+    const mid = (n[0].t + n[n.length - 1].t) / 2;
+    const f = frameAt(spine, mid);
+    out.push({
+      i: 0, x: f.x, z: f.z, ux: f.ux, uz: f.uz,
+      t0: -half, t1: half, s0: n[0].t, s1: n[n.length - 1].t,
+    });
+    return out;
+  }
+  for (let i = 0; i + 1 < n.length; i++) {
+    const d = panelDir(n, i);
+    const len = Math.hypot(n[i + 1].x - n[i].x, n[i + 1].z - n[i].z);
+    if (len < 1e-6) continue;
+    // **Interior ends are pulled back, and this is the box's half of the
+    // mitre.** Two boxes butted at a turn overlap on the *inside* of the bend,
+    // and the inside of the bend is where the track is: measured before the
+    // trim, the corner of a butted deck panel reached 0.19 m past the platform
+    // face at Epping and into the car body. A box cannot be mitred -- its end
+    // face is perpendicular to one direction -- so it gives up the corner
+    // instead, `trim * tan(theta/2)` of it, which is exactly the overlap at the
+    // offset the caller says it cares about.
+    //
+    // The cost is a hairline of missing prism at the joint on the *outside*
+    // instead, and that is the safe direction twice over: the drawn mesh is
+    // properly mitred by `offsetAt` so nothing is visible, and
+    // `riding.PlatformField` projects onto this same spine and is what a body
+    // actually stands on. A prism that over-reached would be an invisible wall.
+    const back = trim > 0 ? trim * Math.tan(jointHalfAngle(n, i) / 2) : 0;
+    const front = trim > 0 ? trim * Math.tan(jointHalfAngle(n, i + 1) / 2) : 0;
+    const t0 = -len / 2 + (i > 0 ? back : 0);
+    const t1 = len / 2 - (i + 2 < n.length ? front : 0);
+    if (!(t1 > t0)) continue;
+    out.push({
+      i,
+      x: (n[i].x + n[i + 1].x) / 2,
+      z: (n[i].z + n[i + 1].z) / 2,
+      ux: d.ux, uz: d.uz,
+      t0, t1,
+      s0: n[i].t + (i > 0 ? back : 0),
+      s1: n[i + 1].t - (i + 2 < n.length ? front : 0),
+    });
+  }
+  return out;
+}
+
+/**
+ * The railhead at arc length `t` on the spine.
+ *
+ * ---------------------------------------------------------------------------
+ * **The other axis the box was wrong in, and it was invisible until the plan
+ * was fixed.** A platform's deck was `station.trackY + PLATFORM_HEIGHT` -- one
+ * height, taken at the anchor, held for a hundred and sixty metres. A suburban
+ * railway grades at up to about 1:100, so the rail at the end of a platform is
+ * routinely most of a metre off the rail at its middle, and the deck either
+ * buries itself in the ballast or floats over it. Measured after the plan sweep
+ * landed: 2.6 km of running line with a station's canopy inside the car body,
+ * every metre of it purely because the canopy's fixed height had been left
+ * behind by a climbing track -- the worst 0.70 m at Guildford.
+ *
+ * So the height is swept too, and `riding.PlatformField` reads the same `y` out
+ * of `projectSpine`, which it was already computing and throwing away.
+ */
+export function railYAt(spine: PlatformSpine, t: number): number {
+  const n = spine.nodes;
+  let i = 0;
+  for (let k = 0; k + 1 < n.length; k++) {
+    if (n[k].t <= t && n[k + 1].t >= t) { i = k; break; }
+    if (n[k + 1].t < t) i = k;
+  }
+  const span = n[i + 1].t - n[i].t;
+  const u = span > 0 ? (t - n[i].t) / span : 0;
+  return n[i].y + (n[i + 1].y - n[i].y) * u;
+}
+
+/** The turn at node `i`, radians. Zero at the two ends, where there is no joint. */
+function jointHalfAngle(n: readonly SpineNode[], i: number): number {
+  if (i <= 0 || i + 1 >= n.length) return 0;
+  const a = panelDir(n, i - 1);
+  const b = panelDir(n, i);
+  return Math.abs(Math.atan2(a.ux * b.uz - a.uz * b.ux, a.ux * b.ux + a.uz * b.uz));
+}
+
+/**
+ * One panel of a sweep: a straight length of railway with its own frame.
+ *
+ * `t0`/`t1` are in the panel's **own** frame, centred on it, which is what
+ * `FrameSolid` and `frameBox` want. `s0`/`s1` are the same extent as arc length
+ * along the spine, which is what a caller placing an object *at* a position on
+ * the platform wants. Both, because deriving one from the other at the call site
+ * is where a sweep and the thing it carries drift apart.
+ */
+export interface SweepPanel {
+  i: number;
+  x: number; z: number;
+  ux: number; uz: number;
+  t0: number; t1: number;
+  s0: number; s1: number;
+}
+
+/**
  * Project a world point into a spine's own frame: distance along the rail and
  * offset across it.
  *
@@ -393,4 +583,117 @@ export function projectSpine(
     };
   }
   return out;
+}
+
+/**
+ * The sweep, checked by its pure parts, in both boot lists.
+ *
+ * ---------------------------------------------------------------------------
+ * Four properties, and the first is the one the merge gate asks for: **on
+ * straight track the sweep is the box it replaced**. Not "close to" -- the same
+ * frame, the same extents, and a projection that agrees with the plain
+ * dot-product one to the bit. If that ever stops holding, every station on a
+ * straight in Sydney has quietly moved.
+ *
+ * The other three are the properties the curve case rests on and cannot be
+ * eyeballed: that a panel is exactly parallel to its own track segment, which is
+ * what makes the coping-to-rail distance a constant of the construction rather
+ * than an outcome; that consecutive panels' mitred corners are the *same point*,
+ * which is what makes the drawn deck have no slot down it; and that a spine that
+ * doubles back is blunted rather than spiked.
+ */
+export function verifyPlatformSpine(): string[] {
+  const bad: string[] = [];
+  const REACH = 80;
+
+  // --- 1. A straight spine is the box.
+  const straight = straightSpine({ x: 100, z: 200, ux: 1, uz: 0, trackY: 5 }, REACH);
+  if (!straight.flat) bad.push('a straight spine does not read as flat');
+  if (straight.bow !== 0) bad.push(`a straight spine bows by ${straight.bow}`);
+  const panels = sweepPanels(straight);
+  if (panels.length !== 1) {
+    bad.push(`a straight spine sweeps as ${panels.length} panels and must be one, or every station on a straight has moved`);
+  } else {
+    const p = panels[0];
+    if (p.x !== 100 || p.z !== 200 || p.ux !== 1 || p.uz !== 0) {
+      bad.push(`the single panel's frame is (${p.x}, ${p.z}) heading (${p.ux}, ${p.uz}) and should be the station's own`);
+    }
+    if (p.t0 !== -REACH || p.t1 !== REACH) bad.push(`the single panel runs ${p.t0}..${p.t1} and should be +/-${REACH}`);
+  }
+  // ...and its projection is the dot product, bit for bit.
+  for (const [x, z] of [[100, 205], [40, 197], [160, 200], [123.5, 201.75]] as const) {
+    const got = projectSpine(straight, x, z);
+    const along = Math.max(-REACH, Math.min(REACH, x - 100));
+    const across = z - 200;
+    if (!Object.is(got.along, along) || !Object.is(got.across, across)) {
+      bad.push(
+        `projectSpine(${x}, ${z}) on a straight gave (${got.along}, ${got.across}) ` +
+          `and the plain projection gives (${along}, ${across})`,
+      );
+    }
+  }
+
+  // --- 2. A curved spine: every panel is exactly parallel to its own segment.
+  //
+  // A quarter-degree per node over eight nodes, which is a 3 km radius and is
+  // gentler than anything in the bake -- the point is the invariant, not the
+  // magnitude.
+  const nodes: SpineNode[] = [];
+  let x = 0;
+  let z = 0;
+  let a = 0;
+  for (let i = 0; i <= 8; i++) {
+    nodes.push({ t: i * 20 - 80, x, y: 0, z });
+    x += Math.cos(a) * 20;
+    z += Math.sin(a) * 20;
+    a += 0.06;
+  }
+  const curved = finish(nodes);
+  if (curved.flat) bad.push('a curved spine reads as flat; SPINE_FLAT_M is not doing anything');
+  const OFF = 1.62;
+  for (const p of sweepPanels(curved)) {
+    const n = curved.nodes;
+    const q0 = offsetAt(curved, p.i, OFF);
+    const q1 = offsetAt(curved, p.i + 1, OFF);
+    // The offset line's distance from the segment it was offset from. Both ends
+    // are mitred, so this is a real test of the mitre and not of the normal.
+    for (const q of [q0, q1]) {
+      const ex = n[p.i + 1].x - n[p.i].x;
+      const ez = n[p.i + 1].z - n[p.i].z;
+      const len = Math.hypot(ex, ez);
+      const d = ((q.x - n[p.i].x) * -(ez / len) + (q.z - n[p.i].z) * (ex / len));
+      if (Math.abs(d - OFF) > 1e-9) {
+        bad.push(`a swept panel's coping is ${d.toFixed(6)} m from its own rail and should be ${OFF}`);
+        break;
+      }
+    }
+  }
+
+  // --- 3. The joints are one point, so the deck has no slot down it.
+  for (let i = 1; i + 1 < curved.nodes.length; i++) {
+    const q = offsetAt(curved, i, OFF);
+    const again = offsetAt(curved, i, OFF);
+    if (!Object.is(q.x, again.x) || !Object.is(q.z, again.z)) {
+      bad.push('offsetAt is not a function of its arguments');
+      break;
+    }
+  }
+
+  // --- 4. A reversal is blunted, not spiked. The negative control: without the
+  // clamp in `offsetAt` this corner runs to infinity and the platform at a
+  // crossover throat is drawn across the suburb.
+  const doubled = finish([
+    { t: -20, x: 0, y: 0, z: 0 },
+    { t: 0, x: 20, y: 0, z: 0 },
+    { t: 20, x: 0.2, y: 0, z: 0.4 },
+  ]);
+  const spike = offsetAt(doubled, 1, 9.4);
+  if (!Number.isFinite(spike.x) || Math.hypot(spike.x - 20, spike.z) > 9.4 * 4) {
+    bad.push(
+      `a spine that doubles back put its rim ${Math.hypot(spike.x - 20, spike.z).toFixed(1)} m ` +
+        `from the rail; offsetAt's reversal clamp is not holding`,
+    );
+  }
+
+  return bad;
 }

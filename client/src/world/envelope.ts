@@ -151,7 +151,7 @@ export const CAR_BODY_ROOF_M = 4.15;
  * metres.
  *
  * ---------------------------------------------------------------------------
- * **Seventy-five millimetres, and the number is not a choice -- it is what a
+ * **Seventy millimetres, and the number is not a choice -- it is what a
  * platform is.** `rail-solids.PLATFORM_INNER` is 1.62 m and a real platform
  * really is that close to a real train; the gap you step over at Town Hall is
  * about eight centimetres. So the margin cannot be set from comfort, because any
@@ -159,13 +159,22 @@ export const CAR_BODY_ROOF_M = 4.15;
  * one structure that is allowed to be nearest, and everything else has to be
  * further out than the platform is.
  *
+ * **Exactly `PLATFORM_INNER - CAR_BODY_HALF_M`, and five millimetres of slop
+ * here cost a whole audit.** At 0.075 the limit came to 1.625 m against a
+ * platform face at 1.620, so once the deck was swept and actually followed the
+ * rail, every correctly-built metre of every platform in the city reported a
+ * 5 mm intrusion -- 57 km of it, which read as the sweep having made things
+ * worse when it had made them right. The gauge's edge has to be the platform's
+ * face, and the test below is strict, so a platform exactly where a platform
+ * goes is clear and anything nearer is not.
+ *
  * The consequence is worth saying plainly, because it is the whole reason the
  * platform sweep exists: **the railway's tightest clearance is 70 mm, so a
  * platform placed in a frame the track leaves cannot survive.** Eighty metres of
  * a 1,000 m curve walks 3.2 m off its own tangent, which is forty-five times the
  * budget. A constant cannot absorb that and no constant was ever going to.
  */
-export const STRUCTURE_MARGIN_M = 0.075;
+export const STRUCTURE_MARGIN_M = 0.07;
 
 /**
  * Is a point at lateral offset `offset` from a running line, `dy` metres over

@@ -185,7 +185,12 @@ import { STATION_HALF_WIDTH } from '../world/rail-cut.ts';
 // WORKSTREAM AG: how much of the corridor this platform's track may have. See
 // `PlatformSite.outer` -- both ends of the wire read this one answer.
 import { atlasFor } from '../world/track-atlas.ts';
-import { platformSlots } from '../world/platform-spine.ts';
+import {
+  platformSlots,
+  projectSpine,
+  spineOn,
+  type PlatformSpine,
+} from '../world/platform-spine.ts';
 
 // --- The two constants that belong to the controller ---------------------------------
 
@@ -1135,6 +1140,25 @@ export interface PlatformSite {
    * Zero means no platform on that side.
    */
   outer: [number, number];
+  /**
+   * The running line under this platform, over the platform's own length.
+   *
+   * ---------------------------------------------------------------------------
+   * **The field follows the curve because the deck does, and they must be the
+   * same curve.** `world/rail-geo.writePlatforms` sweeps the drawn slab along
+   * `StationPlan.spine`; if this still tested a straight rectangle, then at
+   * Wollstonecraft -- whose track leaves its own anchor tangent by 17.6 m over
+   * the platform -- the surface a body stands on and the surface a body sees
+   * would be seventeen metres apart. Both are built by `spineOn` from the same
+   * bake at the same arc length, so they are one curve rather than two that
+   * agree.
+   *
+   * It is also what makes the mitre wedge harmless: the drawn slab's prisms are
+   * butted panel to panel and fall short at the outside of a bend, and this --
+   * which is what `groundHeightAt` and `world.groundFor` actually stand a body
+   * on -- is exact there.
+   */
+  spine: PlatformSpine;
 }
 
 /**
@@ -1275,15 +1299,16 @@ export class PlatformField {
     if (list === undefined) return -Infinity;
     let best = -Infinity;
     for (const site of list) {
-      const dx = x - site.x;
-      const dz = z - site.z;
-      const along = dx * site.ux + dz * site.uz;
-      if (along < -PLATFORM_HALF_LENGTH_M || along > PLATFORM_HALF_LENGTH_M) continue;
-      const signed = dx * -site.uz + dz * site.ux;
-      const across = Math.abs(signed);
+      // Projected onto the running line, not onto a chord through it. See
+      // `PlatformSite.spine`.
+      const p = projectSpine(site.spine, x, z);
+      if (p.along < -PLATFORM_HALF_LENGTH_M || p.along > PLATFORM_HALF_LENGTH_M) continue;
+      const across = Math.abs(p.across);
       // `site.outer`, per side, rather than one constant for both. See it.
-      if (across < PLATFORM_INNER_M || across > site.outer[signed < 0 ? 0 : 1]) continue;
-      const top = site.y + PLATFORM_TOP_M;
+      if (across < PLATFORM_INNER_M || across > site.outer[p.across < 0 ? 0 : 1]) continue;
+      // `p.y` -- the railhead *here* -- not `site.y`, the railhead at the anchor.
+      // The drawn deck follows the grade and this is what stands a body on it.
+      const top = p.y + PLATFORM_TOP_M;
       if (top > best) best = top;
     }
     return best;
@@ -1367,7 +1392,7 @@ export class PlatformField {
       bestMove = move;
       bestX = px;
       bestZ = pz;
-      bestTop = site.y + PLATFORM_TOP_M;
+      bestTop = projectSpine(site.spine, px, pz).y + PLATFORM_TOP_M;
     }
     if (bestTop === -Infinity) return -Infinity;
     out.x = bestX;
@@ -1410,18 +1435,16 @@ export class PlatformField {
     if (list === undefined) return -Infinity;
     let best = -Infinity;
     for (const site of list) {
-      const dx = x - site.x;
-      const dz = z - site.z;
-      const along = dx * site.ux + dz * site.uz;
-      if (along < -PLATFORM_HALF_LENGTH_M || along > PLATFORM_HALF_LENGTH_M) continue;
-      // The plan normal. The sign is kept now, because the two sides of a pair
-      // no longer reach the same distance -- one may be a corridor edge with the
-      // full deck and the other four metres from a running line. See
-      // `PlatformSite.outer`.
-      const signed = dx * -site.uz + dz * site.ux;
-      const across = Math.abs(signed);
-      if (across < PLATFORM_INNER_M || across > site.outer[signed < 0 ? 0 : 1]) continue;
-      const top = site.y + PLATFORM_TOP_M;
+      // Along and across the *curve*, and the sign of `across` is kept now,
+      // because the two sides of a pair no longer reach the same distance -- one
+      // may be a corridor edge with the full deck and the other four metres from
+      // a running line. See `PlatformSite.spine` and `.outer`.
+      const p = projectSpine(site.spine, x, z);
+      if (p.along < -PLATFORM_HALF_LENGTH_M || p.along > PLATFORM_HALF_LENGTH_M) continue;
+      const across = Math.abs(p.across);
+      if (across < PLATFORM_INNER_M || across > site.outer[p.across < 0 ? 0 : 1]) continue;
+      // The railhead here, not at the anchor. See `surfaceAt`.
+      const top = p.y + PLATFORM_TOP_M;
       if (feetY < top - PLATFORM_STEP_M || feetY > top + PLATFORM_REACH_M) continue;
       if (top > best) best = top;
     }
@@ -1466,8 +1489,11 @@ export function buildPlatforms(bake: RailBake): PlatformField {
           name: stop.name, x: at.x, z: at.z, y: at.y, ux: at.dx, uz: at.dz,
           outer: platformSlots(
             bake, atlas, { line: li, dir: di, s: stop.s },
-            PLATFORM_HALF_LENGTH_M, PLATFORM_INNER_M, PLATFORM_OUTER_M,
+            PLATFORM_HALF_LENGTH_M, PLATFORM_INNER_M, PLATFORM_OUTER_M, stop.name,
           ),
+          // The identical call `rail-solids.planStation` makes, on the identical
+          // direction at the identical arc length. See `PlatformSite.spine`.
+          spine: spineOn(bake, dir, stop.s, PLATFORM_HALF_LENGTH_M),
         });
       }
     }

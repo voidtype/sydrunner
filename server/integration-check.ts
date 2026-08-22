@@ -18636,6 +18636,9 @@ async function checkRiding(): Promise<void> {
   // their own module-level scratch. That last part is what makes this a real
   // test of the composition rather than of one shared `CarFrame`.
   const ride1 = (await import(rideHere)) as typeof import('../client/src/game/riding.ts');
+  const spineMod = (await import(
+    new URL('../client/src/world/platform-spine.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/world/platform-spine.ts');
   const ride2 = (await import(`${rideHere}?instance=2`)) as typeof import('../client/src/game/riding.ts');
 
   const bytes = await Bun.file(bakePath).arrayBuffer();
@@ -19322,6 +19325,12 @@ async function checkRiding(): Promise<void> {
             radial.add({
               name: stop.name, x: at.x, z: at.z, y: at.y, ux: at.dx, uz: at.dz,
               outer: [ride1.PLATFORM_OUTER_M, ride1.PLATFORM_OUTER_M],
+              // A straight spine, for the same reason: the control is about the
+              // merge rule and a curve would change what is compared.
+              spine: spineMod.straightSpine(
+                { x: at.x, z: at.z, ux: at.dx, uz: at.dz, trackY: at.y },
+                ride1.PLATFORM_HALF_LENGTH_M,
+              ),
             });
           }
         }

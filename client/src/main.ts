@@ -556,6 +556,8 @@ import { RailCut } from './world/rail-cut.ts';
 import { RoadDeck, verifyRoadDeck } from './world/road-deck.ts';
 import { ClearanceEnvelope, verifyEnvelope } from './world/envelope.ts';
 import { verifyTrackAtlas } from './world/track-atlas.ts';
+import { verifyStationLayouts } from './world/station-layouts.ts';
+import { verifyPlatformSpine } from './world/platform-spine.ts';
 import { verifyUndercroft } from './world/undercroft.ts';
 // Phase 1 of `STATIONS.md`: the vessel primitive and its manifold invariant.
 // Nothing in the build reads a vessel yet -- `vesselsEnabled()` is off and no
@@ -2184,6 +2186,20 @@ async function main(): Promise<void> {
       const atlasFailures = verifyTrackAtlas();
       if (atlasFailures.length) {
         console.warn('[rail] track atlas self-check:\n  - ' + atlasFailures.join('\n  - '));
+      }
+      // ...and the hand-authored layouts, against the bake's own names, which
+      // this end has and the boot list on the server does not. An override keyed
+      // on a misspelling is inert and looks exactly like one that works.
+      // The sweep by its pure parts: on straight track it must be the box it
+      // replaced, and on a curve every panel must be exactly parallel to its own
+      // rail. See `world/platform-spine.verifyPlatformSpine`.
+      const spineFailures = verifyPlatformSpine();
+      if (spineFailures.length) {
+        console.warn('[rail] platform sweep self-check:\n  - ' + spineFailures.join('\n  - '));
+      }
+      const layoutFailures = verifyStationLayouts(railBake.stations.map((s) => s.name));
+      if (layoutFailures.length) {
+        console.warn('[rail] station layout table:\n  - ' + layoutFailures.join('\n  - '));
       }
       // The same case seen from the other side: the envelope's check proves the
       // *collision* comes out as a tunnel, and this one proves the picture does.
