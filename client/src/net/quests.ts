@@ -83,8 +83,18 @@ export const QUEST_OP = {
 /** `choice` on a `NODE` op that means "I have just opened this conversation". */
 export const NODE_OPENED = 0xff;
 
-/** How many story flags travel on one state frame. See `encodeQuestState`. */
-export const MAX_WIRE_FLAGS = 48;
+/**
+ * How many story flags travel on one state frame. See `encodeQuestState`.
+ *
+ * Was 48 with a `u8` count, which the first content pool made wrong the day it
+ * was sized: a hundred quests, each writing a completion mark and up to four
+ * unlocks, is a long-lived account past 255 flags within weeks -- and a flag
+ * that does not travel is a completion the client cannot see, so the `!`
+ * comes back over a quest the server will refuse. The count is a `u16` now
+ * (protocol v22) and this bound is the account's own, so the frame carries
+ * everything the account holds. Worst case about 20 kB, sent on change only.
+ */
+export const MAX_WIRE_FLAGS = 1024;
 /** How many cursors. A player with more than this many quests open is not a case. */
 export const MAX_WIRE_CURSORS = 24;
 
@@ -242,7 +252,7 @@ export function encodeQuestState(type: number, frame: QuestStateFrame): ArrayBuf
   const line = ENC.encode(frame.line).subarray(0, 2000);
 
   let n = 8 + note.length;
-  n += 1;
+  n += 2;
   for (const f of flags) n += 1 + f.length;
   n += 1;
   for (let i = 0; i < cursors.length; i++) n += 4 + ids[i].length + 2 * Math.min(cursors[i].counts.length, 255);
@@ -257,7 +267,8 @@ export function encodeQuestState(type: number, frame: QuestStateFrame): ArrayBuf
   v.setUint8(6, note.length);
   bytes.set(note, 7);
   let p = 7 + note.length;
-  v.setUint8(p++, flags.length);
+  v.setUint16(p, flags.length, true);
+  p += 2;
   for (const f of flags) {
     v.setUint8(p++, f.length);
     bytes.set(f, p);
@@ -305,7 +316,8 @@ export function decodeQuestState(buffer: ArrayBuffer, type: number): QuestStateF
   if (buffer.byteLength < 7 + noteLen + 2) return null;
   out.note = noteLen > 0 ? DEC.decode(new Uint8Array(buffer, 7, noteLen)) : '';
   let p = 7 + noteLen;
-  const flagCount = v.getUint8(p++);
+  const flagCount = Math.min(v.getUint16(p, true), MAX_WIRE_FLAGS);
+  p += 2;
   for (let i = 0; i < flagCount; i++) {
     if (p >= buffer.byteLength) return null;
     const len = v.getUint8(p++);
@@ -490,6 +502,19 @@ export function verifyQuestWire(): string[] {
   if (!flood) failures.push('A QUEST_STATE frame at the caps did not decode.');
   else if (flood.flags.length > MAX_WIRE_FLAGS || flood.cursors.length > MAX_WIRE_CURSORS) {
     failures.push(`${flood.flags.length} flags and ${flood.cursors.length} cursors crossed, over the caps.`);
+  }
+
+  // The case the u8 count could never pass: a completionist with more than 255
+  // marks. Every flag must arrive, in order, or the client re-offers a quest the
+  // server will refuse. 300 is past the old cap and well under the new one.
+  const many = Array.from({ length: 300 }, (_, i) => `q:pool-quest-${i}`);
+  const completionist = decodeQuestState(
+    encodeQuestState(MSG_QUEST_STATE, { ...blankQuestState(), flags: many }),
+    MSG_QUEST_STATE,
+  );
+  if (!completionist) failures.push('A 300-flag QUEST_STATE frame did not decode.');
+  else if (completionist.flags.length !== 300 || completionist.flags[299] !== 'q:pool-quest-299') {
+    failures.push(`300 flags went in and ${completionist.flags.length} came out (last ${completionist.flags[completionist.flags.length - 1]}).`);
   }
 
   return failures;

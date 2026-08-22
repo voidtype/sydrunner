@@ -589,7 +589,10 @@ export interface AccountRecord {
  * keeps the oldest, because the oldest are the story and the newest is one
  * quest.
  */
-export const MAX_STORY_FLAGS = 256;
+export const MAX_STORY_FLAGS = 1024;
+// 256 was sized before the content pool existed; see `net/quests.MAX_WIRE_FLAGS`
+// for the arithmetic that moved both together. The two are equal on purpose:
+// a flag the account can hold is a flag the frame can carry.
 export const MAX_OPEN_QUESTS = 24;
 
 /** What the file on disk looks like. Versioned, on `WalletFile`'s terms. */

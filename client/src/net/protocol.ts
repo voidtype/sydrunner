@@ -855,7 +855,16 @@ export const MSG = {
  * but a server that answers a message a client cannot parse is the exact
  * disagreement the version exists to refuse, so it moves.
  */
-export const PROTOCOL_VERSION = 21;
+/*
+ * v22: the quest state frame counts its flags in a u16.
+ *
+ * Workstream AN's register, plus the lead's sizing. The frame's flag count was
+ * a u8 and `MAX_WIRE_FLAGS` was 48, both sized before a content pool of a
+ * hundred quests existed; a completion mark that does not travel is a `!`
+ * drawn over a quest the server refuses. One byte wider, one version up. The
+ * codecs live in `net/quests.ts`; `verifyQuestWire` round-trips 300 flags.
+ */
+export const PROTOCOL_VERSION = 22;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
