@@ -5213,7 +5213,7 @@ export class Simulation {
 
     if (tunnel) {
       const stop = nextCall(dir, s);
-      if (stop >= 0 && stopPlatform(bake, dir, stop, a.z, this.landing)) {
+      if (stop >= 0 && stopPlatform(bake, dir, stop, a.z, this.world.platforms ?? null, this.landing)) {
         this.placeRider(p, this.landing);
         clearAboard(a);
         // The killfeed line is the client's -- see `main.ts` -- but the *event*
@@ -5309,7 +5309,7 @@ export class Simulation {
     const dir = bake === null ? null : dirOf(bake, a.line, a.dir);
     if (bake !== null && dir !== null) {
       const stop = nextCall(dir, dir.lengthM);
-      if (stop >= 0 && stopPlatform(bake, dir, stop, a.z, this.landing)) {
+      if (stop >= 0 && stopPlatform(bake, dir, stop, a.z, this.world.platforms ?? null, this.landing)) {
         this.placeRider(p, this.landing);
       }
     }

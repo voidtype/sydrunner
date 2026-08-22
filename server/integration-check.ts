@@ -19990,7 +19990,7 @@ async function checkRiding(): Promise<void> {
           tested++;
           const stop = ride1.nextCall(dir, s);
           if (stop < 0) continue;
-          if (!ride1.stopPlatform(bake, dir, stop, 1, at)) continue;
+          if (!ride1.stopPlatform(bake, dir, stop, 1, null, at)) continue;
           // The station it landed at has to be a real calling station ahead of
           // where they jumped, and the platform has to be above the track rather
           // than inside it.

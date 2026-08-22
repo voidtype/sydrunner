@@ -3073,7 +3073,8 @@ export function spanFlagsAt(bake: RailBake, dir: RailDirection, s: number): numb
  * geometry `rail-geo` builds the platform from (`station.ux/uz` is that heading).
  */
 export function stopPlatform(
-  bake: RailBake, dir: RailDirection, stopIndex: number, side: number, out: Vec3Out,
+  bake: RailBake, dir: RailDirection, stopIndex: number, side: number,
+  platforms: PlatformField | null, out: Vec3Out,
 ): boolean {
   const stop = dir.stops[stopIndex];
   if (stop === undefined) return false;
@@ -3085,8 +3086,51 @@ export function stopPlatform(
   out.x = _bogieA.x + nx * d;
   out.y = _bogieA.y + PLATFORM_TOP_M + RIDER_EYE_HEIGHT;
   out.z = _bogieA.z + nz * d;
+  /*
+   * And then the FIELD decides, exactly as `alightPlatform` does, because the
+   * blind arithmetic above stopped being safe the day platforms stopped being
+   * two 9.4 m decks that covered every mistake. `side` here is which side of
+   * the carriage the body happened to be standing -- nothing checked that a
+   * platform exists on that side, and for years nothing had to: the overlapped
+   * decks caught everybody. The swept, budget-clipped platforms do not, and
+   * the e2e acceptance found the hole within an hour of them landing -- a
+   * rider carried past the buffers at Emu Plains was put down on the naked
+   * side and fell. `placeOn` slides the landing to the nearest real deck,
+   * crossing the corridor if the deck is on the other side; `ALIGHT_SNAP_M`
+   * bounds it exactly as it bounds a disembark. No field -- a check world with
+   * no platforms -- keeps the blind answer, which is the old behaviour.
+   */
+  if (platforms === null) return true;
+  const top = platforms.surfaceAt(out.x, out.z);
+  if (top > -Infinity) {
+    out.y = top + RIDER_EYE_HEIGHT;
+    return true;
+  }
+  const snapped = platforms.placeOn(out.x, out.z, STRAND_SNAP_M, out);
+  if (snapped > -Infinity) out.y = snapped + RIDER_EYE_HEIGHT;
   return true;
 }
+
+/**
+ * How far a STRANDED rider may be slid to land on the last platform.
+ *
+ * Deliberately not `ALIGHT_SNAP_M`. A disembark happens beside a deck and
+ * twelve metres corrects a curve's worth of error; a terminus strand happens
+ * where the *polyline* ends, and the bake trims a direction's polyline short
+ * of the station it names -- measured at Emu Plains, the end of the Berowra
+ * run stops 85.6 m from the site's centre, which put the strand point about
+ * fourteen metres past the deck's end and `placeOn` under the old reach
+ * refused it. The e2e acceptance caught the rider falling beside the buffers
+ * the day the platforms stopped being wide enough to hide it.
+ *
+ * A hundred metres: over half a consist plus the trim, and still an order of
+ * magnitude short of the next station, so the bound keeps meaning what
+ * `placeOn`'s header wants it to mean -- this station, not a drag across the
+ * yard. `strandRider`'s own contract is "put them on the last platform the
+ * trip called at", and a slide to mid-deck is that contract kept, not a
+ * teleport.
+ */
+export const STRAND_SNAP_M = 100;
 
 /**
  * What the HUD says while you are on a train: line, destination, next stop.

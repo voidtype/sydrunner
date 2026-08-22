@@ -6015,7 +6015,7 @@ async function main(): Promise<void> {
       alightPlatform(rideFrame, it, a.x, a.z, platforms, rideLanding);
     } else if (tunnel) {
       const stop = nextCall(dir, pose.s);
-      if (stop >= 0 && stopPlatform(railBake, dir, stop, a.z, rideLanding)) {
+      if (stop >= 0 && stopPlatform(railBake, dir, stop, a.z, platforms, rideLanding)) {
         hud.notice(`dragged out by staff at ${dir.stops[stop].name}`);
       } else {
         alightTrackside(rideFrame, it, a.x, a.z, rideLanding);
