@@ -122,6 +122,10 @@ LANES_VERSION = lanes.LANES_VERSION
 @dataclass
 class TileResult:
     key: str
+    # Building rings **in the collision payload**, which is what the index ships
+    # as `b`. Not `len(buildings)`: a footprint that degenerated is not in the
+    # payload and is not a wall, and both authorities subtract this number from
+    # the payload's count word to find the decks. See `write_collision`.
     buildings: int
     triangles: int
     glb_bytes: int
@@ -606,7 +610,7 @@ def write_collision(
     origin: tuple[float, float],
     bases: list[float] | None = None,
     extra: list = (),
-) -> int:
+) -> tuple[int, int]:
     """Convex-ish prism collision, tile-local, little-endian. **Format v2.**
 
         u32  building count
@@ -642,6 +646,39 @@ def write_collision(
     Deliberately not derived from the render mesh: the render mesh gains window
     reveals and balconies inside 80 m, and colliding against those would be both
     expensive and worse to play against.
+
+    ---------------------------------------------------------------------------
+    RETURNS `(bytes_written, building_rings_emitted)`, AND THE SECOND HALF IS NOT
+    A CONVENIENCE.
+
+    The index records a per-tile `b` and **both authorities subtract it from the
+    payload's own count word to find the structures**: `write_collision` emits
+    the `extra` rings first and the buildings after, so the first `total - b`
+    records are the decks and the landmark volumes, and that subtraction is the
+    entire provenance `CollisionWorld.addTile` has for `Prism.structural`. See
+    that function's `buildingCount` argument, and `world/invisible-walls.ts` for
+    the positional split written out at length.
+
+    `b` used to be `len(buildings)` -- the footprints the tile was *offered*.
+    This function does not emit all of them: `collision_ring` returns None for a
+    ring that degenerates to fewer than three points, and that one is dropped
+    here, correctly, because the count word has to be the number actually
+    written. The two numbers are therefore not the same number, and the gap goes
+    straight into the subtraction: with `k` rings dropped and `S` structures,
+    `total - b` is `S - k`, so the **last `k` structures on that tile are handed
+    to both authorities as buildings**. A deck marked a building is a deck whose
+    soffit `resolve` stops honouring -- it goes solid from the ground up, and the
+    viaduct a player is meant to walk under becomes a wall they cannot see
+    through the deck over their head. The failure is silent in both directions
+    and there is no second source to catch it with.
+
+    So the caller records *this* number as `b` and the subtraction is exact by
+    construction. Measured over the shipped bake before the change: **0 of 18,113
+    tiles had a dropped ring** (`total < b` never occurs and `collision_ring`
+    reports zero footprints reaching its last fallback), so this fixes a defect
+    with no members today rather than one in the field -- which is the reason to
+    fix it now, while the count that proves it is still zero. It needs a retile
+    to reach the shipped index; nothing about the payload format changes.
     """
     oe, on = origin
     # Landmark rings are prepared before the count word is written, because the
@@ -686,7 +723,7 @@ def write_collision(
             out += struct.pack("<ff", float(e - oe), float(-(n - on)))
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(bytes(out))
-    return len(out)
+    return len(out), len(building_rings)
 
 
 def write_terrain(path: Path, grid: np.ndarray) -> int:
@@ -2030,7 +2067,12 @@ def build_tile(
     # a plan ring and `[base, base + height]` -- because that is what a deck is
     # and the Harbour Bridge's own has been written this way since terrain
     # arrived. See `decks.DeckNetwork.prisms`.
-    collision_bytes = write_collision(
+    # `collision_buildings` rather than `len(buildings)`, and the difference is
+    # the whole of `Prism.structural`: the index's `b` is subtracted from the
+    # payload's count word on both authorities to find the decks, so it has to be
+    # the number of building rings the payload actually carries and not the
+    # number this pass was offered. See `write_collision`'s return contract.
+    collision_bytes, collision_buildings = write_collision(
         config.COLLISION_DIR / f"{tile_key}.bin",
         buildings,
         origin,
@@ -2058,7 +2100,7 @@ def build_tile(
     wz0 = wz1 - config.TILE_SIZE
     return TileResult(
         key=tile_key,
-        buildings=len(buildings),
+        buildings=collision_buildings,
         triangles=triangles,
         glb_bytes=glb_bytes,
         params_bytes=params_bytes,

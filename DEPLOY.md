@@ -578,6 +578,15 @@ block from it. So:
    it. Read the audits' *numbers*, not only their exit codes: an unscoped
    audit over a partial re-emit counts the tiles you did not touch, and
    `collision-fit-audit` currently exits 1 on "0.0 m² over a ceiling of 0.0".
+   Then `bun run server/undrawn-solids-check.ts` — 91 s over the whole build,
+   and the one that catches a retile which kept a collision ring and lost the
+   mesh over it. It reads the shipped bytes rather than the pipeline's own
+   objects, so it is the only audit here that could not have been fooled by the
+   bake that produced them; today it measures **0** and its budget is a ratchet
+   at 0, so any number at all is a regression. It ends on a control that drops a
+   synthetic wall on the Pacific Highway and proves it would have been named —
+   if the control line ever says "the scan is blind", the zero above it is
+   worthless. `--near x,z --radius m` scopes it to one place for a bug report.
 3. **Restore region mtimes** for bundles whose hash did not change
    (`data/scratch/station-round/restore-region-mtimes.py`), so a
    size-and-mtime uploader sends only the ones that did.
