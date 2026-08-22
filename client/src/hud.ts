@@ -721,25 +721,32 @@ export class Hud {
    * wait with a *number* in it, and a wait with a number that shows a spinner
    * instead is a wait the player cannot tell from a hang.
    *
-   * Refused once `ready` has run, and that is not defensiveness. The reveal is
-   * driven by a poll and a poll has a frame of latency; without this, a tick
-   * that lands after the curtain went up would write "laying the ground" into a
-   * hidden element and leave it there for the fatal handler to show later.
-   *
-   * The error class is never touched here. A fatal message must not be
-   * overwritten by progress, and `fatal` sets a colour this has no business
-   * clearing.
+   * Refused once anything else has claimed this line, and both claimants matter.
+   * `ready` is the ordinary one: the reveal is driven by a poll and a poll has a
+   * frame of latency, so without the lock a tick landing after the curtain went
+   * up would write "laying the ground" into a hidden element and leave it there
+   * for the fatal handler to show later. `fatal` is the one that would actually
+   * hurt: the gate polls every frame and the boot's error is written once, so
+   * the very next tick would paint over the only explanation the player is ever
+   * going to get.
    */
   loadingProgress(message: string): void {
-    if (this.revealed) return;
+    if (this.loadingLocked) return;
     if (this.loadingText.textContent === message) return;
     this.loadingText.textContent = message;
   }
 
-  /** Whether `ready` has taken the loading screen down. See `loadingProgress`. */
-  private revealed = false;
+  /**
+   * Whether the loading line has been claimed by `ready` or `fatal`.
+   *
+   * One flag for the two, because what it guards is the element rather than
+   * either event, and a progress poll must lose to both. Never cleared: neither
+   * of those two states is left.
+   */
+  private loadingLocked = false;
 
   fatal(message: string): void {
+    this.loadingLocked = true;
     this.loading.classList.remove('hidden');
     this.loadingText.textContent = message;
     this.loadingText.classList.add('error');
@@ -891,7 +898,7 @@ export class Hud {
    * exists at all.
    */
   ready(index: { stage: string; totals: Record<string, number> }, firstVisit = false): void {
-    this.revealed = true;
+    this.loadingLocked = true;
     this.loading.classList.add('hidden');
     const t = index.totals;
     this.world = `stage "${index.stage}" · ${(t.buildings ?? 0).toLocaleString()} buildings`;

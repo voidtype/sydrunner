@@ -1261,17 +1261,6 @@ export class TileStreamer implements LampSource {
    * cache exists to avoid, twice.
    */
   private ringCache = new Map<number, { x: number; z: number; ring: string[] }>();
-  /**
-   * `index.tiles` by key.
-   *
-   * The ground pass works from a ring of *keys* -- that is what the settled set
-   * is keyed by and what the pure arithmetic in `world/ground-first.ts` deals in
-   * -- and then needs each one's bounds to build a sheet. A linear search over
-   * 18,113 entries per sheet is not a thing to do sixty times a second, and the
-   * index is append-only (hex manifests push onto it; nothing is ever removed),
-   * so a map filled beside every push is exact rather than merely cached.
-   */
-  private readonly entries = new Map<string, TileEntry>();
   /** Ground sheets built this session. Monotonic; for the overlay. */
   private builtSheets = 0;
   /**
@@ -1959,15 +1948,12 @@ export class TileStreamer implements LampSource {
       onHexTiles((manifest) => {
         index.tiles.push(...(manifest.tiles as unknown as TileEntry[]));
         addRegions(manifest.regions);
-        // WORKSTREAM AJ: and the ground layer's two derived views of the same
-        // array. The key map is what turns a ring entry back into bounds; the
-        // ring cache is a linear pass over an array that just grew, so it is
-        // stale by definition and dropping it is the whole correction.
-        this.noteIndexTiles(manifest.tiles as unknown as TileEntry[]);
+        // WORKSTREAM AJ: and the ground gate's cached ring, which is a linear
+        // pass over an array that just grew and is therefore stale.
+        this.noteIndexGrew();
       });
       await ensureHexesNear(focus.x, focus.z);
     }
-    this.noteIndexTiles(this.index.tiles);
     this.terrainField = new TerrainField(
       this.terrain.grid,
       this.index.tile_size,
@@ -2169,9 +2155,10 @@ export class TileStreamer implements LampSource {
         fresh.geometry.dispose();
         continue;
       }
-      this.adoptSheetMesh(sheet, fresh);
       this.groundRoot.remove(old);
       old.geometry.dispose();
+      sheet.mesh = fresh;
+      this.placeSheetMesh(sheet);
       recut++;
     }
     return recut;
@@ -2183,9 +2170,16 @@ export class TileStreamer implements LampSource {
    * sheet is wanted is `pumpGround`; everything about what one is lives here.
    */
 
-  /** Take note of tiles added to the index. See `entries` and `ringCache`. */
-  private noteIndexTiles(added: readonly TileEntry[]): void {
-    for (const entry of added) this.entries.set(entry.key, entry);
+  /**
+   * The index grew, so any ring computed from it is stale.
+   *
+   * A hex manifest pushes a square kilometre of tile entries onto `index.tiles`
+   * mid-session, and `ringAt`'s whole premise is that a ring can only change
+   * when the query point moves. It can also change when the *world* does, which
+   * is this, and the correction is simply to drop the cache: the next query does
+   * one pass and is right again.
+   */
+  private noteIndexGrew(): void {
     this.ringCache.clear();
   }
 
@@ -2211,14 +2205,13 @@ export class TileStreamer implements LampSource {
    *   - **The shadow role**, carried over from whatever the sheet already held so
    *     a re-cut in the middle of a walk does not flip the pipeline.
    */
-  private adoptSheetMesh(sheet: GroundSheet, mesh: Mesh): void {
+  private placeSheetMesh(sheet: GroundSheet): void {
     const tileSize = this.index?.tile_size ?? 0;
     const [minX, minZ] = sheet.entry.bounds;
-    mesh.position.set(minX, 0, minZ + tileSize);
-    mesh.frustumCulled = true;
-    mesh.receiveShadow = sheet.receives;
-    sheet.mesh = mesh;
-    this.groundRoot.add(mesh);
+    sheet.mesh.position.set(minX, 0, minZ + tileSize);
+    sheet.mesh.frustumCulled = true;
+    sheet.mesh.receiveShadow = sheet.receives;
+    this.groundRoot.add(sheet.mesh);
   }
 
   /**
@@ -2254,16 +2247,7 @@ export class TileStreamer implements LampSource {
     }
     const sheet: GroundSheet = {
       entry,
-      mesh: null as unknown as Mesh,
-      // Arrives receiving, exactly as it did as a tile child -- `buildTerrainMesh`
-      // sets the flag and the boot warm-up compiles that variant and only that
-      // variant. `applyGroundShadowRole` switches it off on the first frame the
-      // sheet is out of the sun's reach.
-      receives: true,
-    };
-    this.adoptSheetMesh(
-      sheet,
-      buildTerrainMesh(
+      mesh: buildTerrainMesh(
         heights,
         this.terrain.grid,
         tileSize,
@@ -2271,7 +2255,13 @@ export class TileStreamer implements LampSource {
         this.tileCut(entry),
         this.tileSeam(entry),
       ),
-    );
+      // Arrives receiving, exactly as it did as a tile child -- `buildTerrainMesh`
+      // sets the flag and the boot warm-up compiles that variant and only that
+      // variant. `applyGroundShadowRole` switches it off on the first frame the
+      // sheet is out of the sun's reach.
+      receives: true,
+    };
+    this.placeSheetMesh(sheet);
     this.groundSheets.set(entry.key, sheet);
     this.groundSettled.add(entry.key);
     this.builtSheets++;
