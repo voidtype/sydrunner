@@ -137,6 +137,10 @@ import { RailCut } from '../client/src/world/rail-cut.ts';
 // ground a player stands on. `RailSolidField` is the definition those prisms are
 // now *also* derived from, so the two ends compute one number.
 import { RailSolidField, buildNetwork } from '../client/src/world/rail-solids.ts';
+// The lateral half of the same solids, which is this file's own module rather
+// than a shared one: it is a *residency*, and only a process with participants
+// in it has one. See `server/rail-lateral.ts`.
+import { RailLateralField } from './rail-lateral.ts';
 import { buildCorridor, corridorCut } from '../client/src/world/corridor.ts';
 import type { VesselField } from '../client/src/world/vessel-field.ts';
 import { setVesselsEnabled, vesselsEnabled } from '../client/src/world/vessel.ts';
@@ -1974,6 +1978,20 @@ export interface ServerWorld {
    */
   railSolids?: RailSolidField | null;
   /**
+   * And the same solids as **lateral** collision, held near whoever is near them.
+   *
+   * `railSolids` above answers "how high is the railway over this point", which
+   * is half of what a body asks. The other half is "may I walk here", and until
+   * this field the answer on this process was yes everywhere -- a trench wall, a
+   * pier and a station wall were things the browser was stopped by and this
+   * process had never heard of, so the two ends disagreed about a wall the
+   * player could see. `server/rail-lateral.ts` closes it by registering the
+   * identical prisms `world/rail-geo.buildChunk` gives the browser into the
+   * `CollisionWorld` this process already resolves against. Null with no rail
+   * bake, exactly as `railSolids` is.
+   */
+  railLateral?: RailLateralField | null;
+  /**
    * The rail corridor, so `groundFor` knows where the ground **is not**.
    *
    * `world/rail-cut.ts`'s header names this process as its second caller and
@@ -2284,6 +2302,7 @@ export async function loadWorld(
     platforms: null,
     railCut: null,
     railSolids: null,
+    railLateral: null,
     roads,
     stationBoxes: null,
     vessels: null,
@@ -2368,6 +2387,11 @@ export async function loadWorld(
     const vesselled = (x: number, z: number): boolean =>
       world.vessels !== null && world.vessels !== undefined && world.vessels.surfaceAt(x, z) > -Infinity;
     world.railSolids = new RailSolidField(net, world.railCut ?? null, rawGround, wildGround, vesselled);
+    // And the lateral half, over the same field and the same `CollisionWorld`
+    // every other layer of this world resolves against. It holds nothing until
+    // `Rooms.step` tells it where somebody is; see `server/rail-lateral.ts` on
+    // why the residency is by entity and why the radius is the browser's.
+    world.railLateral = new RailLateralField(world.railSolids, world.collision);
   }
 
   // **The vessel path, off unless asked for.** Phase 2a: nothing here runs, and

@@ -1917,6 +1917,13 @@ export class RoomHost {
     // earlier ticks read.
     const segments = this.world.segments;
     if (segments !== undefined) segments.update(this.occupants());
+    // And the railway's walls, on the same list and in the same place, because
+    // it is the same argument one layer down: `RailLateralField` registers rail
+    // solids into the *same* `CollisionWorld` the hexagons above put tiles into,
+    // so a room that swept it mid-tick would be a room resolving two bodies
+    // against two cities. A no-op on a world with no rail bake. See
+    // `server/rail-lateral.ts`.
+    this.world.railLateral?.update(this.occupants());
     for (const room of this.rooms) room.step();
   }
 

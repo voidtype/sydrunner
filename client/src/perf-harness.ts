@@ -272,6 +272,7 @@ import { HandsAssets, HandsViewmodel, handsWarmupParts } from './player/hands.ts
 import { PhoneAssets, PhoneProp, PhoneViewmodel, phoneWarmupParts } from './world/phone.ts';
 import { CashNoteAssets, CashNotePiles, cashNoteWarmupParts } from './world/cashnote.ts';
 import { DoorMarker } from './world/doormarker.ts';
+import { WallGhosts } from './world/wallghosts.ts';
 import { QuestMarkerField } from './world/questmarkers.ts';
 import { geometryLayout, type WarmupPart } from './world/warmup.ts';
 
@@ -1198,6 +1199,25 @@ async function warmGroups(): Promise<{ groups: WarmGroup[]; rail: RailRide | nul
     label: { hands: handsAssets, phone: phoneAssets, cash: cashAssets, questmarker: questMarkers },
   });
 
+  // WORKSTREAM AQ: the undrawn-wall silhouette. One instanced box set over one
+  // unlit translucent material, and **no parts** -- the audit skips an instanced
+  // draw exactly as it skips the bikes and the crowd, because no stand-in can
+  // warm one. See `world/warmup.ts`'s rule and `WallGhosts`' constructor, which
+  // is where the real warm-up lives. Declared here anyway, with an empty list,
+  // because a renderer with no row in this table is one a reader cannot see is
+  // missing -- which is the failure this whole audit exists to make impossible.
+  const ghostScene = new Scene();
+  const ghosts = new WallGhosts(
+    ghostScene,
+    { prismsWithin: (_x, _z, _r, out) => ((out.length = 0), out) },
+    { hazardAt: () => null },
+  );
+  groups.push({
+    name: 'wallghost',
+    parts: [],
+    real: [ghosts.mesh],
+  });
+
   return { groups, rail };
 }
 
@@ -1213,6 +1233,12 @@ const UNAUDITED: ReadonlyArray<readonly [string, string]> = [
   ['trains (world/trains.ts)', '10.5 MB of glTF; covered by trains.warm(precompileGroup)'],
   ['near-field car models (world/carlod.ts)', '2.4 MB of glTF over fetch'],
   ['landmarks', 'a streamed GLB group; covered by compileAsync on the group'],
+  // WORKSTREAM AQ. Its `real` mesh *is* collected below and lands in the
+  // instanced-draws-skipped count; what cannot be done is warm it with a
+  // stand-in, so it has no census row and is named here instead. The overlay's
+  // own warm-up is that the mesh is visible from construction with `count = 0`,
+  // which puts it in the boot's scene pass. See `world/wallghosts.ts`.
+  ['undrawn-wall silhouette (world/wallghosts.ts)', 'one instanced box set; covered by the scene pass'],
 ];
 
 /**
