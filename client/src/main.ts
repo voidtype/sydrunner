@@ -661,6 +661,10 @@ import { Minimap } from './minimap.ts';
 import { MapAtlas } from './mapatlas.ts';
 import { BigMap, verifyBigMap } from './bigmap.ts';
 import { InvisibleWalls, verifyInvisibleWalls } from './world/invisible-walls.ts';
+// The same fact as the overlay above, drawn in the street instead of on a map.
+// A player who has just been stopped by nothing does not open the map; see
+// `world/wallghosts.ts`.
+import { WallGhosts, verifyWallGhosts } from './world/wallghosts.ts';
 import { verifyTileLifecycle } from './world/tile-lifecycle.ts';
 // WORKSTREAM AJ: the reveal rule, its two constants and the progress line. See
 // the curtain block below `setPrecompiler`.
@@ -1262,6 +1266,11 @@ async function main(): Promise<void> {
   // that never goes out trains the player to ignore it. See
   // `world/invisible-walls.ts`.
   const wallFailures = timed('invisible-walls', () => verifyInvisibleWalls());
+  // And the in-world half of the same overlay, which fails the same silent way
+  // twice over: a qualifier that never fires draws nothing and is
+  // indistinguishable from having nothing to draw, and one that always fires
+  // puts a grey box over the Western Distributor. See `world/wallghosts.ts`.
+  const ghostFailures = timed('wall-ghosts', () => verifyWallGhosts());
   // And the two rules that decide when a tile is *allowed* to be one of those
   // walls, which is the same criterion again: both of them fail by looking
   // healthy. A transient failure misfiled as permanent is a tile that is never
@@ -1449,6 +1458,7 @@ async function main(): Promise<void> {
     guardFailures.length ||
     hudFailures.length ||
     wallFailures.length ||
+    ghostFailures.length ||
     lifecycleFailures.length ||
     groundFirstFailures.length ||
     nightFailures.length ||
@@ -1533,6 +1543,7 @@ async function main(): Promise<void> {
           ...guardFailures,
           ...hudFailures,
           ...wallFailures,
+          ...ghostFailures,
           ...lifecycleFailures,
           ...groundFirstFailures,
           ...nightFailures,
@@ -5822,6 +5833,12 @@ async function main(): Promise<void> {
   const invisibleWalls = new InvisibleWalls(index, collision, streamer, rawGroundAt);
   minimap.setHazardSource((prism) => invisibleWalls.prismHazard(prism));
 
+  // And the same residency, in the street. `InvisibleWalls` owns the per-tile
+  // scan and this reads its answer through `hazardAt`, so the box in the world
+  // and the hatch on the map are the same claim about the same tile in the same
+  // frame rather than two scans that could disagree. See `world/wallghosts.ts`.
+  const wallGhosts = new WallGhosts(scene, collision, invisibleWalls);
+
   // Spec 8.3's live points. `active` only, which is the whole information the
   // map carries about them -- a cafe you have just taken should leave the map
   // the instant it leaves the world, or the player runs back to a dot that is
@@ -9983,6 +10000,13 @@ async function main(): Promise<void> {
     // rather than the previous one's. It runs on its own 10 Hz clock inside; the
     // frame delta is what drives it, like the maps below.
     invisibleWalls.update(frameDt, player.position.x, player.position.z);
+    // Immediately after, and on the same delta: it reads the residency the line
+    // above just recomputed, so a box in the street can never be a frame behind
+    // the hatch on the map.
+    // `player.position` is the eye; the qualifier wants the feet, because it is
+    // asking `CollisionWorld.resolve`'s band question about a standing body and
+    // a band measured from the eye would clear every soffit in the city.
+    wallGhosts.update(frameDt, player.position.x, player.position.y - EYE_HEIGHT, player.position.z);
 
     minimap.update(frameDt, player.position.x, player.position.z, player.yaw);
     // The balance, the piles of cash, the handset and the two prompts. One
@@ -12177,6 +12201,23 @@ async function main(): Promise<void> {
     invisibleWalls,
     invisibleWallStats: () => invisibleWalls.stats(),
     invisibleWallSelfChecks: () => verifyInvisibleWalls(),
+
+    /**
+     * WORKSTREAM AQ: the same overlay in the street rather than on the map.
+     *
+     * `stats().drawn` is the number to read while somebody is standing in front
+     * of a wall that is not there: a non-zero count is the overlay agreeing with
+     * them, and a zero while they are stopped means whatever is holding them is
+     * *not* the streaming gap -- which is the single most useful thing a bug
+     * report about an invisible wall can say. `capped` is how many were dropped
+     * at `MAX_GHOSTS`, which is only ever non-zero in a cold CBD.
+     *
+     * See `world/wallghosts.ts`, and see
+     * `client/src/world/collision-window-check.ts` for how big the gap it draws
+     * actually is at four speeds.
+     */
+    wallGhosts,
+    wallGhostStats: () => wallGhosts.stats(),
 
     /**
      * The streaming lifecycle, from the other end: what has failed, what is

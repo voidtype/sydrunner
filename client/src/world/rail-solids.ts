@@ -2460,6 +2460,81 @@ export class RailSolidField {
     }
     return best;
   }
+
+  /**
+   * Which stations and segments can put a solid inside this box.
+   *
+   * ---------------------------------------------------------------------------
+   * **The lateral half, and it is a broad phase and nothing else.**
+   *
+   * Everything above this answers "how high is the railway over a point", which
+   * is the only question the ground query has. It is not the only question a
+   * *body* has: a trench wall, a pier, a parapet and a station wall are things
+   * you walk into, and until `server/rail-lateral.ts` the server had no way to
+   * be stopped by one -- `world/rail-geo.ts` handed the identical prisms to the
+   * browser's `CollisionWorld` and the browser's alone, so the two ends of the
+   * wire disagreed about a wall the player could see. See that file for what the
+   * disagreement cost.
+   *
+   * What it returns is *indices*, not prisms, and that is the whole discipline
+   * of this pair of methods. A caller that wanted prisms would have to be handed
+   * an array this class does not own and cannot invalidate, and
+   * `invalidateCorridor` would then have no way to reach the copy. Indices are
+   * stable for the life of the network; `solidsOf` resolves one to the cache's
+   * own record at the moment it is asked, which is the same record `roofHeight`
+   * reads and is rebuilt by the same `invalidateCorridor`.
+   *
+   * Both grids are swept because both kinds are walls -- see `stationRoofAt` and
+   * `corridorRoofAt` for why the height query keeps them apart. Deduplicated
+   * through the output sets, since an entity is filed in every cell its padded
+   * box touches and a box a few hundred metres across touches many.
+   */
+  entitiesIn(
+    minX: number,
+    minZ: number,
+    maxX: number,
+    maxZ: number,
+    stations: Set<number>,
+    segments: Set<number>,
+  ): void {
+    for (let cx = Math.floor(minX / STATION_CELL_M); cx <= Math.floor(maxX / STATION_CELL_M); cx++) {
+      for (let cz = Math.floor(minZ / STATION_CELL_M); cz <= Math.floor(maxZ / STATION_CELL_M); cz++) {
+        const list = this.stationGrid.get(fieldCell(cx, cz));
+        if (list !== undefined) for (const i of list) stations.add(i);
+      }
+    }
+    for (let cx = Math.floor(minX / SEGMENT_CELL_M); cx <= Math.floor(maxX / SEGMENT_CELL_M); cx++) {
+      for (let cz = Math.floor(minZ / SEGMENT_CELL_M); cz <= Math.floor(maxZ / SEGMENT_CELL_M); cz++) {
+        const list = this.segmentGrid.get(fieldCell(cx, cz));
+        if (list !== undefined) for (const i of list) segments.add(i);
+      }
+    }
+  }
+
+  /**
+   * One entity's solids, built if they have not been, with the settle flag.
+   *
+   * `settled` is `StationPlan.measured` for a station and `TrenchProfile.complete`
+   * for a segment, and it is the same flag this class uses to decide whether to
+   * *cache* an answer: false means the terrain under it had not arrived and the
+   * geometry was guessed. A caller registering these prisms somewhere permanent
+   * must not keep an unsettled set, for the reason the cache does not -- the
+   * answer will change under it and there is nothing to tell it so.
+   *
+   * The prisms are the cache's own arrays and are read-only to the caller.
+   * `CollisionWorld.addPrisms` copies what it needs into its own records, so a
+   * registration survives `invalidateCorridor` taking the source away -- which
+   * is why the caller must drop its keys on that event rather than trusting the
+   * arrays to go stale in place.
+   */
+  solidsOf(kind: 'station' | 'segment', i: number): { prisms: readonly SolidPrism[]; settled: boolean } {
+    if (kind === 'station') {
+      const built = this.stationSolidsFor(i);
+      return { prisms: built.prisms, settled: built.measured };
+    }
+    const built = this.segmentSolidsFor(i);
+    return { prisms: built.prisms, settled: built.complete };
+  }
 }
 
 /** `collision.roofHeight`'s loop, over one list. */

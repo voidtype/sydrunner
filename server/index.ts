@@ -112,6 +112,7 @@ import { verifySpatialHash } from '../client/src/game/spatialhash.ts';
 import { verifyTrackAtlas } from '../client/src/world/track-atlas.ts';
 import { verifyStationLayouts } from '../client/src/world/station-layouts.ts';
 import { verifyPlatformSpine } from '../client/src/world/platform-spine.ts';
+import { verifyRailLateral } from './rail-lateral.ts';
 import { verifyMovementBasis } from '../client/src/player/controller.ts';
 // WORKSTREAM O (feel): the one breath both viewmodels apply. Three-free, which is
 // why it can be run here at all -- `verifyBat` and `verifyFootyBall` cannot be,
@@ -539,6 +540,14 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // same sweep through `riding.PlatformField`, so it has to agree about where
     // the deck is down to the bit.
     ['verifyPlatformSpine', verifyPlatformSpine()],
+    // WORKSTREAM AQ: the radius this process holds the railway's *walls* to, and
+    // the key it files them under. This list only, and not the browser's --
+    // `server/rail-lateral.ts` is a residency, and only a process with
+    // participants in it has one. The failure it guards is the reason the file
+    // exists said backwards: a server whose rail solids reach less far than the
+    // browser's is one that walks a player through a trench wall they can see,
+    // and neither end logs a word about it.
+    ['verifyRailLateral', verifyRailLateral()],
     // And phase 2's selection on top of it. A working set that is missing
     // somebody nearby is a player invisible while punching you; see
     // `server/aoi.ts`, which asserts the rule against a brute-force scan.
@@ -1390,6 +1399,18 @@ const server = Bun.serve<Conn>({
          * `world.HexResidency`.
          */
         segments: world.segments?.stats() ?? null,
+        /**
+         * WORKSTREAM AQ: the railway's walls, held near whoever is near them.
+         *
+         * Beside `segments` because it is the fourth layer of the same idea and
+         * fails the same silent way: `resident` at zero while somebody stands in
+         * a cutting means this process is walking players through trench walls
+         * their own browser stops them at, and nothing else anywhere says so.
+         * `provisional` is the one to watch after a restart -- it counts
+         * entities built against terrain that had not landed, which should
+         * settle to zero within a sweep or two. See `server/rail-lateral.ts`.
+         */
+        railLateral: world.railLateral?.stats() ?? null,
         /**
          * Is there still traffic on the streets this process is holding?
          *
