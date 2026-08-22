@@ -58,6 +58,26 @@
  * and asks `pointInPolygon` against every prism taller than 2 m -- tall enough
  * to be a wall around a giver's feet rather than a kerb or a low fence.
  *
+ * **The height half, and the datum that makes it possible.** A prism is a solid
+ * only between its `base` and its `top`, not from the ground up, and a plan hit
+ * is not an "inside" until the giver's own feet are in that band. This asks the
+ * ground the way `world/questmarkers.ts` does -- `TerrainField.height` over the
+ * tile the giver falls in -- and only flags a giver whose feet lie between the
+ * prism's `base` and `top`, not merely whose plan is inside its footprint.
+ *
+ * The two heights are the same datum, and that is the whole reason the test is
+ * a subtraction and not a guess. `pipeline/sydney/terrain.py` writes every
+ * terrain post as `DEM - base`, where `base` is the DEM at the ENU origin, and
+ * the index carries it as `datum_ahd` (71.075 m AHD) with `sea_level_y` at
+ * `-71.075`; `cli._report_terrain` states it as "y = 0 is 71.075 m AHD, the
+ * ground at the ENU origin". A prism's `base` is the terrain at its pad, in the
+ * same frame, so a prism whose `top` reads `-20 m` is a building at 51 m AHD --
+ * above sea level, below the CBD origin -- and a giver whose terrain reads
+ * `+30 m` is 50 m above that roof, not inside it. The negative tops the report
+ * used to print are not a datum error and not a bug; they are real buildings in
+ * suburbs that stand below the origin. What was wrong was the plan-only test,
+ * which flagged a giver 50 m over a roof as if they were in the wall.
+ *
  * It does not move anybody. A track violation has one correct fix
  * (`place-nudge.ts`'s perpendicular step, because there is only one geometry
  * to clear); a giver standing inside a building has several -- move the giver,
@@ -69,6 +89,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { decodeRail } from '../../client/src/game/rail.ts';
 import { CollisionWorld, pointInPolygon, type Prism } from '../../client/src/player/collision.ts';
+import { TerrainField, decodeTerrain } from '../../client/src/world/terrain.ts';
 import { REGISTER_LEVELS } from '../../client/src/game/questmodel.ts';
 
 const SCRIPTS = import.meta.dir;
@@ -200,15 +221,41 @@ function prismsOf(t: TileEntry): Prism[] {
 /** Tall enough to be a wall around a giver's feet, not a kerb or a low fence. See header. */
 const SOLID_MIN_HEIGHT_M = 2;
 
+/**
+ * The ground, off the disk, the way `server/world.ts` reads it. One field for
+ * the whole drop: a giver's feet are the terrain height at their point, and the
+ * building check asks whether those feet are in a prism's `[base, top]` band.
+ * The grids are adopted under the tile's own key, which is the key `height`
+ * derives from a world point, so the two halves meet.
+ */
+const terrain = new TerrainField(worldIndex.terrain.grid, TILE_SIZE, '');
+const terrainLoaded = new Set<string>();
+function terrainOf(t: TileEntry): void {
+  if (terrainLoaded.has(t.key)) return;
+  terrainLoaded.add(t.key);
+  const path = join(WORLD_ROOT, 'tiles', `${t.key}.terr.bin`);
+  if (!existsSync(path)) return;
+  const b = readFileSync(path);
+  const buf = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+  const grid = decodeTerrain(buf, worldIndex.terrain.grid);
+  if (grid) terrain.adopt(t.key, grid);
+}
+
 for (const n of npcs) {
   const tile = tileFor(n.x, n.z);
   if (!tile) continue; // outside the baked world -- nothing to test this giver against
+  terrainOf(tile);
+  const feet = terrain.height(n.x, n.z);
   for (const prism of prismsOf(tile)) {
     if (prism.height <= SOLID_MIN_HEIGHT_M) continue;
-    if (pointInPolygon(prism.points, n.x, n.z)) {
-      bad.push(`giver ${n.id} (${n.pack}) at (${n.x}, ${n.z}) stands inside a building, top ${prism.top.toFixed(1)} m`);
-      break;
-    }
+    if (!pointInPolygon(prism.points, n.x, n.z)) continue;
+    // A plan hit is an "inside" only with the feet in the prism's own band. A
+    // giver 50 m over a roof is not in the wall, and a prism's `base` is the
+    // terrain at its pad, so feet below it are on the ground the building was
+    // built on rather than in it. See the header for the datum.
+    if (Number.isNaN(feet) || feet < prism.base || feet >= prism.top) continue;
+    bad.push(`giver ${n.id} (${n.pack}) at (${n.x}, ${n.z}) stands inside a building, top ${prism.top.toFixed(1)} m`);
+    break;
   }
 }
 
