@@ -268,6 +268,8 @@ import {
   SOLID_STAIR,
   SOLID_VIADUCT_PIER,
   planStation,
+  platformBack,
+  platformSides,
   trenchPrisms,
   trenchProfile,
   viaductDeck,
@@ -3047,34 +3049,14 @@ function writePortal(concrete: Solid, lining: Solid, portal: Portal): void {
  * dressed as data. Two faces at the real clearance is right at every station
  * with an even count and generous at the others.
  */
-/**
- * Which sides of this station carry a platform. **Both, for now.**
- *
- * ---------------------------------------------------------------------------
- * `StationPlan.sideClear` measures something real and this function deliberately
- * does not act on it yet. The measurement: a platform is built 1.62 m off the
- * anchor's centreline on both sides, and at Roseville there are running lines
- * at -5, -3, +4, +5, +6 and +7 m from that axis -- inside the slab. The train
- * passes through the platform, and about a hundred anchors on four-road
- * formations are the same.
- *
- * Suppressing the blocked side was tried and reverted the same hour, by walking
- * it. `game/riding.PlatformField` -- the analytic copy of the platform that
- * **the server** holds and that `groundHeightAt` prefers over the terrain --
- * answers for both sides of every site unconditionally, from the bake, with no
- * notion of a side at all. Not drawing one leaves a platform that is still a
- * floor on both ends of the wire and is invisible, which is a worse bug than the
- * one being fixed and is exactly the class of bug -- geometry and field
- * disagreeing about a surface -- that `PlatformField` was written to end.
- *
- * The honest fix is for `buildPlatforms` to decide the side, from the bake,
- * where both ends can see it, and for this to follow. Until then `sideClear` is
- * computed, carried on the plan, and not obeyed -- kept rather than deleted
- * because the measurement is the expensive half and it is right.
+/*
+ * `platformSides` used to be defined here, returning `[-1, 1]` for every station
+ * with a page explaining why it could not yet do otherwise. It is now
+ * `rail-solids.platformSides`, decided from `world/track-atlas.ts`, and is
+ * imported above -- the deck, the collision prism, the access stair and
+ * `riding.PlatformField` all read the one answer. Read that function's header
+ * for what discharged the objection.
  */
-function platformSides(_plan: StationPlan): number[] {
-  return [-1, 1];
-}
 
 function writePlatforms(
   concrete: Solid,
@@ -3099,7 +3081,12 @@ function writePlatforms(
 
   for (const side of platformSides(plan)) {
     const inner = PLATFORM_INNER;
-    const outer = PLATFORM_INNER + PLATFORM_WIDTH;
+    // The back of the passenger platform, which is `PLATFORM_WIDTH` where there
+    // is room for it and the slot where there is not. Everything below hangs off
+    // this rather than off the constant, so a narrowed platform's canopy and
+    // furniture move in with the deck instead of standing over the neighbouring
+    // train. See `rail-solids.platformBack`.
+    const outer = platformBack(plan, side);
     // The coping: a 25 mm lip along the platform edge.
     //
     // It is the smallest object in this file and it earns its six quads for the
@@ -3126,7 +3113,8 @@ function writePlatforms(
     const rise = top + CANOPY_HEIGHT;
     frameBox(
       canopy, f, -C, C,
-      (inner - CANOPY_OVERHANG) * side, (outer + CANOPY_OVERHANG) * side,
+      (inner - CANOPY_OVERHANG) * side,
+      Math.min(outer + CANOPY_OVERHANG, plan.slot[side < 0 ? 0 : 1]) * side,
       rise - 0.28, rise,
     );
     for (const t of [-C + 3, -C / 3, C / 3, C - 3]) {
@@ -3165,9 +3153,12 @@ function writePlatformFurniture(
 ): void {
   const f = plan.station;
   const top = plan.top;
-  const back = PLATFORM_INNER + PLATFORM_WIDTH;
 
   for (const side of platformSides(plan)) {
+    // Per side, because the two sides of one station routinely get different
+    // slots: an edge road keeps the full platform and the road beside it may
+    // have four metres to share. See `rail-solids.platformBack`.
+    const back = platformBack(plan, side);
     const at = (o: number): number => o * side;
 
     // Seats: a slatted bench with a back, against the rear of the platform.

@@ -62,6 +62,87 @@
  */
 
 import type { RailBake, RailDirection } from '../game/rail.ts';
+import { runBudget, type TrackAtlas } from './track-atlas.ts';
+
+/**
+ * The narrowest strip of platform worth building, metres of deck.
+ *
+ * ---------------------------------------------------------------------------
+ * A metre and a quarter, and the number is a body. `player/controller`'s capsule
+ * is 0.4 m across and `RAIL-CORRIDOR.md` is explicit that *"where no slot fits,
+ * no platform is built"* -- so the question is not what looks like a platform,
+ * it is what a passenger can stand on without being inside the train beside
+ * them. Two capsule widths and a margin is that, and it lands where the measured
+ * budgets are bimodal: an interior side of a 4 m pair gets 1.78 m of budget
+ * against a 1.62 m inner face, which is 0.16 m of deck and is refused, while a
+ * corridor edge gets the full 9.4 m. Almost nothing sits between the two.
+ *
+ * Exported from here rather than from either caller because `rail-solids` and
+ * `riding` both decide it and the whole point of the pair is that they decide it
+ * the same.
+ */
+export const MIN_PLATFORM_DECK = 1.25;
+
+/**
+ * How far out a platform may reach on each side of a running line: `[-1, +1]`.
+ *
+ * Zero on a side where what the budget leaves is under `MIN_PLATFORM_DECK`,
+ * which is a refusal: a station with one platform is honest and a platform
+ * inside a train is not.
+ *
+ * **The worst budget over the platform's own length**, not the budget at its
+ * anchor -- see `track-atlas.runBudget`. A platform is one object and is either
+ * clear along all of it or clear along none of it.
+ *
+ * `inner` and `outer` are the caller's own platform dimensions rather than
+ * imports, because the two callers are on opposite sides of an import cycle:
+ * `rail-solids` reads `riding`'s `PLATFORM_OUTER_M` and `riding` cannot
+ * therefore read back. `verifyRailGeometry` asserts the two callers pass the
+ * same numbers, which is the check that keeps that survivable.
+ */
+export function platformSlots(
+  bake: RailBake,
+  atlas: TrackAtlas,
+  ref: SpineRef | null,
+  reach: number,
+  inner: number,
+  outer: number,
+): [number, number] {
+  // No polyline to measure against: the anchor is one the network never reaches
+  // and there is nothing beside it either. It keeps what it has always had.
+  if (ref === null) return [outer, outer];
+  const dir = bake.lines[ref.line].dirs[ref.dir];
+  const first = dir.vertexOff;
+  const last = dir.vertexOff + dir.vertexCount - 1;
+  const c = bake.cum;
+  let v0 = last;
+  let v1 = first;
+  for (let v = first; v <= last; v++) {
+    if (c[v] < ref.s - reach || c[v] > ref.s + reach) continue;
+    if (v < v0) v0 = v;
+    if (v > v1) v1 = v;
+  }
+  if (v0 > v1) {
+    // Shorter than one polyline edge. The nearest vertex speaks for it: a
+    // stretch with no vertex in it is straight, and its neighbour distance does
+    // not change along a straight.
+    let best = first;
+    let bd = Infinity;
+    for (let v = first; v <= last; v++) {
+      const d = Math.abs(c[v] - ref.s);
+      if (d < bd) { bd = d; best = v; }
+    }
+    v0 = best;
+    v1 = best;
+  }
+  const out: [number, number] = [0, 0];
+  for (let i = 0; i < 2; i++) {
+    const side = i === 0 ? -1 : 1;
+    const room = Math.min(outer, runBudget(atlas, v0, v1, side));
+    out[i] = room - inner >= MIN_PLATFORM_DECK ? room : 0;
+  }
+  return out;
+}
 
 /**
  * How far a platform's own running line may depart from its chord before the

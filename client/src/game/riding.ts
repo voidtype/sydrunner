@@ -182,6 +182,10 @@ import {
 // deck's outer edge and the rim of the terrain carve have to be *the same
 // number*: see `PLATFORM_OUTER_M`, where their difference was the bug.
 import { STATION_HALF_WIDTH } from '../world/rail-cut.ts';
+// WORKSTREAM AG: how much of the corridor this platform's track may have. See
+// `PlatformSite.outer` -- both ends of the wire read this one answer.
+import { atlasFor } from '../world/track-atlas.ts';
+import { platformSlots } from '../world/platform-spine.ts';
 
 // --- The two constants that belong to the controller ---------------------------------
 
@@ -1109,6 +1113,28 @@ export interface PlatformSite {
   /** Unit plan heading of the track here. The platform runs along it. */
   ux: number;
   uz: number;
+  /**
+   * How far the deck reaches on each side, metres: `[-1 side, +1 side]`.
+   *
+   * ---------------------------------------------------------------------------
+   * **This is the other half of `rail-solids.StationPlan.slot`, and the two are
+   * the same call.** The deck used to run to `PLATFORM_OUTER_M` on both sides
+   * unconditionally, here and in the geometry, and on the inside of a two-track
+   * corridor that put it straight through the neighbouring train -- 59.6 km of
+   * running line, measured, across 162 of 361 sites.
+   *
+   * It has to be carried *here* and not only in the geometry, and that is the
+   * lesson `world/rail-geo.platformSides` records: the browser draws platforms
+   * and this field is what both ends *stand* on, so a side the geometry stops
+   * drawing while the field still answers for it is a metre of invisible floor
+   * -- a worse bug than the one being fixed, and the reason the first attempt at
+   * this was reverted within the hour. `world/track-atlas.ts` is what made the
+   * decision available to a process with no renderer, and `platformSlots` is the
+   * one function both ends call.
+   *
+   * Zero means no platform on that side.
+   */
+  outer: [number, number];
 }
 
 /**
@@ -1253,8 +1279,10 @@ export class PlatformField {
       const dz = z - site.z;
       const along = dx * site.ux + dz * site.uz;
       if (along < -PLATFORM_HALF_LENGTH_M || along > PLATFORM_HALF_LENGTH_M) continue;
-      const across = Math.abs(dx * -site.uz + dz * site.ux);
-      if (across < PLATFORM_INNER_M || across > PLATFORM_OUTER_M) continue;
+      const signed = dx * -site.uz + dz * site.ux;
+      const across = Math.abs(signed);
+      // `site.outer`, per side, rather than one constant for both. See it.
+      if (across < PLATFORM_INNER_M || across > site.outer[signed < 0 ? 0 : 1]) continue;
       const top = site.y + PLATFORM_TOP_M;
       if (top > best) best = top;
     }
@@ -1303,7 +1331,6 @@ export class PlatformField {
     // boundary the comparison uses.
     const INSET = 0.1;
     const lo = PLATFORM_INNER_M + INSET;
-    const hi = PLATFORM_INNER_M + PLATFORM_WIDTH_M - INSET;
     const end = PLATFORM_HALF_LENGTH_M - INSET;
     let bestMove = reach;
     let bestX = 0;
@@ -1314,7 +1341,18 @@ export class PlatformField {
       const dz = z - site.z;
       let along = dx * site.ux + dz * site.uz;
       let across = dx * -site.uz + dz * site.ux;
-      const side = across < 0 ? -1 : 1;
+      let i = across < 0 ? 0 : 1;
+      // **A rider is put down on a side that exists.** Where the slot refused
+      // this side, the platform is on the other one, and clamping to the side
+      // the carriage door happens to face would set a body down in the six-foot
+      // between two running lines with the field answering `-Infinity` for it --
+      // which is precisely the silent fall-through this method was written to
+      // end, reintroduced by the narrowing. See `PlatformSite.outer`.
+      if (site.outer[i] <= 0) i = 1 - i;
+      if (site.outer[i] <= 0) continue;
+      const side = i === 0 ? -1 : 1;
+      const hi = Math.min(PLATFORM_INNER_M + PLATFORM_WIDTH_M, site.outer[i]) - INSET;
+      if (hi <= lo) continue;
       let mag = across < 0 ? -across : across;
       if (along < -end) along = -end;
       else if (along > end) along = end;
@@ -1376,9 +1414,13 @@ export class PlatformField {
       const dz = z - site.z;
       const along = dx * site.ux + dz * site.uz;
       if (along < -PLATFORM_HALF_LENGTH_M || along > PLATFORM_HALF_LENGTH_M) continue;
-      // The plan normal. Both platforms of a pair, so the sign is dropped.
-      const across = Math.abs(dx * -site.uz + dz * site.ux);
-      if (across < PLATFORM_INNER_M || across > PLATFORM_OUTER_M) continue;
+      // The plan normal. The sign is kept now, because the two sides of a pair
+      // no longer reach the same distance -- one may be a corridor edge with the
+      // full deck and the other four metres from a running line. See
+      // `PlatformSite.outer`.
+      const signed = dx * -site.uz + dz * site.ux;
+      const across = Math.abs(signed);
+      if (across < PLATFORM_INNER_M || across > site.outer[signed < 0 ? 0 : 1]) continue;
       const top = site.y + PLATFORM_TOP_M;
       if (feetY < top - PLATFORM_STEP_M || feetY > top + PLATFORM_REACH_M) continue;
       if (top > best) best = top;
@@ -1409,12 +1451,24 @@ export const PLATFORM_REACH_M = 1.6;
 export function buildPlatforms(bake: RailBake): PlatformField {
   const field = new PlatformField();
   const at = createTrainPose();
-  for (const line of bake.lines) {
-    for (const dir of line.dirs) {
+  // Shared with `rail-solids.buildNetwork` by identity rather than by argument.
+  // See `track-atlas.atlasFor` for why that is a correctness property and not a
+  // saving: the drawn deck and the standable deck have to be one decision.
+  const atlas = atlasFor(bake);
+  for (let li = 0; li < bake.lines.length; li++) {
+    const line = bake.lines[li];
+    for (let di = 0; di < line.dirs.length; di++) {
+      const dir = line.dirs[di];
       for (const stop of dir.stops) {
         if (!stop.calls) continue;
         sampleAlong(bake, dir, stop.s, at);
-        field.add({ name: stop.name, x: at.x, z: at.z, y: at.y, ux: at.dx, uz: at.dz });
+        field.add({
+          name: stop.name, x: at.x, z: at.z, y: at.y, ux: at.dx, uz: at.dz,
+          outer: platformSlots(
+            bake, atlas, { line: li, dir: di, s: stop.s },
+            PLATFORM_HALF_LENGTH_M, PLATFORM_INNER_M, PLATFORM_OUTER_M,
+          ),
+        });
       }
     }
   }

@@ -211,8 +211,61 @@ export function ownsAlignment(atlas: TrackAtlas, v: number): boolean {
   return atlas.owner[v] === v;
 }
 
+/**
+ * The budget a **run** of track gets on one side: the worst of it, over the run.
+ *
+ * ---------------------------------------------------------------------------
+ * **The worst and not the average, and the difference is the whole bug at
+ * Wollstonecraft.** A platform is one object 160 m long, so it is either clear
+ * of the neighbouring train for its whole length or it is not clear at all. A
+ * mean would let the middle of a platform be legal because its two ends have
+ * room, which is exactly the geometry that fails: two tracks converging through
+ * a station have plenty of space at one end and none at the other, and the
+ * offending forty metres is what the owner rides through.
+ *
+ * `v0` and `v1` are vertex indices on one direction's polyline, inclusive. A run
+ * that covers no vertex at all -- a short platform between two distant vertices
+ * -- answers from the nearer of them, because a stretch of track with no vertex
+ * in it is straight and its neighbour distance does not change along it.
+ */
+export function runBudget(atlas: TrackAtlas, v0: number, v1: number, side: number): number {
+  let worst = Infinity;
+  for (let v = v0; v <= v1; v++) {
+    const b = corridorBudget(atlas, v, side);
+    if (b < worst) worst = b;
+  }
+  return Number.isFinite(worst) ? worst : corridorBudget(atlas, v0, side);
+}
+
 const CELL_M = 32;
 const cellKey = (cx: number, cz: number): number => (cx & 0xfffff) * 0x100000 + (cz & 0xfffff);
+
+/**
+ * The atlas for a bake, built once however many callers ask.
+ *
+ * ---------------------------------------------------------------------------
+ * **A cache, and it is here for correctness before it is here for the 90 ms.**
+ * Three separate things need the atlas -- `rail-solids.buildNetwork`, which
+ * gives it to the writers; `riding.buildPlatforms`, which gives it to the field
+ * both ends stand on; and `world/corridor.ts` -- and they are constructed in a
+ * different order in `main.ts`, in `server/world.ts` and in the checks. Passing
+ * it between them would make that order a thing somebody has to get right, and
+ * two of them building their own would put a platform's drawn edge and its
+ * standable edge on two objects that merely happen to agree.
+ *
+ * Keyed on the bake by identity, so a process that loads a second bake -- which
+ * `perf-harness.ts` and the checks do -- gets a second atlas rather than the
+ * first one's answers about somebody else's railway.
+ */
+const cache = new WeakMap<object, TrackAtlas>();
+
+export function atlasFor(bake: AtlasBake): TrackAtlas {
+  const hit = cache.get(bake);
+  if (hit !== undefined) return hit;
+  const built = buildTrackAtlas(bake);
+  cache.set(bake, built);
+  return built;
+}
 
 /**
  * Build the atlas. One pass at decode, and the only pass.
@@ -357,36 +410,26 @@ export function buildTrackAtlas(bake: AtlasBake): TrackAtlas {
     while (owner[v] !== owner[owner[v]] && hops++ < r) owner[v] = owner[owner[v]];
   }
 
-  // --- 2. The gap to the nearest *other* physical track, each side.
+  // --- 2. The cross-section here, and the two gaps that fall out of it.
   //
-  // Coincident edges are skipped: they are this same alignment wearing another
-  // service's number, and budgeting against your own rails would give every
-  // shared track a budget of nothing. That is the one thing the ownership pass
-  // above buys the budget, and it is why the two are in this order.
-  for (let v = 0; v < n; v++) {
-    if (rank[v] < 0) continue;
-    eachNear(v, (_w, _wr, lateral, dist, par) => {
-      if (dist <= COINCIDENT_M) return;
-      if (par < PARALLEL_COS) return;
-      if (lateral < 0) { if (dist < gapLeft[v]) gapLeft[v] = dist; }
-      else if (dist < gapRight[v]) gapRight[v] = dist;
-    });
-  }
-
-  // --- 3. The cross-section here: how many roads, and which one am I.
+  // **One pass for both, because both are the same walk.** The gap is the
+  // nearest distinct road each side and the cross-section is all of them, so
+  // asking twice was 50 ms of the atlas's build for an answer the first walk
+  // already had. Coincident edges are skipped throughout: they are this same
+  // alignment wearing another service's number, and budgeting against your own
+  // rails would give every shared track a budget of nothing. That is what the
+  // ownership pass above buys, and why the two are in this order.
   //
-  // Local, and see `TrackAtlas.corridorTracks` for the global partition that was
-  // tried first and came out as one corridor for the whole city. The lateral
-  // offsets of the distinct neighbouring alignments are collected, deduplicated
-  // at `COINCIDENT_M` so a shared alignment is one road rather than two, and the
-  // ordinal is simply how many of them are to the `-1` side.
+  // The offsets are deduplicated at `COINCIDENT_M` so a shared alignment counts
+  // as one road, and the ordinal is how many of them lie to the `-1` side.
   const lat: number[] = [];
   for (let v = 0; v < n; v++) {
     if (rank[v] < 0) continue;
     lat.length = 0;
     eachNear(v, (_w, _wr, lateral, dist, par) => {
-      if (dist > CORRIDOR_M || par < PARALLEL_COS) return;
-      if (dist <= COINCIDENT_M) return;
+      if (par < PARALLEL_COS || dist <= COINCIDENT_M) return;
+      if (lateral < 0) { if (dist < gapLeft[v]) gapLeft[v] = dist; }
+      else if (dist < gapRight[v]) gapRight[v] = dist;
       for (const o of lat) if (Math.abs(o - lateral) <= COINCIDENT_M) return;
       lat.push(lateral);
     });

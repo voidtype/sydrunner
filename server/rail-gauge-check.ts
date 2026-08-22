@@ -63,6 +63,8 @@ import {
 import {
   buildNetwork,
   planStation,
+  platformBack,
+  platformSides,
   stationSolids,
   framePoint,
   PLATFORM_INNER,
@@ -414,13 +416,17 @@ for (const st of net.stations) {
   const top = st.trackY + PLATFORM_HEIGHT;
   const L = PLATFORM_HALF_LENGTH;
   const inner = PLATFORM_INNER;
-  const outer = PLATFORM_INNER + PLATFORM_WIDTH;
   const deco = (kind: string, t0: number, t1: number, o0: number, o1: number, y0: number, y1: number): void =>
     push({
       kind, where: st.name, f: st, t0, t1, o0, o1, y0, y1,
       ownUx: st.ux, ownUz: st.uz, ownX: st.x, ownZ: st.z, solid: false,
     });
-  for (const side of [-1, 1]) {
+  // The same sides and the same narrowed back the writers use, read off the
+  // plan rather than restated: an audit that measured the platform the code used
+  // to draw would go green while the world stayed broken.
+  for (const side of platformSides(plan)) {
+    const outer = platformBack(plan, side);
+    const slot = plan.slot[side < 0 ? 0 : 1];
     deco('platform coping', -L, L, inner * side, (inner + 0.14) * side, top, top + 0.025);
     deco(
       'tactile strip', -L, L,
@@ -429,7 +435,7 @@ for (const st of net.stations) {
     );
     const C = CANOPY_HALF_LENGTH;
     const rise = top + CANOPY_HEIGHT;
-    deco('canopy', -C, C, (inner - CANOPY_OVERHANG) * side, (outer + CANOPY_OVERHANG) * side, rise - 0.28, rise);
+    deco('canopy', -C, C, (inner - CANOPY_OVERHANG) * side, Math.min(outer + CANOPY_OVERHANG, slot) * side, rise - 0.28, rise);
     for (const t of [-C + 3, -C / 3, C / 3, C - 3]) {
       const o = ((inner + outer) / 2) * side;
       deco('canopy column', t - 0.11, t + 0.11, o - 0.11, o + 0.11, top, rise - 0.28);

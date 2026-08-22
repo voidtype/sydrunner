@@ -97,7 +97,8 @@ import { pointInPolygon } from '../player/collision.ts';
 import { DECK_THICKNESS_M } from './road-deck.ts';
 import { RAIL_HALF_M } from './envelope.ts';
 import { PLATFORM_OUTER_M, samePlatform } from '../game/riding.ts';
-import type { SpineRef } from './platform-spine.ts';
+import { platformSlots, type SpineRef } from './platform-spine.ts';
+import { atlasFor, type TrackAtlas } from './track-atlas.ts';
 
 /**
  * What `world/rail-geo.ts` hands `CollisionWorld`, and what this file evaluates.
@@ -499,6 +500,15 @@ export interface RailNetwork {
   chunks: Map<string, Chunk>;
   /** What the deduplication actually saved. Printed at boot. */
   directedSegments: number;
+  /**
+   * How much of the corridor each track may build in. `RAIL-CORRIDOR.md`.
+   *
+   * On the network rather than passed to the writers that want it, because the
+   * writers that want it are six deep and every one of them already has a
+   * `RailNetwork`. Built here so both ends build it from the identical bake at
+   * the identical moment, which is the same argument `buildNetwork` itself makes.
+   */
+  atlas: TrackAtlas;
 }
 
 export function chunkKey(cx: number, cz: number): string {
@@ -528,6 +538,9 @@ export function bucket(chunks: Map<string, Chunk>, key: string): Chunk {
  * 60 km from the origin.
  */
 export function buildNetwork(bake: RailBake): RailNetwork {
+  // First, because `planStation` reads it and because a network without it
+  // would be a network whose platforms do not know what is beside them.
+  const atlas = atlasFor(bake);
   const segments: Segment[] = [];
   const seen = new Map<string, number>();
   const p = bake.vertices;
@@ -750,7 +763,7 @@ export function buildNetwork(bake: RailBake): RailNetwork {
     bucket(chunks, chunkOf(station.x, station.z)).stations.push(index);
   }
 
-  return { bake, segments, portals, stations, chunks, directedSegments: directed };
+  return { bake, segments, portals, stations, chunks, directedSegments: directed, atlas };
 }
 
 /**
@@ -1022,6 +1035,37 @@ export interface StationPlan {
    */
   sideClear: [boolean, boolean];
   /**
+   * How far out the platform deck may reach on each side, metres: `[-1, +1]`.
+   *
+   * ---------------------------------------------------------------------------
+   * **This replaces a constant, and the constant was the report.** The deck ran
+   * to `riding.PLATFORM_OUTER_M` -- 9.4 m, the rim of the terrain carve -- on
+   * both sides of every anchor, unconditionally. The nearest parallel running
+   * line in this bake is at a **median of 4.05 m**, so on the inside of a
+   * two-track corridor the deck was drawn straight through the neighbouring
+   * train: measured before the change, 59.6 km of running line had a platform
+   * inside the car body, across 162 of the 361 platform sites. That is
+   * *"passing through a lot of rail assets, but the platforms are the worst"*,
+   * and it is not a curve, a station or a tuning value. It is one number used in
+   * a place where the answer varies.
+   *
+   * So the deck reaches the lesser of the old constant and
+   * `track-atlas.runBudget` over the platform's own length -- which on a
+   * corridor edge is the constant unchanged, and beside a neighbour is half the
+   * gap. Zero where what is left is too narrow to stand on; see
+   * `MIN_PLATFORM_DECK` for why that is a refusal and not a sliver.
+   *
+   * The value is the **outer face in the station's frame**, so a reader wanting
+   * the deck writes `PLATFORM_INNER * side` to `slot[i] * side` and has no
+   * arithmetic of its own to get wrong. `riding.PlatformField` carries the
+   * identical pair from the identical call, because a deck the geometry has
+   * narrowed and the field has not is a metre of invisible floor -- which is the
+   * exact failure `platformSides`' essay refused to ship, and is why that essay
+   * ends *"the honest fix is for `buildPlatforms` to decide the side, from the
+   * bake, where both ends can see it"*. The atlas is that.
+   */
+  slot: [number, number];
+  /**
    * The terrain under the station building, sampled at the building rather than
    * at the stair.
    *
@@ -1152,11 +1196,18 @@ export function planStation(
     if (!placed) housePush = 12;
   }
 
+  // How far the deck may reach on each side. See `StationPlan.slot`: this is the
+  // number that used to be `PLATFORM_OUTER_M` on both sides unconditionally, and
+  // the change is the end of *"the platforms are the worst"*.
+  const slot = platformSlots(
+    net.bake, net.atlas, station.spine, PLATFORM_HALF_LENGTH, PLATFORM_INNER, PLATFORM_OUTER_M,
+  );
+
   const hp = framePoint(station, houseAlong, (houseInner + housePush + HOUSE_WIDTH / 2) * houseSide, 0);
   const hg = rawGround(hp[0], hp[2]);
   return {
     station, mine, top, base, onBridge, landing, run, measured,
-    houseSide, houseAlong, housePush, sideClear,
+    houseSide, houseAlong, housePush, sideClear, slot,
     houseGround: Number.isFinite(hg) ? hg : landing[houseSide < 0 ? 0 : 1][0],
   };
 }
@@ -1303,7 +1354,11 @@ export function platformDeckSolids(plan: StationPlan, out: FrameSolid[]): void {
     out.push({
       f,
       t0: -PLATFORM_HALF_LENGTH, t1: PLATFORM_HALF_LENGTH,
-      o0: PLATFORM_INNER * side, o1: PLATFORM_OUTER_M * side,
+      // `plan.slot`, not `PLATFORM_OUTER_M`. On a corridor edge the two are the
+      // same number and nothing moves; beside a neighbouring running line the
+      // slot is half the gap and the deck stops out of the train's way. See
+      // `StationPlan.slot`.
+      o0: PLATFORM_INNER * side, o1: plan.slot[side < 0 ? 0 : 1] * side,
       y0: plan.base, y1: plan.top,
       kind: SOLID_PLATFORM_DECK,
     });
@@ -1471,15 +1526,55 @@ export function stationSolids(plan: StationPlan, out: FrameSolid[]): void {
 }
 
 /**
- * Which sides may carry a platform. `writePlatforms`' `platformSides`, moved
- * here because the deck, the stair and the field all have to agree about it.
+ * Which sides carry a platform. The deck, the stair, the canopy, the furniture
+ * and `riding.PlatformField` all read this one answer.
  *
- * See `StationPlan.sideClear`: the measurement is right, it is carried, and it
- * is deliberately not obeyed yet -- obeying it needs the *other* track's
- * platform to exist, which is a round of its own.
+ * ---------------------------------------------------------------------------
+ * **It returned `[-1, 1]` unconditionally, and the essay saying why is worth
+ * keeping because this is the round that discharges it.** Suppressing a blocked
+ * side was tried once and reverted the same hour, for a good reason:
+ *
+ *   > `game/riding.PlatformField` -- the analytic copy of the platform that
+ *   > **the server** holds and that `groundHeightAt` prefers over the terrain --
+ *   > answers for both sides of every site unconditionally, from the bake, with
+ *   > no notion of a side at all. Not drawing one leaves a platform that is
+ *   > still a floor on both ends of the wire and is invisible.
+ *
+ * ...and it ended: *"the honest fix is for `buildPlatforms` to decide the side,
+ * from the bake, where both ends can see it, and for this to follow."*
+ *
+ * `world/track-atlas.ts` is that. It is built from the bake, at decode, on both
+ * ends, and `platformSlots` turns it into the same pair of numbers here and in
+ * `buildPlatforms`. So a side that is not drawn is a side the field does not
+ * answer for either, and the invisible floor cannot happen.
+ *
+ * `StationPlan.sideClear` is still computed and still not obeyed. It asks a
+ * different question -- *is another track's loading gauge inside this strip* --
+ * and the slot subsumes it in every case measured, so acting on both would be
+ * two rules for one decision. It stays because its measurement is the expensive
+ * half and because a case where they disagree is worth finding.
  */
-export function platformSides(_plan: StationPlan): number[] {
-  return [-1, 1];
+/**
+ * The back of the **passenger platform** on this side, as against the back of
+ * the deck.
+ *
+ * Two different edges and they always were: `PLATFORM_WIDTH` is the platform a
+ * passenger walks on and `PLATFORM_OUTER_M` is the surface that runs back to the
+ * rim of the carve, which is 2.28 m of extra floor that exists so there is no
+ * slot behind the platform to fall into. The coping, the tactile strip, the
+ * canopy and every piece of furniture are placed against *this* one, and where
+ * the slot has narrowed the deck they move in with it rather than hanging over
+ * the edge of a platform that is no longer under them.
+ */
+export function platformBack(plan: StationPlan, side: number): number {
+  return Math.min(PLATFORM_INNER + PLATFORM_WIDTH, plan.slot[side < 0 ? 0 : 1]);
+}
+
+export function platformSides(plan: StationPlan): number[] {
+  const out: number[] = [];
+  if (plan.slot[0] > 0) out.push(-1);
+  if (plan.slot[1] > 0) out.push(1);
+  return out;
 }
 
 // --- The corridor: the trench wall and the viaduct ------------------------------------

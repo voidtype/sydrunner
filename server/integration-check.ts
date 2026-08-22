@@ -19315,7 +19315,14 @@ async function checkRiding(): Promise<void> {
             );
             if (dup) continue;
             seen.push({ name: stop.name, x: at.x, z: at.z });
-            radial.add({ name: stop.name, x: at.x, z: at.z, y: at.y, ux: at.dx, uz: at.dz });
+            // The full deck on both sides, because this control is about the
+            // *merge rule* and not about the slot: it reproduces the radial
+            // merge the field used to do, and giving it real slots would change
+            // what is being compared. See `riding.PlatformSite.outer`.
+            radial.add({
+              name: stop.name, x: at.x, z: at.z, y: at.y, ux: at.dx, uz: at.dz,
+              outer: [ride1.PLATFORM_OUTER_M, ride1.PLATFORM_OUTER_M],
+            });
           }
         }
       }
