@@ -3154,6 +3154,7 @@ export class CombatAudio {
         this.engineIdleAt = t;
         idle.own.out.gain.setTargetAtTime(0.0001, t, ENGINE_GLIDE_S);
         idle.skid.gain.setTargetAtTime(0.0001, t, ENGINE_GLIDE_S);
+        idle.roll.gain.setTargetAtTime(0.0001, t, ENGINE_GLIDE_S);
         idle.bed.gain.setTargetAtTime(0.0001, t, ENGINE_GLIDE_S);
         for (const chain of idle.voices) chain.out.gain.setTargetAtTime(0.0001, t, ENGINE_GLIDE_S);
       } else if (t - this.engineIdleAt > ENGINE_IDLE_S) {
@@ -3174,14 +3175,15 @@ export class CombatAudio {
     // The local car: no distance and no pan, because the listener is sitting in
     // it. `bark`'s convention for the local player exactly -- the event is not
     // given a distance rather than given a distance of zero.
-    this.engineChain(rig.own, mix.own, mix.own.active ? ENGINE_OWN_GAIN : 0, t);
+    this.engineChain(rig.own, mix.own, mix.own.active ? ENGINE_OWN_GAIN * ENGINE_TRIM : 0, t);
     const n = Math.min(rig.voices.length, mix.voices.length);
     for (let i = 0; i < n; i++) {
       const voice = mix.voices[i];
-      this.engineChain(rig.voices[i], voice, voice.active ? ENGINE_VOICE_GAIN * voice.gain : 0, t);
+      this.engineChain(rig.voices[i], voice, voice.active ? ENGINE_VOICE_GAIN * ENGINE_TRIM * voice.gain : 0, t);
     }
-    rig.skid.gain.setTargetAtTime(ENGINE_SKID_GAIN * mix.skid, t, ENGINE_GLIDE_S);
-    rig.bed.gain.setTargetAtTime(ENGINE_BED_GAIN * mix.bed, t, ENGINE_GLIDE_S);
+    rig.skid.gain.setTargetAtTime(ENGINE_SKID_GAIN * ENGINE_TRIM * mix.skid, t, ENGINE_GLIDE_S);
+    rig.roll.gain.setTargetAtTime(ENGINE_ROLL_GAIN * ENGINE_TRIM * mix.roll, t, ENGINE_GLIDE_S);
+    rig.bed.gain.setTargetAtTime(ENGINE_BED_GAIN * ENGINE_TRIM * mix.bed, t, ENGINE_GLIDE_S);
   }
 
   /** One chain, from one voice. Six parameter moves and not a node between them. */
@@ -3242,6 +3244,33 @@ export class CombatAudio {
     rubber.connect(scrub).connect(skid);
     sources.push(rubber);
 
+    // --- The rolling tyres. The same noise buffer, the opposite filter: a
+    // high-pass rather than a narrow band, because tread on bitumen is wide and
+    // dull where a skid is narrow and singing. Through the duck, like the skid,
+    // and through a panner placed behind and below the seat -- the only
+    // positioned node in the engine, because it is the only sound whose
+    // direction the driver can name. See `ENGINE_ROLL_HZ`.
+    const roll = ctx.createGain();
+    roll.gain.value = 0.0001;
+    const rear = ctx.createPanner();
+    rear.panningModel = 'HRTF';
+    rear.distanceModel = 'linear';
+    rear.refDistance = 1;
+    rear.maxDistance = 10;
+    rear.positionX.value = 0;
+    rear.positionY.value = -0.6;
+    rear.positionZ.value = 1.6;
+    roll.connect(rear).connect(duck);
+    const tread = ctx.createBufferSource();
+    tread.buffer = noise;
+    tread.loop = true;
+    const lowCut = ctx.createBiquadFilter();
+    lowCut.type = 'highpass';
+    lowCut.frequency.value = ENGINE_ROLL_HZ;
+    lowCut.Q.value = 0.707;
+    tread.connect(lowCut).connect(roll);
+    sources.push(tread);
+
     // --- The pool.
     const voices: EngineChain[] = [];
     for (let i = 0; i < pool; i++) voices.push(this.engineNodes(ctx, noise, master, true, sources));
@@ -3273,7 +3302,7 @@ export class CombatAudio {
 
     const now = ctx.currentTime;
     for (const node of sources) node.start(now);
-    return { own, duck, skid, voices, bed, sources };
+    return { own, duck, skid, roll, voices, bed, sources };
   }
 
   /** One engine's ten nodes. See the three layers in the section header. */
@@ -3365,6 +3394,7 @@ export class CombatAudio {
         rig.own.pan?.disconnect();
         rig.duck.disconnect();
         rig.skid.disconnect();
+        rig.roll.disconnect();
         rig.bed.disconnect();
         for (const chain of rig.voices) {
           chain.out.disconnect();
@@ -3831,6 +3861,8 @@ interface EngineRig {
   duck: GainNode;
   /** The tyres, also through `duck`. See `carsound.SKID_SPEED_MIN`. */
   skid: GainNode;
+  /** The tyres rolling, behind the seat. See `ENGINE_ROLL_HZ`. */
+  roll: GainNode;
   /** The pool. `carsound.ENGINE_VOICES` of them. */
   voices: EngineChain[];
   /** The city. See `carsound.ts` section 5. */
@@ -3919,6 +3951,35 @@ const ENGINE_PAN_S = 0.12;
  */
 const ENGINE_OWN_GAIN = 0.30;
 const ENGINE_VOICE_GAIN = 0.22;
+
+/**
+ * One trim on the whole engine mix, and it is the owner's number.
+ *
+ * The ratios above were argued against the siren and the rotor, and the
+ * arithmetic against the limiter in the section header is correct -- and the
+ * owner drove the first cut and said *"the cars are c 6x too loud"*. The ratios
+ * are right; the absolute was not. One multiplier here rather than six edited
+ * constants, so the argument for the ratios stays readable and the thing that
+ * changed is the thing he asked for. Applied to the local car, the pool, the
+ * tyres and the bed alike, because "the cars" was all of them.
+ */
+const ENGINE_TRIM = 1 / 6;
+
+/**
+ * The rolling tyres: level and where the low-cut sits.
+ *
+ * *"some quiet low-cut white noise from the rear wheels."* The road noise --
+ * see `carsound.rollLevel` for why it exists and how it scales with speed. A
+ * high-pass at 700 Hz is the low-cut: it takes out everything the engine's
+ * sawtooth and lump already own, so the two layers never fight over the same
+ * octave and the noise reads as tread on bitumen rather than as the engine
+ * getting windier. Quiet means quiet -- half the skid's level, before the trim.
+ * Positioned behind and below the listener, because rear wheels are; the
+ * `AudioListener` is never re-oriented, so "behind" is always behind the
+ * driver's seat regardless of where the car is pointing, which is exactly right.
+ */
+const ENGINE_ROLL_GAIN = 0.05;
+const ENGINE_ROLL_HZ = 700;
 
 /**
  * The tyres: level, where the scrub sits and how narrow.

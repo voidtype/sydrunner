@@ -395,6 +395,8 @@ export interface CarSoundMix {
   own: EngineVoice;
   /** The local car's tyres, 0..1. See `SKID_SPEED_MIN`. */
   skid: number;
+  /** The local car's tyres rolling on the road, 0..1. See `rollLevel`. */
+  roll: number;
   /** The pool. Always `ENGINE_VOICES` long and always the same objects. */
   voices: EngineVoice[];
   /** The city, 0..1. See section 5. */
@@ -451,7 +453,7 @@ function createVoice(): EngineVoice {
 export function createCarSoundMix(): CarSoundMix {
   const voices: EngineVoice[] = [];
   for (let i = 0; i < ENGINE_VOICES; i++) voices.push(createVoice());
-  return { own: createVoice(), skid: 0, voices, bed: 0, wanted: false };
+  return { own: createVoice(), skid: 0, roll: 0, voices, bed: 0, wanted: false };
 }
 
 /**
@@ -502,10 +504,78 @@ function clamp01(v: number): number {
  * the list of things the two engines are not required to agree about.
  */
 export function engineRate(speed: number): number {
+  return engineRateIn(speed, gearFor(speed));
+}
+
+// --- The gearbox ------------------------------------------------------------------
+//
+// The owner, driving the first cut: *"car needs to change gear sounds too ...
+// like its changing gear ... doesnt have to be real gears just after a point."*
+//
+// A single monotonic curve from idle to redline is what a CVT sounds like, and a
+// CVT is the least satisfying thing a car can sound like: the pitch only ever
+// goes up, so nothing ever *happens*. What a gearbox gives the ear is a
+// sawtooth -- the revs climb, drop back, climb again -- and the drops are the
+// events. The speeds they land at do not have to be a real Corolla's; they have
+// to fall where a player actually drives, which is the same argument
+// `engineRate`'s essay makes about the curve's shape. So the shift points sit
+// where Sydney driving spends its time: two of them under 15 m/s, where every
+// corner exit and every set of lights lives.
+//
+// Each gear sweeps the same band of revs, `GEAR_DROP` of redline up to redline,
+// because that is what full-throttle acceleration through a box does and it is
+// what makes each shift read as "the same engine, a gear higher". First gear
+// alone starts from idle, so pulling away still rises from the 27 Hz lump rather
+// than snapping to 55 % of redline the moment the wheels turn.
+
+/** Speeds at which the box shifts up, m/s. Five gears; the last runs to the top speed. */
+export const GEAR_SHIFT_AT: readonly number[] = [7, 14, 23, 33];
+/** Where the revs land after a shift, as a fraction of redline. */
+export const GEAR_DROP = 0.55;
+/**
+ * How far below a shift point the speed must fall before the box shifts back
+ * down, m/s. A car held at exactly a shift point -- a speed limit, a following
+ * distance -- would otherwise change gear every frame, which is not a sound a
+ * car makes.
+ */
+export const GEAR_HYSTERESIS = 1.5;
+/** How long the throttle lifts on an upshift, seconds. The click in the sawtooth. */
+export const GEAR_LIFT_S = 0.16;
+
+/** Which gear a car at this speed is in, with no memory. Ambient cars and the checks. */
+export function gearFor(speed: number): number {
   const s = speed < 0 ? -speed : speed;
-  const u = clamp01(s / DRIVE_TOP_SPEED);
+  let g = 0;
+  while (g < GEAR_SHIFT_AT.length && s >= GEAR_SHIFT_AT[g]) g++;
+  return g;
+}
+
+/**
+ * Which gear a car with memory is in: the previous gear, held until the speed
+ * has clearly left its band. The own car's gearbox, so it does not hunt.
+ */
+export function gearNext(prev: number, speed: number): number {
+  const s = speed < 0 ? -speed : speed;
+  let g = prev;
+  while (g < GEAR_SHIFT_AT.length && s >= GEAR_SHIFT_AT[g]) g++;
+  while (g > 0 && s < GEAR_SHIFT_AT[g - 1] - GEAR_HYSTERESIS) g--;
+  return g;
+}
+
+/**
+ * The firing rate in a given gear. Within the gear's band the revs climb from
+ * `GEAR_DROP` of redline (idle, in first) to redline at the top of the band,
+ * with `engineRate`'s own square-root blend inside the band so the low end of
+ * each gear still feels like acceleration rather than a ramp.
+ */
+export function engineRateIn(speed: number, gear: number): number {
+  const s = speed < 0 ? -speed : speed;
+  const lo = gear <= 0 ? 0 : GEAR_SHIFT_AT[gear - 1];
+  const hi = gear >= GEAR_SHIFT_AT.length ? DRIVE_TOP_SPEED : GEAR_SHIFT_AT[gear];
+  const u = clamp01((s - lo) / (hi - lo));
   const shaped = 0.35 * u + 0.65 * Math.sqrt(u);
-  return 1 + (ENGINE_RATE_TOP - 1) * shaped;
+  const floor = gear <= 0 ? 1 : GEAR_DROP * ENGINE_RATE_TOP;
+  return floor + (ENGINE_RATE_TOP - floor) * shaped;
 }
 
 /**
@@ -561,6 +631,31 @@ export function bedLevel(moving: number): number {
   const n = moving > 0 ? moving : 0;
   return n / (n + BED_HALF);
 }
+
+/**
+ * How loud the tyres are *rolling*, 0..1 -- the road noise, not the squeal.
+ *
+ * The owner, driving the first cut: *"should have some quiet low-cut white
+ * noise from the rear wheels"*. That is a real thing a car does that the engine
+ * model above has no term for: tread on bitumen is broadband noise that rises
+ * with speed and sits behind you, and it is most of what you hear in a modern
+ * car at a cruise. It is the layer that makes a quiet engine still sound like a
+ * moving car.
+ *
+ * Rises with the square of speed over a short dead band, because rolling noise
+ * really does go roughly as v^2 and because a car creeping out of a parking bay
+ * makes none. Reaches 1 at `DRIVE_TOP_SPEED`. Monotonic and bounded, which
+ * `verifyCarSound` asserts; the level and the filter are `game/audio.ts`'s.
+ */
+export function rollLevel(speed: number): number {
+  const s = speed < 0 ? -speed : speed;
+  if (s <= ROLL_SPEED_MIN) return 0;
+  const v = clamp01((s - ROLL_SPEED_MIN) / (DRIVE_TOP_SPEED - ROLL_SPEED_MIN));
+  return v * v;
+}
+
+/** Below this the tyres roll silently: a car being parked, not driven. m/s. */
+export const ROLL_SPEED_MIN = 2;
 
 /** How much the tyres are complaining, 0..1. See `SKID_SPEED_MIN`. */
 export function skidLevel(speed: number, steer: number): number {
@@ -648,6 +743,10 @@ export class CarSoundField implements EngineSink {
   /** The local car's speed history and smoothed load, exactly as a slot's. */
   private ownLast = -1;
   private ownLoad = IDLE_LOAD;
+  /** The own car's gear, with memory. See `gearNext`. */
+  private ownGear = 0;
+  /** Seconds of throttle lift left after an upshift. See `GEAR_LIFT_S`. */
+  private ownLift = 0;
 
   /** How many voices sounded last frame. Diagnostics, and the check reads it. */
   voiced = 0;
@@ -825,21 +924,34 @@ export class CarSoundField implements EngineSink {
       const speed = l.ownSpeed < 0 ? -l.ownSpeed : l.ownSpeed;
       const accel = this.ownLast < 0 || dt <= 0 ? 0 : (speed - this.ownLast) / dt;
       this.ownLast = speed;
-      this.ownLoad = follow(this.ownLoad, engineLoad(speed, accel), dt);
+      // The gearbox. An upshift lifts the throttle for `GEAR_LIFT_S`, which is
+      // the one thing that makes a rate drop sound like a gear change rather
+      // than like the engine missing a beat; a downshift does not, because a
+      // box changing down under braking just drops the revs in.
+      const gear = gearNext(this.ownGear, speed);
+      if (gear > this.ownGear) this.ownLift = GEAR_LIFT_S;
+      this.ownGear = gear;
+      this.ownLift = this.ownLift > dt ? this.ownLift - dt : 0;
+      const load = this.ownLift > 0 ? 0 : engineLoad(speed, accel);
+      this.ownLoad = follow(this.ownLoad, load, dt);
       own.active = true;
       own.key = l.ownCar;
-      own.rate = engineRate(speed);
+      own.rate = engineRateIn(speed, gear);
       own.load = this.ownLoad;
       own.gain = 1;
       own.pan = 0;
       out.skid = skidLevel(speed, l.ownSteer);
+      out.roll = rollLevel(speed);
     } else {
       own.active = false;
       own.key = 0;
       own.gain = 0;
       this.ownLast = -1;
       this.ownLoad = IDLE_LOAD;
+      this.ownGear = 0;
+      this.ownLift = 0;
       out.skid = 0;
+      out.roll = 0;
     }
 
     // --- 4. Everything else, as one number. The seven that got chains are taken
@@ -931,7 +1043,11 @@ export function verifyCarSound(): string[] {
   for (let i = 0; i <= 200; i++) {
     const s = (i / 200) * DRIVE_TOP_SPEED;
     const r = engineRate(s);
-    if (!(r >= prev)) f.push(`engineRate not monotonic at ${s.toFixed(2)} m/s: ${r} < ${prev}`);
+    // A sawtooth, not a ramp: monotonic within a gear, and a drop at every
+    // shift point. See the gearbox section.
+    if (gearFor(s) === gearFor(s - 0.25) && !(r >= prev)) {
+      f.push(`engineRate falls inside a gear at ${s.toFixed(2)} m/s: ${r} < ${prev}`);
+    }
     if (r < 1 || r > ENGINE_RATE_TOP + 1e-9) f.push(`engineRate out of bounds at ${s.toFixed(2)}: ${r}`);
     prev = r;
   }
@@ -943,6 +1059,34 @@ export function verifyCarSound(): string[] {
   // crash impulse is still a car.
   if (engineRate(DRIVE_TOP_SPEED * 3) !== ENGINE_RATE_TOP) f.push('engineRate does not clamp above the top speed');
   if (engineRate(-20) !== engineRate(20)) f.push('engineRate is not symmetric in reverse');
+  // The gearbox: every shift point drops the revs, every gear reaches redline
+  // at its top, and the box with memory does not hunt at a boundary.
+  for (let g = 0; g < GEAR_SHIFT_AT.length; g++) {
+    const at = GEAR_SHIFT_AT[g];
+    if (!(engineRate(at - 0.01) > engineRate(at) + 0.5)) {
+      f.push(`no audible shift at ${at} m/s: ${engineRate(at - 0.01)} -> ${engineRate(at)}`);
+    }
+    if (Math.abs(engineRateIn(at, g) - ENGINE_RATE_TOP) > 1e-9) {
+      f.push(`gear ${g + 1} does not reach redline at the top of its band`);
+    }
+    if (Math.abs(engineRateIn(at, g + 1) - GEAR_DROP * ENGINE_RATE_TOP) > 1e-9) {
+      f.push(`gear ${g + 2} does not start at GEAR_DROP of redline`);
+    }
+  }
+  if (gearFor(0) !== 0 || gearFor(DRIVE_TOP_SPEED) !== GEAR_SHIFT_AT.length) f.push('gearFor is wrong at the ends');
+  {
+    // Hunting: oscillate a metre a second either side of a shift point and count changes.
+    const at = GEAR_SHIFT_AT[1];
+    let gear = gearNext(0, at - 3);
+    let changes = 0;
+    for (let i = 0; i < 200; i++) {
+      const next = gearNext(gear, at + (i % 2 === 0 ? 1 : -1));
+      if (next !== gear) changes++;
+      gear = next;
+    }
+    if (changes !== 1) f.push(`the own car's box hunts at a shift point: ${changes} change(s) in 200 frames`);
+    if (gearNext(gear, at - GEAR_HYSTERESIS - 0.5) !== 1) f.push('the box does not shift down once clearly below the point');
+  }
 
   prev = Infinity;
   for (let d = 0; d <= ENGINE_RANGE + 40; d += 0.5) {
@@ -1003,6 +1147,18 @@ export function verifyCarSound(): string[] {
   if (skidLevel(3, 1) !== 0) f.push('skidLevel squeals at walking pace');
   if (skidLevel(DRIVE_TOP_SPEED, 1) !== 1) f.push('skidLevel does not reach 1 at full lock and full speed');
   if (skidLevel(30, -1) !== skidLevel(30, 1)) f.push('skidLevel is not symmetric in the wheel');
+  if (rollLevel(0) !== 0 || rollLevel(ROLL_SPEED_MIN) !== 0) f.push('rollLevel rolls while parked');
+  if (rollLevel(DRIVE_TOP_SPEED) !== 1) f.push('rollLevel does not reach 1 at top speed');
+  if (rollLevel(DRIVE_TOP_SPEED * 2) !== 1) f.push('rollLevel is not bounded above top speed');
+  if (rollLevel(-20) !== rollLevel(20)) f.push('rollLevel is not symmetric in reverse');
+  {
+    let last = 0;
+    for (let v = 0; v <= DRIVE_TOP_SPEED; v += 0.5) {
+      const r = rollLevel(v);
+      if (r < last) { f.push(`rollLevel falls between ${v - 0.5} and ${v} m/s`); break; }
+      last = r;
+    }
+  }
 
   // --- The pool. A field, forty cars in a line, and the seven nearest.
   const mix = createCarSoundMix();
@@ -1201,6 +1357,7 @@ export function verifyCarSound(): string[] {
   solo.end(soloL, soloMix);
   if (soloMix.own.active) f.push('the local car is still running after the player got out');
   if (soloMix.skid !== 0) f.push('the tyres are still squealing after the player got out');
+  if (soloMix.roll !== 0) f.push('the tyres are still rolling after the player got out');
 
   return f;
 }
