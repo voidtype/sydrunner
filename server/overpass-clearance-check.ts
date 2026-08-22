@@ -95,23 +95,41 @@
  * ## The budget is a ratchet
  *
  * `CLEARANCE_BUDGET` is the shipped bake's own measurement, on
- * `undrawn-solids-check.ts`' terms: a fence and not a target. It is large today
- * because the bake it guards is the broken one -- the fix is in `decks.py` and
- * reaches players only through a retile, and a check that failed until then
- * would be a red light nobody could turn green and would therefore be turned
- * off. Whoever runs the retile lowers this to what the retile measures. Raising
- * it is how a handful becomes a thousand with nobody noticing.
+ * `undrawn-solids-check.ts`' terms: a fence and not a target. Whoever runs a
+ * retile lowers it to what that retile measures. Raising it is how a handful
+ * becomes a thousand with nobody noticing.
  *
- * Some of what is left after the retile cannot come down from `decks.py` at
- * all, and the budget has to keep room for it: a crossing where **neither** way
- * is tagged `bridge` has no deck to lift, and a bridge way 16 m long between
- * two ways that are not -- the Cahill onramp and its like -- has no length to
- * climb in. `decks.TOUCHDOWN_RAMP_GRADE`'s block has the measurement and
+ * **THE RETILE OF 2026-08-23 HAS RUN, AND IT DID NOT DO WHAT THE INNER RING
+ * SAID IT WOULD.** 1,646 tiles re-emitted -- every tile a deck's plan passes
+ * through -- carrying `decks._crossing_demand`. Measured here, over the whole
+ * 60 km bake, before and after:
+ *
+ *                        separations   under 5.0 m   under 4.5 m   clear p50
+ *     before                   1,373         1,306         1,297      0.17 m
+ *     after                    1,369         1,055         1,006      1.44 m
+ *
+ * A fifth of the defect, not the half the trade curve in
+ * `decks.TOUCHDOWN_RAMP_GRADE`'s block projected -- and that block says why in
+ * its own first line: **it was measured over the inner 8 km**, where 336 became
+ * 172 and the median went to 5.17 m. The network is not the inner ring. Outside
+ * it the population is motorway interchange -- the M7, the M5, the M12, Western
+ * Sydney Airport -- where a ramp is pinned to the ground at both ends and
+ * `_pin_ceiling` gives the clearance away rather than break a touchdown: the
+ * build log's own line reads **2,834 stations could not reach the clearance,
+ * worst 6.82 m short**, against `TOUCHDOWN_RAMP_GRADE` at 10%. The rule is
+ * right and the tuning is inner-city. Raising the ramp grade is the next lever
+ * and it is a trade against a cliff, so it wants its own round and its own
+ * curve measured out here rather than at Darling Harbour.
+ *
+ * Some of what is left cannot come down from `decks.py` at all, and the budget
+ * has to keep room for it: a crossing where **neither** way is tagged `bridge`
+ * has no deck to lift, and a bridge way 16 m long between two ways that are
+ * not -- the Cahill onramp and its like -- has no length to climb in.
  * `RAIL-VERTICAL.md` §6 is the precedent for naming a limit rather than
  * pretending it away.
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { decodeLanes } from '../client/src/game/traffic.ts';
 import { decodeStreetNames, translateStreetNames } from '../client/src/world/tile-decode.ts';
@@ -128,9 +146,10 @@ export const MIN_CLEARANCE_M = 5.0;
 /**
  * How many grade separations may give less than that, network-wide.
  *
- * The shipped bake's measurement. A ratchet: see the header.
+ * The shipped bake's measurement, 1,306 before the 2026-08-23 retile and this
+ * after it. A ratchet: see the header.
  */
-export const CLEARANCE_BUDGET = 1306;
+export const CLEARANCE_BUDGET = 1055;
 
 /**
  * And how many may be under `TRUCK_M`, the height a heavy vehicle needs.
@@ -142,7 +161,8 @@ export const CLEARANCE_BUDGET = 1306;
  * a truck and at 0 m it is closed to everything.
  */
 export const TRUCK_M = 4.5;
-export const TRUCK_BUDGET = 1297;
+/** 1,297 before the 2026-08-23 retile. A ratchet, like the one above. */
+export const TRUCK_BUDGET = 1006;
 
 /** How near a crossing a way's own vertex has to be to be the junction's. */
 export const JUNCTION_M = 1.0;
@@ -165,6 +185,28 @@ function flag(name: string, fallback: string): string {
 const WORST = Number(flag('worst', '30'));
 const NEAR = flag('near', '');
 const RADIUS = Number(flag('radius', '600'));
+/**
+ * Where to write the tile keys a retile would have to re-emit to fix what this
+ * convicts, one to a line, for `build --only @FILE`.
+ *
+ * A count is what gates; a *list of tiles* is what a round is planned from, and
+ * deriving it by eye off the clustered table is how a round misses a tile. The
+ * list is the crossing's own tile and every tile the way over it reaches.
+ *
+ * **It is a floor, and a low one, and the reason is the property this file
+ * relies on everywhere else.** A way span in the ways block is *clipped to its
+ * own tile* -- that is the third bullet in the header, and it is what makes a
+ * tile's roads a fact about that tile -- so `c.over` is one tile's worth of
+ * deck and never the run. Raising a deck moves its whole profile and not the
+ * metre over the crossing: `decks._demand_envelope` rolls the demand out along
+ * the run at the grade ceiling, so a lift at one crossing repaints geometry a
+ * kilometre away, in tiles nothing here can name. Over the shipped bake this
+ * emits 406 keys for 1,306 convicted crossings, against 2,000-odd tiles the
+ * pipeline's own `DeckNetwork.tile_keys()` knows carry a deck. **Scope a round
+ * from that, and use this to check it covers what the gate convicts.** See
+ * DEPLOY.md §B.
+ */
+const KEYS_OUT = flag('keys-out', '');
 const ROOT = process.env.SYDNEY_WORLD ?? new URL('../client/public/world', import.meta.url).pathname;
 
 const say = (s: string): void => console.log(s);
@@ -326,6 +368,8 @@ interface Crossing {
   /** A point along each way, clear of the crossing, so the two can be named apart. */
   overAt: [number, number];
   underAt: [number, number];
+  /** The way that is over, kept only for `--keys-out`. See `KEYS_OUT`. */
+  over: Way;
 }
 
 let centre: [number, number] | null = null;
@@ -410,6 +454,7 @@ for (const t of scope) {
             underId: under.osmId,
             overAt: alongFrom(ya >= yb ? aSeg : bSeg, x, z),
             underAt: alongFrom(ya >= yb ? bSeg : aSeg, x, z),
+            over,
           });
         }
       }
@@ -510,6 +555,32 @@ if (short.length > 0) {
   if (short.length > rows.length) {
     say(`  ... ${(short.length - rows.length).toLocaleString()} more, clustered at ${CLUSTER_M} m; --worst N for more`);
   }
+}
+
+// --- The retile scope, on request -------------------------------------------------------
+
+if (KEYS_OUT !== '') {
+  const keys = new Set<string>();
+  const add = (x: number, z: number): void => {
+    const t = tileAt(x, z);
+    if (t !== undefined) keys.add(t.key);
+  };
+  for (const c of short) {
+    add(c.x, c.z);
+    // The whole run of the deck that is too low, not the crossing's own tile:
+    // see `KEYS_OUT`. Sampled between vertices as well as at them, because a
+    // motorway way can carry a 600 m straight that steps over four tiles.
+    const w = c.over;
+    for (let i = 0; i + 1 < w.count; i++) {
+      const dx = w.x[i + 1] - w.x[i];
+      const dz = w.z[i + 1] - w.z[i];
+      const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / (SIZE / 4)));
+      for (let s = 0; s <= steps; s++) add(w.x[i] + (dx * s) / steps, w.z[i] + (dz * s) / steps);
+    }
+  }
+  writeFileSync(KEYS_OUT, [...keys].sort().join('\n') + '\n');
+  say('');
+  say(`  ${keys.size.toLocaleString()} tile keys written to ${KEYS_OUT} (a floor: see KEYS_OUT)`);
 }
 
 // --- THE CONTROL ----------------------------------------------------------------------
