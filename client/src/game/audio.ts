@@ -61,6 +61,7 @@
  */
 
 import type { RailAnnounceMix, RailVoice } from './rail-audio.ts';
+import type { CarSoundMix, EngineVoice } from './carsound.ts';
 import { screamGap } from './sunbutton.ts';
 
 /**
@@ -1044,6 +1045,23 @@ export class CombatAudio {
     // that reaches here is still a crash and has to be audible over a running
     // engine and a city: 0.25 at nothing, 1 at a write-off.
     const level = 0.25 + 0.75 * k;
+
+    // --- And the engine gets out of the way. See `engineUpdate`: `duck` is a
+    // gain node in the local car's chain that **nothing else ever writes**, which
+    // is the whole reason the duck can be a scheduled ramp rather than a piece of
+    // state the frame loop has to carry. A `setTargetAtTime` on the chain's own
+    // output would be overwritten by the mix on the next frame, 16 ms later, and
+    // the duck would never be heard.
+    //
+    // It is the local car only. A crash you are in should take the engine out
+    // from under you for a beat; a crash across the street should not reach into
+    // seven other cars' throttles.
+    const rig = this.engine;
+    if (rig) {
+      rig.duck.gain.cancelScheduledValues(t);
+      rig.duck.gain.setValueAtTime(1 - ENGINE_DUCK * k, t);
+      rig.duck.gain.linearRampToValueAtTime(1, t + ENGINE_DUCK_S);
+    }
 
     // --- The panel.
     const panel = ctx.createBufferSource();
@@ -3020,6 +3038,343 @@ export class CombatAudio {
     source.connect(g).connect(master);
     source.start(at);
   }
+
+  // --- The traffic ---------------------------------------------------------------
+  //
+  // **Synthesised, and an engine is the case the founding argument was written
+  // for.** The one departure at the top of this file is for *voice*, on the
+  // grounds that "Oi! Stop right there" is not two oscillators and an envelope. An
+  // engine is a firing pulse, a resonance and some induction noise; it is
+  // *literally* oscillators and filters, it has to change pitch continuously with
+  // a quantity the game already knows, and a sampled one would be a loop whose
+  // rpm, length and loudness were decided somewhere else and would have to be
+  // pitch-shifted and crossfaded to move with the car. That is more machinery than
+  // the synthesis is, and it sounds worse.
+  //
+  // `game/carsound.ts` decides *which* cars and *how loud*; this decides what one
+  // costs. The split is `heatUpdate`'s and `railAnnounce`'s -- the schedule half
+  // compiles into the Bun server and its check runs in both boot lists -- and the
+  // one number that crosses is a **rate**, a dimensionless multiple of an idling
+  // engine, so that the hertz below stay next to the oscillator they set.
+  //
+  // ---------------------------------------------------------------------------
+  // WHAT ONE ENGINE IS MADE OF. THREE LAYERS, AND THEY ARE THE THREE A REAL ONE
+  // HAS.
+  //
+  //   - **the firing pulse**, and it is most of the sound. A sawtooth at
+  //     `ENGINE_IDLE_HZ * rate` -- 27 Hz is a four-cylinder four-stroke at 810 rpm,
+  //     because a four-stroke fires twice a revolution -- through a low-pass that
+  //     opens with load. The fundamental is below hearing at idle and that is
+  //     correct: what you hear of an idling engine is its harmonics, and a
+  //     sawtooth is a harmonic series with nothing else in it.
+  //   - **the half-order lump.** A square an octave below the firing rate, at a
+  //     fifth of the level. Every four-stroke has energy at half its firing order
+  //     because the cylinders do not all breathe alike, and this one component is
+  //     the difference between "engine" and "buzzer". Take it out and the idle
+  //     goes smooth and electronic.
+  //   - **the induction roar.** The shared noise buffer through a bandpass at nine
+  //     times the firing rate, so the roar climbs with the revs rather than
+  //     sitting still under them. Its level *is* the load -- an engine under
+  //     throttle does not get much louder, it gets harsher, and this is where the
+  //     harshness comes from.
+  //
+  // The low-pass corner is the fourth thing that moves with load, and between them
+  // those four are why there is no separate "revving" sound: `game/carsound.ts`
+  // derives the load from the car's own acceleration, so an ambient Corolla pulling
+  // away from a red light in Ashfield revs exactly as the player's car does, out of
+  // one number and no keyboard.
+  //
+  // ---------------------------------------------------------------------------
+  // NOTHING IS EVER RESTARTED, AND THAT IS WHAT MAKES THE POOL POSSIBLE.
+  //
+  // Every oscillator and every noise loop in this rig starts once and runs until
+  // the rig is torn down. A car arriving, leaving, or handing its chain to another
+  // car changes a frequency and a gain and nothing else. There is no
+  // `AudioBufferSourceNode` created per car, per frame or per handover, which is
+  // the difference between this and a sample-based engine: at 44 m/s a car crosses
+  // the audible range in four seconds, so a voice-per-car policy is a node
+  // allocation every few hundred milliseconds forever, and a collector pause in a
+  // 16.7 ms frame is a stutter you can see.
+  //
+  // Every parameter move is `setTargetAtTime`, on `heatUpdate`'s lesson: at 60 fps
+  // a stepped `frequency.value` on a running oscillator is a zipper, and the
+  // Doppler moves these the width of a fifth in a second and a half.
+  //
+  // ---------------------------------------------------------------------------
+  // AGAINST THE LIMITER, BY ARITHMETIC RATHER THAN BY EAR.
+  //
+  // `master` is 0.55 and the compressor's -8 dB threshold is 0.398 linear. One
+  // chain peaks at about 0.7 of its own output gain once the three layers have
+  // been through the low-pass. So the local car flat out is 0.55 * 0.30 * 0.7 =
+  // **0.115**, and the seven pooled voices at the closest a real street puts them
+  // -- around 10 m, so 0.14 of full each -- sum incoherently to about **0.21**.
+  // Together with the bed that is 0.33, still under the threshold, which is what
+  // leaves the limiter for the thing it is for: a crash or a gunshot landing on
+  // top of all of it. Checked this way rather than by ear because the failure --
+  // a mix that pumps every time a bat connects -- sounds like a mastering problem
+  // rather than like a bug.
+  //
+  // ---------------------------------------------------------------------------
+  // THE RIG IS BUILT LATE AND TORN DOWN LAZILY.
+  //
+  // `heatSilence` drops its chain the moment the last siren goes, because a
+  // pursuit is a rare event. Traffic is not: a player walking down a quiet lane
+  // and back onto the road would build and drop ninety nodes every few seconds. So
+  // the rig is built on the first frame anything is audible and torn down only
+  // after `ENGINE_IDLE_S` of continuous silence -- long enough to cover a
+  // laneway, short enough that a player who parks in a paddock is not holding a
+  // rig open for the session.
+
+  /** The pool, the local car, the tyres and the bed. Null until anything is heard. */
+  private engine: EngineRig | null = null;
+  /** `ctx.currentTime` the rig last went quiet at, or 0 while it is wanted. */
+  private engineIdleAt = 0;
+
+  /**
+   * Drive every engine in earshot for this frame, or pass `null` for silence.
+   *
+   * One call from the frame loop with whatever `game/carsound.CarSoundField`
+   * resolved, which is `raveUpdate`'s and `heatUpdate`'s arrangement exactly:
+   * there is one place that decides what is audible and no audio state anywhere
+   * else. Returns nothing and throws nothing -- a browser with no audio is a city
+   * with traffic you can only see.
+   */
+  engineUpdate(mix: CarSoundMix | null): void {
+    const ctx = this.ctx;
+    const master = this.master;
+    if (!ctx || !master) return;
+    const t = ctx.currentTime;
+
+    if (mix === null || !mix.wanted) {
+      const idle = this.engine;
+      if (!idle) return;
+      if (this.engineIdleAt === 0) {
+        // Hushed on the frame it stops being wanted; dropped later. A ramp rather
+        // than a disconnect, on `heatSilence`' rule: a loop cut dead is a click.
+        this.engineIdleAt = t;
+        idle.own.out.gain.setTargetAtTime(0.0001, t, ENGINE_GLIDE_S);
+        idle.skid.gain.setTargetAtTime(0.0001, t, ENGINE_GLIDE_S);
+        idle.bed.gain.setTargetAtTime(0.0001, t, ENGINE_GLIDE_S);
+        for (const chain of idle.voices) chain.out.gain.setTargetAtTime(0.0001, t, ENGINE_GLIDE_S);
+      } else if (t - this.engineIdleAt > ENGINE_IDLE_S) {
+        this.engineSilence();
+      }
+      return;
+    }
+
+    this.engineIdleAt = 0;
+    // Sized from the mix rather than from a literal of this file's own. The pool
+    // size is `carsound.ENGINE_VOICES`, it is chosen there with the argument for
+    // the number, and a second copy of it here is a thing that can silently drift
+    // into building six chains for seven voices.
+    const rig = this.engine ?? this.engineBuild(ctx, master, mix.voices.length);
+    if (!rig) return;
+    this.engine = rig;
+
+    // The local car: no distance and no pan, because the listener is sitting in
+    // it. `bark`'s convention for the local player exactly -- the event is not
+    // given a distance rather than given a distance of zero.
+    this.engineChain(rig.own, mix.own, mix.own.active ? ENGINE_OWN_GAIN : 0, t);
+    const n = Math.min(rig.voices.length, mix.voices.length);
+    for (let i = 0; i < n; i++) {
+      const voice = mix.voices[i];
+      this.engineChain(rig.voices[i], voice, voice.active ? ENGINE_VOICE_GAIN * voice.gain : 0, t);
+    }
+    rig.skid.gain.setTargetAtTime(ENGINE_SKID_GAIN * mix.skid, t, ENGINE_GLIDE_S);
+    rig.bed.gain.setTargetAtTime(ENGINE_BED_GAIN * mix.bed, t, ENGINE_GLIDE_S);
+  }
+
+  /** One chain, from one voice. Six parameter moves and not a node between them. */
+  private engineChain(chain: EngineChain, voice: EngineVoice, level: number, t: number): void {
+    // The firing rate. `rate` already has the Doppler in it -- see
+    // `carsound.EngineVoice.rate` -- so the shift arrives here as one multiply
+    // that has already happened, which is the whole of the "Doppler costs one
+    // multiply" claim in that file's header.
+    const f = ENGINE_IDLE_HZ * voice.rate;
+    chain.fire.frequency.setTargetAtTime(f, t, ENGINE_GLIDE_S);
+    // The half-order lump follows the firing rate rather than sitting still,
+    // because it is a property of the engine turning over and not a drone.
+    chain.lump.frequency.setTargetAtTime(f * 0.5, t, ENGINE_GLIDE_S);
+    chain.intake.frequency.setTargetAtTime(f * ENGINE_INTAKE_ORDER, t, ENGINE_GLIDE_S);
+    chain.body.frequency.setTargetAtTime(ENGINE_BODY_HZ + ENGINE_BODY_OPEN * voice.load, t, ENGINE_GLIDE_S);
+    chain.intakeGain.gain.setTargetAtTime(ENGINE_INTAKE_MIN + ENGINE_INTAKE_LOAD * voice.load, t, ENGINE_GLIDE_S);
+    chain.out.gain.setTargetAtTime(level, t, ENGINE_GLIDE_S);
+    // Slower than the rest: a pan that tracked at the gain's rate would jitter
+    // across the head as a car's bearing changes fastest at its closest point,
+    // which is the moment it must sound most solid.
+    if (chain.pan) chain.pan.pan.setTargetAtTime(voice.pan, t, ENGINE_PAN_S);
+  }
+
+  /**
+   * Build the whole rig: `carsound.ENGINE_VOICES` pooled chains, one for the local
+   * car with a duck and a skid on it, and the bed.
+   *
+   * All at once, because they share a lifecycle -- `heatBuild`'s reason for
+   * building the siren and the rotor together. About ninety nodes, and the count
+   * is stated in `game/carsound.ts`' header where the pool size is chosen.
+   */
+  private engineBuild(ctx: AudioContext, master: GainNode, pool: number): EngineRig | null {
+    const noise = this.noise;
+    if (!noise) return null;
+    const sources: AudioScheduledSourceNode[] = [];
+
+    // --- The local car, through the crash duck. Nothing else writes `duck`; see
+    // `carCrunch`.
+    const duck = ctx.createGain();
+    duck.gain.value = 1;
+    duck.connect(master);
+    const own = this.engineNodes(ctx, noise, duck, false, sources);
+
+    // --- The tyres. A narrow band of noise and nothing else: this is a *hint*
+    // that the car is being thrown around, not a tyre model, and the argument for
+    // that is in `carsound.SKID_SPEED_MIN`. Through the duck as well, so a crash
+    // silences the squeal that led into it.
+    const skid = ctx.createGain();
+    skid.gain.value = 0.0001;
+    skid.connect(duck);
+    const rubber = ctx.createBufferSource();
+    rubber.buffer = noise;
+    rubber.loop = true;
+    const scrub = ctx.createBiquadFilter();
+    scrub.type = 'bandpass';
+    scrub.frequency.value = ENGINE_SKID_HZ;
+    scrub.Q.value = ENGINE_SKID_Q;
+    rubber.connect(scrub).connect(skid);
+    sources.push(rubber);
+
+    // --- The pool.
+    const voices: EngineChain[] = [];
+    for (let i = 0; i < pool; i++) voices.push(this.engineNodes(ctx, noise, master, true, sources));
+
+    // --- And the city. One rumble, no pitch, no position -- see
+    // `game/carsound.ts` section 5. White noise through a two-pole low-pass is
+    // what four streets of traffic sounds like from inside a fifth one, and the
+    // narrow band over the top of it is the only thing that stops it reading as
+    // wind.
+    const bed = ctx.createGain();
+    bed.gain.value = 0.0001;
+    bed.connect(master);
+    const rumble = ctx.createBufferSource();
+    rumble.buffer = noise;
+    rumble.loop = true;
+    const far = ctx.createBiquadFilter();
+    far.type = 'lowpass';
+    far.frequency.value = ENGINE_BED_HZ;
+    far.Q.value = 0.707;
+    rumble.connect(far).connect(bed);
+    const hum = ctx.createBiquadFilter();
+    hum.type = 'bandpass';
+    hum.frequency.value = ENGINE_BED_BAND_HZ;
+    hum.Q.value = 0.8;
+    const humGain = ctx.createGain();
+    humGain.gain.value = ENGINE_BED_BAND;
+    rumble.connect(hum).connect(humGain).connect(bed);
+    sources.push(rumble);
+
+    const now = ctx.currentTime;
+    for (const node of sources) node.start(now);
+    return { own, duck, skid, voices, bed, sources };
+  }
+
+  /** One engine's ten nodes. See the three layers in the section header. */
+  private engineNodes(
+    ctx: AudioContext,
+    noise: AudioBuffer,
+    dest: AudioNode,
+    panned: boolean,
+    sources: AudioScheduledSourceNode[],
+  ): EngineChain {
+    const out = ctx.createGain();
+    out.gain.value = 0.0001;
+    let pan: StereoPannerNode | null = null;
+    if (panned) {
+      try {
+        pan = ctx.createStereoPanner();
+        out.connect(pan).connect(dest);
+      } catch {
+        // No panner on this engine. `heatBuild`'s judgement about the rotor's
+        // orbit holds here: the position is a nicety and its absence is not worth
+        // a branch anywhere else.
+        pan = null;
+        out.connect(dest);
+      }
+    } else {
+      out.connect(dest);
+    }
+
+    const body = ctx.createBiquadFilter();
+    body.type = 'lowpass';
+    // Butterworth, `raveBuild`'s reason: a default Q of 1 puts a 1.2 dB bump on
+    // the corner, and a corner that sweeps 320 Hz to 3 kHz as a car accelerates
+    // would sweep that bump with it -- a filter sound rather than a throttle.
+    body.Q.value = 0.707;
+    body.frequency.value = ENGINE_BODY_HZ;
+    body.connect(out);
+
+    const fire = ctx.createOscillator();
+    fire.type = 'sawtooth';
+    fire.frequency.value = ENGINE_IDLE_HZ;
+    const fireGain = ctx.createGain();
+    fireGain.gain.value = ENGINE_FIRE_LEVEL;
+    fire.connect(fireGain).connect(body);
+
+    const lump = ctx.createOscillator();
+    lump.type = 'square';
+    lump.frequency.value = ENGINE_IDLE_HZ * 0.5;
+    const lumpGain = ctx.createGain();
+    lumpGain.gain.value = ENGINE_LUMP_LEVEL;
+    lump.connect(lumpGain).connect(body);
+
+    const induction = ctx.createBufferSource();
+    induction.buffer = noise;
+    induction.loop = true;
+    const intake = ctx.createBiquadFilter();
+    intake.type = 'bandpass';
+    intake.frequency.value = ENGINE_IDLE_HZ * ENGINE_INTAKE_ORDER;
+    intake.Q.value = ENGINE_INTAKE_Q;
+    const intakeGain = ctx.createGain();
+    intakeGain.gain.value = ENGINE_INTAKE_MIN;
+    // Straight to `out` rather than through the body filter: the induction roar
+    // is what you hear *instead of* the exhaust when a car opens up, and putting
+    // it behind the same low-pass would make the throttle close the thing it is
+    // supposed to open.
+    induction.connect(intake).connect(intakeGain).connect(out);
+
+    sources.push(fire, lump, induction);
+    return { out, pan, fire, lump, body, intake, intakeGain };
+  }
+
+  /** Stop the rig and forget it. Rebuilt from scratch the next time a car passes. */
+  private engineSilence(): void {
+    const rig = this.engine;
+    if (!rig) return;
+    this.engine = null;
+    this.engineIdleAt = 0;
+    // Already hushed by `engineUpdate` `ENGINE_IDLE_S` ago, so there is nothing
+    // left to ramp; the timer below is only here because a `stop()` inside the
+    // same call as the last `setTargetAtTime` would truncate a tail that is
+    // already inaudible but not yet zero.
+    setTimeout(() => {
+      try {
+        for (const node of rig.sources) node.stop();
+      } catch {
+        // Already stopped by a context teardown. Nothing to do.
+      }
+      try {
+        rig.own.out.disconnect();
+        rig.own.pan?.disconnect();
+        rig.duck.disconnect();
+        rig.skid.disconnect();
+        rig.bed.disconnect();
+        for (const chain of rig.voices) {
+          chain.out.disconnect();
+          chain.pan?.disconnect();
+        }
+      } catch {
+        // Likewise.
+      }
+    }, 300);
+  }
 }
 
 // --- The sound system's own types and numbers ---------------------------------------
@@ -3438,3 +3793,189 @@ const SUN_SCREAM_CLIPS: readonly string[] = [
   '/audio/sun/scream_3.mp3',
   '/audio/sun/scream_4.mp3',
 ];
+
+// --- The traffic's own types and numbers --------------------------------------
+
+/**
+ * One engine's graph. Ten nodes, built by `engineNodes` and never rebuilt.
+ *
+ * Every field here is held because a *running* node's parameter is what gets
+ * moved -- `heatChain.rotorBlade`'s argument exactly. Retriggering an oscillator
+ * to change its pitch would be a click every frame, and `setTargetAtTime` on a
+ * running oscillator's frequency is what a real pitch bend is.
+ */
+interface EngineChain {
+  out: GainNode;
+  /** Null on an engine with no `StereoPannerNode`, and on the local car. */
+  pan: StereoPannerNode | null;
+  /** The firing pulse and the half-order lump under it. */
+  fire: OscillatorNode;
+  lump: OscillatorNode;
+  /** The exhaust's brightness. Opened by load. */
+  body: BiquadFilterNode;
+  /** Where the induction roar sits, and how much of it there is. */
+  intake: BiquadFilterNode;
+  intakeGain: GainNode;
+}
+
+/** Everything the traffic runs on. Built by `engineBuild`, dropped by `engineSilence`. */
+interface EngineRig {
+  /** The local player's car. Through `duck`, and never panned. */
+  own: EngineChain;
+  /**
+   * The crash duck. **Written by `carCrunch` and by nothing else**, which is the
+   * whole reason it is a node of its own rather than a factor in the mix: a
+   * scheduled ramp on the chain's output gain would be overwritten by the next
+   * frame's `setTargetAtTime` 16 ms later.
+   */
+  duck: GainNode;
+  /** The tyres, also through `duck`. See `carsound.SKID_SPEED_MIN`. */
+  skid: GainNode;
+  /** The pool. `carsound.ENGINE_VOICES` of them. */
+  voices: EngineChain[];
+  /** The city. See `carsound.ts` section 5. */
+  bed: GainNode;
+  /** Every node that has to be stopped on teardown. */
+  sources: AudioScheduledSourceNode[];
+}
+
+/**
+ * Where an idling engine fires, hertz.
+ *
+ * A four-stroke fires twice per revolution per pair of cylinders, so a
+ * four-cylinder at 810 rpm is 27 Hz. `carsound.ENGINE_RATE_TOP` multiplies it to
+ * 184 Hz, which is 5,500 rpm -- a car being driven hard rather than one being
+ * destroyed.
+ *
+ * The fundamental is below hearing at idle and that is not a mistake: what the
+ * ear identifies as an idling engine is the *harmonic series* over an inaudible
+ * fundamental, which is why the layer is a sawtooth and not a sine.
+ */
+const ENGINE_IDLE_HZ = 27;
+
+/**
+ * The exhaust's low-pass corner at idle, and how far a full throttle opens it.
+ *
+ * 320 Hz to 2,920 Hz. This is the parameter that carries "revving" -- an engine
+ * under load does not get much louder, it gets *brighter*, because the pulses
+ * sharpen. Moving the level instead is the classic mistake and produces a car
+ * that seems to drive towards you when you press the accelerator.
+ */
+const ENGINE_BODY_HZ = 320;
+const ENGINE_BODY_OPEN = 2600;
+
+/**
+ * Where the induction roar sits, as a multiple of the firing rate, and how narrow.
+ *
+ * Nine, so 243 Hz at idle and about 1.7 kHz flat out. A *multiple* rather than a
+ * fixed band is the entire point: a formant that stayed put while the pitch rose
+ * would read as an engine behind a filter, and the thing that says "this machine
+ * is spinning faster" is that all of its noise climbs together.
+ *
+ * Q of 1.1 is broad -- an intake is a pipe, not a resonator -- and `heatBuild`'s
+ * siren bandpass uses the same figure for the same reason.
+ */
+const ENGINE_INTAKE_ORDER = 9;
+const ENGINE_INTAKE_Q = 1.1;
+/** How much roar at idle, and how much a full throttle adds. */
+const ENGINE_INTAKE_MIN = 0.05;
+const ENGINE_INTAKE_LOAD = 0.55;
+
+/**
+ * The two pitched layers, relative to each other.
+ *
+ * The lump is a fifth of the fire. Enough to hear as unevenness in the idle and
+ * not enough to hear as a second note -- take it to zero and the engine goes
+ * smooth and electronic, take it to half and it becomes a two-stroke.
+ */
+const ENGINE_FIRE_LEVEL = 0.5;
+const ENGINE_LUMP_LEVEL = 0.16;
+
+/**
+ * How fast a parameter follows the mix, seconds, and how fast the pan does.
+ *
+ * 50 ms is under a Doppler sweep's timescale by an order of magnitude and well
+ * over a frame, which is the window that removes the zipper without adding a
+ * lag anybody could hear. The pan is slower on purpose: a car's *bearing* changes
+ * fastest at its closest approach, which is exactly the moment it must sound
+ * solid rather than skittering across the head.
+ */
+const ENGINE_GLIDE_S = 0.05;
+const ENGINE_PAN_S = 0.12;
+
+/**
+ * The three levels, and their whole argument is the ratio between them.
+ *
+ * The car you are in is louder than any car you are not, and both are far louder
+ * than the city behind them. 0.30 puts the local engine just under `SIREN_GAIN`'s
+ * 0.30 and over `ROTOR_GAIN`'s 0.22 -- it is the loudest continuous thing in the
+ * mix while you are driving, which is correct, because it is the only one you are
+ * sitting inside.
+ *
+ * The pooled voice at 0.22 is `ROTOR_GAIN` exactly, and that is the intended
+ * reading: another car close by is a *presence*, not an event.
+ *
+ * See the arithmetic against the limiter in the section header.
+ */
+const ENGINE_OWN_GAIN = 0.30;
+const ENGINE_VOICE_GAIN = 0.22;
+
+/**
+ * The tyres: level, where the scrub sits and how narrow.
+ *
+ * A third of the engine it belongs to, because a skid is a texture on top of the
+ * car and not a second car. 1.9 kHz with a Q of 2.2 is a *narrow* band, unlike
+ * everything else in this file, and narrow is what makes noise read as rubber
+ * rather than as static: what a tyre does at the limit is sing at one frequency.
+ */
+const ENGINE_SKID_GAIN = 0.10;
+const ENGINE_SKID_HZ = 1900;
+const ENGINE_SKID_Q = 2.2;
+
+/**
+ * The city: level, the rumble's corner, and the narrow band that keeps it from
+ * being wind.
+ *
+ * 0.10 is deliberately at the bottom of everything in this file -- under
+ * `SUN_SCREAM_GAIN`'s 0.12 -- because a bed you can *notice* is not a bed, it is
+ * a hum, and the whole point of it is that a player never identifies it as a
+ * sound at all until they walk somewhere it is not.
+ *
+ * 190 Hz is what a few streets of traffic leaves after the buildings between you
+ * and it have taken the rest, which is `RAVE_CUTOFF_AT`'s observation about a
+ * kick drum in a different key. Low-passed noise on its own reads as wind, so a
+ * quarter of a narrow band at 420 Hz goes over the top of it; that is the
+ * frequency at which a car becomes a car.
+ */
+const ENGINE_BED_GAIN = 0.10;
+const ENGINE_BED_HZ = 190;
+const ENGINE_BED_BAND_HZ = 420;
+const ENGINE_BED_BAND = 0.25;
+
+/**
+ * How far the crash ducks the local engine, and how long it takes to come back.
+ *
+ * Seventy per cent for 0.35 s at a write-off, scaled by the crash's own strength
+ * so a kerb barely dips it. The duck is not there to make room in the mix --
+ * `carCrunch` already sits well under the limiter -- it is there because the
+ * *silence* is the impact. An engine that carries on unchanged through a crash is
+ * the single clearest way to make a collision feel like it did not happen, and a
+ * beat of nothing underneath the crunch is what sells the hit that `DESIGN.md`
+ * rule 2 wants read as comedy rather than as damage.
+ *
+ * A linear ramp back rather than an exponential: an engine recovering after a
+ * shunt is a driver getting back on the throttle, which is a straight line.
+ */
+const ENGINE_DUCK = 0.7;
+const ENGINE_DUCK_S = 0.35;
+
+/**
+ * How long the rig may sit silent before it is torn down, seconds.
+ *
+ * Six. `heatSilence` drops its chain immediately because a pursuit is rare;
+ * traffic is the opposite, and a player walking into a laneway and back out would
+ * otherwise build and drop ninety nodes twice in ten seconds. Six seconds covers
+ * every laneway in Sydney and still releases the rig for somebody who has driven
+ * into a paddock.
+ */
+const ENGINE_IDLE_S = 6;

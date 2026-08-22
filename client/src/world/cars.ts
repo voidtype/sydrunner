@@ -102,6 +102,10 @@ import {
 } from '../game/traffic.ts';
 import { policeLiveried } from '../game/factions.ts';
 import type { ViewLatch } from '../game/viewlatch.ts';
+// What the traffic sounds like. A sink for `CarLightSink`'s reason, stated on
+// the `engines` property below. Three-free, so this is a type import into a
+// file that is not.
+import type { EngineSink } from '../game/carsound.ts';
 // The dents, graded once in the three-free rules file so the four systems that
 // draw a damaged car cannot disagree about what "dented" means. See
 // `game/driving.damageGrade`.
@@ -1197,6 +1201,26 @@ export class TrafficMovers {
   /** Driven cars drawn last update. Diagnostics only. */
   drivenDrawn = 0;
 
+  /**
+   * What any of this sounds like, or null.
+   *
+   * The coupling to `game/carsound.ts`, and it is one property for the reason
+   * `lights`, `models`, `suppress` and `latch` are each one property: **this loop
+   * already visits every car in view**, it already has the position, the heading
+   * and the speed that an engine needs, and a second pass that had to agree with
+   * it about which cars exist is how you end up hearing a car that is not there.
+   * The alternative measured out at roughly a sixth of the traffic section again,
+   * for six numbers that had just been computed twenty lines earlier.
+   *
+   * `begin()` returning false is the whole of the "audio is off" case and costs
+   * one comparison a frame rather than a call per car.
+   *
+   * The offer sites are the interesting part and there are two of them, one in
+   * each walk. Both sit at a deliberate point in the sequence -- see the ambient
+   * visitor, which offers a car the latch is *hiding*.
+   */
+  engines: EngineSink | null = null;
+
   constructor(assets: CarAssets) {
     this.band = new InstancedMesh(chequerBand(), assets.material, MOVER_CAPACITY);
     this.band.name = 'traffic_livery';
@@ -1295,6 +1319,8 @@ export class TrafficMovers {
     const models = this.models;
     const modelling = models !== null && models.begin();
     const suppress = this.suppress;
+    const engines = this.engines;
+    const engining = engines !== null && engines.begin();
     // The latch, if there is one and if the caller said where the camera is. See
     // `game/viewlatch.ts`: a car that comes into existence inside the shot is not
     // drawn until you look away, and one that stops existing inside it goes on
@@ -1414,6 +1440,19 @@ export class TrafficMovers {
       // the record in `CarField` and not the timetable's copy of it. See
       // `suppress`.
       if (suppress !== null && suppress(p.identity)) return;
+      // **And it is offered to the engines here, before the latch and not after.**
+      // Deliberate, and the one thing the sound does not inherit from the picture:
+      // `game/viewlatch.ts` declines to *draw* a car that materialised inside your
+      // field of view, which is a rule about what it would look like to watch one
+      // appear. A car you are not looking at is still a car, and the entire value
+      // of engine noise is that it reaches you from behind -- so a latched car is
+      // silent to the eye and audible to the ear, which is the right way round.
+      //
+      // After the suppression test, though, and that one *is* inherited: a car
+      // somebody has stolen is offered by the driven walk below, with a live pose
+      // and its driver's speed, and hearing the timetable's stale copy of it as
+      // well would be one car making two engine noises.
+      if (engining) engines!.offer(p.identity, p.x, p.y, p.z, p.dx, p.dz, p.speed);
       // **And has this one only just come into existence in front of you?** Also
       // before the counters, and for the same reason: a latched car is not drawn,
       // not lit and not modelled, because as far as this frame is concerned it is
@@ -1448,6 +1487,11 @@ export class TrafficMovers {
     let drivenDrawn = 0;
     if (this.driven !== null) {
       this.driven.forEach((p) => {
+        // Before the capacity return, unlike the headlights: a car this file has
+        // run out of *instances* for is still a car with an engine running, and
+        // silence is not the failure that an undrawn car is. `game/carsound.ts`
+        // has a capacity of its own and it is seven.
+        if (engining) engines!.offer(p.identity, p.x, p.y, p.z, p.dx, p.dz, p.speed);
         const n = this.counts[p.body];
         if (n >= MOVER_CAPACITY) return;
         if (lighting) lights!.add(p);

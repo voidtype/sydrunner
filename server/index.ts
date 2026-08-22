@@ -205,6 +205,11 @@ import { verifyTeams } from '../client/src/game/teams.ts';
 import { verifyTeamField } from '../client/src/game/teamfield.ts';
 import { decodeTeamOp, verifyTeamsWire } from '../client/src/net/teams.ts';
 import { verifyDrivingContract } from '../client/src/game/driving-contract.ts';
+// --- WORKSTREAM AL. The traffic's own sound, which this process cannot make and
+// can entirely check: `game/carsound.ts` is three-free on `game/rail-audio.ts`'
+// terms, so the whole schedule -- which cars are audible, how loud, at what pitch
+// -- re-derives here with no `AudioContext` within a mile of it.
+import { verifyCarSound } from '../client/src/game/carsound.ts';
 import { verifyFares } from './fares.ts';
 import { WalletStore, defaultWalletPath, verifyWallets } from './wallets.ts';
 // --- Accounts, unique handles and the level ladder. Workstream G.
@@ -565,6 +570,15 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifyWallets', verifyWallets()],
     ['verifyFares', verifyFares()],
     ['verifyDrivingContract', verifyDrivingContract()],
+    // Every failure in this one is silent in this list's sense and none of them
+    // is visible anywhere: a pitch curve that is not monotonic is a car that
+    // drops a gear as it accelerates, a Doppler clamp that does not hold turns a
+    // head-on pass into a slide whistle, and a voice pool that hands a chain over
+    // without taking the gain to zero first is a click nobody can reproduce. It
+    // runs *here* as well as in the browser on `PREAMBLE`'s rule, and it can,
+    // because there is no audio in the file -- only the arithmetic that decides
+    // what the audio should be.
+    ['verifyCarSound', verifyCarSound()],
     // The phone's model. Run **here** despite the server having no opinion
     // about which hand a bat is in, because the interesting half of that file
     // is the photo album and every one of its failures is silent: an album that

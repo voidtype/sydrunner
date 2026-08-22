@@ -391,6 +391,15 @@ import {
   verifyBikeMesh,
 } from './world/bike.ts';
 import { CombatAudio, RAVE_AUDIBLE_RANGE } from './game/audio.ts';
+// --- WORKSTREAM AL: what the traffic sounds like, decided three-free and made of
+// oscillators in `game/audio.ts`. The split is `game/rail-audio.ts`'; see the
+// header of `game/carsound.ts` for the argument and for the pool.
+import {
+  CarSoundField,
+  createCarListener,
+  createCarSoundMix,
+  verifyCarSound,
+} from './game/carsound.ts';
 // The camera distance, which is a *scalar* and not a mode -- see `game/camera.ts`
 // for why the boolean this replaced was the reported bug rather than a feature.
 import {
@@ -968,6 +977,16 @@ async function main(): Promise<void> {
   // kills a tile's draw call; see `verifyStaticCars`.
   const staticCarFailures = timed('static cars', () => verifyStaticCars(BODY_COUNT, CAR_PAINT_COUNT));
   const drivenCarFailures = timed('drivencars', verifyDrivenCars);
+  // --- WORKSTREAM AL. What the traffic sounds like, and every failure in it is
+  // silent in the sense this list means: the game runs, the cars move, and the
+  // audio is subtly wrong in a way nobody can screenshot. A pitch curve that is
+  // not monotonic is a car that drops a gear as it speeds up; a Doppler clamp
+  // that does not hold is a head-on pass that reads as a slide whistle; a pool
+  // that hands a chain over without taking the gain down first is a click, and a
+  // click in a loop arrives as "the audio keeps breaking" with no repro. The
+  // sound itself is ears-only and is the one thing this cannot judge. See
+  // `game/carsound.ts`.
+  const carSoundFailures = timed('car sound', verifyCarSound);
   // And the plume off a broken bonnet, which fails in the way every closed-form
   // effect in this renderer fails: a perfectly good frame with nothing in it.
   // A count left at zero is no smoke at all, a count left high is twelve stale
@@ -1369,6 +1388,7 @@ async function main(): Promise<void> {
     drivingFailures.length ||
     staticCarFailures.length ||
     drivenCarFailures.length ||
+    carSoundFailures.length ||
     carSmokeFailures.length ||
     carFireFailures.length ||
     damageGradeFailures.length ||
@@ -1452,6 +1472,7 @@ async function main(): Promise<void> {
           ...drivingFailures,
           ...staticCarFailures,
           ...drivenCarFailures,
+          ...carSoundFailures,
           ...carSmokeFailures,
           ...carFireFailures,
           ...damageGradeFailures,
@@ -4907,6 +4928,18 @@ async function main(): Promise<void> {
   // the traffic must not steer round where it used to be either.
   traffic.obstacles.suppress = drivenCars.suppress;
   trafficMovers.driven = drivenCars.source;
+  // --- WORKSTREAM AL: and a fifth sink on the same loop, for the same reason the
+  // four above it are sinks -- that loop already visits every car in view and
+  // already has the position, heading and speed an engine needs. The mix is
+  // resolved and handed to the sound system down in the frame loop; this is only
+  // the wiring, and it is here because `trafficMovers`' other sinks are.
+  const carSound = new CarSoundField();
+  const carSoundMix = createCarSoundMix();
+  const carListener = createCarListener();
+  trafficMovers.engines = carSound;
+  /** Where the player was last frame, for the listener's own velocity. See below. */
+  let carSoundLastX = 0;
+  let carSoundLastZ = 0;
   if (carModels) {
     carModels.suppress = drivenCars.suppress;
     carModels.drivenClaims = drivenCars.claims;
@@ -10464,6 +10497,54 @@ async function main(): Promise<void> {
       const screaming = sunButton.state ? sunScreaming(sunButton.state, clockMs) : false;
       audio.sunScreamUpdate(sunScreamMix(screaming, sunAltDeg));
     }
+
+    // --- WORKSTREAM AL: the traffic, out loud.
+    //
+    // The offers went in twenty sections ago, from inside `trafficMovers.update`
+    // -- see `TrafficMovers.engines`, which is a sink for the same reason the
+    // headlights and the model claims are. This is the other end of it: the
+    // listener is described, the field resolves who is audible, and the mix goes
+    // to the sound system. One call a frame with whatever is out there, which is
+    // `audio.raveUpdate`'s and `audio.heatUpdate`'s arrangement exactly -- one
+    // place decides what is audible and there is no state anywhere else.
+    //
+    // **The ears are the camera's and the velocity is the body's**, and the split
+    // is not an oversight. Distance and pan are properties of the view: in the
+    // chase camera you are watching your car from seven metres behind it, the
+    // world is drawn from there, and a pan measured from anywhere else would put
+    // a car on your left in your right ear. Velocity is a property of *travel*,
+    // and the chase camera is on a spring -- differentiating its position would
+    // feed the spring's own wobble into the Doppler, which is the one place a
+    // wobble would be audible as a wobble. The body has no spring, so it is
+    // differentiated instead, and it is the right answer on a train as well.
+    //
+    // `on` is read by `begin()`, which ran earlier this frame, so enabling the
+    // audio takes effect on the next one. That is a single frame at the pointer
+    // lock click and it is deliberately not worth a second call site.
+    carSound.on = audio.enabled;
+    carListener.x = camera.position.x;
+    carListener.y = camera.position.y;
+    carListener.z = camera.position.z;
+    carListener.vx = frameDt > 1e-5 ? (player.position.x - carSoundLastX) / frameDt : 0;
+    carListener.vz = frameDt > 1e-5 ? (player.position.z - carSoundLastZ) / frameDt : 0;
+    carSoundLastX = player.position.x;
+    carSoundLastZ = player.position.z;
+    // Straight off the camera's world matrix rather than rebuilt from the yaw, on
+    // the view latch's argument at the `trafficMovers.update` call above: a
+    // cutscene, a vehicle camera or a shoulder cam all answer correctly without
+    // this line knowing any of them exist.
+    carListener.fwdX = -camera.matrixWorld.elements[8];
+    carListener.fwdZ = -camera.matrixWorld.elements[10];
+    carListener.dt = frameDt;
+    carListener.ownCar = playerCombat.drivingCar;
+    // The **predicted** speed and the wheel this frame produced, not the record's
+    // and not the pose's. This is the one number in the mix a player is holding a
+    // key down to change, and a frame of lag on it is a throttle that answers
+    // late. See `carsound.CarListener.ownSpeed`.
+    carListener.ownSpeed = playerCombat.carSpeed;
+    carListener.ownSteer = driveSteering.right;
+    carSound.end(carListener, carSoundMix);
+    audio.engineUpdate(carSoundMix);
 
     frameProfile.at(FSEC.actors);
     // Every actor -- three dummies and the player's own body -- on the frame
