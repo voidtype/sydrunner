@@ -251,6 +251,12 @@ import { verifySim } from './sim.ts';
  * refused) and the **wire** is `client/src/net/quests.ts`.
  */
 import { verifyDialog, verifyQuests } from '../client/src/game/questmodel.ts';
+// WORKSTREAM AO: who the givers in that content *are* -- kit, heading, stance
+// and the height the mark over them hangs at. Three-free by construction and
+// checked here for `verifyPhoneModel`'s reason: this process serves the content
+// these rules are read off, so it should refuse to start over a rule that is
+// broken. Nothing here runs in the simulation -- a giver is not an actor.
+import { verifyGiverBodies } from '../client/src/game/giverbodies.ts';
 import { decodeQuest, verifyQuestWire } from '../client/src/net/quests.ts';
 import { ContentStore, ImprovCache, QuestEngine, contentResponse, type QuestWorld } from './quests.ts';
 import { TEAM } from '../client/src/game/teams.ts';
@@ -673,6 +679,18 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     ['verifyQuests', verifyQuests()],
     ['verifyDialog', verifyDialog()],
     ['verifyQuestWire', verifyQuestWire()],
+    // --- WORKSTREAM AO: the givers' bodies, or the pure half of them.
+    //
+    // This process draws nothing and never will, and the check runs here
+    // anyway, on `verifySpawn`'s reasoning one block down: the rules are a pure
+    // function of content **this** process serves, and every one of them fails
+    // silently. A kit derived from something other than the id is a giver who
+    // is a different person on every client; a facing sign inverted is a
+    // hundred people standing with their backs to the street; a mark height
+    // that stops agreeing with the ground fallback is every exclamation mark in
+    // Sydney stepping half a metre on the beat a body appears under it. None of
+    // those throws, and the browser is the only place that would have looked.
+    ['verifyGiverBodies', verifyGiverBodies()],
     // WORKSTREAM N (carry): the sentence a restored session is visible as. Run
     // here as well as in the browser for `verifyLevelHud`'s reason one line up
     // -- this process decides *whether* a join was a restore and puts the bit on

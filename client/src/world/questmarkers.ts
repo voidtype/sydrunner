@@ -102,6 +102,17 @@
  * gap this feature happens to paper over and not one it should be trusted to
  * fix: when somebody gives the givers bodies, the height here should come off
  * the rig's head bone the way `main.ts` feeds the plate field.
+ *
+ * **Somebody did.** `world/giverbodies.ts` stands them up -- a pooled rig in one
+ * of the crowd's own seven kits, on the same range and the same beat as this
+ * field -- and `QuestMarkerSource.headY` is the hook that paragraph asked for.
+ * When it answers, the mark hangs off `BONE.HEAD` through
+ * `game/giverbodies.markYFromHeadBone`; when it does not -- a giver too far for
+ * a body, or a session where the pool is full -- the old ground arithmetic still
+ * serves, and the two are arranged to agree to a millimetre for a figure in the
+ * bind pose so a body appearing under a mark does not move it. The clearance
+ * itself now lives in `game/giverbodies.MARK_CLEARANCE_M`, which is the one
+ * place both halves can read it.
  */
 
 import {
@@ -115,6 +126,13 @@ import {
 } from 'three/webgpu';
 
 import { FIGURE_HEIGHT } from '../player/animation.ts';
+import {
+  HEAD_BONE_HEIGHT,
+  MARK_CLEARANCE_M,
+  giverHash,
+  markYFromGround,
+  markYFromHeadBone,
+} from '../game/giverbodies.ts';
 import {
   markerFor,
   parseDialogPack,
@@ -150,8 +168,15 @@ export const FADE_FULL_M = 110;
  */
 export const GLYPH_EM_M = 0.85;
 
-/** How far over the ground the glyph's baseline floats. */
-const MARKER_LIFT_M = FIGURE_HEIGHT + 0.62;
+/**
+ * How far over the ground the glyph's baseline floats, when there is no body.
+ *
+ * `FIGURE_HEIGHT + 0.62`, as it always was, with the `0.62` now named in
+ * `game/giverbodies.ts` so the head-bone path can add the identical clearance to
+ * the identical crown. `markYFromGround` is this expression; it is kept as a
+ * constant as well because the buffer arithmetic in the header quotes it.
+ */
+const MARKER_LIFT_M = FIGURE_HEIGHT + MARK_CLEARANCE_M;
 
 /** How far the bob travels, and how fast. Slow, because it is not an alarm. */
 const BOB_M = 0.085;
@@ -307,14 +332,15 @@ export function markerScale(distance: number): number {
  * A cheap string hash rather than an index, because the index of an NPC in the
  * bundle changes the moment somebody edits a content file and every marker in
  * Sydney would re-phase on a publish.
+ *
+ * The hash itself now lives in `game/giverbodies.giverHash`, which is the same
+ * FNV-1a this function has always had, moved to the three-free side because the
+ * bodies under these marks need it too -- the mark's bob and the giver's kit and
+ * her place in the idle cycle are one person's number rather than three. The
+ * arithmetic below is untouched, so no marker in Sydney re-phased.
  */
 export function bobPhase(id: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i++) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return ((h >>> 0) % 628) / 100;
+  return (giverHash(id) % 628) / 100;
 }
 
 // --- What the field is told ------------------------------------------------------
@@ -335,6 +361,17 @@ export interface QuestMarkerSource {
   facts(): PlayerFacts;
   /** Ground height under a point. `main.ts`'s `wildGround`, never `groundHeightAt`. */
   groundAt(x: number, z: number): number;
+  /**
+   * The world y of this giver's **head bone**, if somebody is drawing her a
+   * body, and `null` otherwise. `world/giverbodies.GiverBodyField.headY`.
+   *
+   * Optional, and that is not laziness: this field predates the bodies, the
+   * check below drives it with no body field at all, and a mark over a giver too
+   * far away for a rig has to keep working. When it answers, the mark hangs off
+   * the rig; when it does not, the ground arithmetic serves. The header says why
+   * the two agree.
+   */
+  headY?(id: string): number | null;
 }
 
 /** One mark, resolved. Held between rescans and billboarded every frame. */
@@ -352,6 +389,17 @@ export class QuestMarkerField {
 
   /** How many marks were drawn last frame. For the check, and for a console poke. */
   live = 0;
+  /**
+   * How many decisions this field has taken. **The 4 Hz beat, made readable.**
+   *
+   * `world/giverbodies.ts` draws the bodies under these marks on the same range,
+   * the same cap and -- because of this counter -- literally the same clock: it
+   * re-decides when this number changes rather than keeping a second
+   * accumulator that would drift a frame either side of this one. A counter
+   * rather than a callback for `FactionField.events`' reason: this object has no
+   * business knowing that anything else exists.
+   */
+  beats = 0;
   /**
    * Givers in range with something to say who did not fit the cap.
    *
@@ -471,6 +519,7 @@ export class QuestMarkerField {
   private rescan(source: QuestMarkerSource): void {
     this.markers.length = 0;
     this.dropped = 0;
+    this.beats++;
     const npcs = source.npcs();
     if (npcs.length === 0) return;
     // Built once per rescan rather than per NPC: `view()` indexes the whole
@@ -488,10 +537,17 @@ export class QuestMarkerField {
         this.dropped++;
         continue;
       }
+      // **Off the head when there is a head.** See the header's last section:
+      // `headY` answers for a giver `world/giverbodies.ts` is drawing, and the
+      // crown offset plus the clearance is `markYFromHeadBone`. Otherwise the
+      // ground, plus a person, plus the same clearance -- and for a figure
+      // standing in the bind pose the two are the same number, so a body
+      // arriving under a mark does not move it.
+      const head = source.headY?.(npc.id) ?? null;
       this.markers.push({
         kind,
         x: npc.x,
-        y: source.groundAt(npc.x, npc.z) + MARKER_LIFT_M,
+        y: head === null ? markYFromGround(source.groundAt(npc.x, npc.z)) : markYFromHeadBone(head),
         z: npc.z,
         phase: bobPhase(npc.id),
       });
@@ -550,6 +606,18 @@ export class QuestMarkerField {
       }
       this.quads++;
     }
+  }
+
+  /**
+   * The baseline height of the nth live mark, or `null`.
+   *
+   * For the check, and for a console poke. The height is the one thing about a
+   * mark that a screenshot cannot settle -- a mark 45 cm too low over a giver is
+   * a mark over a giver -- so it is worth being able to read the number.
+   */
+  markerHeight(index: number): number | null {
+    const marker = this.markers[index];
+    return marker === undefined ? null : marker.y;
   }
 
   /** Give the buffers back. Nothing else here allocates GPU memory. */
@@ -686,6 +754,14 @@ export function verifyQuestMarkers(): string[] {
     if (field.live !== 0) failures.push(`An empty bundle drew ${field.live} markers.`);
     if (field.mesh.geometry.drawRange.count !== 0) failures.push('An empty field left a draw range behind.');
 
+    // The beat, which `world/giverbodies.ts` now runs its own decision off. A
+    // counter that did not move would freeze every giver's body at whatever it
+    // was on the first frame, and nothing about the marks would look wrong.
+    const firstBeat = field.beats;
+    if (firstBeat === 0) failures.push('The marker field took a decision without counting a beat.');
+    field.update(1, camera, source([]));
+    if (field.beats !== firstBeat + 1) failures.push('The rescan beat does not advance on an empty bundle.');
+
     // One giver, in range, with a job on this rung: a mark, and a draw range.
     field.update(1, camera, source([giver('a', 10, 0)]));
     if (field.live !== 1) failures.push(`One giver with a takeable job drew ${field.live} marks.`);
@@ -695,6 +771,47 @@ export function verifyQuestMarkers(): string[] {
     // And out of range it is gone entirely rather than drawn at nothing.
     field.update(1, camera, source([giver('a', MARKER_RANGE_M + 40, 0)]));
     if (field.live !== 0) failures.push(`A giver ${MARKER_RANGE_M + 40} m away still drew a mark.`);
+
+    // --- The head, which is what `world/giverbodies.ts` was written for.
+    //
+    // Three things, and all three are silent: the two heights disagreeing puts a
+    // visible step in every mark on the beat a body appears under it; the hook
+    // being ignored leaves the whole feature doing nothing; and the crown offset
+    // being forgotten puts the mark 45 cm low, which on a screenshot of one
+    // giver simply looks like a design decision.
+    {
+      const g = 4.25;
+      const ground = 12.0;
+      // `markYFromGround` is the constant this file has always used, restated
+      // through the shared clearance. If those two ever part, the fallback path
+      // and the header's arithmetic are describing different marks.
+      if (Math.abs(markYFromGround(ground) - (ground + MARKER_LIFT_M)) > 1e-9) {
+        failures.push('The ground fallback no longer matches this file’s own lift.');
+      }
+      const withBody: QuestMarkerSource = {
+        ...source([giver('a', 10, 0)]),
+        groundAt: () => g,
+        // A figure standing on `g` in the bind pose.
+        headY: () => g + HEAD_BONE_HEIGHT,
+      };
+      field.update(1, camera, withBody);
+      if (field.live !== 1) failures.push('A giver with a body drew no mark.');
+      const posed = field.markerHeight(0);
+      if (posed === null) failures.push('The field kept no marker to read a height off.');
+      else if (Math.abs(posed - markYFromGround(g)) > 1e-6) {
+        failures.push(
+          `A mark over a body sits at ${posed.toFixed(3)} m and over bare ground at ` +
+            `${markYFromGround(g).toFixed(3)} m; it would jump when she appears.`,
+        );
+      }
+      // A head that moves takes the mark with it, and by the same amount.
+      const dropped: QuestMarkerSource = { ...withBody, headY: () => g + HEAD_BONE_HEIGHT - 0.5 };
+      field.update(1, camera, dropped);
+      const after = field.markerHeight(0);
+      if (posed !== null && after !== null && Math.abs(posed - after - 0.5) > 1e-6) {
+        failures.push(`A head 0.5 m lower moved the mark by ${(posed - after).toFixed(3)} m.`);
+      }
+    }
 
     // The cap, and the counter that says it was reached. A buffer overrun in a
     // typed array is silent, which is why this is asserted rather than trusted.
