@@ -120,6 +120,26 @@
  * `road-deck.PAVING_RISE_M`, and the caller's own ground is the only correct one
  * to use here for the same reason it is the only correct one for `cutAt`.
  *
+ * **And then the overpass fix opened a seam in this rule, and the seam is a
+ * second question, not a change to `deckAt`.** `pipeline/sydney/decks.py`'s
+ * crossing rule lifts a deck that crosses a road `decks.MIN_ROAD_CLEARANCE_M`
+ * (5.0 m) clear of the road it flies over, so after the retile that carries it a
+ * viaduct over a rail corridor stands six metres up rather than on the ground.
+ * `deckAt` answers "is asphalt drawn here", and a deck six metres up is still
+ * asphalt drawn here -- but it is no longer the reason the ground is there, so
+ * the carve must fire under it, and a carve that `deckAt` alone suppressed would
+ * leave a mound of un-cut ground with a bridge in the air above it. The question
+ * the carve wants is therefore "is the paving here *carrying* the ground", which
+ * is `road-deck.RoadDeck.carriesGroundAt` against `DECK_CARRIES_GROUND_M`, and
+ * not `deckAt` -- the latter's contract is that a carriageway's answer does not
+ * depend on the ground at all, which is the order-independence the header argues
+ * and which `server/world.ts` relies on to agree with the browser before either
+ * has the terrain for the tile. So `decked` and `probeAlong` ask
+ * `carriesGroundAt` and `deckAt` stays as it is. On today's data the two agree,
+ * because no deck stands clear of the ground: `server/rail-clearance-check.ts`
+ * is byte-identical before and after this change, and that is the gate that
+ * holds the seam shut until the retile.
+ *
  * ---------------------------------------------------------------------------
  * **This file imports nothing but the flag constants.** No three.js, on
  * `game/rail.ts`'s own terms: `server/world.ts` needs the same corridor to
@@ -350,38 +370,6 @@ export function inTrench(flags: number, depth: number): boolean {
 }
 
 /**
- * How far under a road's paved surface the railhead has to be before the road is
- * treated as carrying the ground over it, metres. Negative, and deliberately so.
- *
- * The question this answers is "which of these two is on top", and the honest
- * reading is *the road wins unless the rail is plainly above it*. A level
- * crossing measures zero here and the road must still keep its ground -- that is
- * the case where the asphalt runs between the rails and the ballast is
- * legitimately buried in it. What the tolerance excludes is the opposite
- * geometry: a road passing *under* a railway on a bridge, where the deck is
- * metres below the railhead and keeping the terrain up at the road would put a
- * lid across the underbridge.
- *
- * `inCutting` has already refused every bridge span before this is reached, and
- * it also requires the terrain to be no more than `CUT_MIN_DEPTH` (0.3 m) below
- * the railhead -- so anything that gets this far has the *ground* at rail level
- * whatever the road is doing, and a road far below that ground is a road in its
- * own cutting passing under an at-grade railway. That is the only geometry this
- * excludes and it is right to exclude it.
- *
- * **A metre, and half a metre is measurably too tight.** At -0.5 m the
- * extent-wide audit left a residual of 34 m2 of carved carriageway in four
- * clusters, and every sample in all four measured the road surface 0.50 to
- * 0.52 m under the railhead with the terrain 0.27 to 0.29 m under it -- level
- * crossings, where the road is draped a gutter's depth below a track that is
- * standing on its own ballast. A crossing 12 m wide has that much crown-to-
- * channel fall in it. A metre puts the boundary outside the noise and is still
- * four times too small to admit a road underbridge, which needs 4.5 m of
- * headroom before anybody would build one.
- */
-const DECK_UNDER_RAIL_TOLERANCE_M = -1.0;
-
-/**
  * What `RailCut` needs from `world/road-deck.RoadDeck`.
  *
  * One method, structurally typed, so this file keeps importing nothing: the
@@ -401,7 +389,25 @@ export interface RoadCover {
    * carriageway ignores it and answers from `.lanes.bin`'s solved height, which
    * is what a bridge deck needs. Pass `NaN` and only the carriageways answer.
    */
-  deckAt(x: number, z: number, groundY: number): number;
+   deckAt(x: number, z: number, groundY: number): number;
+
+  /**
+   * Is the paving here **carrying the ground**, rather than flying over it?
+   *
+   * The ground-aware half of `deckAt`, and the question the carve actually wants.
+   * `deckAt` answers "is asphalt drawn here"; after `pipeline/sydney/decks.py`'s
+   * crossing rule lifts a deck that crosses a road `decks.MIN_ROAD_CLEARANCE_M`
+   * clear of it, a viaduct over a rail corridor stands six metres up and is still
+   * asphalt drawn here -- but it is no longer the reason the ground is there, so
+   * the carve must fire under it. `road-deck.RoadDeck.carriesGroundAt` answers
+   * the right question against `DECK_CARRIES_GROUND_M`; `deckAt` itself stays
+   * ground-independent for the order-independence the header argues and which
+   * `server/world.ts` relies on to agree with the browser before either has the
+   * terrain for the tile, so the two are separate questions rather than one.
+   * `NaN` ground answers `false`, the same way `deckAt` answers `NaN` for a
+   * draped strip: a rule that guessed would guess differently on the two ends.
+   */
+  carriesGroundAt(x: number, z: number, groundY: number): boolean;
 }
 
 /** The grid cell the broad phase files strips into, metres. */
@@ -801,11 +807,10 @@ export class RailCut {
     return best;
   }
 
-  /** Is a paved surface carrying the ground over this railhead? */
-  private decked(x: number, z: number, railY: number, groundY: number): boolean {
+  /** Is a paved surface carrying the ground over this point? See `RoadCover.carriesGroundAt`. */
+  private decked(x: number, z: number, _railY: number, groundY: number): boolean {
     if (this.roads === null) return false;
-    const deckY = this.roads.deckAt(x, z, groundY);
-    return Number.isFinite(deckY) && deckY - railY > DECK_UNDER_RAIL_TOLERANCE_M;
+    return this.roads.carriesGroundAt(x, z, groundY);
   }
 
   /**
@@ -876,13 +881,12 @@ export class RailCut {
       // Sampled once per point rather than once per strip, which matters: this
       // is the hottest loop in a chunk build and a four-road corridor asks about
       // three or four strips at every one of its points.
-      const deckY = this.roads === null ? Number.NaN : this.roads.deckAt(x, z, g);
-      const paved = Number.isFinite(deckY);
+      const paved = this.roads === null ? false : this.roads.carriesGroundAt(x, z, g);
       for (const s of list) {
         const railY = this.railYOn(s, x, z);
         if (!Number.isFinite(railY)) continue;
         const depth = g - railY;
-        if (paved && deckY - railY > DECK_UNDER_RAIL_TOLERANCE_M) continue;
+        if (paved) continue;
         // A trench implies a cut -- `inTrench` says so -- so the deep answer
         // ends the walk and the shallow one only records.
         if (inTrench(this.flags[s], depth)) return { cut: true, trench: true };

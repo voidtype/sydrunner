@@ -158,12 +158,19 @@ export const UNDRAWN_AREA_BUDGET_M2 = 0;
  * the strip between a building and its kerb -- and every one of those is
  * somewhere an invisible wall stops them. And the filter *hid a real class*:
  * with it on the check measured zero, and with it off the same build measures
- * **17**, every one of them a 2-3 m2 structural sliver about a metre over the
- * ground with `decks.PARAPET_HEIGHT_M`'s own 1.1 m of height -- deck parapets
- * whose prism was emitted where their geometry was not. Several of them are
- * inside a standing body's band: the three at (-301, -1097), (-298, -1102) and
- * (-258, -1075) have their base 1.1 m over the ground and their top 2.4 m over
- * it, which is a shin-to-shoulder bar across Millers Point that nothing draws.
+  * **17**, and the 17 are not one class. Fourteen are `decks.py`'s per-segment
+  * versus mitred-frame mismatch: `prisms` built its rings from the segment
+  * normal while `_emit_run` drew from `_frames`' mitred per-station normal, so on
+  * a curve the solid stood up to 1.06 m from the barrier the player can see, and
+  * `_mitred_ring` is the one frame both now use -- so they are gone with the
+  * next retile. The other three are at Millers Point, (-301, -1097), (-298,
+  * -1102) and (-258, -1075): `landmarks.BRIDGE_PARAPET_HEIGHT` hero parapets
+  * whose geometry lives in `landmarks.glb`, which this check does not open, so
+  * they read as undrawn here and a landmark-aware check is what would name
+  * them. Their base is 1.1 m over the ground and their top 2.4 m over it -- a
+  * shin-to-shoulder bar across Millers Point that nothing draws. The budget
+  * therefore goes 17 to 3 with the retile, not to 0, and this file keeps it at
+  * 17 until the retile runs.
  *
  * So the scan is over every prism now and the lane test is kept only as a
  * *severity* split -- a wall in a trunk carriageway is worse than a wall in a
