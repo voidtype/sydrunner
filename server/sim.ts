@@ -327,7 +327,7 @@ import type { WalletFrame } from '../client/src/net/cash.ts';
 // left in *this* file is the three places an account meets the simulation --
 // which wallet a joiner opens, what a knockout does to the ladder, and the
 // sentence a guest is shown when they cross $100.
-import { levelFor } from '../client/src/net/accounts.ts';
+import { XP_PER_KO, koEquivalent, levelFor } from '../client/src/net/accounts.ts';
 // Teams and talents. The contract (`game/teams.ts`) is data and pure rules; the
 // lookup (`game/teamfield.ts`) folds auras in and is the thing the gameplay
 // hooks read; the wire (`net/teams.ts`) is the sub-ops and the broadcast. This
@@ -1828,7 +1828,16 @@ export class Simulation {
       // a second field to keep in step with the record beside it, updated on the
       // same path, to save one nullable dereference per player per refresh. The
       // dereference is the cheaper of the two.
-      s.kills = p.account !== null ? p.account.kills : p.kos;
+      //
+      // WORKSTREAM AK: the account branch is now the **ladder currency** rather
+      // than the body count, expressed in the knockout-equivalents this `u16`
+      // has always carried (`accounts.koEquivalent`). The two were the same
+      // number until quests started paying xp and are not any more, and the one
+      // the bar has to be drawn from is the one `levelFor` reads -- otherwise a
+      // player finishes a job, levels up, and watches a bar that still says
+      // "4 of 10" under a plate that says 3. The guest branch is untouched: a
+      // guest has no xp because there is nowhere to keep it.
+      s.kills = p.account !== null ? koEquivalent(p.account.xp) : p.kos;
       s.colourway = p.colourway;
       s.bot = p.bot !== null;
       s.name = p.name;
@@ -2006,7 +2015,10 @@ export class Simulation {
     if (account === null) {
       // A guest at the first threshold. `attacker.kos` has already been
       // incremented by the caller, so this fires on the tenth kill exactly.
-      if ((attacker.prompted & PROMPTED.LEVEL) === 0 && levelFor(attacker.kos) > 1) {
+      // The guest's own knockouts, in the ladder's currency: a guest has no
+      // `xp` field to read (workstream AK), and `kos * XP_PER_KO` is exactly
+      // what an account with the same knockouts would be holding.
+      if ((attacker.prompted & PROMPTED.LEVEL) === 0 && levelFor(attacker.kos * XP_PER_KO) > 1) {
         attacker.prompted |= PROMPTED.LEVEL;
         this.note(attacker.id, 'sign up to level up (esc)');
       }

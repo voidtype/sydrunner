@@ -334,6 +334,30 @@ export const MSG = {
    * `SUN_PRESS` claims one entry up.
    */
   TEAM: 0x11,
+  /**
+   * Take a quest, hand one in, give one up, walk a dialog node, or say a
+   * photograph was taken. One id with a sub-op byte; see `net/quests.QUEST_OP`
+   * and `game/questmodel.ts` (the contract).
+   *
+   * `SUGGEST`, `PHONE` and `TEAM`'s arrangement for their reasons exactly: six
+   * operations that are one conversation, held from one panel, a handful of
+   * times a session. Six ids would be six cases in `server/index.ts` for one
+   * feature and six things to rate-limit separately.
+   *
+   * **0x15, paired with `QUEST_STATE` at 0x95, which is `CHAT_SAY`'s halves
+   * convention honoured properly** -- request and reply are one number in two
+   * halves and reading either off a hex dump gives you the other. The three
+   * free-looking numbers below 0x15 are not free in that sense: 0x12, 0x13 and
+   * 0x14 are the low halves of `HEAT`, `TALENTS` and `TEAM_EVENT`, and taking
+   * one of them would put a client message opposite an unrelated server one
+   * and quietly break the convention for whoever reads the table next.
+   *
+   * **The pack itself is not on this wire.** A dialog tree is tens of
+   * kilobytes and the socket is `maxPayloadLength: 1024`; the content is
+   * fetched over HTTP from `/content` and only the cursors and the decisions
+   * cross here. See `net/quests.ts`' header for the whole argument.
+   */
+  QUEST: 0x15,
 
   WELCOME: 0x81,
   SNAPSHOT: 0x82,
@@ -585,6 +609,32 @@ export const MSG = {
    * frame between the two arriving.
    */
   TALENTS: 0x93,
+  /**
+   * Where one player is in every quest they are on, and what they have unlocked.
+   * See `net/quests.encodeQuestState`.
+   *
+   * **0x95, the high half of `QUEST` at 0x15** -- `CHAT_SAY`'s convention, and
+   * see that entry for why the intervening numbers were not taken.
+   *
+   * **Per client, and never deduplicated across sockets**, which it shares with
+   * `SUGGEST_LIST` and with nothing else in this half of the table: it carries
+   * this player's cursors, this player's story flags and this player's xp, so
+   * there is no shared body to encode once. `server/room.ts`'s `FrameGroups`
+   * exists for messages that are a function of the working set and this is not
+   * one.
+   *
+   * Sent **on change**, on `BIKES`' argument taken further than `BIKES` takes
+   * it: a cursor moves a few times a minute for somebody actively questing and
+   * *never* for somebody who is not, so the ordinary player receives exactly
+   * one of these in a session -- the one at join that says they have no quests.
+   *
+   * The improv line rides on the tail of it rather than on a message of its
+   * own, and that is the same call `Simulation.note` made about `MSG.NOTE`: a
+   * second id, a second decoder and a second cadence, to deliver a sentence
+   * that arrives *because* a cursor-bearing frame is already being sent to this
+   * exact player at this exact moment. See `net/quests.QuestStateFrame.line`.
+   */
+  QUEST_STATE: 0x95,
 } as const;
 
 /**
@@ -5807,7 +5857,7 @@ export function verifyNet(): string[] {
     }
     // Which half each one belongs in, named here rather than inferred from a
     // prefix: a list is checkable and a naming convention is not.
-    const clientToServer = ['HELLO', 'INPUT', 'PING', 'CHAT_SAY', 'SUGGEST', 'SUN_PRESS', 'PHONE', 'TEAM'];
+    const clientToServer = ['HELLO', 'INPUT', 'PING', 'CHAT_SAY', 'SUGGEST', 'SUN_PRESS', 'PHONE', 'TEAM', 'QUEST'];
     for (const [name, id] of Object.entries(MSG)) {
       const wantsLow = clientToServer.includes(name);
       if (wantsLow && id >= 0x80) {
