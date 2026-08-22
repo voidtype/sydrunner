@@ -842,7 +842,20 @@ export const MSG = {
  * of the next player. The handshake refusal is the whole safety net, which is
  * why the number moves in the same commit as the widths.
  */
-export const PROTOCOL_VERSION = 20;
+/*
+ * v21: quests and dialog on the wire.
+ *
+ * Workstream AK. Two new messages -- `QUEST` (0x15, client -> server: accept,
+ * turn-in) and `QUEST_STATE` (0x95, server -> client: the cursor) -- a matched
+ * pair under the halves convention, with their codecs in `net/quests.ts`
+ * because this file imports nothing and is the root of the tree. The account
+ * record also grew `xp`, `story` and `quests`; those are storage, not wire,
+ * and `levelFor` reads xp seeded at kills x 100 so the ladder is bit-identical
+ * to before. Strictly additive on the wire -- a v20 client never sends 0x15 --
+ * but a server that answers a message a client cannot parse is the exact
+ * disagreement the version exists to refuse, so it moves.
+ */
+export const PROTOCOL_VERSION = 21;
 
 /** Spec 10: "60 Hz tick, snapshots at 20-30 Hz." */
 export const TICK_HZ = 60;
