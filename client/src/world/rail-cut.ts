@@ -121,6 +121,44 @@
  * to use here for the same reason it is the only correct one for `cutAt`.
  *
  * ---------------------------------------------------------------------------
+ * **WHY `decked` STILL ASKS `deckAt` AND NOT `road-deck.carriesGroundAt`, NOW
+ * THAT THE RETILE HAS RUN.**
+ *
+ * The overpass round lifted every deck that crosses a road
+ * (`pipeline/sydney/decks.py`'s `_crossing_demand`), and the argument at the
+ * time was that a viaduct standing six metres up is no longer the reason the
+ * ground is there, so the carve should fire under it: `decked` and `probeAlong`
+ * would ask `carriesGroundAt` -- paving within `DECK_CARRIES_GROUND_M` of the
+ * ground -- rather than `deckAt`. That was tried twice, and the second time
+ * against the tiles it was waiting for. Commit 2498a85 wrote it, d45f90d took
+ * it out because on the old bake it cost 1,423 m2 of drawn paving and 1,310
+ * lattice drops, and the retile of 2026-08-23 was the gate it was to return
+ * through. **It came back worse, and the reason is not a tuning error.**
+ * Measured against the new tiles, `SYDNEY_CHECK_ONLY=roads`:
+ *
+ *                                   paving the carve removes   lattice drops
+ *     deckAt, as this file is                          0 m2           4,456
+ *     carriesGroundAt, old bake                    1,423 m2           5,684
+ *     carriesGroundAt, new bake                    7,004 m2          11,425
+ *
+ * The 7,004 m2 is **not** a defect in the new rule. None of it is footway; all
+ * of it is carriageway, and the worst of it is the M5 Motorway at (-26764,
+ * 8297) standing 8.3 m over its corridor and Station Street at (-6904, 10432)
+ * standing 6.8 m over its. Those are road bridges over a railway. The new rule
+ * removes the ground under them, which is exactly what it was written to do,
+ * and the retile made five times as many of them by lifting the decks.
+ *
+ * **So the seam is in the assertion, not only here.** `checkRoadDeck` asks *is
+ * the ground under this drawn paving still there*, and a bridge legitimately
+ * answers no. What it has to ask instead is *is the player still held* --
+ * ground, or the deck's own collision volume, which `decks.prisms` already
+ * emits with `WALK_UNDER_M` deciding soffit against embankment. Until the
+ * section asks the second question, `carriesGroundAt` cannot be adopted here:
+ * it is not that the rule is wrong, it is that nothing yet measures the thing
+ * that would make it safe. `road-deck.carriesGroundAt` stays where it is,
+ * tested by `verifyRoadDeck`, waiting for that.
+ *
+ * ---------------------------------------------------------------------------
  * **This file imports nothing but the flag constants.** No three.js, on
  * `game/rail.ts`'s own terms: `server/world.ts` needs the same corridor to
  * answer "how high is the ground" for a player standing in a cutting, and a

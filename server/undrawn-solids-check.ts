@@ -158,26 +158,28 @@ export const UNDRAWN_AREA_BUDGET_M2 = 0;
  * the strip between a building and its kerb -- and every one of those is
  * somewhere an invisible wall stops them. And the filter *hid a real class*:
  * with it on the check measured zero, and with it off the same build measures
-  * **17**, and the 17 are not one class. Fourteen are `decks.py`'s per-segment
-  * versus mitred-frame mismatch: `prisms` built its rings from the segment
-  * normal while `_emit_run` drew from `_frames`' mitred per-station normal, so on
-  * a curve the solid stood up to 1.06 m from the barrier the player can see, and
-  * `_mitred_ring` is the one frame both now use -- so they are gone with the
-  * next retile. The other three are at Millers Point, (-301, -1097), (-298,
-  * -1102) and (-258, -1075): `landmarks.BRIDGE_PARAPET_HEIGHT` hero parapets
-  * whose geometry lives in `landmarks.glb`, which this check does not open, so
-  * they read as undrawn here and a landmark-aware check is what would name
-  * them. Their base is 1.1 m over the ground and their top 2.4 m over it -- a
-  * shin-to-shoulder bar across Millers Point that nothing draws. The budget
-  * therefore goes 17 to 3 with the retile, not to 0, and this file keeps it at
-  * 17 until the retile runs.
+ * **17**, and the 17 were not one class. Fourteen were `decks.py`'s per-segment
+ * versus mitred-frame mismatch: `prisms` built its rings from the segment
+ * normal while `_emit_run` drew from `_frames`' mitred per-station normal, so on
+ * a curve the solid stood up to 1.06 m from the barrier the player can see, and
+ * `_mitred_ring` is the one frame both now use.
+ *
+ * **The retile of 2026-08-23 ran, and the fourteen are gone.** 1,646 tiles
+ * re-emitted; this check now measures **3**, and they are the same three the
+ * prediction named, to the metre: Millers Point, (-301.1, -1097.0), (-298.4,
+ * -1102.4) and (-257.9, -1075.3) -- `landmarks.BRIDGE_PARAPET_HEIGHT` hero
+ * parapets whose geometry lives in `landmarks.glb`, which this check does not
+ * open, so they read as undrawn here and a landmark-aware check is what would
+ * name them. Their base is 1.1 m over the ground and their top 2.4 m over it --
+ * a shin-to-shoulder bar across Millers Point that nothing draws. The budget is
+ * 3 rather than 0 for exactly those three and for nothing else.
  *
  * So the scan is over every prism now and the lane test is kept only as a
  * *severity* split -- a wall in a trunk carriageway is worse than a wall in a
  * back garden, and the table sorts by it. Both counts are ratcheted, because
  * they can regress independently.
  */
-export const UNDRAWN_ANYWHERE_BUDGET = 17;
+export const UNDRAWN_ANYWHERE_BUDGET = 3;
 
 /**
  * How far a prism's underside must clear the ground before it stops being a

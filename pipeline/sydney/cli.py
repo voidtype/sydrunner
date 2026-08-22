@@ -6063,6 +6063,24 @@ def main(argv: list[str] | None = None) -> int:
     # buffered by different code with different join rules, so a fence panel
     # that stops exactly on one kerb can have its centroid a centimetre inside
     # the other. Set from the run that ships and tightened when it can be.
+    #
+    # WHAT THIS COUNTS AND WHAT IT DOES NOT, because the 08-23 round met both on
+    # one day and they are different defects with different owners.
+    #
+    #   - **Here**: `fences.py` FRONT fences, the property-line panels drawn into
+    #     the tile GLB. Over the 1,646 tiles the overpass round re-emitted this
+    #     went 2,956 -> 84 -- the clip that arrived in the 08-17 pipeline round
+    #     reaching tiles last built on 08-09. The 84 are the residual of that
+    #     clip and are this command's to lower.
+    #   - **Not here**: the railway's own BOUNDARY fence, which `rail-geo`
+    #     builds at runtime from `rail.bin` and clips against `.lanes.bin` at
+    #     `FENCE_CLIP_M`. The same round put 11 of those panels in a carriageway
+    #     -- North Parade, North Terrace, Central Coast Highway, the Western
+    #     Motorway -- because lifting a deck moved the carriageway the clip is
+    #     asked about. That one is measured and named by
+    #     `FENCE_IN_ROAD_CEILING` in `server/integration-check.ts`
+    #     (`SYDNEY_CHECK_ONLY=paved`), it is `rail-geo`'s to fix, and no change
+    #     to `fences.py` touches it.
     fr.add_argument("--max-triangles", type=int, default=0,
                     help="fence triangles allowed in a carriageway")
     fr.add_argument("--worst", type=int, default=12, help="offenders to name")
