@@ -4304,7 +4304,8 @@ export class Simulation {
         );
         if (hit !== null) {
           offended = true;
-          // Two hp, and cosmetic on purpose -- see `driving.PEDESTRIAN_DAMAGE`.
+          // Half a hp, and cosmetic on purpose -- see `driving.PEDESTRIAN_DAMAGE`,
+          // which is a *ratio* against the crash cap and moved down with it.
           // Through the same `damage` call the walls use, so the same cooldown
           // applies and a car driven through a crowd collects one dent per half
           // second rather than one per body.

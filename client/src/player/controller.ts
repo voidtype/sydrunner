@@ -133,6 +133,23 @@ export function createPlayerState(x = 0, z = 0): PlayerState {
  * on a roof" are different questions with different answers at the same (x, z),
  * and only the caller's height distinguishes standing on a warehouse from
  * standing beside it.
+ *
+ * ---------------------------------------------------------------------------
+ * **Returns whether the prism resolver pushed this body**, and it used to return
+ * nothing. WORKSTREAM AP.
+ *
+ * A return rather than a field on `PlayerState`, which was the other way to do
+ * it: the state record is replayed, seeded and copied in four places
+ * (`net/client.reconcile`'s `replayBody` among them) and every one of them would
+ * have had to learn about a field that is only meaningful for the tick that just
+ * ran. A return value is meaningful for exactly that long. Every existing caller
+ * ignores it and is unchanged.
+ *
+ * The one caller that wants it is `combat.advance`, which hands it to
+ * `driving.crashFromClamp` -- see that function's header for the whole argument,
+ * which is the owner's: **a car takes damage from closing into a solid, and a
+ * step that fell short with nothing in the way is a bump and is free.** This
+ * function is the only thing in the project that knows which of those happened.
  */
 export function step(
   state: PlayerState,
@@ -140,7 +157,7 @@ export function step(
   dt: number,
   world: MoveResolver | null,
   groundHeightAt: (x: number, z: number, feetY: number) => number,
-): void {
+): boolean {
   state.yaw = input.yaw;
   state.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, input.pitch));
 
@@ -214,6 +231,8 @@ export function step(
   const feetY = state.position.y - EYE_HEIGHT;
   let resolvedX = toX;
   let resolvedZ = toZ;
+  /** Did a prism push this body? The return; see the header. */
+  let pushed = false;
   if (world) {
     // The two ends of the capsule, and only the bottom one carries the step.
     //
@@ -237,6 +256,7 @@ export function step(
     );
     resolvedX = r.x;
     resolvedZ = r.z;
+    pushed = r.hit;
     if (r.hit) {
       // Kill only the velocity component that went into the wall, so the player
       // slides along it instead of stopping dead.
@@ -272,6 +292,8 @@ export function step(
   } else {
     state.onGround = false;
   }
+
+  return pushed;
 }
 
 /** Camera orientation for a state. Yaw then pitch, in that order. */

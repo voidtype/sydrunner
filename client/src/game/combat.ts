@@ -168,12 +168,18 @@
 
 import { Vector3 } from 'three/webgpu';
 
-import type { CollisionWorld, MoveResolver } from '../player/collision.ts';
+import { BODY_HEIGHT_M, type CollisionWorld, type MoveResolver } from '../player/collision.ts';
 import { createAboardSlot, type AboardSlot } from './riding.ts';
 import {
   EYE_HEIGHT,
   GRAVITY,
   PLAYER_RADIUS,
+  // WORKSTREAM AP: the step allowance, imported for one assertion in
+  // `verifyCombat` and nothing else. `game/driving.ts` restates it as
+  // `NOSE_STEP` because it may not import this module, and the two drifting
+  // apart is not a tuning inconsistency -- it is the kerb-damage bug, so the
+  // cross-check is real and lives here, in the one file that can see both.
+  STEP_HEIGHT,
   createPlayerState,
   step,
   type InputSnapshot,
@@ -222,7 +228,7 @@ import { shapeRideInput } from './bikes.ts';
 // The cars, on exactly the bikes' terms one line up: the *rules* half, three-free,
 // run by the server and the browser and `net/client.reconcile`'s replay from one
 // file. See `game/driving.ts`.
-import { CAR_HEALTH_MAX, crashFromClamp, shapeDriveInput, stepCarSpeed } from './driving.ts';
+import { CAR_HEALTH_MAX, NOSE_HEAD, NOSE_STEP, crashFromClamp, shapeDriveInput, stepCarSpeed } from './driving.ts';
 // The wading rule. A pure module with no import of its own -- see its header for
 // why the water level reaches both ends of the wire without going over it.
 import {
@@ -1308,7 +1314,11 @@ export function advance(
 
   const fromX = c.body.position.x;
   const fromZ = c.body.position.z;
-  step(c.body, movement, dt, moverOf(world), groundOf(world));
+  // The return is **did a prism push this body**, and it is the gate on the
+  // clamp half of the crash detection twenty lines down. See
+  // `driving.crashFromClamp`: a step that fell short with nothing solid in the
+  // way is a bump, and a bump is free.
+  const hitSolid = step(c.body, movement, dt, moverOf(world), groundOf(world));
 
   // And the deep-entry limit, after the step rather than inside it, because it
   // is a question about where the step *landed*. Undoing the move rather than
@@ -1349,10 +1359,20 @@ export function advance(
   // distance the speed promised, calls the shortfall an impact, and takes it off
   // the car. See its header for why the tolerance is not zero.
   //
-  // Below the wading undo, deliberately: a player who was pushed back out of
-  // deep water did not crash into anything, and measuring before the undo would
-  // charge them for a wave.
-  c.carCrashDv += crashFromClamp(c, c.body.position.x - fromX, c.body.position.z - fromZ, dt);
+  // Below the wading undo, deliberately: this asks where the body *ended up*,
+  // and after the undo is where it ended up.
+  //
+  // **WORKSTREAM AP corrected the reasoning that used to be written here**, and
+  // the correction is the bug. The old paragraph said the ordering was chosen so
+  // as not to "charge them for a wave" -- but measuring after the undo is
+  // exactly what charged them: the undo puts the body back at `from`, so a car
+  // driven off a wharf at 40 m/s reported a shortfall of the whole step and was
+  // billed a maximum crash every half second for as long as the player held W.
+  // The ordering was never the problem. The missing question was *was anything
+  // solid in the way*, and `hitSolid` -- `controller.step`'s own return, not a
+  // second query -- is it. Water is not a wall, and neither is a kerb the body
+  // stepped over. See `driving.crashFromClamp`.
+  c.carCrashDv += crashFromClamp(c, c.body.position.x - fromX, c.body.position.z - fromZ, dt, hitSolid);
 
   return events;
 }
@@ -2036,6 +2056,33 @@ function idleInput(yaw = 0, pitch = 0): CombatInput {
  */
 export function verifyCombat(): string[] {
   const failures: string[] = [];
+
+  // --- WORKSTREAM AP: **the bonnet asks the body's question.**
+  //
+  // The one cross-check in the project that is worth more than the tidiness of
+  // the numbers agreeing, and this file is where it has to live because it is
+  // the only one that imports both the controller and the driving rules.
+  //
+  // `driving.stepCarSpeed`'s nose probe restates the controller's step
+  // allowance and body height rather than importing them (`driving.ts` may not
+  // import a module that imports three). If they drift, the probe and the
+  // capsule disagree about which prisms exist -- which is exactly the bug the
+  // owner reported as *"even small bumps in a road alone are giving damage"*:
+  // a kerb the body walks over and the bonnet calls a wall, invisible on
+  // screen, worth a full crash every half second. See `driving.NOSE_STEP`.
+  if (NOSE_STEP !== STEP_HEIGHT) {
+    failures.push(
+      `driving.NOSE_STEP is ${NOSE_STEP} and controller.STEP_HEIGHT is ${STEP_HEIGHT}. The car's nose probe and ` +
+        `the driver's own capsule now disagree about which kerbs are solid, which is free crash damage on ` +
+        `every piece of low geometry in Sydney. See driving.NOSE_STEP.`,
+    );
+  }
+  if (NOSE_HEAD !== BODY_HEIGHT_M) {
+    failures.push(
+      `driving.NOSE_HEAD is ${NOSE_HEAD} and collision.BODY_HEIGHT_M is ${BODY_HEIGHT_M}. The nose probe now ` +
+        `demands different headroom from the body behind it, so a soffit the driver fits under is a crash.`,
+    );
+  }
 
   // --- The cycle is 500 ms, in simulated time, through the real phase machine.
   {

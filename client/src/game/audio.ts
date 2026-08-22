@@ -69,8 +69,14 @@ import { screamGap } from './sunbutton.ts';
  * `strength`, so a fraction of the top speed.
  *
  * A sixth, which on `driving.DRIVE_TOP_SPEED`'s 44 m/s is a 7.3 m/s impact --
- * about the speed at which `driving.crashDamage` first takes more than twenty
- * health, and comfortably past anything that could be called parking.
+ * comfortably past anything that could be called parking, and now well *under*
+ * the speed at which the car takes any health at all. That is deliberate and it
+ * is the one place this file and `game/driving.ts` are meant to disagree: since
+ * WORKSTREAM AP raised `driving.CRASH_FREE_SPEED` to 12, nothing under 18 m/s of
+ * road speed costs a car anything, and a glass-breaking threshold that had
+ * followed the damage curve up there would have made every crash in a suburban
+ * street silent. **The sound is about the impact and the damage is about the
+ * consequence**; a player should hear a wing go before the bar moves.
  *
  * **0.16, halved from 0.33 when the top speed doubled.** The number that has to
  * stay put is the *impact* -- glass breaks at about seven metres a second and
