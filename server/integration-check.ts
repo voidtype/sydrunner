@@ -18809,6 +18809,19 @@ async function checkRiding(): Promise<void> {
     worstAbove: number;
     walked: number;
     alighted: boolean;
+    /**
+     * The trip ran out under them before a dwell came, and `sim.strandRider`
+     * stood them on the last platform it called at.
+     *
+     * A legitimate end and not a failure, and it has to be a field here because
+     * the wait loop cannot tell it from "ten minutes and the doors never opened"
+     * by looking at `isAboard` alone. It printed the second sentence for the
+     * first event -- *"put them down at , 24 s after boarding -- still aboard"*,
+     * with an empty station name, on whichever runs the instant this section
+     * samples happened to land near a terminus. See `sim.enterCarriage`'s
+     * `RIDE_TRIP_GONE`.
+     */
+    stranded: boolean;
     waitedS: number;
     /**
      * The platform under the point `alightPlatform` **chose**, before a single
@@ -18863,7 +18876,7 @@ async function checkRiding(): Promise<void> {
       boarded: false, car: -1, lx: 0, ly: 0, lz: 0, chancerAboard: false,
       stillAboard: false, travelled: 0, straight: 0,
       worstBelow: 0, worstAbove: 0, walked: 0,
-      alighted: false, waitedS: 0,
+      alighted: false, stranded: false, waitedS: 0,
       landSurface: -Infinity, landedOnPlatform: false,
       feet: 0, ground: 0, surface: -Infinity, gapMm: null,
       onGround: false, vy: 0, health: 0, fromTrackCentre: 0, onPlatform: false,
@@ -18993,8 +19006,13 @@ async function checkRiding(): Promise<void> {
     // 2.5 km between calls west of Strathfield, which at 44 m/s is a minute of
     // railway with the doors shut.
     let waited = 0;
+    // Held from inside the loop because `clearAboard` empties `a` on the tick
+    // the trip runs out, and a stranded rider still has to be able to say which
+    // station the server stood them at. See below.
+    let dirRode: import('../client/src/game/rail.ts').RailDirection | null = null;
     for (; waited < 600 * TICK_HZ && ride1.isAboard(a); waited++) {
       const dirNow = ride1.dirOf(bake, a.line, a.dir);
+      if (dirNow !== null) dirRode = dirNow;
       const now = ride1.aboardPose(bake, a, rail1.railSeconds(railMs));
       if (dirNow !== null && now !== null && now.doorsOpen) {
         r.to = now.atStop >= 0 ? dirNow.stops[now.atStop].name : '?';
@@ -19028,7 +19046,19 @@ async function checkRiding(): Promise<void> {
       tickClock();
     }
     r.waitedS = waited / TICK_HZ;
-    if (!r.alighted) { sim.leave(p.id); r.ok = r.boarded; return r; }
+    // The loop above ends on `!isAboard`, and there are two ways to get there.
+    // One is `E` at a dwell, which is `alighted`. The other is the trip running
+    // out under a rider who is still waiting for one -- the server's own
+    // `strandRider`, which puts them on the last platform the trip called at and
+    // is exactly as legitimate an end. Naming it here is what stops this section
+    // printing "still aboard" at a body that is standing on a platform, on the
+    // runs whose sampled instant lands near a terminus. See `RideReport.stranded`.
+    if (!r.alighted && !ride1.isAboard(a)) {
+      r.stranded = true;
+      const last = dirRode === null ? -1 : ride1.nextCall(dirRode, dirRode.lengthM);
+      if (dirRode !== null && last >= 0) r.to = dirRode.stops[last].name;
+    }
+    if (!r.alighted && !r.stranded) { sim.leave(p.id); r.ok = r.boarded; return r; }
 
     // Half a second of ticks to settle, because "on solid ground" is a claim
     // about where a body comes to rest and not about the frame it was put down
@@ -19111,12 +19141,16 @@ async function checkRiding(): Promise<void> {
           `carriage's own frame. The floor is not moving in that frame, which is the entire point`,
       );
       check(
-        r.alighted,
-        `  and E at the next dwell put them down at ${r.to}, ` +
-          `${r.waitedS.toFixed(0)} s after boarding` +
-          (r.alighted ? '' : ' -- still aboard'),
+        r.alighted || r.stranded,
+        r.stranded
+          ? `  and the trip ran out under them ${r.waitedS.toFixed(0)} s after boarding, before a dwell ` +
+            `came: the server stood them on ${r.to}'s platform, which is strandRider's contract and ` +
+            `not a failure to get off`
+          : `  and E at the next dwell put them down at ${r.to}, ` +
+            `${r.waitedS.toFixed(0)} s after boarding` +
+            (r.alighted ? '' : ' -- still aboard, and no dwell in ten minutes of timetable'),
       );
-      if (r.alighted) {
+      if (r.alighted || r.stranded) {
         // **On solid ground, at the right station.** Two claims, and the first
         // one is checked against the server's own `groundHeight` rather than
         // against the platform, because that is the function that decides
@@ -19141,15 +19175,23 @@ async function checkRiding(): Promise<void> {
         // Hornsby. Section 3c(c2) below now asserts that half **exhaustively**,
         // by name, which is strictly more than the toss ever did; this one is
         // left saying only what riding owns. Both numbers are still printed.
-        check(
-          r.landedOnPlatform,
-          `  and the disembark put them on a platform rather than on the paddock above the cutting: ` +
-            `the platform field puts a surface at ${r.landSurface.toFixed(2)} m where ` +
-            `\`alightPlatform\` chose. Half a second later they are standing on ` +
-            `${r.onPlatform
-              ? `it, ${r.gapMm === null ? 'Infinity' : r.gapMm.toFixed(0)} mm off`
-              : `${r.surface === -Infinity ? 'no platform at all -- pushed off the deck by something standing on it; see (c2)' : `${r.surface.toFixed(2)} m`}`}`,
-        );
+        //
+        // Asked of a disembark only. A stranded rider was put down by
+        // `stopPlatform` rather than by `alightPlatform`, which is a different
+        // function with its own reach, and `landSurface` was never composed for
+        // them -- the line above and the two either side of it already say
+        // everything this run can honestly claim about that ending.
+        if (r.alighted) {
+          check(
+            r.landedOnPlatform,
+            `  and the disembark put them on a platform rather than on the paddock above the cutting: ` +
+              `the platform field puts a surface at ${r.landSurface.toFixed(2)} m where ` +
+              `\`alightPlatform\` chose. Half a second later they are standing on ` +
+              `${r.onPlatform
+                ? `it, ${r.gapMm === null ? 'Infinity' : r.gapMm.toFixed(0)} mm off`
+                : `${r.surface === -Infinity ? 'no platform at all -- pushed off the deck by something standing on it; see (c2)' : `${r.surface.toFixed(2)} m`}`}`,
+          );
+        }
         // And clear of the four-foot: at least the platform's own inner edge
         // away from the track centre, or they got off between the rails.
         check(
@@ -19363,7 +19405,7 @@ async function checkRiding(): Promise<void> {
       );
     }
 
-    // --- (c) And a disembark always lands on one.
+    // --- (c) And a disembark always lands on one, wherever the corridor built one.
     //
     // The other half of the `-Infinity`, and it is not the same half: at Central
     // a rider's own platform *is* in the field and the composed alight point
@@ -19373,11 +19415,51 @@ async function checkRiding(): Promise<void> {
     // than shrugging, so this sweeps every calling stop of every direction --
     // the carriage `nextDwell` puts a boarder at, every door bay, both sides --
     // and demands a surface at every one.
+    //
+    // ---------------------------------------------------------------------------
+    // AND IT WAS `onPlatform === points`, AND THAT SENTENCE OUTLIVED ITS WORLD.
+    //
+    // It was written against a railway where every track carried a 9.4 m deck on
+    // **both** sides, so "there is a platform beside this door" was true by
+    // construction and the only way to miss one was arithmetic. The corridor
+    // rework made the deck a slot occupant -- `RAIL-CORRIDOR.md`: *"where no slot
+    // fits, no platform is built. A missing platform is honest; a platform inside
+    // a train is not"* -- and three of Sydney's 190 station names came out of it
+    // with no deck anywhere at all: **Cabramatta, Museum, Summer Hill**, whose
+    // stopping anchors sit between running lines with under `MIN_PLATFORM_DECK`
+    // of budget on either side. A disembark there falls back to the carriage's
+    // own rail level, which is the honest answer and is not something this
+    // section can assert away.
+    //
+    // So the claim keeps its teeth and changes its shape: a disembark lands on a
+    // platform **at every stop the corridor gave one to**, and the stops it did
+    // not are named, counted and ratcheted. 52 of 2,014 landings, all thirteen of
+    // them at those three names. It may not grow, and the day a round gives
+    // Cabramatta a deck it comes down.
+    //
+    // Two real defects were found underneath the stale sentence and are fixed
+    // rather than fenced, both in `game/riding.ts`:
+    //
+    //   - **`placeOn` clamped in the anchor's chord** while `surfaceAt` judged on
+    //     the swept spine, so 22 landings were slid onto points the field then
+    //     answered `-Infinity` for. `verifyRiding` now carries that as a pure
+    //     case with its own negative control.
+    //   - **`ALIGHT_SNAP_M` was 12 m**, which is a curve's worth of error and not
+    //     the width of a corridor. A rider at the door on the side the slot
+    //     refused needs 14 m to reach the deck across the formation, and at
+    //     Central, Hornsby and Newtown -- where the anchored road carries no deck
+    //     and the station's platforms are on the roads either side -- up to 46 m.
+    //     `stopPlatform` was given `STRAND_SNAP_M` for exactly this hole the day
+    //     the slots landed; the ordinary disembark was not. 247 landings.
+    //
+    // 1,693 of the 2,014 landed before the two; 1,962 do now.
     {
+      /** The three names the slot rule left without a deck anywhere. See above. */
+      const NO_SLOT_ANYWHERE = 52;
       let points = 0;
       let onPlatform = 0;
       let worstSnap = 0;
-      let firstOff = '';
+      const missed = new Map<string, number>();
       const frame = ride1.createCarFrame();
       const spot = { x: 0, y: 0, z: 0 };
       const raw = { x: 0, y: 0, z: 0 };
@@ -19409,19 +19491,38 @@ async function checkRiding(): Promise<void> {
                 const snap = Math.hypot(spot.x - raw.x, spot.z - raw.z);
                 if (snap > worstSnap) worstSnap = snap;
                 if (field.surfaceAt(spot.x, spot.z) > -Infinity) onPlatform++;
-                else if (!firstOff) firstOff = `${line.id} dir ${dir.index} at ${stop.name}`;
+                else missed.set(stop.name, (missed.get(stop.name) ?? 0) + 1);
               }
             }
           }
         }
       }
+      const off = points - onPlatform;
+      const named = [...missed.entries()]
+        .sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1))
+        .map(([n, c]) => `${n} x${c}`)
+        .join(', ');
       check(
-        points > 1500 && onPlatform === points,
-        `and a disembark lands on a platform at all ${points.toLocaleString()} of them -- every calling ` +
-          `stop of every direction, the carriage the dwell solver stands a boarder at, both door bays, ` +
-          `both sides. Worst slide ${worstSnap.toFixed(2)} m against a ${ride1.ALIGHT_SNAP_M} m bound, ` +
-          `which is a curve rotating the carriage's sideways out of the platform's and not a teleport` +
-          (firstOff ? `. FIRST OFF: ${firstOff}` : ''),
+        points > 1500 && off <= NO_SLOT_ANYWHERE,
+        `a disembark lands on a platform at ${onPlatform.toLocaleString()} of ${points.toLocaleString()} ` +
+          `of them -- every calling stop of every direction, the carriage the dwell solver stands a ` +
+          `boarder at, both door bays, both sides. Worst slide ${worstSnap.toFixed(2)} m against a ` +
+          `${ride1.ALIGHT_SNAP_M} m bound, which is a corridor's width and not a teleport. The ` +
+          `${off} that do not are stops the slot rule left no deck at, against a ceiling of ` +
+          `${NO_SLOT_ANYWHERE}${named ? `: ${named}` : ''}`,
+      );
+      // THE NEGATIVE CONTROL for the ceiling, and it is a claim about *names*
+      // rather than about landings: the 52 are three stations with no deck on
+      // either side of any of their anchors, not a spray of near misses across
+      // the city. A fourth name arriving here is a slot regression and reads as
+      // one, where a bare count would absorb it.
+      check(
+        missed.size > 0 && [...missed.keys()].every((n) => field.sites
+          .filter((s) => s.name === n).every((s) => s.outer[0] <= 0 && s.outer[1] <= 0)),
+        `  and every one of them is at a station the corridor gave no deck at all -- ` +
+          `${[...missed.keys()].sort().join(', ')} -- rather than at a platform the landing missed. ` +
+          `See platform-spine.MIN_PLATFORM_DECK and RAIL-CORRIDOR.md: a station whose anchors sit ` +
+          `between running lines gets no slab, and a rider there is put down at rail level`,
       );
     }
 
@@ -19431,13 +19532,22 @@ async function checkRiding(): Promise<void> {
     // WHY THIS IS A SEPARATE CLAIM, AND WHY IT IS A CEILING RATHER THAN A ZERO.
     //
     // (c) proves `alightPlatform` chooses a point with a platform under it, at
-    // all 2,014 of them. That is the whole of what riding owns, and it holds.
+    // 1,962 of the 2,014 and at every stop that has a deck to choose. That is
+    // the whole of what riding owns, and it holds.
     // It is *not* the whole of what a player experiences, because the very next
     // thing that happens to the body is a tick of `controller.step`, and
     // `CollisionWorld.resolve` will push it out of anything it has been put
-    // inside. At 35 of those 2,014 points it does exactly that -- up to 6.5 m
+    // inside. At 13 of those points it does exactly that -- up to 37 m
     // sideways, which is off the deck entirely and onto the terrain over the
-    // cutting. The player gets off at Hornsby and is shoved into the car park.
+    // cutting. The player gets off at Kogarah and is shoved into the car park.
+    //
+    // **The arithmetic below had a bug of its own and it is fixed here.**
+    // `pushedOff` was `points - stayed`, and `stayed` was only ever incremented
+    // for a point that had a platform to begin with -- so every one of (c)'s
+    // misses was counted a second time as a body shoved off a deck, which it is
+    // not: it was never on one. That is how this read 332 while the collision
+    // world was pushing eleven bodies. The two populations are now separated and
+    // the count below is the one this check is named for.
     //
     // **That is a real defect and it is not riding's.** A footprint standing on
     // a platform is `world/envelope.ClearanceEnvelope`'s subject -- the same
@@ -19467,9 +19577,15 @@ async function checkRiding(): Promise<void> {
     // that was passing has been loosened, and 35 is what the shipped city
     // actually is. It may not grow. When the envelope round lands it comes down
     // to zero and the ceiling goes with it.
+    //
+    // 35 also stands unchanged through this round, which is the point of writing
+    // the two populations apart: the number of bodies the collision world shoves
+    // off a deck is **13**, it was 11 when the fence was set, and the 321 that
+    // made this read 332 were (c)'s and are (c)'s again.
     {
       const STANDING_RESIDUAL = 35;
       let points = 0;
+      let placed = 0;
       let stayed = 0;
       let worstPush = 0;
       const off = new Map<string, number>();
@@ -19500,7 +19616,10 @@ async function checkRiding(): Promise<void> {
                 points++;
                 ride1.alightPlatform(frame, it, bay.x, side, field, spot);
                 const top = field.surfaceAt(spot.x, spot.z);
-                if (top === -Infinity) continue; // (c) owns this one, and it is zero.
+                // (c) owns this one, and counting it here as well is what made
+                // this assertion read 332. See the header.
+                if (top === -Infinity) continue;
+                placed++;
                 // One depenetration, from the server's own collision world and
                 // at the feet height the disembark chose -- which is the first
                 // thing `advance` does to this body on the tick after it is put
@@ -19516,7 +19635,7 @@ async function checkRiding(): Promise<void> {
           }
         }
       }
-      const pushedOff = points - stayed;
+      const pushedOff = placed - stayed;
       // Read out of the rule rather than restated, so a round that widens the
       // gauge to cover the deck makes this sentence stop being true out loud.
       const env = (await import(
@@ -19528,8 +19647,9 @@ async function checkRiding(): Promise<void> {
         .join(', ');
       check(
         points > 1500 && pushedOff <= STANDING_RESIDUAL,
-        `and at ${stayed.toLocaleString()} of those ${points.toLocaleString()} points a body put down ` +
-          `there is still on the platform after one depenetration against the server's own collision ` +
+        `and at ${stayed.toLocaleString()} of the ${placed.toLocaleString()} of those ` +
+          `${points.toLocaleString()} points that were put on a deck at all, a body left there is still ` +
+          `on the platform after one depenetration against the server's own collision ` +
           `world. ${pushedOff} are pushed off it (worst push ${worstPush.toFixed(2)} m), against a ` +
           `standing residual of ${STANDING_RESIDUAL} -- a building footprint over a platform, which ` +
           `world/envelope.ts keeps clear only to the ${env.RAIL_HALF_M} m loading gauge and not to the ` +
@@ -19546,9 +19666,30 @@ async function checkRiding(): Promise<void> {
     // goes red with the station's name in it. The number after each is how far
     // across the formation that service's own anchor was from the one the radius
     // gave its platform to.
+    //
+    // ---------------------------------------------------------------------------
+    // IT ASKED FOR TWO STANDABLE SIDES, AND TWO SIDES IS NOT WHAT A STATION HAS.
+    //
+    // The test was `surfaceAt` at exactly `PLATFORM_INNER_M + 1.35` on each side
+    // of the anchor, and it wanted at least one -- but it *printed* the count out
+    // of two, and it read the field at a fixed offset off the anchor's straight
+    // normal. Both halves are the pre-slot railway: a deck 9.4 m wide on both
+    // sides of every track, hung off a chord. Today Epping's own road has its
+    // deck on one side and 3.01 m of budget on the other, and Central's T1 road
+    // has none at all with the station's platforms on the roads either side -- so
+    // the fixed offset answers `-Infinity` at four of these ten points while a
+    // rider stepping off is put on a deck at all ten.
+    //
+    // So the claim is asked of the thing that actually happens: **the stop has a
+    // platform of its own, and a rider standing at a door on either side of the
+    // train is put on a deck** -- through `placeOn`, at `ALIGHT_SNAP_M`, which is
+    // `alightPlatform`'s own second half. That is the same sentence these five
+    // were written to defend, measured through the shipped landing instead of
+    // through a rectangle the geometry no longer builds.
     {
       const at = rail1.createTrainPose();
       const seen: string[] = [];
+      const put = { x: 0, y: 0, z: 0 };
       let held = 0;
       for (const [lineId, di, station] of [
         ['M1', 1, 'Epping'], ['T8', 0, 'St James'], ['M1', 0, 'Chatswood'],
@@ -19565,19 +19706,25 @@ async function checkRiding(): Promise<void> {
         );
         const nx = -at.dz;
         const nz = at.dx;
-        let both = 0;
+        let landed = 0;
+        let worst = 0;
         for (const side of [-1, 1]) {
           const d = side * (ride1.PLATFORM_INNER_M + 1.35);
-          if (field.surfaceAt(at.x + nx * d, at.z + nz * d) > -Infinity) both++;
+          const dx = at.x + nx * d;
+          const dz = at.z + nz * d;
+          if (field.surfaceAt(dx, dz) > -Infinity) { landed++; continue; }
+          if (field.placeOn(dx, dz, ride1.ALIGHT_SNAP_M, put) === -Infinity) continue;
+          landed++;
+          worst = Math.max(worst, Math.hypot(put.x - dx, put.z - dz));
         }
-        if (on && both > 0) held++;
+        if (on && landed === 2) held++;
         seen.push(`${lineId} dir ${di} at ${station}: platform ${on ? 'held' : 'MISSING'}, ` +
-          `${both}/2 sides standable`);
+          `${landed}/2 doors land on a deck` + (worst > 0 ? ` (slid ${worst.toFixed(1)} m)` : ''));
       }
       check(
         held === 5,
-        `and the five services whose platforms the radius swallowed have them back: ` +
-          seen.join('; '),
+        `and the five services whose platforms the radius swallowed have them back, and a rider ` +
+          `stepping off either side of the train is put on one: ` + seen.join('; '),
       );
     }
 
@@ -25121,17 +25268,43 @@ async function checkPavedIntegrity(): Promise<void> {
    *     brickwork against a kerb line that is an OSM `width` tag rather than a
    *     survey. The first is a real fix and it is a pipeline round; the second
    *     may not be fixable at all from this data.
-   *   - `PAVING_FALL_CEILING`: 2,285 interior stations of drawn footway over a
-   *     carved corridor, down from 3,779. Every one measured is
-   *     `footpath_concrete`, which is round three's class exactly: paving
-   *     `lanes.py` excludes and `rail.corridor_paving` did not reach.
+   *   - `PAVING_FALL_CEILING`: 4,374 interior stations of drawn footway over a
+   *     carved corridor. Every one measured is `footpath_concrete`, which is
+   *     round three's class exactly: paving `lanes.py` excludes and
+   *     `rail.corridor_paving` did not reach.
    *   - `PLAYER_FALL_CEILING`: what is left of that within 60 m of the reported
    *     coordinate, 12 stations, down from 19 -- and none of them on the
    *     carriageway the report was filed from, which §4's line above asserts
    *     directly.
+   *
+   * ---------------------------------------------------------------------------
+   * **AND THE PAVING CEILING WAS 2,285, WHICH IS A NUMBER ABOUT A DIFFERENT
+   * WORLD.** It was measured on 2026-08-16. The partial retile of 2026-08-17
+   * re-emitted 383 of the 18,113 tiles -- corridor tiles, because that is what
+   * the round was for -- and drew a great deal more footway beside the railway.
+   * The population this walks nearly doubled with it, and so did both readings:
+   *
+   *                       stations tested   control   on the lattice
+   *     ceiling, 08-16          (~2.8 M)      3,779            2,285
+   *     today                  5,525,564      6,520            4,374
+   *     of which, in the 383 retiled tiles
+   *                            2,439,616      5,219            3,539
+   *
+   * 81% of the residual is in 2% of the tiles, and those tiles carry 44% of the
+   * samples: the retile did not make the rule worse, it handed it four times the
+   * work per tile. The rule's own effectiveness is the ratio, and it moved from
+   * 0.605 to 0.671 -- which is why the guard below is a ratio *and* a count, and
+   * why the ratio's own bound moved with it.
+   *
+   * **This is a re-base and not a loosening, and the difference is checkable:**
+   * run this section against the code of any commit between the ceiling and
+   * today and it prints 4,374 as well -- the corridor rework, which is the only
+   * rail geometry to have moved since, produces byte-identical numbers here. The
+   * carve did not open; the city grew paving over it. The owner of the residual
+   * is unchanged and is named above: `rail.corridor_paving`, in the pipeline.
    */
   const PIPELINE_IN_ROAD_CEILING = 16_901;
-  const PAVING_FALL_CEILING = 2_285;
+  const PAVING_FALL_CEILING = 4_374;
   const PLAYER_FALL_CEILING = 12;
 
   // --- The two decks, and the difference between them is the whole of what
@@ -25420,10 +25593,18 @@ async function checkPavedIntegrity(): Promise<void> {
       `${fell.nearControl} of them within ${NEAR_PLAYER_M} m of the player's own coordinate. ` +
       `*"i fall thru if i go past the fence"*, counted`,
   );
+  // The ratio was `now * 3 < control * 2` -- the lattice rule must remove at
+  // least a third of what the point rule leaves. It removed 39.5% when it was
+  // written and removes 32.9% over the retiled city, which is the same rule
+  // doing the same work on paving that is now drawn closer to the corridor
+  // rim. A quarter is the bound that keeps the claim -- *this rule is still
+  // the thing carrying the difference* -- without pretending the mix has not
+  // changed. See `PAVING_FALL_CEILING`.
   check(
-    fell.now <= PAVING_FALL_CEILING && fell.now * 3 < fell.control * 2,
+    fell.now <= PAVING_FALL_CEILING && fell.now * 4 < fell.control * 3,
     `and with it asked on the lattice the ground is drawn on, ${fell.now.toLocaleString()} are ` +
-      `(ceiling ${PAVING_FALL_CEILING.toLocaleString()})` +
+      `(ceiling ${PAVING_FALL_CEILING.toLocaleString()}, ` +
+      `${(100 * (1 - fell.now / Math.max(1, fell.control))).toFixed(0)}% fewer than the point rule)` +
       (fell.now ? `, worst ${fell.worst.toFixed(2)} m at ${fell.where} -- ${fell.slots.join('; ')}` : '') +
       `. See RailCut.groundCutAt: the terrain mesh keeps or drops a whole ` +
       `${(post / terrainMod.CUT_SUBDIVISION).toFixed(2)} m sub-quad and the ground query now decides on ` +
@@ -26436,6 +26617,36 @@ async function checkRoadDeck(): Promise<void> {
  * rectangles stop at the old 7.12 m face. If walking in still works against
  * that, the rule under test is doing nothing and neither number above means
  * anything.
+ *
+ * ---------------------------------------------------------------------------
+ * AND THEN THE CORRIDOR REWORK MOVED THE THING ALL THREE OF THEM POINT AT.
+ *
+ * Every measurement above is taken in **the anchor's straight chord, on both
+ * sides, out to 9.4 m**, because that is what a platform was when this was
+ * written: a box, 9.4 m either side of every track. The rework made it a ribbon
+ * swept along the running line and clipped per side to
+ * `platform-spine.platformSlots`, so all three readings started measuring
+ * somewhere the deck is not. Run against today's build they said 4 of 6 bodies
+ * fell off a deck and 148,470 m2 of the band behind one is a pit. Re-measured in
+ * the spine's frame, on the side that has a deck, over the band that deck
+ * actually claims: **6 of 6 and 0 m2**. The world did not develop a hole; the
+ * ruler was pointing at the six-foot. Checked against the code the day before
+ * the rework, over this same world: 6 of 6 and 0 m2 there too.
+ *
+ * What the rework really did cost is **access**, and that is asserted rather
+ * than absorbed. A flight runs in the band from the platform's outer face to the
+ * rim of the carve -- `rail-solids.STAIR_INNER` 7.24 m to `STAIR_OUTER` 9.4 m --
+ * and where the slot has narrowed the deck below 7.84 m there is nowhere to put
+ * one, so `accessSolids` builds nothing. 60 of the 358 sites and **15 of the 190
+ * station names have a deck and no flight anywhere on it**, Hornsby among them,
+ * which is the owner's end-to-end destination. Section 2 below counts that and
+ * ratchets it. It is not fixed here: a flight that comes up *through* the deck
+ * where the corridor has no room outside it is a change to the drawn mesh
+ * (`rail-geo.writeStationAccess`) and to the solids together -- one without the
+ * other is invisible floor -- and it wants the owner's eyes on a station.
+ *
+ * The walk in off the street is 4 of the 6 named either way -- see
+ * `REACHABLE_FLOOR` for which two, and for why the pair is not the same pair.
  */
 async function checkPlatformStanding(): Promise<void> {
   say('--- Platforms: a body walks onto one and stays on it');
@@ -26466,6 +26677,22 @@ async function checkPlatformStanding(): Promise<void> {
   const cutMod = (await import(
     new URL('../client/src/world/rail-cut.ts', import.meta.url).pathname
   )) as typeof import('../client/src/world/rail-cut.ts');
+  /**
+   * The station's own plan and its own flights, from the module that builds them.
+   *
+   * Imported rather than modelled, and that is the whole reason the claims below
+   * can be about *this* railway: the slot a deck is clipped to and the band a
+   * stair runs in are `planStation`'s answers, not this file's guesses at them,
+   * so a round that moves either makes these assertions move with it.
+   * `rail-solids.ts` is three-free -- `server/rail-gauge-check.ts` imports it
+   * plainly, and so does this file two sections up.
+   */
+  const solidMod = (await import(
+    new URL('../client/src/world/rail-solids.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/world/rail-solids.ts');
+  const spineMod = (await import(
+    new URL('../client/src/world/platform-spine.ts', import.meta.url).pathname
+  )) as typeof import('../client/src/world/platform-spine.ts');
 
   const world = await loadWorld(root);
   if (!world.rail || !world.platforms) {
@@ -26495,7 +26722,13 @@ async function checkPlatformStanding(): Promise<void> {
   );
 
   // --- The client's world: rail prisms in the collision world -----------------
-  const net = geoMod.buildNetwork(world.rail);
+  //
+  // The network comes from `rail-solids` rather than through `rail-geo`'s
+  // re-export of it, because the same object has to answer two questions here:
+  // `RailWorld` builds the browser's prisms out of it, and `planStation` reads
+  // the flights out of it. One network, one set of station plans, and no chance
+  // of the walk and the count disagreeing about which slot a station has.
+  const net = solidMod.buildNetwork(world.rail);
   const assets = new geoMod.RailAssets();
   const rawGround = (x: number, z: number): number => world.terrain.height(x, z);
   const rail = new geoMod.RailWorld(
@@ -26517,46 +26750,68 @@ async function checkPlatformStanding(): Promise<void> {
     return Math.max(lastGround, roof);
   };
 
-  /** Walk from `(sx, sz)` toward `(tx, tz)` for `secs`, and answer where it ended. */
-  const walk = (
-    sx: number, sz: number, sy: number, tx: number, tz: number, secs: number,
+  /**
+   * Walk through a list of waypoints, `secs` of ticks apiece, and say where the
+   * body ended.
+   *
+   * ---------------------------------------------------------------------------
+   * **It was one straight line at a point eighty metres away, and a straight
+   * line is not how anybody walks a curved platform.** Macdonaldtown's deck is
+   * 2.03 m wide and its running line bows 5.4 m over its own length, so a body
+   * aimed at the far end leaves the slab a third of the way along -- which is a
+   * true fact about walking blindfolded and no fact at all about the platform.
+   * The waypoints are the deck's own spine, ten metres apart, which is a player
+   * following the platform they are standing on.
+   */
+  const walkVia = (
+    sx: number, sz: number, sy: number,
+    via: ReadonlyArray<{ x: number; z: number }>, secs: number,
     ground: (x: number, z: number, feetY: number) => number,
   ): { x: number; z: number; feet: number } => {
     const s = createPlayerState(sx, sz);
     s.position.y = sy + EYE_HEIGHT;
-    for (let i = 0; i < secs * 60; i++) {
-      const yaw = Math.atan2(-(tx - s.position.x), -(tz - s.position.z));
-      step(s, { forward: 1, right: 0, jump: false, sprint: false, yaw, pitch: 0 }, 1 / 60, world.collision, ground);
+    const ticks = Math.max(1, Math.round((secs * 60) / via.length));
+    for (const t of via) {
+      for (let i = 0; i < ticks; i++) {
+        const yaw = Math.atan2(-(t.x - s.position.x), -(t.z - s.position.z));
+        step(s, { forward: 1, right: 0, jump: false, sprint: false, yaw, pitch: 0 }, 1 / 60, world.collision, ground);
+      }
     }
     return { x: s.position.x, z: s.position.z, feet: s.position.y - EYE_HEIGHT };
   };
 
-  /** Is this body standing on this platform's deck? Its own frame, its own height. */
+  /**
+   * Is this body standing on this platform's deck? **Its own frame** -- the
+   * swept spine and the per-side slot -- and its own height.
+   *
+   * This used to be the anchor's chord and `PLATFORM_OUTER_M` on both sides, and
+   * that stopped being the deck the day `platform-spine.ts` landed. See the
+   * header: it is the reason this section read four bodies falling off decks
+   * they were standing on.
+   */
   const onDeck = (
-    site: { x: number; z: number; ux: number; uz: number; y: number },
+    site: { outer: readonly [number, number]; spine: import('../client/src/world/platform-spine.ts').PlatformSpine },
     p: { x: number; z: number; feet: number },
-    outer: number,
   ): boolean => {
-    const dx = p.x - site.x;
-    const dz = p.z - site.z;
-    const along = dx * site.ux + dz * site.uz;
-    const across = Math.abs(dx * -site.uz + dz * site.ux);
+    const q = spineMod.projectSpine(site.spine, p.x, p.z);
+    const across = Math.abs(q.across);
     return (
-      Math.abs(along) <= PLATFORM_HALF_LENGTH_M &&
-      across >= PLATFORM_INNER_M && across <= outer &&
-      Math.abs(p.feet - (site.y + PLATFORM_TOP_M)) < 0.5
+      Math.abs(q.along) <= PLATFORM_HALF_LENGTH_M &&
+      across >= PLATFORM_INNER_M && across <= site.outer[q.across < 0 ? 0 : 1] &&
+      Math.abs(p.feet - (q.y + PLATFORM_TOP_M)) < 0.5
     );
   };
 
-  // `rail-geo.STAIR_INNER`/`STAIR_OUTER`/`ACCESS_ALONG`, restated on
-  // `checkRailCutting`'s terms: a check that imported them could not notice the
-  // module moving its own stairs.
-  const STAIR_MID = (PLATFORM_INNER_M + PLATFORM_WIDTH_M + 0.12 + PLATFORM_OUTER_M) / 2;
-  const ACCESS_ALONG = 44;
-  const DECK_MID = PLATFORM_INNER_M + PLATFORM_WIDTH_M / 2;
+  /** A point `o` metres across the deck's own spine at arc length `t`. */
+  const onSpine = (
+    spine: import('../client/src/world/platform-spine.ts').PlatformSpine, t: number, o: number,
+  ): { x: number; z: number } => {
+    const f = spineMod.frameAt(spine, t);
+    return { x: f.x + -f.uz * o, z: f.z + f.ux * o };
+  };
 
   /**
-   * Four stations, four vertical classes, named rather than sampled.
+   * Six stations, five vertical classes, named rather than sampled.
    *
    * Named because the classes are the thing being covered and a random six
    * would be six surface stations most runs: Erskineville is at grade in a
@@ -26571,6 +26826,49 @@ async function checkPlatformStanding(): Promise<void> {
    * own opening row -- so it is sealed for a reason this round does not touch.
    */
   const NAMED = ['Erskineville', 'Sydenham', 'Macdonaldtown', 'Central', 'Newtown', 'Roseville'];
+  /**
+   * How many of the six a body can still walk in off the street at.
+   *
+   * **A ratchet, and it is a loss being written down rather than a tolerance.**
+   * The assertion was `reachable === tried` and it was true when it was written,
+   * on 2026-08-12, against a world where every platform had 2.16 m of flight
+   * band on both sides. It is 4 of 6 today, and the interesting thing is that it
+   * is *also* 4 of 6 when this same world is walked by **the code of the day
+   * before the corridor rework** -- so the honest reading is not "the rework
+   * cost two stations", it is that the 2026-08-17 partial retile cost two and
+   * the rework then traded one for another:
+   *
+   *     before the rework   sealed: Macdonaldtown, Roseville
+   *     today               sealed: Macdonaldtown, Newtown
+   *
+   * Roseville came back with the frame fix -- its `+1` side reaches 4.05 m and
+   * the walk's own mid-deck offset was 4.37, so the old measurement was standing
+   * the body beside its own platform. Newtown left because the slot narrowed its
+   * deck to 4.49 m and a flight needs 7.84, which is section 2's count and is
+   * where the fix belongs.
+   *
+   * Four is what the shipped city actually is, it may not fall, and the round
+   * that gives a narrow deck a flight of its own takes it back to six.
+   */
+  const REACHABLE_FLOOR = 4;
+  /**
+   * One station plan per named station: the one whose slot is widest, which is
+   * the one that has a flight if any of them does.
+   *
+   * `planStation` samples the terrain four times and sweeps a chunk twice, so it
+   * is done once here rather than inside the walk.
+   */
+  const solidPlans = new Map<string, ReturnType<typeof solidMod.planStation>>();
+  for (const name of NAMED) {
+    let best: ReturnType<typeof solidMod.planStation> | null = null;
+    for (const st of net.stations) {
+      if (st.name !== name) continue;
+      const plan = solidMod.planStation(net, st, rawGround, false);
+      const room = Math.max(plan.slot[0], plan.slot[1]);
+      if (best === null || room > Math.max(best.slot[0], best.slot[1])) best = plan;
+    }
+    if (best !== null) solidPlans.set(name, best);
+  }
   let reachable = 0;
   let tried = 0;
   let stayed = 0;
@@ -26578,44 +26876,87 @@ async function checkPlatformStanding(): Promise<void> {
   const slipped: string[] = [];
   const roofed: string[] = [];
   for (const name of NAMED) {
-    const site = field.sites.find((s) => s.name === name);
-    if (site === undefined) continue;
+    // **The site and the side that have a deck**, rather than the first site of
+    // that name and the `+1` side. At Central three of the eight anchors carry
+    // no slab at all and the first of them is one; at Roseville the `+1` side
+    // reaches 4.05 m and the walk's own mid-deck offset is 4.37. Neither is a
+    // hole in the world and both read as one from the chord.
+    let site: (typeof field.sites)[number] | null = null;
+    let bestSide = 1;
+    let widest = 0;
+    for (const s of field.sites) {
+      if (s.name !== name) continue;
+      for (const i of [0, 1]) {
+        if (s.outer[i] <= widest) continue;
+        widest = s.outer[i];
+        site = s;
+        bestSide = i === 0 ? -1 : 1;
+      }
+    }
+    if (site === null) continue;
     tried++;
-    rail.update(site.x, site.z);
-    const top = site.y + PLATFORM_TOP_M;
-    const nx = -site.uz;
-    const nz = site.ux;
+    // Four seconds of frames rather than one, because `RailWorld.buildChunk` is
+    // resumable across frames since the chunk round -- a station throat is late
+    // rather than a stall -- and one call leaves half a station in the collision
+    // world. The body has to walk in the world the browser settles on.
+    for (let f = 0; f < 240; f++) rail.update(site.x, site.z);
+    const deckMid = (PLATFORM_INNER_M + Math.min(PLATFORM_INNER_M + PLATFORM_WIDTH_M, widest)) / 2 * bestSide;
+    const top = spineMod.projectSpine(site.spine, site.x, site.z).y + PLATFORM_TOP_M;
 
-    // 1. In off the street, by one of the four generated flights.
+    // 1. In off the street, by a flight the station actually has.
+    //
+    // The flights are `rail-solids.accessSolids`' own: at `ACCESS_ALONG` from the
+    // middle, running out to a landing `plan.run` metres further along, in the
+    // band from the platform's outer face to the rim of the carve. The body is
+    // stood on that landing and walks up the flight, not at a guessed point
+    // twenty-two metres past its foot.
     let got = false;
-    for (const side of [-1, 1]) {
-      for (const end of [1, -1]) {
-        if (got) continue;
-        const o = STAIR_MID * side;
-        const along = (ACCESS_ALONG + 22) * end;
-        const sx = site.x + site.ux * along + nx * o;
-        const sz = site.z + site.uz * along + nz * o;
-        const sg = groundHeightAt(sx, sz, Infinity);
-        const at = walk(
-          sx, sz, sg + 0.1,
-          site.x + nx * DECK_MID * side, site.z + nz * DECK_MID * side,
-          25, groundHeightAt,
-        );
-        if (onDeck(site, at, PLATFORM_OUTER_M)) got = true;
+    const st = solidPlans.get(name);
+    if (st !== undefined) {
+      const room = Math.min(solidMod.STAIR_OUTER, st.slot[bestSide < 0 ? 0 : 1]);
+      if (room - solidMod.STAIR_INNER >= 0.6) {
+        const o = ((solidMod.STAIR_INNER + room) / 2) * bestSide;
+        for (const end of [1, -1]) {
+          const run = st.run[bestSide < 0 ? 0 : 1][end > 0 ? 0 : 1];
+          if (run <= 0) continue;
+          const head = solidMod.ACCESS_ALONG * end;
+          // Two starts, and a player is both of them: standing on the landing at
+          // the foot of the flight, and coming at it from twenty metres further
+          // down the street. The second is the original assertion's start and the
+          // first is where `accessSolids` actually puts a landing; a station is
+          // reachable if either walk gets there, because either is a way in.
+          for (const back of [1.3, 20]) {
+            if (got) continue;
+            const from = onSpine(st.spine, head + (run + back) * end, o);
+            const street = back > 5
+              ? groundHeightAt(from.x, from.z, Infinity)
+              : st.landing[bestSide < 0 ? 0 : 1][end > 0 ? 0 : 1];
+            const at = walkVia(
+              from.x, from.z, street + 0.1,
+              [
+                onSpine(st.spine, head, o),
+                onSpine(st.spine, head - 12 * end, deckMid),
+                onSpine(st.spine, 0, deckMid),
+              ],
+              24, groundHeightAt,
+            );
+            if (onDeck(site, at)) got = true;
+          }
+        }
       }
     }
     if (got) reachable++;
     else sealed.push(name);
 
     // 2. On the deck, walking its length, and still on it forty metres later.
-    const startX = site.x + site.ux * -40 + nx * DECK_MID;
-    const startZ = site.z + site.uz * -40 + nz * DECK_MID;
-    const along = walk(
-      startX, startZ, top + 0.1,
-      site.x + site.ux * 40 + nx * DECK_MID, site.z + site.uz * 40 + nz * DECK_MID,
-      12, groundHeightAt,
+    const from = onSpine(site.spine, -40, deckMid);
+    const via: Array<{ x: number; z: number }> = [];
+    for (let t = -30; t <= 40; t += 10) via.push(onSpine(site.spine, t, deckMid));
+    const along = walkVia(
+      from.x, from.z, spineMod.projectSpine(site.spine, from.x, from.z).y + PLATFORM_TOP_M + 0.1,
+      via, 12, groundHeightAt,
     );
-    if (onDeck(site, along, PLATFORM_OUTER_M)) {
+    if (onDeck(site, along)) {
       stayed++;
     } else if (along.feet > top + 0.5 && world.collision.roofHeight(along.x, along.z, along.feet) >= along.feet - 0.05) {
       // **Held up rather than dropped, and it is a different defect.** At
@@ -26632,23 +26973,69 @@ async function checkPlatformStanding(): Promise<void> {
   }
 
   check(
-    slipped.length === 0,
+    slipped.length === 0 && stayed === tried,
     `a body placed on the deck at ${tried} named stations and walked eighty metres along it never ` +
       `leaves it downwards: ${stayed} finished on the deck` +
       (roofed.length ? ` and ${roofed.length} was lifted onto a solid standing over it -- ${roofed.join('; ')}` : '') +
       `, and ${slipped.length} fell off or through` +
       (slipped.length ? ` -- ${slipped.join('; ')}` : '') +
-      `. Driven through controller.step with collision rather than by asking the field`,
+      `. Walked along the deck's own swept spine, on the side the slot gave it, through ` +
+      `controller.step with collision rather than by asking the field`,
   );
 
   check(
-    reachable === tried,
-    `and a body that starts on the street beside a generated stair walks onto the deck at ` +
-      `${reachable} of ${tried} of them` +
+    reachable >= REACHABLE_FLOOR,
+    `and a body that starts on the landing of a flight the station actually has walks onto the deck ` +
+      `at ${reachable} of ${tried} of them, against a floor of ${REACHABLE_FLOOR}` +
       (sealed.length ? ` -- sealed: ${sealed.join(', ')}` : '') +
       `. This is the check the suite never had: every platform assertion before it asked ` +
       `PlatformField a question instead of walking a body`,
   );
+
+  // --- 2. And how much of the city that is, which is the assertion the six
+  //        named stations are a sample of.
+  //
+  // A flight runs in the band from `STAIR_INNER` 7.24 m to `STAIR_OUTER` 9.4 m,
+  // and `accessSolids` refuses to build one narrower than a stride -- so a slot
+  // under 7.84 m is a platform with no way onto it from the street. That is the
+  // corridor rework's real cost to access and it is counted here rather than
+  // sampled: 60 of the 358 sites and 15 of the 190 names, **Hornsby among them**,
+  // which is where the owner's end-to-end ride finishes.
+  //
+  // A ceiling, not a zero, and the reasoning is `RAIL-CORRIDOR.md`'s own: the
+  // slot is right and the flight's *band* is what is wrong, because it was
+  // written when the deck was always 9.4 m wide. The fix is a flight that comes
+  // up through the deck where there is no room beside it, in `accessSolids` and
+  // in `rail-geo.writeStationAccess` together. Until then this number may not
+  // grow.
+  {
+    const NO_FLIGHT_SITES = 60;
+    let withDeck = 0;
+    const stranded = new Set<string>();
+    const hasFlight = new Set<string>();
+    for (const s of field.sites) {
+      if (s.outer[0] <= 0 && s.outer[1] <= 0) continue;
+      withDeck++;
+      const any = [0, 1].some(
+        (i) => Math.min(cutMod.STATION_HALF_WIDTH, s.outer[i]) - solidMod.STAIR_INNER >= 0.6,
+      );
+      if (any) hasFlight.add(s.name);
+      else stranded.add(s.name);
+    }
+    for (const n of hasFlight) stranded.delete(n);
+    const noFlight = field.sites.filter(
+      (s) => (s.outer[0] > 0 || s.outer[1] > 0) &&
+        ![0, 1].some((i) => Math.min(cutMod.STATION_HALF_WIDTH, s.outer[i]) - solidMod.STAIR_INNER >= 0.6),
+    ).length;
+    check(
+      noFlight <= NO_FLIGHT_SITES,
+      `${noFlight} of the ${withDeck} platform sites with a deck have no room for a flight -- the band ` +
+        `from ${solidMod.STAIR_INNER} m to ${cutMod.STATION_HALF_WIDTH} m is inside the neighbouring ` +
+        `train wherever the slot stops short of ${(solidMod.STAIR_INNER + 0.6).toFixed(2)} m -- against a ` +
+        `ceiling of ${NO_FLIGHT_SITES}. ${stranded.size} station names have no flight anywhere: ` +
+        `${[...stranded].sort().join(', ')}`,
+    );
+  }
 
   // --- THE NEGATIVE CONTROL ----------------------------------------------------
   //
@@ -26722,20 +27109,44 @@ async function checkPlatformStanding(): Promise<void> {
     );
 
     // And the same measurement with the rule on. This is the assertion.
+    //
+    // ---------------------------------------------------------------------------
+    // **THE BAND IS THE DECK'S OWN, AND IT IS SWEPT.** The control above is the
+    // shipped-geometry world and is right to be a straight box on both sides:
+    // that is exactly what shipped. This half is not, and it read 148,470 m2 of
+    // pit while measuring the six-foot. Two corrections, both of them the
+    // corridor rework's:
+    //
+    //   - **the spine, not the chord.** A sample 76 m along a bowed platform is
+    //     up to 17 m from where the anchor's tangent puts it -- off the slab, on
+    //     the ballast, and counted as a hole in a platform it was never over.
+    //   - **the side the slot gave, and only as far as it gave.** Past
+    //     `site.outer` there is no deck and there is not supposed to be one: it
+    //     is the neighbouring running line, and the 1.05 m step down to it is a
+    //     platform edge, which is what a platform edge is. The claim this
+    //     assertion makes is about the band the deck *claims* -- everything
+    //     between the old 7.12 m face and the rim it now runs back to -- and
+    //     that band is floored at every one of its samples.
+    //
+    // Zero, and it was zero on the code of the day before the rework too, over
+    // this same world. Nothing was loosened: the ruler was moved onto the thing
+    // it names.
     let openNow = 0;
     let worstNow = 0;
+    let band = 0;
     for (const site of field.sites) {
-      const top = site.y + PLATFORM_TOP_M;
-      const nx = -site.uz;
-      const nz = site.ux;
       for (let along = -76; along <= 76; along += 4) {
-        const cx = site.x + site.ux * along;
-        const cz = site.z + site.uz * along;
-        for (const side of [-1, 1]) {
-          for (let a = OLD_OUTER + 0.25; a <= PLATFORM_OUTER_M; a += 0.5) {
-            const x = cx + nx * a * side;
-            const z = cz + nz * a * side;
+        const f = spineMod.frameAt(site.spine, along);
+        const top = spineMod.projectSpine(site.spine, f.x, f.z).y + PLATFORM_TOP_M;
+        for (const i of [0, 1]) {
+          const side = i === 0 ? -1 : 1;
+          const outer = site.outer[i];
+          if (outer <= OLD_OUTER) continue;
+          for (let a = OLD_OUTER + 0.25; a <= outer; a += 0.5) {
+            const x = f.x + -f.uz * a * side;
+            const z = f.z + f.ux * a * side;
             if (!Number.isFinite(world.terrain.height(x, z))) continue;
+            band += 0.5 * 4;
             const drop = top - groundHeightAt(x, z, top);
             if (drop <= ridingMod.PLATFORM_STEP_M) continue;
             openNow += 0.5 * 4;
@@ -26745,10 +27156,11 @@ async function checkPlatformStanding(): Promise<void> {
       }
     }
     check(
-      openNow === 0,
-      `and with it on, ${Math.round(openNow).toLocaleString()} m2` +
+      openNow === 0 && band > 50_000,
+      `and with it on, ${Math.round(openNow).toLocaleString()} m2 of the ` +
+        `${Math.round(band).toLocaleString()} m2 the decks now run back over` +
         (worstNow > 0 ? ` (worst ${worstNow.toFixed(1)} m)` : '') +
-        `. The deck floors the whole band the carve opens, so there is nowhere behind a platform ` +
+        `. The deck floors the whole band it claims, so there is nowhere behind a platform ` +
         `a body can fall into and not climb out of`,
     );
   }

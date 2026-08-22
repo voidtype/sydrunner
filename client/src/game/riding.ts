@@ -186,6 +186,7 @@ import { STATION_HALF_WIDTH } from '../world/rail-cut.ts';
 // `PlatformSite.outer` -- both ends of the wire read this one answer.
 import { atlasFor } from '../world/track-atlas.ts';
 import {
+  frameAt,
   platformSlots,
   projectSpine,
   spineOn,
@@ -1299,19 +1300,35 @@ export class PlatformField {
     if (list === undefined) return -Infinity;
     let best = -Infinity;
     for (const site of list) {
-      // Projected onto the running line, not onto a chord through it. See
-      // `PlatformSite.spine`.
-      const p = projectSpine(site.spine, x, z);
-      if (p.along < -PLATFORM_HALF_LENGTH_M || p.along > PLATFORM_HALF_LENGTH_M) continue;
-      const across = Math.abs(p.across);
-      // `site.outer`, per side, rather than one constant for both. See it.
-      if (across < PLATFORM_INNER_M || across > site.outer[p.across < 0 ? 0 : 1]) continue;
-      // `p.y` -- the railhead *here* -- not `site.y`, the railhead at the anchor.
-      // The drawn deck follows the grade and this is what stands a body on it.
-      const top = p.y + PLATFORM_TOP_M;
+      const top = PlatformField.topOn(site, x, z);
       if (top > best) best = top;
     }
     return best;
+  }
+
+  /**
+   * Is this point on *this* site's deck, and how high is it -- one site, one
+   * answer.
+   *
+   * ---------------------------------------------------------------------------
+   * **Lifted out of `surfaceAt` so that `placeOn` can be judged by the function
+   * that judges everybody else.** The three methods below used to spell the
+   * rectangle test out three times, and two of the three spelt it in the
+   * *spine's* frame while `placeOn` spelt it in the anchor's chord -- which is
+   * how a disembark ended up being slid onto a point the field then answered
+   * `-Infinity` for. See `placeOn`'s own header for the measurement.
+   */
+  private static topOn(site: PlatformSite, x: number, z: number): number {
+    // Projected onto the running line, not onto a chord through it. See
+    // `PlatformSite.spine`.
+    const p = projectSpine(site.spine, x, z);
+    if (p.along < -PLATFORM_HALF_LENGTH_M || p.along > PLATFORM_HALF_LENGTH_M) return -Infinity;
+    const across = Math.abs(p.across);
+    // `site.outer`, per side, rather than one constant for both. See it.
+    if (across < PLATFORM_INNER_M || across > site.outer[p.across < 0 ? 0 : 1]) return -Infinity;
+    // `p.y` -- the railhead *here* -- not `site.y`, the railhead at the anchor.
+    // The drawn deck follows the grade and this is what stands a body on it.
+    return p.y + PLATFORM_TOP_M;
   }
 
   /**
@@ -1343,6 +1360,30 @@ export class PlatformField {
    * has an answer -- and both ends run the identical arithmetic over the
    * identical field, so it stays a teleport the two ends agree about.
    *
+   * ---------------------------------------------------------------------------
+   * **AND THE FRAME IT CLAMPS IN IS THE SPINE'S, WHICH IS THIS ROUND'S FIX.**
+   *
+   * The corridor rework swept the deck along the running line and taught
+   * `surfaceAt` and `heightAt` to project onto that curve -- and left this
+   * method clamping into a **straight rectangle** hung off the anchor's own
+   * tangent. So the two disagreed about where the deck was by the platform's
+   * bow, and the disagreement was silent in the worst possible direction: this
+   * one *chose* the point and the other one *judged* it. Measured over every
+   * calling stop of every direction, both door bays, both sides: **22 of the
+   * 2,014 disembarks were slid onto a point `surfaceAt` then answered
+   * `-Infinity` for** -- Croydon, Burwood, Strathfield, Pendle Hill,
+   * Macdonaldtown and Parramatta among them, every one of them a station whose
+   * platform bows -- which is the fall-through this method was written to end,
+   * wearing the new geometry's clothes. Clamping on the spine recovers all 22.
+   *
+   * Two consequences in the code below. The clamp runs in the spine's frame
+   * (`projectSpine` in, `frameAt` back out), and the candidate is then **put to
+   * `topOn`**, the same predicate `surfaceAt` folds over every site: a site
+   * whose clamp lands somewhere the field would not answer for is skipped
+   * rather than returned. A mitre joint can still refuse a point the panel
+   * arithmetic liked, and the honest answer there is the next site, not a
+   * height nobody else agrees with.
+   *
    * Writes the clamped position into `out` and returns the surface, or leaves
    * `out` alone and returns `-Infinity` when there is no platform within reach.
    */
@@ -1362,11 +1403,9 @@ export class PlatformField {
     let bestZ = 0;
     let bestTop = -Infinity;
     for (const site of list) {
-      const dx = x - site.x;
-      const dz = z - site.z;
-      let along = dx * site.ux + dz * site.uz;
-      let across = dx * -site.uz + dz * site.ux;
-      let i = across < 0 ? 0 : 1;
+      const p = projectSpine(site.spine, x, z);
+      let along = p.along;
+      let i = p.across < 0 ? 0 : 1;
       // **A rider is put down on a side that exists.** Where the slot refused
       // this side, the platform is on the other one, and clamping to the side
       // the carriage door happens to face would set a body down in the six-foot
@@ -1378,21 +1417,27 @@ export class PlatformField {
       const side = i === 0 ? -1 : 1;
       const hi = Math.min(PLATFORM_INNER_M + PLATFORM_WIDTH_M, site.outer[i]) - INSET;
       if (hi <= lo) continue;
-      let mag = across < 0 ? -across : across;
+      let mag = p.across < 0 ? -p.across : p.across;
       if (along < -end) along = -end;
       else if (along > end) along = end;
       if (mag < lo) mag = lo;
       else if (mag > hi) mag = hi;
-      across = side * mag;
-      // Back out into world, and how far the body had to move to get there.
-      const px = site.x + site.ux * along + -site.uz * across;
-      const pz = site.z + site.uz * along + site.ux * across;
+      // Back out through the **panel at that arc length**, which is the frame
+      // `topOn` will project the answer back onto. See `platform-spine.frameAt`.
+      const f = frameAt(site.spine, along);
+      const px = f.x + -f.uz * side * mag;
+      const pz = f.z + f.ux * side * mag;
       const move = Math.hypot(px - x, pz - z);
       if (move >= bestMove) continue;
+      // The candidate is judged by `surfaceAt`'s own predicate rather than
+      // asserted. See the header: a point this method likes and the field does
+      // not is the whole defect.
+      const top = PlatformField.topOn(site, px, pz);
+      if (top === -Infinity) continue;
       bestMove = move;
       bestX = px;
       bestZ = pz;
-      bestTop = projectSpine(site.spine, px, pz).y + PLATFORM_TOP_M;
+      bestTop = top;
     }
     if (bestTop === -Infinity) return -Infinity;
     out.x = bestX;
@@ -1438,13 +1483,11 @@ export class PlatformField {
       // Along and across the *curve*, and the sign of `across` is kept now,
       // because the two sides of a pair no longer reach the same distance -- one
       // may be a corridor edge with the full deck and the other four metres from
-      // a running line. See `PlatformSite.spine` and `.outer`.
-      const p = projectSpine(site.spine, x, z);
-      if (p.along < -PLATFORM_HALF_LENGTH_M || p.along > PLATFORM_HALF_LENGTH_M) continue;
-      const across = Math.abs(p.across);
-      if (across < PLATFORM_INNER_M || across > site.outer[p.across < 0 ? 0 : 1]) continue;
-      // The railhead here, not at the anchor. See `surfaceAt`.
-      const top = p.y + PLATFORM_TOP_M;
+      // a running line. See `PlatformSite.spine` and `.outer`. `topOn` is that
+      // test, shared with `surfaceAt` and `placeOn`; the band is this method's
+      // own and is applied to its answer.
+      const top = PlatformField.topOn(site, x, z);
+      if (top === -Infinity) continue;
       if (feetY < top - PLATFORM_STEP_M || feetY > top + PLATFORM_REACH_M) continue;
       if (top > best) best = top;
     }
@@ -2964,12 +3007,13 @@ export function alightPlatform(
     return;
   }
   // Off the rectangle: a curve has rotated the carriage's "sideways" out of the
-  // platform's, or an end carriage is hanging past the ramp. **Slide onto the
-  // platform rather than being put down beside it** -- see `placeOn`, which is
-  // where the whole argument for that lives. `ALIGHT_SNAP_M` bounds it to the
-  // width of the station, so a stop that genuinely has no platform in the field
-  // still falls back to the carriage's own rail level and does not get dragged
-  // across the yard to the next one.
+  // platform's, an end carriage is hanging past the ramp, or -- since the slots
+  // landed -- the rider is simply standing at the door on the side the corridor
+  // had no room for. **Slide onto the platform rather than being put down beside
+  // it** -- see `placeOn`, which is where the whole argument for that lives.
+  // `ALIGHT_SNAP_M` bounds it to the width of the station, so a stop that
+  // genuinely has no platform in the field still falls back to the carriage's
+  // own rail level and does not get dragged across the yard to the next one.
   const snapped = platforms.placeOn(out.x, out.z, ALIGHT_SNAP_M, out);
   if (snapped > -Infinity) out.y = snapped + RIDER_EYE_HEIGHT;
 }
@@ -2977,12 +3021,45 @@ export function alightPlatform(
 /**
  * How far a disembark may be slid to land on a platform. See `alightPlatform`.
  *
- * A platform is 5.5 m wide and its face is 1.62 m off the track centre, so
- * everything this is meant to correct -- a few centimetres of curve, a carriage
- * end hanging past the 160 m -- is inside ten metres. Wider than the station is
- * a different bug and should look like one.
+ * ---------------------------------------------------------------------------
+ * **IT WAS TWELVE, AND TWELVE WAS RIGHT FOR A RAILWAY WHERE EVERY TRACK HAD A
+ * 9.4 m DECK ON BOTH SIDES.** The argument then was that a platform is 5.5 m
+ * wide with its face 1.62 m off the track centre, so everything a disembark has
+ * to correct -- a few centimetres of curve, a carriage end hanging past the
+ * 160 m -- is inside ten metres, and anything wider is a different bug that
+ * should look like one.
+ *
+ * The corridor rework made the deck a *slot occupant*: it is on the side the
+ * budget left room on, and at an interchange it is on a road the stopping
+ * anchor is not. `stopPlatform` hit this within an hour of the slots landing --
+ * a rider carried past the buffers at Emu Plains put down on the naked side --
+ * and was given `STRAND_SNAP_M`. **A disembark at an ordinary dwell has exactly
+ * the same hole and did not get the same fix**, which is what this number is.
+ *
+ * Measured over every calling stop of every direction, both door bays, both
+ * sides -- 2,014 landings, of which 880 need a slide at all:
+ *
+ *     slide needed      what it is
+ *     0 m       1,084   the door is already over the deck
+ *     0-12 m      631   a curve, or a carriage end past the ramp
+ *     12-16 m     187   **the wrong side of the train**: the slot refused this
+ *                       side and the deck is across the corridor, which is one
+ *                       car body plus two deck widths
+ *     16-46 m      60   the anchored road carries no deck and the station's is
+ *                       on another road -- Central 38 m, Hornsby 46 m, Newtown
+ *                       45 m, all of them platforms of that same station
+ *     149 m         2   Museum, which has no deck of its own at all: this is
+ *                       the *next* platform and is exactly what the bound is
+ *                       for. Refused, and it falls back to rail level.
+ *     no deck      50   Cabramatta, Museum and Summer Hill, where the corridor
+ *                       built no slab at any of their anchors. No reach helps.
+ *
+ * So 48 m: the worst legitimate slide plus a margin, and still less than a
+ * third of the shortest thing that would be somebody else's platform. The
+ * sentence the number keeps is unchanged -- *this station, not a drag across
+ * the yard* -- it is the station that got wider.
  */
-export const ALIGHT_SNAP_M = 12;
+export const ALIGHT_SNAP_M = 48;
 
 /**
  * Where a rider ends up when they jump out between stations: beside the track.
@@ -3291,6 +3368,101 @@ export function verifyRiding(eyeHeight: number, radius: number): string[] {
           }
         }
       }
+    }
+  }
+
+  // --- The disembark's clamp, on a curve, against the field that judges it.
+  //
+  // ---------------------------------------------------------------------------
+  // **THE ONE PROPERTY `placeOn` HAS TO HAVE, AND THE ONE IT LOST.** It is the
+  // only method here that *chooses* a point rather than answering about one, so
+  // the point it hands back must be a point `surfaceAt` answers for. When the
+  // corridor rework swept the deck along the running line it taught `surfaceAt`
+  // the curve and left `placeOn` clamping into the anchor's straight rectangle,
+  // and the two then disagreed by the platform's bow -- 36 of the bake's 2,014
+  // disembarks slid onto a point the field called `-Infinity`, which is a body
+  // stood on the paddock over a cutting with nothing saying so.
+  //
+  // Pure, and therefore here rather than only in the integration check: the
+  // curve is a synthetic 200 m parabola with 16 m of bow over its 160 m, which
+  // is Wollstonecraft's order of magnitude. No `Math.sin`/`cos`/`hypot` -- both
+  // ends evaluate this, and `CLAUDE.md`'s determinism rule is not suspended for
+  // a self-check.
+  {
+    const HALF = PLATFORM_HALF_LENGTH_M;
+    const R = 200;
+    const NODES = 17;
+    const verts: number[] = [];
+    const cum: number[] = [];
+    let s = 0;
+    for (let i = 0; i < NODES; i++) {
+      const t = -HALF + (i * (2 * HALF)) / (NODES - 1);
+      const x = t;
+      const z = (t * t) / (2 * R);
+      if (i > 0) {
+        const dx = x - verts[(i - 1) * 3];
+        const dz = z - verts[(i - 1) * 3 + 2];
+        s += Math.sqrt(dx * dx + dz * dz);
+      }
+      verts.push(x, 0, z);
+      cum.push(s);
+    }
+    const fakeBake = {
+      vertices: new Float32Array(verts),
+      cum: new Float32Array(cum),
+    } as unknown as RailBake;
+    const fakeDir = { vertexOff: 0, vertexCount: NODES } as unknown as RailDirection;
+    // The anchor is the middle of the run, which on this curve is its vertex.
+    const anchorS = cum[(NODES - 1) / 2];
+    const spine = spineOn(fakeBake, fakeDir, anchorS, HALF);
+    if (spine.bow < 8) bad.push(`the placeOn control curve bows only ${spine.bow.toFixed(1)} m and proves nothing`);
+    const site: PlatformSite = {
+      name: 'CONTROL', x: 0, z: 0, y: 0, ux: 1, uz: 0,
+      outer: [PLATFORM_OUTER_M, PLATFORM_OUTER_M], spine,
+    };
+    const field = new PlatformField();
+    field.add(site);
+    // Riders standing at a door 12 m off the running line -- out past the
+    // deck's outer face -- every ten metres of the platform's length, both
+    // sides. Every one of them must be put somewhere `surfaceAt` answers for,
+    // and the chord clamp this replaced must fail at least one of them, or the
+    // curve is too gentle to be evidence.
+    const put = { x: 0, y: 0, z: 0 };
+    let refused = 0;
+    let strayed = '';
+    let chordOff = 0;
+    for (let t = -HALF; t <= HALF; t += 10) {
+      const f = frameAt(spine, t);
+      for (const side of [-1, 1]) {
+        const qx = f.x + -f.uz * side * 12;
+        const qz = f.z + f.ux * side * 12;
+        if (field.placeOn(qx, qz, ALIGHT_SNAP_M, put) === -Infinity) { refused++; continue; }
+        if (field.surfaceAt(put.x, put.z) === -Infinity && strayed === '') {
+          strayed = `(${put.x.toFixed(2)}, ${put.z.toFixed(2)}) from t=${t}, side ${side}`;
+        }
+        // THE NEGATIVE CONTROL, inline: the identical clamp in the anchor's own
+        // chord, which is the arithmetic that shipped with the sweep.
+        const along = Math.min(Math.max(qx * site.ux + qz * site.uz, -HALF + 0.1), HALF - 0.1);
+        const across = qx * -site.uz + qz * site.ux;
+        const mag = Math.min(
+          Math.max(across < 0 ? -across : across, PLATFORM_INNER_M + 0.1),
+          PLATFORM_INNER_M + PLATFORM_WIDTH_M - 0.1,
+        );
+        const o = across < 0 ? -mag : mag;
+        if (field.surfaceAt(site.x + site.ux * along + -site.uz * o, site.z + site.uz * along + site.ux * o) === -Infinity) {
+          chordOff++;
+        }
+      }
+    }
+    if (refused > 0) bad.push(`placeOn refused ${refused} of 34 bodies standing 12 m off a 160 m deck`);
+    if (strayed !== '') {
+      bad.push(
+        `placeOn put a body at ${strayed} and surfaceAt answers nothing there -- the clamp and the ` +
+          'field are in different frames again',
+      );
+    }
+    if (chordOff === 0) {
+      bad.push('the chord clamp lands on the deck every time, so the curved control proves nothing');
     }
   }
 
