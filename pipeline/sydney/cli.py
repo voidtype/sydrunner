@@ -1028,6 +1028,35 @@ def _report_decks(net: decks.DeckNetwork) -> None:
         f" {s['pinned']:,} pinned to a ground touchdown"
         f" ({s['unpinned_components']} components reached none)"
     )
+    # The fifth line, and it is the one that says whether the world is walkable
+    # under its own motorways. `decks._crossing_demand` is the rule and
+    # `server/overpass-clearance-check.ts` is the gate on the shipped bytes;
+    # this is the same measurement taken before the tiles are written, because
+    # a 25-hour retile is not something to start on a hope. A crossing under
+    # `MIN_ROAD_CLEARANCE_M` here is a road a deck is standing on.
+    if s.get("cross_roads"):
+        print(
+            f"    {s['cross_roads']:,} crossings over a public carriageway"
+            f" ({s['cross_stacked']:,} over another deck):"
+            f" clearance p05 {s.get('cross_clear_p05', 0.0):.2f} m"
+            f"  p50 {s.get('cross_clear_p50', 0.0):.2f} m,"
+            f" {s.get('cross_under_min', 0):,} under {decks.MIN_ROAD_CLEARANCE_M:.1f} m"
+        )
+        if s.get("demand_unmet"):
+            print(
+                f"    {s['demand_unmet']:,} stations could not reach the clearance"
+                f" (worst {s['demand_unmet_max_m']:.2f} m short): a touchdown and"
+                f" {100 * decks.TOUCHDOWN_RAMP_GRADE:.0f}% between them left no room"
+            )
+    worst = sorted(net.crossings, key=lambda c: c["clear"])[:8]
+    for c in worst:
+        if c["clear"] >= decks.MIN_ROAD_CLEARANCE_M:
+            break
+        print(
+            f"      {c['clear']:6.2f} m  {c['over']} over"
+            f" {c['under'] or '(unnamed)'} ({c['under_class']})"
+            f" at ({c['e']:.0f}, {c['n']:.0f})"
+        )
 
 
 def _emit_far(con, buildings: list[merge.Building], terrain, retile: bool) -> dict:
