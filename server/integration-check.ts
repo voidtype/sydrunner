@@ -5615,7 +5615,12 @@ async function checkPedestrians(): Promise<void> {
 // several minutes and a reconciler bug is iterated on in tens of seconds.
 // `SYDNEY_CHECK_ONLY=ridingOnline bun run server/integration-check.ts`.
 const only = process.env.SYDNEY_CHECK_ONLY ?? '';
-if (only === 'ridingOnline') {
+if (only === 'police') {
+  await checkPolice();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'ridingOnline') {
   await checkRidingOnline();
   for (const f of failures) say(`  - ${f}`);
   say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
