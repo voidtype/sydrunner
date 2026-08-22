@@ -272,6 +272,7 @@ import { HandsAssets, HandsViewmodel, handsWarmupParts } from './player/hands.ts
 import { PhoneAssets, PhoneProp, PhoneViewmodel, phoneWarmupParts } from './world/phone.ts';
 import { CashNoteAssets, CashNotePiles, cashNoteWarmupParts } from './world/cashnote.ts';
 import { DoorMarker } from './world/doormarker.ts';
+import { QuestMarkerField } from './world/questmarkers.ts';
 import { geometryLayout, type WarmupPart } from './world/warmup.ts';
 
 // --- The host, through the smallest possible window ----------------------------
@@ -1159,6 +1160,24 @@ async function warmGroups(): Promise<{ groups: WarmGroup[]; rail: RailRide | nul
   // has handed money to holds nothing.
   cash.update(1 / 60, [{ id: 1, x: 0, y: 0, z: 0, amount: 250 }]);
   const doorMarker = new DoorMarker();
+  /*
+   * WORKSTREAM AN: the quest markers, and the reason they are auditable at all.
+   *
+   * `world/questmarkers.ts` draws its `!` and `?` as **geometry** rather than as
+   * a canvas raster, and that was chosen partly so this line could exist: the
+   * plate field and the sun button are two rows down in `UNAUDITED` because they
+   * build a `CanvasTexture` in their constructors and this harness has no
+   * `document`. A field built out of quads has no such problem, so the one
+   * warm-up part it offers is diffed against the one mesh it draws, here, before
+   * the commit -- which is the difference between the boarding marker's kind of
+   * mistake being caught in review and being felt on the frame a player walks up
+   * to their first quest giver.
+   *
+   * The mesh's geometry is empty until a giver is in range, which is exactly why
+   * it needs a stand-in and exactly why the stand-in is *itself*: an empty
+   * geometry still carries the attribute layout the pipeline is keyed on.
+   */
+  const questMarkers = new QuestMarkerField();
   groups.push({
     name: 'viewmodels',
     parts: [
@@ -1166,6 +1185,7 @@ async function warmGroups(): Promise<{ groups: WarmGroup[]; rail: RailRide | nul
       ...phoneWarmupParts(phoneAssets),
       ...cashNoteWarmupParts(cashAssets),
       ...doorMarker.warmupParts(),
+      ...questMarkers.warmupParts(),
     ],
     real: [
       new HandsViewmodel(handsAssets).group,
@@ -1173,8 +1193,9 @@ async function warmGroups(): Promise<{ groups: WarmGroup[]; rail: RailRide | nul
       phoneProp.group,
       cashScene,
       doorMarker.group,
+      questMarkers.mesh,
     ],
-    label: { hands: handsAssets, phone: phoneAssets, cash: cashAssets },
+    label: { hands: handsAssets, phone: phoneAssets, cash: cashAssets, questmarker: questMarkers },
   });
 
   return { groups, rail };

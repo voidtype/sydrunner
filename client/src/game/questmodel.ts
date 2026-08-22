@@ -74,17 +74,61 @@
  *
  * So the split is:
  *
- *   - `AccountRecord.story` -- a set of strings, permanent. It holds the
- *     authored `unlock` flags **and** the implicit `q:<id>` mark this file
- *     writes when a non-repeatable quest is turned in. One mechanism, so
- *     "have I done this" and "did the story branch" are the same question.
+ *   - `AccountRecord.story` -- a set of strings. It holds the authored
+ *     `unlock` flags **and** the implicit completion mark this file writes when
+ *     a quest is turned in. One mechanism, so "have I done this" and "did the
+ *     story branch" are the same question against the same set.
  *   - `AccountRecord.quests` -- in-progress cursors, cleared on Monday with the
  *     xp. A half-finished job does not survive the week, which is correct: the
  *     obligations are weekly and so is the paperwork.
  *
- * A **repeatable** quest never writes its `q:` mark, so it comes round again.
- * That is the whole of the repeatable/story distinction and it needs no field
- * on the reset at all.
+ * ---------------------------------------------------------------------------
+ * TWO COMPLETION MARKS, AND `repeatable` IS THE SWITCH. Workstream AN.
+ *
+ * A turn-in used to write `q:<id>` for a story quest and **nothing at all** for
+ * a repeatable, which meant a "weekly" job could be handed in and taken again
+ * in the same breath -- `content/quests/act1.json` called its two jobs weekly
+ * and they were not. Now every turn-in writes a mark and the prefix says which
+ * kind it is:
+ *
+ *   - `q:<id>` -- a story completion. Permanent. Survives Monday, because an
+ *     act is a story and a story that resets weekly is not one: a player who
+ *     finished Mutual Obligations in March must not be handed the first job
+ *     again in April.
+ *   - `w:<id>` -- done **this week**. Dropped by `net/accounts.resetIfNewWeek`
+ *     with the xp and the cursors, so the job comes round on Monday with
+ *     everything else that is weekly.
+ *
+ * Both live in `story` rather than in a field of their own, and that is the
+ * decision worth naming: the client already receives the story flags on
+ * `MSG.QUEST_STATE` and the register and the world markers are both drawn from
+ * them, so a second list would have been a wire change to say something the
+ * wire already carries. `doneFlag` is the one place that picks between the two.
+ *
+ * ---------------------------------------------------------------------------
+ * THE LEVEL IS A RUNG, NOT A FLOOR. Workstream AN.
+ *
+ * The owner's words: *"all quests should be on a strict per level register"*.
+ * `quest.level` used to be a minimum -- level 2 meant "level 2 or better" --
+ * and a minimum is not a register, it is a pile that only ever grows. It is now
+ * **exact**: a quest sits on exactly one of ten rungs and is offered while the
+ * player is standing on that rung and at no other time.
+ *
+ * Three consequences, all of them deliberate:
+ *
+ *   - **A rung can be missed.** Reach level 3 without taking the level-2 job
+ *     and it is gone -- until next Monday, when the level resets to 1 and the
+ *     climb comes back through 2. That is rule 3 of `DESIGN.md` doing real work
+ *     rather than being a technicality: the week is the epic, and the register
+ *     is what makes a level feel like a place you were rather than a number you
+ *     passed.
+ *   - **A quest already accepted is unaffected.** The rung gates the *offer*,
+ *     not the walking or the turn-in, so levelling up mid-job never strands
+ *     anybody: `questRefusal` is asked before a cursor exists and never after.
+ *   - **The tenth rung is a landing.** The ladder runs to `MAX_LEVEL`, the
+ *     register runs to ten, and a player at level 14 with nothing to do would
+ *     be a dead end rather than a design. `rungOf` clamps the player to the top
+ *     rung, so level 10 content stays offered above it.
  */
 
 // --- The bounds ---------------------------------------------------------------
@@ -107,6 +151,22 @@ export const MAX_CASH_REWARD = 500;
 export const MAX_XP_REWARD = 2000;
 /** How many story flags one quest may set. Four is three more than any of them uses. */
 export const MAX_UNLOCKS = 4;
+
+/**
+ * How many rungs the register has. Workstream AN.
+ *
+ * Ten, because the owner asked for ten and because it is the number that makes
+ * the phone's register a screen rather than a scroll. It is deliberately **not**
+ * `net/accounts.MAX_LEVEL`, which is 255 and is a bound on what a `u8` can carry
+ * rather than a statement about content: nobody is going to author two hundred
+ * and fifty-five rungs of Sydney, and a register with that many rows would be a
+ * spreadsheet.
+ *
+ * A quest whose `level` is past this is clamped onto the top rung rather than
+ * refused, on `parseStep`'s standing radius argument: a content file with a typo
+ * in one number should lose the number, not the pack.
+ */
+export const REGISTER_LEVELS = 10;
 
 /** How many quests one pack may carry, and how many steps one quest may have. */
 export const MAX_QUESTS_PER_PACK = 64;
@@ -257,7 +317,11 @@ export interface Quest {
   blurb: string;
   /** The dialog NPC who hands it out and takes it back. */
   giver: string;
-  /** Minimum level. 1 means no gate. */
+  /**
+   * **The rung.** Exact, 1 to `REGISTER_LEVELS`, and not a minimum -- see the
+   * header. A quest is offered while `rungOf(player.level) === level` and at no
+   * other time.
+   */
   level: number;
   /** `''`, `'Marita'` or `'DeFAULT'`. The spellings are law; see `game/teams.ts`. */
   faction: string;
@@ -607,7 +671,10 @@ export function parseQuestPack(raw: unknown, name: string): ParseResult<QuestPac
       title: str(q.title, MAX_TITLE_CHARS) || questId,
       blurb: str(q.blurb, MAX_LINE_CHARS),
       giver: id(q.giver),
-      level: clampInt(num(q.level, 1), 1, 255),
+      // Onto the register rather than onto the ladder: the rung is exact, so a
+      // quest that landed above the top rung would be a quest nobody is ever
+      // standing level with. See `REGISTER_LEVELS`.
+      level: clampInt(num(q.level, 1), 1, REGISTER_LEVELS),
       faction: side,
       requires: strList(q.requires, 8, MAX_ID_CHARS),
       needFlags: strList(q.needFlags, 8, MAX_FLAG_CHARS),
@@ -974,6 +1041,45 @@ export function completionFlag(questId: string): string {
 }
 
 /**
+ * The prefix on a mark that only means "this week", and the mark itself.
+ *
+ * `net/accounts.resetIfNewWeek` drops every flag that starts with this and
+ * keeps everything else, which is the whole of how a repeatable comes round on
+ * Monday. Exported as a constant rather than written out at the reset, because
+ * a Monday that swept the wrong prefix would erase the story and nothing
+ * anywhere would say so.
+ */
+export const WEEKLY_FLAG_PREFIX = 'w:';
+
+export function weeklyFlag(questId: string): string {
+  return `${WEEKLY_FLAG_PREFIX}${questId}`;
+}
+
+/**
+ * Which mark this quest leaves when it is handed in. `repeatable` is the switch.
+ *
+ * One function so the engine that writes the mark, the refusal that reads it and
+ * the register that draws it cannot disagree about which prefix a given quest
+ * uses -- which would be a job that reads as done and is offered anyway, or the
+ * reverse. See the header's "two completion marks".
+ */
+export function doneFlag(quest: Quest): string {
+  return quest.repeatable ? weeklyFlag(quest.id) : completionFlag(quest.id);
+}
+
+/**
+ * Which rung of the register a player is standing on.
+ *
+ * The clamp is the tenth rung's landing; see the header. Floored at 1 because a
+ * level of 0 is a number the ladder cannot produce and a rung of 0 would be a
+ * register with nothing on it.
+ */
+export function rungOf(level: number): number {
+  if (!Number.isFinite(level)) return 1;
+  return Math.max(1, Math.min(REGISTER_LEVELS, Math.floor(level)));
+}
+
+/**
  * One cursor off disk, or null. `sanitiseAccount`'s discipline; see that file.
  *
  * `steps` is **optional**, and that is the whole reason this function is
@@ -1064,9 +1170,17 @@ export interface PlayerFacts {
  * copy of the rule that happens to be nearby.
  */
 export function questRefusal(quest: Quest, facts: PlayerFacts, cursors: QuestCursors): string {
-  if (facts.story.has(completionFlag(quest.id))) return 'you have done that one';
+  if (facts.story.has(doneFlag(quest))) {
+    return quest.repeatable ? 'done for the week' : 'you have done that one';
+  }
   if (cursors[quest.id] !== undefined) return 'you are already on that';
-  if (facts.level < quest.level) return `level ${quest.level} first`;
+  // **The rung, exact.** Two sentences rather than one, because "level 3 first"
+  // read by somebody who is level 5 is a lie about which direction they are
+  // wrong in -- and the whole point of a register is that a player can tell
+  // which rung a job belongs to. See the header.
+  const rung = rungOf(facts.level);
+  if (rung < quest.level) return `level ${quest.level} first`;
+  if (rung > quest.level) return `level ${quest.level} only`;
   if (quest.faction !== '' && facts.faction !== quest.faction) return `that is ${quest.faction} work`;
   for (const need of quest.requires) {
     if (!facts.story.has(completionFlag(need))) return 'not yet';
@@ -1076,14 +1190,141 @@ export function questRefusal(quest: Quest, facts: PlayerFacts, cursors: QuestCur
   return '';
 }
 
-/** Whether a dialog choice is offered at all. Same shape, same argument. */
-export function choiceRefusal(choice: DialogChoice, facts: PlayerFacts): string {
+/**
+ * What the live bundle looks like to somebody asking about one player.
+ *
+ * A lookup **function** rather than a map, because the two callers hold the
+ * quests in different shapes for good reasons of their own: the server walks
+ * `ContentStore.bundle.quests` on an op, and the browser keeps an index it
+ * rebuilds when `/content` changes revision. Neither should have to build the
+ * other's structure to ask a question.
+ */
+export interface QuestView {
+  /** The quest with this id in the live bundle, or null. */
+  quest(id: string): Quest | null;
+  /** This player's open cursors. */
+  cursors: QuestCursors;
+}
+
+/** The obvious `QuestView` over an array. For the checks and small bundles. */
+export function questView(quests: readonly Quest[], cursors: QuestCursors): QuestView {
+  const byId = new Map(quests.map((q) => [q.id, q]));
+  return { quest: (id) => byId.get(id) ?? null, cursors };
+}
+
+/**
+ * Whether a dialog choice is offered at all, and why not. Same shape, same
+ * argument.
+ *
+ * ---------------------------------------------------------------------------
+ * **ONE RULE, THREE READERS.** Workstream AN.
+ *
+ * `view` is optional and everything changes when it is supplied. Without it
+ * this answers the *choice's own* gates -- level, side, flags, the price of a
+ * bribe -- which is all a plain `goto` has. With it, a choice that **accepts**
+ * or **turns in** a quest is also asked about the quest, so the one function
+ * answers the whole question a button has to answer before it is drawn.
+ *
+ * That matters because two readers ask the whole question and they must not
+ * drift: `client/src/dialog.ts` greys the button out and prints the sentence,
+ * and `client/src/world/questmarkers.ts` decides whether the NPC gets a `!`.
+ * Before this, the panel had a private copy of the quest half and the world had
+ * none -- which is exactly how a marker ends up floating over an NPC with
+ * nothing to give.
+ *
+ * **`server/quests.ts` deliberately calls this without a view**, and that is
+ * not an oversight. Its `node` handler decides where a conversation *walks*;
+ * the decisions are `accept` and `turnin`, and each of those already asks
+ * `questRefusal` -- the same gate this reaches through -- with the authority's
+ * own facts. Handing `node` the quest half as well would refuse the navigation
+ * that arrives immediately **after** an accept it just granted, and the player
+ * would read "you are already on that" for the click that started the job.
+ */
+export function choiceRefusal(choice: DialogChoice, facts: PlayerFacts, view?: QuestView): string {
   if (choice.needLevel > 0 && facts.level < choice.needLevel) return `level ${choice.needLevel} first`;
   if (choice.needFaction !== '' && facts.faction !== choice.needFaction) return `${choice.needFaction} only`;
   if (choice.needFlag !== '' && !facts.story.has(choice.needFlag)) return 'not yet';
   if (choice.denyFlag !== '' && facts.story.has(choice.denyFlag)) return 'too late for that';
   if (choice.needCash > 0 && facts.cash < choice.needCash) return `$${choice.needCash}`;
+  if (view === undefined) return '';
+  // The quest half. Ordered the way `SuggestionStore.vote` orders its own
+  // refusals: the most specific true thing first. A button that turns in a job
+  // you have not finished should name **the step you are on**, which is the
+  // single most useful sentence a conversation can produce.
+  if (choice.accept !== '') {
+    const quest = view.quest(choice.accept);
+    if (!quest) return 'not available';
+    return questRefusal(quest, facts, view.cursors);
+  }
+  if (choice.turnin !== '') {
+    const quest = view.quest(choice.turnin);
+    const cursor = view.cursors[choice.turnin];
+    if (!quest || !cursor) return 'you are not on that';
+    if (!cursor.d) {
+      const step = quest.steps[cursor.s];
+      return step ? stepLabel(step) : 'not yet';
+    }
+  }
   return '';
+}
+
+/** A step's tracker line, clipped to a row. One place, so the panel and the
+ * refusal say the same words about the same step. */
+export function stepLabel(step: QuestStep, max = 52): string {
+  const text = step.label === '' ? defaultLabel(step) : step.label;
+  return text.length <= max ? text : `${text.slice(0, max - 1)}\u2026`;
+}
+
+// --- The register, and the marks over the giver's head --------------------------
+
+/**
+ * Where one quest sits for one player, in one word.
+ *
+ * The register's vocabulary and the marker's, and they are the same five words
+ * on purpose: a job the phone calls `ready` is a job the world puts a `?` over,
+ * and a player who has read one has read the other.
+ */
+export type QuestStanding = 'on' | 'ready' | 'available' | 'done' | 'locked';
+
+export function questStanding(quest: Quest, facts: PlayerFacts, cursors: QuestCursors): QuestStanding {
+  const cursor = cursors[quest.id];
+  if (cursor !== undefined) return cursor.d ? 'ready' : 'on';
+  if (facts.story.has(doneFlag(quest))) return 'done';
+  return questRefusal(quest, facts, cursors) === '' ? 'available' : 'locked';
+}
+
+/** What floats over a quest giver's head. WoW's pair, and nothing else. */
+export type QuestMarker = 'none' | 'offer' | 'turnin';
+
+/**
+ * The `!` and the `?`, decided once and read by the renderer.
+ *
+ * Pure and three-free so it can be checked in `verifyQuests` rather than by
+ * looking at Sydney, and it takes a **`QuestView`** rather than a bare cursor
+ * map for the reason `choiceRefusal` gives: the answer depends on the quests
+ * behind this NPC's buttons, and an NPC alone cannot know them.
+ *
+ * The rule is deliberately *not* "does this NPC give a quest at your rung". It
+ * is **"is there a button on their tree you could press right now"**, evaluated
+ * through the same `choiceRefusal` the panel greys with -- so the mark and the
+ * conversation can never disagree, which is the failure a second copy of the
+ * rule would produce and nothing would report.
+ *
+ * `turnin` wins over `offer` when both are true, on WoW's own ordering: a
+ * player who can hand something in is finishing a loop, and the reward is the
+ * more urgent of the two invitations.
+ */
+export function markerFor(npc: DialogNpc, facts: PlayerFacts, view: QuestView): QuestMarker {
+  let offer = false;
+  for (const node of npc.nodes) {
+    for (const choice of node.choices) {
+      if (choice.accept === '' && choice.turnin === '') continue;
+      if (choiceRefusal(choice, facts, view) !== '') continue;
+      if (choice.turnin !== '') return 'turnin';
+      offer = true;
+    }
+  }
+  return offer ? 'offer' : 'none';
 }
 
 // --- Progress ------------------------------------------------------------------
@@ -1491,7 +1732,7 @@ export function verifyQuests(): string[] {
         quests: [
           { id: 'first', giver: 'clerk', steps: [{ kind: 'earn', dollars: 5 }], reward: { unlock: ['act0:in'] } },
           { id: 'second', giver: 'clerk', level: 3, requires: ['first'], steps: [{ kind: 'earn', dollars: 5 }] },
-          { id: 'side', giver: 'clerk', faction: 'DeFAULT', steps: [{ kind: 'earn', dollars: 5 }] },
+          { id: 'side', giver: 'clerk', level: 9, faction: 'DeFAULT', steps: [{ kind: 'earn', dollars: 5 }] },
         ],
       },
       'fixture',
@@ -1515,6 +1756,273 @@ export function verifyQuests(): string[] {
     }
     if (questRefusal(quests[0], facts(1, '', []), { first: blankCursor(quests[0]) }) === '') {
       failures.push('A quest already in progress was offered again.');
+    }
+  }
+
+  /*
+   * --- WORKSTREAM AN. **The rung is exact**, which is the whole of the
+   * register, and every one of these fails silently in this repo's sense: the
+   * game plays perfectly and the job is simply never on the phone.
+   *
+   * The one that a minimum could never have caught is `offered at 3, refused at
+   * 4`. A gate that is only ever tested from below reads as correct for as long
+   * as nobody levels up, which is one evening.
+   */
+  {
+    const quests = parseQuestPack(
+      {
+        quests: [
+          { id: 'three', giver: 'clerk', level: 3, steps: [{ kind: 'earn', dollars: 5 }] },
+          { id: 'top', giver: 'clerk', level: 99, steps: [{ kind: 'earn', dollars: 5 }] },
+          { id: 'weekly', giver: 'clerk', level: 2, repeatable: true, steps: [{ kind: 'earn', dollars: 5 }] },
+        ],
+      },
+      'fixture',
+    ).value.quests;
+    const [three, top, weekly] = quests;
+    const facts = (level: number, story: string[] = []): PlayerFacts => ({
+      level,
+      faction: '',
+      story: new Set(story),
+      cash: 0,
+    });
+    if (!three) {
+      failures.push('The register fixture did not parse.');
+    } else {
+      if (questRefusal(three, facts(3), {}) !== '') failures.push('A level-3 quest was refused at level 3.');
+      if (questRefusal(three, facts(2), {}) === '') failures.push('A level-3 quest was offered at level 2.');
+      if (questRefusal(three, facts(4), {}) === '') {
+        failures.push('A level-3 quest was still offered at level 4; the rung is exact, not a minimum.');
+      }
+      // And the sentence points the right way, because "level 3 first" read at
+      // level 5 is the game lying about which direction you are wrong in.
+      if (questRefusal(three, facts(2), {}) !== 'level 3 first') {
+        failures.push(`Below the rung the refusal reads ${JSON.stringify(questRefusal(three, facts(2), {}))}.`);
+      }
+      if (questRefusal(three, facts(4), {}) !== 'level 3 only') {
+        failures.push(`Above the rung the refusal reads ${JSON.stringify(questRefusal(three, facts(4), {}))}.`);
+      }
+    }
+    // The top rung is a landing: a quest authored past the register is clamped
+    // onto it, and a player past the register still stands on it.
+    if (top?.level !== REGISTER_LEVELS) failures.push(`A level-99 quest came back on rung ${top?.level}.`);
+    if (top && questRefusal(top, facts(REGISTER_LEVELS + 5), {}) !== '') {
+      failures.push('A player past the top rung was offered nothing at all; the tenth rung is a landing.');
+    }
+    if (rungOf(0) !== 1 || rungOf(1) !== 1 || rungOf(7) !== 7 || rungOf(400) !== REGISTER_LEVELS) {
+      failures.push(`rungOf clamps wrongly: ${[rungOf(0), rungOf(1), rungOf(7), rungOf(400)].join(', ')}.`);
+    }
+
+    // --- The two completion marks, and which one Monday takes.
+    if (!weekly) {
+      failures.push('The weekly fixture did not parse.');
+    } else {
+      if (doneFlag(weekly) !== weeklyFlag('weekly')) failures.push('A repeatable does not mark itself weekly.');
+      if (three && doneFlag(three) !== completionFlag('three')) failures.push('A story quest does not mark itself permanently.');
+      if (!weeklyFlag('x').startsWith(WEEKLY_FLAG_PREFIX)) failures.push('A weekly mark does not carry the prefix Monday sweeps.');
+      if (completionFlag('x').startsWith(WEEKLY_FLAG_PREFIX)) {
+        failures.push('A story mark carries the weekly prefix; Monday would erase the story.');
+      }
+      if (questRefusal(weekly, facts(2, [weeklyFlag('weekly')]), {}) === '') {
+        failures.push('A repeatable already done this week was offered again.');
+      }
+      if (questRefusal(weekly, facts(2, [completionFlag('weekly')]), {}) !== '') {
+        failures.push('A repeatable was refused by a story mark it never writes.');
+      }
+      // And the standing the register draws, for each of the five words.
+      const cursor = blankCursor(weekly);
+      if (questStanding(weekly, facts(2), {}) !== 'available') failures.push('A takeable job did not read as available.');
+      if (questStanding(weekly, facts(3), {}) !== 'locked') failures.push('A job on another rung did not read as locked.');
+      if (questStanding(weekly, facts(2, [weeklyFlag('weekly')]), {}) !== 'done') failures.push('A finished job did not read as done.');
+      if (questStanding(weekly, facts(2), { weekly: cursor }) !== 'on') failures.push('A job in progress did not read as on.');
+      if (questStanding(weekly, facts(2), { weekly: { ...cursor, d: true } }) !== 'ready') {
+        failures.push('A job ready to hand in did not read as ready.');
+      }
+    }
+  }
+
+  /*
+   * --- WORKSTREAM AN. **The `!` and the `?`**, which are the only thing in the
+   * world that says an NPC is worth walking up to.
+   *
+   * Every failure here is silent and expensive in the same way: a mark that is
+   * absent is content nobody finds, and a mark that is present over an NPC with
+   * nothing to give is a player crossing Sydney for a greyed-out button. The
+   * decision is pure so it can be checked here rather than by looking.
+   */
+  {
+    const npc = parseDialogPack(
+      {
+        npcs: [
+          {
+            id: 'clerk',
+            x: 0,
+            z: 0,
+            nodes: [
+              {
+                id: 'hello',
+                line: 'take a number',
+                choices: [
+                  { text: 'the level three job', accept: 'three' },
+                  { text: 'done the level three job', turnin: 'three' },
+                  { text: 'nothing', goto: '' },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      'fixture',
+    ).value.npcs[0];
+    const quests = parseQuestPack(
+      { quests: [{ id: 'three', giver: 'clerk', level: 3, steps: [{ kind: 'ko', count: 2 }] }] },
+      'fixture',
+    ).value.quests;
+    const facts = (level: number, story: string[] = []): PlayerFacts => ({
+      level,
+      faction: '',
+      story: new Set(story),
+      cash: 0,
+    });
+    if (!npc || quests.length !== 1) {
+      failures.push('The marker fixture did not parse.');
+    } else {
+      const view = (cursors: QuestCursors): QuestView => questView(quests, cursors);
+      if (markerFor(npc, facts(3), view({})) !== 'offer') failures.push('An NPC with a takeable job got no "!".');
+      if (markerFor(npc, facts(2), view({})) !== 'none') failures.push('An NPC got a "!" for a job one rung up.');
+      if (markerFor(npc, facts(4), view({})) !== 'none') failures.push('An NPC got a "!" for a job one rung down.');
+      if (markerFor(npc, facts(3, [completionFlag('three')]), view({})) !== 'none') {
+        failures.push('An NPC got a "!" for a job already done.');
+      }
+      const open = blankCursor(quests[0]);
+      if (markerFor(npc, facts(3), view({ three: open })) !== 'none') {
+        failures.push('An NPC got a mark while the job is still being walked; there is nothing to say to them.');
+      }
+      if (markerFor(npc, facts(3), view({ three: { ...open, d: true } })) !== 'turnin') {
+        failures.push('An NPC holding a finished job got no "?".');
+      }
+      // The turn-in wins. Both are true the moment a repeatable is finished and
+      // the reward is the more urgent invitation -- WoW's own ordering.
+      const both = parseDialogPack(
+        {
+          npcs: [
+            {
+              id: 'clerk',
+              x: 0,
+              z: 0,
+              nodes: [
+                {
+                  id: 'hello',
+                  line: 'again',
+                  choices: [
+                    { text: 'another', accept: 'other' },
+                    { text: 'done', turnin: 'three' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        'fixture',
+      ).value.npcs[0];
+      const pair = parseQuestPack(
+        {
+          quests: [
+            { id: 'three', giver: 'clerk', level: 3, steps: [{ kind: 'ko', count: 2 }] },
+            { id: 'other', giver: 'clerk', level: 3, steps: [{ kind: 'ko', count: 1 }] },
+          ],
+        },
+        'fixture',
+      ).value.quests;
+      if (both && markerFor(both, facts(3), questView(pair, { three: { ...open, d: true } })) !== 'turnin') {
+        failures.push('An NPC with both a job to give and one to take back drew the "!" rather than the "?".');
+      }
+      // A choice whose own gate refuses it is not an invitation either, which is
+      // what makes the mark and the greyed button the same rule.
+      const gated = parseDialogPack(
+        {
+          npcs: [
+            {
+              id: 'clerk',
+              x: 0,
+              z: 0,
+              nodes: [{ id: 'hello', line: 'no', choices: [{ text: 'job', accept: 'three', needFaction: 'Marita' }] }],
+            },
+          ],
+        },
+        'fixture',
+      ).value.npcs[0];
+      if (gated && markerFor(gated, facts(3), view({})) !== 'none') {
+        failures.push('An NPC drew a "!" over a choice the panel would grey out.');
+      }
+      // And an NPC with no quest buttons at all never draws anything, which is
+      // most of the city once the pool lands.
+      const idle = parseDialogPack(
+        { npcs: [{ id: 'x', x: 0, z: 0, nodes: [{ id: 'hello', line: 'hi', choices: [{ text: 'bye', goto: '' }] }] }] },
+        'fixture',
+      ).value.npcs[0];
+      if (idle && markerFor(idle, facts(3), view({})) !== 'none') failures.push('An NPC with nothing to give drew a mark.');
+    }
+  }
+
+  // --- The refusal a button carries, which is the panel's copy of all of the
+  // above and must not be a second opinion. See `choiceRefusal`'s `view`.
+  {
+    const quests = parseQuestPack(
+      { quests: [{ id: 'job', giver: 'clerk', level: 2, steps: [{ kind: 'ko', count: 3, label: 'drop three' }] }] },
+      'fixture',
+    ).value.quests;
+    const npc = parseDialogPack(
+      {
+        npcs: [
+          {
+            id: 'clerk',
+            x: 0,
+            z: 0,
+            nodes: [
+              {
+                id: 'hello',
+                line: 'hi',
+                choices: [
+                  { text: 'take it', accept: 'job' },
+                  { text: 'done it', turnin: 'job' },
+                  { text: 'take the ghost', accept: 'ghost' },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      'fixture',
+    ).value.npcs[0];
+    const facts: PlayerFacts = { level: 2, faction: '', story: new Set(), cash: 0 };
+    if (!npc || quests.length !== 1) {
+      failures.push('The choice-view fixture did not parse.');
+    } else {
+      const [take, hand, ghost] = npc.nodes[0].choices;
+      if (choiceRefusal(take, facts) !== '') failures.push('A choice with no gates of its own was refused without a view.');
+      if (choiceRefusal(take, facts, questView(quests, {})) !== '') failures.push('A takeable job was refused through the view.');
+      if (choiceRefusal(take, { ...facts, level: 3 }, questView(quests, {})) === '') {
+        failures.push('A job one rung down was still offered by its button; the panel would not grey it.');
+      }
+      if (choiceRefusal(ghost, facts, questView(quests, {})) !== 'not available') {
+        failures.push('A choice accepting a quest that does not exist did not say so.');
+      }
+      if (choiceRefusal(hand, facts, questView(quests, {})) !== 'you are not on that') {
+        failures.push('A turn-in for a job never taken did not say so.');
+      }
+      const cursor = blankCursor(quests[0]);
+      if (choiceRefusal(hand, facts, questView(quests, { job: cursor })) !== 'drop three') {
+        failures.push('A turn-in for an unfinished job did not name the step you are on.');
+      }
+      if (choiceRefusal(hand, facts, questView(quests, { job: { ...cursor, d: true } })) !== '') {
+        failures.push('A turn-in for a finished job was refused.');
+      }
+      const clipped = stepLabel(quests[0].steps[0], 6);
+      if ([...clipped].length !== 6 || !clipped.endsWith('\u2026')) {
+        failures.push(`A long step label was not clipped to a row: ${JSON.stringify(clipped)}.`);
+      }
+      if (stepLabel(quests[0].steps[0]) !== 'drop three') failures.push('A short step label was clipped anyway.');
     }
   }
 

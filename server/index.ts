@@ -995,6 +995,23 @@ const questWorld: QuestWorld = {
   note(playerId, text) {
     findPlayer(playerId)?.room.sim.note(playerId, text);
   },
+  /**
+   * WORKSTREAM AN. The body follows the record when quest xp levels somebody.
+   *
+   * `Simulation.creditLadder` does exactly this on a knockout and cannot be
+   * reached from here -- it is private and it is about kills. The two lines are
+   * its two lines: the participant's mirror of the level, which is what
+   * `levelOf` above answers with and therefore what the whole register is gated
+   * on, and the roster version, because the number over this player's head is
+   * carried by the roster and would otherwise stay wrong until the next
+   * two-second refresh.
+   */
+  levelled(playerId, level) {
+    const found = findPlayer(playerId);
+    if (!found) return;
+    found.p.level = level;
+    found.room.sim.rosterVersion++;
+  },
   rideStation: (playerId) => findPlayer(playerId)?.room.sim.rideStation(playerId) ?? null,
   /**
    * Put a frame on one player's socket.
