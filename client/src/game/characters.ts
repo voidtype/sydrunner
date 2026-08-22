@@ -152,6 +152,7 @@
  */
 
 import { type CombatantState } from './combat.ts';
+import { isAboard } from './riding.ts';
 import {
   MAX_ACTORS,
   NPC_KIND,
@@ -1941,6 +1942,14 @@ function targetOf(actor: NpcActor, ctx: FactionCtx): CombatantState | undefined 
 
 /** Whether a combatant can be engaged at all: upright, alive, in the world. */
 function engageable(c: CombatantState): boolean {
+  // And ON the world. A passenger inside a moving train is not somebody an
+  // eshay on the footpath can reach: before this line, the actor would walk to
+  // the outside of the carriage, swing at the wall, and debit the wallet of a
+  // person doing 100 km/h past him -- the e2e ride acceptance caught the pip
+  // half of that (sim.shoot now guards, like every other damage door) and this
+  // is the targeting half. Declined here rather than at each caller, because
+  // "can this person be engaged" is exactly the question this function is.
+  if (isAboard(c.aboard)) return false;
   return c.phase !== 'ko' && c.health > 0;
 }
 
